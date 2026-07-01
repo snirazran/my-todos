@@ -79,13 +79,8 @@ export default function ProfileQuestionsStep({
 }: OnboardingStepProps) {
   const [questionIndex, setQuestionIndex] = useState(0);
 
-  const tz =
-    typeof window !== 'undefined'
-      ? Intl.DateTimeFormat().resolvedOptions().timeZone
-      : 'UTC';
-
   const { data: questsData } = useSWR<{ macroCategories?: MacroCategoryDefinition[] }>(
-    `/api/quests?view=home&timezone=${encodeURIComponent(tz)}`,
+    '/api/onboarding/categories',
     fetcher,
   );
 

@@ -6,6 +6,7 @@ import connectMongo from '@/lib/mongoose';
 import UserModel from '@/lib/models/User';
 import FriendRequestModel, { type FriendRequestSource } from '@/lib/models/FriendRequest';
 import { normalizeFriendCode, areFriends, createFriendship } from '@/lib/friends/code';
+import { notifyFriendUpdate, notifyFriendsChanged } from '@/lib/taskSync';
 
 async function resolveTarget(body: {
   code?: string;
@@ -63,15 +64,21 @@ export async function POST(req: NextRequest) {
       incoming.respondedAt = new Date();
       await incoming.save();
       await createFriendship(userId, targetId, 'code');
+      void notifyFriendsChanged(userId);
       return NextResponse.json({ ok: true, autoAccepted: true });
     }
 
     const source: FriendRequestSource = body.source ?? 'code';
-    await FriendRequestModel.updateOne(
+    const result = await FriendRequestModel.updateOne(
       { fromUserId: userId, toUserId: targetId, status: 'pending' },
       { $setOnInsert: { fromUserId: userId, toUserId: targetId, status: 'pending', source, createdAt: new Date() } },
       { upsert: true },
     );
+
+    // Push the incoming request to the recipient instantly (no refresh needed).
+    if (result.upsertedCount > 0) {
+      void notifyFriendUpdate(targetId);
+    }
 
     return NextResponse.json({ ok: true, pending: true });
   } catch (err) {
@@ -158,6 +165,7 @@ export async function PATCH(req: NextRequest) {
 
     if (action === 'accept') {
       await createFriendship(request.fromUserId, request.toUserId, 'code');
+      void notifyFriendUpdate(request.fromUserId);
     }
 
     return NextResponse.json({ ok: true });

@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState } from 'react';
-import useSWR, { mutate as swrMutate } from 'swr';
+import useSWR from 'swr';
 import { Check, X, Loader2, UserPlus } from 'lucide-react';
 import { BaseSheet } from '@/components/ui/BaseSheet';
+import { mutateFriendsCaches } from '@/hooks/useFriendsSync';
 
 type IncomingRequest = {
   id: string;
@@ -39,7 +40,7 @@ export function FriendRequestsInbox({
       });
       if (res.ok) {
         await mutate();
-        swrMutate('/api/friends');
+        mutateFriendsCaches();
       }
     } catch {
       /* ignore */

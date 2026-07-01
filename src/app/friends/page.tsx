@@ -4,9 +4,17 @@ import React, { useState, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import { ChevronRight, Plus, UserPlus, Bell } from 'lucide-react';
+import {
+  ChevronRight,
+  Plus,
+  UserPlus,
+  Bell,
+  UserMinus,
+  Loader2,
+} from 'lucide-react';
 import useSWR from 'swr';
 import { useAuth } from '@/components/auth/AuthContext';
+import { mutateFriendsCaches } from '@/hooks/useFriendsSync';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import Frog from '@/components/ui/frog';
 import Fly from '@/components/ui/fly';
@@ -14,6 +22,7 @@ import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { AddFriendsSheet } from '@/components/ui/AddFriendsSheet';
 import { InviteFriendsModal } from '@/components/ui/InviteFriendsModal';
 import { FriendRequestsInbox } from '@/components/ui/FriendRequestsInbox';
+import { FriendDetailModal } from '@/components/ui/FriendDetailModal';
 import { contributionFrom, type FriendSummary } from '@/lib/friends/indices';
 import { RewardCard } from '@/components/ui/gift-box/RewardCard';
 import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
@@ -56,6 +65,8 @@ export default function FriendsPage() {
   const [inboxOpen, setInboxOpen] = useState(false);
   const [claiming, setClaiming] = useState(false);
   const [claimReward, setClaimReward] = useState<number | null>(null);
+  const [removeTarget, setRemoveTarget] = useState<FriendSummary | null>(null);
+  const [detailTarget, setDetailTarget] = useState<FriendSummary | null>(null);
 
   const claimable = friendsData?.claimable ?? 0;
 
@@ -187,7 +198,11 @@ export default function FriendsPage() {
               {hasRealFriends ? (
                 <ul className="flex flex-col gap-1.5">
                   {leaderboard.map((entry, i) => (
-                    <LeaderboardRow key={`${entry.userId}-${i}`} entry={entry} />
+                    <LeaderboardRow
+                      key={`${entry.userId}-${i}`}
+                      entry={entry}
+                      onOpen={() => setDetailTarget(entry)}
+                    />
                   ))}
                 </ul>
               ) : (
@@ -212,7 +227,104 @@ export default function FriendsPage() {
           onClose={() => setClaimReward(null)}
         />
       )}
+      <FriendDetailModal
+        entry={detailTarget}
+        onClose={() => setDetailTarget(null)}
+        onRemove={(entry) => {
+          setDetailTarget(null);
+          setRemoveTarget(entry);
+        }}
+      />
+      <RemoveFriendDialog
+        target={removeTarget}
+        onClose={() => setRemoveTarget(null)}
+      />
     </main>
+  );
+}
+
+function RemoveFriendDialog({
+  target,
+  onClose,
+}: {
+  target: FriendSummary | null;
+  onClose: () => void;
+}) {
+  const [removing, setRemoving] = useState(false);
+
+  const handleRemove = async () => {
+    if (!target || removing) return;
+    setRemoving(true);
+    try {
+      const res = await fetch('/api/friends', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ friendId: target.userId }),
+      });
+      if (res.ok) {
+        mutateFriendsCaches();
+        onClose();
+      }
+    } finally {
+      setRemoving(false);
+    }
+  };
+
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
+    <AnimatePresence>
+      {target && (
+        <>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={removing ? undefined : onClose}
+            className="fixed inset-0 z-[1500] bg-black/70 backdrop-blur-sm"
+          />
+          <div className="pointer-events-none fixed inset-0 z-[1501] flex items-center justify-center p-5">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.94, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.94, y: 12 }}
+              transition={{ type: 'spring', damping: 26, stiffness: 300 }}
+              className="pointer-events-auto relative w-full max-w-sm rounded-[28px] bg-white px-6 pb-6 pt-7 text-center shadow-2xl"
+            >
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-500/10 text-rose-500">
+                <UserMinus className="h-7 w-7" />
+              </div>
+              <h2 className="text-xl font-black tracking-tight text-zinc-900">
+                Remove friend?
+              </h2>
+              <p className="mt-1.5 text-[15px] font-medium text-zinc-500">
+                {target.frogName || target.name} will be removed from your
+                friends. You can add each other again anytime.
+              </p>
+
+              <div className="mt-6 flex flex-col gap-2.5">
+                <button
+                  onClick={handleRemove}
+                  disabled={removing}
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-rose-500 py-3.5 text-base font-black tracking-tight text-white shadow-[0_5px_0_#be123c] transition-all hover:bg-rose-600 active:translate-y-0.5 disabled:opacity-60"
+                >
+                  {removing && <Loader2 className="h-5 w-5 animate-spin" />}
+                  {removing ? 'Removing…' : 'Remove friend'}
+                </button>
+                <button
+                  onClick={onClose}
+                  disabled={removing}
+                  className="w-full rounded-2xl bg-zinc-100 py-3.5 text-base font-black tracking-tight text-zinc-600 transition-colors hover:bg-zinc-200 disabled:opacity-60"
+                >
+                  Cancel
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        </>
+      )}
+    </AnimatePresence>,
+    document.body,
   );
 }
 
@@ -366,36 +478,50 @@ function FlyClaimRewardOverlay({
   );
 }
 
-function LeaderboardRow({ entry }: { entry: LeaderboardEntry }) {
+function LeaderboardRow({
+  entry,
+  onOpen,
+}: {
+  entry: LeaderboardEntry;
+  onOpen: () => void;
+}) {
   const shared = entry.givesYou ?? contributionFrom(entry.fliesToday);
+
   return (
-    <li className="flex items-center gap-2 rounded-xl border border-border/50 bg-card py-1.5 pl-1.5 pr-3 sm:gap-2.5 sm:py-2">
-      <div className="flex h-[78px] w-[96px] shrink-0 items-end justify-center self-center overflow-hidden min-[360px]:h-[102px] min-[360px]:w-[132px] min-[400px]:h-[124px] min-[400px]:w-[164px] sm:h-[124px] sm:w-48 md:h-[144px] md:w-56">
-        <Frog
-          className="min-[360px]:-translate-y-2 min-[400px]:-translate-y-3.5 md:-translate-y-3"
-          width={224}
-          height={185}
-          indices={entry.indices}
-        />
-      </div>
+    <li>
+      <button
+        type="button"
+        onClick={onOpen}
+        className="flex w-full items-center gap-2 rounded-xl border border-border/50 bg-card py-1.5 pl-1.5 pr-3 text-left transition-all hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md active:scale-[0.99] sm:gap-2.5 sm:py-2"
+      >
+        <div className="flex h-[78px] w-[96px] shrink-0 items-end justify-center self-center overflow-hidden min-[360px]:h-[102px] min-[360px]:w-[132px] min-[400px]:h-[124px] min-[400px]:w-[164px] sm:h-[124px] sm:w-48 md:h-[144px] md:w-56">
+          <Frog
+            className="min-[360px]:-translate-y-2 min-[400px]:-translate-y-3.5 md:-translate-y-3"
+            width={224}
+            height={185}
+            indices={entry.indices}
+          />
+        </div>
 
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-black leading-tight tracking-tight text-emerald-950 sm:text-base">
-          {entry.frogName || entry.name}
-        </p>
-        {entry.name && entry.frogName && entry.name !== entry.frogName && (
-          <p className="truncate text-xs font-semibold text-emerald-700/70">
-            {entry.name}
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-black leading-tight tracking-tight text-emerald-950 sm:text-base">
+            {entry.frogName || entry.name}
           </p>
-        )}
-      </div>
+          {entry.name && entry.frogName && entry.name !== entry.frogName && (
+            <p className="truncate text-xs font-semibold text-emerald-700/70">
+              {entry.name}
+            </p>
+          )}
+        </div>
 
-      <div className="flex shrink-0 items-center gap-1.5">
-        <Fly size={28} y={-4} interactive={false} />
-        <span className="text-xl font-black tabular-nums leading-none text-emerald-600 sm:text-2xl">
-          +{shared}
-        </span>
-      </div>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <Fly size={28} y={-4} interactive={false} />
+          <span className="text-xl font-black tabular-nums leading-none text-emerald-600 sm:text-2xl">
+            +{shared}
+          </span>
+          <ChevronRight className="h-5 w-5 text-emerald-900/25" />
+        </div>
+      </button>
     </li>
   );
 }

@@ -17,6 +17,12 @@ export async function middleware(req: NextRequest) {
   // BUT we need to be careful about public assets or api routes that don't need auth.
   // The config matcher handles specific paths.
 
+  // Onboarding runs before any account exists (account creation is deferred to
+  // the final step), so it must be reachable regardless of auth state.
+  if (req.nextUrl.pathname.startsWith('/onboarding')) {
+    return NextResponse.next();
+  }
+
   // Allow logged-out users to preview the home page via /?guest=1
   const isGuestPreview =
     req.nextUrl.pathname === '/' && req.nextUrl.searchParams.has('guest');
@@ -31,6 +37,10 @@ export async function middleware(req: NextRequest) {
     // Original logic: if (!isAuth && !isAuthRoute) -> redirect login.
     // This implies home '/' requires login.
     const welcomeUrl = new URL('/welcome', req.url);
+    const ref = req.nextUrl.searchParams.get('ref');
+    const friend = req.nextUrl.searchParams.get('friend');
+    if (ref) welcomeUrl.searchParams.set('ref', ref);
+    if (friend) welcomeUrl.searchParams.set('friend', friend);
     return NextResponse.redirect(welcomeUrl);
   }
 

@@ -139,6 +139,18 @@ export async function notifyFriendsChanged(actorId: string) {
   }
 }
 
+export async function notifyFriendUpdate(userId: string) {
+  try {
+    const event = await createTaskEvent(userId, { eventKind: 'friend-updated' });
+    void sendTaskSyncMessage(userId, event);
+  } catch (err) {
+    console.error(
+      'Friend update notify failed:',
+      (err as { message?: string } | null)?.message,
+    );
+  }
+}
+
 export async function notifyUserChanged(userId: string, change?: TaskSyncChange) {
   try {
     const event = await createTaskEvent(userId, change);

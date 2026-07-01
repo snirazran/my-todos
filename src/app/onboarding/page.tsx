@@ -10,8 +10,9 @@ import NotificationStep from './steps/NotificationStep';
 import AboutIntroStep from './steps/AboutIntroStep';
 import ProfileQuestionsStep from './steps/ProfileQuestionsStep';
 import CreateAccountStep from './steps/CreateAccountStep';
+import { signInAnonymously } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
-import { clearAuthTokenCookie } from '@/lib/authCookie';
+import { clearAuthTokenCookie, setAuthTokenCookie } from '@/lib/authCookie';
 import { OnboardingBackground } from '@/components/ui/OnboardingBackground';
 
 const STEP_IDS = ['name', 'humanName', 'createAccount', 'notifications', 'aboutIntro', 'age'] as const;
@@ -71,7 +72,15 @@ export default function OnboardingPage() {
     () =>
       STEP_IDS.filter((id) => {
         if (id === 'notifications' && !showNotificationStep) return false;
-        if (id === 'createAccount' && !auth?.currentUser?.isAnonymous) return false;
+        // Hide the "create account" step only once a real (non-anonymous)
+        // account exists — e.g. a magic-link returnee. With no account yet
+        // (deferred creation) or an anonymous one, keep offering it.
+        if (
+          id === 'createAccount' &&
+          auth?.currentUser &&
+          !auth.currentUser.isAnonymous
+        )
+          return false;
         return true;
       }),
     [showNotificationStep],
@@ -107,6 +116,15 @@ export default function OnboardingPage() {
       setSaving(true);
       const focusAreaIds = selections.focusAreas ?? [];
       try {
+        // Account creation is deferred until onboarding actually completes, so
+        // abandoning the flow never leaves a stranded account. If the user
+        // hasn't attached an email mid-flow, create the anonymous account now.
+        if (!auth?.currentUser) {
+          const cred = await signInAnonymously(auth);
+          const token = await cred.user.getIdToken();
+          setAuthTokenCookie(token);
+          await fetch('/api/user', { method: 'POST' });
+        }
         const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
         const [onboardingRes] = await Promise.all([
           fetch('/api/onboarding', {

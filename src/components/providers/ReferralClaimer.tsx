@@ -1,8 +1,10 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/components/auth/AuthContext';
 import { mutate as swrMutate } from 'swr';
+import { GiftClaimRewardOverlay } from '@/components/ui/GiftClaimRewardOverlay';
+import type { ItemDef } from '@/lib/skins/catalog';
 
 const STORAGE_KEY = 'frogress_referral_code';
 
@@ -14,6 +16,10 @@ const STORAGE_KEY = 'frogress_referral_code';
 export function ReferralClaimer() {
   const { user, loading } = useAuth();
   const claimedRef = useRef(false);
+  const [claimedGift, setClaimedGift] = useState<{
+    gift: ItemDef;
+    inviterName: string;
+  } | null>(null);
 
   // Capture ?ref=CODE on mount and persist it
   useEffect(() => {
@@ -58,9 +64,26 @@ export function ReferralClaimer() {
           } catch {
             /* ignore */
           }
-          // Refresh inventory/wallet caches so the new gift appears
+          // Refresh inventory/wallet/friends caches so the new gift and
+          // friendship appear immediately.
           swrMutate((key) => typeof key === 'string' && key.startsWith('/api/skins'));
           swrMutate((key) => typeof key === 'string' && key.startsWith('/api/backgrounds'));
+          swrMutate((key) => typeof key === 'string' && key.startsWith('/api/friends'));
+
+          try {
+            const data = await res.json();
+            if (data?.gift) {
+              setClaimedGift({
+                gift: data.gift as ItemDef,
+                inviterName:
+                  typeof data.inviterName === 'string'
+                    ? data.inviterName
+                    : 'A friend',
+              });
+            }
+          } catch {
+            /* no reward payload */
+          }
         }
       } catch {
         // Will retry on next session
@@ -68,5 +91,13 @@ export function ReferralClaimer() {
     })();
   }, [user, loading]);
 
-  return null;
+  if (!claimedGift) return null;
+
+  return (
+    <GiftClaimRewardOverlay
+      gift={claimedGift.gift}
+      inviterName={claimedGift.inviterName}
+      onClose={() => setClaimedGift(null)}
+    />
+  );
 }

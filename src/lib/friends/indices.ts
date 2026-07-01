@@ -31,6 +31,10 @@ export type FriendSummary = {
   fliesToday: number;
   /** Flies this friend contributes to you today (floor of their flies / 2). */
   givesYou?: number;
+  /** The friend's equipped background id (resolved to images on the client). */
+  backgroundId?: string | null;
+  /** Lifetime flies this friend has contributed to you (claimed). */
+  sharedTotal?: number;
 };
 
 /** Flies a friend's daily catch contributes to you: every 2 → 1. */

@@ -4,7 +4,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import FriendshipModel from '@/lib/models/Friendship';
+import FriendRequestModel from '@/lib/models/FriendRequest';
 import UserModel from '@/lib/models/User';
+import { friendshipKey } from '@/lib/friends/code';
+import { notifyFriendUpdate } from '@/lib/taskSync';
 import { getCachedCatalog, buildById } from '@/lib/skins/getCatalog';
 import {
   equippedToIndices,
@@ -44,10 +47,14 @@ export async function GET(req: NextRequest) {
 
     const [users, me, catalog] = await Promise.all([
       UserModel.find({ _id: { $in: friendIds } })
-        .select('name frogName wardrobe.equipped wardrobe.flyDaily')
+        .select(
+          'name frogName wardrobe.equipped wardrobe.flyDaily wardrobe.backgrounds.equipped',
+        )
         .lean(),
       UserModel.findById(userId)
-        .select('name frogName wardrobe.equipped wardrobe.flyDaily wardrobe.friendFlyDaily')
+        .select(
+          'name frogName wardrobe.equipped wardrobe.flyDaily wardrobe.friendFlyDaily wardrobe.friendFlyTotals wardrobe.backgrounds.equipped',
+        )
         .lean(),
       getCachedCatalog(),
     ]);
@@ -57,7 +64,11 @@ export async function GET(req: NextRequest) {
       _id: string;
       name?: string;
       frogName?: string;
-      wardrobe?: { equipped?: Partial<Record<string, string | null>>; flyDaily?: DailyFlyProgress };
+      wardrobe?: {
+        equipped?: Partial<Record<string, string | null>>;
+        flyDaily?: DailyFlyProgress;
+        backgrounds?: { equipped?: string | null };
+      };
     }): FriendSummary => {
       const fliesToday = fliesEarnedOn(u.wardrobe?.flyDaily, today);
       return {
@@ -67,10 +78,18 @@ export async function GET(req: NextRequest) {
         indices: equippedToIndices(u.wardrobe?.equipped, byId),
         fliesToday,
         givesYou: contributionFrom(fliesToday),
+        backgroundId: u.wardrobe?.backgrounds?.equipped ?? null,
       };
     };
 
-    const friends: FriendSummary[] = users.map(toSummary);
+    const totals = (me?.wardrobe?.friendFlyTotals ?? {}) as Record<
+      string,
+      number
+    >;
+    const friends: FriendSummary[] = users.map((u) => ({
+      ...toSummary(u),
+      sharedTotal: Math.max(0, Math.floor(totals[u._id] ?? 0)),
+    }));
 
     const prior = me?.wardrobe?.friendFlyDaily as FriendFlyDaily | undefined;
     const credited: Record<string, number> =
@@ -94,6 +113,71 @@ export async function GET(req: NextRequest) {
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'Failed to load friends' },
+      { status: 500 },
+    );
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  let userId: string;
+  try {
+    userId = await requireUserId();
+  } catch {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  let body: { friendId?: string };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+  }
+
+  const friendId = (body.friendId || '').trim();
+  if (!friendId) {
+    return NextResponse.json({ error: 'Missing friendId' }, { status: 400 });
+  }
+
+  try {
+    await connectMongo();
+    const [userA, userB] = friendshipKey(userId, friendId);
+    await FriendshipModel.deleteOne({ userA, userB });
+    // Clear any request history between them so they can re-add later.
+    await FriendRequestModel.deleteMany({
+      $or: [
+        { fromUserId: userId, toUserId: friendId },
+        { fromUserId: friendId, toUserId: userId },
+      ],
+    });
+
+    // Wipe each user's stored data about the other (both directions).
+    await Promise.all([
+      UserModel.updateOne(
+        { _id: userId },
+        {
+          $unset: {
+            [`wardrobe.friendFlyTotals.${friendId}`]: '',
+            [`wardrobe.friendFlyDaily.credited.${friendId}`]: '',
+          },
+        },
+      ),
+      UserModel.updateOne(
+        { _id: friendId },
+        {
+          $unset: {
+            [`wardrobe.friendFlyTotals.${userId}`]: '',
+            [`wardrobe.friendFlyDaily.credited.${userId}`]: '',
+          },
+        },
+      ),
+    ]);
+
+    void notifyFriendUpdate(friendId);
+
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : 'Failed to remove friend' },
       { status: 500 },
     );
   }

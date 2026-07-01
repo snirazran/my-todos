@@ -6,8 +6,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Check, Loader2, X } from 'lucide-react';
 import { mutate as swrMutate } from 'swr';
 
-type FoundFriend = { userId: string; name: string; frogName: string; alreadyFriends: boolean };
-
 export function EnterFriendCodeModal({
   open,
   onClose,
@@ -21,55 +19,40 @@ export function EnterFriendCodeModal({
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [found, setFound] = useState<FoundFriend | null>(null);
   const [sent, setSent] = useState(false);
+  const [sentLabel, setSentLabel] = useState('Friend request sent!');
 
   useEffect(() => {
     if (!open) return;
     setCode('');
     setError(null);
-    setFound(null);
     setSent(false);
     setLoading(false);
   }, [open]);
 
-  const handleFind = async () => {
-    const trimmed = code.trim();
-    if (!trimmed || loading) return;
-    setLoading(true);
-    setError(null);
-    setFound(null);
-    setSent(false);
-    try {
-      const res = await fetch(`/api/friends/lookup?code=${encodeURIComponent(trimmed)}`);
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || 'Could not find that frog');
-        return;
-      }
-      setFound(data);
-    } catch {
-      setError('Something went wrong. Try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleSend = async () => {
-    if (!found || loading) return;
+    const trimmed = code.trim();
+    if (!trimmed || loading || sent) return;
     setLoading(true);
     setError(null);
     try {
       const res = await fetch('/api/friends/request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: code.trim(), source: 'code' }),
+        body: JSON.stringify({ code: trimmed, source: 'code' }),
       });
       const data = await res.json();
       if (!res.ok) {
         setError(data.error || 'Could not send request');
         return;
       }
+      setSentLabel(
+        data.alreadyFriends
+          ? 'Already your friend!'
+          : data.autoAccepted
+            ? "You're now friends!"
+            : 'Friend request sent!',
+      );
       setSent(true);
       swrMutate('/api/friends');
       swrMutate('/api/friends/request');
@@ -121,12 +104,11 @@ export function EnterFriendCodeModal({
                 value={code}
                 onChange={(e) => {
                   setCode(e.target.value.toUpperCase());
-                  setFound(null);
                   setSent(false);
                   setError(null);
                 }}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleFind();
+                  if (e.key === 'Enter') handleSend();
                 }}
                 placeholder="Enter code here..."
                 autoCapitalize="characters"
@@ -139,31 +121,20 @@ export function EnterFriendCodeModal({
                 <p className="mt-3 text-sm font-bold text-rose-500">{error}</p>
               )}
 
-              {found && !sent && (
-                <div className="mt-3 rounded-2xl bg-[#5f9654]/10 px-4 py-3 text-sm font-bold text-[#47783d]">
-                  Found {found.name || found.frogName}
-                  {found.alreadyFriends ? ' — already your friend!' : ''}
-                </div>
-              )}
-
               {sent && (
                 <div className="mt-3 flex items-center justify-center gap-2 rounded-2xl bg-[#5f9654]/10 px-4 py-3 text-sm font-black text-[#47783d]">
                   <Check className="h-4 w-4" strokeWidth={3} />
-                  Friend request sent!
+                  {sentLabel}
                 </div>
               )}
 
               <button
-                onClick={found && !sent && !found.alreadyFriends ? handleSend : handleFind}
-                disabled={loading || !code.trim() || (found?.alreadyFriends ?? false) || sent}
+                onClick={handleSend}
+                disabled={loading || !code.trim() || sent}
                 className="mt-5 flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[#5f9654] text-lg font-black tracking-tight text-white shadow-[0_5px_0_#47783d] transition-all hover:bg-[#548849] active:translate-y-0.5 disabled:opacity-60"
               >
                 {loading && <Loader2 className="h-5 w-5 animate-spin" />}
-                {sent
-                  ? 'Sent!'
-                  : found && !found.alreadyFriends
-                    ? 'Send friend request'
-                    : 'Find friend'}
+                {sent ? 'Sent!' : 'Send friend request'}
               </button>
             </motion.div>
           </div>

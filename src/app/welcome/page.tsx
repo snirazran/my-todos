@@ -4,11 +4,8 @@ import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
-import { signInAnonymously } from 'firebase/auth';
 import { Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { auth } from '@/lib/firebase';
-import { setAuthTokenCookie } from '@/lib/authCookie';
 import Frog, { type FrogHandle } from '@/components/ui/frog';
 import { useFrogTongue, TONGUE_STROKE } from '@/hooks/useFrogTongue';
 import { useNotification } from '@/components/providers/NotificationProvider';
@@ -58,10 +55,6 @@ export default function WelcomePage() {
       completed: false,
       onPersist: async () => {
         try {
-          const cred = await signInAnonymously(auth);
-          const token = await cred.user.getIdToken();
-          setAuthTokenCookie(token);
-          await fetch('/api/user', { method: 'POST' });
           setAdoptionSucceeded(true);
           router.push('/onboarding');
         } catch (err: any) {

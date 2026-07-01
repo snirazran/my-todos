@@ -7,6 +7,7 @@ import InviteConfigModel from '@/lib/models/InviteConfig';
 import { ensureInviteConfig } from '@/lib/inviteConfig/defaults';
 import { getFullCatalog, buildById } from '@/lib/skins/getCatalog';
 import { createFriendship } from '@/lib/friends/code';
+import { notifyFriendsChanged } from '@/lib/taskSync';
 
 export async function POST(req: NextRequest) {
   try {
@@ -58,6 +59,11 @@ export async function POST(req: NextRequest) {
 
     // Claiming a gift invite makes the inviter and the new user mutual friends.
     await createFriendship(referral.inviterId, userId, 'invite');
+
+    const inviter = await UserModel.findById(referral.inviterId)
+      .select('name frogName')
+      .lean<{ name?: string; frogName?: string }>();
+    const inviterName = inviter?.frogName || inviter?.name || 'A friend';
 
     // Grant the gift to the new user
     const giftHistorySet =
@@ -122,10 +128,13 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    void notifyFriendsChanged(userId);
+
     return NextResponse.json({
       ok: true,
       gift,
       inviterId: referral.inviterId,
+      inviterName,
     });
   } catch (err) {
     return NextResponse.json(

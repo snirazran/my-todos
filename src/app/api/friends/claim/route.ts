@@ -78,12 +78,15 @@ export async function POST(req: NextRequest) {
       prior && prior.date === today ? { ...prior.credited } : {};
 
     let granted = 0;
+    const incTotals: Record<string, number> = {};
     for (const f of friends) {
       const owed = contributionFrom(fliesEarnedOn(f.wardrobe?.flyDaily, today));
       const already = credited[f._id] ?? 0;
       if (owed > already) {
-        granted += owed - already;
+        const delta = owed - already;
+        granted += delta;
         credited[f._id] = owed;
+        incTotals[`wardrobe.friendFlyTotals.${f._id}`] = delta;
       }
     }
 
@@ -94,7 +97,7 @@ export async function POST(req: NextRequest) {
     await UserModel.updateOne(
       { _id: userId },
       {
-        $inc: { 'wardrobe.flies': granted },
+        $inc: { 'wardrobe.flies': granted, ...incTotals },
         $set: {
           'wardrobe.friendFlyDaily': {
             date: today,

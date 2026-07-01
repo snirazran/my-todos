@@ -50,6 +50,8 @@ export type UserWardrobe = {
   flies: number;
   flyDaily?: DailyFlyProgress;
   friendFlyDaily?: FriendFlyDaily;
+  /** Lifetime flies each friend has contributed to you (by friend userId). */
+  friendFlyTotals?: Record<string, number>;
 
   // Hunger System
   hunger?: number; // Time remaining in ms (Max 24h = 86400000)
