@@ -150,7 +150,7 @@ export function FriendDetailModal({
 
                 {/* Frog — sits above the white sheet below it */}
                 <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-center">
-                  <div className="-translate-y-6">
+                  <div className="-translate-y-[26px]">
                     <Frog width={230} height={210} indices={entry.indices} />
                   </div>
                 </div>
