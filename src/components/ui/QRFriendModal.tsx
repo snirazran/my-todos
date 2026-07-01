@@ -58,7 +58,7 @@ export function QRFriendModal({
             if (e.target === e.currentTarget) onClose();
           }}
         >
-          <div className="relative flex h-full w-full flex-col bg-[#23a6f0] text-white sm:h-auto sm:max-h-[calc(100dvh-3rem)] sm:w-[24rem] sm:max-w-[calc(100vw-3rem)] sm:overflow-hidden sm:rounded-[32px] sm:shadow-2xl">
+          <div className="relative flex h-full w-full flex-col overflow-x-hidden overflow-y-auto bg-[#23a6f0] text-white overscroll-contain sm:h-auto sm:max-h-[calc(100dvh-3rem)] sm:w-[24rem] sm:max-w-[calc(100vw-3rem)] sm:rounded-[32px] sm:shadow-2xl">
             <button
               type="button"
               onClick={onClose}
@@ -193,9 +193,9 @@ function MyCodeView({
   }, [data?.code]);
 
   return (
-    <div className="flex h-full flex-col items-center justify-center px-6 py-3 sm:h-auto sm:justify-start sm:py-5">
+    <div className="flex h-full flex-col items-center justify-center px-6 py-3 sm:h-auto sm:justify-start sm:py-5 sm:[@media(max-height:760px)]:py-4 sm:[@media(max-height:680px)]:py-3">
       <div className="flex w-full max-w-sm flex-col items-center">
-        <div className="pointer-events-none relative z-10 origin-bottom -mb-1.5 sm:-mb-2 sm:-mt-14 sm:translate-y-1.5 min-[360px]:max-sm:scale-125 min-[360px]:max-sm:translate-y-1 min-[400px]:max-sm:scale-[1.45] min-[400px]:max-sm:translate-y-2">
+        <div className="pointer-events-none relative z-10 origin-bottom -mb-1.5 translate-y-0 sm:-mb-2 sm:-mt-14 sm:translate-y-1 min-[360px]:max-sm:scale-125 min-[360px]:max-sm:translate-y-0 min-[400px]:max-sm:scale-[1.45] min-[400px]:max-sm:translate-y-1 sm:[@media(max-height:760px)]:-mt-12 sm:[@media(max-height:680px)]:-mt-10 sm:[@media(max-height:680px)]:scale-90">
           <Frog
             width={isDesktop ? 230 : 150}
             height={isDesktop ? 259 : 169}
@@ -203,8 +203,8 @@ function MyCodeView({
           />
         </div>
 
-        <div className="relative w-full rounded-[28px] bg-white px-5 pb-5 pt-6 text-center shadow-2xl sm:px-6 sm:pb-7">
-          <p className="text-lg font-black leading-tight tracking-tight text-zinc-900 sm:text-xl">
+        <div className="relative w-full rounded-[28px] bg-white px-5 pb-5 pt-6 text-center shadow-2xl sm:px-6 sm:pb-7 sm:[@media(max-height:760px)]:pb-5 sm:[@media(max-height:760px)]:pt-5">
+          <p className="text-lg font-black leading-tight tracking-tight text-zinc-900 sm:text-xl sm:[@media(max-height:680px)]:text-lg">
             {data?.name ? `${data.name} & ${data.frogName}` : data?.frogName ?? 'Your code'}
           </p>
           <button
@@ -220,7 +220,7 @@ function MyCodeView({
             )}
           </button>
 
-          <div className="mx-auto mt-3 flex aspect-square w-full max-w-[155px] items-center justify-center min-[360px]:max-w-[190px] min-[400px]:max-w-[220px] sm:mt-4 sm:max-w-[210px]">
+          <div className="mx-auto mt-3 flex aspect-square w-full max-w-[155px] items-center justify-center min-[360px]:max-w-[190px] min-[400px]:max-w-[220px] sm:mt-4 sm:max-w-[210px] sm:[@media(max-height:760px)]:max-w-[180px] sm:[@media(max-height:680px)]:max-w-[150px]">
             {qr ? (
               <img src={qr} alt="Your friend QR code" className="h-full w-full" />
             ) : (
@@ -233,7 +233,7 @@ function MyCodeView({
       <button
         type="button"
         onClick={handleShare}
-        className="mt-4 flex items-center gap-2.5 rounded-2xl bg-white px-8 py-3.5 text-lg font-black tracking-tight text-[#23a6f0] shadow-[0_5px_0_rgba(0,0,0,0.12)] transition-all active:translate-y-0.5 sm:mt-5"
+        className="mt-4 flex items-center gap-2.5 rounded-2xl bg-white px-8 py-3.5 text-lg font-black tracking-tight text-[#23a6f0] shadow-[0_5px_0_rgba(0,0,0,0.12)] transition-all active:translate-y-0.5 sm:mt-5 sm:[@media(max-height:760px)]:mt-4 sm:[@media(max-height:680px)]:py-3 sm:[@media(max-height:680px)]:text-base"
       >
         <Send className="h-5 w-5 -rotate-12" />
         Share Link

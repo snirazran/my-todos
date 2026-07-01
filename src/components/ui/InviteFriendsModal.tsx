@@ -166,9 +166,9 @@ export function InviteFriendsModal({
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
             transition={{ type: 'spring', damping: 30, stiffness: 280 }}
-            className="pointer-events-none fixed inset-0 z-[1401] flex md:items-center md:justify-center md:p-6"
+            className="pointer-events-none fixed inset-0 z-[1401] flex md:items-center md:justify-center md:p-4 lg:p-6"
           >
-            <div className="pointer-events-auto mx-auto flex h-full w-full flex-col overflow-hidden bg-background md:h-auto md:max-h-[calc(100dvh-3rem)] md:w-[min(100vw-3rem,32rem)] md:rounded-[32px] md:shadow-2xl">
+            <div className="pointer-events-auto mx-auto flex h-full min-h-0 w-full flex-col overflow-hidden bg-background md:h-auto md:max-h-[calc(100dvh-2rem)] md:w-[min(100vw-2rem,32rem)] md:rounded-[32px] md:shadow-2xl lg:max-h-[calc(100dvh-3rem)] lg:w-[min(100vw-3rem,32rem)]">
               {step === 'overview' && (
                 <OverviewStep
                   config={config}
@@ -216,42 +216,42 @@ function OverviewStep({
   if (!config) return <Loading onClose={onClose} />;
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="relative flex min-h-[44dvh] flex-col justify-end overflow-hidden bg-[#4f9149] px-6 pb-7 pt-6 text-center text-white sm:min-h-[48dvh] md:pb-6">
+    <div className="flex h-full min-h-0 flex-col md:max-h-[calc(100dvh-2rem)] lg:max-h-[calc(100dvh-3rem)]">
+      <div className="relative flex h-[clamp(8.5rem,36dvh,19rem)] shrink-0 flex-col justify-end overflow-hidden bg-[#4f9149] px-6 pb-7 pt-6 text-center text-white sm:h-[clamp(9rem,38dvh,20rem)] md:h-[clamp(8rem,32dvh,16rem)] md:pb-6 lg:h-[clamp(8.5rem,32dvh,17rem)]">
         <AppImage
           src="/invitefrog.webp"
           priority
-          className="absolute inset-0 h-full w-full object-cover object-[center_35%] md:object-[center_32%] md:opacity-100"
+          className="absolute inset-0 h-full w-full object-cover object-[center_35%] md:object-[center_41%] md:opacity-100"
         />
         <AppImage
           src="/invitefrog.webp"
           priority
-          className="absolute inset-0 hidden h-full w-full object-cover object-[center_32%] md:block"
+          className="absolute inset-0 hidden h-full w-full object-cover object-[center_41%] md:block"
         />
         <div className="absolute inset-0 bg-[linear-gradient(to_bottom,transparent_0%,transparent_48%,rgba(0,0,0,0.22)_72%,rgba(0,0,0,0.62)_100%)]" />
         <svg
           aria-hidden
           preserveAspectRatio="none"
           viewBox="0 0 100 16"
-          className="absolute inset-x-0 bottom-[-1px] z-20 h-4 w-full fill-background sm:h-5"
+          className="absolute inset-x-0 bottom-[-1px] z-20 h-5 w-full fill-background sm:h-6"
         >
-          <path d="M0 0 Q50 16 100 0 L100 16 L0 16 Z" />
+          <path d="M0 0 Q50 12 100 0 L100 16 L0 16 Z" />
         </svg>
         <CloseButton
           onClose={onClose}
           className="right-4 top-[calc(env(safe-area-inset-top)+0.75rem)] text-white"
         />
         <div className="relative z-10 mx-auto flex w-full max-w-xl flex-col items-center">
-          <h2 className="text-3xl font-black tracking-tight [text-shadow:0_2px_0_rgba(25,83,43,0.75),0_4px_14px_rgba(0,0,0,0.32)]">
+          <h2 className="text-[25px] font-black leading-[1.08] tracking-tight [text-shadow:0_2px_0_rgba(25,83,43,0.75),0_4px_14px_rgba(0,0,0,0.32)] sm:text-3xl">
             Share Frogress, get rewards!
           </h2>
-          <p className="mt-2 max-w-md text-[15px] font-medium text-white/95 [text-shadow:0_1px_0_rgba(25,83,43,0.7),0_3px_10px_rgba(0,0,0,0.28)]">
+          <p className="mt-1.5 max-w-md text-[13px] font-medium text-white/95 [text-shadow:0_1px_0_rgba(25,83,43,0.7),0_3px_10px_rgba(0,0,0,0.28)] sm:mt-2 sm:text-[15px]">
             Invite a friend to gift them a skin and earn rewards for yourself!
           </p>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-6 pb-6 pt-7">
+      <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-5 pt-6 overscroll-contain sm:pb-6 sm:pt-7 md:flex-none">
         {config.rewards.length > 0 && (
           <RewardProgressTrack
             rewards={config.rewards}
@@ -262,7 +262,7 @@ function OverviewStep({
       </div>
 
       <div
-        className="border-t border-border/40 bg-background p-4"
+        className="shrink-0 border-t border-border/40 bg-background p-4"
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1.85rem)' }}
       >
         <button
@@ -305,7 +305,7 @@ function RewardProgressTrack({
 
   return (
     <div className="mx-auto max-w-2xl px-1 pt-0">
-      <div className="relative mx-auto h-56">
+      <div className="relative mx-auto h-[clamp(9rem,26dvh,14rem)] [--card-size:clamp(3.75rem,20vw,7rem)] [--label-top:calc(var(--rail-top)+1.75rem)] [--rail-top:calc(var(--card-size)+1.1rem)] min-[380px]:h-[clamp(10.25rem,28dvh,14rem)] min-[380px]:[--card-size:clamp(4.5rem,13dvh,7rem)] min-[380px]:[--label-top:calc(var(--rail-top)+2rem)] min-[380px]:[--rail-top:calc(var(--card-size)+1.35rem)]">
         {rewards.map((reward, index) => {
           const pos = milestonePositionPct(index, rewards.length);
           const isLastReward = index === rewards.length - 1;
@@ -316,26 +316,28 @@ function RewardProgressTrack({
               style={{ left: `${pos}%` }}
             >
               <div
-                className={`flex h-24 w-24 items-center justify-center rounded-[26px] border-4 bg-card shadow-sm transition-colors sm:h-28 sm:w-28 ${
+                className={`flex h-[var(--card-size)] w-[var(--card-size)] items-center justify-center rounded-[clamp(1.05rem,5vw,1.625rem)] border-[3px] bg-card shadow-sm transition-colors min-[380px]:border-4 ${
                   claimedCount >= reward.tier ? 'border-primary/40' : 'border-muted'
                 }`}
               >
-                <RewardPreview
-                  reward={reward.rewards?.[0] ?? legacyReward(reward)}
-                  fallbackItem={reward.item ?? null}
-                  active={isLastReward}
-                />
+                <div className="h-full w-full scale-[0.92] min-[380px]:scale-[0.9] sm:scale-95 min-[900px]:scale-100">
+                  <RewardPreview
+                    reward={reward.rewards?.[0] ?? legacyReward(reward)}
+                    fallbackItem={reward.item ?? null}
+                    active={isLastReward}
+                  />
+                </div>
               </div>
             </div>
           );
         })}
 
         <div
-          className="absolute top-[132px] h-3 -translate-y-1/2 rounded-full bg-muted"
+          className="absolute top-[var(--rail-top)] h-3 -translate-y-1/2 rounded-full bg-muted"
           style={{ left: `${railStart}%`, width: `${railSpan}%` }}
         />
         <div
-          className="absolute top-[132px] h-3 -translate-y-1/2 overflow-hidden rounded-full"
+          className="absolute top-[var(--rail-top)] h-3 -translate-y-1/2 overflow-hidden rounded-full"
           style={{ left: `${railStart}%`, width: `${railSpan * (progressEnd / 100)}%` }}
         >
           <motion.div
@@ -358,11 +360,11 @@ function RewardProgressTrack({
             return (
               <div
                 key={reward.tier}
-                className="absolute top-[132px] flex -translate-x-1/2 -translate-y-1/2 flex-col items-center"
+                className="absolute top-[var(--rail-top)] flex -translate-x-1/2 -translate-y-1/2 flex-col items-center"
                 style={{ left: `${pos}%` }}
               >
                 <div
-                  className={`relative z-10 flex h-7 w-7 items-center justify-center rounded-full transition-colors ${
+                  className={`relative z-10 flex h-6 w-6 items-center justify-center rounded-full transition-colors min-[380px]:h-7 min-[380px]:w-7 ${
                     reached
                       ? 'bg-primary text-primary-foreground shadow-sm'
                       : 'bg-muted text-transparent'
@@ -379,10 +381,10 @@ function RewardProgressTrack({
             return (
               <div
                 key={`reward-label-${reward.tier}`}
-                className="absolute top-[164px] -translate-x-1/2"
+                className="absolute top-[var(--label-top)] -translate-x-1/2"
                 style={{ left: `${pos}%` }}
               >
-                <p className="w-24 text-center text-sm font-black text-muted-foreground sm:text-[15px]">
+                <p className="w-20 text-center text-xs font-black text-muted-foreground min-[380px]:w-24 min-[380px]:text-sm min-[900px]:text-[15px]">
                   {reward.label}
                 </p>
               </div>
@@ -448,55 +450,58 @@ function PickStep({
   const selected = config.giftOptions.find((g) => g.id === selectedGiftId) ?? null;
 
   return (
-    <div className="relative flex h-full flex-col overflow-hidden bg-[#8fc36d] px-5 pb-5 pt-4 text-center text-white">
-      <div className="relative z-10 mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col">
+    <div className="relative flex h-full flex-col overflow-x-hidden overflow-y-auto bg-[#8fc36d] px-5 pb-5 pt-4 text-center text-white overscroll-contain md:h-auto md:max-h-[calc(100dvh-2rem)] lg:max-h-[calc(100dvh-3rem)]">
+      <div className="relative z-10 mx-auto flex min-h-full w-full max-w-3xl flex-col md:min-h-0">
         <CloseButton
           onClose={onBack}
           className="left-[-0.5rem] top-[calc(env(safe-area-inset-top)+0.5rem)] text-white"
         />
 
-        <div className="relative mx-auto mt-10 flex h-52 w-full max-w-md items-center justify-center overflow-visible rounded-[28px] bg-[radial-gradient(circle_at_center,rgba(225,255,194,0.55),rgba(133,190,92,0.08)_46%,transparent_74%)]">
-          <div className="absolute inset-[-40px] opacity-40 [mask-image:radial-gradient(circle_at_center,black_0%,black_18%,rgba(0,0,0,0.35)_46%,transparent_70%)] [webkit-mask-image:radial-gradient(circle_at_center,black_0%,black_18%,rgba(0,0,0,0.35)_46%,transparent_70%)]">
+        <div className="relative mx-auto mt-4 flex h-44 w-full max-w-md shrink-0 items-center justify-center overflow-visible rounded-[28px] [@media(max-height:620px)]:h-36 sm:mt-10 sm:h-56 sm:[@media(max-height:850px)]:mt-4 sm:[@media(max-height:850px)]:h-40 md:mt-4 md:h-40">
+          <div className="pointer-events-none absolute inset-x-[-5rem] bottom-[-5rem] top-[-5rem] bg-[radial-gradient(ellipse_at_center,rgba(225,255,194,0.58)_0%,rgba(190,235,151,0.3)_45%,rgba(133,190,92,0)_76%)]" />
+          <div className="absolute inset-[-72px] opacity-40 [mask-image:radial-gradient(circle_at_center,black_0%,black_22%,rgba(0,0,0,0.35)_54%,transparent_82%)] [webkit-mask-image:radial-gradient(circle_at_center,black_0%,black_22%,rgba(0,0,0,0.35)_54%,transparent_82%)]">
             <RotatingRays colorClass="text-white/14" />
           </div>
-          <div className="relative z-10 -translate-y-3">
-            <Frog width={250} height={281} />
-            <div className="absolute right-0 top-12 z-20 rotate-[6deg] rounded-2xl bg-white px-3 py-1.5 text-[13px] font-black tracking-tight text-[#4f8f28] shadow-[0_3px_0_rgba(52,100,31,0.25)] sm:right-[-1rem]">
+          <div className="relative z-10 -translate-y-3 scale-[0.82] sm:scale-100">
+            <Frog className="-translate-y-16 sm:-translate-y-20" width={250} height={281} />
+            <div className="absolute right-0 top-16 z-20 rotate-[6deg] rounded-2xl bg-white px-3 py-1.5 text-[13px] font-black tracking-tight text-[#4f8f28] shadow-[0_3px_0_rgba(52,100,31,0.25)] sm:right-[-1rem] sm:top-14">
               Ooh, a gift for me?
               <span className="absolute -bottom-1.5 left-4 h-3 w-3 rotate-45 bg-white" />
             </div>
           </div>
         </div>
 
-        <h2 className="mx-auto mt-8 max-w-lg text-2xl font-black tracking-tight">
+        <h2 className="mx-auto mt-4 max-w-lg text-xl font-black tracking-tight [@media(max-height:620px)]:mt-2 [@media(max-height:620px)]:text-lg sm:mt-8 sm:text-2xl sm:[@media(max-height:850px)]:mt-3 sm:[@media(max-height:850px)]:text-xl md:mt-3 md:text-xl">
           Select a gift for your friend!
         </h2>
-        <p className="mx-auto mt-2 max-w-md text-base font-medium leading-snug text-white/85">
+        <p className="mx-auto mt-1.5 max-w-md text-sm font-medium leading-snug text-white/85 [@media(max-height:620px)]:text-xs sm:mt-2 sm:text-base sm:[@media(max-height:850px)]:text-sm md:text-sm">
           Choose the gift they will receive when they join.
         </p>
 
-        <div className="mt-7 min-h-0 flex-1 overflow-y-auto">
-          <div className="mx-auto flex max-w-2xl flex-wrap justify-center gap-3">
+        <div className="mt-4 min-h-0 shrink-0 [@media(max-height:620px)]:mt-3 sm:mt-7 sm:[@media(max-height:850px)]:mt-4">
+          <div className="mx-auto grid max-w-2xl grid-cols-3 gap-2 min-[380px]:gap-3 sm:[@media(max-height:850px)]:max-w-[28rem]">
             {config.giftOptions.map((gift) => {
               const isSelected = selectedGiftId === gift.id;
               return (
                 <button
                   key={gift.id}
                   onClick={() => onSelect(gift.id)}
-                  className={`aspect-square w-[32%] min-w-[112px] max-w-[150px] overflow-visible rounded-[22px] border-4 bg-[#8fc36d] p-1 transition-all active:scale-95 ${
+                  className={`aspect-square w-full overflow-hidden rounded-[18px] border-4 bg-[#8fc36d] p-1 transition-all active:scale-95 min-[380px]:rounded-[22px] ${
                     isSelected
                       ? 'border-white ring-4 ring-inset ring-white/25'
                       : 'border-white/15 hover:border-white/70'
                   }`}
                 >
-                  <GiftPreview item={gift.item ?? null} active={isSelected} />
+                  <span className="pointer-events-none block h-full w-full">
+                    <GiftPreview item={gift.item ?? null} active={isSelected} />
+                  </span>
                 </button>
               );
             })}
           </div>
 
           {selected && (
-            <div className="mt-4 text-center">
+            <div className="mt-3 hidden text-center min-[380px]:block">
               <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/60">
                 Selected
               </p>
@@ -507,7 +512,10 @@ function PickStep({
           )}
         </div>
 
-        <div style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1.75rem)' }}>
+        <div
+          className="mt-auto"
+          style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1.75rem)' }}
+        >
           <button
             onClick={onSend}
             disabled={!selectedGiftId || creating}
@@ -578,7 +586,7 @@ function GiftPreview({ item, active = false }: { item: CatalogItem | null; activ
   const indices = itemToIndices(item);
   return (
     <div className="flex h-full w-full items-center justify-center overflow-visible">
-      <Frog width={300} height={338} indices={indices} paused={!active} />
+      <Frog width={300} height={338} indices={indices} paused={!active} visualOffsetY={0} />
     </div>
   );
 }

@@ -164,7 +164,12 @@
       "Bash(node rep.mjs)",
       "Bash(git log *)",
       "WebFetch(domain:help.rive.app)",
-      "WebFetch(domain:rive.app)"
+      "WebFetch(domain:rive.app)",
+      "Bash(npm init *)",
+      "Bash(npm i *)",
+      "Bash(ls node_modules/puppeteer-core)",
+      "Bash(perl -0pi -e 's/top-\\\\[132px\\\\]/top-[100px] sm:top-[132px]/g; s/top-\\\\[164px\\\\]/top-[124px] sm:top-[164px]/g;' src/components/ui/InviteFriendsModal.tsx)",
+      "Bash(perl -0pi -e 's/top-\\\\[100px\\\\] sm:top-\\\\[132px\\\\]/top-[116px] sm:top-[132px]/g; s/top-\\\\[124px\\\\] sm:top-\\\\[164px\\\\]/top-[148px] sm:top-[164px]/g;' src/components/ui/InviteFriendsModal.tsx)"
     ]
   }
 }

@@ -105,7 +105,7 @@ export function EnterFriendCodeModal({
                 type="button"
                 onClick={onClose}
                 aria-label="Close"
-                className="absolute left-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-zinc-100 text-zinc-500 transition-colors hover:bg-zinc-200"
+                className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-zinc-100 text-zinc-500 transition-colors hover:bg-zinc-200"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -132,7 +132,7 @@ export function EnterFriendCodeModal({
                 autoCapitalize="characters"
                 autoCorrect="off"
                 spellCheck={false}
-                className="mt-6 h-14 w-full rounded-2xl bg-zinc-100 px-5 text-center text-lg font-bold tracking-[0.12em] text-zinc-900 outline-none ring-emerald-400 placeholder:font-medium placeholder:tracking-normal placeholder:text-zinc-400 focus:ring-2"
+                className="mt-6 h-14 w-full rounded-2xl bg-zinc-100 px-5 text-center text-lg font-bold tracking-[0.12em] text-zinc-900 outline-none ring-[#5f9654] placeholder:font-medium placeholder:tracking-normal placeholder:text-zinc-400 focus:ring-2"
               />
 
               {error && (
@@ -140,14 +140,14 @@ export function EnterFriendCodeModal({
               )}
 
               {found && !sent && (
-                <div className="mt-3 rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">
+                <div className="mt-3 rounded-2xl bg-[#5f9654]/10 px-4 py-3 text-sm font-bold text-[#47783d]">
                   Found {found.name || found.frogName}
                   {found.alreadyFriends ? ' — already your friend!' : ''}
                 </div>
               )}
 
               {sent && (
-                <div className="mt-3 flex items-center justify-center gap-2 rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-700">
+                <div className="mt-3 flex items-center justify-center gap-2 rounded-2xl bg-[#5f9654]/10 px-4 py-3 text-sm font-black text-[#47783d]">
                   <Check className="h-4 w-4" strokeWidth={3} />
                   Friend request sent!
                 </div>
@@ -156,7 +156,7 @@ export function EnterFriendCodeModal({
               <button
                 onClick={found && !sent && !found.alreadyFriends ? handleSend : handleFind}
                 disabled={loading || !code.trim() || (found?.alreadyFriends ?? false) || sent}
-                className="mt-5 flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500 text-lg font-black tracking-tight text-white shadow-[0_5px_0_rgba(16,122,72,0.35)] transition-all active:translate-y-0.5 disabled:opacity-60"
+                className="mt-5 flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[#5f9654] text-lg font-black tracking-tight text-white shadow-[0_5px_0_#47783d] transition-all hover:bg-[#548849] active:translate-y-0.5 disabled:opacity-60"
               >
                 {loading && <Loader2 className="h-5 w-5 animate-spin" />}
                 {sent
