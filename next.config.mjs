@@ -15,6 +15,18 @@ const lanOrigins = Object.values(networkInterfaces())
 const nextConfig = {
   reactStrictMode: false,
   allowedDevOrigins: [...lanOrigins, '192.168.*.*', '10.*.*.*', '172.16.*.*'],
+  async rewrites() {
+    return [
+      {
+        source: '/.well-known/apple-app-site-association',
+        destination: '/api/well-known/apple-app-site-association',
+      },
+      {
+        source: '/.well-known/assetlinks.json',
+        destination: '/api/well-known/assetlinks',
+      },
+    ];
+  },
   images: {
     // Serve modern formats automatically (next/image negotiates per-browser).
     formats: ['image/avif', 'image/webp'],

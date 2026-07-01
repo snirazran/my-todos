@@ -8,5 +8,9 @@
 	<array>
 		<string>group.io.frog.tasks.liveactivities</string>
 	</array>
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:frogress.com</string>
+	</array>
 </dict>
 </plist>
