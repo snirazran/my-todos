@@ -445,7 +445,7 @@ function InviteRewardBanner({ onClick }: { onClick: () => void }) {
       <span className="relative flex h-16 w-16 shrink-0 items-center justify-center self-center overflow-hidden rounded-2xl bg-emerald-500/10 ring-1 ring-emerald-500/15">
         {isOutfit && item ? (
           <Frog
-            className="-translate-y-[5px]"
+            className="-translate-y-[14px]"
             width={94}
             height={80}
             indices={rewardItemToIndices(item)}

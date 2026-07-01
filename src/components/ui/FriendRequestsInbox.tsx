@@ -51,7 +51,12 @@ export function FriendRequestsInbox({
   const incoming = data?.incoming ?? [];
 
   return (
-    <BaseSheet open={open} onOpenChange={(v) => !v && onClose()} closeAriaLabel="Close friend invites">
+    <BaseSheet
+      open={open}
+      onOpenChange={(v) => !v && onClose()}
+      closeAriaLabel="Close friend invites"
+      className="sm:max-w-lg"
+    >
       {({ bindScroll }) => (
         <div className="flex max-h-[80dvh] flex-col">
           <div className="px-6 pb-2 pt-5 text-center">
