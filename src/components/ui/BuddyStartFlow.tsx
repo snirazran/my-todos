@@ -12,6 +12,7 @@ import { GiftRive } from '@/components/ui/gift-box/GiftBox';
 import QuickAddSheet from '@/components/ui/QuickAddSheet';
 import { BuddyUpFlow } from '@/components/ui/BuddyUpFlow';
 import { BaseSheet } from '@/components/ui/BaseSheet';
+import { useRegisterOpenSheet } from '@/lib/sheetStore';
 import type { QuickAddSubmit } from '@/components/ui/quick-add/types';
 import type { BuddyCreateParams } from '@/lib/models/TaskBond';
 import type { FriendSummary } from '@/lib/friends/indices';
@@ -230,6 +231,7 @@ function BuddyInviteFlow({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const sentBtnRef = useRef<HTMLButtonElement>(null);
+  useRegisterOpenSheet(phase !== 'compose');
 
   const { data: config } = useSWR<InviteConfig>('/api/invite/config', fetcher, {
     revalidateOnFocus: false,
@@ -334,7 +336,7 @@ function BuddyInviteFlow({
 
                 <div className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-6 pb-4 pt-[calc(env(safe-area-inset-top)+3.5rem)] text-center md:pt-14">
                   <div className="relative mb-1">
-                    <Frog width={150} height={135} indices={indices} />
+                    <Frog width={150} height={135} indices={indices} paused={!!giftId} />
                     <div className="absolute -right-24 top-2 z-20 max-w-[190px] rotate-[6deg] rounded-2xl bg-white px-3.5 py-2 text-left text-[13px] font-black leading-snug tracking-tight text-[#4f9149] shadow-[0_3px_0_rgba(25,60,25,0.25)]">
                       Send them a gift so they say yes!
                       <span className="absolute -bottom-1.5 left-4 h-3 w-3 rotate-45 bg-white" />

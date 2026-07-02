@@ -57,7 +57,20 @@ export function useRiveVisibility(
 
     let observer: IntersectionObserver | null = null;
 
-    if (enabled && ref.current) {
+    if (!enabled) {
+      rive.pause();
+      if (isDebugMode) updateStatus();
+      return () => {
+        if (rafId) cancelAnimationFrame(rafId);
+        if (isDebugMode) {
+          rive.off(EventType.Play, updateStatus);
+          rive.off(EventType.Pause, updateStatus);
+          rive.off(EventType.Stop, updateStatus);
+        }
+      };
+    }
+
+    if (ref.current) {
       observer = new IntersectionObserver(
         (entries) => {
           entries.forEach((entry) => {

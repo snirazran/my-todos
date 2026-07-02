@@ -15,6 +15,7 @@ import Fly from '@/components/ui/fly';
 import Frog from '@/components/ui/frog';
 import { GiftRive } from '@/components/ui/gift-box/GiftBox';
 import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
+import { useRegisterOpenSheet } from '@/lib/sheetStore';
 import type { QuestReward } from '@/lib/quests/types';
 import type { ItemDef, WardrobeSlot } from '@/lib/skins/catalog';
 
@@ -67,6 +68,7 @@ export function InviteFriendsModal({
   open: boolean;
   onClose: () => void;
 }) {
+  useRegisterOpenSheet(open);
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
@@ -463,7 +465,12 @@ function PickStep({
             <RotatingRays colorClass="text-white/14" />
           </div>
           <div className="relative z-10 -translate-y-3 scale-[0.82] sm:scale-100">
-            <Frog className="-translate-y-16 sm:-translate-y-20" width={250} height={281} />
+            <Frog
+              className="-translate-y-16 sm:-translate-y-20"
+              width={250}
+              height={281}
+              paused={!!selectedGiftId}
+            />
             <div className="absolute right-0 top-16 z-20 rotate-[6deg] rounded-2xl bg-white px-3 py-1.5 text-[13px] font-black tracking-tight text-[#4f8f28] shadow-[0_3px_0_rgba(52,100,31,0.25)] sm:right-[-1rem] sm:top-14">
               Ooh, a gift for me?
               <span className="absolute -bottom-1.5 left-4 h-3 w-3 rotate-45 bg-white" />

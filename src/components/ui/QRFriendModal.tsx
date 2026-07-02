@@ -7,6 +7,7 @@ import { X, Copy, Check, Send, Loader2 } from 'lucide-react';
 import useSWR, { mutate as swrMutate } from 'swr';
 import jsQR from 'jsqr';
 import Frog from '@/components/ui/frog';
+import { useRegisterOpenSheet } from '@/lib/sheetStore';
 import { isNativeScan, parseFriendValue } from '@/lib/friends/scan';
 
 type Tab = 'scan' | 'mycode';
@@ -26,6 +27,7 @@ export function QRFriendModal({
   initialTab?: Tab;
   indices?: Partial<Record<'skin' | 'hat' | 'body' | 'hand_item', number>>;
 }) {
+  useRegisterOpenSheet(open);
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 

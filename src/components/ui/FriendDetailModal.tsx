@@ -12,6 +12,7 @@ import {
   DEFAULT_BACKGROUND_IMAGES,
   type BackgroundImages,
 } from '@/hooks/useBackgrounds';
+import { useRegisterOpenSheet } from '@/lib/sheetStore';
 import { contributionFrom, type FriendSummary } from '@/lib/friends/indices';
 import { mutateFriendsCaches } from '@/hooks/useFriendsSync';
 
@@ -57,6 +58,7 @@ export function FriendDetailModal({
   onRemove: (entry: FriendSummary) => void;
   onBuddyUp: (entry: FriendSummary) => void;
 }) {
+  useRegisterOpenSheet(!!entry);
   const { data } = useBackgrounds(!!entry);
   const [menuOpen, setMenuOpen] = useState(false);
   const [busyBond, setBusyBond] = useState<string | null>(null);

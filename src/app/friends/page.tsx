@@ -16,6 +16,7 @@ import useSWR from 'swr';
 import { useAuth } from '@/components/auth/AuthContext';
 import { mutateFriendsCaches } from '@/hooks/useFriendsSync';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
+import { useRegisterOpenSheet, useSheetStore } from '@/lib/sheetStore';
 import Frog from '@/components/ui/frog';
 import Fly from '@/components/ui/fly';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
@@ -79,6 +80,16 @@ export default function FriendsPage() {
   const [removeTarget, setRemoveTarget] = useState<FriendSummary | null>(null);
   const [detailTarget, setDetailTarget] = useState<FriendSummary | null>(null);
   const [buddyTarget, setBuddyTarget] = useState<FriendSummary | null>(null);
+  const anySheetOpen = useSheetStore((s) => s.count > 0);
+  const isAnyPanelOpen =
+    anySheetOpen ||
+    addOpen ||
+    inviteOpen ||
+    inboxOpen ||
+    claimReward !== null ||
+    !!removeTarget ||
+    !!detailTarget ||
+    !!buddyTarget;
 
   const claimable = friendsData?.claimable ?? 0;
 
@@ -142,7 +153,7 @@ export default function FriendsPage() {
         </button>
 
         {/* Self frog */}
-        <SelfFrog indices={indices} />
+        <SelfFrog indices={indices} paused={isAnyPanelOpen} />
 
         {/* Add friend — frog sits right on top of it */}
         <button
@@ -164,6 +175,7 @@ export default function FriendsPage() {
               claimable={claimable}
               claiming={claiming}
               onClaim={handleClaim}
+              paused={isAnyPanelOpen}
             />
           )}
 
@@ -194,7 +206,10 @@ export default function FriendsPage() {
 
           {/* Invite & earn */}
           <div className="mb-5 w-full">
-            <InviteRewardBanner onClick={() => setInviteOpen(true)} />
+            <InviteRewardBanner
+              onClick={() => setInviteOpen(true)}
+              paused={isAnyPanelOpen}
+            />
           </div>
 
           {/* Leaderboard — focus is how much each friend shares with you */}
@@ -217,6 +232,7 @@ export default function FriendsPage() {
                       entry={entry}
                       buddyInvites={buddyInviteByFriend.get(entry.userId) ?? 0}
                       onOpen={() => setDetailTarget(entry)}
+                      paused={isAnyPanelOpen}
                     />
                   ))}
                 </ul>
@@ -280,6 +296,7 @@ function RemoveFriendDialog({
   onClose: () => void;
 }) {
   const [removing, setRemoving] = useState(false);
+  useRegisterOpenSheet(!!target);
 
   const handleRemove = async () => {
     if (!target || removing) return;
@@ -361,16 +378,18 @@ function ClaimHeroCard({
   claimable,
   claiming,
   onClaim,
+  paused = false,
 }: {
   claimable: number;
   claiming: boolean;
   onClaim: () => void;
+  paused?: boolean;
 }) {
   if (claimable <= 0) {
     return (
       <div className="mb-5 flex w-full items-center gap-3 rounded-[20px] border border-border/50 bg-card/40 px-4 py-3.5">
         <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-muted">
-          <Fly size={30} interactive={false} />
+          <Fly size={30} interactive={false} paused={paused} />
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-black tracking-tight text-emerald-950">
@@ -391,7 +410,7 @@ function ClaimHeroCard({
       className="group mb-5 flex w-full items-center gap-3 overflow-hidden rounded-[20px] border border-emerald-300 bg-gradient-to-br from-emerald-50 to-emerald-100/70 px-4 py-3.5 text-left shadow-sm disabled:opacity-70"
     >
       <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-500/15">
-        <Fly size={36} interactive={false} />
+        <Fly size={36} interactive={false} paused={paused} />
       </span>
       <div className="min-w-0 flex-1">
         <p className="text-base font-black tracking-tight text-emerald-950">
@@ -429,6 +448,7 @@ function FlyClaimRewardOverlay({
   tz: string;
   onClose: () => void;
 }) {
+  useRegisterOpenSheet(true);
   const [displayAmount, setDisplayAmount] = useState(amount);
   const [doubling, setDoubling] = useState(false);
   const doubledRef = useRef(false);
@@ -511,10 +531,12 @@ function LeaderboardRow({
   entry,
   onOpen,
   buddyInvites = 0,
+  paused = false,
 }: {
   entry: LeaderboardEntry;
   onOpen: () => void;
   buddyInvites?: number;
+  paused?: boolean;
 }) {
   const shared = entry.givesYou ?? contributionFrom(entry.fliesToday);
 
@@ -536,6 +558,7 @@ function LeaderboardRow({
             width={224}
             height={185}
             indices={entry.indices}
+            paused={paused}
           />
         </div>
 
@@ -551,7 +574,7 @@ function LeaderboardRow({
         </div>
 
         <div className="flex shrink-0 items-center gap-1.5">
-          <Fly size={28} y={-4} interactive={false} />
+          <Fly size={28} y={-4} interactive={false} paused={paused} />
           <span className="text-xl font-black tabular-nums leading-none text-emerald-600 sm:text-2xl">
             +{shared}
           </span>
@@ -583,7 +606,13 @@ function rewardItemToIndices(
   return {};
 }
 
-function InviteRewardBanner({ onClick }: { onClick: () => void }) {
+function InviteRewardBanner({
+  onClick,
+  paused = false,
+}: {
+  onClick: () => void;
+  paused?: boolean;
+}) {
   const { data: config } = useSWR<InviteConfig>('/api/invite/config', fetcher, {
     revalidateOnFocus: false,
   });
@@ -611,6 +640,7 @@ function InviteRewardBanner({ onClick }: { onClick: () => void }) {
             width={94}
             height={80}
             indices={rewardItemToIndices(item)}
+            paused={paused}
           />
         ) : item?.icon ? (
           <img src={item.icon} alt="" className="h-12 w-12 object-contain" />
@@ -637,12 +667,14 @@ function InviteRewardBanner({ onClick }: { onClick: () => void }) {
 
 function SelfFrog({
   indices,
+  paused = false,
 }: {
   indices: Partial<Record<'skin' | 'hat' | 'body' | 'hand_item', number>>;
+  paused?: boolean;
 }) {
   return (
     <div className="pointer-events-none relative z-30 flex shrink-0 origin-bottom flex-col items-center md:scale-110 lg:scale-100">
-      <Frog width={240} height={270} indices={indices} />
+      <Frog width={240} height={270} indices={indices} paused={paused} />
     </div>
   );
 }

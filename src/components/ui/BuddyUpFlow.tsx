@@ -15,6 +15,7 @@ import type { FriendSummary } from '@/lib/friends/indices';
 import { mutateFriendsCaches } from '@/hooks/useFriendsSync';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { useAuth } from '@/components/auth/AuthContext';
+import { useRegisterOpenSheet } from '@/lib/sheetStore';
 
 type Phase = 'compose' | 'review' | 'sent';
 
@@ -92,6 +93,7 @@ export function BuddyUpFlow({
   const [error, setError] = useState<string | null>(null);
   const [notifGranted, setNotifGranted] = useState(false);
   const sentBtnRef = useRef<HTMLButtonElement>(null);
+  useRegisterOpenSheet(open && phase !== 'compose');
 
   const goPhase = (p: Phase) => {
     phaseRef.current = p;
@@ -249,7 +251,7 @@ export function BuddyUpFlow({
                   </div>
                   <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-100">
                     <span className="-translate-y-[2px]">
-                      <Fly size={34} interactive={false} />
+                      <Fly size={34} interactive={false} paused />
                     </span>
                   </span>
                 </div>

@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Check, Loader2, X } from 'lucide-react';
 import { mutate as swrMutate } from 'swr';
+import { useRegisterOpenSheet } from '@/lib/sheetStore';
 
 export function EnterFriendCodeModal({
   open,
@@ -13,6 +14,7 @@ export function EnterFriendCodeModal({
   open: boolean;
   onClose: () => void;
 }) {
+  useRegisterOpenSheet(open);
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
