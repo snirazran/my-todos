@@ -1,5 +1,11 @@
-import React, { useEffect, useState } from 'react';
-import { AnimatePresence, motion, useDragControls } from 'framer-motion';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  AnimatePresence,
+  animate,
+  motion,
+  useDragControls,
+  useMotionValue,
+} from 'framer-motion';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSheetOverscrollDrag } from './useSheetOverscrollDrag';
@@ -46,7 +52,14 @@ export const SideOpenTray = React.forwardRef<HTMLDivElement, SideOpenTrayProps>(
     const [isDesktop, setIsDesktop] = useState(false);
     const dragControls = useDragControls();
     const overscrollDrag = useSheetOverscrollDrag();
+    const panelRef = useRef<HTMLDivElement | null>(null);
+    const dragExitRef = useRef({ velocity: 0, offset: 0 });
+    const backdropOpacity = useMotionValue(0);
     useRegisterOpenSheet(isOpen);
+
+    useEffect(() => {
+      if (isOpen) dragExitRef.current = { velocity: 0, offset: 0 };
+    }, [isOpen]);
 
     useEffect(() => {
       const checkDesktop = () => {
@@ -86,7 +99,30 @@ export const SideOpenTray = React.forwardRef<HTMLDivElement, SideOpenTrayProps>(
         y: `${closeProgress * 100}%`,
         opacity: isDraggingAny ? 0 : 1,
       },
-      exit: { y: '100%' },
+      exit: ({ velocity, offset }: { velocity: number; offset: number }) => {
+        if (velocity > 40) {
+          const h =
+            panelRef.current?.offsetHeight || window.innerHeight * 0.85;
+          const remaining = Math.max(h - offset, 60);
+          const duration = Math.min(Math.max(remaining / velocity, 0.12), 0.3);
+          return {
+            y: '100%',
+            transition: {
+              type: 'tween' as const,
+              duration,
+              ease: 'easeOut' as const,
+            },
+          };
+        }
+        return {
+          y: '100%',
+          transition: {
+            type: 'tween' as const,
+            duration: 0.3,
+            ease: [0.32, 0.72, 0, 1] as const,
+          },
+        };
+      },
     };
 
     const desktopVariants = {
@@ -99,7 +135,7 @@ export const SideOpenTray = React.forwardRef<HTMLDivElement, SideOpenTrayProps>(
     };
 
     return (
-      <AnimatePresence>
+      <AnimatePresence custom={dragExitRef.current}>
         {isOpen && (
           <>
             {/* Backdrop */}
@@ -112,6 +148,7 @@ export const SideOpenTray = React.forwardRef<HTMLDivElement, SideOpenTrayProps>(
               onClick={onClose}
               style={{
                 zIndex: backdropZ,
+                opacity: backdropOpacity,
                 pointerEvents:
                   closeProgress > 0.5 || isDraggingAny ? 'none' : 'auto',
               }}
@@ -119,21 +156,43 @@ export const SideOpenTray = React.forwardRef<HTMLDivElement, SideOpenTrayProps>(
 
             {/* The Vertical Tray/Drawer */}
             <motion.div
-              ref={ref}
+              ref={(el: HTMLDivElement | null) => {
+                panelRef.current = el;
+                if (typeof ref === 'function') ref(el);
+                else if (ref) ref.current = el;
+              }}
               variants={isDesktop ? desktopVariants : mobileVariants}
               initial="initial"
               animate="animate"
               exit="exit"
+              custom={dragExitRef.current}
               drag={!isDesktop && !isDraggingAny ? 'y' : false}
               dragControls={dragControls}
               dragListener={false}
               dragConstraints={{ top: 0, bottom: 0 }}
-              dragElastic={{ top: 0, bottom: 0.6 }}
+              dragElastic={{ top: 0.05, bottom: 1 }}
               dragMomentum={false}
+              dragTransition={{ bounceStiffness: 400, bounceDamping: 40 }}
+              onDrag={(_e, info) => {
+                const h = panelRef.current?.offsetHeight || 400;
+                const progress = Math.min(1, Math.max(0, info.offset.y / h));
+                backdropOpacity.set((1 - progress * 0.75) * (1 - closeProgress));
+              }}
               onDragEnd={(e, { offset, velocity }) => {
                 // Velocity-projected dismiss — matches BaseSheet feel.
                 if (offset.y + velocity.y * 0.15 > 130 || velocity.y > 800) {
+                  dragExitRef.current = {
+                    velocity: Math.max(velocity.y, 0),
+                    offset: Math.max(offset.y, 0),
+                  };
                   onClose();
+                } else {
+                  dragExitRef.current = { velocity: 0, offset: 0 };
+                  animate(backdropOpacity, 1 - closeProgress, {
+                    type: 'spring',
+                    stiffness: 400,
+                    damping: 40,
+                  });
                 }
               }}
               transition={isDesktop

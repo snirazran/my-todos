@@ -3,7 +3,13 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { mutate } from 'swr';
-import { AnimatePresence, motion, useDragControls } from 'framer-motion';
+import {
+  AnimatePresence,
+  animate,
+  motion,
+  useDragControls,
+  useMotionValue,
+} from 'framer-motion';
 import {
   Bell,
   CalendarDays,
@@ -122,7 +128,14 @@ export default function QuickAddSheet({
   const [mounted, setMounted] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
   const dragControls = useDragControls();
+  const sheetRef = useRef<HTMLDivElement | null>(null);
+  const dragExitRef = useRef({ velocity: 0, offset: 0 });
+  const backdropOpacity = useMotionValue(0);
   useRegisterOpenSheet(open);
+
+  useEffect(() => {
+    if (open) dragExitRef.current = { velocity: 0, offset: 0 };
+  }, [open]);
   const [showPremiumLimit, setShowPremiumLimit] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
   const [pickedBacklogTaskId, setPickedBacklogTaskId] = useState<string | null>(null);
@@ -470,10 +483,45 @@ export default function QuickAddSheet({
 
   if (!mounted) return null;
 
+  const sheetVariants = {
+    hidden: isDesktop ? { opacity: 0, scale: 0.96 } : { y: '100%' },
+    visible: isDesktop ? { opacity: 1, scale: 1 } : { y: 0 },
+    exit: ({ velocity, offset }: { velocity: number; offset: number }) => {
+      if (isDesktop) {
+        return {
+          opacity: 0,
+          scale: 0.96,
+          transition: {
+            type: 'tween' as const,
+            ease: [0.32, 0.72, 0, 1] as const,
+            duration: 0.2,
+          },
+        };
+      }
+      if (velocity > 40) {
+        const h = sheetRef.current?.offsetHeight || 480;
+        const remaining = Math.max(h - offset, 60);
+        const duration = Math.min(Math.max(remaining / velocity, 0.12), 0.3);
+        return {
+          y: '100%',
+          transition: { type: 'tween' as const, duration, ease: 'easeOut' as const },
+        };
+      }
+      return {
+        y: '100%',
+        transition: {
+          type: 'tween' as const,
+          ease: [0.32, 0.72, 0, 1] as const,
+          duration: 0.3,
+        },
+      };
+    },
+  };
+
   return (
     <>
       {createPortal(
-        <AnimatePresence>
+        <AnimatePresence custom={dragExitRef.current}>
           {open && (
             <>
               <motion.div
@@ -483,12 +531,16 @@ export default function QuickAddSheet({
                 onClick={() => onOpenChange(false)}
                 transition={{ duration: 0.16, ease: 'easeOut' }}
                 className="fixed inset-0 z-[1399] bg-black/80 will-change-opacity"
+                style={{ opacity: backdropOpacity }}
               />
 
               <motion.div
-                initial={isDesktop ? { opacity: 0, scale: 0.96 } : { y: '100%' }}
-                animate={isDesktop ? { opacity: 1, scale: 1 } : { y: 0 }}
-                exit={isDesktop ? { opacity: 0, scale: 0.96 } : { y: '100%' }}
+                ref={sheetRef}
+                variants={sheetVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+                custom={dragExitRef.current}
                 transition={{
                   type: 'tween',
                   ease: [0.32, 0.72, 0, 1],
@@ -498,11 +550,28 @@ export default function QuickAddSheet({
                 dragControls={dragControls}
                 dragListener={false}
                 dragConstraints={{ top: 0, bottom: 0 }}
-                dragElastic={{ top: 0, bottom: 0.6 }}
+                dragElastic={{ top: 0.05, bottom: 1 }}
                 dragMomentum={false}
+                dragTransition={{ bounceStiffness: 400, bounceDamping: 40 }}
+                onDrag={(_e, info) => {
+                  const h = sheetRef.current?.offsetHeight || 400;
+                  const progress = Math.min(1, Math.max(0, info.offset.y / h));
+                  backdropOpacity.set(1 - progress * 0.75);
+                }}
                 onDragEnd={(_e, { offset, velocity }) => {
                   if (offset.y + velocity.y * 0.15 > 130 || velocity.y > 800) {
+                    dragExitRef.current = {
+                      velocity: Math.max(velocity.y, 0),
+                      offset: Math.max(offset.y, 0),
+                    };
                     onOpenChange(false);
+                  } else {
+                    dragExitRef.current = { velocity: 0, offset: 0 };
+                    animate(backdropOpacity, 1, {
+                      type: 'spring',
+                      stiffness: 400,
+                      damping: 40,
+                    });
                   }
                 }}
                 style={{

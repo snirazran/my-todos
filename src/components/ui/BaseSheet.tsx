@@ -68,6 +68,19 @@ const exitMobileTransition: Transition = {
 const DISMISS_PROJECTION = 0.15; // weight of fling velocity when projecting
 const DISMISS_DISTANCE = 130; // px of projected travel that triggers dismiss
 const DISMISS_VELOCITY = 800; // hard fling velocity that always dismisses
+const FLING_EXIT_MIN_VELOCITY = 40;
+
+const snapBackDragTransition = { bounceStiffness: 400, bounceDamping: 40 };
+const snapBackSpring: Transition = {
+  type: 'spring',
+  stiffness: 400,
+  damping: 40,
+};
+
+interface DragExitInfo {
+  velocity: number;
+  offset: number;
+}
 
 export function BaseSheet({
   open,
@@ -93,6 +106,11 @@ export function BaseSheet({
   // proportionally as the sheet is pulled down (native feel).
   const backdropOpacity = useMotionValue(0);
   const sheetHeightRef = useRef(0);
+  const dragExitRef = useRef<DragExitInfo>({ velocity: 0, offset: 0 });
+
+  useEffect(() => {
+    if (open) dragExitRef.current = { velocity: 0, offset: 0 };
+  }, [open]);
 
   useEffect(() => {
     setMounted(true);
@@ -122,8 +140,32 @@ export function BaseSheet({
 
   if (!mounted) return null;
 
+  const sheetVariants = {
+    hidden: isDesktop ? { opacity: 0, scale: 0.98 } : { y: '100%' },
+    visible: isDesktop ? { opacity: 1, scale: 1 } : { y: 0 },
+    exit: ({ velocity, offset }: DragExitInfo) => {
+      if (isDesktop) {
+        return {
+          opacity: 0,
+          scale: 0.98,
+          transition: defaultDesktopTransition,
+        };
+      }
+      if (velocity > FLING_EXIT_MIN_VELOCITY) {
+        const h = sheetHeightRef.current || 480;
+        const remaining = Math.max(h - offset, 60);
+        const duration = Math.min(Math.max(remaining / velocity, 0.12), 0.3);
+        return {
+          y: '100%',
+          transition: { type: 'tween' as const, duration, ease: 'easeOut' as const },
+        };
+      }
+      return { y: '100%', transition: exitMobileTransition };
+    },
+  };
+
   return createPortal(
-    <AnimatePresence>
+    <AnimatePresence custom={dragExitRef.current}>
       {open && (
         <>
           {/* Backdrop */}
@@ -150,13 +192,11 @@ export function BaseSheet({
             style={{ zIndex: zIndex + 1 }}
           >
             <motion.div
-              initial={isDesktop ? { opacity: 0, scale: 0.98 } : { y: '100%' }}
-              animate={isDesktop ? { opacity: 1, scale: 1 } : { y: 0 }}
-              exit={
-                isDesktop
-                  ? { opacity: 0, scale: 0.98 }
-                  : { y: '100%', transition: exitMobileTransition }
-              }
+              variants={sheetVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              custom={dragExitRef.current}
               transition={
                 isDesktop ? defaultDesktopTransition : resolvedMobileTransition
               }
@@ -167,8 +207,9 @@ export function BaseSheet({
               dragControls={dragControls}
               dragListener={false}
               dragConstraints={{ top: 0, bottom: 0 }}
-              dragElastic={{ top: 0, bottom: 0.6 }}
+              dragElastic={{ top: 0.05, bottom: 1 }}
               dragMomentum={false}
+              dragTransition={snapBackDragTransition}
               onDragStart={() => setIsDragging(true)}
               onDrag={(_e, info) => {
                 const h = sheetHeightRef.current || 400;
@@ -180,14 +221,14 @@ export function BaseSheet({
                 setIsDragging(false);
                 const projected = offset.y + velocity.y * DISMISS_PROJECTION;
                 if (projected > DISMISS_DISTANCE || velocity.y > DISMISS_VELOCITY) {
+                  dragExitRef.current = {
+                    velocity: Math.max(velocity.y, 0),
+                    offset: Math.max(offset.y, 0),
+                  };
                   onOpenChange(false);
                 } else {
-                  // Snapped back — restore the scrim.
-                  animate(backdropOpacity, 1, {
-                    type: 'tween',
-                    duration: 0.2,
-                    ease: [0.32, 0.72, 0, 1],
-                  });
+                  dragExitRef.current = { velocity: 0, offset: 0 };
+                  animate(backdropOpacity, 1, snapBackSpring);
                 }
               }}
               style={{ willChange: 'transform' }}

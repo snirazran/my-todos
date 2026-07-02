@@ -29,7 +29,11 @@ export function useSheetOverscrollDrag() {
     };
 
     const onTouchMove = (e: TouchEvent) => {
-      if (handedOff || !enabledRef.current || e.touches.length !== 1) return;
+      if (handedOff) {
+        e.preventDefault();
+        return;
+      }
+      if (!enabledRef.current || e.touches.length !== 1) return;
       const deltaY = e.touches[0].clientY - startY;
       if (deltaY <= 6) return;
       let node = e.target as HTMLElement | null;
