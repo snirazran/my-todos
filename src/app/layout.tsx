@@ -6,6 +6,7 @@ import Providers from '@/app/providers';
 import SiteHeader from '@/components/ui/siteHeader';
 import MobileNav from '@/components/ui/MobileNav';
 import { RiveCounter } from '@/components/ui/RiveCounter';
+import { RiveScrollPause } from '@/components/ui/RiveScrollPause';
 import { AuthContext } from '@/components/auth/AuthContext';
 import { GlobalPageBackground } from '@/components/ui/GlobalPageBackground';
 
@@ -116,6 +117,7 @@ export default function RootLayout({
               </main>
               <MobileNav />
               <RiveCounter />
+              <RiveScrollPause />
             </div>
           </Providers>
         </AuthContext>

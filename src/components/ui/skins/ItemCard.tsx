@@ -8,6 +8,7 @@ import Fly from '@/components/ui/fly';
 import { cn } from '@/lib/utils';
 import type { ItemDef, Rarity } from '@/lib/skins/catalog';
 import Frog from '@/components/ui/frog';
+import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GiftRive } from '@/components/ui/gift-box/GiftBox';
 
@@ -294,6 +295,16 @@ function ItemCardComponent({
             >
               <GiftRive color={item.riveIndex} paused={pausePreview} animation={giftAnimation} />
             </div>
+          ) : pausePreview ? (
+            <FrogSnapshot
+              className={cn(
+                'w-[125%] h-[125%] object-contain translate-y-[10%] min-[375px]:translate-y-[2%] min-[425px]:-translate-y-[4%] md:-translate-y-[5%]',
+                previewClassName,
+              )}
+              indices={previewIndices}
+              width={180}
+              height={180}
+            />
           ) : (
             <Frog
               className={cn(
@@ -303,7 +314,7 @@ function ItemCardComponent({
               indices={previewIndices}
               width={180}
               height={180}
-              paused={pausePreview}
+              paused={false}
             />
           )}
         </div>

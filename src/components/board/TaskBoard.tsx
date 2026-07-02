@@ -661,36 +661,9 @@ export default function TaskBoard({
     usePan(scrollerRef);
   recomputeCanPanRef.current = recomputeCanPan;
 
-  // Freeze ambient Rive playback while the board is scrolling (outer pan and
-  // inner column scrolls — hence capture) and while a card is being dragged,
-  // so those frames go to the gesture instead of canvas rasterization. Uses
-  // getState() on purpose: no React subscription, so pause/resume can never
-  // feed back into the drag/scroll render loop.
-  useEffect(() => {
-    const s = scrollerRef.current;
-    if (!s) return;
-    const { acquire, release } = useRiveInteractionPause.getState();
-    let held = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const onScroll = () => {
-      if (!held) {
-        held = true;
-        acquire();
-      }
-      clearTimeout(timer);
-      timer = setTimeout(() => {
-        held = false;
-        release();
-      }, 200);
-    };
-    s.addEventListener('scroll', onScroll, { passive: true, capture: true });
-    return () => {
-      s.removeEventListener('scroll', onScroll, { capture: true });
-      clearTimeout(timer);
-      if (held) release();
-    };
-  }, [scrollerRef]);
-
+  // Freeze ambient Rive playback while a card is being dragged (scrolling is
+  // covered globally by RiveScrollPause). Uses getState() on purpose: no React
+  // subscription, so pause/resume can never feed back into the drag renders.
   useEffect(() => {
     if (!drag?.active) return;
     const { acquire, release } = useRiveInteractionPause.getState();
