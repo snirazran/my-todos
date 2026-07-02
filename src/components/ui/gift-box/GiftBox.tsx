@@ -14,6 +14,7 @@ import {
 } from '@rive-app/react-canvas-lite';
 import { useRiveAsset } from '@/hooks/useRiveAsset';
 import { useRiveVisibility } from '@/hooks/useRiveVisibility';
+import { riveDevicePixelRatio } from '@/lib/riveLoader';
 
 // Define layout outside component to maintain reference stability
 const RIVE_LAYOUT = new Layout({
@@ -96,7 +97,8 @@ export const GiftRive = React.memo(
       if (!rive) return;
       const el = containerRef.current;
       if (!el) return;
-      const resize = () => rive.resizeDrawingSurfaceToCanvas();
+      const resize = () =>
+        rive.resizeDrawingSurfaceToCanvas(riveDevicePixelRatio());
       resize();
       const raf = requestAnimationFrame(resize);
       const observer = new ResizeObserver(() => resize());

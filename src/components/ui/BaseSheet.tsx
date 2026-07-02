@@ -20,6 +20,12 @@ export interface BaseSheetRenderProps {
   dragControls: ReturnType<typeof useDragControls>;
   isDragging: boolean;
   /**
+   * True once the sheet's entrance animation has finished. Use it to defer
+   * mounting heavy content (Rive canvases, images) so the slide-in stays
+   * smooth.
+   */
+  entered: boolean;
+  /**
    * Attach to the sheet's scrollable body. When the body is scrolled to the
    * top and the user keeps dragging down, the drag is handed off to the sheet
    * so it can be dragged closed (native "overscroll to dismiss").
@@ -98,6 +104,7 @@ export function BaseSheet({
   const [mounted, setMounted] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [entered, setEntered] = useState(false);
   const dragControls = useDragControls();
   const overscroll = useSheetOverscrollDrag();
 
@@ -110,6 +117,7 @@ export function BaseSheet({
 
   useEffect(() => {
     if (open) dragExitRef.current = { velocity: 0, offset: 0 };
+    else setEntered(false);
   }, [open]);
 
   useEffect(() => {
@@ -210,7 +218,13 @@ export function BaseSheet({
               dragElastic={{ top: 0.05, bottom: 1 }}
               dragMomentum={false}
               dragTransition={snapBackDragTransition}
-              onDragStart={() => setIsDragging(true)}
+              onAnimationComplete={(definition) => {
+                if (definition === 'visible') setEntered(true);
+              }}
+              onDragStart={() => {
+                setIsDragging(true);
+                setEntered(true);
+              }}
               onDrag={(_e, info) => {
                 const h = sheetHeightRef.current || 400;
                 const progress = Math.min(1, Math.max(0, info.offset.y / h));
@@ -258,6 +272,7 @@ export function BaseSheet({
                 isDesktop,
                 dragControls,
                 isDragging,
+                entered,
                 bindScroll: overscroll.bind,
               })}
             </motion.div>

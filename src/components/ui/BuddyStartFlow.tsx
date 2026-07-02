@@ -140,7 +140,7 @@ function ChooseSheet({
       zIndex={1200}
       hideHandle
     >
-      {({ bindScroll }) => (
+      {({ bindScroll, entered }) => (
         <div className="flex max-h-[82dvh] flex-col">
           <div className="relative shrink-0 px-6 pb-5 pt-9 text-center">
             <div
@@ -171,13 +171,15 @@ function ChooseSheet({
                     className="flex w-full items-center gap-2 rounded-2xl border border-border/50 bg-card py-1.5 pl-1.5 pr-3 text-left transition-all hover:-translate-y-0.5 hover:border-[#4f9149]/40 hover:shadow-md active:scale-[0.99]"
                   >
                     <span className="flex h-14 w-16 shrink-0 items-end justify-center overflow-hidden">
-                      <Frog
-                        className="-translate-y-1"
-                        width={112}
-                        height={92}
-                        indices={f.indices}
-                        paused
-                      />
+                      {entered && (
+                        <Frog
+                          className="-translate-y-1 animate-in fade-in duration-200"
+                          width={112}
+                          height={92}
+                          indices={f.indices}
+                          paused
+                        />
+                      )}
                     </span>
                     <span className="min-w-0 flex-1 truncate text-sm font-black tracking-tight text-foreground">
                       {f.frogName || f.name}

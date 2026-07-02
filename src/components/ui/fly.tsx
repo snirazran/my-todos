@@ -16,6 +16,7 @@ import {
 } from '@rive-app/react-canvas-lite';
 import { useRiveAsset } from '@/hooks/useRiveAsset';
 import { useRiveVisibility } from '@/hooks/useRiveVisibility';
+import { riveDevicePixelRatio } from '@/lib/riveLoader';
 
 const FLY_LAYOUT = new Layout({ fit: Fit.Contain, alignment: Alignment.Center });
 
@@ -66,7 +67,8 @@ const Fly = memo(forwardRef<HTMLDivElement, FlyProps>(
       if (!rive) return;
       const el = innerRef.current;
       if (!el) return;
-      const resize = () => rive.resizeDrawingSurfaceToCanvas();
+      const resize = () =>
+        rive.resizeDrawingSurfaceToCanvas(riveDevicePixelRatio());
       resize();
       const raf = requestAnimationFrame(resize);
       const observer = new ResizeObserver(() => resize());

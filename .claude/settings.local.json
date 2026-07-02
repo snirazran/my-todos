@@ -173,7 +173,12 @@
       "Bash(awk 'NR>=1600 && NR<=1660 && /doc = await TaskModel|const doc|findOne|\\\\.lean/' src/app/api/tasks/route.ts)",
       "Bash(awk -F: '$1>1500 && $1<1700')",
       "Bash(awk -F: '$1>1200 && $1<1760')",
-      "Bash(awk -F: '$1<1200')"
+      "Bash(awk -F: '$1<1200')",
+      "WebFetch(domain:pixelpoint.io)",
+      "PowerShell(npx tsc --noEmit 2>$null | Select-Object -First 30)",
+      "PowerShell(npx tsc --noEmit 2>$null | Select-Object -First 10; npx next lint --file src/components/ui/BaseSheet.tsx --file src/components/ui/BuddyNudgeSheet.tsx --file src/components/ui/frog.tsx --file src/components/ui/fly.tsx --file src/components/ui/gift-box/GiftBox.tsx --file src/lib/riveLoader.ts 2>$null | Select-Object -First 30)",
+      "PowerShell(npx tsc --noEmit; Write-Host \"TSC_EXIT=$LASTEXITCODE\")",
+      "PowerShell(npx eslint src/components/ui/BaseSheet.tsx src/components/ui/BuddyNudgeSheet.tsx src/components/ui/BuddyStartFlow.tsx src/components/ui/BuddyNudgeCard.tsx src/components/ui/frog.tsx src/components/ui/fly.tsx src/components/ui/gift-box/GiftBox.tsx src/lib/riveLoader.ts; Write-Host \"LINT_EXIT=$LASTEXITCODE\")"
     ]
   }
 }

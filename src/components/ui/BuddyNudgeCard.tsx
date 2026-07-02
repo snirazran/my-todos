@@ -54,7 +54,7 @@ export function BuddyNudgeCard() {
 
   return (
     <>
-      {show && !flowOpen && (
+      {show && (
         <div className="mx-3 mt-2">
             <button
               type="button"

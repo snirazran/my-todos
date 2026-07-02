@@ -21,6 +21,7 @@ import {
 } from '@rive-app/react-canvas-lite';
 import { useRiveAsset } from '@/hooks/useRiveAsset';
 import { useRiveVisibility } from '@/hooks/useRiveVisibility';
+import { riveDevicePixelRatio } from '@/lib/riveLoader';
 
 // Stable layout constant — defined once at module level to prevent useRive from seeing
 // a new object reference on every render, which can cause unnecessary reinitialization.
@@ -127,7 +128,8 @@ const Frog = memo(
       if (!rive) return;
       const el = wrapperRef.current;
       if (!el) return;
-      const resize = () => rive.resizeDrawingSurfaceToCanvas();
+      const resize = () =>
+        rive.resizeDrawingSurfaceToCanvas(riveDevicePixelRatio());
       resize();
       const raf = requestAnimationFrame(resize);
       const observer = new ResizeObserver(() => resize());

@@ -1,4 +1,9 @@
 export const urlCache = new Map<string, string>();
+
+export const riveDevicePixelRatio = () => {
+  if (typeof window === 'undefined') return 1;
+  return Math.min(window.devicePixelRatio || 1, 2);
+};
 const promiseCache = new Map<string, Promise<string>>();
 
 export const getRiveBlobUrl = (assetPath: string): string | undefined => {
