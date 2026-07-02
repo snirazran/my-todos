@@ -43,6 +43,7 @@ import { useNotification } from '@/components/providers/NotificationProvider';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import { useFrogodoroUiStore } from '@/lib/frogodoroUiStore';
 import { useSheetStore } from '@/lib/sheetStore';
+import { useRiveInteractionPause } from '@/lib/riveInteractionPause';
 
 type RepeatChoice = 'this-week' | 'weekly';
 
@@ -659,6 +660,43 @@ export default function TaskBoard({
   const { panActive, startPanIfEligible, onPanMove, endPan, recomputeCanPan } =
     usePan(scrollerRef);
   recomputeCanPanRef.current = recomputeCanPan;
+
+  // Freeze ambient Rive playback while the board is scrolling (outer pan and
+  // inner column scrolls — hence capture) and while a card is being dragged,
+  // so those frames go to the gesture instead of canvas rasterization. Uses
+  // getState() on purpose: no React subscription, so pause/resume can never
+  // feed back into the drag/scroll render loop.
+  useEffect(() => {
+    const s = scrollerRef.current;
+    if (!s) return;
+    const { acquire, release } = useRiveInteractionPause.getState();
+    let held = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const onScroll = () => {
+      if (!held) {
+        held = true;
+        acquire();
+      }
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        held = false;
+        release();
+      }, 200);
+    };
+    s.addEventListener('scroll', onScroll, { passive: true, capture: true });
+    return () => {
+      s.removeEventListener('scroll', onScroll, { capture: true });
+      clearTimeout(timer);
+      if (held) release();
+    };
+  }, [scrollerRef]);
+
+  useEffect(() => {
+    if (!drag?.active) return;
+    const { acquire, release } = useRiveInteractionPause.getState();
+    acquire();
+    return release;
+  }, [drag?.active]);
 
   const snapSuppressed = !!drag?.active || panActive;
 

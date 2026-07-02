@@ -5,20 +5,15 @@ import React, {
   memo,
   useCallback,
   useEffect,
-  useRef,
+  useId,
   useImperativeHandle,
+  useRef,
+  useState,
 } from 'react';
-import {
-  useRive,
-  Layout,
-  Fit,
-  Alignment,
-} from '@rive-app/react-canvas-lite';
-import { useRiveAsset } from '@/hooks/useRiveAsset';
-import { useRiveVisibility } from '@/hooks/useRiveVisibility';
+import { attachFlyCanvas, type FlyCanvasHandle } from '@/lib/flyEngine';
 import { riveDevicePixelRatio } from '@/lib/riveLoader';
-
-const FLY_LAYOUT = new Layout({ fit: Fit.Contain, alignment: Alignment.Center });
+import { useRiveStatsStore } from '@/lib/riveStatsStore';
+import { useUIStore } from '@/lib/uiStore';
 
 type FlyProps = {
   onClick?: (e: React.MouseEvent) => void;
@@ -47,54 +42,97 @@ const Fly = memo(forwardRef<HTMLDivElement, FlyProps>(
   ) => {
     const innerRef = useRef<HTMLDivElement>(null);
     useImperativeHandle(ref, () => innerRef.current!);
-
-    const riveUrl = useRiveAsset('/fly_idle.riv');
-
-    const { RiveComponent, rive } = useRive({
-      src: riveUrl || undefined,
-      animations: ['Wings', 'Body'],
-      autoplay: true,
-      autoBind: false,
-      layout: FLY_LAYOUT,
-      onLoad: () => {
-        onLoad?.();
-      },
-    });
-
-    useRiveVisibility(rive, innerRef, !paused, 'fly');
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const handleRef = useRef<FlyCanvasHandle | null>(null);
+    const onLoadRef = useRef(onLoad);
+    const [visible, setVisible] = useState(false);
 
     useEffect(() => {
-      if (!rive) return;
+      onLoadRef.current = onLoad;
+    }, [onLoad]);
+
+    useEffect(() => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const handle = attachFlyCanvas(canvas);
+      handleRef.current = handle;
+      onLoadRef.current?.();
+      return () => {
+        handle?.detach();
+        handleRef.current = null;
+      };
+    }, []);
+
+    useEffect(() => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const applySize = () => {
+        const px = Math.max(1, Math.round(size * riveDevicePixelRatio()));
+        if (canvas.width !== px || canvas.height !== px) {
+          canvas.width = px;
+          canvas.height = px;
+          handleRef.current?.redraw();
+        }
+      };
+      applySize();
+      let mql: MediaQueryList | null = null;
+      const onDprChange = () => {
+        applySize();
+        watchDpr();
+      };
+      const watchDpr = () => {
+        mql?.removeEventListener('change', onDprChange);
+        mql = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
+        mql.addEventListener('change', onDprChange);
+      };
+      watchDpr();
+      return () => mql?.removeEventListener('change', onDprChange);
+    }, [size]);
+
+    useEffect(() => {
       const el = innerRef.current;
       if (!el) return;
-      const resize = () =>
-        rive.resizeDrawingSurfaceToCanvas(riveDevicePixelRatio());
-      resize();
-      const raf = requestAnimationFrame(resize);
-      const observer = new ResizeObserver(() => resize());
+      const observer = new IntersectionObserver(
+        (observed) => {
+          for (const entry of observed) {
+            setVisible(entry.isIntersecting && entry.intersectionRatio >= 0.1);
+          }
+        },
+        { threshold: [0, 0.1] },
+      );
       observer.observe(el);
-      return () => {
-        cancelAnimationFrame(raf);
-        observer.disconnect();
-      };
-    }, [rive]);
+      return () => observer.disconnect();
+    }, []);
+
+    const playing = visible && !paused;
+    useEffect(() => {
+      handleRef.current?.setPlaying(playing);
+    }, [playing]);
+
+    const instanceId = useId();
+    const fullId = `fly-${instanceId}`;
+    const isDebugMode = useUIStore((s) => s.isDebugMode);
+    const registerInstance = useRiveStatsStore((s) => s.registerInstance);
+    const unregisterInstance = useRiveStatsStore((s) => s.unregisterInstance);
+    const updateInstance = useRiveStatsStore((s) => s.updateInstance);
 
     useEffect(() => {
-      if (!rive) return;
-      if (paused) {
-        rive.pause();
-      } else if (rive.isPaused) {
-        rive.play();
-      }
-    }, [paused, rive]);
+      if (!isDebugMode) return;
+      registerInstance(fullId);
+      return () => unregisterInstance(fullId);
+    }, [isDebugMode, fullId, registerInstance, unregisterInstance]);
+
+    useEffect(() => {
+      if (!isDebugMode) return;
+      updateInstance(fullId, { isPlaying: playing, isPaused: !playing });
+    }, [isDebugMode, fullId, playing, updateInstance]);
 
     const handleClick = useCallback(
       (e: React.MouseEvent) => {
         if (!interactive) return;
         onClick?.(e);
-        rive?.play();
       },
-      [interactive, onClick, rive]
+      [interactive, onClick]
     );
 
     return (
@@ -114,7 +152,10 @@ const Fly = memo(forwardRef<HTMLDivElement, FlyProps>(
           lineHeight: 0,
         }}
       >
-        {riveUrl && <RiveComponent style={{ width: '100%', height: '100%' }} />}
+        <canvas
+          ref={canvasRef}
+          style={{ width: '100%', height: '100%', display: 'block' }}
+        />
       </div>
     );
   }
