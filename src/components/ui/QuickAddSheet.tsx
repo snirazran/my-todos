@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { mutate } from 'swr';
 import {
@@ -13,10 +13,9 @@ import {
 import {
   Bell,
   CalendarDays,
+  Lock,
   Plus,
   Repeat,
-  Tag,
-  X,
 } from 'lucide-react';
 import {
   apiDayFromDisplay,
@@ -27,6 +26,7 @@ import {
   type DisplayDay,
 } from '@/components/board/helpers';
 import Fly from '@/components/ui/fly';
+import { Icon as AppIcon } from '@/components/ui/Icon';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
 import { PlusUpgradeModal } from './PlusUpgradeModal';
 import { PickerSheet } from './quick-add/PickerSheet';
@@ -35,10 +35,6 @@ import { useTagManager } from './quick-add/useTagManager';
 import { useCalendarMonth } from './quick-add/useCalendarMonth';
 import { useKeyboardInset } from './quick-add/useKeyboardInset';
 import {
-  customRepeatLabel,
-  formatEndDateLabel,
-  formatTimeDisplay,
-  monthlyRepeatLabel,
   parseYmdLocal,
   repeatModeFor,
   ymdLocal,
@@ -47,7 +43,7 @@ import {
 
 // Click-and-drag horizontal scrolling — mirrors the shop/wardrobe FilterBar.
 // Touch scrolls natively via `touch-pan-x`; this adds desktop drag, and `guard`
-// swallows the click that ends a drag so a pill doesn't open on release.
+// swallows the click that ends a drag so a chip doesn't toggle on release.
 function useDragScroll() {
   const ref = useRef<HTMLDivElement>(null);
   const isDown = useRef(false);
@@ -95,6 +91,55 @@ function useDragScroll() {
     handlers: { onMouseDown, onMouseLeave, onMouseUp, onMouseMove },
     guard,
   };
+}
+
+function ToolbarPill({
+  icon,
+  label,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-primary/10 px-3.5 text-[13px] font-bold text-primary transition-transform active:scale-95"
+    >
+      {icon}
+      <span className="whitespace-nowrap">{label}</span>
+    </button>
+  );
+}
+
+function ToolbarIcon({
+  icon,
+  label,
+  active = false,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  active?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+      className={`grid h-10 w-10 shrink-0 place-items-center rounded-full transition-colors active:scale-95 ${
+        active
+          ? 'bg-primary/10 text-primary'
+          : 'text-muted-foreground [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground'
+      }`}
+    >
+      {icon}
+    </button>
+  );
 }
 import type {
   ActivePicker,
@@ -146,17 +191,19 @@ export default function QuickAddSheet({
   >(undefined);
   const [showSavedConfirm, setShowSavedConfirm] = useState(false);
   const pendingSubmitRef = useRef<(() => Promise<void>) | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const tagInputRef = useRef<HTMLInputElement>(null);
-  const chipRowRef = useRef<HTMLDivElement>(null);
-  const toolbarScroll = useDragScroll();
-  const [chipLift, setChipLift] = useState(0);
+  const tagScroll = useDragScroll();
+  const [tagFadeRight, setTagFadeRight] = useState(false);
+  const updateTagFade = useCallback(() => {
+    const el = tagScroll.ref.current;
+    if (!el) return;
+    setTagFadeRight(el.scrollWidth - el.clientWidth - el.scrollLeft > 4);
+  }, [tagScroll.ref]);
   const [chipView, setChipView] = useState<{
-    tags: string[];
     startTime: string;
-    endTime: string;
     notify: boolean;
-  }>({ tags: [], startTime: '', endTime: '', notify: false });
+  }>({ startTime: '', notify: false });
 
   const tagManager = useTagManager({
     open,
@@ -181,6 +228,29 @@ export default function QuickAddSheet({
   const [sheetBaseHeight, setSheetBaseHeight] = useState<number | null>(null);
   const [suggestionsReady, setSuggestionsReady] = useState(false);
   const [hasSuggestionContent, setHasSuggestionContent] = useState(false);
+
+  const questTagIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const entry of categoryTagMap ?? []) {
+      if (focusCategoryIds && !focusCategoryIds.includes(entry.categoryId)) {
+        continue;
+      }
+      for (const id of entry.tagIds) ids.add(id);
+    }
+    return ids;
+  }, [categoryTagMap, focusCategoryIds]);
+
+  const stripTags = useMemo(() => {
+    if (questTagIds.size === 0) return tagManager.savedTags;
+    return [
+      ...tagManager.savedTags.filter((t) => questTagIds.has(t.id)),
+      ...tagManager.savedTags.filter((t) => !questTagIds.has(t.id)),
+    ];
+  }, [tagManager.savedTags, questTagIds]);
+
+  useEffect(() => {
+    updateTagFade();
+  }, [stripTags.length, open, updateTagFade]);
 
   const calendar = useCalendarMonth(new Date());
   const { inset: keyboardInset, height: viewportHeight } = useKeyboardInset(open);
@@ -211,6 +281,13 @@ export default function QuickAddSheet({
       setShowReminderPicker(false);
     }
   }, [activePicker]);
+
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = '0px';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [text, open]);
 
   useEffect(() => {
     // Render the saved area immediately so its height is reserved from the first
@@ -292,51 +369,38 @@ export default function QuickAddSheet({
     sheetBaseHeight ?? viewportHeight ?? 900,
   );
   const showSuggestions = suggestionsReady && !hasTaskText && hasSuggestionContent;
-  // Tag chips and the reminder time chip both drive the chip row.
-  const hasChips = tags.length > 0 || notifyEnabled;
+  const hasChips = notifyEnabled;
   const isShortScreen = availableSheetHeight < 700;
   // The sheet hugs its content and sits at the bottom; this is just the cap so a
   // long saved list can't grow past the screen (it scrolls internally instead).
   const bottomGap = Math.round(availableSheetHeight * 0.02);
-  const sheetMaxHeight = Math.max(
+  let sheetMaxHeight = Math.max(
     360,
     Math.min(
       availableSheetHeight - bottomGap - 12,
-      isShortScreen ? availableSheetHeight : 560,
+      isShortScreen ? availableSheetHeight : 600,
     ),
   );
+  if (keyboardActive && viewportHeight) {
+    sheetMaxHeight = Math.min(sheetMaxHeight, viewportHeight - 20);
+  }
   const suggestionsOffset = 360;
   // Cap the saved list so it can't push the input card off-screen; below the cap
   // it sizes to its content, above it scrolls inside.
   const suggestionsMax = Math.min(420, Math.round(availableSheetHeight * 0.42));
 
-  // When the keyboard is up, a tag chip grows the card and would push the Add
-  // Task button down behind the keyboard. Lift the whole sheet up by exactly
-  // the chip row's height so the card growth is cancelled out and the button
-  // stays put — without resizing the suggestions area.
-  useEffect(() => {
-    if (!keyboardActive || !hasChips) {
-      setChipLift(0);
-      return;
-    }
-    const measure = () => setChipLift(chipRowRef.current?.offsetHeight ?? 0);
-    measure();
-    const id = window.requestAnimationFrame(measure);
-    return () => window.cancelAnimationFrame(id);
-  }, [keyboardActive, hasChips, chipView]);
-
-  // Keep last chip set rendered while the row collapses (tags empties instantly).
+  // Keep the last chip rendered while the row collapses.
   useEffect(() => {
     if (hasChips) {
-      setChipView({ tags, startTime, endTime, notify: notifyEnabled });
+      setChipView({ startTime, notify: notifyEnabled });
       return;
     }
     const t = window.setTimeout(
-      () => setChipView({ tags: [], startTime: '', endTime: '', notify: false }),
+      () => setChipView({ startTime: '', notify: false }),
       320,
     );
     return () => window.clearTimeout(t);
-  }, [hasChips, tags, startTime, endTime, notifyEnabled]);
+  }, [hasChips, startTime, notifyEnabled]);
 
   useEffect(() => {
     if (!open) {
@@ -368,24 +432,16 @@ export default function QuickAddSheet({
       : repeat === 'monthly'
         ? 'monthly'
         : repeatModeFor(pickedDays, repeat, daysOrder);
-  const repeatBaseLabel =
-    repeatMode === 'daily'
-      ? 'Every day'
-      : repeatMode === 'weekdays'
-        ? 'Every weekday'
-        : repeatMode === 'weekend'
-          ? 'Every weekend'
-          : repeatMode === 'weekly'
-            ? `Every week on ${labelForDisplayDay(repeatDay as Exclude<DisplayDay, 7>, daysOrder)}`
-            : repeatMode === 'monthly'
-              ? monthlyRepeatLabel(selectedDateKey || todayKey)
-              : repeatMode === 'custom' && repeatRule
-                ? customRepeatLabel(repeatRule)
-                : 'Does not repeat';
-  const repeatLabel =
-    repeatMode !== 'none' && repeatEndDate
-      ? `${repeatBaseLabel} · until ${formatEndDateLabel(repeatEndDate)}`
-      : repeatBaseLabel;
+  const repeatShortLabel =
+    {
+      daily: 'Daily',
+      weekdays: 'Weekdays',
+      weekend: 'Weekends',
+      weekly: `Weekly · ${labelForDisplayDay(repeatDay as Exclude<DisplayDay, 7>, daysOrder).slice(0, 3)}`,
+      monthly: 'Monthly',
+      custom: 'Custom',
+      none: 'Repeat',
+    }[repeatMode] ?? 'Repeat';
 
   const selectSingleDay = (day: DisplayDay) => {
     setPickedDays([day]);
@@ -576,18 +632,17 @@ export default function QuickAddSheet({
                 }}
                 style={{
                   contain: 'layout paint style',
-                  // Mobile only: offset the sheet upward by the chip row height so
-                  // adding a tag while the keyboard is open doesn't push the Add
-                  // Task button behind the keyboard.
-                  bottom: isDesktop ? undefined : chipLift || undefined,
+                  // Mobile only: pin the sheet above the on-screen keyboard using
+                  // the real visualViewport inset so the Add Task button can never
+                  // hide behind it.
+                  bottom:
+                    isDesktop || !keyboardActive ? undefined : keyboardInset,
                   transition: 'bottom 280ms cubic-bezier(0.32,0.72,0,1)',
                 }}
                 className={`fixed z-[1400] flex max-h-[100dvh] transform-gpu pointer-events-none will-change-transform ${
                   isDesktop
                     ? 'inset-0 items-center justify-center p-6'
-                    : `inset-x-0 bottom-0 items-end px-4 pt-2 sm:px-6 ${
-                        keyboardActive ? 'pb-[7vh] sm:pb-[8vh]' : 'pb-4 sm:pb-6'
-                      }`
+                    : 'inset-x-0 bottom-0 items-end px-3 pt-2 pb-4 sm:px-6 sm:pb-6'
                 }`}
               >
                 <div
@@ -595,11 +650,11 @@ export default function QuickAddSheet({
                   className="pointer-events-auto mx-auto flex w-full max-w-[500px] flex-col pb-[env(safe-area-inset-bottom)] sm:max-w-[620px]"
                 >
                   <div className="flex min-h-0 flex-1 flex-col gap-3">
-                  <div className="flex flex-none flex-col overflow-hidden rounded-[28px] bg-popover px-4 pb-2 pt-2 ring-1 ring-border/80 shadow-[0_3px_0_0_rgba(0,0,0,0.18)] sm:pt-5">
+                  <div className="flex flex-none flex-col overflow-hidden rounded-[28px] bg-popover px-5 pb-3 pt-2 ring-1 ring-border/80 shadow-[0_3px_0_0_rgba(0,0,0,0.18)] sm:pt-5">
                     {!isDesktop && (
                       <div
                         onPointerDown={(e) => dragControls.start(e)}
-                        className="-mx-4 -mt-2 mb-1 flex h-6 items-center justify-center touch-none cursor-grab active:cursor-grabbing"
+                        className="-mx-5 -mt-2 mb-1 flex h-7 items-center justify-center touch-none cursor-grab active:cursor-grabbing"
                       >
                         <div className="h-1.5 w-10 rounded-full bg-muted-foreground/25" />
                       </div>
@@ -614,7 +669,7 @@ export default function QuickAddSheet({
                         }`}
                       >
                         <div className="min-h-0 overflow-hidden">
-                          <div ref={chipRowRef} className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 px-1 -mx-1 mask-fade-right">
+                          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 px-1 -mx-1 mask-fade-right">
                             {chipView.notify && (
                               <span className="shrink-0 inline-flex items-center gap-1.5 rounded-xl border border-primary/20 bg-primary/10 px-3 py-1.5 text-[11px] font-black uppercase tracking-wider text-primary shadow-sm">
                                 <Bell className="h-3 w-3 shrink-0 text-amber-500" />
@@ -623,73 +678,39 @@ export default function QuickAddSheet({
                                 </span>
                               </span>
                             )}
-                            {chipView.tags.map((tagId) => {
-                              const tag = tagManager.getTagDetails(tagId);
-                              const color = tag?.color;
-                              const name = tag?.name || 'Unknown';
-
-                              return (
-                                <button
-                                  key={tagId}
-                                  type="button"
-                                  onClick={() => tagManager.removeTag(tagId)}
-                                  className="group shrink-0 relative inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider border transition-all shadow-sm [@media(hover:hover)]:hover:opacity-75 active:scale-95"
-                                  style={
-                                    color
-                                      ? {
-                                          backgroundColor: `${color}20`,
-                                          color: color,
-                                          borderColor: `${color}40`,
-                                        }
-                                      : undefined
-                                  }
-                                >
-                                  {!color && (
-                                    <span className="bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-200 border-indigo-200 dark:border-indigo-800 flex items-center gap-1 h-full w-full absolute inset-0 rounded-md px-2 opacity-10 pointer-events-none" />
-                                  )}
-                                  <span
-                                    className={
-                                      !color
-                                        ? 'text-indigo-700 dark:text-indigo-300 relative z-10'
-                                        : 'relative z-10'
-                                    }
-                                  >
-                                    {name}
-                                  </span>
-                                  <X className="w-3 h-3 opacity-50 [@media(hover:hover)]:group-hover:opacity-100 transition-opacity" />
-                                </button>
-                              );
-                            })}
                           </div>
                         </div>
                       </div>
 
-                      <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+                      <div className="flex shrink-0 items-start gap-3">
                         <div className="relative flex-1">
-                          <input
+                          <textarea
                             ref={inputRef}
                             value={text}
-                            onChange={(e) => setText(e.target.value)}
+                            rows={1}
+                            onChange={(e) =>
+                              setText(e.target.value.replace(/\s*\n+\s*/g, ' '))
+                            }
                             onFocus={() => setInputFocused(true)}
                             onBlur={() => setInputFocused(false)}
-                            placeholder="Enter a new task..."
+                            placeholder="What needs doing?"
                             disabled={isSubmitting}
                             spellCheck={false}
                             autoComplete="off"
                             maxLength={100}
-                            className="h-14 w-full rounded-[16px] bg-muted/50 pl-4 pr-14 text-xl font-medium text-foreground ring-2 ring-border shadow-[0_3px_0_0_rgba(15,23,42,0.08)] focus:outline-none focus:ring-2 focus:ring-primary/60 disabled:opacity-50 text-left sm:h-16 sm:text-xl"
+                            className="block w-full min-h-[76px] max-h-[136px] resize-none overflow-y-auto rounded-xl bg-transparent px-1 pt-3 pb-1 text-[22px] font-semibold leading-[30px] tracking-tight text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50 text-left sm:text-2xl"
                             onKeyDown={(e) => {
-                              if (e.key === 'Enter' && !e.shiftKey) {
+                              if (e.key === 'Enter') {
                                 e.preventDefault();
-                                handleSubmit();
+                                if (!e.shiftKey) handleSubmit();
                               }
                               if (e.key === 'Escape') onOpenChange(false);
                             }}
                           />
-                          {text.length >= 95 && (
+                          {text.length >= 90 && (
                             <span
                               aria-hidden="true"
-                              className={`pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-bold tabular-nums ${
+                              className={`pointer-events-none absolute bottom-1 right-1 text-[11px] font-bold tabular-nums ${
                                 text.length >= 100 ? 'text-rose-500' : 'text-rose-400'
                               }`}
                             >
@@ -697,80 +718,116 @@ export default function QuickAddSheet({
                             </span>
                           )}
                         </div>
-                        <div className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-muted/60 ring-1 ring-inset ring-border/60 sm:h-16 sm:w-16">
+                        <div className="mt-1 grid h-14 w-14 shrink-0 place-items-center rounded-full bg-muted/60 ring-1 ring-inset ring-border/60 sm:h-16 sm:w-16">
                           <Fly size={48} y={-3} />
                         </div>
                       </div>
 
-                      <div className="mt-3 mb-2.5 h-px bg-border/70" />
+                      <div className="mt-1.5 mb-2.5 h-px bg-border/60" />
 
-                      {/* Metadata toolbar */}
                       <div
-                        ref={toolbarScroll.ref}
-                        onMouseDown={toolbarScroll.handlers.onMouseDown}
-                        onMouseLeave={toolbarScroll.handlers.onMouseLeave}
-                        onMouseUp={toolbarScroll.handlers.onMouseUp}
-                        onMouseMove={toolbarScroll.handlers.onMouseMove}
-                        className="-mx-1 flex cursor-grab select-none items-center gap-2 overflow-x-auto no-scrollbar px-1 pb-0.5 touch-pan-x active:cursor-grabbing"
+                        ref={tagScroll.ref}
+                        onScroll={updateTagFade}
+                        onMouseDown={tagScroll.handlers.onMouseDown}
+                        onMouseLeave={tagScroll.handlers.onMouseLeave}
+                        onMouseUp={tagScroll.handlers.onMouseUp}
+                        onMouseMove={tagScroll.handlers.onMouseMove}
+                        className={`-mx-2 mb-1.5 grid auto-cols-max grid-flow-col ${
+                          stripTags.length > 5 ? 'grid-rows-2' : 'grid-rows-1'
+                        } cursor-grab select-none items-center gap-x-2 gap-y-4 overflow-x-auto no-scrollbar px-2 pt-2 pb-2 touch-pan-x active:cursor-grabbing ${
+                          tagFadeRight ? 'mask-fade-right' : ''
+                        }`}
                       >
+                        {stripTags.map((tag) => {
+                          const selected = tags.includes(tag.id);
+                          const isQuestTag =
+                            questTagIds.has(tag.id) && !tag.disabled;
+                          return (
+                            <button
+                              key={tag.id}
+                              type="button"
+                              onClick={tagScroll.guard(() =>
+                                tagManager.toggleTag(tag),
+                              )}
+                              className={`relative inline-flex h-9 select-none items-center justify-center gap-1.5 rounded-xl border pr-3 text-[11px] font-black uppercase tracking-wider shadow-sm transition-all active:scale-95 [@media(hover:hover)]:hover:opacity-75 ${
+                                isQuestTag ? 'pl-[56px]' : 'pl-3'
+                              } ${
+                                tag.disabled
+                                  ? 'border-dashed border-border bg-muted text-muted-foreground/70'
+                                  : selected
+                                    ? 'ring-2 ring-offset-1 ring-offset-popover'
+                                    : ''
+                              }`}
+                              style={
+                                tag.disabled
+                                  ? undefined
+                                  : {
+                                      backgroundColor: `${tag.color}20`,
+                                      color: tag.color,
+                                      borderColor: `${tag.color}40`,
+                                    }
+                              }
+                            >
+                              {isQuestTag && (
+                                <span
+                                  className="pointer-events-none absolute left-1 top-1/2 grid h-12 w-11 -translate-y-1/2 -rotate-3 place-items-center rounded-[10px] border bg-popover shadow-sm"
+                                  style={{ borderColor: `${tag.color}40` }}
+                                >
+                                  <AppIcon name="quests" className="h-7 w-7" />
+                                </span>
+                              )}
+                              <span className="max-w-[128px] truncate">
+                                {tag.name}
+                              </span>
+                              {tag.disabled && (
+                                <Lock className="h-3 w-3 shrink-0" />
+                              )}
+                            </button>
+                          );
+                        })}
+                        <button
+                          type="button"
+                          aria-label="Add tag"
+                          onClick={tagScroll.guard(() => setActivePicker('tags'))}
+                          className="inline-flex h-9 items-center justify-center gap-1 rounded-xl border border-dashed border-primary/40 bg-primary/5 px-3 text-[11px] font-extrabold uppercase tracking-wider text-primary transition-colors active:scale-95 [@media(hover:hover)]:hover:bg-primary/10"
+                        >
+                          <Plus className="h-3.5 w-3.5 shrink-0 stroke-[3]" />
+                          {stripTags.length === 0 && (
+                            <span className="whitespace-nowrap">Create tag</span>
+                          )}
+                        </button>
+                      </div>
+
+                      <div className="-mx-1 flex items-center gap-1.5 overflow-x-auto no-scrollbar px-1 pb-0.5">
                         {!hideDayPicker && (
-                          <button
-                            type="button"
-                            onClick={toolbarScroll.guard(() => setActivePicker('date'))}
-                            className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-primary/10 px-3 py-2 text-[13px] font-bold text-primary transition-colors active:scale-95"
-                          >
-                            <CalendarDays className="h-4 w-4" />
-                            <span className="whitespace-nowrap">{selectedDateLabel}</span>
-                          </button>
+                          <ToolbarPill
+                            icon={<CalendarDays className="h-4 w-4" />}
+                            label={selectedDateLabel}
+                            onClick={() => setActivePicker('date')}
+                          />
                         )}
-                        <button
-                          type="button"
-                          onClick={toolbarScroll.guard(() => setActivePicker('tags'))}
-                          className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-bold transition-colors active:scale-95 ${
-                            tags.length > 0
-                              ? 'bg-primary/10 text-primary'
-                              : 'bg-muted/60 text-muted-foreground [@media(hover:hover)]:hover:bg-muted'
-                          }`}
-                        >
-                          <Tag className="h-4 w-4" />
-                          <span className="whitespace-nowrap">
-                            {tags.length > 0
-                              ? `${tags.length} tag${tags.length === 1 ? '' : 's'}`
-                              : 'Tags'}
-                          </span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={toolbarScroll.guard(() => setShowReminderPicker(true))}
-                          className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-bold transition-colors active:scale-95 ${
-                            notifyEnabled
-                              ? 'bg-primary/10 text-primary'
-                              : 'bg-muted/60 text-muted-foreground [@media(hover:hover)]:hover:bg-muted'
-                          }`}
-                        >
-                          <Bell className="h-4 w-4" />
-                          <span className="whitespace-nowrap">
-                            {notifyEnabled
-                              ? formatTimeDisplay(startTime || '09:00')
-                              : 'Notify'}
-                          </span>
-                        </button>
-                        {!hideRepeatPicker && (
-                          <button
-                            type="button"
-                            onClick={toolbarScroll.guard(() => setActivePicker('repeat'))}
-                            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-bold transition-colors active:scale-95 ${
-                              repeatsOn
-                                ? 'bg-primary/10 text-primary'
-                                : 'bg-muted/60 text-muted-foreground [@media(hover:hover)]:hover:bg-muted'
-                            }`}
-                          >
-                            <Repeat className="h-4 w-4" />
-                            <span className="whitespace-nowrap">
-                              {repeatsOn ? repeatLabel : 'Repeat'}
-                            </span>
-                          </button>
+                        {!hideRepeatPicker && repeatsOn && (
+                          <ToolbarPill
+                            icon={<Repeat className="h-4 w-4" />}
+                            label={repeatShortLabel}
+                            onClick={() => setActivePicker('repeat')}
+                          />
                         )}
+                        <div className="ml-auto flex items-center gap-1">
+                          <ToolbarIcon
+                            icon={<Bell className="h-5 w-5" />}
+                            label="Reminder"
+                            active={notifyEnabled}
+                            onClick={() => setShowReminderPicker(true)}
+                          />
+                          {!hideRepeatPicker && !repeatsOn && (
+                            <ToolbarIcon
+                              icon={<Repeat className="h-5 w-5" />}
+                              label="Repeat"
+                              onClick={() => setActivePicker('repeat')}
+                            />
+                          )}
+                        </div>
                       </div>
 
                     </div>
