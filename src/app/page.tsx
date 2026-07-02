@@ -50,6 +50,7 @@ import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import { randomUUID } from '@/lib/uuid';
 import { QuestOnboardingPopup } from '@/components/ui/QuestOnboardingPopup';
 import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
+import { BuddyNudgeCard } from '@/components/ui/BuddyNudgeCard';
 import type {
   FocusCategoryTagMap,
   MacroCategoryDefinition,
@@ -698,6 +699,7 @@ export default function Home() {
                   quickAddOpen={showQuickAdd}
                   paused={isAnyPanelOpen}
                 />
+                <BuddyNudgeCard />
               </div>
             </div>
           </div>

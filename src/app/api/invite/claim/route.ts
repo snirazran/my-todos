@@ -1,25 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { v4 as uuid } from 'uuid';
 import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import ReferralModel from '@/lib/models/Referral';
 import UserModel from '@/lib/models/User';
 import InviteConfigModel from '@/lib/models/InviteConfig';
+import TaskBondModel from '@/lib/models/TaskBond';
 import { ensureInviteConfig } from '@/lib/inviteConfig/defaults';
 import { getFullCatalog, buildById } from '@/lib/skins/getCatalog';
 import { createFriendship } from '@/lib/friends/code';
-import { notifyFriendsChanged } from '@/lib/taskSync';
+import { notifyFriendsChanged, notifyFriendUpdate } from '@/lib/taskSync';
+import { createTasksForUser } from '@/app/api/tasks/route';
+import { buildAcceptBody, repeatLabelFor } from '@/lib/buddy/bond';
+import { getZonedToday } from '@/lib/utils';
+import { sendBuddyPush, buddyDisplayName } from '@/lib/buddy/push';
 
 export async function POST(req: NextRequest) {
   try {
     const userId = await requireUserId();
 
-    let body: { code?: string };
+    let body: { code?: string; tz?: string };
     try {
       body = await req.json();
     } catch {
       return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
     }
     const code = (body.code || '').trim();
+    const tz = body.tz || 'UTC';
     if (!code) return NextResponse.json({ error: 'Missing code' }, { status: 400 });
 
     await connectMongo();
@@ -130,11 +137,62 @@ export async function POST(req: NextRequest) {
 
     void notifyFriendsChanged(userId);
 
+    let buddyTaskResult: { text: string; partnerName: string } | null = null;
+    if (referral.buddyTask?.text) {
+      try {
+        const params = referral.buddyTask;
+        const bondId = uuid();
+        const acceptBody = buildAcceptBody(params, tz);
+
+        const fromResult = await createTasksForUser(
+          referral.inviterId,
+          acceptBody,
+          tz,
+          { bondId, buddyUserId: userId },
+        );
+        const toResult = await createTasksForUser(userId, acceptBody, tz, {
+          bondId,
+          buddyUserId: referral.inviterId,
+        });
+
+        if (fromResult.ok && toResult.ok) {
+          await TaskBondModel.create({
+            bondId,
+            invitedBy: referral.inviterId,
+            fromUserId: referral.inviterId,
+            toUserId: userId,
+            status: 'active',
+            initialText: params.text,
+            createParams: params,
+            repeatLabel: repeatLabelFor(params),
+            taskFromId: fromResult.repeatGroupId ?? fromResult.ids[0],
+            taskToId: toResult.repeatGroupId ?? toResult.ids[0],
+            activeSince: getZonedToday(tz),
+          });
+
+          buddyTaskResult = { text: params.text, partnerName: inviterName };
+
+          void notifyFriendUpdate(referral.inviterId);
+          void buddyDisplayName(userId).then((name) =>
+            sendBuddyPush(referral.inviterId, {
+              title: 'Goal Buddy 🐸',
+              body: `${name} joined — you're sharing "${params.text}" now!`,
+              path: '/planner',
+              type: 'buddy_accepted',
+            }),
+          );
+        }
+      } catch {
+        /* buddy task is best-effort; gift + friendship already succeeded */
+      }
+    }
+
     return NextResponse.json({
       ok: true,
       gift,
       inviterId: referral.inviterId,
       inviterName,
+      buddyTask: buddyTaskResult,
     });
   } catch (err) {
     return NextResponse.json(

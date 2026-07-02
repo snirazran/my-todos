@@ -24,6 +24,7 @@ import { InviteFriendsModal } from '@/components/ui/InviteFriendsModal';
 import { FriendRequestsInbox } from '@/components/ui/FriendRequestsInbox';
 import { FriendDetailModal } from '@/components/ui/FriendDetailModal';
 import { BuddyUpFlow } from '@/components/ui/BuddyUpFlow';
+import { BuddyNudgeSheet } from '@/components/ui/BuddyNudgeSheet';
 import { contributionFrom, type FriendSummary } from '@/lib/friends/indices';
 import { RewardCard } from '@/components/ui/gift-box/RewardCard';
 import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
@@ -124,22 +125,22 @@ export default function FriendsPage() {
 
   return (
     <main className="relative min-h-[100dvh] overflow-x-hidden pb-24 md:pb-12">
-      {/* Friend invites — persistent, over the winter scene */}
-      <button
-        type="button"
-        onClick={() => setInboxOpen(true)}
-        aria-label="Friend invites"
-        className="absolute right-4 top-[calc(env(safe-area-inset-top)+0.75rem)] z-30 flex h-11 w-11 items-center justify-center rounded-full bg-white/90 text-emerald-700 shadow-md ring-1 ring-black/5 backdrop-blur-sm transition-transform active:scale-95"
-      >
-        <Bell className="h-[22px] w-[22px]" />
-        {alertsCount > 0 && (
-          <span className="absolute -right-1 -top-1 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full border-2 border-white bg-rose-500 px-1 text-[10px] font-black text-white">
-            {alertsCount > 9 ? '9+' : alertsCount}
-          </span>
-        )}
-      </button>
-
       <div className="relative z-10 mx-auto flex w-full flex-col items-center px-4 pt-[calc(env(safe-area-inset-top)+0.5rem)] md:max-w-2xl md:pt-11">
+        {/* Friend invites — persistent, over the winter scene */}
+        <button
+          type="button"
+          onClick={() => setInboxOpen(true)}
+          aria-label="Friend invites"
+          className="absolute right-4 top-[calc(env(safe-area-inset-top)+0.75rem)] z-30 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-emerald-700 shadow-md ring-1 ring-black/5 backdrop-blur-sm transition-transform active:scale-95"
+        >
+          <Bell className="h-6 w-6" />
+          {alertsCount > 0 && (
+            <span className="absolute -right-1 -top-1 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full border-2 border-white bg-rose-500 px-1 text-[10px] font-black text-white">
+              {alertsCount > 9 ? '9+' : alertsCount}
+            </span>
+          )}
+        </button>
+
         {/* Self frog */}
         <SelfFrog indices={indices} />
 
@@ -261,6 +262,11 @@ export default function FriendsPage() {
       <RemoveFriendDialog
         target={removeTarget}
         onClose={() => setRemoveTarget(null)}
+      />
+      <BuddyNudgeSheet
+        friends={friends}
+        indices={indices}
+        ready={!!friendsData}
       />
     </main>
   );

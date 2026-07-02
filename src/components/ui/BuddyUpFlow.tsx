@@ -191,7 +191,7 @@ export function BuddyUpFlow({
                 exit={{ opacity: 0, scale: 0.98, y: 12 }}
                 transition={{ type: 'spring', damping: 30, stiffness: 300 }}
                 onClick={(e) => e.stopPropagation()}
-                className="relative flex w-full flex-col overflow-hidden bg-[#6b5bd1] md:h-auto md:max-h-[calc(100dvh-2rem)] md:w-[min(100vw-2rem,30rem)] md:rounded-[28px] md:shadow-2xl"
+                className="relative flex w-full flex-col overflow-hidden bg-[#4f9149] md:h-auto md:max-h-[calc(100dvh-2rem)] md:w-[min(100vw-2rem,30rem)] md:rounded-[28px] md:shadow-2xl"
               >
                 <button
                   type="button"
@@ -232,7 +232,7 @@ export function BuddyUpFlow({
 
                 <div className="relative mt-16 translate-y-[11px]">
                   <Frog width={196} height={176} indices={myIndices} />
-                  <div className="absolute -right-[5.5rem] top-1 z-20 max-w-[200px] rotate-[6deg] rounded-2xl bg-white px-3.5 py-2 text-left text-[13px] font-black leading-snug tracking-tight text-[#6b5bd1] shadow-[0_3px_0_rgba(40,30,90,0.25)]">
+                  <div className="absolute -right-[5.5rem] top-1 z-20 max-w-[200px] rotate-[6deg] rounded-2xl bg-white px-3.5 py-2 text-left text-[13px] font-black leading-snug tracking-tight text-[#4f9149] shadow-[0_3px_0_rgba(25,60,25,0.25)]">
                     Wanna be my Goal Buddy? Let&apos;s build this habit together!
                     <span className="absolute -bottom-1.5 left-4 h-3 w-3 rotate-45 bg-white" />
                   </div>
@@ -268,7 +268,7 @@ export function BuddyUpFlow({
                   type="button"
                   onClick={handleSend}
                   disabled={sending}
-                  className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-white text-lg font-black tracking-tight text-[#6b5bd1] shadow-[0_5px_0_rgba(0,0,0,0.15)] transition-all active:translate-y-0.5 disabled:opacity-70"
+                  className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-white text-lg font-black tracking-tight text-[#4f9149] shadow-[0_5px_0_rgba(0,0,0,0.15)] transition-all active:translate-y-0.5 disabled:opacity-70"
                 >
                   {sending && <Loader2 className="h-5 w-5 animate-spin" />}
                   Send invitation
@@ -287,7 +287,7 @@ export function BuddyUpFlow({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[1600] flex items-end justify-center bg-[#6b5bd1]/95 backdrop-blur-sm sm:items-center"
+              className="fixed inset-0 z-[1600] flex items-end justify-center bg-[#4f9149]/95 backdrop-blur-sm sm:items-center"
               onClick={onClose}
             >
               <motion.div

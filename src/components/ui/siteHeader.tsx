@@ -158,7 +158,7 @@ export default function SiteHeader() {
 
   return (
     <>
-      {(pathname === '/' || pathname === '/wardrobe') && (
+      {(pathname === '/' || pathname === '/wardrobe' || pathname === '/friends') && (
         <div
           className={cn(
             'fixed left-3 top-[calc(env(safe-area-inset-top)+0.5rem)] z-[90] flex items-center px-2 py-1 md:hidden',
