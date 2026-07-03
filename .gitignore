@@ -60,3 +60,7 @@ ios/App/Pods
 ios/App/App/GoogleService-Info.plist
 
 .vercel
+
+# Rive WASM runtime — copied from node_modules by scripts/copy-rive-wasm.mjs (postinstall)
+public/rive.wasm
+public/rive_fallback.wasm

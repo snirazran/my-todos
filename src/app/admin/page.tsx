@@ -22,7 +22,6 @@ import {
   XCircle,
   Paintbrush,
   ScrollText,
-  Upload,
   Bug,
   RefreshCcw,
   UserPlus,
@@ -33,7 +32,6 @@ import { Label } from '@/components/ui/label';
 import { useUIStore } from '@/lib/uiStore';
 import { AdminCosmeticsPopup } from '@/components/ui/AdminCosmeticsPopup';
 import { AdminGiftManagerPopup } from '@/components/ui/AdminGiftManagerPopup';
-import { AdminRiveManagerPopup } from '@/components/ui/AdminRiveManagerPopup';
 import { AdminGuard } from '@/components/auth/AdminGuard';
 
 type Template = {
@@ -72,7 +70,6 @@ function AdminPageContent() {
   // Popup managers
   const [cosmeticsOpen, setCosmeticsOpen] = useState(false);
   const [giftManagerOpen, setGiftManagerOpen] = useState(false);
-  const [riveManagerOpen, setRiveManagerOpen] = useState(false);
 
   // Load notification data
   useEffect(() => {
@@ -308,13 +305,6 @@ function AdminPageContent() {
               description="Create gifts and configure item drop chances."
               onClick={() => setGiftManagerOpen(true)}
             />
-            <ManagerActionCard
-              icon={<Upload className="w-5 h-5" />}
-              accent="bg-sky-500/10 text-sky-600 dark:text-sky-400"
-              title="Rive Manager"
-              description="Upload frog, fly, and gift Rive files with backups."
-              onClick={() => setRiveManagerOpen(true)}
-            />
           </div>
         </Section>
 
@@ -511,7 +501,6 @@ function AdminPageContent() {
 
       <AdminCosmeticsPopup open={cosmeticsOpen} onClose={() => setCosmeticsOpen(false)} />
       <AdminGiftManagerPopup open={giftManagerOpen} onClose={() => setGiftManagerOpen(false)} />
-      <AdminRiveManagerPopup open={riveManagerOpen} onClose={() => setRiveManagerOpen(false)} />
     </div>
   );
 }

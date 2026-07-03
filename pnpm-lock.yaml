@@ -85,12 +85,9 @@ importers:
       '@radix-ui/react-tooltip':
         specifier: ^1.2.8
         version: 1.2.8(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
-      '@rive-app/canvas':
-        specifier: ^2.30.4
-        version: 2.30.4
-      '@rive-app/react-canvas':
-        specifier: ^4.22.1
-        version: 4.22.1(react@19.2.6)
+      '@rive-app/canvas-lite':
+        specifier: 2.37.2
+        version: 2.37.2
       '@rive-app/react-canvas-lite':
         specifier: ^4.28.1
         version: 4.28.1(patch_hash=knspupdgwovpabfas3vo5hobna)(react@19.2.6)
@@ -2029,16 +2026,8 @@ packages:
   '@rive-app/canvas-lite@2.37.2':
     resolution: {integrity: sha512-Pp8R/ZpZliwkPm684HFIKZ4N6UurcfbfFQXV74+HV2bxAutpQYsDCr0sOjEgJC/brG5aeSCVyJY3Iq7nNAkmeQ==}
 
-  '@rive-app/canvas@2.30.4':
-    resolution: {integrity: sha512-kq8pUw6aexyEqnDG2hpw8NJiHfhaTycN6d+6Q1ogKG492NKWbcWHcVzXlcl77x0uWSEAKyKrOxzwOb+ebwUvZw==}
-
   '@rive-app/react-canvas-lite@4.28.1':
     resolution: {integrity: sha512-lhaD8eIATdjXGQxUK1iKMND8jg2SNBGOF7w962sEJaLPBP9pQEu+X8dLXXJlbZbp0p8pumAfUkruub4roadIKQ==}
-    peerDependencies:
-      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0
-
-  '@rive-app/react-canvas@4.22.1':
-    resolution: {integrity: sha512-RJVoP60mi152u7Joh/x/DutKC4aSaMrxwR5LRrvOUZiJbJO9ZKWofyttZmHEYRw+sAhDGnvQ0eIdc2e/udkvSg==}
     peerDependencies:
       react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0
 
@@ -7102,16 +7091,9 @@ snapshots:
 
   '@rive-app/canvas-lite@2.37.2': {}
 
-  '@rive-app/canvas@2.30.4': {}
-
   '@rive-app/react-canvas-lite@4.28.1(patch_hash=knspupdgwovpabfas3vo5hobna)(react@19.2.6)':
     dependencies:
       '@rive-app/canvas-lite': 2.37.2
-      react: 19.2.6
-
-  '@rive-app/react-canvas@4.22.1(react@19.2.6)':
-    dependencies:
-      '@rive-app/canvas': 2.30.4
       react: 19.2.6
 
   '@rtsao/scc@1.1.0': {}

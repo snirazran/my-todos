@@ -9,6 +9,8 @@ import { RiveCounter } from '@/components/ui/RiveCounter';
 import { RiveScrollPause } from '@/components/ui/RiveScrollPause';
 import { AuthContext } from '@/components/auth/AuthContext';
 import { GlobalPageBackground } from '@/components/ui/GlobalPageBackground';
+import { RiveWarmup } from '@/components/providers/RiveWarmup';
+import { RIVE_WASM_VERSION } from '@/lib/riveWasmVersion';
 
 const poppins = Poppins({
   subsets: ['latin'],
@@ -94,6 +96,20 @@ export default function RootLayout({
         {/* The fly the frog's tongue grabs on task completion — preload so the
             very first completion never renders a blank (uncached) fly. */}
         <link rel="preload" as="image" href="/fly.svg" type="image/svg+xml" />
+        {/* Rive runtime WASM (self-hosted) + the frog animation — start both
+            downloads from the HTML head so they don't wait for hydration. */}
+        <link
+          rel="preload"
+          href={`/rive.wasm?v=${RIVE_WASM_VERSION}`}
+          as="fetch"
+          crossOrigin="anonymous"
+        />
+        <link
+          rel="preload"
+          href="/frog_idle.riv"
+          as="fetch"
+          crossOrigin="anonymous"
+        />
       </head>
       <body
         className={[
@@ -118,6 +134,7 @@ export default function RootLayout({
               <MobileNav />
               <RiveCounter />
               <RiveScrollPause />
+              <RiveWarmup />
             </div>
           </Providers>
         </AuthContext>

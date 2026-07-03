@@ -15,6 +15,29 @@ const lanOrigins = Object.values(networkInterfaces())
 const nextConfig = {
   reactStrictMode: false,
   allowedDevOrigins: [...lanOrigins, '192.168.*.*', '10.*.*.*', '172.16.*.*'],
+  async headers() {
+    return [
+      {
+        source: '/:file(rive|rive_fallback).wasm',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+          { key: 'Content-Type', value: 'application/wasm' },
+        ],
+      },
+      {
+        source: '/:file*.riv',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=300, stale-while-revalidate=86400',
+          },
+        ],
+      },
+    ];
+  },
   async rewrites() {
     return [
       {
