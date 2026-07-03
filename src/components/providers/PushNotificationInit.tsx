@@ -18,7 +18,16 @@ export function PushNotificationInit() {
   useEffect(() => {
     if (!user?.uid) return;
     if (Capacitor.isNativePlatform()) return;
-    void initWebPush();
+    const idle =
+      typeof window.requestIdleCallback === 'function'
+        ? window.requestIdleCallback
+        : (cb: () => void) => window.setTimeout(cb, 3000);
+    const cancelIdle =
+      typeof window.cancelIdleCallback === 'function'
+        ? window.cancelIdleCallback
+        : window.clearTimeout;
+    const id = idle(() => void initWebPush());
+    return () => cancelIdle(id);
   }, [user?.uid]);
 
   return null;

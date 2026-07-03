@@ -187,7 +187,8 @@
       "Bash(echo \"tsc: $?\")",
       "Bash(echo \"eslint: $?\")",
       "Bash('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' --headless=new --disable-gpu --window-size=390,844 --hide-scrollbars --virtual-time-budget=25000 --screenshot=/tmp/claude-501/-Users-snirazran-Fullstack-my-todos/80da076c-1eb3-4a09-9b72-53a4e0288742/scratchpad/login4.png http://localhost:3000/login)",
-      "Bash('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' --headless=new --disable-gpu --window-size=390,844 --hide-scrollbars --virtual-time-budget=25000 --screenshot=/tmp/claude-501/-Users-snirazran-Fullstack-my-todos/80da076c-1eb3-4a09-9b72-53a4e0288742/scratchpad/login5.png http://localhost:3000/login)"
+      "Bash('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' --headless=new --disable-gpu --window-size=390,844 --hide-scrollbars --virtual-time-budget=25000 --screenshot=/tmp/claude-501/-Users-snirazran-Fullstack-my-todos/80da076c-1eb3-4a09-9b72-53a4e0288742/scratchpad/login5.png http://localhost:3000/login)",
+      "Bash(pkill -f 'next dev')"
     ]
   }
 }

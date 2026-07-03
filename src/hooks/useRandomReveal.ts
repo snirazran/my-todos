@@ -19,10 +19,6 @@ export function useRandomReveal(
     if (decidedRef.current) return;
     decidedRef.current = true;
 
-    // TESTING: always show, ignore dismiss/probability. Revert before ship.
-    setShow(true);
-    return;
-
     let until = 0;
     try {
       until = Number(localStorage.getItem(storageKey(key))) || 0;

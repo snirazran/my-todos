@@ -96,6 +96,8 @@ export default function RootLayout({
         {/* The fly the frog's tongue grabs on task completion — preload so the
             very first completion never renders a blank (uncached) fly. */}
         <link rel="preload" as="image" href="/fly.svg" type="image/svg+xml" />
+        <link rel="preconnect" href="https://identitytoolkit.googleapis.com" />
+        <link rel="preconnect" href="https://fcmregistrations.googleapis.com" />
         {/* Rive runtime WASM (self-hosted) + the frog animation — start both
             downloads from the HTML head so they don't wait for hydration. */}
         <link
