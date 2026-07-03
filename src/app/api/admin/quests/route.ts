@@ -102,7 +102,7 @@ function sanitizeReward(input: any): QuestReward | null {
   return reward;
 }
 
-function sanitizeRewards(input: any): QuestRewards {
+export function sanitizeRewards(input: any): QuestRewards {
   const rewards = Array.isArray(input)
     ? input.map(sanitizeReward).filter(Boolean)
     : [];

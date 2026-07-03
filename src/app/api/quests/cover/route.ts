@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import connectMongo from '@/lib/mongoose';
 import QuestTemplateModel from '@/lib/models/QuestTemplate';
 import QuestCategoryModel from '@/lib/models/QuestCategory';
+import QuestRecipeModel from '@/lib/models/QuestRecipe';
+import QuestCoverAssetModel from '@/lib/models/QuestCoverAsset';
 import type { QuestCoverImageFile } from '@/lib/models/QuestTemplate';
 import { getAdminStorage } from '@/lib/firebaseAdmin';
 
@@ -31,7 +33,13 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const type = searchParams.get('type');
   const id = searchParams.get('id');
-  if (!id || (type !== 'template' && type !== 'category')) {
+  if (
+    !id ||
+    (type !== 'template' &&
+      type !== 'category' &&
+      type !== 'recipe' &&
+      type !== 'asset')
+  ) {
     return NextResponse.json({ error: 'Invalid cover request' }, { status: 400 });
   }
 
@@ -42,9 +50,17 @@ export async function GET(req: Request) {
       ? await QuestTemplateModel.findOne({ templateId: id })
           .select(projection)
           .lean<CoverDoc | null>()
-      : await QuestCategoryModel.findOne({ categoryId: id })
-          .select(projection)
-          .lean<CoverDoc | null>();
+      : type === 'category'
+        ? await QuestCategoryModel.findOne({ categoryId: id })
+            .select(projection)
+            .lean<CoverDoc | null>()
+        : type === 'recipe'
+          ? await QuestRecipeModel.findOne({ recipeId: id })
+              .select(projection)
+              .lean<CoverDoc | null>()
+          : await QuestCoverAssetModel.findOne({ key: id })
+              .select(projection)
+              .lean<CoverDoc | null>();
 
   if (!doc) {
     return NextResponse.json({ error: 'Cover not found' }, { status: 404 });

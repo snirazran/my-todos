@@ -26,6 +26,9 @@ export interface QuestDoc {
   claimedObjectiveIds: string[];
   completedAt?: Date | null;
   claimedAt?: Date | null;
+  // Generated (recipe-rolled) quests: local day the quest finished; a new roll
+  // is generated once the user's local date moves past it.
+  regenAfterDay?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -38,7 +41,7 @@ const QuestSchema = new Schema<QuestDoc>(
     rollKey: { type: String, required: true, index: true },
     placement: {
       type: String,
-      enum: ['daily', 'category'],
+      enum: ['daily', 'category', 'onboarding'],
       required: true,
     },
     categoryId: {
@@ -58,6 +61,7 @@ const QuestSchema = new Schema<QuestDoc>(
     claimedObjectiveIds: { type: [String], default: [] },
     completedAt: { type: Date, default: null },
     claimedAt: { type: Date, default: null },
+    regenAfterDay: { type: String, default: undefined },
   },
   {
     collection: 'quests',

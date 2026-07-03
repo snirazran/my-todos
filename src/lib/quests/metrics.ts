@@ -10,7 +10,8 @@ export type QuestMetricKey =
   | 'task_streak_3'
   | 'task_saved_later'
   | 'skin_equipped'
-  | 'frog_fed_full';
+  | 'frog_fed_full'
+  | 'focus_tag_linked';
 
 export const QUEST_METRIC_KEYS: QuestMetricKey[] = [
   'trade_completed',
@@ -22,6 +23,7 @@ export const QUEST_METRIC_KEYS: QuestMetricKey[] = [
   'task_saved_later',
   'skin_equipped',
   'frog_fed_full',
+  'focus_tag_linked',
 ];
 
 export async function bumpQuestMetric(args: {

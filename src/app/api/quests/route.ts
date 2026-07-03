@@ -73,7 +73,7 @@ type ClaimableEntry = {
   id: string;
   questId?: string;
   kind: 'objective' | 'season';
-  placement?: 'daily' | 'category';
+  placement?: 'daily' | 'category' | 'onboarding';
   categoryName?: string;
   objectiveLabel?: string;
   tags?: ObjectiveTagChip[];
@@ -85,7 +85,7 @@ type ClaimableEntry = {
 type TrackableEntry = {
   id: string;
   questId: string;
-  placement: 'daily' | 'category';
+  placement: 'daily' | 'category' | 'onboarding';
   categoryName?: string;
   objectiveLabel: string;
   remainingLabel: string;
@@ -208,7 +208,7 @@ export async function GET(req: Request) {
     // Count prizes ready to collect. Quests no longer have an end-reward —
     // only per-objective rewards are claimable, so count one per completed
     // objective with unclaimed rewards.
-    const questClaimable = [...dashboard.dailyQuests, ...dashboard.categoryQuests].reduce(
+    const questClaimable = [...(dashboard.onboardingQuests ?? []), ...dashboard.dailyQuests, ...dashboard.categoryQuests].reduce(
       (sum, quest) => {
         if (quest.claimed || quest.locked) return sum;
         let count = 0;
@@ -268,7 +268,7 @@ export async function GET(req: Request) {
     const questFocusTags = (quest: { categoryId?: string }) =>
       quest.categoryId ? focusTagsByCategory.get(quest.categoryId) ?? [] : [];
     const claimables: ClaimableEntry[] = [];
-    for (const quest of [...dashboard.dailyQuests, ...dashboard.categoryQuests]) {
+    for (const quest of [...(dashboard.onboardingQuests ?? []), ...dashboard.dailyQuests, ...dashboard.categoryQuests]) {
       if (quest.claimed || quest.locked) continue;
       for (const block of quest.logic) {
         if (
@@ -299,7 +299,7 @@ export async function GET(req: Request) {
       }
     }
     const trackables: TrackableEntry[] = [];
-    for (const quest of [...dashboard.dailyQuests, ...dashboard.categoryQuests]) {
+    for (const quest of [...(dashboard.onboardingQuests ?? []), ...dashboard.dailyQuests, ...dashboard.categoryQuests]) {
       if (quest.claimed || quest.locked) continue;
       for (const block of quest.logic) {
         const target = Math.max(1, block.target);
@@ -363,7 +363,7 @@ export async function GET(req: Request) {
     }
 
     // Count active quests the user can still work on (not claimed, not yet fully claimable)
-    const activeCount = [...dashboard.dailyQuests, ...dashboard.categoryQuests].filter(
+    const activeCount = [...(dashboard.onboardingQuests ?? []), ...dashboard.dailyQuests, ...dashboard.categoryQuests].filter(
       (quest) => !quest.claimed && !quest.claimable && !quest.locked,
     ).length;
     const lightMacroCategories = dashboard.macroCategories.map(lightenCategory);
@@ -429,6 +429,7 @@ export async function GET(req: Request) {
         categoryQuests: dashboard.categoryQuests.map((q) =>
           withTemplateCover(q, dashboard.templatesWithCover),
         ),
+        onboardingQuests: dashboard.onboardingQuests ?? [],
         unlockedAnimationIds: dashboard.focusProfile.unlockedAnimationIds ?? [],
         rewardCatalog: {
           ...dashboard.rewardCatalog,

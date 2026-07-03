@@ -9,6 +9,7 @@ import {
   QuestProgressBar,
   QuestRewardTileBadge,
   setQuestScrollTarget,
+  trackableEyebrow,
   type Claimable,
   type Trackable,
 } from '@/lib/questClaims';
@@ -26,7 +27,8 @@ export function NextQuestStrip({
 }) {
   const router = useRouter();
 
-  const claimable = claimables?.[0];
+  const claimable =
+    claimables?.find((c) => c.placement === 'onboarding') ?? claimables?.[0];
   const claimableCount = claimables?.length ?? 0;
 
   const nextUp = useMemo(() => {
@@ -35,6 +37,8 @@ export function NextQuestStrip({
       const aTarget = Math.max(1, a.target);
       const bTarget = Math.max(1, b.target);
       return (
+        Number(b.placement === 'onboarding') -
+          Number(a.placement === 'onboarding') ||
         Number(a.needsFocusTags ?? false) - Number(b.needsFocusTags ?? false) ||
         b.progress / bTarget - a.progress / aTarget ||
         aTarget - a.progress - (bTarget - b.progress)
@@ -108,9 +112,7 @@ export function NextQuestStrip({
           />
           <div className="flex min-w-0 flex-1 flex-col leading-tight">
             <span className="text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">
-              {nextUp.placement === 'category'
-                ? nextUp.categoryName ?? 'Focus quest'
-                : 'Daily quest'}
+              {trackableEyebrow(nextUp)}
             </span>
             {nextUp.needsFocusTags ? (
               <>

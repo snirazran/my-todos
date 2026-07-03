@@ -54,6 +54,7 @@ type QuestsResponse = {
   macroCategories: MacroCategoryDefinition[];
   dailyQuests: DailyQuestProgressView[];
   categoryQuests: CategoryQuestProgressView[];
+  onboardingQuests?: QuestProgressView[];
   activeSeason?: QuestSeasonView | null;
   rewardCatalog: Record<string, ItemDef>;
   unlockedAnimationIds: string[];
@@ -785,6 +786,27 @@ export function QuestsPanel({
                             (a, b) =>
                               Number(isQuestRetired(a)) - Number(isQuestRetired(b)),
                           );
+                          const onboardingQuests = (data.onboardingQuests ?? []).filter(
+                            (quest) => !isQuestFinished(quest),
+                          );
+                          const renderOnboardingCard = (quest: QuestProgressView) => (
+                            <div
+                              key={quest.id}
+                              data-quest-anchor={quest.id}
+                              className="rounded-[24px]"
+                            >
+                            <DailyQuestPresentationCard
+                              quest={quest as QuestProgressView & { placement: 'onboarding' }}
+                              rewardCatalog={data.rewardCatalog}
+                              isPremium={data.isPremium}
+                              claimingObjectiveId={claimingObjectiveId}
+                              onClaimObjective={(objectiveId) =>
+                                handleClaimObjective(quest.id, objectiveId)
+                              }
+                              paused={carouselDragging}
+                            />
+                            </div>
+                          );
                           const renderDailyCard = (quest: DailyQuestProgressView) => (
                             <div
                               key={quest.id}
@@ -869,8 +891,13 @@ export function QuestsPanel({
 
                           return (
                             <>
-                              {/* Mobile: daily carousel then focus stack */}
+                              {/* Mobile: onboarding first, daily carousel, focus stack */}
                               <div className="flex flex-col gap-8 md:hidden">
+                                {onboardingQuests.length > 0 && (
+                                  <div className="space-y-4">
+                                    {onboardingQuests.map(renderOnboardingCard)}
+                                  </div>
+                                )}
                                 <div className="space-y-4">
                                   {dailyQuests.length === 0 ? (
                                     <PanelCard>No active daily quests here.</PanelCard>
@@ -899,6 +926,11 @@ export function QuestsPanel({
                                   CSS multi-column balancing gap/shadow artifact. */}
                               {(() => {
                                 const cells: React.ReactNode[] = [
+                                  ...onboardingQuests.map((quest, i) => (
+                                    <div key={`onboarding-cell-${i}`}>
+                                      {renderOnboardingCard(quest)}
+                                    </div>
+                                  )),
                                   ...(dailyQuests.length === 0
                                     ? [<PanelCard key="empty-daily">No active daily quests here.</PanelCard>]
                                     : dailyQuests.map(renderDailyCard)

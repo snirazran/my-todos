@@ -12,6 +12,13 @@ import { getFullCatalog } from '@/lib/skins/getCatalog';
 import { loadBackgroundPrizes } from '@/lib/skins/gifts';
 import { getZonedToday, getZonedYMD } from '@/lib/utils';
 import { loadQuestCounters, sumCounters } from './metrics';
+import QuestRecipeModel, {
+  type QuestRecipeDoc,
+  type RecipeSlot,
+} from '@/lib/models/QuestRecipe';
+import { ensureDefaultQuestRecipe } from './recipeDefaults';
+import { EXPLORER_QUEST, FIRST_HOPS_QUEST } from './onboardingQuests';
+import QuestCoverAssetModel from '@/lib/models/QuestCoverAsset';
 import type {
   CategoryQuestProgressView,
   DailyQuestProgressView,
@@ -222,6 +229,17 @@ function sumFocusSeconds(
   }, 0);
 }
 
+// Rolled fly amounts and focus-minute targets land on multiples of 5 (10, 15,
+// 20…) so rewards never read as odd values like 49. Falls back to the raw roll
+// when the admin range contains no multiple of 5.
+function snapToFiveInRange(value: number, min: number, max: number): number {
+  const lo = Math.ceil(min / 5) * 5;
+  const hi = Math.floor(max / 5) * 5;
+  if (lo > hi) return value;
+  const snapped = Math.round(value / 5) * 5;
+  return Math.min(hi, Math.max(lo, snapped));
+}
+
 function resolveLogicTarget(
   block: QuestLogicBlock,
   seed: string,
@@ -233,7 +251,10 @@ function resolveLogicTarget(
   const min = Math.max(1, Math.min(block.minAmount ?? 1, block.maxAmount ?? 1));
   const max = Math.max(min, block.maxAmount ?? min);
   const rng = createSeededRandom(seed);
-  return Math.floor(rng() * (max - min + 1)) + min;
+  const rolled = Math.floor(rng() * (max - min + 1)) + min;
+  return block.type === 'focus_minutes'
+    ? snapToFiveInRange(rolled, min, max)
+    : rolled;
 }
 
 function resolveRewardAmount(reward: QuestReward, seed: string) {
@@ -245,7 +266,8 @@ function resolveRewardAmount(reward: QuestReward, seed: string) {
   const min = Math.max(1, Math.min(reward.minAmount ?? 1, reward.maxAmount ?? 1));
   const max = Math.max(min, reward.maxAmount ?? min);
   const rng = createSeededRandom(seed);
-  return Math.floor(rng() * (max - min + 1)) + min;
+  const rolled = Math.floor(rng() * (max - min + 1)) + min;
+  return snapToFiveInRange(rolled, min, max);
 }
 
 function progressForLogicBlock(args: {
@@ -455,13 +477,52 @@ function questDocToView(doc: QuestDoc): QuestProgressView {
   };
 }
 
+// A recipe slot's rewards are OPTIONS, not a bundle: each roll grants exactly
+// one of them, picked with the roll's seed.
+function pickSlotReward(rewards: QuestRewards | undefined, seed: string) {
+  const pool = rewards ?? [];
+  if (pool.length <= 1) return pool;
+  const rng = createSeededRandom(seed);
+  return [pool[Math.floor(rng() * pool.length)]];
+}
+
+function pickWeighted<T extends { weight?: number }>(
+  entries: T[],
+  rng: () => number,
+): T | null {
+  if (entries.length === 0) return null;
+  const total = entries.reduce((sum, e) => sum + Math.max(1, e.weight ?? 1), 0);
+  let roll = rng() * total;
+  for (const entry of entries) {
+    roll -= Math.max(1, entry.weight ?? 1);
+    if (roll <= 0) return entry;
+  }
+  return entries[entries.length - 1];
+}
+
 function placementWindowKey(
   placement: QuestPlacement,
   templateId: string,
   timezone: string,
 ) {
   if (placement === 'daily') return getZonedToday(timezone);
+  if (placement === 'onboarding') return 'onboarding';
   return `category:${templateId}`;
+}
+
+function isQuestDocFullyClaimed(doc: {
+  logic?: ResolvedQuestLogicBlock[];
+  claimedObjectiveIds?: string[];
+}): boolean {
+  const rewardBlocks = (doc.logic ?? []).filter(
+    (block) => (block.rewards?.length ?? 0) > 0,
+  );
+  return (
+    rewardBlocks.length > 0 &&
+    rewardBlocks.every((block) =>
+      (doc.claimedObjectiveIds ?? []).includes(block.id),
+    )
+  );
 }
 
 function comparableQuestValue(value: unknown): unknown {
@@ -512,7 +573,9 @@ async function syncQuestForTemplate(args: {
   const questId =
     template.placement === 'daily'
       ? `${template.templateId}:${windowKey}`
-      : `${template.templateId}:category`;
+      : template.placement === 'onboarding'
+        ? `${template.templateId}:onboarding`
+        : `${template.templateId}:category`;
 
   let doc =
     args.existingDoc ??
@@ -579,10 +642,11 @@ async function syncQuestForTemplate(args: {
   });
   const templateLogic =
     template.placement === 'category'
-      ? template.logic.map((block) => ({
-          ...block,
-          tagMode: 'focus_category_tags' as const,
-        }))
+      ? template.logic.map((block) =>
+          block.type === 'metric_count'
+            ? block
+            : { ...block, tagMode: 'focus_category_tags' as const },
+        )
       : template.logic;
 
   const lockedForFreeUser =
@@ -719,7 +783,7 @@ export async function syncQuestState(args: {
   const { userId, timezone } = args;
   const includeCatalog = args.includeCatalog ?? true;
   const includeCategories = args.includeCategories ?? true;
-  const [user, tasks, catalog, templates, categories, allExistingDocs] = await Promise.all([
+  const [user, tasks, catalog, templates, categories, allExistingDocs, recipes] = await Promise.all([
     UserModel.findById(userId).lean<UserDoc | null>(),
     TaskModel.find(
       { userId, deletedAt: { $exists: false } },
@@ -741,8 +805,14 @@ export async function syncQuestState(args: {
     QuestTemplateModel.find({ isActive: true }).lean<QuestTemplateDoc[]>(),
     includeCategories
       ? QuestCategoryModel.find({}).sort({ createdAt: 1 }).lean<QuestCategoryDoc[]>()
-      : Promise.resolve([] as QuestCategoryDoc[]),
+      : QuestCategoryModel.find(
+          {},
+          { categoryId: 1, name: 1, shortLabel: 1, questMode: 1 },
+        )
+          .sort({ createdAt: 1 })
+          .lean<QuestCategoryDoc[]>(),
     QuestModel.find({ userId }).select('-coverImageUrl'),
+    QuestRecipeModel.find({ isActive: true }).lean<QuestRecipeDoc[]>(),
   ]);
 
   if (!user) throw new Error('User not found');
@@ -771,8 +841,14 @@ export async function syncQuestState(args: {
   const dailyTemplates = filteredTemplates.filter(
     (template) => template.placement === 'daily',
   );
+  const questModeByCategoryId = new Map(
+    categories.map((c) => [c.categoryId, c.questMode ?? 'templates']),
+  );
   const categoryTemplates = filteredTemplates.filter((template) => {
     if (template.placement !== 'category' || !template.categoryId) return false;
+    if (questModeByCategoryId.get(template.categoryId) === 'generated') {
+      return false;
+    }
     return profile.selectedCategoryIds.includes(template.categoryId);
   });
 
@@ -796,6 +872,64 @@ export async function syncQuestState(args: {
       `${userId}:${todayKey}:${args.dailySelectionSeed ?? 'default'}`,
     );
     selectedDailyTemplates = shuffle(dailyTemplates, rng).slice(0, 3);
+  }
+
+  // An active daily recipe replaces authored daily templates with ONE quest
+  // holding an objective per slot (slot order = difficulty order, like the
+  // focus ladders). Rolls are stable per user per local day; the daily
+  // windowKey handles the reset.
+  const dailyRecipe = recipes.find(
+    (r) =>
+      (r.placement ?? 'category') === 'daily' &&
+      r.isActive &&
+      (r.slots ?? []).length > 0,
+  );
+  if (dailyRecipe) {
+    const templateId = `gend:${todayKey}`;
+    const rolledLogic = (dailyRecipe.slots as RecipeSlot[])
+      .map((slot, index) => {
+        const pool = (slot.pool ?? []).filter(
+          (entry) => entry && Math.floor(entry.minTarget) > 0,
+        );
+        const pick = pickWeighted(
+          pool,
+          createSeededRandom(`${userId}:${templateId}:slot:${index}`),
+        );
+        if (!pick || (slot.rewards ?? []).length === 0) return null;
+        const isMetric = pick.type === 'metric_count';
+        const minAmount = Math.max(1, Math.floor(pick.minTarget));
+        const block: QuestLogicBlock = {
+          id: `slot-${index + 1}`,
+          type: pick.type,
+          subject: 'task',
+          action:
+            pick.type === 'count' ? pick.action ?? 'complete' : undefined,
+          amountMode: 'random',
+          minAmount,
+          maxAmount: Math.max(minAmount, Math.floor(pick.maxTarget)),
+          tagMode: 'ignore',
+          metricKey: isMetric ? pick.metricKey : undefined,
+          rewards: pickSlotReward(
+            slot.rewards,
+            `${userId}:${templateId}:slot:${index}:reward`,
+          ),
+        };
+        return block;
+      })
+      .filter((block): block is QuestLogicBlock => !!block);
+    if (rolledLogic.length > 0) {
+      selectedDailyTemplates = [
+        {
+          templateId,
+          name: dailyRecipe.name || 'Daily Quests',
+          description: '',
+          placement: 'daily',
+          logic: rolledLogic,
+          visibilityConditions: [],
+          isActive: true,
+        } as unknown as QuestTemplateDoc,
+      ];
+    }
   }
 
   // Per-category rotation: each selected category has exactly one active quest.
@@ -861,7 +995,144 @@ export async function syncQuestState(args: {
     },
   );
 
-  const eligibleTemplates = [...selectedDailyTemplates, ...selectedCategoryTemplates];
+  // Generated mode: categories whose quests are rolled from a recipe instead
+  // of authored templates. A roll lives until its window expires (immediate
+  // re-roll) or it is fully claimed (re-roll after the local day ends).
+  const generatedCategoryIds = profile.selectedCategoryIds.filter(
+    (categoryId) => questModeByCategoryId.get(categoryId) === 'generated',
+  );
+  const generatedTemplates: QuestTemplateDoc[] = [];
+  if (generatedCategoryIds.length > 0) {
+    let activeRecipes = recipes.filter((r) => (r.placement ?? 'category') !== 'daily');
+    if (activeRecipes.length === 0) {
+      const seeded = await ensureDefaultQuestRecipe();
+      if (seeded && seeded.isActive) activeRecipes = [seeded];
+    }
+    for (const categoryId of generatedCategoryIds) {
+      const recipe =
+        activeRecipes.find((r) => (r.categoryIds ?? []).includes(categoryId)) ??
+        activeRecipes.find((r) => (r.categoryIds ?? []).length === 0);
+      if (!recipe || (recipe.slots ?? []).length === 0) continue;
+
+      let existing =
+        allExistingDocs.find(
+          (doc) =>
+            doc.placement === 'category' &&
+            doc.categoryId === categoryId &&
+            doc.templateId.startsWith('gen:'),
+        ) ?? null;
+
+      if (existing) {
+        const rewardBlocks = (existing.logic ?? []).filter(
+          (block) => (block.rewards?.length ?? 0) > 0,
+        );
+        const fullyClaimed =
+          rewardBlocks.length > 0 &&
+          rewardBlocks.every((block) =>
+            (existing!.claimedObjectiveIds ?? []).includes(block.id),
+          );
+        if (fullyClaimed && !existing.regenAfterDay) {
+          existing.regenAfterDay = todayKey;
+          await QuestModel.updateOne(
+            { _id: existing._id },
+            { $set: { regenAfterDay: todayKey } },
+          );
+        }
+        const cooldownOver =
+          !!existing.regenAfterDay && todayKey > existing.regenAfterDay;
+        const expired =
+          !fullyClaimed &&
+          !!existing.expiresAt &&
+          existing.expiresAt.getTime() <= nowMs;
+        if (cooldownOver || expired) {
+          existing = null;
+        } else {
+          categoryDocIdsToKeep.add(String(existing._id));
+        }
+      }
+
+      const rollKey = existing?.rollKey ?? crypto.randomUUID();
+      const templateId = existing?.templateId ?? `gen:${categoryId}:${rollKey}`;
+      const logic = (recipe.slots as RecipeSlot[])
+        .map((slot, index) => {
+          const pool = (slot.pool ?? []).filter(
+            (entry) => entry && Math.floor(entry.minTarget) > 0,
+          );
+          const pick = pickWeighted(
+            pool,
+            createSeededRandom(`${userId}:${templateId}:slot:${index}`),
+          );
+          if (!pick) return null;
+          const isMetric = pick.type === 'metric_count';
+          const minAmount = Math.max(1, Math.floor(pick.minTarget));
+          const block: QuestLogicBlock = {
+            id: `slot-${index + 1}`,
+            type: pick.type,
+            subject: 'task',
+            action: pick.type === 'count' ? pick.action ?? 'complete' : undefined,
+            amountMode: 'random',
+            minAmount,
+            maxAmount: Math.max(minAmount, Math.floor(pick.maxTarget)),
+            tagMode: isMetric ? 'ignore' : 'focus_category_tags',
+            metricKey: isMetric ? pick.metricKey : undefined,
+            rewards: pickSlotReward(
+              slot.rewards,
+              `${userId}:${templateId}:slot:${index}:reward`,
+            ),
+          };
+          return block;
+        })
+        .filter((block): block is QuestLogicBlock => !!block);
+      if (logic.length === 0) continue;
+
+      const category = categories.find((c) => c.categoryId === categoryId);
+      generatedTemplates.push({
+        templateId,
+        name: `${category?.shortLabel || category?.name || 'Focus'} Goals`,
+        description: 'A fresh set of goals rolled just for you.',
+        placement: 'category',
+        categoryId,
+        durationMinutes:
+          recipe.durationMinutes > 0 ? recipe.durationMinutes : undefined,
+        logic,
+        visibilityConditions: [],
+        isActive: true,
+      } as unknown as QuestTemplateDoc);
+    }
+  }
+
+  // Onboarding quests: First Hops for everyone until fully claimed, then
+  // Explorer. Fully-claimed docs stay in the DB (never re-emitted) so these
+  // one-time quests never repeat.
+  const onboardingTemplates: QuestTemplateDoc[] = [];
+  const onboardingDocFor = (templateId: string) =>
+    allExistingDocs.find((doc) => doc.templateId === templateId);
+  const firstHopsDoc = onboardingDocFor(FIRST_HOPS_QUEST.templateId);
+  if (!firstHopsDoc || !isQuestDocFullyClaimed(firstHopsDoc)) {
+    onboardingTemplates.push({
+      ...FIRST_HOPS_QUEST,
+      placement: 'onboarding',
+      visibilityConditions: [],
+      isActive: true,
+    } as unknown as QuestTemplateDoc);
+  } else {
+    const explorerDoc = onboardingDocFor(EXPLORER_QUEST.templateId);
+    if (!explorerDoc || !isQuestDocFullyClaimed(explorerDoc)) {
+      onboardingTemplates.push({
+        ...EXPLORER_QUEST,
+        placement: 'onboarding',
+        visibilityConditions: [],
+        isActive: true,
+      } as unknown as QuestTemplateDoc);
+    }
+  }
+
+  const eligibleTemplates = [
+    ...selectedDailyTemplates,
+    ...selectedCategoryTemplates,
+    ...generatedTemplates,
+    ...onboardingTemplates,
+  ];
   const eligibleDailyTemplateIds = new Set(
     selectedDailyTemplates.map((t) => t.templateId),
   );
@@ -922,7 +1193,12 @@ export async function syncQuestState(args: {
   const questViews = docs.map(questDocToView);
   const dailyQuests = questViews
     .filter((quest): quest is DailyQuestProgressView => quest.placement === 'daily')
-    .sort((a, b) => a.title.localeCompare(b.title));
+    .sort((a, b) => a.title.localeCompare(b.title))
+    .map((quest) =>
+      quest.templateId.startsWith('gend:') && dailyRecipe?.coverImageUrl
+        ? { ...quest, coverImageUrl: dailyRecipe.coverImageUrl }
+        : quest,
+    );
   const categoryQuests = questViews
     .filter(
       (quest): quest is CategoryQuestProgressView => quest.placement === 'category',
@@ -933,6 +1209,22 @@ export async function syncQuestState(args: {
       }
       return a.title.localeCompare(b.title);
     });
+  let onboardingQuests = questViews.filter(
+    (quest) => quest.placement === 'onboarding',
+  );
+  if (onboardingQuests.length > 0) {
+    const coverAssets = await QuestCoverAssetModel.find(
+      { key: { $in: onboardingQuests.map((quest) => quest.templateId) } },
+      { key: 1, coverImageUrl: 1 },
+    ).lean();
+    const coverByKey = new Map(
+      coverAssets.map((asset) => [asset.key, asset.coverImageUrl]),
+    );
+    onboardingQuests = onboardingQuests.map((quest) => {
+      const coverImageUrl = coverByKey.get(quest.templateId);
+      return coverImageUrl ? { ...quest, coverImageUrl } : quest;
+    });
+  }
 
   const templatesWithCover = new Set(
     templates
@@ -964,6 +1256,7 @@ export async function syncQuestState(args: {
     templatesWithCover,
     dailyQuests,
     categoryQuests: gatedCategoryQuests,
+    onboardingQuests,
     rewardCatalog: includeCatalog
       ? buildRewardCatalog(
           catalog,
@@ -972,6 +1265,9 @@ export async function syncQuestState(args: {
               quest.logic.map((block) => block.rewards ?? []),
             ),
             ...categoryQuests.flatMap((quest) =>
+              quest.logic.map((block) => block.rewards ?? []),
+            ),
+            ...onboardingQuests.flatMap((quest) =>
               quest.logic.map((block) => block.rewards ?? []),
             ),
           ],

@@ -58,6 +58,7 @@ export type QuestCardLogicBlock = Pick<
   | 'progress'
   | 'tagMode'
   | 'metricKey'
+  | 'helpText'
   | 'resolvedTagName'
   | 'resolvedTagNames'
   | 'rewards'
@@ -383,9 +384,11 @@ export function DailyQuestPresentationCard({
   onClaimObjective,
   paused = false,
 }: BaseCardProps & {
-  quest: QuestCardData & { placement: 'daily' };
+  quest: QuestCardData & { placement: 'daily' | 'onboarding' };
 }) {
-  const timeLeft = useTimeLeft();
+  const isOnboarding = quest.placement === 'onboarding';
+  const dailyTimeLeft = useTimeLeft();
+  const timeLeft = isOnboarding ? '' : dailyTimeLeft;
   const [rewardPopup, setRewardPopup] = useState<RewardPopupState | null>(null);
   const claimedObjectiveIds = quest.claimedObjectiveIds ?? [];
   const hiddenClaimedObjectiveIds = useHiddenClaimedObjectives(
@@ -417,7 +420,7 @@ export function DailyQuestPresentationCard({
           <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/55 px-4 text-center text-white">
             <Check className="h-9 w-9 text-emerald-300 drop-shadow-[0_2px_0_rgba(0,0,0,0.4)]" strokeWidth={3.5} />
             <p className="text-base font-black tracking-tight drop-shadow-[0_2px_0_rgba(0,0,0,0.4)]">
-              All daily objectives done!
+              {isOnboarding ? 'All done — nice hops!' : 'All daily objectives done!'}
             </p>
             {timeLeft ? (
               <div className="flex flex-col items-center gap-1">
@@ -450,7 +453,7 @@ export function DailyQuestPresentationCard({
             }}
           >
             <CalendarDays className="h-3.5 w-3.5 shrink-0" strokeWidth={3} />
-            <span className="leading-none">Daily</span>
+            <span className="leading-none">{isOnboarding ? quest.title : 'Daily'}</span>
           </span>
           {timeLeft && !isCompleted ? (
             <span
@@ -727,6 +730,7 @@ export function CategoryQuestPresentationCard({
               categoryName={category?.shortLabel || category?.name}
               categoryAccent={category?.accent}
               onPickTags={onEditTags}
+              forceDimmed={needsFocusTags}
             />
             {block.tagMode !== 'focus_category_tags' &&
             getTagScopeMessage(block) ? (
@@ -917,6 +921,7 @@ function ObjectiveRow({
   categoryName,
   categoryAccent,
   onPickTags,
+  forceDimmed = false,
 }: {
   block: QuestCardLogicBlock;
   objectiveClaimed?: boolean;
@@ -932,6 +937,7 @@ function ObjectiveRow({
   categoryName?: string;
   categoryAccent?: string;
   onPickTags?: () => void;
+  forceDimmed?: boolean;
 }) {
   const safeTarget = Math.max(1, block.target);
   const objectiveComplete = block.progress >= safeTarget;
@@ -942,8 +948,9 @@ function ObjectiveRow({
 
   const stepDone = objectiveClaimed || (objectiveComplete && !hasRewards);
   const needsTag =
-    block.tagMode === 'focus_category_tags' &&
-    (linkedTags?.length ?? 0) === 0;
+    forceDimmed ||
+    (block.tagMode === 'focus_category_tags' &&
+      (linkedTags?.length ?? 0) === 0);
 
   const renderActionSlot = () => {
     if (objectiveClaimable && onClaimObjective) {
@@ -1029,6 +1036,9 @@ function ObjectiveRow({
               categoryAccent,
               onPickTags,
             })}
+            {block.helpText && !stepDone ? (
+              <HelpDot text={block.helpText} />
+            ) : null}
           </p>
 
           <div className="relative mt-2 h-6 overflow-hidden rounded-full bg-muted">
@@ -1066,6 +1076,31 @@ function ObjectiveRow({
         <div className="shrink-0">{renderActionSlot()}</div>
       </div>
     </div>
+  );
+}
+
+function HelpDot({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span className="relative inline-flex">
+      <button
+        type="button"
+        aria-label="How to do this"
+        onClick={(event) => {
+          event.stopPropagation();
+          setOpen((v) => !v);
+        }}
+        onBlur={() => setOpen(false)}
+        className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-border/60 bg-muted text-[11px] font-black text-muted-foreground transition hover:border-primary/40 hover:text-primary"
+      >
+        ?
+      </button>
+      {open && (
+        <span className="absolute bottom-full left-1/2 z-30 mb-2 w-56 -translate-x-1/2 rounded-xl border border-border bg-popover px-3 py-2 text-xs font-medium normal-case leading-snug text-popover-foreground shadow-lg">
+          {text}
+        </span>
+      )}
+    </span>
   );
 }
 

@@ -24,7 +24,7 @@ export type Claimable = {
   id: string;
   questId?: string;
   kind: 'objective' | 'season';
-  placement?: 'daily' | 'category';
+  placement?: 'daily' | 'category' | 'onboarding';
   categoryName?: string;
   objectiveLabel?: string;
   tags?: ObjectiveTagChip[];
@@ -36,7 +36,7 @@ export type Claimable = {
 export type Trackable = {
   id: string;
   questId?: string;
-  placement: 'daily' | 'category';
+  placement: 'daily' | 'category' | 'onboarding';
   categoryName?: string;
   objectiveLabel: string;
   remainingLabel: string;
@@ -303,7 +303,17 @@ function toastTitle(c: Claimable): string {
   if (c.placement === 'category') {
     return `${c.categoryName ?? 'Focus'} objective complete`;
   }
+  if (c.placement === 'onboarding') return 'Starter objective complete';
   return 'Daily objective complete';
+}
+
+export function trackableEyebrow(t: {
+  placement: 'daily' | 'category' | 'onboarding';
+  categoryName?: string;
+}): string {
+  if (t.placement === 'category') return t.categoryName ?? 'Focus quest';
+  if (t.placement === 'onboarding') return 'Getting started';
+  return 'Daily quest';
 }
 
 function ClaimRewardToast({
@@ -393,9 +403,7 @@ function QuestProgressToast({
       />
       <div className="flex min-w-0 flex-1 flex-col leading-tight">
         <span className="text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">
-          {trackable.placement === 'category'
-            ? trackable.categoryName ?? 'Focus quest'
-            : 'Daily quest'}
+          {trackableEyebrow(trackable)}
         </span>
         <span className="mt-0.5 text-[13px] font-black text-foreground">
           <ObjectiveLabel

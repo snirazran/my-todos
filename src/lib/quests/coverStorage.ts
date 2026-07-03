@@ -2,7 +2,7 @@ import { getAdminStorage } from '@/lib/firebaseAdmin';
 import { optimizeImage } from '@/lib/imageOptimize';
 import type { QuestCoverImageFile } from '@/lib/models/QuestTemplate';
 
-export type CoverType = 'template' | 'category';
+export type CoverType = 'template' | 'category' | 'recipe' | 'asset';
 
 const DATA_URL_RE = /^data:([^;,]+);base64,(.+)$/;
 

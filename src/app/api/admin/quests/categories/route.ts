@@ -42,6 +42,10 @@ function sanitizeQuickAddSuggestions(value: unknown): QuickAddSuggestionEntry[] 
   return out;
 }
 
+function sanitizeQuestMode(value: unknown): 'templates' | 'generated' {
+  return value === 'generated' ? 'generated' : 'templates';
+}
+
 function categoryToJSON(c: {
   categoryId: string;
   name: string;
@@ -53,6 +57,7 @@ function categoryToJSON(c: {
   backgroundFrom: string;
   backgroundTo: string;
   isBuiltIn: boolean;
+  questMode?: 'templates' | 'generated';
   quickAddSuggestions?: QuickAddSuggestionEntry[];
 }) {
   return {
@@ -66,6 +71,7 @@ function categoryToJSON(c: {
     backgroundFrom: c.backgroundFrom,
     backgroundTo: c.backgroundTo,
     isBuiltIn: c.isBuiltIn,
+    questMode: c.questMode ?? 'templates',
     quickAddSuggestions: c.quickAddSuggestions ?? [],
   };
 }
@@ -92,6 +98,7 @@ export async function GET() {
           backgroundFrom: c.backgroundFrom,
           backgroundTo: c.backgroundTo,
           isBuiltIn: false,
+          questMode: c.questMode,
           quickAddSuggestions: c.quickAddSuggestions,
         }),
       ),
@@ -139,6 +146,7 @@ export async function POST(req: NextRequest) {
       backgroundFrom: backgroundFrom ?? '#1e1b4b',
       backgroundTo: backgroundTo ?? '#312e81',
       isBuiltIn: false,
+      questMode: sanitizeQuestMode(body.questMode),
       quickAddSuggestions,
     });
 
@@ -155,6 +163,7 @@ export async function POST(req: NextRequest) {
         backgroundFrom: category.backgroundFrom,
         backgroundTo: category.backgroundTo,
         isBuiltIn: category.isBuiltIn,
+        questMode: category.questMode,
         quickAddSuggestions: category.quickAddSuggestions,
       }),
     });
@@ -184,6 +193,7 @@ export async function PUT(req: NextRequest) {
       backgroundFrom: backgroundFrom ?? '#1e1b4b',
       backgroundTo: backgroundTo ?? '#312e81',
       isBuiltIn: false,
+      questMode: sanitizeQuestMode(body.questMode),
       quickAddSuggestions,
     };
     const unsetFields: Record<string, 1> = {};
@@ -225,6 +235,7 @@ export async function PUT(req: NextRequest) {
         backgroundFrom: category.backgroundFrom,
         backgroundTo: category.backgroundTo,
         isBuiltIn: category.isBuiltIn,
+        questMode: category.questMode,
         quickAddSuggestions: category.quickAddSuggestions,
       }),
     });

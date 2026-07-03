@@ -14,7 +14,7 @@ export type QuestReward = {
 
 export type QuestRewards = QuestReward[];
 
-export type QuestPlacement = 'daily' | 'category';
+export type QuestPlacement = 'daily' | 'category' | 'onboarding';
 export type QuestSubject = 'task' | 'any';
 export type QuestCountAction = 'complete' | 'add';
 export type QuestAmountMode = 'fixed' | 'random';
@@ -36,6 +36,8 @@ export type QuestLogicBlock = {
   tagMode?: 'ignore' | 'random_user_tag' | 'focus_category_tags';
   // For type 'metric_count': which QuestCounter metric this block tracks.
   metricKey?: string;
+  // Shown behind a small "?" on the objective row (onboarding quests).
+  helpText?: string;
   rewards?: QuestRewards;
 };
 

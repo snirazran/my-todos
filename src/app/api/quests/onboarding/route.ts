@@ -4,6 +4,8 @@ import connectMongo from '@/lib/mongoose';
 import UserModel from '@/lib/models/User';
 import QuestCategoryModel from '@/lib/models/QuestCategory';
 import { saveFocusProfile } from '@/lib/quests/engine';
+import { bumpQuestMetric } from '@/lib/quests/metrics';
+import QuestCounterModel from '@/lib/models/QuestCounter';
 import type { FocusCategoryTagMap, MacroCategoryId } from '@/lib/quests/types';
 
 export async function POST(req: NextRequest) {
@@ -79,6 +81,16 @@ export async function POST(req: NextRequest) {
         { error: 'Select at least one focus category' },
         { status: 400 },
       );
+    }
+
+    if (categoryTagMap.some((entry: FocusCategoryTagMap) => entry.tagIds.length > 0)) {
+      const alreadyCounted = await QuestCounterModel.exists({
+        userId,
+        metric: 'focus_tag_linked',
+      });
+      if (!alreadyCounted) {
+        await bumpQuestMetric({ userId, metric: 'focus_tag_linked', timezone });
+      }
     }
 
     const dashboard = await saveFocusProfile({

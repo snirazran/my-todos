@@ -57,6 +57,15 @@ export const QUEST_METRIC_COPY: Record<string, MetricCopy> = {
     label: (n) => (n === 1 ? 'Equip a skin' : `Equip ${n} skins`),
     remaining: (n) => `Equip ${n} more ${n === 1 ? 'skin' : 'skins'}`,
   },
+  focus_tag_linked: {
+    adminLabel: 'Focus tag linked',
+    label: (n) =>
+      n === 1 ? 'Link a tag to a focus quest' : `Link tags to ${n} focus quests`,
+    remaining: (n) =>
+      n === 1
+        ? 'Link a tag to a focus quest'
+        : `Link tags to ${n} more focus quests`,
+  },
   frog_fed_full: {
     adminLabel: 'Frog fed to full',
     label: (n) =>

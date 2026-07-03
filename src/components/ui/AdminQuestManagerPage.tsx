@@ -117,6 +117,7 @@ type AdminCategory = {
   accent: string;
   backgroundFrom: string;
   backgroundTo: string;
+  questMode?: 'templates' | 'generated';
   quickAddSuggestions: { text: string; emoji: string }[];
 };
 
@@ -125,7 +126,35 @@ type CategoryFormState = {
   description: string;
   onboardingSentence: string;
   coverImageUrl?: string;
+  questMode: 'templates' | 'generated';
   quickAddSuggestions: QuickAddSuggestionDraft[];
+};
+
+type AdminRecipePoolEntry = {
+  id: string;
+  type: 'count' | 'focus_minutes' | 'metric_count';
+  action?: 'complete' | 'add';
+  metricKey?: string;
+  minTarget: number;
+  maxTarget: number;
+  weight: number;
+};
+
+type AdminRecipeSlot = {
+  id: string;
+  pool: AdminRecipePoolEntry[];
+  rewards: QuestReward[];
+};
+
+type AdminRecipe = {
+  recipeId: string;
+  name: string;
+  placement: 'category' | 'daily';
+  isActive: boolean;
+  durationMinutes: number;
+  categoryIds: string[];
+  coverImageUrl?: string;
+  slots: AdminRecipeSlot[];
 };
 
 type ViewLevel = 'home' | 'daily' | 'focus' | 'season' | 'category' | 'form';
@@ -460,8 +489,21 @@ export function AdminQuestManagerPage() {
     description: '',
     onboardingSentence: '',
     coverImageUrl: undefined,
+    questMode: 'templates',
     quickAddSuggestions: [],
   });
+
+  // Generated-mode recipe editors (focus ladder + daily roll)
+  const [adminRecipes, setAdminRecipes] = useState<AdminRecipe[]>([]);
+  const [openRecipeId, setOpenRecipeId] = useState<string | null>(null);
+  const [savingRecipeId, setSavingRecipeId] = useState<string | null>(null);
+  const [recipeRewardTarget, setRecipeRewardTarget] = useState<{
+    recipeId: string;
+    slotId: string;
+  } | null>(null);
+  const [onboardCovers, setOnboardCovers] = useState<
+    Record<string, string | undefined>
+  >({});
 
   useEffect(() => {
     void loadData();
@@ -471,16 +513,20 @@ export function AdminQuestManagerPage() {
     setLoading(true);
     setResult(null);
     try {
-      const [templatesRes, metaRes, categoriesRes, seasonsRes] = await Promise.all([
+      const [templatesRes, metaRes, categoriesRes, seasonsRes, recipesRes, coversRes] = await Promise.all([
         fetch('/api/admin/quests', { credentials: 'include' }),
         fetch('/api/admin/quests/meta', { credentials: 'include' }),
         fetch('/api/admin/quests/categories', { credentials: 'include' }),
         fetch('/api/admin/quests/seasons', { credentials: 'include' }),
+        fetch('/api/admin/quest-recipes', { credentials: 'include' }),
+        fetch('/api/admin/quest-covers', { credentials: 'include' }),
       ]);
       const templatesData = await templatesRes.json();
       const metaData = await metaRes.json();
       const categoriesData = await categoriesRes.json();
       const seasonsData = await seasonsRes.json();
+      const recipesData = await recipesRes.json();
+      const coversData = await coversRes.json();
       if (!templatesRes.ok || !metaRes.ok || !seasonsRes.ok) {
         throw new Error(
           templatesData.error ||
@@ -493,6 +539,13 @@ export function AdminQuestManagerPage() {
       setSeasons(seasonsData.seasons ?? []);
       setRewardItems(metaData.rewardsCatalog ?? []);
       setAdminCategories(categoriesData.categories ?? []);
+      setAdminRecipes((recipesData.recipes ?? []) as AdminRecipe[]);
+      setOnboardCovers(
+        Object.fromEntries(
+          ((coversData.covers ?? []) as { key: string; coverImageUrl?: string }[])
+            .map((c) => [c.key, c.coverImageUrl]),
+        ),
+      );
     } catch (error) {
       setResult({
         type: 'error',
@@ -633,6 +686,7 @@ export function AdminQuestManagerPage() {
             description: cat.description,
             onboardingSentence: cat.onboardingSentence ?? '',
             coverImageUrl: cat.coverImageUrl,
+            questMode: cat.questMode ?? 'templates',
             quickAddSuggestions: (cat.quickAddSuggestions ?? []).map((s) => ({
               id: crypto.randomUUID(),
               text: s.text,
@@ -644,6 +698,7 @@ export function AdminQuestManagerPage() {
             description: '',
             onboardingSentence: '',
             coverImageUrl: undefined,
+            questMode: 'templates',
             quickAddSuggestions: [],
           },
     );
@@ -1070,11 +1125,469 @@ export function AdminQuestManagerPage() {
           Add Quest
         </Button>
       </div>
+      {adminRecipes.filter((r) => r.placement === 'daily').map(renderRecipeCard)}
+      {recipeRewardDialog}
+      {renderOnboardingCoversCard()}
       {renderQuestList(dailyTemplates, 'daily')}
     </div>
   );
 
   // ── Focus categories view ─────────────────────────────────────────────────
+  const updateRecipe = (
+    recipeId: string,
+    updater: (recipe: AdminRecipe) => AdminRecipe,
+  ) => {
+    setAdminRecipes((prev) =>
+      prev.map((r) => (r.recipeId === recipeId ? updater(r) : r)),
+    );
+  };
+
+  const updateRecipeSlot = (
+    recipeId: string,
+    slotId: string,
+    patch: Partial<AdminRecipeSlot>,
+  ) => {
+    updateRecipe(recipeId, (r) => ({
+      ...r,
+      slots: r.slots.map((slot) =>
+        slot.id === slotId ? { ...slot, ...patch } : slot,
+      ),
+    }));
+  };
+
+  const updateRecipePoolEntry = (
+    recipeId: string,
+    slotId: string,
+    entryId: string,
+    patch: Partial<AdminRecipePoolEntry>,
+  ) => {
+    updateRecipe(recipeId, (r) => ({
+      ...r,
+      slots: r.slots.map((slot) =>
+        slot.id === slotId
+          ? {
+              ...slot,
+              pool: slot.pool.map((entry) =>
+                entry.id === entryId ? { ...entry, ...patch } : entry,
+              ),
+            }
+          : slot,
+      ),
+    }));
+  };
+
+  const addRecipePoolEntry = (recipeId: string, slotId: string) => {
+    const entry: AdminRecipePoolEntry = {
+      id: crypto.randomUUID(),
+      type: 'count',
+      action: 'complete',
+      minTarget: 3,
+      maxTarget: 5,
+      weight: 1,
+    };
+    updateRecipe(recipeId, (r) => ({
+      ...r,
+      slots: r.slots.map((slot) =>
+        slot.id === slotId ? { ...slot, pool: [...slot.pool, entry] } : slot,
+      ),
+    }));
+  };
+
+  const removeRecipePoolEntry = (
+    recipeId: string,
+    slotId: string,
+    entryId: string,
+  ) => {
+    updateRecipe(recipeId, (r) => ({
+      ...r,
+      slots: r.slots.map((slot) =>
+        slot.id === slotId
+          ? { ...slot, pool: slot.pool.filter((e) => e.id !== entryId) }
+          : slot,
+      ),
+    }));
+  };
+
+  const addRecipeSlot = (recipeId: string) => {
+    updateRecipe(recipeId, (r) => ({
+      ...r,
+      slots: [
+        ...r.slots,
+        {
+          id: crypto.randomUUID(),
+          pool: [
+            {
+              id: crypto.randomUUID(),
+              type: 'count',
+              action: 'complete',
+              minTarget: 5,
+              maxTarget: 8,
+              weight: 1,
+            },
+          ],
+          rewards: [
+            {
+              type: 'FLIES',
+              amountMode: 'random',
+              minAmount: 10,
+              maxAmount: 15,
+            },
+          ],
+        },
+      ],
+    }));
+  };
+
+  const removeRecipeSlot = (recipeId: string, slotId: string) => {
+    updateRecipe(recipeId, (r) => ({
+      ...r,
+      slots: r.slots.filter((slot) => slot.id !== slotId),
+    }));
+  };
+
+  const saveRecipe = async (recipeId: string) => {
+    const target = adminRecipes.find((r) => r.recipeId === recipeId);
+    if (!target) return;
+    setSavingRecipeId(recipeId);
+    try {
+      const res = await fetch('/api/admin/quest-recipes', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(target),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not save recipe');
+      if (data.recipe) {
+        updateRecipe(recipeId, () => data.recipe as AdminRecipe);
+      }
+      setResult({ type: 'success', message: 'Recipe saved' });
+    } catch (error) {
+      setResult({
+        type: 'error',
+        message:
+          error instanceof Error ? error.message : 'Could not save recipe',
+      });
+    } finally {
+      setSavingRecipeId(null);
+    }
+  };
+
+  const readFileAsDataUrl = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+
+  const handleRecipeCoverFile = async (
+    recipeId: string,
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    const dataUrl = await readFileAsDataUrl(file);
+    updateRecipe(recipeId, (prev) => ({ ...prev, coverImageUrl: dataUrl }));
+  };
+
+  const saveOnboardCover = async (key: string, coverImageUrl: string | null) => {
+    try {
+      const res = await fetch('/api/admin/quest-covers', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ key, coverImageUrl }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not save cover');
+      setOnboardCovers((prev) => ({ ...prev, [key]: data.coverImageUrl }));
+    } catch (error) {
+      setResult({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Could not save cover',
+      });
+    }
+  };
+
+  const handleOnboardCoverFile = async (
+    key: string,
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    const dataUrl = await readFileAsDataUrl(file);
+    await saveOnboardCover(key, dataUrl);
+  };
+
+  const renderRecipeCard = (r: AdminRecipe) => {
+    const isDaily = r.placement === 'daily';
+    const open = openRecipeId === r.recipeId;
+    return (
+      <div key={r.recipeId} className="rounded-2xl border border-border/40 bg-card/60">
+        <button
+          type="button"
+          onClick={() => setOpenRecipeId(open ? null : r.recipeId)}
+          className="flex w-full items-center gap-3 px-4 py-3.5 text-left"
+        >
+          <div className="min-w-0 flex-1">
+            <p className="flex items-center gap-2 text-sm font-bold text-foreground">
+              {isDaily ? 'Generated daily quest' : 'Generated focus recipe'}
+              {isDaily && (
+                <span className={cn(
+                  'rounded-full border px-2 py-0.5 text-[10px] font-black uppercase tracking-wide',
+                  r.isActive
+                    ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                    : 'border-border/50 bg-muted/40 text-muted-foreground',
+                )}>
+                  {r.isActive ? 'On' : 'Off'}
+                </span>
+              )}
+            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {isDaily
+                ? `One quest · ${r.slots.length} objectives, easiest first · replaces authored dailies when on`
+                : `${r.slots.length} tiers · ${Math.max(1, Math.round(r.durationMinutes / 1440))}-day window · applies to categories set to Generated`}
+            </p>
+          </div>
+          <span className="text-xs font-bold text-muted-foreground">{open ? 'Hide' : 'Edit'}</span>
+        </button>
+
+        {open && (
+          <div className="space-y-3 border-t border-border/30 px-4 py-4">
+            {isDaily ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => updateRecipe(r.recipeId, (prev) => ({ ...prev, isActive: !prev.isActive }))}
+                  className={cn(
+                    'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold transition',
+                    r.isActive
+                      ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                      : 'border-border/50 bg-background text-muted-foreground hover:border-primary/30',
+                  )}
+                >
+                  {r.isActive ? 'Generated daily quest on' : 'Generated daily quest off'}
+                </button>
+                <label className="grid gap-1.5">
+                  <span className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">Quest title</span>
+                  <input
+                    value={r.name}
+                    onChange={(e) => updateRecipe(r.recipeId, (prev) => ({ ...prev, name: e.target.value }))}
+                    className="h-10 w-full max-w-xs rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-primary/30"
+                  />
+                </label>
+                <div className="grid gap-1.5">
+                  <span className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">Cover image</span>
+                  <div className="flex items-center gap-3">
+                    <div className="h-14 w-24 overflow-hidden rounded-xl border border-border/50 bg-muted/40">
+                      {r.coverImageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={r.coverImageUrl} alt="" className="h-full w-full object-cover" />
+                      ) : null}
+                    </div>
+                    <label className="cursor-pointer rounded-full border border-border/50 bg-background px-3 py-1.5 text-[11px] font-bold text-muted-foreground transition hover:border-primary/30 hover:text-foreground">
+                      {r.coverImageUrl ? 'Change' : 'Upload'}
+                      <input type="file" accept="image/*" className="hidden" onChange={(e) => void handleRecipeCoverFile(r.recipeId, e)} />
+                    </label>
+                    {r.coverImageUrl && (
+                      <button
+                        type="button"
+                        onClick={() => updateRecipe(r.recipeId, (prev) => ({ ...prev, coverImageUrl: undefined }))}
+                        className="text-[11px] font-bold text-red-500/80 hover:text-red-500"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="flex flex-wrap items-center gap-x-1.5 gap-y-2 leading-[30px]">
+                <span className="text-sm font-medium text-muted-foreground">Each roll lasts</span>
+                <InlinePillNumber
+                  value={Math.max(1, Math.round(r.durationMinutes / 1440))}
+                  onChange={(v) => updateRecipe(r.recipeId, (prev) => ({ ...prev, durationMinutes: Math.max(1, v) * 1440 }))}
+                />
+                <span className="text-sm font-medium text-muted-foreground">days; finished ladders re-roll after the day ends.</span>
+              </div>
+            )}
+
+            {r.slots.map((slot, slotIndex) => (
+              <div key={slot.id} className="rounded-2xl border border-border/50 bg-muted/30 px-4 py-3.5">
+                <div className="mb-2.5 flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">
+                    {isDaily ? 'Objective' : 'Tier'} {slotIndex + 1}{slotIndex === 0 ? ' · easiest' : slotIndex === r.slots.length - 1 ? ' · hardest' : ''}
+                  </span>
+                  {r.slots.length > 1 && (
+                    <button onClick={() => removeRecipeSlot(r.recipeId, slot.id)} className="rounded-lg p-1 text-muted-foreground/60 transition hover:bg-red-500/10 hover:text-red-500">
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  {slot.pool.map((entry) => (
+                    <div key={entry.id} className="flex flex-wrap items-center gap-x-1.5 gap-y-2 leading-[30px]">
+                      <InlinePillSelect
+                        value={entry.type}
+                        onChange={(v) =>
+                          updateRecipePoolEntry(r.recipeId, slot.id, entry.id, {
+                            type: v as AdminRecipePoolEntry['type'],
+                            action: v === 'count' ? entry.action ?? 'complete' : undefined,
+                            metricKey: v === 'metric_count' ? entry.metricKey ?? 'trade_completed' : undefined,
+                          })
+                        }
+                      >
+                        <option value="count">{isDaily ? 'Tasks' : 'Tagged tasks'}</option>
+                        <option value="focus_minutes">Focus minutes</option>
+                        <option value="metric_count">App action</option>
+                      </InlinePillSelect>
+                      {entry.type === 'count' && (
+                        <InlinePillSelect value={entry.action ?? 'complete'} onChange={(v) => updateRecipePoolEntry(r.recipeId, slot.id, entry.id, { action: v as 'complete' | 'add' })}>
+                          <option value="complete">complete</option>
+                          <option value="add">add</option>
+                        </InlinePillSelect>
+                      )}
+                      {entry.type === 'metric_count' && (
+                        <InlinePillSelect value={entry.metricKey ?? 'trade_completed'} onChange={(v) => updateRecipePoolEntry(r.recipeId, slot.id, entry.id, { metricKey: v })}>
+                          {Object.entries(QUEST_METRIC_COPY).map(([key, copy]) => (
+                            <option key={key} value={key}>{copy.adminLabel}</option>
+                          ))}
+                        </InlinePillSelect>
+                      )}
+                      <InlinePillNumber value={entry.minTarget} onChange={(v) => updateRecipePoolEntry(r.recipeId, slot.id, entry.id, { minTarget: v })} />
+                      <span className="text-sm font-medium text-muted-foreground">to</span>
+                      <InlinePillNumber value={entry.maxTarget} onChange={(v) => updateRecipePoolEntry(r.recipeId, slot.id, entry.id, { maxTarget: v })} />
+                      <span className="text-sm font-medium text-muted-foreground">· weight</span>
+                      <InlinePillNumber value={entry.weight} onChange={(v) => updateRecipePoolEntry(r.recipeId, slot.id, entry.id, { weight: v })} />
+                      {slot.pool.length > 1 && (
+                        <button onClick={() => removeRecipePoolEntry(r.recipeId, slot.id, entry.id)} className="rounded-lg p-1 text-muted-foreground/60 transition hover:bg-red-500/10 hover:text-red-500">
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-border/30 pt-2.5">
+                  <button
+                    type="button"
+                    onClick={() => addRecipePoolEntry(r.recipeId, slot.id)}
+                    className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-background px-2.5 py-1 text-[11px] font-bold text-muted-foreground transition hover:border-primary/30 hover:text-foreground"
+                  >
+                    <Plus className="h-3 w-3" />
+                    Pool option
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRecipeRewardTarget({ recipeId: r.recipeId, slotId: slot.id })}
+                    className="inline-flex items-center gap-1 rounded-full border border-emerald-500/25 bg-emerald-500/8 px-2.5 py-1 text-[11px] font-bold text-emerald-600 transition hover:bg-emerald-500/15 dark:text-emerald-400"
+                  >
+                    <Gift className="h-3 w-3" />
+                    Reward
+                  </button>
+                  {slot.rewards.length > 1 && (
+                    <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                      rolls one of
+                    </span>
+                  )}
+                  <div className="flex flex-wrap gap-2">
+                    {slot.rewards.map((reward, ri) => (
+                      <RewardTile
+                        key={`${reward.type}-${reward.itemId ?? reward.amount ?? ri}`}
+                        reward={reward}
+                        rewardCatalog={rewardCatalog}
+                        isPremium={false}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            <div className="flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => addRecipeSlot(r.recipeId)}
+                className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-background px-3 py-1.5 text-xs font-bold text-muted-foreground transition hover:border-primary/30 hover:text-foreground"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                {isDaily ? 'Add objective' : 'Add tier'}
+              </button>
+              <Button size="sm" className="rounded-xl font-black" onClick={() => void saveRecipe(r.recipeId)} disabled={savingRecipeId === r.recipeId}>
+                {savingRecipeId === r.recipeId ? 'Saving…' : 'Save recipe'}
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const recipeRewardDialog = recipeRewardTarget ? (
+    <RewardPickerDialog
+      open={!!recipeRewardTarget}
+      onOpenChange={(isOpen) => {
+        if (!isOpen) setRecipeRewardTarget(null);
+      }}
+      rewards={
+        adminRecipes
+          .find((r) => r.recipeId === recipeRewardTarget.recipeId)
+          ?.slots.find((slot) => slot.id === recipeRewardTarget.slotId)
+          ?.rewards ?? []
+      }
+      rewardItems={rewardItems}
+      rewardCatalog={rewardCatalog}
+      onSave={(rewards) => {
+        updateRecipeSlot(recipeRewardTarget.recipeId, recipeRewardTarget.slotId, {
+          rewards: rewards.length > 0 ? rewards : [],
+        });
+        setRecipeRewardTarget(null);
+      }}
+    />
+  ) : null;
+
+  const renderOnboardingCoversCard = () => (
+    <div className="rounded-2xl border border-border/40 bg-card/60 px-4 py-3.5">
+      <p className="text-sm font-bold text-foreground">Onboarding quest covers</p>
+      <p className="mt-0.5 text-xs text-muted-foreground">
+        Images for the one-time First Hops and Explorer quests new users see.
+      </p>
+      <div className="mt-3 space-y-3">
+        {[
+          { key: 'onboard:first-hops', label: 'First Hops' },
+          { key: 'onboard:explorer', label: 'Explorer' },
+        ].map(({ key, label }) => (
+          <div key={key} className="flex items-center gap-3">
+            <div className="h-14 w-24 shrink-0 overflow-hidden rounded-xl border border-border/50 bg-muted/40">
+              {onboardCovers[key] ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={onboardCovers[key]} alt="" className="h-full w-full object-cover" />
+              ) : null}
+            </div>
+            <span className="w-20 text-xs font-bold text-foreground">{label}</span>
+            <label className="cursor-pointer rounded-full border border-border/50 bg-background px-3 py-1.5 text-[11px] font-bold text-muted-foreground transition hover:border-primary/30 hover:text-foreground">
+              {onboardCovers[key] ? 'Change' : 'Upload'}
+              <input type="file" accept="image/*" className="hidden" onChange={(e) => void handleOnboardCoverFile(key, e)} />
+            </label>
+            {onboardCovers[key] && (
+              <button
+                type="button"
+                onClick={() => void saveOnboardCover(key, null)}
+                className="text-[11px] font-bold text-red-500/80 hover:text-red-500"
+              >
+                Remove
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
   const renderFocus = () => (
     <div className="space-y-4">
       <div className="flex items-center justify-end">
@@ -1083,6 +1596,9 @@ export function AdminQuestManagerPage() {
           Add Category
         </Button>
       </div>
+
+      {adminRecipes.filter((r) => r.placement !== 'daily').map(renderRecipeCard)}
+      {recipeRewardDialog}
 
       <div className="space-y-2">
         {adminCategories.map((cat) => {
@@ -1108,9 +1624,18 @@ export function AdminQuestManagerPage() {
                 onClick={() => { setSelectedCategoryId(cat.id); setView('category'); }}
                 className="min-w-0 flex-1 text-left"
               >
-                <p className="truncate text-sm font-bold text-foreground">{cat.name}</p>
+                <p className="flex items-center gap-2 truncate text-sm font-bold text-foreground">
+                  <span className="truncate">{cat.name}</span>
+                  {cat.questMode === 'generated' && (
+                    <span className="shrink-0 rounded-full border border-violet-500/25 bg-violet-500/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-violet-600 dark:text-violet-400">
+                      Generated
+                    </span>
+                  )}
+                </p>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  {questCount} quest{questCount !== 1 ? 's' : ''}{cat.description ? ` · ${cat.description}` : ''}
+                  {cat.questMode === 'generated'
+                    ? 'Quests rolled from the recipe'
+                    : `${questCount} quest${questCount !== 1 ? 's' : ''}`}{cat.description ? ` · ${cat.description}` : ''}
                 </p>
               </button>
               <div className={cn(
@@ -1795,6 +2320,33 @@ export function AdminQuestManagerPage() {
                   Shown as this area&apos;s label in the user onboarding flow. Falls back to the name if empty.
                 </span>
               </label>
+              <div className="grid gap-2">
+                <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Quest Mode</span>
+                <div className="grid grid-cols-2 gap-2">
+                  {(['templates', 'generated'] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => setCategoryForm((p) => ({ ...p, questMode: mode }))}
+                      className={cn(
+                        'rounded-2xl border px-4 py-3 text-left transition',
+                        categoryForm.questMode === mode
+                          ? 'border-primary/40 bg-primary/10'
+                          : 'border-border bg-background hover:border-primary/20',
+                      )}
+                    >
+                      <p className="text-sm font-bold text-foreground">
+                        {mode === 'templates' ? 'Authored quests' : 'Generated ladder'}
+                      </p>
+                      <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+                        {mode === 'templates'
+                          ? 'Uses the quest templates you create for this category.'
+                          : 'Rolls a fresh objective ladder from the recipe on a timer.'}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div className="rounded-2xl border border-border/50 bg-background/70 p-3">
                 <div className="mb-2 flex items-center justify-between gap-3">
                   <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Category Photo</p>
