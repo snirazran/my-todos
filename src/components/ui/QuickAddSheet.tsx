@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { mutate } from 'swr';
+import useSWR, { mutate } from 'swr';
 import {
   AnimatePresence,
   animate,
@@ -229,16 +229,41 @@ export default function QuickAddSheet({
   const [suggestionsReady, setSuggestionsReady] = useState(false);
   const [hasSuggestionContent, setHasSuggestionContent] = useState(false);
 
+  const { data: questContext } = useSWR<{
+    isPremium?: boolean;
+    activeFocusCategoryId?: string | null;
+    onboarding?: {
+      selectedCategoryIds?: string[];
+      categoryTagMap?: { categoryId: string; tagIds: string[] }[];
+    };
+  }>(
+    open
+      ? `/api/quests?view=home&timezone=${encodeURIComponent(
+          Intl.DateTimeFormat().resolvedOptions().timeZone,
+        )}`
+      : null,
+    (url: string) => fetch(url).then((res) => res.json()),
+    { revalidateOnFocus: false },
+  );
+
   const questTagIds = useMemo(() => {
+    const resolvedTagMap =
+      categoryTagMap ?? questContext?.onboarding?.categoryTagMap;
+    const resolvedFocusIds =
+      focusCategoryIds ?? questContext?.onboarding?.selectedCategoryIds;
+    const activeFocusCategoryId = questContext?.activeFocusCategoryId ?? null;
     const ids = new Set<string>();
-    for (const entry of categoryTagMap ?? []) {
-      if (focusCategoryIds && !focusCategoryIds.includes(entry.categoryId)) {
+    for (const entry of resolvedTagMap ?? []) {
+      if (resolvedFocusIds && !resolvedFocusIds.includes(entry.categoryId as any)) {
+        continue;
+      }
+      if (activeFocusCategoryId && entry.categoryId !== activeFocusCategoryId) {
         continue;
       }
       for (const id of entry.tagIds) ids.add(id);
     }
     return ids;
-  }, [categoryTagMap, focusCategoryIds]);
+  }, [categoryTagMap, focusCategoryIds, questContext]);
 
   const stripTags = useMemo(() => {
     if (questTagIds.size === 0) return tagManager.savedTags;

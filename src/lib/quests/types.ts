@@ -47,6 +47,10 @@ export type QuestVisibilityCondition = {
 export type ResolvedQuestLogicBlock = QuestLogicBlock & {
   target: number;
   progress: number;
+  // Raw progress accrued while the quest was locked (free users' non-active
+  // focus quests). Subtracted from the recomputed raw count so locked quests
+  // don't advance; grows while locked, frozen once the quest is active.
+  progressOffset?: number;
   resolvedTagId?: string;
   resolvedTagIds?: string[];
   resolvedTagName?: string;

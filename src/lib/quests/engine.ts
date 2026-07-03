@@ -577,6 +577,15 @@ async function syncQuestForTemplate(args: {
         }))
       : template.logic;
 
+  const lockedForFreeUser =
+    template.placement === 'category' &&
+    !isPremiumUser(user) &&
+    !!resolveActiveFocusCategoryId(profile, false) &&
+    template.categoryId !== resolveActiveFocusCategoryId(profile, false);
+  const prevBlocksById = new Map(
+    (doc.logic ?? []).map((block) => [block.id, block]),
+  );
+
   const resolvedLogic: ResolvedQuestLogicBlock[] = templateLogic.map((block) => {
       const resolvedTag =
         block.tagMode === 'random_user_tag' && userTags.length > 0
@@ -611,13 +620,20 @@ async function syncQuestForTemplate(args: {
                 .filter((tagName): tagName is string => !!tagName)
             : undefined,
       };
-    const progress = progressForLogicBlock({
+    const rawProgress = progressForLogicBlock({
       block: resolvedBlock,
       tasks,
       timezone,
       startDate,
       endDate,
     });
+    const prevBlock = prevBlocksById.get(block.id);
+    const prevOffset = Math.max(0, prevBlock?.progressOffset ?? 0);
+    const prevProgress = Math.max(0, prevBlock?.progress ?? 0);
+    const progressOffset = lockedForFreeUser
+      ? Math.max(0, rawProgress - prevProgress)
+      : prevOffset;
+    const progress = Math.max(0, rawProgress - progressOffset);
     const resolvedRewards = (block.rewards ?? [])
       .filter((r): r is QuestReward => isSupportedReward(r as { type?: string }))
       .map((r, ri) =>
@@ -629,6 +645,7 @@ async function syncQuestForTemplate(args: {
     return {
       ...resolvedBlock,
       progress,
+      progressOffset,
       rewards: resolvedRewards.length > 0 ? resolvedRewards : undefined,
     };
   });
