@@ -41,6 +41,7 @@ export type Trackable = {
   objectiveLabel: string;
   remainingLabel: string;
   tags?: ObjectiveTagChip[];
+  needsFocusTags?: boolean;
   progress: number;
   target: number;
   reward?: any;
@@ -218,6 +219,8 @@ export function QuestRewardTileBadge({
         hideBadge
         className="h-12 w-12 rounded-xl"
         frogClassName="-translate-y-[18%]"
+        flySize={30}
+        giftAnimation="box_shake"
       />
       <span className="absolute -right-0.5 -top-1 z-20 flex min-w-4 items-center justify-center rounded-sm border border-white/10 bg-black/50 px-1 py-0.5 text-[8px] font-bold uppercase tracking-wide text-white shadow-sm backdrop-blur-sm">
         {rewardQuantityLabel(reward)}

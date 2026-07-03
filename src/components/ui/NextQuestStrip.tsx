@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Tags } from 'lucide-react';
 import type { QuestRewardCatalogItem } from '@/components/ui/QuestCards';
 import {
   ObjectiveLabel,
@@ -35,6 +35,7 @@ export function NextQuestStrip({
       const aTarget = Math.max(1, a.target);
       const bTarget = Math.max(1, b.target);
       return (
+        Number(a.needsFocusTags ?? false) - Number(b.needsFocusTags ?? false) ||
         b.progress / bTarget - a.progress / aTarget ||
         aTarget - a.progress - (bTarget - b.progress)
       );
@@ -111,18 +112,35 @@ export function NextQuestStrip({
                 ? nextUp.categoryName ?? 'Focus quest'
                 : 'Daily quest'}
             </span>
-            <span className="mt-0.5 text-[13px] font-black text-foreground">
-              <ObjectiveLabel label={nextUp.remainingLabel} tags={nextUp.tags} />
-            </span>
-            <div className="mt-1.5 flex items-center gap-2">
-              <QuestProgressBar
-                from={nextUp.progress / Math.max(1, nextUp.target)}
-                to={nextUp.progress / Math.max(1, nextUp.target)}
-              />
-              <span className="shrink-0 text-[11px] font-bold tabular-nums text-muted-foreground">
-                {Math.min(nextUp.progress, nextUp.target)}/{nextUp.target}
-              </span>
-            </div>
+            {nextUp.needsFocusTags ? (
+              <>
+                <span className="mt-0.5 text-[13px] font-black text-foreground">
+                  Pick a tag to start this quest
+                </span>
+                <span className="mt-1.5 inline-flex w-fit items-center gap-1.5 rounded-lg border border-dashed border-primary/50 bg-primary/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.14em] text-primary">
+                  <Tags className="h-3 w-3" strokeWidth={2.75} />
+                  Pick a tag
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="mt-0.5 text-[13px] font-black text-foreground">
+                  <ObjectiveLabel
+                    label={nextUp.remainingLabel}
+                    tags={nextUp.tags}
+                  />
+                </span>
+                <div className="mt-1.5 flex items-center gap-2">
+                  <QuestProgressBar
+                    from={nextUp.progress / Math.max(1, nextUp.target)}
+                    to={nextUp.progress / Math.max(1, nextUp.target)}
+                  />
+                  <span className="shrink-0 text-[11px] font-bold tabular-nums text-muted-foreground">
+                    {Math.min(nextUp.progress, nextUp.target)}/{nextUp.target}
+                  </span>
+                </div>
+              </>
+            )}
           </div>
           <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
         </>

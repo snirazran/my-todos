@@ -1241,6 +1241,7 @@ export const RewardTile = memo(function RewardTile({
   hideBadge = false,
   giftAnimation,
   frogClassName,
+  flySize,
 }: {
   reward: QuestReward;
   rewardCatalog: Record<string, QuestRewardCatalogItem>;
@@ -1255,6 +1256,8 @@ export const RewardTile = memo(function RewardTile({
   giftAnimation?: string;
   /** Optional class override for the frog cosmetic preview (e.g. a translate). */
   frogClassName?: string;
+  /** Optional size override for the fly reward icon. */
+  flySize?: number;
 }) {
   const { ref, hasHydrated } = useDelayedHydration<HTMLDivElement>(
     hydrateDelayMs,
@@ -1305,7 +1308,7 @@ export const RewardTile = memo(function RewardTile({
       {reward.type === 'FLIES' ? (
         <div className="relative flex items-center justify-center w-full h-full">
           <Fly
-            size={compact ? 30 : 22}
+            size={flySize ?? (compact ? 30 : 22)}
             y={-1}
             paused={paused}
             interactive={false}

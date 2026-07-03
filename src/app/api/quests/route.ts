@@ -82,6 +82,7 @@ type TrackableEntry = {
   objectiveLabel: string;
   remainingLabel: string;
   tags?: ObjectiveTagChip[];
+  needsFocusTags?: boolean;
   progress: number;
   target: number;
   reward?: any;
@@ -313,6 +314,10 @@ export async function GET(req: Request) {
             block.tagMode === 'focus_category_tags'
               ? questFocusTags(quest)
               : undefined,
+          needsFocusTags:
+            quest.placement === 'category' &&
+            block.tagMode === 'focus_category_tags' &&
+            questFocusTags(quest).length === 0,
           progress: Math.max(0, block.progress),
           target,
           reward: block.rewards?.[0],
