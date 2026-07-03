@@ -107,6 +107,19 @@
   animation: shimmer 2.4s linear infinite;
 }
 
+@keyframes quest-anchor-glow {
+  0%,
+  55% {
+    box-shadow: 0 0 0 3px hsl(var(--primary) / 0.55);
+  }
+  100% {
+    box-shadow: 0 0 0 3px transparent;
+  }
+}
+.quest-anchor-highlight {
+  animation: quest-anchor-glow 1.9s ease-out;
+}
+
 @keyframes ping-ring {
   0% {
     transform: translate(-50%, -50%) scale(0.8);

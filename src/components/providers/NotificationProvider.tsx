@@ -162,8 +162,13 @@ export function NotificationProvider({
           >
         {/* Top slot: timer pill portals in here (above all toasts) */}
         <div id="frog-bottom-stack-top" className="contents" />
+        {/* Deck stack: newest toast in front; older ones peek out behind it
+            and step forward as the front one leaves. */}
+        <div className="relative w-full md:w-[380px] md:self-end">
         <AnimatePresence initial={false}>
-          {notifications.map((n) => {
+          {notifications.map((n, index) => {
+            const depth = notifications.length - 1 - index;
+            const isFront = depth === 0;
             const isSavedTasksToast = n.content === 'Moved to Saved Tasks';
             const isMovedToTodayToast = n.content === 'Moved to Today';
             const isDuplicateToast =
@@ -175,12 +180,28 @@ export function NotificationProvider({
             return (
               <motion.div
                 key={n.id}
-                layout
                 initial={{ opacity: 0, y: 20, scale: 0.96 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.15 } }}
+                animate={{
+                  opacity: depth > 2 ? 0 : 1,
+                  y: depth * -10,
+                  scale: 1 - depth * 0.05,
+                }}
+                exit={{
+                  opacity: 0,
+                  scale: 0.96,
+                  position: 'absolute',
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  transition: { duration: 0.15 },
+                }}
                 transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                className={`pointer-events-auto w-full md:w-[380px] md:self-end flex items-center gap-3 px-4 py-3 rounded-[18px] border shadow-sm backdrop-blur-2xl ${
+                style={{ zIndex: 100 - depth }}
+                className={`${
+                  isFront
+                    ? 'pointer-events-auto relative'
+                    : 'pointer-events-none absolute inset-x-0 bottom-0'
+                } flex w-full items-center gap-3 px-4 py-3 rounded-[18px] border shadow-sm backdrop-blur-2xl ${
                   isMoveToast
                     ? 'bg-card/90 text-foreground border-border/50'
                     : 'bg-popover/90 text-popover-foreground border-border'
@@ -254,6 +275,7 @@ export function NotificationProvider({
             );
           })}
         </AnimatePresence>
+        </div>
         {/* Bottom slot: cinematic skip hint portals in here (below all toasts) */}
         <div id="frog-bottom-stack-bottom" className="contents" />
           </div>,

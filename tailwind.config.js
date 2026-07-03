@@ -50,12 +50,17 @@ module.exports = {
           '0%': { transform: 'translateX(-140%) skewX(-18deg)' },
           '100%': { transform: 'translateX(260%) skewX(-18deg)' },
         },
+        'quest-pulse': {
+          '0%,100%': { transform: 'scale(1)' },
+          '50%': { transform: 'scale(1.06)' },
+        },
       },
       animation: {
         float: 'float 3s ease-in-out infinite',
         'logo-line': 'logo-line 3s ease-in-out infinite',
         shimmer: 'shimmer 2s linear infinite',
         shine: 'shine 1.35s ease-in-out infinite',
+        'quest-pulse': 'quest-pulse 1.8s ease-in-out infinite',
       },
       colors: {
         // every key here becomes a colour-utility name

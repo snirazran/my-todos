@@ -49,6 +49,7 @@ import {
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import { randomUUID } from '@/lib/uuid';
 import { QuestOnboardingPopup } from '@/components/ui/QuestOnboardingPopup';
+import { NextQuestStrip } from '@/components/ui/NextQuestStrip';
 import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
 import { BuddyNudgeCard } from '@/components/ui/BuddyNudgeCard';
 import type {
@@ -355,6 +356,12 @@ export default function Home() {
     isPremium?: boolean;
     claimableCount?: number;
     activeCount?: number;
+    claimables?: import('@/lib/questClaims').Claimable[];
+    trackables?: import('@/lib/questClaims').Trackable[];
+    claimablesRewardCatalog?: Record<
+      string,
+      import('@/components/ui/QuestCards').QuestRewardCatalogItem
+    >;
     onboarding?: {
       complete: boolean;
       selectedCategoryIds: MacroCategoryId[];
@@ -569,6 +576,14 @@ export default function Home() {
 
               <div className="min-h-[360px] pb-16" ref={taskListRef}>
                 {renderGuestPrompt()}
+                {user && (
+                  <NextQuestStrip
+                    claimables={questsData?.claimables}
+                    trackables={questsData?.trackables}
+                    catalog={questsData?.claimablesRewardCatalog}
+                    isPremium={isPremium}
+                  />
+                )}
                 <TaskList
                   tasks={data}
                   toggle={handleToggle}

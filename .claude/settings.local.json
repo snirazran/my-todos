@@ -191,7 +191,10 @@
       "Bash(pkill -f 'next dev')",
       "Bash(lsof -ti:3000,3001)",
       "Bash(xargs kill)",
-      "Bash(git -C /Users/snirazran/Fullstack/my-todos status --short)"
+      "Bash(git -C /Users/snirazran/Fullstack/my-todos status --short)",
+      "WebFetch(domain:trophy.so)",
+      "WebFetch(domain:blog.duolingo.com)",
+      "Bash(awk '/export async function syncQuestState/,/^}/' /Users/snirazran/Fullstack/my-todos/src/lib/quests/engine.ts)"
     ]
   }
 }

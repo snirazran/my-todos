@@ -31,38 +31,88 @@ function lightenCategory<T extends { id?: string; coverImageUrl?: string }>(
   return { ...category, coverImageUrl: categoryCoverRef(category.id) };
 }
 
-function objectiveSummaryLabel(block: {
-  type?: string;
-  subject?: string;
-  action?: string;
-  tagMode?: string;
-  target?: number;
-}): string {
+function objectiveSummaryLabel(
+  block: {
+    type?: string;
+    subject?: string;
+    action?: string;
+    tagMode?: string;
+    target?: number;
+  },
+  tagsResolved = false,
+): string {
   const target = Math.max(0, block.target ?? 0);
+  const usesFocusTags = block.tagMode === 'focus_category_tags';
   if (block.type === 'focus_minutes') {
-    return block.tagMode === 'focus_category_tags'
-      ? `Focus for ${target} minutes on tagged tasks`
+    return usesFocusTags && !tagsResolved
+      ? `Focus for ${target} minutes on tasks with focus tags`
       : `Focus for ${target} minutes on tasks`;
   }
   const subject = block.subject === 'any' || target !== 1 ? 'tasks' : 'task';
   const action = block.action === 'add' ? 'Add' : 'Complete';
   const scope =
-    block.tagMode === 'focus_category_tags'
-      ? `${subject} with focus tags`
-      : subject;
+    usesFocusTags && !tagsResolved ? `${subject} with focus tags` : subject;
   return `${action} ${target} ${scope}`;
 }
 
+type ObjectiveTagChip = {
+  id: string;
+  name: string;
+  color: string;
+};
+
 type ClaimableEntry = {
   id: string;
+  questId?: string;
   kind: 'objective' | 'season';
   placement?: 'daily' | 'category';
   categoryName?: string;
   objectiveLabel?: string;
+  tags?: ObjectiveTagChip[];
   seasonName?: string;
   day?: number;
   reward?: any;
 };
+
+type TrackableEntry = {
+  id: string;
+  questId: string;
+  placement: 'daily' | 'category';
+  categoryName?: string;
+  objectiveLabel: string;
+  remainingLabel: string;
+  tags?: ObjectiveTagChip[];
+  progress: number;
+  target: number;
+  reward?: any;
+};
+
+function objectiveRemainingLabel(
+  block: {
+    type?: string;
+    subject?: string;
+    action?: string;
+    tagMode?: string;
+    target?: number;
+    progress?: number;
+  },
+  tagsResolved = false,
+): string {
+  const target = Math.max(1, block.target ?? 1);
+  const remaining = Math.max(1, target - Math.max(0, block.progress ?? 0));
+  const usesFocusTags = block.tagMode === 'focus_category_tags';
+  if (block.type === 'focus_minutes') {
+    if (!usesFocusTags) return `Focus ${remaining} more min`;
+    return tagsResolved
+      ? `Focus ${remaining} more min on tasks`
+      : `Focus ${remaining} more min on tasks with focus tags`;
+  }
+  const subject = remaining === 1 ? 'task' : 'tasks';
+  const action = block.action === 'add' ? 'Add' : 'Complete';
+  const scope =
+    usesFocusTags && !tagsResolved ? `${subject} with focus tags` : subject;
+  return `${action} ${remaining} more ${scope}`;
+}
 
 function normalizeQuestTag(tag: any, index: number, isPremium: boolean) {
   if (typeof tag === 'string') {
@@ -169,6 +219,41 @@ export async function GET(req: Request) {
     const categoryNameById = new Map<string, string>(
       (dashboard.macroCategories ?? []).map((c: any) => [c.id, c.name]),
     );
+    const tagChipById = new Map<string, ObjectiveTagChip>();
+    for (const tag of (dashboard.user.tags ?? []) as unknown[]) {
+      if (typeof tag === 'string') {
+        const name = tag.trim();
+        if (name) tagChipById.set(name, { id: name, name, color: '#22c55e' });
+        continue;
+      }
+      if (!tag || typeof tag !== 'object') continue;
+      const name =
+        typeof (tag as any).name === 'string' && (tag as any).name.trim()
+          ? (tag as any).name.trim()
+          : typeof (tag as any).id === 'string'
+            ? (tag as any).id.trim()
+            : '';
+      if (!name) continue;
+      const id =
+        typeof (tag as any).id === 'string' && (tag as any).id.trim()
+          ? (tag as any).id.trim()
+          : name;
+      const color =
+        typeof (tag as any).color === 'string' && (tag as any).color.trim()
+          ? (tag as any).color.trim()
+          : '#22c55e';
+      tagChipById.set(id, { id, name, color });
+    }
+    const focusTagsByCategory = new Map<string, ObjectiveTagChip[]>(
+      (dashboard.focusProfile.categoryTagMap ?? []).map((entry: any) => [
+        entry.categoryId,
+        (entry.tagIds ?? [])
+          .map((tagId: string) => tagChipById.get(tagId))
+          .filter(Boolean) as ObjectiveTagChip[],
+      ]),
+    );
+    const questFocusTags = (quest: { categoryId?: string }) =>
+      quest.categoryId ? focusTagsByCategory.get(quest.categoryId) ?? [] : [];
     const claimables: ClaimableEntry[] = [];
     for (const quest of [...dashboard.dailyQuests, ...dashboard.categoryQuests]) {
       if (quest.claimed || quest.locked) continue;
@@ -180,16 +265,58 @@ export async function GET(req: Request) {
         ) {
           claimables.push({
             id: `${quest.id}:${block.id}`,
+            questId: quest.id,
             kind: 'objective',
             placement: quest.placement,
             categoryName:
               quest.placement === 'category'
                 ? categoryNameById.get(quest.categoryId ?? '')
                 : undefined,
-            objectiveLabel: objectiveSummaryLabel(block),
+            objectiveLabel: objectiveSummaryLabel(
+              block,
+              questFocusTags(quest).length > 0,
+            ),
+            tags:
+              block.tagMode === 'focus_category_tags'
+                ? questFocusTags(quest)
+                : undefined,
             reward: block.rewards?.[0],
           });
         }
+      }
+    }
+    const trackables: TrackableEntry[] = [];
+    for (const quest of [...dashboard.dailyQuests, ...dashboard.categoryQuests]) {
+      if (quest.claimed || quest.locked) continue;
+      for (const block of quest.logic) {
+        const target = Math.max(1, block.target);
+        if ((block.rewards?.length ?? 0) === 0) continue;
+        if (block.progress >= target) continue;
+        if (quest.claimedObjectiveIds.includes(block.id)) continue;
+        trackables.push({
+          id: `${quest.id}:${block.id}`,
+          questId: quest.id,
+          placement: quest.placement,
+          categoryName:
+            quest.placement === 'category'
+              ? categoryNameById.get(quest.categoryId ?? '')
+              : undefined,
+          objectiveLabel: objectiveSummaryLabel(
+            block,
+            questFocusTags(quest).length > 0,
+          ),
+          remainingLabel: objectiveRemainingLabel(
+            block,
+            questFocusTags(quest).length > 0,
+          ),
+          tags:
+            block.tagMode === 'focus_category_tags'
+              ? questFocusTags(quest)
+              : undefined,
+          progress: Math.max(0, block.progress),
+          target,
+          reward: block.rewards?.[0],
+        });
       }
     }
     if (activeSeason && activeSeason.claimable && !activeSeason.claimedToday) {
@@ -207,11 +334,11 @@ export async function GET(req: Request) {
         reward: seasonReward,
       });
     }
-    const claimableRewards = claimables
+    const claimableRewards = [...claimables, ...trackables]
       .map((c) => c.reward)
       .filter(Boolean) as import('@/lib/quests/types').QuestRewards;
     let claimablesRewardCatalog: Record<string, unknown> = {};
-    if (isSummary && claimableRewards.some((r) => r?.itemId)) {
+    if (isSummary && claimableRewards.some((r) => r?.itemId || r?.backgroundId)) {
       const catalog = dashboard.catalog?.length
         ? dashboard.catalog
         : await getCachedCatalog();
@@ -230,6 +357,7 @@ export async function GET(req: Request) {
           isPremium: dashboard.isPremium,
           claimableCount,
           claimables,
+          trackables,
           claimablesRewardCatalog,
           activeCount,
           activeFocusCategoryId: dashboard.activeFocusCategoryId,

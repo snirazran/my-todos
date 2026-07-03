@@ -1240,6 +1240,7 @@ export const RewardTile = memo(function RewardTile({
   paused = false,
   hideBadge = false,
   giftAnimation,
+  frogClassName,
 }: {
   reward: QuestReward;
   rewardCatalog: Record<string, QuestRewardCatalogItem>;
@@ -1252,6 +1253,8 @@ export const RewardTile = memo(function RewardTile({
   hideBadge?: boolean;
   /** Optional gift-box animation override (e.g. 'box_shake'). */
   giftAnimation?: string;
+  /** Optional class override for the frog cosmetic preview (e.g. a translate). */
+  frogClassName?: string;
 }) {
   const { ref, hasHydrated } = useDelayedHydration<HTMLDivElement>(
     hydrateDelayMs,
@@ -1342,6 +1345,7 @@ export const RewardTile = memo(function RewardTile({
               compact
                 ? 'h-[118%] w-[118%] -translate-y-[18%]'
                 : 'h-[120%] w-[120%] translate-y-[8%]',
+              frogClassName,
             )}
             indices={previewIndices}
             width={compact ? 96 : 64}

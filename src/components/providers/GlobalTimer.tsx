@@ -18,6 +18,8 @@ import { App } from '@capacitor/app';
 import { randomUUID } from '@/lib/uuid';
 import type { ActiveFrogodoroTimer } from '@/lib/types/UserDoc';
 import { getCurrentLiveActivityState } from '@/lib/liveTimer';
+import { notifyQuestClaims } from '@/lib/questClaims';
+import { useNotification } from '@/components/providers/NotificationProvider';
 
 function getPhaseDuration(phase: PomodoroPhase, settings: FrogodoroSettings): number {
   return phase === 'focus' ? settings.focusDuration * 60 : settings.breakDuration * 60;
@@ -51,7 +53,22 @@ export function GlobalTimer() {
     registerCompletion,
     setAwaitingDone,
     setPhaseElapsed,
+    lastCompletionId,
+    lastCompletedPhase,
   } = useFrogodoroStore();
+
+  const { showNotification } = useNotification();
+  const prevCompletionIdRef = useRef(lastCompletionId);
+  useEffect(() => {
+    if (lastCompletionId === prevCompletionIdRef.current) return;
+    prevCompletionIdRef.current = lastCompletionId;
+    if (lastCompletedPhase !== 'focus') return;
+    const t = window.setTimeout(
+      () => void notifyQuestClaims(showNotification),
+      1500,
+    );
+    return () => window.clearTimeout(t);
+  }, [lastCompletionId, lastCompletedPhase, showNotification]);
 
   const prevIsRunning = useRef(isRunning);
   const clientIdRef = useRef<string | null>(null);

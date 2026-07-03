@@ -34,6 +34,7 @@ import { RARITY_CONFIG as GIFT_RARITY_CONFIG } from './gift-box/constants';
 import Fly from './fly';
 import { FlyCounter } from './FlyCounter';
 import { mutateInventoryCaches, useInventory } from '@/hooks/useInventory';
+import { takeQuestScrollTarget } from '@/lib/questClaims';
 import { PlusUpgradeModal } from './PlusUpgradeModal';
 import { useDraggableScroll } from '@/hooks/useDraggableScroll';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
@@ -333,6 +334,42 @@ export function QuestsPanel({
 
     return () => window.cancelAnimationFrame(frame);
   }, [data, isLoading]);
+
+  const pendingScrollQuestIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (isLoading || !data) return;
+    if (!pendingScrollQuestIdRef.current) {
+      pendingScrollQuestIdRef.current = takeQuestScrollTarget();
+    }
+    const questId = pendingScrollQuestIdRef.current;
+    if (!questId) return;
+
+    const sortedDaily = [...(data.dailyQuests ?? [])].sort(
+      (a, b) => Number(isQuestRetired(a)) - Number(isQuestRetired(b)),
+    );
+    const dailyIndex = sortedDaily.findIndex((quest) => quest.id === questId);
+    if (dailyIndex >= 0) setDailyPage(dailyIndex);
+
+    const timeout = window.setTimeout(() => {
+      pendingScrollQuestIdRef.current = null;
+      const anchors = Array.from(
+        document.querySelectorAll<HTMLElement>(
+          `[data-quest-anchor="${CSS.escape(questId)}"]`,
+        ),
+      );
+      for (const el of anchors) {
+        if (el.offsetParent === null) continue;
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.classList.add('quest-anchor-highlight');
+        window.setTimeout(
+          () => el.classList.remove('quest-anchor-highlight'),
+          2000,
+        );
+        break;
+      }
+    }, 450);
+    return () => window.clearTimeout(timeout);
+  }, [isLoading, data]);
 
   const categoryMap = useMemo(
     () =>
@@ -749,8 +786,12 @@ export function QuestsPanel({
                               Number(isQuestRetired(a)) - Number(isQuestRetired(b)),
                           );
                           const renderDailyCard = (quest: DailyQuestProgressView) => (
-                            <DailyQuestPresentationCard
+                            <div
                               key={quest.id}
+                              data-quest-anchor={quest.id}
+                              className="rounded-[24px]"
+                            >
+                            <DailyQuestPresentationCard
                               quest={quest}
                               rewardCatalog={data.rewardCatalog}
                               isPremium={data.isPremium}
@@ -760,10 +801,15 @@ export function QuestsPanel({
                               }
                               paused={carouselDragging}
                             />
+                            </div>
                           );
                           const renderFocusCard = (quest: CategoryQuestProgressView) => (
-                            <CategoryQuestPresentationCard
+                            <div
                               key={quest.id}
+                              data-quest-anchor={quest.id}
+                              className="rounded-[24px]"
+                            >
+                            <CategoryQuestPresentationCard
                               quest={quest}
                               category={categoryMap[quest.categoryId]}
                               rewardCatalog={data.rewardCatalog}
@@ -795,6 +841,7 @@ export function QuestsPanel({
                               onUpgrade={() => setPlusOpen(true)}
                               paused={carouselDragging}
                             />
+                            </div>
                           );
 
                           const focusEmptyStates = (
