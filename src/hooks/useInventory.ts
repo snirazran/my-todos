@@ -11,6 +11,27 @@ export function mutateInventoryCaches() {
   mutateGlobal(INVENTORY_SUMMARY_KEY);
 }
 
+export function mutateInventorySummary() {
+  mutateGlobal(INVENTORY_SUMMARY_KEY);
+}
+
+let equipMutationsInFlight = 0;
+let lastEquipSettledAt = 0;
+
+export function beginEquipMutation() {
+  equipMutationsInFlight += 1;
+}
+
+export function endEquipMutation() {
+  equipMutationsInFlight = Math.max(0, equipMutationsInFlight - 1);
+  lastEquipSettledAt = Date.now();
+  return equipMutationsInFlight;
+}
+
+export function shouldSuppressEquipEcho() {
+  return equipMutationsInFlight > 0 || Date.now() - lastEquipSettledAt < 3000;
+}
+
 export function patchInventoryFlies(balance: number) {
   const patch = (curr: any) => {
     if (!curr?.wardrobe) return curr;
@@ -51,14 +72,11 @@ export function useInventory(active: boolean = true, summary: boolean = false) {
 
     // Optimistic update
     mutate(
-      {
-        ...data,
-        wardrobe: {
-          ...data.wardrobe!,
-          unseenItems: [],
-        },
-      },
-      false
+      (curr) =>
+        curr?.wardrobe
+          ? { ...curr, wardrobe: { ...curr.wardrobe, unseenItems: [] } }
+          : curr,
+      { revalidate: false },
     );
 
     await fetch('/api/skins/inventory', {
@@ -67,7 +85,7 @@ export function useInventory(active: boolean = true, summary: boolean = false) {
       body: JSON.stringify({ action: 'markSeen' }),
     });
 
-    mutateInventoryCaches();
+    mutateInventorySummary();
   };
 
   const markContainersSeen = async () => {
@@ -80,16 +98,19 @@ export function useInventory(active: boolean = true, summary: boolean = false) {
     const containerSet = new Set(containerIdsArr);
 
     mutate(
-      {
-        ...data,
-        wardrobe: {
-          ...data.wardrobe!,
-          unseenItems: data.wardrobe!.unseenItems!.filter(
-            (id) => !containerSet.has(id),
-          ),
-        },
-      },
-      false,
+      (curr) =>
+        curr?.wardrobe
+          ? {
+              ...curr,
+              wardrobe: {
+                ...curr.wardrobe,
+                unseenItems: (curr.wardrobe.unseenItems ?? []).filter(
+                  (id) => !containerSet.has(id),
+                ),
+              },
+            }
+          : curr,
+      { revalidate: false },
     );
 
     await fetch('/api/skins/inventory', {
@@ -98,7 +119,7 @@ export function useInventory(active: boolean = true, summary: boolean = false) {
       body: JSON.stringify({ action: 'markContainersSeen' }),
     });
 
-    mutateInventoryCaches();
+    mutateInventorySummary();
   };
 
   const markItemSeen = async (itemId: string) => {
@@ -106,14 +127,19 @@ export function useInventory(active: boolean = true, summary: boolean = false) {
 
     // Optimistic update: remove just this item
     mutate(
-      {
-        ...data,
-        wardrobe: {
-          ...data.wardrobe!,
-          unseenItems: data.wardrobe!.unseenItems!.filter((id) => id !== itemId),
-        },
-      },
-      false
+      (curr) =>
+        curr?.wardrobe
+          ? {
+              ...curr,
+              wardrobe: {
+                ...curr.wardrobe,
+                unseenItems: (curr.wardrobe.unseenItems ?? []).filter(
+                  (id) => id !== itemId,
+                ),
+              },
+            }
+          : curr,
+      { revalidate: false },
     );
 
     await fetch('/api/skins/inventory', {
@@ -122,7 +148,7 @@ export function useInventory(active: boolean = true, summary: boolean = false) {
       body: JSON.stringify({ action: 'markOneSeen', itemId }),
     });
 
-    mutateInventoryCaches();
+    mutateInventorySummary();
   };
 
   const containerIds = useMemo(

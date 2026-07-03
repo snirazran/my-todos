@@ -7,7 +7,11 @@ import {
   useBackgrounds,
   type BackgroundItem,
 } from '@/hooks/useBackgrounds';
-import { mutateInventoryCaches } from '@/hooks/useInventory';
+import {
+  beginEquipMutation,
+  endEquipMutation,
+  mutateInventoryCaches,
+} from '@/hooks/useInventory';
 
 type Notif = { msg: string; type: 'success' | 'error' };
 
@@ -91,7 +95,15 @@ export function useBackgroundActions({
       return;
     }
     if (equipped === item.id) return;
-    setBusyId(item.id);
+    try {
+      navigator.vibrate?.(14);
+    } catch {}
+    if (data) {
+      const nextData = { ...data, equipped: item.id };
+      void mutate(nextData, { revalidate: false });
+      mutateBackgrounds(nextData);
+    }
+    beginEquipMutation();
     try {
       const res = await fetch('/api/backgrounds/equip', {
         method: 'PUT',
@@ -102,17 +114,11 @@ export function useBackgroundActions({
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error || 'Failed to equip');
       }
-      if (data) {
-        const nextData = { ...data, equipped: item.id };
-        void mutate(nextData, { revalidate: false });
-        mutateBackgrounds(nextData);
-      }
-      onNotify?.({ msg: `Equipped ${item.name}`, type: 'success' });
-      refresh();
     } catch (err) {
       onNotify?.({ msg: err instanceof Error ? err.message : 'Failed', type: 'error' });
+      refresh();
     } finally {
-      setBusyId(null);
+      endEquipMutation();
     }
   };
 

@@ -1,7 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Check, Loader2 } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import Fly from '@/components/ui/fly';
 import { Button } from '@/components/ui/button';
@@ -86,19 +87,46 @@ export function BackgroundCard({
   const config = RARITY_CONFIG[item.rarity];
   const preview = item.images.mobile || item.images.tablet || item.images.web || item.images.webLarge;
   const isSelected = selectedCount > 0;
+  const prevEquippedRef = useRef(isEquipped);
+  const [equipPulse, setEquipPulse] = useState<'on' | 'off' | null>(null);
+
+  useEffect(() => {
+    if (prevEquippedRef.current === isEquipped) return;
+    prevEquippedRef.current = isEquipped;
+    setEquipPulse(isEquipped ? 'on' : 'off');
+  }, [isEquipped]);
 
   const handleClick = (e: React.MouseEvent) => {
     if (!actionLoading) onAction(e);
   };
 
   return (
-    <div
+    <motion.div
       onClick={handleClick}
+      whileTap={{ scale: 0.95 }}
+      animate={
+        equipPulse === 'on'
+          ? { scale: [1, 1.05, 1] }
+          : equipPulse === 'off'
+            ? { scale: [1, 0.97, 1] }
+            : { scale: 1 }
+      }
+      transition={
+        equipPulse
+          ? { duration: 0.4, ease: [0.34, 1.56, 0.64, 1] }
+          : { type: 'spring', stiffness: 500, damping: 30 }
+      }
+      onAnimationComplete={() => setEquipPulse(null)}
       className={cn(
-        'group relative flex flex-col p-2.5 pb-1 md:p-3.5 md:pb-1.5 transition-all duration-300 rounded-2xl border-[3px] overflow-hidden cursor-pointer active:scale-95 w-full max-w-[240px] lg:max-w-[360px] mx-auto',
+        'group relative flex flex-col p-2.5 pb-1 md:p-3.5 md:pb-1.5 transition-[color,background-color,border-color,box-shadow] duration-300 rounded-2xl border-[3px] overflow-hidden cursor-pointer w-full max-w-[240px] lg:max-w-[360px] mx-auto',
         config.border,
         config.bg,
-        isEquipped ? config.shadow : cn(config.shadow, config.hoverGlow),
+        isEquipped
+          ? cn(
+              config.shadow,
+              'ring-2 ring-green-500/80 ring-offset-2 ring-offset-background',
+            )
+          : cn(config.shadow, config.hoverGlow),
         isSelected && 'border-primary ring-2 ring-primary/30',
       )}
     >
@@ -141,6 +169,15 @@ export function BackgroundCard({
           <span className="relative text-xs font-bold opacity-60">No image</span>
         )}
 
+        {equipPulse === 'on' && (
+          <motion.div
+            initial={{ opacity: 0.6, scale: 0.7 }}
+            animate={{ opacity: 0, scale: 1.4 }}
+            transition={{ duration: 0.55, ease: 'easeOut' }}
+            className="absolute inset-0 z-20 rounded-xl pointer-events-none bg-[radial-gradient(circle,rgba(74,222,128,0.55)_0%,transparent_70%)]"
+          />
+        )}
+
         {ownedCount > 0 && (
           <div className="absolute top-1 right-1 md:top-1.5 md:right-1.5 bg-black/50 backdrop-blur-sm text-white text-[9px] md:text-[10px] font-bold px-1.5 py-0.5 rounded-md md:rounded-lg shadow-sm border border-white/10 z-20">
             x{ownedCount}
@@ -151,22 +188,27 @@ export function BackgroundCard({
       <div className="w-full mx-auto mt-2 md:w-3/4">
         {mode === 'inventory' ? (
           <>
-            {!isEquipped && (
-              <div
-                className={cn(
-                  'h-7 md:h-8 w-full flex items-center justify-center rounded-lg text-[10px] md:text-xs font-black uppercase tracking-wide transition-colors',
-                  'bg-muted text-muted-foreground group-hover:bg-primary/20 group-hover:text-primary',
-                )}
-              >
-                {actionLoading ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  'EQUIP'
-                )}
-              </div>
-            )}
+            <div
+              className={cn(
+                'h-7 md:h-8 w-full flex items-center justify-center gap-1 rounded-lg text-[10px] md:text-xs font-black uppercase tracking-wide transition-colors duration-200',
+                isEquipped
+                  ? 'bg-green-500 text-white shadow-md'
+                  : 'bg-muted text-muted-foreground group-hover:bg-primary/20 group-hover:text-primary',
+              )}
+            >
+              {actionLoading ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : isEquipped ? (
+                <>
+                  <Check className="w-3 h-3 md:w-3.5 md:h-3.5 stroke-[4]" />
+                  <span>Equipped</span>
+                </>
+              ) : (
+                <span>Equip</span>
+              )}
+            </div>
             {onSell && (item.priceFlies ?? 0) > 0 && (
-              <div className={cn('text-center w-full', !isEquipped && 'mt-1')}>
+              <div className="mt-1 text-center w-full">
                 <Button
                   variant="ghost"
                   size="sm"
@@ -226,6 +268,6 @@ export function BackgroundCard({
           </button>
         )}
       </div>
-    </div>
+    </motion.div>
   );
 }

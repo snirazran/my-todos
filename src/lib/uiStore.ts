@@ -27,6 +27,9 @@ interface UIState {
 
   isWardrobeStuck: boolean;
   setWardrobeStuck: (stuck: boolean) => void;
+
+  wardrobeTab: string;
+  setWardrobeTab: (tab: string) => void;
 }
 
 export const useUIStore = create<UIState>()(
@@ -57,6 +60,9 @@ export const useUIStore = create<UIState>()(
 
       isWardrobeStuck: false,
       setWardrobeStuck: (stuck: boolean) => set({ isWardrobeStuck: stuck }),
+
+      wardrobeTab: 'inventory',
+      setWardrobeTab: (tab: string) => set({ wardrobeTab: tab }),
     }),
     {
       name: 'frogress-ui-storage',

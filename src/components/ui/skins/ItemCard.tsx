@@ -141,6 +141,14 @@ function ItemCardComponent({
   const config = RARITY_CONFIG[item.rarity];
   const isOwned = ownedCount > 0;
   const cardRef = useRef<HTMLDivElement>(null);
+  const prevEquippedRef = useRef(isEquipped);
+  const [equipPulse, setEquipPulse] = useState<'on' | 'off' | null>(null);
+
+  useEffect(() => {
+    if (prevEquippedRef.current === isEquipped) return;
+    prevEquippedRef.current = isEquipped;
+    setEquipPulse(isEquipped ? 'on' : 'off');
+  }, [isEquipped]);
   const [nearViewport, setNearViewport] = useState(false);
   const [previewReady, setPreviewReady] = useState(!deferPreview);
   const [previewMounted, setPreviewMounted] = useState(!deferPreview);
@@ -211,14 +219,31 @@ function ItemCardComponent({
         if (mode === 'inventory' || mode === 'trade' || mode === 'shop')
           handleAction(e);
       }}
+      whileTap={{ scale: 0.95 }}
+      animate={
+        equipPulse === 'on'
+          ? { scale: [1, 1.05, 1] }
+          : equipPulse === 'off'
+            ? { scale: [1, 0.97, 1] }
+            : { scale: 1 }
+      }
+      transition={
+        equipPulse
+          ? { duration: 0.4, ease: [0.34, 1.56, 0.64, 1] }
+          : { type: 'spring', stiffness: 500, damping: 30 }
+      }
+      onAnimationComplete={() => setEquipPulse(null)}
       // UX TWEAK: Smaller padding on mobile (p-2.5) -> Normal on desktop (md:p-3.5)
       // Added min-h-[220px] to ensure card has presence even if image fails
       className={cn(
-        'group relative flex flex-col p-2.5 pb-1 md:p-3.5 md:pb-1.5 transition-all duration-300 rounded-2xl border-[3px] overflow-hidden cursor-pointer active:scale-95 w-full max-w-[240px] lg:max-w-[360px] mx-auto',
+        'group relative flex flex-col p-2.5 pb-1 md:p-3.5 md:pb-1.5 transition-[color,background-color,border-color,box-shadow] duration-300 rounded-2xl border-[3px] overflow-hidden cursor-pointer w-full max-w-[240px] lg:max-w-[360px] mx-auto',
         config.border,
         config.bg,
         isEquipped
-          ? cn(config.shadow)
+          ? cn(
+              config.shadow,
+              'ring-2 ring-green-500/80 ring-offset-2 ring-offset-background',
+            )
           : isSelected
             ? 'bg-primary/10 border-primary shadow-[0_0_15px_rgba(34,197,94,0.4)]'
             : cn(config.shadow, config.hoverGlow),
@@ -231,6 +256,7 @@ function ItemCardComponent({
             initial={{ scale: 0, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 550, damping: 18 }}
             className="absolute z-30 p-1 text-white bg-green-500 rounded-full shadow-md top-1.5 right-1.5"
           >
             <Check className="w-3 h-3 md:w-3.5 md:h-3.5 stroke-[4]" />
@@ -319,6 +345,15 @@ function ItemCardComponent({
           )}
         </div>
 
+        {equipPulse === 'on' && (
+          <motion.div
+            initial={{ opacity: 0.6, scale: 0.7 }}
+            animate={{ opacity: 0, scale: 1.4 }}
+            transition={{ duration: 0.55, ease: 'easeOut' }}
+            className="absolute inset-0 z-20 rounded-xl pointer-events-none bg-[radial-gradient(circle,rgba(74,222,128,0.55)_0%,transparent_70%)]"
+          />
+        )}
+
         {ownedCount > 0 && (
           <div className="absolute top-1 right-1 md:top-1.5 md:right-1.5 bg-black/50 backdrop-blur-sm text-white text-[9px] md:text-[10px] font-bold px-1.5 py-0.5 rounded-md md:rounded-lg shadow-sm border border-white/10 z-20">
             x{ownedCount}
@@ -387,6 +422,27 @@ function ItemCardComponent({
               </>
             )}
           </button>
+        )}
+
+        {/* Equip Status Bar (Inventory Mode) */}
+        {mode === 'inventory' && !customAction && item.slot !== 'container' && (
+          <div
+            className={cn(
+              'h-7 md:h-8 w-full flex items-center justify-center gap-1 rounded-lg text-[10px] md:text-xs font-black uppercase tracking-wide transition-colors duration-200',
+              isEquipped
+                ? 'bg-green-500 text-white shadow-md'
+                : 'bg-muted text-muted-foreground group-hover:bg-primary/20 group-hover:text-primary',
+            )}
+          >
+            {isEquipped ? (
+              <>
+                <Check className="w-3 h-3 md:w-3.5 md:h-3.5 stroke-[4]" />
+                <span>Equipped</span>
+              </>
+            ) : (
+              <span>Equip</span>
+            )}
+          </div>
         )}
 
         {/* Sell Button (Inventory Mode) */}

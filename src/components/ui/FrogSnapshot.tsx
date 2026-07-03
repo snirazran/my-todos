@@ -39,11 +39,12 @@ export function FrogSnapshot({
     // the actual on-screen box (flex can shrink the wrapper below its inline
     // width), otherwise the stamped bitmap gets stretched by CSS.
     const applySize = () => {
-      const rect = canvas.getBoundingClientRect();
-      if (rect.width === 0 || rect.height === 0) return;
+      const boxWidth = canvas.offsetWidth;
+      const boxHeight = canvas.offsetHeight;
+      if (boxWidth === 0 || boxHeight === 0) return;
       const dpr = riveDevicePixelRatio();
-      const w = Math.max(1, Math.round(rect.width * dpr));
-      const h = Math.max(1, Math.round(rect.height * dpr));
+      const w = Math.max(1, Math.round(boxWidth * dpr));
+      const h = Math.max(1, Math.round(boxHeight * dpr));
       if (canvas.width === w && canvas.height === h && cancelStamp) return;
       canvas.width = w;
       canvas.height = h;

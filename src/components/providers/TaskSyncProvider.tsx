@@ -12,7 +12,10 @@ import {
   type TaskSyncEventKind,
 } from '@/lib/taskSyncClient';
 import { mutateBackgrounds } from '@/hooks/useBackgrounds';
-import { mutateInventoryCaches } from '@/hooks/useInventory';
+import {
+  mutateInventoryCaches,
+  shouldSuppressEquipEcho,
+} from '@/hooks/useInventory';
 import { mutateFriendsCaches } from '@/hooks/useFriendsSync';
 
 const NATIVE_SYNC_INTERVAL_MS = 10_000;
@@ -100,11 +103,13 @@ function applySyncSideEffects(detail: TaskSyncDetail) {
     return;
   }
   if (detail.eventKind === 'background-equipped') {
+    if (shouldSuppressEquipEcho()) return;
     mutateBackgrounds();
     mutateInventoryCaches();
     return;
   }
   if (detail.eventKind === 'wardrobe-equipped') {
+    if (shouldSuppressEquipEcho()) return;
     mutateInventoryCaches();
   }
 }

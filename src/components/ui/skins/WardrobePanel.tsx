@@ -1,4 +1,10 @@
-import { mutateInventoryCaches, useInventory } from '@/hooks/useInventory';
+import {
+  beginEquipMutation,
+  endEquipMutation,
+  mutateInventoryCaches,
+  mutateInventorySummary,
+  useInventory,
+} from '@/hooks/useInventory';
 import { useMemo, useState, useEffect } from 'react';
 import React from 'react';
 import { useAuth } from '@/components/auth/AuthContext';
@@ -223,7 +229,6 @@ function WardrobeManagerContent({
   >(new Set<FilterCategory>(['all']));
   const [buyingId, setBuyingId] = useState<string | null>(null);
   const [purchaseCard, setPurchaseCard] = useState<WardrobeCard | null>(null);
-  const [equippingId, setEquippingId] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortOrder>('latest');
   const [notif, setNotif] = useState<{
     msg: string;
@@ -276,6 +281,13 @@ function WardrobeManagerContent({
     return () => setWardrobeStuck(false);
   }, [embedded, isStuck, setWardrobeStuck]);
 
+  const setWardrobeTab = useUIStore((s) => s.setWardrobeTab);
+  React.useEffect(() => {
+    if (!embedded) return;
+    setWardrobeTab(activeTab);
+    return () => setWardrobeTab('inventory');
+  }, [embedded, activeTab, setWardrobeTab]);
+
   const tabTriggerClass = cn(
     'flex-1 h-full rounded-2xl relative flex items-center justify-center gap-2',
     'text-xs md:text-sm font-bold tracking-wide uppercase transition-colors',
@@ -322,23 +334,29 @@ function WardrobeManagerContent({
     // Refund for this batch
     const totalRefund = refund * qty;
 
-    const newBalance = (data.wardrobe.flies ?? 0) + totalRefund;
-
     if (currentCount < qty) return;
 
     // Optimistic
-    const newData: ApiData = {
-      ...data,
-      wardrobe: {
-        ...data.wardrobe,
-        flies: newBalance,
-        inventory: {
-          ...data.wardrobe.inventory,
-          [item.id]: Math.max(0, currentCount - qty),
-        },
-      },
-    };
-    mutate(newData, false);
+    mutate(
+      (curr) =>
+        curr?.wardrobe
+          ? {
+              ...curr,
+              wardrobe: {
+                ...curr.wardrobe,
+                flies: (curr.wardrobe.flies ?? 0) + totalRefund,
+                inventory: {
+                  ...curr.wardrobe.inventory,
+                  [item.id]: Math.max(
+                    0,
+                    (curr.wardrobe.inventory[item.id] ?? 0) - qty,
+                  ),
+                },
+              },
+            }
+          : curr,
+      { revalidate: false },
+    );
 
     // setActionId(item.id); // Removed
     try {
@@ -493,30 +511,68 @@ function WardrobeManagerContent({
     });
   };
 
-  const toggleEquip = async (slot: WardrobeSlot, itemId: string) => {
+  const equipQueue = React.useRef<Promise<void>>(Promise.resolve());
+
+  const haptic = (ms: number) => {
+    try {
+      navigator.vibrate?.(ms);
+    } catch {}
+  };
+
+  const sendEquip = (slot: WardrobeSlot, itemId: string | null) => {
+    beginEquipMutation();
+    equipQueue.current = equipQueue.current
+      .then(() =>
+        fetch('/api/skins/inventory', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ slot, itemId }),
+        }).then((res) => {
+          if (!res.ok) throw new Error('Failed');
+        }),
+      )
+      .then(
+        () => {
+          if (endEquipMutation() === 0) mutateInventorySummary();
+        },
+        () => {
+          endEquipMutation();
+          setNotif({ msg: 'Could not update outfit.', type: 'error' });
+          refreshInventory();
+        },
+      );
+  };
+
+  const applyEquip = (slot: WardrobeSlot, itemId: string | null) => {
+    if (!data?.wardrobe) return;
+    mutate(
+      (curr) =>
+        curr?.wardrobe
+          ? {
+              ...curr,
+              wardrobe: {
+                ...curr.wardrobe,
+                equipped: { ...curr.wardrobe.equipped, [slot]: itemId },
+              },
+            }
+          : curr,
+      { revalidate: false },
+    );
+    sendEquip(slot, itemId);
+  };
+
+  const toggleEquip = (slot: WardrobeSlot, itemId: string) => {
     if (!data?.wardrobe?.equipped) return;
     const isEquipped = data.wardrobe.equipped[slot] === itemId;
-    setEquippingId(itemId);
-    await fetch('/api/skins/inventory', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slot, itemId: isEquipped ? null : itemId }),
-    });
-    setEquippingId(null);
-    refreshInventory();
+    haptic(isEquipped ? 8 : 14);
+    applyEquip(slot, isEquipped ? null : itemId);
   };
 
   const equipItemDirect = async (item: ItemDef) => {
     if (!data?.wardrobe?.equipped) return;
     if (data.wardrobe.equipped[item.slot] === item.id) return;
-    setEquippingId(item.id);
-    await fetch('/api/skins/inventory', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slot: item.slot, itemId: item.id }),
-    });
-    setEquippingId(null);
-    refreshInventory();
+    haptic(14);
+    applyEquip(item.slot, item.id);
   };
 
   const equippedIndices = useMemo(() => {
@@ -567,19 +623,23 @@ function WardrobeManagerContent({
 
     setBuyingId(item.id);
     try {
-      const currentCount = data.wardrobe.inventory[item.id] ?? 0;
-      const newData: ApiData = {
-        ...data,
-        wardrobe: {
-          ...data.wardrobe,
-          flies: balance - price,
-          inventory: {
-            ...data.wardrobe.inventory,
-            [item.id]: currentCount + 1,
-          },
-        },
-      };
-      mutate(newData, false);
+      mutate(
+        (curr) =>
+          curr?.wardrobe
+            ? {
+                ...curr,
+                wardrobe: {
+                  ...curr.wardrobe,
+                  flies: (curr.wardrobe.flies ?? 0) - price,
+                  inventory: {
+                    ...curr.wardrobe.inventory,
+                    [item.id]: (curr.wardrobe.inventory[item.id] ?? 0) + 1,
+                  },
+                },
+              }
+            : curr,
+        { revalidate: false },
+      );
 
       const res = await fetch('/api/skins/shop', {
         method: 'POST',
@@ -680,6 +740,21 @@ function WardrobeManagerContent({
   const balance = data?.wardrobe?.flies ?? 0;
   const isGuest = !user;
   const canRenderItems = !!data;
+
+  const pinSnapshotRef = React.useRef<{
+    key: string;
+    equipped: Partial<Record<WardrobeSlot, string | null>> | undefined;
+    bgEquipped: string | null;
+  } | null>(null);
+  const pinKey = `${activeTab}|${activeFilter}|${sortBy}|${canRenderItems}|${bg.isLoading}`;
+  if (pinSnapshotRef.current?.key !== pinKey) {
+    pinSnapshotRef.current = {
+      key: pinKey,
+      equipped: data?.wardrobe?.equipped,
+      bgEquipped: bg.equipped,
+    };
+  }
+  const pinSnapshot = pinSnapshotRef.current;
 
   const purchaseItem = purchaseCard?.kind === 'item' ? purchaseCard.item : null;
   const purchaseBg = purchaseCard?.kind === 'bg' ? purchaseCard.bg : null;
@@ -1044,8 +1119,8 @@ function WardrobeManagerContent({
                         inventoryBackgrounds,
                         sortBy,
                       ),
-                      data?.wardrobe?.equipped,
-                      bg.equipped,
+                      pinSnapshot.equipped,
+                      pinSnapshot.bgEquipped,
                     ).map((card, index) =>
                       card.kind === 'item' ? (
                         <ItemCard
@@ -1060,7 +1135,7 @@ function WardrobeManagerContent({
                             card.item.id
                           }
                           canAfford={true}
-                          actionLoading={equippingId === card.item.id}
+                          actionLoading={false}
                           onAction={() => handleItemAction(card.item)}
                           onSell={() => {
                             setItemToSell(card.item);
