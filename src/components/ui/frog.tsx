@@ -280,9 +280,11 @@ const Frog = memo(
         const raf = requestAnimationFrame(() => {
           raf2 = requestAnimationFrame(markDressed);
         });
+        const timer = setTimeout(markDressed, 150);
         return () => {
           cancelAnimationFrame(raf);
           cancelAnimationFrame(raf2);
+          clearTimeout(timer);
         };
       }
       const timer = setTimeout(markDressed, 500);
