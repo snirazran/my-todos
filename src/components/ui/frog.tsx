@@ -109,6 +109,13 @@ const Frog = memo(
     const wrapperRef = useRef<HTMLDivElement | null>(null);
     const moodReactionCleanupRef = useRef<(() => void) | null>(null);
     const riveUrl = useRiveAsset('/frog_idle.riv');
+    const [dressed, setDressed] = React.useState(false);
+    const dressedRef = useRef(false);
+    const markDressed = React.useCallback(() => {
+      if (dressedRef.current) return;
+      dressedRef.current = true;
+      setDressed(true);
+    }, []);
 
     const { RiveComponent, rive } = useRive({
       src: riveUrl || undefined,
@@ -236,6 +243,20 @@ const Frog = memo(
       ],
     );
 
+    const slotReady: Record<WardrobeSlot, boolean> = {
+      skin: skinBinding.value !== null || !!skinInput,
+      mood: moodBinding.value !== null || !!moodInput,
+      hat: hatBinding.value !== null || !!hatInput,
+      body: bodyBinding.value !== null || !!bodyInput,
+      hand_item: handItemBinding.value !== null || !!handItemInput,
+    };
+    const providedSlots = (
+      Object.keys(INPUTS) as WardrobeSlot[]
+    ).filter((slot) => typeof indices?.[slot] === 'number');
+    const allProvidedReady =
+      providedSlots.length > 0 &&
+      providedSlots.every((slot) => slotReady[slot]);
+
     /* ---- controlled per-slot indices -> data bindings + legacy inputs ---- */
     useEffect(() => {
       if (!indices) return;
@@ -250,6 +271,23 @@ const Frog = memo(
       if (typeof indices.hand_item === 'number')
         setBoundSlotIndex('hand_item', indices.hand_item);
     }, [indices, setBoundSlotIndex]);
+
+    /* ---- keep the canvas hidden until the wardrobe indices are applied ---- */
+    useEffect(() => {
+      if (!rive || dressedRef.current) return;
+      if (providedSlots.length === 0 || allProvidedReady) {
+        let raf2 = 0;
+        const raf = requestAnimationFrame(() => {
+          raf2 = requestAnimationFrame(markDressed);
+        });
+        return () => {
+          cancelAnimationFrame(raf);
+          cancelAnimationFrame(raf2);
+        };
+      }
+      const timer = setTimeout(markDressed, 500);
+      return () => clearTimeout(timer);
+    }, [rive, providedSlots.length, allProvidedReady, markDressed]);
 
     /* ---- pause: play one RAF tick so the state machine applies indices, then freeze ---- */
     useEffect(() => {
@@ -352,6 +390,8 @@ const Frog = memo(
               height: '100%',
               display: 'block',
               transform: `translateY(${resolvedVisualOffsetY}px)`,
+              opacity: dressed ? 1 : 0,
+              transition: 'opacity 150ms ease-out',
             }}
           />
         )}
