@@ -116,7 +116,7 @@ function WardrobePageInner() {
                 .getElementById('main-scroll')
                 ?.scrollTo({ top: 0, behavior: 'smooth' })
             }
-            className="fixed right-4 bottom-[calc(env(safe-area-inset-bottom)+76px+0.75rem)] md:bottom-6 z-[70] h-[72px] w-[72px] overflow-hidden rounded-full border-[3px] border-primary/40 bg-card shadow-xl"
+            className="fixed right-4 md:right-[max(1rem,calc((100vw-48rem)/2-72px-0.75rem))] bottom-[calc(env(safe-area-inset-bottom)+76px+0.75rem)] md:bottom-6 z-[70] h-[72px] w-[72px] overflow-hidden rounded-full border-[3px] border-primary/40 bg-card shadow-xl"
           >
             {equippedBgImage && (
               // eslint-disable-next-line @next/next/no-img-element
