@@ -1,4 +1,5 @@
 import useSWR from 'swr';
+import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
 
 export type BuddyTaskState = {
   bondId: string;
@@ -9,7 +10,7 @@ export type BuddyTaskState = {
   pendingRepeatChange: { requestedByMe: boolean } | null;
 };
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json());
+const fetcher = bootstrapFetcher;
 
 export function useBuddyState(active = true) {
   const { data } = useSWR<{ byTaskId: Record<string, BuddyTaskState> }>(

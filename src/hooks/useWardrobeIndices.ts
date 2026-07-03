@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import useSWR from 'swr';
 import { byId as staticById } from '@/lib/skins/catalog';
 import type { ItemDef } from '@/lib/skins/catalog';
+import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
 
 const CACHE_KEY = 'frog-wardrobe-indices';
 
@@ -23,9 +24,12 @@ function getCachedIndices(): Indices | null {
 }
 
 export function useWardrobeIndices(enabled: boolean) {
-  const { data } = useSWR(
+  const { data } = useSWR<{
+    wardrobe?: { equipped?: Partial<Record<keyof Indices, string | null>> };
+    catalog?: ItemDef[];
+  }>(
     enabled ? '/api/skins/inventory?view=summary' : null,
-    (u) => fetch(u!).then((r) => r.json()),
+    bootstrapFetcher,
     { revalidateOnFocus: false }
   );
 

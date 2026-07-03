@@ -1,4 +1,5 @@
 import useSWR, { mutate as mutateGlobal } from 'swr';
+import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
 
 export type BackgroundRarity =
   | 'common'
@@ -45,7 +46,7 @@ export type CachedBackground = {
   images: BackgroundImages;
 };
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json());
+const fetcher = bootstrapFetcher;
 
 export function mutateBackgrounds(data?: BackgroundsApiData) {
   if (data) {

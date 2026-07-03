@@ -6,6 +6,7 @@ import { Icon } from '@/components/ui/Icon';
 import { useAuth } from '@/components/auth/AuthContext';
 import { useInventory } from '@/hooks/useInventory';
 import useSWR from 'swr';
+import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -27,7 +28,7 @@ export default function MobileNav() {
     activeCount?: number;
   }>(
     user ? `/api/quests?view=home&timezone=${encodeURIComponent(timezone)}` : null,
-    (url: string) => fetch(url).then((res) => res.json()),
+    bootstrapFetcher,
     { revalidateOnFocus: false },
   );
   const questClaimableCount = questsData?.claimableCount ?? 0;
@@ -35,12 +36,12 @@ export default function MobileNav() {
 
   const { data: friendRequestsData } = useSWR<{ incoming?: { id: string }[] }>(
     user ? '/api/friends/request' : null,
-    (url: string) => fetch(url).then((res) => res.json()),
+    bootstrapFetcher,
     { revalidateOnFocus: false },
   );
   const { data: buddyInvitesData } = useSWR<{ incoming?: unknown[] }>(
     user ? '/api/buddy/invite' : null,
-    (url: string) => fetch(url).then((res) => res.json()),
+    bootstrapFetcher,
     { revalidateOnFocus: false },
   );
   const friendRequestCount =
@@ -49,7 +50,7 @@ export default function MobileNav() {
 
   const { data: friendsData } = useSWR<{ claimable?: number }>(
     user ? `/api/friends?tz=${encodeURIComponent(timezone)}` : null,
-    (url: string) => fetch(url).then((res) => res.json()),
+    bootstrapFetcher,
     { revalidateOnFocus: false },
   );
   const friendClaimable = friendsData?.claimable ?? 0;

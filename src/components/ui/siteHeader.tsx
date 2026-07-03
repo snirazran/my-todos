@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/SkinRotation';
 import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
 import useSWR from 'swr';
+import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronRight } from 'lucide-react';
 import Fly from '@/components/ui/fly';
@@ -83,25 +84,25 @@ export default function SiteHeader() {
     activeCount?: number;
   }>(
     user ? `/api/quests?view=home&timezone=${encodeURIComponent(timezone)}` : null,
-    (url: string) => fetch(url).then((res) => res.json()),
+    bootstrapFetcher,
     { revalidateOnFocus: false },
   );
   const questClaimableCount = questsData?.claimableCount ?? 0;
 
   const { data: friendsData } = useSWR<{ claimable?: number }>(
     user ? `/api/friends?tz=${encodeURIComponent(timezone)}` : null,
-    (url: string) => fetch(url).then((res) => res.json()),
+    bootstrapFetcher,
     { revalidateOnFocus: false },
   );
   const friendClaimable = friendsData?.claimable ?? 0;
   const { data: buddyInvitesData } = useSWR<{ incoming?: unknown[] }>(
     user ? '/api/buddy/invite' : null,
-    (url: string) => fetch(url).then((res) => res.json()),
+    bootstrapFetcher,
     { revalidateOnFocus: false },
   );
   const { data: friendRequestsData } = useSWR<{ incoming?: unknown[] }>(
     user ? '/api/friends/request' : null,
-    (url: string) => fetch(url).then((res) => res.json()),
+    bootstrapFetcher,
     { revalidateOnFocus: false },
   );
   const friendAlerts =
@@ -610,7 +611,7 @@ type UserInfo = {
   premiumUntil?: string | null;
 };
 
-const userInfoFetcher = (url: string) => fetch(url).then((r) => r.json());
+const userInfoFetcher = bootstrapFetcher;
 
 function MobileSheet({
   isOpen,

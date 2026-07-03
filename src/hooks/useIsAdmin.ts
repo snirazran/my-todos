@@ -1,7 +1,6 @@
 import useSWR from 'swr';
 import { useAuth } from '@/components/auth/AuthContext';
-
-const fetcher = (url: string) => fetch(url).then((r) => r.json());
+import { bootstrapFetcher as fetcher } from '@/lib/bootstrapFetcher';
 
 export function useIsAdmin() {
   const { user, loading } = useAuth();

@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import useSWR, { mutate as mutateGlobal } from 'swr';
 import type { ItemDef, WardrobeSlot } from '@/lib/skins/catalog';
+import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
 
 export const INVENTORY_KEY = '/api/skins/inventory';
 export const INVENTORY_SUMMARY_KEY = '/api/skins/inventory?view=summary';
@@ -33,7 +34,7 @@ type ApiData = {
   unseenContainerCount?: number;
 };
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json());
+const fetcher = bootstrapFetcher;
 
 export function useInventory(active: boolean = true, summary: boolean = false) {
   const { data, mutate, error, isLoading } = useSWR<ApiData>(
