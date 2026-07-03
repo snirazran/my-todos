@@ -457,6 +457,25 @@ function WardrobeManagerContent({
     return counts;
   }, [data, unseenItems, unseenContainers, visitedCategories]);
 
+  const canRenderItems = !!data;
+
+  const pinSnapshotRef = React.useRef<{
+    key: string;
+    equipped: Partial<Record<WardrobeSlot, string | null>> | undefined;
+    bgEquipped: string | null;
+    unseenItems: string[];
+  } | null>(null);
+  const pinKey = `${activeTab}|${activeFilter}|${sortBy}|${canRenderItems}|${bg.isLoading}`;
+  if (pinSnapshotRef.current?.key !== pinKey) {
+    pinSnapshotRef.current = {
+      key: pinKey,
+      equipped: data?.wardrobe?.equipped,
+      bgEquipped: bg.equipped,
+      unseenItems: data?.wardrobe?.unseenItems ?? [],
+    };
+  }
+  const pinSnapshot = pinSnapshotRef.current;
+
   // --- Logic ---
   const getFilteredItems = (items: ItemDef[]) => {
     let result = items;
@@ -471,7 +490,7 @@ function WardrobeManagerContent({
     }
     if (sortBy === 'latest') {
       const history = data?.wardrobe?.inventoryHistory ?? {};
-      const unseenList = data?.wardrobe?.unseenItems ?? [];
+      const unseenList = pinSnapshot.unseenItems;
       const unseenOrder = new Map<string, number>();
       unseenList.forEach((id, idx) => unseenOrder.set(id, idx));
       const getTs = (id: string) => {
@@ -739,22 +758,6 @@ function WardrobeManagerContent({
 
   const balance = data?.wardrobe?.flies ?? 0;
   const isGuest = !user;
-  const canRenderItems = !!data;
-
-  const pinSnapshotRef = React.useRef<{
-    key: string;
-    equipped: Partial<Record<WardrobeSlot, string | null>> | undefined;
-    bgEquipped: string | null;
-  } | null>(null);
-  const pinKey = `${activeTab}|${activeFilter}|${sortBy}|${canRenderItems}|${bg.isLoading}`;
-  if (pinSnapshotRef.current?.key !== pinKey) {
-    pinSnapshotRef.current = {
-      key: pinKey,
-      equipped: data?.wardrobe?.equipped,
-      bgEquipped: bg.equipped,
-    };
-  }
-  const pinSnapshot = pinSnapshotRef.current;
 
   const purchaseItem = purchaseCard?.kind === 'item' ? purchaseCard.item : null;
   const purchaseBg = purchaseCard?.kind === 'bg' ? purchaseCard.bg : null;
@@ -1051,6 +1054,9 @@ function WardrobeManagerContent({
               embedded
                 ? 'relative flex-1 -mx-4 px-4 md:-mx-6 md:px-6 bg-background pt-5 pb-2 rounded-t-[24px] md:pt-3 md:rounded-t-none'
                 : 'relative mt-4 flex-1 overflow-hidden rounded-t-[24px] border-t border-border/40',
+              embedded &&
+                activeTab === 'trade' &&
+                'lg:mx-[calc(50%-50vw)] lg:px-[calc((100vw-min(1100px,100vw-3rem))/2)]',
               embedded
                 ? ''
                 : isDesktop

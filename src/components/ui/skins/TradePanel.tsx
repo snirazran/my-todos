@@ -3,12 +3,18 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, AlertCircle, Plus, ArrowUp, ChevronDown } from 'lucide-react';
+import { Sparkles, AlertCircle, ArrowRight, ArrowUp, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { ItemDef, Rarity, rarityRank } from '@/lib/skins/catalog';
+import {
+  ItemDef,
+  Rarity,
+  rarityRank,
+  RARITY_ORDER,
+  TRADE_ITEM_COUNT,
+} from '@/lib/skins/catalog';
 import { Button } from '@/components/ui/button';
 import confetti from 'canvas-confetti';
-import Frog from '@/components/ui/frog';
+import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
 import { ItemCard } from './ItemCard';
 
 // Import from gift-box for the reward UI
@@ -92,7 +98,6 @@ import { BackgroundCard } from './BackgroundCard';
 import { backgroundPreview } from '@/hooks/useBackgroundActions';
 import type { BackgroundItem } from '@/hooks/useBackgrounds';
 
-const TRADE_ITEM_COUNT = 5;
 
 type TradeEntry = {
   uid: string;
@@ -144,9 +149,6 @@ export function TradePanel({
   // Mobile-only collapse for the contract slot grid. Auto-expands when items are added,
   // auto-collapses when cleared. Desktop (lg+) ignores this and always shows the grid.
   const [isContractExpanded, setIsContractExpanded] = useState(false);
-  // On web (lg+) the contract renders outside the wardrobe card via a portal,
-  // docked to the right of the viewport. On mobile/tablet it stays inline.
-  const [isDesktop, setIsDesktop] = useState(false);
   const prevSelectedCountRef = useRef(0);
 
   useEffect(() => {
@@ -210,14 +212,6 @@ export function TradePanel({
     return () => query.removeEventListener('change', update);
   }, []);
 
-  useEffect(() => {
-    const query = window.matchMedia('(min-width: 1024px)');
-    const update = () => setIsDesktop(query.matches);
-    update();
-    query.addEventListener('change', update);
-    return () => query.removeEventListener('change', update);
-  }, []);
-
   const availableItems = useMemo(() => {
     const matchesFilter = (entry: TradeEntry) => {
       if (activeFilter === 'all') return true;
@@ -234,10 +228,9 @@ export function TradePanel({
         ? entry.item?.priceFlies ?? 0
         : entry.bg?.priceFlies ?? 0;
 
-    const result = Array.from(entryMap.values()).filter((entry) => {
-      if (targetRarity && entry.rarity !== targetRarity) return false;
-      return matchesFilter(entry);
-    });
+    const result = Array.from(entryMap.values()).filter((entry) =>
+      matchesFilter(entry),
+    );
 
     return result.sort((a, b) => {
       switch (sortBy) {
@@ -258,7 +251,7 @@ export function TradePanel({
   const availableGrid = useInfiniteScroll(availableItems, {
     initial: availableItems.length,
     batch: availableItems.length || 1,
-    resetKey: `${activeFilter}|${sortBy}|${targetRarity ?? ''}|${availableItems.length}`,
+    resetKey: `${activeFilter}|${sortBy}|${availableItems.length}`,
     rootRef: inventoryScrollRef,
     enabled: false,
   });
@@ -309,15 +302,24 @@ export function TradePanel({
   }, [selectedIds]);
 
   // --- Actions ---
+  const haptic = (pattern: number | number[]) => {
+    try {
+      navigator.vibrate?.(pattern);
+    } catch {}
+  };
+
   const handleSelect = (entry: TradeEntry) => {
     if (selectedIds.length >= TRADE_ITEM_COUNT) return;
+    if (targetRarity && entry.rarity !== targetRarity) return;
     const currentlySelected = selectedCounts[entry.uid] || 0;
     if (currentlySelected < entry.owned) {
+      haptic(selectedIds.length + 1 === TRADE_ITEM_COUNT ? [10, 30, 16] : 8);
       setSelectedIds((prev) => [...prev, entry.uid]);
     }
   };
 
   const handleRemove = (index: number) => {
+    haptic(6);
     setSelectedIds((prev) => prev.filter((_, i) => i !== index));
   };
 
@@ -345,6 +347,7 @@ export function TradePanel({
 
       setTradeResult(data.reward);
       setSelectedIds([]);
+      haptic([12, 40, 20]);
       if (onTradeSuccess) onTradeSuccess();
 
       confetti({
@@ -362,6 +365,221 @@ export function TradePanel({
 
   const handleClaimReward = () => {
     setTradeResult(null);
+  };
+
+
+  const isReady = selectedIds.length === TRADE_ITEM_COUNT;
+  const nextRarity: Rarity | null =
+    targetRarity && targetRarity !== 'legendary'
+      ? (RARITY_ORDER[rarityRank[targetRarity] + 1] as Rarity)
+      : null;
+
+  let contractHint = `Combine ${TRADE_ITEM_COUNT} same-rarity items to upgrade.`;
+  if (isReady && nextRarity) {
+    contractHint = `Ready! Combine into 1 ${nextRarity} reward.`;
+  } else if (targetRarity) {
+    contractHint = `Add ${TRADE_ITEM_COUNT - selectedIds.length} more ${targetRarity} items.`;
+  }
+
+  const renderContract = (desktopMode: boolean) => {
+    const expanded = desktopMode || isContractExpanded;
+
+    const headerInfo = (
+      <div className="flex items-center gap-2 min-w-0">
+        {!desktopMode && (
+          <ChevronDown
+            size={16}
+            className={cn(
+              'transition-transform duration-200 text-muted-foreground shrink-0',
+              expanded ? '' : '-rotate-180',
+            )}
+          />
+        )}
+        <h3 className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-black uppercase text-foreground min-w-0">
+          Contract
+          {targetRarity && nextRarity && (
+            <span className="flex items-center gap-1 min-w-0">
+              <span
+                className={`text-[10px] px-2 py-0.5 rounded uppercase font-bold ${getRarityBg(targetRarity)}`}
+              >
+                {targetRarity}
+              </span>
+              <ArrowRight size={12} className="shrink-0 text-muted-foreground/60" />
+              <span
+                className={`text-[10px] px-2 py-0.5 rounded uppercase font-bold ${getRarityBg(nextRarity)}`}
+              >
+                {nextRarity}
+              </span>
+            </span>
+          )}
+        </h3>
+      </div>
+    );
+
+    const headerCount = (
+      <motion.div
+        key={selectedIds.length}
+        initial={{ scale: 1.35 }}
+        animate={{ scale: 1 }}
+        transition={{ type: 'spring', stiffness: 500, damping: 22 }}
+        className={cn(
+          'text-base font-black',
+          isReady ? 'text-green-500' : 'text-primary',
+        )}
+      >
+        {selectedIds.length}
+        <span className="text-muted-foreground/40">/{TRADE_ITEM_COUNT}</span>
+      </motion.div>
+    );
+
+    return (
+      <>
+        {desktopMode ? (
+          <div className="flex items-center justify-between w-full gap-3 px-4 py-3 border-b border-border bg-muted/30 shrink-0">
+            {headerInfo}
+            <div className="text-right shrink-0">{headerCount}</div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setIsContractExpanded((v) => !v)}
+            aria-expanded={isContractExpanded}
+            className="flex items-center justify-between w-full gap-3 px-4 py-2.5 text-left border-b border-border bg-muted/30 shrink-0"
+          >
+            {headerInfo}
+            <div className="text-right shrink-0">{headerCount}</div>
+          </button>
+        )}
+
+        <div className="w-full h-1 overflow-hidden bg-muted shrink-0">
+          <motion.div
+            initial={false}
+            animate={{ scaleX: selectedIds.length / TRADE_ITEM_COUNT }}
+            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            className={cn(
+              'h-full w-full origin-left',
+              isReady ? 'bg-green-500' : 'bg-primary',
+            )}
+          />
+        </div>
+
+        <motion.div
+          initial={false}
+          animate={{ height: expanded ? 'auto' : 0, opacity: expanded ? 1 : 0 }}
+          transition={{ type: 'spring', stiffness: 340, damping: 34 }}
+          className="w-full overflow-hidden"
+        >
+          <div className="w-full max-w-md mx-auto p-2.5 lg:p-4">
+            <div className="grid grid-cols-5 gap-1.5 lg:gap-2 mb-2 lg:mb-4">
+              {Array.from({ length: TRADE_ITEM_COUNT }).map((_, i) => {
+                const uid = selectedIds[i];
+                const entry = uid ? entryMap.get(uid) : null;
+                const config = entry ? RARITY_CONFIG[entry.rarity] : null;
+
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => entry && handleRemove(i)}
+                    className={cn(
+                      'h-12 lg:h-auto lg:aspect-square rounded-lg border-2 flex items-center justify-center relative overflow-hidden transition-colors duration-200',
+                      !entry && 'border-dashed border-border bg-muted/50',
+                      entry && config && cn(config.border, config.bg, 'shadow-sm'),
+                    )}
+                  >
+                    <AnimatePresence>
+                      {entry && (
+                        <motion.div
+                          key={`${uid}-${i}`}
+                          initial={{ scale: 0.4, opacity: 0 }}
+                          animate={{ scale: 1, opacity: 1 }}
+                          exit={{ scale: 0.4, opacity: 0 }}
+                          transition={{ type: 'spring', stiffness: 480, damping: 26 }}
+                          className="absolute inset-0 flex items-center justify-center"
+                        >
+                          {entry.kind === 'background' && entry.bg ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={backgroundPreview(entry.bg)}
+                              alt={entry.bg.name}
+                              className="absolute inset-0 object-cover w-full h-full"
+                            />
+                          ) : entry.item ? (
+                            <FrogSnapshot
+                              indices={{
+                                skin: 0,
+                                hat: 0,
+                                body: 0,
+                                hand_item: 0,
+                                [entry.item.slot]: entry.item.riveIndex,
+                              }}
+                              width={44}
+                              height={44}
+                              visualOffsetY={3}
+                              className="pointer-events-none"
+                            />
+                          ) : null}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                    {!entry && (
+                      <span className="text-[10px] font-bold text-muted-foreground/40">
+                        {i + 1}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {error && (
+              <div className="flex items-center justify-center gap-2 mb-2 text-xs font-bold text-destructive">
+                <AlertCircle size={14} /> {error}
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              {selectedIds.length > 0 && (
+                <Button
+                  variant="outline"
+                  onClick={handleClear}
+                  className="h-10 px-3 lg:h-12 shrink-0 border-destructive/20 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                >
+                  Clear
+                </Button>
+              )}
+              <Button
+                disabled={!isReady || isTrading}
+                onClick={handleConfirmTrade}
+                className={cn(
+                  'group relative flex-1 h-10 lg:h-14 font-black uppercase tracking-wider transition-all overflow-hidden text-sm',
+                  isReady
+                    ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/40'
+                    : 'bg-muted text-muted-foreground',
+                )}
+              >
+                {isReady && !isTrading && (
+                  <>
+                    <span className="absolute inset-0 pointer-events-none animate-pulse bg-primary-foreground/10" />
+                    <span className="absolute top-0 left-0 z-10 block w-1/2 h-full pointer-events-none bg-gradient-to-r from-transparent via-white to-transparent opacity-25 animate-shine" />
+                  </>
+                )}
+                {isTrading ? (
+                  <Sparkles className="w-5 h-5 mr-2 animate-spin" />
+                ) : (
+                  <>
+                    Trade Up <ArrowUp size={18} className="ml-2" />
+                  </>
+                )}
+              </Button>
+            </div>
+            <p className="text-[10px] text-center text-muted-foreground mt-1.5">
+              {contractHint}
+            </p>
+          </div>
+        </motion.div>
+      </>
+    );
   };
 
   // --- Render ---
@@ -414,7 +632,8 @@ export function TradePanel({
         )
       }
 
-      {/* --- INVENTORY (Main View) --- */}
+      {/* --- INVENTORY + CONTRACT SIDEBAR (lg+) --- */}
+      <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-4 lg:items-start">
       <div
         ref={inventoryScrollRef}
         onScroll={(event) => {
@@ -436,7 +655,7 @@ export function TradePanel({
           }
         }}
         className={cn(
-          'flex-1 flex flex-col order-2 bg-background lg:bg-muted/40 lg:rounded-[20px] lg:border lg:border-border/40',
+          'flex-1 flex flex-col bg-background lg:bg-muted/40 lg:rounded-[20px] lg:border lg:border-border/40',
           pageScroll
             ? 'pb-[150px] lg:pb-4'
             : 'lg:min-h-0 lg:overflow-y-auto lg:overscroll-none',
@@ -450,7 +669,7 @@ export function TradePanel({
           </div>
         )}
 
-        <div className="px-4 pb-52 lg:p-4 lg:pb-56">
+        <div className="px-4 pb-52 lg:p-4">
           {availableItems.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-40 md:h-64 text-sm border-2 border-dashed text-muted-foreground border-border rounded-xl bg-muted/30">
               <p>Your wardrobe is empty (or filtered out).</p>
@@ -461,10 +680,18 @@ export function TradePanel({
                 {availableGrid.visibleItems.map((entry, index) => {
                   const selected = selectedCounts[entry.uid] || 0;
                   const remaining = entry.owned - selected;
-                  const isDimmed = remaining === 0;
+                  const isWrongRarity =
+                    !!targetRarity && entry.rarity !== targetRarity;
+                  const isDimmed = remaining === 0 || isWrongRarity;
 
                   return (
-                    <div key={entry.uid} className={isDimmed ? 'opacity-50 grayscale pointer-events-none' : ''}>
+                    <div
+                      key={entry.uid}
+                      className={cn(
+                        'transition-[opacity,filter] duration-300',
+                        isDimmed && 'opacity-40 grayscale pointer-events-none',
+                      )}
+                    >
                       {entry.kind === 'item' && entry.item ? (
                         <ItemCard
                           item={entry.item}
@@ -511,174 +738,15 @@ export function TradePanel({
         </div>
       </div>
 
-      {/* --- CONTRACT (Mobile/tablet: inline fixed bottom dock. Web: portaled outside the card, docked to the right.) --- */}
-      {(() => {
-        const inner = (
-          <>
-        {/* Header (tap to expand/collapse) */}
-        <button
-          type="button"
-          onClick={() => setIsContractExpanded((v) => !v)}
-          aria-expanded={isContractExpanded}
-          className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-muted/30 shrink-0 w-full text-left"
-        >
-            <div className="flex items-center gap-2">
-              <ChevronDown
-                size={16}
-                className={cn(
-                  'transition-transform duration-200 text-muted-foreground',
-                  isContractExpanded ? '' : '-rotate-180',
-                )}
-              />
-              <h3 className="flex items-center gap-2 text-sm font-black uppercase text-foreground">
-                Contract
-                {targetRarity && (
-                  <span
-                    className={`text-[10px] px-2 py-0.5 rounded uppercase font-bold ${getRarityBg(
-                      targetRarity
-                    )}`}
-                  >
-                    {targetRarity} Only
-                  </span>
-                )}
-              </h3>
-            </div>
-            <div className="text-right">
-              <div className="text-base font-black text-primary">
-                {selectedIds.length}
-                <span className="text-muted-foreground/40">/{TRADE_ITEM_COUNT}</span>
-              </div>
-            </div>
-        </button>
+        <aside className="hidden lg:flex lg:flex-col lg:sticky lg:top-36 overflow-hidden rounded-2xl border border-border/60 bg-card shadow-lg">
+          {renderContract(true)}
+        </aside>
+      </div>
 
-        {/* Scrollable Content (Sidebar) or Fixed (Bottom Bar) */}
-        <div className="flex flex-col pointer-events-auto w-full max-w-md mx-auto">
-           {/* Slot grid + Trade Up controls (collapsible on mobile) */}
-           <div
-             className={cn(
-               'overflow-hidden transition-[max-height,opacity,padding] duration-300 ease-out',
-               isContractExpanded
-                 ? 'max-h-[700px] opacity-100 p-2 lg:p-4'
-                 : 'max-h-0 opacity-0 p-0',
-             )}
-           >
-           <div className="grid grid-cols-5 gap-1.5 lg:gap-3 mb-2 lg:mb-4">
-                {Array.from({ length: TRADE_ITEM_COUNT }).map((_, i) => {
-                  const uid = selectedIds[i];
-                  const entry = uid ? entryMap.get(uid) : null;
-                  const config = entry ? RARITY_CONFIG[entry.rarity] : null;
-
-                  return (
-                    <motion.button
-                      key={i}
-                      layout
-                      onClick={() => entry && handleRemove(i)}
-                      className={cn(
-                        'h-10 lg:h-auto lg:aspect-square rounded-lg border-2 flex items-center justify-center relative overflow-hidden transition-all duration-200',
-                        !entry &&
-                          'border-dashed border-border bg-muted/50',
-                        entry &&
-                          config &&
-                          cn(config.border, config.bg, 'shadow-sm')
-                      )}
-                    >
-                      {entry ? (
-                        entry.kind === 'background' && entry.bg ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={backgroundPreview(entry.bg)}
-                            alt={entry.bg.name}
-                            className="absolute inset-0 w-full h-full object-cover"
-                          />
-                        ) : entry.item ? (
-                          <div className="relative flex items-center justify-center w-full h-full">
-                            <Frog
-                              className="object-contain w-full h-full"
-                              indices={{
-                                skin: 0,
-                                hat: 0,
-                                body: 0,
-                                hand_item: 0,
-                                [entry.item.slot]: entry.item.riveIndex,
-                              }}
-                              width={60}
-                              height={60}
-                              paused={false}
-                            />
-                          </div>
-                        ) : null
-                      ) : (
-                        <span className="text-[10px] font-bold text-muted-foreground/40">
-                          {i + 1}
-                        </span>
-                      )}
-                    </motion.button>
-                  );
-                })}
-           </div>
-
-           <div className="mt-auto">
-             {error && (
-                <div className="flex items-center gap-2 mb-2 text-xs font-bold text-destructive justify-center">
-                  <AlertCircle size={14} /> {error}
-                </div>
-              )}
-
-             <div className="flex gap-2">
-                {selectedIds.length > 0 && (
-                  <Button
-                    variant="outline"
-                    onClick={handleClear}
-                    className="h-9 lg:h-12 shrink-0 border-destructive/20 text-destructive hover:bg-destructive/10 hover:text-destructive px-3"
-                  >
-                    Clear
-                  </Button>
-                )}
-                <Button
-                  disabled={selectedIds.length !== TRADE_ITEM_COUNT || isTrading}
-                  onClick={handleConfirmTrade}
-                  className={cn(
-                    'group relative flex-1 h-9 lg:h-14 font-black uppercase tracking-wider transition-all overflow-hidden text-sm',
-                    selectedIds.length === TRADE_ITEM_COUNT
-                      ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/30'
-                      : 'bg-muted text-muted-foreground'
-                  )}
-                >
-                  {selectedIds.length === TRADE_ITEM_COUNT && (
-                    <span className="absolute top-0 z-10 block w-1/2 h-full -skew-x-12 pointer-events-none -inset-full bg-gradient-to-r from-transparent to-white opacity-20 group-hover:animate-shine" />
-                  )}
-
-                  {isTrading ? (
-                    <Sparkles className="w-5 h-5 mr-2 animate-spin" />
-                  ) : (
-                    <>
-                      Trade Up <ArrowUp size={18} className="ml-2" />
-                    </>
-                  )}
-                </Button>
-             </div>
-             <p className="text-[10px] text-center text-muted-foreground mt-1">
-                Combine {TRADE_ITEM_COUNT} items to upgrade rarity.
-              </p>
-           </div>
-           </div>
-        </div>
-          </>
-        );
-
-        return mounted && isDesktop
-          ? createPortal(
-              <div className="fixed z-[60] right-6 bottom-6 w-[340px] max-w-[calc(100vw-3rem)] bg-card border border-border/60 rounded-2xl shadow-2xl overflow-hidden flex flex-col pointer-events-auto">
-                {inner}
-              </div>,
-              document.body,
-            )
-          : (
-              <div className="fixed bottom-[calc(76px+env(safe-area-inset-bottom))] md:bottom-0 left-0 w-full pointer-events-none shrink-0 z-[60] bg-card border-t border-border shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.1)] flex flex-col">
-                {inner}
-              </div>
-            );
-      })()}
+      {/* --- CONTRACT DOCK (mobile/tablet) --- */}
+      <div className="lg:hidden fixed bottom-[calc(76px+env(safe-area-inset-bottom))] md:bottom-0 left-0 w-full z-[60] bg-card border-t border-border shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.1)] flex flex-col">
+        {renderContract(false)}
+      </div>
     </div>
   );
 }

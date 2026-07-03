@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireUserId } from '@/lib/auth';
 import dbConnect from '@/lib/mongoose';
 import User from '@/lib/models/User';
-import { RARITY_ORDER } from '@/lib/skins/catalog';
+import { RARITY_ORDER, TRADE_ITEM_COUNT } from '@/lib/skins/catalog';
 import { getPrizePool, type GiftPrize } from '@/lib/skins/gifts';
 
 type Pick = { id: string; kind: 'item' | 'background' };
@@ -22,9 +22,9 @@ export async function POST(req: NextRequest) {
         ? body.itemIds.map((id: any) => ({ id: String(id), kind: 'item' as const }))
         : [];
 
-    if (picks.length !== 5 || picks.some((p) => !p.id)) {
+    if (picks.length !== TRADE_ITEM_COUNT || picks.some((p) => !p.id)) {
       return NextResponse.json(
-        { error: 'Must provide exactly 5 items to trade.' },
+        { error: `Must provide exactly ${TRADE_ITEM_COUNT} items to trade.` },
         { status: 400 },
       );
     }

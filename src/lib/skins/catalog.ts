@@ -19,6 +19,8 @@ export const RARITY_ORDER = [
   'legendary',
 ] as const;
 
+export const TRADE_ITEM_COUNT = 10;
+
 export const rarityRank: Record<Rarity, number> = {
   common: 0,
   uncommon: 1,
