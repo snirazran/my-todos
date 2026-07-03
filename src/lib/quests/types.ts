@@ -18,7 +18,7 @@ export type QuestPlacement = 'daily' | 'category';
 export type QuestSubject = 'task' | 'any';
 export type QuestCountAction = 'complete' | 'add';
 export type QuestAmountMode = 'fixed' | 'random';
-export type QuestLogicType = 'count' | 'focus_minutes';
+export type QuestLogicType = 'count' | 'focus_minutes' | 'metric_count';
 export type QuestVisibilityMetric =
   | 'daily_tasks_count'
   | 'tags_count';
@@ -34,6 +34,8 @@ export type QuestLogicBlock = {
   maxAmount?: number;
   action?: QuestCountAction;
   tagMode?: 'ignore' | 'random_user_tag' | 'focus_category_tags';
+  // For type 'metric_count': which QuestCounter metric this block tracks.
+  metricKey?: string;
   rewards?: QuestRewards;
 };
 

@@ -14,6 +14,7 @@ import { createTasksForUser } from '@/app/api/tasks/route';
 import { buildAcceptBody, repeatLabelFor } from '@/lib/buddy/bond';
 import { getZonedToday } from '@/lib/utils';
 import { sendBuddyPush, buddyDisplayName } from '@/lib/buddy/push';
+import { bumpQuestMetric } from '@/lib/quests/metrics';
 
 export async function POST(req: NextRequest) {
   try {
@@ -134,6 +135,12 @@ export async function POST(req: NextRequest) {
         await UserModel.updateOne({ _id: referral.inviterId }, update);
       }
     }
+
+    await bumpQuestMetric({
+      userId: referral.inviterId,
+      metric: 'friend_invited',
+      timezone: tz,
+    });
 
     void notifyFriendsChanged(userId);
 

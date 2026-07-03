@@ -4,6 +4,7 @@ import dbConnect from '@/lib/mongoose';
 import User from '@/lib/models/User';
 import { RARITY_ORDER, TRADE_ITEM_COUNT } from '@/lib/skins/catalog';
 import { getPrizePool, type GiftPrize } from '@/lib/skins/gifts';
+import { bumpQuestMetric } from '@/lib/quests/metrics';
 
 type Pick = { id: string; kind: 'item' | 'background' };
 
@@ -140,6 +141,10 @@ export async function POST(req: NextRequest) {
 
     user.markModified('wardrobe.inventory');
     await user.save();
+
+    const timezone = typeof body?.timezone === 'string' ? body.timezone : undefined;
+    await bumpQuestMetric({ userId, metric: 'trade_completed', timezone });
+    await bumpQuestMetric({ userId, metric: 'skin_acquired', timezone });
 
     return NextResponse.json({ success: true, reward });
   } catch (error) {

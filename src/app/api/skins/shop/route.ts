@@ -4,6 +4,7 @@ import connectMongo from '@/lib/mongoose';
 import UserModel, { type UserDoc } from '@/lib/models/User';
 import type { UserWardrobe } from '@/lib/types/UserDoc';
 import { getFullCatalog, buildById } from '@/lib/skins/getCatalog';
+import { bumpQuestMetric } from '@/lib/quests/metrics';
 
 const json = (body: unknown, init = 200) =>
   NextResponse.json(body, { status: init });
@@ -42,6 +43,7 @@ export async function POST(req: NextRequest) {
         { _id: user._id },
         { $set: { wardrobe: init } },
       );
+      await bumpQuestMetric({ userId, metric: 'skin_acquired' });
       return json({ ok: true });
     }
 
@@ -76,6 +78,8 @@ export async function POST(req: NextRequest) {
       // Either user not found (unlikely) or not enough flies
       return json({ error: 'Not enough flies' }, 400);
     }
+
+    await bumpQuestMetric({ userId, metric: 'skin_acquired' });
 
     return json({ ok: true });
   } catch {

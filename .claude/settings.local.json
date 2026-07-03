@@ -194,7 +194,9 @@
       "Bash(git -C /Users/snirazran/Fullstack/my-todos status --short)",
       "WebFetch(domain:trophy.so)",
       "WebFetch(domain:blog.duolingo.com)",
-      "Bash(awk '/export async function syncQuestState/,/^}/' /Users/snirazran/Fullstack/my-todos/src/lib/quests/engine.ts)"
+      "Bash(awk '/export async function syncQuestState/,/^}/' /Users/snirazran/Fullstack/my-todos/src/lib/quests/engine.ts)",
+      "Bash(awk -F: '$1 > 1100 && $1 < 1400')",
+      "Bash(awk 'NR>1590 && NR<1800 && \\(/completed/ || /handleBuddyCompletion|syncGamification|toggle/\\)' /Users/snirazran/Fullstack/my-todos/src/app/api/tasks/route.ts)"
     ]
   }
 }

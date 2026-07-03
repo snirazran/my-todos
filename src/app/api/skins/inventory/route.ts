@@ -5,6 +5,7 @@ import UserModel, { type UserDoc } from '@/lib/models/User';
 import { CATALOG, type WardrobeSlot } from '@/lib/skins/catalog';
 import { getFullCatalog, buildById } from '@/lib/skins/getCatalog';
 import { notifyUserChanged } from '@/lib/taskSync';
+import { bumpQuestMetric } from '@/lib/quests/metrics';
 import type { UserWardrobe } from '@/lib/types/UserDoc';
 
 const json = (body: unknown, init = 200) =>
@@ -192,6 +193,7 @@ export async function PUT(req: NextRequest) {
       slot,
       itemId,
     });
+    await bumpQuestMetric({ userId, metric: 'skin_equipped' });
     return json({ ok: true });
   } catch {
     return json({ error: 'Unauthorized' }, 401);

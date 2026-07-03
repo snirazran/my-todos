@@ -20,6 +20,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/utils';
+import { metricObjectiveLabel } from '@/lib/quests/metricLabels';
 import type { ItemDef } from '@/lib/skins/catalog';
 import type {
   MacroCategoryDefinition,
@@ -56,6 +57,7 @@ export type QuestCardLogicBlock = Pick<
   | 'target'
   | 'progress'
   | 'tagMode'
+  | 'metricKey'
   | 'resolvedTagName'
   | 'resolvedTagNames'
   | 'rewards'
@@ -141,6 +143,10 @@ export function formatQuestObjective(block: QuestCardLogicBlock) {
   const targetLabel =
     block.targetLabel ?? String(Math.max(0, block.target ?? 0));
 
+  if (block.type === 'metric_count') {
+    return metricObjectiveLabel(block.metricKey, Math.max(1, block.target ?? 1));
+  }
+
   if (block.type === 'focus_minutes') {
     return block.tagMode === 'focus_category_tags'
       ? `Focus for ${targetLabel} minutes on tagged tasks`
@@ -172,7 +178,7 @@ function renderObjectiveLabel(
     onPickTags?: () => void;
   },
 ) {
-  if (block.tagMode !== 'focus_category_tags') {
+  if (block.type === 'metric_count' || block.tagMode !== 'focus_category_tags') {
     return formatQuestObjective(block);
   }
 

@@ -3,6 +3,7 @@ import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import UserModel, { type UserDoc } from '@/lib/models/User';
 import { getFullCatalog, buildById } from '@/lib/skins/getCatalog';
+import { bumpQuestMetric } from '@/lib/quests/metrics';
 
 const json = (body: unknown, init = 200) =>
   NextResponse.json(body, { status: init });
@@ -63,6 +64,8 @@ export async function POST(req: NextRequest) {
     if (result.modifiedCount === 0) {
       return json({ error: 'Failed to sell items (race condition?)' }, 400);
     }
+
+    await bumpQuestMetric({ userId, metric: 'skin_sold', amount });
 
     return json({ ok: true, refund: totalRefund, soldAmount: amount });
   } catch {

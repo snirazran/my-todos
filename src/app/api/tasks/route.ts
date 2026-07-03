@@ -22,6 +22,7 @@ import { syncQuestState, isPremiumUser } from '@/lib/quests/engine';
 import { getZonedToday, getZonedYMD } from '@/lib/utils';
 import { notifyTaskChanged } from '@/lib/taskSync';
 import { severBond, handleBuddyCompletion } from '@/lib/buddy/server';
+import { bumpQuestMetric } from '@/lib/quests/metrics';
 
 type Origin = 'weekly' | 'regular';
 type BoardItem = { id: string; text: string; order: number; type: TaskType };
@@ -591,6 +592,12 @@ async function awardFlyForTask(
     Math.max(0, currentHungerState.hunger) + TASK_HUNGER_REWARD_MS,
   );
   const finalHungerStatus = { ...currentHungerState, hunger: newHunger };
+  if (
+    newHunger >= MAX_HUNGER_MS &&
+    Math.max(0, currentHungerState.hunger) < MAX_HUNGER_MS
+  ) {
+    await bumpQuestMetric({ userId, metric: 'frog_fed_full', timezone: tz });
+  }
 
   const setFields: Record<string, any> = {
     ...hungerUpdates,
@@ -1525,6 +1532,7 @@ export async function PUT(req: NextRequest) {
       );
       await syncGamification(uid, tz);
       await notifyTaskChanged(uid);
+      await bumpQuestMetric({ userId: uid, metric: 'task_saved_later', timezone: tz });
       return NextResponse.json({ ok: true });
     }
 
@@ -1767,6 +1775,26 @@ export async function PUT(req: NextRequest) {
       ownFlyValue: taskFlyValue(doc),
       tz,
     });
+  }
+  if (doc.type === 'weekly' && isTodayCompletion) {
+    const fresh = await TaskModel.findOne({
+      userId: uid,
+      id: taskId,
+    }).lean<TaskDoc>();
+    if (fresh) {
+      const streakMap = await streakMapForWeeklyDocs(uid, [fresh], date, tz);
+      const streakNow = streakMap.get(fresh.id) ?? 0;
+      if (completed && !alreadyCompletedForDate && streakNow === 3) {
+        await bumpQuestMetric({ userId: uid, metric: 'task_streak_3', timezone: tz });
+      } else if (!completed && streakNow === 2) {
+        await bumpQuestMetric({
+          userId: uid,
+          metric: 'task_streak_3',
+          amount: -1,
+          timezone: tz,
+        });
+      }
+    }
   }
   void syncGamification(uid, tz);
   await notifyTaskChanged(uid, {

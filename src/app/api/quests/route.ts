@@ -4,6 +4,10 @@ import connectMongo from '@/lib/mongoose';
 import { buildRewardCatalog, syncQuestState } from '@/lib/quests/engine';
 import { getActiveQuestSeasonView } from '@/lib/quests/seasons';
 import { getCachedCatalog } from '@/lib/skins/getCatalog';
+import {
+  metricObjectiveLabel,
+  metricRemainingLabel,
+} from '@/lib/quests/metricLabels';
 
 const isDataUrl = (value: unknown): value is string =>
   typeof value === 'string' && value.startsWith('data:');
@@ -37,11 +41,15 @@ function objectiveSummaryLabel(
     subject?: string;
     action?: string;
     tagMode?: string;
+    metricKey?: string;
     target?: number;
   },
   tagsResolved = false,
 ): string {
   const target = Math.max(0, block.target ?? 0);
+  if (block.type === 'metric_count') {
+    return metricObjectiveLabel(block.metricKey, target);
+  }
   const usesFocusTags = block.tagMode === 'focus_category_tags';
   if (block.type === 'focus_minutes') {
     return usesFocusTags && !tagsResolved
@@ -94,6 +102,7 @@ function objectiveRemainingLabel(
     subject?: string;
     action?: string;
     tagMode?: string;
+    metricKey?: string;
     target?: number;
     progress?: number;
   },
@@ -101,6 +110,9 @@ function objectiveRemainingLabel(
 ): string {
   const target = Math.max(1, block.target ?? 1);
   const remaining = Math.max(1, target - Math.max(0, block.progress ?? 0));
+  if (block.type === 'metric_count') {
+    return metricRemainingLabel(block.metricKey, remaining);
+  }
   const usesFocusTags = block.tagMode === 'focus_category_tags';
   if (block.type === 'focus_minutes') {
     if (!usesFocusTags) return `Focus ${remaining} more min`;

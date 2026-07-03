@@ -11,6 +11,7 @@ import type { ItemDef } from '@/lib/skins/catalog';
 import { getFullCatalog } from '@/lib/skins/getCatalog';
 import { loadBackgroundPrizes } from '@/lib/skins/gifts';
 import { getZonedToday, getZonedYMD } from '@/lib/utils';
+import { loadQuestCounters, sumCounters } from './metrics';
 import type {
   CategoryQuestProgressView,
   DailyQuestProgressView,
@@ -253,8 +254,14 @@ function progressForLogicBlock(args: {
   timezone: string;
   startDate: string;
   endDate: string;
+  counters?: { metric: string; dateKey: string; count: number }[];
 }) {
-  const { block, tasks, timezone, startDate, endDate } = args;
+  const { block, tasks, timezone, startDate, endDate, counters } = args;
+
+  if (block.type === 'metric_count') {
+    if (!block.metricKey) return 0;
+    return sumCounters(counters ?? [], block.metricKey, startDate, endDate);
+  }
 
   if (block.type === 'focus_minutes') {
     return Math.floor(
@@ -497,9 +504,10 @@ async function syncQuestForTemplate(args: {
   user: UserDoc;
   tasks: TaskDoc[];
   timezone: string;
+  counters?: { metric: string; dateKey: string; count: number }[];
   existingDoc?: InstanceType<typeof QuestModel> | null;
 }) {
-  const { template, userId, user, tasks, timezone } = args;
+  const { template, userId, user, tasks, timezone, counters } = args;
   const windowKey = placementWindowKey(template.placement, template.templateId, timezone);
   const questId =
     template.placement === 'daily'
@@ -626,6 +634,7 @@ async function syncQuestForTemplate(args: {
       timezone,
       startDate,
       endDate,
+      counters,
     });
     const prevBlock = prevBlocksById.get(block.id);
     const prevOffset = Math.max(0, prevBlock?.progressOffset ?? 0);
@@ -885,12 +894,26 @@ export async function syncQuestState(args: {
       .map((doc) => [`${doc.templateId}:${doc.windowKey}`, doc]),
   );
 
+  const needsCounters = eligibleTemplates.some((template) =>
+    (template.logic ?? []).some((block) => block.type === 'metric_count'),
+  );
+  let counters: { metric: string; dateKey: string; count: number }[] = [];
+  if (needsCounters) {
+    let sinceDateKey = todayKey;
+    for (const doc of allExistingDocs) {
+      if (deleteIdSet.has(doc._id.toString())) continue;
+      const created = getZonedYMD(doc.createdAt ?? new Date(), timezone);
+      if (created < sinceDateKey) sinceDateKey = created;
+    }
+    counters = await loadQuestCounters({ userId, sinceDateKey });
+  }
+
   const [docs] = await Promise.all([
     Promise.all(
       eligibleTemplates.map((template) => {
         const windowKey = placementWindowKey(template.placement, template.templateId, timezone);
         const existingDoc = existingDocMap.get(`${template.templateId}:${windowKey}`) ?? null;
-        return syncQuestForTemplate({ template, userId, user, tasks, timezone, existingDoc });
+        return syncQuestForTemplate({ template, userId, user, tasks, timezone, counters, existingDoc });
       }),
     ),
     deletePromise,

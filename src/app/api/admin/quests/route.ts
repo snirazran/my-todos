@@ -5,6 +5,7 @@ import connectMongo from '@/lib/mongoose';
 import QuestTemplateModel from '@/lib/models/QuestTemplate';
 import QuestCategoryModel from '@/lib/models/QuestCategory';
 import { templateToView } from '@/lib/quests/engine';
+import { QUEST_METRIC_KEYS } from '@/lib/quests/metrics';
 import {
   isCoverDataUrl,
   isCoverProxyUrl,
@@ -29,7 +30,11 @@ const json = (body: unknown, status = 200) =>
   NextResponse.json(body, { status });
 
 const VALID_PLACEMENTS = new Set<QuestPlacement>(['daily', 'category']);
-const VALID_LOGIC_TYPES = new Set<QuestLogicType>(['count', 'focus_minutes']);
+const VALID_LOGIC_TYPES = new Set<QuestLogicType>([
+  'count',
+  'focus_minutes',
+  'metric_count',
+]);
 const VALID_SUBJECTS = new Set<QuestSubject>(['task', 'any']);
 const VALID_ACTIONS = new Set<QuestCountAction>(['complete', 'add']);
 const VALID_AMOUNT_MODES = new Set<QuestAmountMode>(['fixed', 'random']);
@@ -130,6 +135,12 @@ function sanitizeLogicBlock(input: any): QuestLogicBlock | null {
     block.action = input.action;
   } else {
     block.subject = 'task';
+  }
+
+  if (block.type === 'metric_count') {
+    if (!QUEST_METRIC_KEYS.includes(input.metricKey)) return null;
+    block.metricKey = input.metricKey;
+    block.tagMode = 'ignore';
   }
 
   if (block.amountMode === 'fixed') {

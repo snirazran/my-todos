@@ -31,6 +31,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
+import { QUEST_METRIC_COPY } from '@/lib/quests/metricLabels';
 import type {
   QuestLogicBlock,
   QuestPlacement,
@@ -357,6 +358,7 @@ function buildPreviewLogicBlock(block: QuestLogicBlock): QuestCardLogicBlock {
     target,
     progress: 0,
     tagMode: block.tagMode,
+    metricKey: block.metricKey,
     targetLabel: isRandom
       ? amountRangeLabel(block.minAmount, block.maxAmount)
       : String(target),
@@ -2038,6 +2040,29 @@ function ObjectivesEditorDialog({
                     </span>
                   )}
                 </div>
+              ) : block.type === 'metric_count' ? (
+                <div className="flex flex-wrap items-center gap-x-1.5 gap-y-2 leading-[30px]">
+                  <InlinePillSelect
+                    value={block.metricKey ?? 'trade_completed'}
+                    onChange={(v) => onUpdate(block.id, { metricKey: v })}
+                  >
+                    {Object.entries(QUEST_METRIC_COPY).map(([key, copy]) => (
+                      <option key={key} value={key}>
+                        {copy.adminLabel}
+                      </option>
+                    ))}
+                  </InlinePillSelect>
+                  <span className={word}>×</span>
+                  {block.amountMode === 'fixed' ? (
+                    <InlinePillNumber value={block.amount ?? 1} onChange={(v) => onUpdate(block.id, { amount: v })} />
+                  ) : (
+                    <>
+                      <InlinePillNumber value={block.minAmount ?? 1} onChange={(v) => onUpdate(block.id, { minAmount: v })} />
+                      <span className={word}>to</span>
+                      <InlinePillNumber value={block.maxAmount ?? 3} onChange={(v) => onUpdate(block.id, { maxAmount: v })} />
+                    </>
+                  )}
+                </div>
               ) : (
                 <div className="flex flex-wrap items-center gap-x-1.5 gap-y-2 leading-[30px]">
                   <span className={word}>Focus on tasks for</span>
@@ -2080,10 +2105,23 @@ function ObjectivesEditorDialog({
               <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-border/30 pt-2.5">
                 <button
                   type="button"
-                  onClick={() => onUpdate(block.id, block.type === 'count' ? { type: 'focus_minutes', subject: 'task', action: undefined } : { type: 'count', subject: 'task', action: 'complete' })}
+                  onClick={() =>
+                    onUpdate(
+                      block.id,
+                      block.type === 'count'
+                        ? { type: 'focus_minutes', subject: 'task', action: undefined, metricKey: undefined }
+                        : block.type === 'focus_minutes'
+                          ? { type: 'metric_count', subject: 'task', action: undefined, metricKey: 'trade_completed', tagMode: 'ignore' }
+                          : { type: 'count', subject: 'task', action: 'complete', metricKey: undefined, tagMode: placement === 'category' ? 'focus_category_tags' : 'ignore' },
+                    )
+                  }
                   className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-background px-2.5 py-1 text-[11px] font-bold text-muted-foreground transition hover:border-primary/30 hover:text-foreground"
                 >
-                  {block.type === 'count' ? 'Switch to focus time' : 'Switch to count'}
+                  {block.type === 'count'
+                    ? 'Switch to focus time'
+                    : block.type === 'focus_minutes'
+                      ? 'Switch to app action'
+                      : 'Switch to count'}
                 </button>
                 <button
                   type="button"

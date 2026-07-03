@@ -4,6 +4,7 @@ import UserModel from '@/lib/models/User';
 import { getZonedToday } from '@/lib/utils';
 import { notifyFriendUpdate } from '@/lib/taskSync';
 import { sendBuddyPush, buddyDisplayName } from '@/lib/buddy/push';
+import { bumpQuestMetric } from '@/lib/quests/metrics';
 
 function dowYMD(ymd: string): number {
   const [y, m, d] = ymd.split('-').map(Number);
@@ -114,6 +115,8 @@ export async function handleBuddyCompletion(opts: {
     await Promise.all([
       UserModel.updateOne({ _id: userId }, { $inc: { 'wardrobe.flies': ownFlyValue } }),
       UserModel.updateOne({ _id: partnerId }, { $inc: { 'wardrobe.flies': partnerValue } }),
+      bumpQuestMetric({ userId, metric: 'buddy_task_completed', timezone: tz }),
+      bumpQuestMetric({ userId: partnerId, metric: 'buddy_task_completed', timezone: tz }),
     ]);
     bond.bonusAwardedDates = [...bond.bonusAwardedDates, date];
   } else if (!bothNow && alreadyBonused) {
@@ -121,6 +124,8 @@ export async function handleBuddyCompletion(opts: {
     await Promise.all([
       UserModel.updateOne({ _id: userId }, { $inc: { 'wardrobe.flies': -ownFlyValue } }),
       UserModel.updateOne({ _id: partnerId }, { $inc: { 'wardrobe.flies': -partnerValue } }),
+      bumpQuestMetric({ userId, metric: 'buddy_task_completed', amount: -1, timezone: tz }),
+      bumpQuestMetric({ userId: partnerId, metric: 'buddy_task_completed', amount: -1, timezone: tz }),
     ]);
     bond.bonusAwardedDates = bond.bonusAwardedDates.filter((d) => d !== date);
   }
