@@ -110,22 +110,38 @@ export async function handleBuddyCompletion(opts: {
   const bothNow = fromSet.has(date) && toSet.has(date);
   const alreadyBonused = bond.bonusAwardedDates.includes(date);
 
+  const loadBondTaskTags = () =>
+    Promise.all([
+      TaskModel.findOne({ userId, bondId })
+        .select('tags')
+        .lean<{ tags?: string[] } | null>(),
+      TaskModel.findOne({ userId: partnerId, bondId })
+        .select('tags')
+        .lean<{ tags?: string[] } | null>(),
+    ]);
+
   if (completed && bothNow && !alreadyBonused) {
-    const partnerValue = await partnerTaskFlyValue(bondId, partnerId);
+    const [partnerValue, [myTask, partnerTask]] = await Promise.all([
+      partnerTaskFlyValue(bondId, partnerId),
+      loadBondTaskTags(),
+    ]);
     await Promise.all([
       UserModel.updateOne({ _id: userId }, { $inc: { 'wardrobe.flies': ownFlyValue } }),
       UserModel.updateOne({ _id: partnerId }, { $inc: { 'wardrobe.flies': partnerValue } }),
-      bumpQuestMetric({ userId, metric: 'buddy_task_completed', timezone: tz }),
-      bumpQuestMetric({ userId: partnerId, metric: 'buddy_task_completed', timezone: tz }),
+      bumpQuestMetric({ userId, metric: 'buddy_task_completed', timezone: tz, tagIds: myTask?.tags ?? [] }),
+      bumpQuestMetric({ userId: partnerId, metric: 'buddy_task_completed', timezone: tz, tagIds: partnerTask?.tags ?? [] }),
     ]);
     bond.bonusAwardedDates = [...bond.bonusAwardedDates, date];
   } else if (!bothNow && alreadyBonused) {
-    const partnerValue = await partnerTaskFlyValue(bondId, partnerId);
+    const [partnerValue, [myTask, partnerTask]] = await Promise.all([
+      partnerTaskFlyValue(bondId, partnerId),
+      loadBondTaskTags(),
+    ]);
     await Promise.all([
       UserModel.updateOne({ _id: userId }, { $inc: { 'wardrobe.flies': -ownFlyValue } }),
       UserModel.updateOne({ _id: partnerId }, { $inc: { 'wardrobe.flies': -partnerValue } }),
-      bumpQuestMetric({ userId, metric: 'buddy_task_completed', amount: -1, timezone: tz }),
-      bumpQuestMetric({ userId: partnerId, metric: 'buddy_task_completed', amount: -1, timezone: tz }),
+      bumpQuestMetric({ userId, metric: 'buddy_task_completed', amount: -1, timezone: tz, tagIds: myTask?.tags ?? [] }),
+      bumpQuestMetric({ userId: partnerId, metric: 'buddy_task_completed', amount: -1, timezone: tz, tagIds: partnerTask?.tags ?? [] }),
     ]);
     bond.bonusAwardedDates = bond.bonusAwardedDates.filter((d) => d !== date);
   }

@@ -130,7 +130,12 @@ type CategoryFormState = {
   quickAddSuggestions: QuickAddSuggestionDraft[];
 };
 
-type AdminRecipePoolEntry = {
+type AdminRecipePoolEntryStreak = {
+  streakDaysMin?: number;
+  streakDaysMax?: number;
+};
+
+type AdminRecipePoolEntry = AdminRecipePoolEntryStreak & {
   id: string;
   type: 'count' | 'focus_minutes' | 'metric_count';
   action?: 'complete' | 'add';
@@ -493,6 +498,16 @@ export function AdminQuestManagerPage() {
     quickAddSuggestions: [],
   });
 
+  // Daily streak bonus config
+  const [streakConfig, setStreakConfig] = useState<{
+    isActive: boolean;
+    streakLength: number;
+    rewards: QuestReward[];
+    limits: { min: number; max: number };
+  } | null>(null);
+  const [savingStreak, setSavingStreak] = useState(false);
+  const [streakRewardPickerOpen, setStreakRewardPickerOpen] = useState(false);
+
   // Generated-mode recipe editors (focus ladder + daily roll)
   const [adminRecipes, setAdminRecipes] = useState<AdminRecipe[]>([]);
   const [openRecipeId, setOpenRecipeId] = useState<string | null>(null);
@@ -513,13 +528,14 @@ export function AdminQuestManagerPage() {
     setLoading(true);
     setResult(null);
     try {
-      const [templatesRes, metaRes, categoriesRes, seasonsRes, recipesRes, coversRes] = await Promise.all([
+      const [templatesRes, metaRes, categoriesRes, seasonsRes, recipesRes, coversRes, streakRes] = await Promise.all([
         fetch('/api/admin/quests', { credentials: 'include' }),
         fetch('/api/admin/quests/meta', { credentials: 'include' }),
         fetch('/api/admin/quests/categories', { credentials: 'include' }),
         fetch('/api/admin/quests/seasons', { credentials: 'include' }),
         fetch('/api/admin/quest-recipes', { credentials: 'include' }),
         fetch('/api/admin/quest-covers', { credentials: 'include' }),
+        fetch('/api/admin/quests/streak', { credentials: 'include' }),
       ]);
       const templatesData = await templatesRes.json();
       const metaData = await metaRes.json();
@@ -527,6 +543,7 @@ export function AdminQuestManagerPage() {
       const seasonsData = await seasonsRes.json();
       const recipesData = await recipesRes.json();
       const coversData = await coversRes.json();
+      const streakData = await streakRes.json();
       if (!templatesRes.ok || !metaRes.ok || !seasonsRes.ok) {
         throw new Error(
           templatesData.error ||
@@ -540,6 +557,7 @@ export function AdminQuestManagerPage() {
       setRewardItems(metaData.rewardsCatalog ?? []);
       setAdminCategories(categoriesData.categories ?? []);
       setAdminRecipes((recipesData.recipes ?? []) as AdminRecipe[]);
+      if (streakRes.ok && streakData.streak) setStreakConfig(streakData.streak);
       setOnboardCovers(
         Object.fromEntries(
           ((coversData.covers ?? []) as { key: string; coverImageUrl?: string }[])
@@ -1127,6 +1145,7 @@ export function AdminQuestManagerPage() {
       </div>
       {adminRecipes.filter((r) => r.placement === 'daily').map(renderRecipeCard)}
       {recipeRewardDialog}
+      {renderStreakCard()}
       {renderOnboardingCoversCard()}
       {renderQuestList(dailyTemplates, 'daily')}
     </div>
@@ -1452,11 +1471,33 @@ export function AdminQuestManagerPage() {
                         </InlinePillSelect>
                       )}
                       {entry.type === 'metric_count' && (
-                        <InlinePillSelect value={entry.metricKey ?? 'trade_completed'} onChange={(v) => updateRecipePoolEntry(r.recipeId, slot.id, entry.id, { metricKey: v })}>
+                        <InlinePillSelect
+                          value={entry.metricKey?.startsWith('task_streak') ? 'task_streak_3' : entry.metricKey ?? 'trade_completed'}
+                          onChange={(v) =>
+                            updateRecipePoolEntry(r.recipeId, slot.id, entry.id, {
+                              metricKey: v,
+                              ...(v === 'task_streak_3'
+                                ? {
+                                    streakDaysMin: entry.streakDaysMin ?? 3,
+                                    streakDaysMax: entry.streakDaysMax ?? entry.streakDaysMin ?? 3,
+                                  }
+                                : { streakDaysMin: undefined, streakDaysMax: undefined }),
+                            })
+                          }
+                        >
                           {Object.entries(QUEST_METRIC_COPY).map(([key, copy]) => (
                             <option key={key} value={key}>{copy.adminLabel}</option>
                           ))}
                         </InlinePillSelect>
+                      )}
+                      {entry.type === 'metric_count' && entry.metricKey?.startsWith('task_streak') && (
+                        <>
+                          <span className="text-sm font-medium text-muted-foreground">of</span>
+                          <InlinePillNumber value={entry.streakDaysMin ?? 3} onChange={(v) => updateRecipePoolEntry(r.recipeId, slot.id, entry.id, { streakDaysMin: v })} />
+                          <span className="text-sm font-medium text-muted-foreground">to</span>
+                          <InlinePillNumber value={entry.streakDaysMax ?? entry.streakDaysMin ?? 3} onChange={(v) => updateRecipePoolEntry(r.recipeId, slot.id, entry.id, { streakDaysMax: v })} />
+                          <span className="text-sm font-medium text-muted-foreground">days ·</span>
+                        </>
                       )}
                       <InlinePillNumber value={entry.minTarget} onChange={(v) => updateRecipePoolEntry(r.recipeId, slot.id, entry.id, { minTarget: v })} />
                       <span className="text-sm font-medium text-muted-foreground">to</span>
@@ -1549,6 +1590,159 @@ export function AdminQuestManagerPage() {
       }}
     />
   ) : null;
+
+  const saveStreakConfig = async () => {
+    if (!streakConfig) return;
+    setSavingStreak(true);
+    setResult(null);
+    try {
+      const res = await fetch('/api/admin/quests/streak', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          isActive: streakConfig.isActive,
+          streakLength: streakConfig.streakLength,
+          rewards: streakConfig.rewards,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not save streak config');
+      setStreakConfig(data.streak);
+      setResult({ type: 'success', message: 'Daily streak saved' });
+    } catch (error) {
+      setResult({
+        type: 'error',
+        message:
+          error instanceof Error ? error.message : 'Could not save streak config',
+      });
+    } finally {
+      setSavingStreak(false);
+    }
+  };
+
+  const renderStreakCard = () => {
+    if (!streakConfig) return null;
+    return (
+      <div className="rounded-2xl border border-border/40 bg-card/60 px-4 py-3.5">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-bold text-foreground">Daily streak bonus</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Finishing every daily quest for N days in a row grants one random
+              prize from the pool below.
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={streakConfig.isActive}
+            onClick={() =>
+              setStreakConfig((prev) =>
+                prev ? { ...prev, isActive: !prev.isActive } : prev,
+              )
+            }
+            className={cn(
+              'relative h-6 w-11 shrink-0 rounded-full transition-colors',
+              streakConfig.isActive ? 'bg-emerald-500' : 'bg-muted',
+            )}
+          >
+            <span
+              className={cn(
+                'absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform',
+                streakConfig.isActive ? 'translate-x-[22px]' : 'translate-x-0.5',
+              )}
+            />
+          </button>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-end gap-4">
+          <label className="block">
+            <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+              Streak length (days)
+            </span>
+            <input
+              type="number"
+              min={streakConfig.limits.min}
+              max={streakConfig.limits.max}
+              value={streakConfig.streakLength}
+              onChange={(e) =>
+                setStreakConfig((prev) =>
+                  prev
+                    ? {
+                        ...prev,
+                        streakLength: Math.min(
+                          prev.limits.max,
+                          Math.max(
+                            prev.limits.min,
+                            Math.floor(Number(e.target.value) || prev.limits.min),
+                          ),
+                        ),
+                      }
+                    : prev,
+                )
+              }
+              className="mt-1 block h-10 w-28 rounded-xl border border-border/50 bg-background px-3 text-sm font-bold text-foreground"
+            />
+            <span className="mt-1 block text-[10px] text-muted-foreground">
+              {streakConfig.limits.min}–{streakConfig.limits.max} days
+            </span>
+          </label>
+
+          <div className="min-w-0 flex-1">
+            <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+              Prize pool (one drawn at random)
+            </span>
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              {streakConfig.rewards.length === 0 ? (
+                <span className="text-xs text-muted-foreground">
+                  No prizes yet.
+                </span>
+              ) : (
+                streakConfig.rewards.map((reward, ri) => (
+                  <RewardTile
+                    key={`${reward.type}-${reward.itemId ?? reward.backgroundId ?? reward.amount ?? ri}`}
+                    reward={reward}
+                    rewardCatalog={rewardCatalog}
+                    isPremium={false}
+                  />
+                ))
+              )}
+              <button
+                type="button"
+                onClick={() => setStreakRewardPickerOpen(true)}
+                className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-background px-3 py-1.5 text-xs font-bold text-muted-foreground transition hover:border-primary/30 hover:text-foreground"
+              >
+                <Pencil className="h-3 w-3" />
+                Edit prizes
+              </button>
+            </div>
+          </div>
+
+          <Button
+            size="sm"
+            className="rounded-xl font-black"
+            onClick={() => void saveStreakConfig()}
+            disabled={savingStreak}
+          >
+            {savingStreak ? 'Saving…' : 'Save streak'}
+          </Button>
+        </div>
+
+        <RewardPickerDialog
+          open={streakRewardPickerOpen}
+          onOpenChange={setStreakRewardPickerOpen}
+          rewards={streakConfig.rewards}
+          rewardItems={rewardItems}
+          rewardCatalog={rewardCatalog}
+          onSave={(rewards) => {
+            setStreakConfig((prev) => (prev ? { ...prev, rewards } : prev));
+            setStreakRewardPickerOpen(false);
+          }}
+        />
+      </div>
+    );
+  };
 
   const renderOnboardingCoversCard = () => (
     <div className="rounded-2xl border border-border/40 bg-card/60 px-4 py-3.5">

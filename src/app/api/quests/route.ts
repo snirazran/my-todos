@@ -2,7 +2,9 @@ import { NextResponse } from 'next/server';
 import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import { buildRewardCatalog, syncQuestState } from '@/lib/quests/engine';
+import { loadStreakConfig, syncDailyStreak } from '@/lib/quests/streak';
 import { getActiveQuestSeasonView } from '@/lib/quests/seasons';
+import { getZonedToday } from '@/lib/utils';
 import { getCachedCatalog } from '@/lib/skins/getCatalog';
 import {
   metricObjectiveLabel,
@@ -196,7 +198,7 @@ export async function GET(req: Request) {
       view === 'home' ||
       searchParams.get('includeCategories') === '1';
 
-    const [dashboard, activeSeason] = await Promise.all([
+    const [dashboard, activeSeason, streakConfig] = await Promise.all([
       syncQuestState({
         userId,
         timezone,
@@ -204,7 +206,14 @@ export async function GET(req: Request) {
         includeCategories,
       }),
       getActiveQuestSeasonView({ userId, timezone }),
+      loadStreakConfig(),
     ]);
+    const dailyStreak = await syncDailyStreak({
+      user: dashboard.user,
+      config: streakConfig,
+      dailyQuests: dashboard.dailyQuests,
+      todayKey: getZonedToday(timezone),
+    });
     // Count prizes ready to collect. Quests no longer have an end-reward —
     // only per-objective rewards are claimable, so count one per completed
     // objective with unclaimed rewards.
@@ -227,7 +236,9 @@ export async function GET(req: Request) {
     );
     const seasonDailyClaimable =
       activeSeason && activeSeason.claimable && !activeSeason.claimedToday ? 1 : 0;
-    const claimableCount = questClaimable + seasonDailyClaimable;
+    const streakClaimable = dailyStreak?.claimable ? 1 : 0;
+    const claimableCount =
+      questClaimable + seasonDailyClaimable + streakClaimable;
 
     const categoryNameById = new Map<string, string>(
       (dashboard.macroCategories ?? []).map((c: any) => [c.id, c.name]),
@@ -378,6 +389,7 @@ export async function GET(req: Request) {
           claimablesRewardCatalog,
           activeCount,
           activeFocusCategoryId: dashboard.activeFocusCategoryId,
+          dailyStreak,
           onboarding: {
             complete: !!dashboard.focusProfile.completedAt,
             selectedCategoryIds: dashboard.focusProfile.selectedCategoryIds,
@@ -415,6 +427,7 @@ export async function GET(req: Request) {
         claimableCount,
         activeCount,
         activeFocusCategoryId: dashboard.activeFocusCategoryId,
+        dailyStreak,
         onboarding: {
           complete: !!dashboard.focusProfile.completedAt,
           selectedCategoryIds: dashboard.focusProfile.selectedCategoryIds,

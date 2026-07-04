@@ -22,7 +22,7 @@ import { syncQuestState, isPremiumUser } from '@/lib/quests/engine';
 import { getZonedToday, getZonedYMD } from '@/lib/utils';
 import { notifyTaskChanged } from '@/lib/taskSync';
 import { severBond, handleBuddyCompletion } from '@/lib/buddy/server';
-import { bumpQuestMetric } from '@/lib/quests/metrics';
+import { bumpQuestMetric, taskStreakMetric } from '@/lib/quests/metrics';
 
 type Origin = 'weekly' | 'regular';
 type BoardItem = { id: string; text: string; order: number; type: TaskType };
@@ -1784,14 +1784,20 @@ export async function PUT(req: NextRequest) {
     if (fresh) {
       const streakMap = await streakMapForWeeklyDocs(uid, [fresh], date, tz);
       const streakNow = streakMap.get(fresh.id) ?? 0;
-      if (completed && !alreadyCompletedForDate && streakNow === 3) {
-        await bumpQuestMetric({ userId: uid, metric: 'task_streak_3', timezone: tz });
-      } else if (!completed && streakNow === 2) {
+      if (completed && !alreadyCompletedForDate && streakNow >= 2) {
         await bumpQuestMetric({
           userId: uid,
-          metric: 'task_streak_3',
+          metric: taskStreakMetric(streakNow),
+          timezone: tz,
+          tagIds: fresh.tags ?? [],
+        });
+      } else if (!completed && streakNow >= 1) {
+        await bumpQuestMetric({
+          userId: uid,
+          metric: taskStreakMetric(streakNow + 1),
           amount: -1,
           timezone: tz,
+          tagIds: fresh.tags ?? [],
         });
       }
     }

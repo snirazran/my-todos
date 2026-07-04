@@ -52,7 +52,8 @@ export default function HumanNameStep({ selections, onSelect, onNext, onBack, sa
       </button>
 
       <OnboardingFrogHeader
-        indices={{ skin: 0, hat: 0, body: 0, hand_item: 0, mood: 2 }}
+        indices={{ skin: 0, hat: 0, body: 0, hand_item: 0 }}
+        emote="love"
         title={`*RIBBIT* I like the name ${frogName}!`}
         subtitle="What should I call you?"
         speechBubbleMessage={`*RIBBIT* I like the name ${frogName}!\nWhat should I call you?`}

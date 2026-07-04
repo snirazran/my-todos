@@ -35,7 +35,7 @@ export const QUEST_METRIC_COPY: Record<string, MetricCopy> = {
       `Finish ${n} more ${n === 1 ? 'task' : 'tasks'} with your buddy`,
   },
   task_streak_3: {
-    adminLabel: '3-day streaks reached',
+    adminLabel: 'Task streak reached',
     label: (n) =>
       n === 1
         ? 'Reach a 3-day streak on a repeating task'
@@ -77,11 +77,35 @@ export const QUEST_METRIC_COPY: Record<string, MetricCopy> = {
   },
 };
 
+const TASK_STREAK_LABEL_PATTERN = /^task_streak_(\d+)$/;
+
+function taskStreakCopy(metricKey: string): MetricCopy | undefined {
+  const match = TASK_STREAK_LABEL_PATTERN.exec(metricKey);
+  if (!match) return undefined;
+  const days = Number(match[1]);
+  return {
+    adminLabel: `${days}-day streaks reached`,
+    label: (n) =>
+      n === 1
+        ? `Reach a ${days}-day streak on a repeating task`
+        : `Reach a ${days}-day streak on ${n} repeating tasks`,
+    remaining: (n) =>
+      n === 1
+        ? `Reach 1 more ${days}-day streak`
+        : `Reach ${n} more ${days}-day streaks`,
+  };
+}
+
+function metricCopyFor(metricKey: string | undefined): MetricCopy | undefined {
+  if (!metricKey) return undefined;
+  return taskStreakCopy(metricKey) ?? QUEST_METRIC_COPY[metricKey];
+}
+
 export function metricObjectiveLabel(
   metricKey: string | undefined,
   target: number,
 ): string {
-  const copy = metricKey ? QUEST_METRIC_COPY[metricKey] : undefined;
+  const copy = metricCopyFor(metricKey);
   if (!copy) return `Complete ${target} ${target === 1 ? 'objective' : 'objectives'}`;
   return copy.label(Math.max(1, target));
 }
@@ -90,7 +114,7 @@ export function metricRemainingLabel(
   metricKey: string | undefined,
   remaining: number,
 ): string {
-  const copy = metricKey ? QUEST_METRIC_COPY[metricKey] : undefined;
+  const copy = metricCopyFor(metricKey);
   if (!copy)
     return `Complete ${remaining} more ${remaining === 1 ? 'objective' : 'objectives'}`;
   return copy.remaining(Math.max(1, remaining));

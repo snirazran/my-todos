@@ -11,7 +11,14 @@ import type { ItemDef } from '@/lib/skins/catalog';
 import { getFullCatalog } from '@/lib/skins/getCatalog';
 import { loadBackgroundPrizes } from '@/lib/skins/gifts';
 import { getZonedToday, getZonedYMD } from '@/lib/utils';
-import { loadQuestCounters, sumCounters } from './metrics';
+import {
+  isTagScopedQuestMetric,
+  loadQuestCounters,
+  sumCounters,
+  sumCountersForTags,
+  taskStreakMetric,
+  type QuestCounterEntry,
+} from './metrics';
 import QuestRecipeModel, {
   type QuestRecipeDoc,
   type RecipeSlot,
@@ -271,17 +278,29 @@ function resolveRewardAmount(reward: QuestReward, seed: string) {
 }
 
 function progressForLogicBlock(args: {
-  block: QuestLogicBlock;
+  block: ResolvedQuestLogicBlock;
   tasks: TaskDoc[];
   timezone: string;
   startDate: string;
   endDate: string;
-  counters?: { metric: string; dateKey: string; count: number }[];
+  counters?: QuestCounterEntry[];
 }) {
   const { block, tasks, timezone, startDate, endDate, counters } = args;
 
   if (block.type === 'metric_count') {
     if (!block.metricKey) return 0;
+    if (
+      block.tagMode === 'focus_category_tags' &&
+      isTagScopedQuestMetric(block.metricKey)
+    ) {
+      return sumCountersForTags(
+        counters ?? [],
+        block.metricKey,
+        startDate,
+        endDate,
+        block.resolvedTagIds ?? [],
+      );
+    }
     return sumCounters(counters ?? [], block.metricKey, startDate, endDate);
   }
 
@@ -486,6 +505,21 @@ function pickSlotReward(rewards: QuestRewards | undefined, seed: string) {
   return [pool[Math.floor(rng() * pool.length)]];
 }
 
+// Streak pool entries roll their day requirement from the admin-configured
+// range; the rolled length is baked into the metric key (task_streak_N).
+function resolveRecipeMetricKey(
+  pick: { metricKey?: string; streakDaysMin?: number; streakDaysMax?: number },
+  seed: string,
+): string | undefined {
+  if (!pick.metricKey?.startsWith('task_streak')) return pick.metricKey;
+  const fallback = Number(pick.metricKey.match(/^task_streak_(\d+)$/)?.[1] ?? 3);
+  const min = Math.max(2, Math.floor(pick.streakDaysMin ?? fallback));
+  const max = Math.max(min, Math.floor(pick.streakDaysMax ?? min));
+  const rng = createSeededRandom(seed);
+  const days = Math.floor(rng() * (max - min + 1)) + min;
+  return taskStreakMetric(days);
+}
+
 function pickWeighted<T extends { weight?: number }>(
   entries: T[],
   rng: () => number,
@@ -565,7 +599,7 @@ async function syncQuestForTemplate(args: {
   user: UserDoc;
   tasks: TaskDoc[];
   timezone: string;
-  counters?: { metric: string; dateKey: string; count: number }[];
+  counters?: QuestCounterEntry[];
   existingDoc?: InstanceType<typeof QuestModel> | null;
 }) {
   const { template, userId, user, tasks, timezone, counters } = args;
@@ -643,7 +677,8 @@ async function syncQuestForTemplate(args: {
   const templateLogic =
     template.placement === 'category'
       ? template.logic.map((block) =>
-          block.type === 'metric_count'
+          block.type === 'metric_count' &&
+          !isTagScopedQuestMetric(block.metricKey)
             ? block
             : { ...block, tagMode: 'focus_category_tags' as const },
         )
@@ -908,7 +943,9 @@ export async function syncQuestState(args: {
           minAmount,
           maxAmount: Math.max(minAmount, Math.floor(pick.maxTarget)),
           tagMode: 'ignore',
-          metricKey: isMetric ? pick.metricKey : undefined,
+          metricKey: isMetric
+            ? resolveRecipeMetricKey(pick, `${userId}:${templateId}:slot:${index}:streak`)
+            : undefined,
           rewards: pickSlotReward(
             slot.rewards,
             `${userId}:${templateId}:slot:${index}:reward`,
@@ -1065,6 +1102,9 @@ export async function syncQuestState(args: {
           if (!pick) return null;
           const isMetric = pick.type === 'metric_count';
           const minAmount = Math.max(1, Math.floor(pick.minTarget));
+          const metricKey = isMetric
+            ? resolveRecipeMetricKey(pick, `${userId}:${templateId}:slot:${index}:streak`)
+            : undefined;
           const block: QuestLogicBlock = {
             id: `slot-${index + 1}`,
             type: pick.type,
@@ -1073,8 +1113,11 @@ export async function syncQuestState(args: {
             amountMode: 'random',
             minAmount,
             maxAmount: Math.max(minAmount, Math.floor(pick.maxTarget)),
-            tagMode: isMetric ? 'ignore' : 'focus_category_tags',
-            metricKey: isMetric ? pick.metricKey : undefined,
+            tagMode:
+              !isMetric || isTagScopedQuestMetric(metricKey)
+                ? 'focus_category_tags'
+                : 'ignore',
+            metricKey,
             rewards: pickSlotReward(
               slot.rewards,
               `${userId}:${templateId}:slot:${index}:reward`,
@@ -1168,7 +1211,7 @@ export async function syncQuestState(args: {
   const needsCounters = eligibleTemplates.some((template) =>
     (template.logic ?? []).some((block) => block.type === 'metric_count'),
   );
-  let counters: { metric: string; dateKey: string; count: number }[] = [];
+  let counters: QuestCounterEntry[] = [];
   if (needsCounters) {
     let sinceDateKey = todayKey;
     for (const doc of allExistingDocs) {

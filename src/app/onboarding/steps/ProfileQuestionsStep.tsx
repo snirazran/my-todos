@@ -210,7 +210,8 @@ export default function ProfileQuestionsStep({
       </div>
 
       <OnboardingFrogHeader
-        indices={{ skin: 0, hat: 0, body: 0, hand_item: 0, mood: 3 }}
+        indices={{ skin: 0, hat: 0, body: 0, hand_item: 0 }}
+        emote="question"
         eyebrow={currentQuestion.sectionLabel}
         title={currentQuestion.title}
         subtitle={currentQuestion.subtitle}

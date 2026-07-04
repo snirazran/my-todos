@@ -7,6 +7,10 @@ export type RecipePoolEntry = {
   type: 'count' | 'focus_minutes' | 'metric_count';
   action?: 'complete' | 'add';
   metricKey?: string;
+  // Streak metrics only: the rolled quest requires a streak of N days, with N
+  // picked from this inclusive range.
+  streakDaysMin?: number;
+  streakDaysMax?: number;
   minTarget: number;
   maxTarget: number;
   weight: number;

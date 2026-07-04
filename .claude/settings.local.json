@@ -197,7 +197,14 @@
       "Bash(awk '/export async function syncQuestState/,/^}/' /Users/snirazran/Fullstack/my-todos/src/lib/quests/engine.ts)",
       "Bash(awk -F: '$1 > 1100 && $1 < 1400')",
       "Bash(awk 'NR>1590 && NR<1800 && \\(/completed/ || /handleBuddyCompletion|syncGamification|toggle/\\)' /Users/snirazran/Fullstack/my-todos/src/app/api/tasks/route.ts)",
-      "Bash(python3 *)"
+      "Bash(python3 *)",
+      "Skill(artifact-design)",
+      "Artifact",
+      "Skill(run)",
+      "Bash(npm ls *)",
+      "Bash(echo \"TSC_EXIT:$?\")",
+      "Bash(unset NODE_OPTIONS)",
+      "Bash(echo \"EXIT:$?\")"
     ]
   }
 }

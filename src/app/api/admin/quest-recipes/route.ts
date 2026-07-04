@@ -8,7 +8,7 @@ import QuestRecipeModel, {
   type RecipeSlot,
 } from '@/lib/models/QuestRecipe';
 import { ensureDefaultQuestRecipe } from '@/lib/quests/recipeDefaults';
-import { QUEST_METRIC_KEYS } from '@/lib/quests/metrics';
+import { isValidQuestMetricKey } from '@/lib/quests/metrics';
 import { sanitizeRewards } from '@/app/api/admin/quests/route';
 import {
   isCoverDataUrl,
@@ -38,8 +38,22 @@ function sanitizePoolEntry(input: any): RecipePoolEntry | null {
     entry.action = input.action === 'add' ? 'add' : 'complete';
   }
   if (entry.type === 'metric_count') {
-    if (!QUEST_METRIC_KEYS.includes(input.metricKey)) return null;
+    if (!isValidQuestMetricKey(input.metricKey)) return null;
     entry.metricKey = input.metricKey;
+    if (input.metricKey.startsWith('task_streak')) {
+      const rawDaysMin = Math.floor(Number(input.streakDaysMin));
+      const daysMin =
+        Number.isFinite(rawDaysMin) && rawDaysMin >= 2
+          ? Math.min(60, rawDaysMin)
+          : 3;
+      const rawDaysMax = Math.floor(Number(input.streakDaysMax));
+      const daysMax =
+        Number.isFinite(rawDaysMax) && rawDaysMax >= daysMin
+          ? Math.min(60, rawDaysMax)
+          : daysMin;
+      entry.streakDaysMin = daysMin;
+      entry.streakDaysMax = daysMax;
+    }
   }
   return entry;
 }

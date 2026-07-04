@@ -21,9 +21,15 @@ import type {
 } from '@/lib/quests/types';
 import {
   CategoryQuestPresentationCard,
-  DailyQuestPresentationCard,
+  DailyChecklistCard,
+  FocusPosterCard,
+  FocusSlotBar,
   getRewardQuantityLabel,
+  PlusGateCard,
   RewardTile,
+  StarterQuestCard,
+  SwitchFocusConfirm,
+  type DailyStreakInfo,
   type QuestTagChip,
 } from './QuestCards';
 import { RewardCard } from './gift-box/RewardCard';
@@ -36,7 +42,6 @@ import { FlyCounter } from './FlyCounter';
 import { mutateInventoryCaches, useInventory } from '@/hooks/useInventory';
 import { takeQuestScrollTarget } from '@/lib/questClaims';
 import { PlusUpgradeModal } from './PlusUpgradeModal';
-import { useDraggableScroll } from '@/hooks/useDraggableScroll';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import Frog, { type WardrobeSlot } from './frog';
 
@@ -46,6 +51,7 @@ type QuestsResponse = {
   todoCount?: number;
   tags?: Array<{ id: string; name: string; color: string; key?: string }>;
   activeFocusCategoryId?: MacroCategoryId | null;
+  dailyStreak?: DailyStreakInfo | null;
   onboarding: {
     complete: boolean;
     selectedCategoryIds: MacroCategoryId[];
@@ -272,8 +278,10 @@ export function QuestsPanel({
     instance: number;
   } | null>(null);
   const [flyGainToast, setFlyGainToast] = useState<FlyGainToast | null>(null);
-  const [dailyPage, setDailyPage] = useState(0);
-  const [carouselDragging, setCarouselDragging] = useState(false);
+  const [pinnedCategoryId, setPinnedCategoryId] = useState<string | null>(null);
+  const [pendingSwitchCategoryId, setPendingSwitchCategoryId] = useState<
+    string | null
+  >(null);
   const rewardRevealIdRef = useRef(0);
   const flyGainToastIdRef = useRef(0);
   const knownFlyBalanceRef = useRef(0);
@@ -344,12 +352,6 @@ export function QuestsPanel({
     }
     const questId = pendingScrollQuestIdRef.current;
     if (!questId) return;
-
-    const sortedDaily = [...(data.dailyQuests ?? [])].sort(
-      (a, b) => Number(isQuestRetired(a)) - Number(isQuestRetired(b)),
-    );
-    const dailyIndex = sortedDaily.findIndex((quest) => quest.id === questId);
-    if (dailyIndex >= 0) setDailyPage(dailyIndex);
 
     const timeout = window.setTimeout(() => {
       pendingScrollQuestIdRef.current = null;
@@ -454,6 +456,43 @@ export function QuestsPanel({
 
   const editingFocusCategory = editingFocusCategoryId
     ? categoryMap[editingFocusCategoryId]
+    : null;
+
+  // The hero card shows one focus quest: the free user's active focus, or the
+  // premium user's pinned pick (falling back to the top-sorted quest). The
+  // rest render as bench posters.
+  const heroQuest = useMemo(() => {
+    if (filteredCategoryQuests.length === 0) return null;
+    if (data?.isPremium) {
+      const pinned = pinnedCategoryId
+        ? filteredCategoryQuests.find(
+            (quest) => quest.categoryId === pinnedCategoryId,
+          )
+        : null;
+      return pinned ?? filteredCategoryQuests[0];
+    }
+    const activeId = data?.activeFocusCategoryId;
+    const active = activeId
+      ? filteredCategoryQuests.find((quest) => quest.categoryId === activeId)
+      : null;
+    return (
+      active ??
+      filteredCategoryQuests.find((quest) => !(quest.locked ?? false)) ??
+      filteredCategoryQuests[0]
+    );
+  }, [
+    filteredCategoryQuests,
+    data?.isPremium,
+    data?.activeFocusCategoryId,
+    pinnedCategoryId,
+  ]);
+  const benchQuests = useMemo(
+    () =>
+      filteredCategoryQuests.filter((quest) => quest.id !== heroQuest?.id),
+    [filteredCategoryQuests, heroQuest?.id],
+  );
+  const pendingSwitchCategory = pendingSwitchCategoryId
+    ? categoryMap[pendingSwitchCategoryId]
     : null;
 
   const queueRewardReveal = (summary?: QuestRewardSummary) => {
@@ -617,6 +656,28 @@ export function QuestsPanel({
     });
   };
 
+  const [claimingStreak, setClaimingStreak] = useState(false);
+  const handleClaimStreak = async () => {
+    if (claimingStreak) return;
+    setClaimingStreak(true);
+    setClaimMessage(null);
+    try {
+      const res = await fetch('/api/quests/streak/claim', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ timezone }),
+      });
+      const payload = await res.json();
+      if (!res.ok) throw new Error(payload.error || 'Claim failed');
+      queueRewardReveal(payload.rewardSummary);
+      await refreshQuestData();
+    } catch (err: any) {
+      setClaimMessage(err.message || 'Claim failed');
+    } finally {
+      setClaimingStreak(false);
+    }
+  };
+
   const handleClaimObjective = async (questId: string, objectiveId: string) => {
     if (claimingObjectiveId) return;
     setClaimingObjectiveId(objectiveId);
@@ -652,6 +713,7 @@ export function QuestsPanel({
       const payload = await res.json();
       if (!res.ok) throw new Error(payload.error || 'Could not switch focus');
       await refreshQuestData();
+      setPendingSwitchCategoryId(null);
     } catch (err: any) {
       setClaimMessage(err.message || 'Could not switch focus');
     } finally {
@@ -779,13 +841,7 @@ export function QuestsPanel({
                           data.activeSeason && "relative z-10 -mt-8 pt-8 px-4 md:mx-auto md:mt-6 md:w-full md:max-w-6xl md:px-8 md:pt-0 bg-background rounded-t-[24px] md:rounded-none md:bg-transparent"
                         )}>
                         {(() => {
-                          // Finished / out-of-date daily quests sink to the
-                          // bottom; otherwise the engine's order is preserved
-                          // (stable sort).
-                          const dailyQuests = [...(data.dailyQuests ?? [])].sort(
-                            (a, b) =>
-                              Number(isQuestRetired(a)) - Number(isQuestRetired(b)),
-                          );
+                          const dailyQuests = data.dailyQuests ?? [];
                           const onboardingQuests = (data.onboardingQuests ?? []).filter(
                             (quest) => !isQuestFinished(quest),
                           );
@@ -795,7 +851,7 @@ export function QuestsPanel({
                               data-quest-anchor={quest.id}
                               className="rounded-[24px]"
                             >
-                            <DailyQuestPresentationCard
+                            <StarterQuestCard
                               quest={quest as QuestProgressView & { placement: 'onboarding' }}
                               rewardCatalog={data.rewardCatalog}
                               isPremium={data.isPremium}
@@ -803,25 +859,7 @@ export function QuestsPanel({
                               onClaimObjective={(objectiveId) =>
                                 handleClaimObjective(quest.id, objectiveId)
                               }
-                              paused={carouselDragging}
-                            />
-                            </div>
-                          );
-                          const renderDailyCard = (quest: DailyQuestProgressView) => (
-                            <div
-                              key={quest.id}
-                              data-quest-anchor={quest.id}
-                              className="rounded-[24px]"
-                            >
-                            <DailyQuestPresentationCard
-                              quest={quest}
-                              rewardCatalog={data.rewardCatalog}
-                              isPremium={data.isPremium}
-                              claimingObjectiveId={claimingObjectiveId}
-                              onClaimObjective={(objectiveId) =>
-                                handleClaimObjective(quest.id, objectiveId)
-                              }
-                              paused={carouselDragging}
+                              paused={false}
                             />
                             </div>
                           );
@@ -861,7 +899,7 @@ export function QuestsPanel({
                                 handleSetActiveFocus(quest.categoryId)
                               }
                               onUpgrade={() => setPlusOpen(true)}
-                              paused={carouselDragging}
+                              paused={false}
                             />
                             </div>
                           );
@@ -889,76 +927,139 @@ export function QuestsPanel({
                             </>
                           );
 
+                          const questCount = filteredCategoryQuests.length;
+                          const heroCategory = heroQuest
+                            ? categoryMap[heroQuest.categoryId]
+                            : null;
+
+                          const dailySection =
+                            dailyQuests.length === 0 ? (
+                              <PanelCard>No active daily quests here.</PanelCard>
+                            ) : (
+                              <DailyChecklistCard
+                                quests={dailyQuests}
+                                rewardCatalog={data.rewardCatalog}
+                                isPremium={data.isPremium}
+                                claimingObjectiveId={claimingObjectiveId}
+                                onClaimObjective={handleClaimObjective}
+                                streak={data.dailyStreak}
+                                claimingStreak={claimingStreak}
+                                onClaimStreak={handleClaimStreak}
+                                paused={false}
+                              />
+                            );
+
+                          const focusSection = (
+                            <div className="flex flex-col gap-2">
+                              {focusEmptyStates}
+                              {heroQuest && (
+                                <>
+                                  <FocusSlotBar
+                                    isPremium={data.isPremium}
+                                    activeLabel={
+                                      heroCategory?.shortLabel ||
+                                      heroCategory?.name
+                                    }
+                                    activeAccent={heroCategory?.accent}
+                                    totalCount={questCount}
+                                    onLockedPress={() => setPlusOpen(true)}
+                                  />
+                                  {renderFocusCard(heroQuest)}
+                                </>
+                              )}
+                            </div>
+                          );
+
+                          const benchShelf = benchQuests.length > 0 && (
+                            <div>
+                              <p className="px-1 pb-2 text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+                                {data.isPremium ? 'Also running' : 'On the bench'}
+                              </p>
+                              <div className="no-scrollbar -mx-4 flex gap-3 overflow-x-auto px-4 pb-1 md:mx-0 md:flex-wrap md:overflow-visible md:px-0">
+                                {benchQuests.map((quest) => {
+                                  const linkedTags = (
+                                    categoryTagMap.get(quest.categoryId) ?? []
+                                  )
+                                    .map((tagId) => tagCatalog.get(tagId))
+                                    .filter(Boolean) as QuestTagChip[];
+                                  const needsTag =
+                                    quest.logic.some(
+                                      (block) =>
+                                        block.tagMode === 'focus_category_tags',
+                                    ) && linkedTags.length === 0;
+                                  return (
+                                    <div
+                                      key={quest.id}
+                                      data-quest-anchor={quest.id}
+                                      className="flex rounded-[18px]"
+                                    >
+                                      <FocusPosterCard
+                                        quest={quest}
+                                        category={categoryMap[quest.categoryId]}
+                                        live={data.isPremium}
+                                        finished={isQuestRetired(quest)}
+                                        linkedTags={linkedTags}
+                                        rewardCatalog={data.rewardCatalog}
+                                        isPremium={data.isPremium}
+                                        onPress={() => {
+                                          if (data.isPremium) {
+                                            if (needsTag) {
+                                              setEditingFocusCategoryId(
+                                                quest.categoryId,
+                                              );
+                                            } else {
+                                              setPinnedCategoryId(
+                                                quest.categoryId,
+                                              );
+                                            }
+                                          } else {
+                                            setPendingSwitchCategoryId(
+                                              quest.categoryId,
+                                            );
+                                          }
+                                        }}
+                                      />
+                                    </div>
+                                  );
+                                })}
+                                {!data.isPremium && (
+                                  <PlusGateCard
+                                    questCount={questCount}
+                                    onUpgrade={() => setPlusOpen(true)}
+                                  />
+                                )}
+                              </div>
+                            </div>
+                          );
+
                           return (
                             <>
-                              {/* Mobile: onboarding first, daily carousel, focus stack */}
+                              {/* Mobile: onboarding, daily checklist, focus hero + bench shelf */}
                               <div className="flex flex-col gap-8 md:hidden">
                                 {onboardingQuests.length > 0 && (
                                   <div className="space-y-4">
                                     {onboardingQuests.map(renderOnboardingCard)}
                                   </div>
                                 )}
-                                <div className="space-y-4">
-                                  {dailyQuests.length === 0 ? (
-                                    <PanelCard>No active daily quests here.</PanelCard>
-                                  ) : dailyQuests.length === 1 ? (
-                                    renderDailyCard(dailyQuests[0])
-                                  ) : (
-                                    <QuestCarousel
-                                      activePage={dailyPage}
-                                      onPageChange={setDailyPage}
-                                      count={dailyQuests.length}
-                                      onDragChange={setCarouselDragging}
-                                    >
-                                      {dailyQuests.map(renderDailyCard)}
-                                    </QuestCarousel>
-                                  )}
-                                </div>
-                                <div className="space-y-4">
-                                  {focusEmptyStates}
-                                  {filteredCategoryQuests.map(renderFocusCard)}
+                                <div>{dailySection}</div>
+                                <div className="flex flex-col gap-5">
+                                  {focusSection}
+                                  {benchShelf}
                                 </div>
                               </div>
 
-                              {/* Desktop: 2-column layout, daily first. Cells are
-                                  split into two flex columns (alternating) so both
-                                  columns start flush at the top — avoids the
-                                  CSS multi-column balancing gap/shadow artifact. */}
-                              {(() => {
-                                const cells: React.ReactNode[] = [
-                                  ...onboardingQuests.map((quest, i) => (
-                                    <div key={`onboarding-cell-${i}`}>
-                                      {renderOnboardingCard(quest)}
-                                    </div>
-                                  )),
-                                  ...(dailyQuests.length === 0
-                                    ? [<PanelCard key="empty-daily">No active daily quests here.</PanelCard>]
-                                    : dailyQuests.map(renderDailyCard)
-                                  ).map((node, i) => (
-                                    <div key={`daily-cell-${i}`}>{node}</div>
-                                  )),
-                                  ...(Array.isArray(focusEmptyStates.props.children)
-                                    ? focusEmptyStates.props.children
-                                        .filter(Boolean)
-                                        .map((child: React.ReactNode, i: number) => (
-                                          <div key={`focus-empty-${i}`}>{child}</div>
-                                        ))
-                                    : []),
-                                  ...filteredCategoryQuests.map((quest) => (
-                                    <div key={`focus-cell-${quest.id}`}>
-                                      {renderFocusCard(quest)}
-                                    </div>
-                                  )),
-                                ];
-                                const leftCol = cells.filter((_, i) => i % 2 === 0);
-                                const rightCol = cells.filter((_, i) => i % 2 === 1);
-                                return (
-                                  <div className="hidden gap-4 md:grid md:grid-cols-2">
-                                    <div className="flex flex-col gap-4">{leftCol}</div>
-                                    <div className="flex flex-col gap-4">{rightCol}</div>
+                              {/* Desktop: left column stacks starter + daily, hero fills
+                                  the right column, bench shelf spans below */}
+                              <div className="hidden md:flex md:flex-col md:gap-6">
+                                <div className="grid grid-cols-2 items-start gap-4">
+                                  <div className="flex flex-col gap-4">
+                                    {onboardingQuests.map(renderOnboardingCard)}
+                                    {dailySection}
                                   </div>
-                                );
-                              })()}
+                                  {focusSection}
+                                </div>
+                                {benchShelf}
+                              </div>
                             </>
                           );
                         })()}
@@ -994,6 +1095,30 @@ export function QuestsPanel({
                 onClaim={handleClaimSeasonDay}
                 onUpgrade={() => setPlusOpen(true)}
                 paused={false}
+              />
+              <SwitchFocusConfirm
+                open={!!pendingSwitchCategoryId}
+                categoryName={
+                  pendingSwitchCategory?.shortLabel ||
+                  pendingSwitchCategory?.name
+                }
+                currentFocusName={
+                  data?.activeFocusCategoryId
+                    ? categoryMap[data.activeFocusCategoryId]?.shortLabel ||
+                      categoryMap[data.activeFocusCategoryId]?.name
+                    : undefined
+                }
+                switching={
+                  !!pendingSwitchCategoryId &&
+                  switchingFocusId === pendingSwitchCategoryId
+                }
+                onConfirm={() => {
+                  if (pendingSwitchCategoryId) {
+                    void handleSetActiveFocus(pendingSwitchCategoryId);
+                  }
+                }}
+                onUpgrade={() => setPlusOpen(true)}
+                onClose={() => setPendingSwitchCategoryId(null)}
               />
               <PlusUpgradeModal open={plusOpen} onClose={() => setPlusOpen(false)} />
       </>
@@ -2223,177 +2348,6 @@ function EmptyState({
   );
 }
 
-function QuestCarousel({
-  children,
-  activePage,
-  onPageChange,
-  count,
-  onDragChange,
-}: {
-  children: React.ReactNode;
-  activePage: number;
-  onPageChange: (page: number) => void;
-  count: number;
-  onDragChange?: (dragging: boolean) => void;
-}) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const isDragging = useRef(false);
-  const startX = useRef(0);
-  const scrollStart = useRef(0);
-  const lastX = useRef(0);
-  const lastTime = useRef(0);
-  const velocity = useRef(0);
-  const pages = React.Children.toArray(children);
-
-  const onPointerDown = (e: React.PointerEvent) => {
-    if (e.pointerType !== 'mouse') return;
-    if ((e.target as HTMLElement).closest('button, a, [role="button"]')) return;
-    const el = scrollRef.current;
-    if (!el) return;
-    isDragging.current = true;
-    onDragChange?.(true);
-    startX.current = e.clientX;
-    lastX.current = e.clientX;
-    lastTime.current = Date.now();
-    velocity.current = 0;
-    scrollStart.current = el.scrollLeft;
-    el.style.cursor = 'grabbing';
-    el.style.scrollSnapType = 'none';
-    el.style.scrollBehavior = 'auto';
-    el.setPointerCapture(e.pointerId);
-  };
-
-  const onPointerMove = (e: React.PointerEvent) => {
-    if (!isDragging.current || !scrollRef.current) return;
-    const now = Date.now();
-    const dt = now - lastTime.current;
-    if (dt > 0) {
-      velocity.current = (lastX.current - e.clientX) / dt;
-    }
-    lastX.current = e.clientX;
-    lastTime.current = now;
-    const dx = e.clientX - startX.current;
-    scrollRef.current.scrollLeft = scrollStart.current - dx;
-  };
-
-  const onPointerUp = (e: React.PointerEvent) => {
-    if (!isDragging.current || !scrollRef.current) return;
-    isDragging.current = false;
-    onDragChange?.(false);
-    const el = scrollRef.current;
-    el.releasePointerCapture(e.pointerId);
-    el.style.cursor = 'grab';
-
-    // Find the nearest card based on drag direction + velocity
-    const containerRect = el.getBoundingClientRect();
-    const containerCenter = containerRect.left + containerRect.width / 2;
-    let closestIdx = 0;
-    let closestDist = Infinity;
-
-    itemRefs.current.forEach((item, i) => {
-      if (!item) return;
-      const rect = item.getBoundingClientRect();
-      const itemCenter = rect.left + rect.width / 2;
-      // Bias toward the direction of the flick
-      const dist =
-        Math.abs(itemCenter - containerCenter) - velocity.current * 150;
-      if (dist < closestDist) {
-        closestDist = dist;
-        closestIdx = i;
-      }
-    });
-
-    // Smooth scroll to the target card, then re-enable snap
-    el.style.scrollBehavior = 'smooth';
-    itemRefs.current[closestIdx]?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'nearest',
-      inline: 'center',
-    });
-    setTimeout(() => {
-      if (scrollRef.current) {
-        scrollRef.current.style.scrollSnapType = 'x mandatory';
-        scrollRef.current.style.scrollBehavior = '';
-      }
-    }, 350);
-  };
-
-  // Track which card is most visible via IntersectionObserver
-  useEffect(() => {
-    const container = scrollRef.current;
-    if (!container) return;
-    itemRefs.current = itemRefs.current.slice(0, count);
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
-            const idx = itemRefs.current.indexOf(
-              entry.target as HTMLDivElement,
-            );
-            if (idx !== -1) onPageChange(idx);
-          }
-        }
-      },
-      { root: container, threshold: 0.6 },
-    );
-    itemRefs.current.forEach((el) => el && observer.observe(el));
-    return () => observer.disconnect();
-  }, [count, onPageChange]);
-
-  return (
-    <div>
-      <div
-        ref={scrollRef}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
-        className="flex gap-3 overflow-x-auto snap-x snap-mandatory -mx-4 px-4 pb-1 cursor-grab select-none md:mx-0 md:grid md:grid-cols-1 md:gap-4 md:overflow-visible md:px-0 md:cursor-auto md:snap-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
-        style={{ WebkitOverflowScrolling: 'touch' }}
-      >
-        {pages.map((child, i) => {
-          const shouldRender = true;
-          return (
-            <div
-              key={i}
-              ref={(el) => {
-                itemRefs.current[i] = el;
-              }}
-              className="flex-none w-[88%] snap-center md:w-auto"
-            >
-              {shouldRender ? child : <div className="min-h-[420px]" />}
-            </div>
-          );
-        })}
-      </div>
-      {count > 1 && (
-        <div className="flex items-center justify-center gap-1.5 pt-3 md:hidden">
-          {Array.from({ length: count }, (_, i) => (
-            <button
-              key={i}
-              type="button"
-              onClick={() => {
-                itemRefs.current[i]?.scrollIntoView({
-                  behavior: 'smooth',
-                  block: 'nearest',
-                  inline: 'center',
-                });
-                onPageChange(i);
-              }}
-              className={cn(
-                'h-2 rounded-full transition-all duration-200',
-                i === activePage
-                  ? 'bg-primary w-5'
-                  : 'bg-muted-foreground/30 hover:bg-muted-foreground/50 w-2',
-              )}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
 
 function PanelCard({ children }: { children: React.ReactNode }) {
   return (

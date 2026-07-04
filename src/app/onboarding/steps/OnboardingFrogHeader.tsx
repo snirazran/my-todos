@@ -3,12 +3,13 @@
 import dynamic from 'next/dynamic';
 import { type ReactNode } from 'react';
 import { FrogSpeechBubble } from '@/components/ui/FrogSpeechBubble';
-import type { WardrobeSlot } from '@/components/ui/frog';
+import type { FrogEmote, WardrobeSlot } from '@/components/ui/frog';
 
 const Frog = dynamic(() => import('@/components/ui/frog'), { ssr: false });
 
 type Props = {
   indices?: Partial<Record<WardrobeSlot, number>>;
+  emote?: FrogEmote | null;
   eyebrow?: ReactNode;
   title: ReactNode;
   subtitle?: ReactNode;
@@ -28,6 +29,7 @@ const DEFAULT_FROG_INDICES: Partial<Record<WardrobeSlot, number>> = {
 
 export function OnboardingFrogHeader({
   indices = DEFAULT_FROG_INDICES,
+  emote = null,
   eyebrow,
   title,
   subtitle,
@@ -47,7 +49,7 @@ export function OnboardingFrogHeader({
               messageClassName="!whitespace-pre-line !text-sm !leading-tight md:!text-base"
             />
           ) : null}
-          <Frog width={280} height={315} indices={indices} />
+          <Frog width={280} height={315} indices={indices} emote={emote} />
         </div>
         <div className="relative block md:hidden">
           {speechBubbleMessage ? (
@@ -60,7 +62,7 @@ export function OnboardingFrogHeader({
               messageClassName="!whitespace-pre-line !text-sm !leading-tight md:!text-base"
             />
           ) : null}
-          <Frog width={230} height={259} indices={indices} />
+          <Frog width={230} height={259} indices={indices} emote={emote} />
         </div>
       </div>
 

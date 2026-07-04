@@ -6,13 +6,16 @@ import { AnimatePresence, motion } from 'framer-motion';
 import {
   CalendarDays,
   Check,
+  ChevronDown,
   Clock,
   Compass,
   Gift,
   Lock,
+  Pause,
   Pencil,
   Plus,
   Repeat,
+  Sprout,
   Tags,
   Trophy,
   X,
@@ -200,18 +203,55 @@ function renderObjectiveLabel(
 
   const tags = context.linkedTags ?? [];
   if (tags.length > 0) {
+    const leadIn = isMinutes
+      ? `${actionLabel} ${targetLabel} minutes on`
+      : `${actionLabel} ${targetLabel}`;
+    const peekLabel =
+      !isMinutes && numericTarget === 1 && !targetLabel.includes('-')
+        ? 'tagged task'
+        : 'tagged tasks';
     return (
       <>
-        <span>{`${actionLabel} ${targetLabel} ${subjectLabel} with`}</span>
-        {tags.map((tag) => (
-          <QuestTagPill key={tag.id} tag={tag} />
-        ))}
-        <span>{tags.length > 1 ? 'tags' : 'tag'}</span>
+        <span>{leadIn}</span>
+        <TaggedTasksPeek label={peekLabel} tags={tags} />
       </>
     );
   }
 
   return <span>{`${actionLabel} ${targetLabel} ${subjectLabel}`}</span>;
+}
+
+function TaggedTasksPeek({
+  label,
+  tags,
+}: {
+  label: string;
+  tags: QuestTagChip[];
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span className="relative inline-flex">
+      <button
+        type="button"
+        aria-label="Show counted tags"
+        onClick={(event) => {
+          event.stopPropagation();
+          setOpen((v) => !v);
+        }}
+        onBlur={() => setOpen(false)}
+        className="border-b-2 border-dotted border-primary/60 font-black text-primary transition hover:border-primary"
+      >
+        {label}
+      </button>
+      {open && (
+        <span className="absolute bottom-full left-1/2 z-30 mb-2 flex w-max max-w-56 -translate-x-1/2 flex-wrap items-center gap-1.5 rounded-xl border border-border bg-popover px-3 py-2 shadow-lg">
+          {tags.map((tag) => (
+            <QuestTagPill key={tag.id} tag={tag} />
+          ))}
+        </span>
+      )}
+    </span>
+  );
 }
 
 function getTaggedSubjectCopy(block: QuestCardLogicBlock) {
@@ -376,7 +416,7 @@ function useHiddenClaimedObjectives(
   return hiddenIds;
 }
 
-export function DailyQuestPresentationCard({
+export function StarterQuestCard({
   quest,
   rewardCatalog,
   isPremium,
@@ -384,12 +424,13 @@ export function DailyQuestPresentationCard({
   onClaimObjective,
   paused = false,
 }: BaseCardProps & {
-  quest: QuestCardData & { placement: 'daily' | 'onboarding' };
+  quest: QuestCardData & { placement: 'onboarding' };
 }) {
-  const isOnboarding = quest.placement === 'onboarding';
-  const dailyTimeLeft = useTimeLeft();
-  const timeLeft = isOnboarding ? '' : dailyTimeLeft;
   const [rewardPopup, setRewardPopup] = useState<RewardPopupState | null>(null);
+  const [showAllObjectives, setShowAllObjectives] = useState(false);
+  useEffect(() => {
+    setShowAllObjectives(false);
+  }, [quest.id]);
   const claimedObjectiveIds = quest.claimedObjectiveIds ?? [];
   const hiddenClaimedObjectiveIds = useHiddenClaimedObjectives(
     quest.id,
@@ -398,109 +439,119 @@ export function DailyQuestPresentationCard({
   const visibleLogic = quest.logic.filter(
     (block) => !hiddenClaimedObjectiveIds.has(block.id),
   );
+  const isBlockDone = (block: QuestCardLogicBlock) => {
+    const complete = block.progress >= Math.max(1, block.target);
+    const hasRewards = (block.rewards?.length ?? 0) > 0;
+    return claimedObjectiveIds.includes(block.id) || (complete && !hasRewards);
+  };
+  const isBlockClaimable = (block: QuestCardLogicBlock) =>
+    block.progress >= Math.max(1, block.target) &&
+    (block.rewards?.length ?? 0) > 0 &&
+    !claimedObjectiveIds.includes(block.id);
+  const totalSteps = quest.logic.length;
+  const doneSteps = quest.logic.filter(isBlockDone).length;
+  const collapsedClaimedCount = quest.logic.filter((block) =>
+    hiddenClaimedObjectiveIds.has(block.id),
+  ).length;
+  const orderedOpen = [...visibleLogic].sort(
+    (a, b) => Number(isBlockClaimable(b)) - Number(isBlockClaimable(a)),
+  );
+  const shownBlocks = showAllObjectives ? orderedOpen : orderedOpen.slice(0, 2);
+  const foldedBlocks = showAllObjectives ? [] : orderedOpen.slice(2);
+  const foldedPeekRewards = foldedBlocks
+    .map((block) => block.rewards?.[0])
+    .filter(Boolean)
+    .slice(0, 3) as QuestReward[];
 
-  const isCompleted = visibleLogic.length === 0;
+  if (visibleLogic.length === 0) return null;
 
   return (
-    <div className="overflow-hidden rounded-[28px] border border-border/50 bg-card shadow-sm">
-      <div className="relative overflow-hidden">
-        {quest.coverImageUrl ? (
-          <img
-            src={quest.coverImageUrl}
-            alt={quest.title}
-            loading="lazy"
-            decoding="async"
-            className="h-[150px] w-full object-cover"
-          />
-        ) : (
-          <div className="h-[150px] w-full bg-[linear-gradient(135deg,#0ea5e9_0%,#2563eb_55%,#0f172a_100%)]" />
-        )}
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/55 via-black/25 to-transparent" />
-        {isCompleted && (
-          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/55 px-4 text-center text-white">
-            <Check className="h-9 w-9 text-emerald-300 drop-shadow-[0_2px_0_rgba(0,0,0,0.4)]" strokeWidth={3.5} />
-            <p className="text-base font-black tracking-tight drop-shadow-[0_2px_0_rgba(0,0,0,0.4)]">
-              {isOnboarding ? 'All done — nice hops!' : 'All daily objectives done!'}
-            </p>
-            {timeLeft ? (
-              <div className="flex flex-col items-center gap-1">
-                <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/85 drop-shadow-[0_1px_0_rgba(0,0,0,0.4)]">
-                  Resets in
-                </span>
-                <span
-                  className="inline-flex items-center gap-1.5 text-[15px] uppercase leading-none tracking-wide text-white drop-shadow-[0_2px_0_rgba(15,23,42,0.85)]"
-                  style={{
-                    fontFamily: 'var(--font-display), "Luckiest Guy", cursive',
-                    WebkitTextStroke: '1.5px rgba(15, 23, 42, 0.9)',
-                    paintOrder: 'stroke fill',
-                    lineHeight: 1,
-                  }}
-                >
-                  <Clock className="h-4 w-4 shrink-0 translate-y-[1px]" strokeWidth={3} />
-                  <span className="leading-none">{timeLeft}</span>
-                </span>
-              </div>
-            ) : null}
+    <div className="overflow-hidden rounded-[28px] border border-primary/30 bg-card shadow-sm">
+      <div className="flex items-center justify-between gap-2 bg-primary/10 px-4 py-2.5">
+        <span className="inline-flex min-w-0 items-center gap-1.5 text-[11px] font-black uppercase tracking-[0.16em] text-primary">
+          <Sprout className="h-3.5 w-3.5 shrink-0" strokeWidth={2.75} />
+          <span className="truncate">{quest.title}</span>
+        </span>
+        <span className="flex shrink-0 items-center gap-1">
+          {quest.logic.map((block) => (
+            <span
+              key={block.id}
+              className={cn(
+                'h-1.5 w-3.5 rounded-full',
+                isBlockDone(block) ? 'bg-primary' : 'bg-primary/20',
+              )}
+            />
+          ))}
+          <span className="ml-1 text-[10px] font-black tabular-nums text-primary/80">
+            {doneSteps}/{totalSteps}
+          </span>
+        </span>
+      </div>
+      <div className="px-4 pb-3 pt-1">
+        {collapsedClaimedCount > 0 && (
+          <div className="flex items-center gap-1.5 border-b border-border/20 px-1 py-2 text-[11px] font-black uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
+            <Check className="h-3.5 w-3.5" strokeWidth={3.5} />
+            {collapsedClaimedCount} claimed
           </div>
         )}
-        <div className="absolute inset-x-0 top-0 flex flex-wrap items-center justify-between gap-2 px-4 pt-3">
-          <span
-            className="inline-flex items-center gap-1.5 text-[15px] uppercase leading-none tracking-wide text-white drop-shadow-[0_2px_0_rgba(15,23,42,0.85)]"
-            style={{
-              fontFamily: 'var(--font-display), "Luckiest Guy", cursive',
-              WebkitTextStroke: '1.5px rgba(15, 23, 42, 0.9)',
-              paintOrder: 'stroke fill',
-            }}
+        {shownBlocks.map((block, i) => (
+          <ObjectiveRow
+            key={block.id}
+            block={block}
+            objectiveClaimed={claimedObjectiveIds.includes(block.id)}
+            claimingObjective={claimingObjectiveId === block.id}
+            isPremium={isPremium}
+            rewardCatalog={rewardCatalog}
+            paused={true}
+            onOpenRewards={(rewards) =>
+              setRewardPopup({ eyebrow: 'Objective', title: 'Rewards', rewards })
+            }
+            onClaimObjective={
+              onClaimObjective ? () => onClaimObjective(block.id) : undefined
+            }
+            isLast={i === shownBlocks.length - 1 && foldedBlocks.length === 0}
+            isFirst={i === 0}
+          />
+        ))}
+        {(foldedBlocks.length > 0 ||
+          (showAllObjectives && orderedOpen.length > 2)) && (
+          <button
+            type="button"
+            onClick={() => setShowAllObjectives((v) => !v)}
+            className="mt-2 flex w-full items-center gap-2 rounded-xl bg-muted/40 px-3 py-2.5 text-[11px] font-black uppercase tracking-[0.1em] text-muted-foreground transition hover:bg-muted/70"
           >
-            <CalendarDays className="h-3.5 w-3.5 shrink-0" strokeWidth={3} />
-            <span className="leading-none">{isOnboarding ? quest.title : 'Daily'}</span>
-          </span>
-          {timeLeft && !isCompleted ? (
-            <span
-              className="inline-flex shrink-0 items-center gap-1.5 text-[15px] uppercase leading-none tracking-wide text-white drop-shadow-[0_2px_0_rgba(15,23,42,0.85)]"
-              style={{
-                fontFamily: 'var(--font-display), "Luckiest Guy", cursive',
-                WebkitTextStroke: '1.5px rgba(15, 23, 42, 0.9)',
-                paintOrder: 'stroke fill',
-              }}
-            >
-              <Clock className="h-3.5 w-3.5 shrink-0" strokeWidth={3} />
-              <span className="leading-none">{timeLeft}</span>
-            </span>
-          ) : null}
-        </div>
-      </div>
-
-      {!isCompleted && (
-      <div className="px-4 pt-1 pb-4">
-        {(
-          visibleLogic.map((block, i) => (
-            <ObjectiveRow
-              key={block.id}
-              block={block}
-              objectiveClaimed={claimedObjectiveIds.includes(block.id)}
-              claimingObjective={claimingObjectiveId === block.id}
-              isPremium={isPremium}
-              rewardCatalog={rewardCatalog}
-              paused={true}
-              onOpenRewards={(rewards) =>
-                setRewardPopup({
-                  eyebrow: 'Objective',
-                  title: 'Rewards',
-                  rewards,
-                })
-              }
-              onClaimObjective={
-                onClaimObjective ? () => onClaimObjective(block.id) : undefined
-              }
-              isLast={i === visibleLogic.length - 1}
-              isFirst={i === 0}
+            <ChevronDown
+              className={cn(
+                'h-3.5 w-3.5 transition-transform',
+                showAllObjectives && 'rotate-180',
+              )}
+              strokeWidth={3}
             />
-          ))
+            {showAllObjectives
+              ? 'Show less'
+              : `${foldedBlocks.length} more step${foldedBlocks.length > 1 ? 's' : ''}`}
+            {!showAllObjectives && foldedPeekRewards.length > 0 && (
+              <span className="ml-auto flex items-center gap-1.5 normal-case tracking-normal">
+                <span className="text-[10px] font-bold text-muted-foreground/80">
+                  worth
+                </span>
+                {foldedPeekRewards.map((reward, index) => (
+                  <RewardTile
+                    key={`${reward.type}-${reward.itemId ?? reward.backgroundId ?? index}`}
+                    reward={reward}
+                    rewardCatalog={rewardCatalog}
+                    isPremium={isPremium}
+                    paused={true}
+                    hideBadge
+                    flySize={16}
+                    className="h-8 w-8 rounded-lg"
+                  />
+                ))}
+              </span>
+            )}
+          </button>
         )}
-
       </div>
-      )}
       <RewardDetailsPopup
         open={!!rewardPopup}
         eyebrow={rewardPopup?.eyebrow ?? ''}
@@ -511,6 +562,228 @@ export function DailyQuestPresentationCard({
         onClose={() => setRewardPopup(null)}
         paused={paused}
       />
+    </div>
+  );
+}
+
+export type DailyStreakInfo = {
+  count: number;
+  targetLength: number;
+  todayComplete: boolean;
+  claimable: boolean;
+};
+
+export function DailyChecklistCard({
+  quests,
+  rewardCatalog,
+  isPremium,
+  claimingObjectiveId,
+  onClaimObjective,
+  streak,
+  claimingStreak = false,
+  onClaimStreak,
+  paused = false,
+}: Omit<BaseCardProps, 'onClaimObjective'> & {
+  quests: Array<QuestCardData & { placement: 'daily' }>;
+  onClaimObjective?: (questId: string, objectiveId: string) => void;
+  streak?: DailyStreakInfo | null;
+  claimingStreak?: boolean;
+  onClaimStreak?: () => void;
+}) {
+  const timeLeft = useTimeLeft();
+  const [rewardPopup, setRewardPopup] = useState<RewardPopupState | null>(null);
+  const allDone = quests.every((quest) =>
+    quest.logic.every((block) => {
+      const complete = block.progress >= Math.max(1, block.target);
+      const hasRewards = (block.rewards?.length ?? 0) > 0;
+      const claimed = (quest.claimedObjectiveIds ?? []).includes(block.id);
+      return claimed || (complete && !hasRewards);
+    }),
+  );
+
+  return (
+    <div className="overflow-hidden rounded-[28px] border border-border/50 bg-card shadow-sm">
+      <div className="flex items-center justify-between gap-2 px-4 pb-1 pt-3.5">
+        <span className="inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+          <CalendarDays className="h-3.5 w-3.5" strokeWidth={2.75} />
+          Daily quests
+        </span>
+        {timeLeft ? (
+          <span className="inline-flex items-center gap-1 text-[11px] font-black uppercase tracking-wide text-muted-foreground">
+            <Clock className="h-3.5 w-3.5" strokeWidth={2.75} />
+            Resets in {timeLeft}
+          </span>
+        ) : null}
+      </div>
+
+      {allDone ? (
+        <div className="flex flex-col items-center gap-1.5 px-4 pb-6 pt-4 text-center">
+          <Check className="h-8 w-8 text-emerald-500" strokeWidth={3.5} />
+          <p className="text-sm font-black text-foreground">
+            All daily quests done!
+          </p>
+          <p className="text-xs font-bold text-muted-foreground">
+            New quests tomorrow.
+          </p>
+        </div>
+      ) : (
+        <div className="px-4 pb-3 pt-1">
+          {quests.map((quest, questIndex) => (
+            <DailyChecklistQuestRows
+              key={quest.id}
+              quest={quest}
+              firstGroup={questIndex === 0}
+              rewardCatalog={rewardCatalog}
+              isPremium={isPremium}
+              claimingObjectiveId={claimingObjectiveId}
+              onOpenRewards={(rewards) =>
+                setRewardPopup({
+                  eyebrow: 'Objective',
+                  title: 'Rewards',
+                  rewards,
+                })
+              }
+              onClaimObjective={onClaimObjective}
+            />
+          ))}
+        </div>
+      )}
+      {streak ? (
+        <DailyStreakStrip
+          streak={streak}
+          claiming={claimingStreak}
+          onClaim={onClaimStreak}
+        />
+      ) : null}
+      <RewardDetailsPopup
+        open={!!rewardPopup}
+        eyebrow={rewardPopup?.eyebrow ?? ''}
+        title={rewardPopup?.title ?? ''}
+        rewards={rewardPopup?.rewards ?? []}
+        rewardCatalog={rewardCatalog}
+        isPremium={isPremium}
+        onClose={() => setRewardPopup(null)}
+        paused={paused}
+      />
+    </div>
+  );
+}
+
+function DailyStreakStrip({
+  streak,
+  claiming = false,
+  onClaim,
+}: {
+  streak: DailyStreakInfo;
+  claiming?: boolean;
+  onClaim?: () => void;
+}) {
+  const length = Math.max(2, streak.targetLength);
+  const cycleDay =
+    streak.count === 0 ? 0 : ((streak.count - 1) % length) + 1;
+
+  return (
+    <div className="flex items-center gap-2.5 border-t border-dashed border-border/40 bg-amber-500/10 px-4 py-2.5">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border-2 border-amber-400 bg-gradient-to-br from-amber-100 to-amber-50 text-amber-600 dark:from-amber-900/40 dark:to-amber-950/40 dark:text-amber-400">
+        <Gift className="h-[18px] w-[18px]" strokeWidth={2.5} />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-[12px] font-black leading-tight text-foreground">
+          {streak.claimable
+            ? 'Streak bonus ready!'
+            : `Daily streak · day ${cycleDay} of ${length}`}
+        </p>
+        <p className="mt-0.5 text-[11px] font-bold leading-tight text-muted-foreground">
+          {streak.claimable
+            ? `Random prize for your ${length}-day streak`
+            : streak.todayComplete
+              ? 'Done for today — hop back tomorrow!'
+              : `Finish all daily quests ${length - cycleDay} more day${length - cycleDay > 1 ? 's' : ''} for a mystery prize`}
+        </p>
+      </div>
+      {streak.claimable && onClaim ? (
+        <button
+          type="button"
+          onClick={onClaim}
+          disabled={claiming}
+          className="inline-flex h-8 shrink-0 items-center justify-center rounded-xl bg-amber-500 px-3.5 text-[10px] font-black uppercase tracking-[0.15em] text-white shadow-[0_3px_0_0_#b45309] transition-all hover:translate-y-[-1px] hover:shadow-[0_4px_0_0_#b45309] active:translate-y-[2px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {claiming ? 'Claiming...' : 'Claim'}
+        </button>
+      ) : length <= 7 ? (
+        <div className="flex shrink-0 items-center gap-1">
+          {Array.from({ length }, (_, i) => (
+            <span
+              key={i}
+              className={cn(
+                'h-2 w-4 rounded-full',
+                i < cycleDay
+                  ? 'bg-amber-400'
+                  : 'border border-border/60 bg-muted',
+              )}
+            />
+          ))}
+        </div>
+      ) : (
+        <span className="shrink-0 text-[11px] font-black tabular-nums text-amber-600 dark:text-amber-400">
+          {cycleDay}/{length}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function DailyChecklistQuestRows({
+  quest,
+  firstGroup,
+  rewardCatalog,
+  isPremium,
+  claimingObjectiveId,
+  onOpenRewards,
+  onClaimObjective,
+}: {
+  quest: QuestCardData & { placement: 'daily' };
+  firstGroup: boolean;
+  rewardCatalog: Record<string, QuestRewardCatalogItem>;
+  isPremium: boolean;
+  claimingObjectiveId?: string | null;
+  onOpenRewards: (rewards: QuestReward[]) => void;
+  onClaimObjective?: (questId: string, objectiveId: string) => void;
+}) {
+  const claimedObjectiveIds = quest.claimedObjectiveIds ?? [];
+  const hiddenClaimedObjectiveIds = useHiddenClaimedObjectives(
+    quest.id,
+    claimedObjectiveIds,
+  );
+  const visibleLogic = quest.logic.filter(
+    (block) => !hiddenClaimedObjectiveIds.has(block.id),
+  );
+  if (visibleLogic.length === 0) return null;
+
+  return (
+    <div
+      data-quest-anchor={quest.id}
+      className={cn(!firstGroup && 'border-t border-border/20')}
+    >
+      {visibleLogic.map((block, i) => (
+        <ObjectiveRow
+          key={block.id}
+          block={block}
+          objectiveClaimed={claimedObjectiveIds.includes(block.id)}
+          claimingObjective={claimingObjectiveId === block.id}
+          isPremium={isPremium}
+          rewardCatalog={rewardCatalog}
+          paused={true}
+          onOpenRewards={onOpenRewards}
+          onClaimObjective={
+            onClaimObjective
+              ? () => onClaimObjective(quest.id, block.id)
+              : undefined
+          }
+          isLast={i === visibleLogic.length - 1}
+          isFirst={i === 0}
+        />
+      ))}
     </div>
   );
 }
@@ -548,10 +821,14 @@ export function CategoryQuestPresentationCard({
   const timeLeft = useCountdownLabel(quest.expiresAt);
   const [rewardPopup, setRewardPopup] = useState<RewardPopupState | null>(null);
   const [showSwitch, setShowSwitch] = useState(false);
+  const [showAllObjectives, setShowAllObjectives] = useState(false);
   // Close the confirm once a switch finishes (switchingFocus flips back off).
   useEffect(() => {
     if (!switchingFocus) setShowSwitch(false);
   }, [switchingFocus]);
+  useEffect(() => {
+    setShowAllObjectives(false);
+  }, [quest.id]);
   const claimedObjectiveIds = quest.claimedObjectiveIds ?? [];
   const hiddenClaimedObjectiveIds = useHiddenClaimedObjectives(
     quest.id,
@@ -565,6 +842,30 @@ export function CategoryQuestPresentationCard({
   );
   const needsFocusTags = usesFocusTags && linkedTags.length === 0;
   const isCompleted = visibleLogic.length === 0;
+
+  const isBlockDone = (block: QuestCardLogicBlock) => {
+    const complete = block.progress >= Math.max(1, block.target);
+    const hasRewards = (block.rewards?.length ?? 0) > 0;
+    return claimedObjectiveIds.includes(block.id) || (complete && !hasRewards);
+  };
+  const isBlockClaimable = (block: QuestCardLogicBlock) =>
+    block.progress >= Math.max(1, block.target) &&
+    (block.rewards?.length ?? 0) > 0 &&
+    !claimedObjectiveIds.includes(block.id);
+  const totalSteps = quest.logic.length;
+  const doneSteps = quest.logic.filter(isBlockDone).length;
+  const collapsedClaimedCount = quest.logic.filter((block) =>
+    hiddenClaimedObjectiveIds.has(block.id),
+  ).length;
+  const orderedOpen = [...visibleLogic].sort(
+    (a, b) => Number(isBlockClaimable(b)) - Number(isBlockClaimable(a)),
+  );
+  const shownBlocks = showAllObjectives ? orderedOpen : orderedOpen.slice(0, 2);
+  const foldedBlocks = showAllObjectives ? [] : orderedOpen.slice(2);
+  const foldedPeekRewards = foldedBlocks
+    .map((block) => block.rewards?.[0])
+    .filter(Boolean)
+    .slice(0, 3) as QuestReward[];
 
   return (
     <div className="overflow-hidden rounded-[28px] border border-border/50 bg-card shadow-sm">
@@ -698,12 +999,34 @@ export function CategoryQuestPresentationCard({
             ) : null}
           </div>
         )}
+        {totalSteps > 1 && (
+          <div className="mb-1 flex items-center gap-1 px-1">
+            {quest.logic.map((block) => (
+              <span
+                key={block.id}
+                className={cn(
+                  'h-1.5 w-4 rounded-full',
+                  isBlockDone(block) ? 'bg-lime-500' : 'bg-muted',
+                )}
+              />
+            ))}
+            <span className="ml-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-muted-foreground">
+              {doneSteps} / {totalSteps} done
+            </span>
+          </div>
+        )}
         <div
           className={cn(
             locked && 'pointer-events-none select-none opacity-50 saturate-50',
           )}
         >
-        {visibleLogic.map((block, i) => (
+        {collapsedClaimedCount > 0 && (
+          <div className="flex items-center gap-1.5 border-b border-border/20 px-1 py-2 text-[11px] font-black uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
+            <Check className="h-3.5 w-3.5" strokeWidth={3.5} />
+            {collapsedClaimedCount} claimed
+          </div>
+        )}
+        {shownBlocks.map((block, i) => (
           <div key={block.id}>
             <ObjectiveRow
               block={block}
@@ -724,7 +1047,9 @@ export function CategoryQuestPresentationCard({
                   ? undefined
                   : () => onClaimObjective(block.id)
               }
-              isLast={i === visibleLogic.length - 1}
+              isLast={
+                i === shownBlocks.length - 1 && foldedBlocks.length === 0
+              }
               isFirst={i === 0}
               linkedTags={linkedTags}
               categoryName={category?.shortLabel || category?.name}
@@ -776,6 +1101,44 @@ export function CategoryQuestPresentationCard({
             )}
           </div>
         ))}
+        {(foldedBlocks.length > 0 ||
+          (showAllObjectives && orderedOpen.length > 2)) && (
+          <button
+            type="button"
+            onClick={() => setShowAllObjectives((v) => !v)}
+            className="mt-2 flex w-full items-center gap-2 rounded-xl bg-muted/40 px-3 py-2.5 text-[11px] font-black uppercase tracking-[0.1em] text-muted-foreground transition hover:bg-muted/70"
+          >
+            <ChevronDown
+              className={cn(
+                'h-3.5 w-3.5 transition-transform',
+                showAllObjectives && 'rotate-180',
+              )}
+              strokeWidth={3}
+            />
+            {showAllObjectives
+              ? 'Show less'
+              : `${foldedBlocks.length} more objective${foldedBlocks.length > 1 ? 's' : ''}`}
+            {!showAllObjectives && foldedPeekRewards.length > 0 && (
+              <span className="ml-auto flex items-center gap-1.5 normal-case tracking-normal">
+                <span className="text-[10px] font-bold text-muted-foreground/80">
+                  worth
+                </span>
+                {foldedPeekRewards.map((reward, index) => (
+                  <RewardTile
+                    key={`${reward.type}-${reward.itemId ?? reward.backgroundId ?? index}`}
+                    reward={reward}
+                    rewardCatalog={rewardCatalog}
+                    isPremium={isPremium}
+                    paused={true}
+                    hideBadge
+                    flySize={16}
+                    className="h-8 w-8 rounded-lg"
+                  />
+                ))}
+              </span>
+            )}
+          </button>
+        )}
         </div>
 
       </div>
@@ -802,7 +1165,7 @@ export function CategoryQuestPresentationCard({
   );
 }
 
-function SwitchFocusConfirm({
+export function SwitchFocusConfirm({
   open,
   categoryName,
   currentFocusName,
@@ -896,6 +1259,274 @@ function SwitchFocusConfirm({
   );
 }
 
+export function FocusSlotBar({
+  isPremium,
+  activeLabel,
+  activeAccent,
+  totalCount,
+  onLockedPress,
+}: {
+  isPremium: boolean;
+  activeLabel?: string;
+  activeAccent?: string;
+  totalCount: number;
+  onLockedPress?: () => void;
+}) {
+  if (isPremium) {
+    return (
+      <div className="flex items-center gap-2 px-1 pb-2">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-[11px] font-black uppercase tracking-wide text-primary-foreground shadow-[0_3px_0_rgba(15,23,42,0.18)]">
+          <Check className="h-3 w-3" strokeWidth={3.5} />
+          All {totalCount} running
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2 px-1 pb-2">
+      <span
+        className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-black uppercase tracking-wide text-white shadow-[0_3px_0_rgba(15,23,42,0.18)]"
+        style={{ backgroundColor: activeAccent || '#059669' }}
+      >
+        <span className="h-1.5 w-1.5 rounded-full bg-white" aria-hidden />
+        {activeLabel ?? 'Pick a focus'}
+      </span>
+      {[0, 1].map((slot) => (
+        <button
+          key={slot}
+          type="button"
+          onClick={onLockedPress}
+          aria-label="Unlock more focus slots with Plus"
+          className="inline-flex items-center justify-center rounded-full border-[1.5px] border-dashed border-border bg-muted/50 px-3 py-1.5 text-muted-foreground transition hover:border-primary/40 hover:text-primary"
+        >
+          <Lock className="h-3 w-3" strokeWidth={2.75} />
+        </button>
+      ))}
+      <span className="ml-auto text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground">
+        1 of {totalCount} running
+      </span>
+    </div>
+  );
+}
+
+export function FocusPosterCard({
+  quest,
+  category,
+  live,
+  finished = false,
+  linkedTags = [],
+  rewardCatalog,
+  isPremium,
+  onPress,
+}: {
+  quest: QuestCardData & {
+    placement: 'category';
+    categoryId: MacroCategoryDefinition['id'];
+  };
+  category?: MacroCategoryDefinition;
+  live: boolean;
+  finished?: boolean;
+  linkedTags?: QuestTagChip[];
+  rewardCatalog: Record<string, QuestRewardCatalogItem>;
+  isPremium: boolean;
+  onPress?: () => void;
+}) {
+  const claimedObjectiveIds = quest.claimedObjectiveIds ?? [];
+  const needsTag =
+    quest.logic.some((block) => block.tagMode === 'focus_category_tags') &&
+    linkedTags.length === 0;
+  const imageUrl = category?.coverImageUrl ?? quest.coverImageUrl;
+  const totalTarget = quest.logic.reduce(
+    (sum, block) => sum + Math.max(1, block.target),
+    0,
+  );
+  const totalProgress = quest.logic.reduce(
+    (sum, block) =>
+      sum + Math.min(Math.max(0, block.progress), Math.max(1, block.target)),
+    0,
+  );
+  const pct = totalTarget > 0 ? Math.round((totalProgress / totalTarget) * 100) : 0;
+  const peekReward = quest.logic.find(
+    (block) =>
+      !claimedObjectiveIds.includes(block.id) &&
+      (block.rewards?.length ?? 0) > 0,
+  )?.rewards?.[0];
+
+  return (
+    <button
+      type="button"
+      onClick={onPress}
+      className={cn(
+        'flex w-[136px] flex-none flex-col overflow-hidden rounded-[18px] border bg-card text-left shadow-sm transition active:scale-[0.97]',
+        quest.claimable
+          ? 'border-amber-400 ring-1 ring-amber-400/40'
+          : 'border-border/50',
+        finished && 'opacity-70',
+      )}
+    >
+      <div className="relative h-16 w-full overflow-hidden">
+        {imageUrl ? (
+          <img
+            src={imageUrl}
+            alt={category?.name ?? quest.title}
+            loading="lazy"
+            decoding="async"
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <div
+            className="h-full w-full"
+            style={{
+              background: `linear-gradient(135deg, ${category?.backgroundFrom ?? '#0f172a'}, ${category?.backgroundTo ?? '#1e293b'})`,
+            }}
+          />
+        )}
+        {finished && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/45">
+            <Check className="h-6 w-6 text-emerald-300" strokeWidth={3.5} />
+          </div>
+        )}
+        {!finished && peekReward ? (
+          <div className="absolute bottom-1 right-1">
+            <RewardTile
+              reward={peekReward}
+              rewardCatalog={rewardCatalog}
+              isPremium={isPremium}
+              paused={true}
+              flySize={14}
+              className="h-8 w-8 rounded-lg border"
+            />
+          </div>
+        ) : null}
+      </div>
+      <div className="flex items-center justify-between gap-1 px-2.5 pt-2">
+        <span className="truncate text-[11px] font-black text-foreground">
+          {category?.shortLabel || category?.name || quest.title}
+        </span>
+        {!finished && (
+          <span className="shrink-0 text-[10px] font-bold tabular-nums text-muted-foreground">
+            {pct}%
+          </span>
+        )}
+      </div>
+      <div className="relative mx-2.5 mt-1.5 h-2 overflow-hidden rounded-full bg-muted">
+        <div
+          className={cn(
+            'absolute inset-y-[1.5px] left-[1.5px] rounded-full',
+            finished || quest.claimable
+              ? 'bg-lime-500'
+              : live && !needsTag
+                ? 'bg-amber-400'
+                : 'bg-muted-foreground/40',
+          )}
+          style={{ width: `${Math.max(pct, 4)}%` }}
+        />
+      </div>
+      <div
+        className={cn(
+          'mx-2.5 my-2 flex items-center justify-center gap-1 rounded-[10px] py-1.5 text-[9px] font-black uppercase tracking-[0.1em]',
+          finished
+            ? 'text-muted-foreground'
+            : quest.claimable
+              ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+              : needsTag
+                ? 'border-[1.5px] border-dashed border-amber-500/60 bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                : live
+                  ? 'text-muted-foreground'
+                  : 'border-[1.5px] border-dashed border-border text-muted-foreground',
+        )}
+      >
+        {finished ? (
+          'Done'
+        ) : quest.claimable ? (
+          <>
+            <Gift className="h-3 w-3" strokeWidth={2.75} />
+            Reward ready
+          </>
+        ) : needsTag ? (
+          <>
+            <Tags className="h-3 w-3" strokeWidth={2.75} />
+            Pick a tag
+          </>
+        ) : live && linkedTags.length > 0 ? (
+          <span className="flex min-w-0 max-w-full items-center gap-1">
+            <span
+              className="inline-flex min-w-0 items-center rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-wider shadow-sm"
+              style={{
+                backgroundColor: `${linkedTags[0].color}20`,
+                borderColor: `${linkedTags[0].color}40`,
+                color: linkedTags[0].color,
+              }}
+            >
+              <span className="truncate">{linkedTags[0].name}</span>
+            </span>
+            {linkedTags.length > 1 && (
+              <span className="shrink-0 text-[9px] font-black text-muted-foreground">
+                +{linkedTags.length - 1}
+              </span>
+            )}
+          </span>
+        ) : live ? (
+          'Running'
+        ) : (
+          <>
+            <Pause className="h-3 w-3" strokeWidth={2.75} />
+            Swap in
+          </>
+        )}
+      </div>
+    </button>
+  );
+}
+
+export function PlusGateCard({
+  questCount,
+  onUpgrade,
+}: {
+  questCount: number;
+  onUpgrade?: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onUpgrade}
+      className="relative isolate flex w-[148px] flex-none flex-col justify-between overflow-hidden rounded-[18px] p-3 text-left shadow-sm ring-1 ring-emerald-900/40 transition active:scale-[0.97]"
+    >
+      <span
+        aria-hidden
+        className="absolute inset-0 -z-10 bg-[linear-gradient(160deg,#0c3f31_0%,#14532d_60%,#365314_100%)]"
+      />
+      <span
+        aria-hidden
+        className="absolute inset-x-0 top-0 -z-10 h-1/3 bg-gradient-to-b from-white/10 to-transparent"
+      />
+      <div>
+        <p
+          className="text-[13px] uppercase leading-[1.3] tracking-wide text-emerald-50"
+          style={{
+            fontFamily: 'var(--font-display), "Luckiest Guy", cursive',
+            WebkitTextStroke: '1px rgba(6, 44, 34, 0.9)',
+            paintOrder: 'stroke fill',
+          }}
+        >
+          {questCount} quests.
+          <br />
+          One frog.
+          <br />
+          <span className="text-amber-300">Plus runs them all.</span>
+        </p>
+        <p className="mt-1.5 text-[9.5px] font-bold leading-snug text-emerald-100/75">
+          Every focus advances at once — and rewards are doubled.
+        </p>
+      </div>
+      <span className="mt-2.5 flex items-center justify-center rounded-[10px] bg-amber-400 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-950 shadow-[0_2.5px_0_rgba(0,0,0,0.35)]">
+        See Plus
+      </span>
+    </button>
+  );
+}
+
 // Matches the season banner palette: amber while in progress, lime when done.
 function progressBarColor(complete: boolean, claimed: boolean) {
   return claimed || complete ? 'bg-lime-600' : 'bg-amber-400';
@@ -959,7 +1590,7 @@ function ObjectiveRow({
           type="button"
           onClick={onClaimObjective}
           disabled={claimingObjective}
-          className="inline-flex h-9 items-center justify-center rounded-xl bg-amber-500 px-4 text-[10px] font-black uppercase tracking-[0.15em] text-white shadow-[0_3px_0_0_#b45309] transition-all hover:translate-y-[-1px] hover:shadow-[0_4px_0_0_#b45309] active:translate-y-[2px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex h-8 items-center justify-center rounded-xl bg-amber-500 px-3.5 text-[10px] font-black uppercase tracking-[0.15em] text-white shadow-[0_3px_0_0_#b45309] transition-all hover:translate-y-[-1px] hover:shadow-[0_4px_0_0_#b45309] active:translate-y-[2px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60"
         >
           <span className="mr-[-0.15em]">
             {claimingObjective ? 'Claiming...' : 'Claim'}
@@ -969,7 +1600,7 @@ function ObjectiveRow({
     }
     if (objectiveClaimed) {
       return (
-        <div className="flex h-9 items-center gap-1.5 rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-3">
+        <div className="flex h-8 items-center gap-1.5 rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-2.5">
           <Check className="w-3 h-3 text-emerald-500" />
           <span className="text-[10px] font-black uppercase tracking-[0.12em] text-emerald-600/70 dark:text-emerald-400/70">
             Claimed
@@ -979,7 +1610,7 @@ function ObjectiveRow({
     }
     return (
       <div
-        className="inline-flex h-9 cursor-not-allowed items-center justify-center rounded-xl bg-muted px-4 text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground/60 shadow-[0_3px_0_0_rgba(15,23,42,0.12)]"
+        className="inline-flex h-8 cursor-not-allowed items-center justify-center rounded-xl bg-muted px-3.5 text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground/60 shadow-[0_3px_0_0_rgba(15,23,42,0.12)]"
         aria-disabled
       >
         <span className="mr-[-0.15em]">Claim</span>
@@ -993,13 +1624,13 @@ function ObjectiveRow({
   return (
     <div
       className={cn(
-        'py-3 transition-opacity',
+        'py-2.5 transition-opacity',
         !isLast && 'border-b border-border/20',
         needsTag && 'opacity-50 saturate-50',
       )}
       aria-disabled={needsTag || undefined}
     >
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2.5">
         {firstReward ? (
           <div className="relative shrink-0">
             <RewardTile
@@ -1008,7 +1639,7 @@ function ObjectiveRow({
               isPremium={isPremium ?? false}
               compact
               paused={paused}
-              className="h-16 w-16 rounded-2xl"
+              className="h-12 w-12 rounded-xl"
               hydrateDelayMs={150}
               giftAnimation="box_shake"
               onClick={() => onOpenRewards?.(block.rewards ?? [])}
@@ -1024,7 +1655,7 @@ function ObjectiveRow({
         <div className="min-w-0 flex-1">
           <p
             className={cn(
-              'flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm font-black leading-snug md:text-base',
+              'flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm font-black leading-snug',
               stepDone
                 ? 'text-emerald-600 line-through decoration-emerald-500/60 dark:text-emerald-400'
                 : 'text-foreground',
@@ -1041,17 +1672,17 @@ function ObjectiveRow({
             ) : null}
           </p>
 
-          <div className="relative mt-2 h-6 overflow-hidden rounded-full bg-muted">
-            <div className="absolute inset-1">
+          <div className="relative mt-1.5 h-5 overflow-hidden rounded-full bg-muted">
+            <div className="absolute inset-[3px]">
               <div
                 className={cn(
-                  'h-full min-w-5 rounded-full transition-all duration-500',
+                  'h-full min-w-4 rounded-full transition-all duration-500',
                   progressBarColor(objectiveComplete, objectiveClaimed ?? false),
                 )}
-                style={{ width: pct > 0 ? `${pct}%` : '1.25rem' }}
+                style={{ width: pct > 0 ? `${pct}%` : '1rem' }}
               />
             </div>
-            <span className="absolute inset-0 flex items-center justify-center text-[11px] font-black tabular-nums text-foreground/70">
+            <span className="absolute inset-0 flex items-center justify-center text-[10px] font-black tabular-nums text-foreground/70">
               {Math.min(block.progress, safeTarget)}
               {' / '}
               {block.targetLabel ?? block.target}
@@ -1061,7 +1692,7 @@ function ObjectiveRow({
             <span
               aria-hidden
               className={cn(
-                'absolute inset-0 flex items-center justify-center text-[11px] font-black tabular-nums',
+                'absolute inset-0 flex items-center justify-center text-[10px] font-black tabular-nums',
                 progressTextColor(objectiveComplete, objectiveClaimed ?? false),
               )}
               style={{ clipPath: `inset(0 ${100 - pct}% 0 0)` }}
