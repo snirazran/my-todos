@@ -15,6 +15,8 @@ import {
   type FriendSummary,
 } from '@/lib/friends/indices';
 import { getZonedToday } from '@/lib/utils';
+import { previousDayKey } from '@/lib/quests/streak';
+import { computeGap, readLoginStreakState } from '@/lib/streak/loginStreak';
 import type { DailyFlyProgress, FriendFlyDaily } from '@/lib/types/UserDoc';
 
 function fliesEarnedOn(
@@ -48,22 +50,37 @@ export async function GET(req: NextRequest) {
     const [users, me, catalog] = await Promise.all([
       UserModel.find({ _id: { $in: friendIds } })
         .select(
-          'name frogName wardrobe.equipped wardrobe.flyDaily wardrobe.backgrounds.equipped',
+          'name frogName premiumUntil quests.loginStreak wardrobe.equipped wardrobe.flyDaily wardrobe.backgrounds.equipped',
         )
         .lean(),
       UserModel.findById(userId)
         .select(
-          'name frogName wardrobe.equipped wardrobe.flyDaily wardrobe.friendFlyDaily wardrobe.friendFlyTotals wardrobe.backgrounds.equipped',
+          'name frogName premiumUntil quests.loginStreak wardrobe.equipped wardrobe.flyDaily wardrobe.friendFlyDaily wardrobe.friendFlyTotals wardrobe.backgrounds.equipped',
         )
         .lean(),
       getCachedCatalog(),
     ]);
     const byId = buildById(catalog);
 
+    const aliveStreakOf = (u: unknown): number => {
+      const state = readLoginStreakState(u);
+      if (state.count <= 0 || !state.lastDayKey) return 0;
+      if (
+        state.lastDayKey === today ||
+        state.lastDayKey === previousDayKey(today)
+      ) {
+        return state.count;
+      }
+      return computeGap(state.lastDayKey, today) <= state.freezes
+        ? state.count
+        : 0;
+    };
+
     const toSummary = (u: {
       _id: string;
       name?: string;
       frogName?: string;
+      premiumUntil?: Date | string | null;
       wardrobe?: {
         equipped?: Partial<Record<string, string | null>>;
         flyDaily?: DailyFlyProgress;
@@ -79,6 +96,8 @@ export async function GET(req: NextRequest) {
         fliesToday,
         givesYou: contributionFrom(fliesToday),
         backgroundId: u.wardrobe?.backgrounds?.equipped ?? null,
+        streak: aliveStreakOf(u),
+        premium: u.premiumUntil ? new Date(u.premiumUntil) > new Date() : false,
       };
     };
 

@@ -39,6 +39,7 @@ import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
 import { TradePanel } from './TradePanel';
 import GiftBoxOpening from '@/components/ui/gift-box/GiftBoxOpening';
 import { SellConfirmationDialog } from './SellConfirmationDialog';
+import { StreakFreezeShopCard } from '@/components/ui/streak/StreakFreezeShopCard';
 import { BackgroundCard } from './BackgroundCard';
 import { mutateBackgrounds, type BackgroundItem } from '@/hooks/useBackgrounds';
 import {
@@ -1217,6 +1218,7 @@ function WardrobeManagerContent({
                 <WardrobeGridSkeleton />
               ) : activeTab === 'shop' ? (
                 <>
+                  <StreakFreezeShopCard />
                   <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4 pb-4">
                     {mergeWardrobeCards(
                       shopGrid.visibleItems,

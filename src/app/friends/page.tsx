@@ -11,7 +11,10 @@ import {
   Bell,
   UserMinus,
   Loader2,
+  Flame,
 } from 'lucide-react';
+import { Icon } from '@/components/ui/Icon';
+import { PremiumBadge } from '@/components/ui/PremiumBadge';
 import useSWR from 'swr';
 import { useAuth } from '@/components/auth/AuthContext';
 import { mutateFriendsCaches } from '@/hooks/useFriendsSync';
@@ -138,6 +141,7 @@ export default function FriendsPage() {
     <main className="relative min-h-[100dvh] overflow-x-hidden pb-24 md:pb-12">
       <div className="relative z-10 mx-auto flex w-full flex-col items-center px-4 pt-[calc(env(safe-area-inset-top)+0.5rem)] md:max-w-2xl md:pt-11">
         {/* Friend invites — persistent, over the winter scene */}
+        <PremiumBadge className="absolute right-16 top-[calc(env(safe-area-inset-top)+0.75rem)] z-30 border-0 bg-white/90 shadow-md ring-1 ring-black/5 backdrop-blur-sm md:hidden" />
         <button
           type="button"
           onClick={() => setInboxOpen(true)}
@@ -563,12 +567,26 @@ function LeaderboardRow({
         </div>
 
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-black leading-tight tracking-tight text-emerald-950 sm:text-base">
-            {entry.frogName || entry.name}
+          <p className="flex items-center gap-1 text-sm font-black leading-tight tracking-tight text-emerald-950 sm:text-base">
+            <span className="truncate">{entry.frogName || entry.name}</span>
+            {entry.premium && (
+              <Icon
+                name="frogPlus"
+                label="Frogress Plus"
+                className="h-4 w-4 shrink-0 sm:h-5 sm:w-5"
+              />
+            )}
           </p>
           {entry.name && entry.frogName && entry.name !== entry.frogName && (
             <p className="truncate text-xs font-semibold text-emerald-700/70">
               {entry.name}
+            </p>
+          )}
+          {(entry.streak ?? 0) > 0 && (
+            <p className="mt-0.5 flex items-center gap-0.5 text-xs font-black text-orange-500">
+              <Flame className="h-3.5 w-3.5 fill-orange-400" />
+              {entry.streak}
+              <span className="font-bold text-orange-400/80">day streak</span>
             </p>
           )}
         </div>

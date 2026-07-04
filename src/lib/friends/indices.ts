@@ -35,6 +35,10 @@ export type FriendSummary = {
   backgroundId?: string | null;
   /** Lifetime flies this friend has contributed to you (claimed). */
   sharedTotal?: number;
+  /** Current alive login-streak count (0 when broken/none). */
+  streak?: number;
+  /** Whether this user has an active premium subscription. */
+  premium?: boolean;
 };
 
 /** Flies a friend's daily catch contributes to you: every 2 → 1. */

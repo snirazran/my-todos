@@ -33,6 +33,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronRight } from 'lucide-react';
 import Fly from '@/components/ui/fly';
 import { FlyCounter } from '@/components/ui/FlyCounter';
+import { StreakChip } from '@/components/ui/streak/StreakChip';
+import { PremiumBadge } from '@/components/ui/PremiumBadge';
 import { CurrencyShop } from './shop/CurrencyShop';
 import { HelpCenterPanel, ContactPanel } from '@/components/ui/HelpCenter';
 import { cn } from '@/lib/utils';
@@ -199,6 +201,8 @@ export default function SiteHeader() {
                 <Icon name="shuffle" label="Skin rotation" className="h-7 w-7" />
               </button>
             )}
+            <PremiumBadge />
+            <StreakChip variant="mobile" />
             <FlyCounter
               balance={flyBalance}
               variant="mobile"
@@ -238,12 +242,12 @@ export default function SiteHeader() {
         />
 
         {/* ───────── Desktop Navigation (Centered) ───────── */}
-        <div className="hidden md:flex flex-1 min-w-0 items-center justify-center gap-0.5 lg:gap-1">
+        <div className="hidden md:flex flex-1 min-w-0 items-center justify-center gap-0.5 xl:gap-1">
           {navItems.map((item) => {
             const isActive = item.href ? pathname === item.href : item.isActive;
 
             const buttonClass = `
-              relative flex items-center gap-1.5 lg:gap-2 px-2.5 lg:px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all
+              relative flex items-center gap-1.5 xl:gap-2 px-2.5 xl:px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all
               ${
                 isActive
                   ? 'bg-primary/10 text-primary hover:bg-primary/20'
@@ -256,7 +260,7 @@ export default function SiteHeader() {
                 <div key={item.label} className="relative" ref={wardrobeRef}>
                   <button onClick={item.onClick} className={buttonClass}>
                     <Icon name={item.iconName} label={item.label} className="w-8 h-8" />
-                    <span className="hidden lg:inline">{item.label}</span>
+                    <span className="hidden xl:inline">{item.label}</span>
                     {inventoryBadge > 0 && (
                       <span className="flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white shadow-sm ml-1">
                         {inventoryBadge > 9 ? '9+' : inventoryBadge}
@@ -318,7 +322,7 @@ export default function SiteHeader() {
                     label={item.label}
                     className={`w-8 h-8 ${item.label === 'Friends' ? 'scale-125' : ''}`}
                   />
-                  <span className="hidden lg:inline">{item.label}</span>
+                  <span className="hidden xl:inline">{item.label}</span>
                   {item.label === 'Quests' && questClaimableCount > 0 ? (
                     <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white shadow-sm ml-1">
                       {questClaimableCount > 99 ? '99+' : questClaimableCount}
@@ -348,7 +352,7 @@ export default function SiteHeader() {
                   className={buttonClass}
                 >
                   <Icon name={item.iconName} label={item.label} className="w-8 h-8" />
-                  <span className="hidden lg:inline">{item.label}</span>
+                  <span className="hidden xl:inline">{item.label}</span>
                 </button>
               );
             }
@@ -356,7 +360,7 @@ export default function SiteHeader() {
             return (
               <Link key={item.href} href={item.href!} className={buttonClass}>
                 <Icon name={item.iconName} label={item.label} className="w-8 h-8" />
-                <span className="hidden lg:inline">{item.label}</span>
+                <span className="hidden xl:inline">{item.label}</span>
               </Link>
             );
           })}
@@ -386,11 +390,15 @@ export default function SiteHeader() {
           )}
 
           {user && flyBalance !== undefined && (
-            <FlyCounter
-              balance={flyBalance}
-              variant="desktop"
-              onClick={() => setShopOpen(true)}
-            />
+            <>
+              <PremiumBadge />
+              <StreakChip variant="desktop" />
+              <FlyCounter
+                balance={flyBalance}
+                variant="desktop"
+                onClick={() => setShopOpen(true)}
+              />
+            </>
           )}
         </div>
         <style jsx>{`

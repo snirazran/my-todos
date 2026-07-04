@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/send-scheduled-task-reminders",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/login-streak",
+      "schedule": "*/30 * * * *"
     }
   ]
 }

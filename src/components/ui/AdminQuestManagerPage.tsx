@@ -32,6 +32,7 @@ import {
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { QUEST_METRIC_COPY } from '@/lib/quests/metricLabels';
+import type { LoginStreakReward } from '@/lib/streak/types';
 import type {
   QuestLogicBlock,
   QuestPlacement,
@@ -101,6 +102,21 @@ const SEASON_SIZE_FIELDS: {
 ];
 
 type MetaRewardItem = QuestRewardCatalogItem;
+
+type AdminLoginStreakTier = {
+  days: number;
+  rewards: LoginStreakReward[];
+};
+
+type AdminLoginStreakConfig = {
+  isActive: boolean;
+  freezePriceFlies: number;
+  freezeCap: number;
+  saverMinStreak: number;
+  goalTiers: AdminLoginStreakTier[];
+  milestones: AdminLoginStreakTier[];
+  limits: { freezeCapMin: number; freezeCapMax: number };
+};
 type QuickAddSuggestionDraft = {
   id: string;
   text: string;
@@ -518,6 +534,15 @@ export function AdminQuestManagerPage() {
   const [savingStreak, setSavingStreak] = useState(false);
   const [streakRewardPickerOpen, setStreakRewardPickerOpen] = useState(false);
 
+  // Login streak (app-entry) config
+  const [loginStreakConfig, setLoginStreakConfig] =
+    useState<AdminLoginStreakConfig | null>(null);
+  const [savingLoginStreak, setSavingLoginStreak] = useState(false);
+  const [loginRewardTarget, setLoginRewardTarget] = useState<{
+    list: 'goalTiers' | 'milestones';
+    days: number;
+  } | null>(null);
+
   // Generated-mode recipe editors (focus ladder + daily roll)
   const [adminRecipes, setAdminRecipes] = useState<AdminRecipe[]>([]);
   const [openRecipeId, setOpenRecipeId] = useState<string | null>(null);
@@ -538,7 +563,7 @@ export function AdminQuestManagerPage() {
     setLoading(true);
     setResult(null);
     try {
-      const [templatesRes, metaRes, categoriesRes, seasonsRes, recipesRes, coversRes, streakRes] = await Promise.all([
+      const [templatesRes, metaRes, categoriesRes, seasonsRes, recipesRes, coversRes, streakRes, loginStreakRes] = await Promise.all([
         fetch('/api/admin/quests', { credentials: 'include' }),
         fetch('/api/admin/quests/meta', { credentials: 'include' }),
         fetch('/api/admin/quests/categories', { credentials: 'include' }),
@@ -546,6 +571,7 @@ export function AdminQuestManagerPage() {
         fetch('/api/admin/quest-recipes', { credentials: 'include' }),
         fetch('/api/admin/quest-covers', { credentials: 'include' }),
         fetch('/api/admin/quests/streak', { credentials: 'include' }),
+        fetch('/api/admin/streak/login', { credentials: 'include' }),
       ]);
       const templatesData = await templatesRes.json();
       const metaData = await metaRes.json();
@@ -568,6 +594,10 @@ export function AdminQuestManagerPage() {
       setAdminCategories(categoriesData.categories ?? []);
       setAdminRecipes((recipesData.recipes ?? []) as AdminRecipe[]);
       if (streakRes.ok && streakData.streak) setStreakConfig(streakData.streak);
+      const loginStreakData = await loginStreakRes.json();
+      if (loginStreakRes.ok && loginStreakData.loginStreak) {
+        setLoginStreakConfig(loginStreakData.loginStreak);
+      }
       setOnboardCovers(
         Object.fromEntries(
           ((coversData.covers ?? []) as { key: string; coverImageUrl?: string }[])
@@ -1156,6 +1186,7 @@ export function AdminQuestManagerPage() {
       {adminRecipes.filter((r) => r.placement === 'daily').map(renderRecipeCard)}
       {recipeRewardDialog}
       {renderStreakCard()}
+      {renderLoginStreakCard()}
       {renderOnboardingCoversCard()}
       {renderQuestList(dailyTemplates, 'daily')}
     </div>
@@ -1757,6 +1788,294 @@ export function AdminQuestManagerPage() {
             setStreakRewardPickerOpen(false);
           }}
         />
+      </div>
+    );
+  };
+
+  const saveLoginStreakConfig = async () => {
+    if (!loginStreakConfig) return;
+    setSavingLoginStreak(true);
+    setResult(null);
+    try {
+      const res = await fetch('/api/admin/streak/login', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          isActive: loginStreakConfig.isActive,
+          freezePriceFlies: loginStreakConfig.freezePriceFlies,
+          freezeCap: loginStreakConfig.freezeCap,
+          saverMinStreak: loginStreakConfig.saverMinStreak,
+          goalTiers: loginStreakConfig.goalTiers,
+          milestones: loginStreakConfig.milestones,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not save login streak');
+      setLoginStreakConfig(data.loginStreak);
+      setResult({ type: 'success', message: 'Login streak saved' });
+    } catch (error) {
+      setResult({
+        type: 'error',
+        message:
+          error instanceof Error ? error.message : 'Could not save login streak',
+      });
+    } finally {
+      setSavingLoginStreak(false);
+    }
+  };
+
+  const loginQuestRewards = (rewards: LoginStreakReward[]) =>
+    rewards.filter((r) => r.type !== 'STREAK_FREEZE') as QuestReward[];
+  const loginFreezeCount = (rewards: LoginStreakReward[]) =>
+    rewards.reduce(
+      (sum, r) => (r.type === 'STREAK_FREEZE' ? sum + (r.amount ?? 1) : sum),
+      0,
+    );
+  const setLoginTier = (
+    list: 'goalTiers' | 'milestones',
+    days: number,
+    updater: (tier: AdminLoginStreakTier) => AdminLoginStreakTier | null,
+  ) => {
+    setLoginStreakConfig((prev) => {
+      if (!prev) return prev;
+      const tiers = prev[list]
+        .map((tier) => (tier.days === days ? updater(tier) : tier))
+        .filter(Boolean) as AdminLoginStreakTier[];
+      return { ...prev, [list]: tiers };
+    });
+  };
+  const mergeLoginRewards = (quest: QuestReward[], freezes: number) => [
+    ...quest,
+    ...(freezes > 0
+      ? [{ type: 'STREAK_FREEZE', amount: freezes } as LoginStreakReward]
+      : []),
+  ];
+
+  const renderLoginTierList = (
+    list: 'goalTiers' | 'milestones',
+    tiers: AdminLoginStreakTier[],
+  ) => (
+    <div className="mt-2 space-y-2">
+      {tiers.map((tier) => (
+        <div
+          key={tier.days}
+          className="flex flex-wrap items-center gap-2 rounded-xl border border-border/40 bg-background px-3 py-2"
+        >
+          <span className="w-16 text-sm font-black text-foreground">
+            {tier.days}d
+          </span>
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+            {loginQuestRewards(tier.rewards).map((reward, ri) => (
+              <RewardTile
+                key={`${reward.type}-${reward.itemId ?? reward.backgroundId ?? reward.amount ?? ri}`}
+                reward={reward}
+                rewardCatalog={rewardCatalog}
+                isPremium={false}
+              />
+            ))}
+            {loginFreezeCount(tier.rewards) > 0 && (
+              <span className="rounded-full bg-sky-100 px-2.5 py-1 text-xs font-black text-sky-600 dark:bg-sky-500/15">
+                ❄️ ×{loginFreezeCount(tier.rewards)}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => setLoginRewardTarget({ list, days: tier.days })}
+              className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-background px-2.5 py-1 text-xs font-bold text-muted-foreground transition hover:border-primary/30 hover:text-foreground"
+            >
+              <Pencil className="h-3 w-3" />
+              Prizes
+            </button>
+          </div>
+          <label className="flex items-center gap-1 text-xs font-bold text-muted-foreground">
+            ❄️
+            <input
+              type="number"
+              min={0}
+              max={3}
+              value={loginFreezeCount(tier.rewards)}
+              onChange={(e) => {
+                const freezes = Math.min(
+                  3,
+                  Math.max(0, Math.floor(Number(e.target.value) || 0)),
+                );
+                setLoginTier(list, tier.days, (t) => ({
+                  ...t,
+                  rewards: mergeLoginRewards(loginQuestRewards(t.rewards), freezes),
+                }));
+              }}
+              className="h-8 w-14 rounded-lg border border-border/50 bg-background px-2 text-sm font-bold text-foreground"
+            />
+          </label>
+        </div>
+      ))}
+    </div>
+  );
+
+  const renderLoginStreakCard = () => {
+    if (!loginStreakConfig) return null;
+    const targetTier = loginRewardTarget
+      ? loginStreakConfig[loginRewardTarget.list].find(
+          (t) => t.days === loginRewardTarget.days,
+        )
+      : null;
+    return (
+      <div className="rounded-2xl border border-border/40 bg-card/60 px-4 py-3.5">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-bold text-foreground">
+              Login streak (app entry)
+            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Opening the app daily grows the streak. Goals and milestones grant
+              the prizes below; freezes auto-protect missed days.
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={loginStreakConfig.isActive}
+            onClick={() =>
+              setLoginStreakConfig((prev) =>
+                prev ? { ...prev, isActive: !prev.isActive } : prev,
+              )
+            }
+            className={cn(
+              'relative h-6 w-11 shrink-0 rounded-full transition-colors',
+              loginStreakConfig.isActive ? 'bg-emerald-500' : 'bg-muted',
+            )}
+          >
+            <span
+              className={cn(
+                'absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform',
+                loginStreakConfig.isActive
+                  ? 'translate-x-[22px]'
+                  : 'translate-x-0.5',
+              )}
+            />
+          </button>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-end gap-4">
+          <label className="block">
+            <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+              Freeze price (flies)
+            </span>
+            <input
+              type="number"
+              min={1}
+              value={loginStreakConfig.freezePriceFlies}
+              onChange={(e) =>
+                setLoginStreakConfig((prev) =>
+                  prev
+                    ? {
+                        ...prev,
+                        freezePriceFlies: Math.max(
+                          1,
+                          Math.floor(Number(e.target.value) || 1),
+                        ),
+                      }
+                    : prev,
+                )
+              }
+              className="mt-1 block h-10 w-28 rounded-xl border border-border/50 bg-background px-3 text-sm font-bold text-foreground"
+            />
+          </label>
+          <label className="block">
+            <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+              Freeze cap
+            </span>
+            <input
+              type="number"
+              min={loginStreakConfig.limits.freezeCapMin}
+              max={loginStreakConfig.limits.freezeCapMax}
+              value={loginStreakConfig.freezeCap}
+              onChange={(e) =>
+                setLoginStreakConfig((prev) =>
+                  prev
+                    ? {
+                        ...prev,
+                        freezeCap: Math.min(
+                          prev.limits.freezeCapMax,
+                          Math.max(
+                            prev.limits.freezeCapMin,
+                            Math.floor(Number(e.target.value) || 1),
+                          ),
+                        ),
+                      }
+                    : prev,
+                )
+              }
+              className="mt-1 block h-10 w-20 rounded-xl border border-border/50 bg-background px-3 text-sm font-bold text-foreground"
+            />
+          </label>
+          <label className="block">
+            <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+              Saver push min streak
+            </span>
+            <input
+              type="number"
+              min={1}
+              max={10}
+              value={loginStreakConfig.saverMinStreak}
+              onChange={(e) =>
+                setLoginStreakConfig((prev) =>
+                  prev
+                    ? {
+                        ...prev,
+                        saverMinStreak: Math.min(
+                          10,
+                          Math.max(1, Math.floor(Number(e.target.value) || 1)),
+                        ),
+                      }
+                    : prev,
+                )
+              }
+              className="mt-1 block h-10 w-20 rounded-xl border border-border/50 bg-background px-3 text-sm font-bold text-foreground"
+            />
+          </label>
+          <Button
+            size="sm"
+            className="ml-auto rounded-xl font-black"
+            onClick={() => void saveLoginStreakConfig()}
+            disabled={savingLoginStreak}
+          >
+            {savingLoginStreak ? 'Saving…' : 'Save login streak'}
+          </Button>
+        </div>
+
+        <div className="mt-4">
+          <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+            Commitment goals
+          </span>
+          {renderLoginTierList('goalTiers', loginStreakConfig.goalTiers)}
+        </div>
+        <div className="mt-4">
+          <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+            Milestones
+          </span>
+          {renderLoginTierList('milestones', loginStreakConfig.milestones)}
+        </div>
+
+        {loginRewardTarget && targetTier && (
+          <RewardPickerDialog
+            open
+            onOpenChange={(isOpen) => {
+              if (!isOpen) setLoginRewardTarget(null);
+            }}
+            rewards={loginQuestRewards(targetTier.rewards)}
+            rewardItems={rewardItems}
+            rewardCatalog={rewardCatalog}
+            onSave={(rewards) => {
+              setLoginTier(loginRewardTarget.list, loginRewardTarget.days, (t) => ({
+                ...t,
+                rewards: mergeLoginRewards(rewards, loginFreezeCount(t.rewards)),
+              }));
+              setLoginRewardTarget(null);
+            }}
+          />
+        )}
       </div>
     );
   };
