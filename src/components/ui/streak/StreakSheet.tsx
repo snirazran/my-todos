@@ -301,31 +301,34 @@ function CommitStep({
 
       <div className="mt-8 w-full max-w-sm space-y-3">
         {view.goalTiers.map((tier, i) => (
-          <motion.button
+          <motion.div
             key={tier.days}
-            type="button"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.08 * i, type: 'spring', stiffness: 300, damping: 24 }}
-            disabled={busyDays !== null}
-            onClick={() => pickGoal(tier.days)}
-            className="flex w-full items-center gap-4 rounded-2xl border border-border/60 bg-card p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-amber-400 active:scale-[0.98]"
           >
-            <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-orange-100 text-lg font-black text-orange-500 dark:bg-orange-500/15">
-              {tier.days}d
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-base font-black text-foreground">
-                {tier.days} days in a row
+            <button
+              type="button"
+              disabled={busyDays !== null}
+              onClick={() => pickGoal(tier.days)}
+              className="flex w-full items-center gap-4 rounded-2xl border border-border/60 bg-card p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-amber-400 active:scale-[0.98]"
+            >
+              <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-orange-100 text-lg font-black text-orange-500 dark:bg-orange-500/15">
+                {tier.days}d
               </span>
-              <span className="block text-xs font-bold text-muted-foreground">
-                {busyDays === tier.days
-                  ? 'Committing…'
-                  : `Earn ${rewardsLabel(tier.rewards)}`}
+              <span className="min-w-0 flex-1">
+                <span className="block text-base font-black text-foreground">
+                  {tier.days} days in a row
+                </span>
+                <span className="block text-xs font-bold text-muted-foreground">
+                  {busyDays === tier.days
+                    ? 'Committing…'
+                    : `Earn ${rewardsLabel(tier.rewards)}`}
+                </span>
               </span>
-            </span>
-            <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground/40" />
-          </motion.button>
+              <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground/40" />
+            </button>
+          </motion.div>
         ))}
       </div>
 
@@ -346,12 +349,14 @@ function HomeStep({
   frogReady,
   onBuyFreeze,
   onCommit,
+  onDone,
 }: {
   view: LoginStreakView;
   indices: Partial<Record<'skin' | 'hat' | 'body' | 'hand_item', number>>;
   frogReady: boolean;
   onBuyFreeze: () => void;
   onCommit: () => void;
+  onDone: () => void;
 }) {
   return (
     <div className="flex h-full flex-col items-center overflow-y-auto bg-background px-6 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-[calc(env(safe-area-inset-top)+3rem)]">
@@ -478,6 +483,14 @@ function HomeStep({
           </button>
         )}
       </div>
+
+      <button
+        type="button"
+        onClick={onDone}
+        className="mt-6 w-full max-w-sm shrink-0 rounded-2xl bg-primary py-3.5 text-sm font-black uppercase tracking-wide text-primary-foreground shadow-[0_5px_0_0_rgba(0,0,0,0.15)] transition-all active:translate-y-1 active:shadow-none"
+      >
+        Done
+      </button>
     </div>
   );
 }
@@ -576,6 +589,7 @@ export function StreakSheet({
                   frogReady={frogReady}
                   onBuyFreeze={() => setBuyOpen(true)}
                   onCommit={() => setStep('commit')}
+                  onDone={() => onOpenChange(false)}
                 />
               )}
             </motion.div>
