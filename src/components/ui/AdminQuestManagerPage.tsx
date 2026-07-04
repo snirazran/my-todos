@@ -223,6 +223,16 @@ const createVisibilityCondition = (): QuestVisibilityCondition => ({
   operator: 'gt',
   value: 0,
 });
+
+const TASK_STREAK_METRIC_PATTERN = /^task_streak_(\d+)$/;
+
+function isFocusTagScopedMetricKey(metricKey?: string) {
+  return (
+    metricKey === 'buddy_task_completed' ||
+    (!!metricKey && TASK_STREAK_METRIC_PATTERN.test(metricKey))
+  );
+}
+
 const emptyForm = (): FormState => ({
   name: '',
   description: '',
@@ -1504,6 +1514,13 @@ export function AdminQuestManagerPage() {
                       <InlinePillNumber value={entry.maxTarget} onChange={(v) => updateRecipePoolEntry(r.recipeId, slot.id, entry.id, { maxTarget: v })} />
                       <span className="text-sm font-medium text-muted-foreground">· weight</span>
                       <InlinePillNumber value={entry.weight} onChange={(v) => updateRecipePoolEntry(r.recipeId, slot.id, entry.id, { weight: v })} />
+                      {!isDaily &&
+                        entry.type === 'metric_count' &&
+                        isFocusTagScopedMetricKey(entry.metricKey) && (
+                          <span className="text-sm font-medium text-muted-foreground">
+                            · tagged with their focus tags
+                          </span>
+                        )}
                       {slot.pool.length > 1 && (
                         <button onClick={() => removeRecipePoolEntry(r.recipeId, slot.id, entry.id)} className="rounded-lg p-1 text-muted-foreground/60 transition hover:bg-red-500/10 hover:text-red-500">
                           <Trash2 className="h-3 w-3" />
@@ -2808,6 +2825,12 @@ function ObjectivesEditorDialog({
                       <InlinePillNumber value={block.maxAmount ?? 3} onChange={(v) => onUpdate(block.id, { maxAmount: v })} />
                     </>
                   )}
+                  {placement === 'category' &&
+                    isFocusTagScopedMetricKey(block.metricKey) && (
+                      <span className={word}>
+                        tagged with their focus tags
+                      </span>
+                    )}
                 </div>
               ) : (
                 <div className="flex flex-wrap items-center gap-x-1.5 gap-y-2 leading-[30px]">
@@ -3573,4 +3596,3 @@ function SeasonImageUploader({
     </div>
   );
 }
-

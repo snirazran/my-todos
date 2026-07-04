@@ -1,8 +1,23 @@
 type MetricCopy = {
   adminLabel: string;
-  label: (n: number) => string;
-  remaining: (n: number) => string;
+  label: (n: number, options?: MetricLabelOptions) => string;
+  remaining: (n: number, options?: MetricLabelOptions) => string;
 };
+
+type MetricLabelOptions = {
+  tagScoped?: boolean;
+};
+
+function taggedTaskLabel(n: number) {
+  return n === 1 ? 'tagged task' : 'tagged tasks';
+}
+
+function repeatingTaskLabel(n: number, tagScoped?: boolean) {
+  if (tagScoped) {
+    return n === 1 ? 'tagged repeating task' : 'tagged repeating tasks';
+  }
+  return n === 1 ? 'repeating task' : 'repeating tasks';
+}
 
 export const QUEST_METRIC_COPY: Record<string, MetricCopy> = {
   trade_completed: {
@@ -27,23 +42,23 @@ export const QUEST_METRIC_COPY: Record<string, MetricCopy> = {
   },
   buddy_task_completed: {
     adminLabel: 'Buddy tasks (both finished)',
-    label: (n) =>
+    label: (n, options) =>
       n === 1
-        ? 'Finish a task with your buddy'
-        : `Finish ${n} tasks with your buddy`,
-    remaining: (n) =>
-      `Finish ${n} more ${n === 1 ? 'task' : 'tasks'} with your buddy`,
+        ? `Finish a ${options?.tagScoped ? 'tagged task' : 'task'} with your buddy`
+        : `Finish ${n} ${options?.tagScoped ? 'tagged tasks' : 'tasks'} with your buddy`,
+    remaining: (n, options) =>
+      `Finish ${n} more ${options?.tagScoped ? taggedTaskLabel(n) : n === 1 ? 'task' : 'tasks'} with your buddy`,
   },
   task_streak_3: {
     adminLabel: 'Task streak reached',
-    label: (n) =>
+    label: (n, options) =>
       n === 1
-        ? 'Reach a 3-day streak on a repeating task'
-        : `Reach a 3-day streak on ${n} repeating tasks`,
-    remaining: (n) =>
+        ? `Reach a 3-day streak on a ${repeatingTaskLabel(n, options?.tagScoped)}`
+        : `Reach a 3-day streak on ${n} ${repeatingTaskLabel(n, options?.tagScoped)}`,
+    remaining: (n, options) =>
       n === 1
-        ? 'Reach 1 more 3-day streak'
-        : `Reach ${n} more 3-day streaks`,
+        ? `Reach 1 more 3-day streak on a ${repeatingTaskLabel(n, options?.tagScoped)}`
+        : `Reach ${n} more 3-day streaks on ${repeatingTaskLabel(n, options?.tagScoped)}`,
   },
   task_saved_later: {
     adminLabel: 'Tasks saved for later',
@@ -85,14 +100,14 @@ function taskStreakCopy(metricKey: string): MetricCopy | undefined {
   const days = Number(match[1]);
   return {
     adminLabel: `${days}-day streaks reached`,
-    label: (n) =>
+    label: (n, options) =>
       n === 1
-        ? `Reach a ${days}-day streak on a repeating task`
-        : `Reach a ${days}-day streak on ${n} repeating tasks`,
-    remaining: (n) =>
+        ? `Reach a ${days}-day streak on a ${repeatingTaskLabel(n, options?.tagScoped)}`
+        : `Reach a ${days}-day streak on ${n} ${repeatingTaskLabel(n, options?.tagScoped)}`,
+    remaining: (n, options) =>
       n === 1
-        ? `Reach 1 more ${days}-day streak`
-        : `Reach ${n} more ${days}-day streaks`,
+        ? `Reach 1 more ${days}-day streak on a ${repeatingTaskLabel(n, options?.tagScoped)}`
+        : `Reach ${n} more ${days}-day streaks on ${repeatingTaskLabel(n, options?.tagScoped)}`,
   };
 }
 
@@ -104,18 +119,20 @@ function metricCopyFor(metricKey: string | undefined): MetricCopy | undefined {
 export function metricObjectiveLabel(
   metricKey: string | undefined,
   target: number,
+  options?: MetricLabelOptions,
 ): string {
   const copy = metricCopyFor(metricKey);
   if (!copy) return `Complete ${target} ${target === 1 ? 'objective' : 'objectives'}`;
-  return copy.label(Math.max(1, target));
+  return copy.label(Math.max(1, target), options);
 }
 
 export function metricRemainingLabel(
   metricKey: string | undefined,
   remaining: number,
+  options?: MetricLabelOptions,
 ): string {
   const copy = metricCopyFor(metricKey);
   if (!copy)
     return `Complete ${remaining} more ${remaining === 1 ? 'objective' : 'objectives'}`;
-  return copy.remaining(Math.max(1, remaining));
+  return copy.remaining(Math.max(1, remaining), options);
 }

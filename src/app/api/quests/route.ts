@@ -49,10 +49,12 @@ function objectiveSummaryLabel(
   tagsResolved = false,
 ): string {
   const target = Math.max(0, block.target ?? 0);
-  if (block.type === 'metric_count') {
-    return metricObjectiveLabel(block.metricKey, target);
-  }
   const usesFocusTags = block.tagMode === 'focus_category_tags';
+  if (block.type === 'metric_count') {
+    return metricObjectiveLabel(block.metricKey, target, {
+      tagScoped: usesFocusTags,
+    });
+  }
   if (block.type === 'focus_minutes') {
     return usesFocusTags && !tagsResolved
       ? `Focus for ${target} minutes on tasks with focus tags`
@@ -112,10 +114,12 @@ function objectiveRemainingLabel(
 ): string {
   const target = Math.max(1, block.target ?? 1);
   const remaining = Math.max(1, target - Math.max(0, block.progress ?? 0));
-  if (block.type === 'metric_count') {
-    return metricRemainingLabel(block.metricKey, remaining);
-  }
   const usesFocusTags = block.tagMode === 'focus_category_tags';
+  if (block.type === 'metric_count') {
+    return metricRemainingLabel(block.metricKey, remaining, {
+      tagScoped: usesFocusTags,
+    });
+  }
   if (block.type === 'focus_minutes') {
     if (!usesFocusTags) return `Focus ${remaining} more min`;
     return tagsResolved

@@ -143,12 +143,16 @@ const REWARD_TILE_TONE: Record<
   },
 };
 
+const TASK_STREAK_METRIC_PATTERN = /^task_streak_(\d+)$/;
+
 export function formatQuestObjective(block: QuestCardLogicBlock) {
   const targetLabel =
     block.targetLabel ?? String(Math.max(0, block.target ?? 0));
 
   if (block.type === 'metric_count') {
-    return metricObjectiveLabel(block.metricKey, Math.max(1, block.target ?? 1));
+    return metricObjectiveLabel(block.metricKey, Math.max(1, block.target ?? 1), {
+      tagScoped: block.tagMode === 'focus_category_tags',
+    });
   }
 
   if (block.type === 'focus_minutes') {
@@ -173,6 +177,50 @@ export function formatQuestObjective(block: QuestCardLogicBlock) {
   return `${actionLabel} ${targetLabel} ${scopeLabel}`;
 }
 
+function renderFocusScopedMetricObjective(
+  block: QuestCardLogicBlock,
+  tags: QuestTagChip[],
+) {
+  if (block.metricKey === 'buddy_task_completed') {
+    const target = Math.max(1, block.target ?? 1);
+    return (
+      <>
+        <span>{target === 1 ? 'Finish a' : `Finish ${target}`}</span>
+        <TaggedTasksPeek
+          label={target === 1 ? 'tagged task' : 'tagged tasks'}
+          tags={tags}
+        />
+        <span>with your buddy</span>
+      </>
+    );
+  }
+
+  const streakMatch = block.metricKey
+    ? TASK_STREAK_METRIC_PATTERN.exec(block.metricKey)
+    : null;
+  if (streakMatch) {
+    const days = Number(streakMatch[1]);
+    const target = Math.max(1, block.target ?? 1);
+    return (
+      <>
+        <span>
+          {target === 1
+            ? `Reach a ${days}-day streak on a`
+            : `Reach a ${days}-day streak on ${target}`}
+        </span>
+        <TaggedTasksPeek
+          label={
+            target === 1 ? 'tagged repeating task' : 'tagged repeating tasks'
+          }
+          tags={tags}
+        />
+      </>
+    );
+  }
+
+  return formatQuestObjective(block);
+}
+
 function renderObjectiveLabel(
   block: QuestCardLogicBlock,
   context: {
@@ -182,6 +230,15 @@ function renderObjectiveLabel(
     onPickTags?: () => void;
   },
 ) {
+  const tags = context.linkedTags ?? [];
+  if (
+    block.type === 'metric_count' &&
+    block.tagMode === 'focus_category_tags' &&
+    tags.length > 0
+  ) {
+    return renderFocusScopedMetricObjective(block, tags);
+  }
+
   if (block.type === 'metric_count' || block.tagMode !== 'focus_category_tags') {
     return formatQuestObjective(block);
   }
@@ -201,7 +258,6 @@ function renderObjectiveLabel(
       ? 'Add'
       : 'Complete';
 
-  const tags = context.linkedTags ?? [];
   if (tags.length > 0) {
     const leadIn = isMinutes
       ? `${actionLabel} ${targetLabel} minutes on`
@@ -229,8 +285,24 @@ function TaggedTasksPeek({
   tags: QuestTagChip[];
 }) {
   const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLSpanElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (containerRef.current?.contains(event.target as Node)) return;
+      setOpen(false);
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+    };
+  }, [open]);
+
   return (
-    <span className="relative inline-flex">
+    <span ref={containerRef} className="relative inline-flex">
       <button
         type="button"
         aria-label="Show counted tags"
@@ -2103,4 +2175,3 @@ function getRewardOwnedCount(reward: QuestReward, _isPremium: boolean) {
   const base = reward.amount && reward.amount > 1 ? reward.amount : 1;
   return base;
 }
-
