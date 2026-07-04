@@ -31,6 +31,8 @@ import {
   formatEndDateLabel,
 } from '@/components/ui/quick-add/utils';
 import { parseYmd, todayYmd } from '@/components/board/helpers';
+import { useBuddyState } from '@/hooks/useBuddyState';
+import { BuddyFrogFace } from '@/components/ui/BuddyBadge';
 import { randomUUID } from '@/lib/uuid';
 import { TaskRepeatPopup } from './TaskRepeatPopup';
 import RichNotesEditor from './RichNotesEditor';
@@ -158,6 +160,9 @@ export default function TaskDetailSheet({
     const byName = new Map(tags.map((t) => [t.name, t] as const));
     return (id: string) => byId.get(id) ?? byName.get(id);
   }, [tags]);
+
+  const buddyByTaskId = useBuddyState(open);
+  const buddy = displayTask ? buddyByTaskId[displayTask.id] : undefined;
 
   if (!displayTask) return null;
 
@@ -360,6 +365,20 @@ export default function TaskDetailSheet({
                   {displayTask.startTime && (
                     <span className="text-primary">· {displayTask.startTime}</span>
                   )}
+                </div>
+              )}
+
+              {buddy && (
+                <div className="mt-2 flex justify-center">
+                  <span
+                    className="inline-flex items-center gap-1.5 rounded-full bg-[#4f9149]/10 py-1 pl-1 pr-2.5"
+                    title={`Shared with ${buddy.partnerName}`}
+                  >
+                    <BuddyFrogFace indices={buddy.partnerIndices} size={22} />
+                    <span className="text-[12px] font-black leading-none text-[#4f9149]">
+                      With {buddy.partnerName}
+                    </span>
+                  </span>
                 </div>
               )}
 

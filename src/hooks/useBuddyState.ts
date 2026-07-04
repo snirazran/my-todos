@@ -1,10 +1,12 @@
 import useSWR from 'swr';
 import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
+import type { FrogIndices } from '@/lib/friends/indices';
 
 export type BuddyTaskState = {
   bondId: string;
   partnerName: string;
   partnerInitial: string;
+  partnerIndices?: FrogIndices;
   partnerCompletedDates: string[];
   streak: number;
   pendingRepeatChange: { requestedByMe: boolean } | null;

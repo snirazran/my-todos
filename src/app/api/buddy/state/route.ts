@@ -6,11 +6,14 @@ import connectMongo from '@/lib/mongoose';
 import TaskModel from '@/lib/models/Task';
 import TaskBondModel from '@/lib/models/TaskBond';
 import UserModel from '@/lib/models/User';
+import { getCachedCatalog, buildById } from '@/lib/skins/getCatalog';
+import { equippedToIndices, type FrogIndices } from '@/lib/friends/indices';
 
 export type BuddyTaskState = {
   bondId: string;
   partnerName: string;
   partnerInitial: string;
+  partnerIndices: FrogIndices;
   partnerCompletedDates: string[];
   streak: number;
   pendingRepeatChange: { requestedByMe: boolean } | null;
@@ -40,13 +43,22 @@ export async function GET() {
       new Set(bondedTasks.map((t) => t.buddyUserId).filter(Boolean) as string[]),
     );
 
-    const [bonds, partners] = await Promise.all([
+    const [bonds, partners, catalog] = await Promise.all([
       TaskBondModel.find({ bondId: { $in: bondIds }, status: 'active' }).lean(),
       UserModel.find({ _id: { $in: partnerIds } })
-        .select('name frogName')
-        .lean<{ _id: string; name?: string; frogName?: string }[]>(),
+        .select('name frogName wardrobe.equipped')
+        .lean<
+          {
+            _id: string;
+            name?: string;
+            frogName?: string;
+            wardrobe?: { equipped?: Partial<Record<string, string | null>> };
+          }[]
+        >(),
+      getCachedCatalog(),
     ]);
 
+    const byId = buildById(catalog);
     const bondById = new Map(bonds.map((b) => [b.bondId, b]));
     const partnerById = new Map(partners.map((p) => [p._id, p]));
 
@@ -61,6 +73,7 @@ export async function GET() {
         bondId: bond.bondId,
         partnerName: name,
         partnerInitial: name.charAt(0).toUpperCase() || '?',
+        partnerIndices: equippedToIndices(partner?.wardrobe?.equipped, byId),
         partnerCompletedDates: iAmFrom ? bond.completedTo : bond.completedFrom,
         streak: bond.streak?.count ?? 0,
         pendingRepeatChange: bond.pendingRepeatChange
