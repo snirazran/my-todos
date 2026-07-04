@@ -556,9 +556,9 @@ function LeaderboardRow({
             {buddyInvites > 9 ? '9+' : buddyInvites}
           </span>
         )}
-        <div className="flex h-[78px] w-[96px] shrink-0 items-end justify-center self-center overflow-hidden min-[360px]:h-[102px] min-[360px]:w-[132px] min-[400px]:h-[124px] min-[400px]:w-[164px] sm:h-[124px] sm:w-48 md:h-[144px] md:w-56">
+        <div className="flex h-[78px] w-[96px] shrink-0 items-end justify-center self-center overflow-hidden min-[360px]:h-[102px] min-[360px]:w-[132px] min-[400px]:h-[124px] min-[400px]:w-[164px] sm:h-[124px] sm:w-48 md:h-[172px] md:w-56">
           <Frog
-            className="min-[360px]:-translate-y-2 min-[400px]:-translate-y-3.5 md:-translate-y-3"
+            className="min-[360px]:-translate-y-2 min-[400px]:-translate-y-3.5 md:-translate-y-10"
             width={224}
             height={185}
             indices={entry.indices}
