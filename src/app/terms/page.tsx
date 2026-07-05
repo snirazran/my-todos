@@ -50,8 +50,11 @@ const sections: LegalSection[] = [
   {
     title: '7. Paid features and subscriptions',
     body: [
-      'Frogress may offer optional paid features such as Frogress Plus. The price, billing period, trial terms, renewal terms, and cancellation process will be shown at the point of purchase.',
-      'Unless otherwise stated at purchase, payments are handled by the applicable app store, payment processor, or platform provider. Refunds and cancellations may be subject to that provider\'s policies and applicable law.',
+      'Frogress offers an optional paid subscription called Frogress Plus. Current plans, prices, and included features are listed on our pricing page at frogress.com/pricing and at the point of purchase. Plans may include a free trial; if you do not cancel before the trial ends, the subscription begins and you will be charged.',
+      'Subscriptions renew automatically at the end of each billing period until cancelled. You can cancel at any time, and cancellation takes effect at the end of the current billing period, so you keep Plus access until then. Deleting the app or your account does not by itself cancel a subscription.',
+      'Purchases made on our website are processed by Paddle.com, acting as our merchant of record and reseller; Paddle\'s checkout terms apply to those purchases. Purchases made inside the mobile apps are processed by the Apple App Store or Google Play under their terms, and those subscriptions are managed and cancelled through your store account.',
+      'We may change subscription prices or features. If a price change affects an active subscription, we will give notice as required by the applicable store or payment provider, and you can cancel before the change takes effect. Refunds are handled as described in our Refund Policy at frogress.com/refund-policy.',
+      'Frogress may also offer optional rewarded advertisements that let you earn in-app bonuses, such as doubling a reward, by choosing to watch an ad. Watching ads is always optional. Virtual items, currency (such as flies), and cosmetics have no real-world monetary value, cannot be exchanged for cash, and may be modified as part of changes to the service.',
     ],
   },
   {
@@ -76,14 +79,20 @@ const sections: LegalSection[] = [
     ],
   },
   {
-    title: '11. Changes to these Terms',
+    title: '11. Governing law',
+    body: [
+      'These Terms are governed by the laws of the State of Israel, without regard to conflict-of-law rules, and disputes will be resolved in the competent courts of Israel, except where the mandatory consumer protection law of your country of residence gives you additional rights or a different forum.',
+    ],
+  },
+  {
+    title: '12. Changes to these Terms',
     body: [
       'We may update these Terms from time to time. When we make material changes, we will take reasonable steps to notify users, such as updating the date on this page or providing an in-app notice.',
       'Your continued use of Frogress after updated Terms become effective means you accept the updated Terms.',
     ],
   },
   {
-    title: '12. Contact',
+    title: '13. Contact',
     body: [
       'Questions about these Terms can be sent to support@frogress.com.',
     ],

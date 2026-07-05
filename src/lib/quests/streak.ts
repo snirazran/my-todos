@@ -7,6 +7,7 @@ import QuestStreakConfigModel, {
   type QuestStreakConfigDoc,
 } from '@/lib/models/QuestStreakConfig';
 import { getZonedToday } from '@/lib/utils';
+import { recordDoubleableClaim } from '@/lib/rewards/adDouble';
 import { isPremiumUser, syncQuestState } from './engine';
 import type { DailyQuestProgressView, QuestReward } from './types';
 
@@ -203,6 +204,8 @@ export async function claimDailyStreakReward(args: {
       summary.grantedItemIds.push(reward.itemId);
     }
   }
+
+  recordDoubleableClaim(freshUser, summary);
 
   const currentQuests =
     typeof (freshUser as any).quests === 'object' && (freshUser as any).quests

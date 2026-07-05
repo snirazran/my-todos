@@ -34,6 +34,7 @@ import { RewardCard } from '@/components/ui/gift-box/RewardCard';
 import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
 import { RARITY_CONFIG } from '@/components/ui/gift-box/constants';
 import { mutateInventoryCaches } from '@/hooks/useInventory';
+import { showRewardedAd } from '@/lib/ads';
 import type { ItemDef } from '@/lib/skins/catalog';
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
@@ -462,6 +463,8 @@ function FlyClaimRewardOverlay({
     if (doubledRef.current || doubling) return;
     setDoubling(true);
     try {
+      const outcome = await showRewardedAd();
+      if (outcome !== 'rewarded') return;
       const res = await fetch('/api/friends/claim', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

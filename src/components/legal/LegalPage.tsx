@@ -70,6 +70,18 @@ export function LegalPage({
           >
             Privacy Policy
           </Link>
+          <Link
+            href="/refund-policy"
+            className="rounded-xl border border-border bg-card px-4 py-2 text-foreground hover:bg-muted/50"
+          >
+            Refund Policy
+          </Link>
+          <Link
+            href="/pricing"
+            className="rounded-xl border border-border bg-card px-4 py-2 text-foreground hover:bg-muted/50"
+          >
+            Pricing
+          </Link>
           <a
             href="mailto:support@frogress.com"
             className="rounded-xl bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90"

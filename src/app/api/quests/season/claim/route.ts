@@ -12,6 +12,7 @@ import {
   normalizeSeasonDayRewards,
   pruneQuestSeasonProgress,
 } from '@/lib/quests/seasons';
+import { recordDoubleableClaim } from '@/lib/rewards/adDouble';
 
 export async function POST(req: NextRequest) {
   try {
@@ -109,6 +110,7 @@ export async function POST(req: NextRequest) {
     }
 
     const rewardSummary = grantRewardsToUser(user, rewards);
+    recordDoubleableClaim(user, rewardSummary as any);
     questsState.seasons[season.seasonId] = {
       ...seasonState,
       claimedDays: [...claimedDays, day],

@@ -729,6 +729,27 @@ export default function TaskBoard({
 
   const snapSuppressed = !!drag?.active || panActive || snapHold;
 
+  // A touch during the hold takes over from the glide — end the hold right
+  // away so the user's swipe runs with snap engaged instead of free-scrolling.
+  useEffect(() => {
+    if (!snapHold) return;
+    const s = scrollerRef.current;
+    if (!s) return;
+    const cancelHold = () => {
+      if (snapHoldTimerRef.current) {
+        window.clearTimeout(snapHoldTimerRef.current);
+        snapHoldTimerRef.current = null;
+      }
+      setSnapHold(false);
+    };
+    s.addEventListener('touchstart', cancelHold, { passive: true });
+    s.addEventListener('wheel', cancelHold, { passive: true });
+    return () => {
+      s.removeEventListener('touchstart', cancelHold);
+      s.removeEventListener('wheel', cancelHold);
+    };
+  }, [snapHold, scrollerRef]);
+
   // Lock the horizontal board scroller while any sheet/popup is open so the
   // page behind the backdrop can't be slid around.
   const scrollLocked = useSheetStore((s) => s.count) > 0;
@@ -1434,7 +1455,7 @@ export default function TaskBoard({
               ref={setSlideRef(i)}
               data-col="true"
               data-date-key={dk}
-              className="shrink-0 snap-center w-[88vw] sm:w-[360px] md:w-[330px] lg:w-[310px] xl:w-[292px] h-full"
+              className="shrink-0 snap-center snap-always w-[88vw] sm:w-[360px] md:w-[330px] lg:w-[310px] xl:w-[292px] h-full"
             >
               <DayColumn
                 title={titleForIndex(i)}

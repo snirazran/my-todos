@@ -87,6 +87,14 @@ export type UserDoc = {
   statistics?: UserStatistics;
   tags?: UserTag[];
   premiumUntil?: Date;
+  adDoubleClaim?: {
+    id: string;
+    fliesGranted: number;
+    grantedItemIds: string[];
+    grantedBackgroundIds: string[];
+    doubled: boolean;
+    createdAt: Date;
+  };
   focusProfile?: FocusProfile;
   quests?: unknown;
   dailyRewards?: DailyRewardProgress;

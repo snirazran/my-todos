@@ -6,6 +6,7 @@ import Frog from '@/components/ui/frog';
 import Fly from '@/components/ui/fly';
 import { Icon } from '@/components/ui/Icon';
 import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
+import { rewardedAdsAvailable } from '@/lib/ads';
 import { ItemDef } from '@/lib/skins/catalog';
 import { cn } from '@/lib/utils';
 import { RARITY_CONFIG } from './constants';
@@ -415,6 +416,7 @@ function DoubleRewardUpsell({
   giftColor?: number;
 }) {
   const [showPlus, setShowPlus] = useState(false);
+  const canWatchAd = !!onWatchAd && rewardedAdsAvailable();
   const count = rewardAmount ?? giftCount;
   let title = 'Double your reward!';
   if (rewardAmount) {
@@ -506,24 +508,26 @@ function DoubleRewardUpsell({
               )}
             </div>
 
-            <div className="px-5 pt-2">
-              <button
-                type="button"
-                onClick={() => {
-                  if (onWatchAd) onWatchAd();
-                  onClose();
-                }}
-                className="w-full rounded-2xl bg-gradient-to-r from-[#4f9149] via-[#5ca355] to-[#4f9149] bg-[length:200%_100%] animate-[shimmer_2.5s_ease-in-out_infinite] py-3.5 text-white shadow-[0_4px_0_0_#34631f] transition hover:brightness-105 active:translate-y-[3px] active:shadow-none"
-              >
-                <span className="flex items-center justify-center gap-2 text-lg font-black uppercase tracking-[0.08em]">
-                  <Play className="w-5 h-5 fill-current" />
-                  {count ? `Claim ${count * 2} free` : 'Double it free'}
-                </span>
-                <span className="mt-0.5 block text-[11px] font-bold text-white/75">
-                  just watch a short ad
-                </span>
-              </button>
-            </div>
+            {canWatchAd && (
+              <div className="px-5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onWatchAd) onWatchAd();
+                    onClose();
+                  }}
+                  className="w-full rounded-2xl bg-gradient-to-r from-[#4f9149] via-[#5ca355] to-[#4f9149] bg-[length:200%_100%] animate-[shimmer_2.5s_ease-in-out_infinite] py-3.5 text-white shadow-[0_4px_0_0_#34631f] transition hover:brightness-105 active:translate-y-[3px] active:shadow-none"
+                >
+                  <span className="flex items-center justify-center gap-2 text-lg font-black uppercase tracking-[0.08em]">
+                    <Play className="w-5 h-5 fill-current" />
+                    {count ? `Claim ${count * 2} free` : 'Double it free'}
+                  </span>
+                  <span className="mt-0.5 block text-[11px] font-bold text-white/75">
+                    just watch a short ad
+                  </span>
+                </button>
+              </div>
+            )}
 
             <div className="px-5 pt-2.5">
               <button

@@ -60,6 +60,19 @@
 	</dict>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Frogress connects to your local development server while testing the app.</string>
+	<!-- TODO: replace with your real AdMob iOS app ID before release
+	     (this is Google's public test app ID). -->
+	<key>GADApplicationIdentifier</key>
+	<string>ca-app-pub-3940256099942544~1458002511</string>
+	<key>NSUserTrackingUsageDescription</key>
+	<string>Your data will be used to show you more relevant ads.</string>
+	<key>SKAdNetworkItems</key>
+	<array>
+		<dict>
+			<key>SKAdNetworkIdentifier</key>
+			<string>cstr6suwn9.skadnetwork</string>
+		</dict>
+	</array>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

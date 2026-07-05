@@ -58,6 +58,7 @@ const UserSchema = new Schema<UserDoc>(
       default: [],
     },
     premiumUntil: { type: Date },
+    adDoubleClaim: { type: Schema.Types.Mixed, default: undefined },
     focusProfile: {
       type: Schema.Types.Mixed,
       default: () => ({

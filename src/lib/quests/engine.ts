@@ -11,6 +11,7 @@ import type { ItemDef } from '@/lib/skins/catalog';
 import { getFullCatalog } from '@/lib/skins/getCatalog';
 import { loadBackgroundPrizes } from '@/lib/skins/gifts';
 import { getZonedToday, getZonedYMD } from '@/lib/utils';
+import { recordDoubleableClaim } from '@/lib/rewards/adDouble';
 import {
   isTagScopedQuestMetric,
   loadQuestCounters,
@@ -1573,6 +1574,7 @@ export async function claimQuestReward(args: {
   quest.markModified('claimedObjectiveIds');
 
   quest.claimedAt = new Date();
+  recordDoubleableClaim(user, summary);
   user.markModified('wardrobe');
 
   // Claiming the whole quest finishes it — advance a free user's active focus.
@@ -1670,6 +1672,7 @@ export async function claimObjectiveReward(args: {
       }
     }
   }
+  recordDoubleableClaim(user, summary);
   user.markModified('wardrobe');
 
   quest.claimedObjectiveIds = [...(quest.claimedObjectiveIds ?? []), objectiveId];

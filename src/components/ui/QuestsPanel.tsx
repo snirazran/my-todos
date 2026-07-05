@@ -40,6 +40,7 @@ import { RARITY_CONFIG as GIFT_RARITY_CONFIG } from './gift-box/constants';
 import Fly from './fly';
 import { FlyCounter } from './FlyCounter';
 import { mutateInventoryCaches, useInventory } from '@/hooks/useInventory';
+import { showRewardedAd } from '@/lib/ads';
 import { takeQuestScrollTarget } from '@/lib/questClaims';
 import { PlusUpgradeModal } from './PlusUpgradeModal';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
@@ -132,6 +133,7 @@ type QuestRewardSummary = {
   flyBalanceAfter?: number;
   grantedItemIds?: string[];
   grantedBackgroundIds?: string[];
+  doubleClaimId?: string;
 };
 
 type QuestRewardRevealEntry = {
@@ -144,6 +146,8 @@ type QuestRewardRevealEntry = {
   baseQuantity?: number;
   baseFlies?: number;
   isQuestReward?: boolean;
+  doubleClaimId?: string;
+  doubled?: boolean;
 };
 
 type FlyGainToast = {
@@ -523,6 +527,7 @@ export function QuestsPanel({
         flyBalanceAfter,
         baseFlies: isPremium ? baseFlies : undefined,
         isQuestReward: true,
+        doubleClaimId: summary?.doubleClaimId,
       });
       rewardRevealIdRef.current += 1;
     }
@@ -547,6 +552,7 @@ export function QuestsPanel({
         quantity: count > 1 ? count : undefined,
         baseQuantity: isPremium && count > 1 ? baseCount : undefined,
         isQuestReward: true,
+        doubleClaimId: summary?.doubleClaimId,
       });
     }
 
@@ -581,6 +587,7 @@ export function QuestsPanel({
         quantity: count > 1 ? count : undefined,
         baseQuantity: isPremium && count > 1 ? baseCount : undefined,
         isQuestReward: true,
+        doubleClaimId: summary?.doubleClaimId,
       });
     }
 
@@ -635,6 +642,48 @@ export function QuestsPanel({
       remaining: entry.quantity ?? 1,
       instance: 0,
     });
+  };
+
+  const doublingClaimRef = useRef(false);
+  const handleWatchAdDouble = async (entry: QuestRewardRevealEntry) => {
+    const claimId = entry.doubleClaimId;
+    if (!claimId || entry.doubled || doublingClaimRef.current) return;
+    doublingClaimRef.current = true;
+    try {
+      const outcome = await showRewardedAd();
+      if (outcome !== 'rewarded') return;
+      const res = await fetch('/api/rewards/double', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ claimId }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.granted) return;
+      mutateInventoryCaches();
+      setRewardRevealQueue((queue) =>
+        queue.map((e) => {
+          if (e.doubleClaimId !== claimId) return e;
+          const next: QuestRewardRevealEntry = { ...e, doubled: true };
+          if (e.fliesGranted) {
+            const balanceAfter =
+              typeof data?.summary?.flyBalanceAfter === 'number'
+                ? data.summary.flyBalanceAfter
+                : (e.flyBalanceAfter ?? 0) + e.fliesGranted;
+            next.baseFlies = e.fliesGranted;
+            next.fliesGranted = e.fliesGranted * 2;
+            next.flyBalanceAfter = balanceAfter;
+            knownFlyBalanceRef.current = balanceAfter;
+          } else {
+            const base = e.quantity ?? 1;
+            next.baseQuantity = base;
+            next.quantity = base * 2;
+          }
+          return next;
+        }),
+      );
+    } finally {
+      doublingClaimRef.current = false;
+    }
   };
 
   // Called when a single gift box from the tap-to-unwrap flow is dismissed
@@ -1074,6 +1123,7 @@ export function QuestsPanel({
                 isPremium={data?.isPremium ?? false}
                 onClaim={handleRewardRevealClaim}
                 onOpenGift={handleRewardRevealOpenGift}
+                onWatchAd={handleWatchAdDouble}
                 paused={false}
               />
               {giftOpening && (
@@ -2210,12 +2260,14 @@ function QuestRewardRevealOverlay({
   isPremium,
   onClaim,
   onOpenGift,
+  onWatchAd,
   paused = false,
 }: {
   queue: QuestRewardRevealEntry[];
   isPremium: boolean;
   onClaim: (entry: QuestRewardRevealEntry) => void;
   onOpenGift: (entry: QuestRewardRevealEntry) => void;
+  onWatchAd: (entry: QuestRewardRevealEntry) => void | Promise<void>;
   paused?: boolean;
 }) {
   const entry = queue[0] ?? null;
@@ -2264,7 +2316,13 @@ function QuestRewardRevealOverlay({
               quantity={entry.quantity}
               baseQuantity={entry.baseQuantity}
               isPremium={isPremium && !!entry.isQuestReward}
-              showDoubleUpsell={!isPremium && !!entry.isQuestReward}
+              showDoubleUpsell={
+                !isPremium &&
+                !!entry.isQuestReward &&
+                !!entry.doubleClaimId &&
+                !entry.doubled
+              }
+              onWatchAd={() => onWatchAd(entry)}
               rewardAmount={entry.fliesGranted || undefined}
               paused={paused}
               customPreview={

@@ -816,6 +816,7 @@ function MobileSheet({
                   setContactBack('helpCenter');
                   setView('contact');
                 }}
+                onNavigate={onClose}
               />
             ) : view === 'contact' ? (
               <ContactPanel

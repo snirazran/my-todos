@@ -15,7 +15,10 @@ import {
   LifeBuoy,
   Send,
   CheckCircle2,
+  ScrollText,
+  ExternalLink,
 } from 'lucide-react';
+import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
 type QA = { q: string; a: string };
@@ -166,8 +169,16 @@ const HELP_CATEGORIES: HelpCategory[] = [
         a: 'Tap the Plus banner in the menu, or any "Unlock with Plus" prompt, to upgrade.',
       },
       {
+        q: 'How much does Plus cost?',
+        a: 'Plus is 249.90₪ per year (with a 7-day free trial) or 34.90₪ per month (with a 3-day free trial). Full details are on the pricing page linked at the bottom of this help page.',
+      },
+      {
         q: 'When does my Plus renew or expire?',
-        a: 'Your renewal/expiry date is shown in the menu under your Plus status.',
+        a: 'Your renewal/expiry date is shown in the menu under your Plus status. Subscriptions renew automatically until cancelled.',
+      },
+      {
+        q: 'How do I cancel or get a refund?',
+        a: 'Cancelling stops future charges and you keep Plus until the end of the paid period. Web purchases: use the link in your receipt email or contact support. iOS/Android: cancel in your App Store or Google Play subscription settings. See the Refund Policy linked below for refund details.',
       },
     ],
   },
@@ -217,7 +228,13 @@ function matches(item: QA, q: string) {
 }
 
 /* ─── Help Center panel ───────────────────────────────────── */
-export function HelpCenterPanel({ onContact }: { onContact: () => void }) {
+export function HelpCenterPanel({
+  onContact,
+  onNavigate,
+}: {
+  onContact: () => void;
+  onNavigate?: () => void;
+}) {
   const [query, setQuery] = useState('');
   const [openKeys, setOpenKeys] = useState<Set<string>>(new Set());
 
@@ -339,6 +356,41 @@ export function HelpCenterPanel({ onContact }: { onContact: () => void }) {
         >
           Contact us
         </button>
+      </div>
+
+      {/* Pricing & legal */}
+      <div className="rounded-2xl border border-border/50 bg-muted/30 p-4">
+        <div className="flex items-center gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <ScrollText className="h-5 w-5" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-sm font-black text-foreground">
+              Pricing &amp; legal
+            </p>
+            <p className="text-xs font-medium text-muted-foreground">
+              Plans, terms, privacy, and refunds.
+            </p>
+          </div>
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          {[
+            { href: '/pricing', label: 'Pricing' },
+            { href: '/terms', label: 'Terms of Service' },
+            { href: '/privacy', label: 'Privacy Policy' },
+            { href: '/refund-policy', label: 'Refund Policy' },
+          ].map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              onClick={onNavigate}
+              className="flex items-center justify-between gap-2 rounded-xl border border-border/60 bg-card px-3.5 py-2.5 text-[13px] font-bold text-foreground transition-colors hover:bg-muted/40"
+            >
+              {link.label}
+              <ExternalLink className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            </Link>
+          ))}
+        </div>
       </div>
     </div>
   );
