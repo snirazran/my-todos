@@ -5,6 +5,9 @@ project(':capacitor-android').projectDir = new File('../node_modules/.pnpm/@capa
 include ':capacitor-firebase-messaging'
 project(':capacitor-firebase-messaging').projectDir = new File('../node_modules/.pnpm/@capacitor-firebase+messaging@8.3.0_@capacitor+core@8.0.2_firebase@12.9.0/node_modules/@capacitor-firebase/messaging/android')
 
+include ':capacitor-mlkit-barcode-scanning'
+project(':capacitor-mlkit-barcode-scanning').projectDir = new File('../node_modules/.pnpm/@capacitor-mlkit+barcode-scanning@8.1.0_@capacitor+core@8.0.2/node_modules/@capacitor-mlkit/barcode-scanning/android')
+
 include ':capacitor-app'
 project(':capacitor-app').projectDir = new File('../node_modules/.pnpm/@capacitor+app@8.1.0_@capacitor+core@8.0.2/node_modules/@capacitor/app/android')
 
@@ -13,6 +16,9 @@ project(':capacitor-local-notifications').projectDir = new File('../node_modules
 
 include ':capgo-capacitor-social-login'
 project(':capgo-capacitor-social-login').projectDir = new File('../node_modules/.pnpm/@capgo+capacitor-social-login@8.3.20_@capacitor+core@8.0.2/node_modules/@capgo/capacitor-social-login/android')
+
+include ':revenuecat-purchases-capacitor'
+project(':revenuecat-purchases-capacitor').projectDir = new File('../node_modules/.pnpm/@revenuecat+purchases-capacitor@13.2.1_@capacitor+core@8.0.2/node_modules/@revenuecat/purchases-capacitor/android')
 
 include ':capacitor-native-settings'
 project(':capacitor-native-settings').projectDir = new File('../node_modules/.pnpm/capacitor-native-settings@8.1.0_@capacitor+core@8.0.2/node_modules/capacitor-native-settings/android')

@@ -42,6 +42,8 @@
     "@radix-ui/react-slot": "^1.2.3",
     "@radix-ui/react-tabs": "^1.1.12",
     "@radix-ui/react-tooltip": "^1.2.8",
+    "@revenuecat/purchases-capacitor": "^13.2.1",
+    "@revenuecat/purchases-js": "^1.47.0",
     "@rive-app/canvas-lite": "2.37.2",
     "@rive-app/react-canvas-lite": "^4.28.1",
     "@types/canvas-confetti": "^1.9.0",

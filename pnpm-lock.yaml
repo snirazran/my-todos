@@ -85,6 +85,12 @@ importers:
       '@radix-ui/react-tooltip':
         specifier: ^1.2.8
         version: 1.2.8(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      '@revenuecat/purchases-capacitor':
+        specifier: ^13.2.1
+        version: 13.2.1(@capacitor/core@8.0.2)
+      '@revenuecat/purchases-js':
+        specifier: ^1.47.0
+        version: 1.47.0
       '@rive-app/canvas-lite':
         specifier: 2.37.2
         version: 2.37.2
@@ -2022,6 +2028,17 @@ packages:
 
   '@radix-ui/rect@1.1.1':
     resolution: {integrity: sha512-HPwpGIzkl28mWyZqG52jiqDJ12waP11Pa1lGoiyUkIEuMLBP0oeK/C89esbXrxsky5we7dfd8U58nm0SgAWpVw==}
+
+  '@revenuecat/purchases-capacitor@13.2.1':
+    resolution: {integrity: sha512-NruMHWdDjt4lxteHumHU0h+H1v33/5esl6BQeb3Gd20dLyrvwCltnwNWh4eNymdBjfV5IwYmBJ7o8jPOBljTrA==}
+    peerDependencies:
+      '@capacitor/core': '>=8.0.0'
+
+  '@revenuecat/purchases-js@1.47.0':
+    resolution: {integrity: sha512-bytRHMnz4LKSeZLNE4crLo6FjbS2f80iJO+P4ZJ6U+qMJNMtWTkURVufCM3tHszVizhLtW8JYe8TdbLNADhiEQ==}
+
+  '@revenuecat/purchases-typescript-internal-esm@18.18.0':
+    resolution: {integrity: sha512-MmjlKtFESIMpb3TGt2xGyQKVBwIII3GQ5jA5Zh3AAF5oSebQ4DR84ds2y4YMV8TsoCgCZvHP4wJN+oHp3I09Iw==}
 
   '@rive-app/canvas-lite@2.37.2':
     resolution: {integrity: sha512-Pp8R/ZpZliwkPm684HFIKZ4N6UurcfbfFQXV74+HV2bxAutpQYsDCr0sOjEgJC/brG5aeSCVyJY3Iq7nNAkmeQ==}
@@ -7088,6 +7105,15 @@ snapshots:
       '@types/react-dom': 19.2.3(@types/react@19.2.15)
 
   '@radix-ui/rect@1.1.1': {}
+
+  '@revenuecat/purchases-capacitor@13.2.1(@capacitor/core@8.0.2)':
+    dependencies:
+      '@capacitor/core': 8.0.2
+      '@revenuecat/purchases-typescript-internal-esm': 18.18.0
+
+  '@revenuecat/purchases-js@1.47.0': {}
+
+  '@revenuecat/purchases-typescript-internal-esm@18.18.0': {}
 
   '@rive-app/canvas-lite@2.37.2': {}
 

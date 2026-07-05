@@ -3,11 +3,14 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { mutate } from 'swr';
+import { Capacitor } from '@capacitor/core';
 import { Icon } from '@/components/ui/Icon';
 import { AppImage } from '@/components/ui/AppImage';
 import { Bell, Check, Heart, Image as ImageIcon, Shirt, Sparkle, Sparkles, Tag, Unlock, X } from 'lucide-react';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import Frog from '@/components/ui/frog';
+import { purchasePlus, restorePlusPurchases } from '@/lib/purchases';
 
 type Step = 0 | 1 | 2 | 3;
 
@@ -44,13 +47,59 @@ export function PlusUpgradeModal({
 
   const [step, setStep] = useState<Step>(0);
   const [plan, setPlan] = useState<PlanId>('yearly');
+  const [purchasing, setPurchasing] = useState(false);
+  const [purchaseError, setPurchaseError] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
       setStep(0);
       setPlan('yearly');
+      setPurchasing(false);
+      setPurchaseError(null);
     }
   }, [open]);
+
+  const refreshPremiumState = () =>
+    mutate((key) => typeof key === 'string' && key.startsWith('/api/quests'));
+
+  const startPurchase = async () => {
+    if (purchasing) return;
+    setPurchaseError(null);
+    setPurchasing(true);
+    try {
+      const outcome = await purchasePlus(plan);
+      if (outcome === 'purchased') {
+        await refreshPremiumState();
+        await onStartTrial?.(plan);
+        onClose();
+      }
+    } catch (err) {
+      console.error('Plus purchase failed', err);
+      setPurchaseError("Purchase didn't go through. Please try again.");
+    } finally {
+      setPurchasing(false);
+    }
+  };
+
+  const restorePurchases = async () => {
+    if (purchasing) return;
+    setPurchaseError(null);
+    setPurchasing(true);
+    try {
+      const restored = await restorePlusPurchases();
+      if (restored) {
+        await refreshPremiumState();
+        onClose();
+      } else {
+        setPurchaseError('No previous purchases found.');
+      }
+    } catch (err) {
+      console.error('Restore purchases failed', err);
+      setPurchaseError('Restore failed. Please try again.');
+    } finally {
+      setPurchasing(false);
+    }
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -124,10 +173,10 @@ export function PlusUpgradeModal({
                     <Step3
                       plan={plan}
                       onSelect={setPlan}
-                      onStart={async () => {
-                        await onStartTrial?.(plan);
-                        onClose();
-                      }}
+                      onStart={startPurchase}
+                      onRestore={restorePurchases}
+                      busy={purchasing}
+                      error={purchaseError}
                     />
                   </StepShell>
                 )}
@@ -453,12 +502,19 @@ function Step3({
   plan,
   onSelect,
   onStart,
+  onRestore,
+  busy,
+  error,
 }: {
   plan: PlanId;
   onSelect: (p: PlanId) => void;
   onStart: () => void | Promise<void>;
+  onRestore: () => void | Promise<void>;
+  busy: boolean;
+  error: string | null;
 }) {
   const reduceMotion = useReducedMotion();
+  const isNative = Capacitor.isNativePlatform();
   return (
     <div className="flex min-h-full flex-col px-6 pb-6 pt-16 md:pb-5 md:pt-12">
       <Reveal>
@@ -510,12 +566,31 @@ function Step3({
       </Reveal>
 
       <Reveal delay={0.26} className="mt-auto space-y-2 pt-6 text-center">
+        {error && (
+          <p className="text-xs font-bold text-rose-200" role="alert">
+            {error}
+          </p>
+        )}
         <p className="text-xs font-medium text-white/85">
           Recurring billing, cancel anytime.
         </p>
-        <PrimaryButton onClick={onStart}>
-          {plan === 'yearly' ? 'Start my free 7 days' : 'Start my free 3 days'}
+        <PrimaryButton onClick={onStart} disabled={busy}>
+          {busy
+            ? 'Processing…'
+            : plan === 'yearly'
+              ? 'Start my free 7 days'
+              : 'Start my free 3 days'}
         </PrimaryButton>
+        {isNative && (
+          <button
+            type="button"
+            onClick={onRestore}
+            disabled={busy}
+            className="h-9 w-full text-center text-xs font-bold text-white/70 transition-colors hover:text-white disabled:opacity-60"
+          >
+            Restore purchases
+          </button>
+        )}
       </Reveal>
     </div>
   );
