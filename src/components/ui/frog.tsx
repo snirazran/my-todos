@@ -73,6 +73,8 @@ const DEFAULT_FROG_HEIGHT = Math.round(
 );
 const MOUTH_TARGET_X = 75;
 const MOUTH_TARGET_Y = 75;
+export const FROG_TONGUE_MOUTH_OFFSET = { x: -18, y: 12 } as const;
+export const FROG_TONGUE_MOUTH_OFFSET_DESKTOP = { x: -21, y: 26 } as const;
 /* ========================================================================= */
 
 export interface FrogHandle {

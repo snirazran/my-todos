@@ -22,8 +22,13 @@ import { motion, AnimatePresence, useAnimationControls } from 'framer-motion';
 import { Input } from '@/components/ui/input';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import Frog, { type FrogHandle } from '@/components/ui/frog';
+import Frog, {
+  FROG_TONGUE_MOUTH_OFFSET,
+  FROG_TONGUE_MOUTH_OFFSET_DESKTOP,
+  type FrogHandle,
+} from '@/components/ui/frog';
 import { useFrogTongue, TONGUE_STROKE } from '@/hooks/useFrogTongue';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useNotification } from '@/components/providers/NotificationProvider';
 
 const Fly = dynamic(() => import('@/components/ui/fly'), { ssr: false });
@@ -31,7 +36,6 @@ const Fly = dynamic(() => import('@/components/ui/fly'), { ssr: false });
 const FLY_PX = 40;
 const FLY_KEY = 'login-fly';
 const LOGIN_TONGUE_MS = 1040;
-const LOGIN_TONGUE_ORIGIN_Y = -9;
 const FLY_RESPAWN_DELAY_MS = 1500;
 const FLY_BUZZ_START = { x: -56, y: 0, rotate: -6 } as const;
 const FLY_BUZZ = {
@@ -76,6 +80,10 @@ function LoginPageInner() {
   const [email, setEmail] = useState('');
 
   const [loading, setLoading] = useState(false);
+  const isDesktop = useMediaQuery('(min-width: 768px)');
+  const tongueMouthOffset = isDesktop
+    ? FROG_TONGUE_MOUTH_OFFSET_DESKTOP
+    : FROG_TONGUE_MOUTH_OFFSET;
 
   const emailRef = useRef<HTMLInputElement>(null);
 
@@ -99,7 +107,6 @@ function LoginPageInner() {
     flyRefs,
     trackMovingTarget: true,
     durationMs: LOGIN_TONGUE_MS,
-    originYOffset: LOGIN_TONGUE_ORIGIN_Y,
     keepTargetHiddenUntilPersist: true,
   });
 
@@ -324,6 +331,7 @@ function LoginPageInner() {
             <Frog
               ref={frogRef}
               mouthOpen={!!grab}
+              mouthOffset={tongueMouthOffset}
               indices={{ skin: 0, hat: 0, body: 0, hand_item: 0 }}
             />
           </div>

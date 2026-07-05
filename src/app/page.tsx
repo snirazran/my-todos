@@ -23,7 +23,10 @@ import { useAuth } from '@/components/auth/AuthContext';
 import { motion, AnimatePresence, useAnimation } from 'framer-motion';
 import { useUIStore } from '@/lib/uiStore';
 import { useSheetStore } from '@/lib/sheetStore';
-import { type FrogHandle } from '@/components/ui/frog';
+import {
+  FROG_TONGUE_MOUTH_OFFSET,
+  type FrogHandle,
+} from '@/components/ui/frog';
 import Fly from '@/components/ui/fly';
 import TaskList from '@/components/ui/TaskList';
 import QuickAddSheet from '@/components/ui/QuickAddSheet';
@@ -502,7 +505,7 @@ export default function Home() {
               frogRef={frogRef}
               frogBoxRef={frogBoxRef}
               mouthOpen={!!grab}
-              mouthOffset={{ x: -18, y: 12 }}
+              mouthOffset={FROG_TONGUE_MOUTH_OFFSET}
               indices={indices}
               openWardrobe={isWardrobeOpen}
               onOpenChange={setWardrobeOpen}

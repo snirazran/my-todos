@@ -37,7 +37,7 @@ export function OnboardingFrogHeader({
 }: Props) {
   return (
     <>
-      <div className="pointer-events-none absolute inset-x-0 top-4 z-30 flex justify-center md:top-8">
+      <div className="absolute inset-x-0 z-30 flex justify-center pointer-events-none -top-10 md:-top-10">
         <div className="relative hidden md:block">
           {speechBubbleMessage ? (
             <FrogSpeechBubble
@@ -79,14 +79,14 @@ export function OnboardingFrogHeader({
               {eyebrow}
             </p>
           ) : null}
-          <div className="flex h-10 items-center justify-center">
-            <h1 className="line-clamp-2 text-center text-lg font-black leading-5 tracking-tight text-foreground md:text-xl md:leading-6">
+          <div className="flex items-center justify-center h-10">
+            <h1 className="text-lg font-black leading-5 tracking-tight text-center line-clamp-2 text-foreground md:text-xl md:leading-6">
               {title}
             </h1>
           </div>
-          <div className="mt-1 flex h-10 items-start justify-center">
+          <div className="flex items-start justify-center h-10 mt-1">
             {subtitle ? (
-              <p className="line-clamp-2 text-center text-base font-medium leading-5 text-muted-foreground md:text-lg md:leading-6">
+              <p className="text-base font-medium leading-5 text-center line-clamp-2 text-muted-foreground md:text-lg md:leading-6">
                 {subtitle}
               </p>
             ) : null}

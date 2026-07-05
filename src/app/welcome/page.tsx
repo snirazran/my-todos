@@ -6,8 +6,13 @@ import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
-import Frog, { type FrogHandle } from '@/components/ui/frog';
+import Frog, {
+  FROG_TONGUE_MOUTH_OFFSET,
+  FROG_TONGUE_MOUTH_OFFSET_DESKTOP,
+  type FrogHandle,
+} from '@/components/ui/frog';
 import { useFrogTongue, TONGUE_STROKE } from '@/hooks/useFrogTongue';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useNotification } from '@/components/providers/NotificationProvider';
 
 const Fly = dynamic(() => import('@/components/ui/fly'), { ssr: false });
@@ -26,6 +31,10 @@ export default function WelcomePage() {
   const { showNotification } = useNotification();
   const [loading, setLoading] = useState(false);
   const [adoptionSucceeded, setAdoptionSucceeded] = useState(false);
+  const isDesktop = useMediaQuery('(min-width: 768px)');
+  const tongueMouthOffset = isDesktop
+    ? FROG_TONGUE_MOUTH_OFFSET_DESKTOP
+    : FROG_TONGUE_MOUTH_OFFSET;
   const frogRef = useRef<FrogHandle>(null);
   const frogBoxRef = useRef<HTMLDivElement>(null);
   const flyRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -42,7 +51,6 @@ export default function WelcomePage() {
     flyRefs,
     trackMovingTarget: true,
     durationMs: 1040,
-    originYOffset: -9,
     keepTargetHiddenUntilPersist: true,
   });
 
@@ -116,6 +124,7 @@ export default function WelcomePage() {
             <Frog
               ref={frogRef}
               mouthOpen={!!grab}
+              mouthOffset={tongueMouthOffset}
               indices={{ skin: 0, hat: 0, body: 0, hand_item: 0 }}
             />
           </div>
