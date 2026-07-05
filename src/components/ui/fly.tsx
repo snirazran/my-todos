@@ -95,7 +95,15 @@ const Fly = memo(forwardRef<HTMLDivElement, FlyProps>(
       const observer = new IntersectionObserver(
         (observed) => {
           for (const entry of observed) {
-            setVisible(entry.isIntersecting && entry.intersectionRatio >= 0.1);
+            const nowVisible =
+              entry.isIntersecting && entry.intersectionRatio >= 0.1;
+            setVisible(nowVisible);
+            // Repaint immediately on entering the viewport: the browser can
+            // evict offscreen canvas bitmaps, and the shared engine won't push
+            // a frame until playback resumes after the scroll settles — this
+            // blits the latest master frame synchronously so the fly is never
+            // blank mid-scroll.
+            if (nowVisible) handleRef.current?.redraw();
           }
         },
         { threshold: [0, 0.1] },

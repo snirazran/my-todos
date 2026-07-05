@@ -1,4 +1,5 @@
 'use client';
+import { motion } from 'framer-motion';
 import Fly from '@/components/ui/fly';
 import { Icon } from '@/components/ui/Icon';
 import {
@@ -57,15 +58,15 @@ export default function DragOverlay({
         willChange: 'transform',
       }}
     >
-      <div
+      <motion.div
+        initial={{ scale: 0.98, rotate: 0 }}
+        animate={{ scale: 1.04, rotate: -2 }}
+        transition={{ type: 'spring', stiffness: 480, damping: 26 }}
         className={[
           'flex items-center gap-1.5 px-2.5 py-2 select-none rounded-[14px]',
           'bg-card border-2 border-primary/20 shadow-2xl',
         ].join(' ')}
-        style={{
-          minHeight: height,
-          transform: 'rotate(-2deg)',
-        }}
+        style={{ minHeight: height }}
       >
         <span
           aria-hidden
@@ -175,7 +176,7 @@ export default function DragOverlay({
             <Fly size={36} y={-3} />
           </span>
         </span>
-      </div>
+      </motion.div>
     </div>
   );
 }

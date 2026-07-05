@@ -500,6 +500,7 @@ export default React.memo(function TaskList({
   const renderPlaceholder = (k: string) => (
     <div
       key={k}
+      data-drop-placeholder
       className="h-[56px] mb-1.5 border-2 border-dashed rounded-[14px] border-primary/50 bg-primary/10"
     />
   );
@@ -577,11 +578,19 @@ export default React.memo(function TaskList({
       rows.push(
         <motion.div
           key={wrapKey}
-          layout={isAnyDragging ? false : 'position'}
-          layoutDependency={visibleIndex}
+          layout="position"
+          layoutDependency={`${visibleIndex}:${placeholderAt ?? 'x'}`}
           initial={false}
           transition={LAYOUT_TRANSITION}
-          className="relative"
+          className={
+            // content-visibility lets long columns skip rendering offscreen
+            // cards while scrolling (the p-1/-m-1 pair gives shadows ink room
+            // inside the containment box). Disabled during drags so framer can
+            // measure every card for the reorder animations.
+            isAnyDragging
+              ? 'relative -m-1 p-1'
+              : 'relative -m-1 p-1 [content-visibility:auto] [contain-intrinsic-size:auto_60px]'
+          }
         >
           <TaskCard
             key={cardKey}

@@ -105,9 +105,16 @@ export default function TaskCard({
   onTapRef.current = onTap;
 
   const MOVE_TOLERANCE = 8;
-  const LONG_PRESS_DURATION = 300;
+  // Mouse drags start on movement (Trello-style) — the threshold only exists
+  // to keep clicks from becoming accidental micro-drags.
+  const MOUSE_DRAG_THRESHOLD = 6;
+  const LONG_PRESS_DURATION = 220;
   const MOUSE_HOLD_DURATION = 150;
   const defaultTouchAction = touchAction || 'auto';
+
+  const pointerTypeRef = useRef<string>('mouse');
+  const canDragRef = useRef(false);
+  const beginGrabRef = useRef<(x: number, y: number) => void>(() => {});
 
   const cleanupLP = useCallback(() => {
     document.body.style.userSelect = '';
@@ -133,6 +140,19 @@ export default function TaskCard({
       if (!startPos.current) return;
       const dx = Math.abs(e.clientX - startPos.current.x);
       const dy = Math.abs(e.clientY - startPos.current.y);
+
+      // Mouse: movement while pressed means "drag" — grab immediately instead
+      // of requiring a hold. Touch keeps the long-press (movement = scroll).
+      if (
+        pointerTypeRef.current === 'mouse' &&
+        canDragRef.current &&
+        !longPressFiredRef.current &&
+        (dx > MOUSE_DRAG_THRESHOLD || dy > MOUSE_DRAG_THRESHOLD)
+      ) {
+        beginGrabRef.current(e.clientX, e.clientY);
+        return;
+      }
+
       if (dx > MOVE_TOLERANCE || dy > MOVE_TOLERANCE) {
         movedOutRef.current = true;
         // Cancel pending long-press; without drag, this becomes a no-op tap-cancel.
@@ -179,6 +199,8 @@ export default function TaskCard({
       longPressFiredRef.current = false;
       movedOutRef.current = false;
       startPos.current = { x: e.clientX, y: e.clientY };
+      pointerTypeRef.current = e.pointerType;
+      canDragRef.current = canDrag;
 
       const el = cardRef.current;
       if (el) {
@@ -197,11 +219,14 @@ export default function TaskCard({
       // grab timer. We still listen for pointermove/pointerup so onTap fires.
       if (!canDrag) return;
 
-      const delay =
-        e.pointerType === 'mouse' ? MOUSE_HOLD_DURATION : LONG_PRESS_DURATION;
-
-      longPressTimer.current = window.setTimeout(() => {
+      const pointerType = e.pointerType;
+      const beginGrab = (clientX: number, clientY: number) => {
+        if (longPressFiredRef.current) return;
         longPressFiredRef.current = true;
+        if (longPressTimer.current) {
+          clearTimeout(longPressTimer.current);
+          longPressTimer.current = null;
+        }
         if (el && pointerIdRef.current !== null) {
           try {
             el.setPointerCapture(pointerIdRef.current);
@@ -217,16 +242,27 @@ export default function TaskCard({
         // Clear any selection that began before the drag took over.
         window.getSelection()?.removeAllRanges();
 
-        onGrabRef.current({
-          clientX: e.clientX,
-          clientY: e.clientY,
-          pointerType: e.pointerType as 'mouse' | 'touch',
-        });
-
-        if (longPressTimer.current) {
-          clearTimeout(longPressTimer.current);
-          longPressTimer.current = null;
+        if (pointerType !== 'mouse') {
+          try {
+            navigator.vibrate?.(15);
+          } catch {
+            // ignore
+          }
         }
+
+        onGrabRef.current({
+          clientX,
+          clientY,
+          pointerType: pointerType as 'mouse' | 'touch',
+        });
+      };
+      beginGrabRef.current = beginGrab;
+
+      const delay =
+        pointerType === 'mouse' ? MOUSE_HOLD_DURATION : LONG_PRESS_DURATION;
+
+      longPressTimer.current = window.setTimeout(() => {
+        beginGrab(e.clientX, e.clientY);
       }, delay);
     },
     [handlePointerMove, handlePointerUp, handlePointerCancel, task.completed, disableDrag],

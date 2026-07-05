@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import { Plus, Filter, CalendarCheck } from 'lucide-react';
 import { FilterDropdown, FilterType } from '../ui/FilterDropdown';
 
@@ -168,7 +169,8 @@ export default function DayColumn({
         )}
       </div>
 
-      <div
+      <motion.div
+        layoutScroll
         ref={listRef}
         className={[
           'flex-1 px-1 pt-2 overflow-y-auto transition-colors rounded-xl',
@@ -177,7 +179,7 @@ export default function DayColumn({
         ].join(' ')}
       >
         {children}
-      </div>
+      </motion.div>
 
       {footer ? <div className="mt-4">{footer}</div> : null}
     </section>

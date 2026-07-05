@@ -267,6 +267,23 @@ export function useDragManager() {
     targetDayRef.current = null;
   }, [restoreGlobalInteraction]);
 
+  // Drop settle: stop the drag loop immediately (input unlocks right away) and
+  // glide the ghost into the target slot before the caller commits the drop.
+  const settleAndEnd = useCallback(
+    (targetRect: { left: number; top: number } | null, done: () => void) => {
+      restoreGlobalInteraction();
+      const el = overlayElRef.current;
+      if (!el || !targetRect) {
+        done();
+        return;
+      }
+      el.style.transition = 'transform 170ms cubic-bezier(0.22, 1, 0.36, 1)';
+      el.style.transform = `translate3d(${targetRect.left}px, ${targetRect.top}px, 0)`;
+      window.setTimeout(done, 180);
+    },
+    [restoreGlobalInteraction],
+  );
+
   const cancelDrag = useCallback(() => {
     restoreGlobalInteraction();
     setDrag(null);
@@ -557,6 +574,7 @@ export function useDragManager() {
     onGrab,
     endDrag,
     cancelDrag,
+    settleAndEnd,
     registerOverlayEl,
     setFrameCallback,
   };

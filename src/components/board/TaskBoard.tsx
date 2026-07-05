@@ -168,6 +168,7 @@ export default function TaskBoard({
     onGrab,
     endDrag,
     cancelDrag,
+    settleAndEnd,
     registerOverlayEl,
     setFrameCallback,
   } = useDragManager();
@@ -369,32 +370,6 @@ export default function TaskBoard({
     return windowDates.length > 0 && cmpYmd(windowDates[0], minBound) > 0;
   }, [windowDates, accountCreatedAt]);
 
-  // When the past edge renders nothing while idle (nothing left to load), the
-  // drop zone appearing there on drag start inserts width at the front of the
-  // row and visually shunts the whole board. Compensate the scroll position by
-  // exactly that width, and undo it when the drag ends.
-  const pastZoneCompensationRef = useRef(0);
-  React.useLayoutEffect(() => {
-    const s = scrollerRef.current;
-    if (!s) return;
-    const nudge = (delta: number) => {
-      const prev = s.style.scrollBehavior;
-      s.style.scrollBehavior = 'auto';
-      s.scrollLeft += delta;
-      s.style.scrollBehavior = prev;
-    };
-    if (drag?.active) {
-      if (!canLoadPast && pastZoneRef.current) {
-        const w = pastZoneRef.current.offsetWidth + 12;
-        nudge(w);
-        pastZoneCompensationRef.current = w;
-      }
-    } else if (pastZoneCompensationRef.current) {
-      const w = pastZoneCompensationRef.current;
-      pastZoneCompensationRef.current = 0;
-      nudge(-w);
-    }
-  }, [drag?.active, canLoadPast, scrollerRef]);
 
   // Elastic edge "pull": how far past the first/last day the user has scrolled.
   // Drives the Load-more expansion and arms a load-on-release gesture (mobile).
@@ -406,6 +381,7 @@ export default function TaskBoard({
   const edgePullRef = useRef(edgePull);
   edgePullRef.current = edgePull;
   const pullArmedRef = useRef(false);
+  const edgeArmedHapticRef = useRef(false);
   // After an edge load, smooth-center this date once it enters the window.
   const pendingCenterKeyRef = useRef<string | null>(null);
 
@@ -643,6 +619,23 @@ export default function TaskBoard({
         const futureExtra =
           s.scrollLeft + s.clientWidth - (last.offsetLeft + last.clientWidth);
         const pastExtra = first.offsetLeft - s.scrollLeft;
+
+        const rawPull =
+          futureExtra > 2
+            ? clamp01(futureExtra / PULL_FULL)
+            : pastExtra > 2 && canLoadPast
+              ? clamp01(pastExtra / PULL_FULL)
+              : 0;
+        const armedNow = rawPull >= PULL_ARM;
+        if (armedNow && !edgeArmedHapticRef.current) {
+          try {
+            navigator.vibrate?.(10);
+          } catch {
+            // ignore
+          }
+        }
+        edgeArmedHapticRef.current = armedNow;
+
         if (futureExtra > 2) {
           setEdgePull((prev) => {
             const amount = quantize(clamp01(futureExtra / PULL_FULL));
@@ -722,7 +715,19 @@ export default function TaskBoard({
     return release;
   }, [drag?.active]);
 
-  const snapSuppressed = !!drag?.active || panActive;
+  // Keep snap suppressed briefly after a cross-column drop so the smooth
+  // centering glide finishes before mandatory snap re-engages — re-enabling
+  // snap mid-glide yanks the board to the nearest column edge.
+  const [snapHold, setSnapHold] = useState(false);
+  const snapHoldTimerRef = useRef<number | null>(null);
+  useEffect(() => {
+    return () => {
+      if (snapHoldTimerRef.current)
+        window.clearTimeout(snapHoldTimerRef.current);
+    };
+  }, []);
+
+  const snapSuppressed = !!drag?.active || panActive || snapHold;
 
   // Lock the horizontal board scroller while any sheet/popup is open so the
   // page behind the backdrop can't be slid around.
@@ -1157,13 +1162,29 @@ export default function TaskBoard({
 
     if (backlogOpen && finalToDay !== BACKLOG_IDX) setBacklogOpen(false);
 
-    if (finalToDay !== BACKLOG_IDX && window.innerWidth < 768)
-      centerColumnSmooth(finalToDay);
-    commitDragReorder(finalToDay, finalToIndex);
+    // Glide the ghost into the placeholder slot, then commit the reorder. A
+    // backlog drop has no slot — its placeholder still sits in the source
+    // column, and settling there would look like the card flying back home.
+    const slot = overBacklog
+      ? null
+      : document.querySelector<HTMLElement>('[data-drop-placeholder]');
+    settleAndEnd(slot ? slot.getBoundingClientRect() : null, () => {
+      if (finalToDay !== BACKLOG_IDX && window.innerWidth < 768) {
+        setSnapHold(true);
+        if (snapHoldTimerRef.current)
+          window.clearTimeout(snapHoldTimerRef.current);
+        snapHoldTimerRef.current = window.setTimeout(
+          () => setSnapHold(false),
+          600,
+        );
+        centerColumnSmooth(finalToDay);
+      }
+      commitDragReorder(finalToDay, finalToIndex);
 
-    endDrag();
-    setIsDragOverBacklog(false);
-    setTrayCloseProgress(0);
+      endDrag();
+      setIsDragOverBacklog(false);
+      setTrayCloseProgress(0);
+    });
   }, [
     drag,
     targetDay,
@@ -1178,6 +1199,7 @@ export default function TaskBoard({
     centerColumnSmooth,
     commitDragReorder,
     endDrag,
+    settleAndEnd,
     draggingRepeating,
     removeOnDate,
   ]);
@@ -1253,6 +1275,11 @@ export default function TaskBoard({
   const renderEdge = (side: 'past' | 'future') => {
     const isPast = side === 'past';
 
+    // Nothing left to load in the past: render no edge slot at all — mounting
+    // a drop zone there on drag start would insert width at the front of the
+    // row and shunt the whole board. The future zone covers "pick a date".
+    if (isPast && !canLoadPast) return null;
+
     // While dragging a task: an animated "Move to a specific date" drop zone.
     if (drag?.active) {
       return (
@@ -1302,57 +1329,68 @@ export default function TaskBoard({
 
     if (isPast && !canLoadPast) return null;
 
-    // Not dragging: a "Load more" affordance. On touch it elastically scales as
-    // you slide toward it and loads on release; on web it's a plain click.
+    // Not dragging: a ghost "next week" column — the same dashed-card language
+    // as the board's placeholders, previewing the exact dates a pull (mobile)
+    // or click (web) will load. The reveal itself is the progress: it brightens
+    // from muted to primary as the pull approaches the arm point.
     const pull = edgePull.side === side ? edgePull.amount : 0;
     const armed = pull >= PULL_ARM;
-    // Progressive color: a muted resting state that ramps up to full primary
-    // right as the pull crosses the arm threshold — mirrors the TaskList
-    // swipe-icon fill. Works for both the mobile pull and the desktop edge-pan;
-    // the REST floor keeps the button looking tappable when it's idle.
-    const REST_FILL = 0.4;
+    const REST_FILL = 0.35;
     const fill = Math.max(REST_FILL, Math.min(1, pull / PULL_ARM));
     const Chevron = isPast ? ChevronsLeft : ChevronsRight;
     const label = !isMobile
-      ? 'Click to load'
+      ? 'Load more days'
       : armed
         ? 'Release to load'
-        : 'Load more';
+        : 'Pull to load';
+    const rangeStart = isPast
+      ? addDays(windowDates[0], -7)
+      : addDays(windowDates[windowDates.length - 1], 1);
+    const rangeEnd = isPast
+      ? addDays(windowDates[0], -1)
+      : addDays(windowDates[windowDates.length - 1], 7);
+    const fmtRange = (dk: string) =>
+      parseYmd(dk).toLocaleString('en-US', { month: 'short', day: 'numeric' });
     return (
-      <div className="shrink-0 self-center flex items-center justify-center w-[52vw] sm:w-[200px] md:w-[185px]">
+      <div className="shrink-0 self-start flex h-[clamp(220px,calc(100svh-430px),480px)] w-[46vw] sm:w-[200px] md:w-[185px]">
         <button
           type="button"
           onClick={() => triggerEdgeLoad(side)}
-          style={{
-            transform: `scale(${1 + pull * 0.14})`,
-            transition: pull > 0 ? 'transform 60ms linear' : 'transform 260ms ease',
-          }}
-          className="group flex flex-col items-center gap-3 outline-none"
+          style={{ opacity: 0.5 + 0.5 * fill }}
+          className={[
+            'flex h-full w-full flex-col items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed px-4 text-center outline-none transition-colors duration-150',
+            armed
+              ? 'border-primary bg-primary/15 text-primary'
+              : 'border-border bg-card/40 text-muted-foreground hover:border-primary/50 hover:bg-primary/5 hover:text-primary',
+          ].join(' ')}
         >
-          {/* Solid pill — clearly a button, fully filled, no ring */}
           <motion.span
-            animate={{ scale: armed ? 1.06 : 1 }}
-            transition={{ type: 'spring', stiffness: 320, damping: 22 }}
-            style={{
-              filter: `grayscale(${1 - fill})`,
-              opacity: 0.5 + 0.5 * fill,
-            }}
-            className="grid h-12 w-12 place-items-center rounded-full bg-primary text-primary-foreground transition-transform group-hover:scale-105 group-active:scale-95"
+            animate={
+              armed
+                ? { x: isPast ? [0, -5, 0] : [0, 5, 0] }
+                : { x: 0 }
+            }
+            transition={
+              armed
+                ? { repeat: Infinity, duration: 0.7, ease: 'easeInOut' }
+                : { duration: 0.15 }
+            }
           >
-            <Chevron className="h-5 w-5" strokeWidth={2.75} />
+            <Chevron className="h-8 w-8" strokeWidth={2.5} />
           </motion.span>
-
-          {/* Label */}
-          <span className="flex flex-col items-center gap-0.5 leading-none">
-            <span
-              style={{ opacity: 0.55 + 0.45 * fill }}
-              className="text-[13px] font-black tracking-tight text-primary"
-            >
-              {label}
-            </span>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">
-              +7 days
-            </span>
+          <span className="text-sm font-black tracking-tight">{label}</span>
+          <span className="text-[11px] font-bold opacity-70">
+            {fmtRange(rangeStart)} – {fmtRange(rangeEnd)}
+          </span>
+          <span
+            className={[
+              'mt-1.5 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wider transition-colors',
+              armed
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-primary/10 text-primary',
+            ].join(' ')}
+          >
+            +7 days
           </span>
         </button>
       </div>
@@ -1361,8 +1399,10 @@ export default function TaskBoard({
 
   return (
     <div className="relative w-full h-full">
-      {/* SCROLLER */}
-      <div
+      {/* SCROLLER — layoutScroll keeps card layout animations scroll-aware so
+          horizontal scrolling never reads as cards sliding sideways. */}
+      <motion.div
+        layoutScroll
         ref={scrollerRef}
         dir="ltr"
         data-role="board-scroller"
@@ -1476,7 +1516,7 @@ export default function TaskBoard({
           ))}
           {renderEdge('future')}
         </div>
-      </div>
+      </motion.div>
 
       {/* Top header + dot strip (mobile + desktop) */}
       <div
