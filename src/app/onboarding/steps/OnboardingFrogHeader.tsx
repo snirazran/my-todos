@@ -7,15 +7,6 @@ import type { FrogEmote, WardrobeSlot } from '@/components/ui/frog';
 
 const Frog = dynamic(() => import('@/components/ui/frog'), { ssr: false });
 
-type Props = {
-  indices?: Partial<Record<WardrobeSlot, number>>;
-  emote?: FrogEmote | null;
-  eyebrow?: ReactNode;
-  title: ReactNode;
-  subtitle?: ReactNode;
-  speechBubbleMessage?: string;
-};
-
 export const ONBOARDING_BODY_CLASS = 'pt-[370px] md:pt-[398px]';
 
 // Default to the bare frog (no hat/body/hand item) so every onboarding screen
@@ -27,9 +18,37 @@ const DEFAULT_FROG_INDICES: Partial<Record<WardrobeSlot, number>> = {
   hand_item: 0,
 };
 
-export function OnboardingFrogHeader({
+type StageProps = {
+  indices?: Partial<Record<WardrobeSlot, number>>;
+  emote?: FrogEmote | null;
+};
+
+// Rendered once at the page level so the Rive canvas survives step
+// transitions instead of remounting (and re-initializing) on every step.
+export function OnboardingFrogStage({
   indices = DEFAULT_FROG_INDICES,
   emote = null,
+}: StageProps) {
+  return (
+    <div className="pointer-events-none absolute inset-x-0 -top-10 z-30 flex justify-center">
+      <div className="hidden md:block">
+        <Frog width={280} height={315} indices={indices} emote={emote} />
+      </div>
+      <div className="block md:hidden">
+        <Frog width={230} height={259} indices={indices} emote={emote} />
+      </div>
+    </div>
+  );
+}
+
+type Props = {
+  eyebrow?: ReactNode;
+  title: ReactNode;
+  subtitle?: ReactNode;
+  speechBubbleMessage?: string;
+};
+
+export function OnboardingFrogHeader({
   eyebrow,
   title,
   subtitle,
@@ -37,36 +56,20 @@ export function OnboardingFrogHeader({
 }: Props) {
   return (
     <>
-      <div className="absolute inset-x-0 z-30 flex justify-center pointer-events-none -top-10 md:-top-10">
-        <div className="relative hidden md:block">
-          {speechBubbleMessage ? (
+      {speechBubbleMessage ? (
+        <div className="pointer-events-none absolute inset-x-0 -top-10 z-30 flex justify-center">
+          <div className="relative h-[259px] w-[230px] md:h-[315px] md:w-[280px]">
             <FrogSpeechBubble
               rate={0}
               done={0}
               total={0}
               fixedMessage={speechBubbleMessage}
-              className="!top-4"
+              className="!top-[calc(6rem+env(safe-area-inset-top))]"
               messageClassName="!whitespace-pre-line !text-sm !leading-tight md:!text-base"
             />
-          ) : null}
-          <Frog width={280} height={315} indices={indices} emote={emote} />
+          </div>
         </div>
-        <div className="relative block md:hidden">
-          {speechBubbleMessage ? (
-            <FrogSpeechBubble
-              rate={0}
-              done={0}
-              total={0}
-              fixedMessage={speechBubbleMessage}
-              className="!top-4"
-              messageClassName="!whitespace-pre-line !text-sm !leading-tight md:!text-base"
-            />
-          ) : null}
-          <Frog width={230} height={259} indices={indices} emote={emote} />
-        </div>
-      </div>
-
-      {!speechBubbleMessage ? (
+      ) : (
         <div
           className={
             eyebrow
@@ -92,7 +95,7 @@ export function OnboardingFrogHeader({
             ) : null}
           </div>
         </div>
-      ) : null}
+      )}
     </>
   );
 }

@@ -16,7 +16,21 @@ interface NotificationItem {
   id: number;
   content: React.ReactNode;
   undoAction?: () => void | Promise<void>;
+  durationMs: number;
+  dedupeKey: string;
 }
+
+function textOf(node: React.ReactNode): string {
+  if (node == null || typeof node === 'boolean') return '';
+  if (typeof node === 'string' || typeof node === 'number') return String(node);
+  if (Array.isArray(node)) return node.map(textOf).join('|');
+  if (React.isValidElement(node)) {
+    return textOf((node.props as { children?: React.ReactNode }).children);
+  }
+  return '';
+}
+
+const MAX_IDENTICAL_TOASTS = 3;
 
 interface NotificationContextType {
   showNotification: (
@@ -58,32 +72,26 @@ export function NotificationProvider({
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
-  const timeoutsRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(
-    new Map(),
-  );
+  const frontTimerRef = useRef<{
+    id: number;
+    timeout: ReturnType<typeof setTimeout>;
+  } | null>(null);
   const stackRef = useRef<HTMLDivElement | null>(null);
+  const deckRef = useRef<HTMLDivElement | null>(null);
+  const [deckHeight, setDeckHeight] = useState(0);
+  const prevDeckHeightRef = useRef(0);
+  const deckGrowing = deckHeight >= prevDeckHeightRef.current;
+  useEffect(() => {
+    prevDeckHeightRef.current = deckHeight;
+  }, [deckHeight]);
 
   const dismiss = useCallback((id: number) => {
     setNotifications((prev) => prev.filter((n) => n.id !== id));
-    const t = timeoutsRef.current.get(id);
-    if (t) {
-      clearTimeout(t);
-      timeoutsRef.current.delete(id);
-    }
   }, []);
 
-  // Backwards compatible — dismisses the oldest visible notification.
+  // Dismisses the front (most recent) notification.
   const hideNotification = useCallback(() => {
-    setNotifications((prev) => {
-      if (prev.length === 0) return prev;
-      const [head, ...rest] = prev;
-      const t = timeoutsRef.current.get(head.id);
-      if (t) {
-        clearTimeout(t);
-        timeoutsRef.current.delete(head.id);
-      }
-      return rest;
-    });
+    setNotifications((prev) => prev.slice(0, -1));
   }, []);
 
   const showNotification = useCallback(
@@ -93,25 +101,92 @@ export function NotificationProvider({
       options?: { durationMs?: number },
     ) => {
       const id = Date.now() + Math.random();
-      setNotifications((prev) => [...prev, { id, content, undoAction }]);
-      const timeout = setTimeout(
-        () => dismiss(id),
-        options?.durationMs ?? AUTO_DISMISS_MS,
-      );
-      timeoutsRef.current.set(id, timeout);
+      const dedupeKey = textOf(content);
+      setNotifications((prev) => {
+        if (
+          dedupeKey &&
+          prev.filter((n) => n.dedupeKey === dedupeKey).length >=
+            MAX_IDENTICAL_TOASTS
+        ) {
+          return prev;
+        }
+        return [
+          ...prev,
+          {
+            id,
+            content,
+            undoAction,
+            durationMs: options?.durationMs ?? AUTO_DISMISS_MS,
+            dedupeKey,
+          },
+        ];
+      });
     },
-    [dismiss],
+    [],
   );
 
+  // Only the front toast's auto-dismiss timer runs; the ones queued behind it
+  // keep their full read-time for when they step forward.
   useEffect(() => {
-    const map = timeoutsRef.current;
+    const front = notifications[notifications.length - 1] ?? null;
+    if (frontTimerRef.current && frontTimerRef.current.id !== front?.id) {
+      clearTimeout(frontTimerRef.current.timeout);
+      frontTimerRef.current = null;
+    }
+    if (!front || frontTimerRef.current?.id === front.id) return;
+    frontTimerRef.current = {
+      id: front.id,
+      timeout: setTimeout(() => dismiss(front.id), front.durationMs),
+    };
+  }, [notifications, dismiss]);
+
+  useEffect(() => {
     return () => {
-      map.forEach((t) => clearTimeout(t));
-      map.clear();
+      if (frontTimerRef.current) clearTimeout(frontTimerRef.current.timeout);
     };
   }, []);
 
-  // Track the rendered stack height so the FAB / Frogodoro pill can offset cleanly.
+  // Measure the deck's natural (bottom-anchored) content height. Increases
+  // apply immediately; decreases settle briefly first so the transient dip
+  // while a toast exits and the next steps forward never reaches the layout —
+  // the deck renders at an explicitly animated height driven by this value,
+  // which is what the Frogodoro pill above it physically rests on.
+  useEffect(() => {
+    const el = deckRef.current;
+    if (!el) return;
+    let decreaseTimer: ReturnType<typeof setTimeout> | null = null;
+    let lastApplied = -1;
+    const apply = (value: number) => {
+      lastApplied = value;
+      setDeckHeight(value);
+    };
+    const update = () => {
+      const next = el.offsetHeight;
+      if (next >= lastApplied) {
+        if (decreaseTimer) {
+          clearTimeout(decreaseTimer);
+          decreaseTimer = null;
+        }
+        if (next !== lastApplied) apply(next);
+        return;
+      }
+      if (decreaseTimer) return;
+      decreaseTimer = setTimeout(() => {
+        decreaseTimer = null;
+        apply(el.offsetHeight);
+      }, 220);
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+      if (decreaseTimer) clearTimeout(decreaseTimer);
+    };
+  }, [mounted]);
+
+  // Track the full rendered stack height so the FAB and friends can offset
+  // cleanly; the deck's animated height already filters transient dips.
   useEffect(() => {
     const el = stackRef.current;
     if (!el) return;
@@ -120,15 +195,14 @@ export function NotificationProvider({
     const ro = new ResizeObserver(update);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [notifications.length, mounted]);
+  }, [mounted]);
 
   const handleUndo = async (item: NotificationItem) => {
     if (!item.undoAction) return;
     setUndoingId(item.id);
-    const t = timeoutsRef.current.get(item.id);
-    if (t) {
-      clearTimeout(t);
-      timeoutsRef.current.delete(item.id);
+    if (frontTimerRef.current?.id === item.id) {
+      clearTimeout(frontTimerRef.current.timeout);
+      frontTimerRef.current = null;
     }
     try {
       await item.undoAction();
@@ -163,8 +237,30 @@ export function NotificationProvider({
         {/* Top slot: timer pill portals in here (above all toasts) */}
         <div id="frog-bottom-stack-top" className="contents" />
         {/* Deck stack: newest toast in front; older ones peek out behind it
-            and step forward as the front one leaves. */}
-        <div className="relative w-full md:w-[380px] md:self-end">
+            and step forward as the front one leaves. The wrapper renders at an
+            explicitly animated height (measured with dip-filtering) so the
+            pill above never bounces during the exit/step-forward handoff; the
+            inner padding reserves room for the peeking cards. */}
+        <motion.div
+          className="relative w-full md:w-[380px] md:self-end"
+          initial={false}
+          animate={{ height: deckHeight }}
+          transition={
+            // Grow instantly so bottom-anchored toasts never poke above the
+            // wrapper into the pill; only shrinks (already dip-filtered) ease.
+            deckGrowing
+              ? { duration: 0 }
+              : { duration: 0.25, ease: [0.22, 1, 0.36, 1] }
+          }
+        >
+        <div
+          ref={deckRef}
+          className="absolute inset-x-0 bottom-0"
+          style={{
+            paddingTop:
+              Math.min(Math.max(notifications.length - 1, 0), 2) * 10,
+          }}
+        >
         <AnimatePresence initial={false}>
           {notifications.map((n, index) => {
             const depth = notifications.length - 1 - index;
@@ -276,6 +372,7 @@ export function NotificationProvider({
           })}
         </AnimatePresence>
         </div>
+        </motion.div>
         {/* Bottom slot: cinematic skip hint portals in here (below all toasts) */}
         <div id="frog-bottom-stack-bottom" className="contents" />
           </div>,

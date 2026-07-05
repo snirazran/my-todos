@@ -45,7 +45,7 @@ function rewardsLabel(rewards: LoginStreakReward[]) {
   return parts.join(' + ') || 'Surprise';
 }
 
-function WeekStrip({ view }: { view: LoginStreakView }) {
+function WeekStrip({ view, light = false }: { view: LoginStreakView; light?: boolean }) {
   const today = localDayKey();
   const days = useMemo(
     () => Array.from({ length: 7 }, (_, i) => addDaysToKey(today, i - 6)),
@@ -67,7 +67,12 @@ function WeekStrip({ view }: { view: LoginStreakView }) {
         );
         return (
           <div key={dayKey} className="flex flex-col items-center gap-1.5">
-            <span className="text-[10px] font-black uppercase text-muted-foreground">
+            <span
+              className={cn(
+                'text-[10px] font-black uppercase',
+                light ? 'text-white/80' : 'text-muted-foreground',
+              )}
+            >
               {label}
             </span>
             <motion.div
@@ -77,11 +82,17 @@ function WeekStrip({ view }: { view: LoginStreakView }) {
               className={cn(
                 'grid h-10 w-10 place-items-center rounded-full',
                 frozen
-                  ? 'bg-sky-100 text-sky-500 dark:bg-sky-500/15'
+                  ? light
+                    ? 'bg-white/25 text-sky-100'
+                    : 'bg-sky-100 text-sky-500 dark:bg-sky-500/15'
                   : lit
-                    ? 'bg-orange-100 text-orange-500 dark:bg-orange-500/15'
-                    : 'bg-muted/60 text-muted-foreground/40',
-                isToday && 'ring-2 ring-primary',
+                    ? light
+                      ? 'bg-white/25 text-yellow-200'
+                      : 'bg-orange-100 text-orange-500 dark:bg-orange-500/15'
+                    : light
+                      ? 'bg-white/10 text-white/40'
+                      : 'bg-muted/60 text-muted-foreground/40',
+                isToday && (light ? 'ring-2 ring-white' : 'ring-2 ring-primary'),
               )}
             >
               {frozen ? (
@@ -226,6 +237,15 @@ function RevealStep({
           : 'You showed up today. That’s how streaks are made.'}
       </motion.p>
 
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={popped ? { opacity: 1, y: 0 } : {}}
+        transition={{ delay: 0.5 }}
+        className="flex w-full justify-center"
+      >
+        <WeekStrip view={view} light />
+      </motion.div>
+
       <motion.button
         type="button"
         initial={{ opacity: 0, y: 16 }}
@@ -360,18 +380,7 @@ function HomeStep({
 }) {
   return (
     <div className="flex h-full flex-col items-center overflow-y-auto bg-background px-6 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-[calc(env(safe-area-inset-top)+3rem)]">
-      <motion.div
-        animate={{ y: [0, -6, 0] }}
-        transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut' }}
-      >
-        {frogReady ? (
-          <Frog width={170} height={170} indices={indices} emote="love" />
-        ) : (
-          <div style={{ width: 170, height: 170 }} />
-        )}
-      </motion.div>
-
-      <div className="mt-1 flex items-center gap-2">
+      <div className="flex items-center gap-2">
         <Flame
           className={cn(
             'h-10 w-10',
@@ -393,6 +402,18 @@ function HomeStep({
           <span className="text-orange-500"> · check in today!</span>
         )}
       </p>
+
+      <motion.div
+        animate={{ y: [0, -6, 0] }}
+        transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut' }}
+        className="-mt-8"
+      >
+        {frogReady ? (
+          <Frog width={170} height={170} indices={indices} emote="love" />
+        ) : (
+          <div style={{ width: 170, height: 170 }} />
+        )}
+      </motion.div>
 
       <WeekStrip view={view} />
 
@@ -532,14 +553,23 @@ export function StreakSheet({
     };
   }, [open, celebration]);
 
+  const close = () => onOpenChange(false);
+
+  // Celebration flows (reveal → rewards → commit) end by closing the sheet;
+  // the detail page only shows when the user opens their streak directly.
   const advanceFromReveal = () => {
     if (hasRewardEvents) setStep('rewards');
     else if (view && !view.goal) setStep('commit');
-    else setStep('home');
+    else close();
   };
 
   const advanceFromRewards = () => {
     if (view && !view.goal) setStep('commit');
+    else close();
+  };
+
+  const finishCommit = () => {
+    if (celebration) close();
     else setStep('home');
   };
 
@@ -556,8 +586,9 @@ export function StreakSheet({
           transition={{ duration: 0.22 }}
           className="fixed inset-0 z-[998]"
         >
-          <div className="absolute inset-0 bg-background" />
+          <div className="absolute inset-0 bg-background md:bg-black/60 md:backdrop-blur-sm" />
 
+          <div className="absolute inset-0 md:flex md:items-center md:justify-center md:p-6">
           <AnimatePresence mode="popLayout" initial={false}>
             <motion.div
               key={step}
@@ -565,7 +596,7 @@ export function StreakSheet({
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -60 }}
               transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-              className="absolute inset-0 mx-auto w-full sm:max-w-md"
+              className="mx-auto h-full w-full sm:max-w-md md:h-[min(720px,100%)] md:overflow-hidden md:rounded-[32px] md:shadow-2xl"
             >
               {step === 'reveal' && celebration && (
                 <RevealStep
@@ -578,8 +609,8 @@ export function StreakSheet({
               {step === 'commit' && (
                 <CommitStep
                   view={view}
-                  onPicked={() => setStep('home')}
-                  onSkip={() => setStep('home')}
+                  onPicked={finishCommit}
+                  onSkip={finishCommit}
                 />
               )}
               {step === 'home' && (
@@ -594,6 +625,7 @@ export function StreakSheet({
               )}
             </motion.div>
           </AnimatePresence>
+          </div>
 
           {step === 'rewards' && celebration && (
             <StreakCelebration
@@ -608,7 +640,7 @@ export function StreakSheet({
               type="button"
               aria-label="Close streak"
               onClick={() =>
-                step === 'commit' ? setStep('home') : onOpenChange(false)
+                step === 'commit' ? finishCommit() : onOpenChange(false)
               }
               className="absolute right-4 top-[calc(env(safe-area-inset-top)+0.75rem)] z-40 grid h-10 w-10 place-items-center rounded-full bg-muted/70 text-muted-foreground backdrop-blur transition-colors active:scale-95"
             >

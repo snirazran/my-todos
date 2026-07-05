@@ -48,7 +48,7 @@ const getRandomName = (currentName?: string) => {
   return names[Math.floor(Math.random() * names.length)];
 };
 
-export default function FrogNameStep({ selections, onSelect, onNext, onBack, saving, direction }: OnboardingStepProps) {
+export default function FrogNameStep({ selections, onSelect, onNext, saving, direction }: OnboardingStepProps) {
   const [initialName] = useState(() => getRandomName());
   const storedName = selections.frogName?.[0];
   const frogName = storedName ?? initialName;
@@ -70,15 +70,6 @@ export default function FrogNameStep({ selections, onSelect, onNext, onBack, sav
 
   return (
     <div className="flex-1 flex flex-col relative">
-      <button
-        onClick={onBack}
-        className="absolute top-2 left-0 flex items-center justify-center w-8 h-8 rounded-full border border-border/60 bg-background text-muted-foreground hover:bg-muted transition z-10"
-      >
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-          <path d="M10 12L6 8L10 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
-
       <OnboardingFrogHeader
         title="What do you want to name your frog?"
         subtitle="You can change this later."
@@ -128,7 +119,7 @@ export default function FrogNameStep({ selections, onSelect, onNext, onBack, sav
 
       <div className="flex-[8]" />
 
-      <div className="pb-16 flex justify-center">
+      <div className="flex justify-center pb-[calc(4rem+env(safe-area-inset-bottom))]">
         <motion.button
           type="button"
           onClick={onNext}

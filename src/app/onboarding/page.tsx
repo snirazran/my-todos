@@ -8,14 +8,26 @@ import FrogNameStep from './steps/FrogNameStep';
 import HumanNameStep from './steps/HumanNameStep';
 import NotificationStep from './steps/NotificationStep';
 import AboutIntroStep from './steps/AboutIntroStep';
-import ProfileQuestionsStep from './steps/ProfileQuestionsStep';
+import ProfileQuestionsStep, { PROFILE_QUESTION_COUNT } from './steps/ProfileQuestionsStep';
 import CreateAccountStep from './steps/CreateAccountStep';
+import CelebrationStep from './steps/CelebrationStep';
+import { OnboardingTopBar } from './steps/OnboardingTopBar';
+import { OnboardingFrogStage } from './steps/OnboardingFrogHeader';
+import type { FrogEmote } from '@/components/ui/frog';
 import { signInAnonymously } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { clearAuthTokenCookie, setAuthTokenCookie } from '@/lib/authCookie';
 import { OnboardingBackground } from '@/components/ui/OnboardingBackground';
 
-const STEP_IDS = ['name', 'humanName', 'createAccount', 'notifications', 'aboutIntro', 'age'] as const;
+const STEP_IDS = ['name', 'humanName', 'aboutIntro', 'age', 'notifications', 'createAccount'] as const;
+
+const CELEBRATION_MS = 2600;
+
+const STEP_EMOTES: Partial<Record<(typeof STEP_IDS)[number], FrogEmote>> = {
+  humanName: 'love',
+  aboutIntro: 'love',
+  age: 'question',
+};
 
 // Persist answers locally so the frog/human names (collected before sign-in)
 // survive the email magic-link round trip, which reloads onto a fresh
@@ -35,13 +47,6 @@ function loadStoredSelections(): Record<string, string[]> {
   }
 }
 
-function isMobileDevice() {
-  const userAgent = navigator.userAgent || '';
-  const isMobileUserAgent = /Android|iPhone|iPad|iPod|IEMobile|Opera Mini/i.test(userAgent);
-  const isTouchPhoneWidth = navigator.maxTouchPoints > 1 && window.matchMedia('(max-width: 768px)').matches;
-  return isMobileUserAgent || isTouchPhoneWidth;
-}
-
 export default function OnboardingPage() {
   const router = useRouter();
   const [step, setStep] = useState(0);
@@ -50,11 +55,8 @@ export default function OnboardingPage() {
   );
   const [saving, setSaving] = useState(false);
   const [direction, setDirection] = useState(1);
-  const [showNotificationStep, setShowNotificationStep] = useState(false);
-
-  useEffect(() => {
-    setShowNotificationStep(isMobileDevice());
-  }, []);
+  const [subStep, setSubStep] = useState(0);
+  const [celebrating, setCelebrating] = useState(false);
 
   // Keep the local copy in sync so it can be restored after the magic-link reload.
   useEffect(() => {
@@ -71,7 +73,6 @@ export default function OnboardingPage() {
   const stepIds = useMemo(
     () =>
       STEP_IDS.filter((id) => {
-        if (id === 'notifications' && !showNotificationStep) return false;
         // Hide the "create account" step only once a real (non-anonymous)
         // account exists — e.g. a magic-link returnee. With no account yet
         // (deferred creation) or an anonymous one, keep offering it.
@@ -83,10 +84,27 @@ export default function OnboardingPage() {
           return false;
         return true;
       }),
-    [showNotificationStep],
+    [],
   );
 
   const currentId = stepIds[step] ?? stepIds[stepIds.length - 1];
+
+  const ageIndex = stepIds.indexOf('age');
+  const unitsAt = (index: number) =>
+    index + (ageIndex !== -1 && index > ageIndex ? PROFILE_QUESTION_COUNT - 1 : 0);
+  const totalUnits = unitsAt(stepIds.length);
+  const doneUnits = currentId === 'age' ? unitsAt(step) + subStep : unitsAt(step);
+
+  const goToStep = (next: number, dir: number) => {
+    setDirection(dir);
+    setSubStep(stepIds[next] === 'age' && dir < 0 ? PROFILE_QUESTION_COUNT - 1 : 0);
+    setStep(next);
+  };
+
+  const handleSubStepChange = (index: number) => {
+    setDirection(index >= subStep ? 1 : -1);
+    setSubStep(index);
+  };
 
   const onSelect = (stepId: string, optionId: string, multiSelect = false) => {
     setSelections((prev) => {
@@ -110,10 +128,11 @@ export default function OnboardingPage() {
 
   const handleNext = async () => {
     if (step < stepIds.length - 1) {
-      setDirection(1);
-      setStep((s) => s + 1);
+      goToStep(step + 1, 1);
     } else {
       setSaving(true);
+      setCelebrating(true);
+      const celebrationStart = Date.now();
       const focusAreaIds = selections.focusAreas ?? [];
       try {
         // Account creation is deferred until onboarding actually completes, so
@@ -165,6 +184,10 @@ export default function OnboardingPage() {
       } catch {
         // best-effort
       } finally {
+        const remaining = CELEBRATION_MS - (Date.now() - celebrationStart);
+        if (remaining > 0) {
+          await new Promise((resolve) => setTimeout(resolve, remaining));
+        }
         // Drop any stale quests cache (e.g. a pre-onboarding `complete: false`)
         // so the home page fetches fresh data instead of flashing the focus-areas
         // popup before revalidating.
@@ -179,6 +202,11 @@ export default function OnboardingPage() {
   };
 
   const handleBack = async () => {
+    if (currentId === 'age' && subStep > 0) {
+      setDirection(-1);
+      setSubStep((s) => s - 1);
+      return;
+    }
     if (step === 0) {
       const current = auth?.currentUser;
       try {
@@ -196,8 +224,7 @@ export default function OnboardingPage() {
       router.replace('/welcome');
       return;
     }
-    setDirection(-1);
-    setStep((s) => s - 1);
+    goToStep(step - 1, -1);
   };
 
   const stepProps: OnboardingStepProps = {
@@ -210,7 +237,7 @@ export default function OnboardingPage() {
   };
 
   return (
-    <main className="fixed inset-0 isolate flex flex-col items-center overflow-y-auto bg-background px-5 pt-4">
+    <main className="fixed inset-0 isolate flex flex-col items-center overflow-y-auto overflow-x-hidden bg-background px-5 pt-4">
       <div className="absolute inset-x-0 top-0 h-[312px] overflow-hidden md:h-[352px]">
         <OnboardingBackground />
       </div>
@@ -219,14 +246,46 @@ export default function OnboardingPage() {
         className="pointer-events-none absolute inset-x-0 bottom-0 top-[222px] z-[5] rounded-t-[24px] bg-background md:left-1/2 md:right-auto md:top-[278px] md:w-full md:max-w-lg md:-translate-x-1/2 md:rounded-[24px] lg:max-w-xl"
       />
       <div className="relative z-10 flex w-full max-w-none flex-col md:max-w-lg lg:max-w-xl" style={{ minHeight: '100%' }}>
+        <OnboardingFrogStage emote={STEP_EMOTES[currentId] ?? null} />
+        {!celebrating && (
+          <OnboardingTopBar
+            onBack={handleBack}
+            done={doneUnits}
+            total={totalUnits}
+            rightSlot={
+              currentId === 'createAccount' ? (
+                <button
+                  type="button"
+                  onClick={handleNext}
+                  disabled={saving}
+                  className="flex h-10 shrink-0 items-center rounded-full bg-background/90 px-4 text-sm font-black text-primary shadow-md ring-1 ring-border/40 backdrop-blur transition hover:bg-background disabled:opacity-60"
+                >
+                  Skip
+                </button>
+              ) : undefined
+            }
+          />
+        )}
         {currentId === 'name' && <FrogNameStep {...stepProps} />}
         {currentId === 'humanName' && <HumanNameStep {...stepProps} />}
         {currentId === 'createAccount' && <CreateAccountStep {...stepProps} />}
         {currentId === 'notifications' && <NotificationStep {...stepProps} />}
         {currentId === 'aboutIntro' && <AboutIntroStep {...stepProps} />}
-        {currentId === 'age' && <ProfileQuestionsStep {...stepProps} />}
+        {currentId === 'age' && (
+          <ProfileQuestionsStep
+            {...stepProps}
+            subStep={subStep}
+            onSubStepChange={handleSubStepChange}
+          />
+        )}
 
       </div>
+      {celebrating && (
+        <CelebrationStep
+          frogName={selections.frogName?.[0]?.trim() || 'Cookie'}
+          humanName={selections.humanName?.[0]?.trim() || null}
+        />
+      )}
     </main>
   );
 }

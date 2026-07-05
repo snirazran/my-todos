@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 import type { OnboardingStepProps } from './types';
 import { OnboardingFrogHeader, ONBOARDING_BODY_CLASS } from './OnboardingFrogHeader';
 
-export default function HumanNameStep({ selections, onSelect, onNext, onBack, saving, direction }: OnboardingStepProps) {
+export default function HumanNameStep({ selections, onSelect, onNext, saving, direction }: OnboardingStepProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [keyboardInset, setKeyboardInset] = useState(0);
   const frogName = selections.frogName?.[0]?.trim() || 'Cookie';
@@ -42,18 +42,7 @@ export default function HumanNameStep({ selections, onSelect, onNext, onBack, sa
 
   return (
     <div className="flex-1 flex flex-col relative">
-      <button
-        onClick={onBack}
-        className="absolute top-2 left-0 flex items-center justify-center w-8 h-8 rounded-full border border-border/60 bg-background text-muted-foreground hover:bg-muted transition z-10"
-      >
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-          <path d="M10 12L6 8L10 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
-
       <OnboardingFrogHeader
-        indices={{ skin: 0, hat: 0, body: 0, hand_item: 0 }}
-        emote="love"
         title={`*RIBBIT* I like the name ${frogName}!`}
         subtitle="What should I call you?"
         speechBubbleMessage={`*RIBBIT* I like the name ${frogName}!\nWhat should I call you?`}
@@ -75,7 +64,7 @@ export default function HumanNameStep({ selections, onSelect, onNext, onBack, sa
             onChange={(event) => setHumanName(event.target.value)}
             className="relative w-full h-16 md:h-[4.25rem] rounded-3xl border-2 border-border/50 bg-background px-12 text-center text-lg md:text-xl font-bold text-foreground shadow-sm outline-none transition placeholder:text-muted-foreground/35 focus:border-primary/60 focus:ring-4 focus:ring-primary/10"
             aria-label="Your name"
-            placeholder={`Name for ${frogName}'s human...`}
+            placeholder="Your name"
             maxLength={40}
           />
           {humanName.length > 0 && (
@@ -94,8 +83,8 @@ export default function HumanNameStep({ selections, onSelect, onNext, onBack, sa
       <div className="flex-[8]" />
 
       <div
-        className="fixed inset-x-0 z-20 flex justify-center px-5 md:static md:px-0 md:pb-16"
-        style={{ bottom: keyboardInset > 0 ? keyboardInset + 16 : 64 }}
+        className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-20 flex justify-center px-5 md:static md:px-0 md:pb-16"
+        style={keyboardInset > 0 ? { bottom: keyboardInset + 16 } : undefined}
       >
         <motion.button
           type="button"

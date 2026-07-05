@@ -5,23 +5,14 @@ import { cn } from '@/lib/utils';
 import type { OnboardingStepProps } from './types';
 import { OnboardingFrogHeader } from './OnboardingFrogHeader';
 
-export default function AboutIntroStep({ selections, onNext, onBack, saving, direction }: OnboardingStepProps) {
-  const frogName = selections.frogName?.[0]?.trim() || 'Cookie';
+export default function AboutIntroStep({ selections, onNext, saving, direction }: OnboardingStepProps) {
+  const humanName = selections.humanName?.[0]?.trim();
 
   return (
     <div className="flex-1 flex flex-col relative">
-      <button
-        onClick={onBack}
-        className="absolute top-2 left-0 flex items-center justify-center w-8 h-8 rounded-full border border-border/60 bg-background text-muted-foreground hover:bg-muted transition z-10"
-      >
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-          <path d="M10 12L6 8L10 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
-
       <OnboardingFrogHeader
         title="Let's hop into it!"
-        subtitle={`Tell ${frogName} a bit about you so you can grow together.`}
+        speechBubbleMessage={`*RIBBIT* Nice to meet you${humanName ? `, ${humanName}` : ''}!\nTell me a bit about yourself so we can grow together.`}
       />
 
       <motion.div
@@ -36,7 +27,10 @@ export default function AboutIntroStep({ selections, onNext, onBack, saving, dir
 
       <div className="flex-[8]" />
 
-      <div className="pb-16 flex justify-center">
+      <div className="flex flex-col items-center pb-[calc(4rem+env(safe-area-inset-bottom))]">
+        <p className="mb-3 text-center text-xs font-bold uppercase tracking-widest text-muted-foreground">
+          4 quick questions · under a minute
+        </p>
         <motion.button
           type="button"
           onClick={onNext}
@@ -49,7 +43,7 @@ export default function AboutIntroStep({ selections, onNext, onBack, saving, dir
               : 'bg-muted text-muted-foreground cursor-not-allowed',
           )}
         >
-          {saving ? 'Setting up...' : 'Next'}
+          {saving ? 'Setting up...' : "Let's hop!"}
         </motion.button>
       </div>
     </div>

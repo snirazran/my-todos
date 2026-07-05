@@ -1,29 +1,27 @@
 'use client';
 
-import {
-  signInWithPopup,
-  GoogleAuthProvider,
-  signInWithCredential,
-  linkWithPopup,
-  linkWithCredential,
-  sendSignInLinkToEmail,
-} from 'firebase/auth';
+import { sendSignInLinkToEmail } from 'firebase/auth';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
-import { Capacitor } from '@capacitor/core';
-import { SocialLogin } from '@capgo/capacitor-social-login';
 import { auth } from '@/lib/firebase';
+import {
+  GOOGLE_AUTH_ERROR_MESSAGES,
+  initNativeGoogleSignIn,
+  signInWithGoogle,
+} from '@/lib/googleAuth';
+import { GoogleIcon } from '@/components/ui/GoogleIcon';
 import { setAuthTokenCookie } from '@/lib/authCookie';
 import { createEmailLinkSettings } from '@/lib/emailLinkSettings';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import { Loader2, ArrowLeft, ArrowRight, MailCheck } from 'lucide-react';
+import { Loader2, ArrowLeft, ArrowRight } from 'lucide-react';
 import { motion, AnimatePresence, useAnimationControls } from 'framer-motion';
 import { Input } from '@/components/ui/input';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import Frog, {
   FROG_TONGUE_MOUTH_OFFSET,
+  FROG_TONGUE_MOUTH_OFFSET_TABLET,
   FROG_TONGUE_MOUTH_OFFSET_DESKTOP,
   type FrogHandle,
 } from '@/components/ui/frog';
@@ -48,19 +46,6 @@ const FLY_BUZZ = {
 type Step = 'enter' | 'email-sent';
 type FlyState = 'buzzing' | 'hidden' | 'entering';
 
-const GOOGLE_ICON = (
-  <svg
-    className="w-4 h-4 shrink-0"
-    viewBox="0 0 488 512"
-    xmlns="http://www.w3.org/2000/svg"
-  >
-    <path
-      fill="currentColor"
-      d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z"
-    />
-  </svg>
-);
-
 const slide = {
   enter: (dir: number) => ({ x: dir * 50, opacity: 0 }),
   center: { x: 0, opacity: 1 },
@@ -80,10 +65,20 @@ function LoginPageInner() {
   const [email, setEmail] = useState('');
 
   const [loading, setLoading] = useState(false);
-  const isDesktop = useMediaQuery('(min-width: 768px)');
+  const [resendIn, setResendIn] = useState(0);
+
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const timer = setTimeout(() => setResendIn((s) => s - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [resendIn]);
+  const isTablet = useMediaQuery('(min-width: 768px)');
+  const isDesktop = useMediaQuery('(min-width: 1280px)');
   const tongueMouthOffset = isDesktop
     ? FROG_TONGUE_MOUTH_OFFSET_DESKTOP
-    : FROG_TONGUE_MOUTH_OFFSET;
+    : isTablet
+      ? FROG_TONGUE_MOUTH_OFFSET_TABLET
+      : FROG_TONGUE_MOUTH_OFFSET;
 
   const emailRef = useRef<HTMLInputElement>(null);
 
@@ -140,19 +135,7 @@ function LoginPageInner() {
   };
 
   useEffect(() => {
-    if (Capacitor.isNativePlatform()) {
-      void SocialLogin.initialize({
-        google: {
-          webClientId:
-            '324868480648-mcnp29sgs2r9ip4nsbfs82phhiuv4tos.apps.googleusercontent.com',
-          iOSClientId:
-            '324868480648-qv2h2spg5jl3mmhek4u6vvefm7k7m0f4.apps.googleusercontent.com',
-          iOSServerClientId:
-            '324868480648-mcnp29sgs2r9ip4nsbfs82phhiuv4tos.apps.googleusercontent.com',
-          mode: 'online',
-        },
-      });
-    }
+    initNativeGoogleSignIn();
   }, []);
 
   const prepareSignedInRoute = async (route = '/') => {
@@ -170,30 +153,7 @@ function LoginPageInner() {
     try {
       const current = auth.currentUser;
       const shouldLink = isUpgrade && current?.isAnonymous;
-      if (Capacitor.isNativePlatform()) {
-        const googleUser = await SocialLogin.login({
-          provider: 'google',
-          options: { scopes: ['email', 'profile'] },
-        });
-        const idToken =
-          googleUser.result.responseType === 'online'
-            ? googleUser.result.idToken
-            : null;
-        if (!idToken) throw new Error('Failed to get Google token');
-        const cred = GoogleAuthProvider.credential(idToken);
-        if (shouldLink && current) {
-          await linkWithCredential(current, cred);
-        } else {
-          await signInWithCredential(auth, cred);
-        }
-      } else {
-        const provider = new GoogleAuthProvider();
-        if (shouldLink && current) {
-          await linkWithPopup(current, provider);
-        } else {
-          await signInWithPopup(auth, provider);
-        }
-      }
+      await signInWithGoogle({ linkTo: shouldLink ? current : null });
       const route = await prepareSignedInRoute();
       await triggerTongue({
         key: FLY_KEY,
@@ -206,14 +166,10 @@ function LoginPageInner() {
         },
       });
     } catch (err: any) {
-      const map: Record<string, string> = {
-        'auth/credential-already-in-use':
-          'That Google account is already linked to another user.',
-        'auth/email-already-in-use':
-          'That email is already linked to another account.',
-      };
       showNotification(
-        map[err?.code ?? ''] ?? err?.message ?? 'Google sign-in failed',
+        GOOGLE_AUTH_ERROR_MESSAGES[err?.code ?? ''] ??
+          err?.message ??
+          'Google sign-in failed',
       );
       setLoading(false);
     }
@@ -240,6 +196,7 @@ function LoginPageInner() {
           window.localStorage.setItem(EMAIL_LINK_STORAGE_KEY, trimmed);
           setDir(1);
           setStep('email-sent');
+          setResendIn(30);
         } catch (err: any) {
           showNotification(err?.message || 'Could not send email link');
           respawnFly();
@@ -253,6 +210,22 @@ function LoginPageInner() {
   const back = () => {
     setDir(-1);
     setStep('enter');
+  };
+
+  const handleResend = async () => {
+    if (resendIn > 0) return;
+    try {
+      const origin =
+        typeof window !== 'undefined' ? window.location.origin : '';
+      await sendSignInLinkToEmail(
+        auth,
+        email.trim(),
+        createEmailLinkSettings(`${origin}/auth/email-callback`),
+      );
+      setResendIn(30);
+    } catch (err: any) {
+      showNotification(err?.message || 'Could not resend the link');
+    }
   };
 
   return (
@@ -361,33 +334,19 @@ function LoginPageInner() {
                 exit="exit"
                 transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
               >
-                <form onSubmit={handleSendEmailLink} className="space-y-3">
-                  <Input
-                    ref={emailRef}
-                    id="email"
-                    type="email"
-                    aria-label="Email"
-                    placeholder="Email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="h-12 rounded-2xl border-border/60 bg-card/60 px-4 text-base focus-visible:ring-primary/30"
-                    required
-                    autoFocus
-                  />
-                  <button
-                    type="submit"
-                    disabled={!email.trim() || loading}
-                    className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary text-sm font-black uppercase tracking-wider text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {loading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <>
-                        Login <ArrowRight className="h-4 w-4" />
-                      </>
-                    )}
-                  </button>
-                </form>
+                <button
+                  onClick={handleGoogle}
+                  disabled={loading}
+                  className="flex h-12 w-full items-center justify-center gap-3 rounded-2xl border border-border bg-card/60 text-sm font-bold tracking-wide transition-all hover:bg-muted/50 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {loading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <>
+                      <GoogleIcon /> Continue with Google
+                    </>
+                  )}
+                </button>
 
                 <div className="relative my-4">
                   <div className="absolute inset-0 flex items-center">
@@ -400,17 +359,32 @@ function LoginPageInner() {
                   </div>
                 </div>
 
-                <button
-                  onClick={handleGoogle}
-                  disabled={loading}
-                  className="flex h-12 w-full items-center justify-center gap-3 rounded-2xl border border-border bg-card/60 text-sm font-bold tracking-wide transition-all hover:bg-muted/50 active:scale-[0.98]"
-                >
-                  {loading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <>{GOOGLE_ICON} Continue with Google</>
-                  )}
-                </button>
+                <form onSubmit={handleSendEmailLink} className="space-y-3">
+                  <Input
+                    ref={emailRef}
+                    id="email"
+                    type="email"
+                    aria-label="Email"
+                    placeholder="Email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="h-12 rounded-2xl border-border/60 bg-card/60 px-4 text-base focus-visible:ring-primary/30"
+                    required
+                  />
+                  <button
+                    type="submit"
+                    disabled={!email.trim() || loading}
+                    className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary text-sm font-black uppercase tracking-wider text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {loading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <>
+                        Continue with email <ArrowRight className="h-4 w-4" />
+                      </>
+                    )}
+                  </button>
+                </form>
               </motion.div>
             )}
 
@@ -423,12 +397,9 @@ function LoginPageInner() {
                 animate="center"
                 exit="exit"
                 transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-                className="flex flex-col items-center text-center"
+                className="flex flex-col items-center pt-8 text-center"
               >
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                  <MailCheck className="h-7 w-7" />
-                </div>
-                <h1 className="mt-4 text-xl font-black uppercase tracking-tight text-foreground">
+                <h1 className="text-xl font-black uppercase tracking-tight text-foreground">
                   Check your email
                 </h1>
                 <p className="mt-2 text-sm text-muted-foreground">
@@ -437,8 +408,15 @@ function LoginPageInner() {
                   <span className="font-bold text-foreground">{email}</span>
                 </p>
                 <button
+                  onClick={handleResend}
+                  disabled={resendIn > 0}
+                  className="mt-6 text-xs font-bold tracking-wide text-primary hover:underline disabled:cursor-default disabled:text-muted-foreground disabled:no-underline"
+                >
+                  {resendIn > 0 ? `Resend link in ${resendIn}s` : 'Resend link'}
+                </button>
+                <button
                   onClick={back}
-                  className="mt-6 text-xs font-bold tracking-wide text-primary hover:underline"
+                  className="mt-3 text-xs font-bold tracking-wide text-primary hover:underline"
                 >
                   Use a different email
                 </button>

@@ -208,7 +208,19 @@
       "Bash(ping -c 4 -q 5.161.176.246)",
       "Bash(docker info *)",
       "Bash(nc -z localhost 27017)",
-      "Bash(lsof -nP -iTCP:3000 -sTCP:LISTEN)"
+      "Bash(lsof -nP -iTCP:3000 -sTCP:LISTEN)",
+      "PowerShell(npx tsc --noEmit)",
+      "PowerShell(npm run *)",
+      "PowerShell(npx playwright --version)",
+      "PowerShell(npx playwright install chromium)",
+      "PowerShell(npm *)",
+      "PowerShell(cd \"$env:LOCALAPPDATA\\\\Temp\\\\claude\\\\C--Users-snira-Desktop-Full-Stack-frog-task\\\\f22b5d0e-57f0-43c8-afd9-f6f8ebb900d5\\\\scratchpad\"; node shoot.js)",
+      "PowerShell(Set-Content *)",
+      "PowerShell(cd \"$env:LOCALAPPDATA\\\\Temp\\\\claude\\\\C--Users-snira-Desktop-Full-Stack-frog-task\\\\f22b5d0e-57f0-43c8-afd9-f6f8ebb900d5\\\\scratchpad\"; node shoot2.js)",
+      "PowerShell(cd \"$env:LOCALAPPDATA\\\\Temp\\\\claude\\\\C--Users-snira-Desktop-Full-Stack-frog-task\\\\f22b5d0e-57f0-43c8-afd9-f6f8ebb900d5\\\\scratchpad\"; node shoot3.js)",
+      "PowerShell(cd \"$env:LOCALAPPDATA\\\\Temp\\\\claude\\\\C--Users-snira-Desktop-Full-Stack-frog-task\\\\f22b5d0e-57f0-43c8-afd9-f6f8ebb900d5\\\\scratchpad\"; node sweep.js)",
+      "PowerShell(cd \"$env:LOCALAPPDATA\\\\Temp\\\\claude\\\\C--Users-snira-Desktop-Full-Stack-frog-task\\\\f22b5d0e-57f0-43c8-afd9-f6f8ebb900d5\\\\scratchpad\"; node shoot4.js)",
+      "PowerShell(cd \"$env:LOCALAPPDATA\\\\Temp\\\\claude\\\\C--Users-snira-Desktop-Full-Stack-frog-task\\\\f22b5d0e-57f0-43c8-afd9-f6f8ebb900d5\\\\scratchpad\"; node shoot5.js)"
     ]
   }
 }

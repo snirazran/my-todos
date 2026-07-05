@@ -17,7 +17,9 @@ import {
 import { StreakSheet } from '@/components/ui/streak/StreakSheet';
 import type { CheckInResult } from '@/lib/streak/types';
 
-let lastCheckedDayKey: string | null = null;
+// Keyed per user so a fresh account created in the same session (after another
+// account already checked in today) still gets its own check-in.
+let lastChecked: { dayKey: string; userId: string } | null = null;
 
 const EXCLUDED_PREFIXES = [
   '/welcome',
@@ -34,15 +36,18 @@ export function StreakCheckInProvider() {
   const excludedRoute = EXCLUDED_PREFIXES.some((p) => pathname?.startsWith(p));
   const eligible = !!user && !excludedRoute;
 
+  const userId = user?.uid ?? null;
+
   useEffect(() => {
-    if (!eligible) return;
+    if (!eligible || !userId) return;
 
     const run = async () => {
       const today = localDayKey();
-      if (lastCheckedDayKey === today) return;
+      if (lastChecked?.dayKey === today && lastChecked.userId === userId)
+        return;
       const result = await checkInStreak();
       if (!result) return;
-      lastCheckedDayKey = today;
+      lastChecked = { dayKey: today, userId };
       if (!result.active) return;
       if (result.freezeConsumedDays.length > 0 && result.view) {
         showNotification(
@@ -71,7 +76,7 @@ export function StreakCheckInProvider() {
     return () => {
       void handle?.remove();
     };
-  }, [eligible, showNotification]);
+  }, [eligible, userId, showNotification]);
 
   if (!eligible) return null;
   return <StreakSheetHost />;

@@ -64,6 +64,8 @@ export default function MobileNav() {
     pathname === '/login' ||
     pathname === '/register' ||
     pathname === '/onboarding' ||
+    pathname === '/terms' ||
+    pathname === '/privacy' ||
     pathname?.startsWith('/auth/')
   ) return null;
 

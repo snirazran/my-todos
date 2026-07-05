@@ -8,6 +8,7 @@ import { INVENTORY_KEY, INVENTORY_SUMMARY_KEY } from '@/hooks/useInventory';
 import { notifyQuestClaims, seedQuestClaims } from '@/lib/questClaims';
 import Fly from '@/components/ui/fly';
 import { useUIStore } from '@/lib/uiStore';
+import { queuePlusIntroOnce } from '@/lib/plusIntro';
 
 // --- Types ---
 export interface ChecklistItem {
@@ -336,9 +337,6 @@ export function useTaskData({
 
             // NOTIFICATIONS
             if (newFlyStatus) {
-              const prevEarned = flyStatus.earnedToday;
-              const newEarned = newFlyStatus.earnedToday;
-
               if (newFlyStatus.justHitLimit) {
                 if (newFlyStatus.isPremium) {
                   showNotification(
@@ -384,24 +382,11 @@ export function useTaskData({
                     { durationMs: 8000 },
                   );
                 }
-              } else if (newEarned > prevEarned) {
-                const gained = newEarned - prevEarned;
-                showNotification(
-                  <div className="flex w-full items-center gap-3">
-                    <div className="grid h-12 w-12 shrink-0 place-items-center">
-                      <Fly size={44} y={-2} />
-                    </div>
-                    <div className="flex min-w-0 flex-1 flex-col leading-tight">
-                      <span className="text-[14px] font-black text-foreground">
-                        +{gained} {gained === 1 ? 'Fly' : 'Flies'} Collected!
-                      </span>
-                      <span className="mt-0.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                        Keep it up!
-                      </span>
-                    </div>
-                  </div>,
-                );
               }
+            }
+
+            if (nextCompleted && !newFlyStatus?.isPremium) {
+              queuePlusIntroOnce();
             }
 
             mutateToday(

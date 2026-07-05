@@ -28,6 +28,7 @@ import { patchInventoryFlies } from '@/hooks/useInventory';
 import { useBuddyState } from '@/hooks/useBuddyState';
 import { mutateFriendsCaches } from '@/hooks/useFriendsSync';
 import { notifyQuestClaims } from '@/lib/questClaims';
+import { queuePlusIntroOnce } from '@/lib/plusIntro';
 import { useLeftTongue } from './LeftTongue';
 
 // Hoisted so the motion wrapper gets a stable transition reference (a new
@@ -269,33 +270,18 @@ export default React.memo(function TaskList({
         if (typeof json?.flyStatus?.balance === 'number') {
           patchInventoryFlies(json.flyStatus.balance);
         }
-        if (completing && json?.flyStatus) {
-          if (json.flyStatus.justHitLimit) {
-            showNotification(
-              <div className="flex items-center gap-3 pr-1">
-                <Fly size={28} y={-4} />
-                <span className="font-bold text-red-500">
-                  Daily Target Reached!
-                </span>
-              </div>,
-            );
-          } else if (json.awarded) {
-            showNotification(
-              <div className="flex w-full items-center gap-3">
-                <div className="grid h-12 w-12 shrink-0 place-items-center">
-                  <Fly size={44} y={-2} />
-                </div>
-                <div className="flex min-w-0 flex-1 flex-col leading-tight">
-                  <span className="text-[14px] font-black text-foreground">
-                    +1 Fly Collected!
-                  </span>
-                  <span className="mt-0.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                    Keep it up!
-                  </span>
-                </div>
-              </div>,
-            );
-          }
+        if (completing && json?.flyStatus?.justHitLimit) {
+          showNotification(
+            <div className="flex items-center gap-3 pr-1">
+              <Fly size={28} y={-4} />
+              <span className="font-bold text-red-500">
+                Daily Target Reached!
+              </span>
+            </div>,
+          );
+        }
+        if (completing && !json?.flyStatus?.isPremium) {
+          queuePlusIntroOnce();
         }
       })
         .catch(refresh);

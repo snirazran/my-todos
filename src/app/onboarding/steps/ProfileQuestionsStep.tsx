@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Check } from 'lucide-react';
 import useSWR from 'swr';
@@ -67,17 +67,25 @@ const ABOUT_QUESTIONS: AboutQuestion[] = [
 
 const FOCUS_AREAS_QUESTION_ID = 'focusAreas';
 
+export const PROFILE_QUESTION_COUNT = ABOUT_QUESTIONS.length + 1;
+
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
+
+type Props = OnboardingStepProps & {
+  subStep: number;
+  onSubStepChange: (index: number) => void;
+};
 
 export default function ProfileQuestionsStep({
   selections,
   onSelect,
   onNext,
-  onBack,
   saving,
   direction,
-}: OnboardingStepProps) {
-  const [questionIndex, setQuestionIndex] = useState(0);
+  subStep,
+  onSubStepChange,
+}: Props) {
+  const questionIndex = subStep;
 
   const { data: questsData } = useSWR<{ macroCategories?: MacroCategoryDefinition[] }>(
     '/api/onboarding/categories',
@@ -106,13 +114,6 @@ export default function ProfileQuestionsStep({
     [focusAreasQuestion],
   );
   const currentQuestion = displayedQuestions[questionIndex];
-  // One milestone per question page: the bar advances (and a circle fills) each
-  // time you complete a question.
-  const milestoneCount = displayedQuestions.length;
-  const completedMilestones = questionIndex;
-  const totalProgress = milestoneCount > 0 ? questionIndex / milestoneCount : 0;
-  // Keep a sliver of green even at zero progress so the bar never looks empty.
-  const progressWidth = `${Math.max(totalProgress, 0.05) * 100}%`;
   const selectedValues = selections[currentQuestion.id] ?? [];
   const selected = selectedValues[0];
 
@@ -125,25 +126,17 @@ export default function ProfileQuestionsStep({
     onSelect(currentQuestion.id, id);
     window.setTimeout(() => {
       if (questionIndex < displayedQuestions.length - 1) {
-        setQuestionIndex((index) => index + 1);
+        onSubStepChange(questionIndex + 1);
       } else {
         onNext();
       }
     }, 120);
   };
 
-  const handleBack = () => {
-    if (questionIndex > 0) {
-      setQuestionIndex((index) => index - 1);
-      return;
-    }
-    onBack();
-  };
-
   const handleMultiSelectNext = () => {
     if (selectedValues.length === 0) return;
     if (questionIndex < displayedQuestions.length - 1) {
-      setQuestionIndex((index) => index + 1);
+      onSubStepChange(questionIndex + 1);
       return;
     }
     onNext();
@@ -151,67 +144,7 @@ export default function ProfileQuestionsStep({
 
   return (
     <div className="flex-1 flex flex-col">
-      {/* Progress bar — pinned at the top, above the frog */}
-      <div className="absolute inset-x-0 top-[calc(0.5rem+env(safe-area-inset-top))] z-40 flex items-center gap-3 px-3">
-        <button
-          onClick={handleBack}
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-background/90 text-muted-foreground shadow-md ring-1 ring-border/40 backdrop-blur transition hover:bg-background"
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path d="M10 12L6 8L10 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </button>
-
-        <div className="relative h-10 flex-1 rounded-full bg-background/85 px-4 shadow-md ring-1 ring-border/40 backdrop-blur">
-          <div className="relative h-full">
-            <div className="absolute left-0 right-0 top-1/2 h-3 -translate-y-1/2 rounded-full bg-zinc-300 dark:bg-zinc-600" />
-            <motion.div
-              className="absolute left-0 top-1/2 h-3 -translate-y-1/2"
-              initial={false}
-              animate={{ width: progressWidth }}
-              transition={{ type: 'spring', stiffness: 140, damping: 22 }}
-            >
-              <motion.div
-                className="h-full w-full rounded-full bg-primary shadow-sm"
-                animate={{
-                  filter: ['brightness(1)', 'brightness(1.08)', 'brightness(1)'],
-                  boxShadow: [
-                    '0 1px 2px rgba(0,0,0,0.08)',
-                    '0 0 14px rgba(34,197,94,0.35)',
-                    '0 1px 2px rgba(0,0,0,0.08)',
-                  ],
-                }}
-                transition={{
-                  duration: 2.2,
-                  ease: 'easeInOut',
-                  repeat: Infinity,
-                }}
-              />
-            </motion.div>
-            {Array.from({ length: Math.max(milestoneCount - 1, 0) }, (_, index) => {
-              const milestoneNumber = index + 1;
-              const isCompleted = milestoneNumber <= completedMilestones;
-
-              return (
-                <div
-                  key={milestoneNumber}
-                  className={cn(
-                    'absolute top-1/2 flex h-7 w-7 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full transition-colors',
-                    isCompleted ? 'bg-primary text-primary-foreground shadow-sm' : 'bg-zinc-300 text-transparent dark:bg-zinc-600',
-                  )}
-                  style={{ left: `${(milestoneNumber / milestoneCount) * 100}%` }}
-                >
-                  {isCompleted ? <Check className="h-4 w-4" strokeWidth={3} /> : null}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
       <OnboardingFrogHeader
-        indices={{ skin: 0, hat: 0, body: 0, hand_item: 0 }}
-        emote="question"
         eyebrow={currentQuestion.sectionLabel}
         title={currentQuestion.title}
         subtitle={currentQuestion.subtitle}
@@ -256,7 +189,7 @@ export default function ProfileQuestionsStep({
                       <img
                         src={category.coverImageUrl}
                         alt=""
-                        className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                        className="absolute inset-0 h-full w-full object-cover"
                       />
                     ) : (
                       <div
