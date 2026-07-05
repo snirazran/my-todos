@@ -7,7 +7,6 @@ import {
   CalendarPlus,
   Check,
   CheckCircle2,
-  ChevronRight,
   ChevronUp,
   EyeOff,
   Flame,
@@ -16,6 +15,7 @@ import {
   Pencil,
   Plus,
   Repeat,
+  RotateCcw,
   Tag,
   Trash2,
   X,
@@ -42,6 +42,7 @@ const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 // Common-sense limits for the task card.
 const ITEM_MAX = 120;
 const MAX_ITEMS = 20;
+const PREVIEW_ITEMS = 3;
 
 export interface TaskDetailTask {
   id: string;
@@ -149,7 +150,7 @@ export default function TaskDetailSheet({
       const hasNotes = !!(task.notes ?? '').trim();
       const hasChecklist = (task.checklist?.length ?? 0) > 0;
       setTab(hasNotes || !hasChecklist ? 'notes' : 'checklist');
-      setExpanded(hasNotes || hasChecklist);
+      setExpanded(false);
       setShowRepeat(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -163,6 +164,13 @@ export default function TaskDetailSheet({
 
   const buddyByTaskId = useBuddyState(open);
   const buddy = displayTask ? buddyByTaskId[displayTask.id] : undefined;
+
+  const notesText = useMemo(() => {
+    if (!notes) return '';
+    if (typeof window === 'undefined') return '';
+    const doc = new DOMParser().parseFromString(notes, 'text/html');
+    return (doc.body.textContent ?? '').replace(/\s+/g, ' ').trim();
+  }, [notes]);
 
   if (!displayTask) return null;
 
@@ -235,7 +243,7 @@ export default function TaskDetailSheet({
       : repeatMode === 'weekdays'
         ? 'Weekdays'
         : repeatMode === 'weekly'
-          ? DAY_NAMES[repeatDay]
+          ? `Every ${DAY_NAMES[repeatDay]}`
           : repeatMode === 'monthly'
             ? 'Monthly'
             : repeatMode === 'custom'
@@ -260,6 +268,19 @@ export default function TaskDetailSheet({
   const isRepeating = repeatMode !== 'none' || isWeekly;
   const streak = displayTask.streak ?? 0;
 
+  const taskTags = displayTask.tags ?? [];
+  const hasContent = !!notesText || checklist.length > 0;
+  const hasMeta =
+    isCompleted ||
+    !!displayTask.startTime ||
+    (isRepeating && streak > 0) ||
+    !!buddy ||
+    (minimal && isRepeating) ||
+    taskTags.length > 0;
+
+  const chipBase =
+    'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-black leading-none';
+
   return (
     <>
       <BaseSheet
@@ -273,243 +294,467 @@ export default function TaskDetailSheet({
         {({ bindScroll, dragControls }) => (
           <div
             ref={bindScroll}
-            className="flex flex-1 min-h-0 flex-col gap-3 overflow-hidden px-3 pt-1"
+            className="flex flex-1 min-h-0 flex-col gap-3 overflow-hidden px-3 pt-1 pb-[calc(env(safe-area-inset-bottom)+14px)] sm:pb-2"
           >
-            {/* Card 1 — identity + primary actions */}
-            <div className="shrink-0 overflow-hidden rounded-[28px] border border-border/50 bg-card shadow-sm">
-            {/* Grab handle (drag-to-dismiss), inside the card with breathing room */}
+            {/* Main card — mirrors the QuickAddSheet shell */}
             <div
-              className="flex cursor-grab touch-none justify-center pb-1 pt-2.5 active:cursor-grabbing sm:hidden"
-              onPointerDown={(e) => dragControls.start(e)}
+              className="relative flex min-h-0 shrink-0 flex-col overflow-hidden rounded-[28px] bg-popover ring-1 ring-border/80 shadow-[0_3px_0_0_rgba(0,0,0,0.18)]"
             >
-              <div className="h-1.5 w-12 rounded-full bg-border/70" />
-            </div>
-            {/* Header — controls, streak, title, repeat/time meta and tags. */}
-            <div className="relative px-5 pb-3 pt-3 text-center">
-              {onDelete && (
-                <button
-                  onClick={runAndClose(onDelete)}
-                  aria-label="Delete task"
-                  title="Delete"
-                  className="absolute left-4 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-rose-100/70 text-rose-600 transition-colors hover:bg-rose-200/70 dark:bg-rose-500/15 dark:text-rose-300"
-                >
-                  <Trash2 size={17} />
-                </button>
-              )}
+              <div
+                onPointerDown={(e) => dragControls.start(e)}
+                className="flex h-7 shrink-0 items-center justify-center touch-none cursor-grab active:cursor-grabbing sm:hidden"
+              >
+                <div className="h-1.5 w-10 rounded-full bg-muted-foreground/25" />
+              </div>
+
               <button
                 onClick={close}
                 aria-label="Close"
-                className="absolute right-4 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-muted/60 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                className="absolute right-3 top-3 z-10 grid h-8 w-8 place-items-center rounded-full bg-muted/60 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:right-4 sm:top-4"
               >
-                <X size={18} />
+                <X size={16} />
               </button>
 
-              {isRepeating && streak > 0 && (
-                <div className="flex justify-center">
-                  <span
-                    className="inline-flex items-center gap-1 rounded-full bg-orange-500/10 px-2.5 py-1 text-orange-500"
-                    title={`${streak} in a row`}
-                  >
-                    <Flame className="h-3.5 w-3.5" fill="currentColor" />
-                    <span className="text-[12px] font-black tabular-nums leading-none">
-                      ×{streak}
-                    </span>
-                    <span className="text-[10px] font-bold uppercase tracking-wider">
-                      streak
-                    </span>
-                  </span>
-                </div>
-              )}
-
-              <div className="mt-1.5 flex items-center justify-center gap-2 px-10">
-                {!minimal && onEdit && (
-                  <span className="h-9 w-9 shrink-0" aria-hidden />
-                )}
-                <h2 className="px-1 text-[22px] font-black leading-tight tracking-tight text-foreground">
-                  {displayTask.text}
-                </h2>
-                {!minimal && onEdit && (
-                  <button
-                    onClick={onEdit}
-                    aria-label="Edit task"
-                    title="Edit"
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted/60 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                  >
-                    <Pencil size={16} />
-                  </button>
-                )}
-              </div>
-
-              {isCompleted ? (
-                <div className="mt-2 flex flex-wrap items-center justify-center gap-1.5 text-[12px] font-bold">
-                  <span className="inline-flex items-center gap-1 text-green-500">
-                    <CheckCircle2 className="h-4 w-4" />
-                    Completed
-                  </span>
-                  {isRepeating && (
-                    <span className="inline-flex items-center gap-1 text-muted-foreground">
-                      <AppIcon name="repeat" label="Repeat" className="h-3.5 w-3.5" />
-                      {repeatLabel}
-                    </span>
-                  )}
-                  {displayTask.startTime && (
-                    <span className="text-primary">· {displayTask.startTime}</span>
-                  )}
-                </div>
-              ) : (
-                <div className="mt-2 flex flex-wrap items-center justify-center gap-1.5 text-[12px] font-bold text-muted-foreground">
-                  <span className="inline-flex items-center gap-1">
-                    <AppIcon name="repeat" label="Repeat" className="h-3.5 w-3.5" />
-                    {repeatLabel}
-                  </span>
-                  {displayTask.startTime && (
-                    <span className="text-primary">· {displayTask.startTime}</span>
-                  )}
-                </div>
-              )}
-
-              {buddy && (
-                <div className="mt-2 flex justify-center">
-                  <span
-                    className="inline-flex items-center gap-1.5 rounded-full bg-[#4f9149]/10 py-1 pl-1 pr-2.5"
-                    title={`Shared with ${buddy.partnerName}`}
-                  >
-                    <BuddyFrogFace indices={buddy.partnerIndices} size={22} />
-                    <span className="text-[12px] font-black leading-none text-[#4f9149]">
-                      With {buddy.partnerName}
-                    </span>
-                  </span>
-                </div>
-              )}
-
-              {displayTask.tags && displayTask.tags.length > 0 && (
-                <div className="mt-2.5 flex flex-wrap items-center justify-center gap-1.5">
-                  {displayTask.tags.map((tagId) => {
-                    const t = tagDetails(tagId);
-                    if (!t) return null;
-                    return (
-                      <span
-                        key={tagId}
-                        className="inline-flex items-center rounded-md border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-normal"
-                        style={{
-                          backgroundColor: `${t.color}20`,
-                          color: t.color,
-                          borderColor: `${t.color}40`,
-                        }}
-                      >
-                        {t.name}
+              <div className="flex min-h-0 flex-1 flex-col px-5 pb-4 pt-1 sm:pt-5">
+                <div className="pr-9">
+                  {!minimal && onEdit ? (
+                    <button
+                      onClick={onEdit}
+                      className="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded-lg"
+                    >
+                      <span className="text-[21px] font-black leading-[27px] tracking-tight text-foreground sm:text-[23px] sm:leading-[29px]">
+                        {displayTask.text}
+                        <Pencil className="mb-1 ml-2 inline-block h-4 w-4 text-muted-foreground/50" />
                       </span>
-                    );
-                  })}
+                    </button>
+                  ) : (
+                    <span className="block text-[21px] font-black leading-[27px] tracking-tight text-foreground sm:text-[23px] sm:leading-[29px]">
+                      {displayTask.text}
+                    </span>
+                  )}
                 </div>
-              )}
-            </div>
 
-            {isCompleted ? (
-              <div className="flex justify-center px-5 pb-6 pt-2">
-                <button
-                  onClick={runAndClose(onComplete)}
-                  className="flex flex-col items-center gap-2"
-                >
-                  <span className="grid h-[78px] w-[78px] place-items-center rounded-[26px] bg-card shadow-[0_6px_0_0_rgba(0,0,0,0.10)] ring-1 ring-border transition-transform active:translate-y-0.5">
-                    <CheckCircle2 className="h-10 w-10 text-green-500" />
-                  </span>
-                  <span className="text-[13px] font-black text-foreground">Undo</span>
-                </button>
-              </div>
-            ) : minimal ? (
-              <div className="flex justify-center px-5 pb-6 pt-2">
-                {onComplete ? (
-                  <button
-                    onClick={runAndClose(onComplete)}
-                    className="flex flex-col items-center gap-2"
-                  >
-                    <span className="grid h-[78px] w-[78px] place-items-center rounded-[26px] bg-card shadow-[0_6px_0_0_rgba(0,0,0,0.10)] ring-1 ring-border transition-transform active:translate-y-0.5">
-                      <Fly size={52} y={-3} />
-                    </span>
-                    <span className="text-[13px] font-black text-foreground">
-                      Complete
-                    </span>
-                  </button>
-                ) : (
-                  <div className="flex flex-col items-center gap-2 opacity-60">
-                    <span className="grid h-[78px] w-[78px] place-items-center rounded-[26px] bg-muted/40 ring-1 ring-border">
-                      <Fly size={52} y={-3} />
-                    </span>
-                    <span className="text-[13px] font-black text-muted-foreground">
-                      Upcoming
-                    </span>
+                {hasMeta && (
+                  <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                    {isCompleted && (
+                      <span className={`${chipBase} bg-green-500/10 text-green-600 dark:text-green-400`}>
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        Completed
+                      </span>
+                    )}
+                    {isRepeating && streak > 0 && (
+                      <span
+                        className={`${chipBase} bg-orange-500/10 text-orange-500`}
+                        title={`${streak} in a row`}
+                      >
+                        <Flame className="h-3.5 w-3.5" fill="currentColor" />
+                        <span className="tabular-nums">×{streak}</span>
+                      </span>
+                    )}
+                    {displayTask.startTime && (
+                      <button
+                        onClick={!minimal && onSchedule ? onSchedule : undefined}
+                        disabled={minimal || !onSchedule}
+                        className={`${chipBase} bg-primary/10 text-primary disabled:pointer-events-none`}
+                      >
+                        <Bell className="h-3 w-3" />
+                        <span className="tabular-nums">{displayTask.startTime}</span>
+                      </button>
+                    )}
+                    {minimal && isRepeating && (
+                      <span className={`${chipBase} bg-muted/70 text-muted-foreground`}>
+                        <AppIcon name="repeat" label="Repeat" className="h-3 w-3" />
+                        {repeatLabel}
+                      </span>
+                    )}
+                    {buddy && (
+                      <span
+                        className="inline-flex items-center gap-1 rounded-full bg-[#4f9149]/10 py-0.5 pl-0.5 pr-2"
+                        title={`Shared with ${buddy.partnerName}`}
+                      >
+                        <BuddyFrogFace indices={buddy.partnerIndices} size={20} />
+                        <span className="text-[11px] font-black leading-none text-[#4f9149]">
+                          With {buddy.partnerName}
+                        </span>
+                      </span>
+                    )}
+                    {taskTags.map((tagId) => {
+                      const t = tagDetails(tagId);
+                      if (!t) return null;
+                      return (
+                        <button
+                          key={tagId}
+                          onClick={!minimal && onAddTags ? onAddTags : undefined}
+                          disabled={minimal || !onAddTags}
+                          className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-black uppercase tracking-wide leading-4 disabled:pointer-events-none"
+                          style={{
+                            backgroundColor: `${t.color}20`,
+                            color: t.color,
+                            borderColor: `${t.color}40`,
+                          }}
+                        >
+                          {t.name}
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
-              </div>
-            ) : (
-            <div className="grid grid-cols-3 items-end px-2 pb-4 pt-1">
-              <div className="flex justify-center">
-                {onStartTimer && (
-                  <PlainAction
-                    label="Focus"
-                    onClick={runAndClose(onStartTimer)}
-                    icon={
-                      <AppIcon name="clock" label="Focus" className="h-11 w-11" />
-                    }
-                  />
+
+                {!minimal && (
+                  <>
+                    <div className="mt-3 h-px shrink-0 bg-border/60" />
+
+                    {!expanded && (
+                      <div className="flex flex-col pt-2.5">
+                        {hasContent ? (
+                          <>
+                            {notesText && (
+                              <button
+                                onClick={() => openEditor('notes')}
+                                className="flex items-start gap-2.5 rounded-xl px-1 py-1.5 text-left transition-colors [@media(hover:hover)]:hover:bg-muted/40"
+                              >
+                                <Pen className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground/60" />
+                                <span className="line-clamp-2 min-w-0 flex-1 text-[14px] leading-snug text-muted-foreground">
+                                  {notesText}
+                                </span>
+                              </button>
+                            )}
+                            {checklist.slice(0, PREVIEW_ITEMS).map((it) => (
+                              <div
+                                key={it.id}
+                                className="flex items-center gap-2.5 rounded-xl px-1 py-1.5"
+                              >
+                                <button
+                                  onClick={() => toggleItem(it.id)}
+                                  aria-label={it.done ? 'Mark not done' : 'Mark done'}
+                                  className={`grid h-5 w-5 shrink-0 place-items-center rounded-md border-2 transition-colors ${
+                                    it.done
+                                      ? 'border-primary bg-primary text-primary-foreground'
+                                      : 'border-muted-foreground/40 text-transparent hover:border-primary/60'
+                                  }`}
+                                >
+                                  <Check className="h-3 w-3" strokeWidth={3.5} />
+                                </button>
+                                <button
+                                  onClick={() => openEditor('checklist')}
+                                  className={`min-w-0 flex-1 truncate text-left text-[14px] leading-snug transition-colors ${
+                                    it.done
+                                      ? 'text-muted-foreground line-through'
+                                      : 'text-foreground'
+                                  }`}
+                                >
+                                  {it.text}
+                                </button>
+                              </div>
+                            ))}
+                            {checklist.length > PREVIEW_ITEMS && (
+                              <button
+                                onClick={() => openEditor('checklist')}
+                                className="rounded-xl px-1 py-1 text-left text-[12px] font-bold text-primary"
+                              >
+                                +{checklist.length - PREVIEW_ITEMS} more ·{' '}
+                                <span className="tabular-nums">
+                                  {doneCount}/{checklist.length} done
+                                </span>
+                              </button>
+                            )}
+                          </>
+                        ) : (
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => openEditor('notes')}
+                              className="flex h-10 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl border border-dashed border-border bg-muted/30 text-[12px] font-bold text-muted-foreground transition-colors active:scale-[0.98] [@media(hover:hover)]:hover:bg-muted/60 [@media(hover:hover)]:hover:text-foreground"
+                            >
+                              <Pen className="h-3.5 w-3.5 shrink-0" />
+                              Add notes
+                            </button>
+                            <button
+                              onClick={() => openEditor('checklist')}
+                              className="flex h-10 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl border border-dashed border-border bg-muted/30 text-[12px] font-bold text-muted-foreground transition-colors active:scale-[0.98] [@media(hover:hover)]:hover:bg-muted/60 [@media(hover:hover)]:hover:text-foreground"
+                            >
+                              <ListChecks className="h-4 w-4 shrink-0" />
+                              Add checklist
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {expanded && (
+                      <div className="mt-3 flex h-[min(320px,40dvh)] shrink-0 flex-col">
+                        <div className="flex shrink-0 items-center gap-2">
+                          <div className="flex flex-1 gap-1 rounded-full bg-muted/70 p-1">
+                            <TabButton
+                              active={tab === 'notes'}
+                              onClick={() => setTab('notes')}
+                            >
+                              Notes
+                            </TabButton>
+                            <TabButton
+                              active={tab === 'checklist'}
+                              onClick={() => setTab('checklist')}
+                            >
+                              Checklist
+                              {checklist.length > 0 && (
+                                <span className="ml-1 tabular-nums opacity-70">
+                                  {doneCount}/{checklist.length}
+                                </span>
+                              )}
+                            </TabButton>
+                          </div>
+                          <button
+                            onClick={collapseEditor}
+                            aria-label="Collapse"
+                            title="Collapse"
+                            className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-muted/60 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                          >
+                            <ChevronUp className="h-[18px] w-[18px]" />
+                          </button>
+                        </div>
+
+                        <div className="mt-3 flex min-h-0 flex-1 flex-col">
+                          {tab === 'notes' ? (
+                            <RichNotesEditor
+                              value={notes}
+                              onChange={setNotes}
+                              onBlur={commitNotes}
+                            />
+                          ) : (
+                            <div className="flex min-h-0 flex-1 flex-col">
+                              {checklist.length > 0 ? (
+                                <div className="mb-3 flex shrink-0 items-center gap-2.5">
+                                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+                                    <div
+                                      className="h-full rounded-full bg-primary transition-[width] duration-300"
+                                      style={{
+                                        width: `${(doneCount / checklist.length) * 100}%`,
+                                      }}
+                                    />
+                                  </div>
+                                  <span className="shrink-0 text-[12px] font-bold tabular-nums text-muted-foreground">
+                                    {doneCount}/{checklist.length}
+                                  </span>
+                                  <span
+                                    title="Each checked step adds a bonus fly when you complete the task"
+                                    className="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-[12px] font-black tabular-nums leading-none text-primary"
+                                  >
+                                    <Fly size={16} y={-1} interactive={false} paused={doneCount === 0} />
+                                    +{doneCount}
+                                  </span>
+                                </div>
+                              ) : (
+                                <div className="mb-2 flex min-h-0 flex-1 flex-col items-center justify-center gap-1.5 rounded-2xl bg-muted/30 px-6 py-4 text-center">
+                                  <Fly size={38} y={-2} interactive={false} />
+                                  <p className="text-[14px] font-black text-foreground">
+                                    Break it into steps
+                                  </p>
+                                  <p className="text-[12px] font-medium leading-snug text-muted-foreground">
+                                    Each step you check off adds{' '}
+                                    <span className="font-black text-primary">+1 fly</span>{' '}
+                                    when you complete the task.
+                                  </p>
+                                </div>
+                              )}
+
+                              <div
+                                className={`min-h-0 overflow-y-auto ${
+                                  checklist.length > 0 ? 'flex-1' : 'shrink-0'
+                                }`}
+                              >
+                                <div className="space-y-2">
+                                {checklist.map((it) => {
+                                  const isEditing = editingId === it.id;
+                                  return (
+                                    <div
+                                      key={it.id}
+                                      className={`group flex items-center gap-2.5 rounded-2xl border px-3 py-2.5 transition-all focus-within:border-primary/50 focus-within:bg-card ${
+                                        it.done
+                                          ? 'border-primary/30 bg-primary/[0.06]'
+                                          : 'border-border/50 bg-muted/30 hover:bg-muted/50'
+                                      }`}
+                                    >
+                                      <button
+                                        onClick={() => toggleItem(it.id)}
+                                        aria-label={it.done ? 'Mark not done' : 'Mark done'}
+                                        className={`grid h-6 w-6 shrink-0 place-items-center rounded-lg border-2 transition-colors ${
+                                          it.done
+                                            ? 'border-primary bg-primary text-primary-foreground'
+                                            : 'border-muted-foreground/40 text-transparent hover:border-primary/60'
+                                        }`}
+                                      >
+                                        <Check className="h-4 w-4" strokeWidth={3} />
+                                      </button>
+
+                                      {isEditing ? (
+                                        <input
+                                          autoFocus
+                                          value={it.text}
+                                          maxLength={ITEM_MAX}
+                                          onChange={(e) => editItem(it.id, e.target.value)}
+                                          onBlur={() => {
+                                            persist({ checklist });
+                                            setEditingId(null);
+                                          }}
+                                          onKeyDown={(e) => {
+                                            if (e.key === 'Enter' || e.key === 'Escape') {
+                                              e.preventDefault();
+                                              e.currentTarget.blur();
+                                            }
+                                          }}
+                                          className="min-w-0 flex-1 bg-transparent text-[16px] text-foreground focus:outline-none sm:text-[15px]"
+                                        />
+                                      ) : (
+                                        <button
+                                          onClick={() => setEditingId(it.id)}
+                                          className={`min-w-0 flex-1 break-words text-left text-[16px] transition-colors sm:text-[15px] ${
+                                            it.done
+                                              ? 'text-muted-foreground line-through'
+                                              : 'text-foreground'
+                                          }`}
+                                        >
+                                          {it.text || (
+                                            <span className="text-muted-foreground/50">
+                                              Untitled step
+                                            </span>
+                                          )}
+                                        </button>
+                                      )}
+
+                                      {isEditing ? (
+                                        <button
+                                          onMouseDown={(e) => e.preventDefault()}
+                                          onClick={() => {
+                                            persist({ checklist });
+                                            setEditingId(null);
+                                          }}
+                                          aria-label="Done editing"
+                                          className="shrink-0 rounded-lg p-1.5 text-primary transition-colors hover:bg-primary/10"
+                                        >
+                                          <Check className="h-[18px] w-[18px]" strokeWidth={3} />
+                                        </button>
+                                      ) : (
+                                        <button
+                                          onClick={() => removeItem(it.id)}
+                                          aria-label="Remove item"
+                                          className="shrink-0 rounded-lg p-1.5 text-muted-foreground/40 transition-opacity hover:text-rose-500 sm:opacity-0 sm:group-hover:opacity-100"
+                                        >
+                                          <X className="h-4 w-4" />
+                                        </button>
+                                      )}
+                                      <Fly
+                                        size={26}
+                                        y={-2}
+                                        interactive={false}
+                                        paused={!it.done}
+                                        className={`shrink-0 transition-all duration-300 ${
+                                          it.done ? 'opacity-100' : 'opacity-30 grayscale'
+                                        }`}
+                                      />
+                                    </div>
+                                  );
+                                })}
+                                </div>
+
+                              {checklist.length < MAX_ITEMS && (
+                                <div className="mt-2 flex shrink-0 items-center gap-3 rounded-2xl border-2 border-dashed border-border/60 px-3 py-2.5 transition-colors focus-within:border-primary/50">
+                                  <span className="grid h-6 w-6 shrink-0 place-items-center rounded-lg border-2 border-dashed border-muted-foreground/40 text-muted-foreground">
+                                    <Plus className="h-4 w-4" strokeWidth={2.5} />
+                                  </span>
+                                  <input
+                                    ref={newItemRef}
+                                    value={newItem}
+                                    maxLength={ITEM_MAX}
+                                    onChange={(e) => setNewItem(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        addItem();
+                                      }
+                                    }}
+                                    onBlur={addItem}
+                                    placeholder="Add an item…"
+                                    className="min-w-0 flex-1 bg-transparent text-[16px] text-foreground placeholder:text-muted-foreground/60 focus:outline-none sm:text-[15px]"
+                                  />
+                                  {newItem.trim() && (
+                                    <button
+                                      onMouseDown={(e) => e.preventDefault()}
+                                      onClick={addItem}
+                                      className="shrink-0 rounded-lg bg-primary px-3 py-1 text-[13px] font-black text-primary-foreground transition-transform active:scale-95"
+                                    >
+                                      Add
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+
+                              {checklist.length >= MAX_ITEMS && (
+                                <p className="mt-2 px-1 text-[11px] font-bold text-muted-foreground">
+                                  Maximum {MAX_ITEMS} items reached.
+                                </p>
+                              )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Toolbar — same anatomy as the QuickAddSheet bottom row */}
+                    <div className="mt-3 flex shrink-0 items-center gap-1.5">
+                      {onSetRepeat && (
+                        <button
+                          onClick={() => setShowRepeat(true)}
+                          className={`inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-bold transition-transform active:scale-95 ${
+                            isRepeating
+                              ? 'bg-primary/10 text-primary'
+                              : 'bg-muted/70 text-muted-foreground [@media(hover:hover)]:hover:text-foreground'
+                          }`}
+                        >
+                          <Repeat className="h-4 w-4 shrink-0" />
+                          <span className="whitespace-nowrap">
+                            {isRepeating ? repeatChipLabel : 'Repeat'}
+                          </span>
+                        </button>
+                      )}
+                      <div className="ml-auto flex items-center gap-1">
+                        {onSchedule && (
+                          <ToolbarIconButton
+                            label="Reminder"
+                            active={!!displayTask.reminder}
+                            onClick={onSchedule}
+                          >
+                            <Bell className="h-5 w-5" />
+                          </ToolbarIconButton>
+                        )}
+                        {onAddTags && (
+                          <ToolbarIconButton
+                            label="Tags"
+                            active={taskTags.length > 0}
+                            onClick={onAddTags}
+                          >
+                            <Tag className="h-5 w-5" />
+                          </ToolbarIconButton>
+                        )}
+                        {onDelete && (
+                          <button
+                            onClick={runAndClose(onDelete)}
+                            aria-label="Delete task"
+                            title="Delete"
+                            className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-rose-500/80 transition-colors active:scale-95 [@media(hover:hover)]:hover:bg-rose-500/10 [@media(hover:hover)]:hover:text-rose-500"
+                          >
+                            <Trash2 className="h-5 w-5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </>
                 )}
               </div>
-
-              <div className="flex justify-center">
-                {onComplete ? (
-                  <button
-                    onClick={runAndClose(onComplete)}
-                    className="flex flex-col items-center gap-2"
-                  >
-                    <span className="grid h-[78px] w-[78px] place-items-center rounded-[26px] bg-card shadow-[0_6px_0_0_rgba(0,0,0,0.10)] ring-1 ring-border transition-transform active:translate-y-0.5">
-                      <Fly size={52} y={-3} />
-                    </span>
-                    <span className="text-[13px] font-black text-foreground">
-                      Complete
-                    </span>
-                  </button>
-                ) : (
-                  // Future task — completion isn't offered yet.
-                  <div className="flex flex-col items-center gap-2 opacity-60">
-                    <span className="grid h-[78px] w-[78px] place-items-center rounded-[26px] bg-muted/40 ring-1 ring-border">
-                      <Fly size={52} y={-3} />
-                    </span>
-                    <span className="text-[13px] font-black text-muted-foreground">
-                      Upcoming
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex justify-center">
-                {isRepeating && onSkipToday ? (
-                  <PlainAction
-                    label="Skip"
-                    onClick={runAndClose(onSkipToday)}
-                    icon={<EyeOff className="h-10 w-10 text-muted-foreground" />}
-                  />
-                ) : onDoLater && !isCompleted ? (
-                  <PlainAction
-                    label="Save for later"
-                    onClick={runAndClose(onDoLater)}
-                    icon={
-                      <AppIcon
-                        name="saved"
-                        label="Save for later"
-                        className="h-10 w-10"
-                      />
-                    }
-                  />
-                ) : null}
-              </div>
-            </div>
-            )}
             </div>
 
-            {/* Card 2 — duplicate (completed + past tasks) */}
+            {/* Duplicate options — completed + past tasks */}
             {minimal && onDuplicate && (
-              <div className="rounded-[28px] border border-border/50 bg-card p-4 shadow-sm">
+              <div className="shrink-0 rounded-[28px] bg-popover p-3 ring-1 ring-border/80 shadow-[0_3px_0_0_rgba(0,0,0,0.18)]">
                 <p className="mb-2 text-center text-[11px] font-black uppercase tracking-[0.14em] text-muted-foreground">
                   Duplicate to
                 </p>
@@ -538,264 +783,81 @@ export default function TaskDetailSheet({
               </div>
             )}
 
-            {/* Card 2a — primary utilities (repeat / notify / tags). Always
-                visible so they stay reachable while the editor is open. */}
-            {!minimal && (
-            <div
-              className={`shrink-0 self-center flex justify-center gap-1 rounded-[28px] border border-border/50 bg-card p-2 shadow-sm transition-[width] ${
-                expanded ? 'w-full' : 'w-[94%]'
-              }`}
-            >
-              {onSetRepeat && (
-                <MiniAction
-                  active={repeatMode !== 'none'}
-                  label={repeatChipLabel}
-                  onClick={() => setShowRepeat(true)}
-                  icon={<Repeat className="h-5 w-5" />}
-                />
-              )}
-              {onSchedule && (
-                <MiniAction
-                  active={!!displayTask.reminder}
-                  label="Notify"
-                  onClick={onSchedule}
-                  icon={<Bell className="h-5 w-5" />}
-                />
-              )}
-              {onAddTags && (
-                <MiniAction
-                  active={!!displayTask.tags && displayTask.tags.length > 0}
-                  label="Tags"
-                  onClick={onAddTags}
-                  icon={<Tag className="h-5 w-5" />}
-                />
-              )}
-            </div>
-            )}
-
-            {/* Card 2b — notes / checklist openers (collapsed only; replaced by
-                the editor below once expanded). */}
-            {!minimal && !expanded && (
-            <div className="shrink-0 self-center flex w-[88%] justify-center gap-1 rounded-[28px] border border-border/50 bg-card p-2 shadow-sm">
-              <MiniAction
-                icon={<Pen className="h-5 w-5" />}
-                label="Notes"
-                active={!!notes.trim()}
-                onClick={() => openEditor('notes')}
-              />
-              <MiniAction
-                icon={<ListChecks className="h-5 w-5" />}
-                label={
-                  checklist.length > 0
-                    ? `Checklist · ${doneCount}/${checklist.length}`
-                    : 'Checklist'
-                }
-                active={checklist.length > 0}
-                onClick={() => openEditor('checklist')}
-              />
-            </div>
-            )}
-
-            {/* Card 3 — notes / checklist editor (active, expanded). Fills the
-                remaining height and scrolls inside, so the cards above keep
-                their size. */}
-            {!minimal && expanded && (
-            <div className="flex min-h-0 flex-1 flex-col rounded-[28px] border border-border/50 bg-card p-4 shadow-sm">
-              <div className="flex shrink-0 items-center gap-2">
-                <div className="flex flex-1 gap-1 rounded-full bg-muted/70 p-1">
-                  <TabButton
-                    active={tab === 'notes'}
-                    onClick={() => setTab('notes')}
-                  >
-                    Notes
-                  </TabButton>
-                  <TabButton
-                    active={tab === 'checklist'}
-                    onClick={() => setTab('checklist')}
-                  >
-                    Checklist
-                    {checklist.length > 0 && (
-                      <span className="ml-1 tabular-nums opacity-70">
-                        {doneCount}/{checklist.length}
-                      </span>
-                    )}
-                  </TabButton>
-                </div>
+            {/* Primary action — the chunky CTA, twin of Add Task */}
+            {isCompleted ? (
+              onComplete && (
                 <button
-                  onClick={collapseEditor}
-                  aria-label="Collapse"
-                  title="Collapse"
-                  className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-muted/60 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  onClick={runAndClose(onComplete)}
+                  className="flex h-14 w-full shrink-0 items-center justify-center gap-2 rounded-[28px] bg-popover text-[16px] font-black text-foreground ring-1 ring-border/80 shadow-[0_3px_0_0_rgba(0,0,0,0.18)] transition-all active:translate-y-0.5 active:shadow-none [@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:shadow-[0_4px_0_0_rgba(0,0,0,0.18)]"
                 >
-                  <ChevronUp className="h-[18px] w-[18px]" />
+                  <RotateCcw className="h-5 w-5 text-muted-foreground" />
+                  Undo
                 </button>
-              </div>
-
-              <div className="mt-3 flex min-h-0 flex-1 flex-col">
-                {tab === 'notes' ? (
-                  <RichNotesEditor
-                    value={notes}
-                    onChange={setNotes}
-                    onBlur={commitNotes}
-                  />
-                ) : (
-                  <div className="flex min-h-0 flex-1 flex-col">
-                    {checklist.length > 0 && (
-                      <div className="mb-3 flex shrink-0 items-center gap-2.5">
-                        <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
-                          <div
-                            className="h-full rounded-full bg-primary transition-[width] duration-300"
-                            style={{
-                              width: `${(doneCount / checklist.length) * 100}%`,
-                            }}
-                          />
-                        </div>
-                        <span className="shrink-0 text-[12px] font-bold tabular-nums text-muted-foreground">
-                          {doneCount}/{checklist.length}
-                        </span>
-                      </div>
-                    )}
-
-                    <div className="min-h-0 flex-1 space-y-2 overflow-y-auto">
-                      {checklist.map((it) => {
-                        const isEditing = editingId === it.id;
-                        return (
-                          <div
-                            key={it.id}
-                            className={`group flex items-center gap-2.5 rounded-2xl border px-3 py-2.5 transition-all focus-within:border-primary/50 focus-within:bg-card ${
-                              it.done
-                                ? 'border-primary/30 bg-primary/[0.06]'
-                                : 'border-border/50 bg-muted/30 hover:bg-muted/50'
-                            }`}
-                          >
-                            <button
-                              onClick={() => toggleItem(it.id)}
-                              aria-label={it.done ? 'Mark not done' : 'Mark done'}
-                              className={`grid h-6 w-6 shrink-0 place-items-center rounded-lg border-2 transition-colors ${
-                                it.done
-                                  ? 'border-primary bg-primary text-primary-foreground'
-                                  : 'border-muted-foreground/40 text-transparent hover:border-primary/60'
-                              }`}
-                            >
-                              <Check className="h-4 w-4" strokeWidth={3} />
-                            </button>
-
-                            {isEditing ? (
-                              <input
-                                autoFocus
-                                value={it.text}
-                                maxLength={ITEM_MAX}
-                                onChange={(e) => editItem(it.id, e.target.value)}
-                                onBlur={() => {
-                                  persist({ checklist });
-                                  setEditingId(null);
-                                }}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter' || e.key === 'Escape') {
-                                    e.preventDefault();
-                                    e.currentTarget.blur();
-                                  }
-                                }}
-                                className="min-w-0 flex-1 bg-transparent text-[16px] text-foreground focus:outline-none sm:text-[15px]"
-                              />
-                            ) : (
-                              <button
-                                onClick={() => setEditingId(it.id)}
-                                className={`min-w-0 flex-1 break-words text-left text-[16px] transition-colors sm:text-[15px] ${
-                                  it.done
-                                    ? 'text-muted-foreground line-through'
-                                    : 'text-foreground'
-                                }`}
-                              >
-                                {it.text || (
-                                  <span className="text-muted-foreground/50">
-                                    Untitled step
-                                  </span>
-                                )}
-                              </button>
-                            )}
-
-                            {isEditing ? (
-                              <button
-                                onMouseDown={(e) => e.preventDefault()}
-                                onClick={() => {
-                                  persist({ checklist });
-                                  setEditingId(null);
-                                }}
-                                aria-label="Done editing"
-                                className="shrink-0 rounded-lg p-1.5 text-primary transition-colors hover:bg-primary/10"
-                              >
-                                <Check className="h-[18px] w-[18px]" strokeWidth={3} />
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => removeItem(it.id)}
-                                aria-label="Remove item"
-                                className="shrink-0 rounded-lg p-1.5 text-muted-foreground/40 transition-opacity hover:text-rose-500 sm:opacity-0 sm:group-hover:opacity-100"
-                              >
-                                <X className="h-4 w-4" />
-                              </button>
-                            )}
-                            <Fly
-                              size={26}
-                              y={-2}
-                              interactive={false}
-                              paused={!it.done}
-                              className={`shrink-0 transition-all duration-300 ${
-                                it.done ? 'opacity-100' : 'opacity-30 grayscale'
-                              }`}
-                            />
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* Pinned add-item row — always visible below the
-                        scrolling list, regardless of how many items there are. */}
-                    {checklist.length < MAX_ITEMS && (
-                      <div className="mt-2 flex shrink-0 items-center gap-3 rounded-2xl border-2 border-dashed border-border/60 px-3 py-2.5 transition-colors focus-within:border-primary/50">
-                        <span className="grid h-6 w-6 shrink-0 place-items-center rounded-lg border-2 border-dashed border-muted-foreground/40 text-muted-foreground">
-                          <Plus className="h-4 w-4" strokeWidth={2.5} />
-                        </span>
-                        <input
-                          ref={newItemRef}
-                          value={newItem}
-                          maxLength={ITEM_MAX}
-                          onChange={(e) => setNewItem(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              addItem();
-                            }
-                          }}
-                          onBlur={addItem}
-                          placeholder="Add an item…"
-                          className="min-w-0 flex-1 bg-transparent text-[16px] text-foreground placeholder:text-muted-foreground/60 focus:outline-none sm:text-[15px]"
-                        />
-                        {newItem.trim() && (
-                          <button
-                            onMouseDown={(e) => e.preventDefault()}
-                            onClick={addItem}
-                            className="shrink-0 rounded-lg bg-primary px-3 py-1 text-[13px] font-black text-primary-foreground transition-transform active:scale-95"
-                          >
-                            Add
-                          </button>
-                        )}
-                      </div>
-                    )}
-
-                    {checklist.length >= MAX_ITEMS && (
-                      <p className="mt-2 px-1 text-[11px] font-bold text-muted-foreground">
-                        Maximum {MAX_ITEMS} items reached.
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
+              )
+            ) : (
+              <button
+                onClick={runAndClose(onComplete)}
+                disabled={!onComplete}
+                className={[
+                  'group relative h-14 w-full shrink-0 overflow-hidden rounded-[28px] text-[17px] font-black transition-all',
+                  'bg-[#4f9149] text-white',
+                  'shadow-[0_4px_0_0_#34631f] ring-1 ring-[#34631f]/40',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f9149]/40',
+                  '[@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:shadow-[0_5px_0_0_#34631f] active:translate-y-1 active:shadow-none',
+                  'disabled:pointer-events-none disabled:opacity-60 disabled:grayscale',
+                ].join(' ')}
+              >
+                <span className="relative z-10 flex items-center justify-center gap-2.5">
+                  <span className="grid h-9 w-9 place-items-center rounded-full bg-white/90 shadow-sm">
+                    <Fly size={30} y={-2} interactive={false} />
+                  </span>
+                  <span>{onComplete ? 'Complete' : 'Upcoming'}</span>
+                  {!!onComplete && doneCount > 0 && (
+                    <span
+                      title={`Worth ${doneCount + 1} flies — 1 + ${doneCount} checked steps`}
+                      className="rounded-full bg-white/25 px-2 py-1 text-[13px] font-black leading-none tabular-nums"
+                    >
+                      ×{doneCount + 1}
+                    </span>
+                  )}
+                </span>
+              </button>
             )}
 
-            <div className="shrink-0 pb-[calc(env(safe-area-inset-bottom)+14px)]" />
+            {/* Secondary actions */}
+            {!minimal &&
+              (onStartTimer || (isRepeating && onSkipToday) || onDoLater) && (
+                <div className="flex shrink-0 gap-2.5">
+                  {onStartTimer && (
+                    <SecondaryButton
+                      label="Focus"
+                      onClick={runAndClose(onStartTimer)}
+                      icon={
+                        <AppIcon name="clock" label="Focus" className="h-6 w-6" />
+                      }
+                    />
+                  )}
+                  {isRepeating && onSkipToday ? (
+                    <SecondaryButton
+                      label="Skip today"
+                      onClick={runAndClose(onSkipToday)}
+                      icon={<EyeOff className="h-5 w-5 text-muted-foreground" />}
+                    />
+                  ) : onDoLater ? (
+                    <SecondaryButton
+                      label="Save for later"
+                      onClick={runAndClose(onDoLater)}
+                      icon={
+                        <AppIcon
+                          name="saved"
+                          label="Save for later"
+                          className="h-5 w-5"
+                        />
+                      }
+                    />
+                  ) : null}
+                </div>
+              )}
           </div>
         )}
       </BaseSheet>
@@ -818,50 +880,50 @@ export default function TaskDetailSheet({
   );
 }
 
-function PlainAction({
+function ToolbarIconButton({
   label,
-  icon,
+  active = false,
   onClick,
+  children,
 }: {
   label: string;
-  icon: React.ReactNode;
+  active?: boolean;
   onClick: () => void;
+  children: React.ReactNode;
 }) {
   return (
     <button
+      type="button"
+      aria-label={label}
+      title={label}
       onClick={onClick}
-      className="flex flex-col items-center gap-2 text-muted-foreground transition-colors hover:text-foreground active:scale-95"
+      className={`grid h-10 w-10 shrink-0 place-items-center rounded-full transition-colors active:scale-95 ${
+        active
+          ? 'bg-primary/10 text-primary'
+          : 'text-muted-foreground [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground'
+      }`}
     >
-      <span className="grid h-[52px] place-items-center">{icon}</span>
-      <span className="whitespace-nowrap text-[12px] font-bold">{label}</span>
+      {children}
     </button>
   );
 }
 
-function MiniAction({
+function SecondaryButton({
   label,
   icon,
   onClick,
-  active = false,
 }: {
   label: string;
   icon: React.ReactNode;
   onClick: () => void;
-  active?: boolean;
 }) {
   return (
     <button
       onClick={onClick}
-      className={`flex min-w-0 flex-1 flex-col items-center gap-1.5 rounded-2xl py-2.5 transition-colors active:scale-95 ${
-        active
-          ? 'text-primary'
-          : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
-      }`}
+      className="flex h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-[22px] bg-popover text-[14px] font-black text-foreground ring-1 ring-border/80 shadow-[0_3px_0_0_rgba(0,0,0,0.18)] transition-all active:translate-y-0.5 active:shadow-none [@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:shadow-[0_4px_0_0_rgba(0,0,0,0.18)]"
     >
-      <span className="grid h-6 place-items-center">{icon}</span>
-      <span className="max-w-full truncate px-1 py-px text-[12px] font-bold leading-tight">
-        {label}
-      </span>
+      {icon}
+      <span className="truncate">{label}</span>
     </button>
   );
 }

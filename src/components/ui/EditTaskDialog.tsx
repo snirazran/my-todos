@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Check, Pencil } from 'lucide-react';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 
@@ -25,7 +25,7 @@ export function EditTaskDialog({
 }: Props) {
   const [mounted, setMounted] = useState(false);
   const [text, setText] = useState(initialText);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Cache the title so the slide-down exit animation can still render it
   // after the parent clears state.
@@ -43,6 +43,13 @@ export function EditTaskDialog({
     const id = window.setTimeout(() => inputRef.current?.focus(), 80);
     return () => window.clearTimeout(id);
   }, [open, initialText]);
+
+  useLayoutEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = '0px';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [text, open]);
 
   if (!mounted) return null;
 
@@ -70,20 +77,22 @@ export function EditTaskDialog({
                 </div>
 
                 {/* Input row */}
-                <div className="mb-4 flex items-center gap-2">
+                <div className="mb-4 flex items-start gap-2">
                   <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full border border-muted-foreground/10 bg-muted text-primary">
                     <Pencil className="h-5 w-5 stroke-[2.5]" />
                   </div>
                   <div className="relative flex-1">
-                    <input
+                    <textarea
                       ref={inputRef}
-                      type="text"
                       value={text}
-                      onChange={(e) => setText(e.target.value)}
+                      rows={1}
+                      onChange={(e) =>
+                        setText(e.target.value.replace(/\s*\n+\s*/g, ' '))
+                      }
                       onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
+                        if (e.key === 'Enter') {
                           e.preventDefault();
-                          handleSave();
+                          if (!e.shiftKey) handleSave();
                         }
                         if (e.key === 'Escape') onClose();
                       }}
@@ -92,12 +101,12 @@ export function EditTaskDialog({
                       autoComplete="off"
                       disabled={busy}
                       placeholder="Task name"
-                      className="h-12 w-full rounded-[16px] bg-muted/50 pl-4 pr-14 text-lg font-medium text-foreground ring-1 ring-border/80 shadow-[0_1px_0_rgba(255,255,255,.1)_inset] focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50 text-left"
+                      className="block min-h-12 max-h-[136px] w-full resize-none overflow-y-auto rounded-[16px] bg-muted/50 py-3 pl-4 pr-14 text-lg font-medium leading-6 text-foreground ring-1 ring-border/80 shadow-[0_1px_0_rgba(255,255,255,.1)_inset] focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50 text-left"
                     />
                     {text.length >= MAX_LENGTH - 5 && (
                       <span
                         aria-hidden="true"
-                        className={`pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-bold tabular-nums ${
+                        className={`pointer-events-none absolute bottom-2 right-3 text-[11px] font-bold tabular-nums ${
                           text.length >= MAX_LENGTH
                             ? 'text-rose-500'
                             : 'text-rose-400'
