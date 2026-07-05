@@ -115,10 +115,19 @@ export default function TaskCard({
   const pointerTypeRef = useRef<string>('mouse');
   const canDragRef = useRef(false);
   const beginGrabRef = useRef<(x: number, y: number) => void>(() => {});
+  // Non-passive touchmove guard installed synchronously at grab time — the
+  // drag manager's own listener registers an effect-frame later, which is
+  // enough of a gap for the browser to claim the gesture and pan the board
+  // underneath the drag.
+  const touchScrollGuardRef = useRef<((e: TouchEvent) => void) | null>(null);
 
   const cleanupLP = useCallback(() => {
     document.body.style.userSelect = '';
     (document.body.style as any).webkitUserSelect = '';
+    if (touchScrollGuardRef.current) {
+      window.removeEventListener('touchmove', touchScrollGuardRef.current);
+      touchScrollGuardRef.current = null;
+    }
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
@@ -243,6 +252,11 @@ export default function TaskCard({
         window.getSelection()?.removeAllRanges();
 
         if (pointerType !== 'mouse') {
+          const guard = (ev: TouchEvent) => {
+            if (ev.cancelable) ev.preventDefault();
+          };
+          window.addEventListener('touchmove', guard, { passive: false });
+          touchScrollGuardRef.current = guard;
           try {
             navigator.vibrate?.(15);
           } catch {

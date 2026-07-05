@@ -55,6 +55,13 @@ export function useDragManager() {
     null,
   );
 
+  // Auto-scroll stays disarmed until the pointer actually travels from the
+  // grab point — thumbs naturally grab cards inside the screen-edge zones, and
+  // scrolling the board the moment a still-held card is lifted reads as the
+  // view sliding away on its own.
+  const grabPointRef = useRef({ x: 0, y: 0 });
+  const autoScrollArmedRef = useRef(false);
+
   const positionOverlay = useCallback((x: number, y: number) => {
     const el = overlayElRef.current;
     if (!el) return;
@@ -193,6 +200,8 @@ export function useDragManager() {
       dragFromDayRef.current = day;
       targetDayRef.current = day;
       dragOffsetRef.current = { dx: clientX - rect.left, dy: clientY - rect.top };
+      grabPointRef.current = { x: clientX, y: clientY };
+      autoScrollArmedRef.current = false;
 
       setDrag({
         active: true,
@@ -355,6 +364,14 @@ export function useDragManager() {
       positionOverlay(px, py);
       frameCallbackRef.current?.(px, py);
 
+      if (!autoScrollArmedRef.current) {
+        const gp = grabPointRef.current;
+        if (Math.hypot(px - gp.x, py - gp.y) > 12) {
+          autoScrollArmedRef.current = true;
+        }
+      }
+      const autoScrollArmed = autoScrollArmedRef.current;
+
       // --- 3. Auto-Scroll Logic ---
       const s = scrollerRef.current;
       
@@ -406,8 +423,8 @@ export function useDragManager() {
         const combined = clamp(easeQuad(distFactor) * 0.85 + speedFactor * 0.35, 0, 1);
         
         const vx = dir * (MIN_V + (MAX_V - MIN_V) * combined);
-        
-        if (dir !== 0) {
+
+        if (dir !== 0 && autoScrollArmed) {
             s.scrollLeft += vx;
         }
       }
@@ -489,7 +506,7 @@ export function useDragManager() {
              }
            }
         }
-        if (dirY !== 0) {
+        if (dirY !== 0 && autoScrollArmed) {
            const vy = dirY * (MIN_V + (MAX_V - MIN_V) * easeQuad(distY));
            list.scrollTop += vy;
         }
