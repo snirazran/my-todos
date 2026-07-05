@@ -7,6 +7,7 @@ import SiteHeader from '@/components/ui/siteHeader';
 import MobileNav from '@/components/ui/MobileNav';
 import { RiveCounter } from '@/components/ui/RiveCounter';
 import { RiveScrollPause } from '@/components/ui/RiveScrollPause';
+import { SheetRivePause } from '@/components/ui/SheetRivePause';
 import { AuthContext } from '@/components/auth/AuthContext';
 import { GlobalPageBackground } from '@/components/ui/GlobalPageBackground';
 import { RiveWarmup } from '@/components/providers/RiveWarmup';
@@ -136,6 +137,7 @@ export default function RootLayout({
               <MobileNav />
               <RiveCounter />
               <RiveScrollPause />
+              <SheetRivePause />
               <RiveWarmup />
             </div>
           </Providers>

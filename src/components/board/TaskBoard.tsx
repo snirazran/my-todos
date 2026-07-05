@@ -168,6 +168,8 @@ export default function TaskBoard({
     onGrab,
     endDrag,
     cancelDrag,
+    registerOverlayEl,
+    setFrameCallback,
   } = useDragManager();
 
   // index range: 0..N-1 = date columns, N = backlog
@@ -366,6 +368,33 @@ export default function TaskBoard({
     const minBound = accountCreatedAt ?? '1970-01-01';
     return windowDates.length > 0 && cmpYmd(windowDates[0], minBound) > 0;
   }, [windowDates, accountCreatedAt]);
+
+  // When the past edge renders nothing while idle (nothing left to load), the
+  // drop zone appearing there on drag start inserts width at the front of the
+  // row and visually shunts the whole board. Compensate the scroll position by
+  // exactly that width, and undo it when the drag ends.
+  const pastZoneCompensationRef = useRef(0);
+  React.useLayoutEffect(() => {
+    const s = scrollerRef.current;
+    if (!s) return;
+    const nudge = (delta: number) => {
+      const prev = s.style.scrollBehavior;
+      s.style.scrollBehavior = 'auto';
+      s.scrollLeft += delta;
+      s.style.scrollBehavior = prev;
+    };
+    if (drag?.active) {
+      if (!canLoadPast && pastZoneRef.current) {
+        const w = pastZoneRef.current.offsetWidth + 12;
+        nudge(w);
+        pastZoneCompensationRef.current = w;
+      }
+    } else if (pastZoneCompensationRef.current) {
+      const w = pastZoneCompensationRef.current;
+      pastZoneCompensationRef.current = 0;
+      nudge(-w);
+    }
+  }, [drag?.active, canLoadPast, scrollerRef]);
 
   // Elastic edge "pull": how far past the first/last day the user has scrolled.
   // Drives the Load-more expansion and arms a load-on-release gesture (mobile).
@@ -581,11 +610,15 @@ export default function TaskBoard({
     return () => s.removeEventListener('selectstart', onSelectStart);
   }, [scrollerRef]);
 
-  // Track which column is centered on scroll
+  // Track which column is centered on scroll. Coalesced to one rAF per frame —
+  // scroll events can fire several times per frame on mobile, and this handler
+  // does layout reads plus state updates, so running it raw made swipes janky.
   useEffect(() => {
     const s = scrollerRef.current;
     if (!s) return;
-    const handler = () => {
+    let frame = 0;
+    const compute = () => {
+      frame = 0;
       const cols = Array.from(
         document.querySelectorAll<HTMLElement>('[data-col="true"]'),
       );
@@ -606,20 +639,38 @@ export default function TaskBoard({
       if (first && last && !drag?.active) {
         const PULL_FULL = 110;
         const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
+        const quantize = (v: number) => Math.round(v * 25) / 25;
         const futureExtra =
           s.scrollLeft + s.clientWidth - (last.offsetLeft + last.clientWidth);
         const pastExtra = first.offsetLeft - s.scrollLeft;
         if (futureExtra > 2) {
-          setEdgePull({ side: 'future', amount: clamp01(futureExtra / PULL_FULL) });
+          setEdgePull((prev) => {
+            const amount = quantize(clamp01(futureExtra / PULL_FULL));
+            return prev.side === 'future' && prev.amount === amount
+              ? prev
+              : { side: 'future', amount };
+          });
         } else if (pastExtra > 2 && canLoadPast) {
-          setEdgePull({ side: 'past', amount: clamp01(pastExtra / PULL_FULL) });
+          setEdgePull((prev) => {
+            const amount = quantize(clamp01(pastExtra / PULL_FULL));
+            return prev.side === 'past' && prev.amount === amount
+              ? prev
+              : { side: 'past', amount };
+          });
         } else {
           setEdgePull((prev) => (prev.side ? { side: null, amount: 0 } : prev));
         }
       }
     };
+    const handler = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(compute);
+    };
     s.addEventListener('scroll', handler, { passive: true });
-    return () => s.removeEventListener('scroll', handler);
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      s.removeEventListener('scroll', handler);
+    };
   }, [
     N,
     windowDates,
@@ -805,68 +856,74 @@ export default function TaskBoard({
     }
   }
 
-  // Backlog hover detection (unchanged)
-  useEffect(() => {
-    if (
-      drag?.active &&
-      backlogOpen &&
-      drag.fromDay === BACKLOG_IDX &&
-      backlogTrayRef.current
-    ) {
-      const trayRect = backlogTrayRef.current.getBoundingClientRect();
-      const trayTop = trayRect.top;
-      const EXIT_DIST = 200;
-      if (drag.y < trayTop) {
-        const distOut = trayTop - drag.y;
-        const progress = Math.min(1, distOut / EXIT_DIST);
-        setTrayCloseProgress(progress);
-      } else {
-        setTrayCloseProgress(0);
-      }
-    } else {
-      setTrayCloseProgress(0);
-    }
+  // Per-frame drag hit-testing — runs inside the drag manager's rAF loop via
+  // a callback instead of reacting to per-frame React state (which re-rendered
+  // the whole board at 60fps and could cascade into update-depth errors).
+  // Refs hold the authoritative values for the drop logic; state (quantized so
+  // it only changes in visible steps) drives the visuals.
+  const isDragOverBacklogRef = useRef(false);
+  const dateZoneActiveRef = useRef(false);
+  const backlogOpenRef = useRef(backlogOpen);
+  backlogOpenRef.current = backlogOpen;
 
-    if (!drag?.active || !backlogBoxRef.current) {
-      setIsDragOverBacklog(false);
-      setBacklogProximity(0);
-      return;
-    }
-
-    const r = backlogBoxRef.current.getBoundingClientRect();
-    const hit =
-      drag.x >= r.left &&
-      drag.x <= r.right &&
-      drag.y >= r.top &&
-      drag.y <= r.bottom;
-    setIsDragOverBacklog(hit);
-
-    const cx = r.left + r.width / 2;
-    const cy = r.top + r.height / 2;
-    const dist = Math.hypot(drag.x - cx, drag.y - cy);
-    const MAX_DIST = 200;
-    const prox = Math.max(0, 1 - dist / MAX_DIST);
-    setBacklogProximity(prox);
-  }, [drag?.x, drag?.y, drag?.active, backlogOpen, drag?.fromDay, BACKLOG_IDX]);
-
-  // "Move to a specific date" edge-zone hover detection.
   useEffect(() => {
     if (!drag?.active) {
+      setFrameCallback(null);
+      isDragOverBacklogRef.current = false;
+      dateZoneActiveRef.current = false;
+      setIsDragOverBacklog(false);
+      setBacklogProximity(0);
+      setTrayCloseProgress(0);
       setDateZoneActive(false);
       return;
     }
-    const over = (el: HTMLElement | null) => {
-      if (!el) return false;
-      const r = el.getBoundingClientRect();
-      return (
-        drag.x >= r.left &&
-        drag.x <= r.right &&
-        drag.y >= r.top &&
-        drag.y <= r.bottom
-      );
+    const fromDay = drag.fromDay;
+    const quantize = (v: number) => Math.round(v * 20) / 20;
+
+    const onFrame = (x: number, y: number) => {
+      if (
+        backlogOpenRef.current &&
+        fromDay === BACKLOG_IDX &&
+        backlogTrayRef.current
+      ) {
+        const trayTop = backlogTrayRef.current.getBoundingClientRect().top;
+        const EXIT_DIST = 200;
+        const progress =
+          y < trayTop ? Math.min(1, (trayTop - y) / EXIT_DIST) : 0;
+        setTrayCloseProgress(quantize(progress));
+      } else {
+        setTrayCloseProgress(0);
+      }
+
+      const box = backlogBoxRef.current;
+      if (box) {
+        const r = box.getBoundingClientRect();
+        const hit = x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+        isDragOverBacklogRef.current = hit;
+        setIsDragOverBacklog(hit);
+        const cx = r.left + r.width / 2;
+        const cy = r.top + r.height / 2;
+        const dist = Math.hypot(x - cx, y - cy);
+        setBacklogProximity(quantize(Math.max(0, 1 - dist / 200)));
+      } else {
+        isDragOverBacklogRef.current = false;
+        setIsDragOverBacklog(false);
+        setBacklogProximity(0);
+      }
+
+      const over = (el: HTMLElement | null) => {
+        if (!el) return false;
+        const r = el.getBoundingClientRect();
+        return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+      };
+      const zone = over(pastZoneRef.current) || over(futureZoneRef.current);
+      dateZoneActiveRef.current = zone;
+      setDateZoneActive(zone);
     };
-    setDateZoneActive(over(pastZoneRef.current) || over(futureZoneRef.current));
-  }, [drag?.x, drag?.y, drag?.active]);
+
+    setFrameCallback(onFrame);
+    return () => setFrameCallback(null);
+  }, [drag?.active, drag?.fromDay, BACKLOG_IDX, setFrameCallback]);
 
   const commitDragReorder = useCallback(
     (toDay: number, toIndex: number) => {
@@ -1033,8 +1090,13 @@ export default function TaskBoard({
   const onDrop = useCallback(() => {
     if (!drag) return;
 
+    // Read the drag-frame hit-test results from refs — always current at the
+    // moment of release, with no state-update timing window.
+    const overDateZone = dateZoneActiveRef.current;
+    const overBacklog = isDragOverBacklogRef.current;
+
     // Dropped on a "Move to a specific date" edge zone: defer to the calendar.
-    if (dateZoneActive && !isDragOverBacklog) {
+    if (overDateZone && !overBacklog) {
       const fromKey =
         drag.fromDay !== BACKLOG_IDX ? windowDates[drag.fromDay] : '';
       setPendingMove({
@@ -1050,7 +1112,7 @@ export default function TaskBoard({
       return;
     }
 
-    if (isDragOverBacklog && draggingRepeating) {
+    if (overBacklog && draggingRepeating) {
       const fromKey = windowDates[drag.fromDay];
       if (fromKey) removeOnDate(fromKey, drag.taskId).catch(console.error);
       endDrag();
@@ -1062,7 +1124,7 @@ export default function TaskBoard({
     let finalToDay = (targetDay ?? drag.fromDay) as number;
     let finalToIndex = targetIndex ?? drag.fromIndex;
 
-    if (isDragOverBacklog) {
+    if (overBacklog) {
       finalToDay = BACKLOG_IDX;
       finalToIndex = backlog.length;
     }
@@ -1106,8 +1168,6 @@ export default function TaskBoard({
     drag,
     targetDay,
     targetIndex,
-    isDragOverBacklog,
-    dateZoneActive,
     BACKLOG_IDX,
     N,
     windowDates,
@@ -1707,6 +1767,7 @@ export default function TaskBoard({
           dy={drag.dy}
           width={drag.width}
           height={drag.height}
+          innerRef={registerOverlayEl}
           text={drag.taskText}
           tags={drag.tags}
           taskType={drag.taskType}

@@ -46,6 +46,37 @@ export function useDragManager() {
   const pxVelRef = useRef(0);
   const pxVelSmoothedRef = useRef(0);
 
+  // The ghost card follows the pointer via direct DOM writes from the rAF
+  // loop — per-frame positions never touch React state, so dragging costs no
+  // re-renders no matter how many tasks are on the board.
+  const overlayElRef = useRef<HTMLDivElement | null>(null);
+  const dragOffsetRef = useRef({ dx: 0, dy: 0 });
+  const frameCallbackRef = useRef<((x: number, y: number) => void) | null>(
+    null,
+  );
+
+  const positionOverlay = useCallback((x: number, y: number) => {
+    const el = overlayElRef.current;
+    if (!el) return;
+    const { dx, dy } = dragOffsetRef.current;
+    el.style.transform = `translate3d(${x - dx}px, ${y - dy}px, 0)`;
+  }, []);
+
+  const registerOverlayEl = useCallback(
+    (el: HTMLDivElement | null) => {
+      overlayElRef.current = el;
+      if (el) positionOverlay(pointerXRef.current, pointerYRef.current);
+    },
+    [positionOverlay],
+  );
+
+  const setFrameCallback = useCallback(
+    (cb: ((x: number, y: number) => void) | null) => {
+      frameCallbackRef.current = cb;
+    },
+    [],
+  );
+
   // Refs to hold drag invariants to avoid effect dependencies
   const dragActiveRef = useRef(false);
   const dragFromDayRef = useRef<number>(0);
@@ -161,6 +192,7 @@ export function useDragManager() {
       dragActiveRef.current = true;
       dragFromDayRef.current = day;
       targetDayRef.current = day;
+      dragOffsetRef.current = { dx: clientX - rect.left, dy: clientY - rect.top };
 
       setDrag({
         active: true,
@@ -300,14 +332,11 @@ export function useDragManager() {
       // --- 1. Velocity Calculation ---
       const instV = px - pxPrevRef.current;
       pxPrevRef.current = px;
-      pxVelRef.current = instV; 
+      pxVelRef.current = instV;
 
-      // --- 2. Update Drag State (Visuals) ---
-      setDrag((d) => {
-        if (!d) return null;
-        if (d.x === px && d.y === py) return d; 
-        return { ...d, x: px, y: py };
-      });
+      // --- 2. Update Ghost Position (direct DOM write, no React render) ---
+      positionOverlay(px, py);
+      frameCallbackRef.current?.(px, py);
 
       // --- 3. Auto-Scroll Logic ---
       const s = scrollerRef.current;
@@ -482,7 +511,7 @@ export function useDragManager() {
       window.removeEventListener('keydown', handleKey);
       cancelAnimationFrame(raf);
     };
-  }, [drag?.active, cancelDrag]); // No 'drag' dependency, relies on dragActiveRef and Refs
+  }, [drag?.active, cancelDrag, positionOverlay]); // No 'drag' dependency, relies on dragActiveRef and Refs
 
   // safety nets
   useEffect(() => {
@@ -528,5 +557,7 @@ export function useDragManager() {
     onGrab,
     endDrag,
     cancelDrag,
+    registerOverlayEl,
+    setFrameCallback,
   };
 }

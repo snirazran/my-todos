@@ -1544,24 +1544,28 @@ export async function PUT(req: NextRequest) {
       // Pipeline update so we can re-stamp the date-keyed frogodoro sessions
       // onto the new day in the same write — a regular task lives on one date,
       // so all its sessions belong to moveDate after the move.
-      await TaskModel.updateOne({ userId: uid, id: taskId }, [
-        {
-          $set: {
-            type: 'regular',
-            date: moveDate,
-            order: newOrder,
-            updatedAt: now,
-            frogodoroSessions: {
-              $map: {
-                input: { $ifNull: ['$frogodoroSessions', []] },
-                as: 's',
-                in: { $mergeObjects: ['$$s', { date: moveDate }] },
+      await TaskModel.updateOne(
+        { userId: uid, id: taskId },
+        [
+          {
+            $set: {
+              type: 'regular',
+              date: moveDate,
+              order: newOrder,
+              updatedAt: now,
+              frogodoroSessions: {
+                $map: {
+                  input: { $ifNull: ['$frogodoroSessions', []] },
+                  as: 's',
+                  in: { $mergeObjects: ['$$s', { date: moveDate }] },
+                },
               },
             },
           },
-        },
-        { $unset: ['weekStart', 'dayOfWeek', 'suppressedDates'] },
-      ]);
+          { $unset: ['weekStart', 'dayOfWeek', 'suppressedDates'] },
+        ],
+        { updatePipeline: true } as never,
+      );
       await syncGamification(uid, tz);
       await notifyTaskChanged(uid);
       return NextResponse.json({ ok: true });

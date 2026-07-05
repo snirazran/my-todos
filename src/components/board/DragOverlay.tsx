@@ -16,6 +16,7 @@ export default function DragOverlay({
   dy,
   width,
   height,
+  innerRef,
   text,
   tags,
   taskType,
@@ -33,6 +34,8 @@ export default function DragOverlay({
   dy: number;
   width: number;
   height: number;
+  /** Registers the positioned root so the drag loop can move it directly. */
+  innerRef?: (el: HTMLDivElement | null) => void;
   text: string;
   tags?: { id: string; name: string; color: string }[];
   taskType?: 'weekly' | 'regular' | 'backlog';
@@ -46,6 +49,7 @@ export default function DragOverlay({
 }) {
   return (
     <div
+      ref={innerRef}
       className="fixed left-0 top-0 z-[100] pointer-events-none"
       style={{
         transform: `translate3d(${x - dx}px, ${y - dy}px, 0)`,
