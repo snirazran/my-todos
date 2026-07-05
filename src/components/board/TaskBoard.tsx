@@ -1286,7 +1286,10 @@ export default function TaskBoard({
         <div
           ref={isPast ? pastZoneRef : futureZoneRef}
           data-edge-zone={side}
-          className="shrink-0 self-start flex h-[clamp(220px,calc(100svh-430px),480px)] w-[52vw] sm:w-[200px] md:w-[185px]"
+          // Must match the idle edge's width exactly — a wider drop zone
+          // replacing the idle slot at grab time shifts every column and reads
+          // as the view sliding sideways on lift/release.
+          className="shrink-0 self-start flex h-[clamp(220px,calc(100svh-430px),480px)] w-[46vw] sm:w-[200px] md:w-[185px]"
         >
           <motion.div
             initial={{ opacity: 0 }}
