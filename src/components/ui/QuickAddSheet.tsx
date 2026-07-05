@@ -16,6 +16,7 @@ import {
   Lock,
   Plus,
   Repeat,
+  X,
 } from 'lucide-react';
 import {
   apiDayFromDisplay,
@@ -30,6 +31,7 @@ import { Icon as AppIcon } from '@/components/ui/Icon';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
 import { PlusUpgradeModal } from './PlusUpgradeModal';
 import { PickerSheet } from './quick-add/PickerSheet';
+import { TagManagerSheet } from './quick-add/TagManagerSheet';
 import { SuggestionTabs } from './quick-add/SuggestionTabs';
 import { useTagManager } from './quick-add/useTagManager';
 import { useCalendarMonth } from './quick-add/useCalendarMonth';
@@ -146,6 +148,7 @@ import type {
   ChecklistItem,
   QuickAddSheetProps,
   RepeatChoice,
+  SavedTag,
 } from './quick-add/types';
 
 export type { QuickAddSheetProps } from './quick-add/types';
@@ -211,6 +214,37 @@ export default function QuickAddSheet({
     setSelectedTags: setTags,
     onPremiumLimit: () => setShowPremiumLimit(true),
   });
+
+  // Long-press (or right-click) a strip tag to manage it directly — a plain
+  // tap still toggles selection. Mirrors the TagsView interaction.
+  const [managedTag, setManagedTag] = useState<SavedTag | null>(null);
+  const lpTimer = useRef<number | null>(null);
+  const lpFired = useRef(false);
+  const lpStart = useRef<{ x: number; y: number } | null>(null);
+  const cancelLongPress = () => {
+    if (lpTimer.current !== null) {
+      window.clearTimeout(lpTimer.current);
+      lpTimer.current = null;
+    }
+    lpStart.current = null;
+  };
+  const startLongPress = (st: SavedTag, e: React.PointerEvent) => {
+    lpFired.current = false;
+    lpStart.current = { x: e.clientX, y: e.clientY };
+    lpTimer.current = window.setTimeout(() => {
+      lpFired.current = true;
+      cancelLongPress();
+      setManagedTag(st);
+    }, 450);
+  };
+  const moveLongPress = (e: React.PointerEvent) => {
+    if (!lpStart.current) return;
+    if (
+      Math.abs(e.clientX - lpStart.current.x) > 10 ||
+      Math.abs(e.clientY - lpStart.current.y) > 10
+    )
+      cancelLongPress();
+  };
 
   const [pickedDays, setPickedDays] = useState<DisplayDay[]>([]);
   const [activePicker, setActivePicker] = useState<ActivePicker>(null);
@@ -307,6 +341,36 @@ export default function QuickAddSheet({
     }
   }, [activePicker]);
 
+  // Escape closes the topmost layer: picker first, then the sheet itself —
+  // regardless of which element holds focus.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (showPremiumLimit || showSavedConfirm) return;
+      if (managedTag) {
+        setManagedTag(null);
+        return;
+      }
+      if (activePicker || showReminderPicker) {
+        setActivePicker(null);
+        setShowReminderPicker(false);
+        return;
+      }
+      onOpenChange(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [
+    open,
+    activePicker,
+    showReminderPicker,
+    showPremiumLimit,
+    showSavedConfirm,
+    managedTag,
+    onOpenChange,
+  ]);
+
   useEffect(() => {
     const el = inputRef.current;
     if (!el) return;
@@ -365,6 +429,7 @@ export default function QuickAddSheet({
     setPickedChecklist(undefined);
     setShowSavedConfirm(false);
     setHasSuggestionContent(false);
+    setManagedTag(null);
 
     const initialDate = defaultDateKey ?? ymdLocal(new Date());
     setSelectedDateKey(initialDate);
@@ -408,6 +473,12 @@ export default function QuickAddSheet({
   );
   if (keyboardActive && viewportHeight) {
     sheetMaxHeight = Math.min(sheetMaxHeight, viewportHeight - 20);
+  }
+  if (isDesktop) {
+    sheetMaxHeight = Math.min(
+      sheetMaxHeight,
+      Math.round(availableSheetHeight * 0.8),
+    );
   }
   const suggestionsOffset = 360;
   // Cap the saved list so it can't push the input card off-screen; below the cap
@@ -565,13 +636,14 @@ export default function QuickAddSheet({
   if (!mounted) return null;
 
   const sheetVariants = {
-    hidden: isDesktop ? { opacity: 0, scale: 0.96 } : { y: '100%' },
-    visible: isDesktop ? { opacity: 1, scale: 1 } : { y: 0 },
+    hidden: isDesktop ? { opacity: 0, scale: 0.97, y: -12 } : { y: '100%' },
+    visible: isDesktop ? { opacity: 1, scale: 1, y: 0 } : { y: 0 },
     exit: ({ velocity, offset }: { velocity: number; offset: number }) => {
       if (isDesktop) {
         return {
           opacity: 0,
-          scale: 0.96,
+          scale: 0.97,
+          y: -12,
           transition: {
             type: 'tween' as const,
             ease: [0.32, 0.72, 0, 1] as const,
@@ -611,7 +683,7 @@ export default function QuickAddSheet({
                 exit={{ opacity: 0 }}
                 onClick={() => onOpenChange(false)}
                 transition={{ duration: 0.16, ease: 'easeOut' }}
-                className="fixed inset-0 z-[1399] bg-black/80 will-change-opacity"
+                className="fixed inset-0 z-[1399] bg-black/80 will-change-opacity sm:bg-black/60 sm:backdrop-blur-[2px]"
                 style={{ opacity: backdropOpacity }}
               />
 
@@ -666,7 +738,7 @@ export default function QuickAddSheet({
                 }}
                 className={`fixed z-[1400] flex max-h-[100dvh] transform-gpu pointer-events-none will-change-transform ${
                   isDesktop
-                    ? 'inset-0 items-center justify-center p-6'
+                    ? 'inset-0 items-start justify-center p-6 pt-[18vh]'
                     : 'inset-x-0 bottom-0 items-end px-3 pt-2 pb-4 sm:px-6 sm:pb-6'
                 }`}
               >
@@ -674,6 +746,18 @@ export default function QuickAddSheet({
                   style={{ maxHeight: sheetMaxHeight }}
                   className="pointer-events-auto mx-auto flex w-full max-w-[500px] flex-col pb-[env(safe-area-inset-bottom)] sm:max-w-[620px]"
                 >
+                  {isDesktop && (
+                    <div className="mb-2 flex shrink-0 justify-end">
+                      <button
+                        type="button"
+                        aria-label="Close"
+                        onClick={() => onOpenChange(false)}
+                        className="grid h-9 w-9 place-items-center rounded-full bg-white/10 text-white/70 transition-colors hover:bg-white/20 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+                      >
+                        <X className="h-5 w-5" />
+                      </button>
+                    </div>
+                  )}
                   <div className="flex min-h-0 flex-1 flex-col gap-3">
                   <div className="flex flex-none flex-col overflow-hidden rounded-[28px] bg-popover px-5 pb-3 pt-2 ring-1 ring-border/80 shadow-[0_3px_0_0_rgba(0,0,0,0.18)] sm:pt-5">
                     {!isDesktop && (
@@ -729,7 +813,6 @@ export default function QuickAddSheet({
                                 e.preventDefault();
                                 if (!e.shiftKey) handleSubmit();
                               }
-                              if (e.key === 'Escape') onOpenChange(false);
                             }}
                           />
                           {text.length >= 90 && (
@@ -771,9 +854,24 @@ export default function QuickAddSheet({
                             <button
                               key={tag.id}
                               type="button"
-                              onClick={tagScroll.guard(() =>
-                                tagManager.toggleTag(tag),
-                              )}
+                              title="Hold to edit"
+                              onPointerDown={(e) => startLongPress(tag, e)}
+                              onPointerMove={moveLongPress}
+                              onPointerUp={cancelLongPress}
+                              onPointerLeave={cancelLongPress}
+                              onPointerCancel={cancelLongPress}
+                              onContextMenu={(e) => {
+                                e.preventDefault();
+                                cancelLongPress();
+                                setManagedTag(tag);
+                              }}
+                              onClick={tagScroll.guard(() => {
+                                if (lpFired.current) {
+                                  lpFired.current = false;
+                                  return;
+                                }
+                                tagManager.toggleTag(tag);
+                              })}
                               className={`relative inline-flex h-9 select-none items-center justify-center gap-1.5 rounded-xl border pr-3 text-[11px] font-black uppercase tracking-wider shadow-sm transition-all active:scale-95 [@media(hover:hover)]:hover:opacity-75 ${
                                 isQuestTag ? 'pl-[56px]' : 'pl-3'
                               } ${
@@ -898,6 +996,11 @@ export default function QuickAddSheet({
                                 </>
                               )}
                             </span>
+                            {isDesktop && !isSubmitting && (
+                              <span className="pointer-events-none absolute right-5 top-1/2 z-10 -translate-y-1/2 inline-flex items-center rounded-lg border border-white/25 bg-white/15 px-2 py-1 text-[11px] font-bold tracking-wide text-white/85">
+                                Enter ↵
+                              </span>
+                            )}
                           </button>
                         </motion.div>
                       )}
@@ -1026,6 +1129,26 @@ export default function QuickAddSheet({
       <PlusUpgradeModal
         open={showPremiumLimit}
         onClose={() => setShowPremiumLimit(false)}
+      />
+
+      <TagManagerSheet
+        open={!!managedTag}
+        tag={managedTag}
+        onClose={() => setManagedTag(null)}
+        onSave={(updates) => {
+          if (managedTag) tagManager.updateTag(managedTag.id, updates);
+          setManagedTag(null);
+        }}
+        onDelete={() => {
+          if (managedTag) {
+            tagManager.deleteSavedTag(
+              managedTag.id,
+              managedTag.name,
+              { stopPropagation() {} } as React.MouseEvent,
+            );
+          }
+          setManagedTag(null);
+        }}
       />
 
       {mounted && showSavedConfirm && createPortal(
