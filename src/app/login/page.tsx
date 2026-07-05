@@ -14,6 +14,7 @@ import { Capacitor } from '@capacitor/core';
 import { SocialLogin } from '@capgo/capacitor-social-login';
 import { auth } from '@/lib/firebase';
 import { setAuthTokenCookie } from '@/lib/authCookie';
+import { createEmailLinkSettings } from '@/lib/emailLinkSettings';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { Loader2, ArrowLeft, ArrowRight, MailCheck } from 'lucide-react';
@@ -224,10 +225,11 @@ function LoginPageInner() {
         try {
           const origin =
             typeof window !== 'undefined' ? window.location.origin : '';
-          await sendSignInLinkToEmail(auth, trimmed, {
-            url: `${origin}/auth/email-callback`,
-            handleCodeInApp: true,
-          });
+          await sendSignInLinkToEmail(
+            auth,
+            trimmed,
+            createEmailLinkSettings(`${origin}/auth/email-callback`),
+          );
           window.localStorage.setItem(EMAIL_LINK_STORAGE_KEY, trimmed);
           setDir(1);
           setStep('email-sent');

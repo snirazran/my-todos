@@ -11,6 +11,13 @@ const lanOrigins = Object.values(networkInterfaces())
   .filter((addr) => addr && addr.family === 'IPv4' && !addr.internal)
   .map((addr) => addr.address);
 
+const firebaseProjectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+const firebaseAuthHelperHost =
+  process.env.FIREBASE_AUTH_HELPER_HOST ||
+  process.env.NEXT_PUBLIC_FIREBASE_AUTH_HELPER_HOST ||
+  (firebaseProjectId ? `${firebaseProjectId}.firebaseapp.com` : undefined) ||
+  'frogtask-fa522.firebaseapp.com';
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: false,
@@ -48,7 +55,7 @@ const nextConfig = {
     ];
   },
   async rewrites() {
-    return [
+    const rewrites = [
       {
         source: '/.well-known/apple-app-site-association',
         destination: '/api/well-known/apple-app-site-association',
@@ -58,6 +65,19 @@ const nextConfig = {
         destination: '/api/well-known/assetlinks',
       },
     ];
+
+    if (firebaseAuthHelperHost) {
+      rewrites.push({
+        source: '/__/auth/:path*',
+        destination: `https://${firebaseAuthHelperHost}/__/auth/:path*`,
+      });
+      rewrites.push({
+        source: '/__/firebase/:path*',
+        destination: `https://${firebaseAuthHelperHost}/__/firebase/:path*`,
+      });
+    }
+
+    return rewrites;
   },
   images: {
     // Serve modern formats automatically (next/image negotiates per-browser).

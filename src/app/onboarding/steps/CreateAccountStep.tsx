@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Loader2 } from 'lucide-react';
 import { sendSignInLinkToEmail } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
+import { createEmailLinkSettings } from '@/lib/emailLinkSettings';
 import { Input } from '@/components/ui/input';
 import type { OnboardingStepProps } from './types';
 import { OnboardingFrogHeader, ONBOARDING_BODY_CLASS } from './OnboardingFrogHeader';
@@ -34,10 +35,11 @@ export default function CreateAccountStep({ onNext }: OnboardingStepProps) {
     setError(null);
     try {
       const origin = typeof window !== 'undefined' ? window.location.origin : '';
-      await sendSignInLinkToEmail(auth, trimmed, {
-        url: `${origin}/auth/email-callback`,
-        handleCodeInApp: true,
-      });
+      await sendSignInLinkToEmail(
+        auth,
+        trimmed,
+        createEmailLinkSettings(`${origin}/auth/email-callback`),
+      );
       window.localStorage.setItem(EMAIL_LINK_STORAGE_KEY, trimmed);
       setStep('email-sent');
     } catch (sendError: unknown) {

@@ -6,6 +6,13 @@ import type { PluginListenerHandle } from '@capacitor/core';
 import { App } from '@capacitor/app';
 
 const APP_HOSTS = ['frogress.com', 'www.frogress.com'];
+const configuredLinkHost = process.env.NEXT_PUBLIC_FIREBASE_AUTH_LINK_DOMAIN
+  ?.replace(/^https?:\/\//, '')
+  .replace(/\/.*$/, '')
+  .trim();
+const ALLOWED_HOSTS = new Set(
+  [...APP_HOSTS, configuredLinkHost].filter(Boolean),
+);
 const REFERRAL_STORAGE_KEY = 'frogress_referral_code';
 const FRIEND_STORAGE_KEY = 'frogress_friend_code';
 
@@ -23,7 +30,7 @@ function persistInviteParams(url: URL) {
 function applyDeepLink(rawUrl: string) {
   try {
     const url = new URL(rawUrl);
-    if (!APP_HOSTS.includes(url.hostname)) return;
+    if (!ALLOWED_HOSTS.has(url.hostname)) return;
 
     persistInviteParams(url);
 

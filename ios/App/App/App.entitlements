@@ -11,6 +11,7 @@
 	<key>com.apple.developer.associated-domains</key>
 	<array>
 		<string>applinks:frogress.com</string>
+		<string>applinks:auth.frogress.com</string>
 	</array>
 </dict>
 </plist>

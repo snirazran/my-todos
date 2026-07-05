@@ -30,6 +30,16 @@
                 <data android:scheme="https" android:host="frogress.com" />
             </intent-filter>
 
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="auth.frogress.com"
+                    android:pathPrefix="/__/auth/links" />
+            </intent-filter>
+
         </activity>
 
         <service
