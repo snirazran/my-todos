@@ -125,16 +125,10 @@ export default function SiteHeader() {
       protected: true,
     },
     {
+      href: '/quests',
       label: 'Quests',
       iconName: 'quests' as const,
-      onClick: () => {
-        if (!user) {
-          router.push('/login');
-          return;
-        }
-        router.push('/quests');
-      },
-      isActive: pathname === '/quests',
+      protected: true,
     },
     {
       label: 'Wardrobe',
@@ -146,13 +140,10 @@ export default function SiteHeader() {
       isActive: pathname === '/wardrobe',
     },
     {
+      href: '/friends',
       label: 'Friends',
       iconName: 'community' as const,
-      onClick: () => {
-        if (!user) { router.push('/login'); return; }
-        router.push('/friends');
-      },
-      isActive: pathname === '/friends',
+      protected: true,
     },
   ];
 
@@ -216,9 +207,7 @@ export default function SiteHeader() {
           pathname !== '/planner' &&
             !(pathname === '/wardrobe' && isWardrobeStuck) &&
             'shadow-lg shadow-black/5 dark:shadow-black/20',
-          isLoadingScreenVisible && 'pointer-events-none',
         )}
-        aria-disabled={isLoadingScreenVisible}
       >
       <div className="flex items-center justify-between h-full gap-4 px-6 py-3 mx-auto max-w-7xl md:px-10">
         {/* ───────── Logo ───────── */}
@@ -310,57 +299,36 @@ export default function SiteHeader() {
               );
             }
 
-            if (item.onClick) {
-              return (
-                <button
-                  key={item.label}
-                  onClick={item.onClick}
-                  className={buttonClass}
-                >
-                  <Icon
-                    name={item.iconName}
-                    label={item.label}
-                    className={`w-8 h-8 ${item.label === 'Friends' ? 'scale-125' : ''}`}
-                  />
-                  <span className="hidden xl:inline">{item.label}</span>
-                  {item.label === 'Quests' && questClaimableCount > 0 ? (
-                    <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white shadow-sm ml-1">
-                      {questClaimableCount > 99 ? '99+' : questClaimableCount}
-                    </span>
-                  ) : item.label === 'Quests' && questActiveCount > 0 ? (
-                    <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-muted-foreground px-1 text-[10px] font-bold text-white shadow-sm ml-1">
-                      {questActiveCount > 9 ? '9+' : questActiveCount}
-                    </span>
-                  ) : item.label === 'Friends' && friendAlerts > 0 ? (
-                    <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white shadow-sm ml-1">
-                      {friendAlerts > 9 ? '9+' : friendAlerts}
-                    </span>
-                  ) : item.label === 'Friends' && friendClaimable > 0 ? (
-                    <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white shadow-sm ml-1">
-                      {friendClaimable > 9 ? '9+' : friendClaimable}
-                    </span>
-                  ) : null}
-                </button>
-              );
-            }
-
-            if (item.protected && !user) {
-              return (
-                <button
-                  key={item.label}
-                  onClick={() => router.push('/login')}
-                  className={buttonClass}
-                >
-                  <Icon name={item.iconName} label={item.label} className="w-8 h-8" />
-                  <span className="hidden xl:inline">{item.label}</span>
-                </button>
-              );
-            }
-
             return (
-              <Link key={item.href} href={item.href!} className={buttonClass}>
-                <Icon name={item.iconName} label={item.label} className="w-8 h-8" />
+              <Link
+                key={item.label}
+                href={item.protected && !user ? '/login' : item.href!}
+                prefetch={true}
+                className={buttonClass}
+              >
+                <Icon
+                  name={item.iconName}
+                  label={item.label}
+                  className={`w-8 h-8 ${item.label === 'Friends' ? 'scale-125' : ''}`}
+                />
                 <span className="hidden xl:inline">{item.label}</span>
+                {item.label === 'Quests' && questClaimableCount > 0 ? (
+                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white shadow-sm ml-1">
+                    {questClaimableCount > 99 ? '99+' : questClaimableCount}
+                  </span>
+                ) : item.label === 'Quests' && questActiveCount > 0 ? (
+                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-muted-foreground px-1 text-[10px] font-bold text-white shadow-sm ml-1">
+                    {questActiveCount > 9 ? '9+' : questActiveCount}
+                  </span>
+                ) : item.label === 'Friends' && friendAlerts > 0 ? (
+                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white shadow-sm ml-1">
+                    {friendAlerts > 9 ? '9+' : friendAlerts}
+                  </span>
+                ) : item.label === 'Friends' && friendClaimable > 0 ? (
+                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white shadow-sm ml-1">
+                    {friendClaimable > 9 ? '9+' : friendClaimable}
+                  </span>
+                ) : null}
               </Link>
             );
           })}

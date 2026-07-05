@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { ShoppingBag } from 'lucide-react';
 import { Icon } from '@/components/ui/Icon';
@@ -10,18 +11,21 @@ import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useUIStore } from '@/lib/uiStore';
 import { cn } from '@/lib/utils';
 
 export default function MobileNav() {
   const pathname = usePathname();
   const router = useRouter();
   const { user } = useAuth();
-  const isLoadingScreenVisible = useUIStore((state) => state.isLoadingScreenVisible);
   const { unseenCount, unseenContainerCount } = useInventory(!!user, true);
   const inventoryBadge = unseenCount + unseenContainerCount;
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const [wardrobePopupOpen, setWardrobePopupOpen] = useState(false);
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
+
+  useEffect(() => {
+    setPendingHref(null);
+  }, [pathname]);
 
   const { data: questsData } = useSWR<{
     claimableCount?: number;
@@ -76,59 +80,37 @@ export default function MobileNav() {
       protected: true,
     },
     {
+      href: '/quests',
       label: 'Quests',
       iconName: 'quests' as const,
-      onClick: () => {
-        if (!user) {
-          router.push('/login');
-          return;
-        }
-        router.push('/quests');
-      },
-      isActive: pathname === '/quests',
+      protected: true,
     },
     {
+      href: '/wardrobe',
       label: 'Wardrobe',
       iconName: 'wardrobe' as const,
-      onClick: () => {
-        if (!user) {
-          router.push('/login');
-          return;
-        }
-        router.push('/wardrobe');
-      },
-      isActive: pathname === '/wardrobe',
+      protected: true,
     },
     {
+      href: '/friends',
       label: 'Friends',
       iconName: 'community' as const,
-      onClick: () => {
-        if (!user) {
-          router.push('/login');
-          return;
-        }
-        router.push('/friends');
-      },
-      isActive: pathname === '/friends',
+      protected: true,
     },
   ];
 
   return (
     <>
-      <nav
-        className={cn(
-          'fixed bottom-0 left-0 z-50 w-full bg-background/90 backdrop-blur-lg md:hidden pb-[env(safe-area-inset-bottom)]',
-          isLoadingScreenVisible && 'pointer-events-none',
-        )}
-        aria-disabled={isLoadingScreenVisible}
-      >
+      <nav className="fixed bottom-0 left-0 z-50 w-full bg-background/90 backdrop-blur-lg md:hidden pb-[env(safe-area-inset-bottom)]">
         <div className="grid grid-cols-5 h-[76px] py-2.5">
           {navItems.map((item) => {
-            const isActive = item.href ? pathname === item.href : item.isActive;
+            const target = item.protected && !user ? '/login' : item.href;
+            const isActive = (pendingHref ?? pathname) === item.href;
+            const isPending = pendingHref === item.href && pathname !== item.href;
 
             const content = (
               <div className={`flex flex-col items-center gap-0.5 px-3 py-1 rounded-2xl transition-colors ${isActive ? 'bg-primary/10' : ''}`}>
-                <div className="relative">
+                <div className={cn('relative', isPending && 'animate-pulse [animation-delay:250ms]')}>
                   <Icon
                     name={item.iconName}
                     label={item.label}
@@ -162,40 +144,24 @@ export default function MobileNav() {
               </div>
             );
 
-            if (item.onClick) {
-              return (
-                <button
-                  key={item.label}
-                  onClick={item.onClick}
-                  className={`flex flex-col items-center justify-center w-full h-full transition-colors ${
-                    isActive
-                      ? 'text-primary'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  {content}
-                </button>
-              );
-            }
-
             return (
-              <button
+              <Link
                 key={item.href}
+                href={target}
+                prefetch={true}
                 onClick={() => {
-                  if (item.protected && !user) {
-                    router.push('/login');
-                  } else {
-                    router.push(item.href!);
+                  if (target === item.href && pathname !== item.href) {
+                    setPendingHref(item.href);
                   }
                 }}
-                className={`flex flex-col items-center justify-center w-full h-full transition-colors ${
+                className={`flex flex-col items-center justify-center w-full h-full transition-[color,transform] active:scale-95 ${
                   isActive
                     ? 'text-primary'
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
                 {content}
-              </button>
+              </Link>
             );
           })}
         </div>

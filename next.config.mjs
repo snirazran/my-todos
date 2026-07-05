@@ -15,6 +15,15 @@ const lanOrigins = Object.values(networkInterfaces())
 const nextConfig = {
   reactStrictMode: false,
   allowedDevOrigins: [...lanOrigins, '192.168.*.*', '10.*.*.*', '172.16.*.*'],
+  // Reuse the client router cache when hopping between tabs so revisits render
+  // instantly instead of waiting on a fresh RSC round-trip. Page data stays
+  // fresh independently via SWR.
+  experimental: {
+    staleTimes: {
+      dynamic: 180,
+      static: 300,
+    },
+  },
   async headers() {
     return [
       {

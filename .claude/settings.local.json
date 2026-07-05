@@ -204,7 +204,10 @@
       "Bash(npm ls *)",
       "Bash(echo \"TSC_EXIT:$?\")",
       "Bash(unset NODE_OPTIONS)",
-      "Bash(echo \"EXIT:$?\")"
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(ping -c 4 -q 5.161.176.246)",
+      "Bash(docker info *)",
+      "Bash(nc -z localhost 27017)"
     ]
   }
 }
