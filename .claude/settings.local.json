@@ -230,7 +230,8 @@
       "Bash(CAP_DEV=false npx cap sync)",
       "Bash(pod --version)",
       "Bash(pod install *)",
-      "WebFetch(domain:www.paddle.com)"
+      "WebFetch(domain:www.paddle.com)",
+      "WebFetch(domain:www.revenuecat.com)"
     ]
   }
 }

@@ -118,6 +118,12 @@ export default function WelcomePage() {
 
   return (
     <main className="fixed inset-0 flex flex-col items-center justify-center overflow-hidden bg-background px-6 py-10">
+      <Link
+        href="/pricing"
+        className="absolute right-5 top-[calc(1.25rem+env(safe-area-inset-top))] z-20 rounded-full border border-border bg-card/80 px-4 py-2 text-sm font-bold text-foreground shadow-sm backdrop-blur transition-colors hover:bg-muted/50"
+      >
+        Pricing
+      </Link>
       <motion.div
         variants={ENTER_CONTAINER}
         initial={reduceMotion ? false : 'hidden'}
