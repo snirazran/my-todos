@@ -182,19 +182,18 @@ export default function FrogodoroPill({ onClick, taskName }: Props) {
                 {/* Top stem to keep the Timer silhouette */}
                 <line x1="10" y1="2" x2="14" y2="2" strokeLinecap="round" />
               </svg>
-              {/* Only the hand spins */}
-              <motion.svg
+              {/* Only the hand spins — CSS keyframes so it runs on the
+                  compositor instead of waking the main thread every frame */}
+              <svg
                 viewBox="0 0 24 24"
-                className="absolute inset-0 h-4 w-4"
+                className="absolute inset-0 h-4 w-4 animate-[spin_4s_linear_infinite]"
                 fill="none"
                 stroke="currentColor"
                 strokeWidth={2}
                 strokeLinecap="round"
-                animate={{ rotate: 360 }}
-                transition={{ repeat: Infinity, duration: 4, ease: 'linear' }}
               >
                 <line x1="12" y1="12" x2="12" y2="6.5" />
-              </motion.svg>
+              </svg>
             </span>
           ) : (
             <Pause className="w-4 h-4 fill-current" />

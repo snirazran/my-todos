@@ -388,6 +388,12 @@ export function useDragManager() {
       // We lock the column/scroll if we are at the bottom, NOT at the edge, and NOT swiping fast.
       const isLockedTrayZone = isBottom && !isEdge && !isFastX;
 
+      // Scroll deltas are computed during the read phase but applied only after
+      // every getBoundingClientRect below — interleaving writes with reads
+      // forces the browser into multiple synchronous layouts per frame.
+      let pendingVx = 0;
+      let pendingVy = 0;
+
       if (s) {
         const rect = s.getBoundingClientRect();
         
@@ -425,7 +431,7 @@ export function useDragManager() {
         const vx = dir * (MIN_V + (MAX_V - MIN_V) * combined);
 
         if (dir !== 0 && autoScrollArmed) {
-            s.scrollLeft += vx;
+            pendingVx = vx;
         }
       }
 
@@ -507,8 +513,7 @@ export function useDragManager() {
            }
         }
         if (dirY !== 0 && autoScrollArmed) {
-           const vy = dirY * (MIN_V + (MAX_V - MIN_V) * easeQuad(distY));
-           list.scrollTop += vy;
+           pendingVy = dirY * (MIN_V + (MAX_V - MIN_V) * easeQuad(distY));
         }
 
         // Determine Index
@@ -531,6 +536,10 @@ export function useDragManager() {
         
         setTargetIndex(prev => prev === newIndex ? prev : newIndex);
       }
+
+      // --- 5. Write phase: apply the scroll deltas after all reads ---
+      if (s && pendingVx !== 0) s.scrollLeft += pendingVx;
+      if (list && pendingVy !== 0) list.scrollTop += pendingVy;
 
       setTargetDay(prev => prev === newDay ? prev : newDay);
 
