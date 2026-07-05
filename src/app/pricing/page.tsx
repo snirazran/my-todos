@@ -47,28 +47,28 @@ export default function PricingPage() {
               Best deal
             </span>
             <p className="text-sm font-black uppercase tracking-[0.18em] text-muted-foreground">
-              Plus — Yearly
+              Frogress Plus — Yearly
             </p>
             <p className="mt-3 text-4xl font-black tracking-tight text-foreground">
-              249.90₪
+              $69.99
               <span className="text-base font-bold text-muted-foreground">
                 &nbsp;/ year
               </span>
             </p>
             <p className="mt-1 text-sm font-bold text-muted-foreground">
-              About 20.82₪ per month
+              About $5.83 per month
             </p>
             <p className="mt-4 text-sm font-black text-primary">
-              Includes a 7-day free trial
+              7-day free trial, then $69.99 per year until cancelled
             </p>
           </div>
 
           <div className="flex flex-col rounded-[28px] border border-border bg-card p-6 shadow-sm">
             <p className="text-sm font-black uppercase tracking-[0.18em] text-muted-foreground">
-              Plus — Monthly
+              Frogress Plus — Monthly
             </p>
             <p className="mt-3 text-4xl font-black tracking-tight text-foreground">
-              34.90₪
+              $9.99
               <span className="text-base font-bold text-muted-foreground">
                 &nbsp;/ month
               </span>
@@ -77,7 +77,7 @@ export default function PricingPage() {
               Billed every month
             </p>
             <p className="mt-4 text-sm font-black text-primary">
-              Includes a 3-day free trial
+              3-day free trial, then $9.99 per month until cancelled
             </p>
           </div>
         </div>
@@ -129,10 +129,11 @@ export default function PricingPage() {
             ends.
           </p>
           <p className="text-sm font-medium leading-7 text-muted-foreground">
-            Prices are shown in Israeli new shekels and may be converted to
-            your local currency at checkout. Taxes may be included or added
-            depending on your country. See our Refund Policy for how refunds
-            and cancellations work.
+            Prices are shown in US dollars (USD) and match the price at
+            checkout; if you pay in another currency, the equivalent amount is
+            shown before you confirm. Taxes may apply and will be calculated
+            at checkout. See our Refund Policy for how refunds and
+            cancellations work.
           </p>
         </div>
 

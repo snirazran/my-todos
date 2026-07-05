@@ -7,7 +7,7 @@ import { mutate } from 'swr';
 import { Capacitor } from '@capacitor/core';
 import { Icon } from '@/components/ui/Icon';
 import { AppImage } from '@/components/ui/AppImage';
-import { Bell, Check, Heart, Image as ImageIcon, Shirt, Sparkle, Sparkles, Tag, Unlock, X } from 'lucide-react';
+import { Check, Heart, Sparkle, Unlock, X } from 'lucide-react';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import Frog from '@/components/ui/frog';
 import { purchasePlus, restorePlusPurchases } from '@/lib/purchases';
@@ -22,13 +22,13 @@ const PLAN_DETAILS: Record<
 > = {
   yearly: {
     title: '12 Months',
-    price: '249.90₪',
+    price: '$69.99',
     subtitle: 'Try 7 days free',
     badge: 'BEST DEAL',
   },
   monthly: {
     title: 'Monthly',
-    price: '34.90₪ every month',
+    price: '$9.99 every month',
     subtitle: 'Try 3 days free',
   },
 };
@@ -342,7 +342,7 @@ function Step0({
       </div>
 
       <Reveal delay={0.38} className="mt-auto space-y-2 pt-6 md:pt-5">
-        <PrimaryButton onClick={onContinue}>Try for $0.00</PrimaryButton>
+        <PrimaryButton onClick={onContinue}>Try for free</PrimaryButton>
         <button
           type="button"
           onClick={onMaybeLater}
@@ -533,8 +533,8 @@ function Step3({
             title={PLAN_DETAILS.yearly.title}
             price={
               <>
-                249.90₪ <span className="line-through opacity-60">418.80₪</span>{' '}
-                (20.82₪/month)
+                $69.99 <span className="line-through opacity-60">$119.88</span>{' '}
+                ($5.83/month)
               </>
             }
             subtitle={PLAN_DETAILS.yearly.subtitle}

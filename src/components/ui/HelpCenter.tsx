@@ -170,7 +170,7 @@ const HELP_CATEGORIES: HelpCategory[] = [
       },
       {
         q: 'How much does Plus cost?',
-        a: 'Plus is 249.90₪ per year (with a 7-day free trial) or 34.90₪ per month (with a 3-day free trial). Full details are on the pricing page linked at the bottom of this help page.',
+        a: 'Plus is $69.99 per year (with a 7-day free trial) or $9.99 per month (with a 3-day free trial). Full details are on the pricing page linked at the bottom of this help page.',
       },
       {
         q: 'When does my Plus renew or expire?',
