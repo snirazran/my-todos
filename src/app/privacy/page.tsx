@@ -7,7 +7,7 @@ const sections: LegalSection[] = [
   {
     title: '1. Overview',
     body: [
-      'This Privacy Policy explains how Frogress collects, uses, shares, and protects information when you use our web app, mobile app, and related services.',
+      'This Privacy Policy explains how Frogress collects, uses, shares, and protects information when you use our web app, mobile app, and related services. Frogress is operated by Snir Azran, a sole proprietor based in Israel, who is responsible for the information described in this policy.',
       'Frogress is designed as a task, focus, habit, quest, and rewards app. The information we collect is used to run those features, keep your account synced, send reminders you enable, provide support, and improve the product.',
     ],
   },

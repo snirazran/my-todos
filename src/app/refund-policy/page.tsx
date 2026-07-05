@@ -7,7 +7,7 @@ const sections: LegalSection[] = [
   {
     title: '1. Overview',
     body: [
-      'This Refund Policy applies to purchases of Frogress Plus and any other paid Frogress features. Where you bought your subscription determines who processes your payment and how refunds work: purchases made on our website are processed by our merchant of record, purchases made inside the iOS app are processed by Apple, and purchases made inside the Android app are processed by Google Play.',
+      'Frogress is operated by Snir Azran, a sole proprietor based in Israel ("we", "us"). This Refund Policy applies to purchases of Frogress Plus and any other paid Frogress features. Where you bought your subscription determines who processes your payment and how refunds work: purchases made on our website are processed by our merchant of record, purchases made inside the iOS app are processed by Apple, and purchases made inside the Android app are processed by Google Play.',
       'Nothing in this policy limits any non-waivable rights you have under applicable consumer protection law, including the Israeli Consumer Protection Law and, where applicable, EU consumer rights.',
     ],
   },

@@ -229,7 +229,8 @@
       "Bash(sed -n '/interface PurchasesConfig \\\\{/,/^}/p' /Users/snirazran/Fullstack/my-todos/node_modules/@revenuecat/purchases-js/dist/Purchases.es.d.ts)",
       "Bash(CAP_DEV=false npx cap sync)",
       "Bash(pod --version)",
-      "Bash(pod install *)"
+      "Bash(pod install *)",
+      "WebFetch(domain:www.paddle.com)"
     ]
   }
 }

@@ -228,6 +228,45 @@ export default function WelcomePage() {
             Privacy Policy
           </Link>
         </motion.p>
+
+        <motion.div
+          variants={ENTER_ITEM}
+          className="mt-4 flex flex-col items-center gap-1.5 text-center text-[11px] leading-relaxed text-muted-foreground"
+        >
+          <span className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
+            <Link
+              href="/pricing"
+              className="font-semibold text-foreground/70 underline-offset-4 hover:underline"
+            >
+              Pricing
+            </Link>
+            <Link
+              href="/terms"
+              className="font-semibold text-foreground/70 underline-offset-4 hover:underline"
+            >
+              Terms
+            </Link>
+            <Link
+              href="/privacy"
+              className="font-semibold text-foreground/70 underline-offset-4 hover:underline"
+            >
+              Privacy
+            </Link>
+            <Link
+              href="/refund-policy"
+              className="font-semibold text-foreground/70 underline-offset-4 hover:underline"
+            >
+              Refunds
+            </Link>
+            <a
+              href="mailto:support@frogress.com"
+              className="font-semibold text-foreground/70 underline-offset-4 hover:underline"
+            >
+              Contact
+            </a>
+          </span>
+          <span>© {new Date().getFullYear()} Frogress · Operated by Snir Azran</span>
+        </motion.div>
       </motion.div>
 
       {grab && (

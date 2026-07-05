@@ -7,7 +7,7 @@ const sections: LegalSection[] = [
   {
     title: '1. Agreement to these Terms',
     body: [
-      'These Terms of Service govern your access to and use of Frogress, including the web app, mobile app, features, content, and related services. By creating an account, signing in, or using Frogress, you agree to these Terms.',
+      'Frogress is operated by Snir Azran, a sole proprietor based in Israel ("Frogress", "we", "us", or "our"). These Terms of Service govern your access to and use of Frogress, including the web app, mobile app, features, content, and related services. By creating an account, signing in, or using Frogress, you agree to these Terms.',
       'If you use Frogress for an organization or another person, you confirm that you have authority to accept these Terms for them.',
     ],
   },
@@ -94,7 +94,7 @@ const sections: LegalSection[] = [
   {
     title: '13. Contact',
     body: [
-      'Questions about these Terms can be sent to support@frogress.com.',
+      'Frogress is operated by Snir Azran. Questions about these Terms can be sent to support@frogress.com.',
     ],
   },
 ];
