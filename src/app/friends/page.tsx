@@ -514,6 +514,7 @@ function FlyClaimRewardOverlay({
             onClaim={onClose}
             slotLabel="currency"
             showDoubleUpsell={!doubledRef.current}
+            rewardAmount={displayAmount}
             onWatchAd={handleWatchAd}
             customPreview={
               <div className="relative flex h-full w-full items-center justify-center">

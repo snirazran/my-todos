@@ -2265,6 +2265,7 @@ function QuestRewardRevealOverlay({
               baseQuantity={entry.baseQuantity}
               isPremium={isPremium && !!entry.isQuestReward}
               showDoubleUpsell={!isPremium && !!entry.isQuestReward}
+              rewardAmount={entry.fliesGranted || undefined}
               paused={paused}
               customPreview={
                 entry.fliesGranted ? (
