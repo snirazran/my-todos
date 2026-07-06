@@ -676,8 +676,11 @@ export function TradePanel({
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4 pb-4">
-                {availableGrid.visibleItems.map((entry, index) => {
+              {(() => {
+                const renderTradeEntry = (
+                  entry: (typeof availableGrid.visibleItems)[number],
+                  index: number,
+                ) => {
                   const selected = selectedCounts[entry.uid] || 0;
                   const remaining = entry.owned - selected;
                   const isWrongRarity =
@@ -723,8 +726,47 @@ export function TradePanel({
                       ) : null}
                     </div>
                   );
-                })}
-              </div>
+                };
+
+                if (sortBy !== 'rarity_asc' && sortBy !== 'rarity_desc') {
+                  return (
+                    <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4 pb-4">
+                      {availableGrid.visibleItems.map((entry, index) =>
+                        renderTradeEntry(entry, index),
+                      )}
+                    </div>
+                  );
+                }
+
+                const groups: {
+                  rarity: Rarity;
+                  entries: typeof availableGrid.visibleItems;
+                }[] = [];
+                for (const entry of availableGrid.visibleItems) {
+                  const last = groups[groups.length - 1];
+                  if (last && last.rarity === entry.rarity)
+                    last.entries.push(entry);
+                  else groups.push({ rarity: entry.rarity, entries: [entry] });
+                }
+                let entryIndex = 0;
+                return groups.map((group) => (
+                  <div key={group.rarity} className="pb-2 last:pb-4">
+                    <p
+                      className={cn(
+                        'mb-2 px-1 text-[10px] font-black uppercase tracking-[0.18em]',
+                        RARITY_CONFIG[group.rarity].text,
+                      )}
+                    >
+                      {RARITY_CONFIG[group.rarity].label}
+                    </p>
+                    <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4">
+                      {group.entries.map((entry) =>
+                        renderTradeEntry(entry, entryIndex++),
+                      )}
+                    </div>
+                  </div>
+                ));
+              })()}
               {availableGrid.hasMore && (
                 <div
                   ref={availableGrid.sentinelRef}

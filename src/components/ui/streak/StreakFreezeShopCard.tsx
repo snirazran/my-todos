@@ -23,7 +23,7 @@ export function StreakFreezeShopCard() {
       <button
         type="button"
         onClick={() => setBuyOpen(true)}
-        className="mb-3 flex w-full items-center gap-3 rounded-[20px] border border-sky-300/50 bg-gradient-to-r from-sky-50 to-sky-100 p-3.5 text-left transition-all hover:-translate-y-0.5 active:scale-[0.99] dark:from-sky-500/10 dark:to-sky-500/20 md:p-4"
+        className="flex w-full items-center gap-3 rounded-[20px] border border-sky-300/50 bg-gradient-to-r from-sky-50 to-sky-100 p-3.5 text-left transition-all hover:-translate-y-0.5 active:scale-[0.99] dark:from-sky-500/10 dark:to-sky-500/20 md:p-4"
       >
         <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-sky-500/15">
           <Snowflake className="h-7 w-7 text-sky-500" />

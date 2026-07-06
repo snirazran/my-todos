@@ -30,6 +30,8 @@ import { FriendDetailModal } from '@/components/ui/FriendDetailModal';
 import { BuddyUpFlow } from '@/components/ui/BuddyUpFlow';
 import { BuddyNudgeSheet } from '@/components/ui/BuddyNudgeSheet';
 import { contributionFrom, type FriendSummary } from '@/lib/friends/indices';
+import { rarityRank } from '@/lib/skins/catalog';
+import { cn } from '@/lib/utils';
 import { RewardCard } from '@/components/ui/gift-box/RewardCard';
 import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
 import { RARITY_CONFIG } from '@/components/ui/gift-box/constants';
@@ -274,6 +276,8 @@ export default function FriendsPage() {
           setDetailTarget(null);
           setBuddyTarget(entry);
         }}
+        allFriends={friendsData?.friends}
+        myFliesToday={friendsData?.me?.fliesToday ?? 0}
       />
       <BuddyUpFlow
         open={!!buddyTarget}
@@ -547,13 +551,22 @@ function LeaderboardRow({
   paused?: boolean;
 }) {
   const shared = entry.givesYou ?? contributionFrom(entry.fliesToday);
+  const flex =
+    entry.flexRarity && rarityRank[entry.flexRarity] >= rarityRank.rare
+      ? RARITY_CONFIG[entry.flexRarity]
+      : null;
 
   return (
     <li>
       <button
         type="button"
         onClick={onOpen}
-        className="relative flex w-full items-center gap-2 rounded-xl border border-border/50 bg-card py-1.5 pl-1.5 pr-3 text-left transition-all hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md active:scale-[0.99] sm:gap-2.5 sm:py-2"
+        className={cn(
+          'relative flex w-full items-center gap-2 rounded-xl border bg-card py-1.5 pl-1.5 pr-3 text-left transition-all hover:-translate-y-0.5 hover:shadow-md active:scale-[0.99] sm:gap-2.5 sm:py-2',
+          flex
+            ? cn('border-2', flex.border, 'shadow-md', flex.glow)
+            : 'border-border/50 hover:border-emerald-300',
+        )}
       >
         {buddyInvites > 0 && (
           <span className="absolute -left-1 -top-1 z-10 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full border-2 border-background bg-rose-500 px-1 text-[10px] font-black text-white">
@@ -572,7 +585,11 @@ function LeaderboardRow({
 
         <div className="min-w-0 flex-1">
           <p className="flex items-center gap-1 text-sm font-black leading-tight tracking-tight text-emerald-950 sm:text-base">
-            <span className="truncate">{entry.frogName || entry.name}</span>
+            <span
+              className={cn('truncate', entry.premium && 'plus-name-shimmer')}
+            >
+              {entry.frogName || entry.name}
+            </span>
             {entry.premium && (
               <Icon
                 name="frogPlus"

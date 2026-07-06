@@ -13,8 +13,41 @@ import {
   type BackgroundImages,
 } from '@/hooks/useBackgrounds';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
-import { contributionFrom, type FriendSummary } from '@/lib/friends/indices';
+import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
+import {
+  contributionFrom,
+  type FriendSummary,
+  type FriendEquippedItem,
+} from '@/lib/friends/indices';
 import { mutateFriendsCaches } from '@/hooks/useFriendsSync';
+import { cn } from '@/lib/utils';
+import { Icon } from '@/components/ui/Icon';
+import { BaseSheet } from '@/components/ui/BaseSheet';
+import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
+import { RARITY_CONFIG } from '@/components/ui/gift-box/constants';
+import { useInventory, mutateInventoryCaches } from '@/hooks/useInventory';
+import { mutateBackgrounds } from '@/hooks/useBackgrounds';
+import type { BackgroundItem } from '@/hooks/useBackgrounds';
+import type { Rarity } from '@/lib/skins/catalog';
+
+type PeekTarget =
+  | {
+      kind: 'item';
+      id: string;
+      name: string;
+      rarity: Rarity;
+      price: number;
+      slot: FriendEquippedItem['slot'];
+      riveIndex: number;
+    }
+  | {
+      kind: 'bg';
+      id: string;
+      name: string;
+      rarity: Rarity;
+      price: number;
+      image: string;
+    };
 
 type BuddyInvite = {
   bondId: string;
@@ -52,16 +85,86 @@ export function FriendDetailModal({
   onClose,
   onRemove,
   onBuddyUp,
+  allFriends,
+  myFliesToday,
 }: {
   entry: FriendSummary | null;
   onClose: () => void;
   onRemove: (entry: FriendSummary) => void;
   onBuddyUp: (entry: FriendSummary) => void;
+  allFriends?: FriendSummary[];
+  myFliesToday?: number;
 }) {
   useRegisterOpenSheet(!!entry);
   const { data } = useBackgrounds(!!entry);
+  const { data: inventoryData } = useInventory(!!entry);
   const [menuOpen, setMenuOpen] = useState(false);
   const [busyBond, setBusyBond] = useState<string | null>(null);
+  const [peekTarget, setPeekTarget] = useState<PeekTarget | null>(null);
+  const [plusOpen, setPlusOpen] = useState(false);
+
+  useEffect(() => {
+    if (!entry) setPeekTarget(null);
+  }, [entry]);
+
+  const friendBackground = useMemo<BackgroundItem | null>(() => {
+    if (!entry?.backgroundId || !data?.catalog) return null;
+    return data.catalog.find((b) => b.id === entry.backgroundId) ?? null;
+  }, [entry?.backgroundId, data?.catalog]);
+
+  const ownsPeekTarget = useMemo(() => {
+    if (!peekTarget) return false;
+    if (peekTarget.kind === 'item')
+      return (inventoryData?.wardrobe?.inventory?.[peekTarget.id] ?? 0) > 0;
+    return ((data?.inventory as Record<string, number>)?.[peekTarget.id] ?? 0) > 0;
+  }, [peekTarget, inventoryData?.wardrobe?.inventory, data?.inventory]);
+
+  const wearingPeekTarget = useMemo(() => {
+    if (!peekTarget) return false;
+    if (peekTarget.kind === 'item')
+      return (
+        inventoryData?.wardrobe?.equipped?.[peekTarget.slot] === peekTarget.id
+      );
+    return data?.equipped === peekTarget.id;
+  }, [peekTarget, inventoryData?.wardrobe?.equipped, data?.equipped]);
+
+  const equipPeekTarget = async () => {
+    if (!peekTarget) return false;
+    try {
+      navigator.vibrate?.(14);
+    } catch {}
+    const res =
+      peekTarget.kind === 'item'
+        ? await fetch('/api/skins/inventory', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              slot: peekTarget.slot,
+              itemId: peekTarget.id,
+            }),
+          })
+        : await fetch('/api/backgrounds/equip', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: peekTarget.id }),
+          });
+    if (!res.ok) return false;
+    mutateInventoryCaches();
+    mutateBackgrounds();
+    mutateFriendsCaches();
+    return true;
+  };
+
+  const wearerNames = useMemo(() => {
+    if (!peekTarget || !allFriends) return [];
+    return allFriends
+      .filter((f) =>
+        peekTarget.kind === 'item'
+          ? f.equippedItems?.some((i) => i.id === peekTarget.id)
+          : f.backgroundId === peekTarget.id,
+      )
+      .map((f) => f.frogName || f.name);
+  }, [peekTarget, allFriends]);
 
   const { data: invitesData, mutate: mutateInvites } = useSWR<{
     incoming: BuddyInvite[];
@@ -227,6 +330,75 @@ export function FriendDetailModal({
                   <FlyStat label="Shared total" value={total} />
                 </div>
 
+                {/* Friend's equipped look */}
+                {((entry.equippedItems?.length ?? 0) > 0 ||
+                  friendBackground) && (
+                  <div className="flex flex-col gap-2">
+                    <p className="px-1 text-[11px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+                      Their look
+                    </p>
+                    <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                      {(entry.equippedItems ?? []).map((item) => (
+                        <LookChip
+                          key={item.id}
+                          name={item.name}
+                          rarity={item.rarity}
+                          preview={
+                            <FrogSnapshot
+                              className="h-[130%] w-[130%] object-contain"
+                              indices={{ [item.slot]: item.riveIndex }}
+                              width={100}
+                              height={100}
+                            />
+                          }
+                          onClick={() =>
+                            setPeekTarget({
+                              kind: 'item',
+                              id: item.id,
+                              name: item.name,
+                              rarity: item.rarity,
+                              price: item.priceFlies,
+                              slot: item.slot,
+                              riveIndex: item.riveIndex,
+                            })
+                          }
+                        />
+                      ))}
+                      {friendBackground && (
+                        <LookChip
+                          name={friendBackground.name}
+                          rarity={friendBackground.rarity}
+                          preview={
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={
+                                friendBackground.images.mobile ||
+                                friendBackground.images.web ||
+                                ''
+                              }
+                              alt={friendBackground.name}
+                              className="h-full w-full object-cover"
+                            />
+                          }
+                          onClick={() =>
+                            setPeekTarget({
+                              kind: 'bg',
+                              id: friendBackground.id,
+                              name: friendBackground.name,
+                              rarity: friendBackground.rarity,
+                              price: friendBackground.priceFlies,
+                              image:
+                                friendBackground.images.mobile ||
+                                friendBackground.images.web ||
+                                '',
+                            })
+                          }
+                        />
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {/* Pending buddy invitations with this friend */}
                 {(incoming.length > 0 || outgoing.length > 0) && (
                   <div className="flex flex-col gap-2">
@@ -313,10 +485,264 @@ export function FriendDetailModal({
               </div>
             </motion.div>
           </div>
+
+          <ItemPeekSheet
+            target={peekTarget}
+            onClose={() => setPeekTarget(null)}
+            friendName={entry.frogName || entry.name}
+            wearerNames={wearerNames}
+            owned={ownsPeekTarget}
+            wearing={wearingPeekTarget}
+            onEquip={equipPeekTarget}
+            balance={inventoryData?.wardrobe?.flies ?? 0}
+            isPremium={!!inventoryData?.isPremium}
+            paceToday={myFliesToday ?? 0}
+            onUpgrade={() => setPlusOpen(true)}
+          />
+          <PlusUpgradeModal
+            open={plusOpen}
+            onClose={() => setPlusOpen(false)}
+          />
         </>
       )}
     </AnimatePresence>,
     document.body,
+  );
+}
+
+function LookChip({
+  name,
+  rarity,
+  preview,
+  onClick,
+}: {
+  name: string;
+  rarity: Rarity;
+  preview: React.ReactNode;
+  onClick: () => void;
+}) {
+  const config = RARITY_CONFIG[rarity];
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'flex w-[104px] shrink-0 flex-col items-stretch rounded-xl border-2 bg-card p-1.5 text-left shadow-sm transition-transform active:scale-[0.96]',
+        config.border,
+      )}
+    >
+      <div className="flex h-12 items-end justify-center overflow-hidden rounded-lg bg-muted/40">
+        {preview}
+      </div>
+      <p className="mt-1 truncate text-[11px] font-black text-foreground">
+        {name}
+      </p>
+      <p
+        className={cn(
+          'truncate text-[9px] font-black uppercase tracking-wider',
+          config.text,
+        )}
+      >
+        {config.label}
+      </p>
+    </button>
+  );
+}
+
+function ItemPeekSheet({
+  target,
+  onClose,
+  friendName,
+  wearerNames,
+  owned,
+  wearing,
+  onEquip,
+  balance,
+  isPremium,
+  paceToday,
+  onUpgrade,
+}: {
+  target: PeekTarget | null;
+  onClose: () => void;
+  friendName: string;
+  wearerNames: string[];
+  owned: boolean;
+  wearing: boolean;
+  onEquip: () => Promise<boolean>;
+  balance: number;
+  isPremium: boolean;
+  paceToday: number;
+  onUpgrade: () => void;
+}) {
+  const [equipping, setEquipping] = useState(false);
+  const [equipDone, setEquipDone] = useState(false);
+  useEffect(() => {
+    setEquipping(false);
+    setEquipDone(false);
+  }, [target?.id]);
+  const handleEquip = async () => {
+    if (equipping) return;
+    setEquipping(true);
+    const ok = await onEquip();
+    setEquipping(false);
+    if (ok) setEquipDone(true);
+  };
+  const config = target ? RARITY_CONFIG[target.rarity] : RARITY_CONFIG.common;
+  const price = target?.price ?? 0;
+  const shortfall = Math.max(0, price - balance);
+  const pace = Math.max(paceToday, 5);
+  const daysFree = Math.ceil(shortfall / pace);
+  const daysPlus = Math.max(1, Math.ceil(shortfall / (pace * 2)));
+  const scarcity =
+    wearerNames.length <= 1
+      ? `Only ${friendName} wears this among your friends`
+      : `${wearerNames.length} of your friends wear this`;
+
+  return (
+    <BaseSheet
+      open={!!target}
+      onOpenChange={(v) => {
+        if (!v) onClose();
+      }}
+      className="select-none sm:max-w-[400px]"
+      zIndex={1600}
+      closeAriaLabel="Close item details"
+    >
+      {() =>
+        target ? (
+          <div className="flex flex-col px-5 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-3 sm:px-6 sm:pb-6 sm:pt-7">
+            <div className="flex items-center gap-2 pr-12">
+              <span
+                className={cn(
+                  'rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em]',
+                  config.bg,
+                  config.text,
+                )}
+              >
+                {config.label}
+              </span>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                {target.kind === 'bg' ? 'Background' : 'Wardrobe item'}
+              </span>
+            </div>
+
+            <div
+              className={cn(
+                'mx-auto mt-4 flex h-36 w-full max-w-[220px] items-end justify-center overflow-hidden rounded-[24px] border-2 bg-gradient-to-br',
+                config.border,
+                config.gradient,
+              )}
+            >
+              {target.kind === 'item' ? (
+                <FrogSnapshot
+                  className="h-[120%] w-[120%] object-contain"
+                  indices={{ [target.slot]: target.riveIndex }}
+                  width={220}
+                  height={220}
+                />
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={target.image}
+                  alt={target.name}
+                  className="h-full w-full object-cover"
+                />
+              )}
+            </div>
+
+            <h2 className="mt-4 text-center text-xl font-black tracking-tight text-foreground">
+              {target.name}
+            </h2>
+            <p className="mt-1 text-center text-[13px] font-semibold text-muted-foreground">
+              {scarcity}
+            </p>
+
+            {owned ? (
+              wearing || equipDone ? (
+                <p className="mt-4 flex items-center justify-center gap-2 rounded-2xl border border-emerald-300/60 bg-emerald-50 px-4 py-3.5 text-center text-sm font-black text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400">
+                  <Check className="h-4 w-4" strokeWidth={3} />
+                  You&apos;re wearing it!
+                </p>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleEquip}
+                  disabled={equipping}
+                  className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#4f9149] text-base font-black tracking-tight text-white shadow-[0_4px_0_#34631f] transition-all hover:bg-[#457f40] active:translate-y-0.5 active:shadow-none disabled:opacity-60"
+                >
+                  {equipping ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (
+                    <>You own this — wear it now</>
+                  )}
+                </button>
+              )
+            ) : (
+              <>
+                <div className="mt-4 rounded-2xl border border-border/60 bg-muted/40 p-4 text-sm font-bold">
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Shop price</span>
+                    <span className="inline-flex items-center gap-1.5 font-black tabular-nums">
+                      <Fly size={16} paused y={-2} />
+                      {price.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between">
+                    <span className="text-muted-foreground">Your flies</span>
+                    <span className="inline-flex items-center gap-1.5 font-black tabular-nums">
+                      <Fly size={16} paused y={-2} />
+                      {balance.toLocaleString()}
+                    </span>
+                  </div>
+                  {shortfall > 0 ? (
+                    <>
+                      <div className="my-2.5 border-t border-dashed border-border/70" />
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">
+                          At today&apos;s pace
+                        </span>
+                        <span className="font-black tabular-nums">
+                          ~{daysFree} {daysFree === 1 ? 'day' : 'days'}
+                        </span>
+                      </div>
+                      {!isPremium && (
+                        <div className="mt-1.5 flex items-center justify-between">
+                          <span className="inline-flex items-center gap-1 text-muted-foreground">
+                            <Icon name="frogPlus" label="" className="h-4 w-4" />
+                            With Plus
+                          </span>
+                          <span className="font-black tabular-nums text-emerald-600">
+                            ~{daysPlus} {daysPlus === 1 ? 'day' : 'days'}
+                          </span>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <p className="mt-2.5 text-center text-[13px] font-black text-emerald-600">
+                      You can afford it right now!
+                    </p>
+                  )}
+                </div>
+
+                {!isPremium && shortfall > 0 && (
+                  <button
+                    type="button"
+                    onClick={onUpgrade}
+                    className="mt-3.5 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-foreground text-sm font-black uppercase tracking-wide text-background shadow-sm transition-transform active:scale-[0.98]"
+                  >
+                    <Icon name="frogPlus" label="" className="h-5 w-5" />
+                    Get there 2× faster with Plus
+                  </button>
+                )}
+                <p className="mt-2.5 text-center text-[11px] font-medium text-muted-foreground">
+                  Earn flies by completing tasks, then grab it in your shop.
+                </p>
+              </>
+            )}
+          </div>
+        ) : null
+      }
+    </BaseSheet>
   );
 }
 

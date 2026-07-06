@@ -69,6 +69,7 @@ export type PurchaseTarget = {
   name: string;
   rarity: Rarity;
   price: number;
+  originalPrice?: number;
   slotLabel?: string;
 };
 
@@ -233,6 +234,12 @@ export function PurchaseSheet({
             {phase === 'confirm' && !owned && (
               <div className="mt-4 rounded-2xl border border-border/60 bg-muted/40 p-4">
                 <Row label="Price">
+                  {target.originalPrice != null &&
+                    target.originalPrice > price && (
+                      <span className="tabular-nums text-muted-foreground line-through decoration-2 opacity-60">
+                        {target.originalPrice.toLocaleString()}
+                      </span>
+                    )}
                   <Fly size={18} paused y={-2} />
                   <span className="tabular-nums">{price.toLocaleString()}</span>
                 </Row>

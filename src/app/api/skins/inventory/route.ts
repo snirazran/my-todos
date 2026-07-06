@@ -4,6 +4,7 @@ import connectMongo from '@/lib/mongoose';
 import UserModel, { type UserDoc } from '@/lib/models/User';
 import { CATALOG, type WardrobeSlot } from '@/lib/skins/catalog';
 import { getFullCatalog, buildById } from '@/lib/skins/getCatalog';
+import { getDailyDeals, isPremiumActive } from '@/lib/skins/dailyDeal';
 import { notifyUserChanged } from '@/lib/taskSync';
 import { bumpQuestMetric } from '@/lib/quests/metrics';
 import type { UserWardrobe } from '@/lib/types/UserDoc';
@@ -120,7 +121,15 @@ export async function GET(req: NextRequest) {
           .length,
       });
     }
-    return json({ wardrobe, catalog: fullCatalog });
+    const premiumUser = (await UserModel.findById(userId)
+      .select('premiumUntil')
+      .lean()) as { premiumUntil?: Date | null } | null;
+    return json({
+      wardrobe,
+      catalog: fullCatalog,
+      dailyDeals: getDailyDeals(fullCatalog),
+      isPremium: isPremiumActive(premiumUser?.premiumUntil),
+    });
   } catch {
     // Guest Mode or Unauthorized
     let guestCatalog;
@@ -133,6 +142,8 @@ export async function GET(req: NextRequest) {
         unseenItems: [],
       },
       catalog: guestCatalog,
+      dailyDeals: getDailyDeals([...guestCatalog]),
+      isPremium: false,
     });
   }
 }

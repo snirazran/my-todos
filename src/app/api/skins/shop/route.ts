@@ -4,6 +4,7 @@ import connectMongo from '@/lib/mongoose';
 import UserModel, { type UserDoc } from '@/lib/models/User';
 import type { UserWardrobe } from '@/lib/types/UserDoc';
 import { getFullCatalog, buildById } from '@/lib/skins/getCatalog';
+import { getDailyDeals, isPremiumActive } from '@/lib/skins/dailyDeal';
 import { bumpQuestMetric } from '@/lib/quests/metrics';
 
 const json = (body: unknown, init = 200) =>
@@ -48,7 +49,11 @@ export async function POST(req: NextRequest) {
     }
 
     // Check balance
-    const price = byId[itemId].priceFlies ?? 0;
+    let price = byId[itemId].priceFlies ?? 0;
+    const deal = getDailyDeals(fullCatalog).find((d) => d.itemId === itemId);
+    if (deal && isPremiumActive(user.premiumUntil)) {
+      price = deal.dealPrice;
+    }
 
     // Transaction: Atomic check-and-update to prevent race conditions
     const update: any = {

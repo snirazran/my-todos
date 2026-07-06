@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import useSWR, { mutate as mutateGlobal } from 'swr';
 import type { ItemDef, WardrobeSlot } from '@/lib/skins/catalog';
+import type { DailyDeal } from '@/lib/skins/dailyDeal';
 import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
 
 export const INVENTORY_KEY = '/api/skins/inventory';
@@ -53,6 +54,8 @@ type ApiData = {
   catalog: ItemDef[];
   unseenCount?: number;
   unseenContainerCount?: number;
+  dailyDeals?: DailyDeal[];
+  isPremium?: boolean;
 };
 
 const fetcher = bootstrapFetcher;

@@ -11,6 +11,8 @@ import { notifyFriendUpdate } from '@/lib/taskSync';
 import { getCachedCatalog, buildById } from '@/lib/skins/getCatalog';
 import {
   equippedToIndices,
+  equippedToItems,
+  highestRarity,
   contributionFrom,
   type FriendSummary,
 } from '@/lib/friends/indices';
@@ -88,11 +90,14 @@ export async function GET(req: NextRequest) {
       };
     }): FriendSummary => {
       const fliesToday = fliesEarnedOn(u.wardrobe?.flyDaily, today);
+      const equippedItems = equippedToItems(u.wardrobe?.equipped, byId);
       return {
         userId: u._id,
         name: u.name ?? '',
         frogName: u.frogName ?? 'Frog',
         indices: equippedToIndices(u.wardrobe?.equipped, byId),
+        equippedItems,
+        flexRarity: highestRarity(equippedItems),
         fliesToday,
         givesYou: contributionFrom(fliesToday),
         backgroundId: u.wardrobe?.backgrounds?.equipped ?? null,
