@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AppImage } from '@/components/ui/AppImage';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
   Check,
   Gift,
@@ -13,6 +13,7 @@ import {
 import useSWR from 'swr';
 import Fly from '@/components/ui/fly';
 import Frog from '@/components/ui/frog';
+import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
 import { GiftRive } from '@/components/ui/gift-box/GiftBox';
 import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
@@ -71,6 +72,12 @@ export function InviteFriendsModal({
   useRegisterOpenSheet(open);
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+
+  useEffect(() => {
+    const img = new Image();
+    img.src = '/invitefrog.webp';
+    img.decode?.().catch(() => {});
+  }, []);
 
   const { data: config } = useSWR<InviteConfig>(
     open ? '/api/invite/config' : null,
@@ -159,46 +166,103 @@ export function InviteFriendsModal({
     <AnimatePresence>
       {open && (
         <>
-          <div
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.25, ease: 'easeOut' }}
             onClick={closeInvite}
             className="fixed inset-0 z-[1400] bg-black/60 backdrop-blur-sm"
           />
           <motion.div
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
-            exit={{ y: '100%' }}
-            transition={{ type: 'spring', damping: 30, stiffness: 280 }}
-            className="pointer-events-none fixed inset-0 z-[1401] flex md:items-center md:justify-center md:p-4 lg:p-6"
+            exit={{ y: '100%', transition: { type: 'spring', damping: 34, stiffness: 380 } }}
+            transition={{ type: 'spring', damping: 27, stiffness: 260, mass: 0.9 }}
+            className="pointer-events-none fixed inset-0 z-[1401] flex will-change-transform md:items-center md:justify-center md:p-4 lg:p-6"
           >
             <div className="pointer-events-auto mx-auto flex h-full min-h-0 w-full flex-col overflow-hidden bg-background md:h-auto md:max-h-[calc(100dvh-2rem)] md:w-[min(100vw-2rem,32rem)] md:rounded-[32px] md:shadow-2xl lg:max-h-[calc(100dvh-3rem)] lg:w-[min(100vw-3rem,32rem)]">
-              {step === 'overview' && (
-                <OverviewStep
-                  config={config}
-                  claimedCount={status?.claimedCount ?? 0}
-                  totalTiers={config?.rewards?.length ?? 0}
-                  onClose={closeInvite}
-                  onInviteFriends={() => setStep('pick')}
-                />
-              )}
+              <AnimatePresence mode="wait">
+                {step === 'overview' && (
+                  <StepShell key="overview">
+                    <OverviewStep
+                      config={config}
+                      claimedCount={status?.claimedCount ?? 0}
+                      totalTiers={config?.rewards?.length ?? 0}
+                      onClose={closeInvite}
+                      onInviteFriends={() => setStep('pick')}
+                    />
+                  </StepShell>
+                )}
 
-              {step === 'pick' && (
-                <PickStep
-                  config={config}
-                  selectedGiftId={selectedGiftId}
-                  onSelect={setSelectedGiftId}
-                  onClose={closeInvite}
-                  onBack={() => setStep('overview')}
-                  onSend={handleSendInvite}
-                  creating={creatingInvite}
-                />
-              )}
-
+                {step === 'pick' && (
+                  <StepShell key="pick">
+                    <PickStep
+                      config={config}
+                      selectedGiftId={selectedGiftId}
+                      onSelect={setSelectedGiftId}
+                      onClose={closeInvite}
+                      onBack={() => setStep('overview')}
+                      onSend={handleSendInvite}
+                      creating={creatingInvite}
+                    />
+                  </StepShell>
+                )}
+              </AnimatePresence>
             </div>
           </motion.div>
         </>
       )}
     </AnimatePresence>,
     document.body,
+  );
+}
+
+function StepShell({ children }: { children: React.ReactNode }) {
+  const reduceMotion = useReducedMotion();
+  return (
+    <motion.div
+      initial={reduceMotion ? { opacity: 0 } : { opacity: 0, x: 32 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={
+        reduceMotion
+          ? { opacity: 0 }
+          : { opacity: 0, x: -32, transition: { duration: 0.16, ease: 'easeIn' } }
+      }
+      transition={{ type: 'spring', stiffness: 380, damping: 34, mass: 0.8 }}
+      className="relative flex h-full min-h-0 flex-1 flex-col will-change-transform"
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+function Reveal({
+  children,
+  delay = 0,
+  className,
+}: {
+  children: React.ReactNode;
+  delay?: number;
+  className?: string;
+}) {
+  const reduceMotion = useReducedMotion();
+  if (reduceMotion) return <div className={className}>{children}</div>;
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 18, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{
+        type: 'spring',
+        stiffness: 400,
+        damping: 30,
+        mass: 0.7,
+        delay,
+      }}
+      className={className}
+    >
+      {children}
+    </motion.div>
   );
 }
 
@@ -215,21 +279,24 @@ function OverviewStep({
   onClose: () => void;
   onInviteFriends: () => void;
 }) {
+  const reduceMotion = useReducedMotion();
   if (!config) return <Loading onClose={onClose} />;
 
   return (
     <div className="flex h-full min-h-0 flex-col md:max-h-[calc(100dvh-2rem)] lg:max-h-[calc(100dvh-3rem)]">
       <div className="relative flex h-[clamp(8.5rem,36dvh,19rem)] shrink-0 flex-col justify-end overflow-hidden bg-[#4f9149] px-6 pb-7 pt-6 text-center text-white sm:h-[clamp(9rem,38dvh,20rem)] md:h-[clamp(8rem,32dvh,16rem)] md:pb-6 lg:h-[clamp(8.5rem,32dvh,17rem)]">
-        <AppImage
-          src="/invitefrog.webp"
-          priority
-          className="absolute inset-0 h-full w-full object-cover object-[center_35%] md:object-[center_41%] md:opacity-100"
-        />
-        <AppImage
-          src="/invitefrog.webp"
-          priority
-          className="absolute inset-0 hidden h-full w-full object-cover object-[center_41%] md:block"
-        />
+        <motion.div
+          className="absolute inset-0 transform-gpu will-change-transform [backface-visibility:hidden]"
+          initial={reduceMotion ? undefined : { scale: 1.08 }}
+          animate={reduceMotion ? undefined : { scale: 1 }}
+          transition={{ duration: 1.4, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <AppImage
+            src="/invitefrog.webp"
+            priority
+            className="absolute inset-0 h-full w-full object-cover object-[center_35%] md:object-[center_41%]"
+          />
+        </motion.div>
         <div className="absolute inset-0 bg-[linear-gradient(to_bottom,transparent_0%,transparent_48%,rgba(0,0,0,0.22)_72%,rgba(0,0,0,0.62)_100%)]" />
         <svg
           aria-hidden
@@ -243,23 +310,29 @@ function OverviewStep({
           onClose={onClose}
           className="right-4 top-[calc(env(safe-area-inset-top)+0.75rem)] text-white"
         />
-        <div className="relative z-10 mx-auto flex w-full max-w-xl flex-col items-center">
+        <Reveal
+          delay={0.05}
+          className="relative z-10 mx-auto flex w-full max-w-xl flex-col items-center"
+        >
           <h2 className="text-[25px] font-black leading-[1.08] tracking-tight [text-shadow:0_2px_0_rgba(25,83,43,0.75),0_4px_14px_rgba(0,0,0,0.32)] sm:text-3xl">
             Share Frogress, get rewards!
           </h2>
           <p className="mt-1.5 max-w-md text-[13px] font-medium text-white/95 [text-shadow:0_1px_0_rgba(25,83,43,0.7),0_3px_10px_rgba(0,0,0,0.28)] sm:mt-2 sm:text-[15px]">
-            Invite a friend to gift them a skin and earn rewards for yourself!
+            Invite a friend to gift them an outfit and earn rewards for
+            yourself!
           </p>
-        </div>
+        </Reveal>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-5 pt-6 overscroll-contain sm:pb-6 sm:pt-7 md:flex-none">
         {config.rewards.length > 0 && (
-          <RewardProgressTrack
-            rewards={config.rewards}
-            claimedCount={claimedCount}
-            totalTiers={totalTiers}
-          />
+          <Reveal delay={0.14}>
+            <RewardProgressTrack
+              rewards={config.rewards}
+              claimedCount={claimedCount}
+              totalTiers={totalTiers}
+            />
+          </Reveal>
         )}
       </div>
 
@@ -267,13 +340,15 @@ function OverviewStep({
         className="shrink-0 border-t border-border/40 bg-background p-4"
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1.85rem)' }}
       >
-        <button
-          onClick={onInviteFriends}
-          disabled={!config.giftOptions?.length}
-          className="h-12 w-full rounded-2xl bg-emerald-500 font-black tracking-tight text-white transition-colors hover:bg-emerald-600 active:scale-[0.98] disabled:opacity-60"
-        >
-          {config.giftOptions?.length ? 'Invite friends' : 'No gifts configured yet'}
-        </button>
+        <Reveal delay={0.22}>
+          <button
+            onClick={onInviteFriends}
+            disabled={!config.giftOptions?.length}
+            className="h-12 w-full rounded-2xl bg-emerald-500 font-black tracking-tight text-white transition-colors hover:bg-emerald-600 active:scale-[0.98] disabled:opacity-60"
+          >
+            {config.giftOptions?.length ? 'Invite friends' : 'No gifts configured yet'}
+          </button>
+        </Reveal>
       </div>
     </div>
   );
@@ -459,9 +534,11 @@ function PickStep({
           className="left-[-0.5rem] top-[calc(env(safe-area-inset-top)+0.5rem)] text-white"
         />
 
-        <div className="relative mx-auto mt-4 flex h-44 w-full max-w-md shrink-0 items-center justify-center overflow-visible rounded-[28px] [@media(max-height:620px)]:h-36 sm:mt-10 sm:h-56 sm:[@media(max-height:850px)]:mt-4 sm:[@media(max-height:850px)]:h-40 md:mt-4 md:h-40">
-          <div className="pointer-events-none absolute inset-x-[-5rem] bottom-[-5rem] top-[-5rem] bg-[radial-gradient(ellipse_at_center,rgba(225,255,194,0.58)_0%,rgba(190,235,151,0.3)_45%,rgba(133,190,92,0)_76%)]" />
-          <div className="absolute inset-[-72px] opacity-40 [mask-image:radial-gradient(circle_at_center,black_0%,black_22%,rgba(0,0,0,0.35)_54%,transparent_82%)] [webkit-mask-image:radial-gradient(circle_at_center,black_0%,black_22%,rgba(0,0,0,0.35)_54%,transparent_82%)]">
+        <Reveal
+          delay={0.05}
+          className="relative mx-auto mt-4 flex h-44 w-full max-w-md shrink-0 items-center justify-center overflow-visible rounded-[28px] [@media(max-height:620px)]:h-36 sm:mt-10 sm:h-56 sm:[@media(max-height:850px)]:mt-4 sm:[@media(max-height:850px)]:h-40 md:mt-4 md:h-40">
+          <div className="pointer-events-none absolute inset-x-[-5rem] bottom-[-5rem] top-[-5rem] transform-gpu bg-[radial-gradient(ellipse_at_center,rgba(225,255,194,0.58)_0%,rgba(190,235,151,0.3)_45%,rgba(133,190,92,0)_76%)]" />
+          <div className="absolute inset-[-72px] transform-gpu opacity-40 will-change-transform [mask-image:radial-gradient(circle_at_center,black_0%,black_22%,rgba(0,0,0,0.35)_54%,transparent_82%)] [webkit-mask-image:radial-gradient(circle_at_center,black_0%,black_22%,rgba(0,0,0,0.35)_54%,transparent_82%)]">
             <RotatingRays colorClass="text-white/14" />
           </div>
           <div className="relative z-10 -translate-y-3 scale-[0.82] sm:scale-100">
@@ -476,16 +553,20 @@ function PickStep({
               <span className="absolute -bottom-1.5 left-4 h-3 w-3 rotate-45 bg-white" />
             </div>
           </div>
-        </div>
+        </Reveal>
 
-        <h2 className="mx-auto mt-4 max-w-lg text-xl font-black tracking-tight [@media(max-height:620px)]:mt-2 [@media(max-height:620px)]:text-lg sm:mt-8 sm:text-2xl sm:[@media(max-height:850px)]:mt-3 sm:[@media(max-height:850px)]:text-xl md:mt-3 md:text-xl">
-          Select a gift for your friend!
-        </h2>
-        <p className="mx-auto mt-1.5 max-w-md text-sm font-medium leading-snug text-white/85 [@media(max-height:620px)]:text-xs sm:mt-2 sm:text-base sm:[@media(max-height:850px)]:text-sm md:text-sm">
-          Choose the gift they will receive when they join.
-        </p>
+        <Reveal delay={0.12}>
+          <h2 className="mx-auto mt-4 max-w-lg text-xl font-black tracking-tight [@media(max-height:620px)]:mt-2 [@media(max-height:620px)]:text-lg sm:mt-8 sm:text-2xl sm:[@media(max-height:850px)]:mt-3 sm:[@media(max-height:850px)]:text-xl md:mt-3 md:text-xl">
+            Select a gift for your friend!
+          </h2>
+          <p className="mx-auto mt-1.5 max-w-md text-sm font-medium leading-snug text-white/85 [@media(max-height:620px)]:text-xs sm:mt-2 sm:text-base sm:[@media(max-height:850px)]:text-sm md:text-sm">
+            Choose the gift they will receive when they join.
+          </p>
+        </Reveal>
 
-        <div className="mt-4 min-h-0 shrink-0 [@media(max-height:620px)]:mt-3 sm:mt-7 sm:[@media(max-height:850px)]:mt-4">
+        <Reveal
+          delay={0.2}
+          className="mt-4 min-h-0 shrink-0 [@media(max-height:620px)]:mt-3 sm:mt-7 sm:[@media(max-height:850px)]:mt-4">
           <div className="mx-auto grid max-w-2xl grid-cols-3 gap-2 min-[380px]:gap-3 sm:[@media(max-height:850px)]:max-w-[28rem]">
             {config.giftOptions.map((gift) => {
               const isSelected = selectedGiftId === gift.id;
@@ -517,20 +598,22 @@ function PickStep({
               </p>
             </div>
           )}
-        </div>
+        </Reveal>
 
         <div
           className="mt-auto"
           style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1.75rem)' }}
         >
-          <button
-            onClick={onSend}
-            disabled={!selectedGiftId || creating}
-            className="mt-5 flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-white font-black tracking-tight text-[#4f8f28] shadow-[0_5px_0_rgba(52,100,31,0.2)] transition-colors active:translate-y-0.5 disabled:opacity-60"
-          >
-            {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            Send Invitation
-          </button>
+          <Reveal delay={0.28}>
+            <button
+              onClick={onSend}
+              disabled={!selectedGiftId || creating}
+              className="mt-5 flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-white font-black tracking-tight text-[#4f8f28] shadow-[0_5px_0_rgba(52,100,31,0.2)] transition-colors active:translate-y-0.5 disabled:opacity-60"
+            >
+              {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              Send Invitation
+            </button>
+          </Reveal>
         </div>
       </div>
     </div>
@@ -591,9 +674,22 @@ function GiftPreview({ item, active = false }: { item: CatalogItem | null; activ
   }
 
   const indices = itemToIndices(item);
+  if (!active) {
+    return (
+      <div className="flex h-full w-full items-center justify-center overflow-visible">
+        <FrogSnapshot
+          className="h-full w-full"
+          width={300}
+          height={338}
+          indices={indices}
+          visualOffsetY={0}
+        />
+      </div>
+    );
+  }
   return (
     <div className="flex h-full w-full items-center justify-center overflow-visible">
-      <Frog width={300} height={338} indices={indices} paused={!active} visualOffsetY={0} />
+      <Frog width={300} height={338} indices={indices} paused={false} visualOffsetY={0} />
     </div>
   );
 }
