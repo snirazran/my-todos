@@ -8,6 +8,7 @@ import { BaseSheet } from '@/components/ui/BaseSheet';
 import Fly from '@/components/ui/fly';
 import { AnimatedNumber } from '@/components/ui/AnimatedNumber';
 import { cn } from '@/lib/utils';
+import { useUIStore } from '@/lib/uiStore';
 import type { Rarity } from '@/lib/skins/catalog';
 
 const RARITY: Record<
@@ -110,6 +111,7 @@ export function PurchaseSheet({
   const [phase, setPhase] = useState<'confirm' | 'success'>('confirm');
   const [busy, setBusy] = useState(false);
   const primaryRef = useRef<HTMLButtonElement>(null);
+  const openFlyShop = useUIStore((s) => s.openFlyShop);
 
   useEffect(() => {
     if (open) {
@@ -240,16 +242,16 @@ export function PurchaseSheet({
                         {target.originalPrice.toLocaleString()}
                       </span>
                     )}
-                  <Fly size={18} paused y={-2} />
+                  <Fly size={24} paused y={-2} />
                   <span className="tabular-nums">{price.toLocaleString()}</span>
                 </Row>
                 <Row label="Your balance">
-                  <Fly size={18} paused y={-2} />
+                  <Fly size={24} paused y={-2} />
                   <AnimatedNumber value={balance} className="tabular-nums" />
                 </Row>
                 <div className="my-2.5 border-t border-dashed border-border/70" />
                 <Row label="Balance after" strong>
-                  <Fly size={18} paused y={-2} />
+                  <Fly size={24} paused y={-2} />
                   <span
                     className={cn('tabular-nums', !canAfford && 'text-red-500')}
                   >
@@ -262,7 +264,7 @@ export function PurchaseSheet({
             {(phase === 'success' || owned) && (
               <div className="mt-4 flex items-center justify-center gap-1.5 text-sm font-bold text-muted-foreground">
                 <span>Balance</span>
-                <Fly size={18} paused y={-2} />
+                <Fly size={24} paused y={-2} />
                 <AnimatedNumber value={balance} className="tabular-nums text-foreground" />
               </div>
             )}
@@ -284,8 +286,8 @@ export function PurchaseSheet({
                     {equipLabel}
                   </PrimaryButton>
                   <GhostButton
-                    onClick={handleBuy}
-                    disabled={busy || !canAfford}
+                    onClick={canAfford ? handleBuy : openFlyShop}
+                    disabled={busy || (isGuest && !canAfford)}
                   >
                     {canAfford ? (
                       <span className="inline-flex items-center gap-1.5">
@@ -294,8 +296,10 @@ export function PurchaseSheet({
                         <Fly size={16} paused y={-2} />
                         <span className="tabular-nums">{price.toLocaleString()}</span>
                       </span>
-                    ) : (
+                    ) : isGuest ? (
                       'Not enough flies'
+                    ) : (
+                      'Not enough flies — get more'
                     )}
                   </GhostButton>
                 </>
@@ -308,15 +312,29 @@ export function PurchaseSheet({
                     <span className="tabular-nums">{price.toLocaleString()}</span>
                   </span>
                 </PrimaryButton>
-              ) : (
+              ) : isGuest ? (
                 <button
                   ref={primaryRef}
                   type="button"
                   disabled
                   className="flex h-14 w-full items-center justify-center rounded-2xl bg-muted text-sm font-black uppercase tracking-wide text-muted-foreground"
                 >
-                  {isGuest ? 'Sign in to buy' : `Need ${shortBy.toLocaleString()} more flies`}
+                  Sign in to buy
                 </button>
+              ) : (
+                <>
+                  <PrimaryButton ref={primaryRef} onClick={openFlyShop}>
+                    <span className="inline-flex items-center gap-2">
+                      Get
+                      <Fly size={30} y={-5} alwaysPlay />
+                      <span className="tabular-nums">{shortBy.toLocaleString()}</span>
+                      more flies
+                    </span>
+                  </PrimaryButton>
+                  <p className="text-center text-xs font-bold text-muted-foreground">
+                    You&apos;re {shortBy.toLocaleString()} flies short
+                  </p>
+                </>
               )}
             </div>
           </div>

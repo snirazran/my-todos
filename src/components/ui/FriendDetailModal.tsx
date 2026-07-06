@@ -14,6 +14,7 @@ import {
   type BackgroundImages,
 } from '@/hooks/useBackgrounds';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
+import { useUIStore } from '@/lib/uiStore';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
 import {
   contributionFrom,
@@ -568,6 +569,7 @@ function ItemPeekSheet({
   balance: number;
 }) {
   const router = useRouter();
+  const openFlyShop = useUIStore((s) => s.openFlyShop);
   const [equipping, setEquipping] = useState(false);
   const [equipDone, setEquipDone] = useState(false);
   useEffect(() => {
@@ -701,11 +703,24 @@ function ItemPeekSheet({
                     Get it in your shop
                   </button>
                 ) : (
-                  <p className="mt-2.5 text-center text-[11px] font-medium text-muted-foreground">
-                    Earn {shortfall.toLocaleString()} more{' '}
-                    {shortfall === 1 ? 'fly' : 'flies'} by completing tasks,
-                    then grab it in your shop.
-                  </p>
+                  <>
+                    <button
+                      type="button"
+                      onClick={openFlyShop}
+                      className="mt-3.5 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#4f9149] text-base font-black tracking-tight text-white shadow-[0_4px_0_#34631f] transition-all hover:bg-[#457f40] active:translate-y-0.5 active:shadow-none"
+                    >
+                      Get
+                      <Fly size={28} y={-2} alwaysPlay />
+                      <span className="tabular-nums">
+                        {shortfall.toLocaleString()}
+                      </span>
+                      more flies
+                    </button>
+                    <p className="mt-2.5 text-center text-[11px] font-medium text-muted-foreground">
+                      Or earn flies by completing tasks, then grab it in your
+                      shop.
+                    </p>
+                  </>
                 )}
               </>
             )}

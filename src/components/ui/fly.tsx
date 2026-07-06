@@ -22,6 +22,8 @@ type FlyProps = {
   y?: number;
   x?: number;
   paused?: boolean;
+  /** Keep animating while a sheet/scroll holds the global Rive pause (for flies rendered inside an open sheet). */
+  alwaysPlay?: boolean;
   onLoad?: () => void;
   interactive?: boolean;
 };
@@ -35,6 +37,7 @@ const Fly = memo(forwardRef<HTMLDivElement, FlyProps>(
       x = 0,
       y = 0,
       paused = false,
+      alwaysPlay = false,
       onLoad,
       interactive = true,
     },
@@ -54,14 +57,16 @@ const Fly = memo(forwardRef<HTMLDivElement, FlyProps>(
     useEffect(() => {
       const canvas = canvasRef.current;
       if (!canvas) return;
-      const handle = attachFlyCanvas(canvas);
+      const handle = attachFlyCanvas(canvas, {
+        ignoreInteractionPause: alwaysPlay,
+      });
       handleRef.current = handle;
       onLoadRef.current?.();
       return () => {
         handle?.detach();
         handleRef.current = null;
       };
-    }, []);
+    }, [alwaysPlay]);
 
     useEffect(() => {
       const canvas = canvasRef.current;

@@ -232,7 +232,11 @@
       "Bash(pod install *)",
       "WebFetch(domain:www.paddle.com)",
       "WebFetch(domain:www.revenuecat.com)",
-      "WebFetch(domain:www.pushwoosh.com)"
+      "WebFetch(domain:www.pushwoosh.com)",
+      "Bash(lsof -iTCP:3000 -sTCP:LISTEN -P)",
+      "Bash(npx playwright *)",
+      "Bash(perl -i -pe 's/<Fly size=\\\\{18\\\\} paused y=\\\\{-2\\\\} \\\\/>/<Fly size={24} paused y={-2} \\\\/>/g if $. >= 240 && $. <= 270' src/components/ui/skins/PurchaseSheet.tsx)",
+      "WebFetch(domain:javier-barnes-gd.medium.com)"
     ]
   }
 }

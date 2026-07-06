@@ -98,6 +98,10 @@ export type UserDoc = {
     doubled: boolean;
     createdAt: Date;
   };
+  adFlyDaily?: {
+    date: string;
+    count: number;
+  };
   focusProfile?: FocusProfile;
   quests?: unknown;
   dailyRewards?: DailyRewardProgress;

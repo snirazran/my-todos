@@ -9,7 +9,6 @@ import Fly from '@/components/ui/fly';
 import { FrogSpeechBubble } from './FrogSpeechBubble';
 import { useInventory } from '@/hooks/useInventory';
 import { cn } from '@/lib/utils';
-import { CurrencyShop } from '@/components/ui/shop/CurrencyShop';
 import { prefetchQuests } from './QuestsPanel';
 
 type Props = {
@@ -71,7 +70,6 @@ export function FrogDisplay({
     true,
   );
   const [clickedAt, setClickedAt] = React.useState(0);
-  const [shopOpen, setShopOpen] = React.useState(false);
 
   const wardrobeBadge = unseenCount + unseenContainerCount;
 
@@ -138,12 +136,6 @@ export function FrogDisplay({
     <div
       className={`${className} flex flex-col items-center mb-2 md:mb-2 relative md:-translate-y-6`}
     >
-      <CurrencyShop
-        open={shopOpen}
-        onOpenChange={setShopOpen}
-        balance={flyBalance ?? 0}
-      />
-
       <div
         ref={frogBoxRef}
         className="relative z-50 -mb-6 transition-transform duration-500 origin-top scale-100 pointer-events-none -translate-y-9 md:mb-6 md:scale-100 md:translate-y-3"

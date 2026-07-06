@@ -52,13 +52,13 @@ export default function SiteHeader() {
   const {
     isLoadingScreenVisible,
     isWardrobeStuck,
+    openFlyShop,
   } = useUIStore();
   const { unseenCount, unseenContainerCount, data: inventoryData } = useInventory(!!user, true);
   const flyBalance = inventoryData?.wardrobe?.flies;
   const inventoryBadge = unseenCount + unseenContainerCount;
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const [wardrobeDropdownOpen, setWardrobeDropdownOpen] = useState(false);
-  const [shopOpen, setShopOpen] = useState(false);
   const wardrobeRef = useRef<HTMLDivElement>(null);
 
   // Skin & background rotation popup (opened from the wardrobe page).
@@ -197,7 +197,7 @@ export default function SiteHeader() {
             <FlyCounter
               balance={flyBalance}
               variant="mobile"
-              onClick={() => setShopOpen(true)}
+              onClick={openFlyShop}
             />
           </div>
         )}
@@ -224,11 +224,7 @@ export default function SiteHeader() {
           />
         </Link>
 
-        <CurrencyShop
-          open={shopOpen}
-          onOpenChange={setShopOpen}
-          balance={flyBalance ?? 0}
-        />
+        <CurrencyShop />
 
         {/* ───────── Desktop Navigation (Centered) ───────── */}
         <div className="hidden md:flex flex-1 min-w-0 items-center justify-center gap-0.5 xl:gap-1">
@@ -364,7 +360,7 @@ export default function SiteHeader() {
               <FlyCounter
                 balance={flyBalance}
                 variant="desktop"
-                onClick={() => setShopOpen(true)}
+                onClick={openFlyShop}
               />
             </>
           )}

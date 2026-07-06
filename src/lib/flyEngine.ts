@@ -35,6 +35,7 @@ interface Entry {
   ctx: CanvasRenderingContext2D;
   playing: boolean;
   hasFrame: boolean;
+  ignoreInteractionPause: boolean;
 }
 
 interface Mip {
@@ -60,7 +61,10 @@ useRiveInteractionPause.subscribe((state) => {
 });
 
 function entryNeedsFrames(e: Entry) {
-  return (e.playing && !interactionPaused) || !e.hasFrame;
+  return (
+    (e.playing && (!interactionPaused || e.ignoreInteractionPause)) ||
+    !e.hasFrame
+  );
 }
 
 function syncMasterPlayback() {
@@ -166,10 +170,17 @@ function ensureMaster() {
 
 export function attachFlyCanvas(
   canvas: HTMLCanvasElement,
+  opts?: { ignoreInteractionPause?: boolean },
 ): FlyCanvasHandle | null {
   const ctx = canvas.getContext('2d');
   if (!ctx) return null;
-  const entry: Entry = { canvas, ctx, playing: false, hasFrame: false };
+  const entry: Entry = {
+    canvas,
+    ctx,
+    playing: false,
+    hasFrame: false,
+    ignoreInteractionPause: opts?.ignoreInteractionPause ?? false,
+  };
   entries.set(canvas, entry);
   ensureMaster();
   if (masterReady) blit(entry);

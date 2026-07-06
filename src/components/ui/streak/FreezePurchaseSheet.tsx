@@ -8,6 +8,7 @@ import { BaseSheet } from '@/components/ui/BaseSheet';
 import { AnimatedNumber } from '@/components/ui/AnimatedNumber';
 import Fly from '@/components/ui/fly';
 import { cn } from '@/lib/utils';
+import { useUIStore } from '@/lib/uiStore';
 import type { LoginStreakView } from '@/lib/streak/types';
 
 export function FreezePurchaseSheet({
@@ -27,6 +28,7 @@ export function FreezePurchaseSheet({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const openFlyShop = useUIStore((s) => s.openFlyShop);
 
   useEffect(() => {
     if (open) {
@@ -164,19 +166,21 @@ export function FreezePurchaseSheet({
             <button
               ref={buttonRef}
               type="button"
-              disabled={busy || atCap || !canAfford}
-              onClick={handleBuy}
+              disabled={busy || atCap}
+              onClick={canAfford ? handleBuy : openFlyShop}
               className={cn(
                 'mt-5 flex h-12 w-full items-center justify-center gap-1.5 rounded-2xl text-sm font-black text-white transition-all',
-                atCap || !canAfford
+                atCap
                   ? 'bg-muted-foreground/30'
-                  : 'bg-sky-500 shadow-[0_4px_0_0_#0369a1] active:translate-y-1 active:shadow-none',
+                  : !canAfford
+                    ? 'bg-primary shadow-[0_4px_0_0_hsl(var(--primary)/0.6)] active:translate-y-1 active:shadow-none'
+                    : 'bg-sky-500 shadow-[0_4px_0_0_#0369a1] active:translate-y-1 active:shadow-none',
               )}
             >
               {atCap
                 ? 'Freeze limit reached'
                 : !canAfford
-                  ? `Need ${(price - balance).toLocaleString()} more flies`
+                  ? `Get ${(price - balance).toLocaleString()} more flies`
                   : busy
                     ? 'Buying…'
                     : 'Buy freeze'}
