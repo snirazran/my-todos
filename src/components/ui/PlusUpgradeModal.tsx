@@ -625,10 +625,14 @@ function FloatingSparkle({
   if (reduceMotion) return null;
   return (
     <motion.div
-      className="pointer-events-none absolute will-change-transform"
-      style={{ left, bottom: -size }}
-      initial={{ y: 0, opacity: 0, rotate: 0 }}
-      animate={{ y: -280, opacity: [0, 1, 1, 0], rotate: spin }}
+      className="pointer-events-none absolute"
+      style={{ left }}
+      initial={{ bottom: '-6%', opacity: 0, rotate: 0 }}
+      animate={{
+        bottom: '102%',
+        opacity: [0, 1, 1, 0],
+        rotate: spin,
+      }}
       transition={{
         duration,
         delay,
