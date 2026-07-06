@@ -2,7 +2,7 @@ import mongoose, { Schema, type Model } from 'mongoose';
 
 export type FriendRequestStatus = 'pending' | 'accepted' | 'declined';
 
-export type FriendRequestSource = 'code' | 'qr' | 'link';
+export type FriendRequestSource = 'code' | 'qr' | 'link' | 'suggestion';
 
 export type FriendRequestDoc = {
   _id: string;
@@ -28,7 +28,7 @@ const FriendRequestSchema = new Schema<FriendRequestDoc>(
     source: {
       type: String,
       required: true,
-      enum: ['code', 'qr', 'link'],
+      enum: ['code', 'qr', 'link', 'suggestion'],
       default: 'code',
     },
     createdAt: { type: Date, default: Date.now },

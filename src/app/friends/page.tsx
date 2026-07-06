@@ -26,6 +26,7 @@ import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { AddFriendsSheet } from '@/components/ui/AddFriendsSheet';
 import { InviteFriendsModal } from '@/components/ui/InviteFriendsModal';
 import { FriendRequestsInbox } from '@/components/ui/FriendRequestsInbox';
+import { FriendSuggestionsRow } from '@/components/ui/FriendSuggestionsRow';
 import { FriendDetailModal } from '@/components/ui/FriendDetailModal';
 import { BuddyUpFlow } from '@/components/ui/BuddyUpFlow';
 import { BuddyNudgeSheet } from '@/components/ui/BuddyNudgeSheet';
@@ -226,7 +227,7 @@ export default function FriendsPage() {
                 Top contributors today
               </h2>
               <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-700/50">
-                Flies shared with you
+                They catch 2 · you get 1
               </p>
             </div>
 
@@ -252,6 +253,8 @@ export default function FriendsPage() {
               )}
             </div>
           </div>
+
+          <FriendSuggestionsRow enabled={!!user} />
         </div>
       </div>
 
@@ -426,7 +429,7 @@ function ClaimHeroCard({
           {claimable} {claimable === 1 ? 'fly' : 'flies'} ready
         </p>
         <p className="text-xs font-semibold text-emerald-700/70">
-          From your friends today
+          Your cut of your friends&apos; catch today
         </p>
       </div>
       <span className="inline-flex h-10 shrink-0 items-center justify-center rounded-xl bg-amber-500 px-5 text-[11px] font-black uppercase tracking-[0.15em] text-white shadow-[0_3px_0_0_#b45309] transition-all group-hover:-translate-y-[1px] group-hover:shadow-[0_4px_0_0_#b45309] group-active:translate-y-[2px] group-active:shadow-none">

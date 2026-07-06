@@ -42,7 +42,8 @@ export function AddFriendsSheet({
                   Earn together!
                 </h2>
                 <p className="mx-auto mt-1 max-w-[24rem] text-[13px] font-semibold leading-snug text-white/90 drop-shadow-[0_1px_4px_rgba(0,0,0,0.6)] min-[360px]:text-sm min-[400px]:text-[15px] sm:text-base">
-                  Every 2 flies a friend catches earns you 1.
+                  They catch 2 flies, you get 1 — and your catch pays them back
+                  the same way.
                 </p>
               </div>
             </div>
@@ -59,7 +60,7 @@ export function AddFriendsSheet({
                     Invite friends
                   </span>
                   <span className="block text-xs font-semibold text-white/80 sm:text-[13px]">
-                    Earn a reward when they join
+                    They join with a gift — you unlock outfits
                   </span>
                 </span>
                 <ChevronRight className="h-5 w-5 shrink-0 text-white/80" />

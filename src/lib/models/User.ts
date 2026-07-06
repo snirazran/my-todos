@@ -22,6 +22,7 @@ const UserSchema = new Schema<UserDoc>(
     phoneNumber: { type: String, required: false, index: true, sparse: true },
     isGuest: { type: Boolean, default: false },
     friendCode: { type: String, required: false, unique: true, index: true, sparse: true },
+    suggestionsDismissed: { type: [String], default: [] },
     createdAt: { type: Date, default: Date.now },
     wardrobe: {
       type: Schema.Types.Mixed,

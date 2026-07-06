@@ -7,7 +7,7 @@ import { mutate } from 'swr';
 import { Capacitor } from '@capacitor/core';
 import { Icon } from '@/components/ui/Icon';
 import { AppImage } from '@/components/ui/AppImage';
-import { Check, Heart, Sparkle, Unlock, X } from 'lucide-react';
+import { BadgePercent, Check, Heart, Sparkle, Unlock, X } from 'lucide-react';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import Frog from '@/components/ui/frog';
 import { purchasePlus, restorePlusPurchases } from '@/lib/purchases';
@@ -306,37 +306,45 @@ function Step0({
       <div className="flex flex-1 flex-col px-6 pb-6 md:pb-5">
       <Reveal delay={0.05}>
         <h2 className="mt-2 text-center text-xl font-black tracking-tight md:text-2xl">
-          People with Plus are <span className="text-amber-300">2x better</span> at sticking
-          with their goals!
+          Become the person who{' '}
+          <span className="text-amber-300">follows through</span>
+
         </h2>
       </Reveal>
       <div className="mt-5 space-y-3 rounded-2xl bg-white/10 p-4 md:mt-6">
         <Reveal delay={0.12}>
           <FeatureRow
             icon={<Unlock className="h-5 w-5 text-amber-300" />}
-            title="Improve in all areas"
-            subtitle="Unlimited tags and quests, focus on more areas and earn more rewards!"
+            title="Progress on every goal at once"
+            subtitle="All quests run together, with unlimited tags."
           />
         </Reveal>
         <Reveal delay={0.18}>
           <FeatureRow
             icon={<span className="text-sm font-black text-amber-300">×2</span>}
-            title="Double rewards"
-            subtitle="Earn double rewards from quests and tasks!"
+            title="Earn outfits twice as fast"
+            subtitle="Double rewards on every task and quest."
           />
         </Reveal>
         <Reveal delay={0.24}>
           <FeatureRow
-            icon={<Sparkle className="h-5 w-5 text-amber-300" />}
-            title="Season plus rewards"
-            subtitle="Instantly unlock all Season Plus rewards!"
+            icon={<BadgePercent className="h-5 w-5 text-amber-300" />}
+            title="An outfit deal every day"
+            subtitle="A fresh member discount in the shop, daily."
           />
         </Reveal>
         <Reveal delay={0.3}>
           <FeatureRow
+            icon={<Sparkle className="h-5 w-5 text-amber-300" />}
+            title="Season rewards, unlocked"
+            subtitle="The Plus track opens — earn it as you play."
+          />
+        </Reveal>
+        <Reveal delay={0.36}>
+          <FeatureRow
             icon={<Heart className="h-5 w-5 text-rose-300" fill="currentColor" />}
             title="Support our mission"
-            subtitle="Help us keep making Frogress the best app we can!"
+            subtitle="Frogress is built by a tiny team — Plus keeps us going."
           />
         </Reveal>
       </div>
@@ -379,12 +387,11 @@ function FeatureRow({
 }
 
 const COMPARISON_ROWS: { label: string; free: boolean }[] = [
-  { label: 'Unlimited quests', free: false },
+  { label: 'All quests in parallel', free: false },
   { label: 'Unlimited tags', free: false },
   { label: 'Double rewards', free: false },
+  { label: 'Daily outfit deals', free: false },
   { label: 'Season plus rewards', free: false },
-  { label: 'Plus only skins', free: false },
-  { label: 'Plus only backgrounds', free: false },
 ];
 
 
@@ -392,7 +399,9 @@ function Step1({ onContinue }: { onContinue: () => void }) {
   return (
     <div className="flex min-h-full flex-col px-6 pb-6 pt-16 md:pb-5 md:pt-12">
       <Reveal>
-        <h2 className="text-center text-2xl font-black tracking-tight">Have more fun with Plus!</h2>
+        <h2 className="text-center text-2xl font-black tracking-tight">
+          Everything you unlock with Plus
+        </h2>
       </Reveal>
 
       <Reveal delay={0.1} className="relative mt-8">

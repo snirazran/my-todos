@@ -1592,7 +1592,12 @@ export function PlusGateCard({
           Every focus advances at once — and rewards are doubled.
         </p>
       </div>
-      <span className="mt-2.5 flex items-center justify-center rounded-[10px] bg-amber-400 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-950 shadow-[0_2.5px_0_rgba(0,0,0,0.35)]">
+      <span className="relative mt-2.5 flex items-center justify-center rounded-[10px] bg-amber-400 py-1.5 pl-8 pr-2 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-950 shadow-[0_2.5px_0_rgba(0,0,0,0.35)]">
+        <Icon
+          name="frogPlus"
+          label=""
+          className="absolute -left-1.5 -top-3 h-11 w-11 -rotate-6 drop-shadow-[0_2px_0_rgba(0,0,0,0.25)]"
+        />
         See Plus
       </span>
     </button>

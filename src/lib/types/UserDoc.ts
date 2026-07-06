@@ -81,6 +81,7 @@ export type UserDoc = {
   phoneNumber?: string;
   isGuest?: boolean;
   friendCode?: string;
+  suggestionsDismissed?: string[];
   createdAt: Date;
   wardrobe?: UserWardrobe;
   skins?: UserSkins;
