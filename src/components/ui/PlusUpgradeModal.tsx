@@ -306,9 +306,9 @@ function Step0({
       <div className="flex flex-1 flex-col px-6 pb-6 md:pb-5">
       <Reveal delay={0.05}>
         <h2 className="mt-2 text-center text-xl font-black tracking-tight md:text-2xl">
-          Become the person who{' '}
+          Become the person who
+          <br />
           <span className="text-amber-300">follows through</span>
-
         </h2>
       </Reveal>
       <div className="mt-5 space-y-3 rounded-2xl bg-white/10 p-4 md:mt-6">

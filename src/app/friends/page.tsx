@@ -280,7 +280,6 @@ export default function FriendsPage() {
           setBuddyTarget(entry);
         }}
         allFriends={friendsData?.friends}
-        myFliesToday={friendsData?.me?.fliesToday ?? 0}
       />
       <BuddyUpFlow
         open={!!buddyTarget}

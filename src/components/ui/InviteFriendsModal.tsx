@@ -527,11 +527,11 @@ function PickStep({
   const selected = config.giftOptions.find((g) => g.id === selectedGiftId) ?? null;
 
   return (
-    <div className="relative flex h-full flex-col overflow-x-hidden overflow-y-auto bg-[#8fc36d] px-5 pb-5 pt-4 text-center text-white overscroll-contain md:h-auto md:max-h-[calc(100dvh-2rem)] lg:max-h-[calc(100dvh-3rem)]">
+    <div className="relative flex h-full flex-col overflow-x-hidden overflow-y-auto bg-[#8fc36d] px-5 pb-5 pt-[calc(env(safe-area-inset-top)+1rem)] text-center text-white overscroll-contain md:h-auto md:max-h-[calc(100dvh-2rem)] lg:max-h-[calc(100dvh-3rem)] md:pt-4">
       <div className="relative z-10 mx-auto flex min-h-full w-full max-w-3xl flex-col md:min-h-0">
         <CloseButton
           onClose={onBack}
-          className="left-[-0.5rem] top-[calc(env(safe-area-inset-top)+0.5rem)] text-white"
+          className="left-[-0.5rem] top-2 text-white"
         />
 
         <Reveal

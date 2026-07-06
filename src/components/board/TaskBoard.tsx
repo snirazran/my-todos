@@ -1468,7 +1468,7 @@ export default function TaskBoard({
                 count={activeTaskCount(tasksByDate[dk] ?? [])}
                 totalCount={(tasksByDate[dk] ?? []).length}
                 listRef={setListRef(i)}
-                maxHeightClass="max-h-[calc(100svh-315px-var(--safe-bottom))] md:max-h-[calc(100svh-340px-var(--safe-bottom))]"
+                maxHeightClass="max-h-[calc(100svh-315px-var(--safe-bottom)-env(safe-area-inset-top))] md:max-h-[calc(100svh-340px-var(--safe-bottom))]"
                 isToday={dk === todayKey}
                 isPast={cmpYmd(dk, todayKey) < 0}
                 filter={getFilter(i)}
@@ -1498,6 +1498,7 @@ export default function TaskBoard({
                   dragFromIndex={drag?.fromIndex}
                   targetDay={effectiveTargetDay as any}
                   targetIndex={clampedTargetIndex}
+                  dragHeight={drag?.height}
                   removeTask={async (_d, id) => removeOnDate(dk, id)}
                   onGrab={onGrab as any}
                   setCardRef={setCardRef}

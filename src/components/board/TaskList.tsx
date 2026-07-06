@@ -46,6 +46,7 @@ export default React.memo(function TaskList({
   dragFromIndex,
   targetDay,
   targetIndex,
+  dragHeight,
   removeTask,
   onGrab,
   setCardRef,
@@ -78,6 +79,8 @@ export default React.memo(function TaskList({
   dragFromIndex?: number;
   targetDay: DisplayDay | null;
   targetIndex: number | null;
+  /** Height of the card being dragged, so the placeholder holds its exact space. */
+  dragHeight?: number;
   removeTask: (day: DisplayDay, id: string) => Promise<void>;
   onGrab: (p: {
     day: DisplayDay;
@@ -167,6 +170,20 @@ export default React.memo(function TaskList({
   const [pendingScope, setPendingScope] = useState<{
     run: (scope: 'one' | 'all') => void;
   } | null>(null);
+
+  // Hold content-visibility off for a beat after a drag ends so re-enabling
+  // it (a full-column style recalc) doesn't land on the same frame as the
+  // drop commit and its layout animations.
+  const [dragHold, setDragHold] = useState(false);
+  useEffect(() => {
+    if (isAnyDragging) {
+      setDragHold(true);
+      return;
+    }
+    const id = window.setTimeout(() => setDragHold(false), 300);
+    return () => window.clearTimeout(id);
+  }, [isAnyDragging]);
+  const measurable = isAnyDragging || dragHold;
 
   const tz =
     typeof window !== 'undefined'
@@ -501,6 +518,7 @@ export default React.memo(function TaskList({
     <div
       key={k}
       data-drop-placeholder
+      style={dragHeight ? { height: dragHeight } : undefined}
       className="h-[56px] mb-1.5 border-2 border-dashed rounded-[14px] border-primary/50 bg-primary/10"
     />
   );
@@ -574,20 +592,28 @@ export default React.memo(function TaskList({
       const cardKey = `card-${day}-${t.id}`;
       const wrapKey = `wrap-${day}-${t.id}`;
       const afterKey = `ph-${day}-${visibleIndex + 1}`;
+      // The card's visual slot including the placeholder — stable for every
+      // card the placeholder doesn't displace, so framer only re-measures the
+      // cards that actually move.
+      const slot =
+        placeholderAt != null && placeholderAt <= visibleIndex
+          ? visibleIndex + 1
+          : visibleIndex;
 
       rows.push(
         <motion.div
           key={wrapKey}
           layout="position"
-          layoutDependency={`${visibleIndex}:${placeholderAt ?? 'x'}`}
+          layoutDependency={slot}
           initial={false}
           transition={LAYOUT_TRANSITION}
           className={
             // content-visibility lets long columns skip rendering offscreen
             // cards while scrolling (the p-1/-m-1 pair gives shadows ink room
-            // inside the containment box). Disabled during drags so framer can
-            // measure every card for the reorder animations.
-            isAnyDragging
+            // inside the containment box). Disabled during drags (and briefly
+            // after the drop) so framer can measure cards for the reorder
+            // animations without the re-enable recalc hitting the drop frame.
+            measurable
               ? 'relative -m-1 p-1'
               : 'relative -m-1 p-1 [content-visibility:auto] [contain-intrinsic-size:auto_60px]'
           }

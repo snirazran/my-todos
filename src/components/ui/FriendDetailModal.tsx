@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MoreVertical, X, UserMinus, Users, Check, Loader2, Clock } from 'lucide-react';
 import useSWR from 'swr';
@@ -23,7 +24,6 @@ import { mutateFriendsCaches } from '@/hooks/useFriendsSync';
 import { cn } from '@/lib/utils';
 import { Icon } from '@/components/ui/Icon';
 import { BaseSheet } from '@/components/ui/BaseSheet';
-import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
 import { RARITY_CONFIG } from '@/components/ui/gift-box/constants';
 import { useInventory, mutateInventoryCaches } from '@/hooks/useInventory';
 import { mutateBackgrounds } from '@/hooks/useBackgrounds';
@@ -86,14 +86,12 @@ export function FriendDetailModal({
   onRemove,
   onBuddyUp,
   allFriends,
-  myFliesToday,
 }: {
   entry: FriendSummary | null;
   onClose: () => void;
   onRemove: (entry: FriendSummary) => void;
   onBuddyUp: (entry: FriendSummary) => void;
   allFriends?: FriendSummary[];
-  myFliesToday?: number;
 }) {
   useRegisterOpenSheet(!!entry);
   const { data } = useBackgrounds(!!entry);
@@ -101,7 +99,6 @@ export function FriendDetailModal({
   const [menuOpen, setMenuOpen] = useState(false);
   const [busyBond, setBusyBond] = useState<string | null>(null);
   const [peekTarget, setPeekTarget] = useState<PeekTarget | null>(null);
-  const [plusOpen, setPlusOpen] = useState(false);
 
   useEffect(() => {
     if (!entry) setPeekTarget(null);
@@ -504,13 +501,6 @@ export function FriendDetailModal({
             wearing={wearingPeekTarget}
             onEquip={equipPeekTarget}
             balance={inventoryData?.wardrobe?.flies ?? 0}
-            isPremium={!!inventoryData?.isPremium}
-            paceToday={myFliesToday ?? 0}
-            onUpgrade={() => setPlusOpen(true)}
-          />
-          <PlusUpgradeModal
-            open={plusOpen}
-            onClose={() => setPlusOpen(false)}
           />
         </>
       )}
@@ -567,9 +557,6 @@ function ItemPeekSheet({
   wearing,
   onEquip,
   balance,
-  isPremium,
-  paceToday,
-  onUpgrade,
 }: {
   target: PeekTarget | null;
   onClose: () => void;
@@ -579,10 +566,8 @@ function ItemPeekSheet({
   wearing: boolean;
   onEquip: () => Promise<boolean>;
   balance: number;
-  isPremium: boolean;
-  paceToday: number;
-  onUpgrade: () => void;
 }) {
+  const router = useRouter();
   const [equipping, setEquipping] = useState(false);
   const [equipDone, setEquipDone] = useState(false);
   useEffect(() => {
@@ -599,9 +584,6 @@ function ItemPeekSheet({
   const config = target ? RARITY_CONFIG[target.rarity] : RARITY_CONFIG.common;
   const price = target?.price ?? 0;
   const shortfall = Math.max(0, price - balance);
-  const pace = Math.max(paceToday, 5);
-  const daysFree = Math.ceil(shortfall / pace);
-  const daysPlus = Math.max(1, Math.ceil(shortfall / (pace * 2)));
   const scarcity =
     wearerNames.length <= 1
       ? `Only ${friendName} wears this among your friends`
@@ -703,49 +685,28 @@ function ItemPeekSheet({
                       {balance.toLocaleString()}
                     </span>
                   </div>
-                  {shortfall > 0 ? (
-                    <>
-                      <div className="my-2.5 border-t border-dashed border-border/70" />
-                      <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">
-                          At today&apos;s pace
-                        </span>
-                        <span className="font-black tabular-nums">
-                          ~{daysFree} {daysFree === 1 ? 'day' : 'days'}
-                        </span>
-                      </div>
-                      {!isPremium && (
-                        <div className="mt-1.5 flex items-center justify-between">
-                          <span className="inline-flex items-center gap-1 text-muted-foreground">
-                            <Icon name="frogPlus" label="" className="h-4 w-4" />
-                            With Plus
-                          </span>
-                          <span className="font-black tabular-nums text-emerald-600">
-                            ~{daysPlus} {daysPlus === 1 ? 'day' : 'days'}
-                          </span>
-                        </div>
-                      )}
-                    </>
-                  ) : (
+                  {shortfall === 0 && (
                     <p className="mt-2.5 text-center text-[13px] font-black text-emerald-600">
                       You can afford it right now!
                     </p>
                   )}
                 </div>
 
-                {!isPremium && shortfall > 0 && (
+                {shortfall === 0 ? (
                   <button
                     type="button"
-                    onClick={onUpgrade}
-                    className="mt-3.5 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-foreground text-sm font-black uppercase tracking-wide text-background shadow-sm transition-transform active:scale-[0.98]"
+                    onClick={() => router.push('/wardrobe?tab=shop')}
+                    className="mt-3.5 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#4f9149] text-base font-black tracking-tight text-white shadow-[0_4px_0_#34631f] transition-all hover:bg-[#457f40] active:translate-y-0.5 active:shadow-none"
                   >
-                    <Icon name="frogPlus" label="" className="h-5 w-5" />
-                    Get there 2× faster with Plus
+                    Get it in your shop
                   </button>
+                ) : (
+                  <p className="mt-2.5 text-center text-[11px] font-medium text-muted-foreground">
+                    Earn {shortfall.toLocaleString()} more{' '}
+                    {shortfall === 1 ? 'fly' : 'flies'} by completing tasks,
+                    then grab it in your shop.
+                  </p>
                 )}
-                <p className="mt-2.5 text-center text-[11px] font-medium text-muted-foreground">
-                  Earn flies by completing tasks, then grab it in your shop.
-                </p>
               </>
             )}
           </div>
