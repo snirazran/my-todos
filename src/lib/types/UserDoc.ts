@@ -108,6 +108,14 @@ export type UserDoc = {
     doubled: boolean;
     createdAt: Date;
   };
+  tradeRerollClaim?: {
+    id: string;
+    rewardId: string;
+    rewardKind: 'item' | 'background';
+    rarity: string;
+    used: boolean;
+    createdAt: Date;
+  };
   focusProfile?: FocusProfile;
   quests?: unknown;
   dailyRewards?: DailyRewardProgress;

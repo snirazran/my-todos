@@ -1476,6 +1476,7 @@ function WardrobeManagerContent({
                   sortBy={sortBy}
                   paused={isDragging}
                   pageScroll={embedded}
+                  isPremium={!!data.isPremium}
                 />
               ) : null}
             </TabsContent>

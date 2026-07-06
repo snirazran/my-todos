@@ -3,7 +3,16 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, AlertCircle, ArrowRight, ArrowUp, ChevronDown } from 'lucide-react';
+import {
+  Sparkles,
+  AlertCircle,
+  ArrowRight,
+  ArrowUp,
+  ChevronDown,
+  Dices,
+  Play,
+} from 'lucide-react';
+import { rewardedAdsAvailable, showRewardedAd } from '@/lib/ads';
 import { cn } from '@/lib/utils';
 import {
   ItemDef,
@@ -120,6 +129,7 @@ type TradePanelProps = {
   sortBy?: SortOrder;
   paused?: boolean;
   pageScroll?: boolean;
+  isPremium?: boolean;
 };
 
 export function TradePanel({
@@ -133,6 +143,7 @@ export function TradePanel({
   sortBy = 'rarity_asc',
   paused = false,
   pageScroll = false,
+  isPremium = false,
 }: TradePanelProps) {
   // --- State ---
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -140,6 +151,9 @@ export function TradePanel({
   const [tradeResult, setTradeResult] = useState<
     (ItemDef & { kind?: 'item' | 'background'; imageUrl?: string }) | null
   >(null);
+  const [rerollClaimId, setRerollClaimId] = useState<string | null>(null);
+  const [rerollBusy, setRerollBusy] = useState(false);
+  const [rerollError, setRerollError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const [inventoryHasScrolled, setInventoryHasScrolled] = useState(false);
@@ -346,6 +360,8 @@ export function TradePanel({
       if (!res.ok) throw new Error(data.error || 'Trade failed');
 
       setTradeResult(data.reward);
+      setRerollClaimId(data.rerollClaimId ?? null);
+      setRerollError(null);
       setSelectedIds([]);
       haptic([12, 40, 20]);
       if (onTradeSuccess) onTradeSuccess();
@@ -365,6 +381,48 @@ export function TradePanel({
 
   const handleClaimReward = () => {
     setTradeResult(null);
+    setRerollClaimId(null);
+    setRerollError(null);
+  };
+
+  const handleReroll = async () => {
+    if (rerollBusy || !rerollClaimId) return;
+    setRerollBusy(true);
+    setRerollError(null);
+    try {
+      if (!isPremium) {
+        const adResult = await showRewardedAd();
+        if (adResult !== 'rewarded') {
+          if (adResult === 'failed') {
+            setRerollError('Ad not available right now — try again in a moment.');
+          }
+          return;
+        }
+      }
+      const claimId = rerollClaimId;
+      const res = await fetch('/api/skins/trade/reroll', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ claimId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.granted || !data.reward) {
+        setRerollError(data.error ?? 'Could not reroll — try again.');
+        return;
+      }
+      setRerollClaimId(null);
+      setTradeResult(data.reward);
+      haptic([12, 40, 20]);
+      if (onTradeSuccess) onTradeSuccess();
+      confetti({
+        particleCount: 80,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ['#FFD700', '#FFA500', '#FF4500'],
+      });
+    } finally {
+      setRerollBusy(false);
+    }
   };
 
 
@@ -620,12 +678,48 @@ export function TradePanel({
             {/* Main Content */}
             <div className="relative z-10 flex flex-col items-center justify-center w-full max-w-md p-6">
               <RewardCard
-                key="card"
+                key={`card-${tradeResult.id}-${rerollClaimId ?? 'rerolled'}`}
                 prize={tradeResult}
                 claiming={false}
                 onClaim={handleClaimReward}
                 paused={paused}
               />
+              {rerollClaimId && (isPremium || rewardedAdsAvailable()) && (
+                <motion.div
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.9 }}
+                  className="mt-4 flex w-full max-w-xs flex-col items-center gap-1.5"
+                >
+                  <button
+                    type="button"
+                    onClick={handleReroll}
+                    disabled={rerollBusy}
+                    className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-amber-400 text-[13px] font-black uppercase tracking-wide text-slate-900 shadow-[0_4px_0_0_#b45309] transition-all active:translate-y-1 active:shadow-none disabled:opacity-60"
+                  >
+                    {isPremium ? (
+                      <>
+                        <Dices className="h-4 w-4" />
+                        {rerollBusy ? 'Rerolling…' : 'Reroll · free with Plus'}
+                      </>
+                    ) : (
+                      <>
+                        <Play className="h-4 w-4 fill-current" />
+                        {rerollBusy ? 'Loading ad…' : 'Watch an ad · reroll'}
+                      </>
+                    )}
+                  </button>
+                  <p className="text-center text-xs font-medium text-white/60">
+                    Swap it for a different {tradeResult.rarity} — one reroll per
+                    trade.
+                  </p>
+                  {rerollError && (
+                    <p className="text-center text-xs font-bold text-red-300">
+                      {rerollError}
+                    </p>
+                  )}
+                </motion.div>
+              )}
             </div>
           </div>,
           document.body

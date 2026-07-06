@@ -392,6 +392,7 @@ const COMPARISON_ROWS: { label: string; free: boolean }[] = [
   { label: 'Double rewards', free: false },
   { label: 'Every gift opens twice', free: false },
   { label: 'Weekly streak rescue', free: false },
+  { label: 'Free trade rerolls', free: false },
   { label: 'Daily outfit deals', free: false },
   { label: 'Season plus rewards', free: false },
 ];

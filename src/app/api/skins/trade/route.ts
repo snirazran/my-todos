@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUserId } from '@/lib/auth';
 import dbConnect from '@/lib/mongoose';
@@ -139,6 +140,17 @@ export async function POST(req: NextRequest) {
       user.markModified('wardrobe.unseenItems');
     }
 
+    const rerollClaimId = randomUUID();
+    (user as any).tradeRerollClaim = {
+      id: rerollClaimId,
+      rewardId: reward.id,
+      rewardKind: reward.kind,
+      rarity: nextRarity,
+      used: false,
+      createdAt: new Date(),
+    };
+    user.markModified('tradeRerollClaim');
+
     user.markModified('wardrobe.inventory');
     await user.save();
 
@@ -146,7 +158,7 @@ export async function POST(req: NextRequest) {
     await bumpQuestMetric({ userId, metric: 'trade_completed', timezone });
     await bumpQuestMetric({ userId, metric: 'skin_acquired', timezone });
 
-    return NextResponse.json({ success: true, reward });
+    return NextResponse.json({ success: true, reward, rerollClaimId });
   } catch (error) {
     console.error('Trade error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
