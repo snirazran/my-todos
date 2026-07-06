@@ -70,6 +70,7 @@ export async function GET(req: NextRequest) {
         email: '', // We don't have email here easily without requireAuth(), but that is fine
         name: 'Anonymous Frog',
         createdAt: now,
+        plusIntroEligible: true,
         wardrobe: {
           equipped: {},
           inventory: {},

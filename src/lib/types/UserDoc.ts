@@ -87,6 +87,8 @@ export type UserDoc = {
   statistics?: UserStatistics;
   tags?: UserTag[];
   premiumUntil?: Date;
+  plusIntroEligible?: boolean;
+  plusIntroShownAt?: Date | null;
   adDoubleClaim?: {
     id: string;
     fliesGranted: number;

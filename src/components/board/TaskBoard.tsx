@@ -261,6 +261,12 @@ export default function TaskBoard({
     return out;
   }, [tasksByDate, recentlyCompleted]);
 
+  const activeTaskCount = useCallback(
+    (tasks: Task[]) =>
+      tasks.filter((t) => !t.completed || recentlyCompleted.has(t.id)).length,
+    [recentlyCompleted],
+  );
+
   // helpers to get/set a column by index
   const colAt = useCallback(
     (i: number): Task[] => {
@@ -1459,7 +1465,8 @@ export default function TaskBoard({
             >
               <DayColumn
                 title={titleForIndex(i)}
-                count={(tasksByDate[dk] ?? []).length}
+                count={activeTaskCount(tasksByDate[dk] ?? [])}
+                totalCount={(tasksByDate[dk] ?? []).length}
                 listRef={setListRef(i)}
                 maxHeightClass="max-h-[calc(100svh-315px-var(--safe-bottom))] md:max-h-[calc(100svh-340px-var(--safe-bottom))]"
                 isToday={dk === todayKey}

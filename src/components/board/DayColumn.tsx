@@ -8,6 +8,7 @@ import { FilterDropdown, FilterType } from '../ui/FilterDropdown';
 export default function DayColumn({
   title,
   count,
+  totalCount,
   listRef,
   children,
   footer,
@@ -27,6 +28,7 @@ export default function DayColumn({
 }: {
   title: string;
   count?: number;
+  totalCount?: number;
   listRef: (el: HTMLDivElement | null) => void;
   children: React.ReactNode;
   footer?: React.ReactNode;
@@ -163,7 +165,9 @@ export default function DayColumn({
                 isPast ? 'text-muted-foreground/60' : 'text-muted-foreground'
               }`}
             >
-              {count} {count === 1 ? 'Fly' : 'Flies'}
+              {totalCount !== undefined && count !== totalCount
+                ? `${count} left · ${totalCount} total`
+                : `${count} ${count === 1 ? 'task' : 'tasks'}`}
             </span>
           </div>
         )}
