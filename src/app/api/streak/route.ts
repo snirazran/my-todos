@@ -33,6 +33,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       active: true,
       view: buildLoginStreakView(state, config, todayKey),
+      rescue:
+        state.rescue && state.rescue.offeredDayKey === todayKey
+          ? state.rescue
+          : null,
     });
   } catch (error) {
     console.error('Streak fetch failed:', error);

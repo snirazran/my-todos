@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
@@ -54,49 +55,62 @@ export async function POST(req: NextRequest) {
       return json({ error: 'You do not have any gift boxes to open' }, 403);
     }
 
-    if (prize.kind === 'background') {
-      // Backgrounds live in their own inventory; the box is consumed and the
-      // background quantity is incremented (no unseen/history — those are item-only).
-      const currentUnseen = user.wardrobe?.unseenItems || [];
-      const nextUnseen = currentUnseen.filter((id) => id !== giftBoxId);
-      await UserModel.updateOne(
-        { _id: user._id },
-        {
-          $inc: {
-            [`wardrobe.inventory.${giftBoxId}`]: -1,
-            [`wardrobe.backgrounds.inventory.${prize.id}`]: 1,
-          },
-          $set: { 'wardrobe.unseenItems': nextUnseen },
-        },
-      );
-      return json({ ok: true, prize });
+    // Premium users get a second independent roll of the same gift table;
+    // free users get a claim record to redeem the second roll via a rewarded ad.
+    const premium = user.premiumUntil
+      ? new Date(user.premiumUntil) > new Date()
+      : false;
+    const prizes = [prize];
+    if (premium) {
+      const bonus = pickGiftDrop(giftConfig, prizePool);
+      if (bonus) prizes.push(bonus);
     }
 
-    // 2. Atomic swap: decrement box, increment prize & update unseen items
+    // 2. Atomic swap: decrement box, increment prize(s) & update unseen items
     // We calculate the new unseen list to avoid conflicting $pull and $addToSet on the same field
     const currentUnseen = user.wardrobe?.unseenItems || [];
     const nextUnseen = currentUnseen.filter((id) => id !== giftBoxId);
-    // Add prize if not already present (though $addToSet logic implies set behavior, we do it manually for $set)
-    if (!nextUnseen.includes(prize.id)) {
-      nextUnseen.push(prize.id);
-    }
-
-    const update: any = {
-      $inc: {
-        [`wardrobe.inventory.${giftBoxId}`]: -1,
-        [`wardrobe.inventory.${prize.id}`]: 1,
-      },
-      $set: { 'wardrobe.unseenItems': nextUnseen },
+    const inc: Record<string, number> = {
+      [`wardrobe.inventory.${giftBoxId}`]: -1,
     };
+    const set: Record<string, unknown> = {};
+    for (const p of prizes) {
+      if (p.kind === 'background') {
+        const key = `wardrobe.backgrounds.inventory.${p.id}`;
+        inc[key] = (inc[key] ?? 0) + 1;
+      } else {
+        const key = `wardrobe.inventory.${p.id}`;
+        inc[key] = (inc[key] ?? 0) + 1;
+        if (!nextUnseen.includes(p.id)) nextUnseen.push(p.id);
+        if (
+          !user.wardrobe?.inventoryHistory?.[p.id] &&
+          !set[`wardrobe.inventoryHistory.${p.id}`]
+        ) {
+          set[`wardrobe.inventoryHistory.${p.id}`] = new Date().toISOString();
+        }
+      }
+    }
+    set['wardrobe.unseenItems'] = nextUnseen;
 
-    // Only set history if not already present
-    if (!user.wardrobe?.inventoryHistory?.[prize.id]) {
-      update.$set[`wardrobe.inventoryHistory.${prize.id}`] = new Date().toISOString();
+    let doubleClaimId: string | undefined;
+    if (!premium) {
+      doubleClaimId = randomUUID();
+      set['giftDoubleClaim'] = {
+        id: doubleClaimId,
+        giftBoxId,
+        doubled: false,
+        createdAt: new Date(),
+      };
     }
 
-    await UserModel.updateOne({ _id: user._id }, update);
+    await UserModel.updateOne({ _id: user._id }, { $inc: inc, $set: set });
 
-    return json({ ok: true, prize });
+    return json({
+      ok: true,
+      prize,
+      bonusPrize: premium ? prizes[1] ?? null : null,
+      doubleClaimId,
+    });
   } catch {
     return json({ error: 'Unauthorized' }, 401);
   }

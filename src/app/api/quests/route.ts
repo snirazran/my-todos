@@ -431,6 +431,7 @@ export async function GET(req: Request) {
         claimableCount,
         activeCount,
         activeFocusCategoryId: dashboard.activeFocusCategoryId,
+        rentedFocus: dashboard.rentedFocus,
         dailyStreak,
         onboarding: {
           complete: !!dashboard.focusProfile.completedAt,

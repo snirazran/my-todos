@@ -63,6 +63,7 @@ const UserSchema = new Schema<UserDoc>(
     plusIntroShownAt: { type: Date, default: null },
     adDoubleClaim: { type: Schema.Types.Mixed, default: undefined },
     adFlyDaily: { type: Schema.Types.Mixed, default: undefined },
+    giftDoubleClaim: { type: Schema.Types.Mixed, default: undefined },
     focusProfile: {
       type: Schema.Types.Mixed,
       default: () => ({

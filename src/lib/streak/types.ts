@@ -19,6 +19,14 @@ export type LoginStreakNotifState = {
   freezePushSentForDayKey: string;
 };
 
+export type LoginStreakRescue = {
+  id: string;
+  previousCount: number;
+  offeredDayKey: string;
+  adsRequired: number;
+  adsWatched: number;
+};
+
 export type LoginStreakState = {
   count: number;
   lastDayKey: string;
@@ -28,6 +36,8 @@ export type LoginStreakState = {
   goal: LoginStreakGoal | null;
   goalsCompleted: { days: number; dayKey: string }[];
   milestonesReached: number[];
+  rescue: LoginStreakRescue | null;
+  lastRescueDayKey: string;
   notif: LoginStreakNotifState;
 };
 
@@ -71,6 +81,16 @@ export type CheckInResult = {
   previousCount: number;
   view: LoginStreakView | null;
   freezeConsumedDays: string[];
+  milestoneEvents: LoginStreakRewardEvent[];
+  goalEvent: LoginStreakRewardEvent | null;
+  rescue: LoginStreakRescue | null;
+};
+
+export type RescueResult = {
+  granted: boolean;
+  completed: boolean;
+  rescue: LoginStreakRescue | null;
+  view: LoginStreakView | null;
   milestoneEvents: LoginStreakRewardEvent[];
   goalEvent: LoginStreakRewardEvent | null;
 };

@@ -5,9 +5,10 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/components/auth/AuthContext';
 import { useRouter } from 'next/navigation';
-import { X } from 'lucide-react';
+import { Play, X } from 'lucide-react';
 import { ItemDef, byId } from '@/lib/skins/catalog';
 import { cn } from '@/lib/utils';
+import { rewardedAdsAvailable, showRewardedAd } from '@/lib/ads';
 import { RARITY_CONFIG } from './constants';
 import { RotatingRays } from './RotatingRays';
 import { GiftBox } from './GiftBox';
@@ -30,6 +31,12 @@ export default function GiftBoxOpening({
   const [phase, setPhase] = useState<'idle' | 'shaking' | 'revealed'>('idle');
   const [prize, setPrize] = useState<(ItemDef & { kind?: 'item' | 'background'; imageUrl?: string }) | null>(null);
   const [claiming, setClaiming] = useState(false);
+  const [bonusPrize, setBonusPrize] = useState<(ItemDef & { kind?: 'item' | 'background'; imageUrl?: string }) | null>(null);
+  const [doubleClaimId, setDoubleClaimId] = useState<string | null>(null);
+  const [isBonusReveal, setIsBonusReveal] = useState(false);
+  const [revealCount, setRevealCount] = useState(0);
+  const [adBusy, setAdBusy] = useState(false);
+  const [adError, setAdError] = useState<string | null>(null);
   const [loadingText, setLoadingText] = useState(
     () => FUNNY_SENTENCES[Math.floor(Math.random() * FUNNY_SENTENCES.length)],
   );
@@ -84,6 +91,9 @@ export default function GiftBoxOpening({
 
       if (data.prize) {
         setPrize(data.prize);
+        setBonusPrize(data.bonusPrize ?? null);
+        setDoubleClaimId(data.doubleClaimId ?? null);
+        setRevealCount(1);
         if (onWin) onWin(data.prize); // Notify parent immediately or on claim?
         setPhase('revealed');
       } else {
@@ -102,9 +112,61 @@ export default function GiftBoxOpening({
       setShowGuestPrompt(true);
       return;
     }
+    // Premium bonus: reveal the second roll before closing.
+    if (bonusPrize) {
+      const next = bonusPrize;
+      setBonusPrize(null);
+      setIsBonusReveal(true);
+      setRevealCount((c) => c + 1);
+      setPrize(next);
+      if (onWin) onWin(next);
+      return;
+    }
     // Prize is already in inventory from the open-gift API call
     // Just close the modal
     onClose();
+  };
+
+  const handleDouble = async () => {
+    if (adBusy || !doubleClaimId) return;
+    setAdBusy(true);
+    setAdError(null);
+    try {
+      const adResult = await showRewardedAd();
+      if (adResult !== 'rewarded') {
+        if (adResult === 'failed') {
+          setAdError('Ad not available right now — try again in a moment.');
+        }
+        return;
+      }
+      const claimId = doubleClaimId;
+      setDoubleClaimId(null);
+      setPhase('shaking');
+      const animationPromise = new Promise((resolve) =>
+        setTimeout(resolve, 1500),
+      );
+      const apiPromise = fetch('/api/skins/open-gift/double', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ claimId }),
+      }).then((res) => res.json());
+      const [, data] = await Promise.all([animationPromise, apiPromise]);
+      if (data.granted && data.prize) {
+        setIsBonusReveal(true);
+        setRevealCount((c) => c + 1);
+        setPrize(data.prize);
+        if (onWin) onWin(data.prize);
+      } else {
+        setAdError('Could not open another gift — it was already claimed.');
+      }
+      setPhase('revealed');
+    } catch (err) {
+      console.error(err);
+      setPhase('revealed');
+      setAdError('Could not open another gift — try again.');
+    } finally {
+      setAdBusy(false);
+    }
   };
 
   const giftDef = byId[giftBoxId];
@@ -173,13 +235,53 @@ export default function GiftBoxOpening({
 
           {/* --- REVEAL PHASE --- */}
           {phase === 'revealed' && prize && (
-            <RewardCard
-              key="card"
-              prize={prize}
-              claiming={claiming}
-              onClaim={handleClaim}
-              paused={paused}
-            />
+            <motion.div
+              key={`card-${revealCount}`}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex w-full flex-col items-center"
+            >
+              {isBonusReveal && (
+                <motion.span
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.4 }}
+                  className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-amber-400 px-3.5 py-1.5 text-[11px] font-black uppercase tracking-wide text-slate-900 shadow-[0_3px_0_rgba(15,23,42,0.3)]"
+                >
+                  🎁 Bonus gift!
+                </motion.span>
+              )}
+              <RewardCard
+                prize={prize}
+                claiming={claiming}
+                onClaim={handleClaim}
+                paused={paused}
+              />
+              {user && doubleClaimId && rewardedAdsAvailable() && (
+                <motion.div
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.9 }}
+                  className="mt-4 flex w-full max-w-xs flex-col items-center gap-1.5"
+                >
+                  <button
+                    type="button"
+                    onClick={handleDouble}
+                    disabled={adBusy}
+                    className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-amber-400 text-[13px] font-black uppercase tracking-wide text-slate-900 shadow-[0_4px_0_0_#b45309] transition-all active:translate-y-1 active:shadow-none disabled:opacity-60"
+                  >
+                    <Play className="h-4 w-4 fill-current" />
+                    {adBusy ? 'Loading ad…' : 'Watch an ad · open another'}
+                  </button>
+                  {adError && (
+                    <p className="text-center text-xs font-bold text-red-300">
+                      {adError}
+                    </p>
+                  )}
+                </motion.div>
+              )}
+            </motion.div>
           )}
         </AnimatePresence>
       </div>

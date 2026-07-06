@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import connectMongo from '@/lib/mongoose';
 import UserModel from '@/lib/models/User';
 import LoginStreakConfigModel, {
@@ -14,15 +15,51 @@ import { getZonedToday } from '@/lib/utils';
 import type { QuestReward } from '@/lib/quests/types';
 import type {
   CheckInResult,
+  LoginStreakGoal,
+  LoginStreakRescue,
   LoginStreakReward,
   LoginStreakRewardEvent,
   LoginStreakRewardSummary,
   LoginStreakState,
   LoginStreakView,
+  RescueResult,
 } from './types';
 
 const FREEZE_HISTORY_LIMIT = 14;
 export const SAVER_MUTE_THRESHOLD = 7;
+export const RESCUE_MIN_STREAK = 3;
+export const RESCUE_COOLDOWN_DAYS = 7;
+
+export function rescueAdsRequired(previousCount: number): number {
+  if (previousCount >= 30) return 3;
+  if (previousCount >= 7) return 2;
+  return 1;
+}
+
+function dayKeyDiff(fromKey: string, toKey: string): number {
+  return Math.round(
+    (Date.parse(`${toKey}T00:00:00Z`) - Date.parse(`${fromKey}T00:00:00Z`)) /
+      86400000,
+  );
+}
+
+function readRescue(raw: any): LoginStreakRescue | null {
+  if (
+    !raw ||
+    typeof raw.id !== 'string' ||
+    typeof raw.previousCount !== 'number' ||
+    typeof raw.offeredDayKey !== 'string'
+  ) {
+    return null;
+  }
+  return {
+    id: raw.id,
+    previousCount: Math.max(0, Math.floor(raw.previousCount)),
+    offeredDayKey: raw.offeredDayKey,
+    adsRequired: Math.max(0, Math.floor(raw.adsRequired ?? 0)),
+    adsWatched: Math.max(0, Math.floor(raw.adsWatched ?? 0)),
+  };
+}
 
 export async function loadLoginStreakConfig(): Promise<LoginStreakConfigDoc> {
   const doc = await LoginStreakConfigModel.findOne({
@@ -78,6 +115,9 @@ export function readLoginStreakState(user: any): LoginStreakState {
     milestonesReached: Array.isArray(raw?.milestonesReached)
       ? raw.milestonesReached.filter((d: unknown) => typeof d === 'number')
       : [],
+    rescue: readRescue(raw?.rescue),
+    lastRescueDayKey:
+      typeof raw?.lastRescueDayKey === 'string' ? raw.lastRescueDayKey : '',
     notif: {
       lastSaverSentDayKey:
         typeof raw?.notif?.lastSaverSentDayKey === 'string'
@@ -262,6 +302,57 @@ function grantQuestRewards(
   return summary;
 }
 
+function applyStreakRewardGrants(args: {
+  user: any;
+  next: LoginStreakState;
+  config: LoginStreakConfigDoc;
+  todayKey: string;
+  newMilestones: LoginStreakConfigDoc['milestones'];
+  goalCompleted: LoginStreakGoal | null;
+}): {
+  milestoneEvents: LoginStreakRewardEvent[];
+  goalEvent: LoginStreakRewardEvent | null;
+} {
+  const { user, next, config, todayKey, newMilestones, goalCompleted } = args;
+  const multiplier = isPremiumUser(user.toObject()) ? 2 : 1;
+  let grantedFreezes = 0;
+  const milestoneEvents: LoginStreakRewardEvent[] = [];
+  let goalEvent: LoginStreakRewardEvent | null = null;
+
+  for (const milestone of newMilestones) {
+    const { questRewards, freezes } = splitRewards(milestone.rewards ?? []);
+    const summary = grantQuestRewards(user, questRewards, multiplier);
+    grantedFreezes += freezes;
+    summary.freezesGranted = freezes;
+    next.milestonesReached = [...next.milestonesReached, milestone.days];
+    milestoneEvents.push({ days: milestone.days, rewardSummary: summary });
+  }
+
+  if (goalCompleted) {
+    const tier = config.goalTiers.find((t) => t.days === goalCompleted.days);
+    const { questRewards, freezes } = splitRewards(tier?.rewards ?? []);
+    const summary = grantQuestRewards(user, questRewards, multiplier);
+    grantedFreezes += freezes;
+    summary.freezesGranted = freezes;
+    next.goalsCompleted = [
+      ...next.goalsCompleted,
+      { days: goalCompleted.days, dayKey: todayKey },
+    ];
+    next.goal = null;
+    goalEvent = { days: goalCompleted.days, rewardSummary: summary };
+  }
+
+  next.freezes = Math.min(config.freezeCap, next.freezes + grantedFreezes);
+  return { milestoneEvents, goalEvent };
+}
+
+function activeRescueForDay(
+  rescue: LoginStreakRescue | null,
+  todayKey: string,
+): LoginStreakRescue | null {
+  return rescue && rescue.offeredDayKey === todayKey ? rescue : null;
+}
+
 export async function performCheckIn(args: {
   userId: string;
   timezone: string;
@@ -287,6 +378,7 @@ export async function performCheckIn(args: {
       freezeConsumedDays: [],
       milestoneEvents: [],
       goalEvent: null,
+      rescue: null,
     };
   }
 
@@ -299,6 +391,7 @@ export async function performCheckIn(args: {
       freezeConsumedDays: [],
       milestoneEvents: [],
       goalEvent: null,
+      rescue: activeRescueForDay(state.rescue, todayKey),
     };
   }
 
@@ -314,8 +407,27 @@ export async function performCheckIn(args: {
     count: newCount,
     lastDayKey: todayKey,
     longestStreak: Math.max(freshState.longestStreak, newCount),
+    rescue: activeRescueForDay(freshState.rescue, todayKey),
     notif: { ...freshState.notif, saverIgnoredCount: 0 },
   };
+
+  const rescueEligible =
+    newCount === 1 &&
+    previousCount >= RESCUE_MIN_STREAK &&
+    computeGap(freshState.lastDayKey, todayKey) === 1 &&
+    (!freshState.lastRescueDayKey ||
+      dayKeyDiff(freshState.lastRescueDayKey, todayKey) >= RESCUE_COOLDOWN_DAYS);
+  if (rescueEligible) {
+    next.rescue = {
+      id: randomUUID(),
+      previousCount,
+      offeredDayKey: todayKey,
+      adsRequired: isPremiumUser(user.toObject())
+        ? 0
+        : rescueAdsRequired(previousCount),
+      adsWatched: 0,
+    };
+  }
 
   const newMilestones = config.milestones.filter(
     (m) => newCount >= m.days && !next.milestonesReached.includes(m.days),
@@ -325,37 +437,20 @@ export async function performCheckIn(args: {
       ? next.goal
       : null;
 
-  const milestoneEvents: LoginStreakRewardEvent[] = [];
+  let milestoneEvents: LoginStreakRewardEvent[] = [];
   let goalEvent: LoginStreakRewardEvent | null = null;
 
   if (newMilestones.length > 0 || goalCompleted) {
-    const multiplier = isPremiumUser(user.toObject()) ? 2 : 1;
-    let grantedFreezes = 0;
-
-    for (const milestone of newMilestones) {
-      const { questRewards, freezes } = splitRewards(milestone.rewards ?? []);
-      const summary = grantQuestRewards(user, questRewards, multiplier);
-      grantedFreezes += freezes;
-      summary.freezesGranted = freezes;
-      next.milestonesReached = [...next.milestonesReached, milestone.days];
-      milestoneEvents.push({ days: milestone.days, rewardSummary: summary });
-    }
-
-    if (goalCompleted) {
-      const tier = config.goalTiers.find((t) => t.days === goalCompleted.days);
-      const { questRewards, freezes } = splitRewards(tier?.rewards ?? []);
-      const summary = grantQuestRewards(user, questRewards, multiplier);
-      grantedFreezes += freezes;
-      summary.freezesGranted = freezes;
-      next.goalsCompleted = [
-        ...next.goalsCompleted,
-        { days: goalCompleted.days, dayKey: todayKey },
-      ];
-      next.goal = null;
-      goalEvent = { days: goalCompleted.days, rewardSummary: summary };
-    }
-
-    next.freezes = Math.min(config.freezeCap, next.freezes + grantedFreezes);
+    const granted = applyStreakRewardGrants({
+      user,
+      next,
+      config,
+      todayKey,
+      newMilestones,
+      goalCompleted,
+    });
+    milestoneEvents = granted.milestoneEvents;
+    goalEvent = granted.goalEvent;
 
     const currentQuests =
       typeof (user as any).quests === 'object' && (user as any).quests
@@ -387,6 +482,7 @@ export async function performCheckIn(args: {
         freezeConsumedDays: [],
         milestoneEvents: [],
         goalEvent: null,
+        rescue: activeRescueForDay(currentState.rescue, todayKey),
       };
     }
   }
@@ -397,6 +493,109 @@ export async function performCheckIn(args: {
     previousCount,
     view: buildLoginStreakView(next, config, todayKey),
     freezeConsumedDays: coverage?.consumed ?? [],
+    milestoneEvents,
+    goalEvent,
+    rescue: next.rescue,
+  };
+}
+
+export async function performRescue(args: {
+  userId: string;
+  timezone: string;
+  rescueId: string;
+}): Promise<RescueResult> {
+  const { userId, timezone, rescueId } = args;
+  await connectMongo();
+
+  const [user, config] = await Promise.all([
+    UserModel.findById(userId),
+    loadLoginStreakConfig(),
+  ]);
+  if (!user) throw new Error('User not found');
+
+  const todayKey = getZonedToday(timezone);
+  const state = readLoginStreakState(user.toObject());
+  const rescue = state.rescue;
+
+  if (
+    !config.isActive ||
+    !rescue ||
+    rescue.id !== rescueId ||
+    rescue.offeredDayKey !== todayKey ||
+    state.lastDayKey !== todayKey
+  ) {
+    return {
+      granted: false,
+      completed: false,
+      rescue: null,
+      view: config.isActive
+        ? buildLoginStreakView(state, config, todayKey)
+        : null,
+      milestoneEvents: [],
+      goalEvent: null,
+    };
+  }
+
+  const adsWatched = rescue.adsWatched + 1;
+  if (adsWatched < rescue.adsRequired) {
+    const updated: LoginStreakRescue = { ...rescue, adsWatched };
+    await UserModel.updateOne(
+      { _id: userId, 'quests.loginStreak.rescue.id': rescue.id },
+      { $set: { 'quests.loginStreak.rescue': updated } },
+    );
+    return {
+      granted: true,
+      completed: false,
+      rescue: updated,
+      view: buildLoginStreakView(
+        { ...state, rescue: updated },
+        config,
+        todayKey,
+      ),
+      milestoneEvents: [],
+      goalEvent: null,
+    };
+  }
+
+  const newCount = rescue.previousCount + 1;
+  const next: LoginStreakState = {
+    ...state,
+    count: newCount,
+    longestStreak: Math.max(state.longestStreak, newCount),
+    rescue: null,
+    lastRescueDayKey: todayKey,
+  };
+
+  const newMilestones = config.milestones.filter(
+    (m) => newCount >= m.days && !next.milestonesReached.includes(m.days),
+  );
+  const goalCompleted =
+    next.goal && newCount - next.goal.startCount >= next.goal.days
+      ? next.goal
+      : null;
+  const { milestoneEvents, goalEvent } = applyStreakRewardGrants({
+    user,
+    next,
+    config,
+    todayKey,
+    newMilestones,
+    goalCompleted,
+  });
+
+  const currentQuests =
+    typeof (user as any).quests === 'object' && (user as any).quests
+      ? (user as any).quests
+      : {};
+  (user as any).quests = { ...currentQuests, loginStreak: next };
+  user.markModified('quests');
+  user.markModified('wardrobe');
+  await user.save();
+
+  return {
+    granted: true,
+    completed: true,
+    rescue: null,
+    view: buildLoginStreakView(next, config, todayKey),
     milestoneEvents,
     goalEvent,
   };

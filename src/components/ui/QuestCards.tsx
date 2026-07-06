@@ -13,6 +13,7 @@ import {
   Lock,
   Pause,
   Pencil,
+  Play,
   Plus,
   Repeat,
   Sprout,
@@ -36,6 +37,7 @@ import Frog from './frog';
 import { GiftRive } from './gift-box/GiftBox';
 import { ItemCard } from './skins/ItemCard';
 import { BaseSheet } from '@/components/ui/BaseSheet';
+import { rewardedAdsAvailable, showRewardedAd } from '@/lib/ads';
 
 export type QuestRewardCatalogItem = Pick<
   ItemDef,
@@ -874,6 +876,9 @@ export function CategoryQuestPresentationCard({
   activeFocusName,
   onActivateFocus,
   onUpgrade,
+  canRent = false,
+  rentedUntil,
+  onRented,
   paused = false,
 }: BaseCardProps & {
   quest: QuestCardData & {
@@ -888,9 +893,13 @@ export function CategoryQuestPresentationCard({
   activeFocusName?: string;
   onActivateFocus?: () => void;
   onUpgrade?: () => void;
+  canRent?: boolean;
+  rentedUntil?: string | null;
+  onRented?: () => void;
 }) {
   const heroImageUrl = category?.coverImageUrl ?? quest.coverImageUrl;
   const timeLeft = useCountdownLabel(quest.expiresAt);
+  const rentedTimeLeft = useCountdownLabel(rentedUntil ?? undefined);
   const [rewardPopup, setRewardPopup] = useState<RewardPopupState | null>(null);
   const [showSwitch, setShowSwitch] = useState(false);
   const [showAllObjectives, setShowAllObjectives] = useState(false);
@@ -1016,6 +1025,12 @@ export function CategoryQuestPresentationCard({
               {category?.shortLabel || category?.name || 'Focus'}
             </span>
           </span>
+          {rentedTimeLeft && !isCompleted ? (
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-400 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-slate-900 shadow-[0_2px_0_rgba(15,23,42,0.25)]">
+              <Play className="h-3 w-3 fill-current" />
+              Unlocked · {rentedTimeLeft}
+            </span>
+          ) : null}
           {timeLeft && !isCompleted ? (
             <span
               className="inline-flex shrink-0 items-center gap-1.5 text-[15px] uppercase leading-none tracking-wide text-white drop-shadow-[0_2px_0_rgba(15,23,42,0.85)]"
@@ -1226,11 +1241,14 @@ export function CategoryQuestPresentationCard({
       />
       <SwitchFocusConfirm
         open={showSwitch}
+        categoryId={quest.categoryId}
         categoryName={category?.shortLabel || category?.name}
         currentFocusName={activeFocusName}
         switching={switchingFocus}
         onConfirm={() => onActivateFocus?.()}
         onUpgrade={onUpgrade}
+        canRent={canRent}
+        onRented={onRented}
         onClose={() => setShowSwitch(false)}
       />
     </div>
@@ -1239,21 +1257,77 @@ export function CategoryQuestPresentationCard({
 
 export function SwitchFocusConfirm({
   open,
+  categoryId,
   categoryName,
   currentFocusName,
   switching = false,
   onConfirm,
   onUpgrade,
+  canRent = false,
+  onRented,
   onClose,
 }: {
   open: boolean;
+  categoryId?: string;
   categoryName?: string;
   currentFocusName?: string;
   switching?: boolean;
   onConfirm: () => void;
   onUpgrade?: () => void;
+  canRent?: boolean;
+  onRented?: () => void;
   onClose: () => void;
 }) {
+  const RENT_ADS = 2;
+  const [rentBusy, setRentBusy] = useState(false);
+  const [rentWatched, setRentWatched] = useState(0);
+  const [rentError, setRentError] = useState<string | null>(null);
+  const rentAvailable = canRent && !!categoryId && rewardedAdsAvailable();
+
+  useEffect(() => {
+    if (!open) {
+      setRentBusy(false);
+      setRentWatched(0);
+      setRentError(null);
+    }
+  }, [open]);
+
+  const handleRent = async () => {
+    if (rentBusy || !categoryId) return;
+    setRentBusy(true);
+    setRentError(null);
+    try {
+      const adResult = await showRewardedAd();
+      if (adResult !== 'rewarded') {
+        if (adResult === 'failed') {
+          setRentError('Ad not available right now — try again in a moment.');
+        }
+        return;
+      }
+      const res = await fetch('/api/quests/rent-slot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ categoryId }),
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok || !payload.granted) {
+        setRentError(payload.error ?? 'Could not unlock — try again.');
+        return;
+      }
+      setRentWatched(payload.adsWatched ?? rentWatched + 1);
+      if (payload.unlocked) {
+        try {
+          navigator.vibrate?.(28);
+        } catch {}
+        onRented?.();
+        onClose();
+      }
+    } finally {
+      setRentBusy(false);
+    }
+  };
+
   return (
     <BaseSheet
       open={open}
@@ -1292,6 +1366,31 @@ export function SwitchFocusConfirm({
                 >
                   {switching ? 'Switching...' : 'Switch quest'}
                 </button>
+                {rentAvailable && (
+                  <div className="flex flex-col gap-1.5">
+                    <button
+                      type="button"
+                      onClick={handleRent}
+                      disabled={rentBusy}
+                      className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-amber-400 text-[14px] font-black uppercase tracking-wide text-slate-900 shadow-[0_3px_0_0_#b45309] transition-all active:translate-y-0.5 active:shadow-none disabled:opacity-60"
+                    >
+                      <Play className="h-4 w-4 fill-current" />
+                      {rentBusy
+                        ? 'Loading ad…'
+                        : rentWatched > 0
+                          ? `Watch 1 more ad (${rentWatched}/${RENT_ADS})`
+                          : `Run both for 24h · watch ${RENT_ADS} ads`}
+                    </button>
+                    <p className="text-center text-[12px] font-medium text-muted-foreground">
+                      Keep your current quest and unlock this one too.
+                    </p>
+                    {rentError && (
+                      <p className="text-center text-[12px] font-bold text-red-500">
+                        {rentError}
+                      </p>
+                    )}
+                  </div>
+                )}
                 {onUpgrade && (
                   <div className="flex flex-col gap-2">
                   <button

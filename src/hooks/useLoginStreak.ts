@@ -1,9 +1,18 @@
 'use client';
 
 import useSWR, { mutate as mutateGlobal } from 'swr';
-import type { CheckInResult, LoginStreakView } from '@/lib/streak/types';
+import type {
+  CheckInResult,
+  LoginStreakRescue,
+  LoginStreakView,
+  RescueResult,
+} from '@/lib/streak/types';
 
-type StreakResponse = { active: boolean; view: LoginStreakView | null };
+type StreakResponse = {
+  active: boolean;
+  view: LoginStreakView | null;
+  rescue?: LoginStreakRescue | null;
+};
 
 function clientTimezone() {
   return Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -54,8 +63,28 @@ export async function checkInStreak(): Promise<CheckInResult | null> {
   }
 }
 
+export async function rescueStreak(
+  rescueId: string,
+): Promise<RescueResult | null> {
+  try {
+    const res = await fetch('/api/streak/rescue', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ rescueId, timezone: clientTimezone() }),
+    });
+    if (!res.ok) return null;
+    const result = (await res.json()) as RescueResult;
+    if (result.completed && result.view) patchStreakView(result.view);
+    return result;
+  } catch {
+    return null;
+  }
+}
+
 export type StreakSheetRequest = {
   celebration?: CheckInResult | null;
+  rescue?: LoginStreakRescue | null;
 };
 
 let sheetListener: ((req: StreakSheetRequest) => void) | null = null;

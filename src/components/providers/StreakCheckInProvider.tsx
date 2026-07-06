@@ -15,7 +15,9 @@ import {
   type StreakSheetRequest,
 } from '@/hooks/useLoginStreak';
 import { StreakSheet } from '@/components/ui/streak/StreakSheet';
-import type { CheckInResult } from '@/lib/streak/types';
+import { StreakRescueSheet } from '@/components/ui/streak/StreakRescueSheet';
+import { rewardedAdsAvailable } from '@/lib/ads';
+import type { CheckInResult, LoginStreakRescue } from '@/lib/streak/types';
 
 // Keyed per user so a fresh account created in the same session (after another
 // account already checked in today) still gets its own check-in.
@@ -57,7 +59,13 @@ export function StreakCheckInProvider() {
           </span>,
         );
       }
-      if (result.extended) {
+      if (
+        result.rescue &&
+        result.rescue.adsWatched < Math.max(1, result.rescue.adsRequired) &&
+        (result.rescue.adsRequired === 0 || rewardedAdsAvailable())
+      ) {
+        openStreakSheet({ rescue: result.rescue });
+      } else if (result.extended) {
         openStreakSheet({ celebration: result });
       }
     };
@@ -85,22 +93,39 @@ export function StreakCheckInProvider() {
 function StreakSheetHost() {
   const [open, setOpen] = useState(false);
   const [celebration, setCelebration] = useState<CheckInResult | null>(null);
+  const [rescueOpen, setRescueOpen] = useState(false);
+  const [rescue, setRescue] = useState<LoginStreakRescue | null>(null);
 
   useEffect(() => {
     return subscribeStreakSheet((req: StreakSheetRequest) => {
+      if (req.rescue) {
+        setRescue(req.rescue);
+        setRescueOpen(true);
+        return;
+      }
       setCelebration(req.celebration ?? null);
       setOpen(true);
     });
   }, []);
 
   return (
-    <StreakSheet
-      open={open}
-      onOpenChange={(v) => {
-        setOpen(v);
-        if (!v) setCelebration(null);
-      }}
-      celebration={celebration}
-    />
+    <>
+      <StreakSheet
+        open={open}
+        onOpenChange={(v) => {
+          setOpen(v);
+          if (!v) setCelebration(null);
+        }}
+        celebration={celebration}
+      />
+      <StreakRescueSheet
+        open={rescueOpen}
+        onOpenChange={(v) => {
+          setRescueOpen(v);
+          if (!v) setRescue(null);
+        }}
+        offer={rescue}
+      />
+    </>
   );
 }

@@ -52,6 +52,10 @@ type QuestsResponse = {
   todoCount?: number;
   tags?: Array<{ id: string; name: string; color: string; key?: string }>;
   activeFocusCategoryId?: MacroCategoryId | null;
+  rentedFocus?: {
+    categoryId: MacroCategoryId;
+    expiresAt: string | null;
+  } | null;
   dailyStreak?: DailyStreakInfo | null;
   onboarding: {
     complete: boolean;
@@ -946,6 +950,13 @@ export function QuestsPanel({
                                 handleSetActiveFocus(quest.categoryId)
                               }
                               onUpgrade={() => setPlusOpen(true)}
+                              canRent={!data.isPremium && !data.rentedFocus}
+                              rentedUntil={
+                                data.rentedFocus?.categoryId === quest.categoryId
+                                  ? data.rentedFocus?.expiresAt ?? null
+                                  : null
+                              }
+                              onRented={() => mutateQuests()}
                               paused={false}
                             />
                             </div>

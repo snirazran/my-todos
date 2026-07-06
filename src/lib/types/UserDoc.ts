@@ -102,6 +102,12 @@ export type UserDoc = {
     date: string;
     count: number;
   };
+  giftDoubleClaim?: {
+    id: string;
+    giftBoxId: string;
+    doubled: boolean;
+    createdAt: Date;
+  };
   focusProfile?: FocusProfile;
   quests?: unknown;
   dailyRewards?: DailyRewardProgress;

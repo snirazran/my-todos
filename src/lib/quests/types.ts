@@ -90,6 +90,13 @@ export type FocusProfile = {
   // Free users may only actively progress one focus quest at a time; this is
   // the category they've chosen. Ignored for premium (all focuses are active).
   activeFocusCategoryId?: MacroCategoryId | null;
+  // Ad-rented second focus slot. adsWatched tracks progress toward unlock;
+  // expiresAt is set once the required ads are watched (24h rental).
+  rentedFocus?: {
+    categoryId: MacroCategoryId;
+    adsWatched: number;
+    expiresAt: Date | string | null;
+  } | null;
 };
 
 export type QuestProgressView = {

@@ -323,7 +323,7 @@ function Step0({
           <FeatureRow
             icon={<span className="text-sm font-black text-amber-300">×2</span>}
             title="Earn outfits twice as fast"
-            subtitle="Double rewards on every task and quest."
+            subtitle="Double rewards on every task and quest — every gift opens twice."
           />
         </Reveal>
         <Reveal delay={0.24}>
@@ -390,6 +390,8 @@ const COMPARISON_ROWS: { label: string; free: boolean }[] = [
   { label: 'All quests in parallel', free: false },
   { label: 'Unlimited tags', free: false },
   { label: 'Double rewards', free: false },
+  { label: 'Every gift opens twice', free: false },
+  { label: 'Weekly streak rescue', free: false },
   { label: 'Daily outfit deals', free: false },
   { label: 'Season plus rewards', free: false },
 ];
@@ -397,7 +399,7 @@ const COMPARISON_ROWS: { label: string; free: boolean }[] = [
 
 function Step1({ onContinue }: { onContinue: () => void }) {
   return (
-    <div className="flex min-h-full flex-col px-6 pb-6 pt-16 md:pb-5 md:pt-12">
+    <div className="flex min-h-full flex-col px-6 pb-6 pt-[calc(4rem+env(safe-area-inset-top))] md:pb-5 md:pt-12">
       <Reveal>
         <h2 className="text-center text-2xl font-black tracking-tight">
           Everything you unlock with Plus
@@ -477,7 +479,7 @@ function Step2({
   );
   const reduceMotion = useReducedMotion();
   return (
-    <div className="flex min-h-full flex-col px-6 pb-6 pt-16 md:pb-5 md:pt-12">
+    <div className="flex min-h-full flex-col px-6 pb-6 pt-[calc(4rem+env(safe-area-inset-top))] md:pb-5 md:pt-12">
       <Reveal>
         <h2 className="text-center text-2xl font-black tracking-tight">
           We&apos;ll remind you <span className="text-amber-300">2 days</span> before your
@@ -525,7 +527,7 @@ function Step3({
   const reduceMotion = useReducedMotion();
   const isNative = Capacitor.isNativePlatform();
   return (
-    <div className="flex min-h-full flex-col px-6 pb-6 pt-16 md:pb-5 md:pt-12">
+    <div className="flex min-h-full flex-col px-6 pb-6 pt-[calc(4rem+env(safe-area-inset-top))] md:pb-5 md:pt-12">
       <Reveal>
         <h2 className="text-2xl font-black tracking-tight">
           Choose a plan for after your free trial

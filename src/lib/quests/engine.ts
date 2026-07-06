@@ -97,7 +97,40 @@ export function normalizeFocusProfile(user: UserDoc): FocusProfile {
       user.focusProfile?.suggestedContentCreatedAt ?? null,
     unlockedAnimationIds: user.focusProfile?.unlockedAnimationIds ?? [],
     activeFocusCategoryId: user.focusProfile?.activeFocusCategoryId ?? null,
+    rentedFocus: user.focusProfile?.rentedFocus ?? null,
   };
+}
+
+export const RENT_SLOT_ADS_REQUIRED = 2;
+export const RENT_SLOT_DURATION_MS = 24 * 60 * 60 * 1000;
+
+export function activeRentedFocusCategoryId(
+  profile: FocusProfile,
+  now: Date = new Date(),
+): string | null {
+  const rented = profile.rentedFocus;
+  if (!rented?.categoryId || !rented.expiresAt) return null;
+  if (new Date(rented.expiresAt) <= now) return null;
+  if (!(profile.selectedCategoryIds ?? []).includes(rented.categoryId)) {
+    return null;
+  }
+  return rented.categoryId;
+}
+
+// The set of focus categories a user may progress right now; null means all
+// (premium). Free users get their active focus plus an unexpired rental.
+export function resolveUnlockedFocusCategoryIds(
+  profile: FocusProfile,
+  isPremium: boolean,
+  now: Date = new Date(),
+): string[] | null {
+  if (isPremium) return null;
+  const ids: string[] = [];
+  const active = resolveActiveFocusCategoryId(profile, false);
+  if (active) ids.push(active);
+  const rented = activeRentedFocusCategoryId(profile, now);
+  if (rented && rented !== active) ids.push(rented);
+  return ids;
 }
 
 // The single focus category a free user is actively progressing. Premium users
@@ -685,11 +718,15 @@ async function syncQuestForTemplate(args: {
         )
       : template.logic;
 
+  const unlockedFocusIds = resolveUnlockedFocusCategoryIds(
+    profile,
+    isPremiumUser(user),
+  );
   const lockedForFreeUser =
     template.placement === 'category' &&
-    !isPremiumUser(user) &&
-    !!resolveActiveFocusCategoryId(profile, false) &&
-    template.categoryId !== resolveActiveFocusCategoryId(profile, false);
+    unlockedFocusIds !== null &&
+    unlockedFocusIds.length > 0 &&
+    !unlockedFocusIds.includes(template.categoryId ?? '');
   const prevBlocksById = new Map(
     (doc.logic ?? []).map((block) => [block.id, block]),
   );
@@ -1279,13 +1316,17 @@ export async function syncQuestState(args: {
   const premium = isPremiumUser(user);
   const rewardBackgrounds = includeCatalog ? await loadBackgroundPrizes() : [];
   const activeFocusCategoryId = resolveActiveFocusCategoryId(profile, premium);
+  const unlockedFocusIds = resolveUnlockedFocusCategoryIds(profile, premium);
+  const rentedFocusCategoryId = premium
+    ? null
+    : activeRentedFocusCategoryId(profile);
   const gatedCategoryQuests: CategoryQuestProgressView[] = categoryQuests.map(
     (quest) => ({
       ...quest,
       locked:
-        !premium &&
-        !!activeFocusCategoryId &&
-        quest.categoryId !== activeFocusCategoryId,
+        unlockedFocusIds !== null &&
+        unlockedFocusIds.length > 0 &&
+        !unlockedFocusIds.includes(quest.categoryId),
     }),
   );
 
@@ -1296,6 +1337,12 @@ export async function syncQuestState(args: {
     isPremium: premium,
     focusProfile: profile,
     activeFocusCategoryId,
+    rentedFocus: rentedFocusCategoryId
+      ? {
+          categoryId: rentedFocusCategoryId,
+          expiresAt: profile.rentedFocus?.expiresAt ?? null,
+        }
+      : null,
     macroCategories: categories.map(categoryDocToDefinition),
     templatesWithCover,
     dailyQuests,
@@ -1607,14 +1654,18 @@ export async function claimObjectiveReward(args: {
   if (!user) throw new Error('User not found');
   if (!quest) throw new Error('Quest not found');
 
-  // Free users can only claim from their active focus quest.
+  // Free users can only claim from their active focus quest (or a rental).
   if (quest.placement === 'category') {
     const premium = isPremiumUser(user.toObject());
-    const activeId = resolveActiveFocusCategoryId(
+    const unlockedIds = resolveUnlockedFocusCategoryIds(
       normalizeFocusProfile(user.toObject()),
       premium,
     );
-    if (!premium && activeId && quest.categoryId !== activeId) {
+    if (
+      unlockedIds !== null &&
+      unlockedIds.length > 0 &&
+      !unlockedIds.includes(quest.categoryId ?? '')
+    ) {
       throw new Error(
         'This focus quest is locked. Switch your active focus or upgrade to Premium.',
       );
