@@ -315,7 +315,7 @@ function Step0({
         <Reveal delay={0.12}>
           <FeatureRow
             icon={<Unlock className="h-5 w-5 text-amber-300" />}
-            title="Progress on every goal at once"
+            title="Progress on every quest at once"
             subtitle="All quests run together, with unlimited tags."
           />
         </Reveal>
@@ -329,14 +329,14 @@ function Step0({
         <Reveal delay={0.24}>
           <FeatureRow
             icon={<BadgePercent className="h-5 w-5 text-amber-300" />}
-            title="An outfit deal every day"
-            subtitle="A fresh member discount in the shop, daily."
+            title="Daily Plus only discounts"
+            subtitle="Fresh discounts in the shop, daily."
           />
         </Reveal>
         <Reveal delay={0.3}>
           <FeatureRow
             icon={<Sparkle className="h-5 w-5 text-amber-300" />}
-            title="Season rewards, unlocked"
+            title="Season Plus rewards"
             subtitle="The Plus track opens — earn it as you play."
           />
         </Reveal>
