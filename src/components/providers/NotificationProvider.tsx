@@ -11,6 +11,7 @@ import React, {
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { X, CalendarCheck, FolderOpen, CopyPlus } from 'lucide-react';
+import { useSheetStore } from '@/lib/sheetStore';
 
 interface NotificationItem {
   id: number;
@@ -70,6 +71,8 @@ export function NotificationProvider({
   const [undoingId, setUndoingId] = useState<number | null>(null);
   const [stackHeight, setStackHeight] = useState(0);
   const [mounted, setMounted] = useState(false);
+  const openSheets = useSheetStore((s) => s.count);
+  const stackSuppressed = openSheets > 0;
   useEffect(() => setMounted(true), []);
 
   const frontTimerRef = useRef<{
@@ -219,9 +222,9 @@ export function NotificationProvider({
       value={{
         showNotification,
         hideNotification,
-        isVisible: notifications.length > 0,
-        count: notifications.length,
-        stackHeight,
+        isVisible: !stackSuppressed && notifications.length > 0,
+        count: stackSuppressed ? 0 : notifications.length,
+        stackHeight: stackSuppressed ? 0 : stackHeight,
       }}
     >
       {children}
@@ -232,7 +235,7 @@ export function NotificationProvider({
           // regardless of any ancestor stacking context.
           <div
             ref={stackRef}
-            className="fixed left-0 right-0 z-[1300] pointer-events-none flex flex-col gap-2 px-3 md:px-4 bottom-[calc(env(safe-area-inset-bottom)+72px)] md:bottom-[calc(env(safe-area-inset-bottom)+16px)]"
+            className={`fixed left-0 right-0 z-[1300] pointer-events-none flex flex-col gap-2 px-3 md:px-4 bottom-[calc(env(safe-area-inset-bottom)+72px)] md:bottom-[calc(env(safe-area-inset-bottom)+16px)] ${stackSuppressed ? 'hidden' : ''}`}
           >
         {/* Top slot: timer pill portals in here (above all toasts) */}
         <div id="frog-bottom-stack-top" className="contents" />

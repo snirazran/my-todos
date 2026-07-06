@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Pause, Play, SkipForward, Square } from 'lucide-react';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
+import { useUIStore } from '@/lib/uiStore';
 
 /**
  * Compact circular timer for pages that don't host the full Frogodoro UI
@@ -29,6 +30,9 @@ export default function CircularTimer() {
 
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
   const [expanded, setExpanded] = useState(false);
+  const wardrobeDockVisible = useUIStore(
+    (s) => s.isWardrobeStuck && s.wardrobeTab === 'inventory',
+  );
 
   useEffect(() => setPortalTarget(document.body), []);
   // Collapse the controls whenever there's no active session.
@@ -106,18 +110,21 @@ export default function CircularTimer() {
 
   const ctrlBtn =
     'flex h-11 w-11 items-center justify-center rounded-full bg-card text-foreground shadow-lg ring-1 ring-border/60 transition-transform active:scale-90';
+  const dockClass = wardrobeDockVisible
+    ? 'right-5 bottom-[calc(env(safe-area-inset-bottom)+184px)] md:right-[max(calc(1rem+4px),calc((100vw-48rem)/2-72px-0.75rem+4px))] md:bottom-[120px]'
+    : 'right-3 bottom-[calc(env(safe-area-inset-bottom)+96px)]';
 
   return createPortal(
     <>
       {/* Click-outside catcher — closes the expanded controls. */}
       {expanded && (
         <div
-          className="fixed inset-0 z-[1299]"
+          className="fixed inset-0 z-[1309]"
           onClick={() => setExpanded(false)}
           aria-hidden
         />
       )}
-      <div className="fixed right-3 bottom-[calc(env(safe-area-inset-bottom)+96px)] z-[1300] flex flex-col items-center gap-2">
+      <div className={`fixed ${dockClass} z-[1310] flex flex-col items-center gap-2`}>
       <AnimatePresence>
         {expanded && (
           <motion.div

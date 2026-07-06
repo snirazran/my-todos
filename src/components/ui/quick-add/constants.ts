@@ -1,3 +1,12 @@
+export const REMINDER_OFFSET_OPTIONS = [
+  { value: 'at_time', label: 'On time', minutes: 0 },
+  { value: '5m', label: '5 min', minutes: 5 },
+  { value: '10m', label: '10 min', minutes: 10 },
+  { value: '15m', label: '15 min', minutes: 15 },
+  { value: '30m', label: '30 min', minutes: 30 },
+  { value: '1h', label: '1 hour', minutes: 60 },
+] as const;
+
 export const HOURS_12 = Array.from({ length: 12 }, (_, i) => i + 1);
 export const HOURS_24 = Array.from({ length: 24 }, (_, i) => i);
 export const MINUTES_60 = Array.from({ length: 60 }, (_, i) => i);

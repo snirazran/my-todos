@@ -82,7 +82,9 @@ export default function GlobalFrogodoroMini() {
           pill). The completion popup below is global — always rendered and
           top-most — so a finished timer is acknowledged above any open popup or
           settings panel on any page. */}
-      {fullTimerHosts === 0 && !loadingScreenVisible && <CircularTimer />}
+      {fullTimerHosts === 0 && blockingPopups === 0 && !loadingScreenVisible && (
+        <CircularTimer />
+      )}
 
       {mounted &&
         createPortal(

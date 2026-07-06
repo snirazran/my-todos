@@ -47,12 +47,25 @@ function rewardsLabel(rewards: LoginStreakReward[]) {
 
 function WeekStrip({ view, light = false }: { view: LoginStreakView; light?: boolean }) {
   const today = localDayKey();
-  const days = useMemo(
-    () => Array.from({ length: 7 }, (_, i) => addDaysToKey(today, i - 6)),
-    [today],
-  );
-  const runStart =
-    view.count > 0 ? addDaysToKey(view.lastDayKey, -(view.count - 1)) : null;
+  const days = useMemo(() => {
+    const weekStart = addDaysToKey(
+      today,
+      -new Date(`${today}T12:00:00`).getDay(),
+    );
+    return Array.from({ length: 7 }, (_, i) => addDaysToKey(weekStart, i));
+  }, [today]);
+  const runStart = useMemo(() => {
+    if (view.count <= 0 || !view.lastDayKey) return null;
+    const frozen = new Set(view.freezeUsedDayKeys);
+    let cursor = view.lastDayKey;
+    let remaining = view.count;
+    for (let i = view.count + frozen.size; i > 0; i--) {
+      if (!frozen.has(cursor)) remaining -= 1;
+      if (remaining <= 0) break;
+      cursor = addDaysToKey(cursor, -1);
+    }
+    return cursor;
+  }, [view.count, view.lastDayKey, view.freezeUsedDayKeys]);
 
   return (
     <div className="mt-6 grid w-full max-w-sm grid-cols-7 gap-1.5">
@@ -246,16 +259,20 @@ function RevealStep({
         <WeekStrip view={view} light />
       </motion.div>
 
-      <motion.button
-        type="button"
+      <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={popped ? { opacity: 1, y: 0 } : {}}
         transition={{ delay: 0.7 }}
-        onClick={onContinue}
-        className="mt-10 w-full max-w-[280px] rounded-2xl bg-white py-3.5 text-sm font-black uppercase tracking-wide text-amber-700 shadow-[0_5px_0_0_rgba(0,0,0,0.15)] transition-all active:translate-y-1 active:shadow-none"
+        className="mt-10 flex w-full justify-center"
       >
-        Continue
-      </motion.button>
+        <button
+          type="button"
+          onClick={onContinue}
+          className="w-full max-w-[280px] rounded-2xl bg-white py-3.5 text-sm font-black uppercase tracking-wide text-amber-700 shadow-[0_5px_0_0_rgba(0,0,0,0.15)] transition-all active:translate-y-1 active:shadow-none"
+        >
+          Continue
+        </button>
+      </motion.div>
     </div>
   );
 }

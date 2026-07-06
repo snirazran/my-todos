@@ -66,6 +66,7 @@ type Props = {
   setNotifyEnabled: (v: boolean) => void;
   startTime: string;
   setStartTime: (v: string) => void;
+  reminder: string;
   setReminder: (v: string) => void;
   showReminderPicker: boolean;
   setShowReminderPicker: (v: boolean) => void;
@@ -91,7 +92,11 @@ type Props = {
 };
 
 export function PickerSheet(props: Props) {
-  const reminderSnapshotRef = useRef<{ notifyEnabled: boolean; startTime: string } | null>(null);
+  const reminderSnapshotRef = useRef<{
+    notifyEnabled: boolean;
+    startTime: string;
+    reminder: string;
+  } | null>(null);
   const {
     activePicker,
     setActivePicker,
@@ -114,6 +119,7 @@ export function PickerSheet(props: Props) {
     setNotifyEnabled,
     startTime,
     setStartTime,
+    reminder,
     setReminder,
     showReminderPicker,
     setShowReminderPicker,
@@ -171,12 +177,10 @@ export function PickerSheet(props: Props) {
 
   const setReminderTimeParts = (hour24: number, minute: number) => {
     setStartTime(`${pad(hour24)}:${pad(minute)}`);
-    setReminder('at_time');
   };
   const saveReminderTime = () => {
     setNotifyEnabled(true);
     if (!startTime) setStartTime(nowHm());
-    setReminder('at_time');
     reminderSnapshotRef.current = null;
     setShowReminderPicker(false);
   };
@@ -186,7 +190,7 @@ export function PickerSheet(props: Props) {
   useEffect(() => {
     if (showReminderPicker) {
       if (!reminderSnapshotRef.current) {
-        reminderSnapshotRef.current = { notifyEnabled, startTime };
+        reminderSnapshotRef.current = { notifyEnabled, startTime, reminder };
       }
     } else {
       reminderSnapshotRef.current = null;
@@ -199,7 +203,7 @@ export function PickerSheet(props: Props) {
     if (snap) {
       setNotifyEnabled(snap.notifyEnabled);
       setStartTime(snap.startTime);
-      if (!snap.notifyEnabled) setReminder('at_time');
+      setReminder(snap.reminder);
     }
     reminderSnapshotRef.current = null;
     setShowReminderPicker(false);
@@ -306,6 +310,8 @@ export function PickerSheet(props: Props) {
         reminderHour24={reminderHour24}
         reminderMinute={reminderMinute}
         setReminderTimeParts={setReminderTimeParts}
+        reminder={reminder}
+        setReminder={setReminder}
         saveReminderTime={saveReminderTime}
         onClose={cancelReminderPicker}
         canRemove={notifyEnabled}
@@ -514,6 +520,8 @@ function ReminderOverlay({
   reminderHour24,
   reminderMinute,
   setReminderTimeParts,
+  reminder,
+  setReminder,
   saveReminderTime,
   onClose,
   onRemove,
@@ -523,6 +531,8 @@ function ReminderOverlay({
   reminderHour24: number;
   reminderMinute: number;
   setReminderTimeParts: (h: number, m: number) => void;
+  reminder: string;
+  setReminder: (v: string) => void;
   saveReminderTime: () => void;
   onClose: () => void;
   onRemove?: () => void;
@@ -541,6 +551,8 @@ function ReminderOverlay({
             reminderHour24={reminderHour24}
             reminderMinute={reminderMinute}
             setReminderTimeParts={setReminderTimeParts}
+            reminder={reminder}
+            setReminder={setReminder}
             onSave={saveReminderTime}
             canRemove={canRemove}
             onRemove={onRemove}

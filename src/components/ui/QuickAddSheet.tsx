@@ -206,7 +206,8 @@ export default function QuickAddSheet({
   const [chipView, setChipView] = useState<{
     startTime: string;
     notify: boolean;
-  }>({ startTime: '', notify: false });
+    reminder: string;
+  }>({ startTime: '', notify: false, reminder: 'at_time' });
 
   const tagManager = useTagManager({
     open,
@@ -488,15 +489,15 @@ export default function QuickAddSheet({
   // Keep the last chip rendered while the row collapses.
   useEffect(() => {
     if (hasChips) {
-      setChipView({ startTime, notify: notifyEnabled });
+      setChipView({ startTime, notify: notifyEnabled, reminder });
       return;
     }
     const t = window.setTimeout(
-      () => setChipView({ startTime: '', notify: false }),
+      () => setChipView({ startTime: '', notify: false, reminder: 'at_time' }),
       320,
     );
     return () => window.clearTimeout(t);
-  }, [hasChips, startTime, notifyEnabled]);
+  }, [hasChips, startTime, notifyEnabled, reminder]);
 
   useEffect(() => {
     if (!open) {
@@ -785,6 +786,11 @@ export default function QuickAddSheet({
                                 <span className="tabular-nums">
                                   {chipView.startTime || '09:00'}
                                 </span>
+                                {chipView.reminder !== 'at_time' && (
+                                  <span className="text-primary/70">
+                                    · {chipView.reminder} before
+                                  </span>
+                                )}
                               </span>
                             )}
                           </div>
@@ -1101,6 +1107,7 @@ export default function QuickAddSheet({
                   setNotifyEnabled={setNotifyEnabled}
                   startTime={startTime}
                   setStartTime={setStartTime}
+                  reminder={reminder}
                   setReminder={setReminder}
                   showReminderPicker={showReminderPicker}
                   setShowReminderPicker={setShowReminderPicker}

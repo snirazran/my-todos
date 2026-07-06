@@ -3,13 +3,15 @@
 import React from 'react';
 import { Bell } from 'lucide-react';
 import { Wheel } from './Wheel';
-import { HOURS_24, MINUTES_60 } from './constants';
+import { HOURS_24, MINUTES_60, REMINDER_OFFSET_OPTIONS } from './constants';
 import { pad } from './utils';
 
 export function NotifyView({
   reminderHour24,
   reminderMinute,
   setReminderTimeParts,
+  reminder,
+  setReminder,
   onSave,
   saveLabel = 'Save reminder',
   saveDisabled = false,
@@ -19,12 +21,24 @@ export function NotifyView({
   reminderHour24: number;
   reminderMinute: number;
   setReminderTimeParts: (h: number, m: number) => void;
+  reminder: string;
+  setReminder: (v: string) => void;
   onSave: () => void;
   saveLabel?: string;
   saveDisabled?: boolean;
   canRemove?: boolean;
   onRemove?: () => void;
 }) {
+  const selectedOffset =
+    REMINDER_OFFSET_OPTIONS.find((opt) => opt.value === reminder) ??
+    REMINDER_OFFSET_OPTIONS[0];
+  const notifyTotal =
+    (((reminderHour24 * 60 + reminderMinute - selectedOffset.minutes) % 1440) +
+      1440) %
+    1440;
+  const notifyHour = Math.floor(notifyTotal / 60);
+  const notifyMinute = notifyTotal % 60;
+
   return (
     <>
       <div className="relative mb-5 flex h-8 items-center justify-center">
@@ -36,8 +50,14 @@ export function NotifyView({
         <span>
           Notifies you at{' '}
           <span className="text-primary">
-            {pad(reminderHour24)}:{pad(reminderMinute)}
+            {pad(notifyHour)}:{pad(notifyMinute)}
           </span>
+          {selectedOffset.minutes > 0 && (
+            <span className="text-muted-foreground/80">
+              {' '}
+              · {selectedOffset.label} before start
+            </span>
+          )}
         </span>
       </div>
 
@@ -67,6 +87,31 @@ export function NotifyView({
               },
             ]}
           />
+        </div>
+      </div>
+
+      <div className="mb-5">
+        <div className="mb-2 text-center text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground/70">
+          Notify before
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          {REMINDER_OFFSET_OPTIONS.map((opt) => {
+            const selected = reminder === opt.value;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setReminder(opt.value)}
+                className={`h-10 rounded-xl border text-[13px] font-extrabold transition-all ${
+                  selected
+                    ? 'border-primary bg-primary/10 text-primary ring-2 ring-primary/30'
+                    : 'border-border bg-background text-muted-foreground hover:border-primary/40 hover:bg-primary/5 hover:text-primary'
+                }`}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
