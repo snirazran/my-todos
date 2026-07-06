@@ -552,7 +552,7 @@ function LeaderboardRow({
 }) {
   const shared = entry.givesYou ?? contributionFrom(entry.fliesToday);
   const flex =
-    entry.flexRarity && rarityRank[entry.flexRarity] >= rarityRank.rare
+    entry.flexRarity && rarityRank[entry.flexRarity] >= rarityRank.epic
       ? RARITY_CONFIG[entry.flexRarity]
       : null;
 
@@ -594,7 +594,7 @@ function LeaderboardRow({
               <Icon
                 name="frogPlus"
                 label="Frogress Plus"
-                className="h-4 w-4 shrink-0 sm:h-5 sm:w-5"
+                className="h-7 w-7 shrink-0 sm:h-8 sm:w-8"
               />
             )}
           </p>

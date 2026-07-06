@@ -312,8 +312,17 @@ export function FriendDetailModal({
               {/* White content sheet overlapping the banner */}
               <div className="relative z-10 -mt-5 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto rounded-t-[24px] bg-background px-5 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-5">
                 <div className="text-center">
-                  <h2 className="text-xl font-black tracking-tight text-foreground">
-                    {entry.frogName || entry.name}
+                  <h2 className="flex items-center justify-center gap-1.5 text-xl font-black tracking-tight text-foreground">
+                    <span className={cn(entry.premium && 'plus-name-shimmer')}>
+                      {entry.frogName || entry.name}
+                    </span>
+                    {entry.premium && (
+                      <Icon
+                        name="frogPlus"
+                        label="Frogress Plus"
+                        className="h-8 w-8 shrink-0"
+                      />
+                    )}
                   </h2>
                   {entry.name &&
                     entry.frogName &&
@@ -345,10 +354,10 @@ export function FriendDetailModal({
                           rarity={item.rarity}
                           preview={
                             <FrogSnapshot
-                              className="h-[130%] w-[130%] object-contain"
+                              className="h-[125%] w-[125%] object-contain"
                               indices={{ [item.slot]: item.riveIndex }}
-                              width={100}
-                              height={100}
+                              width={180}
+                              height={180}
                             />
                           }
                           onClick={() =>
@@ -527,19 +536,19 @@ function LookChip({
       type="button"
       onClick={onClick}
       className={cn(
-        'flex w-[104px] shrink-0 flex-col items-stretch rounded-xl border-2 bg-card p-1.5 text-left shadow-sm transition-transform active:scale-[0.96]',
+        'flex w-[168px] shrink-0 flex-col items-stretch rounded-2xl border-[3px] bg-card p-2.5 text-left shadow-sm transition-transform active:scale-[0.97]',
         config.border,
       )}
     >
-      <div className="flex h-12 items-end justify-center overflow-hidden rounded-lg bg-muted/40">
+      <div className="flex aspect-[1/0.75] w-full items-end justify-center overflow-hidden rounded-xl bg-muted/40">
         {preview}
       </div>
-      <p className="mt-1 truncate text-[11px] font-black text-foreground">
+      <p className="mt-1.5 truncate text-sm font-black text-foreground">
         {name}
       </p>
       <p
         className={cn(
-          'truncate text-[9px] font-black uppercase tracking-wider',
+          'truncate text-[10px] font-black uppercase tracking-wider',
           config.text,
         )}
       >
@@ -628,17 +637,17 @@ function ItemPeekSheet({
 
             <div
               className={cn(
-                'mx-auto mt-4 flex h-36 w-full max-w-[220px] items-end justify-center overflow-hidden rounded-[24px] border-2 bg-gradient-to-br',
+                'mx-auto mt-4 flex aspect-square w-full max-w-[260px] items-end justify-center overflow-hidden rounded-[28px] border-2 bg-gradient-to-br',
                 config.border,
                 config.gradient,
               )}
             >
               {target.kind === 'item' ? (
                 <FrogSnapshot
-                  className="h-[120%] w-[120%] object-contain"
+                  className="h-[118%] w-[118%] -translate-y-[12%] object-contain"
                   indices={{ [target.slot]: target.riveIndex }}
-                  width={220}
-                  height={220}
+                  width={260}
+                  height={260}
                 />
               ) : (
                 // eslint-disable-next-line @next/next/no-img-element
