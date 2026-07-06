@@ -149,7 +149,7 @@ export const RewardCard = ({
           {/* Top Badge */}
           <div
             className={cn(
-              'absolute top-4 left-0 px-4 py-1.5 rounded-r-xl text-xs font-black uppercase tracking-widest shadow-sm z-20 border-y border-r',
+              'absolute top-4 left-0 z-50 px-4 py-1.5 rounded-r-xl text-xs font-black uppercase tracking-widest shadow-sm border-y border-r',
               config.bg,
               config.text,
               config.border
@@ -247,7 +247,7 @@ export const RewardCard = ({
                       </div>
                     ) : (
                       <Frog
-                        className="object-contain translate-y-2"
+                        className="object-contain -translate-y-16"
                         indices={{
                           skin: prize.slot === 'skin' ? prize.riveIndex : 0,
                           hat: prize.slot === 'hat' ? prize.riveIndex : 0,
