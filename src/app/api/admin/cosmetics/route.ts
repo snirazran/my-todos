@@ -3,6 +3,7 @@ import { requireAdminUserId as requireUserId } from '@/lib/adminAuth';
 import connectMongo from '@/lib/mongoose';
 import CatalogItemModel from '@/lib/models/CatalogItem';
 import { CATALOG } from '@/lib/skins/catalog';
+import { invalidateCatalogCache } from '@/lib/skins/getCatalog';
 
 const json = (body: unknown, init = 200) =>
   NextResponse.json(body, { status: init });
@@ -79,6 +80,7 @@ export async function POST(req: NextRequest) {
       hidden: false,
     });
 
+    invalidateCatalogCache();
     return json({ ok: true, item });
   } catch {
     return json({ error: 'Unauthorized' }, 401);
@@ -116,6 +118,7 @@ export async function PUT(req: NextRequest) {
 
     if (!result) return json({ error: 'Item not found' }, 404);
 
+    invalidateCatalogCache();
     return json({ ok: true, item: result });
   } catch {
     return json({ error: 'Unauthorized' }, 401);
@@ -139,6 +142,7 @@ export async function DELETE(req: NextRequest) {
     await connectMongo();
     await CatalogItemModel.deleteOne({ id: body.id });
 
+    invalidateCatalogCache();
     return json({ ok: true });
   } catch {
     return json({ error: 'Unauthorized' }, 401);

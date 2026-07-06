@@ -41,6 +41,32 @@ const GLOW_COLORS = {
   legendary: 'bg-amber-400',
 };
 
+export function GoldenRewardButton({
+  children,
+  onClick,
+  disabled,
+  className,
+}: {
+  children: React.ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        'w-full flex items-center justify-center gap-2.5 rounded-2xl bg-gradient-to-r from-amber-400 via-orange-500 to-amber-400 bg-[length:200%_100%] animate-[shimmer_2s_ease-in-out_infinite] py-3.5 text-[15px] font-black uppercase tracking-[0.14em] text-white shadow-lg shadow-amber-500/30 ring-2 ring-amber-400/40 transition hover:brightness-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60',
+        className,
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
 export const RewardCard = ({
   prize,
   claiming,
@@ -344,17 +370,15 @@ export const RewardCard = ({
           </button>
         )}
         {showDoubleUpsell && (
-          <button
-            type="button"
+          <GoldenRewardButton
             onClick={() => setShowUpsellPopup(true)}
             disabled={isProcessing || !showContent}
-            className="w-full flex items-center justify-center gap-2.5 rounded-2xl bg-gradient-to-r from-amber-400 via-orange-500 to-amber-400 bg-[length:200%_100%] animate-[shimmer_2s_ease-in-out_infinite] py-3.5 text-[15px] font-black uppercase tracking-[0.14em] text-white shadow-lg shadow-amber-500/30 ring-2 ring-amber-400/40 transition hover:brightness-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <span className="flex items-center justify-center w-7 h-7 text-[11px] font-black text-amber-900 rounded-lg bg-white/30 shadow-inner">
               x2
             </span>
             Double Reward
-          </button>
+          </GoldenRewardButton>
         )}
       </div>
       {showUpsellPopup && (
@@ -402,26 +426,47 @@ function QuantityBadge({
   );
 }
 
-function DoubleRewardUpsell({
+export function DoubleRewardUpsell({
   onClose,
   onWatchAd,
   rewardAmount,
   giftCount,
   giftColor,
+  titleOverride,
+  description,
+  watchLabel,
+  watchSubtext = 'just watch a short ad',
+  plusTitle = 'Never watch an ad again',
+  plusSubtitle = 'Plus auto-doubles every reward',
+  noThanksLabel,
+  closeOnWatch = true,
+  watchAvailable,
+  heroIcon,
 }: {
   onClose: () => void;
-  onWatchAd?: () => void;
+  onWatchAd?: () => void | Promise<void>;
   rewardAmount?: number;
   giftCount?: number;
   giftColor?: number;
+  titleOverride?: string;
+  description?: string;
+  watchLabel?: string;
+  watchSubtext?: string;
+  plusTitle?: string;
+  plusSubtitle?: string;
+  noThanksLabel?: string;
+  closeOnWatch?: boolean;
+  watchAvailable?: boolean;
+  heroIcon?: React.ReactNode;
 }) {
   const [showPlus, setShowPlus] = useState(false);
-  const canWatchAd = !!onWatchAd && rewardedAdsAvailable();
+  const [watching, setWatching] = useState(false);
+  const canWatchAd = !!onWatchAd && (watchAvailable ?? rewardedAdsAvailable());
   const count = rewardAmount ?? giftCount;
-  let title = 'Double your reward!';
-  if (rewardAmount) {
+  let title = titleOverride ?? 'Double your reward!';
+  if (rewardAmount && !titleOverride) {
     title = 'Double your flies!';
-  } else if (giftCount) {
+  } else if (giftCount && !titleOverride) {
     title = giftCount > 1 ? 'Double your gifts!' : 'Double your gift!';
   }
 
@@ -474,7 +519,7 @@ function DoubleRewardUpsell({
                 transition={{ type: 'spring', stiffness: 320, damping: 14, delay: 0.1 }}
                 className="relative mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-[#5ca355] to-[#457f40] text-2xl font-black text-white shadow-[0_4px_0_0_#34631f]"
               >
-                ×2
+                {heroIcon ?? '×2'}
               </motion.div>
               <h4 className="relative mt-4 text-[22px] font-black leading-tight text-slate-900 dark:text-white">
                 {title}
@@ -503,7 +548,7 @@ function DoubleRewardUpsell({
                 </motion.div>
               ) : (
                 <p className="relative mt-1.5 text-sm font-semibold text-slate-400 dark:text-slate-500">
-                  One short ad. Twice the reward.
+                  {description ?? 'One short ad. Twice the reward.'}
                 </p>
               )}
             </div>
@@ -512,18 +557,27 @@ function DoubleRewardUpsell({
               <div className="px-5 pt-2">
                 <button
                   type="button"
-                  onClick={() => {
-                    if (onWatchAd) onWatchAd();
-                    onClose();
+                  disabled={watching}
+                  onClick={async () => {
+                    if (!onWatchAd || watching) return;
+                    setWatching(true);
+                    try {
+                      await onWatchAd();
+                      if (closeOnWatch) onClose();
+                    } finally {
+                      setWatching(false);
+                    }
                   }}
                   className="w-full rounded-2xl bg-gradient-to-r from-[#4f9149] via-[#5ca355] to-[#4f9149] bg-[length:200%_100%] animate-[shimmer_2.5s_ease-in-out_infinite] py-3.5 text-white shadow-[0_4px_0_0_#34631f] transition hover:brightness-105 active:translate-y-[3px] active:shadow-none"
                 >
                   <span className="flex items-center justify-center gap-2 text-lg font-black uppercase tracking-[0.08em]">
                     <Play className="w-5 h-5 fill-current" />
-                    {count ? `Claim ${count * 2} free` : 'Double it free'}
+                    {watching
+                      ? 'Loading ad...'
+                      : watchLabel ?? (count ? `Claim ${count * 2} free` : 'Double it free')}
                   </span>
                   <span className="mt-0.5 block text-[11px] font-bold text-white/75">
-                    just watch a short ad
+                    {watchSubtext}
                   </span>
                 </button>
               </div>
@@ -548,10 +602,10 @@ function DoubleRewardUpsell({
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-black tracking-tight text-emerald-900 drop-shadow-[0_1px_0_rgba(255,255,255,0.5)]">
-                    Never watch an ad again
+                    {plusTitle}
                   </p>
                   <p className="mt-0.5 text-xs font-semibold text-emerald-900/75">
-                    Plus auto-doubles every reward
+                    {plusSubtitle}
                   </p>
                 </div>
                 <span
@@ -568,7 +622,7 @@ function DoubleRewardUpsell({
                 className="w-full rounded-xl py-2.5 text-sm font-semibold text-slate-400 transition-all hover:bg-slate-100 hover:text-slate-600 dark:text-slate-500 dark:hover:bg-slate-800 dark:hover:text-slate-300"
                 onClick={onClose}
               >
-                {count ? `No thanks, keep ${count}` : 'No thanks'}
+                {noThanksLabel ?? (count ? `No thanks, keep ${count}` : 'No thanks')}
               </button>
             </div>
           </motion.div>

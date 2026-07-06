@@ -5,14 +5,14 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/components/auth/AuthContext';
 import { useRouter } from 'next/navigation';
-import { Play, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { ItemDef, byId } from '@/lib/skins/catalog';
 import { cn } from '@/lib/utils';
 import { rewardedAdsAvailable, showRewardedAd } from '@/lib/ads';
 import { RARITY_CONFIG } from './constants';
 import { RotatingRays } from './RotatingRays';
 import { GiftBox } from './GiftBox';
-import { RewardCard } from './RewardCard';
+import { DoubleRewardUpsell, GoldenRewardButton, RewardCard } from './RewardCard';
 import { FUNNY_SENTENCES } from './funnySentences';
 
 export default function GiftBoxOpening({
@@ -37,6 +37,7 @@ export default function GiftBoxOpening({
   const [revealCount, setRevealCount] = useState(0);
   const [adBusy, setAdBusy] = useState(false);
   const [adError, setAdError] = useState<string | null>(null);
+  const [showOpenAnotherUpsell, setShowOpenAnotherUpsell] = useState(false);
   const [loadingText, setLoadingText] = useState(
     () => FUNNY_SENTENCES[Math.floor(Math.random() * FUNNY_SENTENCES.length)],
   );
@@ -141,6 +142,7 @@ export default function GiftBoxOpening({
       }
       const claimId = doubleClaimId;
       setDoubleClaimId(null);
+      setShowOpenAnotherUpsell(false);
       setPhase('shaking');
       const animationPromise = new Promise((resolve) =>
         setTimeout(resolve, 1500),
@@ -258,26 +260,41 @@ export default function GiftBoxOpening({
                 onClaim={handleClaim}
                 paused={paused}
               />
-              {user && doubleClaimId && rewardedAdsAvailable() && (
+              {user && doubleClaimId && (
                 <motion.div
                   initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.9 }}
-                  className="mt-4 flex w-full max-w-xs flex-col items-center gap-1.5"
+                  className="mt-4 flex w-full max-w-[280px] flex-col items-center gap-1.5"
                 >
-                  <button
-                    type="button"
-                    onClick={handleDouble}
+                  <GoldenRewardButton
+                    onClick={() => setShowOpenAnotherUpsell(true)}
                     disabled={adBusy}
-                    className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-amber-400 text-[13px] font-black uppercase tracking-wide text-slate-900 shadow-[0_4px_0_0_#b45309] transition-all active:translate-y-1 active:shadow-none disabled:opacity-60"
+                    className="py-4 text-lg"
                   >
-                    <Play className="h-4 w-4 fill-current" />
-                    {adBusy ? 'Loading ad…' : 'Watch an ad · open another'}
-                  </button>
+                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/30 text-[11px] font-black text-amber-900 shadow-inner">
+                      x2
+                    </span>
+                    {adBusy ? 'Loading ad...' : 'Open Another'}
+                  </GoldenRewardButton>
                   {adError && (
                     <p className="text-center text-xs font-bold text-red-300">
                       {adError}
                     </p>
+                  )}
+                  {showOpenAnotherUpsell && (
+                    <DoubleRewardUpsell
+                      onClose={() => setShowOpenAnotherUpsell(false)}
+                      onWatchAd={handleDouble}
+                      titleOverride="Open another gift?"
+                      description="One short ad. One more surprise."
+                      watchLabel="Open another free"
+                      watchSubtext="just watch a short ad"
+                      plusTitle="Never watch an ad again"
+                      plusSubtitle="Plus auto-doubles every reward"
+                      noThanksLabel="Keep this prize"
+                      closeOnWatch={false}
+                    />
                   )}
                 </motion.div>
               )}

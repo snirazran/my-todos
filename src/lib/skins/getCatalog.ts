@@ -52,6 +52,10 @@ export async function getFullCatalog(): Promise<ItemDef[]> {
 let catalogCache: { at: number; items: ItemDef[] } | null = null;
 const CATALOG_CACHE_TTL_MS = 5 * 60_000;
 
+export function invalidateCatalogCache() {
+  catalogCache = null;
+}
+
 /** Like getFullCatalog, but cached in-process for a few minutes. */
 export async function getCachedCatalog(): Promise<ItemDef[]> {
   if (catalogCache && Date.now() - catalogCache.at < CATALOG_CACHE_TTL_MS) {

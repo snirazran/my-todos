@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Plus, Trash2, Pencil, Crown, Shirt, Hand, Paintbrush, CheckCircle, XCircle, Eye, EyeOff } from 'lucide-react';
+import { X, Plus, Trash2, Pencil, Crown, Shirt, Hand, Paintbrush, CheckCircle, XCircle, Eye, EyeOff, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { createPortal } from 'react-dom';
 import Frog from '@/components/ui/frog';
@@ -20,6 +20,7 @@ const SLOT_CONFIG: Record<CosmeticSlot, { label: string; icon: React.ReactNode }
 const SLOTS: CosmeticSlot[] = ['skin', 'hat', 'body', 'hand_item'];
 
 type DbItem = {
+  _id?: string;
   id: string;
   name: string;
   slot: string;
@@ -47,6 +48,9 @@ export function AdminCosmeticsPopup({
   const [result, setResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<{ name: string; riveIndex: string; rarity: string; priceFlies: string }>({ name: '', riveIndex: '', rarity: 'common', priceFlies: '100' });
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [csvInputKey, setCsvInputKey] = useState(0);
+  const [importing, setImporting] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -181,18 +185,52 @@ export function AdminCosmeticsPopup({
     }
   };
 
+  const handleImportCsv = async () => {
+    if (!csvFile) return;
+    setImporting(true);
+    setResult(null);
+    setAddingNew(false);
+    setEditingId(null);
+    try {
+      const formData = new FormData();
+      formData.append('file', csvFile);
+      const res = await fetch('/api/admin/cosmetics/import', {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setResult({
+          type: 'success',
+          message: `Imported ${data.imported ?? 0} cosmetics; removed ${data.removed ?? 0} old IDs`,
+        });
+        setCsvFile(null);
+        setCsvInputKey((key) => key + 1);
+        await loadDbItems();
+      } else {
+        setResult({ type: 'error', message: data.error || 'Failed to import CSV' });
+      }
+    } catch {
+      setResult({ type: 'error', message: 'Network error' });
+    } finally {
+      setImporting(false);
+    }
+  };
+
   if (!open) return null;
 
   return createPortal(
     <AnimatePresence>
       <motion.div
+        key="cosmetics-backdrop"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={onClose}
         className="fixed inset-0 z-[1100] bg-black/60 backdrop-blur-md"
       />
-      <div className="fixed inset-0 z-[1200] flex items-center justify-center p-4">
+      <div key="cosmetics-dialog-shell" className="fixed inset-0 z-[1200] flex items-center justify-center p-4">
         <motion.div
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -271,11 +309,47 @@ export function AdminCosmeticsPopup({
               </motion.div>
             )}
 
+            <div className="mb-4 rounded-2xl border border-border/60 bg-muted/25 p-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-xl border border-dashed border-border bg-background px-3 py-2 text-sm transition hover:border-primary/40">
+                  <Upload className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <span className="truncate font-semibold text-muted-foreground">
+                    {csvFile ? csvFile.name : 'Choose CSV file'}
+                  </span>
+                  <input
+                    key={csvInputKey}
+                    type="file"
+                    accept=".csv,text/csv"
+                    className="sr-only"
+                    onChange={(e) => {
+                      setCsvFile(e.target.files?.[0] ?? null);
+                      setResult(null);
+                    }}
+                  />
+                </label>
+                <Button
+                  onClick={handleImportCsv}
+                  disabled={!csvFile || importing}
+                  className="shrink-0 font-black"
+                >
+                  {importing ? (
+                    <div className="h-4 w-4 rounded-full border-2 border-primary-foreground border-t-transparent animate-spin" />
+                  ) : (
+                    'Import CSV'
+                  )}
+                </Button>
+              </div>
+              <p className="mt-2 text-[11px] font-medium text-muted-foreground">
+                Replaces all skins, body items, hats, and hand items. Use -1 in inactive columns.
+              </p>
+            </div>
+
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {slotItems.map((item) =>
-                editingId === item.id ? (
+              {slotItems.map((item) => {
+                const itemKey = item._id || item.id || `${item.slot}-${item.riveIndex}-${item.name}`;
+                return editingId === item.id ? (
                   /* ─── Inline Edit Form ─── */
-                  <div key={item.id} className="flex flex-col gap-2 p-3 rounded-2xl border-2 border-amber-400/50 bg-amber-500/5">
+                  <div key={`edit-${itemKey}`} className="flex flex-col gap-2 p-3 rounded-2xl border-2 border-amber-400/50 bg-amber-500/5">
                     <div className="text-[10px] font-mono text-muted-foreground mb-1">id: {item.id}</div>
                     <input
                       type="text"
@@ -332,15 +406,15 @@ export function AdminCosmeticsPopup({
                 ) : (
                   /* ─── Normal Card ─── */
                   <CosmeticCard
-                    key={item.id}
+                    key={`card-${itemKey}`}
                     item={item}
                     slot={activeSlot}
                     onEdit={() => startEdit(item)}
                     onDelete={() => handleDeleteItem(item.id)}
                     onToggleHidden={() => handleToggleHidden(item.id, !!item.hidden)}
                   />
-                ),
-              )}
+                );
+              })}
 
               {/* Add New Card */}
               {!addingNew ? (

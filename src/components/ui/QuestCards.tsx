@@ -38,6 +38,7 @@ import { GiftRive } from './gift-box/GiftBox';
 import { ItemCard } from './skins/ItemCard';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { rewardedAdsAvailable, showRewardedAd } from '@/lib/ads';
+import { GoldenRewardButton } from './gift-box/RewardCard';
 
 export type QuestRewardCatalogItem = Pick<
   ItemDef,
@@ -1368,19 +1369,18 @@ export function SwitchFocusConfirm({
                 </button>
                 {rentAvailable && (
                   <div className="flex flex-col gap-1.5">
-                    <button
-                      type="button"
+                    <GoldenRewardButton
                       onClick={handleRent}
                       disabled={rentBusy}
-                      className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-amber-400 text-[14px] font-black uppercase tracking-wide text-slate-900 shadow-[0_3px_0_0_#b45309] transition-all active:translate-y-0.5 active:shadow-none disabled:opacity-60"
+                      className="h-12 py-0 text-[14px]"
                     >
                       <Play className="h-4 w-4 fill-current" />
                       {rentBusy
-                        ? 'Loading ad…'
+                        ? 'Loading ad...'
                         : rentWatched > 0
                           ? `Watch 1 more ad (${rentWatched}/${RENT_ADS})`
                           : `Run both for 24h · watch ${RENT_ADS} ads`}
-                    </button>
+                    </GoldenRewardButton>
                     <p className="text-center text-[12px] font-medium text-muted-foreground">
                       Keep your current quest and unlock this one too.
                     </p>

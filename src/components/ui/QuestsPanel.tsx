@@ -989,7 +989,6 @@ export function QuestsPanel({
                           const heroCategory = heroQuest
                             ? categoryMap[heroQuest.categoryId]
                             : null;
-
                           const dailySection =
                             dailyQuests.length === 0 ? (
                               <PanelCard>No active daily quests here.</PanelCard>
@@ -1157,6 +1156,7 @@ export function QuestsPanel({
               />
               <SwitchFocusConfirm
                 open={!!pendingSwitchCategoryId}
+                categoryId={pendingSwitchCategoryId ?? undefined}
                 categoryName={
                   pendingSwitchCategory?.shortLabel ||
                   pendingSwitchCategory?.name
@@ -1177,6 +1177,11 @@ export function QuestsPanel({
                   }
                 }}
                 onUpgrade={() => setPlusOpen(true)}
+                canRent={!data?.isPremium && !data?.rentedFocus}
+                onRented={() => {
+                  void mutateQuests();
+                  setPendingSwitchCategoryId(null);
+                }}
                 onClose={() => setPendingSwitchCategoryId(null)}
               />
               <PlusUpgradeModal open={plusOpen} onClose={() => setPlusOpen(false)} />

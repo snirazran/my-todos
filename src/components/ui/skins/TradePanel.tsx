@@ -27,7 +27,11 @@ import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
 import { ItemCard } from './ItemCard';
 
 // Import from gift-box for the reward UI
-import { RewardCard } from '@/components/ui/gift-box/RewardCard';
+import {
+  DoubleRewardUpsell,
+  GoldenRewardButton,
+  RewardCard,
+} from '@/components/ui/gift-box/RewardCard';
 import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
 import { RARITY_CONFIG as GIFT_RARITY_CONFIG } from '@/components/ui/gift-box/constants';
 
@@ -154,6 +158,7 @@ export function TradePanel({
   const [rerollClaimId, setRerollClaimId] = useState<string | null>(null);
   const [rerollBusy, setRerollBusy] = useState(false);
   const [rerollError, setRerollError] = useState<string | null>(null);
+  const [showRerollUpsell, setShowRerollUpsell] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const [inventoryHasScrolled, setInventoryHasScrolled] = useState(false);
@@ -362,6 +367,7 @@ export function TradePanel({
       setTradeResult(data.reward);
       setRerollClaimId(data.rerollClaimId ?? null);
       setRerollError(null);
+      setShowRerollUpsell(false);
       setSelectedIds([]);
       haptic([12, 40, 20]);
       if (onTradeSuccess) onTradeSuccess();
@@ -383,6 +389,7 @@ export function TradePanel({
     setTradeResult(null);
     setRerollClaimId(null);
     setRerollError(null);
+    setShowRerollUpsell(false);
   };
 
   const handleReroll = async () => {
@@ -411,6 +418,7 @@ export function TradePanel({
         return;
       }
       setRerollClaimId(null);
+      setShowRerollUpsell(false);
       setTradeResult(data.reward);
       haptic([12, 40, 20]);
       if (onTradeSuccess) onTradeSuccess();
@@ -684,35 +692,30 @@ export function TradePanel({
                 onClaim={handleClaimReward}
                 paused={paused}
               />
-              {rerollClaimId && (isPremium || rewardedAdsAvailable()) && (
+              {rerollClaimId && (
                 <motion.div
                   initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.9 }}
-                  className="mt-4 flex w-full max-w-xs flex-col items-center gap-1.5"
+                  className="mt-4 flex w-full max-w-[280px] flex-col items-center gap-1.5"
                 >
-                  <button
-                    type="button"
-                    onClick={handleReroll}
+                  <GoldenRewardButton
+                    onClick={() => setShowRerollUpsell(true)}
                     disabled={rerollBusy}
-                    className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-amber-400 text-[13px] font-black uppercase tracking-wide text-slate-900 shadow-[0_4px_0_0_#b45309] transition-all active:translate-y-1 active:shadow-none disabled:opacity-60"
+                    className="py-4 text-lg"
                   >
                     {isPremium ? (
                       <>
                         <Dices className="h-4 w-4" />
-                        {rerollBusy ? 'Rerolling…' : 'Reroll · free with Plus'}
+                        {rerollBusy ? 'Rerolling...' : 'Reroll Reward'}
                       </>
                     ) : (
                       <>
-                        <Play className="h-4 w-4 fill-current" />
-                        {rerollBusy ? 'Loading ad…' : 'Watch an ad · reroll'}
+                        <Dices className="h-5 w-5" strokeWidth={2.75} />
+                        {rerollBusy ? 'Loading ad...' : 'Reroll Reward'}
                       </>
                     )}
-                  </button>
-                  <p className="text-center text-xs font-medium text-white/60">
-                    Swap it for a different {tradeResult.rarity} — one reroll per
-                    trade.
-                  </p>
+                  </GoldenRewardButton>
                   {rerollError && (
                     <p className="text-center text-xs font-bold text-red-300">
                       {rerollError}
@@ -721,6 +724,22 @@ export function TradePanel({
                 </motion.div>
               )}
             </div>
+            {showRerollUpsell && (
+              <DoubleRewardUpsell
+                onClose={() => setShowRerollUpsell(false)}
+                onWatchAd={handleReroll}
+                titleOverride="Reroll this reward?"
+                description={`One short ad. Swap it for another ${tradeResult.rarity}.`}
+                watchLabel={isPremium ? 'Reroll free' : 'Reroll free'}
+                watchSubtext={isPremium ? 'included with Plus' : 'just watch a short ad'}
+                plusTitle="Reroll without ads"
+                plusSubtitle="Unlock ad-free rerolls anytime"
+                noThanksLabel="Keep this reward"
+                watchAvailable={isPremium || rewardedAdsAvailable()}
+                closeOnWatch={false}
+                heroIcon={<Dices className="h-8 w-8" strokeWidth={3} />}
+              />
+            )}
           </div>,
           document.body
         )
