@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { useAuth } from '@/components/auth/AuthContext';
 import { QuestsPanel } from '@/components/ui/QuestsPanel';
-import { LoadingScreen } from '@/components/ui/LoadingScreen';
+import { QuestsPageSkeleton } from '@/components/ui/Skeleton';
 
 export default function QuestsPage() {
   const { user, loading } = useAuth();
@@ -35,9 +35,7 @@ export default function QuestsPage() {
     <main className="h-[100dvh] overflow-hidden bg-background md:h-[calc(100vh-4rem)]">
       <div className="flex h-full w-full flex-col">
         {loading ? (
-          <div className="flex h-full items-center justify-center">
-            <LoadingScreen fullscreen={false} />
-          </div>
+          <QuestsPageSkeleton />
         ) : (
           <QuestsPanel isGuest={!user} />
         )}

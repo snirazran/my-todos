@@ -11,6 +11,7 @@ import { useBackgrounds } from '@/hooks/useBackgrounds';
 import { backgroundPreview } from '@/hooks/useBackgroundActions';
 import { byId as staticById, type WardrobeSlot } from '@/lib/skins/catalog';
 import { useUIStore } from '@/lib/uiStore';
+import { WardrobePageSkeleton } from '@/components/ui/Skeleton';
 import { cn } from '@/lib/utils';
 
 function WardrobePageInner() {
@@ -148,7 +149,7 @@ function WardrobePageInner() {
 export default function WardrobePage() {
   // useSearchParams() requires a Suspense boundary during prerender (Next 16).
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<WardrobePageSkeleton />}>
       <WardrobePageInner />
     </Suspense>
   );

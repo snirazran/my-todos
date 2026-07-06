@@ -22,7 +22,10 @@ import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { useRegisterOpenSheet, useSheetStore } from '@/lib/sheetStore';
 import Frog from '@/components/ui/frog';
 import Fly from '@/components/ui/fly';
-import { LoadingScreen } from '@/components/ui/LoadingScreen';
+import {
+  FriendsPageSkeleton,
+  FriendsLeaderboardSkeleton,
+} from '@/components/ui/Skeleton';
 import { AddFriendsSheet } from '@/components/ui/AddFriendsSheet';
 import { InviteFriendsModal } from '@/components/ui/InviteFriendsModal';
 import { FriendRequestsInbox } from '@/components/ui/FriendRequestsInbox';
@@ -125,7 +128,7 @@ export default function FriendsPage() {
     if (!loading && !user) router.replace('/login');
   }, [loading, user, router]);
 
-  if (loading || !user) return <LoadingScreen />;
+  if (loading || !user) return <FriendsPageSkeleton />;
 
   const friends = friendsData?.friends ?? [];
   const hasRealFriends = friends.length > 0;
@@ -232,7 +235,9 @@ export default function FriendsPage() {
             </div>
 
             <div className="w-full overflow-hidden rounded-[18px] border border-border/50 bg-card/40 p-1.5 shadow-sm">
-              {hasRealFriends ? (
+              {!friendsData ? (
+                <FriendsLeaderboardSkeleton rows={3} />
+              ) : hasRealFriends ? (
                 <ul className="flex flex-col gap-1.5">
                   {leaderboard.map((entry, i) => (
                     <LeaderboardRow

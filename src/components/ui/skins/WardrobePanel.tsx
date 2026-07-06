@@ -43,6 +43,7 @@ import { StreakFreezeShopCard } from '@/components/ui/streak/StreakFreezeShopCar
 import { DailyDealsShelf } from './DailyDealsShelf';
 import { SeenOnFriendsRow } from './SeenOnFriendsRow';
 import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
+import { WardrobeGridSkeleton } from '@/components/ui/Skeleton';
 import { RARITY_CONFIG } from '@/components/ui/gift-box/constants';
 import { BackgroundCard } from './BackgroundCard';
 import { mutateBackgrounds, type BackgroundItem } from '@/hooks/useBackgrounds';
@@ -1554,23 +1555,6 @@ function WardrobeManagerContent({
       />
 
       <PlusUpgradeModal open={plusOpen} onClose={() => setPlusOpen(false)} />
-    </div>
-  );
-}
-
-function WardrobeGridSkeleton() {
-  return (
-    <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4 pb-20 md:pb-4">
-      {Array.from({ length: 8 }).map((_, index) => (
-        <div
-          key={index}
-          className="mx-auto flex w-full max-w-[240px] flex-col rounded-2xl border-[3px] border-border bg-card p-2.5 md:p-3.5"
-        >
-          <div className="mt-4 mb-2 md:mt-5 md:mb-3 aspect-[1/0.75] md:aspect-[1.2/1] rounded-xl bg-muted/50" />
-          <div className="w-2/3 h-3 mx-auto rounded-full bg-muted/60" />
-          <div className="w-3/4 mx-auto mt-3 rounded-lg h-7 bg-muted/50 md:h-8" />
-        </div>
-      ))}
     </div>
   );
 }

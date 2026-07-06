@@ -5,7 +5,7 @@ import TaskBoard from '@/components/board/TaskBoard';
 import { LeftTongueProvider } from '@/components/board/LeftTongue';
 import { FlyGainPopup } from '@/components/ui/FlyGainPopup';
 import { seedQuestClaims } from '@/lib/questClaims';
-import { LoadingScreen } from '@/components/ui/LoadingScreen';
+import { PlannerPageSkeleton } from '@/components/ui/Skeleton';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import {
   Task,
@@ -526,7 +526,11 @@ export default function ManageTasksPage() {
   ]);
 
   if (loading) {
-    return <LoadingScreen fullscreen />;
+    return (
+      <div className="relative w-full h-full overflow-hidden bg-background">
+        <PlannerPageSkeleton />
+      </div>
+    );
   }
 
   return (

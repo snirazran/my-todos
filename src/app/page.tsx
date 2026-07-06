@@ -37,7 +37,7 @@ import { FilterDropdown } from '@/components/ui/FilterDropdown';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { FrogDisplay } from '@/components/ui/FrogDisplay';
 import { getQuestsUrl } from '@/components/ui/QuestsPanel';
-import { LoadingScreen } from '@/components/ui/LoadingScreen';
+import { HomePageSkeleton } from '@/components/ui/Skeleton';
 import { HungerWarningModal } from '@/components/ui/HungerWarningModal';
 import { useFrogTongue, TONGUE_STROKE } from '@/hooks/useFrogTongue';
 import { useNotification } from '@/components/providers/NotificationProvider';
@@ -491,7 +491,7 @@ export default function Home() {
     ) : null;
 
   if (sessionLoading || (user && isLoading && tasks.length === 0)) {
-    return <LoadingScreen />;
+    return <HomePageSkeleton />;
   }
 
   return (

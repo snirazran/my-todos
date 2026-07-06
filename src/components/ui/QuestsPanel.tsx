@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import useSWR, { preload } from 'swr';
 import { Icon } from '@/components/ui/Icon';
-import { LoadingScreen } from '@/components/ui/LoadingScreen';
+import { QuestsPageSkeleton } from '@/components/ui/Skeleton';
 import { Check, Clock, Gift, Lock, ScrollText, Sparkles, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import TagsPopup from './TagsPopup';
@@ -839,9 +839,7 @@ export function QuestsPanel({
                     description="Quests use your tasks, timer sessions, and tags."
                   />
                 ) : isLoading ? (
-                  <div className="flex h-full items-center justify-center">
-                    <LoadingScreen fullscreen={false} />
-                  </div>
+                  <QuestsPageSkeleton />
                 ) : error || !data ? (
                   <EmptyState
                     title="Could not load quests"
