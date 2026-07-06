@@ -292,7 +292,7 @@ export default function GiftBoxOpening({
                       watchSubtext="just watch a short ad"
                       plusTitle="Never watch an ad again"
                       plusSubtitle="Plus auto-doubles every reward"
-                      noThanksLabel="Keep this prize"
+                      noThanksLabel="No thanks, I'll keep 1 gift"
                       closeOnWatch={false}
                     />
                   )}

@@ -38,7 +38,6 @@ import { GiftRive } from './gift-box/GiftBox';
 import { ItemCard } from './skins/ItemCard';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { rewardedAdsAvailable, showRewardedAd } from '@/lib/ads';
-import { GoldenRewardButton } from './gift-box/RewardCard';
 
 export type QuestRewardCatalogItem = Pick<
   ItemDef,
@@ -1369,18 +1368,21 @@ export function SwitchFocusConfirm({
                 </button>
                 {rentAvailable && (
                   <div className="flex flex-col gap-1.5">
-                    <GoldenRewardButton
+                    <button
+                      type="button"
                       onClick={handleRent}
                       disabled={rentBusy}
-                      className="h-12 py-0 text-[14px]"
+                      className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl border-2 border-amber-200/90 bg-amber-50 text-[13px] font-black uppercase tracking-[0.11em] text-amber-700 shadow-[0_6px_14px_rgba(180,83,9,0.14),inset_0_1px_0_rgba(255,255,255,0.85)] transition active:scale-[0.98] disabled:opacity-60"
                     >
-                      <Play className="h-4 w-4 fill-current" />
+                      <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-amber-200/80 text-amber-800">
+                        <Play className="h-3.5 w-3.5 fill-current" />
+                      </span>
                       {rentBusy
                         ? 'Loading ad...'
                         : rentWatched > 0
                           ? `Watch 1 more ad (${rentWatched}/${RENT_ADS})`
-                          : `Run both for 24h · watch ${RENT_ADS} ads`}
-                    </GoldenRewardButton>
+                          : `Watch ${RENT_ADS} ads to progress both`}
+                    </button>
                     <p className="text-center text-[12px] font-medium text-muted-foreground">
                       Keep your current quest and unlock this one too.
                     </p>
@@ -1396,8 +1398,8 @@ export function SwitchFocusConfirm({
                   <button
                     type="button"
                     onClick={onUpgrade}
-                    aria-label="Advance all quests with Frog Plus"
-                    className="group relative isolate flex h-14 w-full items-center justify-center gap-2.5 rounded-2xl px-4 ring-2 ring-amber-200/80 transition-transform active:scale-[0.98]"
+                    aria-label="Progress all quests with Frog Plus"
+                    className="group relative isolate flex h-14 w-full items-center justify-center gap-0 rounded-2xl px-2 ring-2 ring-amber-200/80 transition-transform active:scale-[0.98] min-[375px]:gap-2"
                   >
                     <span
                       aria-hidden
@@ -1409,17 +1411,19 @@ export function SwitchFocusConfirm({
                     />
                     <Icon
                       name="frogPlus"
-                      className="-my-8 -ml-1 h-20 w-20 drop-shadow-[0_3px_0_rgba(31,98,28,0.4)]"
+                      className="pointer-events-none absolute left-1 h-16 w-16 drop-shadow-[0_3px_0_rgba(31,98,28,0.4)] min-[375px]:static min-[375px]:-my-6 min-[375px]:-ml-1 min-[375px]:shrink-0"
                     />
-                    <span className="text-sm font-black uppercase tracking-[0.08em] text-emerald-900 drop-shadow-[0_1px_0_rgba(255,255,255,0.5)]">
-                      Advance all quests with
-                    </span>
-                    <span className="inline-flex items-center rounded-lg bg-gradient-to-b from-emerald-600 to-emerald-800 px-2 py-1.5 text-[11px] font-black uppercase leading-none tracking-[0.18em] text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_2px_4px_rgba(0,0,0,0.25)] ring-1 ring-emerald-900/40">
-                      Plus
+                    <span className="flex w-full items-center justify-center gap-2 pl-12 min-[375px]:w-auto min-[375px]:pl-0">
+                      <span className="whitespace-nowrap text-[14px] font-black uppercase tracking-normal text-emerald-900 drop-shadow-[0_1px_0_rgba(255,255,255,0.5)]">
+                        Progress all quests
+                      </span>
+                      <span className="inline-flex shrink-0 items-center rounded-lg bg-gradient-to-b from-emerald-600 to-emerald-800 px-2 py-1.5 text-[11px] font-black uppercase leading-none tracking-normal text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_2px_4px_rgba(0,0,0,0.25)] ring-1 ring-emerald-900/40">
+                        Plus
+                      </span>
                     </span>
                   </button>
-                  <p className="text-center text-[12px] font-medium text-muted-foreground">
-                    Advance every quest at once.
+                  <p className="whitespace-nowrap text-center text-[11px] font-medium text-muted-foreground">
+                    Finish multiple focus quests at the same time.
                   </p>
                   </div>
                 )}
