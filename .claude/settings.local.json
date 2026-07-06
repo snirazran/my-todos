@@ -231,7 +231,8 @@
       "Bash(pod --version)",
       "Bash(pod install *)",
       "WebFetch(domain:www.paddle.com)",
-      "WebFetch(domain:www.revenuecat.com)"
+      "WebFetch(domain:www.revenuecat.com)",
+      "WebFetch(domain:www.pushwoosh.com)"
     ]
   }
 }

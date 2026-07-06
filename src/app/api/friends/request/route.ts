@@ -7,6 +7,7 @@ import UserModel from '@/lib/models/User';
 import FriendRequestModel, { type FriendRequestSource } from '@/lib/models/FriendRequest';
 import { normalizeFriendCode, areFriends, createFriendship } from '@/lib/friends/code';
 import { notifyFriendUpdate, notifyFriendsChanged } from '@/lib/taskSync';
+import { sendBuddyPush, buddyDisplayName } from '@/lib/buddy/push';
 
 async function resolveTarget(body: {
   code?: string;
@@ -65,6 +66,14 @@ export async function POST(req: NextRequest) {
       await incoming.save();
       await createFriendship(userId, targetId, 'code');
       void notifyFriendsChanged(userId);
+      void buddyDisplayName(userId).then((name) =>
+        sendBuddyPush(targetId, {
+          title: `${name} accepted your request`,
+          body: "You're friends now. Their daily wins earn you flies.",
+          path: '/friends',
+          type: 'friend_accepted',
+        }),
+      );
       return NextResponse.json({ ok: true, autoAccepted: true });
     }
 
@@ -78,6 +87,14 @@ export async function POST(req: NextRequest) {
     // Push the incoming request to the recipient instantly (no refresh needed).
     if (result.upsertedCount > 0) {
       void notifyFriendUpdate(targetId);
+      void buddyDisplayName(userId).then((name) =>
+        sendBuddyPush(targetId, {
+          title: `${name} wants to be friends`,
+          body: "Accept and you'll earn flies from each other's wins.",
+          path: '/friends',
+          type: 'friend_request',
+        }),
+      );
     }
 
     return NextResponse.json({ ok: true, pending: true });
@@ -166,6 +183,14 @@ export async function PATCH(req: NextRequest) {
     if (action === 'accept') {
       await createFriendship(request.fromUserId, request.toUserId, 'code');
       void notifyFriendUpdate(request.fromUserId);
+      void buddyDisplayName(userId).then((name) =>
+        sendBuddyPush(request.fromUserId, {
+          title: `${name} accepted your request`,
+          body: "You're friends now. Their daily wins earn you flies.",
+          path: '/friends',
+          type: 'friend_accepted',
+        }),
+      );
     }
 
     return NextResponse.json({ ok: true });

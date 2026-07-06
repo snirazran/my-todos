@@ -62,8 +62,8 @@ export async function POST(
     void notifyFriendUpdate(bond.fromUserId);
     void buddyDisplayName(userId).then((name) =>
       sendBuddyPush(bond.fromUserId, {
-        title: 'Goal Buddy 🐸',
-        body: `${name} accepted your invite — you're buddies now!`,
+        title: `${name} accepted your invite`,
+        body: "You're goal buddies now. First one to finish today sets the pace.",
         path: '/planner',
         type: 'buddy_accepted',
       }),

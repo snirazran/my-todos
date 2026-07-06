@@ -90,8 +90,8 @@ export async function POST(req: NextRequest) {
     void notifyFriendUpdate(friendId);
     void buddyDisplayName(userId).then((name) =>
       sendBuddyPush(friendId, {
-        title: 'Goal Buddy 🐸',
-        body: `${name} invited you to team up on "${params.text}"`,
+        title: `${name} wants to be your goal buddy`,
+        body: `Team up on "${params.text}" — you'll see each other's progress every day.`,
         path: '/friends',
         type: 'buddy_invite',
       }),

@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
   const baseSetOnInsert = {
     'notificationPrefs.activityHours': [],
     'notificationPrefs.morningSlot': 9,
-    'notificationPrefs.eveningSlot': 18,
+    'notificationPrefs.eveningSlot': 21,
   };
 
   // Add token (deduplicated) and set enabled + timezone. Android tokens are

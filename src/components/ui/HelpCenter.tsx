@@ -508,7 +508,7 @@ export function ContactPanel({
           }}
           rows={6}
           placeholder="Describe your question or issue. Screenshots are super helpful — you can attach them in your email app."
-          className="w-full resize-none rounded-2xl border border-border/60 bg-muted/40 p-4 text-sm font-medium leading-relaxed text-foreground outline-none transition focus:border-primary/50 focus:bg-background"
+          className="w-full resize-none rounded-2xl border border-border/60 bg-muted/40 p-4 text-base font-medium leading-relaxed text-foreground outline-none transition focus:border-primary/50 focus:bg-background sm:text-sm"
         />
       </div>
 

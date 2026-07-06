@@ -182,8 +182,8 @@ export async function POST(req: NextRequest) {
           void notifyFriendUpdate(referral.inviterId);
           void buddyDisplayName(userId).then((name) =>
             sendBuddyPush(referral.inviterId, {
-              title: 'Goal Buddy 🐸',
-              body: `${name} joined — you're sharing "${params.text}" now!`,
+              title: `${name} joined you`,
+              body: `You're sharing "${params.text}" now. Game on.`,
               path: '/planner',
               type: 'buddy_accepted',
             }),

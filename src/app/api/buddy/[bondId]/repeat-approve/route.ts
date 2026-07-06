@@ -71,8 +71,8 @@ export async function POST(
     void notifyFriendUpdate(change.requestedBy);
     void buddyDisplayName(userId).then((name) =>
       sendBuddyPush(change.requestedBy, {
-        title: 'Goal Buddy 🐸',
-        body: `${name} approved your schedule change`,
+        title: `${name} approved your change`,
+        body: 'The new schedule is live.',
         path: '/planner',
         type: 'buddy_repeat_approved',
       }),

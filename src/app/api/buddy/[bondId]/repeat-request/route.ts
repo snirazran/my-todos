@@ -49,8 +49,8 @@ export async function POST(
     void notifyFriendUpdate(partnerId);
     void buddyDisplayName(userId).then((name) =>
       sendBuddyPush(partnerId, {
-        title: 'Goal Buddy 🐸',
-        body: `${name} wants to change a shared task's schedule — approve?`,
+        title: `${name} wants to tweak your shared task`,
+        body: 'Take a look and approve the new schedule.',
         path: '/planner',
         type: 'buddy_repeat_request',
       }),

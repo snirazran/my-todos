@@ -79,10 +79,10 @@ function isTaskDoneForDate(task: TaskDoc, dateYMD: string) {
   return task.type === 'regular' && !!task.completed;
 }
 
-function getReminderLabel(reminder: string) {
-  if (reminder === 'at_time') return 'now';
-  if (reminder === '1h') return 'in 1 hour';
-  return `in ${reminder.replace('m', ' minutes')}`;
+function getReminderBody(reminder: string) {
+  if (reminder === 'at_time') return "It's time. Jump in.";
+  if (reminder === '1h') return 'Starts in 1 hour. Wrap up what you can.';
+  return `Starts in ${reminder.replace('m', ' minutes')}. Get set.`;
 }
 
 async function sendTaskReminder({
@@ -101,8 +101,8 @@ async function sendTaskReminder({
   const messaging = getAdminMessaging();
   const invalidTokens: string[] = [];
   let sent = 0;
-  const title = 'Task reminder';
-  const body = `${task.text} starts ${getReminderLabel(reminder)}.`;
+  const title = task.text;
+  const body = getReminderBody(reminder);
 
   for (const token of tokens) {
     try {

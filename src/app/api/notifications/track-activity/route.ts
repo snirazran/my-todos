@@ -7,10 +7,11 @@ import connectMongo from '@/lib/mongoose';
 import UserModel from '@/lib/models/User';
 
 const MAX_ACTIVITY_ENTRIES = 50;
+const MIN_SAMPLES_TO_TUNE = 3;
 
 /**
  * Compute the best notification hour within a given window from an activity histogram.
- * Falls back to `fallback` if no data exists in the window.
+ * Falls back to `fallback` until an hour has enough samples to be a real pattern.
  */
 function bestHourInRange(
   histogram: Map<number, number>,
@@ -19,7 +20,7 @@ function bestHourInRange(
   fallback: number,
 ): number {
   let bestHour = fallback;
-  let bestCount = 0;
+  let bestCount = MIN_SAMPLES_TO_TUNE - 1;
 
   for (let h = rangeStart; h <= rangeEnd; h++) {
     const count = histogram.get(h) ?? 0;
@@ -49,7 +50,7 @@ function computeSlots(activityHours: number[]): {
 
   return {
     morningSlot: bestHourInRange(histogram, 8, 13, 9),
-    eveningSlot: bestHourInRange(histogram, 16, 21, 18),
+    eveningSlot: bestHourInRange(histogram, 16, 21, 21),
   };
 }
 
@@ -112,6 +113,7 @@ export async function POST(req: NextRequest) {
         'notificationPrefs.morningSlot': morningSlot,
         'notificationPrefs.eveningSlot': eveningSlot,
         'notificationPrefs.timezone': tz,
+        'notificationPrefs.reminderIgnoredCount': 0,
       },
     },
   );

@@ -91,7 +91,7 @@ export async function runLoginStreakSweep() {
     if (!hasTokens || prefs?.enabled === false) continue;
 
     const morningSlot = prefs?.morningSlot ?? 9;
-    const eveningSlot = prefs?.eveningSlot ?? 18;
+    const eveningSlot = prefs?.eveningSlot ?? 21;
 
     const lastFrozen =
       state.freezeUsedDayKeys[state.freezeUsedDayKeys.length - 1];
@@ -118,11 +118,11 @@ export async function runLoginStreakSweep() {
       );
       if (claim.modifiedCount === 1) {
         await sendStreakPush(userId, {
-          title: '❄️ Streak freeze used!',
+          title: `A freeze saved your ${state.count}-day streak`,
           body:
             state.freezes > 0
-              ? `A freeze saved your ${state.count}-day streak. ${state.freezes} left — check in today to keep it going!`
-              : `A freeze saved your ${state.count}-day streak. That was your last one — grab another in the shop!`,
+              ? `${state.freezes} freeze${state.freezes === 1 ? '' : 's'} left. Check in today and keep climbing.`
+              : `That was your last one. Check in today — your streak is on its own now.`,
           type: 'streak_freeze_used',
         });
         results.freezePush += 1;
@@ -153,11 +153,14 @@ export async function runLoginStreakSweep() {
       );
       if (claim.modifiedCount === 1) {
         await sendStreakPush(userId, {
-          title: 'Save your streak! 🔥',
+          title:
+            state.freezes > 0
+              ? "Don't spend a freeze tonight"
+              : `Your ${state.count}-day streak ends at midnight`,
           body:
             state.freezes > 0
-              ? `${state.count}-day streak! A freeze has your back tonight, but a quick hop in keeps it growing.`
-              : `Your ${state.count}-day streak ends at midnight! Hop in to keep it alive.`,
+              ? `A 30-second check-in keeps your ${state.count}-day streak growing for free.`
+              : 'A 30-second check-in saves it.',
           type: 'streak_saver',
         });
         results.saverPush += 1;

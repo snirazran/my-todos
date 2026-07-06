@@ -157,10 +157,10 @@ export async function handleBuddyCompletion(opts: {
   if (completed && date === today) {
     void buddyDisplayName(userId).then((name) =>
       sendBuddyPush(partnerId, {
-        title: 'Goal Buddy 🐸',
-        body: bothNow
-          ? `You both finished today — nice teamwork! 🔥`
-          : `${name} finished today's shared task`,
+        title: bothNow
+          ? 'You both finished today'
+          : `${name} just finished your shared task`,
+        body: bothNow ? 'Great teamwork. Same again tomorrow.' : 'Your move.',
         path: '/planner',
         type: 'buddy_completed',
       }),
