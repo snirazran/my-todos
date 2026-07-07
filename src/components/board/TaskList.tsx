@@ -614,7 +614,7 @@ export default React.memo(function TaskList({
             // after the drop) so framer can measure cards for the reorder
             // animations without the re-enable recalc hitting the drop frame.
             measurable
-              ? 'relative -m-1 p-1'
+              ? 'relative -m-1 p-1 [contain-intrinsic-size:auto_60px]'
               : 'relative -m-1 p-1 [content-visibility:auto] [contain-intrinsic-size:auto_60px]'
           }
         >

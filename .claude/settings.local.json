@@ -236,7 +236,12 @@
       "Bash(lsof -iTCP:3000 -sTCP:LISTEN -P)",
       "Bash(npx playwright *)",
       "Bash(perl -i -pe 's/<Fly size=\\\\{18\\\\} paused y=\\\\{-2\\\\} \\\\/>/<Fly size={24} paused y={-2} \\\\/>/g if $. >= 240 && $. <= 270' src/components/ui/skins/PurchaseSheet.tsx)",
-      "WebFetch(domain:javier-barnes-gd.medium.com)"
+      "WebFetch(domain:javier-barnes-gd.medium.com)",
+      "Bash(git -C /Users/snirazran/Fullstack/my-todos log --oneline -3 -S \"content-visibility\" -- src/components/board/TaskList.tsx)",
+      "Bash(git -C /Users/snirazran/Fullstack/my-todos show 34fa259 --stat)",
+      "Bash(git -C /Users/snirazran/Fullstack/my-todos show a643ab7 --stat)",
+      "Bash(git -C /Users/snirazran/Fullstack/my-todos show 34fa259 -- src/components/board/TaskList.tsx)",
+      "Bash(lsof -nP -iTCP:3001 -sTCP:LISTEN -t)"
     ]
   }
 }

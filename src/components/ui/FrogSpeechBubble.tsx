@@ -2,7 +2,11 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FROG_MESSAGES } from '@/lib/frogMessages';
+import {
+  consumeWelcomeSlot,
+  pickFrogLine,
+  type FrogSpeechContext,
+} from '@/lib/frogSpeech';
 
 interface FrogSpeechBubbleProps {
   rate: number;
@@ -11,9 +15,12 @@ interface FrogSpeechBubbleProps {
   readyQuests?: number;
   clickedAt?: number;
   fixedMessage?: string;
+  facts?: FrogSpeechContext;
   className?: string;
   messageClassName?: string;
 }
+
+const TAP_CHAIN_WINDOW_MS = 20_000;
 
 export function FrogSpeechBubble({
   done,
@@ -22,6 +29,7 @@ export function FrogSpeechBubble({
   isCatching,
   clickedAt = 0,
   fixedMessage,
+  facts,
   className = '',
   messageClassName = '',
 }: FrogSpeechBubbleProps & { isCatching?: boolean }) {
@@ -32,36 +40,43 @@ export function FrogSpeechBubble({
   const prevCatchingRef = useRef(!!isCatching);
   const prevClickedRef = useRef(clickedAt);
   const lastHandledDoneRef = useRef<number | null>(null);
-  const lastMessageRef = useRef('');
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const tapCountRef = useRef(0);
+  const lastTapAtRef = useRef(0);
 
-  const getRandom = (arr: string[]) => {
-    const candidates = arr.filter((msg) => msg !== lastMessageRef.current);
-    if (candidates.length === 0) return arr[0];
-    const picked = candidates[Math.floor(Math.random() * candidates.length)];
-    lastMessageRef.current = picked;
-    return picked;
+  const factsRef = useRef({ done, total, readyQuests, facts });
+  factsRef.current = { done, total, readyQuests, facts };
+
+  const speak = (text: string, ms: number) => {
+    if (!text) return;
+    setMessage(text);
+    setIsVisible(true);
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => setIsVisible(false), ms);
   };
 
-  const getMessage = (
-    currentDone: number,
-    isC?: boolean,
-    currentReadyQuests = readyQuests,
-  ) => {
-    if (isC) return getRandom(FROG_MESSAGES.catching);
-    if (currentReadyQuests > 0) {
-      return getRandom(FROG_MESSAGES.quest_ready);
-    }
+  const speakRef = useRef(speak);
+  speakRef.current = speak;
 
-    const currentRate = total > 0 ? (currentDone / total) * 100 : 0;
-
-    if (total === 0) return getRandom(FROG_MESSAGES.start);
-    if (currentDone === total && total > 0)
-      return getRandom(FROG_MESSAGES.done);
-    if (currentRate < 30) return getRandom(FROG_MESSAGES.early);
-    if (currentRate < 80) return getRandom(FROG_MESSAGES.mid);
-    return getRandom(FROG_MESSAGES.near_finish);
-  };
+  useEffect(() => {
+    if (fixedMessage !== undefined) return;
+    const timer = setTimeout(() => {
+      const slot = consumeWelcomeSlot();
+      if (!slot.show) return;
+      const current = factsRef.current;
+      speakRef.current(
+        pickFrogLine('welcome', {
+          ...current.facts,
+          done: current.done,
+          total: current.total,
+          readyQuests: current.readyQuests,
+          isFirstVisitToday: slot.isFirstVisitToday,
+        }),
+        6000,
+      );
+    }, 900);
+    return () => clearTimeout(timer);
+  }, [fixedMessage]);
 
   useEffect(() => {
     const doneIncreased = done > prevDoneRef.current;
@@ -70,54 +85,28 @@ export function FrogSpeechBubble({
     const frogClicked = clickedAt > prevClickedRef.current;
 
     if (frogClicked) {
-      setMessage(getRandom(FROG_MESSAGES.click));
-      setIsVisible(true);
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      timeoutRef.current = setTimeout(() => setIsVisible(false), 3000);
-    }
-    else if (
-      prevDoneRef.current === done &&
-      prevReadyQuestsRef.current === readyQuests &&
-      total > 0 &&
-      !message
-    ) {
-      setMessage(getRandom(FROG_MESSAGES.welcome));
-      setIsVisible(true);
-
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      timeoutRef.current = setTimeout(() => {
-        setIsVisible(false);
-      }, 5000);
+      const now = Date.now();
+      tapCountRef.current =
+        now - lastTapAtRef.current < TAP_CHAIN_WINDOW_MS
+          ? tapCountRef.current + 1
+          : 1;
+      lastTapAtRef.current = now;
+      speak(
+        pickFrogLine('tap', { ...facts, tapCount: tapCountRef.current }),
+        3000,
+      );
     } else if (catchingStarted) {
       const effectiveDone = done + 1;
       lastHandledDoneRef.current = effectiveDone;
-
-      const newMessage = getMessage(effectiveDone, true, readyQuests);
-      setMessage(newMessage);
-      setIsVisible(true);
-
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      timeoutRef.current = setTimeout(() => {
-        setIsVisible(false);
-      }, 5000);
+      speak(
+        pickFrogLine('catch', { ...facts, done: effectiveDone, total }),
+        4000,
+      );
     } else if (readyQuestsChanged && readyQuests > 0) {
-      setMessage(getRandom(FROG_MESSAGES.quest_ready));
-      setIsVisible(true);
-
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      timeoutRef.current = setTimeout(() => {
-        setIsVisible(false);
-      }, 5000);
+      speak(pickFrogLine('quest_ready', { ...facts, readyQuests }), 5000);
     } else if (doneIncreased) {
       if (done !== lastHandledDoneRef.current) {
-        const newMessage = getMessage(done, false, readyQuests);
-        setMessage(newMessage);
-        setIsVisible(true);
-
-        if (timeoutRef.current) clearTimeout(timeoutRef.current);
-        timeoutRef.current = setTimeout(() => {
-          setIsVisible(false);
-        }, 5000);
+        speak(pickFrogLine('catch', { ...facts, done, total }), 4000);
       }
     } else if (done < prevDoneRef.current) {
       setIsVisible(false);
@@ -127,15 +116,25 @@ export function FrogSpeechBubble({
     prevReadyQuestsRef.current = readyQuests;
     prevCatchingRef.current = !!isCatching;
     prevClickedRef.current = clickedAt;
-  }, [clickedAt, done, isCatching, message, readyQuests, total]);
+  }, [clickedAt, done, facts, isCatching, readyQuests, total]);
+
+  useEffect(
+    () => () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    },
+    [],
+  );
 
   const displayMessage = fixedMessage ?? message;
+  const longestLine = displayMessage
+    .split('\n')
+    .reduce((max, line) => Math.max(max, line.length), 0);
   const textSizeClass =
-    displayMessage.length > 48
+    longestLine > 48
       ? 'text-[10px]'
-      : displayMessage.length > 40
+      : longestLine > 40
         ? 'text-[11px]'
-        : displayMessage.length > 32
+        : longestLine > 32
           ? 'text-xs'
           : 'text-[13px]';
   const shouldShow = fixedMessage ? true : isVisible;
@@ -156,7 +155,7 @@ export function FrogSpeechBubble({
           className={`pointer-events-none absolute left-1/2 top-4 z-[100] w-max min-w-[11rem] max-w-[calc(100vw-1.5rem)] ${className}`}
         >
           <div className="relative rounded-[18px] border border-border/50 bg-card px-3.5 py-3 shadow-sm">
-            <p className={`whitespace-nowrap text-center font-bold leading-none text-foreground ${textSizeClass} ${messageClassName}`}>
+            <p className={`whitespace-nowrap text-center font-bold ${displayMessage.includes('\n') ? 'leading-tight' : 'leading-none'} text-foreground ${textSizeClass} ${messageClassName}`}>
               {displayMessage.split('\n').map((line, index) => (
                 <React.Fragment key={`${line}-${index}`}>
                   {index > 0 ? <br /> : null}

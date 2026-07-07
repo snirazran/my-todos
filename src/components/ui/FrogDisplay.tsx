@@ -8,6 +8,10 @@ import type { WardrobeSlot } from '@/lib/skins/catalog';
 import Fly from '@/components/ui/fly';
 import { FrogSpeechBubble } from './FrogSpeechBubble';
 import { useInventory } from '@/hooks/useInventory';
+import { useLoginStreak } from '@/hooks/useLoginStreak';
+import useSWR from 'swr';
+import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
+import type { FrogSpeechContext } from '@/lib/frogSpeech';
 import { cn } from '@/lib/utils';
 import { prefetchQuests } from './QuestsPanel';
 
@@ -72,6 +76,33 @@ export function FrogDisplay({
     true,
   );
   const [clickedAt, setClickedAt] = React.useState(0);
+
+  const speechEnabled = showSpeechBubble && !isGuest;
+  const { view: streakView } = useLoginStreak(speechEnabled);
+  const { data: profile } = useSWR<{
+    name?: string | null;
+    frogName?: string | null;
+  }>(speechEnabled ? '/api/user' : null, bootstrapFetcher, {
+    revalidateOnFocus: false,
+  });
+
+  const speechFacts = React.useMemo<FrogSpeechContext>(() => {
+    const rawName = profile?.name?.trim();
+    const firstName = rawName?.split(/\s+/)[0];
+    const frogName = profile?.frogName?.trim();
+    return {
+      hungerPercent:
+        typeof hunger === 'number' && typeof maxHunger === 'number' && maxHunger > 0
+          ? Math.max(0, Math.min(100, (hunger / maxHunger) * 100))
+          : null,
+      streak: streakView?.count ?? 0,
+      name:
+        firstName && firstName.length <= 12 && !/^anonymous$/i.test(firstName)
+          ? firstName
+          : null,
+      frogName: frogName && frogName.length <= 12 ? frogName : null,
+    };
+  }, [profile, streakView, hunger, maxHunger]);
 
   const wardrobeBadge = unseenCount + unseenContainerCount;
 
@@ -183,6 +214,7 @@ export function FrogDisplay({
               readyQuests={questClaimableCount}
               isCatching={isCatching}
               clickedAt={clickedAt}
+              facts={speechFacts}
               className="!top-20"
             />
           )}
