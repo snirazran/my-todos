@@ -154,8 +154,11 @@ function siblingOccursOn(task: TaskDoc, date: string) {
  * date if any sibling is, and "done" if any sibling recorded it. Walks backward
  * from today until the first missed scheduled date. Today not being done yet
  * doesn't break the streak (the day isn't over); suppressed/skipped dates are
- * ignored.
+ * ignored, but more than MAX_CONSECUTIVE_SKIPS suppressed occurrences in a row
+ * break the streak.
  */
+const MAX_CONSECUTIVE_SKIPS = 2;
+
 function computeGroupStreak(sibs: TaskDoc[], today: string, tz: string) {
   if (sibs.length === 0) return 0;
   const completed = new Set<string>();
@@ -168,17 +171,24 @@ function computeGroupStreak(sibs: TaskDoc[], today: string, tz: string) {
     if (rs && (!earliestStart || rs < earliestStart)) earliestStart = rs;
   }
   let streak = 0;
+  let skipRun = 0;
   let d = today;
   for (let guard = 0; guard < 2000; guard++) {
     if (earliestStart && d < earliestStart) break;
-    if (!suppressed.has(d) && sibs.some((s) => siblingOccursOn(s, d))) {
-      const done = completed.has(d);
-      if (d === today && !done) {
-        // Today's occurrence isn't done yet — neither count nor break.
-      } else if (done) {
-        streak++;
+    if (sibs.some((s) => siblingOccursOn(s, d))) {
+      if (suppressed.has(d)) {
+        skipRun++;
+        if (skipRun > MAX_CONSECUTIVE_SKIPS) break;
       } else {
-        break;
+        skipRun = 0;
+        const done = completed.has(d);
+        if (d === today && !done) {
+          // Today's occurrence isn't done yet — neither count nor break.
+        } else if (done) {
+          streak++;
+        } else {
+          break;
+        }
       }
     }
     d = addDaysYMD(d, -1);
@@ -369,10 +379,28 @@ function normalizeDailyFly(
   return initDailyFly(today);
 }
 
-/** Flies a task is worth: a base fly plus one per completed checklist item. */
-function taskFlyValue(task: Pick<TaskDoc, 'checklist'>): number {
+const STREAK_FLY_TIERS: ReadonlyArray<readonly [number, number]> = [
+  [30, 5],
+  [14, 4],
+  [7, 3],
+  [3, 2],
+];
+
+/** Base flies for a completion at the given streak length (1 below the first tier). */
+function streakFlyBase(streak: number): number {
+  for (const [minDays, flies] of STREAK_FLY_TIERS) {
+    if (streak >= minDays) return flies;
+  }
+  return 1;
+}
+
+/** Flies a task is worth: a streak-tiered base plus one per completed checklist item. */
+function taskFlyValue(
+  task: Pick<TaskDoc, 'checklist'>,
+  streak: number = 0,
+): number {
   const done = (task.checklist ?? []).filter((c) => c.done).length;
-  return 1 + done;
+  return streakFlyBase(streak) + done;
 }
 
 async function currentFlyStatus(
@@ -1745,13 +1773,30 @@ export async function PUT(req: NextRequest) {
   let dailyTasksCount: number | undefined;
   let awarded = false;
   const isTodayCompletion = date === getZonedToday(tz);
+  let freshWeekly: TaskDoc | null = null;
+  let streakNow = 0;
+  if (doc.type === 'weekly' && isTodayCompletion) {
+    freshWeekly = await TaskModel.findOne({
+      userId: uid,
+      id: taskId,
+    }).lean<TaskDoc>();
+    if (freshWeekly) {
+      const streakMap = await streakMapForWeeklyDocs(
+        uid,
+        [freshWeekly],
+        date,
+        tz,
+      );
+      streakNow = streakMap.get(freshWeekly.id) ?? 0;
+    }
+  }
   if (completed && !alreadyCompletedForDate) {
     const res = await awardFlyForTask(
       uid,
       taskId,
       tz,
       isTodayCompletion,
-      taskFlyValue(doc),
+      taskFlyValue(doc, streakNow),
     );
     flyStatus = res.flyStatus;
     hungerStatus = res.hungerStatus;
@@ -1780,30 +1825,22 @@ export async function PUT(req: NextRequest) {
       tz,
     });
   }
-  if (doc.type === 'weekly' && isTodayCompletion) {
-    const fresh = await TaskModel.findOne({
-      userId: uid,
-      id: taskId,
-    }).lean<TaskDoc>();
-    if (fresh) {
-      const streakMap = await streakMapForWeeklyDocs(uid, [fresh], date, tz);
-      const streakNow = streakMap.get(fresh.id) ?? 0;
-      if (completed && !alreadyCompletedForDate && streakNow >= 2) {
-        await bumpQuestMetric({
-          userId: uid,
-          metric: taskStreakMetric(streakNow),
-          timezone: tz,
-          tagIds: fresh.tags ?? [],
-        });
-      } else if (!completed && streakNow >= 1) {
-        await bumpQuestMetric({
-          userId: uid,
-          metric: taskStreakMetric(streakNow + 1),
-          amount: -1,
-          timezone: tz,
-          tagIds: fresh.tags ?? [],
-        });
-      }
+  if (freshWeekly) {
+    if (completed && !alreadyCompletedForDate && streakNow >= 2) {
+      await bumpQuestMetric({
+        userId: uid,
+        metric: taskStreakMetric(streakNow),
+        timezone: tz,
+        tagIds: freshWeekly.tags ?? [],
+      });
+    } else if (!completed && streakNow >= 1) {
+      await bumpQuestMetric({
+        userId: uid,
+        metric: taskStreakMetric(streakNow + 1),
+        amount: -1,
+        timezone: tz,
+        tagIds: freshWeekly.tags ?? [],
+      });
     }
   }
   void syncGamification(uid, tz);

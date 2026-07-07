@@ -96,6 +96,7 @@ export function PurchaseSheet({
   onBuy,
   onEquip,
   equipLabel = 'Equip now',
+  previewWide = false,
 }: {
   open: boolean;
   onClose: () => void;
@@ -107,6 +108,7 @@ export function PurchaseSheet({
   onBuy: () => Promise<boolean>;
   onEquip: () => Promise<void>;
   equipLabel?: string;
+  previewWide?: boolean;
 }) {
   const [phase, setPhase] = useState<'confirm' | 'success'>('confirm');
   const [busy, setBusy] = useState(false);
@@ -158,7 +160,7 @@ export function PurchaseSheet({
       zIndex={1200}
       closeAriaLabel="Close purchase"
     >
-      {() =>
+      {({ entered }) =>
         target ? (
           <div className="flex flex-col px-5 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-3 sm:px-6 sm:pb-6 sm:pt-7">
             {/* Eyebrow */}
@@ -186,7 +188,10 @@ export function PurchaseSheet({
             {/* Preview */}
             <div
               className={cn(
-                'relative mx-auto mt-4 flex aspect-square w-full max-w-[260px] items-center justify-center overflow-hidden rounded-[28px] bg-gradient-to-br ring-1',
+                'relative mx-auto mt-4 flex items-center justify-center overflow-hidden rounded-[28px] bg-gradient-to-br ring-1',
+                previewWide
+                  ? 'aspect-[16/10] w-full'
+                  : 'aspect-square w-full max-w-[260px]',
                 rarity.gradient,
                 rarity.ring,
                 phase === 'success' && rarity.glow,
@@ -203,7 +208,16 @@ export function PurchaseSheet({
                 transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
                 className="flex h-full w-full items-center justify-center"
               >
-                {preview}
+                {entered && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.25 }}
+                    className="flex h-full w-full items-center justify-center"
+                  >
+                    {preview}
+                  </motion.div>
+                )}
               </motion.div>
 
               <AnimatePresence>

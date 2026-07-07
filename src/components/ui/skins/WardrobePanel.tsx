@@ -811,12 +811,22 @@ function WardrobeManagerContent({
       height={240}
     />
   ) : purchaseBg ? (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={backgroundPreview(purchaseBg)}
-      alt={purchaseBg.name}
-      className="h-full w-full object-cover"
-    />
+    <div className="relative h-full w-full">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={backgroundPreview(purchaseBg)}
+        alt={purchaseBg.name}
+        className="absolute inset-0 h-full w-full object-cover"
+      />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center">
+        <Frog
+          width={200}
+          height={186}
+          indices={equippedIndices}
+          visualOffsetY={-8}
+        />
+      </div>
+    </div>
   ) : null;
   const purchaseOwnedCount = purchaseItem
     ? (data?.wardrobe?.inventory?.[purchaseItem.id] ?? 0)
@@ -1536,6 +1546,7 @@ function WardrobeManagerContent({
         }}
         target={purchaseTarget}
         preview={purchasePreview}
+        previewWide={!!purchaseBg}
         balance={balance}
         ownedCount={purchaseOwnedCount}
         isGuest={isGuest}
