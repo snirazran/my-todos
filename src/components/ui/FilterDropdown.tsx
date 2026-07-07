@@ -56,13 +56,12 @@ export function FilterDropdown({
       const updatePosition = () => {
         if (!triggerRef.current) return;
         const rect = triggerRef.current.getBoundingClientRect();
+        const top = rect.bottom + 8;
+        const left = align === 'right' ? rect.right - 200 : rect.left;
 
-        setCoords({
-          top: rect.bottom + 8,
-          left: align === 'right'
-            ? rect.right - 200
-            : rect.left
-        });
+        setCoords((prev) =>
+          prev && prev.top === top && prev.left === left ? prev : { top, left },
+        );
       };
 
       updatePosition();

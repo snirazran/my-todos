@@ -81,14 +81,24 @@ export function useFrogTongue({
   } | null>(null);
 
   useEffect(() => {
-    const set = () => {
+    let raf = 0;
+    const measure = () => {
+      raf = 0;
       if (animatingRef.current) return;
-      setVp({ w: window.innerWidth, h: window.innerHeight });
+      setVp((prev) => {
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        return prev.w === w && prev.h === h ? prev : { w, h };
+      });
     };
-    set();
-    window.addEventListener('resize', set);
+    const onResize = () => {
+      if (!raf) raf = requestAnimationFrame(measure);
+    };
+    measure();
+    window.addEventListener('resize', onResize);
     return () => {
-      window.removeEventListener('resize', set);
+      if (raf) cancelAnimationFrame(raf);
+      window.removeEventListener('resize', onResize);
     };
   }, []);
 

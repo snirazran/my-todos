@@ -16,6 +16,7 @@ export interface TaskDoc {
   orderOverrides?: Record<string, number>; // YYYY-MM-DD -> per-date order for repeating instances
   notes?: string; // free-text notes shown in the task detail card
   checklist?: { id: string; text: string; done: boolean }[]; // Trello-like sub-items
+  checklistDoneByDate?: Record<string, string[]>; // YYYY-MM-DD -> checked item ids (repeating tasks only)
   repeatMode?:
     | 'none'
     | 'daily'
@@ -113,6 +114,7 @@ const TaskSchema = new Schema<TaskDoc>(
       ],
       default: undefined,
     },
+    checklistDoneByDate: { type: Schema.Types.Mixed, default: undefined },
     dayOfWeek: { type: Number, min: 0, max: 6 },
     date: { type: String },
     weekStart: { type: String },

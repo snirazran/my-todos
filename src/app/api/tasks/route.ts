@@ -23,6 +23,12 @@ import { getZonedToday, getZonedYMD } from '@/lib/utils';
 import { notifyTaskChanged } from '@/lib/taskSync';
 import { severBond, handleBuddyCompletion } from '@/lib/buddy/server';
 import { bumpQuestMetric, taskStreakMetric } from '@/lib/quests/metrics';
+import {
+  checklistContent,
+  checklistForDate,
+  checklistDoneIdsForDate,
+  withChecklistDone,
+} from '@/lib/checklist';
 
 type Origin = 'weekly' | 'regular';
 type BoardItem = { id: string; text: string; order: number; type: TaskType };
@@ -396,10 +402,11 @@ function streakFlyBase(streak: number): number {
 
 /** Flies a task is worth: a streak-tiered base plus one per completed checklist item. */
 function taskFlyValue(
-  task: Pick<TaskDoc, 'checklist'>,
+  task: Pick<TaskDoc, 'type' | 'checklist' | 'checklistDoneByDate'>,
+  date: string,
   streak: number = 0,
 ): number {
-  const done = (task.checklist ?? []).filter((c) => c.done).length;
+  const done = checklistDoneIdsForDate(task, date).length;
   return streakFlyBase(streak) + done;
 }
 
@@ -952,7 +959,7 @@ export async function createTasksForUser(
       updatedAt: now,
       tags,
       notes,
-      checklist,
+      checklist: checklistContent(checklist),
       startTime,
       endTime,
       reminder,
@@ -1007,7 +1014,7 @@ export async function createTasksForUser(
       updatedAt: now,
       tags,
       notes,
-      checklist,
+      checklist: checklistContent(checklist),
       startTime,
       endTime,
       reminder,
@@ -1082,7 +1089,7 @@ export async function createTasksForUser(
         updatedAt: now,
         tags,
         notes,
-        checklist,
+        checklist: checklistContent(checklist),
         startTime,
         endTime,
         reminder,
@@ -1270,6 +1277,19 @@ export async function applySetRepeat(
 
   const repeatEndDate = normalizeRepeatEnd(setRepeat.endDate);
 
+  // Converting a one-off into a repeat: its checklist becomes series content
+  // and any already-checked items become that start date's checked state.
+  const repeatSeedFields = (startDate: string): Record<string, unknown> => {
+    if (doc.type === 'weekly' || !doc.checklist?.length) return {};
+    const doneIds = doc.checklist.filter((c) => c.done).map((c) => c.id);
+    return {
+      checklist: checklistContent(doc.checklist),
+      ...(doneIds.length
+        ? { checklistDoneByDate: { [startDate]: doneIds } }
+        : {}),
+    };
+  };
+
   if (mode === 'none') {
     const targetDate =
       date ||
@@ -1277,7 +1297,15 @@ export async function applySetRepeat(
     await TaskModel.updateOne(
       { userId: uid, id: taskId },
       {
-        $set: { type: 'regular', date: targetDate, completed: false, repeatMode: 'none' },
+        $set: {
+          type: 'regular',
+          date: targetDate,
+          completed: false,
+          repeatMode: 'none',
+          ...(doc.checklist?.length
+            ? { checklist: checklistForDate(doc, targetDate) }
+            : {}),
+        },
         $unset: {
           dayOfWeek: 1,
           weekStart: 1,
@@ -1287,6 +1315,7 @@ export async function applySetRepeat(
           repeatEndDate: 1,
           repeatDayOfMonth: 1,
           repeatRule: 1,
+          checklistDoneByDate: 1,
         },
       },
     );
@@ -1300,6 +1329,7 @@ export async function applySetRepeat(
       repeatMode: 'monthly',
       repeatStartDate,
       repeatDayOfMonth: domFromYMD(repeatStartDate),
+      ...repeatSeedFields(repeatStartDate),
     };
     const unset: Record<string, unknown> = {
       date: 1,
@@ -1327,6 +1357,7 @@ export async function applySetRepeat(
       repeatMode: 'custom',
       repeatStartDate,
       repeatRule: rule,
+      ...repeatSeedFields(repeatStartDate),
     };
     const unset: Record<string, unknown> = {
       date: 1,
@@ -1366,6 +1397,7 @@ export async function applySetRepeat(
       dayOfWeek: weeklyDay,
       repeatMode: mode,
       repeatStartDate,
+      ...repeatSeedFields(repeatStartDate),
     };
     const unset: Record<string, unknown> = {
       date: 1,
@@ -1404,8 +1436,8 @@ export async function applySetRepeat(
           createdAt: now,
           updatedAt: now,
           tags: doc.tags ?? [],
-          // Notes & checklist are intentionally NOT copied to sibling repeats —
-          // they belong to the original task instance, not the whole series.
+          notes: doc.notes,
+          checklist: checklistContent(doc.checklist),
           repeatMode: mode,
           repeatGroupId: groupId,
           repeatStartDate,
@@ -1479,7 +1511,7 @@ export async function PUT(req: NextRequest) {
           order: newOrder,
           tags: doc.tags ?? [],
           notes: doc.notes ?? '',
-          checklist: doc.checklist ?? [],
+          checklist: checklistForDate(doc, fromDate),
           startTime: doc.startTime,
           endTime: doc.endTime,
           reminder: doc.reminder,
@@ -1644,21 +1676,51 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
-  // Handle detail update (notes + checklist) — the Trello-like task card
+  // Handle detail update (notes + checklist) — the Trello-like task card.
+  // Repeating tasks share notes + checklist items across the whole series;
+  // only the checked state is per-date, stored on the doc owning that occurrence.
   if (body.details !== undefined && taskId) {
-    const update: Record<string, unknown> = {};
-    if (typeof body.details.notes === 'string')
-      update.notes = body.details.notes;
-    if (Array.isArray(body.details.checklist)) {
-      update.checklist = body.details.checklist
-        .filter((it: unknown): it is Record<string, unknown> => !!it && typeof it === 'object')
-        .map((it: Record<string, unknown>) => ({
-          id: String(it.id ?? ''),
-          text: String(it.text ?? ''),
-          done: Boolean(it.done),
-        }));
+    const doc = await TaskModel.findOne({
+      userId: uid,
+      id: taskId,
+    }).lean<TaskDoc>();
+    if (!doc)
+      return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+    const set: Record<string, unknown> = {};
+    if (typeof body.details.notes === 'string') set.notes = body.details.notes;
+    const items = sanitizeChecklistInput(body.details.checklist);
+    if (doc.type === 'weekly') {
+      const targetDate =
+        typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)
+          ? date
+          : getZonedToday(tz);
+      if (items) set.checklist = checklistContent(items);
+      if (Object.keys(set).length) {
+        const filter = doc.repeatGroupId
+          ? { userId: uid, repeatGroupId: doc.repeatGroupId }
+          : { userId: uid, id: taskId };
+        await TaskModel.updateMany(filter, { $set: set });
+      }
+      if (items) {
+        const doneIds = items.filter((it) => it.done).map((it) => it.id);
+        await TaskModel.updateOne(
+          { userId: uid, id: taskId },
+          {
+            $set: {
+              checklistDoneByDate: withChecklistDone(
+                doc.checklistDoneByDate,
+                targetDate,
+                doneIds,
+              ),
+            },
+          },
+        );
+      }
+    } else {
+      if (items) set.checklist = items;
+      if (Object.keys(set).length)
+        await TaskModel.updateOne({ userId: uid, id: taskId }, { $set: set });
     }
-    await TaskModel.updateOne({ userId: uid, id: taskId }, { $set: update });
     await notifyTaskChanged(uid);
     return NextResponse.json({ ok: true });
   }
@@ -1708,17 +1770,28 @@ export async function PUT(req: NextRequest) {
       await TaskModel.updateOne(
         { userId: uid, id: taskId },
         {
-          $set: { type: 'regular', date, completed: isCompletedToday },
+          $set: {
+            type: 'regular',
+            date,
+            completed: isCompletedToday,
+            ...(doc.checklist?.length
+              ? { checklist: checklistForDate(doc, date) }
+              : {}),
+          },
           $unset: {
             dayOfWeek: 1,
             suppressedDates: 1,
             completedDates: 1,
             repeatStartDate: 1,
+            checklistDoneByDate: 1,
           },
         },
       );
     } else {
       const dow = dowFromYMD(date);
+      const doneIds = (doc.checklist ?? [])
+        .filter((c) => c.done)
+        .map((c) => c.id);
       await TaskModel.updateOne(
         { userId: uid, id: taskId },
         {
@@ -1727,6 +1800,12 @@ export async function PUT(req: NextRequest) {
             dayOfWeek: dow,
             completedDates: doc.completed ? [date] : [],
             repeatStartDate: date,
+            ...(doc.checklist?.length
+              ? { checklist: checklistContent(doc.checklist) }
+              : {}),
+            ...(doneIds.length
+              ? { checklistDoneByDate: { [date]: doneIds } }
+              : {}),
           },
           $unset: { date: 1, weekStart: 1, completed: 1 },
         },
@@ -1796,7 +1875,7 @@ export async function PUT(req: NextRequest) {
       taskId,
       tz,
       isTodayCompletion,
-      taskFlyValue(doc, streakNow),
+      taskFlyValue(doc, date, streakNow),
     );
     flyStatus = res.flyStatus;
     hungerStatus = res.hungerStatus;
@@ -1821,7 +1900,7 @@ export async function PUT(req: NextRequest) {
       userId: uid,
       date,
       completed,
-      ownFlyValue: taskFlyValue(doc),
+      ownFlyValue: taskFlyValue(doc, date),
       tz,
     });
   }
@@ -1905,8 +1984,8 @@ export async function DELETE(req: NextRequest) {
           completed: completed.has(d),
           completedDates: completed.has(d) ? [d] : [],
           tags: s.tags ?? [],
-          notes: isOriginal ? s.notes ?? '' : '',
-          checklist: isOriginal ? s.checklist ?? [] : [],
+          notes: s.notes ?? '',
+          checklist: checklistForDate(s, d),
           startTime: s.startTime,
           endTime: s.endTime,
           reminder: s.reminder,
@@ -2049,7 +2128,7 @@ async function handleDailyGet(req: NextRequest, userId: string, tz: string) {
       origin: t.type as Origin,
       tags: t.tags ?? [],
       notes: t.notes ?? '',
-      checklist: t.checklist ?? [],
+      checklist: checklistForDate(t, date),
       repeatMode: t.repeatMode,
       repeatGroupId: t.repeatGroupId,
       repeatStartDate: repeatStartForDoc(t, tz),
@@ -2436,7 +2515,7 @@ async function handleDateRangeGet(req: NextRequest, uid: string, tz: string) {
           completed: (doc.completedDates ?? []).includes(d),
           tags: doc.tags ?? [],
           notes: doc.notes ?? '',
-          checklist: doc.checklist ?? [],
+          checklist: checklistForDate(doc, d),
           repeatMode: doc.repeatMode,
           repeatStartDate: repeatStart,
           repeatEndDate: doc.repeatEndDate,
@@ -2466,7 +2545,7 @@ async function handleDateRangeGet(req: NextRequest, uid: string, tz: string) {
           completed: (doc.completedDates ?? []).includes(d),
           tags: doc.tags ?? [],
           notes: doc.notes ?? '',
-          checklist: doc.checklist ?? [],
+          checklist: checklistForDate(doc, d),
           repeatMode: doc.repeatMode,
           repeatStartDate: repeatStart,
           repeatEndDate: doc.repeatEndDate,
@@ -2496,7 +2575,7 @@ async function handleDateRangeGet(req: NextRequest, uid: string, tz: string) {
           completed: (doc.completedDates ?? []).includes(d),
           tags: doc.tags ?? [],
           notes: doc.notes ?? '',
-          checklist: doc.checklist ?? [],
+          checklist: checklistForDate(doc, d),
           repeatMode: doc.repeatMode,
           repeatGroupId: doc.repeatGroupId,
           repeatStartDate: repeatStart,
@@ -2973,6 +3052,7 @@ async function handleBoardPutByDate(
               repeatDayOfMonth: 1,
               repeatStartDate: 1,
               repeatEndDate: 1,
+              checklistDoneByDate: 1,
             },
           },
         );

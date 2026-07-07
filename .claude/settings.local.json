@@ -242,7 +242,10 @@
       "Bash(git -C /Users/snirazran/Fullstack/my-todos show a643ab7 --stat)",
       "Bash(git -C /Users/snirazran/Fullstack/my-todos show 34fa259 -- src/components/board/TaskList.tsx)",
       "Bash(lsof -nP -iTCP:3001 -sTCP:LISTEN -t)",
-      "Bash(git grep *)"
+      "Bash(git grep *)",
+      "Bash(awk -F: '$1 > 2050')",
+      "Bash(git -C /Users/snirazran/Fullstack/my-todos diff --stat)",
+      "Bash(git -C /Users/snirazran/Fullstack/my-todos diff)"
     ]
   }
 }

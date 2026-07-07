@@ -84,10 +84,24 @@ export function LeftTongueProvider({ children }: { children: React.ReactNode }) 
   const tipEl = useRef<SVGGElement | null>(null);
 
   useEffect(() => {
-    const set = () => setVp({ w: window.innerWidth, h: window.innerHeight });
-    set();
-    window.addEventListener('resize', set);
-    return () => window.removeEventListener('resize', set);
+    let raf = 0;
+    const measure = () => {
+      raf = 0;
+      setVp((prev) => {
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        return prev.w === w && prev.h === h ? prev : { w, h };
+      });
+    };
+    const onResize = () => {
+      if (!raf) raf = requestAnimationFrame(measure);
+    };
+    measure();
+    window.addEventListener('resize', onResize);
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+      window.removeEventListener('resize', onResize);
+    };
   }, []);
 
   const registerFly = useCallback((key: string, el: HTMLElement | null) => {

@@ -366,7 +366,12 @@ export default React.memo(function TaskList({
     fetch('/api/tasks', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ taskId, details, timezone: tz }),
+      body: JSON.stringify({
+        taskId,
+        details,
+        date: dateKey ?? todayYmdStr(),
+        timezone: tz,
+      }),
     }).then(refresh);
   };
 

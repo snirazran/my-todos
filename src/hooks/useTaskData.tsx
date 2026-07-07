@@ -1026,7 +1026,7 @@ export function useTaskData({
         await fetch('/api/tasks', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ taskId, details, timezone: tz }),
+          body: JSON.stringify({ taskId, details, date: dateStr, timezone: tz }),
         });
       } catch (e) {
         console.error('Update task details failed', e);
@@ -1034,7 +1034,7 @@ export function useTaskData({
         if (prevBacklog) mutateBacklog(prevBacklog, { revalidate: false });
       }
     },
-    [todayData, backlogData, mutateToday, mutateBacklog, tz],
+    [todayData, backlogData, mutateToday, mutateBacklog, tz, dateStr],
   );
 
   /**

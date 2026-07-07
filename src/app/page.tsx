@@ -966,13 +966,18 @@ export default function Home() {
           setQuickText('');
           setShowQuickAdd(true);
         }}
-        className="fixed right-6 z-[40] grid h-14 w-14 place-items-center rounded-full bg-primary/15 text-primary ring-1 ring-primary/30 shadow-lg backdrop-blur-sm transition-all hover:bg-primary/25 active:scale-95 md:hidden"
-        style={{
-          bottom: `calc(env(safe-area-inset-bottom) + ${
-            notificationStackHeight > 0 ? 80 + notificationStackHeight : 88
-          }px)`,
-          transition: 'bottom 200ms ease',
-        }}
+        className="fixed right-6 z-[40] grid h-14 w-14 place-items-center rounded-full bg-primary/15 text-primary ring-1 ring-primary/30 shadow-lg backdrop-blur-sm transition-all hover:bg-primary/25 active:scale-95 bottom-[var(--fab-bottom)] md:bottom-[var(--fab-bottom-md)] md:right-[max(1.5rem,50vw_-_400px)]"
+        style={
+          {
+            '--fab-bottom': `calc(env(safe-area-inset-bottom) + ${
+              notificationStackHeight > 0 ? 80 + notificationStackHeight : 88
+            }px)`,
+            '--fab-bottom-md': `calc(env(safe-area-inset-bottom) + ${
+              notificationStackHeight > 0 ? 28 + notificationStackHeight : 24
+            }px)`,
+            transition: 'bottom 200ms ease',
+          } as React.CSSProperties
+        }
       >
         <Plus className="h-6 w-6 stroke-[3]" />
       </button>

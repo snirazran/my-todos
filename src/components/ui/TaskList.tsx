@@ -7,7 +7,6 @@ import {
   Repeat,
   Pencil,
   Filter,
-  ChevronDown,
   Check,
   CalendarDays,
   Plus,
@@ -420,7 +419,7 @@ const SortableTaskItem = React.forwardRef<
         style={{ ...style, overflow: 'hidden' }}
         {...attributes}
         {...listeners}
-        className={`relative mb-1.5 w-full rounded-xl ${isDragging ? 'z-30' : isMenuOpen ? 'z-50 shadow-sm border border-primary/30' : 'z-auto'}`}
+        className={`relative mb-1.5 w-full rounded-xl md:mb-2 ${isDragging ? 'z-30' : isMenuOpen ? 'z-50 shadow-sm border border-primary/30' : 'z-auto'}`}
         data-is-active={!isDone}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -941,25 +940,6 @@ export default function TaskList({
     bottom: number;
   } | null>(null);
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
-  const [showScrollHint, setShowScrollHint] = useState(false);
-
-  React.useEffect(() => {
-    const el = scrollContainerRef.current;
-    if (!el) return;
-    const update = () => {
-      const remaining = el.scrollHeight - el.scrollTop - el.clientHeight;
-      // Only meaningful on web where the list has a capped height and scrolls
-      setShowScrollHint(remaining > 8);
-    };
-    update();
-    el.addEventListener('scroll', update, { passive: true });
-    const ro = new ResizeObserver(update);
-    ro.observe(el);
-    return () => {
-      el.removeEventListener('scroll', update);
-      ro.disconnect();
-    };
-  }, [tasks, showCompleted, selectedTags]);
 
   React.useEffect(() => {
     if (isAnyDragging) {
@@ -1349,9 +1329,8 @@ export default function TaskList({
         </div>
 
         <div className="w-full rounded-[18px] bg-card/40 border border-border/50 shadow-sm overflow-hidden">
-        <div className="relative">
         <div
-          className={`p-1.5 pb-0 space-y-0 md:overflow-y-auto overflow-y-visible md:max-h-[600px] no-scrollbar ${exitAction ? 'overflow-x-visible' : 'overflow-x-hidden'}`}
+          className={`p-1.5 pb-0 space-y-0 overflow-y-visible md:p-2 md:pb-0 ${exitAction ? 'overflow-x-visible' : 'overflow-x-hidden'}`}
           ref={scrollContainerRef}
         >
           {tasks.length === 0 && !exitAction ? (
@@ -1478,21 +1457,10 @@ export default function TaskList({
           {/* Show Finished Toggle (Removed from bottom) */}
         </div>
 
-        {/* Scroll hint — fade + chevron shown on web when more tasks lie below the fold */}
-        <div
-          aria-hidden
-          className={`pointer-events-none absolute inset-x-0 bottom-0 z-30 hidden md:flex items-end justify-center h-7 bg-gradient-to-t from-card via-card/80 to-transparent transition-opacity duration-200 ${
-            showScrollHint ? 'opacity-100' : 'opacity-0'
-          }`}
-        >
-          <ChevronDown className="mb-0.5 h-4 w-4 text-muted-foreground/60 animate-bounce" strokeWidth={2.5} />
-        </div>
-        </div>
-
-        {/* Pinned Add Task footer — always visible regardless of list length */}
+        {/* Add Task footer at the end of the list */}
         {(exitAction ||
           (tasks.length > 0 && sortedVisibleTasks.length > 0)) && (
-          <div className="p-1.5 pt-0 bg-card/40">
+          <div className="p-1.5 pt-0 bg-card/40 md:p-2 md:pt-0">
             <button
               onClick={() => onAddRequested('', null, { preselectToday: true })}
               disabled={quickAddOpen}

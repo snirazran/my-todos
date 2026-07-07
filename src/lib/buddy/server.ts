@@ -5,6 +5,7 @@ import { getZonedToday } from '@/lib/utils';
 import { notifyFriendUpdate } from '@/lib/taskSync';
 import { sendBuddyPush, buddyDisplayName } from '@/lib/buddy/push';
 import { bumpQuestMetric } from '@/lib/quests/metrics';
+import { checklistDoneIdsForDate } from '@/lib/checklist';
 
 function dowYMD(ymd: string): number {
   const [y, m, d] = ymd.split('-').map(Number);
@@ -70,11 +71,22 @@ export function computeStreak(
 async function partnerTaskFlyValue(
   bondId: string,
   partnerId: string,
+  date: string,
 ): Promise<number> {
-  const t = await TaskModel.findOne({ userId: partnerId, bondId })
-    .select('checklist')
-    .lean<{ checklist?: { done: boolean }[] }>();
-  return 1 + (t?.checklist ?? []).filter((c) => c.done).length;
+  const docs = await TaskModel.find({ userId: partnerId, bondId })
+    .select('type checklist checklistDoneByDate')
+    .lean<
+      {
+        type?: string;
+        checklist?: { id: string; text: string; done: boolean }[];
+        checklistDoneByDate?: Record<string, string[]>;
+      }[]
+    >();
+  const done = docs.reduce(
+    (max, d) => Math.max(max, checklistDoneIdsForDate(d, date).length),
+    0,
+  );
+  return 1 + done;
 }
 
 /**
@@ -122,7 +134,7 @@ export async function handleBuddyCompletion(opts: {
 
   if (completed && bothNow && !alreadyBonused) {
     const [partnerValue, [myTask, partnerTask]] = await Promise.all([
-      partnerTaskFlyValue(bondId, partnerId),
+      partnerTaskFlyValue(bondId, partnerId, date),
       loadBondTaskTags(),
     ]);
     await Promise.all([
@@ -134,7 +146,7 @@ export async function handleBuddyCompletion(opts: {
     bond.bonusAwardedDates = [...bond.bonusAwardedDates, date];
   } else if (!bothNow && alreadyBonused) {
     const [partnerValue, [myTask, partnerTask]] = await Promise.all([
-      partnerTaskFlyValue(bondId, partnerId),
+      partnerTaskFlyValue(bondId, partnerId, date),
       loadBondTaskTags(),
     ]);
     await Promise.all([
