@@ -11,6 +11,8 @@ import { useInventory } from '@/hooks/useInventory';
 import { cn } from '@/lib/utils';
 import { prefetchQuests } from './QuestsPanel';
 
+const HUNGER_SEGMENTS = 6;
+
 type Props = {
   frogRef: React.RefObject<FrogHandle | null>;
   frogBoxRef?: React.RefObject<HTMLDivElement | null>;
@@ -75,13 +77,30 @@ export function FrogDisplay({
 
   // Local state for smooth hunger updates
   const [displayedHunger, setDisplayedHunger] = React.useState(hunger ?? 0);
+  const prevHungerRef = React.useRef<number | null>(null);
+  const feedTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [feedGainMs, setFeedGainMs] = React.useState(0);
+  const feedPulse = feedGainMs > 0;
 
-  // Sync with prop updates
+  // Sync with prop updates; a jump of over a minute means the frog was fed
   React.useEffect(() => {
-    if (typeof hunger === 'number') {
-      setDisplayedHunger(hunger);
+    if (typeof hunger !== 'number') return;
+    const prev = prevHungerRef.current;
+    prevHungerRef.current = hunger;
+    setDisplayedHunger(hunger);
+    if (prev !== null && hunger - prev > 60_000) {
+      setFeedGainMs(hunger - prev);
+      if (feedTimerRef.current) clearTimeout(feedTimerRef.current);
+      feedTimerRef.current = setTimeout(() => setFeedGainMs(0), 1200);
     }
   }, [hunger]);
+
+  React.useEffect(
+    () => () => {
+      if (feedTimerRef.current) clearTimeout(feedTimerRef.current);
+    },
+    [],
+  );
 
   // Constant visual decay
   React.useEffect(() => {
@@ -102,26 +121,24 @@ export function FrogDisplay({
       ? Math.max(0, Math.min(100, (displayedHunger / maxHunger) * 100))
       : 100;
 
-  // Expanded hunger states for better transition. The label is always
-  // "HUNGER LEVEL" — the color/fill conveys how full the frog is.
   const getHungerState = (p: number) => {
     if (p > 80)
       return {
         bg: 'bg-emerald-500',
-        text: 'text-emerald-500',
-        label: 'Hunger bar',
+        text: 'text-emerald-600',
+        label: 'Full',
       };
     if (p > 60)
-      return { bg: 'bg-lime-500', text: 'text-lime-500', label: 'Hunger bar' };
+      return { bg: 'bg-lime-500', text: 'text-lime-600', label: 'Content' };
     if (p > 40)
       return {
         bg: 'bg-yellow-500',
-        text: 'text-yellow-500',
-        label: 'Hunger bar',
+        text: 'text-yellow-600',
+        label: 'Peckish',
       };
     if (p > 20)
-      return { bg: 'bg-amber-500', text: 'text-amber-500', label: 'Hunger bar' };
-    return { bg: 'bg-rose-500', text: 'text-rose-500', label: 'Hunger bar' };
+      return { bg: 'bg-amber-500', text: 'text-amber-600', label: 'Hungry' };
+    return { bg: 'bg-rose-500', text: 'text-rose-600', label: 'Starving' };
   };
 
   const {
@@ -197,50 +214,54 @@ export function FrogDisplay({
         {/* Decorative Top Highlight to simulate glass edge light */}
         <div className="absolute inset-x-4 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/80 to-transparent opacity-50" />
 
-        {/* Full Width Hunger Pill */}
-        <div className="relative flex flex-col justify-center w-full h-full px-3">
+        {/* Hunger: state label + 6 fly-meal pips (each pip = 8h) */}
+        <div className="relative flex items-center w-full h-full px-3">
           {typeof hunger === 'number' ? (
-            <div
-              className={cn(
-                'relative h-6 w-full overflow-hidden rounded-full bg-muted transition-all duration-200',
-                hungerPercent <= 20 && 'ring-1 ring-rose-500/10',
-              )}
-            >
-              {/* Dark base label — readable on the muted bg where the fill doesn't reach (non-starving states) */}
-              {hungerPercent > 20 && (
-                <div className="absolute inset-0 flex items-center px-4 pointer-events-none">
-                  <span className="text-[11px] font-black tracking-[0.06em] text-foreground/75 whitespace-nowrap">
-                    {hungerStatus}
-                  </span>
-                </div>
-              )}
-              {/* Fill bar with white label inside; overflow-hidden clips the label to the fill width */}
-              <div className="absolute inset-1">
-                <div
-                  className={cn(
-                    'relative h-full min-w-6 rounded-full overflow-hidden',
-                    animateHunger && 'transition-all duration-1000 ease-in-out',
-                    hungerColor,
-                  )}
-                  style={{ width: `${Math.max(hungerPercent, 4)}%` }}
-                >
-                  {hungerPercent > 20 && (
-                    <div className="absolute top-0 bottom-0 left-3 flex items-center pointer-events-none">
-                      <span className="text-[11px] font-black tracking-[0.06em] text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.35)] whitespace-nowrap">
-                        {hungerStatus}
-                      </span>
+            <div className="flex items-center gap-2.5 w-full">
+              <span
+                className={cn(
+                  'w-[64px] shrink-0 text-[11px] font-black tracking-[0.06em] whitespace-nowrap transition-colors duration-300',
+                  feedPulse ? 'text-emerald-500' : hungerTextColor,
+                  hungerPercent <= 20 && !feedPulse && 'animate-pulse',
+                )}
+              >
+                {feedPulse
+                  ? `Yum! +${Math.round(feedGainMs / 3_600_000)}h`
+                  : hungerStatus}
+              </span>
+              <div
+                className={cn(
+                  'flex flex-1 items-center gap-1',
+                  feedPulse && 'animate-feed-pop',
+                )}
+              >
+                {Array.from({ length: HUNGER_SEGMENTS }).map((_, i) => {
+                  const fill = Math.max(
+                    0,
+                    Math.min(1, (hungerPercent / 100) * HUNGER_SEGMENTS - i),
+                  );
+                  return (
+                    <div
+                      key={i}
+                      className={cn(
+                        'relative h-3.5 flex-1 overflow-hidden rounded-full bg-muted',
+                        hungerPercent <= 20 && 'ring-1 ring-rose-500/15',
+                      )}
+                    >
+                      <div
+                        className={cn(
+                          'absolute inset-y-0 left-0 rounded-full',
+                          hungerColor,
+                          animateHunger &&
+                            'transition-all duration-700 ease-out',
+                          feedPulse && 'brightness-125',
+                        )}
+                        style={{ width: `${fill * 100}%` }}
+                      />
                     </div>
-                  )}
-                </div>
+                  );
+                })}
               </div>
-              {/* Starving: render dark label on top of everything so it stays readable over the small red fill */}
-              {hungerPercent <= 20 && (
-                <div className="absolute inset-0 flex items-center px-4 pointer-events-none">
-                  <span className="text-[11px] font-black tracking-[0.06em] text-foreground/85 whitespace-nowrap">
-                    {hungerStatus}
-                  </span>
-                </div>
-              )}
             </div>
           ) : (
             <div className="flex-1" />

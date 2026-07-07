@@ -496,7 +496,7 @@ export default function TaskBoard({
 
   // Mount: scroll to today's column instantly
   const didInitialCenter = useRef(false);
-  useEffect(() => {
+  React.useLayoutEffect(() => {
     if (didInitialCenter.current) return;
     const s = scrollerRef.current;
     const col = (document.querySelectorAll('[data-col="true"]')[activeIdx] ??

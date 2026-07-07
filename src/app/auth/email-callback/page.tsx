@@ -11,7 +11,7 @@ import {
 import { Loader2 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { auth } from '@/lib/firebase';
-import { setAuthTokenCookie } from '@/lib/authCookie';
+import { establishSessionCookie } from '@/lib/authCookie';
 
 const Frog = dynamic(() => import('@/components/ui/frog'), { ssr: false });
 
@@ -45,8 +45,7 @@ export default function EmailCallbackPage() {
       window.localStorage.removeItem(EMAIL_LINK_STORAGE_KEY);
       const user = auth.currentUser;
       if (!user) throw new Error('No user after sign-in');
-      const token = await user.getIdToken(true);
-      setAuthTokenCookie(token);
+      await establishSessionCookie(user);
       const res = await fetch('/api/user', { method: 'POST' });
       const data = await res.json().catch(() => ({}));
       router.replace(data?.isNewUser ? '/onboarding' : '/');

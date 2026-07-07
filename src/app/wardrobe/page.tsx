@@ -7,6 +7,7 @@ import Frog, { type FrogHandle } from '@/components/ui/frog';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
 import { WardrobePageContent } from '@/components/ui/skins/WardrobePanel';
 import { useInventory } from '@/hooks/useInventory';
+import { useIsFrogHungry } from '@/hooks/useFrogHunger';
 import { useBackgrounds } from '@/hooks/useBackgrounds';
 import { backgroundPreview } from '@/hooks/useBackgroundActions';
 import { byId as staticById, type WardrobeSlot } from '@/lib/skins/catalog';
@@ -19,6 +20,7 @@ function WardrobePageInner() {
   const searchParams = useSearchParams();
   const frogRef = useRef<FrogHandle>(null);
   const { data } = useInventory(true);
+  const isFrogHungry = useIsFrogHungry(true);
   const { data: bgData } = useBackgrounds(true);
   const isStuck = useUIStore((s) => s.isWardrobeStuck);
   const wardrobeTab = useUIStore((s) => s.wardrobeTab);
@@ -46,12 +48,12 @@ function WardrobePageInner() {
 
     return {
       skin: getIndex('skin'),
-      mood: 0,
+      mood: isFrogHungry ? 1 : 0,
       hat: getIndex('hat'),
       body: getIndex('body'),
       hand_item: getIndex('hand_item'),
     };
-  }, [data?.catalog, data?.wardrobe?.equipped]);
+  }, [data?.catalog, data?.wardrobe?.equipped, isFrogHungry]);
 
   const dockControls = useAnimationControls();
   const indicesKey = useMemo(

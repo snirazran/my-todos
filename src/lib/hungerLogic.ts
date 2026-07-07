@@ -4,6 +4,7 @@ export const MAX_HUNGER_MS = 48 * 60 * 60 * 1000; // 48 hours (6 units * 8h)
 export const TASK_HUNGER_REWARD_MS = 8 * 60 * 60 * 1000; // 8 hours (1 unit)
 export const PENALTY_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 export const FLIES_PER_PENALTY = 1;
+export const HUNGRY_MOOD_THRESHOLD = 0.2;
 
 export type HungerStatus = {
   hunger: number; // Current hunger (ms remaining)

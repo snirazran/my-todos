@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
 import { useUIStore } from '@/lib/uiStore';
-import { clearAuthTokenCookie } from '@/lib/authCookie';
+import { clearSessionCookie } from '@/lib/authCookie';
 import { useInventory } from '@/hooks/useInventory';
 import GoogleCalendarSync, { getCalendarSyncStatus } from '@/components/ui/GoogleCalendarSync';
 import {
@@ -164,8 +164,8 @@ export default function SiteHeader() {
             user={user}
             loading={loading}
             onSignIn={() => router.push('/login')}
-            onSignOut={() => {
-              clearAuthTokenCookie();
+            onSignOut={async () => {
+              await clearSessionCookie();
               router.replace('/login');
             }}
             compactMobileHome
@@ -336,9 +336,9 @@ export default function SiteHeader() {
             user={user}
             loading={loading}
             onSignIn={() => router.push('/login')}
-            onSignOut={() => {
-              clearAuthTokenCookie();
-              router.replace('/login'); // send straight to login on logout
+            onSignOut={async () => {
+              await clearSessionCookie();
+              router.replace('/login');
             }}
           />
 

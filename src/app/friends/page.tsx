@@ -19,6 +19,7 @@ import useSWR from 'swr';
 import { useAuth } from '@/components/auth/AuthContext';
 import { mutateFriendsCaches } from '@/hooks/useFriendsSync';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
+import { useIsFrogHungry } from '@/hooks/useFrogHunger';
 import { useRegisterOpenSheet, useSheetStore } from '@/lib/sheetStore';
 import Frog from '@/components/ui/frog';
 import Fly from '@/components/ui/fly';
@@ -57,6 +58,7 @@ export default function FriendsPage() {
   );
 
   const { indices } = useWardrobeIndices(!!user);
+  const isFrogHungry = useIsFrogHungry(!!user);
   const { data: friendsData, mutate: mutateFriends } = useSWR<{
     friends: FriendSummary[];
     me: FriendSummary | null;
@@ -164,7 +166,10 @@ export default function FriendsPage() {
         </button>
 
         {/* Self frog */}
-        <SelfFrog indices={indices} paused={isAnyPanelOpen} />
+        <SelfFrog
+          indices={{ ...indices, mood: isFrogHungry ? 1 : 0 }}
+          paused={isAnyPanelOpen}
+        />
 
         {/* Add friend — frog sits right on top of it */}
         <button
@@ -715,7 +720,7 @@ function SelfFrog({
   indices,
   paused = false,
 }: {
-  indices: Partial<Record<'skin' | 'hat' | 'body' | 'hand_item', number>>;
+  indices: Partial<Record<'skin' | 'hat' | 'body' | 'hand_item' | 'mood', number>>;
   paused?: boolean;
 }) {
   return (

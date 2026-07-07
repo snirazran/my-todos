@@ -49,6 +49,7 @@ import {
   FlyStatus,
   HungerStatus,
 } from '@/hooks/useTaskData';
+import { HUNGRY_MOOD_THRESHOLD } from '@/lib/hungerLogic';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import { randomUUID } from '@/lib/uuid';
 import { QuestOnboardingPopup } from '@/components/ui/QuestOnboardingPopup';
@@ -470,6 +471,14 @@ export default function Home() {
 
   const { indices } = useWardrobeIndices(!!user);
 
+  const isFrogHungry =
+    !!user &&
+    hungerStatus.maxHunger > 0 &&
+    hungerStatus.hunger / hungerStatus.maxHunger <= HUNGRY_MOOD_THRESHOLD;
+  const frogIndices = user
+    ? { ...indices, mood: isFrogHungry ? 1 : 0 }
+    : indices;
+
   const renderGuestPrompt = () =>
     !user ? (
       <div className="relative mx-3 mb-2 overflow-hidden border shadow-sm rounded-xl bg-primary/5 border-primary/10">
@@ -506,7 +515,7 @@ export default function Home() {
               frogBoxRef={frogBoxRef}
               mouthOpen={!!grab}
               mouthOffset={FROG_TONGUE_MOUTH_OFFSET}
-              indices={indices}
+              indices={frogIndices}
               openWardrobe={isWardrobeOpen}
               onOpenChange={setWardrobeOpen}
               flyBalance={flyBalance}

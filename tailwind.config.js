@@ -54,6 +54,11 @@ module.exports = {
           '0%,100%': { transform: 'scale(1)' },
           '50%': { transform: 'scale(1.06)' },
         },
+        'feed-pop': {
+          '0%': { transform: 'scale(1)' },
+          '35%': { transform: 'scale(1.07)' },
+          '100%': { transform: 'scale(1)' },
+        },
       },
       animation: {
         float: 'float 3s ease-in-out infinite',
@@ -61,6 +66,7 @@ module.exports = {
         shimmer: 'shimmer 2s linear infinite',
         shine: 'shine 1.35s ease-in-out infinite',
         'quest-pulse': 'quest-pulse 1.8s ease-in-out infinite',
+        'feed-pop': 'feed-pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)',
       },
       colors: {
         // every key here becomes a colour-utility name

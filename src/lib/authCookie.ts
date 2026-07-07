@@ -1,19 +1,32 @@
 'use client';
 
-function buildAuthCookie(value: string, maxAge: number) {
-  const parts = [`token=${value}`, 'path=/', `max-age=${maxAge}`, 'SameSite=Lax'];
+import type { User } from 'firebase/auth';
 
-  if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
-    parts.push('Secure');
+const REFRESH_THRESHOLD_MS = 3 * 24 * 60 * 60 * 1000;
+
+export async function establishSessionCookie(user: User) {
+  const idToken = await user.getIdToken();
+  const res = await fetch('/api/auth/session', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ idToken }),
+  });
+  if (!res.ok) {
+    throw new Error('Failed to establish session');
   }
-
-  return parts.join('; ');
 }
 
-export function setAuthTokenCookie(token: string) {
-  document.cookie = buildAuthCookie(token, 604800);
+export async function clearSessionCookie() {
+  try {
+    await fetch('/api/auth/session', { method: 'DELETE' });
+  } catch {}
 }
 
-export function clearAuthTokenCookie() {
-  document.cookie = buildAuthCookie('', 0);
+export function sessionCookieNeedsRefresh() {
+  const match = document.cookie.match(/(?:^|;\s*)session_exp=([^;]+)/);
+  if (!match) return true;
+  const expiresAt = Number(match[1]);
+  return (
+    !Number.isFinite(expiresAt) || expiresAt - Date.now() < REFRESH_THRESHOLD_MS
+  );
 }

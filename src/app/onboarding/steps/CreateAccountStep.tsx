@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Loader2 } from 'lucide-react';
 import { sendSignInLinkToEmail } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
-import { setAuthTokenCookie } from '@/lib/authCookie';
+import { establishSessionCookie } from '@/lib/authCookie';
 import {
   GOOGLE_AUTH_ERROR_MESSAGES,
   initNativeGoogleSignIn,
@@ -46,8 +46,7 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
       await signInWithGoogle({ linkTo: current?.isAnonymous ? current : null });
       const user = auth.currentUser;
       if (!user) throw new Error('Sign-in did not complete');
-      const token = await user.getIdToken();
-      setAuthTokenCookie(token);
+      await establishSessionCookie(user);
       await fetch('/api/user', { method: 'POST' });
       onNext();
     } catch (signInError: any) {

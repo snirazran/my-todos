@@ -9,16 +9,21 @@ export async function requireAuth() {
     throw new Error('Unauthenticated - No token cookie found');
   }
 
+  const adminAuth = getAdminAuth();
+
   try {
-    const decodedToken = await getAdminAuth().verifyIdToken(token);
-    return decodedToken;
-  } catch (error) {
-    console.error('Error verifying Firebase token:', error);
-    const message =
-      error instanceof Error && error.message
-        ? error.message
-        : 'Unknown token verification error';
-    throw new Error(`Unauthenticated - Invalid token - ${message}`);
+    return await adminAuth.verifySessionCookie(token);
+  } catch {
+    try {
+      return await adminAuth.verifyIdToken(token);
+    } catch (error) {
+      console.error('Error verifying Firebase token:', error);
+      const message =
+        error instanceof Error && error.message
+          ? error.message
+          : 'Unknown token verification error';
+      throw new Error(`Unauthenticated - Invalid token - ${message}`);
+    }
   }
 }
 

@@ -114,6 +114,8 @@ export async function GET(req: NextRequest) {
           inventory: {},
           unseenItems: unseenIds,
           flies: wardrobe.flies ?? 0,
+          hunger: wardrobe.hunger,
+          lastHungerUpdate: wardrobe.lastHungerUpdate,
         },
         catalog: fullCatalog.filter((item) => equippedIds.has(item.id)),
         unseenCount: unseenIds.filter((id) => !containerIds.has(id)).length,

@@ -7,10 +7,13 @@ import {
   useState,
   ReactNode,
 } from 'react';
-import { onAuthStateChanged, User } from 'firebase/auth';
+import { User } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
-import { clearAuthTokenCookie, setAuthTokenCookie } from '@/lib/authCookie';
-import { useRouter, usePathname } from 'next/navigation';
+import {
+  clearSessionCookie,
+  establishSessionCookie,
+  sessionCookieNeedsRefresh,
+} from '@/lib/authCookie';
 
 interface AuthContextType {
   user: User | null;
@@ -25,8 +28,6 @@ const AuthContext = createContext<AuthContextType>({
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const router = useRouter();
-  const pathname = usePathname();
 
   useEffect(() => {
     if (!auth) {
@@ -37,58 +38,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const syncToken = async (user: User | null) => {
-      if (user) {
-        try {
-          // getIdToken(false) returns cached token if not expired, 
-          // but we want to ensure it's not JUST about to expire.
-          // getIdToken(true) forces a refresh, but it's expensive.
-          // Standard getIdToken() is fine as it refreshes if needed.
-          const token = await user.getIdToken();
-          // We use a 7-day max-age for the cookie itself so it doesn't disappear 
-          // between sessions, but the server will still reject the token if it's expired.
-          // The proactive refresh in the client will keep the token fresh.
-          setAuthTokenCookie(token);
-        } catch (e) {
-          console.error('Error syncing token to cookie:', e);
-        }
-      } else {
-        clearAuthTokenCookie();
+    const ensureSessionCookie = async (user: User) => {
+      if (!sessionCookieNeedsRefresh()) return;
+      try {
+        await establishSessionCookie(user);
+      } catch (e) {
+        console.error('Error establishing session cookie:', e);
       }
     };
 
-    const unsubscribe = auth.onIdTokenChanged(async (user) => {
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
       setUser(user);
-      await syncToken(user);
+      if (user) {
+        await ensureSessionCookie(user);
+      } else {
+        await clearSessionCookie();
+      }
       setLoading(false);
     });
 
-    // Proactive refresh: check token every 10 minutes and on visibility change
-    const intervalId = setInterval(async () => {
-      if (auth.currentUser) {
-        await syncToken(auth.currentUser);
-      }
-    }, 10 * 60 * 1000);
-
-    const handleVisibilityChange = async () => {
+    const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && auth.currentUser) {
-        // Refresh the cookie when the user returns to the tab. Non-forced:
-        // Firebase only hits the network when the token is expired/near expiry,
-        // so we avoid a guaranteed network round-trip (and its transient
-        // auth/network-request-failed) on every single focus.
-        try {
-          const token = await auth.currentUser.getIdToken();
-          setAuthTokenCookie(token);
-        } catch (e) {
-          console.warn('Token refresh on visibility change skipped:', e);
-        }
+        void ensureSessionCookie(auth.currentUser);
       }
     };
     window.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       unsubscribe();
-      clearInterval(intervalId);
       window.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
@@ -102,15 +79,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export const useAuth = () => useContext(AuthContext);
 
-// Rename export to match existing usage in layout.tsx if necessary,
-// but layout.tsx imports { AuthContext } as a named export.
-// Wait, layout.tsx imports `import { AuthContext } from '@/components/auth/AuthContext';`
-// and uses it as `<AuthContext>...</AuthContext>`.
-// So I should export the component as AuthContext.
-
 export function AuthContextComponent({ children }: { children: ReactNode }) {
   return <AuthProvider>{children}</AuthProvider>;
 }
 
-// Re-export as AuthContext to minimize refactoring in layout.tsx
 export { AuthContextComponent as AuthContext };

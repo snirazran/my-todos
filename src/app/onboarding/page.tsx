@@ -16,7 +16,7 @@ import { OnboardingFrogStage } from './steps/OnboardingFrogHeader';
 import type { FrogEmote } from '@/components/ui/frog';
 import { signInAnonymously } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
-import { clearAuthTokenCookie, setAuthTokenCookie } from '@/lib/authCookie';
+import { clearSessionCookie, establishSessionCookie } from '@/lib/authCookie';
 import { OnboardingBackground } from '@/components/ui/OnboardingBackground';
 
 const STEP_IDS = ['name', 'humanName', 'aboutIntro', 'age', 'notifications', 'createAccount'] as const;
@@ -140,8 +140,7 @@ export default function OnboardingPage() {
         // hasn't attached an email mid-flow, create the anonymous account now.
         if (!auth?.currentUser) {
           const cred = await signInAnonymously(auth);
-          const token = await cred.user.getIdToken();
-          setAuthTokenCookie(token);
+          await establishSessionCookie(cred.user);
           await fetch('/api/user', { method: 'POST' });
         }
         const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -220,7 +219,7 @@ export default function OnboardingPage() {
           await auth?.signOut();
         } catch {}
       }
-      clearAuthTokenCookie();
+      await clearSessionCookie();
       router.replace('/welcome');
       return;
     }

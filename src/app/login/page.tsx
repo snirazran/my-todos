@@ -10,7 +10,7 @@ import {
   signInWithGoogle,
 } from '@/lib/googleAuth';
 import { GoogleIcon } from '@/components/ui/GoogleIcon';
-import { setAuthTokenCookie } from '@/lib/authCookie';
+import { establishSessionCookie } from '@/lib/authCookie';
 import { createEmailLinkSettings } from '@/lib/emailLinkSettings';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
@@ -141,8 +141,7 @@ function LoginPageInner() {
   const prepareSignedInRoute = async (route = '/') => {
     const user = auth.currentUser;
     if (!user) throw new Error('Authentication did not complete');
-    const token = await user.getIdToken();
-    setAuthTokenCookie(token);
+    await establishSessionCookie(user);
     const res = await fetch('/api/user', { method: 'POST' });
     const data = await res.json().catch(() => ({}));
     return data?.isNewUser ? '/onboarding' : route;
