@@ -245,7 +245,14 @@
       "Bash(git grep *)",
       "Bash(awk -F: '$1 > 2050')",
       "Bash(git -C /Users/snirazran/Fullstack/my-todos diff --stat)",
-      "Bash(git -C /Users/snirazran/Fullstack/my-todos diff)"
+      "Bash(git -C /Users/snirazran/Fullstack/my-todos diff)",
+      "Bash(NODE_OPTIONS= pnpm build)",
+      "Bash(NODE_OPTIONS= npx eslint src/app/try/page.tsx src/components/providers/CrossGiftProvider.tsx src/components/ui/CrossPlatformGiftBanner.tsx src/components/ui/gift-box/FliesGiftOverlay.tsx src/app/get-app/route.ts src/lib/appStores.ts src/lib/crossGift.ts src/lib/growthTrack.ts src/app/api/cross-gift/hello/route.ts src/app/api/cross-gift/claim/route.ts src/app/api/funnel-gift/claim/route.ts)",
+      "Bash(NODE_OPTIONS= pnpm dev)",
+      "Bash(mkdir -p /c/Users/snira/AppData/Local/Temp/claude/C--Users-snira-Desktop-Full-Stack-frog-task/b643ecfb-9243-4eb6-974c-8eaf19e0188a/scratchpad/shot)",
+      "Read(//c/Users/snira/AppData/Local/Temp/claude/C--Users-snira-Desktop-Full-Stack-frog-task/b643ecfb-9243-4eb6-974c-8eaf19e0188a/scratchpad/**)",
+      "Bash(NODE_OPTIONS= npm init -y)",
+      "Bash(NODE_OPTIONS= npm install playwright-core@latest)"
     ]
   }
 }

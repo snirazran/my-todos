@@ -16,6 +16,8 @@ import { BuddyApprovalBanner } from '@/components/ui/BuddyApprovalBanner';
 import { DeepLinkHandler } from '@/components/providers/DeepLinkHandler';
 import { TaskSyncProvider } from '@/components/providers/TaskSyncProvider';
 import { StreakCheckInProvider } from '@/components/providers/StreakCheckInProvider';
+import { CrossGiftProvider } from '@/components/providers/CrossGiftProvider';
+import { CrossPlatformGiftBanner } from '@/components/ui/CrossPlatformGiftBanner';
 
 export default function Providers({ children }: { children: ReactNode }) {
   return (
@@ -39,6 +41,8 @@ export default function Providers({ children }: { children: ReactNode }) {
             <BuddyApprovalBanner />
             <DeepLinkHandler />
             <StreakCheckInProvider />
+            <CrossGiftProvider />
+            <CrossPlatformGiftBanner />
             {children}
           </NotificationProvider>
         </TaskSyncProvider>

@@ -23,12 +23,12 @@ type Pack = {
 };
 
 const PACKS: Pack[] = [
-  { id: 'handful', amount: 100, price: '$0.99', flies: [30] },
-  { id: 'swarm', amount: 220, price: '$1.99', bonus: '+10%', flies: [32, 22] },
-  { id: 'jar', amount: 600, price: '$4.99', bonus: '+20%', badge: 'popular', flies: [36, 26] },
-  { id: 'bucket', amount: 1300, price: '$9.99', bonus: '+30%', flies: [36, 28, 20] },
-  { id: 'crate', amount: 2800, price: '$19.99', bonus: '+40%', flies: [40, 30, 22] },
-  { id: 'feast', amount: 7500, price: '$49.99', bonus: '+50%', badge: 'best', flies: [44, 34, 26, 20] },
+  { id: 'pinch', amount: 200, price: '$1.99', flies: [30] },
+  { id: 'rare-jar', amount: 650, price: '$4.99', bonus: '+30%', badge: 'popular', flies: [32, 22] },
+  { id: 'swarm', amount: 1500, price: '$9.99', bonus: '+50%', flies: [36, 26] },
+  { id: 'epic-cloud', amount: 3500, price: '$19.99', bonus: '+75%', flies: [36, 28, 20] },
+  { id: 'mega-swarm', amount: 10000, price: '$49.99', bonus: '+100%', flies: [40, 30, 22] },
+  { id: 'legendary-vault', amount: 22000, price: '$99.99', bonus: '+120%', badge: 'best', flies: [44, 34, 26, 20] },
 ];
 
 type AdFlyStatus = {

@@ -117,6 +117,17 @@ export type UserDoc = {
     createdAt: Date;
   };
   focusProfile?: FocusProfile;
+  // First time this user was seen on each platform (web browser vs native app).
+  platformsSeen?: { web?: Date | string; native?: Date | string };
+  // One-time gift for trying the app on a second platform; `platform` is where
+  // it was claimed.
+  crossGiftBonus?: {
+    platform: 'web' | 'native';
+    flies: number;
+    claimedAt: Date | string;
+  } | null;
+  // One-time gift earned in the /try ad-landing funnel, banked at sign-in.
+  funnelGift?: { itemId: string; grantedAt: Date | string } | null;
   quests?: unknown;
   dailyRewards?: DailyRewardProgress;
   notificationPrefs?: NotificationPrefs;

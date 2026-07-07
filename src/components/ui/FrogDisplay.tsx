@@ -2,9 +2,10 @@
 
 import React from 'react';
 import { useRouter } from 'next/navigation';
-import Frog, { type FrogHandle } from '@/components/ui/frog';
-
-import type { WardrobeSlot } from '@/lib/skins/catalog';
+import Frog, {
+  type FrogHandle,
+  type WardrobeSlot,
+} from '@/components/ui/frog';
 import Fly from '@/components/ui/fly';
 import { FrogSpeechBubble } from './FrogSpeechBubble';
 import { useInventory } from '@/hooks/useInventory';
@@ -42,6 +43,9 @@ type Props = {
   paused?: boolean;
   showActionButtons?: boolean;
   showSpeechBubble?: boolean;
+  // Renders the bubble with exactly this text (demo/guest contexts) instead of
+  // the fact-driven speech engine.
+  fixedSpeech?: string | null;
 };
 
 export function FrogDisplay({
@@ -69,6 +73,7 @@ export function FrogDisplay({
   paused = false,
   showActionButtons = true,
   showSpeechBubble = true,
+  fixedSpeech = null,
 }: Props) {
   const router = useRouter();
   const { unseenCount, unseenContainerCount } = useInventory(
@@ -203,7 +208,16 @@ export function FrogDisplay({
 
         {/* SPEECH BUBBLE - NOW INSIDE FROG'S CONTAINER */}
 
-        {showSpeechBubble &&
+        {fixedSpeech ? (
+          <FrogSpeechBubble
+            rate={0}
+            done={0}
+            total={0}
+            fixedMessage={fixedSpeech}
+            className="!top-20"
+          />
+        ) : (
+          showSpeechBubble &&
           typeof rate === 'number' &&
           typeof done === 'number' &&
           typeof total === 'number' && (
@@ -217,7 +231,8 @@ export function FrogDisplay({
               facts={speechFacts}
               className="!top-20"
             />
-          )}
+          )
+        )}
       </div>
 
       {/* 2. THE CONTROL DECK 

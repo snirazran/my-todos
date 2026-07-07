@@ -73,6 +73,18 @@ const UserSchema = new Schema<UserDoc>(
         unlockedAnimationIds: [],
       }),
     },
+    platformsSeen: {
+      type: Schema.Types.Mixed,
+      default: undefined,
+    },
+    crossGiftBonus: {
+      type: Schema.Types.Mixed,
+      default: null,
+    },
+    funnelGift: {
+      type: Schema.Types.Mixed,
+      default: null,
+    },
     quests: {
       type: Schema.Types.Mixed,
       default: undefined,
