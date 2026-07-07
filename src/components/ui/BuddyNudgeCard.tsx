@@ -59,14 +59,14 @@ export function BuddyNudgeCard() {
             <button
               type="button"
               onClick={() => setFlowOpen(true)}
-              className="group relative flex w-full items-center gap-2 overflow-hidden rounded-2xl border border-[#4f9149]/25 bg-[#4f9149]/[0.08] py-2.5 pl-1.5 pr-1.5 text-left transition-transform active:scale-[0.99] sm:gap-3 sm:py-4 sm:pl-2 sm:pr-2.5"
+              className="group relative flex w-full items-center gap-2 overflow-hidden rounded-3xl border border-[#4f9149]/30 bg-popover py-2.5 pl-1.5 pr-1.5 text-left shadow-[0_3px_0_0_rgba(79,145,73,0.35)] transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f9149]/40 active:translate-y-[3px] active:shadow-none sm:gap-3 sm:py-4 sm:pl-2 sm:pr-2.5 [@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:shadow-[0_5px_0_0_rgba(79,145,73,0.35)]"
             >
               <span
                 aria-hidden
                 className="pointer-events-none absolute inset-0"
                 style={{
                   background:
-                    'radial-gradient(120% 140% at 0% 0%, rgba(79,145,73,0.16) 0%, transparent 60%)',
+                    'linear-gradient(105deg, rgba(79,145,73,0.20) 0%, rgba(79,145,73,0.07) 42%, transparent 72%)',
                 }}
               />
               <span
@@ -87,14 +87,14 @@ export function BuddyNudgeCard() {
                 </span>
               </span>
               <span className="relative min-w-0 flex-1">
-                <span className="block text-[11.5px] font-black leading-tight tracking-tight text-foreground sm:text-base">
+                <span className="block text-[13px] font-black leading-tight tracking-tight text-foreground sm:text-base">
                   Catch flies together!
                 </span>
-                <span className="mt-0.5 block text-[10px] font-semibold leading-snug text-muted-foreground sm:text-[13px]">
+                <span className="mt-0.5 block text-[11px] font-semibold leading-snug text-muted-foreground sm:text-[13px]">
                   Team up — earn extra flies!
                 </span>
               </span>
-              <span className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#4f9149] text-white shadow-sm transition-transform group-hover:translate-x-0.5 sm:h-8 sm:w-8">
+              <span className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#4f9149] text-white ring-1 ring-[#34631f]/40 shadow-[0_2px_0_0_#34631f] transition-transform group-hover:translate-x-0.5 group-active:translate-y-0 sm:h-9 sm:w-9">
                 <ChevronRight className="h-[18px] w-[18px] sm:h-5 sm:w-5" strokeWidth={2.5} />
               </span>
               <span
@@ -111,7 +111,7 @@ export function BuddyNudgeCard() {
                     dismiss();
                   }
                 }}
-                className="relative flex h-6 w-5 shrink-0 items-center justify-center rounded-full text-muted-foreground/60 transition-colors hover:text-foreground sm:w-6"
+                className="relative flex h-7 w-6 shrink-0 items-center justify-center rounded-full text-muted-foreground/60 transition-colors hover:bg-foreground/5 hover:text-foreground sm:w-7"
               >
                 <X className="h-4 w-4" strokeWidth={2.5} />
               </span>

@@ -735,12 +735,64 @@ export default function TaskBoard({
 
   const snapSuppressed = !!drag?.active || panActive || snapHold;
 
-  // A touch during the hold takes over from the glide — end the hold right
-  // away so the user's swipe runs with snap engaged instead of free-scrolling.
+  // A touch during the hold takes over from the glide. Re-enabling snap here
+  // wouldn't help — browsers lock snap behavior per gesture, so a swipe that
+  // starts while snap is off free-scrolls and can settle between columns.
+  // Instead the swipe runs snap-free and on release we glide to the column it
+  // points at, re-engaging snap only once centered.
+  const holdTouchRef = useRef<{ startScrollLeft: number } | null>(null);
   useEffect(() => {
     if (!snapHold) return;
     const s = scrollerRef.current;
     if (!s) return;
+
+    const onTouchStart = () => {
+      if (snapHoldTimerRef.current) {
+        window.clearTimeout(snapHoldTimerRef.current);
+        snapHoldTimerRef.current = null;
+      }
+      s.scrollTo({ left: s.scrollLeft, behavior: 'auto' });
+      holdTouchRef.current = { startScrollLeft: s.scrollLeft };
+    };
+
+    const settle = () => {
+      const takeover = holdTouchRef.current;
+      holdTouchRef.current = null;
+      if (!takeover) return;
+      if (s.dataset.drag === '1') return;
+      const cols = Array.from(
+        document.querySelectorAll<HTMLElement>('[data-col="true"]'),
+      );
+      if (cols.length === 0) return;
+      const center = s.scrollLeft + s.clientWidth / 2;
+      let nearest = 0;
+      let best = Infinity;
+      cols.forEach((col, i) => {
+        const d = Math.abs(col.offsetLeft + col.clientWidth / 2 - center);
+        if (d < best) {
+          best = d;
+          nearest = i;
+        }
+      });
+      let target = nearest;
+      const delta = s.scrollLeft - takeover.startScrollLeft;
+      if (Math.abs(delta) > 30) {
+        const nearestCenter =
+          cols[nearest].offsetLeft + cols[nearest].clientWidth / 2;
+        if (delta > 0 && nearestCenter < center)
+          target = Math.min(nearest + 1, cols.length - 1);
+        else if (delta < 0 && nearestCenter > center)
+          target = Math.max(nearest - 1, 0);
+      }
+      if (snapHoldTimerRef.current)
+        window.clearTimeout(snapHoldTimerRef.current);
+      snapHoldTimerRef.current = window.setTimeout(
+        () => setSnapHold(false),
+        600,
+      );
+      centerColumnSmooth(target);
+    };
+
     const cancelHold = () => {
       if (snapHoldTimerRef.current) {
         window.clearTimeout(snapHoldTimerRef.current);
@@ -748,13 +800,18 @@ export default function TaskBoard({
       }
       setSnapHold(false);
     };
-    s.addEventListener('touchstart', cancelHold, { passive: true });
+
+    s.addEventListener('touchstart', onTouchStart, { passive: true });
+    s.addEventListener('touchend', settle, { passive: true });
+    s.addEventListener('touchcancel', settle, { passive: true });
     s.addEventListener('wheel', cancelHold, { passive: true });
     return () => {
-      s.removeEventListener('touchstart', cancelHold);
+      s.removeEventListener('touchstart', onTouchStart);
+      s.removeEventListener('touchend', settle);
+      s.removeEventListener('touchcancel', settle);
       s.removeEventListener('wheel', cancelHold);
     };
-  }, [snapHold, scrollerRef]);
+  }, [snapHold, scrollerRef, centerColumnSmooth]);
 
   // Lock the horizontal board scroller while any sheet/popup is open so the
   // page behind the backdrop can't be slid around.
