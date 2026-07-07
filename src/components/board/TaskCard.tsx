@@ -45,6 +45,7 @@ export default function TaskCard({
   disableDrag = false,
   isPast = false,
   showStreak = false,
+  isToday = false,
   occurrenceDate,
 }: {
   dragId: string;
@@ -72,8 +73,10 @@ export default function TaskCard({
   disableDrag?: boolean;
   /** True on past-day columns — completed cards become a clickable pointer. */
   isPast?: boolean;
-  /** Show the repeat streak (fire) badge — only on the today column. */
+  /** Show the repeat streak (fire) badge. */
   showStreak?: boolean;
+  /** True on the today column — streak fly bonus only applies to today completions. */
+  isToday?: boolean;
 }) {
   const cardRef = useRef<HTMLDivElement | null>(null);
   const longPressTimer = useRef<number | null>(null);
@@ -305,7 +308,7 @@ export default function TaskCard({
   const hasMeta =
     (task.tags && task.tags.length > 0) || task.startTime || task.reminder;
   const projectedStreak =
-    showStreak && isRepeating
+    isToday && isRepeating
       ? (task.streak ?? 0) + (task.completed ? 0 : 1)
       : 0;
   const streakFlyBase =

@@ -695,6 +695,7 @@ export default React.memo(function TaskList({
             disableDrag={disableDrag}
             isPast={!!dateKey && !isToday && !isFuture}
             showStreak
+            isToday={isToday}
           />
         </motion.div>,
       );
