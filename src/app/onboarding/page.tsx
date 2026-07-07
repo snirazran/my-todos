@@ -18,6 +18,8 @@ import { signInAnonymously } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { clearSessionCookie, establishSessionCookie } from '@/lib/authCookie';
 import { OnboardingBackground } from '@/components/ui/OnboardingBackground';
+import { useAuth } from '@/components/auth/AuthContext';
+import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 
 const STEP_IDS = ['name', 'humanName', 'aboutIntro', 'age', 'notifications', 'createAccount'] as const;
 
@@ -49,6 +51,9 @@ function loadStoredSelections(): Record<string, string[]> {
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const { user: authUser } = useAuth();
+  const hasAccount = !!authUser && !authUser.isAnonymous;
+  const { indices: wardrobeIndices } = useWardrobeIndices(hasAccount);
   const [step, setStep] = useState(0);
   const [selections, setSelections] = useState<Record<string, string[]>>(
     loadStoredSelections,
@@ -179,6 +184,12 @@ export default function OnboardingPage() {
           } catch {
             // ignore
           }
+          await mutate(
+            '/api/user',
+            (cur: Record<string, unknown> | undefined) =>
+              cur ? { ...cur, onboardingCompleted: true } : cur,
+            { revalidate: false },
+          );
         }
       } catch {
         // best-effort
@@ -208,6 +219,7 @@ export default function OnboardingPage() {
     }
     if (step === 0) {
       const current = auth?.currentUser;
+      if (current && !current.isAnonymous) return;
       try {
         if (current?.isAnonymous) {
           await current.delete();
@@ -245,10 +257,13 @@ export default function OnboardingPage() {
         className="pointer-events-none absolute inset-x-0 bottom-0 top-[222px] z-[5] rounded-t-[24px] bg-background md:left-1/2 md:right-auto md:top-[278px] md:w-full md:max-w-lg md:-translate-x-1/2 md:rounded-[24px] lg:max-w-xl"
       />
       <div className="relative z-10 flex w-full max-w-none flex-col md:max-w-lg lg:max-w-xl" style={{ minHeight: '100%' }}>
-        <OnboardingFrogStage emote={STEP_EMOTES[currentId] ?? null} />
+        <OnboardingFrogStage
+          indices={hasAccount ? wardrobeIndices : undefined}
+          emote={STEP_EMOTES[currentId] ?? null}
+        />
         {!celebrating && (
           <OnboardingTopBar
-            onBack={handleBack}
+            onBack={step === 0 && hasAccount ? undefined : handleBack}
             done={doneUnits}
             total={totalUnits}
             rightSlot={

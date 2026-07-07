@@ -18,6 +18,7 @@ import { TaskSyncProvider } from '@/components/providers/TaskSyncProvider';
 import { StreakCheckInProvider } from '@/components/providers/StreakCheckInProvider';
 import { CrossGiftProvider } from '@/components/providers/CrossGiftProvider';
 import { CrossPlatformGiftBanner } from '@/components/ui/CrossPlatformGiftBanner';
+import { OnboardingGate } from '@/components/providers/OnboardingGate';
 
 export default function Providers({ children }: { children: ReactNode }) {
   return (
@@ -43,6 +44,7 @@ export default function Providers({ children }: { children: ReactNode }) {
             <StreakCheckInProvider />
             <CrossGiftProvider />
             <CrossPlatformGiftBanner />
+            <OnboardingGate />
             {children}
           </NotificationProvider>
         </TaskSyncProvider>

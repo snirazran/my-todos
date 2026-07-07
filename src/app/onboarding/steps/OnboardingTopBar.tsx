@@ -6,7 +6,7 @@ import { Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 type Props = {
-  onBack: () => void;
+  onBack?: () => void;
   done: number;
   total: number;
   rightSlot?: ReactNode;
@@ -18,16 +18,20 @@ export function OnboardingTopBar({ onBack, done, total, rightSlot }: Props) {
 
   return (
     <div className="absolute inset-x-0 top-[calc(0.5rem+env(safe-area-inset-top))] z-40 flex items-center gap-3 px-3">
-      <button
-        type="button"
-        onClick={onBack}
-        aria-label="Back"
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-background/90 text-muted-foreground shadow-md ring-1 ring-border/40 backdrop-blur transition hover:bg-background"
-      >
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-          <path d="M10 12L6 8L10 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
+      {onBack ? (
+        <button
+          type="button"
+          onClick={onBack}
+          aria-label="Back"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-background/90 text-muted-foreground shadow-md ring-1 ring-border/40 backdrop-blur transition hover:bg-background"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M10 12L6 8L10 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+      ) : (
+        <div aria-hidden className="h-10 w-10 shrink-0" />
+      )}
 
       <div className="relative h-10 flex-1 rounded-full bg-background/85 px-4 shadow-md ring-1 ring-border/40 backdrop-blur">
         <div className="relative h-full">
