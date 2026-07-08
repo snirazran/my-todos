@@ -35,24 +35,43 @@ export function useCalendarConnections() {
   return { connections: data?.connections ?? [], mutate, isLoading };
 }
 
-export async function openGoogleCalendarConnect() {
-  const { Capacitor } = await import('@capacitor/core');
-  if (Capacitor.isNativePlatform()) {
-    // Google blocks OAuth consent inside embedded webviews — use the system
-    // browser with a signed state token; the app polls connection status.
-    const res = await fetch('/api/calendar/google/connect-token', { method: 'POST' });
-    const data = await res.json().catch(() => ({}));
-    if (!data.token) return;
-    const { Browser } = await import('@capacitor/browser');
-    await Browser.open({
-      url: `${window.location.origin}/api/calendar/google/connect?t=${encodeURIComponent(data.token)}`,
-    });
-  } else {
-    window.open(
+export async function openGoogleCalendarConnect(): Promise<
+  { ok: true } | { ok: false; reason: string }
+> {
+  try {
+    const { Capacitor } = await import('@capacitor/core');
+    if (Capacitor.isNativePlatform()) {
+      // Google blocks OAuth consent inside embedded webviews — use the system
+      // browser with a signed state token; the app polls connection status.
+      const res = await fetch('/api/calendar/google/connect-token', { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.token) {
+        return {
+          ok: false,
+          reason:
+            res.status === 503
+              ? 'Calendar sync isn’t available on the server yet.'
+              : 'Could not start the Google connection. Try again.',
+        };
+      }
+      const { Browser } = await import('@capacitor/browser');
+      await Browser.open({
+        url: `${window.location.origin}/api/calendar/google/connect?t=${encodeURIComponent(data.token)}`,
+      });
+      return { ok: true };
+    }
+    const popup = window.open(
       '/api/calendar/google/connect',
       'gcal-connect',
       'width=520,height=680,menubar=no,toolbar=no',
     );
+    if (!popup) {
+      return { ok: false, reason: 'Popup blocked — allow popups for this site.' };
+    }
+    return { ok: true };
+  } catch (err) {
+    console.error('google connect open failed:', (err as Error)?.message);
+    return { ok: false, reason: 'Could not open the Google sign-in. Update the app and try again.' };
   }
 }
 
@@ -366,6 +385,7 @@ function ProviderCard({
 export default function IntegrationsPanel() {
   const { connections, mutate, isLoading } = useCalendarConnections();
   const [connectingGoogle, setConnectingGoogle] = useState(false);
+  const [connectError, setConnectError] = useState<string | null>(null);
   const [appleSheetOpen, setAppleSheetOpen] = useState(false);
   const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -377,9 +397,15 @@ export default function IntegrationsPanel() {
     setConnectingGoogle(false);
   }, []);
 
-  const connectGoogle = useCallback(() => {
-    void openGoogleCalendarConnect();
+  const connectGoogle = useCallback(async () => {
+    setConnectError(null);
     setConnectingGoogle(true);
+    const opened = await openGoogleCalendarConnect();
+    if (!opened.ok) {
+      setConnectingGoogle(false);
+      setConnectError(opened.reason);
+      return;
+    }
     let ticks = 0;
     if (pollTimer.current) clearInterval(pollTimer.current);
     pollTimer.current = setInterval(async () => {
@@ -391,6 +417,7 @@ export default function IntegrationsPanel() {
       if (active || ticks > 60) {
         stopPolling();
         if (active) window.dispatchEvent(new Event('board-refresh'));
+        else setConnectError('Connection didn’t complete. Try again.');
       }
     }, 2000);
   }, [mutate, stopPolling]);
@@ -417,9 +444,12 @@ export default function IntegrationsPanel() {
         description="Two-way sync between your events and tasks"
         connection={google}
         connecting={connectingGoogle}
-        onConnect={connectGoogle}
+        onConnect={() => void connectGoogle()}
         onChanged={() => void mutate()}
       />
+      {connectError && (
+        <p className="px-1 text-xs font-bold text-red-500">{connectError}</p>
+      )}
       <ProviderCard
         provider="apple"
         label="Apple Calendar"
