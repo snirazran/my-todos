@@ -821,6 +821,7 @@ export function TradePanel({
                           actionLabel={null}
                           isNew={unseenItems.includes(entry.id)}
                           deferPreview
+                          centerFrogPreview
                           pausePreview={true}
                           previewDelayMs={index * 20}
                         />

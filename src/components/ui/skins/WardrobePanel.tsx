@@ -875,6 +875,7 @@ function WardrobeManagerContent({
         actionLabel={null}
         isNew={unseenInventorySet.has(card.item.id)}
         deferPreview
+        centerFrogPreview
         giftAnimation="box_shake"
         pausePreview={
           (card.item.slot !== 'container' && isDragging) ||
@@ -910,6 +911,7 @@ function WardrobeManagerContent({
         actionLoading={buyingId === card.item.id}
         onAction={() => openItemPurchase(card.item)}
         deferPreview
+        centerFrogPreview
         pausePreview={card.item.slot !== 'container'}
         previewDelayMs={index * 20}
       />

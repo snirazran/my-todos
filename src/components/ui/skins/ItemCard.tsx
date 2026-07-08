@@ -110,6 +110,7 @@ function ItemCardComponent({
   previewClassName,
   previewTopLeftBadge,
   giftAnimation,
+  centerFrogPreview = false,
 }: {
   item: ItemDef;
   ownedCount: number;
@@ -137,6 +138,7 @@ function ItemCardComponent({
   previewTopLeftBadge?: React.ReactNode;
   /** Optional gift-box animation override (e.g. 'box_shake'). */
   giftAnimation?: string;
+  centerFrogPreview?: boolean;
 }) {
   const config = RARITY_CONFIG[item.rarity];
   const isOwned = ownedCount > 0;
@@ -211,6 +213,14 @@ function ItemCardComponent({
   };
 
   const isSelected = (selectedCount || 0) > 0;
+  const centerFrog =
+    centerFrogPreview && item.slot !== 'container' && !customPreview;
+  const frogPreviewClassName = cn(
+    centerFrog
+      ? 'object-contain -translate-y-[6%]'
+      : 'w-[125%] h-[125%] object-contain translate-y-[10%] min-[375px]:translate-y-[2%] min-[425px]:-translate-y-[4%] md:-translate-y-[5%]',
+    previewClassName,
+  );
 
   return (
     <motion.div
@@ -303,7 +313,12 @@ function ItemCardComponent({
           </div>
         )}
 
-        <div className="absolute inset-0 z-10 flex items-end justify-center">
+        <div
+          className={cn(
+            'absolute inset-0 z-10 flex justify-center',
+            centerFrog ? 'items-center' : 'items-end',
+          )}
+        >
           {shouldShowPlaceholder ? (
             <LightweightItemPreview
               item={item}
@@ -323,23 +338,19 @@ function ItemCardComponent({
             </div>
           ) : pausePreview ? (
             <FrogSnapshot
-              className={cn(
-                'w-[125%] h-[125%] object-contain translate-y-[10%] min-[375px]:translate-y-[2%] min-[425px]:-translate-y-[4%] md:-translate-y-[5%]',
-                previewClassName,
-              )}
+              className={frogPreviewClassName}
               indices={previewIndices}
               width={180}
               height={180}
+              visualOffsetY={centerFrog ? 0 : undefined}
             />
           ) : (
             <Frog
-              className={cn(
-                'w-[125%] h-[125%] object-contain translate-y-[10%] min-[375px]:translate-y-[2%] min-[425px]:-translate-y-[4%] md:-translate-y-[5%]',
-                previewClassName,
-              )}
+              className={frogPreviewClassName}
               indices={previewIndices}
               width={180}
               height={180}
+              visualOffsetY={centerFrog ? 0 : undefined}
               paused={false}
             />
           )}
