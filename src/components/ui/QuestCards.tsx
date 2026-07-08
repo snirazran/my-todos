@@ -1278,16 +1278,13 @@ export function SwitchFocusConfirm({
   onRented?: () => void;
   onClose: () => void;
 }) {
-  const RENT_ADS = 2;
   const [rentBusy, setRentBusy] = useState(false);
-  const [rentWatched, setRentWatched] = useState(0);
   const [rentError, setRentError] = useState<string | null>(null);
   const rentAvailable = canRent && !!categoryId && rewardedAdsAvailable();
 
   useEffect(() => {
     if (!open) {
       setRentBusy(false);
-      setRentWatched(0);
       setRentError(null);
     }
   }, [open]);
@@ -1315,7 +1312,6 @@ export function SwitchFocusConfirm({
         setRentError(payload.error ?? 'Could not unlock — try again.');
         return;
       }
-      setRentWatched(payload.adsWatched ?? rentWatched + 1);
       if (payload.unlocked) {
         try {
           navigator.vibrate?.(28);
@@ -1377,11 +1373,17 @@ export function SwitchFocusConfirm({
                       <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-amber-200/80 text-amber-800">
                         <Play className="h-3.5 w-3.5 fill-current" />
                       </span>
-                      {rentBusy
-                        ? 'Loading ad...'
-                        : rentWatched > 0
-                          ? `Watch 1 more ad (${rentWatched}/${RENT_ADS})`
-                          : `Watch ${RENT_ADS} ads to progress both`}
+                      {rentBusy ? (
+                        'Loading...'
+                      ) : (
+                        <>
+                          Progress both
+                          <span className="relative inline-flex shrink-0 items-center overflow-hidden rounded-lg bg-gradient-to-br from-amber-400 via-orange-400 to-orange-500 px-2 py-1 text-[11px] font-black leading-none tracking-[0.08em] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_2px_5px_rgba(217,119,6,0.35)]">
+                            <span className="pointer-events-none absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-white/50 to-transparent animate-shine" />
+                            24 hours
+                          </span>
+                        </>
+                      )}
                     </button>
                     <p className="text-center text-[12px] font-medium text-muted-foreground">
                       Keep your current quest and unlock this one too.

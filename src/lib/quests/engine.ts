@@ -101,7 +101,7 @@ export function normalizeFocusProfile(user: UserDoc): FocusProfile {
   };
 }
 
-export const RENT_SLOT_ADS_REQUIRED = 2;
+export const RENT_SLOT_ADS_REQUIRED = 1;
 export const RENT_SLOT_DURATION_MS = 24 * 60 * 60 * 1000;
 
 export function activeRentedFocusCategoryId(
