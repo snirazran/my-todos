@@ -54,13 +54,13 @@ export default function OnboardingPage() {
   const { user: authUser } = useAuth();
   const hasAccount = !!authUser && !authUser.isAnonymous;
   const { indices: wardrobeIndices } = useWardrobeIndices(hasAccount);
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState(3);
   const [selections, setSelections] = useState<Record<string, string[]>>(
     loadStoredSelections,
   );
   const [saving, setSaving] = useState(false);
   const [direction, setDirection] = useState(1);
-  const [subStep, setSubStep] = useState(0);
+  const [subStep, setSubStep] = useState(3);
   const [celebrating, setCelebrating] = useState(false);
   const mainRef = useRef<HTMLElement | null>(null);
 
@@ -257,12 +257,12 @@ export default function OnboardingPage() {
       ref={mainRef}
       className="fixed inset-0 isolate flex flex-col items-center overflow-y-auto overflow-x-hidden bg-background px-5 pt-4"
     >
-      <div className="absolute inset-x-0 top-0 h-[390px] overflow-hidden short:h-[342px] md:h-[352px]">
+      <div className="absolute inset-x-0 top-0 h-[calc(390px+env(safe-area-inset-top))] overflow-hidden short:h-[calc(342px+env(safe-area-inset-top))] md:h-[352px]">
         <OnboardingBackground />
       </div>
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 bottom-0 top-[286px] z-[5] rounded-t-[24px] bg-background short:top-[238px] md:left-1/2 md:right-auto md:top-[278px] md:w-full md:max-w-lg md:-translate-x-1/2 md:rounded-[24px] lg:max-w-xl"
+        className="pointer-events-none absolute inset-x-0 bottom-0 top-[calc(286px+env(safe-area-inset-top))] z-[5] rounded-t-[24px] bg-background short:top-[calc(238px+env(safe-area-inset-top))] md:left-1/2 md:right-auto md:top-[278px] md:w-full md:max-w-lg md:-translate-x-1/2 md:rounded-[24px] lg:max-w-xl"
       />
       <div className="relative z-10 flex w-full max-w-none flex-col md:max-w-lg lg:max-w-xl" style={{ minHeight: '100%' }}>
         <OnboardingFrogStage

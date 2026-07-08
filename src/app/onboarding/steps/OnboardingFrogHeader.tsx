@@ -7,7 +7,8 @@ import type { FrogEmote, WardrobeSlot } from '@/components/ui/frog';
 
 const Frog = dynamic(() => import('@/components/ui/frog'), { ssr: false });
 
-export const ONBOARDING_BODY_CLASS = 'pt-[430px] short:pt-[382px] md:pt-[398px]';
+export const ONBOARDING_BODY_CLASS =
+  'pt-[calc(430px+env(safe-area-inset-top))] short:pt-[calc(382px+env(safe-area-inset-top))] md:pt-[398px]';
 
 // Default to the bare frog (no hat/body/hand item) so every onboarding screen
 // shows the same plain frog instead of a random outfit.
@@ -73,8 +74,8 @@ export function OnboardingFrogHeader({
         <div
           className={
             eyebrow
-              ? 'absolute inset-x-0 top-[300px] z-20 px-5 short:top-[252px] md:top-[292px] md:px-8'
-              : 'absolute inset-x-0 top-[312px] z-20 px-5 short:top-[264px] md:top-[294px] md:px-8'
+              ? 'absolute inset-x-0 top-[calc(300px+env(safe-area-inset-top))] z-20 px-5 short:top-[calc(252px+env(safe-area-inset-top))] md:top-[292px] md:px-8'
+              : 'absolute inset-x-0 top-[calc(312px+env(safe-area-inset-top))] z-20 px-5 short:top-[calc(264px+env(safe-area-inset-top))] md:top-[294px] md:px-8'
           }
         >
           {eyebrow ? (

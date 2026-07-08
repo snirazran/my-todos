@@ -156,7 +156,7 @@ export default function ProfileQuestionsStep({
         subtitle={currentQuestion.subtitle}
       />
 
-      <div className="relative z-20 flex flex-col pt-[418px] short:pt-[370px] md:pt-[404px]">
+      <div className="relative z-20 flex flex-col pt-[calc(418px+env(safe-area-inset-top))] short:pt-[calc(370px+env(safe-area-inset-top))] md:pt-[404px]">
       <motion.div
         key={currentQuestion.id}
         custom={direction}
@@ -173,61 +173,85 @@ export default function ProfileQuestionsStep({
           )}
         >
           {currentQuestion.id === FOCUS_AREAS_QUESTION_ID ? (
-            <div className="grid grid-cols-2 gap-3">
-              {focusAreaCategories.map((category) => {
+            <div className="flex flex-col gap-3">
+              {focusAreaCategories.map((category, index) => {
                 const isSelected = selectedValues.includes(category.id);
                 return (
-                  <button
+                  <motion.button
                     key={category.id}
                     type="button"
                     aria-pressed={isSelected}
                     onClick={() => chooseOption(category.id)}
                     disabled={saving}
+                    initial={{ opacity: 0, y: 14 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{
+                      delay: 0.06 * index,
+                      duration: 0.3,
+                      ease: [0.22, 1, 0.36, 1],
+                    }}
+                    whileTap={{ scale: 0.98 }}
                     className={cn(
-                      'group relative aspect-[4/5] overflow-hidden rounded-[20px] text-left transition-all duration-200',
+                      'flex items-center gap-3 rounded-3xl border-2 bg-background p-2.5 pr-4 text-left shadow-sm transition-colors duration-200',
                       isSelected
-                        ? 'ring-[3px] ring-primary'
-                        : 'ring-1 ring-border/60 hover:-translate-y-0.5 hover:ring-border active:scale-[0.98]',
+                        ? 'border-primary/60 bg-primary/10'
+                        : 'border-border/50 hover:border-primary/30 hover:bg-muted/30',
                       saving && 'cursor-not-allowed opacity-70',
                     )}
                   >
-                    {category.coverImageUrl ? (
-                      <img
-                        src={category.coverImageUrl}
-                        alt=""
-                        className="absolute inset-0 h-full w-full object-cover"
-                      />
-                    ) : (
-                      <div
-                        className="absolute inset-0"
-                        style={{
-                          background: `linear-gradient(135deg, ${category.backgroundFrom}, ${category.backgroundTo})`,
-                        }}
-                      />
-                    )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent" />
+                    <span className="relative h-16 w-24 shrink-0 overflow-hidden rounded-2xl short:h-14 short:w-[84px]">
+                      {category.coverImageUrl ? (
+                        <img
+                          src={category.coverImageUrl}
+                          alt=""
+                          className={cn(
+                            'absolute inset-0 h-full w-full object-cover transition-transform duration-300',
+                            isSelected && 'scale-110',
+                          )}
+                        />
+                      ) : (
+                        <span
+                          className="absolute inset-0"
+                          style={{
+                            background: `linear-gradient(135deg, ${category.backgroundFrom}, ${category.backgroundTo})`,
+                          }}
+                        />
+                      )}
+                    </span>
 
-                    <div
+                    <span className="min-w-0 flex-1">
+                      <span
+                        className={cn(
+                          'block text-base font-black leading-tight tracking-tight',
+                          isSelected ? 'text-primary' : 'text-foreground',
+                        )}
+                      >
+                        {category.name}
+                      </span>
+                      {category.onboardingSentence?.trim() ? (
+                        <span
+                          className={cn(
+                            'mt-0.5 block truncate text-sm font-medium',
+                            isSelected ? 'text-primary/75' : 'text-muted-foreground',
+                          )}
+                        >
+                          {category.onboardingSentence}
+                        </span>
+                      ) : null}
+                    </span>
+
+                    <span
                       className={cn(
-                        'absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full border-2 backdrop-blur-md transition-all',
+                        'grid h-7 w-7 shrink-0 place-items-center rounded-full border-2 transition-all duration-200',
                         isSelected
-                          ? 'border-white bg-primary text-white'
-                          : 'border-white/70 bg-black/25 text-transparent',
+                          ? 'border-primary bg-primary text-primary-foreground'
+                          : 'border-border text-transparent',
                       )}
                       aria-hidden
                     >
-                      <Check className="h-3.5 w-3.5 stroke-[3]" />
-                    </div>
-
-                    <div className="absolute inset-x-0 bottom-0 p-2.5">
-                      <p className="text-[8px] font-black uppercase tracking-[0.18em] text-white/70">
-                        {category.shortLabel || 'Focus'}
-                      </p>
-                      <h3 className="mt-0.5 text-sm font-black leading-tight tracking-tight text-white">
-                        {category.name}
-                      </h3>
-                    </div>
-                  </button>
+                      <Check className="h-4 w-4 stroke-[3.5]" />
+                    </span>
+                  </motion.button>
                 );
               })}
             </div>

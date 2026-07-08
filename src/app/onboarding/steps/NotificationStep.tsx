@@ -68,7 +68,7 @@ export default function NotificationStep({ selections, onNext, saving, direction
         transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
         className={cn('flex flex-col items-center px-4', ONBOARDING_BODY_CLASS)}
       >
-        <div className="flex w-[calc(100%+4rem)] max-w-[calc(100vw-1.5rem)] items-center gap-3 rounded-3xl bg-muted/70 px-4 py-3 shadow-sm">
+        <div className="flex w-[calc(100%+4rem)] max-w-[calc(100vw-1.5rem)] items-center gap-3 rounded-3xl bg-muted/70 px-4 py-3 shadow-sm md:w-full md:max-w-md lg:max-w-lg">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-background shadow-sm">
             <img src="/frogress-icon.png" alt="" className="h-10 w-10 rounded-xl" />
           </div>
