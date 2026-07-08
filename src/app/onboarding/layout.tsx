@@ -16,5 +16,10 @@ export const viewport: Viewport = {
 };
 
 export default function OnboardingLayout({ children }: { children: ReactNode }) {
-  return children;
+  return (
+    <>
+      <link rel="preload" as="image" href="/frogress-icon.png" />
+      {children}
+    </>
+  );
 }

@@ -8,6 +8,7 @@ import { getDailyDeals, isPremiumActive } from '@/lib/skins/dailyDeal';
 import { notifyUserChanged } from '@/lib/taskSync';
 import { bumpQuestMetric } from '@/lib/quests/metrics';
 import type { UserWardrobe } from '@/lib/types/UserDoc';
+import { MAX_HUNGER_MS } from '@/lib/hungerLogic';
 
 const json = (body: unknown, init = 200) =>
   NextResponse.json(body, { status: init });
@@ -76,7 +77,7 @@ export async function GET(req: NextRequest) {
           equipped: {},
           inventory: {},
           flies: 0,
-          hunger: 86400000,
+          hunger: MAX_HUNGER_MS,
           lastHungerUpdate: now,
           stolenFlies: 0,
         },

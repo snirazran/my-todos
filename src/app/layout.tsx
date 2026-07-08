@@ -86,13 +86,25 @@ export default function RootLayout({
           rel="preload"
           as="image"
           href="/bg-mobile.webp"
-          media="(max-width: 767px)"
+          media="(max-width: 767.98px)"
+        />
+        <link
+          rel="preload"
+          as="image"
+          href="/bg-tablet.webp"
+          media="(min-width: 768px) and (max-width: 1279.98px)"
         />
         <link
           rel="preload"
           as="image"
           href="/bg-web.webp"
-          media="(min-width: 1280px)"
+          media="(min-width: 1280px) and (max-width: 1919.98px)"
+        />
+        <link
+          rel="preload"
+          as="image"
+          href="/bg-web-large.webp"
+          media="(min-width: 1920px)"
         />
         {/* The fly the frog's tongue grabs on task completion — preload so the
             very first completion never renders a blank (uncached) fly. */}

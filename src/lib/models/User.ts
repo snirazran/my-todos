@@ -1,6 +1,7 @@
 // lib/models/User.ts
 import mongoose, { Schema, type Model } from 'mongoose';
 import type { UserDoc } from '@/lib/types/UserDoc';
+import { MAX_HUNGER_MS } from '@/lib/hungerLogic';
 
 export type { UserDoc };
 
@@ -31,7 +32,7 @@ const UserSchema = new Schema<UserDoc>(
         inventory: {},
         unseenItems: [],
         flies: 0,
-        hunger: 86400000, // Start full (24h)
+        hunger: MAX_HUNGER_MS,
         lastHungerUpdate: new Date(),
         stolenFlies: 0,
       }),

@@ -8,6 +8,7 @@ import QuestModel from '@/lib/models/Quest';
 import ReferralModel from '@/lib/models/Referral';
 import { getAdminAuth } from '@/lib/firebaseAdmin';
 import connectMongo from '@/lib/mongoose';
+import { MAX_HUNGER_MS } from '@/lib/hungerLogic';
 
 export async function GET(req: NextRequest) {
   let uid: string;
@@ -112,7 +113,7 @@ export async function POST(req: NextRequest) {
         equipped: {},
         inventory: {},
         flies: 0,
-        hunger: 86400000,
+        hunger: MAX_HUNGER_MS,
         lastHungerUpdate: now,
         stolenFlies: 0,
       },
