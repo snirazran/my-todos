@@ -308,7 +308,7 @@ function ItemCardComponent({
       >
         {/* NEW Badge (Moved) */}
         {isNew && (
-          <div className="absolute top-0 left-0 z-50 px-2 py-1 text-[9px] font-black text-white bg-red-500 rounded-br-xl shadow-sm animate-pulse">
+          <div className="absolute top-0 left-0 z-20 px-2 py-1 text-[9px] font-black text-white bg-red-500 rounded-br-xl shadow-sm animate-pulse">
             NEW
           </div>
         )}
