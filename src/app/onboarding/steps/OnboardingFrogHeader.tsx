@@ -7,7 +7,7 @@ import type { FrogEmote, WardrobeSlot } from '@/components/ui/frog';
 
 const Frog = dynamic(() => import('@/components/ui/frog'), { ssr: false });
 
-export const ONBOARDING_BODY_CLASS = 'pt-[370px] md:pt-[398px]';
+export const ONBOARDING_BODY_CLASS = 'pt-[430px] md:pt-[398px]';
 
 // Default to the bare frog (no hat/body/hand item) so every onboarding screen
 // shows the same plain frog instead of a random outfit.
@@ -30,7 +30,7 @@ export function OnboardingFrogStage({
   emote = null,
 }: StageProps) {
   return (
-    <div className="pointer-events-none absolute inset-x-0 -top-10 z-30 flex justify-center">
+    <div className="pointer-events-none absolute inset-x-0 top-[calc(1.25rem+env(safe-area-inset-top)+1px)] z-30 flex justify-center md:-top-10">
       <div className="hidden md:block">
         <Frog width={280} height={315} indices={indices} emote={emote} />
       </div>
@@ -57,14 +57,14 @@ export function OnboardingFrogHeader({
   return (
     <>
       {speechBubbleMessage ? (
-        <div className="pointer-events-none absolute inset-x-0 -top-10 z-30 flex justify-center">
+        <div className="pointer-events-none absolute inset-x-0 top-[calc(1.25rem+env(safe-area-inset-top)+1px)] z-30 flex justify-center md:-top-10">
           <div className="relative h-[259px] w-[230px] md:h-[315px] md:w-[280px]">
             <FrogSpeechBubble
               rate={0}
               done={0}
               total={0}
               fixedMessage={speechBubbleMessage}
-              className="!top-[calc(6rem+env(safe-area-inset-top))]"
+              className="!top-20 md:!top-24"
               messageClassName="!whitespace-pre-line !text-sm !leading-tight md:!text-base"
             />
           </div>
@@ -73,8 +73,8 @@ export function OnboardingFrogHeader({
         <div
           className={
             eyebrow
-              ? 'absolute inset-x-0 top-[246px] z-20 px-5 md:top-[292px] md:px-8'
-              : 'absolute inset-x-0 top-[270px] z-20 px-5 md:top-[294px] md:px-8'
+              ? 'absolute inset-x-0 top-[300px] z-20 px-5 md:top-[292px] md:px-8'
+              : 'absolute inset-x-0 top-[312px] z-20 px-5 md:top-[294px] md:px-8'
           }
         >
           {eyebrow ? (

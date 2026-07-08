@@ -150,7 +150,7 @@ export default function ProfileQuestionsStep({
         subtitle={currentQuestion.subtitle}
       />
 
-      <div className="relative z-20 flex flex-col pt-[356px] md:pt-[404px]">
+      <div className="relative z-20 flex flex-col pt-[418px] md:pt-[404px]">
       <motion.div
         key={currentQuestion.id}
         custom={direction}

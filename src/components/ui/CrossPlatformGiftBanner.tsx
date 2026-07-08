@@ -122,7 +122,7 @@ export function CrossPlatformGiftBanner() {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 24 }}
           transition={{ type: 'spring', stiffness: 320, damping: 26 }}
-          className="fixed right-3 z-[1290] w-[min(100%-1.5rem,28rem)] bottom-[calc(env(safe-area-inset-bottom)+72px+var(--stack-off))] transition-[bottom] duration-300 ease-out md:right-4 md:w-[380px] md:bottom-[calc(env(safe-area-inset-bottom)+16px+var(--stack-off))]"
+          className="fixed right-3 z-[1300] w-[min(100%-1.5rem,28rem)] bottom-[calc(env(safe-area-inset-bottom)+72px+var(--stack-off))] transition-[bottom] duration-300 ease-out md:right-4 md:w-[380px] md:bottom-[calc(env(safe-area-inset-bottom)+16px+var(--stack-off))]"
           style={
             {
               '--stack-off': `${stackHeight > 0 ? stackHeight + 8 : 0}px`,

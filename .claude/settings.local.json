@@ -252,7 +252,13 @@
       "Bash(mkdir -p /c/Users/snira/AppData/Local/Temp/claude/C--Users-snira-Desktop-Full-Stack-frog-task/b643ecfb-9243-4eb6-974c-8eaf19e0188a/scratchpad/shot)",
       "Read(//c/Users/snira/AppData/Local/Temp/claude/C--Users-snira-Desktop-Full-Stack-frog-task/b643ecfb-9243-4eb6-974c-8eaf19e0188a/scratchpad/**)",
       "Bash(NODE_OPTIONS= npm init -y)",
-      "Bash(NODE_OPTIONS= npm install playwright-core@latest)"
+      "Bash(NODE_OPTIONS= npm install playwright-core@latest)",
+      "Bash(rg -n \"z-\\\\[|z-[0-9]{2,}|zIndex\" src/components/ui/Toast* src/components/ui/toast*)",
+      "Bash(rg -rln \"Toaster|react-hot-toast|sonner|toast\" src/app/layout.tsx src/components)",
+      "Bash(rg -rn \"z-\\\\[1[0-9]{3}\\\\]|z-\\\\[9[0-9]+\\\\]|z-\\\\[2[0-9]{3}\\\\]\" src/components src/app)",
+      "Bash(rg -rn \"z-\\\\[1[0-9]{3}\\\\]\" src/components/ui)",
+      "Bash(rg -rn \"z-\\\\[\" src/components/ui/siteHeader.tsx src/components/ui/BottomNav.tsx src/components/nav*)",
+      "Bash(rg -rln \"fixed bottom-0|bottom-nav|BottomNav|nav\" src/components --glob '*.tsx')"
     ]
   }
 }

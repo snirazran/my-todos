@@ -601,7 +601,7 @@ export function StreakSheet({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.22 }}
-          className="fixed inset-0 z-[998]"
+          className="fixed inset-0 z-[1400]"
         >
           <div className="absolute inset-0 bg-background md:bg-black/60 md:backdrop-blur-sm" />
 

@@ -89,7 +89,7 @@ export function StreakCelebration({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[1300] flex flex-col items-center justify-center overflow-hidden bg-gradient-to-b from-orange-500 via-amber-500 to-amber-600 px-6"
+          className="fixed inset-0 z-[1400] flex flex-col items-center justify-center overflow-hidden bg-gradient-to-b from-orange-500 via-amber-500 to-amber-600 px-6"
         >
           <div className="pointer-events-none absolute inset-0 opacity-40">
             <RotatingRays colorClass="text-white" />
