@@ -13,6 +13,11 @@ export async function POST() {
   } catch {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-  const token = signStateToken({ uid, purpose: 'gcal-connect' }, TOKEN_TTL_MS);
-  return NextResponse.json({ token });
+  try {
+    const token = signStateToken({ uid, purpose: 'gcal-connect' }, TOKEN_TTL_MS);
+    return NextResponse.json({ token });
+  } catch (err) {
+    console.error('calendar connect-token not configured:', (err as Error)?.message);
+    return NextResponse.json({ error: 'calendar sync not configured' }, { status: 503 });
+  }
 }

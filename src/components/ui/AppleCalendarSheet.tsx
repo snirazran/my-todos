@@ -86,7 +86,12 @@ export default function AppleCalendarSheet({
   }, [appleId, appPassword, selectedUrl, onConnected, close]);
 
   return (
-    <BaseSheet open={open} onOpenChange={close} closeAriaLabel="Close Apple Calendar setup">
+    <BaseSheet
+      open={open}
+      onOpenChange={close}
+      zIndex={1380}
+      closeAriaLabel="Close Apple Calendar setup"
+    >
       {({ bindScroll }: BaseSheetRenderProps) => (
         <div
           ref={bindScroll}
