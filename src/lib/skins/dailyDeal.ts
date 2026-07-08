@@ -1,7 +1,8 @@
-import type { ItemDef } from './catalog';
+import { RARITY_ORDER, type ItemDef } from './catalog';
 
 export const DAILY_DEAL_DISCOUNT = 0.25;
-export const DAILY_DEAL_COUNT = 8;
+export const DAILY_DEALS_PER_RARITY = 2;
+export const DAILY_DEAL_COUNT = RARITY_ORDER.length * DAILY_DEALS_PER_RARITY;
 const MIN_DEAL_PRICE_FLIES = 200;
 
 export type DailyDeal = {
@@ -28,6 +29,15 @@ function hashString(s: string): number {
   return h >>> 0;
 }
 
+function shuffle<T>(items: T[]): T[] {
+  const shuffled = [...items];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
 export function computeDealPrice(priceFlies: number): number {
   const discounted = priceFlies * (1 - DAILY_DEAL_DISCOUNT);
   return Math.max(10, Math.round(discounted / 10) * 10);
@@ -36,7 +46,7 @@ export function computeDealPrice(priceFlies: number): number {
 export function getDailyDeals(
   catalog: ItemDef[],
   now: Date = new Date(),
-  count: number = DAILY_DEAL_COUNT,
+  dealsPerRarity: number = DAILY_DEALS_PER_RARITY,
 ): DailyDeal[] {
   const eligible = catalog.filter(
     (i) =>
@@ -45,19 +55,31 @@ export function getDailyDeals(
   if (eligible.length === 0) return [];
 
   const dayKey = utcDayKey(now);
-  const picks = eligible
-    .map((item) => ({
-      item,
-      rank: hashString(`daily-deal:${dayKey}:${item.id}`),
-    }))
-    .sort((a, b) => a.rank - b.rank || a.item.id.localeCompare(b.item.id))
-    .slice(0, count);
+  const rankedByRarity = new Map<ItemDef['rarity'], ItemDef[]>();
+  for (const rarity of RARITY_ORDER) {
+    rankedByRarity.set(
+      rarity,
+      eligible
+        .filter((item) => item.rarity === rarity)
+        .map((item) => ({
+          item,
+          rank: hashString(`daily-deal:${dayKey}:${rarity}:${item.id}`),
+        }))
+        .sort((a, b) => a.rank - b.rank || a.item.id.localeCompare(b.item.id))
+        .slice(0, dealsPerRarity)
+        .map(({ item }) => item),
+    );
+  }
+
+  const picks = shuffle(
+    RARITY_ORDER.flatMap((rarity) => rankedByRarity.get(rarity) ?? []),
+  );
 
   const endsAt = new Date(
     Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1),
   ).toISOString();
 
-  return picks.map(({ item }) => {
+  return picks.map((item) => {
     const price = item.priceFlies ?? 0;
     return {
       itemId: item.id,

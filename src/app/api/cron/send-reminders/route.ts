@@ -27,7 +27,6 @@ type PushMessage = {
   title: string;
   body: string;
   data: Record<string, string>;
-  badge?: number;
 };
 
 const MORNING_MESSAGES = [
@@ -35,19 +34,16 @@ const MORNING_MESSAGES = [
     title: `Today: ${count} task${count === 1 ? '' : 's'}`,
     body: 'Start with the smallest one. Momentum handles the rest.',
     data: { type: 'task_reminder', uncompletedCount: String(count) },
-    badge: count,
   }),
   (count: number, frog: string): PushMessage => ({
     title: 'Your list is ready',
     body: `${count} task${count === 1 ? '' : 's'} today. The first one takes five minutes.`,
     data: { type: 'task_reminder', uncompletedCount: String(count) },
-    badge: count,
   }),
   (count: number, frog: string): PushMessage => ({
     title: `${frog} peeked at your list`,
     body: `${count} task${count === 1 ? '' : 's'} today. One small win before lunch changes everything.`,
     data: { type: 'task_reminder', uncompletedCount: String(count) },
-    badge: count,
   }),
 ];
 
@@ -56,19 +52,16 @@ const EVENING_MESSAGES = [
     title: `${count} task${count === 1 ? '' : 's'} between you and a clear list`,
     body: "There's still time. Even one counts.",
     data: { type: 'task_reminder', uncompletedCount: String(count) },
-    badge: count,
   }),
   (count: number, frog: string): PushMessage => ({
     title: 'Almost done today',
     body: `${count} left. Finish one and call it a win.`,
     data: { type: 'task_reminder', uncompletedCount: String(count) },
-    badge: count,
   }),
   (count: number, frog: string): PushMessage => ({
     title: "Today isn't over yet",
     body: `${count} task${count === 1 ? '' : 's'} still open. Ten minutes is all it takes.`,
     data: { type: 'task_reminder', uncompletedCount: String(count) },
-    badge: count,
   }),
 ];
 
@@ -396,9 +389,6 @@ export async function GET(req: NextRequest) {
                   title: message.title,
                   body: message.body,
                 },
-                ...(message.badge !== undefined
-                  ? { badge: message.badge }
-                  : {}),
                 sound: 'default',
               },
             },

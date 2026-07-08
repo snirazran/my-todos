@@ -201,7 +201,6 @@ export async function POST(req: NextRequest) {
           payload: {
             aps: {
               alert: { title: 'Frogress 🐸', body: messageBody },
-              badge: uncompleted.length,
               sound: 'default',
             },
           },
