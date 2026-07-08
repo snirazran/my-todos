@@ -329,7 +329,7 @@ function Step0({
         <Reveal delay={0.24}>
           <FeatureRow
             icon={<BadgePercent className="h-5 w-5 text-amber-300" />}
-            title="Daily Plus only discounts"
+            title="Daily Plus-only discounts"
             subtitle="Fresh discounts in the shop, daily."
           />
         </Reveal>
@@ -394,7 +394,7 @@ const COMPARISON_ROWS: { label: string; free: boolean }[] = [
   { label: 'Weekly streak rescue', free: false },
   { label: 'Free trade rerolls', free: false },
   { label: 'Daily outfit deals', free: false },
-  { label: 'Season plus rewards', free: false },
+  { label: 'Season Plus rewards', free: false },
 ];
 
 
@@ -455,7 +455,7 @@ function Step1({ onContinue }: { onContinue: () => void }) {
       </Reveal>
 
       <Reveal delay={0.3} className="mt-auto pt-8">
-        <PrimaryButton onClick={onContinue}>Try 7 days for free!</PrimaryButton>
+        <PrimaryButton onClick={onContinue}>Try 7 days free!</PrimaryButton>
       </Reveal>
     </div>
   );
@@ -584,14 +584,14 @@ function Step3({
           </p>
         )}
         <p className="text-xs font-medium text-white/85">
-          Recurring billing, cancel anytime.
+          Recurring billing — cancel anytime.
         </p>
         <PrimaryButton onClick={onStart} disabled={busy}>
           {busy
             ? 'Processing…'
             : plan === 'yearly'
-              ? 'Start my free 7 days'
-              : 'Start my free 3 days'}
+              ? 'Start my 7-day free trial'
+              : 'Start my 3-day free trial'}
         </PrimaryButton>
         {isNative && (
           <button
