@@ -590,6 +590,11 @@ export function StreakSheet({
     else setStep('home');
   };
 
+  const handleBackdropClick = () => {
+    if (buyOpen) return;
+    close();
+  };
+
   if (typeof document === 'undefined') return null;
 
   return createPortal(
@@ -605,7 +610,10 @@ export function StreakSheet({
         >
           <div className="absolute inset-0 bg-background md:bg-black/60 md:backdrop-blur-sm" />
 
-          <div className="absolute inset-0 md:flex md:items-center md:justify-center md:p-6">
+          <div
+            className="absolute inset-0 md:flex md:items-center md:justify-center md:p-6"
+            onClick={handleBackdropClick}
+          >
           <AnimatePresence mode="popLayout" initial={false}>
             <motion.div
               key={step}
@@ -613,6 +621,7 @@ export function StreakSheet({
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -60 }}
               transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+              onClick={(event) => event.stopPropagation()}
               className="mx-auto h-full w-full sm:max-w-md md:h-[min(720px,100%)] md:overflow-hidden md:rounded-[32px] md:shadow-2xl"
             >
               {step === 'reveal' && celebration && (
