@@ -1,16 +1,22 @@
-import { useEffect, type RefObject, useId } from 'react';
+import { useEffect, useState, type RefObject, useId } from 'react';
 import { type Rive, EventType } from '@rive-app/react-canvas-lite';
 import { useRiveStatsStore } from '@/lib/riveStatsStore';
 import { useUIStore } from '@/lib/uiStore';
 
+const FORCE_PLAY_GRACE_MS = 2500;
+
 /**
  * Automatically plays/pauses a Rive animation based on visibility in the viewport.
+ * While `forcePlay` is true (and for a short grace period after it drops), the
+ * animation keeps playing even off-screen so in-flight one-shot timelines
+ * (mouth open/close, emotes) finish instead of freezing mid-animation.
  */
 export function useRiveVisibility(
   rive: Rive | null,
   ref: RefObject<HTMLElement | null>,
   enabled = true,
   label = 'unknown',
+  forcePlay = false,
 ) {
   const instanceId = useId();
   const fullId = `${label}-${instanceId}`;
@@ -20,6 +26,16 @@ export function useRiveVisibility(
   const registerInstance = useRiveStatsStore((s) => s.registerInstance);
   const unregisterInstance = useRiveStatsStore((s) => s.unregisterInstance);
   const updateInstance = useRiveStatsStore((s) => s.updateInstance);
+
+  const [forceHeld, setForceHeld] = useState(forcePlay);
+  useEffect(() => {
+    if (forcePlay) {
+      setForceHeld(true);
+      return;
+    }
+    const t = setTimeout(() => setForceHeld(false), FORCE_PLAY_GRACE_MS);
+    return () => clearTimeout(t);
+  }, [forcePlay]);
 
   useEffect(() => {
     if (!rive || !isDebugMode) return;
@@ -70,6 +86,19 @@ export function useRiveVisibility(
       };
     }
 
+    if (forceHeld) {
+      rive.play();
+      if (isDebugMode) updateStatus();
+      return () => {
+        if (rafId) cancelAnimationFrame(rafId);
+        if (isDebugMode) {
+          rive.off(EventType.Play, updateStatus);
+          rive.off(EventType.Pause, updateStatus);
+          rive.off(EventType.Stop, updateStatus);
+        }
+      };
+    }
+
     if (ref.current) {
       observer = new IntersectionObserver(
         (entries) => {
@@ -100,5 +129,5 @@ export function useRiveVisibility(
         rive.off(EventType.Stop, updateStatus);
       }
     };
-  }, [rive, ref, enabled, fullId, updateInstance, isDebugMode]);
+  }, [rive, ref, enabled, forceHeld, fullId, updateInstance, isDebugMode]);
 }

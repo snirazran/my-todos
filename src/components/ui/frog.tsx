@@ -127,16 +127,19 @@ const Frog = memo(
       setDressed(true);
     }, []);
 
-    const { RiveComponent, rive } = useRive({
-      src: riveUrl || undefined,
-      artboard: ARTBOARD_NAME,
-      stateMachines: STATE_MACHINE,
-      autoplay: true,
-      autoBind: true,
-      layout: FROG_LAYOUT,
-    });
+    const { RiveComponent, rive } = useRive(
+      {
+        src: riveUrl || undefined,
+        artboard: ARTBOARD_NAME,
+        stateMachines: STATE_MACHINE,
+        autoplay: true,
+        autoBind: true,
+        layout: FROG_LAYOUT,
+      },
+      { shouldUseIntersectionObserver: false },
+    );
 
-    useRiveVisibility(rive, wrapperRef, !paused, 'frog');
+    useRiveVisibility(rive, wrapperRef, !paused, 'frog', !!mouthOpen);
 
     const resolvedVisualOffsetY =
       visualOffsetY ?? Math.round(height * 0.17);
