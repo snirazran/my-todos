@@ -270,7 +270,9 @@
       "WebFetch(domain:designerup.co)",
       "Bash(\"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome\" --headless=new --disable-gpu --hide-scrollbars --window-size=500,844 --user-data-dir=./chrome-profile --timeout=18000 --screenshot=focus-rows-mobile.png \"http://localhost:3000/onboarding\")",
       "Bash(\"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome\" --headless=new --disable-gpu --hide-scrollbars --window-size=1280,800 --user-data-dir=./chrome-profile --timeout=18000 --screenshot=focus-rows-desktop.png \"http://localhost:3000/onboarding\")",
-      "Bash(\"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome\" --headless=new --disable-gpu --hide-scrollbars --window-size=500,844 --user-data-dir=./chrome-profile --virtual-time-budget=8000 --timeout=30000 --screenshot=focus-rows-mobile2.png \"http://localhost:3000/onboarding\")"
+      "Bash(\"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome\" --headless=new --disable-gpu --hide-scrollbars --window-size=500,844 --user-data-dir=./chrome-profile --virtual-time-budget=8000 --timeout=30000 --screenshot=focus-rows-mobile2.png \"http://localhost:3000/onboarding\")",
+      "Bash(dig +short NS frogress.com)",
+      "Bash(dig +short TXT frogress.com)"
     ]
   }
 }

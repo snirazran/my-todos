@@ -17,9 +17,8 @@ import { useRegisterOpenSheet } from '@/lib/sheetStore';
 import { useUIStore } from '@/lib/uiStore';
 import { clearSessionCookie } from '@/lib/authCookie';
 import { useInventory } from '@/hooks/useInventory';
-import CalendarSyncSection, {
-  getCalendarConnections,
-  openGoogleCalendarConnect,
+import IntegrationsPanel, {
+  useCalendarConnections,
 } from '@/components/ui/CalendarSyncSection';
 import {
   SkinRotationRow,
@@ -612,7 +611,7 @@ function MobileSheet({
   // above the menu, instead of behind it).
   useRegisterOpenSheet(isOpen);
   const [view, setView] = useState<
-    'main' | 'preferences' | 'notifications' | 'community' | 'profile' | 'helpCenter' | 'contact'
+    'main' | 'preferences' | 'notifications' | 'community' | 'profile' | 'helpCenter' | 'contact' | 'integrations'
   >('main');
   const [contactTopic, setContactTopic] = useState<'question' | 'bug'>('question');
   const [contactBack, setContactBack] = useState<'main' | 'helpCenter'>('main');
@@ -710,25 +709,22 @@ function MobileSheet({
               >
                 <ChevronLeft className="w-6 h-6" />
               </button>
-              {view === 'preferences' && (
-                <h2 className="text-base font-black tracking-tight">Preferences</h2>
+              {view !== 'main' && (
+                <h2 className="min-w-0 flex-1 truncate text-center text-base font-black tracking-tight">
+                  {
+                    {
+                      preferences: 'Preferences',
+                      notifications: 'Notifications',
+                      community: 'Join our frog community',
+                      profile: 'Profile',
+                      helpCenter: 'Help center',
+                      contact: 'Contact us',
+                      integrations: 'Integrations',
+                    }[view]
+                  }
+                </h2>
               )}
-              {view === 'notifications' && (
-                <h2 className="text-base font-black tracking-tight">Notifications</h2>
-              )}
-              {view === 'community' && (
-                <h2 className="text-base font-black tracking-tight">Join our frog community</h2>
-              )}
-              {view === 'profile' && (
-                <h2 className="text-base font-black tracking-tight">Profile</h2>
-              )}
-              {view === 'helpCenter' && (
-                <h2 className="text-base font-black tracking-tight">Help center</h2>
-              )}
-              {view === 'contact' && (
-                <h2 className="text-base font-black tracking-tight">Contact us</h2>
-              )}
-              <div className="w-10" aria-hidden />
+              <div className="w-10 shrink-0" aria-hidden />
             </div>
           </div>
 
@@ -763,6 +759,7 @@ function MobileSheet({
                   onEnableNotifs={handleEnableNotifs}
                   onOpenNotifications={() => setView('notifications')}
                   onOpenPreferences={() => setView('preferences')}
+                  onOpenIntegrations={() => setView('integrations')}
                   onOpenQuestFocus={() => {
                     onOpenQuestOnboarding();
                     onClose();
@@ -810,6 +807,8 @@ function MobileSheet({
                 onDisableNotifs={handleDisableNotifs}
                 onManageEmail={() => flashSoon('Email notifications')}
               />
+            ) : view === 'integrations' ? (
+              <IntegrationsPanel />
             ) : view === 'community' ? (
               <CommunityPanel />
             ) : view === 'helpCenter' ? (
@@ -896,6 +895,7 @@ function MainView({
   onEnableNotifs,
   onOpenNotifications,
   onOpenPreferences,
+  onOpenIntegrations,
   onOpenQuestFocus,
   onInviteFriends,
   onOpenCommunity,
@@ -924,6 +924,7 @@ function MainView({
   onEnableNotifs: () => void;
   onOpenNotifications: () => void;
   onOpenPreferences: () => void;
+  onOpenIntegrations: () => void;
   onOpenQuestFocus: () => void;
   onInviteFriends: () => void;
   onOpenCommunity: () => void;
@@ -936,6 +937,9 @@ function MainView({
   flashSoon: (label: string) => void;
 }) {
   const [plusInfoOpen, setPlusInfoOpen] = useState(false);
+  const { connections } = useCalendarConnections();
+  const activeConnections = connections.filter((c) => c.status === 'active').length;
+  const needsAttention = connections.some((c) => c.status !== 'active');
   const premiumUntilDate = premiumUntil ? new Date(premiumUntil) : null;
   const premiumUntilLabel = premiumUntilDate
     ? premiumUntilDate.toLocaleDateString(undefined, {
@@ -973,6 +977,14 @@ function MainView({
         setTheme={setTheme}
         onOpenQuestFocus={onOpenQuestFocus}
         onOpenPreferences={onOpenPreferences}
+        onOpenIntegrations={onOpenIntegrations}
+        calendarSubtitle={
+          needsAttention
+            ? 'Action needed'
+            : activeConnections > 0
+              ? 'Connected'
+              : 'Sync your events'
+        }
       />
 
       {/* Frogress Plus promo */}
@@ -1005,7 +1017,7 @@ function MainView({
           </div>
           <span
             aria-hidden
-            className="shrink-0 inline-flex items-center rounded-xl bg-gradient-to-b from-emerald-600 to-emerald-800 px-3 py-2 text-xs font-black uppercase tracking-[0.12em] text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_2px_4px_rgba(0,0,0,0.25)] ring-1 ring-emerald-900/40"
+            className="hidden min-[380px]:inline-flex shrink-0 items-center rounded-xl bg-gradient-to-b from-emerald-600 to-emerald-800 px-3 py-2 text-xs font-black uppercase tracking-[0.12em] text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_2px_4px_rgba(0,0,0,0.25)] ring-1 ring-emerald-900/40"
           >
             Try 7 days free
           </span>
@@ -1044,6 +1056,20 @@ function MainView({
           icon={<User className="w-7 h-7 text-sky-500" />}
           label="Profile"
           onClick={onOpenProfile}
+        />
+        <MenuRow
+          icon={<Icon name="googleCalendar" label="Integrations" className="w-7 h-7" />}
+          label="Integrations"
+          trailing={
+            needsAttention ? (
+              <span className="text-[11px] font-bold text-amber-600">Action needed</span>
+            ) : (
+              <span className="text-[11px] font-bold text-muted-foreground">
+                {activeConnections > 0 ? `${activeConnections} connected` : 'Off'}
+              </span>
+            )
+          }
+          onClick={onOpenIntegrations}
         />
         <MenuRow
           icon={<SlidersHorizontal className="w-7 h-7 text-emerald-500" />}
@@ -1194,10 +1220,6 @@ function PreferencesView({
 
       <MenuSection title="Wardrobe">
         <SkinRotationRow />
-      </MenuSection>
-
-      <MenuSection title="Integrations">
-        <CalendarSyncSection />
       </MenuSection>
     </div>
   );
@@ -1375,13 +1397,13 @@ function QuickTile({
     <button
       type="button"
       onClick={onClick}
-      className="flex h-24 w-full items-center gap-3 rounded-2xl border border-border/50 bg-card px-4 py-3 text-left transition-all active:scale-[0.98] hover:bg-accent/50"
+      className="flex min-h-24 w-full items-center gap-3 rounded-2xl border border-border/50 bg-card px-4 py-3 text-left transition-all active:scale-[0.98] hover:bg-accent/50 max-[359px]:gap-2 max-[359px]:px-3"
     >
       <div className="flex h-10 w-10 shrink-0 items-center justify-center">{icon}</div>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-black leading-tight">{title}</p>
+        <p className="line-clamp-2 text-sm font-black leading-tight">{title}</p>
         {subtitle && (
-          <p className="mt-0.5 truncate text-[11px] font-bold text-muted-foreground">
+          <p className="mt-0.5 line-clamp-2 text-[11px] font-bold leading-tight text-muted-foreground">
             {subtitle}
           </p>
         )}
@@ -1395,36 +1417,24 @@ function QuickTilesGrid({
   setTheme,
   onOpenQuestFocus,
   onOpenPreferences,
+  onOpenIntegrations,
+  calendarSubtitle,
 }: {
   theme?: string;
   setTheme: (t: string) => void;
   onOpenQuestFocus: () => void;
   onOpenPreferences: () => void;
+  onOpenIntegrations: () => void;
+  calendarSubtitle: string;
 }) {
   const [rotation, setRotation] = useState<RotationInterval>('disabled');
   const [rotationOpen, setRotationOpen] = useState(false);
-  const [gcalEnabled, setGcalEnabled] = useState(() =>
-    getCalendarConnections().some(
-      (c) => c.provider === 'google' && c.status === 'active',
-    ),
-  );
 
   useEffect(() => {
     setRotation(getRotationInterval());
     const handler = () => setRotation(getRotationInterval());
     window.addEventListener('skin-rotation-change', handler);
     return () => window.removeEventListener('skin-rotation-change', handler);
-  }, []);
-
-  useEffect(() => {
-    const handler = () =>
-      setGcalEnabled(
-        getCalendarConnections().some(
-          (c) => c.provider === 'google' && c.status === 'active',
-        ),
-      );
-    window.addEventListener('calendar-connections-change', handler);
-    return () => window.removeEventListener('calendar-connections-change', handler);
   }, []);
 
   return (
@@ -1442,12 +1452,10 @@ function QuickTilesGrid({
         onClick={() => setRotationOpen(true)}
       />
       <QuickTile
-        icon={<Icon name="googleCalendar" label="Google Calendar" className="h-8 w-8" />}
-        title="Google Calendar"
-        subtitle={gcalEnabled ? 'Connected' : 'Sync your events'}
-        onClick={() => {
-          if (!gcalEnabled) void openGoogleCalendarConnect();
-        }}
+        icon={<Icon name="googleCalendar" label="Calendar sync" className="h-8 w-8" />}
+        title="Calendar sync"
+        subtitle={calendarSubtitle}
+        onClick={onOpenIntegrations}
       />
       <QuickTile
         icon={<Icon name="darkMode" label="Color mode" className="h-[52px] w-[52px]" />}
@@ -1501,9 +1509,9 @@ function MenuRow({
       <div className="h-9 w-9 flex items-center justify-center shrink-0">
         {icon}
       </div>
-      <span className="flex-1 text-sm font-bold truncate">{label}</span>
-      {trailing}
-      <ChevronRight className="w-4 h-4 text-muted-foreground" />
+      <span className="min-w-0 flex-1 text-sm font-bold line-clamp-2 leading-tight">{label}</span>
+      {trailing && <span className="shrink-0">{trailing}</span>}
+      <ChevronRight className="w-4 h-4 shrink-0 text-muted-foreground" />
     </button>
   );
 }

@@ -3,6 +3,7 @@
 import { useCallback, useState } from 'react';
 import { Loader2, Calendar } from 'lucide-react';
 import { BaseSheet, type BaseSheetRenderProps } from '@/components/ui/BaseSheet';
+import { Icon } from '@/components/ui/Icon';
 
 type AppleCalendarOption = { url: string; displayName: string };
 
@@ -91,7 +92,10 @@ export default function AppleCalendarSheet({
           ref={bindScroll}
           className="overflow-y-auto px-5 pb-8 pt-2 max-h-[80vh] md:max-h-[70vh]"
         >
-          <h2 className="text-lg font-black mb-1">Apple Calendar</h2>
+          <div className="mb-1 flex items-center gap-2.5">
+            <Icon name="appleCalendar" label="Apple Calendar" className="h-8 w-8" />
+            <h2 className="text-lg font-black">Apple Calendar</h2>
+          </div>
 
           {!calendars ? (
             <>

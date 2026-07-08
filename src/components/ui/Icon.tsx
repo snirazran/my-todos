@@ -3,6 +3,7 @@ import type { FC, SVGProps } from 'react';
 // Inline SVG icons (via @svgr/webpack). They ship inside the JS bundle, so
 // there is no per-icon network request and no flash-in on first paint.
 // Original multicolor artwork is preserved.
+import AppleCalendar from '../../../public/icons/AppleCalendar.svg';
 import Clock from '../../../public/icons/clock.svg';
 import Community from '../../../public/icons/Community.svg';
 import Compass from '../../../public/icons/Compass.svg';
@@ -21,6 +22,7 @@ import Shuffle from '../../../public/icons/Shuffle.svg';
 import Wardrobe from '../../../public/icons/Wardrobe.svg';
 
 const ICONS = {
+  appleCalendar: AppleCalendar,
   clock: Clock,
   community: Community,
   compass: Compass,
