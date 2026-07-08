@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { mutate } from 'swr';
 import type { OnboardingStepProps } from './steps/types';
@@ -62,6 +62,11 @@ export default function OnboardingPage() {
   const [direction, setDirection] = useState(1);
   const [subStep, setSubStep] = useState(0);
   const [celebrating, setCelebrating] = useState(false);
+  const mainRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    mainRef.current?.scrollTo({ top: 0 });
+  }, [step, subStep]);
 
   // Keep the local copy in sync so it can be restored after the magic-link reload.
   useEffect(() => {
@@ -248,13 +253,16 @@ export default function OnboardingPage() {
   };
 
   return (
-    <main className="fixed inset-0 isolate flex flex-col items-center overflow-y-auto overflow-x-hidden bg-background px-5 pt-4">
-      <div className="absolute inset-x-0 top-0 h-[390px] overflow-hidden md:h-[352px]">
+    <main
+      ref={mainRef}
+      className="fixed inset-0 isolate flex flex-col items-center overflow-y-auto overflow-x-hidden bg-background px-5 pt-4"
+    >
+      <div className="absolute inset-x-0 top-0 h-[390px] overflow-hidden short:h-[342px] md:h-[352px]">
         <OnboardingBackground />
       </div>
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 bottom-0 top-[286px] z-[5] rounded-t-[24px] bg-background md:left-1/2 md:right-auto md:top-[278px] md:w-full md:max-w-lg md:-translate-x-1/2 md:rounded-[24px] lg:max-w-xl"
+        className="pointer-events-none absolute inset-x-0 bottom-0 top-[286px] z-[5] rounded-t-[24px] bg-background short:top-[238px] md:left-1/2 md:right-auto md:top-[278px] md:w-full md:max-w-lg md:-translate-x-1/2 md:rounded-[24px] lg:max-w-xl"
       />
       <div className="relative z-10 flex w-full max-w-none flex-col md:max-w-lg lg:max-w-xl" style={{ minHeight: '100%' }}>
         <OnboardingFrogStage

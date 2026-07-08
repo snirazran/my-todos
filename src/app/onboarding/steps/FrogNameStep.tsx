@@ -90,9 +90,19 @@ export default function FrogNameStep({ selections, onSelect, onNext, saving, dir
             <input
               value={frogName}
               onChange={(event) => setName(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  if (canContinue && !saving) onNext();
+                }
+              }}
               className="w-full h-16 md:h-[4.25rem] rounded-3xl border-2 border-border/50 bg-background px-12 text-center text-xl md:text-2xl font-black text-foreground shadow-sm outline-none transition focus:border-primary/60 focus:ring-4 focus:ring-primary/10"
               aria-label="Frog name"
               maxLength={24}
+              enterKeyHint="next"
+              autoCapitalize="words"
+              autoCorrect="off"
+              spellCheck={false}
             />
             {frogName.length > 0 && (
               <button

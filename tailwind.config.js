@@ -13,6 +13,9 @@ module.exports = {
   ],
   theme: {
     extend: {
+      screens: {
+        short: { raw: '(max-width: 767px) and (max-height: 700px)' },
+      },
       fontFamily: {
         // Heebo follows Poppins so Hebrew text (which Poppins lacks) renders in
         // Heebo while Latin stays Poppins.

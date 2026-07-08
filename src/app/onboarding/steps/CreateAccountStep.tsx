@@ -132,6 +132,9 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
                     type="email"
                     inputMode="email"
                     autoComplete="email"
+                    enterKeyHint="send"
+                    autoCapitalize="none"
+                    spellCheck={false}
                     placeholder="Email address"
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}

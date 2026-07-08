@@ -62,10 +62,21 @@ export default function HumanNameStep({ selections, onSelect, onNext, saving, di
             ref={inputRef}
             value={humanName}
             onChange={(event) => setHumanName(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                if (canContinue && !saving) onNext();
+              }
+            }}
             className="relative w-full h-16 md:h-[4.25rem] rounded-3xl border-2 border-border/50 bg-background px-12 text-center text-lg md:text-xl font-bold text-foreground shadow-sm outline-none transition placeholder:text-muted-foreground/35 focus:border-primary/60 focus:ring-4 focus:ring-primary/10"
             aria-label="Your name"
             placeholder="Your name"
             maxLength={40}
+            enterKeyHint="next"
+            autoComplete="given-name"
+            autoCapitalize="words"
+            autoCorrect="off"
+            spellCheck={false}
           />
           {humanName.length > 0 && (
             <button

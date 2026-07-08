@@ -116,6 +116,12 @@ export default function ProfileQuestionsStep({
   const currentQuestion = displayedQuestions[questionIndex];
   const selectedValues = selections[currentQuestion.id] ?? [];
   const selected = selectedValues[0];
+  const compactGrid =
+    !currentQuestion.multiSelect &&
+    currentQuestion.options.length > 4 &&
+    currentQuestion.options.every(
+      (o) => !o.icon && !o.iconImageUrl && !o.description,
+    );
 
   const chooseOption = (id: string) => {
     if (currentQuestion.multiSelect) {
@@ -150,7 +156,7 @@ export default function ProfileQuestionsStep({
         subtitle={currentQuestion.subtitle}
       />
 
-      <div className="relative z-20 flex flex-col pt-[418px] md:pt-[404px]">
+      <div className="relative z-20 flex flex-col pt-[418px] short:pt-[370px] md:pt-[404px]">
       <motion.div
         key={currentQuestion.id}
         custom={direction}
@@ -227,7 +233,8 @@ export default function ProfileQuestionsStep({
             </div>
           ) : (
             <>
-              {currentQuestion.options.map((option) => {
+              <div className={compactGrid ? 'grid grid-cols-2 gap-2.5' : 'contents'}>
+              {currentQuestion.options.map((option, optionIndex) => {
             const isSelected = currentQuestion.multiSelect
               ? selectedValues.includes(option.id)
               : selected === option.id;
@@ -245,6 +252,10 @@ export default function ProfileQuestionsStep({
                     ? 'flex flex-col items-center justify-center gap-1 px-5 py-4 text-center md:py-3.5'
                     : 'h-[62px] md:h-[56px]',
                   !hasDescription && hasIcon && 'flex items-center justify-start gap-4 px-5 text-left',
+                  compactGrid &&
+                    optionIndex === currentQuestion.options.length - 1 &&
+                    currentQuestion.options.length % 2 === 1 &&
+                    'col-span-2',
                   isSelected
                     ? 'border-primary/60 bg-primary/10 text-primary'
                     : 'border-border/50 hover:border-primary/30 hover:bg-muted/30',
@@ -296,6 +307,7 @@ export default function ProfileQuestionsStep({
               </button>
             );
           })}
+              </div>
           {currentQuestion.plainOption && (
             <button
               type="button"
@@ -314,7 +326,7 @@ export default function ProfileQuestionsStep({
         </div>
 
         {currentQuestion.multiSelect && (
-          <div className="mt-3 flex w-[calc(100%+2rem)] max-w-[calc(100vw-2rem)] justify-center pb-6 md:mx-auto md:w-full md:max-w-md">
+          <div className="sticky bottom-0 z-30 mt-1 flex w-[calc(100%+2rem)] max-w-[calc(100vw-2rem)] justify-center bg-gradient-to-t from-background via-background/90 to-transparent pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-4 md:mx-auto md:w-full md:max-w-md">
             <motion.button
               type="button"
               onClick={handleMultiSelectNext}

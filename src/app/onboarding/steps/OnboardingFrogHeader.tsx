@@ -7,7 +7,7 @@ import type { FrogEmote, WardrobeSlot } from '@/components/ui/frog';
 
 const Frog = dynamic(() => import('@/components/ui/frog'), { ssr: false });
 
-export const ONBOARDING_BODY_CLASS = 'pt-[430px] md:pt-[398px]';
+export const ONBOARDING_BODY_CLASS = 'pt-[430px] short:pt-[382px] md:pt-[398px]';
 
 // Default to the bare frog (no hat/body/hand item) so every onboarding screen
 // shows the same plain frog instead of a random outfit.
@@ -34,7 +34,7 @@ export function OnboardingFrogStage({
       <div className="hidden md:block">
         <Frog width={280} height={315} indices={indices} emote={emote} />
       </div>
-      <div className="block md:hidden">
+      <div className="block origin-top md:hidden short:scale-[0.85]">
         <Frog width={230} height={259} indices={indices} emote={emote} />
       </div>
     </div>
@@ -73,8 +73,8 @@ export function OnboardingFrogHeader({
         <div
           className={
             eyebrow
-              ? 'absolute inset-x-0 top-[300px] z-20 px-5 md:top-[292px] md:px-8'
-              : 'absolute inset-x-0 top-[312px] z-20 px-5 md:top-[294px] md:px-8'
+              ? 'absolute inset-x-0 top-[300px] z-20 px-5 short:top-[252px] md:top-[292px] md:px-8'
+              : 'absolute inset-x-0 top-[312px] z-20 px-5 short:top-[264px] md:top-[294px] md:px-8'
           }
         >
           {eyebrow ? (

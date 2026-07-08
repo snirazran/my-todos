@@ -258,7 +258,10 @@
       "Bash(rg -rn \"z-\\\\[1[0-9]{3}\\\\]|z-\\\\[9[0-9]+\\\\]|z-\\\\[2[0-9]{3}\\\\]\" src/components src/app)",
       "Bash(rg -rn \"z-\\\\[1[0-9]{3}\\\\]\" src/components/ui)",
       "Bash(rg -rn \"z-\\\\[\" src/components/ui/siteHeader.tsx src/components/ui/BottomNav.tsx src/components/nav*)",
-      "Bash(rg -rln \"fixed bottom-0|bottom-nav|BottomNav|nav\" src/components --glob '*.tsx')"
+      "Bash(rg -rln \"fixed bottom-0|bottom-nav|BottomNav|nav\" src/components --glob '*.tsx')",
+      "Bash([ -x \"$CHROME\" ])",
+      "Read(//Applications/**)",
+      "Bash(\"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome\" --headless=new --disable-gpu --hide-scrollbars --window-size=375,667 --user-data-dir=./chrome-profile --virtual-time-budget=12000 --screenshot=onb-mobile-se.png \"http://localhost:3000/onboarding\")"
     ]
   }
 }
