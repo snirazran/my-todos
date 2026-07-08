@@ -161,7 +161,7 @@ export function FriendDetailModal({
           ? f.equippedItems?.some((i) => i.id === peekTarget.id)
           : f.backgroundId === peekTarget.id,
       )
-      .map((f) => f.frogName || f.name);
+      .map((f) => f.name || f.frogName);
   }, [peekTarget, allFriends]);
 
   const { data: invitesData, mutate: mutateInvites } = useSWR<{
@@ -312,7 +312,7 @@ export function FriendDetailModal({
                 <div className="text-center">
                   <h2 className="flex items-center justify-center gap-1.5 text-xl font-black tracking-tight text-foreground">
                     <span className={cn(entry.premium && 'plus-name-shimmer')}>
-                      {entry.frogName || entry.name}
+                      {entry.name || entry.frogName}
                     </span>
                     {entry.premium && (
                       <Icon
@@ -326,7 +326,7 @@ export function FriendDetailModal({
                     entry.frogName &&
                     entry.name !== entry.frogName && (
                       <p className="text-sm font-semibold text-muted-foreground">
-                        {entry.name}
+                        {entry.frogName}
                       </p>
                     )}
                 </div>
@@ -496,7 +496,7 @@ export function FriendDetailModal({
           <ItemPeekSheet
             target={peekTarget}
             onClose={() => setPeekTarget(null)}
-            friendName={entry.frogName || entry.name}
+            friendName={entry.name || entry.frogName}
             wearerNames={wearerNames}
             owned={ownsPeekTarget}
             wearing={wearingPeekTarget}

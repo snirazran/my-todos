@@ -143,7 +143,7 @@ export default function FriendsPage() {
   const leaderboard: LeaderboardEntry[] = [...friends].sort(
     (a, b) =>
       sharedFrom(b) - sharedFrom(a) ||
-      (a.frogName || a.name).localeCompare(b.frogName || b.name),
+      (a.name || a.frogName).localeCompare(b.name || b.frogName),
   );
 
   return (
@@ -365,7 +365,7 @@ function RemoveFriendDialog({
                 Remove friend?
               </h2>
               <p className="mt-1.5 text-[15px] font-medium text-zinc-500">
-                {target.frogName || target.name} will be removed from your
+                {target.name || target.frogName} will be removed from your
                 friends. You can add each other again anytime.
               </p>
 
@@ -600,7 +600,7 @@ function LeaderboardRow({
             <span
               className={cn('truncate', entry.premium && 'plus-name-shimmer')}
             >
-              {entry.frogName || entry.name}
+              {entry.name || entry.frogName}
             </span>
             {entry.premium && (
               <Icon
@@ -612,7 +612,7 @@ function LeaderboardRow({
           </p>
           {entry.name && entry.frogName && entry.name !== entry.frogName && (
             <p className="truncate text-xs font-semibold text-emerald-700/70">
-              {entry.name}
+              {entry.frogName}
             </p>
           )}
           {(entry.streak ?? 0) > 0 && (

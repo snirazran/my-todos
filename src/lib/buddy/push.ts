@@ -13,7 +13,7 @@ export async function buddyDisplayName(userId: string): Promise<string> {
   const u = await UserModel.findById(userId)
     .select('name frogName')
     .lean<{ name?: string; frogName?: string }>();
-  return u?.frogName || u?.name || 'Your buddy';
+  return u?.name || u?.frogName || 'Your buddy';
 }
 
 /**

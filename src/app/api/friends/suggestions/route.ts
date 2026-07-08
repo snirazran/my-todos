@@ -102,7 +102,7 @@ export async function GET() {
     const byId = buildById(catalog);
     const candidateById = new Map(candidates.map((c) => [c._id, c]));
     const mutualNameById = new Map(
-      mutualUsers.map((u) => [u._id, u.frogName || u.name || 'Frog']),
+      mutualUsers.map((u) => [u._id, u.name || u.frogName || 'Frog']),
     );
 
     const suggestions: FriendSuggestion[] = [];

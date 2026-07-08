@@ -182,7 +182,7 @@ function ChooseSheet({
                       )}
                     </span>
                     <span className="min-w-0 flex-1 truncate text-sm font-black tracking-tight text-foreground">
-                      {f.frogName || f.name}
+                      {f.name || f.frogName}
                     </span>
                     <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
                   </button>

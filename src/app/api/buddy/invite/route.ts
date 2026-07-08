@@ -142,7 +142,7 @@ export async function GET() {
         bondId: b.bondId,
         direction: b.fromUserId === userId ? 'outgoing' : 'incoming',
         withUserId: otherId,
-        withName: other?.frogName || other?.name || 'Friend',
+        withName: other?.name || other?.frogName || 'Friend',
         text: b.initialText,
         repeatLabel: b.repeatLabel ?? '',
         createdAt: b.createdAt,

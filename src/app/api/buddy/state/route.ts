@@ -67,7 +67,7 @@ export async function GET() {
       const bond = bondById.get(t.bondId);
       if (!bond) continue;
       const partner = t.buddyUserId ? partnerById.get(t.buddyUserId) : undefined;
-      const name = partner?.frogName || partner?.name || 'Friend';
+      const name = partner?.name || partner?.frogName || 'Friend';
       const iAmFrom = bond.fromUserId === userId;
       byTaskId[t.id] = {
         bondId: bond.bondId,

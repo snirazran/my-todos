@@ -125,7 +125,7 @@ export function BuddyUpFlow({
     });
   }, [phase]);
 
-  const friendName = friend?.frogName || friend?.name || 'your friend';
+  const friendName = friend?.name || friend?.frogName || 'your friend';
 
   const handleSend = async () => {
     if (!friend || !draft || sending) return;
@@ -220,13 +220,13 @@ export function BuddyUpFlow({
                   </span>
                   <span className="flex flex-col leading-tight">
                     <span className="text-lg font-black text-white">
-                      {friend.frogName || friend.name}
+                      {friend.name || friend.frogName}
                     </span>
                     {friend.name &&
                       friend.frogName &&
                       friend.name !== friend.frogName && (
                         <span className="text-[11px] font-semibold text-white/60">
-                          {friend.name}
+                          {friend.frogName}
                         </span>
                       )}
                   </span>

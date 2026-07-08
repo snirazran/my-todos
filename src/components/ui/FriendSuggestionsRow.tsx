@@ -101,7 +101,7 @@ export function FriendSuggestionsRow({ enabled }: { enabled: boolean }) {
                         s.premium && 'plus-name-shimmer',
                       )}
                     >
-                      {s.frogName || s.name}
+                      {s.name || s.frogName}
                     </span>
                     {s.premium && (
                       <Icon
@@ -143,7 +143,7 @@ export function FriendSuggestionsRow({ enabled }: { enabled: boolean }) {
                 <button
                   type="button"
                   onClick={() => dismiss(s.userId)}
-                  aria-label={`Dismiss ${s.frogName || s.name}`}
+                  aria-label={`Dismiss ${s.name || s.frogName}`}
                   className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground"
                 >
                   <X className="h-4 w-4" />

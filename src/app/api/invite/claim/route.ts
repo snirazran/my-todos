@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
     const inviter = await UserModel.findById(referral.inviterId)
       .select('name frogName')
       .lean<{ name?: string; frogName?: string }>();
-    const inviterName = inviter?.frogName || inviter?.name || 'A friend';
+    const inviterName = inviter?.name || inviter?.frogName || 'A friend';
 
     // Grant the gift to the new user
     const giftHistorySet =
