@@ -54,13 +54,13 @@ export default function OnboardingPage() {
   const { user: authUser } = useAuth();
   const hasAccount = !!authUser && !authUser.isAnonymous;
   const { indices: wardrobeIndices } = useWardrobeIndices(hasAccount);
-  const [step, setStep] = useState(3);
+  const [step, setStep] = useState(0);
   const [selections, setSelections] = useState<Record<string, string[]>>(
     loadStoredSelections,
   );
   const [saving, setSaving] = useState(false);
   const [direction, setDirection] = useState(1);
-  const [subStep, setSubStep] = useState(3);
+  const [subStep, setSubStep] = useState(0);
   const [celebrating, setCelebrating] = useState(false);
   const mainRef = useRef<HTMLElement | null>(null);
 

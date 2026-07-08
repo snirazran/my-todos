@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -9,31 +9,12 @@ import { OnboardingFrogHeader, ONBOARDING_BODY_CLASS } from './OnboardingFrogHea
 
 export default function HumanNameStep({ selections, onSelect, onNext, saving, direction }: OnboardingStepProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const [keyboardInset, setKeyboardInset] = useState(0);
   const frogName = selections.frogName?.[0]?.trim() || 'Cookie';
   const humanName = selections.humanName?.[0] ?? '';
   const canContinue = humanName.trim().length > 0;
 
   useEffect(() => {
     inputRef.current?.focus({ preventScroll: true });
-  }, []);
-
-  useEffect(() => {
-    const viewport = window.visualViewport;
-    if (!viewport) return;
-
-    const updateKeyboardInset = () => {
-      const inset = Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop);
-      setKeyboardInset(inset > 80 ? inset : 0);
-    };
-
-    updateKeyboardInset();
-    viewport.addEventListener('resize', updateKeyboardInset);
-    viewport.addEventListener('scroll', updateKeyboardInset);
-    return () => {
-      viewport.removeEventListener('resize', updateKeyboardInset);
-      viewport.removeEventListener('scroll', updateKeyboardInset);
-    };
   }, []);
 
   const setHumanName = (value: string) => {
@@ -93,10 +74,7 @@ export default function HumanNameStep({ selections, onSelect, onNext, saving, di
 
       <div className="flex-[8]" />
 
-      <div
-        className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-20 flex justify-center px-5 md:static md:px-0 md:pb-16"
-        style={keyboardInset > 0 ? { bottom: keyboardInset + 16 } : undefined}
-      >
+      <div className="flex justify-center pb-[calc(4rem+env(safe-area-inset-bottom))]">
         <motion.button
           type="button"
           onClick={onNext}

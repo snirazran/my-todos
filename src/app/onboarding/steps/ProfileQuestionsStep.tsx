@@ -231,7 +231,7 @@ export default function ProfileQuestionsStep({
                       {category.onboardingSentence?.trim() ? (
                         <span
                           className={cn(
-                            'mt-0.5 block truncate text-sm font-medium',
+                            'mt-0.5 block text-sm font-medium leading-snug line-clamp-2',
                             isSelected ? 'text-primary/75' : 'text-muted-foreground',
                           )}
                         >
