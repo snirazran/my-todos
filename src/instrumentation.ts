@@ -4,4 +4,6 @@ export async function register() {
   startFrogodoroTicker();
   const { startLoginStreakTicker } = await import('@/lib/streakTicker');
   startLoginStreakTicker();
+  const { startCalendarSyncTicker } = await import('@/lib/calendarSyncTicker');
+  startCalendarSyncTicker();
 }

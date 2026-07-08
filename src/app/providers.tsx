@@ -8,7 +8,6 @@ import { PushNotificationInit } from '@/components/providers/PushNotificationIni
 import { GlobalTimer } from '@/components/providers/GlobalTimer';
 import GlobalFrogodoroMini from '@/components/providers/GlobalFrogodoroMini';
 import { LiveTimerController } from '@/components/providers/LiveTimerController';
-import { GlobalCalendarSync } from '@/components/ui/GoogleCalendarSync';
 import { GlobalSkinRotation } from '@/components/ui/SkinRotation';
 import { ReferralClaimer } from '@/components/providers/ReferralClaimer';
 import { FriendLinkClaimer } from '@/components/providers/FriendLinkClaimer';
@@ -34,7 +33,6 @@ export default function Providers({ children }: { children: ReactNode }) {
             <GlobalTimer />
             <GlobalFrogodoroMini />
             <LiveTimerController />
-            <GlobalCalendarSync />
             <GlobalSkinRotation />
             <PushNotificationInit />
             <ReferralClaimer />

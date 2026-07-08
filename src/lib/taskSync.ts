@@ -151,7 +151,23 @@ export async function notifyFriendUpdate(userId: string) {
   }
 }
 
+async function maybeScheduleCalendarSweep(userId: string) {
+  try {
+    const { userHasCalendarConnections } = await import('@/lib/calendar/connections');
+    if (await userHasCalendarConnections(userId)) {
+      const { scheduleOutboundSweep } = await import('@/lib/calendar/outboundQueue');
+      scheduleOutboundSweep(userId);
+    }
+  } catch (err) {
+    console.error(
+      'calendar sweep scheduling failed:',
+      (err as { message?: string } | null)?.message,
+    );
+  }
+}
+
 export async function notifyUserChanged(userId: string, change?: TaskSyncChange) {
+  void maybeScheduleCalendarSweep(userId);
   try {
     const event = await createTaskEvent(userId, change);
     void sendTaskSyncMessage(userId, event);

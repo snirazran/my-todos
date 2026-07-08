@@ -17,7 +17,10 @@ import { useRegisterOpenSheet } from '@/lib/sheetStore';
 import { useUIStore } from '@/lib/uiStore';
 import { clearSessionCookie } from '@/lib/authCookie';
 import { useInventory } from '@/hooks/useInventory';
-import GoogleCalendarSync, { getCalendarSyncStatus } from '@/components/ui/GoogleCalendarSync';
+import CalendarSyncSection, {
+  getCalendarConnections,
+  openGoogleCalendarConnect,
+} from '@/components/ui/CalendarSyncSection';
 import {
   SkinRotationRow,
   SkinRotationDialog,
@@ -1194,7 +1197,7 @@ function PreferencesView({
       </MenuSection>
 
       <MenuSection title="Integrations">
-        <GoogleCalendarSync />
+        <CalendarSyncSection />
       </MenuSection>
     </div>
   );
@@ -1400,7 +1403,11 @@ function QuickTilesGrid({
 }) {
   const [rotation, setRotation] = useState<RotationInterval>('disabled');
   const [rotationOpen, setRotationOpen] = useState(false);
-  const [gcalEnabled, setGcalEnabled] = useState(() => getCalendarSyncStatus().enabled);
+  const [gcalEnabled, setGcalEnabled] = useState(() =>
+    getCalendarConnections().some(
+      (c) => c.provider === 'google' && c.status === 'active',
+    ),
+  );
 
   useEffect(() => {
     setRotation(getRotationInterval());
@@ -1410,9 +1417,14 @@ function QuickTilesGrid({
   }, []);
 
   useEffect(() => {
-    const handler = () => setGcalEnabled(getCalendarSyncStatus().enabled);
-    window.addEventListener('gcal-status-change', handler);
-    return () => window.removeEventListener('gcal-status-change', handler);
+    const handler = () =>
+      setGcalEnabled(
+        getCalendarConnections().some(
+          (c) => c.provider === 'google' && c.status === 'active',
+        ),
+      );
+    window.addEventListener('calendar-connections-change', handler);
+    return () => window.removeEventListener('calendar-connections-change', handler);
   }, []);
 
   return (
@@ -1433,7 +1445,9 @@ function QuickTilesGrid({
         icon={<Icon name="googleCalendar" label="Google Calendar" className="h-8 w-8" />}
         title="Google Calendar"
         subtitle={gcalEnabled ? 'Connected' : 'Sync your events'}
-        onClick={() => window.dispatchEvent(new Event('gcal-sync-trigger'))}
+        onClick={() => {
+          if (!gcalEnabled) void openGoogleCalendarConnect();
+        }}
       />
       <QuickTile
         icon={<Icon name="darkMode" label="Color mode" className="h-[52px] w-[52px]" />}
