@@ -27,7 +27,7 @@ import {
   type RotationInterval,
 } from '@/components/ui/SkinRotation';
 import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
-import useSWR from 'swr';
+import useSWR, { mutate as swrMutate } from 'swr';
 import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronRight } from 'lucide-react';
@@ -165,8 +165,8 @@ export default function SiteHeader() {
             loading={loading}
             onSignIn={() => router.push('/login')}
             onSignOut={async () => {
-              await clearSessionCookie();
               router.replace('/login');
+              router.refresh();
             }}
             compactMobileHome
           />
@@ -337,8 +337,8 @@ export default function SiteHeader() {
             loading={loading}
             onSignIn={() => router.push('/login')}
             onSignOut={async () => {
-              await clearSessionCookie();
               router.replace('/login');
+              router.refresh();
             }}
           />
 
@@ -450,7 +450,11 @@ function RightActions({
   // No click-outside listener needed — the settings sheet covers the entire viewport.
 
   const handleSignOut = async () => {
-    await signOut(auth);
+    await Promise.allSettled([
+      auth ? signOut(auth) : Promise.resolve(),
+      clearSessionCookie(),
+    ]);
+    await swrMutate(() => true, undefined, { revalidate: false });
     onSignOut();
   };
 
