@@ -58,6 +58,8 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
+	<key>NSCameraUsageDescription</key>
+	<string>Frogress uses the camera to scan a friend&#8217;s QR code so you can add them.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Frogress connects to your local development server while testing the app.</string>
 	<!-- TODO: replace with your real AdMob iOS app ID before release

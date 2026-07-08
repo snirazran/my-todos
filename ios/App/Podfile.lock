@@ -13,6 +13,8 @@ PODS:
     - CapacitorCordova
   - CapacitorApp (8.1.0):
     - Capacitor
+  - CapacitorBrowser (8.0.3):
+    - Capacitor
   - CapacitorCommunityAdmob (8.0.0):
     - Capacitor
     - Google-Mobile-Ads-SDK (~> 12.14)
@@ -136,6 +138,7 @@ PODS:
 DEPENDENCIES:
   - "Capacitor (from `../../node_modules/.pnpm/@capacitor+ios@8.0.2_@capacitor+core@8.0.2/node_modules/@capacitor/ios`)"
   - "CapacitorApp (from `../../node_modules/.pnpm/@capacitor+app@8.1.0_@capacitor+core@8.0.2/node_modules/@capacitor/app`)"
+  - "CapacitorBrowser (from `../../node_modules/.pnpm/@capacitor+browser@8.0.3_@capacitor+core@8.0.2/node_modules/@capacitor/browser`)"
   - "CapacitorCommunityAdmob (from `../../node_modules/.pnpm/@capacitor-community+admob@8.0.0/node_modules/@capacitor-community/admob`)"
   - "CapacitorCordova (from `../../node_modules/.pnpm/@capacitor+ios@8.0.2_@capacitor+core@8.0.2/node_modules/@capacitor/ios`)"
   - "CapacitorFirebaseMessaging (from `../../node_modules/.pnpm/@capacitor-firebase+messaging@8.3.0_@capacitor+core@8.0.2_firebase@12.9.0/node_modules/@capacitor-firebase/messaging`)"
@@ -178,6 +181,8 @@ EXTERNAL SOURCES:
     :path: "../../node_modules/.pnpm/@capacitor+ios@8.0.2_@capacitor+core@8.0.2/node_modules/@capacitor/ios"
   CapacitorApp:
     :path: "../../node_modules/.pnpm/@capacitor+app@8.1.0_@capacitor+core@8.0.2/node_modules/@capacitor/app"
+  CapacitorBrowser:
+    :path: "../../node_modules/.pnpm/@capacitor+browser@8.0.3_@capacitor+core@8.0.2/node_modules/@capacitor/browser"
   CapacitorCommunityAdmob:
     :path: "../../node_modules/.pnpm/@capacitor-community+admob@8.0.0/node_modules/@capacitor-community/admob"
   CapacitorCordova:
@@ -204,6 +209,7 @@ SPEC CHECKSUMS:
   AppCheckCore: cc8fd0a3a230ddd401f326489c99990b013f0c4f
   Capacitor: 2b79172ad27f3be2d103cce88b8eb9803fdcc744
   CapacitorApp: 449ffe26375e96f8aaaee625ac6e01e5c57c8650
+  CapacitorBrowser: c987c73d09d8bd3b5ec13f06338b1e14d5d2be69
   CapacitorCommunityAdmob: 9c36b466f46da413e5c105f7484e7603178c6223
   CapacitorCordova: 921bdb690ebe82421b24fce45552fd3dea2ae43a
   CapacitorFirebaseMessaging: d48c9156ee96e166416f1d910cb8de53143cea5f
@@ -236,6 +242,6 @@ SPEC CHECKSUMS:
   RevenueCat: f4427b8a1daa7a04a26cb20d60807aa818d9420b
   RevenuecatPurchasesCapacitor: c31daadc8c3b89ff31686b6ea07ff99bc21c96b7
 
-PODFILE CHECKSUM: 456500b42a5bfb4889077b9acf36b92c683268c7
+PODFILE CHECKSUM: 47bb4e546842c524d2d2681a95b97d799fd85d8c
 
 COCOAPODS: 1.16.2
