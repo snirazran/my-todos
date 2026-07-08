@@ -38,7 +38,7 @@ export default function HumanNameStep({ selections, onSelect, onNext, saving, di
         transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
         className={cn('flex flex-col items-center px-4', ONBOARDING_BODY_CLASS)}
       >
-        <div className="relative -mt-20 w-full">
+        <div className="relative -mt-28 w-full">
           <input
             ref={inputRef}
             value={humanName}
@@ -70,18 +70,14 @@ export default function HumanNameStep({ selections, onSelect, onNext, saving, di
             </button>
           )}
         </div>
-      </motion.div>
 
-      <div className="flex-[8]" />
-
-      <div className="flex justify-center pb-[calc(4rem+env(safe-area-inset-bottom))]">
         <motion.button
           type="button"
           onClick={onNext}
           disabled={!canContinue || saving}
           whileTap={{ scale: 0.97 }}
           className={cn(
-            'w-full md:w-80 h-14 rounded-2xl font-bold text-base tracking-wide transition-all duration-200',
+            'mt-4 w-full md:w-80 h-14 rounded-2xl font-bold text-base tracking-wide transition-all duration-200',
             canContinue && !saving
               ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/25 hover:brightness-110'
               : 'bg-muted text-muted-foreground cursor-not-allowed',
@@ -89,7 +85,9 @@ export default function HumanNameStep({ selections, onSelect, onNext, saving, di
         >
           {saving ? 'Setting up...' : 'Next'}
         </motion.button>
-      </div>
+      </motion.div>
+
+      <div className="flex-[8]" />
     </div>
   );
 }
