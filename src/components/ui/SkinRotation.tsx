@@ -112,9 +112,9 @@ export function SkinRotationDialog({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 z-[300] bg-black/40"
+            className="fixed inset-0 z-[1500] bg-black/40"
           />
-          <div className="pointer-events-none fixed inset-0 z-[301] flex items-center justify-center p-4">
+          <div className="pointer-events-none fixed inset-0 z-[1501] flex items-center justify-center p-4">
             <motion.div
               initial={{ opacity: 0, scale: 0.96, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
