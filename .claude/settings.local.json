@@ -257,7 +257,10 @@
       "Bash(mkdir -p src/app/api/calendar/google/connect src/app/api/calendar/google/callback)",
       "Bash(mv src/app/api/calendar/connect/route.ts src/app/api/calendar/google/connect/route.ts)",
       "Bash(mv src/app/api/calendar/oauth/callback/route.ts src/app/api/calendar/google/callback/route.ts)",
-      "Bash(rm -rf src/app/api/calendar/connect src/app/api/calendar/oauth)"
+      "Bash(rm -rf src/app/api/calendar/connect src/app/api/calendar/oauth)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(python -)"
     ]
   }
 }

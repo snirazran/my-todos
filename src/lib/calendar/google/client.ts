@@ -48,7 +48,10 @@ export function googleConsentUrl(state: string) {
   url.searchParams.set('client_id', clientId);
   url.searchParams.set('redirect_uri', googleRedirectUri());
   url.searchParams.set('response_type', 'code');
-  url.searchParams.set('scope', 'https://www.googleapis.com/auth/calendar.events');
+  url.searchParams.set(
+    'scope',
+    'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.app.created',
+  );
   url.searchParams.set('access_type', 'offline');
   url.searchParams.set('prompt', 'consent');
   url.searchParams.set('state', state);
@@ -147,8 +150,63 @@ async function gcalFetch(
   return res;
 }
 
-function calPath(conn: CalendarConnectionDoc) {
+/** Calendar we read the user's own events from (import source). */
+function readCalPath(conn: CalendarConnectionDoc) {
   return `/calendars/${encodeURIComponent(conn.calendarId || 'primary')}`;
+}
+
+/** Calendar app tasks are written to — the app-owned "Frogress" calendar,
+ *  falling back to the read calendar for legacy connections. */
+function writeCalPath(conn: CalendarConnectionDoc) {
+  return `/calendars/${encodeURIComponent(
+    conn.appCalendarId || conn.calendarId || 'primary',
+  )}`;
+}
+
+export const APP_CALENDAR_SUMMARY = 'Frogress';
+
+/**
+ * Create (or verify) the app-owned calendar and persist its id on the
+ * connection. Mutates `conn.appCalendarId` so callers in the same pass write
+ * to the right calendar immediately.
+ */
+export async function ensureAppCalendar(conn: CalendarConnectionDoc): Promise<void> {
+  if (conn.appCalendarId) {
+    const res = await gcalFetch(
+      conn,
+      `/calendars/${encodeURIComponent(conn.appCalendarId)}`,
+    );
+    if (res.ok) return;
+    if (res.status !== 404 && res.status !== 410) {
+      throw new Error(`calendars.get ${res.status}: ${await res.text()}`);
+    }
+  }
+  const res = await gcalFetch(conn, '/calendars', {
+    method: 'POST',
+    body: JSON.stringify({ summary: APP_CALENDAR_SUMMARY }),
+  });
+  if (!res.ok) throw new Error(`calendars.insert ${res.status}: ${await res.text()}`);
+  const created = await res.json();
+  conn.appCalendarId = created.id;
+  const { default: CalendarConnectionModel } = await import(
+    '@/lib/models/CalendarConnection'
+  );
+  await CalendarConnectionModel.updateOne(
+    { _id: conn._id },
+    { $set: { appCalendarId: created.id } },
+  );
+}
+
+export async function deleteAppCalendar(conn: CalendarConnectionDoc): Promise<void> {
+  if (!conn.appCalendarId) return;
+  const res = await gcalFetch(
+    conn,
+    `/calendars/${encodeURIComponent(conn.appCalendarId)}`,
+    { method: 'DELETE' },
+  );
+  if (!res.ok && res.status !== 404 && res.status !== 410) {
+    throw new Error(`calendars.delete ${res.status}: ${await res.text()}`);
+  }
 }
 
 export type GoogleEvent = {
@@ -181,7 +239,7 @@ export async function listEvents(
   params: Record<string, string>,
 ): Promise<ListEventsResult> {
   const search = new URLSearchParams(params);
-  const res = await gcalFetch(conn, `${calPath(conn)}/events?${search}`);
+  const res = await gcalFetch(conn, `${readCalPath(conn)}/events?${search}`);
   if (res.status === 410) throw new GoogleSyncTokenGoneError();
   if (!res.ok) throw new Error(`events.list ${res.status}: ${await res.text()}`);
   return res.json();
@@ -193,7 +251,7 @@ export async function getEvent(
 ): Promise<GoogleEvent | null> {
   const res = await gcalFetch(
     conn,
-    `${calPath(conn)}/events/${encodeURIComponent(eventId)}`,
+    `${writeCalPath(conn)}/events/${encodeURIComponent(eventId)}`,
   );
   if (res.status === 404 || res.status === 410) return null;
   if (!res.ok) throw new Error(`events.get ${res.status}: ${await res.text()}`);
@@ -217,7 +275,7 @@ export async function getInstances(
     });
     const res = await gcalFetch(
       conn,
-      `${calPath(conn)}/events/${encodeURIComponent(eventId)}/instances?${search}`,
+      `${readCalPath(conn)}/events/${encodeURIComponent(eventId)}/instances?${search}`,
     );
     if (res.status === 404 || res.status === 410) return items;
     if (!res.ok)
@@ -233,7 +291,7 @@ export async function insertEvent(
   conn: CalendarConnectionDoc,
   event: Record<string, unknown>,
 ): Promise<GoogleEvent> {
-  const res = await gcalFetch(conn, `${calPath(conn)}/events`, {
+  const res = await gcalFetch(conn, `${writeCalPath(conn)}/events`, {
     method: 'POST',
     body: JSON.stringify(event),
   });
@@ -248,7 +306,7 @@ export async function patchEvent(
 ): Promise<GoogleEvent> {
   const res = await gcalFetch(
     conn,
-    `${calPath(conn)}/events/${encodeURIComponent(eventId)}`,
+    `${writeCalPath(conn)}/events/${encodeURIComponent(eventId)}`,
     { method: 'PATCH', body: JSON.stringify(patch) },
   );
   if (!res.ok) throw new Error(`events.patch ${res.status}: ${await res.text()}`);
@@ -258,7 +316,7 @@ export async function patchEvent(
 export async function deleteEvent(conn: CalendarConnectionDoc, eventId: string) {
   const res = await gcalFetch(
     conn,
-    `${calPath(conn)}/events/${encodeURIComponent(eventId)}`,
+    `${writeCalPath(conn)}/events/${encodeURIComponent(eventId)}`,
     { method: 'DELETE' },
   );
   if (!res.ok && res.status !== 404 && res.status !== 410) {
@@ -271,7 +329,7 @@ export async function watchEvents(
   channel: { id: string; token: string },
 ): Promise<{ resourceId: string; expiration?: string }> {
   const base = process.env.APP_BASE_URL || '';
-  const res = await gcalFetch(conn, `${calPath(conn)}/events/watch`, {
+  const res = await gcalFetch(conn, `${readCalPath(conn)}/events/watch`, {
     method: 'POST',
     body: JSON.stringify({
       id: channel.id,

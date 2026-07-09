@@ -26,9 +26,17 @@ export async function DELETE(
   const conn = await CalendarConnectionModel.findOne({ userId: uid, provider });
   if (!conn) return NextResponse.json({ error: 'not connected' }, { status: 404 });
 
-  if (provider === 'google' && conn.channelId && conn.resourceId) {
-    const { stopChannel } = await import('@/lib/calendar/google/client');
-    await stopChannel(conn, conn.channelId, conn.resourceId);
+  if (provider === 'google') {
+    if (conn.channelId && conn.resourceId) {
+      const { stopChannel } = await import('@/lib/calendar/google/client');
+      await stopChannel(conn, conn.channelId, conn.resourceId);
+    }
+    try {
+      const { deleteAppCalendar } = await import('@/lib/calendar/google/client');
+      await deleteAppCalendar(conn);
+    } catch (err) {
+      console.error('app calendar cleanup failed (continuing):', err);
+    }
   }
 
   await deleteConnectionData(conn._id);

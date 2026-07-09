@@ -13,6 +13,7 @@ export interface CalendarConnectionDoc {
   encAppPassword?: string;
   appleId?: string;
   calendarId?: string;
+  appCalendarId?: string; // app-owned "Frogress" calendar receiving exported tasks
   calendarUrl?: string;
   calendarDisplayName?: string;
   syncToken?: string;
@@ -44,6 +45,7 @@ const CalendarConnectionSchema = new Schema<CalendarConnectionDoc>(
     encAppPassword: { type: String },
     appleId: { type: String },
     calendarId: { type: String },
+    appCalendarId: { type: String },
     calendarUrl: { type: String },
     calendarDisplayName: { type: String },
     syncToken: { type: String },

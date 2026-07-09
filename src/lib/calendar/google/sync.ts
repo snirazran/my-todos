@@ -18,10 +18,11 @@ import { googleAdapter } from './adapter';
 import {
   GoogleAuthError,
   GoogleSyncTokenGoneError,
+  ensureAppCalendar,
   listEvents,
   type GoogleEvent,
 } from './client';
-import { googleToNeutral } from './map';
+import { googleToNeutral, PRIVATE_GROUP_ID, PRIVATE_TASK_ID } from './map';
 
 async function toRemoteChanges(
   conn: CalendarConnectionDoc,
@@ -49,6 +50,10 @@ async function toRemoteChanges(
 
   const changes: RemoteChange[] = [];
   for (const item of items) {
+    // App-written events that still live on the read calendar (pre-split
+    // leftovers) are mirrors, not user data — never import or act on them.
+    const priv = item.extendedProperties?.private;
+    if (priv?.[PRIVATE_TASK_ID] || priv?.[PRIVATE_GROUP_ID]) continue;
     if (item.status === 'cancelled') {
       if (item.recurringEventId && item.originalStartTime) {
         const date = item.originalStartTime.date
@@ -185,6 +190,7 @@ export async function googleInitialSync(conn: CalendarConnectionDoc): Promise<bo
   const tz = await getUserTz(conn.userId);
   const { seedLegacyGoogleLinks } = await import('../engine');
   await seedLegacyGoogleLinks(conn, tz);
+  await ensureAppCalendar(conn);
   const appChanged = await googleInbound(conn);
   await runOutboundSweep(conn.userId, { google: googleAdapter });
   await CalendarConnectionModel.updateOne(

@@ -517,6 +517,12 @@ async function handleCancelledEvent(
 ): Promise<boolean> {
   let appChanged = false;
   for (const link of links) {
+    // App-origin links are mirrors of app tasks: a deleted mirror must never
+    // delete its source task. Drop the link so the outbound sweep re-exports.
+    if (link.origin === 'app') {
+      await CalendarEventLinkModel.deleteOne({ _id: link._id });
+      continue;
+    }
     const unit = await loadUnitForLink(link);
     if (!unit) {
       await CalendarEventLinkModel.deleteOne({ _id: link._id });

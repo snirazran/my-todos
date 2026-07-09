@@ -3,6 +3,7 @@ import type { ProviderAdapter, RemoteChange } from '../engine';
 import { instantToZoned, untilUtcForDate, zonedToUtc } from '../time';
 import {
   deleteEvent,
+  ensureAppCalendar,
   getEvent,
   getInstances,
   insertEvent,
@@ -14,6 +15,7 @@ export const googleAdapter: ProviderAdapter = {
   provider: 'google',
 
   async insert(conn, neutral, fp) {
+    if (!conn.appCalendarId) await ensureAppCalendar(conn);
     const created = await insertEvent(conn, neutralToGoogle(neutral, fp));
     return { providerEventId: created.id, etag: created.etag };
   },
