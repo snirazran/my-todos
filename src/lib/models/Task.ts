@@ -53,6 +53,8 @@ export interface TaskDoc {
     breakTime: number;
   }[];
   calendarEventId?: string; // Google Calendar event ID for dedup
+  exportedEventId?: string; // event id this task was pushed to in the app calendar
+  exportFingerprint?: string; // content hash at last export, to detect changes
   startTime?: string; // e.g. "10:30"
   endTime?: string; // e.g. "11:30"
   reminder?: string; // e.g. "at_time", "5m", "10m", "15m", "30m", "1h"
@@ -140,6 +142,8 @@ const TaskSchema = new Schema<TaskDoc>(
       default: [],
     },
     calendarEventId: { type: String },
+    exportedEventId: { type: String },
+    exportFingerprint: { type: String },
     startTime: { type: String },
     endTime: { type: String },
     reminder: { type: String },

@@ -252,7 +252,12 @@
       "Bash(mkdir -p /c/Users/snira/AppData/Local/Temp/claude/C--Users-snira-Desktop-Full-Stack-frog-task/b643ecfb-9243-4eb6-974c-8eaf19e0188a/scratchpad/shot)",
       "Read(//c/Users/snira/AppData/Local/Temp/claude/C--Users-snira-Desktop-Full-Stack-frog-task/b643ecfb-9243-4eb6-974c-8eaf19e0188a/scratchpad/**)",
       "Bash(NODE_OPTIONS= npm init -y)",
-      "Bash(NODE_OPTIONS= npm install playwright-core@latest)"
+      "Bash(NODE_OPTIONS= npm install playwright-core@latest)",
+      "WebFetch(domain:developers.google.com)",
+      "Bash(mkdir -p src/app/api/calendar/google/connect src/app/api/calendar/google/callback)",
+      "Bash(mv src/app/api/calendar/connect/route.ts src/app/api/calendar/google/connect/route.ts)",
+      "Bash(mv src/app/api/calendar/oauth/callback/route.ts src/app/api/calendar/google/callback/route.ts)",
+      "Bash(rm -rf src/app/api/calendar/connect src/app/api/calendar/oauth)"
     ]
   }
 }

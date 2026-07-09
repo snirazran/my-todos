@@ -101,6 +101,10 @@ const UserSchema = new Schema<UserDoc>(
     },
     calendarSyncEnabled: { type: Boolean, default: false },
     calendarAccessToken: { type: String },
+    googleCalendar: {
+      type: Schema.Types.Mixed,
+      default: undefined,
+    },
     cosmeticOverrides: {
       type: Schema.Types.Mixed,
       default: undefined,

@@ -133,6 +133,12 @@ export type UserDoc = {
   notificationPrefs?: NotificationPrefs;
   calendarSyncEnabled?: boolean;
   calendarAccessToken?: string;
+  googleCalendar?: {
+    refreshToken?: string;
+    accessToken?: string;
+    accessTokenExpiresAt?: Date | string;
+    calendarId?: string;
+  };
   cosmeticOverrides?: Partial<Record<'skin' | 'hat' | 'body' | 'hand_item', number>>;
   activeFrogodoroTimer?: ActiveFrogodoroTimer | null;
   // Monotonic counter bumped on every timer state write (start/pause/resume/
