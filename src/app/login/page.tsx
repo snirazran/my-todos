@@ -28,6 +28,7 @@ import Frog, {
 import { useFrogTongue, TONGUE_STROKE } from '@/hooks/useFrogTongue';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useNotification } from '@/components/providers/NotificationProvider';
+import { useAuth } from '@/components/auth/AuthContext';
 
 const Fly = dynamic(() => import('@/components/ui/fly'), { ssr: false });
 
@@ -57,7 +58,9 @@ const EMAIL_LINK_STORAGE_KEY = 'emailForSignIn';
 function LoginPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { user: authUser } = useAuth();
   const { showNotification } = useNotification();
+  const navigatedRef = useRef(false);
   const isUpgrade = searchParams?.get('upgrade') === '1';
   const [step, setStep] = useState<Step>('enter');
   const [dir, setDir] = useState(1);
@@ -147,6 +150,30 @@ function LoginPageInner() {
     return data?.isNewUser ? '/onboarding' : route;
   };
 
+  const navigateOnce = (route: string) => {
+    if (navigatedRef.current) return;
+    navigatedRef.current = true;
+    router.push(route);
+  };
+
+  // Safety net: signInWithPopup's promise can hang in the opener even though
+  // the sign-in succeeded (AuthContext still gets the user and the session
+  // cookie). If a signed-in, non-anonymous user is somehow still parked on
+  // this page, route them out instead of waiting for a manual refresh.
+  useEffect(() => {
+    if (!authUser || authUser.isAnonymous || navigatedRef.current) return;
+    const timer = setTimeout(async () => {
+      if (navigatedRef.current) return;
+      try {
+        navigateOnce(await prepareSignedInRoute());
+      } catch {
+        navigateOnce('/');
+      }
+    }, 3000);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authUser]);
+
   const handleGoogle = async () => {
     setLoading(true);
     try {
@@ -154,14 +181,19 @@ function LoginPageInner() {
       const shouldLink = isUpgrade && current?.isAnonymous;
       await signInWithGoogle({ linkTo: shouldLink ? current : null });
       const route = await prepareSignedInRoute();
+      // The tongue catch is rAF-driven, and browsers pause rAF while the page
+      // is hidden (e.g. returning from the Google popup on mobile). Never let
+      // the redirect depend on the animation finishing.
+      const watchdog = setTimeout(() => navigateOnce(route), 2500);
       await triggerTongue({
         key: FLY_KEY,
         completed: false,
         onPersist: () => {
           // Keep the fly hidden after the catch and let it re-enter with a
           // delay (matches the error flow) instead of snapping back instantly.
+          clearTimeout(watchdog);
           respawnFly();
-          router.push(route);
+          navigateOnce(route);
         },
       });
     } catch (err: any) {
