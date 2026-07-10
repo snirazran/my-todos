@@ -5,6 +5,7 @@ import { useAuth } from '@/components/auth/AuthContext';
 import { useNotification } from '@/components/providers/NotificationProvider';
 import { useReminderScheduler } from '@/hooks/useReminderScheduler';
 import { INVENTORY_KEY, INVENTORY_SUMMARY_KEY } from '@/hooks/useInventory';
+import { markFlyEarn } from '@/lib/flyEarn';
 import { notifyQuestClaims, seedQuestClaims } from '@/lib/questClaims';
 import Fly from '@/components/ui/fly';
 import { useUIStore } from '@/lib/uiStore';
@@ -322,6 +323,7 @@ export function useTaskData({
             // header reads from /api/skins/inventory and only refreshes
             // after a page reload.
             if (newFlyStatus) {
+              if (nextCompleted) markFlyEarn();
               const nextBalance = newFlyStatus.balance;
               const patch = (curr: any) => {
                 if (!curr?.wardrobe) return curr;

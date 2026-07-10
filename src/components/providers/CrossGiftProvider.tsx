@@ -11,6 +11,7 @@ import {
   fliesPrize,
 } from '@/components/ui/gift-box/GiftRevealOverlay';
 import { trackGrowthEvent } from '@/lib/growthTrack';
+import { markFlyEarn } from '@/lib/flyEarn';
 import { byId } from '@/lib/skins/catalog';
 import type { CrossGiftStatus } from '@/lib/crossGift';
 
@@ -118,6 +119,7 @@ export function CrossGiftProvider() {
         body: JSON.stringify({ platform: status.platform }),
       });
       if (res.ok || res.status === 409) {
+        markFlyEarn();
         mutateFlyCaches();
         trackGrowthEvent('xplat_gift_claimed', { platform: status.platform });
         finish(true);

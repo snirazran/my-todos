@@ -40,7 +40,10 @@ import { cn } from '@/lib/utils';
 import { RewardCard } from '@/components/ui/gift-box/RewardCard';
 import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
 import { RARITY_CONFIG } from '@/components/ui/gift-box/constants';
-import { mutateInventoryCaches } from '@/hooks/useInventory';
+import { mutateInventoryCaches, useInventory } from '@/hooks/useInventory';
+import { markFlyEarn } from '@/lib/flyEarn';
+import { FlyCounter } from '@/components/ui/FlyCounter';
+import { useUIStore } from '@/lib/uiStore';
 import { showRewardedAd } from '@/lib/ads';
 import type { ItemDef } from '@/lib/skins/catalog';
 
@@ -58,6 +61,9 @@ export default function FriendsPage() {
   );
 
   const { indices } = useWardrobeIndices(!!user);
+  const openFlyShop = useUIStore((s) => s.openFlyShop);
+  const { data: inventorySummary } = useInventory(!!user, true);
+  const flyBalance = inventorySummary?.wardrobe?.flies;
   const isFrogHungry = useIsFrogHungry(!!user);
   const { data: friendsData, mutate: mutateFriends } = useSWR<{
     friends: FriendSummary[];
@@ -117,6 +123,7 @@ export default function FriendsPage() {
       const data = await res.json();
       const granted = Math.max(0, Math.floor(data?.granted ?? 0));
       if (granted > 0) {
+        markFlyEarn();
         mutateInventoryCaches();
         await mutateFriends();
         setClaimReward(granted);
@@ -150,20 +157,31 @@ export default function FriendsPage() {
     <main className="relative min-h-[100dvh] overflow-x-hidden pb-24 md:pb-12">
       <div className="relative z-10 mx-auto flex w-full flex-col items-center px-4 pt-[calc(env(safe-area-inset-top)+0.5rem)] md:max-w-2xl md:pt-11">
         {/* Friend invites — persistent, over the winter scene */}
-        <PremiumBadge className="absolute right-16 top-[calc(env(safe-area-inset-top)+0.75rem)] z-30 border-0 bg-white/90 shadow-md ring-1 ring-black/5 backdrop-blur-sm md:hidden" />
-        <button
-          type="button"
-          onClick={() => setInboxOpen(true)}
-          aria-label="Friend invites"
-          className="absolute right-4 top-[calc(env(safe-area-inset-top)+0.75rem)] z-30 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-emerald-700 shadow-md ring-1 ring-black/5 backdrop-blur-sm transition-transform active:scale-95"
-        >
-          <Bell className="h-6 w-6" />
-          {alertsCount > 0 && (
-            <span className="absolute -right-1 -top-1 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full border-2 border-white bg-rose-500 px-1 text-[10px] font-black text-white">
-              {alertsCount > 9 ? '9+' : alertsCount}
-            </span>
+        <div className="absolute right-4 top-[calc(env(safe-area-inset-top)+0.75rem)] z-30 flex items-center gap-2">
+          <PremiumBadge className="border-0 bg-white/90 shadow-md ring-1 ring-black/5 backdrop-blur-sm md:hidden" />
+          <button
+            type="button"
+            onClick={() => setInboxOpen(true)}
+            aria-label="Friend invites"
+            className="relative flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-emerald-700 shadow-md ring-1 ring-black/5 backdrop-blur-sm transition-transform active:scale-95"
+          >
+            <Bell className="h-6 w-6" />
+            {alertsCount > 0 && (
+              <span className="absolute -right-1 -top-1 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full border-2 border-white bg-rose-500 px-1 text-[10px] font-black text-white">
+                {alertsCount > 9 ? '9+' : alertsCount}
+              </span>
+            )}
+          </button>
+          {flyBalance !== undefined && (
+            <div className="md:hidden">
+              <FlyCounter
+                balance={flyBalance}
+                variant="mobile"
+                onClick={openFlyShop}
+              />
+            </div>
           )}
-        </button>
+        </div>
 
         {/* Self frog */}
         <SelfFrog
@@ -490,6 +508,7 @@ function FlyClaimRewardOverlay({
       const bonus = Math.max(0, Math.floor(data?.granted ?? 0));
       if (bonus > 0) {
         doubledRef.current = true;
+        markFlyEarn();
         mutateInventoryCaches();
         setDisplayAmount((a) => a + bonus);
       }

@@ -3,6 +3,7 @@ import useSWR, { mutate as mutateGlobal } from 'swr';
 import type { ItemDef, WardrobeSlot } from '@/lib/skins/catalog';
 import type { DailyDeal } from '@/lib/skins/dailyDeal';
 import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
+import { markFlyEarn } from '@/lib/flyEarn';
 
 export const INVENTORY_KEY = '/api/skins/inventory';
 export const INVENTORY_SUMMARY_KEY = '/api/skins/inventory?view=summary';
@@ -34,6 +35,7 @@ export function shouldSuppressEquipEcho() {
 }
 
 export function patchInventoryFlies(balance: number) {
+  markFlyEarn();
   const patch = (curr: any) => {
     if (!curr?.wardrobe) return curr;
     if (curr.wardrobe.flies === balance) return curr;

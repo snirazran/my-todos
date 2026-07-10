@@ -5,6 +5,7 @@ import {
   mutateInventorySummary,
   useInventory,
 } from '@/hooks/useInventory';
+import { markFlyEarn } from '@/lib/flyEarn';
 import { useMemo, useState, useEffect } from 'react';
 import React from 'react';
 import { useAuth } from '@/components/auth/AuthContext';
@@ -43,7 +44,7 @@ import { TradePanel } from './TradePanel';
 import GiftBoxOpening from '@/components/ui/gift-box/GiftBoxOpening';
 import { SellConfirmationDialog } from './SellConfirmationDialog';
 import { StreakFreezeShopCard } from '@/components/ui/streak/StreakFreezeShopCard';
-import { DailyDealsShelf } from './DailyDealsShelf';
+import { DailyDealsShelf, DailyDealsTeaser } from './DailyDealsShelf';
 import { SeenOnFriendsRow } from './SeenOnFriendsRow';
 import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
 import { WardrobeGridSkeleton } from '@/components/ui/Skeleton';
@@ -360,6 +361,7 @@ function WardrobeManagerContent({
 
     if (currentCount < qty) return;
 
+    markFlyEarn();
     // Optimistic
     mutate(
       (curr) =>
@@ -1336,6 +1338,15 @@ function WardrobeManagerContent({
                 </div>
               ) : activeTab === 'inventory' ? (
                 <>
+                  {activeFilter === 'all' && !!data?.dailyDeals?.length && (
+                    <DailyDealsTeaser
+                      endsAt={data.dailyDeals[0].endsAt}
+                      onClick={() => {
+                        setActiveTab('shop');
+                        scrollPageToTop();
+                      }}
+                    />
+                  )}
                   {(() => {
                     const merged = mergeWardrobeCards(
                       inventoryGrid.visibleItems,

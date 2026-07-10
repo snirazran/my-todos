@@ -12,6 +12,7 @@ import {
   endEquipMutation,
   mutateInventoryCaches,
 } from '@/hooks/useInventory';
+import { markFlyEarn } from '@/lib/flyEarn';
 
 type Notif = { msg: string; type: 'success' | 'error' };
 
@@ -210,6 +211,7 @@ export function useBackgroundActions({
       if (!res.ok) throw new Error(body.error || 'Sell failed');
       onNotify?.({ msg: `Sold ${qty}x ${item.name}!`, type: 'success' });
       onSpend?.(0);
+      markFlyEarn();
       refresh();
     } catch (err) {
       onNotify?.({ msg: err instanceof Error ? err.message : 'Sell failed', type: 'error' });

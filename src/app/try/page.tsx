@@ -305,7 +305,7 @@ export default function TryPage() {
 
       {/* Fly wallet — floats top-right exactly like the app header overlay */}
       <div className="fixed right-4 top-[calc(env(safe-area-inset-top)+0.5rem)] z-[90] flex items-center gap-2 px-2 py-1">
-        <FlyCounter balance={flyBalance} variant="mobile" />
+        <FlyCounter balance={flyBalance} variant="mobile" alwaysCelebrate />
       </div>
 
       <div className="mx-auto flex w-full max-w-4xl flex-col px-3 pb-4 pt-[calc(3rem+env(safe-area-inset-top))] md:px-6 md:pt-12">

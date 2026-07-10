@@ -260,7 +260,10 @@
       "Bash(rm -rf src/app/api/calendar/connect src/app/api/calendar/oauth)",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "Bash(python -)"
+      "Bash(python -)",
+      "Bash(npx tsc *)",
+      "Bash(rm tsc.out)",
+      "Bash(echo \"tsc-exit:$?\")"
     ]
   }
 }

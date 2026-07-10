@@ -40,6 +40,7 @@ import { RARITY_CONFIG as GIFT_RARITY_CONFIG } from './gift-box/constants';
 import Fly from './fly';
 import { FlyCounter } from './FlyCounter';
 import { mutateInventoryCaches, useInventory } from '@/hooks/useInventory';
+import { markFlyEarn } from '@/lib/flyEarn';
 import { showRewardedAd } from '@/lib/ads';
 import { takeQuestScrollTarget } from '@/lib/questClaims';
 import { PlusUpgradeModal } from './PlusUpgradeModal';
@@ -626,6 +627,7 @@ export function QuestsPanel({
       showFlyGainToast(entry);
     }
     if (entry?.isQuestReward) {
+      markFlyEarn();
       mutateInventoryCaches();
     }
     setRewardRevealQueue((current) => current.slice(1));
@@ -663,6 +665,7 @@ export function QuestsPanel({
       });
       const data = await res.json();
       if (!res.ok || !data?.granted) return;
+      markFlyEarn();
       mutateInventoryCaches();
       setRewardRevealQueue((queue) =>
         queue.map((e) => {
@@ -694,6 +697,7 @@ export function QuestsPanel({
   // (prize claimed or closed). Advance to the next copy, or finish and remove
   // the gift entry from the reveal queue once every box is done.
   const handleGiftBoxClosed = () => {
+    markFlyEarn();
     mutateInventoryCaches();
     setGiftOpening((current) => {
       if (!current) return null;
@@ -1139,7 +1143,10 @@ export function QuestsPanel({
                   key={`${giftOpening.entry.key}-${giftOpening.instance}`}
                   giftBoxId={giftOpening.entry.item.id}
                   onClose={handleGiftBoxClosed}
-                  onWin={() => mutateInventoryCaches()}
+                  onWin={() => {
+                    markFlyEarn();
+                    mutateInventoryCaches();
+                  }}
                 />
               )}
               <FlyGainToastPill toast={flyGainToast} />
@@ -2396,7 +2403,7 @@ function FlyGainPill({ toast }: { toast: FlyGainToast }) {
       exit={{ opacity: 1, y: -140, scale: 0.96 }}
       transition={{ duration: 0.42, ease: [0.32, 0.72, 0, 1] }}
     >
-      <FlyCounter balance={value} variant="desktop" />
+      <FlyCounter balance={value} variant="desktop" alwaysCelebrate />
     </motion.div>
   );
 }

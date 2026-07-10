@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Clock, Sparkles } from 'lucide-react';
+import { ChevronRight, Clock, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Icon } from '@/components/ui/Icon';
 import Fly from '@/components/ui/fly';
@@ -33,6 +33,34 @@ function useCountdown(endsAt: string | undefined) {
     return () => clearInterval(id);
   }, [endsAt]);
   return label;
+}
+
+export function DailyDealsTeaser({
+  endsAt,
+  onClick,
+}: {
+  endsAt?: string;
+  onClick: () => void;
+}) {
+  const countdown = useCountdown(endsAt);
+  if (!endsAt) return null;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="mb-3 flex w-full items-center gap-2 rounded-xl border border-amber-400/40 bg-gradient-to-r from-amber-100/70 to-amber-50/40 px-3 py-2 text-left shadow-sm transition-transform active:scale-[0.99] dark:from-amber-900/30 dark:to-amber-950/20"
+    >
+      <Sparkles className="h-4 w-4 shrink-0 text-amber-500" />
+      <span className="min-w-0 flex-1 truncate text-xs font-black uppercase tracking-wide text-foreground">
+        Daily deals in the shop
+      </span>
+      <span className="inline-flex shrink-0 items-center gap-1 text-[11px] font-black tabular-nums text-amber-600 dark:text-amber-400">
+        <Clock className="h-3.5 w-3.5" />
+        {countdown}
+      </span>
+      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+    </button>
+  );
 }
 
 export function DailyDealsShelf({
