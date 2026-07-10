@@ -271,7 +271,14 @@
       "Bash(echo \"gradle exit: $?\")",
       "Bash(./gradlew :app:compileDebugJavaWithJavac --console=plain)",
       "Bash(./gradlew :app:compileDebugJavaWithJavac -q --console=plain)",
-      "PowerShell(npx tsc --noEmit 2>$null; \"exit: $LASTEXITCODE\")"
+      "PowerShell(npx tsc --noEmit 2>$null; \"exit: $LASTEXITCODE\")",
+      "mcp__plugin_paddle_paddle-sandbox__search",
+      "mcp__plugin_paddle_paddle-sandbox__execute",
+      "PowerShell(npx tsc --noEmit 2>$null; if \\($?\\) { 'typecheck OK' })",
+      "WebFetch(domain:community.revenuecat.com)",
+      "PowerShell(node \"C:\\\\Users\\\\snira\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-snira-Desktop-Full-Stack-frog-task\\\\f11706fe-711b-4a8a-aa1b-cd306fb71075\\\\scratchpad\\\\rc-inspect.mjs\")",
+      "PowerShell(node \"C:\\\\Users\\\\snira\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-snira-Desktop-Full-Stack-frog-task\\\\f11706fe-711b-4a8a-aa1b-cd306fb71075\\\\scratchpad\\\\rc-fix-consumable.mjs\")",
+      "PowerShell(node \"C:\\\\Users\\\\snira\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-snira-Desktop-Full-Stack-frog-task\\\\f11706fe-711b-4a8a-aa1b-cd306fb71075\\\\scratchpad\\\\rc-probe-create.mjs\")"
     ]
   }
 }
