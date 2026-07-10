@@ -9,6 +9,7 @@ import jsQR from 'jsqr';
 import Frog from '@/components/ui/frog';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
 import { isNativeScan, parseFriendValue } from '@/lib/friends/scan';
+import { trackAnalyticsEvent } from '@/lib/analytics/client';
 
 type Tab = 'scan' | 'mycode';
 
@@ -175,6 +176,7 @@ function MyCodeView({
     try {
       if (typeof navigator !== 'undefined' && (navigator as any).share) {
         await (navigator as any).share(shareData);
+        trackAnalyticsEvent('friend_link_shared', { method: 'native_share', share_surface: 'friend_qr' });
         return;
       }
     } catch {
@@ -182,6 +184,7 @@ function MyCodeView({
     }
     try {
       await navigator.clipboard.writeText(shareUrl);
+      trackAnalyticsEvent('friend_link_shared', { method: 'copy_link', share_surface: 'friend_qr' });
     } catch {}
   }, [shareUrl, data?.code]);
 
@@ -189,6 +192,7 @@ function MyCodeView({
     if (!data?.code) return;
     try {
       await navigator.clipboard.writeText(data.code);
+      trackAnalyticsEvent('friend_link_shared', { method: 'copy_code', share_surface: 'friend_qr' });
       setCopied(true);
       setTimeout(() => setCopied(false), 1600);
     } catch {}

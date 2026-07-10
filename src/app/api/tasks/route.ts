@@ -41,6 +41,8 @@ import {
   customOccursOn,
   normalizeRepeatRule,
 } from '@/lib/taskOccurrence';
+import { recordAnalyticsEvent } from '@/lib/analytics/server';
+import { taskAnalyticsProperties } from '@/lib/analytics/engagement';
 
 type Origin = 'weekly' | 'regular';
 type BoardItem = { id: string; text: string; order: number; type: TaskType };
@@ -706,6 +708,15 @@ export async function POST(req: NextRequest) {
     });
     void syncGamification(uid, tz);
     await notifyTaskChanged(uid);
+    const analyticsUser = await UserModel.findById(uid).select('focusProfile').lean();
+    await recordAnalyticsEvent({
+      userId: uid,
+      name: 'task_created',
+      properties: taskAnalyticsProperties(created.toObject(), analyticsUser?.focusProfile, {
+        count: 1,
+        task_type: 'duplicate',
+      }),
+    });
     return NextResponse.json({
       ok: true,
       id: dupId,
@@ -733,6 +744,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: result.error }, { status: result.status });
   void syncGamification(uid, tz);
   await notifyTaskChanged(uid);
+  const [createdTask, analyticsUser] = await Promise.all([
+    TaskModel.findOne({ userId: uid, id: { $in: result.ids } }).lean<TaskDoc>(),
+    UserModel.findById(uid).select('focusProfile').lean(),
+  ]);
+  await recordAnalyticsEvent({
+    userId: uid,
+    name: 'task_created',
+    properties: taskAnalyticsProperties(createdTask ?? {
+      type: body?.type ?? 'regular',
+      tags: body?.tags,
+      checklist: body?.checklist,
+      startTime: body?.startTime,
+      endTime: body?.endTime,
+      reminder: body?.reminder,
+    }, analyticsUser?.focusProfile, { count: result.ids.length }),
+  });
   return NextResponse.json({ ok: true, ids: result.ids, tasks: result.tasks });
 }
 
@@ -1795,6 +1822,27 @@ export async function PUT(req: NextRequest) {
     completed,
     date,
   });
+  if (completed !== alreadyCompletedForDate) {
+    const analyticsUser = await UserModel.findById(uid).select('focusProfile').lean();
+    await recordAnalyticsEvent({
+      userId: uid,
+      name: completed ? 'task_completed' : 'task_reopened',
+      properties: taskAnalyticsProperties(doc, analyticsUser?.focusProfile, {
+        streak_length: streakNow,
+      }),
+    });
+  }
+  if (completed && !alreadyCompletedForDate && awarded) {
+    await recordAnalyticsEvent({
+      userId: uid,
+      name: 'fly_earned',
+      properties: {
+        source: doc.bondId ? 'buddy_task' : 'task',
+        fly_amount: taskFlyValue(doc, date, streakNow),
+        is_premium: !!flyStatus?.isPremium,
+      },
+    });
+  }
   return NextResponse.json({
     ok: true,
     awarded,

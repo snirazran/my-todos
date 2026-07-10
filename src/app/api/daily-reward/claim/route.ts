@@ -3,6 +3,7 @@ import { requireAuth } from '@/lib/auth';
 import dbConnect from '@/lib/mongoose';
 import UserModel from '@/lib/models/User';
 import { getRewardForDay, getCurrentMonthKey } from '@/lib/dailyRewards';
+import { recordAnalyticsEvent } from '@/lib/analytics/server';
 
 export async function POST(request: Request) {
   try {
@@ -145,6 +146,26 @@ export async function POST(request: Request) {
     user.markModified('dailyRewards');
 
     await user.save();
+
+    await recordAnalyticsEvent({
+      userId: uid,
+      name: 'daily_reward_claimed',
+      properties: {
+        reward_type: itemsAdded.length > 0 && fliesAdded > 0 ? 'mixed' : itemsAdded.length > 0 ? 'item' : 'flies',
+        reward_day: day,
+        reward_amount: fliesAdded,
+        reward_count: itemsAdded.length,
+        premium_reward_included: isPremium,
+        is_premium: isPremium,
+      },
+    });
+    if (fliesAdded > 0) {
+      await recordAnalyticsEvent({
+        userId: uid,
+        name: 'fly_earned',
+        properties: { source: 'daily_reward', fly_amount: fliesAdded, is_premium: isPremium },
+      });
+    }
 
     return NextResponse.json({
       success: true,

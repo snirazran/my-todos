@@ -12,6 +12,9 @@ import { useUIStore } from '@/lib/uiStore';
 import { useInventory, patchInventoryFlies } from '@/hooks/useInventory';
 import { rewardedAdsAvailable, showRewardedAd } from '@/lib/ads';
 import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
+import { getFlyPackPrices, purchaseFlyPack } from '@/lib/purchases';
+import type { FlyPackId } from '@/lib/flyPacks';
+import { trackAnalyticsEvent } from '@/lib/analytics/client';
 
 type Pack = {
   id: string;
@@ -39,14 +42,24 @@ type AdFlyStatus = {
 
 export function CurrencyShop() {
   const [mounted, setMounted] = useState(false);
+  const [storePrices, setStorePrices] = useState<Partial<Record<FlyPackId, string>>>({});
   const open = useUIStore((s) => s.isFlyShopOpen);
   const setOpen = useUIStore((s) => s.setFlyShopOpen);
-  const { data: inventoryData } = useInventory(open, true);
+  const { data: inventoryData, mutate: mutateInventory } = useInventory(open, true);
   const balance = inventoryData?.wardrobe?.flies ?? 0;
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (open) trackAnalyticsEvent('fly_shop_viewed');
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    void getFlyPackPrices().then(setStorePrices).catch(() => {});
+  }, [open]);
 
   if (!mounted) return null;
 
@@ -86,7 +99,12 @@ export function CurrencyShop() {
 
             <div className="mt-4 grid grid-cols-3 gap-2.5 sm:gap-4">
               {PACKS.map((pack) => (
-                <PackCard key={pack.id} pack={pack} />
+                <PackCard key={pack.id} pack={{ ...pack, price: storePrices[pack.id as FlyPackId] ?? pack.price }} onPurchased={() => {
+                  window.setTimeout(() => void mutateInventory(), 1200);
+                  window.setTimeout(() => void mutateInventory(), 5000);
+                  window.setTimeout(() => void mutateInventory(), 15000);
+                  window.setTimeout(() => void mutateInventory(), 45000);
+                }} />
               ))}
             </div>
 
@@ -101,13 +119,34 @@ export function CurrencyShop() {
   );
 }
 
-function PackCard({ pack }: { pack: Pack }) {
+function PackCard({ pack, onPurchased }: { pack: Pack; onPurchased: () => void }) {
   const popular = pack.badge === 'popular';
   const best = pack.badge === 'best';
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
+  const buy = async () => {
+    if (busy) return;
+    setBusy(true);
+    setStatus(null);
+    try {
+      const result = await purchaseFlyPack(pack.id as FlyPackId);
+      if (result === 'purchased') {
+        setStatus('Adding flies...');
+        onPurchased();
+      }
+    } catch (error) {
+      setStatus(error instanceof Error && error.message.includes('not configured')
+        ? 'Pack unavailable'
+        : 'Purchase failed');
+    } finally {
+      setBusy(false);
+    }
+  };
   return (
     <button
       type="button"
-      onClick={() => {}}
+      onClick={buy}
+      disabled={busy}
       className={cn(
         'group relative flex flex-col items-center overflow-hidden rounded-[20px] px-2.5 pb-2.5 pt-7 text-center transition-all hover:-translate-y-0.5 active:scale-[0.98] sm:rounded-[24px] sm:px-4 sm:pb-4 sm:pt-8',
         popular
@@ -158,8 +197,9 @@ function PackCard({ pack }: { pack: Pack }) {
       </span>
 
       <span className="mt-2 flex h-9 w-full items-center justify-center rounded-xl bg-[#4f9149] text-xs font-black tracking-wide text-white shadow-[0_4px_0_0_#34631f] transition-all group-hover:-translate-y-0.5 group-hover:shadow-[0_5px_0_0_#34631f] group-active:translate-y-1 group-active:shadow-none sm:h-11 sm:rounded-2xl sm:text-sm">
-        {pack.price}
+        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : pack.price}
       </span>
+      {status ? <span className="mt-2 text-[9px] font-bold text-muted-foreground">{status}</span> : null}
     </button>
   );
 }
@@ -190,7 +230,7 @@ function FreeFliesCard({ open }: { open: boolean }) {
     setBusy(true);
     setError(null);
     try {
-      const result = await showRewardedAd();
+      const result = await showRewardedAd('daily_flies');
       if (result !== 'rewarded') {
         if (result === 'failed') setError('Ad not available right now — try again later.');
         return;

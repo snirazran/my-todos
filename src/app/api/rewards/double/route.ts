@@ -8,6 +8,7 @@ import {
   DOUBLE_CLAIM_WINDOW_MS,
   type AdDoubleClaim,
 } from '@/lib/rewards/adDouble';
+import { recordAnalyticsEvent } from '@/lib/analytics/server';
 
 export async function POST(req: NextRequest) {
   let userId: string;
@@ -73,6 +74,13 @@ export async function POST(req: NextRequest) {
     user.markModified('adDoubleClaim');
     user.markModified('wardrobe');
     await user.save();
+    if (claim.fliesGranted > 0) {
+      await recordAnalyticsEvent({
+        userId,
+        name: 'fly_earned',
+        properties: { source: 'rewarded_ad_double', fly_amount: claim.fliesGranted, is_premium: false },
+      });
+    }
 
     return NextResponse.json({
       granted: true,

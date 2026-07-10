@@ -6,6 +6,7 @@ import type { UserWardrobe } from '@/lib/types/UserDoc';
 import { getFullCatalog, buildById } from '@/lib/skins/getCatalog';
 import { getDailyDeals, isPremiumActive } from '@/lib/skins/dailyDeal';
 import { bumpQuestMetric } from '@/lib/quests/metrics';
+import { recordAnalyticsEvent } from '@/lib/analytics/server';
 
 const json = (body: unknown, init = 200) =>
   NextResponse.json(body, { status: init });
@@ -85,6 +86,25 @@ export async function POST(req: NextRequest) {
     }
 
     await bumpQuestMetric({ userId, metric: 'skin_acquired' });
+
+    await recordAnalyticsEvent({
+      userId,
+      name: 'skin_purchased',
+      properties: {
+        rarity: byId[itemId].rarity,
+        slot: byId[itemId].slot,
+        flies_spent: price,
+        discounted: !!deal && isPremiumActive(user.premiumUntil),
+        is_premium: isPremiumActive(user.premiumUntil),
+      },
+    });
+    if (price > 0) {
+      await recordAnalyticsEvent({
+        userId,
+        name: 'fly_spent',
+        properties: { source: 'skin_shop', fly_amount: price, is_premium: isPremiumActive(user.premiumUntil) },
+      });
+    }
 
     return json({ ok: true });
   } catch {

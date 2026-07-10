@@ -499,7 +499,7 @@ function FlyClaimRewardOverlay({
     if (doubledRef.current || doubling) return;
     setDoubling(true);
     try {
-      const outcome = await showRewardedAd();
+      const outcome = await showRewardedAd('friend_reward_double');
       if (outcome !== 'rewarded') return;
       const res = await fetch('/api/friends/claim', {
         method: 'POST',

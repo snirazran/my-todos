@@ -11,6 +11,9 @@ import { createTasksForUser } from '@/app/api/tasks/route';
 import { repeatLabelFor } from '@/lib/buddy/bond';
 import { sendBuddyPush, buddyDisplayName } from '@/lib/buddy/push';
 import { notifyFriendUpdate } from '@/lib/taskSync';
+import TaskModel from '@/lib/models/Task';
+import { recordAnalyticsEvent } from '@/lib/analytics/server';
+import { taskAnalyticsProperties } from '@/lib/analytics/engagement';
 
 const INVITE_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -72,6 +75,19 @@ export async function POST(req: NextRequest) {
     if (!result.ok)
       return NextResponse.json({ error: result.error }, { status: result.status });
 
+    const [createdTask, analyticsUser] = await Promise.all([
+      TaskModel.findOne({ userId, id: { $in: result.ids } }).lean(),
+      UserModel.findById(userId).select('focusProfile').lean(),
+    ]);
+    await recordAnalyticsEvent({
+      userId,
+      name: 'task_created',
+      properties: taskAnalyticsProperties(createdTask ?? {}, analyticsUser?.focusProfile, {
+        count: result.ids.length,
+        buddy: true,
+      }),
+    });
+
     const taskFromId = result.repeatGroupId ?? result.ids[0];
 
     await TaskBondModel.create({
@@ -85,6 +101,14 @@ export async function POST(req: NextRequest) {
       repeatLabel: repeatLabelFor(params),
       taskFromId,
       expiresAt: new Date(Date.now() + INVITE_TTL_MS),
+    });
+    await recordAnalyticsEvent({
+      userId,
+      name: 'buddy_invite_sent',
+      properties: {
+        source: 'existing_friend',
+        repeat_mode: repeatLabelFor(params),
+      },
     });
 
     void notifyFriendUpdate(friendId);

@@ -1135,6 +1135,7 @@ export default function QuickAddSheet({
 
       <PlusUpgradeModal
         open={showPremiumLimit}
+        placement="quick_add_tag_limit"
         onClose={() => setShowPremiumLimit(false)}
       />
 

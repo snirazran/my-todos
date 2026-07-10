@@ -9,6 +9,7 @@ import {
   otherPlatform,
   type CrossGiftPlatform,
 } from '@/lib/crossGift';
+import { recordAnalyticsEvent } from '@/lib/analytics/server';
 
 export async function POST(req: NextRequest) {
   let userId: string;
@@ -57,6 +58,11 @@ export async function POST(req: NextRequest) {
         { status: 409 },
       );
     }
+    await recordAnalyticsEvent({
+      userId,
+      name: 'fly_earned',
+      properties: { source: 'cross_platform_gift', fly_amount: CROSS_GIFT_FLIES, is_premium: false },
+    });
 
     return NextResponse.json({ ok: true, flies: CROSS_GIFT_FLIES });
   } catch (err) {

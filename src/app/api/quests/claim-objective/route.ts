@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import { claimObjectiveReward } from '@/lib/quests/engine';
+import UserModel from '@/lib/models/User';
+import QuestModel from '@/lib/models/Quest';
+import { recordAnalyticsEvent } from '@/lib/analytics/server';
+import { questAnalyticsProperties } from '@/lib/analytics/engagement';
 
 export async function POST(req: NextRequest) {
   try {
@@ -19,12 +23,33 @@ export async function POST(req: NextRequest) {
     }
 
     await connectMongo();
+    const quest = await QuestModel.findOne({ userId, questId }).lean();
+    const objective = quest?.logic?.find((block) => block.id === objectiveId);
     const rewardSummary = await claimObjectiveReward({
       userId,
       questId,
       objectiveId,
       timezone,
     });
+    if (quest && objective) {
+      await recordAnalyticsEvent({
+        userId,
+        name: 'quest_objective_claimed',
+        properties: questAnalyticsProperties(quest, rewardSummary, objective),
+      });
+    }
+    if (rewardSummary.fliesGranted > 0) {
+      const user = await UserModel.findById(userId).select('premiumUntil').lean();
+      await recordAnalyticsEvent({
+        userId,
+        name: 'fly_earned',
+        properties: {
+          source: 'quest_objective',
+          fly_amount: rewardSummary.fliesGranted,
+          is_premium: !!user?.premiumUntil && new Date(user.premiumUntil) > new Date(),
+        },
+      });
+    }
 
     return NextResponse.json({
       ok: true,

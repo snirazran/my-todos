@@ -19,6 +19,7 @@ import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
 import type { QuestReward } from '@/lib/quests/types';
 import type { ItemDef, WardrobeSlot } from '@/lib/skins/catalog';
+import { trackAnalyticsEvent } from '@/lib/analytics/client';
 
 type CatalogItem = {
   id: string;
@@ -122,6 +123,7 @@ export function InviteFriendsModal({
       try {
         if (typeof navigator !== 'undefined' && (navigator as any).share) {
           await (navigator as any).share(shareData);
+          trackAnalyticsEvent('referral_invite_shared', { method: 'native_share', share_surface: 'invite_rewards' });
           return;
         }
       } catch {
@@ -130,6 +132,7 @@ export function InviteFriendsModal({
 
       try {
         await navigator.clipboard.writeText(url);
+        trackAnalyticsEvent('referral_invite_shared', { method: 'copy_link', share_surface: 'invite_rewards' });
       } catch {}
     },
     [],

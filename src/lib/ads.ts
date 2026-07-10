@@ -1,6 +1,7 @@
 'use client';
 
 import { Capacitor } from '@capacitor/core';
+import { trackAnalyticsEvent } from '@/lib/analytics/client';
 
 const TEST_REWARDED_IOS = 'ca-app-pub-3940256099942544/1712485313';
 const TEST_REWARDED_ANDROID = 'ca-app-pub-3940256099942544/5224354917';
@@ -43,8 +44,12 @@ async function ensureInitialized() {
   return AdMob;
 }
 
-export async function showRewardedAd(): Promise<RewardedAdResult> {
-  if (!rewardedAdsAvailable()) return 'failed';
+export async function showRewardedAd(placement = 'unknown'): Promise<RewardedAdResult> {
+  trackAnalyticsEvent('ad_requested', { placement });
+  if (!rewardedAdsAvailable()) {
+    trackAnalyticsEvent('ad_failed', { placement, reason: 'unsupported_platform' });
+    return 'failed';
+  }
   try {
     const AdMob = await ensureInitialized();
     const { RewardAdPluginEvents } = await import('@capacitor-community/admob');
@@ -52,10 +57,19 @@ export async function showRewardedAd(): Promise<RewardedAdResult> {
     return await new Promise<RewardedAdResult>((resolve) => {
       let settled = false;
       let rewarded = false;
+      let impressionTracked = false;
       const handles: Array<{ remove: () => Promise<void> }> = [];
       const finish = (result: RewardedAdResult) => {
         if (settled) return;
         settled = true;
+        trackAnalyticsEvent(
+          result === 'rewarded'
+            ? 'ad_completed'
+            : result === 'dismissed'
+              ? 'ad_dismissed'
+              : 'ad_failed',
+          { placement },
+        );
         for (const h of handles) void h.remove();
         resolve(result);
       };
@@ -65,6 +79,11 @@ export async function showRewardedAd(): Promise<RewardedAdResult> {
           handles.push(
             await AdMob.addListener(RewardAdPluginEvents.Rewarded, () => {
               rewarded = true;
+            }),
+            await AdMob.addListener(RewardAdPluginEvents.Showed, () => {
+              if (impressionTracked) return;
+              impressionTracked = true;
+              trackAnalyticsEvent('ad_impression', { placement });
             }),
             await AdMob.addListener(RewardAdPluginEvents.Dismissed, () => {
               finish(rewarded ? 'rewarded' : 'dismissed');
@@ -83,6 +102,7 @@ export async function showRewardedAd(): Promise<RewardedAdResult> {
     });
   } catch (err) {
     console.error('Rewarded ad init failed', err);
+    trackAnalyticsEvent('ad_failed', { placement, reason: 'initialization' });
     return 'failed';
   }
 }

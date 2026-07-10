@@ -133,7 +133,7 @@ export default function GiftBoxOpening({
     setAdBusy(true);
     setAdError(null);
     try {
-      const adResult = await showRewardedAd();
+      const adResult = await showRewardedAd('gift_double');
       if (adResult !== 'rewarded') {
         if (adResult === 'failed') {
           setAdError('Ad not available right now — try again in a moment.');

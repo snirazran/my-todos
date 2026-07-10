@@ -78,7 +78,7 @@ export function StreakRescueSheet({
     setError(null);
     try {
       if (!isPremiumRescue) {
-        const adResult = await showRewardedAd();
+        const adResult = await showRewardedAd('streak_rescue');
         if (adResult !== 'rewarded') {
           if (adResult === 'failed') {
             setError('Ad not available right now — try again in a moment.');

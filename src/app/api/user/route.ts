@@ -9,6 +9,9 @@ import ReferralModel from '@/lib/models/Referral';
 import { getAdminAuth } from '@/lib/firebaseAdmin';
 import connectMongo from '@/lib/mongoose';
 import { MAX_HUNGER_MS } from '@/lib/hungerLogic';
+import { recordAnalyticsEvent } from '@/lib/analytics/server';
+import AnalyticsEventModel from '@/lib/models/AnalyticsEvent';
+import FlyPurchaseModel from '@/lib/models/FlyPurchase';
 
 export async function GET(req: NextRequest) {
   let uid: string;
@@ -133,6 +136,12 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    await recordAnalyticsEvent({
+      userId: uid,
+      name: 'account_created',
+      properties: { method: isAnonymous ? 'guest' : email ? 'email_or_social' : 'phone' },
+    });
+
     return NextResponse.json({ ok: true, isNewUser: true, user: newUser });
   } catch (error) {
     console.error('Error syncing user:', error);
@@ -236,11 +245,23 @@ export async function DELETE(req: NextRequest) {
   try {
     await connectMongo();
 
+    const linkedAnonymousIds = await AnalyticsEventModel.distinct('anonymousId', {
+      userId: uid,
+      anonymousId: { $exists: true },
+    });
+
     await Promise.all([
       TaskModel.deleteMany({ userId: uid }),
       QuestModel.deleteMany({ userId: uid }),
       ReferralModel.deleteMany({ inviterId: uid }),
       ReferralModel.updateMany({ claimedByUserId: uid }, { $set: { claimedByUserId: null } }),
+      AnalyticsEventModel.deleteMany({
+        $or: [
+          { userId: uid },
+          ...(linkedAnonymousIds.length ? [{ anonymousId: { $in: linkedAnonymousIds } }] : []),
+        ],
+      }),
+      FlyPurchaseModel.deleteMany({ userId: uid }),
     ]);
 
     await UserModel.deleteOne({ _id: uid });

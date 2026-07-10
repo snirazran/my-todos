@@ -50,7 +50,7 @@ export function queuePlusIntroOnce(delayMs = 2000) {
       } catch {}
       if (!shouldShow) return;
       window.setTimeout(() => {
-        useUIStore.getState().setPremiumModalOpen(true);
+        useUIStore.getState().setPremiumModalOpen(true, 'task_completion_intro');
       }, delayMs);
     })
     .catch(() => {

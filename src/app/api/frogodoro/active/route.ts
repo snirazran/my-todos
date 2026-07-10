@@ -14,6 +14,9 @@ import type {
   LiveActivityRef,
   NotificationPrefs,
 } from '@/lib/types/UserDoc';
+import { recordAnalyticsEvent } from '@/lib/analytics/server';
+import TaskModel from '@/lib/models/Task';
+import { taskAnalyticsProperties } from '@/lib/analytics/engagement';
 
 export const dynamic = 'force-dynamic';
 
@@ -111,6 +114,7 @@ export async function PUT(req: NextRequest) {
       liveActivityStartClockSkewMs: 1,
       notificationPrefs: 1,
       frogodoroSeq: 1,
+      focusProfile: 1,
     }).lean();
     const existingTimer = (
       existing as {
@@ -169,6 +173,21 @@ export async function PUT(req: NextRequest) {
     ).lean();
     const seq = (updated as { frogodoroSeq?: number } | null)?.frogodoroSeq ?? 0;
     publishTimerEvent(userId, stored, seq);
+
+    if (!existingTimer && stored.phase === 'focus' && stored.status === 'running') {
+      const task = await TaskModel.findOne({ userId, id: stored.taskId }).lean();
+      await recordAnalyticsEvent({
+        userId,
+        name: 'timer_started',
+        properties: taskAnalyticsProperties(task ?? {}, existing?.focusProfile, {
+          phase: stored.phase,
+          duration_minutes: stored.settings.focusDuration,
+          focus_duration_minutes: stored.settings.focusDuration,
+          break_duration_minutes: stored.settings.breakDuration,
+          auto_start_breaks: stored.settings.autoStartBreaks,
+        }),
+      });
+    }
 
     if (stored.status === 'running' && stored.endsAt) {
       scheduleFrogodoroTimerProcessing({

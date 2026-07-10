@@ -363,7 +363,7 @@ export function useTaskData({
                     <button
                       type="button"
                       onClick={() => {
-                        useUIStore.getState().setPremiumModalOpen(true);
+                        useUIStore.getState().setPremiumModalOpen(true, 'daily_fly_limit');
                         hideNotification();
                       }}
                       className="flex w-full items-center gap-3 text-left"

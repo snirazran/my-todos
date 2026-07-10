@@ -1707,7 +1707,7 @@ function WardrobeManagerContent({
         }}
       />
 
-      <PlusUpgradeModal open={plusOpen} onClose={() => setPlusOpen(false)} />
+      <PlusUpgradeModal open={plusOpen} placement="premium_daily_deal" onClose={() => setPlusOpen(false)} />
     </div>
   );
 }

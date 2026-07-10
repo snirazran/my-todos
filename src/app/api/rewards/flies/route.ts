@@ -11,6 +11,7 @@ import {
   adFliesRemaining,
   type AdFlyDaily,
 } from '@/lib/rewards/adFlies';
+import { recordAnalyticsEvent } from '@/lib/analytics/server';
 
 export async function GET(req: NextRequest) {
   let userId: string;
@@ -84,6 +85,11 @@ export async function POST(req: NextRequest) {
     user.markModified('adFlyDaily');
     user.markModified('wardrobe');
     await user.save();
+    await recordAnalyticsEvent({
+      userId,
+      name: 'fly_earned',
+      properties: { source: 'rewarded_ad', fly_amount: AD_FLY_REWARD, is_premium: false },
+    });
 
     return NextResponse.json({
       granted: true,

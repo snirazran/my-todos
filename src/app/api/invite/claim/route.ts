@@ -15,6 +15,7 @@ import { buildAcceptBody, repeatLabelFor } from '@/lib/buddy/bond';
 import { getZonedToday } from '@/lib/utils';
 import { sendBuddyPush, buddyDisplayName } from '@/lib/buddy/push';
 import { bumpQuestMetric } from '@/lib/quests/metrics';
+import { recordAnalyticsEvent } from '@/lib/analytics/server';
 
 export async function POST(req: NextRequest) {
   try {
@@ -141,6 +142,15 @@ export async function POST(req: NextRequest) {
       metric: 'friend_invited',
       timezone: tz,
     });
+    await recordAnalyticsEvent({
+      userId: referral.inviterId,
+      name: 'referral_invite_claimed',
+      properties: {
+        gift_option: referral.giftOptionId ?? 'unknown',
+        has_buddy_task: !!referral.buddyTask?.text,
+        milestone_tier: claimedCount,
+      },
+    });
 
     void notifyFriendsChanged(userId);
 
@@ -178,6 +188,15 @@ export async function POST(req: NextRequest) {
           });
 
           buddyTaskResult = { text: params.text, partnerName: inviterName };
+
+          await recordAnalyticsEvent({
+            userId: referral.inviterId,
+            name: 'buddy_invite_accepted',
+            properties: {
+              source: 'referral',
+              repeat_mode: repeatLabelFor(params),
+            },
+          });
 
           void notifyFriendUpdate(referral.inviterId);
           void buddyDisplayName(userId).then((name) =>

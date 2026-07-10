@@ -23,7 +23,8 @@ interface UIState {
   setLoadingScreenVisible: (visible: boolean) => void;
 
   isPremiumModalOpen: boolean;
-  setPremiumModalOpen: (open: boolean) => void;
+  premiumModalPlacement: string;
+  setPremiumModalOpen: (open: boolean, placement?: string) => void;
 
   isFlyShopOpen: boolean;
   openFlyShop: () => void;
@@ -61,7 +62,9 @@ export const useUIStore = create<UIState>()(
       setLoadingScreenVisible: (visible: boolean) => set({ isLoadingScreenVisible: visible }),
 
       isPremiumModalOpen: false,
-      setPremiumModalOpen: (open: boolean) => set({ isPremiumModalOpen: open }),
+      premiumModalPlacement: 'unknown',
+      setPremiumModalOpen: (open: boolean, placement = 'unknown') =>
+        set({ isPremiumModalOpen: open, ...(open ? { premiumModalPlacement: placement } : {}) }),
 
       isFlyShopOpen: false,
       openFlyShop: () => set({ isFlyShopOpen: true }),

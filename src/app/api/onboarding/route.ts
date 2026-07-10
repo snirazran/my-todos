@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { requireUserId } from '@/lib/auth';
 import UserModel from '@/lib/models/User';
 import connectMongo from '@/lib/mongoose';
+import { recordAnalyticsEvent } from '@/lib/analytics/server';
 
 const VALID_AGE_RANGES = new Set(['under-18', '18-24', '25-34', '35-44', '45-54', '55-64', '65-plus']);
 const VALID_ABOUT_GENDERS = new Set(['male', 'female', 'non-binary', 'prefer-not']);
@@ -107,6 +108,13 @@ export async function POST(req: Request) {
         },
       },
     );
+    await recordAnalyticsEvent({
+      userId: uid,
+      name: 'onboarding_completed',
+      properties: {
+        method: usedBefore ?? 'unspecified',
+      },
+    });
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ error: 'Failed to save onboarding' }, { status: 500 });

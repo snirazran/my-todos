@@ -6,6 +6,7 @@ import { mutate as swrMutate } from 'swr';
 import { GiftClaimRewardOverlay } from '@/components/ui/GiftClaimRewardOverlay';
 import { SharedTaskClaimPopup } from '@/components/ui/SharedTaskClaimPopup';
 import type { ItemDef } from '@/lib/skins/catalog';
+import { trackAnalyticsEvent } from '@/lib/analytics/client';
 
 const STORAGE_KEY = 'frogress_referral_code';
 
@@ -34,6 +35,15 @@ export function ReferralClaimer() {
       const code = params.get('ref')?.trim();
       if (code) {
         localStorage.setItem(STORAGE_KEY, code);
+        let referrerHost = 'direct';
+        try {
+          if (document.referrer) referrerHost = new URL(document.referrer).hostname;
+        } catch {}
+        trackAnalyticsEvent('referral_invite_opened', {
+          method: 'link',
+          share_surface: 'referral',
+          referrer_host: referrerHost,
+        });
       }
     } catch {
       /* ignore */

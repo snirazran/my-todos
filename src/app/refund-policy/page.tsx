@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { LegalPage, type LegalSection } from '@/components/legal/LegalPage';
 
-const lastUpdated = 'July 5, 2026';
+const lastUpdated = 'July 10, 2026';
 
 const sections: LegalSection[] = [
   {
@@ -22,14 +22,14 @@ const sections: LegalSection[] = [
   {
     title: '3. Purchases made through the Apple App Store',
     body: [
-      'Subscriptions purchased inside the iOS app are billed by Apple, and under Apple\'s rules only Apple can issue refunds for them.',
+      'Subscriptions and consumable fly packs purchased inside the iOS app are billed by Apple, and under Apple\'s rules only Apple can issue refunds for them.',
       'To request a refund, go to reportaproblem.apple.com, sign in with your Apple ID, and select the Frogress Plus purchase, or request a refund through your device\'s subscription settings. Apple decides these requests under its own policies. If you have trouble, contact us at support@frogress.com and we will do our best to help.',
     ],
   },
   {
     title: '4. Purchases made through Google Play',
     body: [
-      'Subscriptions purchased inside the Android app are billed by Google Play. You can request a refund through the Google Play Store app or at play.google.com under Order history.',
+      'Subscriptions and consumable fly packs purchased inside the Android app are billed by Google Play. You can request a refund through the Google Play Store app or at play.google.com under Order history.',
       'Google decides refund requests made after its initial refund window under its own policies. If Google directs you to the developer or you have trouble, contact us at support@frogress.com and we will review your request under the same 14-day standard described above.',
     ],
   },

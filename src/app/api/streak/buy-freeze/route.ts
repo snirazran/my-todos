@@ -6,6 +6,7 @@ import {
   loadLoginStreakConfig,
   readLoginStreakState,
 } from '@/lib/streak/loginStreak';
+import { recordAnalyticsEvent } from '@/lib/analytics/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -60,9 +61,18 @@ export async function POST() {
     }
 
     const fresh = await UserModel.findById(userId)
-      .select('wardrobe.flies quests')
+      .select('wardrobe.flies quests premiumUntil')
       .lean();
     const state = readLoginStreakState(fresh);
+    await recordAnalyticsEvent({
+      userId,
+      name: 'fly_spent',
+      properties: {
+        source: 'streak_freeze',
+        fly_amount: price,
+        is_premium: !!fresh?.premiumUntil && new Date(fresh.premiumUntil) > new Date(),
+      },
+    });
     return NextResponse.json({
       ok: true,
       freezes: state.freezes,

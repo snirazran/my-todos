@@ -8,6 +8,7 @@ import FriendRequestModel, { type FriendRequestSource } from '@/lib/models/Frien
 import { normalizeFriendCode, areFriends, createFriendship } from '@/lib/friends/code';
 import { notifyFriendUpdate, notifyFriendsChanged } from '@/lib/taskSync';
 import { sendBuddyPush, buddyDisplayName } from '@/lib/buddy/push';
+import { recordAnalyticsEvent } from '@/lib/analytics/server';
 
 async function resolveTarget(body: {
   code?: string;
@@ -65,6 +66,15 @@ export async function POST(req: NextRequest) {
       incoming.respondedAt = new Date();
       await incoming.save();
       await createFriendship(userId, targetId, 'code');
+      await recordAnalyticsEvent({
+        userId,
+        name: 'friend_request_accepted',
+        properties: {
+          request_source: incoming.source,
+          auto_accepted: true,
+          response_hours: Math.max(0, (Date.now() - new Date(incoming.createdAt).getTime()) / 3_600_000),
+        },
+      });
       void notifyFriendsChanged(userId);
       void buddyDisplayName(userId).then((name) =>
         sendBuddyPush(targetId, {
@@ -86,6 +96,11 @@ export async function POST(req: NextRequest) {
 
     // Push the incoming request to the recipient instantly (no refresh needed).
     if (result.upsertedCount > 0) {
+      await recordAnalyticsEvent({
+        userId,
+        name: 'friend_request_sent',
+        properties: { request_source: source },
+      });
       void notifyFriendUpdate(targetId);
       void buddyDisplayName(userId).then((name) =>
         sendBuddyPush(targetId, {
@@ -179,6 +194,16 @@ export async function PATCH(req: NextRequest) {
     request.status = action === 'accept' ? 'accepted' : 'declined';
     request.respondedAt = new Date();
     await request.save();
+
+    await recordAnalyticsEvent({
+      userId,
+      name: action === 'accept' ? 'friend_request_accepted' : 'friend_request_declined',
+      properties: {
+        request_source: request.source,
+        auto_accepted: false,
+        response_hours: Math.max(0, (Date.now() - new Date(request.createdAt).getTime()) / 3_600_000),
+      },
+    });
 
     if (action === 'accept') {
       await createFriendship(request.fromUserId, request.toUserId, 'code');

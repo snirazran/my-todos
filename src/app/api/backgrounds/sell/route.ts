@@ -8,6 +8,7 @@ import {
   ensureDefaultBackground,
 } from '@/lib/backgrounds/defaults';
 import { notifyUserChanged } from '@/lib/taskSync';
+import { recordAnalyticsEvent } from '@/lib/analytics/server';
 
 const json = (body: unknown, init = 200) =>
   NextResponse.json(body, { status: init });
@@ -81,6 +82,20 @@ export async function POST(req: NextRequest) {
       await notifyUserChanged(userId, {
         eventKind: 'background-equipped',
         backgroundId: DEFAULT_BACKGROUND_ID,
+      });
+    }
+
+    const isPremium = !!user.premiumUntil && new Date(user.premiumUntil) > new Date();
+    await recordAnalyticsEvent({
+      userId,
+      name: 'skin_sold',
+      properties: { rarity: bg.rarity, slot: 'background', item_count: amount, flies_received: totalRefund, is_premium: isPremium },
+    });
+    if (totalRefund > 0) {
+      await recordAnalyticsEvent({
+        userId,
+        name: 'fly_earned',
+        properties: { source: 'background_sale', fly_amount: totalRefund, is_premium: isPremium },
       });
     }
 

@@ -92,6 +92,7 @@ export default function Home() {
     setWardrobeOpen,
     setIsCinematicActive,
     isPremiumModalOpen,
+    premiumModalPlacement,
     setPremiumModalOpen,
   } = useUIStore();
 
@@ -951,6 +952,7 @@ export default function Home() {
 
       <PlusUpgradeModal
         open={isPremiumModalOpen}
+        placement={premiumModalPlacement}
         onClose={() => setPremiumModalOpen(false)}
       />
 

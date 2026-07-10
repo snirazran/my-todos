@@ -6,6 +6,7 @@ import User from '@/lib/models/User';
 import { RARITY_ORDER, TRADE_ITEM_COUNT } from '@/lib/skins/catalog';
 import { getPrizePool, type GiftPrize } from '@/lib/skins/gifts';
 import { bumpQuestMetric } from '@/lib/quests/metrics';
+import { recordAnalyticsEvent } from '@/lib/analytics/server';
 
 type Pick = { id: string; kind: 'item' | 'background' };
 
@@ -157,6 +158,19 @@ export async function POST(req: NextRequest) {
     const timezone = typeof body?.timezone === 'string' ? body.timezone : undefined;
     await bumpQuestMetric({ userId, metric: 'trade_completed', timezone });
     await bumpQuestMetric({ userId, metric: 'skin_acquired', timezone });
+    const isPremium = !!user.premiumUntil && new Date(user.premiumUntil) > new Date();
+    await recordAnalyticsEvent({
+      userId,
+      name: 'skin_traded',
+      properties: {
+        from_rarity: firstRarity,
+        to_rarity: nextRarity,
+        rarity: reward.rarity,
+        slot: reward.slot,
+        item_count: TRADE_ITEM_COUNT,
+        is_premium: isPremium,
+      },
+    });
 
     return NextResponse.json({ success: true, reward, rerollClaimId });
   } catch (error) {

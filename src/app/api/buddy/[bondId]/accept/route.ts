@@ -9,6 +9,10 @@ import { buildAcceptBody } from '@/lib/buddy/bond';
 import { getZonedToday } from '@/lib/utils';
 import { sendBuddyPush, buddyDisplayName } from '@/lib/buddy/push';
 import { notifyFriendUpdate } from '@/lib/taskSync';
+import TaskModel from '@/lib/models/Task';
+import UserModel from '@/lib/models/User';
+import { recordAnalyticsEvent } from '@/lib/analytics/server';
+import { taskAnalyticsProperties } from '@/lib/analytics/engagement';
 
 export async function POST(
   req: NextRequest,
@@ -54,10 +58,32 @@ export async function POST(
     if (!result.ok)
       return NextResponse.json({ error: result.error }, { status: result.status });
 
+    const [createdTask, analyticsUser] = await Promise.all([
+      TaskModel.findOne({ userId, id: { $in: result.ids } }).lean(),
+      UserModel.findById(userId).select('focusProfile').lean(),
+    ]);
+    await recordAnalyticsEvent({
+      userId,
+      name: 'task_created',
+      properties: taskAnalyticsProperties(createdTask ?? {}, analyticsUser?.focusProfile, {
+        count: result.ids.length,
+        buddy: true,
+      }),
+    });
+
     bond.taskToId = result.repeatGroupId ?? result.ids[0];
     bond.status = 'active';
     bond.activeSince = getZonedToday(tz);
     await bond.save();
+    await recordAnalyticsEvent({
+      userId,
+      name: 'buddy_invite_accepted',
+      properties: {
+        source: 'existing_friend',
+        repeat_mode: bond.repeatLabel ?? 'unknown',
+        response_hours: Math.max(0, (Date.now() - new Date(bond.createdAt).getTime()) / 3_600_000),
+      },
+    });
 
     void notifyFriendUpdate(bond.fromUserId);
     void buddyDisplayName(userId).then((name) =>

@@ -6,6 +6,7 @@ import connectMongo from '@/lib/mongoose';
 import TaskBondModel from '@/lib/models/TaskBond';
 import { sendBuddyPush, buddyDisplayName } from '@/lib/buddy/push';
 import { notifyFriendUpdate } from '@/lib/taskSync';
+import { recordAnalyticsEvent } from '@/lib/analytics/server';
 
 export async function POST(
   req: NextRequest,
@@ -44,6 +45,11 @@ export async function POST(
       requestedAt: new Date(),
     };
     await bond.save();
+    await recordAnalyticsEvent({
+      userId,
+      name: 'buddy_repeat_change_requested',
+      properties: { repeat_mode: bond.repeatLabel ?? 'unknown' },
+    });
 
     const partnerId = bond.fromUserId === userId ? bond.toUserId : bond.fromUserId;
     void notifyFriendUpdate(partnerId);

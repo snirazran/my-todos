@@ -8,6 +8,7 @@ import UserModel from '@/lib/models/User';
 import { contributionFrom } from '@/lib/friends/indices';
 import { getZonedToday } from '@/lib/utils';
 import type { DailyFlyProgress, FriendFlyDaily } from '@/lib/types/UserDoc';
+import { recordAnalyticsEvent } from '@/lib/analytics/server';
 
 function fliesEarnedOn(
   flyDaily: DailyFlyProgress | undefined,
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest) {
     await connectMongo();
 
     const me = await UserModel.findById(userId)
-      .select('wardrobe.flies wardrobe.friendFlyDaily')
+      .select('wardrobe.flies wardrobe.friendFlyDaily premiumUntil')
       .lean();
     const prior = me?.wardrobe?.friendFlyDaily as FriendFlyDaily | undefined;
 
@@ -62,6 +63,11 @@ export async function POST(req: NextRequest) {
           $set: { 'wardrobe.friendFlyDaily.lastClaim.doubled': true },
         },
       );
+      await recordAnalyticsEvent({
+        userId,
+        name: 'fly_earned',
+        properties: { source: 'friend_reward_double', fly_amount: bonus, is_premium: false },
+      });
       return NextResponse.json({ granted: bonus });
     }
 
@@ -107,6 +113,15 @@ export async function POST(req: NextRequest) {
         },
       },
     );
+    await recordAnalyticsEvent({
+      userId,
+      name: 'fly_earned',
+      properties: {
+        source: 'friend_activity',
+        fly_amount: granted,
+        is_premium: !!me?.premiumUntil && new Date(me.premiumUntil) > new Date(),
+      },
+    });
 
     return NextResponse.json({ granted });
   } catch (err) {

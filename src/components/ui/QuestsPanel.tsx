@@ -271,6 +271,11 @@ export function QuestsPanel({
   );
   const [seasonEventOpen, setSeasonEventOpen] = useState(false);
   const [plusOpen, setPlusOpen] = useState(false);
+  const [plusPlacement, setPlusPlacement] = useState('quests');
+  const openPlus = (placement: string) => {
+    setPlusPlacement(placement);
+    setPlusOpen(true);
+  };
   const [claimingSeason, setClaimingSeason] = useState(false);
   const [claimMessage, setClaimMessage] = useState<string | null>(null);
   const [editingFocusCategoryId, setEditingFocusCategoryId] =
@@ -664,7 +669,7 @@ export function QuestsPanel({
     if (!claimId || entry.doubled || doublingClaimRef.current) return;
     doublingClaimRef.current = true;
     try {
-      const outcome = await showRewardedAd();
+      const outcome = await showRewardedAd('quest_reward_double');
       if (outcome !== 'rewarded') return;
       const res = await fetch('/api/rewards/double', {
         method: 'POST',
@@ -961,7 +966,7 @@ export function QuestsPanel({
                               onActivateFocus={() =>
                                 handleSetActiveFocus(quest.categoryId)
                               }
-                              onUpgrade={() => setPlusOpen(true)}
+                              onUpgrade={() => openPlus('focus_quest_card')}
                               canRent={!data.isPremium && !data.rentedFocus}
                               rentedUntil={
                                 data.rentedFocus?.categoryId === quest.categoryId
@@ -1031,7 +1036,7 @@ export function QuestsPanel({
                                     }
                                     activeAccent={heroCategory?.accent}
                                     totalCount={questCount}
-                                    onLockedPress={() => setPlusOpen(true)}
+                                    onLockedPress={() => openPlus('focus_slot_limit')}
                                   />
                                   {renderFocusCard(heroQuest)}
                                 </>
@@ -1094,7 +1099,7 @@ export function QuestsPanel({
                                 {!data.isPremium && (
                                   <PlusGateCard
                                     questCount={questCount}
-                                    onUpgrade={() => setPlusOpen(true)}
+                                    onUpgrade={() => openPlus('focus_bench_limit')}
                                   />
                                 )}
                               </div>
@@ -1166,7 +1171,7 @@ export function QuestsPanel({
                 claiming={claimingSeason}
                 onClose={() => setSeasonEventOpen(false)}
                 onClaim={handleClaimSeasonDay}
-                onUpgrade={() => setPlusOpen(true)}
+                onUpgrade={() => openPlus('season_plus_track')}
                 paused={false}
               />
               <SwitchFocusConfirm
@@ -1191,7 +1196,7 @@ export function QuestsPanel({
                     void handleSetActiveFocus(pendingSwitchCategoryId);
                   }
                 }}
-                onUpgrade={() => setPlusOpen(true)}
+                onUpgrade={() => openPlus('focus_switch')}
                 canRent={!data?.isPremium && !data?.rentedFocus}
                 onRented={() => {
                   void mutateQuests();
@@ -1199,7 +1204,7 @@ export function QuestsPanel({
                 }}
                 onClose={() => setPendingSwitchCategoryId(null)}
               />
-              <PlusUpgradeModal open={plusOpen} onClose={() => setPlusOpen(false)} />
+              <PlusUpgradeModal open={plusOpen} placement={plusPlacement} onClose={() => setPlusOpen(false)} />
       </>
     );
   };

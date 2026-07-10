@@ -13,6 +13,7 @@ import {
 import { getZonedToday } from '@/lib/utils';
 import { sendBuddyPush, buddyDisplayName } from '@/lib/buddy/push';
 import { notifyFriendUpdate } from '@/lib/taskSync';
+import { recordAnalyticsEvent } from '@/lib/analytics/server';
 
 export async function POST(
   req: NextRequest,
@@ -67,6 +68,11 @@ export async function POST(
     bond.streak = { count: 0, lastDate: null };
     bond.pendingRepeatChange = null;
     await bond.save();
+    await recordAnalyticsEvent({
+      userId,
+      name: 'buddy_repeat_change_accepted',
+      properties: { repeat_mode: bond.repeatLabel ?? 'unknown' },
+    });
 
     void notifyFriendUpdate(change.requestedBy);
     void buddyDisplayName(userId).then((name) =>

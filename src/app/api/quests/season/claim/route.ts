@@ -13,6 +13,7 @@ import {
   pruneQuestSeasonProgress,
 } from '@/lib/quests/seasons';
 import { recordDoubleableClaim } from '@/lib/rewards/adDouble';
+import { recordAnalyticsEvent } from '@/lib/analytics/server';
 
 export async function POST(req: NextRequest) {
   try {
@@ -120,6 +121,38 @@ export async function POST(req: NextRequest) {
     user.markModified('quests');
     user.markModified('wardrobe');
     await user.save();
+
+    await recordAnalyticsEvent({
+      userId,
+      name: 'season_reward_claimed',
+      properties: {
+        season_id: season.seasonId,
+        season_day: day,
+        fly_amount: rewardSummary.fliesGranted,
+        reward_amount: rewardSummary.fliesGranted,
+        item_count: rewardSummary.grantedItemIds.length,
+        reward_count: rewardSummary.grantedItemIds.length,
+        reward_type:
+          rewardSummary.grantedItemIds.length > 0 && rewardSummary.fliesGranted > 0
+            ? 'mixed'
+            : rewardSummary.grantedItemIds.length > 0
+              ? 'item'
+              : 'flies',
+        premium_reward_included: isPremium,
+        is_premium: isPremium,
+      },
+    });
+    if (rewardSummary.fliesGranted > 0) {
+      await recordAnalyticsEvent({
+        userId,
+        name: 'fly_earned',
+        properties: {
+          source: 'season',
+          fly_amount: rewardSummary.fliesGranted,
+          is_premium: isPremium,
+        },
+      });
+    }
 
     return NextResponse.json({ ok: true, rewardSummary, claimedDay: day });
   } catch (error) {

@@ -2,6 +2,8 @@
 
 import { Capacitor } from '@capacitor/core';
 import { auth } from '@/lib/firebase';
+import { trackAnalyticsEvent } from '@/lib/analytics/client';
+import { FLY_PACKS, getFlyPack, type FlyPackId } from '@/lib/flyPacks';
 
 export type PlusPlan = 'yearly' | 'monthly';
 export type PurchaseOutcome = 'purchased' | 'cancelled';
@@ -99,11 +101,28 @@ async function purchasePlusWeb(uid: string, plan: PlusPlan): Promise<PurchaseOut
   return 'purchased';
 }
 
-export async function purchasePlus(plan: PlusPlan): Promise<PurchaseOutcome> {
+export async function purchasePlus(plan: PlusPlan, placement = 'unknown'): Promise<PurchaseOutcome> {
   const uid = requireUid();
-  return Capacitor.isNativePlatform()
-    ? purchasePlusNative(uid, plan)
-    : purchasePlusWeb(uid, plan);
+  const store = Capacitor.isNativePlatform() ? Capacitor.getPlatform() : 'web';
+  trackAnalyticsEvent('purchase_started', { plan, store, placement });
+  try {
+    const outcome = Capacitor.isNativePlatform()
+      ? await purchasePlusNative(uid, plan)
+      : await purchasePlusWeb(uid, plan);
+    trackAnalyticsEvent(
+      outcome === 'purchased' ? 'purchase_completed' : 'purchase_cancelled',
+      { plan, store, placement },
+    );
+    return outcome;
+  } catch (error) {
+    trackAnalyticsEvent('purchase_failed', {
+      plan,
+      store,
+      placement,
+      reason: error instanceof Error ? error.name : 'unknown',
+    });
+    throw error;
+  }
 }
 
 export async function restorePlusPurchases(): Promise<boolean> {
@@ -113,4 +132,104 @@ export async function restorePlusPurchases(): Promise<boolean> {
   const { customerInfo } = await Purchases.restorePurchases();
   await syncPremiumWithServer();
   return !!customerInfo.entitlements.active['plus'];
+}
+
+export async function purchaseFlyPack(packId: FlyPackId): Promise<PurchaseOutcome> {
+  const uid = requireUid();
+  const pack = getFlyPack(packId);
+  if (!pack) throw new Error('Unknown fly pack');
+  const store = Capacitor.isNativePlatform() ? Capacitor.getPlatform() : 'web';
+  trackAnalyticsEvent('fly_pack_selected', {
+    pack_id: pack.id,
+    fly_amount: pack.amount,
+    price_usd: pack.priceUsd,
+    store,
+  });
+  trackAnalyticsEvent('fly_pack_purchase_started', {
+    pack_id: pack.id,
+    fly_amount: pack.amount,
+    price_usd: pack.priceUsd,
+    store,
+  });
+
+  try {
+    if (Capacitor.isNativePlatform()) {
+      const Purchases = await getNativePurchases(uid);
+      const { PURCHASES_ERROR_CODE } = await import('@revenuecat/purchases-capacitor');
+      const offerings = await Purchases.getOfferings();
+      const pkg = offerings.current?.availablePackages.find(
+        (entry) =>
+          entry.identifier === pack.packageId ||
+          entry.product.identifier === pack.productId,
+      );
+      if (!pkg) throw new Error(`RevenueCat package ${pack.packageId} is not configured`);
+      try {
+        await Purchases.purchasePackage({ aPackage: pkg });
+      } catch (error: any) {
+        if (
+          error?.code === PURCHASES_ERROR_CODE.PURCHASE_CANCELLED_ERROR ||
+          error?.userCancelled
+        ) {
+          trackAnalyticsEvent('fly_pack_purchase_cancelled', { pack_id: pack.id, store });
+          return 'cancelled';
+        }
+        throw error;
+      }
+    } else {
+      const purchases = await getWebPurchases(uid);
+      const { ErrorCode, PurchasesError } = await import('@revenuecat/purchases-js');
+      const offerings = await purchases.getOfferings();
+      const pkg = offerings.current?.availablePackages.find(
+        (entry) =>
+          entry.identifier === pack.packageId ||
+          entry.webBillingProduct.identifier === pack.productId,
+      );
+      if (!pkg) throw new Error(`RevenueCat package ${pack.packageId} is not configured`);
+      try {
+        await purchases.purchase({
+          rcPackage: pkg,
+          customerEmail: auth?.currentUser?.email ?? undefined,
+        });
+      } catch (error) {
+        if (error instanceof PurchasesError && error.errorCode === ErrorCode.UserCancelledError) {
+          trackAnalyticsEvent('fly_pack_purchase_cancelled', { pack_id: pack.id, store });
+          return 'cancelled';
+        }
+        throw error;
+      }
+    }
+    return 'purchased';
+  } catch (error) {
+    trackAnalyticsEvent('fly_pack_purchase_failed', {
+      pack_id: pack.id,
+      store,
+      reason: error instanceof Error ? error.name : 'unknown',
+    });
+    throw error;
+  }
+}
+
+export async function getFlyPackPrices(): Promise<Partial<Record<FlyPackId, string>>> {
+  const uid = requireUid();
+  const prices: Partial<Record<FlyPackId, string>> = {};
+  if (Capacitor.isNativePlatform()) {
+    const Purchases = await getNativePurchases(uid);
+    const offerings = await Purchases.getOfferings();
+    for (const pack of FLY_PACKS) {
+      const pkg = offerings.current?.availablePackages.find(
+        (entry) => entry.identifier === pack.packageId || entry.product.identifier === pack.productId,
+      );
+      if (pkg) prices[pack.id] = pkg.product.priceString;
+    }
+    return prices;
+  }
+  const purchases = await getWebPurchases(uid);
+  const offerings = await purchases.getOfferings();
+  for (const pack of FLY_PACKS) {
+    const pkg = offerings.current?.availablePackages.find(
+      (entry) => entry.identifier === pack.packageId || entry.webBillingProduct.identifier === pack.productId,
+    );
+    if (pkg) prices[pack.id] = pkg.webBillingProduct.price.formattedPrice;
+  }
+  return prices;
 }

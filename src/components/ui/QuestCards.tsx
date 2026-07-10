@@ -1294,7 +1294,7 @@ export function SwitchFocusConfirm({
     setRentBusy(true);
     setRentError(null);
     try {
-      const adResult = await showRewardedAd();
+      const adResult = await showRewardedAd('focus_rental');
       if (adResult !== 'rewarded') {
         if (adResult === 'failed') {
           setRentError('Ad not available right now — try again in a moment.');

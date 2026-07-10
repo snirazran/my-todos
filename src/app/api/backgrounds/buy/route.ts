@@ -3,6 +3,7 @@ import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import BackgroundModel from '@/lib/models/Background';
 import UserModel, { type UserDoc } from '@/lib/models/User';
+import { recordAnalyticsEvent } from '@/lib/analytics/server';
 
 const json = (body: unknown, init = 200) =>
   NextResponse.json(body, { status: init });
@@ -46,6 +47,20 @@ export async function POST(req: NextRequest) {
 
     if (result.modifiedCount === 0) {
       return json({ error: 'Not enough flies' }, 400);
+    }
+
+    const isPremium = !!user.premiumUntil && new Date(user.premiumUntil) > new Date();
+    await recordAnalyticsEvent({
+      userId,
+      name: 'skin_purchased',
+      properties: { rarity: bg.rarity, slot: 'background', flies_spent: price, discounted: false, is_premium: isPremium },
+    });
+    if (price > 0) {
+      await recordAnalyticsEvent({
+        userId,
+        name: 'fly_spent',
+        properties: { source: 'background_shop', fly_amount: price, is_premium: isPremium },
+      });
     }
 
     return json({ ok: true });

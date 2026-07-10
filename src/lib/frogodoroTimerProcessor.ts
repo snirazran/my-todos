@@ -15,6 +15,9 @@ import type {
   NotificationPrefs,
   LiveActivityRef,
 } from '@/lib/types/UserDoc';
+import { recordAnalyticsEvent } from '@/lib/analytics/server';
+import TaskModel from '@/lib/models/Task';
+import { taskAnalyticsProperties } from '@/lib/analytics/engagement';
 
 const DEFAULT_SETTINGS: FrogodoroSettings = {
   focusDuration: 25,
@@ -156,7 +159,7 @@ async function processDuePass(
     'activeFrogodoroTimer.status': 'running',
     'activeFrogodoroTimer.endsAt': { $lte: now.toISOString() },
   })
-    .select('_id activeFrogodoroTimer notificationPrefs liveActivity')
+    .select('_id activeFrogodoroTimer notificationPrefs liveActivity focusProfile')
     .limit(100)
     .lean()
     .exec();
@@ -222,6 +225,21 @@ async function processOneDueTimer(
     seconds: next.completedDuration,
     timezone,
   });
+  if (next.completedPhase === 'focus') {
+    const task = await TaskModel.findOne({ userId, id: timer.taskId }).lean();
+    await recordAnalyticsEvent({
+      userId,
+      name: 'timer_completed',
+      properties: taskAnalyticsProperties(task ?? {}, (user as any).focusProfile, {
+        phase: next.completedPhase,
+        duration_minutes: Math.round(next.completedDuration / 60),
+        focus_duration_minutes: timer.settings.focusDuration,
+        break_duration_minutes: timer.settings.breakDuration,
+        auto_start_breaks: timer.settings.autoStartBreaks,
+        completed_seconds: next.completedDuration,
+      }),
+    });
+  }
 
   const live = (user as any).liveActivity as LiveActivityRef | null | undefined;
   if (live?.id && live.pushToken) {
@@ -309,7 +327,7 @@ export async function advanceUserTimer(
 ): Promise<ActiveFrogodoroTimer | null> {
   const now = new Date();
   const user = await UserModel.findById(userId)
-    .select('_id activeFrogodoroTimer notificationPrefs liveActivity')
+    .select('_id activeFrogodoroTimer notificationPrefs liveActivity focusProfile')
     .lean()
     .exec();
 

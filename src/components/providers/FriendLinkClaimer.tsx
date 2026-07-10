@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { useAuth } from '@/components/auth/AuthContext';
 import { mutate as swrMutate } from 'swr';
+import { trackAnalyticsEvent } from '@/lib/analytics/client';
 
 const STORAGE_KEY = 'frogress_friend_code';
 
@@ -22,6 +23,7 @@ export function FriendLinkClaimer() {
       const code = params.get('friend')?.trim();
       if (code) {
         localStorage.setItem(STORAGE_KEY, code);
+        trackAnalyticsEvent('friend_link_opened', { method: 'link', share_surface: 'friend_link' });
       }
     } catch {
       /* ignore */

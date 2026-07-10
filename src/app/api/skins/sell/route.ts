@@ -4,6 +4,7 @@ import connectMongo from '@/lib/mongoose';
 import UserModel, { type UserDoc } from '@/lib/models/User';
 import { getFullCatalog, buildById } from '@/lib/skins/getCatalog';
 import { bumpQuestMetric } from '@/lib/quests/metrics';
+import { recordAnalyticsEvent } from '@/lib/analytics/server';
 
 const json = (body: unknown, init = 200) =>
   NextResponse.json(body, { status: init });
@@ -66,6 +67,26 @@ export async function POST(req: NextRequest) {
     }
 
     await bumpQuestMetric({ userId, metric: 'skin_sold', amount });
+
+    const isPremium = !!user.premiumUntil && new Date(user.premiumUntil) > new Date();
+    await recordAnalyticsEvent({
+      userId,
+      name: 'skin_sold',
+      properties: {
+        rarity: byId[itemId].rarity,
+        slot: byId[itemId].slot,
+        item_count: amount,
+        flies_received: totalRefund,
+        is_premium: isPremium,
+      },
+    });
+    if (totalRefund > 0) {
+      await recordAnalyticsEvent({
+        userId,
+        name: 'fly_earned',
+        properties: { source: 'skin_sale', fly_amount: totalRefund, is_premium: isPremium },
+      });
+    }
 
     return json({ ok: true, refund: totalRefund, soldAmount: amount });
   } catch {

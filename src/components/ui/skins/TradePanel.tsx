@@ -398,7 +398,7 @@ export function TradePanel({
     setRerollError(null);
     try {
       if (!isPremium) {
-        const adResult = await showRewardedAd();
+        const adResult = await showRewardedAd('trade_reroll');
         if (adResult !== 'rewarded') {
           if (adResult === 'failed') {
             setRerollError('Ad not available right now — try again in a moment.');
@@ -738,6 +738,7 @@ export function TradePanel({
                 watchAvailable={isPremium || rewardedAdsAvailable()}
                 closeOnWatch={false}
                 heroIcon={<Dices className="h-8 w-8" strokeWidth={3} />}
+                plusPlacement="trade_reroll"
               />
             )}
           </div>,

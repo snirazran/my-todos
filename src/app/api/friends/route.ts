@@ -20,6 +20,7 @@ import { getZonedToday } from '@/lib/utils';
 import { previousDayKey } from '@/lib/quests/streak';
 import { computeGap, readLoginStreakState } from '@/lib/streak/loginStreak';
 import type { DailyFlyProgress, FriendFlyDaily } from '@/lib/types/UserDoc';
+import { recordAnalyticsEvent } from '@/lib/analytics/server';
 
 function fliesEarnedOn(
   flyDaily: DailyFlyProgress | undefined,
@@ -197,6 +198,8 @@ export async function DELETE(req: NextRequest) {
     ]);
 
     void notifyFriendUpdate(friendId);
+
+    await recordAnalyticsEvent({ userId, name: 'friend_removed' });
 
     return NextResponse.json({ ok: true });
   } catch (err) {

@@ -11,6 +11,7 @@ import { BadgePercent, Check, Heart, Sparkle, Unlock, X } from 'lucide-react';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import Frog from '@/components/ui/frog';
 import { purchasePlus, restorePlusPurchases } from '@/lib/purchases';
+import { trackAnalyticsEvent } from '@/lib/analytics/client';
 
 type Step = 0 | 1 | 2 | 3;
 
@@ -37,10 +38,12 @@ export function PlusUpgradeModal({
   open,
   onClose,
   onStartTrial,
+  placement = 'unknown',
 }: {
   open: boolean;
   onClose: () => void;
   onStartTrial?: (plan: PlanId) => void | Promise<void>;
+  placement?: string;
 }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -56,8 +59,10 @@ export function PlusUpgradeModal({
       setPlan('yearly');
       setPurchasing(false);
       setPurchaseError(null);
+      trackAnalyticsEvent('paywall_viewed', { placement });
+      trackAnalyticsEvent('paywall_step_viewed', { placement, step: 1 });
     }
-  }, [open]);
+  }, [open, placement]);
 
   const refreshPremiumState = () =>
     mutate((key) => typeof key === 'string' && key.startsWith('/api/quests'));
@@ -67,7 +72,7 @@ export function PlusUpgradeModal({
     setPurchaseError(null);
     setPurchasing(true);
     try {
-      const outcome = await purchasePlus(plan);
+      const outcome = await purchasePlus(plan, placement);
       if (outcome === 'purchased') {
         await refreshPremiumState();
         await onStartTrial?.(plan);
@@ -112,7 +117,13 @@ export function PlusUpgradeModal({
 
   if (!mounted) return null;
 
-  const next = () => setStep((s) => (Math.min(3, s + 1) as Step));
+  const next = () => setStep((current) => {
+    const nextStep = Math.min(3, current + 1) as Step;
+    if (nextStep !== current) {
+      trackAnalyticsEvent('paywall_step_viewed', { placement, step: nextStep + 1 });
+    }
+    return nextStep;
+  });
 
   const trialReminderDate = (() => {
     const d = new Date();

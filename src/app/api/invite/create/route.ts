@@ -5,6 +5,7 @@ import ReferralModel from '@/lib/models/Referral';
 import InviteConfigModel from '@/lib/models/InviteConfig';
 import { ensureInviteConfig } from '@/lib/inviteConfig/defaults';
 import type { BuddyCreateParams } from '@/lib/models/TaskBond';
+import { recordAnalyticsEvent } from '@/lib/analytics/server';
 
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
@@ -84,6 +85,15 @@ export async function POST(req: NextRequest) {
       giftItemId: option.itemId,
       giftOptionId: option.id,
       buddyTask,
+    });
+    await recordAnalyticsEvent({
+      userId,
+      name: 'referral_invite_created',
+      properties: {
+        gift_option: option.id,
+        has_buddy_task: !!buddyTask,
+        share_surface: buddyTask ? 'buddy_invite' : 'invite_rewards',
+      },
     });
 
     return NextResponse.json({ ok: true, code, referral });

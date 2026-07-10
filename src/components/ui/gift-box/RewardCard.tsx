@@ -442,6 +442,7 @@ export function DoubleRewardUpsell({
   closeOnWatch = true,
   watchAvailable,
   heroIcon,
+  plusPlacement = 'double_reward',
 }: {
   onClose: () => void;
   onWatchAd?: () => void | Promise<void>;
@@ -458,6 +459,7 @@ export function DoubleRewardUpsell({
   closeOnWatch?: boolean;
   watchAvailable?: boolean;
   heroIcon?: React.ReactNode;
+  plusPlacement?: string;
 }) {
   const [showPlus, setShowPlus] = useState(false);
   const [watching, setWatching] = useState(false);
@@ -628,7 +630,7 @@ export function DoubleRewardUpsell({
           </motion.div>
         </div>
       )}
-      <PlusUpgradeModal open={showPlus} onClose={() => setShowPlus(false)} />
+      <PlusUpgradeModal open={showPlus} placement={plusPlacement} onClose={() => setShowPlus(false)} />
     </>,
     document.body,
   );

@@ -910,7 +910,7 @@ function MobileSheet({
             )}
           </AnimatePresence>
           <InviteFriendsModal open={inviteOpen} onClose={() => setInviteOpen(false)} />
-          <PlusUpgradeModal open={plusOpen} onClose={() => setPlusOpen(false)} />
+          <PlusUpgradeModal open={plusOpen} placement="settings_menu" onClose={() => setPlusOpen(false)} />
         </motion.div>
       )}
     </AnimatePresence>,

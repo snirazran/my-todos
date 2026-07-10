@@ -193,6 +193,7 @@ export default function TagsPopup({
 
       <PlusUpgradeModal
         open={showPremiumLimit}
+        placement="focus_tag_limit"
         onClose={() => setShowPremiumLimit(false)}
       />
       <FocusTagLimitDialog

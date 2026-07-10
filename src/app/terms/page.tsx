@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { LegalPage, type LegalSection } from '@/components/legal/LegalPage';
 
-const lastUpdated = 'July 5, 2026';
+const lastUpdated = 'July 10, 2026';
 
 const sections: LegalSection[] = [
   {
@@ -51,6 +51,7 @@ const sections: LegalSection[] = [
     title: '7. Paid features and subscriptions',
     body: [
       'Frogress offers an optional paid subscription called Frogress Plus. Current plans, prices, and included features are listed on our pricing page at frogress.com/pricing and at the point of purchase. Plans may include a free trial; if you do not cancel before the trial ends, the subscription begins and you will be charged.',
+      'Frogress may also offer one-time consumable fly packs. The amount and price shown at checkout apply to that purchase. A completed pack purchase adds the stated virtual currency to your Frogress account; it does not create a subscription or recurring charge.',
       'Subscriptions renew automatically at the end of each billing period until cancelled. You can cancel at any time, and cancellation takes effect at the end of the current billing period, so you keep Plus access until then. Deleting the app or your account does not by itself cancel a subscription.',
       'Purchases made on our website are processed by Paddle.com, acting as our merchant of record and reseller; Paddle\'s checkout terms apply to those purchases. Purchases made inside the mobile apps are processed by the Apple App Store or Google Play under their terms, and those subscriptions are managed and cancelled through your store account.',
       'We may change subscription prices or features. If a price change affects an active subscription, we will give notice as required by the applicable store or payment provider, and you can cancel before the change takes effect. Refunds are handled as described in our Refund Policy at frogress.com/refund-policy.',

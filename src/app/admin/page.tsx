@@ -25,6 +25,7 @@ import {
   Bug,
   RefreshCcw,
   UserPlus,
+  BarChart3,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -270,6 +271,13 @@ function AdminPageContent() {
           subtitle="Manage shop catalogs, gifts, quests, and game assets."
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <ManagerLinkCard
+              href="/admin/statistics"
+              icon={<BarChart3 className="w-5 h-5" />}
+              accent="bg-cyan-500/10 text-cyan-600 dark:text-cyan-400"
+              title="Statistics"
+              description="Product health, retention, revenue, and ad performance."
+            />
             <ManagerLinkCard
               href="/admin/backgrounds"
               icon={<ImageIcon className="w-5 h-5" />}

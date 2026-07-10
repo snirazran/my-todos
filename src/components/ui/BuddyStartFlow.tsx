@@ -16,6 +16,7 @@ import { useRegisterOpenSheet } from '@/lib/sheetStore';
 import type { QuickAddSubmit } from '@/components/ui/quick-add/types';
 import type { BuddyCreateParams } from '@/lib/models/TaskBond';
 import type { FriendSummary } from '@/lib/friends/indices';
+import { trackAnalyticsEvent } from '@/lib/analytics/client';
 
 const BUDDY = '#4f9149';
 
@@ -55,6 +56,7 @@ async function shareInviteUrl(url: string) {
         text: 'I set up a shared goal for us — tap to join me and grab a gift.',
         url,
       });
+      trackAnalyticsEvent('referral_invite_shared', { method: 'native_share', share_surface: 'buddy_invite' });
       return;
     }
   } catch {
@@ -62,6 +64,7 @@ async function shareInviteUrl(url: string) {
   }
   try {
     await navigator.clipboard.writeText(url);
+    trackAnalyticsEvent('referral_invite_shared', { method: 'copy_link', share_surface: 'buddy_invite' });
   } catch {
     /* ignore */
   }

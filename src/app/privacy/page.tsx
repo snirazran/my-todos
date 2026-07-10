@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { LegalPage, type LegalSection } from '@/components/legal/LegalPage';
 
-const lastUpdated = 'July 9, 2026';
+const lastUpdated = 'July 10, 2026';
 
 const sections: LegalSection[] = [
   {
@@ -23,6 +23,7 @@ const sections: LegalSection[] = [
     title: '3. Information collected automatically',
     body: [
       'We may collect technical information such as device type, operating system, browser or app version, timezone, notification token, crash or error logs, IP address, usage events, and basic diagnostics needed to operate and protect Frogress.',
+      'Product analytics events may include app opens, pages viewed, account and onboarding milestones, task creation and completion counts, focus timer starts and completions, reward claims, optional ad outcomes, paywall and purchase steps, and subscription lifecycle events. These events may include random session and anonymous browser identifiers, coarse platform, campaign tags you arrived with, and limited event details such as plan, ad placement, or reward type. The anonymous identifier lets us measure the /try advertising funnel before sign-in and does not contain your email or device advertising identifier. Analytics events do not include task titles, notes, checklist text, email addresses, phone numbers, full birth dates, or calendar content.',
       'We use cookies, local storage, and similar technologies for authentication, session management, theme or app preferences, sign-in flows, and app functionality.',
     ],
   },
@@ -45,8 +46,8 @@ const sections: LegalSection[] = [
   {
     title: '6. Payments and subscriptions',
     body: [
-      'If you subscribe to Frogress Plus, your payment is processed by a payment provider, not by us: Paddle.com for purchases made on our website (acting as merchant of record), Apple for purchases in the iOS app, and Google Play for purchases in the Android app. We never receive or store your full card details.',
-      'These providers share limited information with us and our subscription platform, RevenueCat, such as a purchase identifier, product, price, currency, country, subscription status, and renewal or expiration dates. We use this to activate and manage your Plus access, prevent fraud and abuse, provide support, and understand aggregate revenue.',
+      'If you subscribe to Frogress Plus or buy a consumable fly pack, your payment is processed by a payment provider, not by us: Paddle.com for purchases made on our website (acting as merchant of record), Apple for purchases in the iOS app, and Google Play for purchases in the Android app. We never receive or store your full card details.',
+      'These providers share limited information with us and our purchase platform, RevenueCat, such as a purchase identifier, product, price, currency, country, subscription status, and renewal or expiration dates. We use this to activate and manage Plus access, grant purchased fly packs, prevent duplicate grants, prevent fraud and abuse, provide support, and understand aggregate revenue.',
       'Paddle, Apple, Google, and RevenueCat process your information under their own privacy policies.',
     ],
   },
@@ -77,6 +78,7 @@ const sections: LegalSection[] = [
     title: '10. Retention',
     body: [
       'We keep information for as long as needed to provide Frogress, maintain your account, resolve disputes, enforce our terms, comply with legal obligations, and maintain security.',
+      'First-party product analytics events are automatically deleted after approximately 400 days. The admin statistics dashboard presents aggregate metrics rather than individual user activity. Analytics events linked to your account are deleted when your Frogress account is deleted, subject to limited backup, fraud-prevention, financial, or legal records we may need to retain.',
       'Some information may remain in backups, logs, or records for a limited period after deletion before it is removed or anonymized according to our normal retention practices.',
     ],
   },

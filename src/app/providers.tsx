@@ -18,6 +18,7 @@ import { StreakCheckInProvider } from '@/components/providers/StreakCheckInProvi
 import { CrossGiftProvider } from '@/components/providers/CrossGiftProvider';
 import { CrossPlatformGiftBanner } from '@/components/ui/CrossPlatformGiftBanner';
 import { OnboardingGate } from '@/components/providers/OnboardingGate';
+import { AnalyticsProvider } from '@/components/providers/AnalyticsProvider';
 
 export default function Providers({ children }: { children: ReactNode }) {
   return (
@@ -30,6 +31,7 @@ export default function Providers({ children }: { children: ReactNode }) {
       >
         <TaskSyncProvider>
           <NotificationProvider>
+            <AnalyticsProvider />
             <GlobalTimer />
             <GlobalFrogodoroMini />
             <LiveTimerController />

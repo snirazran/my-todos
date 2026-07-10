@@ -6,6 +6,7 @@ import connectMongo from '@/lib/mongoose';
 import TaskBondModel from '@/lib/models/TaskBond';
 import TaskModel from '@/lib/models/Task';
 import { notifyFriendUpdate } from '@/lib/taskSync';
+import { recordAnalyticsEvent } from '@/lib/analytics/server';
 
 export async function POST(
   _req: Request,
@@ -39,6 +40,15 @@ export async function POST(
     );
 
     void notifyFriendUpdate(bond.fromUserId);
+    await recordAnalyticsEvent({
+      userId,
+      name: 'buddy_invite_declined',
+      properties: {
+        source: 'existing_friend',
+        repeat_mode: bond.repeatLabel ?? 'unknown',
+        response_hours: Math.max(0, (Date.now() - new Date(bond.createdAt).getTime()) / 3_600_000),
+      },
+    });
 
     return NextResponse.json({ ok: true });
   } catch (err) {
