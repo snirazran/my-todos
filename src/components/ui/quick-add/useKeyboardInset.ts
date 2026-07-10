@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 export function useKeyboardInset(active: boolean) {
   const [inset, setInset] = useState(0);
   const [height, setHeight] = useState<number | null>(null);
+  const layoutHeightRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!active) {
+      layoutHeightRef.current = null;
       setInset(0);
       setHeight(null);
       return;
@@ -14,9 +16,18 @@ export function useKeyboardInset(active: boolean) {
 
     const vv = window.visualViewport;
     const update = () => {
+      const viewportBottom = vv.height + vv.offsetTop;
+      // Some mobile WebViews resize window.innerHeight after the first keyboard
+      // cycle. Preserve the full, pre-keyboard layout height so subsequent
+      // openings cannot report a smaller inset and push the sheet downward.
+      layoutHeightRef.current = Math.max(
+        layoutHeightRef.current ?? 0,
+        window.innerHeight,
+        viewportBottom,
+      );
       const nextInset = Math.max(
         0,
-        window.innerHeight - vv.height - vv.offsetTop,
+        layoutHeightRef.current - viewportBottom,
       );
       setInset(nextInset);
       setHeight(vv.height);

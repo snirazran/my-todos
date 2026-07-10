@@ -1451,13 +1451,14 @@ function SeasonRewardPreview({
       </div>
       <div
         className="relative z-10 flex items-center justify-center"
-        style={{ transform: 'scale(1.6)' }}
+        style={{ transform: reward.type === 'FLIES' ? undefined : 'scale(1.6)' }}
       >
         <RewardTile
           reward={reward}
           rewardCatalog={rewardCatalog}
           isPremium={isPremium}
           compact
+          flySize={48}
           paused={paused}
           hideBadge
           className="rounded-2xl border-0 bg-transparent shadow-none"

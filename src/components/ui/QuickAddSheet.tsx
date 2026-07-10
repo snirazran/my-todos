@@ -95,6 +95,127 @@ function useDragScroll() {
   };
 }
 
+function TagScrollRail({
+  scrollerRef,
+  contentVersion,
+  onVisibilityChange,
+}: {
+  scrollerRef: React.RefObject<HTMLDivElement | null>;
+  contentVersion: unknown;
+  onVisibilityChange: (visible: boolean) => void;
+}) {
+  const [metrics, setMetrics] = useState({
+    canScroll: false,
+    thumbPercent: 100,
+    leftPercent: 0,
+  });
+
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    let frame = 0;
+    const update = () => {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => {
+        const maxScroll = scroller.scrollWidth - scroller.clientWidth;
+        const canScroll = maxScroll > 4;
+        const thumbPercent = canScroll
+          ? Math.max(18, (scroller.clientWidth / scroller.scrollWidth) * 100)
+          : 100;
+        const leftPercent = canScroll
+          ? (scroller.scrollLeft / maxScroll) * (100 - thumbPercent)
+          : 0;
+        setMetrics({ canScroll, thumbPercent, leftPercent });
+        onVisibilityChange(canScroll);
+      });
+    };
+
+    update();
+    scroller.addEventListener('scroll', update, { passive: true });
+    const observer = new ResizeObserver(update);
+    observer.observe(scroller);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      observer.disconnect();
+      scroller.removeEventListener('scroll', update);
+    };
+  }, [contentVersion, onVisibilityChange, scrollerRef]);
+
+  if (!metrics.canScroll) return null;
+
+  const scrollFromPointer = (
+    track: HTMLDivElement,
+    clientX: number,
+  ) => {
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    const bounds = track.getBoundingClientRect();
+    const thumbWidth = bounds.width * (metrics.thumbPercent / 100);
+    const travel = bounds.width - thumbWidth;
+    const thumbLeft = Math.min(
+      travel,
+      Math.max(0, clientX - bounds.left - thumbWidth / 2),
+    );
+    const maxScroll = scroller.scrollWidth - scroller.clientWidth;
+    scroller.scrollLeft = travel > 0 ? (thumbLeft / travel) * maxScroll : 0;
+  };
+
+  return (
+    <div
+      role="scrollbar"
+      aria-label="Scroll tags"
+      aria-orientation="horizontal"
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={Math.round(
+        (metrics.leftPercent / Math.max(1, 100 - metrics.thumbPercent)) * 100,
+      )}
+      tabIndex={0}
+      onPointerDown={(event) => {
+        event.preventDefault();
+        event.currentTarget.setPointerCapture(event.pointerId);
+        scrollFromPointer(event.currentTarget, event.clientX);
+      }}
+      onPointerMove={(event) => {
+        if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
+        scrollFromPointer(event.currentTarget, event.clientX);
+      }}
+      onKeyDown={(event) => {
+        const scroller = scrollerRef.current;
+        if (!scroller) return;
+        if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+          event.preventDefault();
+          scroller.scrollBy({
+            left: event.key === 'ArrowLeft' ? -80 : 80,
+            behavior: 'smooth',
+          });
+        } else if (event.key === 'Home' || event.key === 'End') {
+          event.preventDefault();
+          scroller.scrollTo({
+            left: event.key === 'Home' ? 0 : scroller.scrollWidth,
+            behavior: 'smooth',
+          });
+        }
+      }}
+      className="group absolute inset-x-4 -bottom-2 h-2 touch-none cursor-pointer rounded-full bg-slate-200/60 p-px outline-none transition-colors hover:bg-slate-200/90 focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-popover dark:bg-white/[0.07] dark:ring-1 dark:ring-inset dark:ring-white/10 dark:hover:bg-white/[0.1] dark:focus-visible:ring-2 dark:focus-visible:ring-primary/40"
+    >
+      <div
+        className="absolute bottom-px top-px flex items-center justify-center rounded-full bg-slate-300/70 transition-[width,background-color] duration-150 group-hover:bg-slate-300 dark:bg-white/20 dark:ring-1 dark:ring-inset dark:ring-white/10 dark:group-hover:bg-white/30"
+        style={{
+          width: `${metrics.thumbPercent}%`,
+          left: `${metrics.leftPercent}%`,
+        }}
+      >
+        <span className="pointer-events-none flex items-center gap-0.5" aria-hidden="true">
+          <span className="h-0.5 w-0.5 rounded-full bg-white/90 dark:bg-white/60" />
+          <span className="h-0.5 w-0.5 rounded-full bg-white/90 dark:bg-white/60" />
+          <span className="h-0.5 w-0.5 rounded-full bg-white/90 dark:bg-white/60" />
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function ToolbarPill({
   icon,
   label,
@@ -198,6 +319,7 @@ export default function QuickAddSheet({
   const tagInputRef = useRef<HTMLInputElement>(null);
   const tagScroll = useDragScroll();
   const [tagFadeRight, setTagFadeRight] = useState(false);
+  const [tagScrollerVisible, setTagScrollerVisible] = useState(false);
   const updateTagFade = useCallback(() => {
     const el = tagScroll.ref.current;
     if (!el) return;
@@ -840,18 +962,27 @@ export default function QuickAddSheet({
                       <div className="mt-1.5 mb-2.5 h-px bg-border/60" />
 
                       <div
-                        ref={tagScroll.ref}
-                        onScroll={updateTagFade}
-                        onMouseDown={tagScroll.handlers.onMouseDown}
-                        onMouseLeave={tagScroll.handlers.onMouseLeave}
-                        onMouseUp={tagScroll.handlers.onMouseUp}
-                        onMouseMove={tagScroll.handlers.onMouseMove}
-                        className={`-mx-2 mb-1.5 grid auto-cols-max grid-flow-col ${
-                          stripTags.length > 5 ? 'grid-rows-2' : 'grid-rows-1'
-                        } cursor-grab select-none items-center gap-x-2 gap-y-4 overflow-x-auto no-scrollbar px-2 pt-2 pb-2 touch-pan-x active:cursor-grabbing ${
-                          tagFadeRight ? 'mask-fade-right' : ''
+                        className={`relative -mx-2 ${
+                          tagScrollerVisible
+                            ? keyboardActive
+                              ? 'mb-3'
+                              : 'mb-4'
+                            : 'mb-1.5'
                         }`}
                       >
+                        <div
+                          ref={tagScroll.ref}
+                          onScroll={updateTagFade}
+                          onMouseDown={tagScroll.handlers.onMouseDown}
+                          onMouseLeave={tagScroll.handlers.onMouseLeave}
+                          onMouseUp={tagScroll.handlers.onMouseUp}
+                          onMouseMove={tagScroll.handlers.onMouseMove}
+                          className={`grid auto-cols-max grid-flow-col ${
+                            stripTags.length > 5 ? 'grid-rows-2' : 'grid-rows-1'
+                          } cursor-grab select-none items-center gap-x-2 gap-y-4 overflow-x-auto no-scrollbar px-2 pt-2 pb-2 touch-pan-x active:cursor-grabbing ${
+                            tagFadeRight ? 'mask-fade-right' : ''
+                          }`}
+                        >
                         {stripTags.map((tag) => {
                           const selected = tags.includes(tag.id);
                           const isQuestTag =
@@ -925,6 +1056,12 @@ export default function QuickAddSheet({
                             <span className="whitespace-nowrap">Create tag</span>
                           )}
                         </button>
+                        </div>
+                        <TagScrollRail
+                          scrollerRef={tagScroll.ref}
+                          contentVersion={stripTags}
+                          onVisibilityChange={setTagScrollerVisible}
+                        />
                       </div>
 
                       <div className="-mx-1 flex items-center gap-1.5 overflow-x-auto no-scrollbar px-1 pb-0.5">
