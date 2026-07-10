@@ -13,13 +13,14 @@ import type { WardrobeSlot } from '@/lib/skins/catalog';
 
 const STORAGE_KEY = 'skinRotationInterval';
 
-export type RotationInterval = 'disabled' | '5m' | '10m' | '1h' | '1d';
+export type RotationInterval = 'disabled' | '1m' | '5m' | '10m' | '1h' | '1d';
 
 const OPTIONS: {
   value: RotationInterval;
   label: string;
   hint: string;
 }[] = [
+  { value: '1m', label: 'Every minute', hint: 'Blink and it changes' },
   { value: '5m', label: 'Every 5 minutes', hint: 'Party mode' },
   { value: '10m', label: 'Every 10 minutes', hint: 'Keep it lively' },
   { value: '1h', label: 'Every hour', hint: 'A surprise each session' },
@@ -29,6 +30,7 @@ const OPTIONS: {
 
 const INTERVAL_MS: Record<RotationInterval, number> = {
   disabled: 0,
+  '1m': 60 * 1000,
   '5m': 5 * 60 * 1000,
   '10m': 10 * 60 * 1000,
   '1h': 60 * 60 * 1000,
@@ -38,7 +40,8 @@ const INTERVAL_MS: Record<RotationInterval, number> = {
 export function getRotationInterval(): RotationInterval {
   if (typeof window === 'undefined') return 'disabled';
   const v = window.localStorage.getItem(STORAGE_KEY);
-  if (v === '5m' || v === '10m' || v === '1h' || v === '1d') return v;
+  if (v === '1m' || v === '5m' || v === '10m' || v === '1h' || v === '1d')
+    return v;
   return 'disabled';
 }
 
@@ -137,7 +140,7 @@ export function SkinRotationDialog({
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: 10 }}
               transition={{ type: 'spring', damping: 26, stiffness: 320 }}
-              className="pointer-events-auto relative w-full max-w-md rounded-3xl border border-border/50 bg-card p-5 shadow-2xl"
+              className="pointer-events-auto relative w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain rounded-3xl border border-border/50 bg-card p-5 shadow-2xl"
             >
               <button
                 type="button"
@@ -230,6 +233,7 @@ type SkinsResponse = {
 type BackgroundsResponse = BackgroundsApiData;
 
 async function rotateOnce() {
+  window.dispatchEvent(new Event('style-shuffle-start'));
   try {
     const [skinsRes, bgRes] = await Promise.all([
       fetch('/api/skins/inventory'),
@@ -297,46 +301,101 @@ async function rotateOnce() {
     window.dispatchEvent(new Event('style-shuffle-swap'));
   } catch {
     // silent
+  } finally {
+    window.dispatchEvent(new Event('style-shuffle-end'));
   }
 }
 
-export function StyleShuffleBadge({ className }: { className?: string }) {
-  const [visible, setVisible] = useState(false);
-  const timerRef = useRef<number | null>(null);
+export function StyleShuffleHeaderButton({ className }: { className?: string }) {
+  const [open, setOpen] = useState(false);
+  const [value, setValue] = useState<RotationInterval>('disabled');
+  const [spinning, setSpinning] = useState(false);
+  const [ring, setRing] = useState(false);
+  const [ringKey, setRingKey] = useState(0);
+  const stopRequested = useRef(false);
+  const failsafeRef = useRef<number | null>(null);
 
   useEffect(() => {
-    const handler = () => {
-      setVisible(true);
-      if (timerRef.current) window.clearTimeout(timerRef.current);
-      timerRef.current = window.setTimeout(() => setVisible(false), 2600);
+    setValue(getRotationInterval());
+    const handler = () => setValue(getRotationInterval());
+    window.addEventListener('skin-rotation-change', handler);
+    return () => window.removeEventListener('skin-rotation-change', handler);
+  }, []);
+
+  useEffect(() => {
+    const onStart = () => {
+      stopRequested.current = false;
+      if (failsafeRef.current) window.clearTimeout(failsafeRef.current);
+      setSpinning(true);
     };
-    window.addEventListener('style-shuffle-swap', handler);
+    const onEnd = () => {
+      stopRequested.current = true;
+      if (failsafeRef.current) window.clearTimeout(failsafeRef.current);
+      failsafeRef.current = window.setTimeout(() => setSpinning(false), 1600);
+    };
+    const onSwap = () => {
+      setRing(true);
+      setRingKey((k) => k + 1);
+    };
+    window.addEventListener('style-shuffle-start', onStart);
+    window.addEventListener('style-shuffle-end', onEnd);
+    window.addEventListener('style-shuffle-swap', onSwap);
     return () => {
-      window.removeEventListener('style-shuffle-swap', handler);
-      if (timerRef.current) window.clearTimeout(timerRef.current);
+      window.removeEventListener('style-shuffle-start', onStart);
+      window.removeEventListener('style-shuffle-end', onEnd);
+      window.removeEventListener('style-shuffle-swap', onSwap);
+      if (failsafeRef.current) window.clearTimeout(failsafeRef.current);
     };
   }, []);
 
   return (
-    <AnimatePresence>
-      {visible && (
-        <motion.div
-          initial={{ opacity: 0, y: 10, scale: 0.9 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: -8, scale: 0.94 }}
-          transition={{ type: 'spring', stiffness: 420, damping: 26 }}
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-label="Style Shuffle"
+        className={cn(
+          'relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border/50 bg-card/80 shadow-sm backdrop-blur-xl transition-colors active:scale-95 max-[379px]:h-9 max-[379px]:w-9 max-[359px]:h-8 max-[359px]:w-8',
+          className,
+        )}
+      >
+        {ring && (
+          <span
+            key={ringKey}
+            onAnimationEnd={() => setRing(false)}
+            className="pointer-events-none absolute inset-0 rounded-full border-2 border-fuchsia-400 [animation:shuffle-ping_0.9s_cubic-bezier(0,0,0.2,1)_both]"
+          />
+        )}
+        <span
           className={cn(
-            'pointer-events-none flex items-center gap-1.5 rounded-full border border-border/50 bg-card/90 px-3 py-1.5 shadow-md backdrop-blur-sm',
-            className,
+            'flex items-center justify-center will-change-transform',
+            spinning && '[animation:spin_0.7s_linear_infinite]',
           )}
+          onAnimationIteration={() => {
+            if (stopRequested.current) {
+              if (failsafeRef.current) window.clearTimeout(failsafeRef.current);
+              setSpinning(false);
+            }
+          }}
         >
-          <Shuffle className="h-3.5 w-3.5 text-fuchsia-500" />
-          <span className="whitespace-nowrap text-[11px] font-black uppercase tracking-wide text-foreground">
-            New look!
-          </span>
-        </motion.div>
-      )}
-    </AnimatePresence>
+          <Icon
+            name="shuffle"
+            label="Style Shuffle"
+            className="h-7 w-7 max-[379px]:h-6 max-[379px]:w-6 max-[359px]:h-5 max-[359px]:w-5"
+          />
+        </span>
+      </button>
+      <SkinRotationDialog
+        open={open}
+        currentValue={value}
+        onClose={() => setOpen(false)}
+        onSelect={(v) => {
+          setRotationInterval(v);
+          setValue(v);
+          setOpen(false);
+        }}
+      />
+    </>
   );
 }
 

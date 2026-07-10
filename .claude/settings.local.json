@@ -264,7 +264,8 @@
       "Bash(npx tsc *)",
       "Bash(rm tsc.out)",
       "Bash(echo \"tsc-exit:$?\")",
-      "WebFetch(domain:solve-marketing.agency)"
+      "WebFetch(domain:solve-marketing.agency)",
+      "PowerShell(npx tsx \"C:\\\\Users\\\\snira\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-snira-Desktop-Full-Stack-frog-task\\\\f02dd2cb-406b-4891-90c7-62f05f280853\\\\scratchpad\\\\measure-copy.ts\")"
     ]
   }
 }

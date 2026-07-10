@@ -23,6 +23,7 @@ import IntegrationsPanel, {
 import {
   SkinRotationRow,
   SkinRotationDialog,
+  StyleShuffleHeaderButton,
   getRotationInterval,
   setRotationInterval,
   labelForInterval,
@@ -62,31 +63,6 @@ export default function SiteHeader() {
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const [wardrobeDropdownOpen, setWardrobeDropdownOpen] = useState(false);
   const wardrobeRef = useRef<HTMLDivElement>(null);
-
-  // Style Shuffle popup (opened from the wardrobe page).
-  const [rotationOpen, setRotationOpen] = useState(false);
-  const [rotationValue, setRotationValue] = useState<RotationInterval>('disabled');
-  useEffect(() => {
-    setRotationValue(getRotationInterval());
-    const handler = () => setRotationValue(getRotationInterval());
-    window.addEventListener('skin-rotation-change', handler);
-    return () => window.removeEventListener('skin-rotation-change', handler);
-  }, []);
-
-  const [shuffleSwapAnim, setShuffleSwapAnim] = useState(false);
-  useEffect(() => {
-    let timer: number | null = null;
-    const handler = () => {
-      setShuffleSwapAnim(true);
-      if (timer) window.clearTimeout(timer);
-      timer = window.setTimeout(() => setShuffleSwapAnim(false), 1100);
-    };
-    window.addEventListener('style-shuffle-swap', handler);
-    return () => {
-      window.removeEventListener('style-shuffle-swap', handler);
-      if (timer) window.clearTimeout(timer);
-    };
-  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -199,25 +175,8 @@ export default function SiteHeader() {
             )}
             aria-disabled={isLoadingScreenVisible}
           >
-            {pathname === '/wardrobe' && (
-              <button
-                type="button"
-                onClick={() => setRotationOpen(true)}
-                aria-label="Style Shuffle"
-                className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border/50 bg-card/80 shadow-sm backdrop-blur-xl transition-colors active:scale-95"
-              >
-                {shuffleSwapAnim && (
-                  <span className="pointer-events-none absolute inset-0 animate-ping rounded-full border-2 border-fuchsia-400" />
-                )}
-                <Icon
-                  name="shuffle"
-                  label="Style Shuffle"
-                  className={cn(
-                    'h-7 w-7',
-                    shuffleSwapAnim && '[animation:spin_0.7s_ease-in-out]',
-                  )}
-                />
-              </button>
+            {(pathname === '/' || pathname === '/wardrobe') && (
+              <StyleShuffleHeaderButton />
             )}
             <PremiumBadge />
             <StreakChip variant="mobile" />
@@ -369,26 +328,13 @@ export default function SiteHeader() {
             }}
           />
 
-          {user && flyBalance !== undefined && pathname === '/wardrobe' && (
-            <button
-              type="button"
-              onClick={() => setRotationOpen(true)}
-              aria-label="Style Shuffle"
-              className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border/50 bg-card/80 shadow-sm transition-colors hover:bg-muted active:scale-95"
-            >
-              {shuffleSwapAnim && (
-                <span className="pointer-events-none absolute inset-0 animate-ping rounded-full border-2 border-fuchsia-400" />
-              )}
-              <Icon
-                name="shuffle"
-                label="Style Shuffle"
-                className={cn(
-                  'h-7 w-7',
-                  shuffleSwapAnim && '[animation:spin_0.7s_ease-in-out]',
-                )}
-              />
-            </button>
-          )}
+          {user &&
+            flyBalance !== undefined &&
+            (pathname === '/' ||
+              pathname === '/wardrobe' ||
+              pathname === '/friends') && (
+              <StyleShuffleHeaderButton className="hover:bg-muted" />
+            )}
 
           {user && flyBalance !== undefined && (
             <>
@@ -415,17 +361,6 @@ export default function SiteHeader() {
         `}</style>
       </div>
       </header>
-
-      <SkinRotationDialog
-        open={rotationOpen}
-        currentValue={rotationValue}
-        onClose={() => setRotationOpen(false)}
-        onSelect={(v) => {
-          setRotationInterval(v);
-          setRotationValue(v);
-          setRotationOpen(false);
-        }}
-      />
     </>
   );
 }

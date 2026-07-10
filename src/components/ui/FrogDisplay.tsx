@@ -8,7 +8,6 @@ import Frog, {
 } from '@/components/ui/frog';
 import Fly from '@/components/ui/fly';
 import { FrogSpeechBubble } from './FrogSpeechBubble';
-import { StyleShuffleBadge } from './SkinRotation';
 import { useInventory } from '@/hooks/useInventory';
 import { useLoginStreak } from '@/hooks/useLoginStreak';
 import useSWR from 'swr';
@@ -206,12 +205,6 @@ export function FrogDisplay({
             paused={paused}
           />
         </div>
-
-        {!isGuest && (
-          <div className="pointer-events-none absolute -top-2 left-1/2 z-50 -translate-x-1/2">
-            <StyleShuffleBadge />
-          </div>
-        )}
 
         {/* SPEECH BUBBLE - NOW INSIDE FROG'S CONTAINER */}
 

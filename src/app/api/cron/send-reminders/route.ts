@@ -267,7 +267,12 @@ export async function GET(req: NextRequest) {
     const routineNudge = (slot: 'morning' | 'evening'): PushMessage | null => {
       if (uncompletedCount === 0) return null;
       if (ignoredCount < REMINDER_MUTE_THRESHOLD) {
-        const ctx = { count: uncompletedCount, frog, exampleTask: exampleText };
+        const ctx = {
+          count: uncompletedCount,
+          frog,
+          exampleTask: exampleText,
+          ignoredStreak: ignoredCount,
+        };
         const copy =
           slot === 'morning' ? morningMessage(ctx) : eveningMessage(ctx);
         return {

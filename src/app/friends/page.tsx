@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { Icon } from '@/components/ui/Icon';
 import { PremiumBadge } from '@/components/ui/PremiumBadge';
+import { StyleShuffleHeaderButton } from '@/components/ui/SkinRotation';
 import useSWR from 'swr';
 import { useAuth } from '@/components/auth/AuthContext';
 import { mutateFriendsCaches } from '@/hooks/useFriendsSync';
@@ -158,6 +159,7 @@ export default function FriendsPage() {
       <div className="relative z-10 mx-auto flex w-full flex-col items-center px-4 pt-[calc(env(safe-area-inset-top)+0.5rem)] md:max-w-2xl md:pt-11">
         {/* Friend invites — persistent, over the winter scene */}
         <div className="absolute right-4 top-[calc(env(safe-area-inset-top)+0.75rem)] z-30 flex items-center gap-2">
+          <StyleShuffleHeaderButton className="border-0 bg-white/90 shadow-md ring-1 ring-black/5 md:hidden" />
           <PremiumBadge className="border-0 bg-white/90 shadow-md ring-1 ring-black/5 backdrop-blur-sm md:hidden" />
           <button
             type="button"

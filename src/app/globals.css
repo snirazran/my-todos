@@ -194,6 +194,17 @@
   animation: quest-anchor-glow 1.9s ease-out;
 }
 
+@keyframes shuffle-ping {
+  0% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+}
+
 @keyframes ping-ring {
   0% {
     transform: translate(-50%, -50%) scale(0.8);
