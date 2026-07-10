@@ -97,6 +97,11 @@ const config: CapacitorConfig = {
     cleartext: serverUrl.startsWith('http://'),
   },
   plugins: {
+    // No banner/sound/badge for pushes that arrive while the app is open —
+    // the in-app UI already reflects those events.
+    FirebaseMessaging: {
+      presentationOptions: [],
+    },
     SocialLogin: {
       providers: {
         google: true,

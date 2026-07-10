@@ -22,6 +22,9 @@ importers:
       '@capacitor-community/admob':
         specifier: ^8.0.0
         version: 8.0.0
+      '@capacitor-community/in-app-review':
+        specifier: 8.0.0
+        version: 8.0.0(@capacitor/core@8.0.2)
       '@capacitor-firebase/messaging':
         specifier: ^8.3.0
         version: 8.3.0(@capacitor/core@8.0.2)(firebase@12.9.0)
@@ -819,6 +822,11 @@ packages:
   '@capacitor-community/admob@8.0.0':
     resolution: {integrity: sha512-+ZIq+UtcNvTMFwjvuhOuGvCjwK2Wu36lTIl9o1/CEjfp2Aj3m4b9zQGx0vXrERYqQmJp/Ven7ee3gGuh2Ym8nA==}
     engines: {node: '>=22.0.0'}
+
+  '@capacitor-community/in-app-review@8.0.0':
+    resolution: {integrity: sha512-AYpEkIjdv27WGS3hnlc7xAQ1BhaBvD2svgQBfHF4P2Olw1N6a7MSCOQC6O4SuxmdBdJ2fM6uFeo1jyNjKLtIPw==}
+    peerDependencies:
+      '@capacitor/core': '>=8.0.0'
 
   '@capacitor-firebase/messaging@8.3.0':
     resolution: {integrity: sha512-gjlpPH8nFN2D4PGpg+Bi7Pk1Apy+nRh6DHTI8hr4o3QfCmZPnNCT0mhhT8Rcdpwf2D+E5NxkaVy4/2GYiXoF8Q==}
@@ -5849,6 +5857,10 @@ snapshots:
     dependencies:
       '@capacitor/core': 8.0.2
       '@rdlabo/capacitor-docgen': 0.4.1
+
+  '@capacitor-community/in-app-review@8.0.0(@capacitor/core@8.0.2)':
+    dependencies:
+      '@capacitor/core': 8.0.2
 
   '@capacitor-firebase/messaging@8.3.0(@capacitor/core@8.0.2)(firebase@12.9.0)':
     dependencies:

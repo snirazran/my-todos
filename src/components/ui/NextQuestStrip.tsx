@@ -71,7 +71,7 @@ export function NextQuestStrip({
     >
       {claimable ? (
         <>
-          <div className="animate-quest-pulse">
+          <div className="h-12 w-12 shrink-0 animate-quest-pulse">
             <QuestRewardTileBadge
               reward={claimable.reward}
               catalog={resolvedCatalog}

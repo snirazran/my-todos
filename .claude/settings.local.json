@@ -265,7 +265,12 @@
       "Bash(rm tsc.out)",
       "Bash(echo \"tsc-exit:$?\")",
       "WebFetch(domain:solve-marketing.agency)",
-      "PowerShell(npx tsx \"C:\\\\Users\\\\snira\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-snira-Desktop-Full-Stack-frog-task\\\\f02dd2cb-406b-4891-90c7-62f05f280853\\\\scratchpad\\\\measure-copy.ts\")"
+      "PowerShell(npx tsx \"C:\\\\Users\\\\snira\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-snira-Desktop-Full-Stack-frog-task\\\\f02dd2cb-406b-4891-90c7-62f05f280853\\\\scratchpad\\\\measure-copy.ts\")",
+      "Bash(taskkill //PID 9056 //F)",
+      "Bash(./gradlew compileDebugJavaWithJavac -q --console=plain)",
+      "Bash(echo \"gradle exit: $?\")",
+      "Bash(./gradlew :app:compileDebugJavaWithJavac --console=plain)",
+      "Bash(./gradlew :app:compileDebugJavaWithJavac -q --console=plain)"
     ]
   }
 }

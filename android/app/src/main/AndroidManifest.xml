@@ -58,6 +58,10 @@
             android:name=".FrogTimerActionReceiver"
             android:exported="false" />
 
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="push_default" />
+
         <!-- TODO: replace with your real AdMob Android app ID before release
              (this is Google's public test app ID). -->
         <meta-data

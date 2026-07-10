@@ -43,6 +43,7 @@ import { mutateInventoryCaches, useInventory } from '@/hooks/useInventory';
 import { markFlyEarn } from '@/lib/flyEarn';
 import { showRewardedAd } from '@/lib/ads';
 import { takeQuestScrollTarget } from '@/lib/questClaims';
+import { maybeRequestAppRating } from '@/lib/rateApp';
 import { PlusUpgradeModal } from './PlusUpgradeModal';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import Frog, { type WardrobeSlot } from './frog';
@@ -277,6 +278,13 @@ export function QuestsPanel({
   const [rewardRevealQueue, setRewardRevealQueue] = useState<
     QuestRewardRevealEntry[]
   >([]);
+  const prevRevealCountRef = useRef(0);
+  useEffect(() => {
+    if (prevRevealCountRef.current > 0 && rewardRevealQueue.length === 0) {
+      maybeRequestAppRating();
+    }
+    prevRevealCountRef.current = rewardRevealQueue.length;
+  }, [rewardRevealQueue.length]);
   // When opening a quest gift reward, play the full "tap to unwrap" gift-box
   // flow instead of revealing the prize instantly. `remaining` lets multi-copy
   // rewards be unwrapped one box at a time; `instance` re-mounts GiftBoxOpening

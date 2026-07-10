@@ -17,6 +17,7 @@ import {
 import { StreakSheet } from '@/components/ui/streak/StreakSheet';
 import { StreakRescueSheet } from '@/components/ui/streak/StreakRescueSheet';
 import { rewardedAdsAvailable } from '@/lib/ads';
+import { recordAppUsageDay } from '@/lib/rateApp';
 import type { CheckInResult, LoginStreakRescue } from '@/lib/streak/types';
 
 // Keyed per user so a fresh account created in the same session (after another
@@ -50,6 +51,7 @@ export function StreakCheckInProvider() {
       const result = await checkInStreak();
       if (!result) return;
       lastChecked = { dayKey: today, userId };
+      recordAppUsageDay();
       if (!result.active) return;
       if (result.freezeConsumedDays.length > 0 && result.view) {
         showNotification(

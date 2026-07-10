@@ -110,6 +110,7 @@ function bindForeground() {
         });
         return;
       }
+      if (document.visibilityState === 'visible') return;
       const title = n.title || data.title || 'Frogress';
       void navigator.serviceWorker.ready
         .then((reg) =>

@@ -131,6 +131,7 @@ public final class FrogTimerNotification {
                         "Frogodoro alarm",
                         NotificationManager.IMPORTANCE_HIGH);
                 ch.setDescription("Focus / break finished alarm");
+                ch.setShowBadge(false);
                 ch.enableVibration(true);
                 ch.setVibrationPattern(new long[]{0, 500, 250, 500, 250, 500});
                 AudioAttributes attrs = new AudioAttributes.Builder()
