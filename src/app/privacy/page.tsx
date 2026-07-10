@@ -54,7 +54,7 @@ const sections: LegalSection[] = [
     title: '7. Advertising',
     body: [
       'The Frogress mobile apps show optional rewarded video ads through Google AdMob, for example when you choose to watch an ad to double a reward. Ads are never shown without you choosing to watch one.',
-      'To deliver and measure ads, Google may collect device information such as your device advertising identifier, IP address, general location, and ad interaction data, under Google\'s privacy policy. On iOS, ads use the advertising identifier only if you allow tracking in the App Tracking Transparency prompt; if you decline, ads are still available but are not personalized using that identifier.',
+      "To deliver and measure ads, Google may collect device information such as your device advertising identifier, IP address, general location, and ad interaction data, under Google's privacy policy. On iOS, ads use the advertising identifier only if you allow tracking in the App Tracking Transparency prompt; if you decline, ads are still available but are not personalized using that identifier.",
       'You can limit ad personalization in your device settings (iOS: Settings > Privacy & Security > Tracking; Android: Settings > Google > Ads). Frogress Plus subscribers do not need to watch ads, because Plus doubles rewards automatically.',
     ],
   },

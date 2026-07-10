@@ -547,12 +547,12 @@ export function StarterQuestCard({
           <span className="truncate">{quest.title}</span>
         </span>
         <span className="flex shrink-0 items-center gap-1">
-          {quest.logic.map((block) => (
+          {Array.from({ length: totalSteps }, (_, i) => (
             <span
-              key={block.id}
+              key={i}
               className={cn(
                 'h-1.5 w-3.5 rounded-full',
-                isBlockDone(block) ? 'bg-primary' : 'bg-primary/20',
+                i < doneSteps ? 'bg-primary' : 'bg-primary/20',
               )}
             />
           ))}
@@ -1088,12 +1088,12 @@ export function CategoryQuestPresentationCard({
         )}
         {totalSteps > 1 && (
           <div className="mb-1 flex items-center gap-1 px-1">
-            {quest.logic.map((block) => (
+            {Array.from({ length: totalSteps }, (_, i) => (
               <span
-                key={block.id}
+                key={i}
                 className={cn(
                   'h-1.5 w-4 rounded-full',
-                  isBlockDone(block) ? 'bg-lime-500' : 'bg-muted',
+                  i < doneSteps ? 'bg-lime-500' : 'bg-muted',
                 )}
               />
             ))}

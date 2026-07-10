@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Check, ChevronRight, Shuffle, X } from 'lucide-react';
 import { useAuth } from '@/components/auth/AuthContext';
+import { cn } from '@/lib/utils';
 import { Icon } from '@/components/ui/Icon';
 import { mutateInventoryCaches } from '@/hooks/useInventory';
 import { mutateBackgrounds, type BackgroundsApiData } from '@/hooks/useBackgrounds';
@@ -14,12 +15,16 @@ const STORAGE_KEY = 'skinRotationInterval';
 
 export type RotationInterval = 'disabled' | '5m' | '10m' | '1h' | '1d';
 
-const OPTIONS: { value: RotationInterval; label: string }[] = [
-  { value: 'disabled', label: 'Disabled' },
-  { value: '5m', label: 'Every 5 minutes' },
-  { value: '10m', label: 'Every 10 minutes' },
-  { value: '1h', label: 'Every 1 hour' },
-  { value: '1d', label: 'Every 1 day' },
+const OPTIONS: {
+  value: RotationInterval;
+  label: string;
+  hint: string;
+}[] = [
+  { value: '5m', label: 'Every 5 minutes', hint: 'Party mode' },
+  { value: '10m', label: 'Every 10 minutes', hint: 'Keep it lively' },
+  { value: '1h', label: 'Every hour', hint: 'A surprise each session' },
+  { value: '1d', label: 'Every day', hint: 'Fresh fit every morning' },
+  { value: 'disabled', label: 'Off', hint: 'Keep your current look' },
 ];
 
 const INTERVAL_MS: Record<RotationInterval, number> = {
@@ -66,9 +71,9 @@ export function SkinRotationRow() {
         className="w-full flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-accent/50 text-left"
       >
         <div className="h-9 w-9 flex items-center justify-center shrink-0">
-          <Icon name="shuffle" label="Skin rotation" className="w-10 h-10" />
+          <Icon name="shuffle" label="Style Shuffle" className="w-10 h-10" />
         </div>
-        <span className="flex-1 text-sm font-bold truncate">Skin &amp; Background rotation</span>
+        <span className="flex-1 text-sm font-bold truncate">Style Shuffle</span>
         <span className="text-[11px] font-bold text-muted-foreground">
           {labelForInterval(value)}
         </span>
@@ -100,8 +105,20 @@ export function SkinRotationDialog({
   onSelect: (value: RotationInterval) => void;
 }) {
   const [mounted, setMounted] = useState(false);
+  const [shuffling, setShuffling] = useState(false);
   useEffect(() => setMounted(true), []);
   if (!mounted) return null;
+
+  const shuffleNow = async () => {
+    if (shuffling) return;
+    setShuffling(true);
+    try {
+      navigator.vibrate?.(14);
+    } catch {}
+    await rotateOnce();
+    setShuffling(false);
+    onClose();
+  };
 
   return createPortal(
     <AnimatePresence>
@@ -112,7 +129,7 @@ export function SkinRotationDialog({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 z-[1500] bg-black/40"
+            className="fixed inset-0 z-[1500] bg-black/40 backdrop-blur-sm"
           />
           <div className="pointer-events-none fixed inset-0 z-[1501] flex items-center justify-center p-4">
             <motion.div
@@ -120,23 +137,41 @@ export function SkinRotationDialog({
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: 10 }}
               transition={{ type: 'spring', damping: 26, stiffness: 320 }}
-              className="pointer-events-auto relative w-full max-w-md rounded-3xl bg-white p-5 shadow-2xl"
+              className="pointer-events-auto relative w-full max-w-md rounded-3xl border border-border/50 bg-card p-5 shadow-2xl"
             >
               <button
                 type="button"
                 onClick={onClose}
-                className="absolute left-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-muted text-foreground transition-colors hover:bg-muted/80"
+                className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-muted text-foreground transition-colors hover:bg-muted/80"
                 aria-label="Close"
               >
                 <X className="h-4 w-4" />
               </button>
-              <h3 className="text-center text-lg font-black tracking-tight text-foreground">
-                Skin &amp; Background rotation
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-fuchsia-500 to-violet-500 shadow-lg shadow-fuchsia-500/30">
+                <Shuffle className="h-7 w-7 text-white" />
+              </div>
+              <h3 className="mt-3 text-center text-xl font-black tracking-tight text-foreground">
+                Style Shuffle
               </h3>
-              <p className="mt-1 text-center text-xs font-medium text-muted-foreground">
-                Randomly cycle through your wardrobe at the chosen interval.
+              <p className="mx-auto mt-1 max-w-[290px] text-center text-xs font-medium text-muted-foreground">
+                Let your frog surprise you — a fresh outfit and background from
+                your own wardrobe, automatically.
               </p>
-              <div className="mt-4 space-y-2">
+              <button
+                type="button"
+                onClick={shuffleNow}
+                disabled={shuffling}
+                className="mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-fuchsia-500 to-violet-500 text-sm font-black uppercase tracking-wide text-white shadow-md shadow-fuchsia-500/25 transition-transform active:scale-[0.98] disabled:opacity-60"
+              >
+                <Shuffle
+                  className={cn('h-4 w-4', shuffling && 'animate-spin')}
+                />
+                {shuffling ? 'Shuffling…' : 'Shuffle now'}
+              </button>
+              <p className="mb-2 mt-5 px-1 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">
+                Auto-shuffle
+              </p>
+              <div className="space-y-2">
                 {OPTIONS.map((opt) => {
                   const isSelected = opt.value === currentValue;
                   return (
@@ -144,15 +179,30 @@ export function SkinRotationDialog({
                       key={opt.value}
                       type="button"
                       onClick={() => onSelect(opt.value)}
-                      className={`flex w-full items-center gap-3 rounded-2xl border-2 px-4 py-3 text-left transition-all ${
+                      className={cn(
+                        'flex w-full items-center gap-3 rounded-2xl border-2 px-4 py-2.5 text-left transition-all active:scale-[0.98]',
                         isSelected
-                          ? 'border-fuchsia-400 bg-fuchsia-50 text-foreground'
-                          : 'border-border/40 bg-white text-muted-foreground'
-                      }`}
+                          ? 'border-fuchsia-400 bg-fuchsia-50 dark:bg-fuchsia-950/30'
+                          : 'border-border/40 bg-card hover:border-border',
+                      )}
                     >
-                      <span className="flex-1 text-base font-bold">{opt.label}</span>
+                      <span className="min-w-0 flex-1">
+                        <span
+                          className={cn(
+                            'block text-sm font-bold',
+                            isSelected
+                              ? 'text-foreground'
+                              : 'text-muted-foreground',
+                          )}
+                        >
+                          {opt.label}
+                        </span>
+                        <span className="block text-[11px] font-medium text-muted-foreground/80">
+                          {opt.hint}
+                        </span>
+                      </span>
                       {isSelected && (
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-fuchsia-400 text-white">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-fuchsia-400 text-white">
                           <Check className="h-3.5 w-3.5 stroke-[3]" />
                         </span>
                       )}
@@ -244,9 +294,50 @@ async function rotateOnce() {
     mutateBackgrounds();
     window.dispatchEvent(new Event('wardrobe-refresh'));
     window.dispatchEvent(new Event('background-refresh'));
+    window.dispatchEvent(new Event('style-shuffle-swap'));
   } catch {
     // silent
   }
+}
+
+export function StyleShuffleBadge({ className }: { className?: string }) {
+  const [visible, setVisible] = useState(false);
+  const timerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const handler = () => {
+      setVisible(true);
+      if (timerRef.current) window.clearTimeout(timerRef.current);
+      timerRef.current = window.setTimeout(() => setVisible(false), 2600);
+    };
+    window.addEventListener('style-shuffle-swap', handler);
+    return () => {
+      window.removeEventListener('style-shuffle-swap', handler);
+      if (timerRef.current) window.clearTimeout(timerRef.current);
+    };
+  }, []);
+
+  return (
+    <AnimatePresence>
+      {visible && (
+        <motion.div
+          initial={{ opacity: 0, y: 10, scale: 0.9 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: -8, scale: 0.94 }}
+          transition={{ type: 'spring', stiffness: 420, damping: 26 }}
+          className={cn(
+            'pointer-events-none flex items-center gap-1.5 rounded-full border border-border/50 bg-card/90 px-3 py-1.5 shadow-md backdrop-blur-sm',
+            className,
+          )}
+        >
+          <Shuffle className="h-3.5 w-3.5 text-fuchsia-500" />
+          <span className="whitespace-nowrap text-[11px] font-black uppercase tracking-wide text-foreground">
+            New look!
+          </span>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
 }
 
 export function GlobalSkinRotation() {

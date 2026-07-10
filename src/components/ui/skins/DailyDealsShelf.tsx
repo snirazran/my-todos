@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { Icon } from '@/components/ui/Icon';
 import Fly from '@/components/ui/fly';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
+import { DragScrollRow } from '@/components/ui/DragScrollRow';
 import { RARITY_CONFIG } from '@/components/ui/gift-box/constants';
 import type { ItemDef } from '@/lib/skins/catalog';
 import type { DailyDeal } from '@/lib/skins/dailyDeal';
@@ -72,7 +73,7 @@ export function DailyDealsShelf({
         </span>
       </div>
 
-      <div className="flex gap-2.5 overflow-x-auto pb-1 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <DragScrollRow>
         {entries.map(({ deal, item }) => {
           const config = RARITY_CONFIG[item.rarity];
           return (
@@ -125,7 +126,7 @@ export function DailyDealsShelf({
             </button>
           );
         })}
-      </div>
+      </DragScrollRow>
 
     </div>
   );

@@ -14,6 +14,7 @@ import {
   Shirt,
   ShoppingBag,
   Repeat,
+  Check,
   ChevronDown,
   Sparkles,
   Paintbrush,
@@ -26,6 +27,8 @@ import type { ItemDef, WardrobeSlot } from '@/lib/skins/catalog';
 import { rarityRank, byId as staticById } from '@/lib/skins/catalog';
 import Fly from '@/components/ui/fly';
 import Frog from '@/components/ui/frog';
+import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
+import { GiftRive } from '@/components/ui/gift-box/GiftBox';
 import { ItemCard } from './ItemCard';
 import { PurchaseSheet, type PurchaseTarget } from './PurchaseSheet';
 import { FilterBar, FilterCategory } from './FilterBar';
@@ -44,6 +47,7 @@ import { DailyDealsShelf } from './DailyDealsShelf';
 import { SeenOnFriendsRow } from './SeenOnFriendsRow';
 import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
 import { WardrobeGridSkeleton } from '@/components/ui/Skeleton';
+import { DragScrollRow } from '@/components/ui/DragScrollRow';
 import { RARITY_CONFIG } from '@/components/ui/gift-box/constants';
 import { BackgroundCard } from './BackgroundCard';
 import { mutateBackgrounds, type BackgroundItem } from '@/hooks/useBackgrounds';
@@ -485,6 +489,19 @@ function WardrobeManagerContent({
     bgEquipped: string | null;
     unseenItems: string[];
   } | null>(null);
+  const rotationResyncRef = React.useRef(false);
+  React.useEffect(() => {
+    const handler = () => {
+      rotationResyncRef.current = true;
+    };
+    window.addEventListener('wardrobe-refresh', handler);
+    return () => window.removeEventListener('wardrobe-refresh', handler);
+  }, []);
+  const equipSig = (
+    eq: Partial<Record<WardrobeSlot, string | null>> | undefined,
+    bgId: string | null | undefined,
+  ) =>
+    `${eq?.skin ?? ''}|${eq?.hat ?? ''}|${eq?.body ?? ''}|${eq?.hand_item ?? ''}|${bgId ?? ''}`;
   const pinKey = `${activeTab}|${activeFilter}|${sortBy}|${canRenderItems}|${bg.isLoading}`;
   if (pinSnapshotRef.current?.key !== pinKey) {
     pinSnapshotRef.current = {
@@ -493,6 +510,19 @@ function WardrobeManagerContent({
       bgEquipped: bg.equipped,
       unseenItems: data?.wardrobe?.unseenItems ?? [],
     };
+    rotationResyncRef.current = false;
+  } else if (
+    rotationResyncRef.current &&
+    equipSig(data?.wardrobe?.equipped, bg.equipped) !==
+      equipSig(pinSnapshotRef.current.equipped, pinSnapshotRef.current.bgEquipped)
+  ) {
+    pinSnapshotRef.current = {
+      key: pinKey,
+      equipped: data?.wardrobe?.equipped,
+      bgEquipped: bg.equipped,
+      unseenItems: data?.wardrobe?.unseenItems ?? [],
+    };
+    rotationResyncRef.current = false;
   }
   const pinSnapshot = pinSnapshotRef.current;
 
@@ -584,6 +614,7 @@ function WardrobeManagerContent({
 
   const applyEquip = (slot: WardrobeSlot, itemId: string | null) => {
     if (!data?.wardrobe) return;
+    rotationResyncRef.current = false;
     mutate(
       (curr) =>
         curr?.wardrobe
@@ -898,6 +929,63 @@ function WardrobeManagerContent({
         onSell={() => bg.setSellTarget(card.bg)}
       />
     );
+
+  const renderWornRowCard = (card: WardrobeCard) =>
+    card.kind === 'item' ? (
+      <WardrobeRowCard
+        key={card.item.id}
+        rarity={card.rarity}
+        name={card.item.name}
+        sublabel={SLOT_LABEL[card.item.slot]}
+        equipped={data?.wardrobe?.equipped?.[card.item.slot] === card.item.id}
+        onClick={() => handleItemAction(card.item)}
+      >
+        <FrogSnapshot
+          className="h-[125%] w-[125%] object-contain"
+          indices={{ [card.item.slot]: card.item.riveIndex }}
+          width={120}
+          height={120}
+        />
+      </WardrobeRowCard>
+    ) : (
+      <WardrobeRowCard
+        key={`bg-${card.bg.id}`}
+        rarity={card.rarity}
+        name={card.bg.name}
+        sublabel="Background"
+        equipped={bg.equipped === card.bg.id}
+        onClick={() => bg.handleEquip(card.bg)}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={backgroundPreview(card.bg)}
+          alt={card.bg.name}
+          className="h-full w-full object-cover"
+        />
+      </WardrobeRowCard>
+    );
+
+  const renderGiftRowCard = (card: WardrobeCard) =>
+    card.kind === 'item' ? (
+      <WardrobeRowCard
+        key={card.item.id}
+        rarity={card.rarity}
+        name={card.item.name}
+        sublabel={RARITY_CONFIG[card.rarity].label}
+        sublabelClass={RARITY_CONFIG[card.rarity].text}
+        count={data?.wardrobe?.inventory?.[card.item.id] ?? 0}
+        isNew={unseenInventorySet.has(card.item.id)}
+        onClick={() => handleItemAction(card.item)}
+      >
+        <div className="h-full w-full py-1">
+          <GiftRive
+            color={card.item.riveIndex}
+            animation="box_shake"
+            paused={isDragging}
+          />
+        </div>
+      </WardrobeRowCard>
+    ) : null;
 
   const renderShopCard = (card: WardrobeCard, index: number) =>
     card.kind === 'item' ? (
@@ -1305,16 +1393,45 @@ function WardrobeManagerContent({
                       );
                     }
 
+                    const rowSection = (
+                      key: string,
+                      label: React.ReactNode,
+                      labelClass: string,
+                      cards: WardrobeCard[],
+                      renderCard: (card: WardrobeCard) => React.ReactNode,
+                    ) =>
+                      cards.length ? (
+                        <div key={key} className="pb-2 last:pb-4">
+                          <p
+                            className={cn(
+                              'mb-2 px-1 text-[10px] font-black uppercase tracking-[0.18em]',
+                              labelClass,
+                            )}
+                          >
+                            {label}
+                          </p>
+                          <DragScrollRow>{cards.map(renderCard)}</DragScrollRow>
+                        </div>
+                      ) : null;
+
                     const isWorn = (card: WardrobeCard) =>
                       card.kind === 'item'
                         ? pinSnapshot.equipped?.[card.item.slot] ===
                           card.item.id
                         : card.bg.id === pinSnapshot.bgEquipped;
+                    const giftsAsRow = activeFilter !== 'container';
                     const worn: WardrobeCard[] = [];
+                    const gifts: WardrobeCard[] = [];
                     const fresh: WardrobeCard[] = [];
                     const rest: WardrobeCard[] = [];
                     for (const card of merged) {
-                      if (isWorn(card)) worn.push(card);
+                      if (
+                        giftsAsRow &&
+                        card.kind === 'item' &&
+                        card.item.slot === 'container'
+                      )
+                        gifts.push(card);
+                      else if (isWorn(card)) worn.push(card);
                       else if (
                         card.kind === 'item' &&
                         pinSnapshot.unseenItems.includes(card.item.id)
@@ -1322,16 +1439,27 @@ function WardrobeManagerContent({
                         fresh.push(card);
                       else rest.push(card);
                     }
+                    gifts.sort(
+                      (a, b) => rarityRank[b.rarity] - rarityRank[a.rarity],
+                    );
                     rest.sort(
                       (a, b) => rarityRank[b.rarity] - rarityRank[a.rarity],
                     );
                     return (
                       <>
-                        {section(
+                        {rowSection(
                           'worn',
                           'On your frog',
                           'text-emerald-600',
                           worn,
+                          renderWornRowCard,
+                        )}
+                        {rowSection(
+                          'gifts',
+                          'Gifts',
+                          'text-amber-500',
+                          gifts,
+                          renderGiftRowCard,
                         )}
                         {section('new', 'New', 'text-rose-500', fresh)}
                         {groupCardsByRarity(rest).map((group) =>
@@ -1570,6 +1698,70 @@ function WardrobeManagerContent({
 
       <PlusUpgradeModal open={plusOpen} onClose={() => setPlusOpen(false)} />
     </div>
+  );
+}
+
+function WardrobeRowCard({
+  rarity,
+  name,
+  sublabel,
+  sublabelClass,
+  count,
+  isNew,
+  equipped,
+  onClick,
+  children,
+}: {
+  rarity: ItemDef['rarity'];
+  name: string;
+  sublabel: string;
+  sublabelClass?: string;
+  count?: number;
+  isNew?: boolean;
+  equipped?: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  const config = RARITY_CONFIG[rarity];
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'relative flex w-[132px] shrink-0 flex-col items-stretch rounded-xl border-2 bg-card p-2 text-left shadow-sm transition-transform active:scale-[0.97]',
+        config.border,
+      )}
+    >
+      <div className="relative flex h-16 items-end justify-center overflow-hidden rounded-lg bg-muted/40">
+        {children}
+        {isNew && (
+          <span className="absolute left-1 top-1 z-20 animate-pulse rounded-md bg-red-500 px-1.5 py-0.5 text-[8px] font-black uppercase text-white shadow-sm">
+            New
+          </span>
+        )}
+        {(count ?? 0) > 1 && (
+          <span className="absolute right-1 top-1 z-20 rounded-md border border-white/10 bg-black/50 px-1.5 py-0.5 text-[9px] font-bold text-white backdrop-blur-sm">
+            x{count}
+          </span>
+        )}
+        {equipped && (
+          <span className="absolute right-1 top-1 z-20 flex h-5 w-5 items-center justify-center rounded-full bg-green-500 p-0.5 text-white shadow-md">
+            <Check className="h-3 w-3 stroke-[4]" />
+          </span>
+        )}
+      </div>
+      <p className="mt-1.5 truncate text-xs font-black text-foreground">
+        {name}
+      </p>
+      <p
+        className={cn(
+          'truncate text-[10px] font-semibold',
+          sublabelClass ?? 'text-muted-foreground',
+        )}
+      >
+        {sublabel}
+      </p>
+    </button>
   );
 }
 

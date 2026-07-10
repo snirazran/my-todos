@@ -4,6 +4,7 @@ import React from 'react';
 import useSWR from 'swr';
 import { cn } from '@/lib/utils';
 import Fly from '@/components/ui/fly';
+import { DragScrollRow } from '@/components/ui/DragScrollRow';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
 import { RARITY_CONFIG } from '@/components/ui/gift-box/constants';
 import type { ItemDef } from '@/lib/skins/catalog';
@@ -102,7 +103,7 @@ export function SeenOnFriendsRow({
       <p className="mb-2 px-1 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">
         Seen on your friends
       </p>
-      <div className="flex gap-2.5 overflow-x-auto pb-1 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <DragScrollRow>
         {entries.map((entry) => {
           const id = entry.kind === 'item' ? entry.item.id : entry.bg.id;
           const name = entry.kind === 'item' ? entry.item.name : entry.bg.name;
@@ -161,7 +162,7 @@ export function SeenOnFriendsRow({
             </button>
           );
         })}
-      </div>
+      </DragScrollRow>
     </div>
   );
 }

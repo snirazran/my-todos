@@ -31,7 +31,7 @@ import {
 import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
 import useSWR, { mutate as swrMutate } from 'swr';
 import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useAnimationControls } from 'framer-motion';
 import { ChevronRight } from 'lucide-react';
 import Fly from '@/components/ui/fly';
 import { FlyCounter } from '@/components/ui/FlyCounter';
@@ -63,7 +63,7 @@ export default function SiteHeader() {
   const [wardrobeDropdownOpen, setWardrobeDropdownOpen] = useState(false);
   const wardrobeRef = useRef<HTMLDivElement>(null);
 
-  // Skin & background rotation popup (opened from the wardrobe page).
+  // Style Shuffle popup (opened from the wardrobe page).
   const [rotationOpen, setRotationOpen] = useState(false);
   const [rotationValue, setRotationValue] = useState<RotationInterval>('disabled');
   useEffect(() => {
@@ -71,6 +71,21 @@ export default function SiteHeader() {
     const handler = () => setRotationValue(getRotationInterval());
     window.addEventListener('skin-rotation-change', handler);
     return () => window.removeEventListener('skin-rotation-change', handler);
+  }, []);
+
+  const [shuffleSwapAnim, setShuffleSwapAnim] = useState(false);
+  useEffect(() => {
+    let timer: number | null = null;
+    const handler = () => {
+      setShuffleSwapAnim(true);
+      if (timer) window.clearTimeout(timer);
+      timer = window.setTimeout(() => setShuffleSwapAnim(false), 1100);
+    };
+    window.addEventListener('style-shuffle-swap', handler);
+    return () => {
+      window.removeEventListener('style-shuffle-swap', handler);
+      if (timer) window.clearTimeout(timer);
+    };
   }, []);
 
   useEffect(() => {
@@ -188,10 +203,20 @@ export default function SiteHeader() {
               <button
                 type="button"
                 onClick={() => setRotationOpen(true)}
-                aria-label="Skin & background rotation"
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border/50 bg-card/80 shadow-sm backdrop-blur-xl transition-colors active:scale-95"
+                aria-label="Style Shuffle"
+                className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border/50 bg-card/80 shadow-sm backdrop-blur-xl transition-colors active:scale-95"
               >
-                <Icon name="shuffle" label="Skin rotation" className="h-7 w-7" />
+                {shuffleSwapAnim && (
+                  <span className="pointer-events-none absolute inset-0 animate-ping rounded-full border-2 border-fuchsia-400" />
+                )}
+                <Icon
+                  name="shuffle"
+                  label="Style Shuffle"
+                  className={cn(
+                    'h-7 w-7',
+                    shuffleSwapAnim && '[animation:spin_0.7s_ease-in-out]',
+                  )}
+                />
               </button>
             )}
             <PremiumBadge />
@@ -348,10 +373,20 @@ export default function SiteHeader() {
             <button
               type="button"
               onClick={() => setRotationOpen(true)}
-              aria-label="Skin & background rotation"
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border/50 bg-card/80 shadow-sm transition-colors hover:bg-muted active:scale-95"
+              aria-label="Style Shuffle"
+              className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border/50 bg-card/80 shadow-sm transition-colors hover:bg-muted active:scale-95"
             >
-              <Icon name="shuffle" label="Skin rotation" className="h-7 w-7" />
+              {shuffleSwapAnim && (
+                <span className="pointer-events-none absolute inset-0 animate-ping rounded-full border-2 border-fuchsia-400" />
+              )}
+              <Icon
+                name="shuffle"
+                label="Style Shuffle"
+                className={cn(
+                  'h-7 w-7',
+                  shuffleSwapAnim && '[animation:spin_0.7s_ease-in-out]',
+                )}
+              />
             </button>
           )}
 
@@ -591,6 +626,11 @@ type UserInfo = {
 
 const userInfoFetcher = bootstrapFetcher;
 
+const sheetTransition = {
+  duration: 0.3,
+  ease: [0.32, 0.72, 0, 1] as [number, number, number, number],
+};
+
 function MobileSheet({
   isOpen,
   onClose,
@@ -642,6 +682,16 @@ function MobileSheet({
     if (isOpen) setView('main');
   }, [isOpen]);
 
+  const sheetControls = useAnimationControls();
+  const subviewControls = useAnimationControls();
+  useEffect(() => {
+    if (isOpen) sheetControls.start({ x: 0, transition: sheetTransition });
+  }, [isOpen, sheetControls]);
+  useEffect(() => {
+    if (isOpen && view !== 'main')
+      subviewControls.start({ x: 0, transition: sheetTransition });
+  }, [isOpen, view, subviewControls]);
+
   const flashSoon = (label: string) => {
     setToast(`${label} — coming soon`);
     window.setTimeout(() => setToast(null), 1800);
@@ -670,25 +720,31 @@ function MobileSheet({
 
   const displayName = userInfo?.name || user?.displayName || 'You';
   const frogName = userInfo?.frogName || 'Frog';
+  const goBack = () => setView(view === 'contact' ? contactBack : 'main');
 
   return createPortal(
     <AnimatePresence>
       {isOpen && (
         <motion.div
-          initial={{ x: '-100%' }}
-          animate={{ x: 0 }}
-          exit={{ x: '-100%' }}
-          transition={{ type: 'spring', damping: 28, stiffness: 220 }}
-          drag={isMobile ? 'x' : false}
+          initial={{ x: '100%' }}
+          animate={sheetControls}
+          exit={{ x: '100%' }}
+          transition={sheetTransition}
+          drag={isMobile && view === 'main' ? 'x' : false}
           dragDirectionLock
           dragConstraints={{ left: 0, right: 0 }}
-          dragElastic={{ left: 0.9, right: 0 }}
+          dragElastic={{ left: 0, right: 0.9 }}
           onDragEnd={(_e, info) => {
-            // Swipe far enough left, or flick left quickly, to dismiss.
-            if (info.offset.x < -100 || info.velocity.x < -500) onClose();
+            if (info.offset.x > 90 || info.velocity.x > 500) {
+              sheetControls
+                .start({ x: '100%', transition: sheetTransition })
+                .then(onClose);
+            }
           }}
-          className="fixed z-[1340] inset-0 h-[100dvh] w-full overflow-y-auto bg-slate-100 dark:bg-background md:bg-white dark:md:bg-background"
+          style={{ touchAction: 'pan-y' }}
+          className="fixed z-[1340] inset-0 h-[100dvh] w-full overflow-hidden bg-slate-100 dark:bg-background md:bg-white dark:md:bg-background will-change-transform"
         >
+        <div className="absolute inset-0 overflow-y-auto">
         <div className="mx-auto w-full md:max-w-xl md:min-h-full md:bg-slate-100 md:border-x md:border-border/60 md:shadow-[0_0_0_6px_rgba(15,23,42,0.10)] dark:md:bg-background">
           {/* Top bar */}
           <div
@@ -697,54 +753,18 @@ function MobileSheet({
           >
             <div className="px-4 py-3 flex items-center justify-between">
               <button
-                onClick={
-                  view === 'contact'
-                    ? () => setView(contactBack)
-                    : view !== 'main'
-                      ? () => setView('main')
-                      : onClose
-                }
+                onClick={onClose}
                 className="p-2 -ml-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                aria-label={view !== 'main' ? 'Back' : 'Close'}
+                aria-label="Close"
               >
-                <ChevronLeft className="w-6 h-6" />
+                <X className="w-6 h-6" />
               </button>
-              {view !== 'main' && (
-                <h2 className="min-w-0 flex-1 truncate text-center text-base font-black tracking-tight">
-                  {
-                    {
-                      preferences: 'Preferences',
-                      notifications: 'Notifications',
-                      community: 'Join our frog community',
-                      profile: 'Profile',
-                      helpCenter: 'Help center',
-                      contact: 'Contact us',
-                      integrations: 'Integrations',
-                    }[view]
-                  }
-                </h2>
-              )}
               <div className="w-10 shrink-0" aria-hidden />
             </div>
           </div>
 
           <div className="px-5 pb-10 space-y-5">
-            {/* Toast */}
-            <AnimatePresence>
-              {toast && (
-                <motion.div
-                  initial={{ opacity: 0, y: -6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -6 }}
-                  className="fixed left-1/2 top-16 z-[200] -translate-x-1/2 rounded-full bg-foreground text-background px-4 py-2 text-xs font-bold shadow-lg"
-                >
-                  {toast}
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {view === 'main' ? (
-              showAuth && user ? (
+            {showAuth && user ? (
                 <MainView
                   displayName={displayName}
                   frogName={frogName}
@@ -786,10 +806,72 @@ function MobileSheet({
                   theme={theme}
                   setTheme={setTheme}
                 />
-              ) : (
-                <SignedOutView onSignIn={onSignIn} onClose={onClose} />
-              )
-            ) : view === 'preferences' ? (
+            ) : (
+              <SignedOutView onSignIn={onSignIn} onClose={onClose} />
+            )}
+          </div>
+        </div>
+        </div>
+
+        <AnimatePresence>
+          {view !== 'main' && (
+        <motion.div
+          key="subview"
+          initial={{ x: '100%' }}
+          animate={subviewControls}
+          exit={{ x: '100%' }}
+          transition={sheetTransition}
+          drag={isMobile ? 'x' : false}
+          dragDirectionLock
+          dragConstraints={{ left: 0, right: 0 }}
+          dragElastic={{ left: 0, right: 0.9 }}
+          onDragEnd={(_e, info) => {
+            if (info.offset.x > 90 || info.velocity.x > 500) {
+              const target = view === 'contact' ? contactBack : 'main';
+              if (target === 'main') {
+                subviewControls
+                  .start({ x: '100%', transition: sheetTransition })
+                  .then(() => setView('main'));
+              } else {
+                setView(target);
+              }
+            }
+          }}
+          style={{ touchAction: 'pan-y' }}
+          className="absolute inset-0 overflow-y-auto bg-slate-100 dark:bg-background md:bg-white dark:md:bg-background will-change-transform"
+        >
+        <div className="mx-auto w-full md:max-w-xl md:min-h-full md:bg-slate-100 md:border-x md:border-border/60 md:shadow-[0_0_0_6px_rgba(15,23,42,0.10)] dark:md:bg-background">
+          <div
+            className="sticky top-0 z-10 bg-slate-100/80 backdrop-blur-xl dark:bg-background/80"
+            style={{ paddingTop: 'env(safe-area-inset-top)' }}
+          >
+            <div className="px-4 py-3 flex items-center justify-between">
+              <button
+                onClick={goBack}
+                className="p-2 -ml-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                aria-label="Back"
+              >
+                <ChevronLeft className="w-6 h-6" />
+              </button>
+              <h2 className="min-w-0 flex-1 truncate text-center text-base font-black tracking-tight">
+                {
+                  {
+                    preferences: 'Preferences',
+                    notifications: 'Notifications',
+                    community: 'Join our frog community',
+                    profile: 'Profile',
+                    helpCenter: 'Help center',
+                    contact: 'Contact us',
+                    integrations: 'Integrations',
+                  }[view]
+                }
+              </h2>
+              <div className="w-10 shrink-0" aria-hidden />
+            </div>
+          </div>
+
+          <div className="px-5 pb-10 space-y-5">
+            {view === 'preferences' ? (
               <PreferencesView
                 theme={theme}
                 setTheme={setTheme}
@@ -871,7 +953,23 @@ function MobileSheet({
               />
             )}
           </div>
-          </div>
+        </div>
+        </motion.div>
+          )}
+        </AnimatePresence>
+
+          <AnimatePresence>
+            {toast && (
+              <motion.div
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                className="fixed left-1/2 top-16 z-[200] -translate-x-1/2 rounded-full bg-foreground text-background px-4 py-2 text-xs font-bold shadow-lg"
+              >
+                {toast}
+              </motion.div>
+            )}
+          </AnimatePresence>
           <InviteFriendsModal open={inviteOpen} onClose={() => setInviteOpen(false)} />
           <PlusUpgradeModal open={plusOpen} onClose={() => setPlusOpen(false)} />
         </motion.div>
@@ -1013,7 +1111,7 @@ function MainView({
                 Plus
               </span>
             </p>
-            <p className="text-xs font-semibold text-emerald-900/75">Unlock unlimited tags &amp; quests!</p>
+            <p className="text-xs font-semibold text-emerald-900/75">All quests at once &amp; double rewards!</p>
           </div>
           <span
             aria-hidden
@@ -1446,8 +1544,8 @@ function QuickTilesGrid({
         onClick={onOpenQuestFocus}
       />
       <QuickTile
-        icon={<Icon name="shuffle" label="Skin rotation" className="h-[52px] w-[52px]" />}
-        title="Skin rotation"
+        icon={<Icon name="shuffle" label="Style Shuffle" className="h-[52px] w-[52px]" />}
+        title="Style Shuffle"
         subtitle={labelForInterval(rotation)}
         onClick={() => setRotationOpen(true)}
       />
