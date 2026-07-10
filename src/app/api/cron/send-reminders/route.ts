@@ -14,6 +14,13 @@ import type {
   NotificationPrefs,
   UserWardrobe,
 } from '@/lib/types/UserDoc';
+import {
+  eveningMessage,
+  farewellMessage,
+  friendFliesMessage,
+  hungerMessage,
+  morningMessage,
+} from '@/lib/notifications/frogVoice';
 
 const CRON_SECRET = process.env.CRON_SECRET;
 
@@ -28,78 +35,6 @@ type PushMessage = {
   body: string;
   data: Record<string, string>;
 };
-
-const MORNING_MESSAGES = [
-  (count: number, frog: string): PushMessage => ({
-    title: `Today: ${count} task${count === 1 ? '' : 's'}`,
-    body: 'Start with the smallest one. Momentum handles the rest.',
-    data: { type: 'task_reminder', uncompletedCount: String(count) },
-  }),
-  (count: number, frog: string): PushMessage => ({
-    title: 'Your list is ready',
-    body: `${count} task${count === 1 ? '' : 's'} today. The first one takes five minutes.`,
-    data: { type: 'task_reminder', uncompletedCount: String(count) },
-  }),
-  (count: number, frog: string): PushMessage => ({
-    title: `${frog} peeked at your list`,
-    body: `${count} task${count === 1 ? '' : 's'} today. One small win before lunch changes everything.`,
-    data: { type: 'task_reminder', uncompletedCount: String(count) },
-  }),
-];
-
-const EVENING_MESSAGES = [
-  (count: number, frog: string): PushMessage => ({
-    title: `${count} task${count === 1 ? '' : 's'} between you and a clear list`,
-    body: "There's still time. Even one counts.",
-    data: { type: 'task_reminder', uncompletedCount: String(count) },
-  }),
-  (count: number, frog: string): PushMessage => ({
-    title: 'Almost done today',
-    body: `${count} left. Finish one and call it a win.`,
-    data: { type: 'task_reminder', uncompletedCount: String(count) },
-  }),
-  (count: number, frog: string): PushMessage => ({
-    title: "Today isn't over yet",
-    body: `${count} task${count === 1 ? '' : 's'} still open. Ten minutes is all it takes.`,
-    data: { type: 'task_reminder', uncompletedCount: String(count) },
-  }),
-];
-
-function hungerMessage(frog: string): PushMessage {
-  return {
-    title: `${frog} is hungry`,
-    body: "Finish one task to feed him — or he'll help himself to one of your flies tonight.",
-    data: { type: 'frog_hunger', path: '/' },
-  };
-}
-
-function farewellMessage(frog: string): PushMessage {
-  return {
-    title: "We'll stop nudging for now",
-    body: `Open the app anytime and reminders come back. ${frog} isn't going anywhere.`,
-    data: { type: 'task_reminder_muted', path: '/' },
-  };
-}
-
-function friendFliesMessage(owed: number): PushMessage {
-  return {
-    title:
-      owed === 1
-        ? 'A friend earned you a fly'
-        : `Your friends earned you ${owed} flies`,
-    body: "Claim them before midnight — they don't roll over.",
-    data: { type: 'friend_flies', path: '/friends' },
-  };
-}
-
-function pickVariant(
-  variants: ((count: number, frog: string) => PushMessage)[],
-  count: number,
-  frog: string,
-): PushMessage {
-  const idx = Math.floor(Math.random() * variants.length);
-  return variants[idx](count, frog);
-}
 
 /**
  * Get the current hour (0-23) in a given IANA timezone.
@@ -138,12 +73,14 @@ function getTodayInTz(tz: string): string {
 }
 
 /**
- * Count uncompleted tasks for a user on a given date.
+ * Count uncompleted tasks for a user on a given date, and pick one concrete
+ * task to name in the nudge: the next scheduled one, else the shortest-titled
+ * (a stand-in for "smallest").
  */
-async function countUncompletedTasks(
+async function getUncompletedTasks(
   userId: string,
   dateYMD: string,
-): Promise<number> {
+): Promise<{ count: number; exampleText: string | null }> {
   const dow = new Date(`${dateYMD}T12:00:00Z`).getUTCDay();
 
   const tasks = await TaskModel.find({
@@ -166,7 +103,20 @@ async function countUncompletedTasks(
     return !t.completed;
   });
 
-  return uncompleted.length;
+  const scheduled = uncompleted
+    .filter((t: any) => typeof t.startTime === 'string' && t.startTime)
+    .sort((a: any, b: any) => String(a.startTime).localeCompare(String(b.startTime)));
+  const example =
+    scheduled[0] ??
+    [...uncompleted].sort(
+      (a: any, b: any) =>
+        String(a.text ?? '').length - String(b.text ?? '').length,
+    )[0];
+
+  return {
+    count: uncompleted.length,
+    exampleText: (example as any)?.text ?? null,
+  };
 }
 
 /**
@@ -308,18 +258,31 @@ export async function GET(req: NextRequest) {
     }
 
     const todayYMD = getTodayInTz(tz);
-    const uncompletedCount = await countUncompletedTasks(userId, todayYMD);
+    const { count: uncompletedCount, exampleText } = await getUncompletedTasks(
+      userId,
+      todayYMD,
+    );
     const ignoredCount = prefs.reminderIgnoredCount ?? 0;
 
-    const routineNudge = (
-      variants: ((count: number, frog: string) => PushMessage)[],
-    ): PushMessage | null => {
+    const routineNudge = (slot: 'morning' | 'evening'): PushMessage | null => {
       if (uncompletedCount === 0) return null;
       if (ignoredCount < REMINDER_MUTE_THRESHOLD) {
-        return pickVariant(variants, uncompletedCount, frog);
+        const ctx = { count: uncompletedCount, frog, exampleTask: exampleText };
+        const copy =
+          slot === 'morning' ? morningMessage(ctx) : eveningMessage(ctx);
+        return {
+          ...copy,
+          data: {
+            type: 'task_reminder',
+            uncompletedCount: String(uncompletedCount),
+          },
+        };
       }
       if (ignoredCount === REMINDER_MUTE_THRESHOLD) {
-        return farewellMessage(frog);
+        return {
+          ...farewellMessage(frog),
+          data: { type: 'task_reminder_muted', path: '/' },
+        };
       }
       return null;
     };
@@ -329,7 +292,7 @@ export async function GET(req: NextRequest) {
 
     if (isEvening) {
       if (isFrogStarving(wardrobe)) {
-        message = hungerMessage(frog);
+        message = { ...hungerMessage(frog), data: { type: 'frog_hunger', path: '/' } };
       } else {
         const owedFlies = await countUnclaimedFriendFlies(
           userId,
@@ -337,14 +300,17 @@ export async function GET(req: NextRequest) {
           todayYMD,
         );
         if (owedFlies > 0) {
-          message = friendFliesMessage(owedFlies);
+          message = {
+            ...friendFliesMessage(owedFlies),
+            data: { type: 'friend_flies', path: '/friends' },
+          };
         } else {
-          message = routineNudge(EVENING_MESSAGES);
+          message = routineNudge('evening');
           isRoutine = message !== null;
         }
       }
     } else {
-      message = routineNudge(MORNING_MESSAGES);
+      message = routineNudge('morning');
       isRoutine = message !== null;
     }
 

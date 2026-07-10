@@ -263,7 +263,8 @@
       "Bash(python -)",
       "Bash(npx tsc *)",
       "Bash(rm tsc.out)",
-      "Bash(echo \"tsc-exit:$?\")"
+      "Bash(echo \"tsc-exit:$?\")",
+      "WebFetch(domain:solve-marketing.agency)"
     ]
   }
 }

@@ -6,6 +6,7 @@ import UserModel from '@/lib/models/User';
 import TaskModel, { type TaskDoc } from '@/lib/models/Task';
 import { getAdminMessaging } from '@/lib/firebaseAdmin';
 import { getZonedToday } from '@/lib/utils';
+import { taskReminderBody } from '@/lib/notifications/frogVoice';
 import type { NotificationPrefs } from '@/lib/types/UserDoc';
 
 const CRON_SECRET = process.env.CRON_SECRET;
@@ -79,12 +80,6 @@ function isTaskDoneForDate(task: TaskDoc, dateYMD: string) {
   return task.type === 'regular' && !!task.completed;
 }
 
-function getReminderBody(reminder: string) {
-  if (reminder === 'at_time') return "It's time. Jump in.";
-  if (reminder === '1h') return 'Starts in 1 hour. Wrap up what you can.';
-  return `Starts in ${reminder.replace('m', ' minutes')}. Get set.`;
-}
-
 async function sendTaskReminder({
   userId,
   tokens,
@@ -102,7 +97,7 @@ async function sendTaskReminder({
   const invalidTokens: string[] = [];
   let sent = 0;
   const title = task.text;
-  const body = getReminderBody(reminder);
+  const body = taskReminderBody(reminder);
 
   for (const token of tokens) {
     try {

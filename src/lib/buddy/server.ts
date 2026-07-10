@@ -4,6 +4,10 @@ import UserModel from '@/lib/models/User';
 import { getZonedToday } from '@/lib/utils';
 import { notifyFriendUpdate } from '@/lib/taskSync';
 import { sendBuddyPush, buddyDisplayName } from '@/lib/buddy/push';
+import {
+  buddyBothFinishedMessage,
+  buddyPartnerFinishedMessage,
+} from '@/lib/notifications/frogVoice';
 import { bumpQuestMetric } from '@/lib/quests/metrics';
 import { checklistDoneIdsForDate } from '@/lib/checklist';
 
@@ -167,16 +171,22 @@ export async function handleBuddyCompletion(opts: {
 
   // Push the partner when I finish today's shared occurrence.
   if (completed && date === today) {
-    void buddyDisplayName(userId).then((name) =>
-      sendBuddyPush(partnerId, {
-        title: bothNow
-          ? 'You both finished today'
-          : `${name} just finished your shared task`,
-        body: bothNow ? 'Great teamwork. Same again tomorrow.' : 'Your move.',
+    void (async () => {
+      const [name, partnerTask] = await Promise.all([
+        buddyDisplayName(userId),
+        TaskModel.findOne({ userId: partnerId, bondId })
+          .select('text')
+          .lean<{ text?: string } | null>(),
+      ]);
+      const copy = bothNow
+        ? buddyBothFinishedMessage(name, partnerTask?.text)
+        : buddyPartnerFinishedMessage(name, partnerTask?.text);
+      await sendBuddyPush(partnerId, {
+        ...copy,
         path: '/planner',
         type: 'buddy_completed',
-      }),
-    );
+      });
+    })();
   }
 }
 
