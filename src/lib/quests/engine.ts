@@ -25,8 +25,7 @@ import QuestRecipeModel, {
   type RecipeSlot,
 } from '@/lib/models/QuestRecipe';
 import { ensureDefaultQuestRecipe } from './recipeDefaults';
-import { EXPLORER_QUEST, FIRST_HOPS_QUEST } from './onboardingQuests';
-import QuestCoverAssetModel from '@/lib/models/QuestCoverAsset';
+import { ensureDefaultOnboardingTemplates } from './onboardingQuests';
 import type {
   CategoryQuestProgressView,
   DailyQuestProgressView,
@@ -1182,29 +1181,36 @@ export async function syncQuestState(args: {
     }
   }
 
-  // Onboarding quests: First Hops for everyone until fully claimed, then
-  // Explorer. Fully-claimed docs stay in the DB (never re-emitted) so these
-  // one-time quests never repeat.
+  // Onboarding quests: admin-managed templates shown one at a time, oldest
+  // first; the next appears once the previous is fully claimed. Fully-claimed
+  // docs stay in the DB (never re-emitted) so these one-time quests never
+  // repeat.
   const onboardingTemplates: QuestTemplateDoc[] = [];
+  let onboardingCandidates = filteredTemplates.filter(
+    (template) => template.placement === 'onboarding',
+  );
+  if (onboardingCandidates.length === 0) {
+    const seeded = await ensureDefaultOnboardingTemplates();
+    templates.push(...seeded);
+    onboardingCandidates = seeded.filter(
+      (template) =>
+        template.isActive &&
+        matchesVisibilityConditions(
+          template.visibilityConditions,
+          visibilityMetrics,
+        ),
+    );
+  }
+  onboardingCandidates.sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+  );
   const onboardingDocFor = (templateId: string) =>
     allExistingDocs.find((doc) => doc.templateId === templateId);
-  const firstHopsDoc = onboardingDocFor(FIRST_HOPS_QUEST.templateId);
-  if (!firstHopsDoc || !isQuestDocFullyClaimed(firstHopsDoc)) {
-    onboardingTemplates.push({
-      ...FIRST_HOPS_QUEST,
-      placement: 'onboarding',
-      visibilityConditions: [],
-      isActive: true,
-    } as unknown as QuestTemplateDoc);
-  } else {
-    const explorerDoc = onboardingDocFor(EXPLORER_QUEST.templateId);
-    if (!explorerDoc || !isQuestDocFullyClaimed(explorerDoc)) {
-      onboardingTemplates.push({
-        ...EXPLORER_QUEST,
-        placement: 'onboarding',
-        visibilityConditions: [],
-        isActive: true,
-      } as unknown as QuestTemplateDoc);
+  for (const template of onboardingCandidates) {
+    const doc = onboardingDocFor(template.templateId);
+    if (!doc || !isQuestDocFullyClaimed(doc)) {
+      onboardingTemplates.push(template);
+      break;
     }
   }
 
@@ -1290,22 +1296,9 @@ export async function syncQuestState(args: {
       }
       return a.title.localeCompare(b.title);
     });
-  let onboardingQuests = questViews.filter(
+  const onboardingQuests = questViews.filter(
     (quest) => quest.placement === 'onboarding',
   );
-  if (onboardingQuests.length > 0) {
-    const coverAssets = await QuestCoverAssetModel.find(
-      { key: { $in: onboardingQuests.map((quest) => quest.templateId) } },
-      { key: 1, coverImageUrl: 1 },
-    ).lean();
-    const coverByKey = new Map(
-      coverAssets.map((asset) => [asset.key, asset.coverImageUrl]),
-    );
-    onboardingQuests = onboardingQuests.map((quest) => {
-      const coverImageUrl = coverByKey.get(quest.templateId);
-      return coverImageUrl ? { ...quest, coverImageUrl } : quest;
-    });
-  }
 
   const templatesWithCover = new Set(
     templates

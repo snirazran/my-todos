@@ -1509,6 +1509,8 @@ function QuestSeasonEventOverlay({
     amount?: number;
     itemId?: string;
   } | null>(null);
+  const [todayInView, setTodayInView] = useState(true);
+  const [introDone, setIntroDone] = useState(false);
   const { indices: wardrobeIndices } = useWardrobeIndices(open && !isPremium);
 
   // Drag-to-scroll state
@@ -1548,6 +1550,15 @@ function QuestSeasonEventOverlay({
     }
   };
 
+  const scrollToToday = () => {
+    const isHorizontal = window.innerWidth >= 768;
+    currentDayRef.current?.scrollIntoView({
+      block: isHorizontal ? 'nearest' : 'center',
+      inline: isHorizontal ? 'center' : 'nearest',
+      behavior: 'smooth',
+    });
+  };
+
   useEffect(() => {
     if (!open) return;
     const recompute = () => {
@@ -1562,11 +1573,11 @@ function QuestSeasonEventOverlay({
       if (isHorizontal) {
         const center = targetRect.left + targetRect.width / 2 - containerRect.left;
         setGreenLineWidth(`${Math.max(0, center)}px`);
-        setGreenLineHeight('4px');
+        setGreenLineHeight('8px');
       } else {
         const center = targetRect.top + targetRect.height / 2 - containerRect.top;
         setGreenLineHeight(`${Math.max(0, center)}px`);
-        setGreenLineWidth('4px'); // fixed width for vertical line
+        setGreenLineWidth('8px'); // fixed width for vertical line
       }
     };
     recompute();
@@ -1634,10 +1645,34 @@ function QuestSeasonEventOverlay({
     return () => clearTimeout(timer);
   }, [open, season?.currentDay, season?.dayCount]);
 
+  useEffect(() => {
+    if (!open) {
+      setIntroDone(false);
+      setTodayInView(true);
+      return;
+    }
+    const timer = setTimeout(() => setIntroDone(true), 1000);
+    return () => clearTimeout(timer);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const root = scrollAreaRef.current;
+    const target = currentDayRef.current;
+    if (!root || !target) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setTodayInView(entry.isIntersecting),
+      { root, threshold: 0.5 },
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [open, season?.currentDay, season?.dayCount]);
+
   if (!open || !season || typeof document === 'undefined') return null;
 
   const progress = Math.min(season.progressFlies, season.dailyTargetFlies);
   const pct = Math.min(100, (progress / Math.max(1, season.dailyTargetFlies)) * 100);
+  const endsSoon = new Date(season.endsAt).getTime() - Date.now() < 86_400_000;
   const currentRewards =
     season.rewardsByDay.find((entry) => entry.day === season.currentDay) ??
     null;
@@ -1696,13 +1731,22 @@ function QuestSeasonEventOverlay({
             </h2>
           </div>
           <div className="pointer-events-none absolute inset-x-0 bottom-10 mx-auto flex max-w-2xl items-center justify-between gap-3 px-5 md:bottom-12">
-            <div className="pointer-events-auto inline-flex h-9 items-center gap-2 rounded-xl border border-white/15 bg-black/45 px-2.5 text-white shadow-[0_4px_14px_rgba(0,0,0,0.35)] backdrop-blur-md">
-              <Clock className="h-3.5 w-3.5 text-white/85" strokeWidth={2.6} />
-              <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-white/65">
-                Ends in
+            <div className="pointer-events-auto inline-flex h-10 items-center gap-2.5 rounded-full border border-white/20 bg-black/50 py-1 pl-1.5 pr-4 text-white shadow-[0_6px_20px_rgba(0,0,0,0.35)] backdrop-blur-md">
+              <span
+                className={cn(
+                  'flex h-7 w-7 shrink-0 items-center justify-center rounded-full',
+                  endsSoon ? 'bg-amber-400 text-amber-950' : 'bg-white/15 text-white/90',
+                )}
+              >
+                <Clock className="h-3.5 w-3.5" strokeWidth={2.75} />
               </span>
-              <span className="text-[12px] font-black leading-none tabular-nums text-white">
-                {timeLeft}
+              <span className="flex flex-col justify-center leading-none">
+                <span className="text-[8px] font-bold uppercase tracking-[0.22em] text-white/60">
+                  Ends in
+                </span>
+                <span className="mt-0.5 text-[13px] font-black leading-none tabular-nums">
+                  {timeLeft}
+                </span>
               </span>
             </div>
             {!isPremium && onUpgrade && (
@@ -1890,8 +1934,10 @@ function QuestSeasonEventOverlay({
                       key={entry.day}
                       ref={isPreviewStart ? futureDayRowRef : undefined}
                       className={cn(
-                        'relative grid grid-cols-[minmax(0,1fr)_3rem_minmax(0,1fr)] items-center rounded-2xl px-1 py-2 transition-all duration-300 md:flex md:flex-col md:w-[180px] md:shrink-0 md:px-0 [@media(max-height:820px)]:md:w-[150px] [@media(max-height:720px)]:md:w-[124px] [@media(max-height:620px)]:md:w-[104px]',
-                        !isCurrent && 'hover:bg-muted/30',
+                        'relative grid grid-cols-[minmax(0,1fr)_3rem_minmax(0,1fr)] items-center rounded-3xl px-1 py-2 transition-all duration-300 md:flex md:flex-col md:w-[180px] md:shrink-0 md:px-0 md:py-4 [@media(max-height:820px)]:md:w-[150px] [@media(max-height:720px)]:md:w-[124px] [@media(max-height:620px)]:md:w-[104px]',
+                        isCurrent
+                          ? 'bg-primary/5 ring-1 ring-primary/15'
+                          : 'hover:bg-muted/30',
                       )}
                     >
                       <div className="flex w-full justify-center pr-2 sm:pr-3 md:pr-0 md:pb-8 [@media(max-height:820px)]:md:pb-5 [@media(max-height:720px)]:md:pb-3">
@@ -1936,18 +1982,26 @@ function QuestSeasonEventOverlay({
                         <div
                           ref={isCurrent ? currentDayRef : undefined}
                           className={cn(
-                            'relative z-10 flex h-12 w-12 flex-col items-center justify-center rounded-[18px] leading-none text-primary-foreground shadow-[0_4px_0_rgba(0,0,0,0.12)] ring-1 ring-primary/20 [@media(max-height:820px)]:md:h-10 [@media(max-height:820px)]:md:w-10 [@media(max-height:820px)]:md:rounded-[14px] [@media(max-height:720px)]:md:h-8 [@media(max-height:720px)]:md:w-8 [@media(max-height:720px)]:md:rounded-xl',
-                            isClaimed && !isCurrent
-                              ? 'bg-primary'
-                              : 'bg-primary',
+                            'relative z-10 flex h-12 w-12 flex-col items-center justify-center rounded-[18px] leading-none [@media(max-height:820px)]:md:h-10 [@media(max-height:820px)]:md:w-10 [@media(max-height:820px)]:md:rounded-[14px] [@media(max-height:720px)]:md:h-8 [@media(max-height:720px)]:md:w-8 [@media(max-height:720px)]:md:rounded-xl',
+                            isCurrent
+                              ? 'bg-primary text-primary-foreground shadow-[0_4px_0_rgba(0,0,0,0.18)] ring-2 ring-background'
+                              : isClaimed
+                                ? 'bg-primary text-primary-foreground shadow-[0_4px_0_rgba(0,0,0,0.12)] ring-1 ring-primary/20'
+                                : 'border-2 border-border bg-background text-muted-foreground shadow-[0_4px_0_rgba(0,0,0,0.06)]',
                           )}
                         >
-                          <span className="text-[9px] font-black uppercase tracking-[0.15em] opacity-95 [@media(max-height:720px)]:md:text-[7px]">
-                            Day
-                          </span>
-                          <span className="text-lg font-black tabular-nums [@media(max-height:820px)]:md:text-base [@media(max-height:720px)]:md:text-sm">
-                            {entry.day}
-                          </span>
+                          {isClaimed && !isCurrent ? (
+                            <Check className="h-5 w-5" strokeWidth={4} />
+                          ) : (
+                            <>
+                              <span className="text-[9px] font-black uppercase tracking-[0.15em] opacity-95 [@media(max-height:720px)]:md:text-[7px]">
+                                Day
+                              </span>
+                              <span className="text-lg font-black tabular-nums [@media(max-height:820px)]:md:text-base [@media(max-height:720px)]:md:text-sm">
+                                {entry.day}
+                              </span>
+                            </>
+                          )}
                         </div>
                       </div>
 
@@ -2031,6 +2085,26 @@ function QuestSeasonEventOverlay({
         </div>
       </div>
       </div>
+      </div>
+
+      <div className="pointer-events-none absolute inset-x-0 bottom-[calc(1.25rem+env(safe-area-inset-bottom))] z-30 flex justify-center md:bottom-8">
+        <AnimatePresence>
+          {introDone && !todayInView && (
+            <motion.button
+              key="back-to-today"
+              type="button"
+              initial={{ opacity: 0, y: 12, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 12, scale: 0.9 }}
+              whileTap={{ scale: 0.94 }}
+              transition={{ type: 'tween', duration: 0.18, ease: 'easeOut' }}
+              onClick={scrollToToday}
+              className="pointer-events-auto inline-flex h-11 items-center gap-1.5 rounded-full bg-primary px-5 text-sm font-black text-primary-foreground shadow-[0_4px_0_rgba(0,0,0,0.2),0_12px_28px_-8px_rgba(0,0,0,0.45)] ring-2 ring-background"
+            >
+              Back to Day {season.currentDay}
+            </motion.button>
+          )}
+        </AnimatePresence>
       </div>
       </div>
       <AnimatePresence>

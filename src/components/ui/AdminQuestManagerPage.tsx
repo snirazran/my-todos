@@ -11,6 +11,8 @@ import {
   Clock,
   Edit2,
   Eye,
+  Flame,
+  Footprints,
   Gift,
   Layers3,
   Pencil,
@@ -62,6 +64,7 @@ type AdminQuestTemplate = {
   logic: QuestLogicBlock[];
   visibilityConditions: QuestVisibilityCondition[];
   isActive: boolean;
+  createdAt?: string;
 };
 
 type SeasonSizeKey = 'mobile' | 'tablet' | 'web' | 'webLarge';
@@ -178,7 +181,15 @@ type AdminRecipe = {
   slots: AdminRecipeSlot[];
 };
 
-type ViewLevel = 'home' | 'daily' | 'focus' | 'season' | 'category' | 'form';
+type ViewLevel =
+  | 'home'
+  | 'daily'
+  | 'focus'
+  | 'onboarding'
+  | 'streaks'
+  | 'season'
+  | 'category'
+  | 'form';
 
 type FormState = {
   id?: string;
@@ -551,9 +562,6 @@ export function AdminQuestManagerPage() {
     recipeId: string;
     slotId: string;
   } | null>(null);
-  const [onboardCovers, setOnboardCovers] = useState<
-    Record<string, string | undefined>
-  >({});
 
   useEffect(() => {
     void loadData();
@@ -563,13 +571,12 @@ export function AdminQuestManagerPage() {
     setLoading(true);
     setResult(null);
     try {
-      const [templatesRes, metaRes, categoriesRes, seasonsRes, recipesRes, coversRes, streakRes, loginStreakRes] = await Promise.all([
+      const [templatesRes, metaRes, categoriesRes, seasonsRes, recipesRes, streakRes, loginStreakRes] = await Promise.all([
         fetch('/api/admin/quests', { credentials: 'include' }),
         fetch('/api/admin/quests/meta', { credentials: 'include' }),
         fetch('/api/admin/quests/categories', { credentials: 'include' }),
         fetch('/api/admin/quests/seasons', { credentials: 'include' }),
         fetch('/api/admin/quest-recipes', { credentials: 'include' }),
-        fetch('/api/admin/quest-covers', { credentials: 'include' }),
         fetch('/api/admin/quests/streak', { credentials: 'include' }),
         fetch('/api/admin/streak/login', { credentials: 'include' }),
       ]);
@@ -578,7 +585,6 @@ export function AdminQuestManagerPage() {
       const categoriesData = await categoriesRes.json();
       const seasonsData = await seasonsRes.json();
       const recipesData = await recipesRes.json();
-      const coversData = await coversRes.json();
       const streakData = await streakRes.json();
       if (!templatesRes.ok || !metaRes.ok || !seasonsRes.ok) {
         throw new Error(
@@ -598,12 +604,6 @@ export function AdminQuestManagerPage() {
       if (loginStreakRes.ok && loginStreakData.loginStreak) {
         setLoginStreakConfig(loginStreakData.loginStreak);
       }
-      setOnboardCovers(
-        Object.fromEntries(
-          ((coversData.covers ?? []) as { key: string; coverImageUrl?: string }[])
-            .map((c) => [c.key, c.coverImageUrl]),
-        ),
-      );
     } catch (error) {
       setResult({
         type: 'error',
@@ -723,7 +723,15 @@ export function AdminQuestManagerPage() {
       if (!res.ok) throw new Error(data.error || 'Could not delete quest');
       await loadData();
       resetForm();
-      if (view === 'form') setView(form.placement === 'daily' ? 'daily' : 'category');
+      if (view === 'form') {
+        setView(
+          form.placement === 'daily'
+            ? 'daily'
+            : form.placement === 'onboarding'
+              ? 'onboarding'
+              : 'category',
+        );
+      }
       setResult({ type: 'success', message: 'Quest deleted' });
     } catch (error) {
       setResult({
@@ -861,6 +869,13 @@ export function AdminQuestManagerPage() {
         ? 'Save Changes'
         : 'Create Category';
   const dailyTemplates = templates.filter((t) => t.placement === 'daily');
+  const onboardingTemplates = templates
+    .filter((t) => t.placement === 'onboarding')
+    .sort(
+      (a, b) =>
+        new Date(a.createdAt ?? 0).getTime() -
+        new Date(b.createdAt ?? 0).getTime(),
+    );
   const categoryTemplates = templates.filter(
     (t) => t.placement === 'category' && t.categoryId === selectedCategoryId,
   );
@@ -1095,6 +1110,40 @@ export function AdminQuestManagerPage() {
       </button>
 
       <button
+        onClick={() => setView('onboarding')}
+        className="group rounded-2xl border border-border/40 bg-card/60 p-6 text-left transition hover:border-violet-500/25 hover:bg-violet-500/[0.04]"
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-500/10 text-violet-600 dark:text-violet-400">
+            <Footprints className="h-6 w-6" />
+          </div>
+          <ChevronRight className="h-5 w-5 text-muted-foreground/30 transition group-hover:translate-x-0.5 group-hover:text-muted-foreground" />
+        </div>
+        <p className="mt-5 text-lg font-black text-foreground">Onboarding</p>
+        <p className="mt-1 text-sm text-muted-foreground">One-time quests new users play through in order.</p>
+        <p className="mt-4 text-3xl font-black text-foreground">{onboardingTemplates.length}</p>
+        <p className="text-xs text-muted-foreground">quest{onboardingTemplates.length !== 1 ? 's' : ''}</p>
+      </button>
+
+      <button
+        onClick={() => setView('streaks')}
+        className="group rounded-2xl border border-border/40 bg-card/60 p-6 text-left transition hover:border-orange-500/25 hover:bg-orange-500/[0.04]"
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-500/10 text-orange-600 dark:text-orange-400">
+            <Flame className="h-6 w-6" />
+          </div>
+          <ChevronRight className="h-5 w-5 text-muted-foreground/30 transition group-hover:translate-x-0.5 group-hover:text-muted-foreground" />
+        </div>
+        <p className="mt-5 text-lg font-black text-foreground">Streak Manager</p>
+        <p className="mt-1 text-sm text-muted-foreground">Login streak goals, milestones, and freezes.</p>
+        <p className="mt-4 text-3xl font-black text-foreground">
+          {loginStreakConfig ? (loginStreakConfig.isActive ? 'On' : 'Off') : '–'}
+        </p>
+        <p className="text-xs text-muted-foreground">login streak</p>
+      </button>
+
+      <button
         onClick={() => startEditingSeason(seasons[0])}
         className="group rounded-2xl border border-border/40 bg-card/60 p-6 text-left transition hover:border-amber-500/25 hover:bg-amber-500/[0.04]"
       >
@@ -1186,9 +1235,34 @@ export function AdminQuestManagerPage() {
       {adminRecipes.filter((r) => r.placement === 'daily').map(renderRecipeCard)}
       {recipeRewardDialog}
       {renderStreakCard()}
-      {renderLoginStreakCard()}
-      {renderOnboardingCoversCard()}
       {renderQuestList(dailyTemplates, 'daily')}
+    </div>
+  );
+
+  // ── Onboarding quests view ────────────────────────────────────────────────
+  const renderOnboarding = () => (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm text-muted-foreground">
+          New users see one quest at a time, oldest first. The next quest
+          appears once every reward in the previous one is claimed.
+        </p>
+        <Button size="sm" className="rounded-xl" onClick={() => navigateToQuestForm(undefined, 'onboarding')}>
+          <Plus className="mr-1 h-4 w-4" />
+          Add Quest
+        </Button>
+      </div>
+      {renderQuestList(onboardingTemplates, 'onboarding')}
+    </div>
+  );
+
+  // ── Streak manager view ───────────────────────────────────────────────────
+  const renderStreaks = () => (
+    <div className="space-y-4">
+      {loading && !loginStreakConfig && (
+        <div className="rounded-2xl bg-muted/30 p-4 text-sm text-muted-foreground">Loading...</div>
+      )}
+      {renderLoginStreakCard()}
     </div>
   );
 
@@ -1350,36 +1424,6 @@ export function AdminQuestManagerPage() {
     if (!file) return;
     const dataUrl = await readFileAsDataUrl(file);
     updateRecipe(recipeId, (prev) => ({ ...prev, coverImageUrl: dataUrl }));
-  };
-
-  const saveOnboardCover = async (key: string, coverImageUrl: string | null) => {
-    try {
-      const res = await fetch('/api/admin/quest-covers', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ key, coverImageUrl }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Could not save cover');
-      setOnboardCovers((prev) => ({ ...prev, [key]: data.coverImageUrl }));
-    } catch (error) {
-      setResult({
-        type: 'error',
-        message: error instanceof Error ? error.message : 'Could not save cover',
-      });
-    }
-  };
-
-  const handleOnboardCoverFile = async (
-    key: string,
-    event: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (!file) return;
-    const dataUrl = await readFileAsDataUrl(file);
-    await saveOnboardCover(key, dataUrl);
   };
 
   const renderRecipeCard = (r: AdminRecipe) => {
@@ -2080,44 +2124,6 @@ export function AdminQuestManagerPage() {
     );
   };
 
-  const renderOnboardingCoversCard = () => (
-    <div className="rounded-2xl border border-border/40 bg-card/60 px-4 py-3.5">
-      <p className="text-sm font-bold text-foreground">Onboarding quest covers</p>
-      <p className="mt-0.5 text-xs text-muted-foreground">
-        Images for the one-time First Hops and Explorer quests new users see.
-      </p>
-      <div className="mt-3 space-y-3">
-        {[
-          { key: 'onboard:first-hops', label: 'First Hops' },
-          { key: 'onboard:explorer', label: 'Explorer' },
-        ].map(({ key, label }) => (
-          <div key={key} className="flex items-center gap-3">
-            <div className="h-14 w-24 shrink-0 overflow-hidden rounded-xl border border-border/50 bg-muted/40">
-              {onboardCovers[key] ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={onboardCovers[key]} alt="" className="h-full w-full object-cover" />
-              ) : null}
-            </div>
-            <span className="w-20 text-xs font-bold text-foreground">{label}</span>
-            <label className="cursor-pointer rounded-full border border-border/50 bg-background px-3 py-1.5 text-[11px] font-bold text-muted-foreground transition hover:border-primary/30 hover:text-foreground">
-              {onboardCovers[key] ? 'Change' : 'Upload'}
-              <input type="file" accept="image/*" className="hidden" onChange={(e) => void handleOnboardCoverFile(key, e)} />
-            </label>
-            {onboardCovers[key] && (
-              <button
-                type="button"
-                onClick={() => void saveOnboardCover(key, null)}
-                className="text-[11px] font-bold text-red-500/80 hover:text-red-500"
-              >
-                Remove
-              </button>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-
   const renderFocus = () => (
     <div className="space-y-4">
       <div className="flex items-center justify-end">
@@ -2716,7 +2722,7 @@ export function AdminQuestManagerPage() {
       <div className="flex items-center gap-3 rounded-[24px] border border-border/50 bg-background/95 px-4 py-3 shadow-lg backdrop-blur">
         <p className="flex-1 text-sm text-muted-foreground">{form.id ? 'Editing existing template.' : 'Creating a new template.'}</p>
         {form.id && <Button size="sm" variant="destructive" onClick={deleteQuest} disabled={saving} className="rounded-xl">{questDeleteButtonLabel}</Button>}
-        <Button size="sm" variant="outline" onClick={() => { resetForm(); setView(form.placement === 'daily' ? 'daily' : 'category'); }} disabled={saving} className="rounded-xl">Cancel</Button>
+        <Button size="sm" variant="outline" onClick={() => { resetForm(); setView(questFormParentView(form.placement)); }} disabled={saving} className="rounded-xl">Cancel</Button>
         <Button size="sm" onClick={saveQuest} disabled={saving} className="rounded-xl font-black">{questSaveButtonLabel}</Button>
       </div>
 
@@ -2749,14 +2755,21 @@ export function AdminQuestManagerPage() {
     view === 'home' ? null :
     view === 'daily' ? 'Quest Manager' :
     view === 'focus' ? 'Quest Manager' :
+    view === 'onboarding' ? 'Quest Manager' :
+    view === 'streaks' ? 'Quest Manager' :
     view === 'season' ? 'Quest Manager' :
     view === 'category' ? 'Focus Quests' :
-    form.placement === 'daily' ? 'Daily Quests' : selectedCategory?.name ?? 'Focus Quests';
+    form.placement === 'daily' ? 'Daily Quests' :
+    form.placement === 'onboarding' ? 'Onboarding' :
+    selectedCategory?.name ?? 'Focus Quests';
+
+  const questFormParentView = (placement: QuestPlacement): ViewLevel =>
+    placement === 'daily' ? 'daily' : placement === 'onboarding' ? 'onboarding' : 'category';
 
   const handleBack = () => {
-    if (view === 'daily' || view === 'focus' || view === 'season') setView('home');
+    if (view === 'daily' || view === 'focus' || view === 'onboarding' || view === 'streaks' || view === 'season') setView('home');
     else if (view === 'category') setView('focus');
-    else if (view === 'form') setView(form.placement === 'daily' ? 'daily' : 'category');
+    else if (view === 'form') setView(questFormParentView(form.placement));
   };
 
 
@@ -2778,6 +2791,8 @@ export function AdminQuestManagerPage() {
             {view === 'home' && 'Quest Manager'}
             {view === 'daily' && 'Daily Quests'}
             {view === 'focus' && 'Focus Quests'}
+            {view === 'onboarding' && 'Onboarding Quests'}
+            {view === 'streaks' && 'Streak Manager'}
             {view === 'season' && 'Season'}
             {view === 'category' && (selectedCategory?.name ?? 'Category')}
             {view === 'form' && (form.id ? 'Edit Quest' : 'New Quest')}
@@ -2809,6 +2824,8 @@ export function AdminQuestManagerPage() {
                 {view === 'home' && renderHome()}
                 {view === 'daily' && renderDaily()}
                 {view === 'focus' && renderFocus()}
+                {view === 'onboarding' && renderOnboarding()}
+                {view === 'streaks' && renderStreaks()}
                 {view === 'season' && renderSeason()}
                 {view === 'category' && renderCategory()}
               </>
@@ -3165,6 +3182,17 @@ function ObjectivesEditorDialog({
                   )}
                   <span className={word}>minutes</span>
                 </div>
+              )}
+
+              {placement === 'onboarding' && (
+                <input
+                  value={block.helpText ?? ''}
+                  onChange={(e) =>
+                    onUpdate(block.id, { helpText: e.target.value || undefined })
+                  }
+                  placeholder="Help tip shown behind the ? on this objective (optional)"
+                  className="mt-2.5 h-9 w-full rounded-xl border border-border/50 bg-background px-3 text-xs text-foreground outline-none placeholder:text-muted-foreground/60 focus:border-primary/30"
+                />
               )}
 
               {/* Objective rewards */}

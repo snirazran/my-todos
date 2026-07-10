@@ -29,7 +29,11 @@ import type {
 const json = (body: unknown, status = 200) =>
   NextResponse.json(body, { status });
 
-const VALID_PLACEMENTS = new Set<QuestPlacement>(['daily', 'category']);
+const VALID_PLACEMENTS = new Set<QuestPlacement>([
+  'daily',
+  'category',
+  'onboarding',
+]);
 const VALID_LOGIC_TYPES = new Set<QuestLogicType>([
   'count',
   'focus_minutes',
@@ -172,6 +176,10 @@ function sanitizeLogicBlock(input: any): QuestLogicBlock | null {
   if (Array.isArray(input.rewards) && input.rewards.length > 0) {
     const rewards = sanitizeRewards(input.rewards);
     if (rewards.length > 0) block.rewards = rewards;
+  }
+
+  if (typeof input.helpText === 'string' && input.helpText.trim()) {
+    block.helpText = input.helpText.trim();
   }
 
   return block;

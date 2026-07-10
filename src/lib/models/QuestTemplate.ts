@@ -39,7 +39,7 @@ const QuestTemplateSchema = new Schema<QuestTemplateDoc>(
     coverImageFile: { type: Schema.Types.Mixed, default: undefined },
     placement: {
       type: String,
-      enum: ['daily', 'category'],
+      enum: ['daily', 'category', 'onboarding'],
       required: true,
     },
     categoryId: {

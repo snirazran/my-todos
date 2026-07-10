@@ -1,3 +1,7 @@
+import QuestCoverAssetModel from '@/lib/models/QuestCoverAsset';
+import QuestTemplateModel, {
+  type QuestTemplateDoc,
+} from '@/lib/models/QuestTemplate';
 import type { QuestLogicBlock } from './types';
 
 export type OnboardingQuestDef = {
@@ -131,3 +135,52 @@ export const EXPLORER_QUEST: OnboardingQuestDef = {
     },
   ],
 };
+
+// Seeds the two legacy onboarding quests as editable templates the first time
+// the DB has no onboarding templates at all. Pausing (isActive: false) is the
+// way to disable onboarding; deleting every onboarding template re-seeds these.
+export async function ensureDefaultOnboardingTemplates(): Promise<
+  QuestTemplateDoc[]
+> {
+  const exists = await QuestTemplateModel.exists({ placement: 'onboarding' });
+  if (exists) return [];
+
+  const defs = [FIRST_HOPS_QUEST, EXPLORER_QUEST];
+  const covers = await QuestCoverAssetModel.find({
+    key: { $in: defs.map((def) => def.templateId) },
+  }).lean();
+  const coverByKey = new Map(covers.map((cover) => [cover.key, cover]));
+
+  const created: QuestTemplateDoc[] = [];
+  for (const def of defs) {
+    const cover = coverByKey.get(def.templateId);
+    const coverFields = cover?.coverImageFile
+      ? {
+          coverImageUrl: `/api/quests/cover?type=template&id=${encodeURIComponent(def.templateId)}`,
+          coverImageFile: cover.coverImageFile,
+        }
+      : cover?.coverImageUrl
+        ? { coverImageUrl: cover.coverImageUrl }
+        : {};
+    try {
+      const doc = await QuestTemplateModel.create({
+        templateId: def.templateId,
+        name: def.name,
+        description: def.description,
+        placement: 'onboarding',
+        logic: def.logic,
+        visibilityConditions: [],
+        isActive: true,
+        ...coverFields,
+      });
+      created.push(doc.toObject());
+    } catch (error: any) {
+      if (error?.code !== 11000) throw error;
+      const existing = await QuestTemplateModel.findOne({
+        templateId: def.templateId,
+      }).lean<QuestTemplateDoc>();
+      if (existing) created.push(existing);
+    }
+  }
+  return created;
+}

@@ -447,7 +447,9 @@ export async function GET(req: Request) {
         categoryQuests: dashboard.categoryQuests.map((q) =>
           withTemplateCover(q, dashboard.templatesWithCover),
         ),
-        onboardingQuests: dashboard.onboardingQuests ?? [],
+        onboardingQuests: (dashboard.onboardingQuests ?? []).map((q) =>
+          withTemplateCover(q, dashboard.templatesWithCover),
+        ),
         unlockedAnimationIds: dashboard.focusProfile.unlockedAnimationIds ?? [],
         rewardCatalog: {
           ...dashboard.rewardCatalog,
