@@ -11,14 +11,14 @@ export default function StatCard({
   label: string;
 }) {
   return (
-    <div className="p-6 bg-white shadow-md dark:bg-slate-800 rounded-xl">
+    <div className="rounded-xl border border-border bg-card p-6 text-card-foreground shadow-md">
       <div className="flex items-center justify-between mb-2">
         {icon}
-        <span className="text-3xl font-bold text-slate-900 dark:text-white">
+        <span className="text-3xl font-bold text-foreground">
           {value}
         </span>
       </div>
-      <p className="text-slate-600 dark:text-slate-400">{label}</p>
+      <p className="text-muted-foreground">{label}</p>
     </div>
   );
 }

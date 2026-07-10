@@ -84,21 +84,21 @@ export function EnterFriendCodeModal({
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.94, y: 12 }}
               transition={{ type: 'spring', damping: 26, stiffness: 300 }}
-              className="pointer-events-auto relative w-full max-w-md rounded-[28px] bg-white px-6 pb-7 pt-8 text-center shadow-2xl"
+              className="pointer-events-auto relative w-full max-w-md rounded-[28px] border border-border bg-popover px-6 pb-7 pt-8 text-center text-popover-foreground shadow-2xl"
             >
               <button
                 type="button"
                 onClick={onClose}
                 aria-label="Close"
-                className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-zinc-100 text-zinc-500 transition-colors hover:bg-zinc-200"
+                className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
               >
                 <X className="h-5 w-5" />
               </button>
 
-              <h2 className="text-2xl font-black tracking-tight text-zinc-900">
+              <h2 className="text-2xl font-black tracking-tight text-foreground">
                 Enter Friend Code
               </h2>
-              <p className="mt-1 text-[15px] font-medium text-zinc-400">
+              <p className="mt-1 text-[15px] font-medium text-muted-foreground">
                 Enter your friend&apos;s code to find them!
               </p>
 
@@ -116,7 +116,7 @@ export function EnterFriendCodeModal({
                 autoCapitalize="characters"
                 autoCorrect="off"
                 spellCheck={false}
-                className="mt-6 h-14 w-full rounded-2xl bg-zinc-100 px-5 text-center text-lg font-bold tracking-[0.12em] text-zinc-900 outline-none ring-[#5f9654] placeholder:font-medium placeholder:tracking-normal placeholder:text-zinc-400 focus:ring-2"
+                className="mt-6 h-14 w-full rounded-2xl border border-input bg-background px-5 text-center text-lg font-bold tracking-[0.12em] text-foreground outline-none ring-primary placeholder:font-medium placeholder:tracking-normal placeholder:text-muted-foreground focus:ring-2"
               />
 
               {error && (
@@ -124,7 +124,7 @@ export function EnterFriendCodeModal({
               )}
 
               {sent && (
-                <div className="mt-3 flex items-center justify-center gap-2 rounded-2xl bg-[#5f9654]/10 px-4 py-3 text-sm font-black text-[#47783d]">
+                <div className="mt-3 flex items-center justify-center gap-2 rounded-2xl bg-primary/10 px-4 py-3 text-sm font-black text-primary">
                   <Check className="h-4 w-4" strokeWidth={3} />
                   {sentLabel}
                 </div>

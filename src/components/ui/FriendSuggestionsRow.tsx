@@ -69,10 +69,10 @@ export function FriendSuggestionsRow({ enabled }: { enabled: boolean }) {
   return (
     <div className="mt-5 w-full">
       <div className="mb-2.5 px-1.5">
-        <h2 className="text-lg font-black tracking-tight text-emerald-950">
+        <h2 className="text-lg font-black tracking-tight text-foreground">
           People you may know
         </h2>
-        <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-700/50">
+        <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
           Friends of your friends
         </p>
       </div>
@@ -94,7 +94,7 @@ export function FriendSuggestionsRow({ enabled }: { enabled: boolean }) {
                   />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="flex items-center gap-1 text-sm font-black leading-tight tracking-tight text-emerald-950">
+                  <p className="flex items-center gap-1 text-sm font-black leading-tight tracking-tight text-foreground">
                     <span
                       className={cn(
                         'truncate',
@@ -111,7 +111,7 @@ export function FriendSuggestionsRow({ enabled }: { enabled: boolean }) {
                       />
                     )}
                   </p>
-                  <p className="truncate text-xs font-semibold text-emerald-700/70">
+                  <p className="truncate text-xs font-semibold text-muted-foreground">
                     {mutualLabel(s)}
                   </p>
                 </div>

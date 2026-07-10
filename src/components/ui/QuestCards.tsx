@@ -1002,7 +1002,7 @@ export function CategoryQuestPresentationCard({
             className="group absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-black/45 px-4 text-center transition-colors [@media(hover:hover)]:hover:bg-black/55"
             aria-label="Switch quest"
           >
-            <span className="inline-flex items-center gap-2 rounded-full bg-white/95 px-4 py-2.5 text-[12px] font-black uppercase tracking-[0.12em] text-slate-900 shadow-[0_4px_0_0_rgba(15,23,42,0.25)] ring-1 ring-black/10 backdrop-blur-sm transition active:translate-y-[2px] active:shadow-none group-active:translate-y-[2px]">
+            <span className="inline-flex items-center gap-2 rounded-full bg-white/95 px-4 py-2.5 text-[12px] font-black uppercase tracking-[0.12em] text-slate-900 shadow-[0_4px_0_0_rgba(15,23,42,0.25)] ring-1 ring-black/10 backdrop-blur-sm transition active:translate-y-[2px] active:shadow-none group-active:translate-y-[2px] dark:bg-card/95 dark:text-card-foreground dark:ring-white/10">
               <Repeat className="h-4 w-4" strokeWidth={2.75} />
               Switch quest
             </span>
@@ -1053,7 +1053,7 @@ export function CategoryQuestPresentationCard({
             className="group absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-black/45 px-4 text-center transition-colors [@media(hover:hover)]:hover:bg-black/55"
             aria-label="Pick a tag"
           >
-            <span className="inline-flex items-center gap-2 rounded-full bg-white/95 px-4 py-2.5 text-[12px] font-black uppercase tracking-[0.12em] text-slate-900 shadow-[0_4px_0_0_rgba(15,23,42,0.25)] ring-1 ring-black/10 backdrop-blur-sm transition active:translate-y-[2px] active:shadow-none group-active:translate-y-[2px]">
+            <span className="inline-flex items-center gap-2 rounded-full bg-white/95 px-4 py-2.5 text-[12px] font-black uppercase tracking-[0.12em] text-slate-900 shadow-[0_4px_0_0_rgba(15,23,42,0.25)] ring-1 ring-black/10 backdrop-blur-sm transition active:translate-y-[2px] active:shadow-none group-active:translate-y-[2px] dark:bg-card/95 dark:text-card-foreground dark:ring-white/10">
               <Tags className="h-4 w-4" strokeWidth={2.75} />
               Pick a tag
             </span>
@@ -1368,9 +1368,9 @@ export function SwitchFocusConfirm({
                       type="button"
                       onClick={handleRent}
                       disabled={rentBusy}
-                      className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl border-2 border-amber-200/90 bg-amber-50 text-[13px] font-black uppercase tracking-[0.11em] text-amber-700 shadow-[0_6px_14px_rgba(180,83,9,0.14),inset_0_1px_0_rgba(255,255,255,0.85)] transition active:scale-[0.98] disabled:opacity-60"
+                      className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl border-2 border-amber-200/90 bg-amber-50 text-[13px] font-black uppercase tracking-[0.11em] text-amber-700 shadow-[0_6px_14px_rgba(180,83,9,0.14),inset_0_1px_0_rgba(255,255,255,0.85)] transition active:scale-[0.98] disabled:opacity-60 dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-300 dark:shadow-none"
                     >
-                      <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-amber-200/80 text-amber-800">
+                      <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-amber-200/80 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300">
                         <Play className="h-3.5 w-3.5 fill-current" />
                       </span>
                       {rentBusy ? (

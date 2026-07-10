@@ -1,7 +1,11 @@
 'use client';
 
 import { useEffect } from 'react';
-import { preloadRiveAsset, warmRiveRuntime } from '@/lib/riveLoader';
+import {
+  FLY_RIVE_ASSET_URL,
+  preloadRiveAsset,
+  warmRiveRuntime,
+} from '@/lib/riveLoader';
 
 export function RiveWarmup() {
   useEffect(() => {
@@ -19,7 +23,7 @@ export function RiveWarmup() {
 
     const id = idle(() => {
       preloadRiveAsset('/idle_gift.riv');
-      preloadRiveAsset('/fly_idle.riv');
+      preloadRiveAsset(FLY_RIVE_ASSET_URL);
     });
     return () => cancelIdle(id);
   }, []);

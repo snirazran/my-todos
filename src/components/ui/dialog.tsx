@@ -19,7 +19,7 @@ export function DialogContent({
       <RD.Content
         {...props}
         className={cn(
-          'fixed left-1/2 top-1/2 z-[1001] w-[90vw] max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-700 dark:bg-slate-900 sm:p-6',
+          'fixed left-1/2 top-1/2 z-[1001] w-[90vw] max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-border bg-popover p-4 text-popover-foreground shadow-xl sm:p-6',
           className
         )}
       >
@@ -57,7 +57,7 @@ export function DialogDescription({
 }: React.ComponentPropsWithoutRef<typeof RD.Description>) {
   return (
     <RD.Description
-      className={cn('text-sm text-slate-500 dark:text-slate-400', className)}
+      className={cn('text-sm text-muted-foreground', className)}
       {...props}
     />
   );

@@ -159,17 +159,17 @@ export default function FriendsPage() {
       <div className="relative z-10 mx-auto flex w-full flex-col items-center px-4 pt-[calc(env(safe-area-inset-top)+0.5rem)] md:max-w-2xl md:pt-11">
         {/* Friend invites — persistent, over the winter scene */}
         <div className="absolute right-4 top-[calc(env(safe-area-inset-top)+0.75rem)] z-30 flex items-center gap-2">
-          <StyleShuffleHeaderButton className="border-0 bg-white/90 shadow-md ring-1 ring-black/5 md:hidden" />
-          <PremiumBadge className="border-0 bg-white/90 shadow-md ring-1 ring-black/5 backdrop-blur-sm md:hidden" />
+          <StyleShuffleHeaderButton className="border-0 bg-card/90 shadow-md ring-1 ring-border/60 md:hidden" />
+          <PremiumBadge className="border-0 bg-card/90 shadow-md ring-1 ring-border/60 backdrop-blur-sm md:hidden" />
           <button
             type="button"
             onClick={() => setInboxOpen(true)}
             aria-label="Friend invites"
-            className="relative flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-emerald-700 shadow-md ring-1 ring-black/5 backdrop-blur-sm transition-transform active:scale-95"
+            className="relative flex h-10 w-10 items-center justify-center rounded-full bg-card/90 text-primary shadow-md ring-1 ring-border/60 backdrop-blur-sm transition-transform active:scale-95"
           >
             <Bell className="h-6 w-6" />
             {alertsCount > 0 && (
-              <span className="absolute -right-1 -top-1 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full border-2 border-white bg-rose-500 px-1 text-[10px] font-black text-white">
+              <span className="absolute -right-1 -top-1 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full border-2 border-card bg-rose-500 px-1 text-[10px] font-black text-white">
                 {alertsCount > 9 ? '9+' : alertsCount}
               </span>
             )}
@@ -195,7 +195,7 @@ export default function FriendsPage() {
         <button
           type="button"
           onClick={() => setAddOpen(true)}
-          className="relative z-20 -mt-3 flex w-[min(20rem,80vw)] items-center justify-center gap-2 rounded-2xl bg-white px-10 py-3.5 text-lg font-black tracking-tight text-primary ring-1 ring-primary/20 transition-transform active:scale-[0.98]"
+          className="relative z-20 -mt-3 flex w-[min(20rem,80vw)] items-center justify-center gap-2 rounded-2xl bg-card px-10 py-3.5 text-lg font-black tracking-tight text-primary shadow-lg ring-1 ring-primary/25 transition-transform active:scale-[0.98]"
         >
           <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm">
             <Plus className="h-5 w-5" strokeWidth={3} />
@@ -251,10 +251,10 @@ export default function FriendsPage() {
           {/* Leaderboard — focus is how much each friend shares with you */}
           <div className="w-full">
             <div className="mb-2.5 px-1.5">
-              <h2 className="text-lg font-black tracking-tight text-emerald-950">
+              <h2 className="text-lg font-black tracking-tight text-foreground">
                 Top contributors today
               </h2>
-              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-700/50">
+              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
                 They catch 2 · you get 1
               </p>
             </div>
@@ -376,15 +376,15 @@ function RemoveFriendDialog({
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.94, y: 12 }}
               transition={{ type: 'spring', damping: 26, stiffness: 300 }}
-              className="pointer-events-auto relative w-full max-w-sm rounded-[28px] bg-white px-6 pb-6 pt-7 text-center shadow-2xl"
+              className="pointer-events-auto relative w-full max-w-sm rounded-[28px] border border-border bg-popover px-6 pb-6 pt-7 text-center text-popover-foreground shadow-2xl"
             >
               <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-500/10 text-rose-500">
                 <UserMinus className="h-7 w-7" />
               </div>
-              <h2 className="text-xl font-black tracking-tight text-zinc-900">
+              <h2 className="text-xl font-black tracking-tight text-foreground">
                 Remove friend?
               </h2>
-              <p className="mt-1.5 text-[15px] font-medium text-zinc-500">
+              <p className="mt-1.5 text-[15px] font-medium text-muted-foreground">
                 {target.name || target.frogName} will be removed from your
                 friends. You can add each other again anytime.
               </p>
@@ -401,7 +401,7 @@ function RemoveFriendDialog({
                 <button
                   onClick={onClose}
                   disabled={removing}
-                  className="w-full rounded-2xl bg-zinc-100 py-3.5 text-base font-black tracking-tight text-zinc-600 transition-colors hover:bg-zinc-200 disabled:opacity-60"
+                  className="w-full rounded-2xl bg-muted py-3.5 text-base font-black tracking-tight text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:opacity-60"
                 >
                   Cancel
                 </button>
@@ -433,7 +433,7 @@ function ClaimHeroCard({
           <Fly size={30} interactive={false} paused={paused} />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-black tracking-tight text-emerald-950">
+          <p className="text-sm font-black tracking-tight text-foreground">
             No flies to claim yet
           </p>
           <p className="text-xs font-semibold text-muted-foreground">
@@ -448,16 +448,16 @@ function ClaimHeroCard({
       type="button"
       onClick={onClaim}
       disabled={claiming}
-      className="group mb-5 flex w-full items-center gap-3 overflow-hidden rounded-[20px] border border-emerald-300 bg-gradient-to-br from-emerald-50 to-emerald-100/70 px-4 py-3.5 text-left shadow-sm disabled:opacity-70"
+      className="group mb-5 flex w-full items-center gap-3 overflow-hidden rounded-[20px] border border-primary/30 bg-gradient-to-br from-emerald-50 to-emerald-100/70 px-4 py-3.5 text-left shadow-sm dark:from-primary/15 dark:to-primary/5 disabled:opacity-70"
     >
       <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-500/15">
         <Fly size={36} interactive={false} paused={paused} />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-base font-black tracking-tight text-emerald-950">
+        <p className="text-base font-black tracking-tight text-foreground">
           {claimable} {claimable === 1 ? 'fly' : 'flies'} ready
         </p>
-        <p className="text-xs font-semibold text-emerald-700/70">
+        <p className="text-xs font-semibold text-muted-foreground">
           Your cut of your friends&apos; catch today
         </p>
       </div>
@@ -617,7 +617,7 @@ function LeaderboardRow({
         </div>
 
         <div className="min-w-0 flex-1">
-          <p className="flex items-center gap-1 text-sm font-black leading-tight tracking-tight text-emerald-950 sm:text-base">
+          <p className="flex items-center gap-1 text-sm font-black leading-tight tracking-tight text-foreground sm:text-base">
             <span
               className={cn('truncate', entry.premium && 'plus-name-shimmer')}
             >
@@ -632,7 +632,7 @@ function LeaderboardRow({
             )}
           </p>
           {entry.name && entry.frogName && entry.name !== entry.frogName && (
-            <p className="truncate text-xs font-semibold text-emerald-700/70">
+            <p className="truncate text-xs font-semibold text-muted-foreground">
               {entry.frogName}
             </p>
           )}
@@ -650,7 +650,7 @@ function LeaderboardRow({
           <span className="text-xl font-black tabular-nums leading-none text-emerald-600 sm:text-2xl">
             +{shared}
           </span>
-          <ChevronRight className="h-5 w-5 text-emerald-900/25" />
+          <ChevronRight className="h-5 w-5 text-muted-foreground/60" />
         </div>
       </button>
     </li>
@@ -703,7 +703,7 @@ function InviteRewardBanner({
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-center gap-3 rounded-[18px] border border-emerald-200/70 bg-emerald-50/50 px-3.5 py-3 text-left transition-transform active:scale-[0.99]"
+      className="flex w-full items-center gap-3 rounded-[18px] border border-primary/25 bg-primary/5 px-3.5 py-3 text-left transition-transform active:scale-[0.99]"
     >
       <span className="relative flex h-16 w-16 shrink-0 items-center justify-center self-center overflow-hidden rounded-2xl bg-emerald-500/10 ring-1 ring-emerald-500/15">
         {isOutfit && item ? (
@@ -724,7 +724,7 @@ function InviteRewardBanner({
         <p className="text-[11px] font-black uppercase tracking-[0.14em] text-emerald-600">
           Invite &amp; earn
         </p>
-        <p className="text-sm font-black leading-tight tracking-tight text-emerald-950 sm:text-base">
+        <p className="text-sm font-black leading-tight tracking-tight text-foreground sm:text-base">
           {isOutfit
             ? `Gift a skin, unlock this skin`
             : `Gift a skin to earn rewards`}

@@ -13,6 +13,11 @@ export const warmRiveRuntime = () => {
 
 export const urlCache = new Map<string, string>();
 
+// Bump when fly_idle.riv is re-exported. Rive assets are converted to Blob
+// URLs and retained in memory, so a content version prevents an older export
+// from surviving browser/CDN caches.
+export const FLY_RIVE_ASSET_URL = '/fly_idle.riv?v=52410464';
+
 export const riveDevicePixelRatio = () => {
   if (typeof window === 'undefined') return 1;
   return Math.min(window.devicePixelRatio || 1, 2);

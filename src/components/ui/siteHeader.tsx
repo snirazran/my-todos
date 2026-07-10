@@ -412,7 +412,8 @@ function RightActions({
   compactMobileHome?: boolean;
 }) {
   const [isOpen, setIsOpen] = useState(false);
-  const { theme, setTheme } = useTheme();
+  const { theme, resolvedTheme, setTheme } = useTheme();
+  const activeTheme = resolvedTheme ?? theme;
   const router = useRouter();
   const menuRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
@@ -489,7 +490,7 @@ function RightActions({
             onSignOut={handleSignOut}
             onSignIn={onSignIn}
             showAuth={false}
-            theme={theme}
+            theme={activeTheme}
             setTheme={setTheme}
           />
         </div>
@@ -523,7 +524,7 @@ function RightActions({
         onSignOut={handleSignOut}
         user={user}
         showAuth={true}
-        theme={theme}
+        theme={activeTheme}
         setTheme={setTheme}
         onSignIn={onSignIn}
         onOpenQuestOnboarding={handleOpenQuestOnboarding}
@@ -1210,9 +1211,9 @@ function MainView({
 
       <button
         onClick={onSignOut}
-        className="w-full flex items-center justify-center gap-2 p-4 rounded-2xl font-bold bg-red-50 text-red-600 dark:bg-red-950/20 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+        className="flex w-full items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 p-4 font-black text-rose-600 shadow-sm transition-all hover:bg-rose-100 active:scale-[0.99] dark:border-rose-400/35 dark:bg-rose-500/15 dark:text-rose-300 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_8px_24px_rgba(0,0,0,0.12)] dark:hover:border-rose-400/50 dark:hover:bg-rose-500/25"
       >
-        <LogOut className="w-7 h-7" />
+        <LogOut className="h-6 w-6" strokeWidth={2.5} />
         Sign Out
       </button>
     </div>
@@ -1231,20 +1232,28 @@ function PreferencesView({
   return (
     <div className="space-y-3">
       <MenuSection title="Appearance">
-        <button
+        <motion.button
           onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-          className="w-full flex items-center justify-between px-4 py-4 bg-card hover:bg-accent/50 transition-colors first:rounded-t-2xl last:rounded-b-2xl"
+          whileTap={{ scale: 0.985 }}
+          animate={{
+            boxShadow:
+              theme === 'dark'
+                ? 'inset 0 0 0 1px rgba(74, 222, 128, 0.18)'
+                : 'inset 0 0 0 1px rgba(245, 158, 11, 0.14)',
+          }}
+          transition={{ type: 'spring', stiffness: 360, damping: 28 }}
+          className="flex w-full items-center justify-between bg-card px-4 py-4 transition-colors first:rounded-t-2xl last:rounded-b-2xl hover:bg-accent/50"
         >
           <span className="flex items-center gap-3">
-            <div className="h-9 w-9 flex items-center justify-center">
-              <Icon name="darkMode" label="Color mode" className="w-10 h-10" />
+            <div className="flex h-9 w-12 items-center justify-center">
+              <AnimatedThemeIcon dark={theme === 'dark'} />
             </div>
             <span className="font-bold text-sm">Color Mode</span>
           </span>
           <span className="text-[11px] font-bold text-muted-foreground capitalize">
             {theme === 'dark' ? 'Dark' : 'Light'}
           </span>
-        </button>
+        </motion.button>
       </MenuSection>
 
       <MenuSection title="Quests">
@@ -1431,9 +1440,13 @@ function QuickTile({
   onClick: () => void;
 }) {
   return (
-    <button
+    <motion.button
       type="button"
       onClick={onClick}
+      initial={{ opacity: 0.9, scale: 0.96 }}
+      animate={{ opacity: 1, scale: 1 }}
+      whileTap={{ scale: 0.98 }}
+      transition={{ type: 'spring', stiffness: 380, damping: 26 }}
       className="flex min-h-24 w-full items-center gap-3 rounded-2xl border border-border/50 bg-card px-4 py-3 text-left transition-all active:scale-[0.98] hover:bg-accent/50 max-[359px]:gap-2 max-[359px]:px-3"
     >
       <div className="flex h-10 w-10 shrink-0 items-center justify-center">{icon}</div>
@@ -1445,7 +1458,49 @@ function QuickTile({
           </p>
         )}
       </div>
-    </button>
+    </motion.button>
+  );
+}
+
+function AnimatedThemeIcon({ dark }: { dark: boolean }) {
+  return (
+    <motion.span
+      aria-hidden
+      animate={{
+        backgroundColor: dark ? '#252a3d' : '#fef3c7',
+        borderColor: dark ? '#64748b' : '#fbbf24',
+      }}
+      transition={{ duration: 0.28, ease: 'easeOut' }}
+      className="relative block h-7 w-11 overflow-hidden rounded-full border shadow-inner"
+    >
+      <motion.span
+        animate={{ x: dark ? 16 : 0, rotate: dark ? 180 : 0 }}
+        transition={{ type: 'spring', stiffness: 440, damping: 28 }}
+        className="absolute left-0.5 top-0.5 grid h-5 w-5 place-items-center rounded-full bg-white shadow-md"
+      >
+        <AnimatePresence mode="wait" initial={false}>
+          {dark ? (
+            <motion.span
+              key="moon"
+              initial={{ opacity: 0, scale: 0.5, rotate: -90 }}
+              animate={{ opacity: 1, scale: 1, rotate: 0 }}
+              exit={{ opacity: 0, scale: 0.5, rotate: 90 }}
+            >
+              <Moon className="h-3.5 w-3.5 fill-violet-500 text-violet-600" />
+            </motion.span>
+          ) : (
+            <motion.span
+              key="sun"
+              initial={{ opacity: 0, scale: 0.5, rotate: -90 }}
+              animate={{ opacity: 1, scale: 1, rotate: 0 }}
+              exit={{ opacity: 0, scale: 0.5, rotate: 90 }}
+            >
+              <Sun className="h-3.5 w-3.5 fill-amber-400 text-amber-500" />
+            </motion.span>
+          )}
+        </AnimatePresence>
+      </motion.span>
+    </motion.span>
   );
 }
 
@@ -1495,7 +1550,8 @@ function QuickTilesGrid({
         onClick={onOpenIntegrations}
       />
       <QuickTile
-        icon={<Icon name="darkMode" label="Color mode" className="h-[52px] w-[52px]" />}
+        key={`theme-${theme}`}
+        icon={<AnimatedThemeIcon dark={theme === 'dark'} />}
         title="Color mode"
         subtitle={theme === 'dark' ? 'Dark' : 'Light'}
         onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}

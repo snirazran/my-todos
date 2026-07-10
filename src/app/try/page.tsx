@@ -453,7 +453,7 @@ export default function TryPage() {
                   type="button"
                   onClick={() => void handleGoogle()}
                   disabled={signingIn}
-                  className="mt-1 flex h-[52px] w-full items-center justify-center gap-3 rounded-2xl border border-border bg-white text-[15px] font-black tracking-tight text-slate-800 shadow-[0_4px_0_0_rgba(0,0,0,0.12)] transition-all hover:bg-slate-50 active:translate-y-[3px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60"
+                  className="mt-1 flex h-[52px] w-full items-center justify-center gap-3 rounded-2xl border border-border bg-card text-[15px] font-black tracking-tight text-card-foreground shadow-[0_4px_0_0_rgba(0,0,0,0.12)] transition-all hover:bg-accent active:translate-y-[3px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {signingIn ? (
                     <Loader2 className="h-5 w-5 animate-spin" />

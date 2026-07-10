@@ -45,6 +45,51 @@ function rewardsLabel(rewards: LoginStreakReward[]) {
   return parts.join(' + ') || 'Surprise';
 }
 
+function RewardVisuals({ rewards }: { rewards: LoginStreakReward[] }) {
+  let flies = 0;
+  let freezes = 0;
+  let items = 0;
+  for (const reward of rewards) {
+    if (reward.type === 'STREAK_FREEZE') freezes += reward.amount ?? 1;
+    else if (reward.type === 'FLIES') {
+      flies +=
+        reward.amountMode === 'random'
+          ? reward.maxAmount ?? 0
+          : reward.amount ?? 0;
+    } else {
+      items += 1;
+    }
+  }
+
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1.5">
+      {flies > 0 && (
+        <span className="inline-flex items-center gap-0.5 font-black text-primary">
+          <Fly size={24} y={-3} alwaysPlay interactive={false} />
+          <span className="tabular-nums">{flies}</span>
+        </span>
+      )}
+      {flies > 0 && (freezes > 0 || items > 0) && (
+        <span className="text-muted-foreground/50">+</span>
+      )}
+      {freezes > 0 && (
+        <span className="inline-flex items-center gap-1 font-black text-sky-500">
+          <Snowflake className="h-4 w-4" />
+          <span className="tabular-nums">{freezes}</span>
+        </span>
+      )}
+      {freezes > 0 && items > 0 && (
+        <span className="text-muted-foreground/50">+</span>
+      )}
+      {items > 0 && (
+        <span className="font-black text-amber-500">
+          {items} item{items > 1 ? 's' : ''}
+        </span>
+      )}
+    </span>
+  );
+}
+
 function WeekStrip({ view, light = false }: { view: LoginStreakView; light?: boolean }) {
   const today = localDayKey();
   const days = useMemo(() => {
@@ -350,18 +395,26 @@ function CommitStep({
               onClick={() => pickGoal(tier.days)}
               className="flex w-full items-center gap-4 rounded-2xl border border-border/60 bg-card p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-amber-400 active:scale-[0.98]"
             >
-              <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-orange-100 text-lg font-black text-orange-500 dark:bg-orange-500/15">
-                {tier.days}d
+              <span className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-2xl bg-orange-100 font-black text-orange-500 dark:bg-orange-500/15">
+                <Flame className="h-5 w-5 fill-current" />
+                <span className="text-sm leading-none tabular-nums">
+                  {tier.days}d
+                </span>
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block text-base font-black text-foreground">
                   {tier.days} days in a row
                 </span>
-                <span className="block text-xs font-bold text-muted-foreground">
-                  {busyDays === tier.days
-                    ? 'Committing…'
-                    : `Earn ${rewardsLabel(tier.rewards)}`}
-                </span>
+                {busyDays === tier.days ? (
+                  <span className="block text-xs font-bold text-muted-foreground">
+                    Committing…
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground">
+                    <span>Earn</span>
+                    <RewardVisuals rewards={tier.rewards} />
+                  </span>
+                )}
               </span>
               <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground/40" />
             </button>

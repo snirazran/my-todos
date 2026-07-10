@@ -5,7 +5,7 @@ import {
   Layout,
   Rive,
 } from '@rive-app/react-canvas-lite';
-import { preloadRiveAsset } from './riveLoader';
+import { FLY_RIVE_ASSET_URL, preloadRiveAsset } from './riveLoader';
 import { useRiveInteractionPause } from './riveInteractionPause';
 
 /**
@@ -19,6 +19,9 @@ import { useRiveInteractionPause } from './riveInteractionPause';
  */
 
 const MASTER_SIZE = 288;
+const FLY_VIEW_MODEL = 'ViewModel1';
+const FLY_VIEW_MODEL_INSTANCE = 'Instance';
+const FLY_LIGHT_MODE_PROPERTY = 'light_mode';
 // Halving mip levels: blits pick the smallest level that still covers the
 // target canvas, so no single drawImage downscales by more than ~2x (a big
 // one-step downscale bypasses filtering and looks pixelated).
@@ -52,6 +55,45 @@ let masterReady = false;
 let mipsValid = false;
 let creating = false;
 let interactionPaused = false;
+let themeObserver: MutationObserver | null = null;
+let flyLightMode: { value: number } | null = null;
+
+function syncFlyTheme() {
+  if (!flyLightMode || typeof document === 'undefined') return;
+  // The fly asset intentionally maps light_mode=1 to its dark-theme artwork.
+  const value = document.documentElement.classList.contains('dark') ? 1 : 0;
+  flyLightMode.value = value;
+  masterCanvas?.setAttribute('data-light-mode', String(value));
+
+  // Theme changes can happen while an open sheet globally pauses Rive. Mark
+  // every copy stale and advance the master once so the new binding paints
+  // immediately; onAdvance will pause it again when no continuous frames are
+  // needed.
+  mipsValid = false;
+  entries.forEach((entry) => {
+    entry.hasFrame = false;
+  });
+  if (master && !master.isPlaying) master.play();
+}
+
+function bindFlyTheme() {
+  if (!master) return;
+  const viewModel = master.viewModelByName(FLY_VIEW_MODEL);
+  const instance = viewModel?.instanceByName(FLY_VIEW_MODEL_INSTANCE);
+  if (!instance) return;
+  master.bindViewModelInstance(instance);
+  flyLightMode = instance.number(FLY_LIGHT_MODE_PROPERTY);
+  syncFlyTheme();
+}
+
+function observeTheme() {
+  if (themeObserver || typeof document === 'undefined') return;
+  themeObserver = new MutationObserver(syncFlyTheme);
+  themeObserver.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['class'],
+  });
+}
 
 useRiveInteractionPause.subscribe((state) => {
   const paused = state.count > 0;
@@ -150,7 +192,7 @@ function ensureMaster() {
     ctx.imageSmoothingQuality = 'high';
     return { canvas, ctx, size };
   });
-  preloadRiveAsset('/fly_idle.riv').then((url) => {
+  preloadRiveAsset(FLY_RIVE_ASSET_URL).then((url) => {
     master = new Rive({
       src: url,
       canvas: masterCanvas!,
@@ -161,6 +203,8 @@ function ensureMaster() {
       layout: new Layout({ fit: Fit.Contain, alignment: Alignment.Center }),
       onLoad: () => {
         masterReady = true;
+        bindFlyTheme();
+        observeTheme();
         master!.on(EventType.Advance, onAdvance);
         syncMasterPlayback();
       },

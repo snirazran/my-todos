@@ -209,14 +209,14 @@ function MyCodeView({
           />
         </div>
 
-        <div className="relative w-full rounded-[28px] bg-white px-5 pb-5 pt-6 text-center shadow-2xl sm:px-6 sm:pb-7 sm:[@media(max-height:760px)]:pb-5 sm:[@media(max-height:760px)]:pt-5">
-          <p className="text-lg font-black leading-tight tracking-tight text-zinc-900 sm:text-xl sm:[@media(max-height:680px)]:text-lg">
+        <div className="relative w-full rounded-[28px] border border-border bg-popover px-5 pb-5 pt-6 text-center text-popover-foreground shadow-2xl sm:px-6 sm:pb-7 sm:[@media(max-height:760px)]:pb-5 sm:[@media(max-height:760px)]:pt-5">
+          <p className="text-lg font-black leading-tight tracking-tight text-foreground sm:text-xl sm:[@media(max-height:680px)]:text-lg">
             {data?.name ? `${data.name} & ${data.frogName}` : data?.frogName ?? 'Your code'}
           </p>
           <button
             type="button"
             onClick={handleCopy}
-            className="mx-auto mt-1.5 flex items-center gap-1.5 text-base font-bold tracking-[0.12em] text-zinc-500"
+            className="mx-auto mt-1.5 flex items-center gap-1.5 text-base font-bold tracking-[0.12em] text-muted-foreground"
           >
             {data?.code ?? '··········'}
             {copied ? (
@@ -230,7 +230,7 @@ function MyCodeView({
             {qr ? (
               <img src={qr} alt="Your friend QR code" className="h-full w-full" />
             ) : (
-              <Loader2 className="h-8 w-8 animate-spin text-zinc-300" />
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             )}
           </div>
         </div>

@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 
 export function ThemeToggle() {
-  const { theme, setTheme } = useTheme();
+  const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = React.useState(false);
 
   // Avoid hydration mismatch
@@ -17,7 +17,13 @@ export function ThemeToggle() {
 
   if (!mounted) {
     return (
-      <Button variant="ghost" size="icon" className="relative h-9 w-9 rounded-xl border border-border/50 bg-background/50 dark:border-border/50 dark:bg-background/50">
+      <Button
+        variant="ghost"
+        size="icon"
+        aria-hidden
+        disabled
+        className="relative h-9 w-9 rounded-xl border border-border/60 bg-background/70"
+      >
         <div className="h-4 w-4" />
       </Button>
     );
@@ -27,11 +33,13 @@ export function ThemeToggle() {
     <Button
       variant="ghost"
       size="icon"
-      onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-      className="relative h-9 w-9 rounded-xl border border-border/50 bg-background/50 transition-all hover:bg-accent dark:border-border/50 dark:bg-background/50 dark:hover:bg-accent"
+      aria-label={`Switch to ${resolvedTheme === 'dark' ? 'light' : 'dark'} mode`}
+      title={`Switch to ${resolvedTheme === 'dark' ? 'light' : 'dark'} mode`}
+      onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
+      className="relative h-9 w-9 rounded-xl border border-border/60 bg-background/70 transition-all hover:border-primary/35 hover:bg-accent"
     >
       <AnimatePresence mode="wait" initial={false}>
-        {theme === 'dark' ? (
+        {resolvedTheme === 'dark' ? (
           <motion.div
             key="moon"
             initial={{ y: 10, opacity: 0, rotate: 45 }}

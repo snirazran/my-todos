@@ -24,7 +24,7 @@ export const RARITY_CONFIG: Record<
       'from-slate-200 to-slate-100 dark:from-slate-800 dark:to-slate-900',
     shadow: 'shadow-xl shadow-slate-900/10',
     rays: 'text-slate-400/20',
-    button: 'bg-white text-slate-900 hover:bg-slate-50',
+    button: 'bg-background text-foreground hover:bg-accent',
   },
   uncommon: {
     border: 'border-emerald-400',

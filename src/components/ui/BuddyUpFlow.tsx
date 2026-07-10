@@ -240,16 +240,16 @@ export function BuddyUpFlow({
                   </div>
                 </div>
 
-                <div className="mt-4 flex w-full max-w-sm items-center gap-3 rounded-2xl border border-white/20 bg-white/95 px-4 py-3 shadow-lg">
+                <div className="mt-4 flex w-full max-w-sm items-center gap-3 rounded-2xl border border-white/20 bg-white/95 px-4 py-3 shadow-lg dark:border-border dark:bg-card/95">
                   <div className="min-w-0 flex-1 text-left">
-                    <p className="truncate text-base font-black text-slate-800">
+                    <p className="truncate text-base font-black text-slate-800 dark:text-card-foreground">
                       {draft?.text}
                     </p>
-                    <p className="text-sm font-semibold capitalize text-slate-400">
+                    <p className="text-sm font-semibold capitalize text-slate-400 dark:text-muted-foreground">
                       {draft ? repeatLabel(draft) : ''}
                     </p>
                   </div>
-                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-100">
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-100 dark:bg-muted">
                     <span className="-translate-y-[2px]">
                       <Fly size={34} interactive={false} paused />
                     </span>

@@ -129,14 +129,14 @@ export function CrossPlatformGiftBanner() {
             } as CSSProperties
           }
         >
-          <div className="relative overflow-hidden rounded-2xl border border-[#4f9149]/30 bg-white shadow-xl dark:border-[#4f9149]/40 dark:bg-slate-900">
+          <div className="relative overflow-hidden rounded-2xl border border-primary/30 bg-popover text-popover-foreground shadow-xl dark:border-primary/40">
             {qrUrl ? (
               <div className="flex flex-col items-center gap-2 px-4 py-4">
                 <button
                   type="button"
                   onClick={dismiss}
                   aria-label="Dismiss"
-                  className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full text-slate-300 transition-colors hover:bg-slate-100 hover:text-slate-500 dark:hover:bg-slate-800"
+                  className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
                 >
                   <X className="h-4 w-4" strokeWidth={3} />
                 </button>
@@ -144,9 +144,9 @@ export function CrossPlatformGiftBanner() {
                 <img
                   src={qrUrl}
                   alt="QR code to download the Frogress app"
-                  className="h-40 w-40 rounded-xl border border-slate-200 dark:border-slate-700"
+                  className="h-40 w-40 rounded-xl border border-border"
                 />
-                <p className="text-xs font-bold text-slate-500 dark:text-slate-400">
+                <p className="text-xs font-bold text-muted-foreground">
                   Scan with your phone — your gift is waiting
                 </p>
               </div>
@@ -158,19 +158,19 @@ export function CrossPlatformGiftBanner() {
                 <div className="min-w-0 flex-1">
                   {platform === 'web' ? (
                     <>
-                      <p className="text-sm font-black leading-tight text-slate-800 dark:text-white">
+                      <p className="text-sm font-black leading-tight text-foreground">
                         A gift is waiting in the app
                       </p>
-                      <p className="text-xs font-semibold text-slate-400">
+                      <p className="text-xs font-semibold text-muted-foreground">
                         Get the app and unwrap it in your pond
                       </p>
                     </>
                   ) : (
                     <>
-                      <p className="text-sm font-black leading-tight text-slate-800 dark:text-white">
+                      <p className="text-sm font-black leading-tight text-foreground">
                         Your pond works on computers too
                       </p>
-                      <p className="text-xs font-semibold text-slate-400">
+                      <p className="text-xs font-semibold text-muted-foreground">
                         Sign in at frogress.com — a gift will be waiting
                       </p>
                     </>
@@ -224,7 +224,7 @@ export function CrossPlatformGiftBanner() {
                   type="button"
                   onClick={dismiss}
                   aria-label="Dismiss"
-                  className="-mr-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-slate-300 transition-colors hover:bg-slate-100 hover:text-slate-500 dark:hover:bg-slate-800"
+                  className="-mr-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
                 >
                   <X className="h-4 w-4" strokeWidth={3} />
                 </button>

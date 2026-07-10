@@ -270,7 +270,8 @@
       "Bash(./gradlew compileDebugJavaWithJavac -q --console=plain)",
       "Bash(echo \"gradle exit: $?\")",
       "Bash(./gradlew :app:compileDebugJavaWithJavac --console=plain)",
-      "Bash(./gradlew :app:compileDebugJavaWithJavac -q --console=plain)"
+      "Bash(./gradlew :app:compileDebugJavaWithJavac -q --console=plain)",
+      "PowerShell(npx tsc --noEmit 2>$null; \"exit: $LASTEXITCODE\")"
     ]
   }
 }

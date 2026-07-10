@@ -89,7 +89,7 @@ export function ProfilePanel({
         <button
           type="button"
           onClick={() => setConfirmingDelete(true)}
-          className="h-12 w-full rounded-2xl border border-border/50 bg-card text-sm font-black tracking-tight text-rose-500 transition-colors hover:bg-rose-50 active:scale-[0.99]"
+          className="h-12 w-full rounded-2xl border border-border/50 bg-card text-sm font-black tracking-tight text-rose-500 transition-colors hover:bg-rose-500/10 active:scale-[0.99] dark:text-rose-400"
         >
           Delete Data
         </button>
@@ -199,7 +199,7 @@ function DialogShell({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.96, y: 10 }}
           transition={{ type: 'spring', damping: 26, stiffness: 320 }}
-          className="pointer-events-auto relative w-full max-w-md rounded-3xl bg-white p-5 shadow-2xl"
+          className="pointer-events-auto relative w-full max-w-md rounded-3xl border border-border bg-popover p-5 text-popover-foreground shadow-2xl"
         >
           <button
             type="button"

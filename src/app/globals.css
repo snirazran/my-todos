@@ -33,33 +33,36 @@
     --radius: 0.5rem;
     --safe-bottom: env(safe-area-inset-bottom, 0px);
     --bottom-safe: env(safe-area-inset-bottom, 0px);
+    color-scheme: light;
   }
 
   .dark {
-    --background: 150 30% 6%;
-    --foreground: 150 10% 90%;
-    --card: 150 25% 9%;
-    --card-foreground: 150 10% 90%;
-    --popover: 150 25% 9%;
-    --popover-foreground: 150 10% 90%;
-    --primary: 142 70% 50%;
-    --primary-foreground: 145 80% 10%;
-    --secondary: 150 20% 15%;
-    --secondary-foreground: 150 10% 90%;
-    --muted: 150 20% 15%;
-    --muted-foreground: 150 10% 60%;
-    --accent: 150 20% 20%;
-    --accent-foreground: 150 10% 90%;
-    --destructive: 0 62.8% 30.6%;
+    /* Deep, low-glare frog-green neutrals with clearly stepped surfaces. */
+    --background: 150 22% 7%;
+    --foreground: 140 18% 93%;
+    --card: 150 18% 10%;
+    --card-foreground: 140 18% 93%;
+    --popover: 150 16% 12%;
+    --popover-foreground: 140 18% 93%;
+    --primary: 142 65% 55%;
+    --primary-foreground: 150 32% 8%;
+    --secondary: 150 14% 16%;
+    --secondary-foreground: 140 14% 91%;
+    --muted: 150 12% 15%;
+    --muted-foreground: 145 10% 68%;
+    --accent: 146 18% 19%;
+    --accent-foreground: 140 16% 92%;
+    --destructive: 0 68% 48%;
     --destructive-foreground: 0 0% 98%;
-    --border: 150 20% 18%;
-    --input: 150 20% 18%;
-    --ring: 142 70% 50%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
+    --border: 145 13% 30%;
+    --input: 145 13% 36%;
+    --ring: 142 70% 56%;
+    --chart-1: 206 80% 62%;
+    --chart-2: 150 65% 52%;
+    --chart-3: 38 90% 60%;
+    --chart-4: 270 72% 68%;
+    --chart-5: 338 78% 64%;
+    color-scheme: dark;
   }
 }
 
@@ -74,6 +77,13 @@
       'calt' 1;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+  ::selection {
+    background: hsl(var(--primary) / 0.28);
+    color: hsl(var(--foreground));
+  }
+  :focus-visible {
+    outline-color: hsl(var(--ring));
   }
 }
 
@@ -282,15 +292,15 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-slate-100 dark:bg-slate-800;
+  @apply bg-muted;
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply rounded-full bg-slate-300 dark:bg-slate-600;
+  @apply rounded-full bg-border;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-slate-400 dark:bg-slate-500;
+  @apply bg-muted-foreground/60;
 }
 
 /* Smooth color transitions — scoped to interactive elements only (global * rule kills drag/animation perf on mobile) */

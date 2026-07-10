@@ -1442,7 +1442,7 @@ function SeasonRewardPreview({
   return (
     <div
       className={cn(
-        'relative flex h-full w-full items-center justify-center rounded-2xl bg-white',
+        'relative flex h-full w-full items-center justify-center rounded-2xl bg-card',
         className,
       )}
     >

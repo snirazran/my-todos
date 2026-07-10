@@ -10,7 +10,12 @@ import CalendarEventLinkModel, {
   type CalendarEventLinkDoc,
 } from '@/lib/models/CalendarEventLink';
 import { getZonedToday } from '@/lib/utils';
-import { addDaysYMD, dowFromYMD } from '@/lib/taskOccurrence';
+import {
+  addDaysYMD,
+  customOccursOn,
+  domFromYMD,
+  dowFromYMD,
+} from '@/lib/taskOccurrence';
 import { fingerprint } from './fingerprint';
 import { neutralToAppRepeat, type NeutralToAppResult } from './recurrence';
 import { minutesToReminder } from './reminders';
@@ -20,7 +25,7 @@ import {
   taskUnitToNeutral,
   type TaskUnit,
 } from './taskMapping';
-import type { NeutralEvent } from './types';
+import type { NeutralEvent, NeutralRecurrence } from './types';
 
 export const SYNC_WINDOW_PAST_DAYS = 7;
 export const SYNC_WINDOW_FUTURE_DAYS = 60;
@@ -155,7 +160,47 @@ async function createDatedTask(
   return id;
 }
 
-/** Create app task(s) for an inbound event. Returns the link key. */
+/** First date on/after `fromDate` where the recurrence occurs, honoring the
+ *  series anchor (`startDate`) for interval phase. Null when the series has
+ *  no occurrence left (ended, or none within `maxDays`). */
+function firstRecurrenceOnOrAfter(
+  rec: NeutralRecurrence,
+  startDate: string,
+  fromDate: string,
+  maxDays = 366,
+): string | null {
+  if (rec.until && rec.until < startDate) return null;
+  if (startDate >= fromDate) return startDate;
+  const rule: NonNullable<TaskDoc['repeatRule']> = {
+    freq: rec.freq,
+    interval: Math.max(1, rec.interval || 1),
+    byWeekday:
+      rec.freq === 'weekly'
+        ? rec.byWeekday?.length
+          ? rec.byWeekday
+          : [dowFromYMD(startDate)]
+        : undefined,
+    byMonthday:
+      rec.freq === 'monthly'
+        ? rec.byMonthday?.length
+          ? rec.byMonthday
+          : [domFromYMD(startDate)]
+        : undefined,
+  };
+  let d = fromDate;
+  for (let i = 0; i < maxDays; i++) {
+    if (rec.until && d > rec.until) return null;
+    if (customOccursOn({ repeatRule: rule, repeatStartDate: startDate }, d)) {
+      return d;
+    }
+    d = addDaysYMD(d, 1);
+  }
+  return null;
+}
+
+/** Create app task(s) for an inbound event. Returns the link key. Recurring
+ *  events are anchored at their first occurrence on/after today so past
+ *  occurrences never materialize as app tasks. */
 async function createTasksFromNeutral(
   uid: string,
   neutral: NeutralEvent,
@@ -166,10 +211,19 @@ async function createTasksFromNeutral(
     return { taskId: await createDatedTask(uid, neutral, importTagId) };
   }
 
-  const appShape = neutralToAppRepeat(neutral.recurrence, neutral.startDate);
+  const anchor = firstRecurrenceOnOrAfter(
+    neutral.recurrence,
+    neutral.startDate,
+    getZonedToday(tz),
+  );
+  if (!anchor) return null;
+  const anchored =
+    anchor === neutral.startDate ? neutral : { ...neutral, startDate: anchor };
+
+  const appShape = neutralToAppRepeat(neutral.recurrence, anchor);
   if (!appShape) return null;
 
-  const body = neutralRecurrenceToCreateBody(neutral, neutral.recurrence, appShape);
+  const body = neutralRecurrenceToCreateBody(anchored, neutral.recurrence, appShape);
   if (importTagId) body.tags = [importTagId];
   body.reminder = minutesToReminder(neutral.reminderMinutes);
 
@@ -189,6 +243,40 @@ async function createTasksFromNeutral(
 
   if (result.repeatGroupId) return { repeatGroupId: result.repeatGroupId };
   return result.ids[0] ? { taskId: result.ids[0] } : null;
+}
+
+/** Link an inbound event to an existing identical unlinked task instead of
+ *  creating a duplicate (e.g. tasks kept across a disconnect/reconnect). */
+async function adoptMatchingTask(
+  conn: CalendarConnectionDoc,
+  remote: NeutralEvent,
+  remoteFp: string,
+  tz: string,
+  todayYMD: string,
+): Promise<{ taskId: string } | null> {
+  if (remote.recurrence) return null;
+  const candidates = await TaskModel.find({
+    userId: conn.userId,
+    type: 'regular',
+    date: remote.startDate,
+    repeatGroupId: { $exists: false },
+    bondId: { $exists: false },
+    deletedAt: { $exists: false },
+  }).lean<TaskDoc[]>();
+  for (const doc of candidates) {
+    const neutral = taskUnitToNeutral(
+      { key: { taskId: doc.id }, docs: [doc] },
+      tz,
+      todayYMD,
+    );
+    if (!neutral || fingerprint(neutral) !== remoteFp) continue;
+    const linked = await CalendarEventLinkModel.exists({
+      connectionId: conn._id,
+      taskId: doc.id,
+    });
+    if (!linked) return { taskId: doc.id };
+  }
+  return null;
 }
 
 function recurrenceEquals(a?: NeutralEvent['recurrence'], b?: NeutralEvent['recurrence']) {
@@ -382,12 +470,14 @@ export async function processRemoteChanges(
         if (remote.startDate < windowStart || remote.startDate > windowEnd) {
           if (!remote.recurrence) continue;
         }
-        const created = await createTasksFromNeutral(
-          conn.userId,
-          remote,
-          tz,
-          conn.settings.importTagId,
-        );
+        const created =
+          (await adoptMatchingTask(conn, remote, remoteFp, tz, todayYMD)) ??
+          (await createTasksFromNeutral(
+            conn.userId,
+            remote,
+            tz,
+            conn.settings.importTagId,
+          ));
         if (!created) continue;
         await CalendarEventLinkModel.create({
           userId: conn.userId,
@@ -590,12 +680,15 @@ async function handleUnsupportedRecurrence(
     const existing = linkByDate.get(inst.date);
 
     if (!existing) {
-      const taskId = await createDatedTask(
-        conn.userId,
-        instNeutral,
-        conn.settings.importTagId,
-        inst.date,
-      );
+      const adopted = await adoptMatchingTask(conn, instNeutral, instFp, tz, windowStart);
+      const taskId =
+        adopted?.taskId ??
+        (await createDatedTask(
+          conn.userId,
+          instNeutral,
+          conn.settings.importTagId,
+          inst.date,
+        ));
       await CalendarEventLinkModel.create({
         userId: conn.userId,
         connectionId: conn._id,
@@ -797,8 +890,60 @@ export async function seedLegacyGoogleLinks(
   }
 }
 
+/**
+ * Remove a connection and the tasks it imported. Completed dated tasks stay
+ * as history; recurring units with completed occurrences are truncated
+ * (repeatEndDate = yesterday) instead of deleted, mirroring removeOrEnd.
+ */
 export async function deleteConnectionData(connectionId: Types.ObjectId | string) {
   await connectMongo();
+  const imported = await CalendarEventLinkModel.find(
+    { connectionId, origin: 'calendar' },
+    { userId: 1, taskId: 1, repeatGroupId: 1 },
+  ).lean<CalendarEventLinkDoc[]>();
+  if (imported.length) {
+    const userId = imported[0].userId;
+    const taskIds = imported
+      .filter((l) => !l.repeatGroupId && l.taskId)
+      .map((l) => l.taskId!);
+    const groupIds = imported
+      .filter((l) => l.repeatGroupId)
+      .map((l) => l.repeatGroupId!);
+    const or: Record<string, unknown>[] = [];
+    if (taskIds.length) or.push({ id: { $in: taskIds } });
+    if (groupIds.length) or.push({ repeatGroupId: { $in: groupIds } });
+    if (or.length) {
+      const docs = await TaskModel.find({ userId, $or: or }).lean<TaskDoc[]>();
+      const truncateIds = groupIntoUnits(docs)
+        .filter(
+          (u) =>
+            u.docs[0].type === 'weekly' &&
+            u.docs.some((d) => d.completedDates?.length),
+        )
+        .flatMap((u) => u.docs.map((d) => d.id));
+      if (truncateIds.length) {
+        const tz = await getUserTz(userId);
+        const yesterday = addDaysYMD(getZonedToday(tz), -1);
+        await TaskModel.updateMany(
+          {
+            userId,
+            id: { $in: truncateIds },
+            $or: [
+              { repeatEndDate: { $exists: false } },
+              { repeatEndDate: { $gt: yesterday } },
+            ],
+          },
+          { $set: { repeatEndDate: yesterday } },
+        );
+      }
+      await TaskModel.deleteMany({
+        userId,
+        completed: { $ne: true },
+        id: { $nin: truncateIds },
+        $or: or,
+      });
+    }
+  }
   await CalendarEventLinkModel.deleteMany({ connectionId });
   await CalendarConnectionModel.deleteOne({ _id: connectionId });
 }

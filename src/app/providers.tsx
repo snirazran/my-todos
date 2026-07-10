@@ -22,7 +22,13 @@ import { AnalyticsProvider } from '@/components/providers/AnalyticsProvider';
 
 export default function Providers({ children }: { children: ReactNode }) {
   return (
-    <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
+    <ThemeProvider
+      attribute="class"
+      defaultTheme="system"
+      enableSystem
+      enableColorScheme
+      disableTransitionOnChange
+    >
       <SWRConfig
         value={{
           revalidateOnFocus: false,

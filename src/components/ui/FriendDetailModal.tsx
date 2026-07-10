@@ -280,7 +280,7 @@ export function FriendDetailModal({
                           exit={{ opacity: 0, scale: 0.95, y: -4 }}
                           transition={{ duration: 0.12 }}
                           onClick={(e) => e.stopPropagation()}
-                          className="absolute right-0 top-12 z-30 w-44 overflow-hidden rounded-xl border border-border/60 bg-white shadow-xl"
+                          className="absolute right-0 top-12 z-30 w-44 overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-xl"
                         >
                           <button
                             type="button"
@@ -288,7 +288,7 @@ export function FriendDetailModal({
                               setMenuOpen(false);
                               onRemove(entry);
                             }}
-                            className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-bold text-rose-600 transition-colors hover:bg-rose-50"
+                            className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-bold text-rose-600 transition-colors hover:bg-rose-500/10 dark:text-rose-400"
                           >
                             <UserMinus className="h-4 w-4" />
                             Remove friend
@@ -417,10 +417,10 @@ export function FriendDetailModal({
                         key={inv.bondId}
                         className="rounded-[18px] border border-[#4f9149]/30 bg-[#4f9149]/8 p-3"
                       >
-                        <p className="text-sm font-black text-emerald-950">
+                        <p className="text-sm font-black text-foreground">
                           {inv.withName} invited you
                         </p>
-                        <p className="truncate text-[13px] font-semibold text-emerald-800/70">
+                        <p className="truncate text-[13px] font-semibold text-muted-foreground">
                           {inv.text}
                           {inv.repeatLabel ? ` · ${inv.repeatLabel}` : ''}
                         </p>
@@ -474,10 +474,10 @@ export function FriendDetailModal({
                   <div className="mx-auto mb-2 flex h-11 w-11 items-center justify-center rounded-2xl bg-[#4f9149]/15 text-[#4f9149]">
                     <Users className="h-6 w-6" />
                   </div>
-                  <p className="text-base font-black tracking-tight text-emerald-950">
+                  <p className="text-base font-black tracking-tight text-foreground">
                     Building habits is better together
                   </p>
-                  <p className="mt-1 text-[13px] font-medium text-emerald-800/70">
+                  <p className="mt-1 text-[13px] font-medium text-muted-foreground">
                     Team up on a task and keep each other going.
                   </p>
                   <button

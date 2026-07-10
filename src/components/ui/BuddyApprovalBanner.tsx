@@ -43,16 +43,16 @@ export function BuddyApprovalBanner() {
           initial={{ opacity: 0, y: -12 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -12 }}
-          className="fixed inset-x-0 top-[calc(env(safe-area-inset-top)+0.5rem)] z-[1400] mx-auto flex w-[min(100%-1.5rem,28rem)] items-center gap-3 rounded-2xl border border-[#4f9149]/30 bg-white px-4 py-3 shadow-xl"
+          className="fixed inset-x-0 top-[calc(env(safe-area-inset-top)+0.5rem)] z-[1400] mx-auto flex w-[min(100%-1.5rem,28rem)] items-center gap-3 rounded-2xl border border-primary/30 bg-popover px-4 py-3 text-popover-foreground shadow-xl"
         >
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#4f9149]/12 text-[#4f9149]">
             <Repeat className="h-5 w-5" />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-black leading-tight text-slate-800">
+            <p className="text-sm font-black leading-tight text-foreground">
               {pending.partnerName} wants to change a shared task&apos;s schedule
             </p>
-            <p className="text-xs font-semibold text-slate-400">
+            <p className="text-xs font-semibold text-muted-foreground">
               Approve to update it for both of you
             </p>
           </div>
@@ -62,7 +62,7 @@ export function BuddyApprovalBanner() {
               onClick={() => respond('repeat-decline')}
               disabled={busy}
               aria-label="Decline"
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition-colors hover:bg-slate-200 disabled:opacity-60"
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:opacity-60"
             >
               <X className="h-4 w-4" strokeWidth={3} />
             </button>

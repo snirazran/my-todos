@@ -6,6 +6,7 @@ import connectMongo from '@/lib/mongoose';
 import CalendarConnectionModel from '@/lib/models/CalendarConnection';
 import { deleteConnectionData } from '@/lib/calendar/engine';
 import { invalidateConnectionCache } from '@/lib/calendar/connections';
+import { notifyTaskChanged } from '@/lib/taskSync';
 
 export async function DELETE(
   _req: NextRequest,
@@ -41,5 +42,6 @@ export async function DELETE(
 
   await deleteConnectionData(conn._id);
   invalidateConnectionCache(uid);
+  await notifyTaskChanged(uid);
   return NextResponse.json({ ok: true });
 }

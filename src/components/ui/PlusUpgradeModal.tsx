@@ -268,7 +268,7 @@ function PrimaryButton({
       disabled={disabled}
       whileTap={{ scale: 0.97 }}
       transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-      className="relative h-14 w-full overflow-hidden rounded-2xl bg-white text-base font-black tracking-tight text-foreground shadow-sm disabled:opacity-60"
+      className="relative h-14 w-full overflow-hidden rounded-2xl bg-white text-base font-black tracking-tight text-violet-700 shadow-sm disabled:opacity-60 dark:text-violet-700"
     >
       {!reduceMotion && (
         <motion.span
@@ -440,7 +440,7 @@ function Step1({ onContinue }: { onContinue: () => void }) {
             <div />
             <div className="text-center text-white/90">Free</div>
             <div className="flex justify-center">
-              <span className="rounded-lg bg-white px-2.5 py-1 text-[11px] font-black tracking-wider text-foreground">
+              <span className="rounded-lg bg-white px-2.5 py-1 text-[11px] font-black tracking-wider text-violet-700 dark:text-violet-700">
                 PLUS
               </span>
             </div>
@@ -692,7 +692,7 @@ function PlanCard({
       }`}
     >
       {badge && (
-        <span className="absolute right-4 top-4 rounded-md bg-white px-2 py-0.5 text-[10px] font-black tracking-wider text-foreground">
+        <span className="absolute right-4 top-4 rounded-md bg-white px-2 py-0.5 text-[10px] font-black tracking-wider text-violet-700 dark:text-violet-700">
           {badge}
         </span>
       )}
