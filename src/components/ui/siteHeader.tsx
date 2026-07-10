@@ -734,6 +734,8 @@ function MobileSheet({
           dragDirectionLock
           dragConstraints={{ left: 0, right: 0 }}
           dragElastic={{ left: 0, right: 0.9 }}
+          dragMomentum={false}
+          dragTransition={{ bounceStiffness: 400, bounceDamping: 40 }}
           onDragEnd={(_e, info) => {
             if (info.offset.x > 90 || info.velocity.x > 500) {
               sheetControls
@@ -825,6 +827,8 @@ function MobileSheet({
           dragDirectionLock
           dragConstraints={{ left: 0, right: 0 }}
           dragElastic={{ left: 0, right: 0.9 }}
+          dragMomentum={false}
+          dragTransition={{ bounceStiffness: 400, bounceDamping: 40 }}
           onDragEnd={(_e, info) => {
             if (info.offset.x > 90 || info.velocity.x > 500) {
               const target = view === 'contact' ? contactBack : 'main';
