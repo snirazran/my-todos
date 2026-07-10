@@ -2,17 +2,21 @@ import { v4 as uuid } from 'uuid';
 import type { DAVCalendar } from 'tsdav';
 import { addDaysYMD } from '@/lib/taskOccurrence';
 import type { ProviderAdapter } from '../engine';
-import { getClient } from './client';
+import { ensureAppCalendar, getClient } from './client';
 import { buildVEVENT, expandInstances, parseVEVENT } from './ics';
 
 function calendarRef(url: string): DAVCalendar {
   return { url } as DAVCalendar;
 }
 
+function collectionUrlOf(href: string): string {
+  return href.slice(0, href.lastIndexOf('/') + 1);
+}
+
 async function fetchOne(conn: Parameters<ProviderAdapter['insert']>[0], href: string) {
   const client = await getClient(conn);
   const objects = await client.fetchCalendarObjects({
-    calendar: calendarRef(conn.calendarUrl!),
+    calendar: calendarRef(collectionUrlOf(href)),
     objectUrls: [href],
   });
   return objects[0] ?? null;
@@ -22,19 +26,20 @@ export const appleAdapter: ProviderAdapter = {
   provider: 'apple',
 
   async insert(conn, neutral, fp) {
+    if (!conn.appCalendarUrl) await ensureAppCalendar(conn);
     const client = await getClient(conn);
     const uid = `${uuid()}@local`;
     const filename = `${uid}.ics`;
     const ics = buildVEVENT(neutral, uid, fp);
     const res = await client.createCalendarObject({
-      calendar: calendarRef(conn.calendarUrl!),
+      calendar: calendarRef(conn.appCalendarUrl!),
       iCalString: ics,
       filename,
     });
     if (!res.ok) {
       throw new Error(`caldav create ${res.status}: ${await res.text()}`);
     }
-    const href = `${conn.calendarUrl!.replace(/\/$/, '')}/${filename}`;
+    const href = `${conn.appCalendarUrl!.replace(/\/$/, '')}/${filename}`;
     let etag = res.headers.get('etag') ?? undefined;
     if (!etag) {
       const obj = await fetchOne(conn, href);

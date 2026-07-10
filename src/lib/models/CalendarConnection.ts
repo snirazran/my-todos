@@ -13,11 +13,11 @@ export interface CalendarConnectionDoc {
   encAppPassword?: string;
   appleId?: string;
   calendarId?: string;
-  appCalendarId?: string; // app-owned "Frogress" calendar receiving exported tasks
-  calendarUrl?: string;
+  appCalendarId?: string; // app-owned "Frogress" calendar receiving exported tasks (Google)
+  appCalendarUrl?: string; // app-owned "Frogress" calendar receiving exported tasks (Apple)
   calendarDisplayName?: string;
   syncToken?: string;
-  ctag?: string;
+  calendarCtags?: Record<string, string>; // per source-calendar ctag (Apple)
   lastFullSyncAt?: Date;
   lastIncrementalSyncAt?: Date;
   nextPollAt?: Date;
@@ -46,10 +46,10 @@ const CalendarConnectionSchema = new Schema<CalendarConnectionDoc>(
     appleId: { type: String },
     calendarId: { type: String },
     appCalendarId: { type: String },
-    calendarUrl: { type: String },
+    appCalendarUrl: { type: String },
     calendarDisplayName: { type: String },
     syncToken: { type: String },
-    ctag: { type: String },
+    calendarCtags: { type: Schema.Types.Mixed },
     lastFullSyncAt: { type: Date },
     lastIncrementalSyncAt: { type: Date },
     nextPollAt: { type: Date },

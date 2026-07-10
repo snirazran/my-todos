@@ -275,7 +275,7 @@ function ProviderCard({
   const metaLine = connected
     ? [
         provider === 'apple'
-          ? connection?.calendarDisplayName
+          ? 'All iCloud calendars'
           : connection?.calendarDisplayName || 'Primary calendar',
         lastSynced ? `Synced ${lastSynced}` : 'Syncing…',
       ]

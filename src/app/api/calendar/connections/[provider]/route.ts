@@ -38,6 +38,13 @@ export async function DELETE(
     } catch (err) {
       console.error('app calendar cleanup failed (continuing):', err);
     }
+  } else if (provider === 'apple') {
+    try {
+      const { deleteAppCalendar } = await import('@/lib/calendar/apple/client');
+      await deleteAppCalendar(conn);
+    } catch (err) {
+      console.error('app calendar cleanup failed (continuing):', err);
+    }
   }
 
   await deleteConnectionData(conn._id);

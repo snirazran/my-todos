@@ -1,4 +1,5 @@
 import { createDAVClient } from 'tsdav';
+import { v4 as uuid } from 'uuid';
 import type { CalendarConnectionDoc } from '@/lib/models/CalendarConnection';
 import { decryptSecret } from '../crypto';
 
@@ -70,10 +71,7 @@ export type AppleCalendarInfo = {
   ctag?: string;
 };
 
-export async function listVEventCalendars(
-  client: DavClient,
-): Promise<AppleCalendarInfo[]> {
-  const calendars = await client.fetchCalendars();
+function toCalendarInfo(calendars: Awaited<ReturnType<DavClient['fetchCalendars']>>) {
   return calendars
     .filter((c) => {
       const comps = (c.components ?? []) as string[];
@@ -89,11 +87,73 @@ export async function listVEventCalendars(
     }));
 }
 
-export async function getCalendarCtag(
+export async function listVEventCalendars(
   client: DavClient,
-  calendarUrl: string,
-): Promise<string | undefined> {
-  const calendars = await client.fetchCalendars();
-  const cal = calendars.find((c) => c.url === calendarUrl);
-  return cal?.ctag ? String(cal.ctag) : undefined;
+): Promise<AppleCalendarInfo[]> {
+  return toCalendarInfo(await client.fetchCalendars());
+}
+
+/** Calendars we import from: every VEVENT calendar except the app-owned one. */
+export async function listSourceCalendars(
+  client: DavClient,
+  appCalendarUrl?: string,
+): Promise<AppleCalendarInfo[]> {
+  const all = await listVEventCalendars(client);
+  return appCalendarUrl ? all.filter((c) => c.url !== appCalendarUrl) : all;
+}
+
+export const APP_CALENDAR_DISPLAY_NAME = 'Frogress';
+
+function calendarHomeUrl(calendars: AppleCalendarInfo[]): string | null {
+  if (calendars.length === 0) return null;
+  const url = calendars[0].url;
+  const trimmed = url.endsWith('/') ? url.slice(0, -1) : url;
+  const idx = trimmed.lastIndexOf('/');
+  return idx < 0 ? null : trimmed.slice(0, idx + 1);
+}
+
+/**
+ * Create (or verify) the app-owned "Frogress" calendar and persist its URL on
+ * the connection. Mutates `conn.appCalendarUrl` so callers in the same pass
+ * write to the right calendar immediately.
+ */
+export async function ensureAppCalendar(
+  conn: CalendarConnectionDoc,
+): Promise<string> {
+  const client = await getClient(conn);
+  const calendars = await listVEventCalendars(client);
+
+  if (conn.appCalendarUrl && calendars.some((c) => c.url === conn.appCalendarUrl)) {
+    return conn.appCalendarUrl;
+  }
+
+  const home = calendarHomeUrl(calendars);
+  if (!home) throw new Error('could not determine iCloud calendar home url');
+  const url = `${home}${uuid()}/`;
+  const res = await client.makeCalendar({
+    url,
+    props: { displayname: APP_CALENDAR_DISPLAY_NAME },
+  });
+  if (!res.some((r) => r.ok)) {
+    throw new Error(`caldav mkcalendar failed: ${res.map((r) => r.status).join(',')}`);
+  }
+
+  conn.appCalendarUrl = url;
+  const { default: CalendarConnectionModel } = await import(
+    '@/lib/models/CalendarConnection'
+  );
+  await CalendarConnectionModel.updateOne(
+    { _id: conn._id },
+    { $set: { appCalendarUrl: url } },
+  );
+  return url;
+}
+
+export async function deleteAppCalendar(conn: CalendarConnectionDoc): Promise<void> {
+  if (!conn.appCalendarUrl) return;
+  const client = await getClient(conn);
+  const res = await client.deleteObject({ url: conn.appCalendarUrl });
+  if (!res.ok && res.status !== 404 && res.status !== 410) {
+    throw new Error(`caldav calendar delete ${res.status}: ${await res.text()}`);
+  }
 }
