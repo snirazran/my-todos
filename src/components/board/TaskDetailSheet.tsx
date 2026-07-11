@@ -307,16 +307,28 @@ export default function TaskDetailSheet({
                 <div className="h-1.5 w-10 rounded-full bg-muted-foreground/25" />
               </div>
 
-              <button
-                onClick={close}
-                aria-label="Close"
-                className="absolute right-3 top-3 z-10 grid h-8 w-8 place-items-center rounded-full bg-muted/60 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:right-4 sm:top-4"
-              >
-                <X size={16} />
-              </button>
+              <div className="absolute right-3 top-3 z-10 flex items-center gap-1.5 sm:right-4 sm:top-4">
+                {isCompleted && onDelete && (
+                  <button
+                    onClick={runAndClose(onDelete)}
+                    aria-label="Delete task"
+                    title="Delete"
+                    className="grid h-8 w-8 place-items-center rounded-full bg-rose-500/10 text-rose-500 transition-colors hover:bg-rose-500/20"
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                )}
+                <button
+                  onClick={close}
+                  aria-label="Close"
+                  className="grid h-8 w-8 place-items-center rounded-full bg-muted/60 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                >
+                  <X size={16} />
+                </button>
+              </div>
 
               <div className="flex min-h-0 flex-1 flex-col px-5 pb-4 pt-1 sm:pt-5">
-                <div className="pr-9">
+                <div className={isCompleted && onDelete ? 'pr-[76px]' : 'pr-9'}>
                   {!minimal && onEdit ? (
                     <button
                       onClick={onEdit}
