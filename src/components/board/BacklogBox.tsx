@@ -25,55 +25,63 @@ export default function BacklogBox({
   forwardRef,
 }: Props) {
   const idleSize = isDesktop ? 64 : 52;
-  const dropHeight = isDesktop ? 72 : 56;
+  const dropHeight = isDesktop ? 56 : 46;
   const countBadgeClass = isDesktop
     ? 'min-w-6 h-6 px-1 text-[11px]'
     : 'w-5 h-5 text-[10px]';
+  const DropIcon = isRepeating ? EyeOff : ArrowDownToLine;
 
   return (
     <div
       ref={forwardRef}
-      className="relative flex w-full shrink-0 items-center justify-center pointer-events-auto"
-      style={{ height: dropHeight }}
+      className="relative grid w-full shrink-0 place-items-center pointer-events-auto"
+      style={{ height: idleSize }}
     >
-      {/* Fixed-size drop target: transform/opacity only, so opening and closing
-          stay on the compositor instead of recalculating layout every frame. */}
+      {/* Drop target: a quiet, icon-only pill while a card is merely in
+          flight — it only announces what it does (label + accent) once the
+          card is actually held over it, so it doesn't read as a big new UI
+          element the moment you pick anything up. Grid-stacked (not
+          absolute) so it can share Framer's `layout` transform with the
+          idle bookmark layer below without either fighting the other. */}
       <motion.div
+        layout
         initial={false}
         animate={{
           opacity: isDragging ? 1 : 0,
-          scaleX: isDragging ? 1 : 0.94,
-          scaleY: isDragging ? 1 : 0.9,
+          scale: isDragging ? 1 : 0.85,
         }}
         transition={{
-          duration: isDragging ? 0.18 : 0.26,
-          ease: [0.22, 1, 0.36, 1],
+          layout: { type: 'spring', stiffness: 500, damping: 38 },
+          opacity: { duration: 0.16 },
+          scale: { duration: 0.16 },
         }}
-        className={`absolute inset-0 flex items-center justify-center gap-2 overflow-hidden rounded-[18px] border shadow-lg ${
+        className={`col-start-1 row-start-1 flex items-center justify-center gap-2 overflow-hidden rounded-full border px-4 ${
           isDragOver
-            ? 'border-primary bg-primary text-primary-foreground'
-            : 'border-primary/50 bg-card text-foreground'
+            ? 'border-primary bg-primary/12 text-primary shadow-md shadow-primary/10'
+            : 'border-border/70 bg-card/95 text-muted-foreground/60 shadow-sm'
         }`}
         style={{
+          height: dropHeight,
           pointerEvents: isDragging ? 'auto' : 'none',
           willChange: 'transform, opacity',
           backfaceVisibility: 'hidden',
         }}
       >
-        {isRepeating ? (
-          <EyeOff size={isDesktop ? 24 : 20} />
-        ) : (
-          <ArrowDownToLine size={isDesktop ? 24 : 20} />
-        )}
-        <span className={`${isDesktop ? 'text-sm' : 'text-xs'} font-black whitespace-nowrap`}>
-          {isRepeating
-            ? isDragOver
-              ? 'Release to skip this day'
-              : 'Drop here to skip this day'
-            : isDragOver
-              ? 'Release to save for later'
-              : 'Drop here to save for later'}
-        </span>
+        <DropIcon size={isDesktop ? 20 : 17} className="shrink-0" />
+        <AnimatePresence initial={false}>
+          {isDragOver && (
+            <motion.span
+              key="label"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.12 }}
+              className={`${isDesktop ? 'text-sm' : 'text-xs'} font-bold whitespace-nowrap`}
+            >
+              {isRepeating ? 'Release to skip this day' : 'Release to save for later'}
+            </motion.span>
+          )}
+        </AnimatePresence>
       </motion.div>
 
       {/* Idle bookmark is a separate fixed layer; it never stretches into the
@@ -88,7 +96,7 @@ export default function BacklogBox({
           duration: isDragging ? 0.18 : 0.24,
           ease: [0.22, 1, 0.36, 1],
         }}
-        className="relative"
+        className="col-start-1 row-start-1"
         style={{
           pointerEvents: isDragging ? 'none' : 'auto',
           willChange: 'transform, opacity',

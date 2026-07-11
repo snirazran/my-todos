@@ -280,7 +280,11 @@
       "PowerShell(node \"C:\\\\Users\\\\snira\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-snira-Desktop-Full-Stack-frog-task\\\\f11706fe-711b-4a8a-aa1b-cd306fb71075\\\\scratchpad\\\\rc-fix-consumable.mjs\")",
       "PowerShell(node \"C:\\\\Users\\\\snira\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-snira-Desktop-Full-Stack-frog-task\\\\f11706fe-711b-4a8a-aa1b-cd306fb71075\\\\scratchpad\\\\rc-probe-create.mjs\")",
       "Bash(awk '/^const createDAVClient/,/^};/' node_modules/tsdav/dist/tsdav.js)",
-      "Bash(awk '/^const createDAVClient/,0' node_modules/tsdav/dist/tsdav.js)"
+      "Bash(awk '/^const createDAVClient/,0' node_modules/tsdav/dist/tsdav.js)",
+      "Bash(powershell -Command \"Get-NetTCPConnection -State Listen -LocalPort 3000 -ErrorAction SilentlyContinue\")",
+      "Bash(command -v chromium-cli)",
+      "Bash(npx --yes playwright --version)",
+      "Bash(npx --yes playwright install chromium --with-deps)"
     ]
   }
 }

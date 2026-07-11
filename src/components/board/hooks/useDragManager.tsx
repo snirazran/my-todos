@@ -60,7 +60,12 @@ export function useDragManager() {
   // scrolling the board the moment a still-held card is lifted reads as the
   // view sliding away on its own.
   const grabPointRef = useRef({ x: 0, y: 0 });
-  const autoScrollArmedRef = useRef(false);
+  // Armed separately per axis: a vertical reorder drag (the common case)
+  // must never arm horizontal auto-scroll just because the finger drifted a
+  // few px sideways, or it silently drags the whole board — and the column
+  // under a stationary finger — toward whichever edge that drift leaned.
+  const autoScrollArmedXRef = useRef(false);
+  const autoScrollArmedYRef = useRef(false);
 
   const positionOverlay = useCallback((x: number, y: number) => {
     const el = overlayElRef.current;
@@ -201,7 +206,8 @@ export function useDragManager() {
       targetDayRef.current = day;
       dragOffsetRef.current = { dx: clientX - rect.left, dy: clientY - rect.top };
       grabPointRef.current = { x: clientX, y: clientY };
-      autoScrollArmedRef.current = false;
+      autoScrollArmedXRef.current = false;
+      autoScrollArmedYRef.current = false;
 
       setDrag({
         active: true,
@@ -364,13 +370,28 @@ export function useDragManager() {
       positionOverlay(px, py);
       frameCallbackRef.current?.(px, py);
 
-      if (!autoScrollArmedRef.current) {
+      // Dominant-axis lock: horizontal auto-scroll only arms once the drag has
+      // clearly committed sideways (bigger than a small dead-zone AND the
+      // larger of the two components) — otherwise an ordinary up/down reorder
+      // that lands within EDGE_X of the screen edge (very likely on a narrow
+      // single-column-peek mobile layout) would start dragging the board.
+      if (!autoScrollArmedXRef.current || !autoScrollArmedYRef.current) {
         const gp = grabPointRef.current;
-        if (Math.hypot(px - gp.x, py - gp.y) > 12) {
-          autoScrollArmedRef.current = true;
+        const dxFromGrab = px - gp.x;
+        const dyFromGrab = py - gp.y;
+        if (
+          !autoScrollArmedXRef.current &&
+          Math.abs(dxFromGrab) > 24 &&
+          Math.abs(dxFromGrab) >= Math.abs(dyFromGrab)
+        ) {
+          autoScrollArmedXRef.current = true;
+        }
+        if (!autoScrollArmedYRef.current && Math.abs(dyFromGrab) > 12) {
+          autoScrollArmedYRef.current = true;
         }
       }
-      const autoScrollArmed = autoScrollArmedRef.current;
+      const autoScrollArmedX = autoScrollArmedXRef.current;
+      const autoScrollArmedY = autoScrollArmedYRef.current;
 
       // --- 3. Auto-Scroll Logic ---
       const s = scrollerRef.current;
@@ -430,7 +451,7 @@ export function useDragManager() {
         
         const vx = dir * (MIN_V + (MAX_V - MIN_V) * combined);
 
-        if (dir !== 0 && autoScrollArmed) {
+        if (dir !== 0 && autoScrollArmedX) {
             pendingVx = vx;
         }
       }
@@ -441,6 +462,12 @@ export function useDragManager() {
 
       // Only check for new column if NOT locked in tray zone
       if (!isLockedTrayZone) {
+        // Placement uses live geometry only — the pointer decides which
+        // column a task lands in the instant it's over it, with no
+        // visibility/majority requirement. You can drop a task into a
+        // column that's still mostly off-screen; where the *view* settles
+        // afterward is a separate decision (see the "most visible column"
+        // recenter in TaskBoard's onDrop) so this stays simple and immediate.
         for (let day = 0; day < slideRefs.current.length; day++) {
           const col = slideRefs.current[day];
           if (!col) continue;
@@ -512,7 +539,7 @@ export function useDragManager() {
              }
            }
         }
-        if (dirY !== 0 && autoScrollArmed) {
+        if (dirY !== 0 && autoScrollArmedY) {
            pendingVy = dirY * (MIN_V + (MAX_V - MIN_V) * easeQuad(distY));
         }
 

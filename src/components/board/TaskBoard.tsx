@@ -359,6 +359,11 @@ export default function TaskBoard({
   }, [pathname, cancelDrag]);
 
   const [pageIndex, setPageIndex] = useState<number>(activeIdx);
+  // Mirrors pageIndex for callbacks (like onDrop) that need the live "which
+  // column is currently most visible" answer without depending on pageIndex
+  // and getting recreated on every scroll tick during a drag.
+  const pageIndexRef = useRef(pageIndex);
+  pageIndexRef.current = pageIndex;
   const recomputeCanPanRef = useRef<(() => void) | undefined>(undefined);
 
   // Edge "Move to a specific date" drop zones (shown while dragging)
@@ -1248,10 +1253,16 @@ export default function TaskBoard({
       ? null
       : document.querySelector<HTMLElement>('[data-drop-placeholder]');
     settleAndEnd(slot ? slot.getBoundingClientRect() : null, () => {
+      // Where the task gets filed (finalToDay) and where the *view* settles
+      // are separate decisions. You can drop a task into a column that's
+      // still mostly off-screen — dragging near the edge auto-scrolls the
+      // board toward it, but that scroll may not have finished. So on
+      // release, snap the view to whichever column is currently more
+      // visible (pageIndexRef, the same "current page" tracked while
+      // swiping) rather than forcing it to jump to wherever the task landed.
+      const settleDay = pageIndexRef.current;
       const shouldGlideToColumn =
-        finalToDay !== BACKLOG_IDX &&
-        finalToDay !== drag.fromDay &&
-        window.innerWidth < 768;
+        settleDay !== BACKLOG_IDX && window.innerWidth < 768;
 
       if (shouldGlideToColumn) {
         setSnapHold(true);
@@ -1273,7 +1284,7 @@ export default function TaskBoard({
         // its layout reads before starting native smooth scrolling. Starting
         // both in one frame makes scroll jank scale with the number of tasks.
         window.requestAnimationFrame(() => {
-          window.requestAnimationFrame(() => centerColumnSmooth(finalToDay));
+          window.requestAnimationFrame(() => centerColumnSmooth(settleDay));
         });
       }
     });
@@ -1737,7 +1748,11 @@ export default function TaskBoard({
           ['--stack' as string]: `${notificationStackHeight}px`,
           transition: 'padding 200ms ease',
         }}
-        className="fixed bottom-0 left-0 right-0 z-[40] px-3 md:px-4 pb-[calc(env(safe-area-inset-bottom)+84px+var(--stack))] md:pb-[calc(env(safe-area-inset-bottom)+92px+var(--stack))] pointer-events-none"
+        className={`fixed bottom-0 left-0 right-0 px-3 md:px-4 pb-[calc(env(safe-area-inset-bottom)+84px+var(--stack))] md:pb-[calc(env(safe-area-inset-bottom)+92px+var(--stack))] pointer-events-none ${
+          // Above the drag ghost (z-[100]) while dragging so the drop-zone
+          // label isn't hidden under the card that's hovering over it.
+          drag?.active ? 'z-[105]' : 'z-[40]'
+        }`}
       >
         <div className="pointer-events-auto mx-auto flex w-[88vw] max-w-none flex-col items-center justify-center md:w-full md:max-w-[480px]">
           {isMobile && (

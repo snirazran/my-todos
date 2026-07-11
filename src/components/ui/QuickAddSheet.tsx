@@ -357,7 +357,6 @@ export default function QuickAddSheet({
   const lpTimer = useRef<number | null>(null);
   const lpFired = useRef(false);
   const lpStart = useRef<{ x: number; y: number } | null>(null);
-  const restoreInputFocusAfterTagTap = useRef(false);
   const cancelLongPress = () => {
     if (lpTimer.current !== null) {
       window.clearTimeout(lpTimer.current);
@@ -370,7 +369,6 @@ export default function QuickAddSheet({
     lpStart.current = { x: e.clientX, y: e.clientY };
     lpTimer.current = window.setTimeout(() => {
       lpFired.current = true;
-      restoreInputFocusAfterTagTap.current = false;
       cancelLongPress();
       setManagedTag(st);
     }, 450);
@@ -1009,8 +1007,13 @@ export default function QuickAddSheet({
                               type="button"
                               title="Hold to edit"
                               onPointerDown={(e) => {
-                                restoreInputFocusAfterTagTap.current =
-                                  document.activeElement === inputRef.current;
+                                // Keep the textarea focused so mobile browsers do
+                                // not start hiding the keyboard before `onClick`.
+                                // Refocusing after the click is too late and causes
+                                // a visible close/reopen flicker.
+                                if (document.activeElement === inputRef.current) {
+                                  e.preventDefault();
+                                }
                                 startLongPress(tag, e);
                               }}
                               onPointerMove={moveLongPress}
@@ -1025,16 +1028,9 @@ export default function QuickAddSheet({
                               onClick={tagScroll.guard(() => {
                                 if (lpFired.current) {
                                   lpFired.current = false;
-                                  restoreInputFocusAfterTagTap.current = false;
                                   return;
                                 }
                                 tagManager.toggleTag(tag);
-                                if (restoreInputFocusAfterTagTap.current) {
-                                  window.requestAnimationFrame(() => {
-                                    inputRef.current?.focus({ preventScroll: true });
-                                  });
-                                }
-                                restoreInputFocusAfterTagTap.current = false;
                               })}
                               className={`relative inline-flex h-9 select-none items-center justify-center gap-1.5 rounded-xl border pr-3 text-[11px] font-black uppercase tracking-wider shadow-sm transition-all active:scale-95 [@media(hover:hover)]:hover:opacity-75 ${
                                 isQuestTag ? 'pl-[56px]' : 'pl-3'
