@@ -15,6 +15,7 @@ import {
   CalendarPlus,
   ChevronsLeft,
   ChevronsRight,
+  Plus,
 } from 'lucide-react';
 import useSWR from 'swr';
 import {
@@ -25,6 +26,7 @@ import {
   parseYmd,
   cmpYmd,
   addDays,
+  WEEK_ORDER,
 } from './helpers';
 import DayColumn from './DayColumn';
 import TaskList from './TaskList';
@@ -451,10 +453,9 @@ export default function TaskBoard({
 
   // Backlog state
   const [backlogOpen, setBacklogOpen] = useState(false);
-  const backlogBoxRef = useRef<HTMLButtonElement>(null);
+  const backlogBoxRef = useRef<HTMLDivElement>(null);
   const backlogTrayRef = useRef<HTMLDivElement>(null);
   const [isDragOverBacklog, setIsDragOverBacklog] = useState(false);
-  const [backlogProximity, setBacklogProximity] = useState(0);
   const [trayCloseProgress, setTrayCloseProgress] = useState(0);
   const [todayInView, setTodayInView] = useState(true);
 
@@ -961,7 +962,6 @@ export default function TaskBoard({
       isDragOverBacklogRef.current = false;
       dateZoneActiveRef.current = false;
       setIsDragOverBacklog(false);
-      setBacklogProximity(0);
       setTrayCloseProgress(0);
       setDateZoneActive(false);
       return;
@@ -990,14 +990,9 @@ export default function TaskBoard({
         const hit = x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
         isDragOverBacklogRef.current = hit;
         setIsDragOverBacklog(hit);
-        const cx = r.left + r.width / 2;
-        const cy = r.top + r.height / 2;
-        const dist = Math.hypot(x - cx, y - cy);
-        setBacklogProximity(quantize(Math.max(0, 1 - dist / 200)));
       } else {
         isDragOverBacklogRef.current = false;
         setIsDragOverBacklog(false);
-        setBacklogProximity(0);
       }
 
       const over = (el: HTMLElement | null) => {
@@ -1253,7 +1248,12 @@ export default function TaskBoard({
       ? null
       : document.querySelector<HTMLElement>('[data-drop-placeholder]');
     settleAndEnd(slot ? slot.getBoundingClientRect() : null, () => {
-      if (finalToDay !== BACKLOG_IDX && window.innerWidth < 768) {
+      const shouldGlideToColumn =
+        finalToDay !== BACKLOG_IDX &&
+        finalToDay !== drag.fromDay &&
+        window.innerWidth < 768;
+
+      if (shouldGlideToColumn) {
         setSnapHold(true);
         if (snapHoldTimerRef.current)
           window.clearTimeout(snapHoldTimerRef.current);
@@ -1261,13 +1261,21 @@ export default function TaskBoard({
           () => setSnapHold(false),
           600,
         );
-        centerColumnSmooth(finalToDay);
       }
       commitDragReorder(finalToDay, finalToIndex);
 
       endDrag();
       setIsDragOverBacklog(false);
       setTrayCloseProgress(0);
+
+      if (shouldGlideToColumn) {
+        // Let React commit the source/destination lists and let Motion complete
+        // its layout reads before starting native smooth scrolling. Starting
+        // both in one frame makes scroll jank scale with the number of tasks.
+        window.requestAnimationFrame(() => {
+          window.requestAnimationFrame(() => centerColumnSmooth(finalToDay));
+        });
+      }
     });
   }, [
     drag,
@@ -1731,17 +1739,66 @@ export default function TaskBoard({
         }}
         className="fixed bottom-0 left-0 right-0 z-[40] px-3 md:px-4 pb-[calc(env(safe-area-inset-bottom)+84px+var(--stack))] md:pb-[calc(env(safe-area-inset-bottom)+92px+var(--stack))] pointer-events-none"
       >
-        <div className="pointer-events-auto mx-auto w-full max-w-[300px] md:max-w-[480px] relative min-h-[48px] md:min-h-[72px] flex items-center justify-center">
-          <BacklogBox
-            count={backlog.length}
-            isDragOver={isDragOverBacklog}
-            isDragging={!!drag?.active}
-            isRepeating={draggingRepeating}
-            isDesktop={!isMobile}
-            proximity={backlogProximity}
-            onClick={() => setBacklogOpen(true)}
-            forwardRef={backlogBoxRef}
-          />
+        <div className="pointer-events-auto mx-auto flex w-[88vw] max-w-none flex-col items-center justify-center md:w-full md:max-w-[480px]">
+          {isMobile && (
+            <div
+              className="mb-1 flex h-4 items-center justify-center gap-1.5"
+              aria-label={`Visible day: ${windowDates[pageIndex] ?? activeDateKey}`}
+            >
+              {WEEK_ORDER.map((day) => {
+                const visibleDate = windowDates[pageIndex] ?? activeDateKey;
+                const active = parseYmd(visibleDate).getDay() === day;
+                return (
+                  <span
+                    key={day}
+                    aria-hidden="true"
+                    className={`h-1 rounded-full transition-[width,background-color] ${
+                      active ? 'w-4 bg-primary' : 'w-1.5 bg-primary/20'
+                    }`}
+                  />
+                );
+              })}
+            </div>
+          )}
+          <div className="relative h-14 w-full md:h-[72px]">
+            <div className="mx-auto h-full w-full max-w-[300px] md:max-w-[480px]">
+              <BacklogBox
+                count={backlog.length}
+                isDragOver={isDragOverBacklog}
+                isDragging={!!drag?.active}
+                isRepeating={draggingRepeating}
+                isDesktop={!isMobile}
+                onClick={() => setBacklogOpen(true)}
+                forwardRef={backlogBoxRef}
+              />
+            </div>
+            {isMobile && (
+              <button
+                type="button"
+                aria-label="Add task"
+                disabled={
+                  scrollLocked ||
+                  backlogOpen ||
+                  !!drag?.active ||
+                  calendarOpen ||
+                  moveCalendarOpen ||
+                  showQuickAdd ||
+                  showTimer
+                }
+                onClick={() => {
+                  const visibleDate = windowDates[pageIndex] ?? activeDateKey;
+                  const targetDate =
+                    cmpYmd(visibleDate, todayKey) < 0 ? todayKey : visibleDate;
+                  setQuickText('');
+                  setInitialDateKey(targetDate);
+                  setShowQuickAdd(true);
+                }}
+                className="absolute right-0 top-1/2 z-10 grid h-[52px] w-[52px] -translate-y-1/2 place-items-center rounded-full bg-primary/15 text-primary ring-1 ring-primary/30 shadow-lg transition-[opacity,transform,background-color] active:scale-95 disabled:pointer-events-none disabled:opacity-0"
+              >
+                <Plus className="h-6 w-6 stroke-[3]" />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

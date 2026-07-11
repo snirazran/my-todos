@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useEffect } from 'react';
-import { motion, useSpring, useTransform, AnimatePresence } from 'framer-motion';
+import React from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowDownToLine, EyeOff } from 'lucide-react';
 import { Icon } from '@/components/ui/Icon';
 
@@ -11,9 +11,8 @@ interface Props {
   isDragging: boolean;
   isRepeating?: boolean;
   isDesktop: boolean;
-  proximity: number; // 0 to 1
   onClick: () => void;
-  forwardRef: React.Ref<HTMLButtonElement>;
+  forwardRef: React.Ref<HTMLDivElement>;
 }
 
 export default function BacklogBox({
@@ -22,142 +21,103 @@ export default function BacklogBox({
   isDragging,
   isRepeating = false,
   isDesktop,
-  proximity,
   onClick,
   forwardRef,
 }: Props) {
-  const idleSize = isDesktop ? 64 : 48;
-  const dropHeight = isDesktop ? 96 : 72;
-  const dropRadius = isDesktop ? 26 : 22;
-  const idleRadius = isDesktop ? 18 : 14;
+  const idleSize = isDesktop ? 64 : 52;
+  const dropHeight = isDesktop ? 72 : 56;
   const countBadgeClass = isDesktop
     ? 'min-w-6 h-6 px-1 text-[11px]'
     : 'w-5 h-5 text-[10px]';
 
-  // Smooth out the proximity value to prevent jitter
-  const smoothProx = useSpring(proximity, {
-    stiffness: 100,
-    damping: 30,
-    mass: 0.5
-  });
-
-  useEffect(() => {
-    smoothProx.set(isDragging ? proximity : 0);
-  }, [proximity, isDragging, smoothProx]);
-
   return (
-    <motion.div 
-      className="relative flex pointer-events-auto origin-left shrink-0"
-      initial={false}
-      animate={{
-        width: isDragging ? '100%' : `${idleSize}px`,
-      }}
-      transition={{
-        type: 'spring',
-        stiffness: 300,
-        damping: 28,
-      }}
+    <div
+      ref={forwardRef}
+      className="relative flex w-full shrink-0 items-center justify-center pointer-events-auto"
+      style={{ height: dropHeight }}
     >
-      <motion.button
-        ref={forwardRef}
-        onClick={!isDragging ? onClick : undefined}
-        aria-label="Backlog"
+      {/* Fixed-size drop target: transform/opacity only, so opening and closing
+          stay on the compositor instead of recalculating layout every frame. */}
+      <motion.div
         initial={false}
         animate={{
-          width: '100%', // Button always fills wrapper
-          height: isDragging ? `${dropHeight}px` : `${idleSize}px`,
-          borderRadius: isDragging ? dropRadius : idleRadius,
+          opacity: isDragging ? 1 : 0,
+          scaleX: isDragging ? 1 : 0.94,
+          scaleY: isDragging ? 1 : 0.9,
         }}
         transition={{
-          type: 'spring',
-          stiffness: 300,
-          damping: 28,
+          duration: isDragging ? 0.18 : 0.26,
+          ease: [0.22, 1, 0.36, 1],
         }}
-        // Base styles
-        className={`
-           relative flex items-center justify-center overflow-hidden w-full
-           bg-card border-border/80 border
-           ${isDragging 
-             ? isDragOver 
-               ? 'bg-primary border-primary text-primary-foreground shadow-xl' 
-               : 'bg-card border-primary/50 text-foreground shadow-lg'
-             : 'hover:bg-card/95 hover:border-primary/50 transition-colors shadow-lg shadow-black/5 dark:shadow-black/20'
-           }
-        `}
+        className={`absolute inset-0 flex items-center justify-center gap-2 overflow-hidden rounded-[18px] border shadow-lg ${
+          isDragOver
+            ? 'border-primary bg-primary text-primary-foreground'
+            : 'border-primary/50 bg-card text-foreground'
+        }`}
+        style={{
+          pointerEvents: isDragging ? 'auto' : 'none',
+          willChange: 'transform, opacity',
+          backfaceVisibility: 'hidden',
+        }}
       >
-        {/* State A: Drop Zone (Visible when dragging) */}
-        <motion.div
-          initial={false}
-          animate={{ 
-            opacity: isDragging ? 1 : 0,
-            scale: isDragging ? 1 : 0.8 
-          }}
-          transition={{ duration: 0.2 }}
-          className="absolute inset-0 flex flex-col items-center justify-center gap-1"
-          style={{ pointerEvents: 'none' }}
-        >
-          {isRepeating ? (
-            <EyeOff
-              size={isDesktop ? 28 : 22}
-              className={isDragOver ? 'animate-bounce' : ''}
-            />
-          ) : (
-            <ArrowDownToLine
-              size={isDesktop ? 28 : 22}
-              className={isDragOver ? 'animate-bounce' : ''}
-            />
-          )}
-          <span
-            className={`${isDesktop ? 'text-sm' : 'text-xs'} font-black whitespace-nowrap`}
-          >
-            {isRepeating
-              ? isDragOver
-                ? 'Drop to skip'
-                : 'Skip for this day'
-              : isDragOver
-                ? 'Drop to save'
-                : 'Save for later'}
-          </span>
-        </motion.div>
+        {isRepeating ? (
+          <EyeOff size={isDesktop ? 24 : 20} />
+        ) : (
+          <ArrowDownToLine size={isDesktop ? 24 : 20} />
+        )}
+        <span className={`${isDesktop ? 'text-sm' : 'text-xs'} font-black whitespace-nowrap`}>
+          {isRepeating
+            ? isDragOver
+              ? 'Release to skip this day'
+              : 'Drop here to skip this day'
+            : isDragOver
+              ? 'Release to save for later'
+              : 'Drop here to save for later'}
+        </span>
+      </motion.div>
 
-        {/* State B: Icon (Visible when NOT dragging) */}
-        <motion.div
-           initial={false}
-           animate={{ 
-             opacity: isDragging ? 0 : 1,
-             scale: isDragging ? 0.8 : 1 
-           }}
-           transition={{ duration: 0.2 }}
-           className="absolute inset-0 flex items-center justify-center"
-           style={{ pointerEvents: 'none' }}
+      {/* Idle bookmark is a separate fixed layer; it never stretches into the
+          drop target, avoiding width/height/border-radius interpolation. */}
+      <motion.div
+        initial={false}
+        animate={{
+          opacity: isDragging ? 0 : 1,
+          scale: isDragging ? 0.86 : 1,
+        }}
+        transition={{
+          duration: isDragging ? 0.18 : 0.24,
+          ease: [0.22, 1, 0.36, 1],
+        }}
+        className="relative"
+        style={{
+          pointerEvents: isDragging ? 'none' : 'auto',
+          willChange: 'transform, opacity',
+        }}
+      >
+        <button
+          type="button"
+          onClick={onClick}
+          aria-label="Saved tasks"
+          className="grid place-items-center rounded-[18px] border border-border/80 bg-card shadow-lg shadow-black/5 transition-colors hover:border-primary/50 hover:bg-card/95 dark:shadow-black/20"
+          style={{ width: idleSize, height: idleSize }}
         >
           <Icon name="saved" className={isDesktop ? 'h-10 w-10' : 'h-8 w-8'} />
-        </motion.div>
+        </button>
 
-        {/* Drag Over Glow Effect */}
-        {isDragging && isDragOver && (
-          <motion.div
-            layoutId="glow"
-            className="absolute inset-0 z-[-1] bg-white/20 dark:bg-black/20"
-            transition={{ duration: 0.2 }}
-          />
-        )}
-      </motion.button>
-
-      {/* Count Badge - Outside button to avoid overflow clipping */}
-      <AnimatePresence>
-        {!isDragging && count > 0 && (
-          <motion.div
-            key="backlog-count"
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0, opacity: 0 }}
-            className={`absolute -top-2.5 -right-2.5 z-10 flex ${countBadgeClass} items-center justify-center font-black text-primary-foreground bg-primary rounded-full shadow-sm ring-2 ring-background pointer-events-none`}
-          >
-            {count}
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
+        <AnimatePresence>
+          {count > 0 && (
+            <motion.div
+              key="backlog-count"
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0, opacity: 0 }}
+              className={`absolute -right-2.5 -top-2.5 z-10 flex ${countBadgeClass} items-center justify-center rounded-full bg-primary font-black text-primary-foreground shadow-sm ring-2 ring-background pointer-events-none`}
+            >
+              {count}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+    </div>
   );
 }

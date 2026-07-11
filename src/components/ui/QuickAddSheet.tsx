@@ -117,13 +117,23 @@ function TagScrollRail({
     const update = () => {
       window.cancelAnimationFrame(frame);
       frame = window.requestAnimationFrame(() => {
-        const maxScroll = scroller.scrollWidth - scroller.clientWidth;
+        const maxScroll = Math.max(
+          0,
+          scroller.scrollWidth - scroller.clientWidth,
+        );
+        const clampedScroll = Math.min(
+          maxScroll,
+          Math.max(0, scroller.scrollLeft),
+        );
+        if (scroller.scrollLeft !== clampedScroll) {
+          scroller.scrollLeft = clampedScroll;
+        }
         const canScroll = maxScroll > 4;
         const thumbPercent = canScroll
           ? Math.max(18, (scroller.clientWidth / scroller.scrollWidth) * 100)
           : 100;
         const leftPercent = canScroll
-          ? (scroller.scrollLeft / maxScroll) * (100 - thumbPercent)
+          ? (clampedScroll / maxScroll) * (100 - thumbPercent)
           : 0;
         setMetrics({ canScroll, thumbPercent, leftPercent });
         onVisibilityChange(canScroll);
@@ -323,7 +333,10 @@ export default function QuickAddSheet({
   const updateTagFade = useCallback(() => {
     const el = tagScroll.ref.current;
     if (!el) return;
-    setTagFadeRight(el.scrollWidth - el.clientWidth - el.scrollLeft > 4);
+    const maxScroll = Math.max(0, el.scrollWidth - el.clientWidth);
+    const clampedScroll = Math.min(maxScroll, Math.max(0, el.scrollLeft));
+    if (el.scrollLeft !== clampedScroll) el.scrollLeft = clampedScroll;
+    setTagFadeRight(maxScroll - clampedScroll > 4);
   }, [tagScroll.ref]);
   const [chipView, setChipView] = useState<{
     startTime: string;
@@ -344,6 +357,7 @@ export default function QuickAddSheet({
   const lpTimer = useRef<number | null>(null);
   const lpFired = useRef(false);
   const lpStart = useRef<{ x: number; y: number } | null>(null);
+  const restoreInputFocusAfterTagTap = useRef(false);
   const cancelLongPress = () => {
     if (lpTimer.current !== null) {
       window.clearTimeout(lpTimer.current);
@@ -356,6 +370,7 @@ export default function QuickAddSheet({
     lpStart.current = { x: e.clientX, y: e.clientY };
     lpTimer.current = window.setTimeout(() => {
       lpFired.current = true;
+      restoreInputFocusAfterTagTap.current = false;
       cancelLongPress();
       setManagedTag(st);
     }, 450);
@@ -979,9 +994,10 @@ export default function QuickAddSheet({
                           onMouseMove={tagScroll.handlers.onMouseMove}
                           className={`grid auto-cols-max grid-flow-col ${
                             stripTags.length > 5 ? 'grid-rows-2' : 'grid-rows-1'
-                          } cursor-grab select-none items-center gap-x-2 gap-y-4 overflow-x-auto no-scrollbar px-2 pt-2 pb-2 touch-pan-x active:cursor-grabbing ${
+                          } cursor-grab select-none items-center gap-x-2 gap-y-4 overflow-x-auto overscroll-x-none no-scrollbar px-2 pt-2 pb-2 touch-pan-x active:cursor-grabbing ${
                             tagFadeRight ? 'mask-fade-right' : ''
                           }`}
+                          style={{ overscrollBehaviorX: 'none' }}
                         >
                         {stripTags.map((tag) => {
                           const selected = tags.includes(tag.id);
@@ -992,7 +1008,11 @@ export default function QuickAddSheet({
                               key={tag.id}
                               type="button"
                               title="Hold to edit"
-                              onPointerDown={(e) => startLongPress(tag, e)}
+                              onPointerDown={(e) => {
+                                restoreInputFocusAfterTagTap.current =
+                                  document.activeElement === inputRef.current;
+                                startLongPress(tag, e);
+                              }}
                               onPointerMove={moveLongPress}
                               onPointerUp={cancelLongPress}
                               onPointerLeave={cancelLongPress}
@@ -1005,9 +1025,16 @@ export default function QuickAddSheet({
                               onClick={tagScroll.guard(() => {
                                 if (lpFired.current) {
                                   lpFired.current = false;
+                                  restoreInputFocusAfterTagTap.current = false;
                                   return;
                                 }
                                 tagManager.toggleTag(tag);
+                                if (restoreInputFocusAfterTagTap.current) {
+                                  window.requestAnimationFrame(() => {
+                                    inputRef.current?.focus({ preventScroll: true });
+                                  });
+                                }
+                                restoreInputFocusAfterTagTap.current = false;
                               })}
                               className={`relative inline-flex h-9 select-none items-center justify-center gap-1.5 rounded-xl border pr-3 text-[11px] font-black uppercase tracking-wider shadow-sm transition-all active:scale-95 [@media(hover:hover)]:hover:opacity-75 ${
                                 isQuestTag ? 'pl-[56px]' : 'pl-3'
@@ -1152,20 +1179,22 @@ export default function QuickAddSheet({
                     {suggestionsReady && (
                       <motion.div
                         key="quick-add-suggestions"
-                        initial={{ opacity: 0, y: 0 }}
+                        initial={{ opacity: 0, y: suggestionsOffset }}
                         animate={{
                           opacity: showSuggestions ? 1 : 0,
                           y: showSuggestions ? 0 : suggestionsOffset,
                         }}
-                        exit={{ opacity: 0 }}
+                        exit={{ opacity: 0, y: suggestionsOffset }}
                         transition={{
                           duration: 0.4,
                           ease: [0.32, 0.72, 0, 1],
                         }}
                         style={{ maxHeight: suggestionsMax }}
                         className={[
-                          'relative flex min-h-0 flex-col overflow-hidden rounded-[28px] border border-border/80 bg-popover p-4 shadow-[0_3px_0_0_rgba(0,0,0,0.18)]',
-                          showSuggestions ? 'pointer-events-auto' : 'pointer-events-none',
+                          'flex min-h-0 flex-col overflow-hidden rounded-[28px] border border-border/80 bg-popover p-4 shadow-[0_3px_0_0_rgba(0,0,0,0.18)]',
+                          showSuggestions
+                            ? 'relative pointer-events-auto'
+                            : 'invisible absolute inset-x-0 top-0 pointer-events-none',
                         ].join(' ')}
                       >
                         <SuggestionTabs

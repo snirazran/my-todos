@@ -55,10 +55,14 @@ export const SideOpenTray = React.forwardRef<HTMLDivElement, SideOpenTrayProps>(
     const panelRef = useRef<HTMLDivElement | null>(null);
     const dragExitRef = useRef({ velocity: 0, offset: 0 });
     const backdropOpacity = useMotionValue(0);
-    useRegisterOpenSheet(isOpen);
+    const [keepScrollLocked, setKeepScrollLocked] = useState(isOpen);
+    useRegisterOpenSheet(keepScrollLocked);
 
     useEffect(() => {
-      if (isOpen) dragExitRef.current = { velocity: 0, offset: 0 };
+      if (isOpen) {
+        dragExitRef.current = { velocity: 0, offset: 0 };
+        setKeepScrollLocked(true);
+      }
     }, [isOpen]);
 
     useEffect(() => {
@@ -74,7 +78,7 @@ export const SideOpenTray = React.forwardRef<HTMLDivElement, SideOpenTrayProps>(
 
     // Lock body scroll when open
     useEffect(() => {
-      if (isOpen && lockScroll) {
+      if (keepScrollLocked && lockScroll) {
         document.body.style.overflow = 'hidden';
       } else {
         document.body.style.overflow = '';
@@ -82,7 +86,7 @@ export const SideOpenTray = React.forwardRef<HTMLDivElement, SideOpenTrayProps>(
       return () => {
         document.body.style.overflow = '';
       };
-    }, [isOpen, lockScroll]);
+    }, [keepScrollLocked, lockScroll]);
 
     // Close on Escape
     useEffect(() => {
@@ -118,7 +122,7 @@ export const SideOpenTray = React.forwardRef<HTMLDivElement, SideOpenTrayProps>(
           y: '100%',
           transition: {
             type: 'tween' as const,
-            duration: 0.3,
+            duration: 0.24,
             ease: [0.32, 0.72, 0, 1] as const,
           },
         };
@@ -135,7 +139,12 @@ export const SideOpenTray = React.forwardRef<HTMLDivElement, SideOpenTrayProps>(
     };
 
     return (
-      <AnimatePresence custom={dragExitRef.current}>
+      <AnimatePresence
+        custom={dragExitRef.current}
+        onExitComplete={() => {
+          if (!isOpen) setKeepScrollLocked(false);
+        }}
+      >
         {isOpen && (
           <>
             {/* Backdrop */}
@@ -200,13 +209,19 @@ export const SideOpenTray = React.forwardRef<HTMLDivElement, SideOpenTrayProps>(
                 : { type: 'tween', duration: 0.4, ease: [0.32, 0.72, 0, 1] }
               }
               className={cn(
-                "fixed flex flex-col bg-card border-r border-border/50 shadow-2xl overflow-hidden",
+                "fixed flex flex-col transform-gpu bg-card border-r border-border/50 shadow-2xl overflow-hidden",
                 "inset-x-0 bottom-0 top-[15vh] rounded-t-[32px] border-t",
                 "md:inset-y-0 md:left-0 md:right-auto md:w-[420px] md:top-0 md:bottom-0 md:rounded-none md:border-t-0",
                 className
               )}
               onClick={(e) => e.stopPropagation()}
-              style={{ zIndex: backdropZ + 5, pointerEvents: isDraggingAny ? 'none' : 'auto', willChange: 'transform, opacity' }}
+              style={{
+                zIndex: backdropZ + 5,
+                pointerEvents: isDraggingAny ? 'none' : 'auto',
+                willChange: 'transform, opacity',
+                backfaceVisibility: 'hidden',
+                contain: 'layout style',
+              }}
             >
               {/* Drag Handle (Mobile Only) */}
               {!isDesktop && (

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Filter } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Filter } from 'lucide-react';
 import { Icon } from '@/components/ui/Icon';
 import { Task, draggableIdFor } from './helpers';
 import TaskCard from './TaskCard';
@@ -97,6 +97,16 @@ export default React.memo(function BacklogTray({
 
   const [showFilterMenu, setShowFilterMenu] = useState(false);
   const filterMenuRef = useRef<HTMLDivElement>(null);
+  const [isMobile, setIsMobile] = useState(false);
+  const [page, setPage] = useState(0);
+
+  useEffect(() => {
+    const query = window.matchMedia('(max-width: 767px)');
+    const update = () => setIsMobile(query.matches);
+    update();
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
 
   const handleDelete = async () => {
     if (!confirmItem || !onRemove) return;
@@ -138,6 +148,27 @@ export default React.memo(function BacklogTray({
     }
     return true;
   });
+  const mobilePageSize = 4;
+  const pageCount = Math.max(1, Math.ceil(filteredTasks.length / mobilePageSize));
+  const visibleTasks = isMobile
+    ? filteredTasks.slice(page * mobilePageSize, (page + 1) * mobilePageSize)
+    : filteredTasks;
+  const firstPageDot = Math.min(
+    Math.max(0, page - 2),
+    Math.max(0, pageCount - 5),
+  );
+  const pageDots = Array.from(
+    { length: Math.min(5, pageCount) },
+    (_, index) => firstPageDot + index,
+  );
+
+  useEffect(() => {
+    if (!isOpen) {
+      setPage(0);
+      return;
+    }
+    setPage((current) => Math.min(current, pageCount - 1));
+  }, [isOpen, pageCount]);
 
   return (
     <>
@@ -148,7 +179,7 @@ export default React.memo(function BacklogTray({
         title={`${filteredTasks.length} Saved Tasks`}
         icon={<Icon name="saved" className="h-6 w-6" />}
         iconContainerClassName="bg-primary/10 text-primary"
-        className="md:w-[500px]"
+        className="top-[38vh] md:top-0 md:w-[500px]"
         backdropZ={1305}
         isDraggingAny={isDraggingAny}
         closeProgress={closeProgress}
@@ -188,7 +219,50 @@ export default React.memo(function BacklogTray({
           </div>
         }
       >
-        <div className="h-3 shrink-0" aria-hidden />
+        {isMobile && pageCount > 1 ? (
+          <div className="sticky top-0 z-10 -mx-1 flex shrink-0 items-center justify-between bg-card px-1 py-2">
+            <button
+              type="button"
+              aria-label="Previous saved tasks page"
+              disabled={page === 0}
+              onClick={() => setPage((current) => Math.max(0, current - 1))}
+              className="grid h-9 w-9 place-items-center rounded-full text-muted-foreground transition-colors active:scale-95 disabled:opacity-25"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+            <div
+              className="flex items-center gap-1.5"
+              aria-label={`Page ${page + 1} of ${pageCount}`}
+            >
+              {pageDots.map((index) => (
+                <button
+                  key={index}
+                  type="button"
+                  aria-label={`Go to saved tasks page ${index + 1}`}
+                  onClick={() => setPage(index)}
+                  className={`h-2 rounded-full transition-[width,background-color] ${
+                    index === page
+                      ? 'w-5 bg-primary'
+                      : 'w-2 bg-muted-foreground/25'
+                  }`}
+                />
+              ))}
+            </div>
+            <button
+              type="button"
+              aria-label="Next saved tasks page"
+              disabled={page >= pageCount - 1}
+              onClick={() =>
+                setPage((current) => Math.min(pageCount - 1, current + 1))
+              }
+              className="grid h-9 w-9 place-items-center rounded-full text-muted-foreground transition-colors active:scale-95 disabled:opacity-25"
+            >
+              <ChevronRight className="h-5 w-5" />
+            </button>
+          </div>
+        ) : (
+          <div className="h-3 shrink-0" aria-hidden />
+        )}
         <AnimatePresence mode="popLayout" initial={false}>
           {filteredTasks.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center gap-4 opacity-30 min-h-[300px]">
@@ -198,7 +272,7 @@ export default React.memo(function BacklogTray({
               </p>
             </div>
           ) : (
-            filteredTasks.map((t) => {
+            visibleTasks.map((t) => {
               const originalIndex = tasks.findIndex((it) => it.id === t.id);
               return (
                 <motion.div
@@ -210,7 +284,7 @@ export default React.memo(function BacklogTray({
                     transition: { duration: 0.15 },
                   }}
                   key={t.id}
-                  layout
+                  layout={!isMobile}
                   className="w-full relative"
                 >
                   <div className="group relative">
