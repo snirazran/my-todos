@@ -6,7 +6,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import useSWR, { preload } from 'swr';
 import { Icon } from '@/components/ui/Icon';
 import { QuestsPageSkeleton } from '@/components/ui/Skeleton';
-import { Check, Clock, Gift, Lock, ScrollText, Sparkles, X } from 'lucide-react';
+import { Check, Clock, Compass, Gift, Lock, ScrollText, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import TagsPopup from './TagsPopup';
 import type { ItemDef } from '@/lib/skins/catalog';
@@ -20,18 +20,19 @@ import type {
   QuestReward,
 } from '@/lib/quests/types';
 import {
+  AreaRow,
+  AreaStartCard,
   CategoryQuestPresentationCard,
   DailyChecklistCard,
-  FocusPosterCard,
-  FocusSlotBar,
   getRewardQuantityLabel,
-  PlusGateCard,
   RewardTile,
   StarterQuestCard,
   SwitchFocusConfirm,
+  type AreaRowState,
   type DailyStreakInfo,
   type QuestTagChip,
 } from './QuestCards';
+import { QuestStartSheet } from './QuestStartSheet';
 import { RewardCard } from './gift-box/RewardCard';
 import GiftBoxOpening from './gift-box/GiftBoxOpening';
 import { SingleRewardCard } from './daily-reward/RewardCard';
@@ -279,6 +280,8 @@ export function QuestsPanel({
   const [claimingSeason, setClaimingSeason] = useState(false);
   const [claimMessage, setClaimMessage] = useState<string | null>(null);
   const [editingFocusCategoryId, setEditingFocusCategoryId] =
+    useState<MacroCategoryId | null>(null);
+  const [startQuestCategoryId, setStartQuestCategoryId] =
     useState<MacroCategoryId | null>(null);
   const [rewardRevealQueue, setRewardRevealQueue] = useState<
     QuestRewardRevealEntry[]
@@ -881,6 +884,7 @@ export function QuestsPanel({
                       }}
                       className={cn(
                         'no-scrollbar flex-1 min-h-0 overflow-y-auto overscroll-none [overflow-anchor:none]',
+                        'bg-muted dark:bg-muted/25',
                         data.activeSeason
                           ? 'px-0 pt-0 md:px-0 md:pt-0 md:pb-8'
                           : 'px-4 pt-[calc(1rem+env(safe-area-inset-top))] md:px-8 md:pt-8 md:pb-8',
@@ -906,12 +910,77 @@ export function QuestsPanel({
                         )}
                         <div className={cn(
                           "flex flex-col gap-8",
-                          data.activeSeason && "relative z-10 -mt-8 pt-8 px-4 md:mx-auto md:mt-6 md:w-full md:max-w-6xl md:px-8 md:pt-0 bg-background rounded-t-[24px] md:rounded-none md:bg-transparent"
+                          data.activeSeason && "relative z-10 -mt-8 pt-8 px-4 md:mx-auto md:mt-6 md:w-full md:max-w-6xl md:px-8 md:pt-0 bg-muted rounded-t-[24px] md:rounded-none md:bg-transparent"
                         )}>
                         {(() => {
                           const dailyQuests = data.dailyQuests ?? [];
                           const onboardingQuests = (data.onboardingQuests ?? []).filter(
                             (quest) => !isQuestFinished(quest),
+                          );
+
+                          // Progressive disclosure: brand-new frogs only see the
+                          // starter + daily quests. Focus quests appear once a few
+                          // early objectives are done (or the user already has a
+                          // focus footprint from before).
+                          const FOCUS_UNLOCK_TARGET = 3;
+                          const completedEarlyObjectives = [
+                            ...(data.onboardingQuests ?? []),
+                            ...dailyQuests,
+                          ].reduce(
+                            (sum, quest) =>
+                              sum +
+                              quest.logic.filter(
+                                (block) =>
+                                  block.progress >= Math.max(1, block.target),
+                              ).length,
+                            0,
+                          );
+                          const hasFocusFootprint =
+                            (data.onboarding?.categoryTagMap?.length ?? 0) > 0 ||
+                            filteredCategoryQuests.some(
+                              (quest) =>
+                                quest.claimedObjectiveIds.length > 0 ||
+                                quest.logic.some((block) => block.progress > 0),
+                            );
+                          const focusUnlocked =
+                            filteredCategoryQuests.length === 0 ||
+                            hasFocusFootprint ||
+                            completedEarlyObjectives >= FOCUS_UNLOCK_TARGET;
+                          const remainingUnlockSteps = Math.max(
+                            1,
+                            FOCUS_UNLOCK_TARGET - completedEarlyObjectives,
+                          );
+                          const focusTeaser = (
+                            <div className="flex flex-col items-center gap-2.5 rounded-[28px] border-2 border-dashed border-border/70 bg-muted/30 px-5 py-7 text-center">
+                              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                                <Compass className="h-6 w-6" strokeWidth={2.5} />
+                              </div>
+                              <p className="text-sm font-black text-foreground">
+                                Area quests
+                              </p>
+                              <p className="max-w-[250px] text-xs font-bold leading-snug text-muted-foreground">
+                                Finish {remainingUnlockSteps} more quest{' '}
+                                {remainingUnlockSteps === 1 ? 'step' : 'steps'}{' '}
+                                above to unlock extra rewards for the areas of
+                                your life you chose to work on.
+                              </p>
+                              <div className="flex items-center gap-1.5 pt-0.5">
+                                {Array.from(
+                                  { length: FOCUS_UNLOCK_TARGET },
+                                  (_, i) => (
+                                    <span
+                                      key={i}
+                                      className={cn(
+                                        'h-2 w-5 rounded-full',
+                                        i < completedEarlyObjectives
+                                          ? 'bg-primary'
+                                          : 'border border-border/60 bg-muted',
+                                      )}
+                                    />
+                                  ),
+                                )}
+                              </div>
+                            </div>
                           );
                           const renderOnboardingCard = (quest: QuestProgressView) => (
                             <div
@@ -950,6 +1019,9 @@ export function QuestsPanel({
                               }
                               onEditTags={() =>
                                 setEditingFocusCategoryId(quest.categoryId)
+                              }
+                              onStartQuest={() =>
+                                setStartQuestCategoryId(quest.categoryId)
                               }
                               onClaimObjective={(objectiveId) =>
                                 handleClaimObjective(quest.id, objectiveId)
@@ -1002,10 +1074,71 @@ export function QuestsPanel({
                             </>
                           );
 
-                          const questCount = filteredCategoryQuests.length;
-                          const heroCategory = heroQuest
-                            ? categoryMap[heroQuest.categoryId]
-                            : null;
+                          // Until any area is started, no area gets promoted
+                          // over the others: show an equal-footing chooser
+                          // instead of hero + shelf.
+                          const questStarted = (
+                            quest: CategoryQuestProgressView,
+                          ) =>
+                            (categoryTagMap.get(quest.categoryId) ?? [])
+                              .length > 0 ||
+                            quest.claimedObjectiveIds.length > 0 ||
+                            quest.logic.some((block) => block.progress > 0);
+                          const chooserMode =
+                            filteredCategoryQuests.length > 0 &&
+                            !filteredCategoryQuests.some(questStarted);
+
+                          const compactChooser =
+                            filteredCategoryQuests.length > 4;
+                          const areaChooser = (
+                            <div className="flex flex-col gap-2 pb-6">
+                              <div className="px-1">
+                                <p className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+                                  <Compass
+                                    className="h-3.5 w-3.5 text-primary"
+                                    strokeWidth={2.75}
+                                  />
+                                  Your areas
+                                </p>
+                                <p className="mt-1.5 text-lg font-black leading-tight text-foreground">
+                                  Where should your frog help first?
+                                </p>
+                                <p className="mt-0.5 text-xs font-bold text-muted-foreground/80">
+                                  {data.isPremium
+                                    ? 'Do tasks in an area, earn its rewards — start as many as you like'
+                                    : 'Do tasks in an area, earn its rewards — pick one, switch any time'}
+                                </p>
+                              </div>
+                              <div
+                                className={cn(
+                                  'mt-0.5',
+                                  compactChooser
+                                    ? 'grid grid-cols-2 gap-3'
+                                    : 'flex flex-col gap-3',
+                                )}
+                              >
+                                {filteredCategoryQuests.map((quest) => (
+                                  <div
+                                    key={quest.id}
+                                    data-quest-anchor={quest.id}
+                                  >
+                                    <AreaStartCard
+                                      quest={quest}
+                                      category={categoryMap[quest.categoryId]}
+                                      compact={compactChooser}
+                                      rewardCatalog={data.rewardCatalog}
+                                      isPremium={data.isPremium}
+                                      onPress={() =>
+                                        setStartQuestCategoryId(
+                                          quest.categoryId,
+                                        )
+                                      }
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
                           const dailySection =
                             dailyQuests.length === 0 ? (
                               <PanelCard>No active daily quests here.</PanelCard>
@@ -1023,92 +1156,83 @@ export function QuestsPanel({
                               />
                             );
 
-                          const focusSection = (
-                            <div className="flex flex-col gap-2">
-                              {focusEmptyStates}
-                              {heroQuest && (
-                                <>
-                                  <FocusSlotBar
-                                    isPremium={data.isPremium}
-                                    activeLabel={
-                                      heroCategory?.shortLabel ||
-                                      heroCategory?.name
-                                    }
-                                    activeAccent={heroCategory?.accent}
-                                    totalCount={questCount}
-                                    onLockedPress={() => openPlus('focus_slot_limit')}
-                                  />
-                                  {renderFocusCard(heroQuest)}
-                                </>
-                              )}
+                          const areaRows = benchQuests.length > 0 && (
+                            <div className="mt-0.5 flex flex-col gap-2.5">
+                              {benchQuests.map((quest) => {
+                                const linkedTags = (
+                                  categoryTagMap.get(quest.categoryId) ?? []
+                                )
+                                  .map((tagId) => tagCatalog.get(tagId))
+                                  .filter(Boolean) as QuestTagChip[];
+                                const needsTag =
+                                  quest.logic.some(
+                                    (block) =>
+                                      block.tagMode === 'focus_category_tags',
+                                  ) && linkedTags.length === 0;
+                                const rowState: AreaRowState = data.isPremium
+                                  ? needsTag
+                                    ? 'start'
+                                    : 'running'
+                                  : quest.locked
+                                    ? 'paused'
+                                    : needsTag
+                                      ? 'start'
+                                      : 'running';
+                                return (
+                                  <div
+                                    key={quest.id}
+                                    data-quest-anchor={quest.id}
+                                  >
+                                    <AreaRow
+                                      quest={quest}
+                                      category={categoryMap[quest.categoryId]}
+                                      state={rowState}
+                                      finished={isQuestRetired(quest)}
+                                      linkedTags={linkedTags}
+                                      rewardCatalog={data.rewardCatalog}
+                                      isPremium={data.isPremium}
+                                      onPress={() => {
+                                        if (needsTag && !quest.locked) {
+                                          setStartQuestCategoryId(
+                                            quest.categoryId,
+                                          );
+                                        } else if (data.isPremium) {
+                                          setPinnedCategoryId(
+                                            quest.categoryId,
+                                          );
+                                        } else if (quest.locked) {
+                                          setPendingSwitchCategoryId(
+                                            quest.categoryId,
+                                          );
+                                        }
+                                      }}
+                                    />
+                                  </div>
+                                );
+                              })}
                             </div>
                           );
 
-                          const benchShelf = benchQuests.length > 0 && (
-                            <div>
-                              <p className="px-1 pb-2 text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
-                                {data.isPremium ? 'Also running' : 'On the bench'}
-                              </p>
-                              <div className="no-scrollbar -mx-4 flex gap-3 overflow-x-auto px-4 pb-1 md:mx-0 md:flex-wrap md:overflow-visible md:px-0">
-                                {benchQuests.map((quest) => {
-                                  const linkedTags = (
-                                    categoryTagMap.get(quest.categoryId) ?? []
-                                  )
-                                    .map((tagId) => tagCatalog.get(tagId))
-                                    .filter(Boolean) as QuestTagChip[];
-                                  const needsTag =
-                                    quest.logic.some(
-                                      (block) =>
-                                        block.tagMode === 'focus_category_tags',
-                                    ) && linkedTags.length === 0;
-                                  return (
-                                    <div
-                                      key={quest.id}
-                                      data-quest-anchor={quest.id}
-                                      className="flex rounded-[18px]"
-                                    >
-                                      <FocusPosterCard
-                                        quest={quest}
-                                        category={categoryMap[quest.categoryId]}
-                                        live={data.isPremium}
-                                        finished={isQuestRetired(quest)}
-                                        linkedTags={linkedTags}
-                                        rewardCatalog={data.rewardCatalog}
-                                        isPremium={data.isPremium}
-                                        onPress={() => {
-                                          if (data.isPremium) {
-                                            if (needsTag) {
-                                              setEditingFocusCategoryId(
-                                                quest.categoryId,
-                                              );
-                                            } else {
-                                              setPinnedCategoryId(
-                                                quest.categoryId,
-                                              );
-                                            }
-                                          } else {
-                                            setPendingSwitchCategoryId(
-                                              quest.categoryId,
-                                            );
-                                          }
-                                        }}
-                                      />
-                                    </div>
-                                  );
-                                })}
-                                {!data.isPremium && (
-                                  <PlusGateCard
-                                    questCount={questCount}
-                                    onUpgrade={() => openPlus('focus_bench_limit')}
+                          const focusSection = (
+                            <div className="flex flex-col gap-2">
+                              <div className="px-1">
+                                <p className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+                                  <Compass
+                                    className="h-3.5 w-3.5 text-primary"
+                                    strokeWidth={2.75}
                                   />
-                                )}
+                                  Your areas
+                                </p>
                               </div>
+                              {focusEmptyStates}
+                              {heroQuest && renderFocusCard(heroQuest)}
+                              {areaRows}
                             </div>
                           );
 
                           return (
                             <>
-                              {/* Mobile: onboarding, daily checklist, focus hero + bench shelf */}
+                              {/* Mobile: onboarding, daily checklist, focus hero + up-next shelf */}
                               <div className="flex flex-col gap-8 md:hidden">
                                 {onboardingQuests.length > 0 && (
                                   <div className="space-y-4">
@@ -1116,23 +1240,31 @@ export function QuestsPanel({
                                   </div>
                                 )}
                                 <div>{dailySection}</div>
-                                <div className="flex flex-col gap-5">
-                                  {focusSection}
-                                  {benchShelf}
-                                </div>
+                                {focusUnlocked ? (
+                                  chooserMode ? (
+                                    areaChooser
+                                  ) : (
+                                    focusSection
+                                  )
+                                ) : (
+                                  focusTeaser
+                                )}
                               </div>
 
                               {/* Desktop: left column stacks starter + daily, hero fills
-                                  the right column, bench shelf spans below */}
+                                  the right column, up-next shelf spans below */}
                               <div className="hidden md:flex md:flex-col md:gap-6">
                                 <div className="grid grid-cols-2 items-start gap-4">
                                   <div className="flex flex-col gap-4">
                                     {onboardingQuests.map(renderOnboardingCard)}
                                     {dailySection}
                                   </div>
-                                  {focusSection}
+                                  {focusUnlocked
+                                    ? chooserMode
+                                      ? areaChooser
+                                      : focusSection
+                                    : focusTeaser}
                                 </div>
-                                {benchShelf}
                               </div>
                             </>
                           );
@@ -1181,6 +1313,7 @@ export function QuestsPanel({
                   pendingSwitchCategory?.shortLabel ||
                   pendingSwitchCategory?.name
                 }
+                coverImageUrl={pendingSwitchCategory?.coverImageUrl}
                 currentFocusName={
                   data?.activeFocusCategoryId
                     ? categoryMap[data.activeFocusCategoryId]?.shortLabel ||
@@ -1214,6 +1347,24 @@ export function QuestsPanel({
       <div className="relative flex h-full w-full flex-col overflow-hidden bg-background">
         {renderContent()}
       </div>
+
+      <QuestStartSheet
+        open={startQuestCategoryId !== null}
+        category={
+          startQuestCategoryId ? categoryMap[startQuestCategoryId] ?? null : null
+        }
+        quest={
+          startQuestCategoryId
+            ? filteredCategoryQuests.find(
+                (quest) => quest.categoryId === startQuestCategoryId,
+              ) ?? null
+            : null
+        }
+        rewardCatalog={data?.rewardCatalog ?? {}}
+        isPremium={data?.isPremium ?? false}
+        onClose={() => setStartQuestCategoryId(null)}
+        onDone={refreshQuestData}
+      />
 
       <TagsPopup
         open={editingFocusCategoryId !== null}

@@ -9,12 +9,12 @@ type MetricLabelOptions = {
 };
 
 function taggedTaskLabel(n: number) {
-  return n === 1 ? 'tagged task' : 'tagged tasks';
+  return n === 1 ? 'quest task' : 'quest tasks';
 }
 
 function repeatingTaskLabel(n: number, tagScoped?: boolean) {
   if (tagScoped) {
-    return n === 1 ? 'tagged repeating task' : 'tagged repeating tasks';
+    return n === 1 ? 'repeating quest task' : 'repeating quest tasks';
   }
   return n === 1 ? 'repeating task' : 'repeating tasks';
 }
@@ -44,8 +44,8 @@ export const QUEST_METRIC_COPY: Record<string, MetricCopy> = {
     adminLabel: 'Buddy tasks (both finished)',
     label: (n, options) =>
       n === 1
-        ? `Finish a ${options?.tagScoped ? 'tagged task' : 'task'} with your buddy`
-        : `Finish ${n} ${options?.tagScoped ? 'tagged tasks' : 'tasks'} with your buddy`,
+        ? `Finish a ${options?.tagScoped ? 'quest task' : 'task'} with your buddy`
+        : `Finish ${n} ${options?.tagScoped ? 'quest tasks' : 'tasks'} with your buddy`,
     remaining: (n, options) =>
       `Finish ${n} more ${options?.tagScoped ? taggedTaskLabel(n) : n === 1 ? 'task' : 'tasks'} with your buddy`,
   },

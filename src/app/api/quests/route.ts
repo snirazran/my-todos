@@ -46,7 +46,7 @@ function objectiveSummaryLabel(
     metricKey?: string;
     target?: number;
   },
-  tagsResolved = false,
+  tagName?: string,
 ): string {
   const target = Math.max(0, block.target ?? 0);
   const usesFocusTags = block.tagMode === 'focus_category_tags';
@@ -56,14 +56,18 @@ function objectiveSummaryLabel(
     });
   }
   if (block.type === 'focus_minutes') {
-    return usesFocusTags && !tagsResolved
-      ? `Focus for ${target} minutes on tasks with focus tags`
-      : `Focus for ${target} minutes on tasks`;
+    if (!usesFocusTags) return `Focus for ${target} minutes on tasks`;
+    return tagName
+      ? `Focus for ${target} minutes on ${tagName}`
+      : `Focus for ${target} minutes on quest tasks`;
   }
   const subject = block.subject === 'any' || target !== 1 ? 'tasks' : 'task';
   const action = block.action === 'add' ? 'Add' : 'Complete';
-  const scope =
-    usesFocusTags && !tagsResolved ? `${subject} with focus tags` : subject;
+  const scope = usesFocusTags
+    ? tagName
+      ? `${tagName} ${subject}`
+      : `quest ${subject}`
+    : subject;
   return `${action} ${target} ${scope}`;
 }
 
@@ -110,7 +114,7 @@ function objectiveRemainingLabel(
     target?: number;
     progress?: number;
   },
-  tagsResolved = false,
+  tagName?: string,
 ): string {
   const target = Math.max(1, block.target ?? 1);
   const remaining = Math.max(1, target - Math.max(0, block.progress ?? 0));
@@ -122,14 +126,17 @@ function objectiveRemainingLabel(
   }
   if (block.type === 'focus_minutes') {
     if (!usesFocusTags) return `Focus ${remaining} more min`;
-    return tagsResolved
-      ? `Focus ${remaining} more min on tasks`
-      : `Focus ${remaining} more min on tasks with focus tags`;
+    return tagName
+      ? `Focus ${remaining} more min on ${tagName}`
+      : `Focus ${remaining} more min on quest tasks`;
   }
   const subject = remaining === 1 ? 'task' : 'tasks';
   const action = block.action === 'add' ? 'Add' : 'Complete';
-  const scope =
-    usesFocusTags && !tagsResolved ? `${subject} with focus tags` : subject;
+  const scope = usesFocusTags
+    ? tagName
+      ? `${tagName} ${subject}`
+      : `quest ${subject}`
+    : subject;
   return `${action} ${remaining} more ${scope}`;
 }
 
@@ -302,7 +309,7 @@ export async function GET(req: Request) {
                 : undefined,
             objectiveLabel: objectiveSummaryLabel(
               block,
-              questFocusTags(quest).length > 0,
+              questFocusTags(quest)[0]?.name,
             ),
             tags:
               block.tagMode === 'focus_category_tags'
@@ -331,11 +338,11 @@ export async function GET(req: Request) {
               : undefined,
           objectiveLabel: objectiveSummaryLabel(
             block,
-            questFocusTags(quest).length > 0,
+            questFocusTags(quest)[0]?.name,
           ),
           remainingLabel: objectiveRemainingLabel(
             block,
-            questFocusTags(quest).length > 0,
+            questFocusTags(quest)[0]?.name,
           ),
           tags:
             block.tagMode === 'focus_category_tags'
@@ -424,6 +431,9 @@ export async function GET(req: Request) {
           ]),
         )
       : {};
+    const streakRewardCatalog = dailyStreak?.rewards?.length
+      ? buildRewardCatalog(dashboard.catalog, [dailyStreak.rewards])
+      : {};
 
     return NextResponse.json(
       {
@@ -454,6 +464,7 @@ export async function GET(req: Request) {
         rewardCatalog: {
           ...dashboard.rewardCatalog,
           ...seasonRewardCatalog,
+          ...streakRewardCatalog,
         },
       },
       {

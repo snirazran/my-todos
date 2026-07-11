@@ -10,14 +10,10 @@ import {
   Clock,
   Compass,
   Gift,
-  Lock,
-  Pause,
   Pencil,
   Play,
-  Plus,
   Repeat,
   Sprout,
-  Tags,
   Trophy,
   X,
 } from 'lucide-react';
@@ -147,6 +143,132 @@ const REWARD_TILE_TONE: Record<
 
 const TASK_STREAK_METRIC_PATTERN = /^task_streak_(\d+)$/;
 
+// "worth 🪰 190" — the fly with its total, number nudged down to sit level
+// with the fly's visual center.
+export function FlyWorth({
+  amount,
+  flySize = 24,
+}: {
+  amount: number;
+  flySize?: number;
+}) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      <Fly size={flySize} y={-1} paused interactive={false} />
+      <span className="translate-y-[2px] text-[13px] font-black tabular-nums text-foreground">
+        {amount}
+      </span>
+    </span>
+  );
+}
+
+// Compact objective phrasing for one-line contexts (area rows).
+function shortObjectiveLabel(block: QuestCardLogicBlock) {
+  const target = Math.max(1, block.target ?? 1);
+  const targetLabel = block.targetLabel ?? String(target);
+  if (block.type === 'focus_minutes') return `Focus ${targetLabel} min`;
+  if (block.type === 'metric_count') {
+    const streakMatch = block.metricKey
+      ? TASK_STREAK_METRIC_PATTERN.exec(block.metricKey)
+      : null;
+    if (streakMatch) {
+      return `${streakMatch[1]}-day streak ×${target}`;
+    }
+    if (block.metricKey === 'buddy_task_completed') {
+      return `${target} buddy task${target > 1 ? 's' : ''}`;
+    }
+    return metricObjectiveLabel(block.metricKey, target);
+  }
+  return `${block.action === 'add' ? 'Add' : 'Complete'} ${targetLabel} task${
+    target > 1 || targetLabel.includes('-') ? 's' : ''
+  }`;
+}
+
+// Total unclaimed loot in a quest, for "worth" teasers.
+export function questLoot(quest: {
+  logic: QuestCardLogicBlock[];
+  claimedObjectiveIds?: string[];
+}) {
+  const claimed = quest.claimedObjectiveIds ?? [];
+  const rewards = quest.logic
+    .filter(
+      (block) =>
+        !claimed.includes(block.id) && (block.rewards?.length ?? 0) > 0,
+    )
+    .flatMap((block) => block.rewards ?? []);
+  return {
+    flies: rewards
+      .filter((reward) => reward.type === 'FLIES')
+      .reduce(
+        (sum, reward) =>
+          sum +
+          Math.max(
+            0,
+            reward.amount ?? reward.maxAmount ?? reward.minAmount ?? 0,
+          ),
+        0,
+      ),
+    items: rewards.filter((reward) => reward.type !== 'FLIES'),
+  };
+}
+
+const METRIC_HINT_COPY: Record<string, string> = {
+  trade_completed:
+    'In the Wardrobe, trade three same-rarity skins for one of a higher rarity.',
+  skin_sold: 'Sell a skin you no longer want from the Wardrobe.',
+  skin_acquired: 'Buy a skin in the Wardrobe shop, or win one from a gift box.',
+  friend_invited:
+    'Invite a friend from the Friends page — you both get a gift when they join.',
+  buddy_task_completed:
+    'Finish a shared task with your buddy — it counts once you both check it off.',
+  task_saved_later: "Use a task's menu to move it to Saved Tasks.",
+  skin_equipped: 'Equip a skin on your frog in the Wardrobe.',
+  focus_tag_linked:
+    'On the Quests page, tap Start quest on a focus quest and pick a focus.',
+  frog_fed_full:
+    'Feed your frog flies on the home screen until its belly is full.',
+};
+
+function objectiveHintText(
+  block: QuestCardLogicBlock,
+  linkedTags?: QuestTagChip[],
+): string {
+  if (block.helpText) return block.helpText;
+
+  const usesFocusTags = block.tagMode === 'focus_category_tags';
+  const tagName = usesFocusTags
+    ? linkedTags?.[0]?.name
+    : block.resolvedTagNames?.[0] ?? block.resolvedTagName;
+  const tagScoped =
+    usesFocusTags ||
+    !!block.resolvedTagName ||
+    (block.resolvedTagNames?.length ?? 0) > 0 ||
+    !!block.previewTagLabel;
+  const scopeSuffix = !tagScoped
+    ? ''
+    : tagName
+      ? ` Only tasks tagged “${tagName}” count.`
+      : ' Tap Start quest on the area card first.';
+
+  if (block.type === 'focus_minutes') {
+    return `Start a focus timer on a task — every focused minute counts.${scopeSuffix}`;
+  }
+  if (block.type === 'metric_count') {
+    const streakMatch = block.metricKey
+      ? TASK_STREAK_METRIC_PATTERN.exec(block.metricKey)
+      : null;
+    const base = streakMatch
+      ? `Complete the same repeating task ${streakMatch[1]} days in a row.`
+      : METRIC_HINT_COPY[block.metricKey ?? ''] ??
+        'Keep using the app — this one fills up on its own.';
+    return `${base}${scopeSuffix}`;
+  }
+  if (block.action === 'add') {
+    return `Tap the + button to add a new task.${scopeSuffix}`;
+  }
+  return `Check off a task on your list — your frog snacks on the fly.${scopeSuffix}`;
+}
+
 export function formatQuestObjective(block: QuestCardLogicBlock) {
   const targetLabel =
     block.targetLabel ?? String(Math.max(0, block.target ?? 0));
@@ -159,7 +281,7 @@ export function formatQuestObjective(block: QuestCardLogicBlock) {
 
   if (block.type === 'focus_minutes') {
     return block.tagMode === 'focus_category_tags'
-      ? `Focus for ${targetLabel} minutes on tagged tasks`
+      ? `Focus for ${targetLabel} minutes on quest tasks`
       : `Focus for ${targetLabel} minutes on tasks`;
   }
 
@@ -174,9 +296,23 @@ export function formatQuestObjective(block: QuestCardLogicBlock) {
   const actionLabel = block.action === 'add' ? 'Add' : 'Complete';
   const scopeLabel =
     block.tagMode === 'focus_category_tags'
-      ? `${subjectLabel} with focus tags`
+      ? `quest ${subjectLabel}`
       : subjectLabel;
   return `${actionLabel} ${targetLabel} ${scopeLabel}`;
+}
+
+function InlineTagChips({ tags }: { tags: QuestTagChip[] }) {
+  if (tags.length === 0) return null;
+  return (
+    <>
+      <QuestTagPill tag={tags[0]} compact />
+      {tags.length > 1 && (
+        <span className="text-[11px] font-black text-muted-foreground">
+          +{tags.length - 1}
+        </span>
+      )}
+    </>
+  );
 }
 
 function renderFocusScopedMetricObjective(
@@ -188,11 +324,10 @@ function renderFocusScopedMetricObjective(
     return (
       <>
         <span>{target === 1 ? 'Finish a' : `Finish ${target}`}</span>
-        <TaggedTasksPeek
-          label={target === 1 ? 'tagged task' : 'tagged tasks'}
-          tags={tags}
-        />
-        <span>with your buddy</span>
+        <InlineTagChips tags={tags} />
+        <span>
+          {target === 1 ? 'task with your buddy' : 'tasks with your buddy'}
+        </span>
       </>
     );
   }
@@ -207,15 +342,11 @@ function renderFocusScopedMetricObjective(
       <>
         <span>
           {target === 1
-            ? `Reach a ${days}-day streak on a`
-            : `Reach a ${days}-day streak on ${target}`}
+            ? `Reach a ${days}-day streak on a repeating`
+            : `Reach a ${days}-day streak on ${target} repeating`}
         </span>
-        <TaggedTasksPeek
-          label={
-            target === 1 ? 'tagged repeating task' : 'tagged repeating tasks'
-          }
-          tags={tags}
-        />
+        <InlineTagChips tags={tags} />
+        <span>{target === 1 ? 'task' : 'tasks'}</span>
       </>
     );
   }
@@ -264,68 +395,20 @@ function renderObjectiveLabel(
     const leadIn = isMinutes
       ? `${actionLabel} ${targetLabel} minutes on`
       : `${actionLabel} ${targetLabel}`;
-    const peekLabel =
-      !isMinutes && numericTarget === 1 && !targetLabel.includes('-')
-        ? 'tagged task'
-        : 'tagged tasks';
     return (
       <>
         <span>{leadIn}</span>
-        <TaggedTasksPeek label={peekLabel} tags={tags} />
+        <InlineTagChips tags={tags} />
+        <span>
+          {isMinutes || !(numericTarget === 1 && !targetLabel.includes('-'))
+            ? 'tasks'
+            : 'task'}
+        </span>
       </>
     );
   }
 
   return <span>{`${actionLabel} ${targetLabel} ${subjectLabel}`}</span>;
-}
-
-function TaggedTasksPeek({
-  label,
-  tags,
-}: {
-  label: string;
-  tags: QuestTagChip[];
-}) {
-  const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLSpanElement | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-
-    const handlePointerDown = (event: PointerEvent) => {
-      if (containerRef.current?.contains(event.target as Node)) return;
-      setOpen(false);
-    };
-
-    document.addEventListener('pointerdown', handlePointerDown);
-    return () => {
-      document.removeEventListener('pointerdown', handlePointerDown);
-    };
-  }, [open]);
-
-  return (
-    <span ref={containerRef} className="relative inline-flex">
-      <button
-        type="button"
-        aria-label="Show counted tags"
-        onClick={(event) => {
-          event.stopPropagation();
-          setOpen((v) => !v);
-        }}
-        onBlur={() => setOpen(false)}
-        className="border-b-2 border-dotted border-primary/60 font-black text-primary transition hover:border-primary"
-      >
-        {label}
-      </button>
-      {open && (
-        <span className="absolute bottom-full left-1/2 z-30 mb-2 flex w-max max-w-56 -translate-x-1/2 flex-wrap items-center gap-1.5 rounded-xl border border-border bg-popover px-3 py-2 shadow-lg">
-          {tags.map((tag) => (
-            <QuestTagPill key={tag.id} tag={tag} />
-          ))}
-        </span>
-      )}
-    </span>
-  );
 }
 
 function getTaggedSubjectCopy(block: QuestCardLogicBlock) {
@@ -501,10 +584,6 @@ export function StarterQuestCard({
   quest: QuestCardData & { placement: 'onboarding' };
 }) {
   const [rewardPopup, setRewardPopup] = useState<RewardPopupState | null>(null);
-  const [showAllObjectives, setShowAllObjectives] = useState(false);
-  useEffect(() => {
-    setShowAllObjectives(false);
-  }, [quest.id]);
   const claimedObjectiveIds = quest.claimedObjectiveIds ?? [];
   const hiddenClaimedObjectiveIds = useHiddenClaimedObjectives(
     quest.id,
@@ -524,26 +603,17 @@ export function StarterQuestCard({
     !claimedObjectiveIds.includes(block.id);
   const totalSteps = quest.logic.length;
   const doneSteps = quest.logic.filter(isBlockDone).length;
-  const collapsedClaimedCount = quest.logic.filter((block) =>
-    hiddenClaimedObjectiveIds.has(block.id),
-  ).length;
-  const orderedOpen = [...visibleLogic].sort(
+  const shownBlocks = [...visibleLogic].sort(
     (a, b) => Number(isBlockClaimable(b)) - Number(isBlockClaimable(a)),
   );
-  const shownBlocks = showAllObjectives ? orderedOpen : orderedOpen.slice(0, 2);
-  const foldedBlocks = showAllObjectives ? [] : orderedOpen.slice(2);
-  const foldedPeekRewards = foldedBlocks
-    .map((block) => block.rewards?.[0])
-    .filter(Boolean)
-    .slice(0, 3) as QuestReward[];
 
   if (visibleLogic.length === 0) return null;
 
   return (
-    <div className="overflow-hidden rounded-[28px] border border-primary/30 bg-card shadow-sm">
-      <div className="flex items-center justify-between gap-2 bg-primary/10 px-4 py-2.5">
-        <span className="inline-flex min-w-0 items-center gap-1.5 text-[11px] font-black uppercase tracking-[0.16em] text-primary">
-          <Sprout className="h-3.5 w-3.5 shrink-0" strokeWidth={2.75} />
+    <div>
+      <div className="flex items-center justify-between gap-2 px-1 pb-2">
+        <span className="inline-flex min-w-0 items-center gap-1.5 text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+          <Sprout className="h-3.5 w-3.5 shrink-0 text-primary" strokeWidth={2.75} />
           <span className="truncate">{quest.title}</span>
         </span>
         <span className="flex shrink-0 items-center gap-1">
@@ -556,75 +626,35 @@ export function StarterQuestCard({
               )}
             />
           ))}
-          <span className="ml-1 text-[10px] font-black tabular-nums text-primary/80">
+          <span className="ml-1 text-[10px] font-black tabular-nums text-muted-foreground">
             {doneSteps}/{totalSteps}
           </span>
         </span>
       </div>
-      <div className="px-4 pb-3 pt-1">
-        {collapsedClaimedCount > 0 && (
-          <div className="flex items-center gap-1.5 border-b border-border/20 px-1 py-2 text-[11px] font-black uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
-            <Check className="h-3.5 w-3.5" strokeWidth={3.5} />
-            {collapsedClaimedCount} claimed
-          </div>
-        )}
-        {shownBlocks.map((block, i) => (
-          <ObjectiveRow
+      <div className="flex flex-col gap-2.5">
+        {shownBlocks.map((block) => (
+          <div
             key={block.id}
-            block={block}
-            objectiveClaimed={claimedObjectiveIds.includes(block.id)}
-            claimingObjective={claimingObjectiveId === block.id}
-            isPremium={isPremium}
-            rewardCatalog={rewardCatalog}
-            paused={true}
-            onOpenRewards={(rewards) =>
-              setRewardPopup({ eyebrow: 'Objective', title: 'Rewards', rewards })
-            }
-            onClaimObjective={
-              onClaimObjective ? () => onClaimObjective(block.id) : undefined
-            }
-            isLast={i === shownBlocks.length - 1 && foldedBlocks.length === 0}
-            isFirst={i === 0}
-          />
-        ))}
-        {(foldedBlocks.length > 0 ||
-          (showAllObjectives && orderedOpen.length > 2)) && (
-          <button
-            type="button"
-            onClick={() => setShowAllObjectives((v) => !v)}
-            className="mt-2 flex w-full items-center gap-2 rounded-xl bg-muted/40 px-3 py-2.5 text-[11px] font-black uppercase tracking-[0.1em] text-muted-foreground transition hover:bg-muted/70"
+            className="rounded-[20px] border border-border/50 bg-card px-4 py-1 shadow-sm"
           >
-            <ChevronDown
-              className={cn(
-                'h-3.5 w-3.5 transition-transform',
-                showAllObjectives && 'rotate-180',
-              )}
-              strokeWidth={3}
+            <ObjectiveRow
+              block={block}
+              objectiveClaimed={claimedObjectiveIds.includes(block.id)}
+              claimingObjective={claimingObjectiveId === block.id}
+              isPremium={isPremium}
+              rewardCatalog={rewardCatalog}
+              paused={true}
+              onOpenRewards={(rewards) =>
+                setRewardPopup({ eyebrow: 'Objective', title: 'Rewards', rewards })
+              }
+              onClaimObjective={
+                onClaimObjective ? () => onClaimObjective(block.id) : undefined
+              }
+              isLast
+              isFirst
             />
-            {showAllObjectives
-              ? 'Show less'
-              : `${foldedBlocks.length} more step${foldedBlocks.length > 1 ? 's' : ''}`}
-            {!showAllObjectives && foldedPeekRewards.length > 0 && (
-              <span className="ml-auto flex items-center gap-1.5 normal-case tracking-normal">
-                <span className="text-[10px] font-bold text-muted-foreground/80">
-                  worth
-                </span>
-                {foldedPeekRewards.map((reward, index) => (
-                  <RewardTile
-                    key={`${reward.type}-${reward.itemId ?? reward.backgroundId ?? index}`}
-                    reward={reward}
-                    rewardCatalog={rewardCatalog}
-                    isPremium={isPremium}
-                    paused={true}
-                    hideBadge
-                    flySize={16}
-                    className="h-8 w-8 rounded-lg"
-                  />
-                ))}
-              </span>
-            )}
-          </button>
-        )}
+          </div>
+        ))}
       </div>
       <RewardDetailsPopup
         open={!!rewardPopup}
@@ -645,6 +675,7 @@ export type DailyStreakInfo = {
   targetLength: number;
   todayComplete: boolean;
   claimable: boolean;
+  rewards?: QuestReward[];
 };
 
 export function DailyChecklistCard({
@@ -676,13 +707,13 @@ export function DailyChecklistCard({
   );
 
   return (
-    <div
-      data-quest-anchor={quests.map((quest) => quest.id).join(' ')}
-      className="overflow-hidden rounded-[28px] border border-border/50 bg-card shadow-sm"
-    >
-      <div className="flex items-center justify-between gap-2 px-4 pb-1 pt-3.5">
+    <div data-quest-anchor={quests.map((quest) => quest.id).join(' ')}>
+      <div className="flex items-center justify-between gap-2 px-1 pb-2">
         <span className="inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
-          <CalendarDays className="h-3.5 w-3.5" strokeWidth={2.75} />
+          <CalendarDays
+            className="h-3.5 w-3.5 text-primary"
+            strokeWidth={2.75}
+          />
           Daily quests
         </span>
         {timeLeft ? (
@@ -693,23 +724,22 @@ export function DailyChecklistCard({
         ) : null}
       </div>
 
-      {allDone ? (
-        <div className="flex flex-col items-center gap-1.5 px-4 pb-6 pt-4 text-center">
-          <Check className="h-8 w-8 text-emerald-500" strokeWidth={3.5} />
-          <p className="text-sm font-black text-foreground">
-            All daily quests done!
-          </p>
-          <p className="text-xs font-bold text-muted-foreground">
-            New quests tomorrow.
-          </p>
-        </div>
-      ) : (
-        <div className="px-4 pb-3 pt-1">
-          {quests.map((quest, questIndex) => (
+      <div className="flex flex-col gap-2.5">
+        {allDone ? (
+          <div className="flex flex-col items-center gap-1.5 rounded-[20px] border border-border/50 bg-card px-4 py-5 text-center shadow-sm">
+            <Check className="h-8 w-8 text-emerald-500" strokeWidth={3.5} />
+            <p className="text-sm font-black text-foreground">
+              All daily quests done!
+            </p>
+            <p className="text-xs font-bold text-muted-foreground">
+              New quests tomorrow.
+            </p>
+          </div>
+        ) : (
+          quests.map((quest) => (
             <DailyChecklistQuestRows
               key={quest.id}
               quest={quest}
-              firstGroup={questIndex === 0}
               rewardCatalog={rewardCatalog}
               isPremium={isPremium}
               claimingObjectiveId={claimingObjectiveId}
@@ -722,16 +752,18 @@ export function DailyChecklistCard({
               }
               onClaimObjective={onClaimObjective}
             />
-          ))}
-        </div>
-      )}
-      {streak ? (
-        <DailyStreakStrip
-          streak={streak}
-          claiming={claimingStreak}
-          onClaim={onClaimStreak}
-        />
-      ) : null}
+          ))
+        )}
+        {streak ? (
+          <DailyStreakStrip
+            streak={streak}
+            claiming={claimingStreak}
+            onClaim={onClaimStreak}
+            rewardCatalog={rewardCatalog}
+            isPremium={isPremium}
+          />
+        ) : null}
+      </div>
       <RewardDetailsPopup
         open={!!rewardPopup}
         eyebrow={rewardPopup?.eyebrow ?? ''}
@@ -750,69 +782,88 @@ function DailyStreakStrip({
   streak,
   claiming = false,
   onClaim,
+  rewardCatalog,
+  isPremium,
 }: {
   streak: DailyStreakInfo;
   claiming?: boolean;
   onClaim?: () => void;
+  rewardCatalog: Record<string, QuestRewardCatalogItem>;
+  isPremium: boolean;
 }) {
   const length = Math.max(2, streak.targetLength);
   const cycleDay =
     streak.count === 0 ? 0 : ((streak.count - 1) % length) + 1;
+  const prizePool = streak.rewards ?? [];
+  const prize = prizePool[0];
 
   return (
-    <div className="flex items-center gap-2.5 border-t border-dashed border-border/40 bg-amber-500/10 px-4 py-2.5">
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border-2 border-amber-400 bg-gradient-to-br from-amber-100 to-amber-50 text-amber-600 dark:from-amber-900/40 dark:to-amber-950/40 dark:text-amber-400">
-        <Gift className="h-[18px] w-[18px]" strokeWidth={2.5} />
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-[12px] font-black leading-tight text-foreground">
-          {streak.claimable
-            ? 'Streak bonus ready!'
-            : `Daily streak · day ${cycleDay} of ${length}`}
-        </p>
-        <p className="mt-0.5 text-[11px] font-bold leading-tight text-muted-foreground">
-          {streak.claimable
-            ? `Random prize for your ${length}-day streak`
-            : streak.todayComplete
-              ? 'Done for today — hop back tomorrow!'
-              : `Finish all daily quests ${length - cycleDay} more day${length - cycleDay > 1 ? 's' : ''} for a mystery prize`}
-        </p>
-      </div>
-      {streak.claimable && onClaim ? (
-        <button
-          type="button"
-          onClick={onClaim}
-          disabled={claiming}
-          className="inline-flex h-8 shrink-0 items-center justify-center rounded-xl bg-amber-500 px-3.5 text-[10px] font-black uppercase tracking-[0.15em] text-white shadow-[0_3px_0_0_#b45309] transition-all hover:translate-y-[-1px] hover:shadow-[0_4px_0_0_#b45309] active:translate-y-[2px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {claiming ? 'Claiming...' : 'Claim'}
-        </button>
-      ) : length <= 7 ? (
-        <div className="flex shrink-0 items-center gap-1">
-          {Array.from({ length }, (_, i) => (
-            <span
-              key={i}
-              className={cn(
-                'h-2 w-4 rounded-full',
-                i < cycleDay
-                  ? 'bg-amber-400'
-                  : 'border border-border/60 bg-muted',
-              )}
-            />
-          ))}
+    <div className="rounded-[20px] border border-border/50 bg-card px-4 py-3 shadow-sm">
+      <div className="flex items-center gap-2.5">
+        {prize ? (
+          <RewardTile
+            reward={prize}
+            rewardCatalog={rewardCatalog}
+            isPremium={isPremium}
+            paused={true}
+            hideBadge={prize.type !== 'FLIES'}
+            flySize={22}
+            className="h-10 w-10 shrink-0 rounded-xl"
+          />
+        ) : (
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-400/15 text-amber-500">
+            <Gift className="h-[18px] w-[18px]" strokeWidth={2.5} />
+          </div>
+        )}
+        <div className="min-w-0 flex-1">
+          <p className="text-[12px] font-black leading-tight text-foreground">
+            {streak.claimable
+              ? 'Streak prize ready!'
+              : `Daily streak · day ${cycleDay} of ${length}`}
+          </p>
+          <p className="mt-0.5 text-[11px] font-bold leading-tight text-muted-foreground">
+            {streak.claimable
+              ? `You finished every daily quest ${length} days in a row`
+              : streak.todayComplete
+                ? 'Done for today — hop back tomorrow!'
+                : `Finish all daily quests ${length - cycleDay} more day${length - cycleDay > 1 ? 's' : ''} to win${prizePool.length > 1 ? ` one of ${prizePool.length} prizes` : ''}`}
+          </p>
         </div>
-      ) : (
-        <span className="shrink-0 text-[11px] font-black tabular-nums text-amber-600 dark:text-amber-400">
-          {cycleDay}/{length}
-        </span>
-      )}
+        {streak.claimable && onClaim ? (
+          <button
+            type="button"
+            onClick={onClaim}
+            disabled={claiming}
+            className="inline-flex h-8 shrink-0 items-center justify-center rounded-xl bg-amber-500 px-3.5 text-[10px] font-black uppercase tracking-[0.15em] text-white shadow-[0_3px_0_0_#b45309] transition-all hover:translate-y-[-1px] hover:shadow-[0_4px_0_0_#b45309] active:translate-y-[2px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {claiming ? 'Claiming...' : 'Claim'}
+          </button>
+        ) : length <= 7 ? (
+          <div className="flex shrink-0 items-center gap-1">
+            {Array.from({ length }, (_, i) => (
+              <span
+                key={i}
+                className={cn(
+                  'h-2 w-4 rounded-full',
+                  i < cycleDay
+                    ? 'bg-amber-400'
+                    : 'border border-border/60 bg-muted',
+                )}
+              />
+            ))}
+          </div>
+        ) : (
+          <span className="shrink-0 text-[11px] font-black tabular-nums text-amber-600 dark:text-amber-400">
+            {cycleDay}/{length}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
 
 function DailyChecklistQuestRows({
   quest,
-  firstGroup,
   rewardCatalog,
   isPremium,
   claimingObjectiveId,
@@ -820,7 +871,6 @@ function DailyChecklistQuestRows({
   onClaimObjective,
 }: {
   quest: QuestCardData & { placement: 'daily' };
-  firstGroup: boolean;
   rewardCatalog: Record<string, QuestRewardCatalogItem>;
   isPremium: boolean;
   claimingObjectiveId?: string | null;
@@ -838,27 +888,31 @@ function DailyChecklistQuestRows({
   if (visibleLogic.length === 0) return null;
 
   return (
-    <div className={cn(!firstGroup && 'border-t border-border/20')}>
-      {visibleLogic.map((block, i) => (
-        <ObjectiveRow
+    <>
+      {visibleLogic.map((block) => (
+        <div
           key={block.id}
-          block={block}
-          objectiveClaimed={claimedObjectiveIds.includes(block.id)}
-          claimingObjective={claimingObjectiveId === block.id}
-          isPremium={isPremium}
-          rewardCatalog={rewardCatalog}
-          paused={true}
-          onOpenRewards={onOpenRewards}
-          onClaimObjective={
-            onClaimObjective
-              ? () => onClaimObjective(quest.id, block.id)
-              : undefined
-          }
-          isLast={i === visibleLogic.length - 1}
-          isFirst={i === 0}
-        />
+          className="rounded-[20px] border border-border/50 bg-card px-4 py-1 shadow-sm"
+        >
+          <ObjectiveRow
+            block={block}
+            objectiveClaimed={claimedObjectiveIds.includes(block.id)}
+            claimingObjective={claimingObjectiveId === block.id}
+            isPremium={isPremium}
+            rewardCatalog={rewardCatalog}
+            paused={true}
+            onOpenRewards={onOpenRewards}
+            onClaimObjective={
+              onClaimObjective
+                ? () => onClaimObjective(quest.id, block.id)
+                : undefined
+            }
+            isLast
+            isFirst
+          />
+        </div>
       ))}
-    </div>
+    </>
   );
 }
 
@@ -870,6 +924,7 @@ export function CategoryQuestPresentationCard({
   claimingObjectiveId,
   linkedTags,
   onEditTags,
+  onStartQuest,
   onClaimObjective,
   locked = false,
   switchingFocus = false,
@@ -888,6 +943,7 @@ export function CategoryQuestPresentationCard({
   category?: MacroCategoryDefinition;
   linkedTags: QuestTagChip[];
   onEditTags?: () => void;
+  onStartQuest?: () => void;
   locked?: boolean;
   switchingFocus?: boolean;
   activeFocusName?: string;
@@ -935,21 +991,27 @@ export function CategoryQuestPresentationCard({
     !claimedObjectiveIds.includes(block.id);
   const totalSteps = quest.logic.length;
   const doneSteps = quest.logic.filter(isBlockDone).length;
-  const collapsedClaimedCount = quest.logic.filter((block) =>
-    hiddenClaimedObjectiveIds.has(block.id),
-  ).length;
   const orderedOpen = [...visibleLogic].sort(
     (a, b) => Number(isBlockClaimable(b)) - Number(isBlockClaimable(a)),
   );
-  const shownBlocks = showAllObjectives ? orderedOpen : orderedOpen.slice(0, 2);
-  const foldedBlocks = showAllObjectives ? [] : orderedOpen.slice(2);
-  const foldedPeekRewards = foldedBlocks
-    .map((block) => block.rewards?.[0])
-    .filter(Boolean)
-    .slice(0, 3) as QuestReward[];
+  const shownBlocks = showAllObjectives ? orderedOpen : orderedOpen.slice(0, 1);
+  const foldedBlocks = showAllObjectives ? [] : orderedOpen.slice(1);
+  const foldedRewards = foldedBlocks.flatMap((block) => block.rewards ?? []);
+  const foldedFlies = foldedRewards
+    .filter((reward) => reward.type === 'FLIES')
+    .reduce(
+      (sum, reward) =>
+        sum +
+        Math.max(0, reward.amount ?? reward.maxAmount ?? reward.minAmount ?? 0),
+      0,
+    );
+  const foldedItems = foldedRewards
+    .filter((reward) => reward.type !== 'FLIES')
+    .slice(0, 2);
 
   return (
-    <div className="overflow-hidden rounded-[28px] border border-border/50 bg-card shadow-sm">
+    <div>
+      <div className="overflow-hidden rounded-[24px] border border-border/50 bg-card shadow-sm">
       <div className="relative overflow-hidden">
         {heroImageUrl ? (
           <img
@@ -1046,75 +1108,94 @@ export function CategoryQuestPresentationCard({
           ) : null}
         </div>
 
-        {usesFocusTags && !locked && !isCompleted && linkedTags.length === 0 && (
+        {needsFocusTags && !locked && !isCompleted && (
           <button
             type="button"
-            onClick={onEditTags}
-            className="group absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-black/45 px-4 text-center transition-colors [@media(hover:hover)]:hover:bg-black/55"
-            aria-label="Pick a tag"
-          >
-            <span className="inline-flex items-center gap-2 rounded-full bg-white/95 px-4 py-2.5 text-[12px] font-black uppercase tracking-[0.12em] text-slate-900 shadow-[0_4px_0_0_rgba(15,23,42,0.25)] ring-1 ring-black/10 backdrop-blur-sm transition active:translate-y-[2px] active:shadow-none group-active:translate-y-[2px] dark:bg-card/95 dark:text-card-foreground dark:ring-white/10">
-              <Tags className="h-4 w-4" strokeWidth={2.75} />
-              Pick a tag
-            </span>
-            <span className="text-[12px] font-bold text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]">
-              Choose a tag to start this quest
-            </span>
-          </button>
+            onClick={onStartQuest ?? onEditTags}
+            className="absolute inset-0 z-20"
+            aria-label="Start quest"
+          />
         )}
       </div>
 
-      {!isCompleted && (
-      <div className="px-4 pt-3 pb-4 sm:px-5 sm:pb-5">
-        {usesFocusTags && !locked && linkedTags.length > 0 && (
-          <div className="mb-2 flex flex-wrap items-center gap-2 px-1">
-            <span className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">
-              Focus tags
-            </span>
-            {linkedTags.map((tag) => (
-              <QuestTagPill key={tag.id} tag={tag} />
-            ))}
-            {onEditTags ? (
-              <button
-                type="button"
-                onClick={onEditTags}
-                aria-label="Edit focus tags"
-                className="ml-auto inline-flex h-7 w-7 items-center justify-center rounded-full border border-border/60 bg-background text-muted-foreground shadow-sm transition hover:border-primary/40 hover:text-primary"
-              >
-                <Pencil className="h-3.5 w-3.5" strokeWidth={2.5} />
-              </button>
-            ) : null}
-          </div>
-        )}
-        {totalSteps > 1 && (
-          <div className="mb-1 flex items-center gap-1 px-1">
-            {Array.from({ length: totalSteps }, (_, i) => (
-              <span
-                key={i}
-                className={cn(
-                  'h-1.5 w-4 rounded-full',
-                  i < doneSteps ? 'bg-lime-500' : 'bg-muted',
-                )}
-              />
-            ))}
-            <span className="ml-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-muted-foreground">
-              {doneSteps} / {totalSteps} done
-            </span>
-          </div>
-        )}
+      {/* Not started yet: the art stays fully visible; the CTA lives below it. */}
+      {needsFocusTags && !locked && !isCompleted && (
+        <button
+          type="button"
+          onClick={onStartQuest ?? onEditTags}
+          className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+        >
+          <span className="min-w-0 flex-1 text-[13px] font-black leading-snug text-foreground">
+            Get rewarded for {category?.name ?? 'these'} tasks
+          </span>
+          <span className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-xl bg-[#4f9149] px-4 text-[11px] font-black uppercase tracking-[0.12em] text-white shadow-[0_3px_0_0_#34631f] transition-all active:translate-y-[2px] active:shadow-none">
+            <Play className="h-3.5 w-3.5 fill-current" />
+            Start quest
+          </span>
+        </button>
+      )}
+
+      {/* Banner footer: which tag counts + overall progress pips. */}
+      {!isCompleted && !needsFocusTags && (
+        <div className="px-4 pb-3 pt-2.5">
+          {usesFocusTags && !locked && linkedTags.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+                Counting tasks tagged
+              </span>
+              {linkedTags.map((tag) => (
+                <QuestTagPill key={tag.id} tag={tag} />
+              ))}
+              {onEditTags ? (
+                <button
+                  type="button"
+                  onClick={onEditTags}
+                  aria-label="Edit focus tags"
+                  className="ml-auto inline-flex h-7 w-7 items-center justify-center rounded-full border border-border/60 bg-background text-muted-foreground shadow-sm transition hover:border-primary/40 hover:text-primary"
+                >
+                  <Pencil className="h-3.5 w-3.5" strokeWidth={2.5} />
+                </button>
+              ) : null}
+            </div>
+          )}
+          {totalSteps > 1 && (
+            <div
+              className={cn(
+                'flex items-center gap-1',
+                usesFocusTags && !locked && linkedTags.length > 0 && 'mt-2',
+              )}
+            >
+              {Array.from({ length: totalSteps }, (_, i) => (
+                <span
+                  key={i}
+                  className={cn(
+                    'h-1.5 w-4 rounded-full',
+                    i < doneSteps ? 'bg-lime-500' : 'bg-muted',
+                  )}
+                />
+              ))}
+              <span className="ml-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-muted-foreground">
+                {doneSteps} / {totalSteps} done
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+      </div>
+
+      {/* Objectives float below the banner, matching the daily/starter rows. */}
+      {!isCompleted && !needsFocusTags && (
         <div
           className={cn(
+            'mt-2.5 flex flex-col gap-2.5',
             locked && 'pointer-events-none select-none opacity-50 saturate-50',
           )}
         >
-        {collapsedClaimedCount > 0 && (
-          <div className="flex items-center gap-1.5 border-b border-border/20 px-1 py-2 text-[11px] font-black uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
-            <Check className="h-3.5 w-3.5" strokeWidth={3.5} />
-            {collapsedClaimedCount} claimed
-          </div>
-        )}
-        {shownBlocks.map((block, i) => (
-          <div key={block.id}>
+        {shownBlocks.map((block) => (
+          <div
+            key={block.id}
+            className="rounded-[20px] border border-border/50 bg-card px-4 py-1 shadow-sm"
+          >
             <ObjectiveRow
               block={block}
               objectiveClaimed={claimedObjectiveIds.includes(block.id)}
@@ -1134,10 +1215,8 @@ export function CategoryQuestPresentationCard({
                   ? undefined
                   : () => onClaimObjective(block.id)
               }
-              isLast={
-                i === shownBlocks.length - 1 && foldedBlocks.length === 0
-              }
-              isFirst={i === 0}
+              isLast
+              isFirst
               linkedTags={linkedTags}
               categoryName={category?.shortLabel || category?.name}
               categoryAccent={category?.accent}
@@ -1151,7 +1230,7 @@ export function CategoryQuestPresentationCard({
               </p>
             ) : null}
             {block.tagMode !== 'focus_category_tags' && (
-              <div className="flex flex-wrap items-center gap-2 -mt-1.5 mb-1 px-1">
+              <div className="flex flex-wrap items-center gap-2 -mt-1.5 mb-2 px-1">
                 {block.resolvedTagNames?.length ? (
                   block.resolvedTagNames.map((tagName, index) => {
                     const matchedTag = linkedTags.find(
@@ -1189,11 +1268,11 @@ export function CategoryQuestPresentationCard({
           </div>
         ))}
         {(foldedBlocks.length > 0 ||
-          (showAllObjectives && orderedOpen.length > 2)) && (
+          (showAllObjectives && orderedOpen.length > 1)) && (
           <button
             type="button"
             onClick={() => setShowAllObjectives((v) => !v)}
-            className="mt-2 flex w-full items-center gap-2 rounded-xl bg-muted/40 px-3 py-2.5 text-[11px] font-black uppercase tracking-[0.1em] text-muted-foreground transition hover:bg-muted/70"
+            className="flex w-full items-center gap-2 rounded-[20px] border border-dashed border-border/60 bg-muted/30 px-4 py-2.5 text-[11px] font-black uppercase tracking-[0.1em] text-muted-foreground transition hover:bg-muted/60"
           >
             <ChevronDown
               className={cn(
@@ -1202,33 +1281,41 @@ export function CategoryQuestPresentationCard({
               )}
               strokeWidth={3}
             />
-            {showAllObjectives
-              ? 'Show less'
-              : `${foldedBlocks.length} more objective${foldedBlocks.length > 1 ? 's' : ''}`}
-            {!showAllObjectives && foldedPeekRewards.length > 0 && (
-              <span className="ml-auto flex items-center gap-1.5 normal-case tracking-normal">
-                <span className="text-[10px] font-bold text-muted-foreground/80">
-                  worth
+            {showAllObjectives ? (
+              'Show less'
+            ) : (
+              <span className="flex min-w-0 items-center gap-1.5">
+                <span className="shrink-0">{foldedBlocks.length} more</span>
+                {linkedTags[0] ? (
+                  <QuestTagPill tag={linkedTags[0]} compact />
+                ) : null}
+                <span className="shrink-0">
+                  objective{foldedBlocks.length > 1 ? 's' : ''}
                 </span>
-                {foldedPeekRewards.map((reward, index) => (
-                  <RewardTile
-                    key={`${reward.type}-${reward.itemId ?? reward.backgroundId ?? index}`}
-                    reward={reward}
-                    rewardCatalog={rewardCatalog}
-                    isPremium={isPremium}
-                    paused={true}
-                    hideBadge
-                    flySize={16}
-                    className="h-8 w-8 rounded-lg"
-                  />
-                ))}
               </span>
             )}
+            {!showAllObjectives &&
+              (foldedFlies > 0 || foldedItems.length > 0) && (
+                <span className="ml-auto flex items-center gap-1.5 normal-case tracking-normal">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground/80">
+                    worth
+                  </span>
+                  {foldedFlies > 0 && <FlyWorth amount={foldedFlies} />}
+                  {foldedItems.map((reward, index) => (
+                    <RewardTile
+                      key={`${reward.type}-${reward.itemId ?? reward.backgroundId ?? index}`}
+                      reward={reward}
+                      rewardCatalog={rewardCatalog}
+                      isPremium={isPremium}
+                      paused={true}
+                      className="h-8 w-8 rounded-lg"
+                    />
+                  ))}
+                </span>
+              )}
           </button>
         )}
         </div>
-
-      </div>
       )}
       <RewardDetailsPopup
         open={!!rewardPopup}
@@ -1243,6 +1330,7 @@ export function CategoryQuestPresentationCard({
         open={showSwitch}
         categoryId={quest.categoryId}
         categoryName={category?.shortLabel || category?.name}
+        coverImageUrl={heroImageUrl}
         currentFocusName={activeFocusName}
         switching={switchingFocus}
         onConfirm={() => onActivateFocus?.()}
@@ -1259,6 +1347,7 @@ export function SwitchFocusConfirm({
   open,
   categoryId,
   categoryName,
+  coverImageUrl,
   currentFocusName,
   switching = false,
   onConfirm,
@@ -1270,6 +1359,7 @@ export function SwitchFocusConfirm({
   open: boolean;
   categoryId?: string;
   categoryName?: string;
+  coverImageUrl?: string;
   currentFocusName?: string;
   switching?: boolean;
   onConfirm: () => void;
@@ -1336,9 +1426,33 @@ export function SwitchFocusConfirm({
           ref={bindScroll}
           className="relative overflow-y-auto overscroll-none px-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-1 text-card-foreground sm:px-6 sm:pb-6 sm:pt-3"
         >
-          <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-400/15 text-amber-500">
-                <Repeat className="h-7 w-7" strokeWidth={2.5} />
-              </div>
+          {coverImageUrl ? (
+            <div className="relative mb-4 mt-4 h-24 overflow-hidden rounded-2xl sm:mt-10">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={coverImageUrl}
+                alt={categoryName ?? 'Quest'}
+                className="absolute inset-0 h-full w-full object-cover"
+              />
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 to-transparent" />
+              {categoryName ? (
+                <span
+                  className="absolute bottom-2 left-3 text-[19px] uppercase leading-none tracking-wide text-white drop-shadow-[0_3px_0_rgba(15,23,42,0.9)]"
+                  style={{
+                    fontFamily: 'var(--font-display), "Luckiest Guy", cursive',
+                    WebkitTextStroke: '1.8px rgba(15, 23, 42, 0.95)',
+                    paintOrder: 'stroke fill',
+                  }}
+                >
+                  {categoryName}
+                </span>
+              ) : null}
+            </div>
+          ) : (
+            <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-400/15 text-amber-500">
+              <Repeat className="h-7 w-7" strokeWidth={2.5} />
+            </div>
+          )}
               <h3 className="text-center text-xl font-black text-foreground">
                 Switch your quest?
               </h3>
@@ -1436,61 +1550,14 @@ export function SwitchFocusConfirm({
   );
 }
 
-export function FocusSlotBar({
-  isPremium,
-  activeLabel,
-  activeAccent,
-  totalCount,
-  onLockedPress,
-}: {
-  isPremium: boolean;
-  activeLabel?: string;
-  activeAccent?: string;
-  totalCount: number;
-  onLockedPress?: () => void;
-}) {
-  if (isPremium) {
-    return (
-      <div className="flex items-center gap-2 px-1 pb-2">
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-[11px] font-black uppercase tracking-wide text-primary-foreground shadow-[0_3px_0_rgba(15,23,42,0.18)]">
-          <Check className="h-3 w-3" strokeWidth={3.5} />
-          All {totalCount} running
-        </span>
-      </div>
-    );
-  }
+export type AreaRowState = 'running' | 'paused' | 'start';
 
-  return (
-    <div className="flex items-center gap-2 px-1 pb-2">
-      <span
-        className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-black uppercase tracking-wide text-white shadow-[0_3px_0_rgba(15,23,42,0.18)]"
-        style={{ backgroundColor: activeAccent || '#059669' }}
-      >
-        <span className="h-1.5 w-1.5 rounded-full bg-white" aria-hidden />
-        {activeLabel ?? 'Pick a focus'}
-      </span>
-      {[0, 1].map((slot) => (
-        <button
-          key={slot}
-          type="button"
-          onClick={onLockedPress}
-          aria-label="Unlock more focus slots with Plus"
-          className="inline-flex items-center justify-center rounded-full border-[1.5px] border-dashed border-border bg-muted/50 px-3 py-1.5 text-muted-foreground transition hover:border-primary/40 hover:text-primary"
-        >
-          <Lock className="h-3 w-3" strokeWidth={2.75} />
-        </button>
-      ))}
-      <span className="ml-auto text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground">
-        1 of {totalCount} running
-      </span>
-    </div>
-  );
-}
-
-export function FocusPosterCard({
+// One compact row per non-expanded area: art thumb, name, and the loot still
+// waiting inside — plus what tapping it does (start / switch / view).
+export function AreaRow({
   quest,
   category,
-  live,
+  state,
   finished = false,
   linkedTags = [],
   rewardCatalog,
@@ -1502,7 +1569,7 @@ export function FocusPosterCard({
     categoryId: MacroCategoryDefinition['id'];
   };
   category?: MacroCategoryDefinition;
-  live: boolean;
+  state: AreaRowState;
   finished?: boolean;
   linkedTags?: QuestTagChip[];
   rewardCatalog: Record<string, QuestRewardCatalogItem>;
@@ -1510,9 +1577,6 @@ export function FocusPosterCard({
   onPress?: () => void;
 }) {
   const claimedObjectiveIds = quest.claimedObjectiveIds ?? [];
-  const needsTag =
-    quest.logic.some((block) => block.tagMode === 'focus_category_tags') &&
-    linkedTags.length === 0;
   const imageUrl = category?.coverImageUrl ?? quest.coverImageUrl;
   const totalTarget = quest.logic.reduce(
     (sum, block) => sum + Math.max(1, block.target),
@@ -1523,26 +1587,31 @@ export function FocusPosterCard({
       sum + Math.min(Math.max(0, block.progress), Math.max(1, block.target)),
     0,
   );
-  const pct = totalTarget > 0 ? Math.round((totalProgress / totalTarget) * 100) : 0;
-  const peekReward = quest.logic.find(
+  const pct =
+    totalTarget > 0 ? Math.round((totalProgress / totalTarget) * 100) : 0;
+
+  const loot = questLoot(quest);
+  const lootTiles = loot.items.slice(0, 2);
+  const lootExtra = loot.items.length - lootTiles.length;
+  const nextBlock = quest.logic.find(
     (block) =>
       !claimedObjectiveIds.includes(block.id) &&
-      (block.rewards?.length ?? 0) > 0,
-  )?.rewards?.[0];
+      block.progress < Math.max(1, block.target),
+  );
 
   return (
     <button
       type="button"
       onClick={onPress}
       className={cn(
-        'flex w-[136px] flex-none flex-col overflow-hidden rounded-[18px] border bg-card text-left shadow-sm transition active:scale-[0.97]',
-        quest.claimable
+        'flex w-full items-center gap-3 rounded-[20px] border bg-card p-3 text-left shadow-sm transition active:scale-[0.98]',
+        quest.claimable && !finished
           ? 'border-amber-400 ring-1 ring-amber-400/40'
           : 'border-border/50',
         finished && 'opacity-70',
       )}
     >
-      <div className="relative h-16 w-full overflow-hidden">
+      <div className="relative h-14 w-[88px] shrink-0 overflow-hidden rounded-xl">
         {imageUrl ? (
           <img
             src={imageUrl}
@@ -1564,147 +1633,245 @@ export function FocusPosterCard({
             <Check className="h-6 w-6 text-emerald-300" strokeWidth={3.5} />
           </div>
         )}
-        {!finished && peekReward ? (
-          <div className="absolute bottom-1 right-1">
-            <RewardTile
-              reward={peekReward}
-              rewardCatalog={rewardCatalog}
-              isPremium={isPremium}
-              paused={true}
-              flySize={14}
-              className="h-8 w-8 rounded-lg border"
-            />
-          </div>
-        ) : null}
       </div>
-      <div className="flex items-center justify-between gap-1 px-2.5 pt-2">
-        <span className="truncate text-[11px] font-black text-foreground">
-          {category?.shortLabel || category?.name || quest.title}
-        </span>
-        {!finished && (
-          <span className="shrink-0 text-[10px] font-bold tabular-nums text-muted-foreground">
-            {pct}%
+
+      <div className="min-w-0 flex-1">
+        <p className="flex min-w-0 items-center gap-1.5">
+          <span className="truncate text-[14px] font-black text-foreground">
+            {category?.name ?? quest.title}
           </span>
-        )}
-      </div>
-      <div className="relative mx-2.5 mt-1.5 h-2 overflow-hidden rounded-full bg-muted">
-        <div
-          className={cn(
-            'absolute inset-y-[1.5px] left-[1.5px] rounded-full',
-            finished || quest.claimable
-              ? 'bg-lime-500'
-              : live && !needsTag
-                ? 'bg-amber-400'
-                : 'bg-muted-foreground/40',
-          )}
-          style={{ width: `${Math.max(pct, 4)}%` }}
-        />
-      </div>
-      <div
-        className={cn(
-          'mx-2.5 my-2 flex items-center justify-center gap-1 rounded-[10px] py-1.5 text-[9px] font-black uppercase tracking-[0.1em]',
-          finished
-            ? 'text-muted-foreground'
-            : quest.claimable
-              ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
-              : needsTag
-                ? 'border-[1.5px] border-dashed border-amber-500/60 bg-amber-500/10 text-amber-600 dark:text-amber-400'
-                : live
-                  ? 'text-muted-foreground'
-                  : 'border-[1.5px] border-dashed border-border text-muted-foreground',
-        )}
-      >
-        {finished ? (
-          'Done'
-        ) : quest.claimable ? (
+          {state === 'running' && !finished && linkedTags[0] ? (
+            <QuestTagPill tag={linkedTags[0]} compact />
+          ) : null}
+        </p>
+        {state === 'running' && !finished ? (
           <>
-            <Gift className="h-3 w-3" strokeWidth={2.75} />
-            Reward ready
+            <div className="mt-1.5 flex items-center gap-2">
+              <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-muted">
+                <div
+                  className={cn(
+                    'absolute inset-y-[1.5px] left-[1.5px] rounded-full',
+                    quest.claimable ? 'bg-lime-500' : 'bg-amber-400',
+                  )}
+                  style={{ width: `${Math.max(pct, 4)}%` }}
+                />
+              </div>
+              <span className="shrink-0 text-[10px] font-bold tabular-nums text-muted-foreground">
+                {pct}%
+              </span>
+            </div>
+            {nextBlock ? (
+              <p className="mt-1 flex items-center gap-1.5 text-[11px] font-bold text-muted-foreground">
+                <span className="min-w-0 flex-1 truncate">
+                  Next: {shortObjectiveLabel(nextBlock)} ·{' '}
+                  <span className="tabular-nums">
+                    {Math.min(
+                      nextBlock.progress,
+                      Math.max(1, nextBlock.target),
+                    )}
+                    /{nextBlock.targetLabel ?? nextBlock.target}
+                  </span>
+                </span>
+                {nextBlock.rewards?.[0] ? (
+                  nextBlock.rewards[0].type === 'FLIES' ? (
+                    <FlyWorth
+                      amount={Math.max(
+                        0,
+                        nextBlock.rewards[0].amount ??
+                          nextBlock.rewards[0].maxAmount ??
+                          nextBlock.rewards[0].minAmount ??
+                          0,
+                      )}
+                      flySize={20}
+                    />
+                  ) : (
+                    <RewardTile
+                      reward={nextBlock.rewards[0]}
+                      rewardCatalog={rewardCatalog}
+                      isPremium={isPremium}
+                      paused={true}
+                      hideBadge
+                      className="h-7 w-7 shrink-0 rounded-lg"
+                    />
+                  )
+                ) : null}
+              </p>
+            ) : null}
           </>
-        ) : needsTag ? (
-          <>
-            <Tags className="h-3 w-3" strokeWidth={2.75} />
-            Pick a tag
-          </>
-        ) : live && linkedTags.length > 0 ? (
-          <span className="flex min-w-0 max-w-full items-center gap-1">
-            <span
-              className="inline-flex min-w-0 items-center rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-wider shadow-sm"
-              style={{
-                backgroundColor: `${linkedTags[0].color}20`,
-                borderColor: `${linkedTags[0].color}40`,
-                color: linkedTags[0].color,
-              }}
-            >
-              <span className="truncate">{linkedTags[0].name}</span>
+        ) : !finished && (loot.flies > 0 || lootTiles.length > 0) ? (
+          <span className="mt-1 flex items-center gap-1.5">
+            <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground/80">
+              worth
             </span>
-            {linkedTags.length > 1 && (
-              <span className="shrink-0 text-[9px] font-black text-muted-foreground">
-                +{linkedTags.length - 1}
+            {loot.flies > 0 && <FlyWorth amount={loot.flies} />}
+            {lootTiles.map((reward, index) => (
+              <RewardTile
+                key={`${reward.type}-${reward.itemId ?? reward.backgroundId ?? index}`}
+                reward={reward}
+                rewardCatalog={rewardCatalog}
+                isPremium={isPremium}
+                paused={true}
+                className="h-8 w-8 rounded-lg"
+              />
+            ))}
+            {lootExtra > 0 && (
+              <span className="text-[10px] font-black text-muted-foreground">
+                +{lootExtra}
               </span>
             )}
           </span>
-        ) : live ? (
-          'Running'
+        ) : finished ? (
+          <p className="mt-0.5 text-[11px] font-bold text-muted-foreground">
+            Done — refreshes soon
+          </p>
+        ) : null}
+      </div>
+
+      <div className="shrink-0">
+        {finished ? (
+          <span className="text-[10px] font-black uppercase tracking-[0.12em] text-muted-foreground">
+            Done
+          </span>
+        ) : quest.claimable ? (
+          <span className="inline-flex items-center gap-1 rounded-xl bg-amber-500/15 px-3 py-2 text-[10px] font-black uppercase tracking-[0.1em] text-amber-600 dark:text-amber-400">
+            <Gift className="h-3.5 w-3.5" strokeWidth={2.75} />
+            Ready
+          </span>
+        ) : state === 'start' ? (
+          <span className="inline-flex items-center gap-1 rounded-xl border-[1.5px] border-dashed border-amber-500/60 bg-amber-500/10 px-3 py-2 text-[10px] font-black uppercase tracking-[0.1em] text-amber-600 dark:text-amber-400">
+            <Play className="h-3.5 w-3.5 fill-current" />
+            Start
+          </span>
+        ) : state === 'paused' ? (
+          <span className="inline-flex items-center gap-1 rounded-xl border-[1.5px] border-dashed border-border px-3 py-2 text-[10px] font-black uppercase tracking-[0.1em] text-muted-foreground">
+            <Repeat className="h-3.5 w-3.5" strokeWidth={2.75} />
+            Switch
+          </span>
         ) : (
-          <>
-            <Pause className="h-3 w-3" strokeWidth={2.75} />
-            Swap in
-          </>
+          <span className="pr-1 text-muted-foreground">
+            <ChevronDown className="h-4 w-4 -rotate-90" strokeWidth={3} />
+          </span>
         )}
       </div>
     </button>
   );
 }
 
-export function PlusGateCard({
-  questCount,
-  onUpgrade,
+// Big art-forward pick card for the "nothing started yet" chooser: full-bleed
+// cover, the area name in the display font, the loot on offer, and one loud
+// Start button.
+export function AreaStartCard({
+  quest,
+  category,
+  compact = false,
+  rewardCatalog,
+  isPremium,
+  onPress,
 }: {
-  questCount: number;
-  onUpgrade?: () => void;
+  quest: QuestCardData & {
+    placement: 'category';
+    categoryId: MacroCategoryDefinition['id'];
+  };
+  category?: MacroCategoryDefinition;
+  /** Half-width grid variant for users with many areas. */
+  compact?: boolean;
+  rewardCatalog: Record<string, QuestRewardCatalogItem>;
+  isPremium: boolean;
+  onPress?: () => void;
 }) {
+  const imageUrl = category?.coverImageUrl ?? quest.coverImageUrl;
+  const loot = questLoot(quest);
+  const lootTiles = loot.items.slice(0, compact ? 1 : 2);
+  const lootExtra = loot.items.length - lootTiles.length;
+
+  const worth = (loot.flies > 0 || lootTiles.length > 0) && (
+    <span className="flex min-w-0 items-center gap-1.5">
+      <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground/80">
+        worth
+      </span>
+      {loot.flies > 0 && <FlyWorth amount={loot.flies} />}
+      {lootTiles.map((reward, index) => (
+        <RewardTile
+          key={`${reward.type}-${reward.itemId ?? reward.backgroundId ?? index}`}
+          reward={reward}
+          rewardCatalog={rewardCatalog}
+          isPremium={isPremium}
+          paused={true}
+          className="h-8 w-8 rounded-lg"
+        />
+      ))}
+      {lootExtra > 0 && (
+        <span className="text-[10px] font-black text-muted-foreground">
+          +{lootExtra}
+        </span>
+      )}
+    </span>
+  );
+
   return (
     <button
       type="button"
-      onClick={onUpgrade}
-      className="relative isolate flex w-[148px] flex-none flex-col justify-between overflow-hidden rounded-[18px] p-3 text-left shadow-sm ring-1 ring-emerald-900/40 transition active:scale-[0.97]"
+      onClick={onPress}
+      className="h-full w-full overflow-hidden rounded-[24px] border border-border/50 bg-card text-left shadow-sm transition active:scale-[0.98] [@media(hover:hover)]:hover:shadow-md"
     >
-      <span
-        aria-hidden
-        className="absolute inset-0 -z-10 bg-[linear-gradient(160deg,#0c3f31_0%,#14532d_60%,#365314_100%)]"
-      />
-      <span
-        aria-hidden
-        className="absolute inset-x-0 top-0 -z-10 h-1/3 bg-gradient-to-b from-white/10 to-transparent"
-      />
-      <div>
-        <p
-          className="text-[13px] uppercase leading-[1.3] tracking-wide text-emerald-50"
+      <div
+        className={cn(
+          'relative w-full overflow-hidden',
+          compact ? 'h-20' : 'h-28',
+        )}
+      >
+        {imageUrl ? (
+          <img
+            src={imageUrl}
+            alt={category?.name ?? quest.title}
+            loading="lazy"
+            decoding="async"
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <div
+            className="h-full w-full"
+            style={{
+              background: `linear-gradient(135deg, ${category?.backgroundFrom ?? '#0f172a'}, ${category?.backgroundTo ?? '#1e293b'})`,
+            }}
+          />
+        )}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-black/50 to-transparent" />
+        <span
+          className={cn(
+            'absolute bottom-2 uppercase leading-none tracking-wide text-white drop-shadow-[0_3px_0_rgba(15,23,42,0.9)]',
+            compact
+              ? 'left-3 right-3 truncate text-[15px]'
+              : 'left-3.5 text-[20px]',
+          )}
           style={{
             fontFamily: 'var(--font-display), "Luckiest Guy", cursive',
-            WebkitTextStroke: '1px rgba(6, 44, 34, 0.9)',
+            WebkitTextStroke: compact
+              ? '1.4px rgba(15, 23, 42, 0.95)'
+              : '1.8px rgba(15, 23, 42, 0.95)',
             paintOrder: 'stroke fill',
           }}
         >
-          {questCount} quests.
-          <br />
-          One frog.
-          <br />
-          <span className="text-amber-300">Plus runs them all.</span>
-        </p>
-        <p className="mt-1.5 text-[9.5px] font-bold leading-snug text-emerald-100/75">
-          Every focus advances at once — and rewards are doubled.
-        </p>
+          {category?.name ?? quest.title}
+        </span>
       </div>
-      <span className="relative mt-2.5 flex items-center justify-center rounded-[10px] bg-amber-400 py-1.5 pl-8 pr-2 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-950 shadow-[0_2.5px_0_rgba(0,0,0,0.35)]">
-        <Icon
-          name="frogPlus"
-          label=""
-          className="absolute -left-1.5 -top-3 h-11 w-11 -rotate-6 drop-shadow-[0_2px_0_rgba(0,0,0,0.25)]"
-        />
-        See Plus
-      </span>
+      {compact ? (
+        <div className="flex flex-col gap-2 px-3 py-2.5">
+          {worth}
+          <span className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-xl bg-amber-500 px-3 text-[11px] font-black uppercase tracking-[0.12em] text-white shadow-[0_3px_0_0_#b45309] transition-all active:translate-y-[2px] active:shadow-none">
+            <Play className="h-3.5 w-3.5 fill-current" />
+            Start
+          </span>
+        </div>
+      ) : (
+        <div className="flex items-center justify-between gap-3 px-4 py-3">
+          {worth || <span />}
+          <span className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl bg-amber-500 px-4 text-[11px] font-black uppercase tracking-[0.12em] text-white shadow-[0_3px_0_0_#b45309] transition-all active:translate-y-[2px] active:shadow-none">
+            <Play className="h-3.5 w-3.5 fill-current" />
+            Start
+          </span>
+        </div>
+      )}
     </button>
   );
 }
@@ -1780,24 +1947,17 @@ function ObjectiveRow({
         </button>
       );
     }
-    if (objectiveClaimed) {
+    if (stepDone) {
       return (
         <div className="flex h-8 items-center gap-1.5 rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-2.5">
           <Check className="w-3 h-3 text-emerald-500" />
           <span className="text-[10px] font-black uppercase tracking-[0.12em] text-emerald-600/70 dark:text-emerald-400/70">
-            Claimed
+            {objectiveClaimed ? 'Claimed' : 'Done'}
           </span>
         </div>
       );
     }
-    return (
-      <div
-        className="inline-flex h-8 cursor-not-allowed items-center justify-center rounded-xl bg-muted px-3.5 text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground/60 shadow-[0_3px_0_0_rgba(15,23,42,0.12)]"
-        aria-disabled
-      >
-        <span className="mr-[-0.15em]">Claim</span>
-      </div>
-    );
+    return <HintButton text={objectiveHintText(block, linkedTags)} />;
   };
 
   const firstReward = hasRewards ? block.rewards![0] : null;
@@ -1849,9 +2009,6 @@ function ObjectiveRow({
               categoryAccent,
               onPickTags,
             })}
-            {block.helpText && !stepDone ? (
-              <HelpDot text={block.helpText} />
-            ) : null}
           </p>
 
           <div className="relative mt-1.5 h-5 overflow-hidden rounded-full bg-muted">
@@ -1892,24 +2049,40 @@ function ObjectiveRow({
   );
 }
 
-function HelpDot({ text }: { text: string }) {
+function HintButton({ text }: { text: string }) {
   const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLSpanElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (containerRef.current?.contains(event.target as Node)) return;
+      setOpen(false);
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+    };
+  }, [open]);
+
   return (
-    <span className="relative inline-flex">
+    <span ref={containerRef} className="relative inline-flex">
       <button
         type="button"
         aria-label="How to do this"
+        aria-expanded={open}
         onClick={(event) => {
           event.stopPropagation();
           setOpen((v) => !v);
         }}
-        onBlur={() => setOpen(false)}
-        className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-border/60 bg-muted text-[11px] font-black text-muted-foreground transition hover:border-primary/40 hover:text-primary"
+        className="inline-flex h-8 items-center justify-center rounded-xl border border-border/70 bg-background px-3.5 text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground shadow-[0_3px_0_0_rgba(15,23,42,0.08)] transition-all hover:text-foreground active:translate-y-[2px] active:shadow-none"
       >
-        ?
+        <span className="mr-[-0.15em]">Hint</span>
       </button>
       {open && (
-        <span className="absolute bottom-full left-1/2 z-30 mb-2 w-56 -translate-x-1/2 rounded-xl border border-border bg-popover px-3 py-2 text-xs font-medium normal-case leading-snug text-popover-foreground shadow-lg">
+        <span className="absolute bottom-full right-0 z-30 mb-2 w-56 rounded-xl border border-border bg-popover px-3 py-2 text-left text-xs font-medium normal-case tracking-normal leading-snug text-popover-foreground shadow-lg">
           {text}
         </span>
       )}
@@ -1917,10 +2090,21 @@ function HelpDot({ text }: { text: string }) {
   );
 }
 
-function QuestTagPill({ tag }: { tag: QuestTagChip }) {
+function QuestTagPill({
+  tag,
+  compact = false,
+}: {
+  tag: QuestTagChip;
+  compact?: boolean;
+}) {
   return (
     <span
-      className="relative inline-flex max-w-full items-center justify-center gap-1.5 rounded-xl border px-3 py-1.5 text-[11px] font-black uppercase tracking-wider shadow-sm"
+      className={cn(
+        'relative inline-flex max-w-full items-center justify-center gap-1.5 border font-black uppercase tracking-wider shadow-sm',
+        compact
+          ? 'rounded-lg px-2 py-0.5 text-[10px]'
+          : 'rounded-xl px-3 py-1.5 text-[11px]',
+      )}
       style={{
         backgroundColor: `${tag.color}20`,
         borderColor: `${tag.color}40`,

@@ -291,7 +291,10 @@
       "Bash(echo \"POST /api/user \\(no body\\): $\\(curl -s -o /dev/null -w '%{http_code}' -X POST http://localhost:3000/api/user\\)\")",
       "Bash(echo \"POST /api/user \\(tz body\\): $\\(curl -s -X POST -H 'Content-Type: application/json' -d '{\"timezone\":\"Asia/Jerusalem\"}' -o /dev/null -w '%{http_code}' http://localhost:3000/api/user\\)\")",
       "Bash(echo \"GET /api/tasks: $\\(curl -s -o /dev/null -w '%{http_code}' 'http://localhost:3000/api/tasks?date=2026-07-11&timezone=Asia/Jerusalem'\\)\")",
-      "PowerShell(\\(Get-Content node_modules/tailwindcss/package.json | ConvertFrom-Json\\).version)"
+      "PowerShell(\\(Get-Content node_modules/tailwindcss/package.json | ConvertFrom-Json\\).version)",
+      "WebFetch(domain:www.deconstructoroffun.com)",
+      "Bash(echo \"build-exit:$?\")",
+      "Bash(echo \"tsc:$?\")"
     ]
   }
 }

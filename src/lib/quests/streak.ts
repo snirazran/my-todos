@@ -23,6 +23,9 @@ export type DailyStreakView = {
   targetLength: number;
   todayComplete: boolean;
   claimable: boolean;
+  // The configured prize pool (the claim draws one of these), so the UI can
+  // show the real prize instead of a "mystery" placeholder.
+  rewards: QuestReward[];
 };
 
 export function previousDayKey(dayKey: string) {
@@ -104,6 +107,7 @@ export async function syncDailyStreak(args: {
     targetLength,
     todayComplete,
     claimable: next.milestonesEarned > next.milestonesClaimed,
+    rewards: (config.rewards ?? []) as QuestReward[],
   };
 }
 
