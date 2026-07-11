@@ -339,7 +339,7 @@ export default function TaskCard({
       }}
       className={[
         compact
-          ? 'group relative overflow-visible flex items-center gap-2 px-2 py-2 select-none rounded-[14px] transition-colors duration-200'
+          ? 'group relative overflow-visible flex items-center gap-2 px-2 py-2 select-none rounded-xl transition-colors duration-200'
           : 'group relative overflow-visible flex items-start gap-3 p-3.5 select-none rounded-xl transition-colors duration-200',
         task.completed
           ? isPast
@@ -348,12 +348,22 @@ export default function TaskCard({
           : disableDrag
             ? 'cursor-pointer'
             : 'cursor-grab',
-        'bg-card border border-border/80',
+        // The column itself now sits a shade darker/greyer (DayColumn) so
+        // cards need to visibly pop off it, Trello-style — only in the
+        // planner's compact list; the home page's non-compact cards sit on
+        // their own lighter list surface and are unaffected. Trello itself
+        // drops the card outline entirely and relies on a soft drop shadow
+        // for edge definition instead, so the border here stays present
+        // (for the hover/active/menu highlight below) but transparent at
+        // rest.
+        compact
+          ? 'bg-card dark:bg-muted border border-transparent shadow-[0_1px_2px_rgba(0,0,0,0.12)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.5)]'
+          : 'bg-card border border-border/80 shadow-sm',
         task.completed
-          ? 'shadow-sm'
-          : 'shadow-sm md:hover:border-primary/40 active:border-primary/40',
-        compact ? 'mb-1.5' : 'mb-2.5',
-        menuOpen ? 'z-50 shadow-sm border-primary/30' : '',
+          ? ''
+          : 'md:hover:border-primary/40 active:border-primary/40',
+        compact ? 'mb-1' : 'mb-2.5',
+        menuOpen ? 'z-50 border-primary/30' : '',
         hiddenWhileDragging ? 'opacity-0' : '',
       ].join(' ')}
       role="listitem"

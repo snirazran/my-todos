@@ -65,16 +65,19 @@ export default function DayColumn({
       className={[
         'group relative flex flex-col overflow-visible',
         'rounded-[20px]',
-        isPast ? 'bg-muted' : 'bg-card',
+        // Recessed list surface, distinct from the cards sitting on top of
+        // it (Trello-style layering) — a soft grey in light mode, dropping
+        // to the page's own near-black in dark mode so the (lighter) cards
+        // clearly pop off it instead of blending in.
+        isPast ? 'bg-muted/40 dark:bg-background/60' : 'bg-muted/70 dark:bg-background',
         'border border-border/50 shadow-sm',
         appliedMax,
-        'p-3',
+        'p-2',
         'min-h-[100px]',
         'transition-colors duration-300',
-        isPast ? 'hover:bg-muted' : 'hover:bg-card',
       ].join(' ')}
     >
-      <div className="flex flex-col gap-2 px-2 mb-4 pt-1">
+      <div className="flex flex-col gap-2 px-1 mb-2 pt-1">
         <div className="flex items-center justify-between">
           <h2 className="flex items-baseline gap-2">
             {displayDate && (
@@ -177,7 +180,7 @@ export default function DayColumn({
         layoutScroll
         ref={listRef}
         className={[
-          'flex-1 px-1 pt-2 overflow-y-auto transition-colors rounded-xl',
+          'flex-1 px-0.5 pt-1 overflow-y-auto transition-colors rounded-xl',
           'no-scrollbar touch-auto overscroll-y-contain',
           'pb-[env(safe-area-inset-bottom)]',
         ].join(' ')}

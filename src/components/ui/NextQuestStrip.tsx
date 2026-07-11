@@ -63,7 +63,7 @@ export function NextQuestStrip({
         if (targetQuestId) setQuestScrollTarget(targetQuestId);
         router.push('/quests');
       }}
-      className={`group relative mx-3 mb-2 flex w-[calc(100%-1.5rem)] items-center gap-3 overflow-hidden rounded-xl border p-3 text-left shadow-sm transition-colors ${
+      className={`group relative mx-1.5 mb-2 flex w-[calc(100%-0.75rem)] items-center gap-3 overflow-hidden rounded-[18px] border p-3 text-left shadow-sm transition-colors md:mx-4 md:w-[calc(100%-2rem)] ${
         claimable
           ? 'border-amber-400/40 bg-amber-500/10 hover:bg-amber-500/15'
           : 'border-primary/10 bg-primary/5 hover:bg-primary/10'

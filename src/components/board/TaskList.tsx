@@ -524,7 +524,7 @@ export default React.memo(function TaskList({
       key={k}
       data-drop-placeholder
       style={dragHeight ? { height: dragHeight } : undefined}
-      className="h-[56px] mb-1.5 border-2 border-dashed rounded-[14px] border-primary/50 bg-primary/10"
+      className="h-[56px] mb-1"
     />
   );
 
@@ -546,7 +546,7 @@ export default React.memo(function TaskList({
       rows.push(
         <div
           key={`empty-none-${day}`}
-          className="flex items-center justify-center w-full py-4 text-center rounded-[14px] border border-dashed border-muted-foreground/20 bg-muted/20"
+          className="flex items-center justify-center w-full py-4 text-center rounded-xl border border-dashed border-muted-foreground/20 bg-muted/20"
         >
           <p className="text-xs font-medium text-muted-foreground/80">
             No activities for this day
@@ -559,7 +559,7 @@ export default React.memo(function TaskList({
         <button
           key={`empty-state-${day}`}
           onClick={() => onAddRequested('')}
-          className="flex flex-col items-center justify-center w-full py-3 text-center transition-all border-2 border-dashed cursor-pointer border-muted-foreground/20 bg-muted/30 hover:bg-muted/50 rounded-[14px] group"
+          className="flex flex-col items-center justify-center w-full py-3 text-center transition-all border-2 border-dashed cursor-pointer border-muted-foreground/20 bg-muted/30 hover:bg-muted/50 rounded-xl group"
         >
           <div className="flex items-center justify-center w-11 h-11 mb-1.5 transition-all border rounded-full bg-muted border-muted-foreground/10 grayscale opacity-70 group-hover:grayscale-0 group-hover:opacity-100">
             <Fly size={36} y={-3} />

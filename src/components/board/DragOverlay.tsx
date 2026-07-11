@@ -63,8 +63,13 @@ export default function DragOverlay({
         animate={{ scale: 1.04, rotate: -2 }}
         transition={{ type: 'spring', stiffness: 480, damping: 26 }}
         className={[
-          'flex items-center gap-1.5 px-2.5 py-2 select-none rounded-[14px]',
-          'bg-card border-2 border-primary/20 shadow-2xl',
+          'flex items-center gap-1.5 px-2.5 py-2 select-none rounded-xl',
+          // Lifted card, Trello-style: no outline, just a stronger two-layer
+          // shadow (tight contact shadow + soft ambient one) to read as
+          // "picked up" instead of a colored ring.
+          'bg-card dark:bg-muted',
+          'shadow-[0_2px_4px_rgba(0,0,0,0.14),0_18px_36px_rgba(0,0,0,0.20)]',
+          'dark:shadow-[0_2px_4px_rgba(0,0,0,0.45),0_18px_36px_rgba(0,0,0,0.55)]',
         ].join(' ')}
         style={{ minHeight: height }}
       >

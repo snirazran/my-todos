@@ -1010,8 +1010,16 @@ export default function QuickAddSheet({
                                 // Keep the textarea focused so mobile browsers do
                                 // not start hiding the keyboard before `onClick`.
                                 // Refocusing after the click is too late and causes
-                                // a visible close/reopen flicker.
-                                if (document.activeElement === inputRef.current) {
+                                // a visible close/reopen flicker. Touch-only: on
+                                // desktop this also suppresses the browser's
+                                // synthetic mousedown (the pointer-event spec's
+                                // compatibility-event behavior), which silently
+                                // broke the row's click-and-drag scroll whenever
+                                // the textarea had focus.
+                                if (
+                                  e.pointerType !== 'mouse' &&
+                                  document.activeElement === inputRef.current
+                                ) {
                                   e.preventDefault();
                                 }
                                 startLongPress(tag, e);
@@ -1187,7 +1195,11 @@ export default function QuickAddSheet({
                         }}
                         style={{ maxHeight: suggestionsMax }}
                         className={[
-                          'flex min-h-0 flex-col overflow-hidden rounded-[28px] border border-border/80 bg-popover p-4 shadow-[0_3px_0_0_rgba(0,0,0,0.18)]',
+                          // Opaque (not the /70 blend used elsewhere) — this
+                          // panel sits over a blurred sheet backdrop, so a
+                          // translucent tint picks up whatever's behind it
+                          // instead of landing on the intended flat color.
+                          'flex min-h-0 flex-col overflow-hidden rounded-[28px] border border-border/80 bg-muted dark:bg-background p-4 shadow-[0_3px_0_0_rgba(0,0,0,0.18)]',
                           showSuggestions
                             ? 'relative pointer-events-auto'
                             : 'invisible absolute inset-x-0 top-0 pointer-events-none',

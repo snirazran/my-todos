@@ -9,12 +9,14 @@ import React, {
 } from 'react';
 import { usePathname } from 'next/navigation';
 import { randomUUID } from '@/lib/uuid';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
+  ArrowDownToLine,
   CalendarCheck,
   CalendarPlus,
   ChevronsLeft,
   ChevronsRight,
+  EyeOff,
   Plus,
 } from 'lucide-react';
 import useSWR from 'swr';
@@ -1755,65 +1757,118 @@ export default function TaskBoard({
         }`}
       >
         <div className="pointer-events-auto mx-auto flex w-[88vw] max-w-none flex-col items-center justify-center md:w-full md:max-w-[480px]">
-          {isMobile && (
-            <div
-              className="mb-1 flex h-4 items-center justify-center gap-1.5"
-              aria-label={`Visible day: ${windowDates[pageIndex] ?? activeDateKey}`}
-            >
-              {WEEK_ORDER.map((day) => {
-                const visibleDate = windowDates[pageIndex] ?? activeDateKey;
-                const active = parseYmd(visibleDate).getDay() === day;
-                return (
-                  <span
-                    key={day}
-                    aria-hidden="true"
-                    className={`h-1 rounded-full transition-[width,background-color] ${
-                      active ? 'w-4 bg-primary' : 'w-1.5 bg-primary/20'
-                    }`}
-                  />
-                );
-              })}
-            </div>
-          )}
-          <div className="relative h-14 w-full md:h-[72px]">
-            <div className="mx-auto h-full w-full max-w-[300px] md:max-w-[480px]">
-              <BacklogBox
-                count={backlog.length}
-                isDragOver={isDragOverBacklog}
-                isDragging={!!drag?.active}
-                isRepeating={draggingRepeating}
-                isDesktop={!isMobile}
-                onClick={() => setBacklogOpen(true)}
-                forwardRef={backlogBoxRef}
-              />
-            </div>
-            {isMobile && (
-              <button
-                type="button"
-                aria-label="Add task"
-                disabled={
-                  scrollLocked ||
-                  backlogOpen ||
-                  !!drag?.active ||
-                  calendarOpen ||
-                  moveCalendarOpen ||
-                  showQuickAdd ||
-                  showTimer
-                }
-                onClick={() => {
-                  const visibleDate = windowDates[pageIndex] ?? activeDateKey;
-                  const targetDate =
-                    cmpYmd(visibleDate, todayKey) < 0 ? todayKey : visibleDate;
-                  setQuickText('');
-                  setInitialDateKey(targetDate);
-                  setShowQuickAdd(true);
-                }}
-                className="absolute right-0 top-1/2 z-10 grid h-[52px] w-[52px] -translate-y-1/2 place-items-center rounded-full bg-primary/15 text-primary ring-1 ring-primary/30 shadow-lg transition-[opacity,transform,background-color] active:scale-95 disabled:pointer-events-none disabled:opacity-0"
+          {isMobile ? (
+            // One shared surface for the saved-tasks target, the week dots,
+            // and add — previously three independent floating shapes with no
+            // visual relationship to each other. At rest it's a normal row;
+            // the moment a drag starts, that row fades out (kept mounted so
+            // the bar never resizes) and a single drop strip takes over
+            // almost the full bar — no per-item growing/shrinking fight, so
+            // nothing clips or fights for space.
+            <div className="relative flex h-16 w-full max-w-[300px] items-center rounded-[28px] border border-border/60 bg-card px-2 shadow-lg shadow-black/5 dark:shadow-black/20">
+              <div
+                className={`flex w-full items-center gap-1 transition-opacity duration-150 ${
+                  drag?.active ? 'pointer-events-none opacity-0' : 'opacity-100'
+                }`}
+                aria-hidden={!!drag?.active}
               >
-                <Plus className="h-6 w-6 stroke-[3]" />
-              </button>
-            )}
-          </div>
+                <BacklogBox
+                  count={backlog.length}
+                  isDragOver={false}
+                  isDragging={false}
+                  isRepeating={draggingRepeating}
+                  isDesktop={false}
+                  onClick={() => setBacklogOpen(true)}
+                />
+
+                <div
+                  className="flex min-w-0 flex-1 items-center justify-center gap-1.5 overflow-hidden"
+                  aria-label={`Visible day: ${windowDates[pageIndex] ?? activeDateKey}`}
+                >
+                  {WEEK_ORDER.map((day) => {
+                    const visibleDate = windowDates[pageIndex] ?? activeDateKey;
+                    const active = parseYmd(visibleDate).getDay() === day;
+                    return (
+                      <span
+                        key={day}
+                        aria-hidden="true"
+                        className={`h-1 shrink-0 rounded-full transition-[width,background-color] ${
+                          active ? 'w-4 bg-primary' : 'w-1.5 bg-primary/20'
+                        }`}
+                      />
+                    );
+                  })}
+                </div>
+
+                <button
+                  type="button"
+                  aria-label="Add task"
+                  disabled={
+                    scrollLocked ||
+                    backlogOpen ||
+                    !!drag?.active ||
+                    calendarOpen ||
+                    moveCalendarOpen ||
+                    showQuickAdd ||
+                    showTimer
+                  }
+                  onClick={() => {
+                    const visibleDate = windowDates[pageIndex] ?? activeDateKey;
+                    const targetDate =
+                      cmpYmd(visibleDate, todayKey) < 0 ? todayKey : visibleDate;
+                    setQuickText('');
+                    setInitialDateKey(targetDate);
+                    setShowQuickAdd(true);
+                  }}
+                  className="relative grid h-14 w-14 shrink-0 -translate-y-3 place-items-center rounded-full bg-primary text-primary-foreground shadow-[0_8px_18px_-4px_rgba(0,0,0,0.4)] ring-4 ring-card transition-[opacity,transform] active:scale-95 disabled:pointer-events-none disabled:opacity-0"
+                >
+                  <Plus className="h-6 w-6 stroke-[3]" />
+                </button>
+              </div>
+
+              <AnimatePresence>
+                {drag?.active && (
+                  <motion.div
+                    ref={backlogBoxRef}
+                    initial={{ opacity: 0, scale: 0.94 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.94 }}
+                    transition={{ type: 'spring', stiffness: 480, damping: 32 }}
+                    className={`absolute inset-1.5 flex items-center justify-center gap-2 rounded-[22px] border-2 transition-colors ${
+                      isDragOverBacklog
+                        ? 'border-primary bg-primary/12 text-primary'
+                        : 'border-dashed border-primary/30 bg-primary/5 text-primary/70'
+                    }`}
+                  >
+                    {draggingRepeating ? (
+                      <EyeOff className="h-5 w-5 shrink-0" />
+                    ) : (
+                      <ArrowDownToLine className="h-5 w-5 shrink-0" />
+                    )}
+                    <span className="text-sm font-bold whitespace-nowrap">
+                      {isDragOverBacklog
+                        ? draggingRepeating
+                          ? 'Release to skip this day'
+                          : 'Release to save for later'
+                        : draggingRepeating
+                          ? 'Drop to skip this day'
+                          : 'Drop to save for later'}
+                    </span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          ) : (
+            <BacklogBox
+              count={backlog.length}
+              isDragOver={isDragOverBacklog}
+              isDragging={!!drag?.active}
+              isRepeating={draggingRepeating}
+              isDesktop
+              onClick={() => setBacklogOpen(true)}
+              forwardRef={backlogBoxRef}
+            />
+          )}
         </div>
       </div>
 

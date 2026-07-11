@@ -420,7 +420,13 @@ const SortableTaskItem = React.forwardRef<
         style={{ ...style, overflow: 'hidden' }}
         {...attributes}
         {...listeners}
-        className={`relative mb-1.5 w-full rounded-xl md:mb-2 ${isDragging ? 'z-30' : isMenuOpen ? 'z-50 shadow-sm border border-primary/30' : 'z-auto'}`}
+        // The card's own drop shadow has to live here, on the outermost
+        // layer — its children below are clipped by this element's own
+        // `overflow: hidden` (needed for the swipe-reveal actions), and any
+        // box-shadow on a clipped child is invisible no matter how it's
+        // styled. This layer's *own* shadow isn't affected by its own
+        // overflow setting, only its children's are.
+        className={`relative mb-1.5 w-full rounded-xl shadow-[0_1px_2px_rgba(0,0,0,0.12)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.5)] md:mb-2 ${isDragging ? 'z-30' : isMenuOpen ? 'z-50 border border-primary/30' : 'z-auto'}`}
         data-is-active={!isDone}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -435,7 +441,7 @@ const SortableTaskItem = React.forwardRef<
             layout: { duration: 0.25, ease: [0.25, 0.1, 0.25, 1] },
             opacity: { duration: 0.2, ease: 'easeOut', delay: 0.15 },
           }}
-          className={`group relative w-full rounded-xl ${isDragging ? 'overflow-visible shadow-none' : isExitingLater ? 'overflow-visible shadow-none' : isGlowActive && !isDone ? 'overflow-visible shadow-none' : isOpen || isSwiping ? 'overflow-hidden bg-muted/70 shadow-none' : 'overflow-hidden bg-transparent shadow-sm shadow-black/5 dark:shadow-black/20'} ${isExitingLater ? 'will-change-transform' : ''}`}
+          className={`group relative w-full rounded-xl ${isDragging ? 'overflow-visible shadow-none' : isExitingLater ? 'overflow-visible shadow-none' : isGlowActive && !isDone ? 'overflow-visible shadow-none' : isOpen || isSwiping ? 'overflow-hidden bg-muted/70 shadow-none' : 'overflow-hidden'} ${isExitingLater ? 'will-change-transform' : ''}`}
         >
           {/* Swipe Actions Layer (Behind) - Now on Left (revealed by Right Swipe) */}
           {/* Swipe Actions Layer (Visible when dragging Right -> Do Later) */}
@@ -504,9 +510,8 @@ const SortableTaskItem = React.forwardRef<
             className={`
               relative flex w-full items-center gap-1 px-2.5 py-2.5 md:gap-1 md:px-3.5 md:py-3.5
               transition-colors duration-200 rounded-xl
-              bg-card
-              border border-border/50 shadow-none
-              ${isOpen || isSwiping ? 'bg-card' : 'bg-card'}
+              bg-card dark:bg-muted
+              border border-transparent shadow-none
               ${isHovered && isDesktop && !isDone ? 'border-primary/40' : ''}
               ${
                 isGlowActive && !isDone
@@ -1331,7 +1336,7 @@ export default function TaskList({
           {/* Header Menu Removed - Moved to Page */}
         </div>
 
-        <div className="w-full rounded-[18px] bg-card/40 border border-border/50 shadow-sm overflow-hidden">
+        <div className="w-full rounded-[18px] bg-muted/70 dark:bg-background border border-border/50 shadow-sm overflow-hidden">
         <div
           className={`p-1.5 pb-0 space-y-0 overflow-y-visible md:p-2 md:pb-0 ${exitAction ? 'overflow-x-visible' : 'overflow-x-hidden'}`}
           ref={scrollContainerRef}

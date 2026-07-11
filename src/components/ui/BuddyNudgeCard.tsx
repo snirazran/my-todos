@@ -55,11 +55,11 @@ export function BuddyNudgeCard() {
   return (
     <>
       {show && (
-        <div className="mx-3 mt-2">
+        <div className="mx-1.5 mt-2 md:mx-4">
             <button
               type="button"
               onClick={() => setFlowOpen(true)}
-              className="group relative flex w-full items-center gap-2 overflow-hidden rounded-3xl border border-[#4f9149]/30 bg-popover py-2.5 pl-1.5 pr-1.5 text-left shadow-[0_3px_0_0_rgba(79,145,73,0.35)] transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f9149]/40 active:translate-y-[3px] active:shadow-none sm:gap-3 sm:py-4 sm:pl-2 sm:pr-2.5 [@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:shadow-[0_5px_0_0_rgba(79,145,73,0.35)]"
+              className="group relative flex w-full items-center gap-2 overflow-hidden rounded-[18px] border border-[#4f9149]/30 bg-popover py-2.5 pl-1.5 pr-1.5 text-left shadow-[0_3px_0_0_rgba(79,145,73,0.35)] transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f9149]/40 active:translate-y-[3px] active:shadow-none sm:gap-3 sm:py-4 sm:pl-2 sm:pr-2.5 [@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:shadow-[0_5px_0_0_rgba(79,145,73,0.35)]"
             >
               <span
                 aria-hidden

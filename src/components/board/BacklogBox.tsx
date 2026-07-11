@@ -12,7 +12,10 @@ interface Props {
   isRepeating?: boolean;
   isDesktop: boolean;
   onClick: () => void;
-  forwardRef: React.Ref<HTMLDivElement>;
+  /** Omit when this instance isn't the live drop-hit-test target (e.g. the
+   * idle bookmark button in the mobile toolbar, where a separate full-width
+   * strip takes over as the real drop target during a drag). */
+  forwardRef?: React.Ref<HTMLDivElement>;
 }
 
 export default function BacklogBox({
@@ -25,107 +28,89 @@ export default function BacklogBox({
   forwardRef,
 }: Props) {
   const idleSize = isDesktop ? 64 : 52;
-  const dropHeight = isDesktop ? 56 : 46;
   const countBadgeClass = isDesktop
     ? 'min-w-6 h-6 px-1 text-[11px]'
     : 'w-5 h-5 text-[10px]';
   const DropIcon = isRepeating ? EyeOff : ArrowDownToLine;
+  const label = isRepeating ? 'Release to skip this day' : 'Release to save for later';
 
   return (
     <div
       ref={forwardRef}
-      className="relative grid w-full shrink-0 place-items-center pointer-events-auto"
-      style={{ height: idleSize }}
+      className="relative flex shrink-0 items-center justify-center pointer-events-auto"
+      style={{ height: idleSize, width: idleSize }}
     >
-      {/* Drop target: a quiet, icon-only pill while a card is merely in
-          flight — it only announces what it does (label + accent) once the
-          card is actually held over it, so it doesn't read as a big new UI
-          element the moment you pick anything up. Grid-stacked (not
-          absolute) so it can share Framer's `layout` transform with the
-          idle bookmark layer below without either fighting the other. */}
-      <motion.div
-        layout
-        initial={false}
-        animate={{
-          opacity: isDragging ? 1 : 0,
-          scale: isDragging ? 1 : 0.85,
-        }}
-        transition={{
-          layout: { type: 'spring', stiffness: 500, damping: 38 },
-          opacity: { duration: 0.16 },
-          scale: { duration: 0.16 },
-        }}
-        className={`col-start-1 row-start-1 flex items-center justify-center gap-2 overflow-hidden rounded-full border px-4 ${
+      {/* The target itself never resizes — a fixed circle at rest, ringed in
+          primary once a card is actually over it. What it does is
+          communicated by a floating label above it (macOS/iOS dock-drop
+          convention) instead of the target growing to fit text, which was
+          fighting the toolbar's other children for space and clipping. */}
+      <button
+        type="button"
+        onClick={onClick}
+        aria-label="Saved tasks"
+        className={`grid h-full w-full place-items-center rounded-full border shadow-lg shadow-black/5 transition-colors dark:shadow-black/20 ${
           isDragOver
-            ? 'border-primary bg-primary/12 text-primary shadow-md shadow-primary/10'
-            : 'border-border/70 bg-card/95 text-muted-foreground/60 shadow-sm'
+            ? 'border-primary bg-primary/12 text-primary'
+            : isDragging
+              ? 'border-primary/40 bg-card text-muted-foreground/70'
+              : 'border-border/80 bg-card text-foreground hover:border-primary/50 hover:bg-card/95'
         }`}
-        style={{
-          height: dropHeight,
-          pointerEvents: isDragging ? 'auto' : 'none',
-          willChange: 'transform, opacity',
-          backfaceVisibility: 'hidden',
-        }}
       >
-        <DropIcon size={isDesktop ? 20 : 17} className="shrink-0" />
-        <AnimatePresence initial={false}>
-          {isDragOver && (
+        <AnimatePresence initial={false} mode="wait">
+          {isDragging ? (
             <motion.span
-              key="label"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.12 }}
-              className={`${isDesktop ? 'text-sm' : 'text-xs'} font-bold whitespace-nowrap`}
+              key="drop"
+              initial={{ opacity: 0, scale: 0.7 }}
+              animate={{ opacity: 1, scale: isDragOver ? 1.08 : 1 }}
+              exit={{ opacity: 0, scale: 0.7 }}
+              transition={{ type: 'spring', stiffness: 500, damping: 30 }}
             >
-              {isRepeating ? 'Release to skip this day' : 'Release to save for later'}
+              <DropIcon size={isDesktop ? 24 : 20} />
+            </motion.span>
+          ) : (
+            <motion.span
+              key="idle"
+              initial={{ opacity: 0, scale: 0.7 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.7 }}
+              transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+            >
+              <Icon name="saved" className={isDesktop ? 'h-9 w-9' : 'h-7 w-7'} />
             </motion.span>
           )}
         </AnimatePresence>
-      </motion.div>
+      </button>
 
-      {/* Idle bookmark is a separate fixed layer; it never stretches into the
-          drop target, avoiding width/height/border-radius interpolation. */}
-      <motion.div
-        initial={false}
-        animate={{
-          opacity: isDragging ? 0 : 1,
-          scale: isDragging ? 0.86 : 1,
-        }}
-        transition={{
-          duration: isDragging ? 0.18 : 0.24,
-          ease: [0.22, 1, 0.36, 1],
-        }}
-        className="col-start-1 row-start-1"
-        style={{
-          pointerEvents: isDragging ? 'none' : 'auto',
-          willChange: 'transform, opacity',
-        }}
-      >
-        <button
-          type="button"
-          onClick={onClick}
-          aria-label="Saved tasks"
-          className="grid place-items-center rounded-[18px] border border-border/80 bg-card shadow-lg shadow-black/5 transition-colors hover:border-primary/50 hover:bg-card/95 dark:shadow-black/20"
-          style={{ width: idleSize, height: idleSize }}
-        >
-          <Icon name="saved" className={isDesktop ? 'h-10 w-10' : 'h-8 w-8'} />
-        </button>
+      <AnimatePresence>
+        {count > 0 && !isDragging && (
+          <motion.div
+            key="backlog-count"
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0, opacity: 0 }}
+            className={`absolute -right-1.5 -top-1.5 z-10 flex ${countBadgeClass} items-center justify-center rounded-full bg-primary font-black text-primary-foreground shadow-sm ring-2 ring-background pointer-events-none`}
+          >
+            {count}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-        <AnimatePresence>
-          {count > 0 && (
-            <motion.div
-              key="backlog-count"
-              initial={{ scale: 0, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0, opacity: 0 }}
-              className={`absolute -right-2.5 -top-2.5 z-10 flex ${countBadgeClass} items-center justify-center rounded-full bg-primary font-black text-primary-foreground shadow-sm ring-2 ring-background pointer-events-none`}
-            >
-              {count}
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
+      <AnimatePresence>
+        {isDragOver && (
+          <motion.div
+            key="tooltip"
+            initial={{ opacity: 0, y: 4, scale: 0.94 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 4, scale: 0.94 }}
+            transition={{ type: 'spring', stiffness: 480, damping: 32 }}
+            className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-3 -translate-x-1/2 whitespace-nowrap rounded-full border border-primary/30 bg-card px-3.5 py-2 text-xs font-bold text-primary shadow-xl"
+          >
+            {label}
+            <span className="absolute left-1/2 top-full h-2.5 w-2.5 -translate-x-1/2 -translate-y-1.5 rotate-45 border-b border-r border-primary/30 bg-card" />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

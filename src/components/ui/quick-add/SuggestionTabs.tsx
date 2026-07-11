@@ -128,7 +128,7 @@ export function SuggestionTabs({ open, className, onPick, onContentChange }: Pro
                     checklist: t.checklist,
                   })
                 }
-                className="group flex items-center gap-3 w-full rounded-2xl border border-border/60 bg-card px-3 py-2.5 text-left transition-all [@media(hover:hover)]:hover:border-primary/40 [@media(hover:hover)]:hover:bg-primary/5 active:scale-[0.99]"
+                className="group flex items-center gap-3 w-full rounded-xl border border-transparent bg-card dark:bg-muted px-3 py-2.5 text-left shadow-[0_1px_2px_rgba(0,0,0,0.12)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.5)] transition-all [@media(hover:hover)]:hover:border-primary/40 [@media(hover:hover)]:hover:bg-primary/5 active:scale-[0.99]"
               >
                 <div className="min-w-0 flex-1 flex flex-col gap-1">
                   {((t.tags && t.tags.length > 0) || t.startTime) && (

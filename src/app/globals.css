@@ -33,6 +33,8 @@
     --radius: 0.5rem;
     --safe-bottom: env(safe-area-inset-bottom, 0px);
     --bottom-safe: env(safe-area-inset-bottom, 0px);
+    --repeat-icon-grey: #6c6c6c;
+    --repeat-icon-green: #1f621c;
     color-scheme: light;
   }
 
@@ -62,6 +64,11 @@
     --chart-3: 38 90% 60%;
     --chart-4: 270 72% 68%;
     --chart-5: 338 78% 64%;
+    /* The repeat glyph's own two hardcoded fills were unreadable against a
+       near-black card — lighten both for dark mode instead of flattening
+       the icon to a single currentColor fill. */
+    --repeat-icon-grey: #a3ada6;
+    --repeat-icon-green: #3ed66b;
     color-scheme: dark;
   }
 }

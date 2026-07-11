@@ -284,7 +284,10 @@
       "Bash(powershell -Command \"Get-NetTCPConnection -State Listen -LocalPort 3000 -ErrorAction SilentlyContinue\")",
       "Bash(command -v chromium-cli)",
       "Bash(npx --yes playwright --version)",
-      "Bash(npx --yes playwright install chromium --with-deps)"
+      "Bash(npx --yes playwright install chromium --with-deps)",
+      "WebFetch(domain:gist.github.com)",
+      "Bash(awk 'NR>=440 && NR<=560' /c/Users/snira/Desktop/Full-Stack/frog-task/src/app/page.tsx)",
+      "Bash(awk 'NR==592,NR==740' /c/Users/snira/Desktop/Full-Stack/frog-task/src/app/page.tsx)"
     ]
   }
 }
