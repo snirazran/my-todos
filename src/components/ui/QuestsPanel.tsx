@@ -379,7 +379,7 @@ export function QuestsPanel({
       pendingScrollQuestIdRef.current = null;
       const anchors = Array.from(
         document.querySelectorAll<HTMLElement>(
-          `[data-quest-anchor="${CSS.escape(questId)}"]`,
+          `[data-quest-anchor~="${CSS.escape(questId)}"]`,
         ),
       );
       for (const el of anchors) {

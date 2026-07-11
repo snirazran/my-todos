@@ -180,7 +180,7 @@ export default function DayColumn({
         layoutScroll
         ref={listRef}
         className={[
-          'flex-1 px-0.5 pt-1 overflow-y-auto transition-colors rounded-xl',
+          'flex-1 px-0.5 pt-1 overflow-y-auto overflow-x-hidden transition-colors rounded-xl',
           'no-scrollbar touch-auto overscroll-y-contain',
           'pb-[env(safe-area-inset-bottom)]',
         ].join(' ')}

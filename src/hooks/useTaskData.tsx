@@ -55,6 +55,7 @@ export interface Task {
   startTime?: string;
   endTime?: string;
   reminder?: string;
+  isStarter?: boolean;
 }
 
 export type FlyStatus = {

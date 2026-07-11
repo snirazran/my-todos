@@ -676,7 +676,10 @@ export function DailyChecklistCard({
   );
 
   return (
-    <div className="overflow-hidden rounded-[28px] border border-border/50 bg-card shadow-sm">
+    <div
+      data-quest-anchor={quests.map((quest) => quest.id).join(' ')}
+      className="overflow-hidden rounded-[28px] border border-border/50 bg-card shadow-sm"
+    >
       <div className="flex items-center justify-between gap-2 px-4 pb-1 pt-3.5">
         <span className="inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
           <CalendarDays className="h-3.5 w-3.5" strokeWidth={2.75} />
@@ -835,10 +838,7 @@ function DailyChecklistQuestRows({
   if (visibleLogic.length === 0) return null;
 
   return (
-    <div
-      data-quest-anchor={quest.id}
-      className={cn(!firstGroup && 'border-t border-border/20')}
-    >
+    <div className={cn(!firstGroup && 'border-t border-border/20')}>
       {visibleLogic.map((block, i) => (
         <ObjectiveRow
           key={block.id}

@@ -2058,6 +2058,7 @@ async function handleDailyGet(req: NextRequest, userId: string, tz: string) {
       startTime: t.startTime,
       endTime: t.endTime,
       reminder: t.reminder,
+      isStarter: t.isStarter,
     }))
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   const { flyStatus, hungerStatus, dailyTasksCount } = await currentFlyStatus(

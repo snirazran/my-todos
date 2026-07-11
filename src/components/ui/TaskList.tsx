@@ -101,6 +101,7 @@ interface Task {
   completedDates?: string[];
   /** Consecutive-completion streak for a repeating task, as of today. */
   streak?: number;
+  isStarter?: boolean;
 }
 
 const animateLayoutChanges: AnimateLayoutChanges = (args) =>
@@ -520,6 +521,7 @@ const SortableTaskItem = React.forwardRef<
               }
 
               select-none active:border-primary/40 active:bg-muted/40
+              has-[[data-completion-target]:active]:border-transparent has-[[data-completion-target]:active]:bg-card dark:has-[[data-completion-target]:active]:bg-muted
               ${isDragging ? 'z-[100] opacity-100 shadow-lg shadow-black/15 ring-2 ring-primary/40 dark:shadow-black/40' : ''}
               ${isDone && !isDragging && isHovered && isDesktop ? 'bg-accent/50' : ''}
               cursor-pointer
@@ -695,6 +697,7 @@ const SortableTaskItem = React.forwardRef<
             <div
               role="button"
               tabIndex={0}
+              data-completion-target
               aria-label={isDone ? 'Mark not done' : 'Mark done'}
               onClick={(e) => {
                 e.stopPropagation();
@@ -714,7 +717,7 @@ const SortableTaskItem = React.forwardRef<
                   handleTaskToggle(task);
                 }
               }}
-              className={`relative z-10 flex-shrink-0 w-11 h-11 md:w-12 md:h-12 cursor-pointer transition-opacity duration-200 ${isDone && !isDragging ? 'opacity-60' : 'opacity-100'}`}
+              className={`relative z-10 flex-shrink-0 w-11 h-11 md:w-12 md:h-12 cursor-pointer transition-[opacity,transform] duration-200 active:scale-90 ${isDone && !isDragging ? 'opacity-60' : 'opacity-100'}`}
             >
               <AnimatePresence initial={false}>
                 {!isDone ? (

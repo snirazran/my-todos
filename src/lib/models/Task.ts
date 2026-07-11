@@ -59,6 +59,7 @@ export interface TaskDoc {
   reminderSentKeys?: string[];
   bondId?: string; // links this task to a shared "buddy" bond (TaskBond)
   buddyUserId?: string; // the friend this task is shared with
+  isStarter?: boolean; // seeded "Grab your first fly" onboarding task
 }
 
 const TaskSchema = new Schema<TaskDoc>(
@@ -146,6 +147,7 @@ const TaskSchema = new Schema<TaskDoc>(
     reminderSentKeys: { type: [String], default: [] },
     bondId: { type: String, index: true },
     buddyUserId: { type: String },
+    isStarter: { type: Boolean, default: undefined },
   },
   {
     collection: 'tasks',

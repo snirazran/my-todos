@@ -370,20 +370,17 @@ export function useDragManager() {
       positionOverlay(px, py);
       frameCallbackRef.current?.(px, py);
 
-      // Dominant-axis lock: horizontal auto-scroll only arms once the drag has
-      // clearly committed sideways (bigger than a small dead-zone AND the
-      // larger of the two components) — otherwise an ordinary up/down reorder
-      // that lands within EDGE_X of the screen edge (very likely on a narrow
-      // single-column-peek mobile layout) would start dragging the board.
+      // Horizontal auto-scroll arms on net sideways travel from the grab
+      // point alone — a small dead-zone filters out the few-px drift of a
+      // vertical reorder, but there is deliberately no "dominant axis"
+      // requirement: on a narrow single-column mobile layout the finger often
+      // moves vertically first (or grabs near the screen edge), which would
+      // make a dominance check unsatisfiable and dead-lock cross-day moves.
       if (!autoScrollArmedXRef.current || !autoScrollArmedYRef.current) {
         const gp = grabPointRef.current;
         const dxFromGrab = px - gp.x;
         const dyFromGrab = py - gp.y;
-        if (
-          !autoScrollArmedXRef.current &&
-          Math.abs(dxFromGrab) > 24 &&
-          Math.abs(dxFromGrab) >= Math.abs(dyFromGrab)
-        ) {
+        if (!autoScrollArmedXRef.current && Math.abs(dxFromGrab) > 16) {
           autoScrollArmedXRef.current = true;
         }
         if (!autoScrollArmedYRef.current && Math.abs(dyFromGrab) > 12) {

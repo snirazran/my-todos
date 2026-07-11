@@ -604,14 +604,32 @@ export default function Home() {
                   toggle={handleToggle}
                   showConfetti={rate === 100}
                   visuallyCompleted={visuallyDone}
-                  renderBullet={(task, isVisuallyDone, isPaused) =>
-                    task.completed || isVisuallyDone ? null : (
+                  renderBullet={(task, isVisuallyDone, isPaused) => {
+                    if (task.completed || isVisuallyDone) return null;
+                    const showFlyCoach = !!task.isStarter && doneCount === 0;
+                    return (
                       <div
                         ref={(el) => {
                           flyRefs.current[task.id] = el;
                         }}
-                        className="relative flex items-center justify-center w-11 h-11 border rounded-full bg-muted border-muted-foreground/10 shrink-0 md:h-12 md:w-12"
+                        className="relative flex items-center justify-center w-11 h-11 border-2 rounded-full bg-muted border-muted-foreground/20 shrink-0 md:h-12 md:w-12"
                       >
+                        {showFlyCoach && (
+                          <>
+                            <span
+                              aria-hidden
+                              className="pointer-events-none absolute -inset-0.5 rounded-full ring-[3px] ring-amber-400/90 animate-[demo-glow-breathe_2.4s_ease-in-out_infinite]"
+                            />
+                            <span
+                              aria-hidden
+                              className="pointer-events-none absolute -inset-0.5 rounded-full ring-[3px] ring-amber-400 animate-[demo-sonar_2.4s_cubic-bezier(0,0,0.2,1)_infinite] motion-reduce:hidden"
+                            />
+                            <span className="pointer-events-none absolute right-full top-1/2 mr-3 flex -translate-y-1/2 items-center gap-0.5 whitespace-nowrap text-[11px] font-bold text-amber-500 dark:text-amber-400">
+                              Tap to finish
+                              <ChevronRight className="h-3.5 w-3.5" />
+                            </span>
+                          </>
+                        )}
                         <Fly
                           onClick={() => null}
                           size={40}
@@ -625,8 +643,8 @@ export default function Home() {
                           </span>
                         )}
                       </div>
-                    )
-                  }
+                    );
+                  }}
                   onAddRequested={(prefill) => {
                     if (!user) {
                       router.push('/login');

@@ -49,7 +49,13 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
       const user = auth.currentUser;
       if (!user) throw new Error('Sign-in did not complete');
       await establishSessionCookie(user);
-      await fetch('/api/user', { method: 'POST' });
+      await fetch('/api/user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        }),
+      });
       onNext();
     } catch (signInError: any) {
       setError(getGoogleAuthErrorMessage(signInError));

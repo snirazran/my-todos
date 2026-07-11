@@ -9,6 +9,8 @@ import ReferralModel from '@/lib/models/Referral';
 import { getAdminAuth } from '@/lib/firebaseAdmin';
 import connectMongo from '@/lib/mongoose';
 import { MAX_HUNGER_MS } from '@/lib/hungerLogic';
+import { getZonedToday } from '@/lib/utils';
+import { v4 as uuid } from 'uuid';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
 import AnalyticsEventModel from '@/lib/models/AnalyticsEvent';
 import FlyPurchaseModel from '@/lib/models/FlyPurchase';
@@ -89,6 +91,8 @@ export async function POST(req: NextRequest) {
   try {
     const { uid, email, name, phone_number: phoneNumber, firebase } = decoded as any;
     const isAnonymous = firebase?.sign_in_provider === 'anonymous';
+    const body = await req.json().catch(() => ({}) as Record<string, unknown>);
+    const tz = typeof body?.timezone === 'string' ? body.timezone : 'UTC';
     await connectMongo();
 
     const existingUser = await UserModel.findById(uid).lean();
@@ -135,6 +139,23 @@ export async function POST(req: NextRequest) {
         unlockedAnimationIds: [],
       },
     });
+
+    try {
+      await TaskModel.create({
+        userId: uid,
+        type: 'regular',
+        id: uuid(),
+        text: 'Grab your first fly',
+        order: 0,
+        date: getZonedToday(tz),
+        completed: false,
+        isStarter: true,
+        createdAt: now,
+        updatedAt: now,
+      });
+    } catch (seedError) {
+      console.error('Error seeding starter task:', seedError);
+    }
 
     await recordAnalyticsEvent({
       userId: uid,

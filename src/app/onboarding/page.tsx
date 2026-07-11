@@ -148,12 +148,16 @@ export default function OnboardingPage() {
         // Account creation is deferred until onboarding actually completes, so
         // abandoning the flow never leaves a stranded account. If the user
         // hasn't attached an email mid-flow, create the anonymous account now.
+        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
         if (!auth?.currentUser) {
           const cred = await signInAnonymously(auth);
           await establishSessionCookie(cred.user);
-          await fetch('/api/user', { method: 'POST' });
+          await fetch('/api/user', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ timezone }),
+          });
         }
-        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
         const [onboardingRes] = await Promise.all([
           fetch('/api/onboarding', {
             method: 'POST',

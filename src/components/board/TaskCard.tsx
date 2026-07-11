@@ -551,13 +551,13 @@ export default function TaskCard({
               if (onToggleComplete && !isAnyDragging) onToggleComplete();
             }}
             aria-label={task.completed ? 'Mark not done' : 'Mark done'}
-            className={`relative h-10 w-10 shrink-0 rounded-full transition-colors ${
+            className={`relative h-10 w-10 shrink-0 rounded-full transition-transform active:scale-90 ${
               onToggleComplete ? 'cursor-pointer' : 'cursor-default'
             }`}
           >
             <span
               ref={(el) => registerFly(dragId, el)}
-              className={`absolute inset-0 flex items-center justify-center rounded-full border border-muted-foreground/10 bg-muted transition-opacity duration-200 ${
+              className={`absolute inset-0 flex items-center justify-center rounded-full border-2 border-muted-foreground/20 bg-muted transition-opacity duration-200 ${
                 task.completed || grabbing
                   ? 'opacity-0 pointer-events-none'
                   : 'opacity-100'

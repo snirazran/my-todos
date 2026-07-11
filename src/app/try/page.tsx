@@ -246,7 +246,13 @@ export default function TryPage() {
       const current = auth.currentUser;
       if (!current) throw new Error('Authentication did not complete');
       await establishSessionCookie(current);
-      const res = await fetch('/api/user', { method: 'POST' });
+      const res = await fetch('/api/user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        }),
+      });
       const data = await res.json().catch(() => ({}));
       setIsNewUser(!!data?.isNewUser);
       trackGrowthEvent('funnel_signup', { isNewUser: !!data?.isNewUser });
@@ -851,7 +857,7 @@ function DemoTaskRow({
               )}
               <div
                 ref={flyRef}
-                className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-muted-foreground/10 bg-muted md:h-12 md:w-12"
+                className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-2 border-muted-foreground/20 bg-muted md:h-12 md:w-12"
               >
                 <Fly size={40} y={-3} x={0} interactive={false} />
               </div>

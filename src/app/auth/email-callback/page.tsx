@@ -46,7 +46,13 @@ export default function EmailCallbackPage() {
       const user = auth.currentUser;
       if (!user) throw new Error('No user after sign-in');
       await establishSessionCookie(user);
-      const res = await fetch('/api/user', { method: 'POST' });
+      const res = await fetch('/api/user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        }),
+      });
       const data = await res.json().catch(() => ({}));
       router.replace(data?.isNewUser ? '/onboarding' : '/');
     } catch (err: any) {
