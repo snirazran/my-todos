@@ -7,7 +7,7 @@ import { sendSignInLinkToEmail } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { establishSessionCookie } from '@/lib/authCookie';
 import {
-  GOOGLE_AUTH_ERROR_MESSAGES,
+  getGoogleAuthErrorMessage,
   initNativeGoogleSignIn,
   signInWithGoogle,
 } from '@/lib/googleAuth';
@@ -35,7 +35,9 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    initNativeGoogleSignIn();
+    void initNativeGoogleSignIn().catch(() => {
+      // The button action retries initialization and surfaces a friendly error.
+    });
   }, []);
 
   const handleGoogle = async () => {
@@ -50,11 +52,7 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
       await fetch('/api/user', { method: 'POST' });
       onNext();
     } catch (signInError: any) {
-      setError(
-        GOOGLE_AUTH_ERROR_MESSAGES[signInError?.code ?? ''] ??
-          signInError?.message ??
-          'Google sign-in failed',
-      );
+      setError(getGoogleAuthErrorMessage(signInError));
       setLoading(false);
     }
   };

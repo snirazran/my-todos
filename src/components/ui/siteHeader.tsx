@@ -16,6 +16,7 @@ import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
 import { useUIStore } from '@/lib/uiStore';
 import { clearSessionCookie } from '@/lib/authCookie';
+import { signOutNativeGoogle } from '@/lib/googleAuth';
 import { useInventory } from '@/hooks/useInventory';
 import IntegrationsPanel, {
   useCalendarConnections,
@@ -157,10 +158,7 @@ export default function SiteHeader() {
             user={user}
             loading={loading}
             onSignIn={() => router.push('/login')}
-            onSignOut={async () => {
-              router.replace('/login');
-              router.refresh();
-            }}
+            onSignOut={() => window.location.replace('/login')}
             compactMobileHome
           />
         </div>
@@ -322,10 +320,7 @@ export default function SiteHeader() {
             user={user}
             loading={loading}
             onSignIn={() => router.push('/login')}
-            onSignOut={async () => {
-              router.replace('/login');
-              router.refresh();
-            }}
+            onSignOut={() => window.location.replace('/login')}
           />
 
           {user &&
@@ -408,7 +403,7 @@ function RightActions({
   user: any;
   loading: boolean;
   onSignIn: () => void;
-  onSignOut: () => void;
+  onSignOut: () => Promise<void> | void;
   compactMobileHome?: boolean;
 }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -426,9 +421,10 @@ function RightActions({
     await Promise.allSettled([
       auth ? signOut(auth) : Promise.resolve(),
       clearSessionCookie(),
+      signOutNativeGoogle(),
     ]);
     await swrMutate(() => true, undefined, { revalidate: false });
-    onSignOut();
+    await onSignOut();
   };
 
   const handleOpenQuestOnboarding = () => {
@@ -971,7 +967,7 @@ function MainView({
   onReportIssue: () => void;
   onHelpCenter: () => void;
   onGoAdmin: () => void;
-  onSignOut: () => void;
+  onSignOut: () => Promise<void> | void;
   flashSoon: (label: string) => void;
 }) {
   const [plusInfoOpen, setPlusInfoOpen] = useState(false);

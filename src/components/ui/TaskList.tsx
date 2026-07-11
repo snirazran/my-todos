@@ -13,6 +13,7 @@ import {
   Flame,
   Pen,
   ListChecks,
+  Sparkles,
 } from 'lucide-react';
 import Fly from '@/components/ui/fly';
 import { TimeTag } from '@/components/ui/TimeTag';
@@ -1178,6 +1179,8 @@ export default function TaskList({
   // Combined for DnD context and empty-state checks
   const sortedVisibleTasks = [...sortedActiveTasks, ...completedTasks];
   const activeTaskIds = sortedActiveTasks.map((t) => t.id);
+  const allTasksCompleted =
+    tasks.length > 0 && tasks.every((task) => task.completed);
 
   // We no longer need a separate completedTasks array for rendering elsewhere.
   const completedCount = tasks.filter(
@@ -1362,7 +1365,66 @@ export default function TaskList({
             sortedVisibleTasks.length === 0 &&
             !exitAction ? (
             /* Empty State: Tasks exist but all filtered/completed */
-            <>
+            allTasksCompleted && selectedTags.length === 0 ? (
+              <motion.div
+                initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                animate={{
+                  opacity: quickAddOpen ? 0 : 1,
+                  y: 0,
+                  scale: 1,
+                }}
+                transition={{
+                  duration: quickAddOpen ? 0 : 0.4,
+                  ease: [0.22, 1, 0.36, 1],
+                }}
+                className="relative mb-2 overflow-hidden rounded-[16px] border border-[#d9e8c9] bg-[radial-gradient(circle_at_50%_-15%,rgba(251,204,87,0.30),transparent_43%),linear-gradient(145deg,#fffdf4_0%,#f5faed_55%,#edf7e9_100%)] px-5 pb-5 pt-4 text-center dark:border-primary/20 dark:bg-[radial-gradient(circle_at_50%_-15%,rgba(251,204,87,0.12),transparent_43%),linear-gradient(145deg,rgba(31,98,28,0.14),rgba(31,98,28,0.06))]"
+              >
+                <Sparkles
+                  aria-hidden
+                  className="absolute left-6 top-7 h-5 w-5 rotate-[-12deg] text-[#efb72f]"
+                  strokeWidth={2.5}
+                />
+                <Sparkles
+                  aria-hidden
+                  className="absolute right-7 top-14 h-4 w-4 rotate-12 text-[#7ebf5c]"
+                  strokeWidth={2.5}
+                />
+
+                <div className="mx-auto flex h-[76px] w-[76px] items-center justify-center">
+                  <Icon
+                    name="planner"
+                    label="Today's tasks completed"
+                    className="h-[58px] w-[58px]"
+                  />
+                </div>
+
+                <div className="mx-auto mt-1 inline-flex items-center gap-1.5 rounded-full border border-[#efc75f]/50 bg-[#fff4c7]/80 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.13em] text-[#7a5914] dark:bg-amber-400/10 dark:text-amber-300">
+                  <Check className="h-3.5 w-3.5" strokeWidth={4} />
+                  Today complete
+                </div>
+
+                <p className="mt-2 text-xl font-black tracking-tight text-[#244b23] dark:text-foreground md:text-2xl">
+                  Every fly caught!
+                </p>
+                <p className="mx-auto mt-1 max-w-sm text-[13px] font-semibold leading-relaxed text-[#52704f] dark:text-muted-foreground md:text-sm">
+                  You finished all {tasks.length} of today&apos;s{' '}
+                  {tasks.length === 1 ? 'task' : 'tasks'}. Your frog is full and
+                  happy.
+                </p>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    onAddRequested('', null, { preselectToday: true })
+                  }
+                  className="group mx-auto mt-4 flex min-h-11 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#4f9149] via-[#5ca355] to-[#4f9149] bg-[length:200%_100%] px-5 py-2.5 text-sm font-black text-white shadow-[0_4px_0_0_#34631f] transition-all hover:brightness-105 active:translate-y-[3px] active:shadow-none disabled:pointer-events-none disabled:opacity-0"
+                  disabled={quickAddOpen}
+                >
+                  <Plus className="h-4 w-4" strokeWidth={3.5} />
+                  Add another task
+                </button>
+              </motion.div>
+            ) : (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: quickAddOpen ? 0 : 1 }}
@@ -1386,7 +1448,7 @@ export default function TaskList({
                   </p>
                 </button>
               </motion.div>
-            </>
+            )
           ) : (
             /* List Content */
             <DndContext

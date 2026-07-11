@@ -18,7 +18,7 @@ import confetti from 'canvas-confetti';
 import QRCode from 'qrcode';
 import { auth } from '@/lib/firebase';
 import {
-  GOOGLE_AUTH_ERROR_MESSAGES,
+  getGoogleAuthErrorMessage,
   initNativeGoogleSignIn,
   signInWithGoogle,
 } from '@/lib/googleAuth';
@@ -120,7 +120,9 @@ export default function TryPage() {
   });
 
   useEffect(() => {
-    initNativeGoogleSignIn();
+    void initNativeGoogleSignIn().catch(() => {
+      // The button action retries initialization and surfaces a friendly error.
+    });
     trackGrowthEvent('funnel_view');
   }, []);
 
@@ -250,11 +252,9 @@ export default function TryPage() {
       trackGrowthEvent('funnel_signup', { isNewUser: !!data?.isNewUser });
       await claimReward();
     } catch (err: any) {
-      showNotification(
-        GOOGLE_AUTH_ERROR_MESSAGES[err?.code ?? ''] ??
-          err?.message ??
-          'Google sign-in failed',
-      );
+      showNotification(getGoogleAuthErrorMessage(err), undefined, {
+        durationMs: 5000,
+      });
     } finally {
       setSigningIn(false);
     }

@@ -5,14 +5,13 @@ import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 import { auth } from '@/lib/firebase';
 import {
-  GOOGLE_AUTH_ERROR_MESSAGES,
+  getGoogleAuthErrorMessage,
   initNativeGoogleSignIn,
   signInWithGoogle,
 } from '@/lib/googleAuth';
 import { GoogleIcon } from '@/components/ui/GoogleIcon';
 import { establishSessionCookie } from '@/lib/authCookie';
 import { createEmailLinkSettings } from '@/lib/emailLinkSettings';
-import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { Loader2, ArrowLeft, ArrowRight } from 'lucide-react';
 import { motion, AnimatePresence, useAnimationControls } from 'framer-motion';
@@ -56,7 +55,6 @@ const slide = {
 const EMAIL_LINK_STORAGE_KEY = 'emailForSignIn';
 
 function LoginPageInner() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const { user: authUser } = useAuth();
   const { showNotification } = useNotification();
@@ -138,7 +136,9 @@ function LoginPageInner() {
   };
 
   useEffect(() => {
-    initNativeGoogleSignIn();
+    void initNativeGoogleSignIn().catch(() => {
+      // The button action retries initialization and surfaces a friendly error.
+    });
   }, []);
 
   const prepareSignedInRoute = async (route = '/') => {
@@ -153,7 +153,10 @@ function LoginPageInner() {
   const navigateOnce = (route: string) => {
     if (navigatedRef.current) return;
     navigatedRef.current = true;
-    router.push(route);
+    // Authentication changes both Firebase client state and the server cookie.
+    // A document navigation guarantees the next render sees both, avoiding a
+    // stale App Router tree after logout/login inside the Capacitor webview.
+    window.location.replace(route);
   };
 
   // Safety net: signInWithPopup's promise can hang in the opener even though
@@ -169,7 +172,7 @@ function LoginPageInner() {
       } catch {
         navigateOnce('/');
       }
-    }, 3000);
+    }, 1500);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authUser]);
@@ -181,27 +184,13 @@ function LoginPageInner() {
       const shouldLink = isUpgrade && current?.isAnonymous;
       await signInWithGoogle({ linkTo: shouldLink ? current : null });
       const route = await prepareSignedInRoute();
-      // The tongue catch is rAF-driven, and browsers pause rAF while the page
-      // is hidden (e.g. returning from the Google popup on mobile). Never let
-      // the redirect depend on the animation finishing.
-      const watchdog = setTimeout(() => navigateOnce(route), 2500);
-      await triggerTongue({
-        key: FLY_KEY,
-        completed: false,
-        onPersist: () => {
-          // Keep the fly hidden after the catch and let it re-enter with a
-          // delay (matches the error flow) instead of snapping back instantly.
-          clearTimeout(watchdog);
-          respawnFly();
-          navigateOnce(route);
-        },
-      });
+      // The decorative tongue animation uses requestAnimationFrame, which can
+      // pause around a native Google popup. Never gate authentication on it.
+      navigateOnce(route);
     } catch (err: any) {
-      showNotification(
-        GOOGLE_AUTH_ERROR_MESSAGES[err?.code ?? ''] ??
-          err?.message ??
-          'Google sign-in failed',
-      );
+      showNotification(getGoogleAuthErrorMessage(err), undefined, {
+        durationMs: 5000,
+      });
       setLoading(false);
     }
   };

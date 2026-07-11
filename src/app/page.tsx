@@ -544,9 +544,11 @@ export default function Home() {
                   <div className="flex items-center gap-2 ml-3 cursor-pointer group md:gap-2.5">
                     <Icon name="planner" className="w-7 h-7 md:w-8 md:h-8" />
                     <span className="text-sm font-black tracking-tight lowercase text-foreground md:text-base">
-                      {openTaskCount}{' '}
-                      {openTaskCount === 1 ? 'fly' : 'flies'}{' '}
-                      left for today!
+                      {data.length > 0 && openTaskCount === 0
+                        ? 'all done for today!'
+                        : `${openTaskCount} ${
+                            openTaskCount === 1 ? 'fly' : 'flies'
+                          } left for today!`}
                     </span>
                   </div>
                 </div>
