@@ -114,9 +114,26 @@ export async function POST(req: NextRequest) {
       ? new Date(user.premiumUntil) > new Date()
       : false;
     const existingTags = normalizeUserTags((user.tags ?? []) as unknown[]);
+    const existingTagIds = new Set(existingTags.map((t) => t.id));
     const profile = normalizeFocusProfile(user);
-    const hadStartedArea = (profile.categoryTagMap ?? []).some(
-      (entry) => entry.tagIds.length > 0,
+    const hadStartedArea = (profile.categoryTagMap ?? []).some((entry) =>
+      entry.tagIds.some((tagId) => existingTagIds.has(tagId)),
+    );
+    const activeId = profile.activeFocusCategoryId;
+    const activeStarted =
+      !!activeId &&
+      (
+        (profile.categoryTagMap ?? []).find(
+          (entry) => entry.categoryId === activeId,
+        )?.tagIds ?? []
+      ).some((tagId) => existingTagIds.has(tagId));
+
+    // Free users can only use their first N tags — the rest are locked
+    // (mirrors /api/tags' `disabled` flag).
+    const lockedTagIds = new Set(
+      isPremium
+        ? []
+        : existingTags.slice(FREE_TAG_LIMIT).map((t) => t.id),
     );
 
     let tag: NormalizedTag | undefined;
@@ -124,6 +141,12 @@ export async function POST(req: NextRequest) {
       tag = existingTags.find((t) => t.id === requestedTagId);
       if (!tag) {
         return NextResponse.json({ error: 'Tag not found' }, { status: 400 });
+      }
+      if (lockedTagIds.has(tag.id)) {
+        return NextResponse.json(
+          { error: 'That tag is locked — Frog Plus unlocks it' },
+          { status: 400 },
+        );
       }
     } else {
       tag = existingTags.find(
@@ -144,7 +167,9 @@ export async function POST(req: NextRequest) {
               error: `You've used all ${tagLimit} tags`,
               code: 'TAG_LIMIT',
               tagLimit,
-              tags: existingTags.filter((t) => !assignedElsewhere.has(t.id)),
+              tags: existingTags
+                .filter((t) => !assignedElsewhere.has(t.id))
+                .map((t) => ({ ...t, locked: lockedTagIds.has(t.id) })),
             },
             { status: 400 },
           );
@@ -202,9 +227,10 @@ export async function POST(req: NextRequest) {
       timezone,
     });
 
-    // A free user's first started area becomes their active focus, so the
-    // quest they just started is the one that actually tracks.
-    if (!isPremium && !hadStartedArea) {
+    // A free user's started area becomes their active focus whenever nothing
+    // is actively tracking yet (first start, or the active area lost its
+    // tag) — so the quest they just started is the one that counts.
+    if (!isPremium && (!hadStartedArea || !activeStarted)) {
       await UserModel.updateOne(
         { _id: userId },
         { $set: { 'focusProfile.activeFocusCategoryId': categoryId } },

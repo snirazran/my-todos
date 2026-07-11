@@ -442,6 +442,7 @@ export async function GET(req: Request) {
         activeCount,
         activeFocusCategoryId: dashboard.activeFocusCategoryId,
         rentedFocus: dashboard.rentedFocus,
+        frogName: (dashboard.user as { frogName?: string }).frogName ?? null,
         dailyStreak,
         onboarding: {
           complete: !!dashboard.focusProfile.completedAt,

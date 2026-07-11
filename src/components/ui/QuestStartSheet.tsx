@@ -2,15 +2,15 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { mutate } from 'swr';
-import { Check, Flame, Play, Timer } from 'lucide-react';
+import { Check, Flame, Lock, Play, Timer } from 'lucide-react';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { Icon } from '@/components/ui/Icon';
 import Fly from './fly';
 import { PlusUpgradeModal } from './PlusUpgradeModal';
 import {
+  BareRewardIcon,
   FlyWorth,
   questLoot,
-  RewardTile,
   type QuestRewardCatalogItem,
 } from './QuestCards';
 import type {
@@ -20,7 +20,7 @@ import type {
 
 type LimitPick = {
   tagLimit: number;
-  tags: Array<{ id: string; name: string; color: string }>;
+  tags: Array<{ id: string; name: string; color: string; locked?: boolean }>;
 };
 
 export function QuestStartSheet({
@@ -247,18 +247,20 @@ export function QuestStartSheet({
                 <StepDot accent={accent}>3</StepDot>
                 Get paid
               </p>
-              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              <div className="mt-2 flex flex-col items-start gap-1.5">
                 {loot.flies > 0 && <FlyWorth amount={loot.flies} />}
-                {lootTiles.map((reward, index) => (
-                  <RewardTile
-                    key={`${reward.type}-${reward.itemId ?? reward.backgroundId ?? index}`}
-                    reward={reward}
-                    rewardCatalog={rewardCatalog}
-                    isPremium={isPremium}
-                    paused={true}
-                    className="h-9 w-9 rounded-lg"
-                  />
-                ))}
+                {lootTiles.length > 0 && (
+                  <span className="flex flex-wrap items-center gap-1.5">
+                    {lootTiles.map((reward, index) => (
+                      <BareRewardIcon
+                        key={`${reward.type}-${reward.itemId ?? reward.backgroundId ?? index}`}
+                        reward={reward}
+                        rewardCatalog={rewardCatalog}
+                        isPremium={isPremium}
+                      />
+                    ))}
+                  </span>
+                )}
                 {loot.flies === 0 && lootTiles.length === 0 && (
                   <span className="text-[12px] font-bold text-foreground">
                     Flies &amp; gear
@@ -279,6 +281,20 @@ export function QuestStartSheet({
               {limitPick.tags.length > 0 ? (
                 <div className="mt-2.5 flex flex-wrap gap-2">
                   {limitPick.tags.map((tag) => {
+                    if (tag.locked) {
+                      return (
+                        <button
+                          key={tag.id}
+                          type="button"
+                          onClick={() => setPlusOpen(true)}
+                          aria-label={`${tag.name} is locked — unlock with Plus`}
+                          className="inline-flex h-9 max-w-full items-center gap-1.5 rounded-xl border border-dashed border-border bg-muted px-3 text-[11px] font-black uppercase tracking-wider text-muted-foreground/70 transition-all active:scale-95"
+                        >
+                          <span className="truncate">{tag.name}</span>
+                          <Lock className="h-3 w-3 shrink-0" />
+                        </button>
+                      );
+                    }
                     const selected = pickedTagId === tag.id;
                     return (
                       <button

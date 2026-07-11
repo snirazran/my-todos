@@ -101,23 +101,32 @@ function PlannerColumnSkeleton({
         className,
       )}
     >
+      {/* Matches DayColumn: a recessed grey surface with white task cards on top. */}
       <div
         className={cn(
-          'rounded-[20px] border border-border/50 p-3 shadow-sm',
-          isPast ? 'bg-muted' : 'bg-card',
+          'rounded-[20px] border border-border/50 p-2 shadow-sm',
+          isPast
+            ? 'bg-muted/40 dark:bg-background/60'
+            : 'bg-muted/70 dark:bg-background',
         )}
       >
-        <div className="mb-4 flex items-center justify-between px-2 pt-1">
-          <div className="flex items-baseline gap-2">
-            <Skeleton className="h-7 w-12 rounded-md" />
+        <div className="mb-2 flex flex-col gap-2 px-1 pt-1">
+          <div className="flex items-center justify-between">
+            <div className="flex items-baseline gap-2">
+              <Skeleton className="h-6 w-14 rounded-md" />
+              <Skeleton className="h-3 w-16 rounded-full" />
+            </div>
+            <div className="flex items-center gap-2">
+              {!isPast && <Skeleton className="h-5 w-5 rounded-full" />}
+              <Skeleton className="h-7 w-7 rounded-lg" />
+            </div>
+          </div>
+          <div className="-mt-1 flex items-center gap-1.5">
+            <Skeleton className="h-3.5 w-3.5 rounded-md" />
             <Skeleton className="h-3 w-16 rounded-full" />
           </div>
-          <div className="flex items-center gap-2">
-            {!isPast && <Skeleton className="h-5 w-5 rounded-full" />}
-            <Skeleton className="h-7 w-7 rounded-lg" />
-          </div>
         </div>
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2 px-0.5 pt-1">
           {Array.from({ length: rows }).map((_, i) => (
             <TaskRowSkeleton
               key={i}
@@ -155,15 +164,44 @@ export function PlannerPageSkeleton() {
   );
 }
 
-function QuestObjectiveRowSkeleton({ width }: { width: string }) {
+function QuestObjectiveCardSkeleton({ width }: { width: string }) {
   return (
-    <div className="flex items-center gap-3">
-      <Skeleton className="h-14 w-14 shrink-0 rounded-2xl" />
+    <div className="flex items-center gap-2.5 rounded-[20px] border border-border/50 bg-card px-4 py-3.5 shadow-sm">
+      <Skeleton className="h-12 w-12 shrink-0 rounded-xl" />
       <div className="flex min-w-0 flex-1 flex-col gap-2">
-        <Skeleton className={cn('h-4 rounded-full', width)} />
+        <Skeleton className={cn('h-3.5 rounded-full', width)} />
         <Skeleton className="h-5 w-full rounded-full" />
       </div>
-      <Skeleton className="h-11 w-20 shrink-0 rounded-xl" />
+      <Skeleton className="h-8 w-16 shrink-0 rounded-xl" />
+    </div>
+  );
+}
+
+function QuestSectionHeaderSkeleton({
+  rightWidth = 'w-16',
+}: {
+  rightWidth?: string;
+}) {
+  return (
+    <div className="flex items-center justify-between px-1">
+      <div className="flex items-center gap-1.5">
+        <Skeleton className="h-3.5 w-3.5 rounded-md" />
+        <Skeleton className="h-3.5 w-24 rounded-full" />
+      </div>
+      <Skeleton className={cn('h-3.5 rounded-full', rightWidth)} />
+    </div>
+  );
+}
+
+function QuestAreaRowSkeleton() {
+  return (
+    <div className="flex items-center gap-3 rounded-[20px] border border-border/50 bg-card p-3 shadow-sm">
+      <Skeleton className="h-14 w-[88px] shrink-0 rounded-xl" />
+      <div className="flex min-w-0 flex-1 flex-col gap-2">
+        <Skeleton className="h-4 w-2/5 rounded-full" />
+        <Skeleton className="h-3 w-3/5 rounded-full" />
+      </div>
+      <Skeleton className="h-9 w-20 shrink-0 rounded-xl" />
     </div>
   );
 }
@@ -185,39 +223,51 @@ export function QuestsPageSkeleton() {
           </div>
         </div>
 
-        <div className="relative z-10 -mt-8 flex flex-col gap-4 rounded-t-[24px] bg-background px-4 pt-6 md:mx-auto md:mt-6 md:grid md:w-full md:max-w-6xl md:grid-cols-2 md:items-start md:gap-6 md:px-8 md:pt-0">
-          <div className="flex flex-col gap-4">
-            <div className="rounded-[24px] border border-border/50 bg-card p-4 shadow-sm">
-              <div className="flex items-center justify-between">
-                <Skeleton className="h-4 w-28 rounded-full" />
-                <Skeleton className="h-3.5 w-16 rounded-full" />
+        {/* Tinted content area with floating section headers + row cards. */}
+        <div className="relative z-10 -mt-8 rounded-t-[24px] bg-muted px-4 pb-10 pt-8 md:mx-auto md:mt-6 md:w-full md:max-w-6xl md:rounded-none md:bg-transparent md:px-8 md:pt-0">
+          <div className="flex flex-col gap-8 md:grid md:grid-cols-2 md:items-start md:gap-6">
+            <div className="flex flex-col gap-8">
+              {/* Starter quest: floating header + objective row cards */}
+              <div className="flex flex-col gap-2.5">
+                <QuestSectionHeaderSkeleton rightWidth="w-20" />
+                <QuestObjectiveCardSkeleton width="w-3/5" />
+                <QuestObjectiveCardSkeleton width="w-2/5" />
               </div>
-              <Skeleton className="mt-4 h-3.5 w-24 rounded-full" />
-              <div className="mt-4">
-                <QuestObjectiveRowSkeleton width="w-3/5" />
+
+              {/* Daily quests: header + rows + streak card */}
+              <div className="flex flex-col gap-2.5">
+                <QuestSectionHeaderSkeleton rightWidth="w-24" />
+                <QuestObjectiveCardSkeleton width="w-2/5" />
+                <QuestObjectiveCardSkeleton width="w-1/2" />
+                <QuestObjectiveCardSkeleton width="w-1/3" />
+                <div className="flex items-center gap-2.5 rounded-[20px] border border-border/50 bg-card px-4 py-3 shadow-sm">
+                  <Skeleton className="h-10 w-10 shrink-0 rounded-xl" />
+                  <div className="flex min-w-0 flex-1 flex-col gap-2">
+                    <Skeleton className="h-3.5 w-2/5 rounded-full" />
+                    <Skeleton className="h-3 w-3/5 rounded-full" />
+                  </div>
+                  <Skeleton className="h-2 w-14 shrink-0 rounded-full" />
+                </div>
               </div>
             </div>
 
-            <div className="rounded-[24px] border border-border/50 bg-card p-4 shadow-sm">
-              <div className="flex items-center justify-between">
-                <Skeleton className="h-4 w-32 rounded-full" />
-                <Skeleton className="h-3.5 w-28 rounded-full" />
+            {/* Areas: header + banner card + objective + area rows */}
+            <div className="flex flex-col gap-2.5">
+              <QuestSectionHeaderSkeleton rightWidth="w-0" />
+              <div className="overflow-hidden rounded-[24px] border border-border/50 bg-card shadow-sm">
+                <Skeleton className="h-[150px] w-full rounded-none" />
+                <div className="flex flex-col gap-2.5 px-4 pb-3 pt-2.5">
+                  <div className="flex items-center gap-2">
+                    <Skeleton className="h-3 w-32 rounded-full" />
+                    <Skeleton className="h-6 w-20 rounded-xl" />
+                  </div>
+                  <Skeleton className="h-2 w-28 rounded-full" />
+                </div>
               </div>
-              <div className="mt-4 flex flex-col gap-4">
-                <QuestObjectiveRowSkeleton width="w-2/5" />
-                <QuestObjectiveRowSkeleton width="w-1/2" />
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-3">
-            <Skeleton className="h-9 w-40 rounded-full" />
-            <div className="overflow-hidden rounded-[24px] border border-border/50 bg-card shadow-sm">
-              <Skeleton className="aspect-[16/9] w-full rounded-none" />
-              <div className="flex flex-col gap-4 p-4">
-                <Skeleton className="mx-auto h-3 w-32 rounded-full" />
-                <QuestObjectiveRowSkeleton width="w-4/5" />
-              </div>
+              <QuestObjectiveCardSkeleton width="w-4/5" />
+              <Skeleton className="h-11 w-full rounded-[20px]" />
+              <QuestAreaRowSkeleton />
+              <QuestAreaRowSkeleton />
             </div>
           </div>
         </div>

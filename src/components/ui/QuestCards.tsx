@@ -14,6 +14,7 @@ import {
   Play,
   Repeat,
   Sprout,
+  TriangleAlert,
   Trophy,
   X,
 } from 'lucide-react';
@@ -147,7 +148,7 @@ const TASK_STREAK_METRIC_PATTERN = /^task_streak_(\d+)$/;
 // with the fly's visual center.
 export function FlyWorth({
   amount,
-  flySize = 24,
+  flySize = 28,
 }: {
   amount: number;
   flySize?: number;
@@ -182,6 +183,62 @@ function shortObjectiveLabel(block: QuestCardLogicBlock) {
   return `${block.action === 'add' ? 'Add' : 'Complete'} ${targetLabel} task${
     target > 1 || targetLabel.includes('-') ? 's' : ''
   }`;
+}
+
+// A reward drawn bare (no tile/badge chrome), matching how flies render in
+// "worth" lines: gift boxes as the raw Rive, backgrounds as a small image.
+export function BareRewardIcon({
+  reward,
+  rewardCatalog,
+  isPremium,
+}: {
+  reward: QuestReward;
+  rewardCatalog: Record<string, QuestRewardCatalogItem>;
+  isPremium: boolean;
+}) {
+  const lookupId = reward.itemId ?? reward.backgroundId;
+  const item = lookupId ? rewardCatalog[lookupId] : null;
+  const quantity = Math.max(1, reward.amount ?? 1);
+
+  if (item?.slot === 'container') {
+    return (
+      <span className="inline-flex items-center gap-1">
+        <span className="-my-1.5 h-11 w-11 shrink-0 -translate-y-[8px]">
+          <GiftRive
+            className="h-full w-full"
+            color={item.riveIndex}
+            paused={false}
+            animation="box_shake"
+          />
+        </span>
+        <span className="translate-y-[2px] text-[13px] font-black tabular-nums text-foreground">
+          {quantity}
+        </span>
+      </span>
+    );
+  }
+
+  if (item?.slot === 'background' && item.imageUrl) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={item.imageUrl}
+        alt={item.name}
+        className="h-8 w-8 rounded-lg object-cover"
+      />
+    );
+  }
+
+  return (
+    <RewardTile
+      reward={reward}
+      rewardCatalog={rewardCatalog}
+      isPremium={isPremium}
+      paused={true}
+      hideBadge={quantity <= 1}
+      className="h-8 w-8 rounded-lg"
+    />
+  );
 }
 
 // Total unclaimed loot in a quest, for "worth" teasers.
@@ -994,8 +1051,8 @@ export function CategoryQuestPresentationCard({
   const orderedOpen = [...visibleLogic].sort(
     (a, b) => Number(isBlockClaimable(b)) - Number(isBlockClaimable(a)),
   );
-  const shownBlocks = showAllObjectives ? orderedOpen : orderedOpen.slice(0, 1);
-  const foldedBlocks = showAllObjectives ? [] : orderedOpen.slice(1);
+  const shownBlocks = showAllObjectives ? orderedOpen : orderedOpen.slice(0, 2);
+  const foldedBlocks = showAllObjectives ? [] : orderedOpen.slice(2);
   const foldedRewards = foldedBlocks.flatMap((block) => block.rewards ?? []);
   const foldedFlies = foldedRewards
     .filter((reward) => reward.type === 'FLIES')
@@ -1095,15 +1152,15 @@ export function CategoryQuestPresentationCard({
           ) : null}
           {timeLeft && !isCompleted ? (
             <span
-              className="inline-flex shrink-0 items-center gap-1.5 text-[15px] uppercase leading-none tracking-wide text-white drop-shadow-[0_2px_0_rgba(15,23,42,0.85)]"
+              className="inline-flex shrink-0 items-center gap-1.5 text-[13px] uppercase leading-none tracking-wide text-white drop-shadow-[0_2px_0_rgba(15,23,42,0.85)]"
               style={{
                 fontFamily: 'var(--font-display), "Luckiest Guy", cursive',
-                WebkitTextStroke: '1.5px rgba(15, 23, 42, 0.9)',
+                WebkitTextStroke: '1.4px rgba(15, 23, 42, 0.9)',
                 paintOrder: 'stroke fill',
               }}
             >
               <Clock className="h-3.5 w-3.5 shrink-0" strokeWidth={3} />
-              <span className="leading-none">{timeLeft}</span>
+              <span className="leading-none">Resets in {timeLeft}</span>
             </span>
           ) : null}
         </div>
@@ -1143,19 +1200,30 @@ export function CategoryQuestPresentationCard({
               <span className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">
                 Counting tasks tagged
               </span>
-              {linkedTags.map((tag) => (
-                <QuestTagPill key={tag.id} tag={tag} />
-              ))}
-              {onEditTags ? (
-                <button
-                  type="button"
-                  onClick={onEditTags}
-                  aria-label="Edit focus tags"
-                  className="ml-auto inline-flex h-7 w-7 items-center justify-center rounded-full border border-border/60 bg-background text-muted-foreground shadow-sm transition hover:border-primary/40 hover:text-primary"
-                >
-                  <Pencil className="h-3.5 w-3.5" strokeWidth={2.5} />
-                </button>
-              ) : null}
+              {linkedTags.map((tag) =>
+                onEditTags ? (
+                  <button
+                    key={tag.id}
+                    type="button"
+                    onClick={onEditTags}
+                    aria-label={`Change the ${tag.name} tag`}
+                    className="inline-flex max-w-full items-center gap-1.5 rounded-xl border px-3 py-1.5 text-[11px] font-black uppercase tracking-wider shadow-sm transition active:scale-95 [@media(hover:hover)]:hover:opacity-80"
+                    style={{
+                      backgroundColor: `${tag.color}20`,
+                      borderColor: `${tag.color}40`,
+                      color: tag.color,
+                    }}
+                  >
+                    <span className="truncate">{tag.name}</span>
+                    <Pencil
+                      className="h-3 w-3 shrink-0 opacity-70"
+                      strokeWidth={2.75}
+                    />
+                  </button>
+                ) : (
+                  <QuestTagPill key={tag.id} tag={tag} />
+                ),
+              )}
             </div>
           )}
           {totalSteps > 1 && (
@@ -1268,7 +1336,7 @@ export function CategoryQuestPresentationCard({
           </div>
         ))}
         {(foldedBlocks.length > 0 ||
-          (showAllObjectives && orderedOpen.length > 1)) && (
+          (showAllObjectives && orderedOpen.length > 2)) && (
           <button
             type="button"
             onClick={() => setShowAllObjectives((v) => !v)}
@@ -1302,13 +1370,11 @@ export function CategoryQuestPresentationCard({
                   </span>
                   {foldedFlies > 0 && <FlyWorth amount={foldedFlies} />}
                   {foldedItems.map((reward, index) => (
-                    <RewardTile
+                    <BareRewardIcon
                       key={`${reward.type}-${reward.itemId ?? reward.backgroundId ?? index}`}
                       reward={reward}
                       rewardCatalog={rewardCatalog}
                       isPremium={isPremium}
-                      paused={true}
-                      className="h-8 w-8 rounded-lg"
                     />
                   ))}
                 </span>
@@ -1340,6 +1406,85 @@ export function CategoryQuestPresentationCard({
         onClose={() => setShowSwitch(false)}
       />
     </div>
+  );
+}
+
+// Shown before unlinking or swapping away a quest's original tag: progress
+// from that tag stops counting, so make sure that's what the user wants.
+export function RemoveTagConfirm({
+  open,
+  mode = 'remove',
+  categoryName,
+  onConfirm,
+  onClose,
+}: {
+  open: boolean;
+  mode?: 'remove' | 'switch';
+  categoryName?: string;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  const switching = mode === 'switch';
+  return (
+    <BaseSheet
+      open={open}
+      onOpenChange={(v) => !v && onClose()}
+      zIndex={1610}
+      className="sm:max-w-[400px] max-h-[calc(100dvh-1rem)] sm:max-h-[calc(100dvh-3rem)]"
+    >
+      {({ bindScroll }) => (
+        <div
+          ref={bindScroll}
+          className="relative overflow-y-auto overscroll-none px-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-1 text-card-foreground sm:px-6 sm:pb-6 sm:pt-3"
+        >
+          <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-400/15 text-amber-500">
+            <TriangleAlert className="h-7 w-7" strokeWidth={2.5} />
+          </div>
+          <h3 className="text-center text-xl font-black text-foreground">
+            {switching
+              ? 'Switch this quest’s tag?'
+              : 'Remove this quest’s tag?'}
+          </h3>
+          <p className="mx-auto mt-1.5 max-w-[20rem] text-center text-[14px] leading-snug text-muted-foreground">
+            {switching ? (
+              <>
+                Progress from the current tag stops counting — the{' '}
+                <span className="font-bold text-foreground">
+                  {categoryName ?? 'area'}
+                </span>{' '}
+                quest will recount using the new tag instead. Rewards you
+                already claimed stay yours.
+              </>
+            ) : (
+              <>
+                The{' '}
+                <span className="font-bold text-foreground">
+                  {categoryName ?? 'area'}
+                </span>{' '}
+                quest stops counting and its progress hides until you link a
+                tag again. Rewards you already claimed stay yours.
+              </>
+            )}
+          </p>
+          <div className="mt-5 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={onConfirm}
+              className="h-12 rounded-2xl bg-muted text-[14px] font-black text-foreground transition hover:bg-muted/80"
+            >
+              {switching ? 'Switch tag' : 'Remove tag'}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="h-12 rounded-2xl bg-primary text-[14px] font-black uppercase tracking-wide text-primary-foreground transition active:translate-y-[2px]"
+            >
+              {switching ? 'Keep current' : 'Keep tag'}
+            </button>
+          </div>
+        </div>
+      )}
+    </BaseSheet>
   );
 }
 
@@ -1685,13 +1830,10 @@ export function AreaRow({
                       flySize={20}
                     />
                   ) : (
-                    <RewardTile
+                    <BareRewardIcon
                       reward={nextBlock.rewards[0]}
                       rewardCatalog={rewardCatalog}
                       isPremium={isPremium}
-                      paused={true}
-                      hideBadge
-                      className="h-7 w-7 shrink-0 rounded-lg"
                     />
                   )
                 ) : null}
@@ -1705,13 +1847,11 @@ export function AreaRow({
             </span>
             {loot.flies > 0 && <FlyWorth amount={loot.flies} />}
             {lootTiles.map((reward, index) => (
-              <RewardTile
+              <BareRewardIcon
                 key={`${reward.type}-${reward.itemId ?? reward.backgroundId ?? index}`}
                 reward={reward}
                 rewardCatalog={rewardCatalog}
                 isPremium={isPremium}
-                paused={true}
-                className="h-8 w-8 rounded-lg"
               />
             ))}
             {lootExtra > 0 && (
@@ -1764,6 +1904,7 @@ export function AreaStartCard({
   quest,
   category,
   compact = false,
+  cta = 'start',
   rewardCatalog,
   isPremium,
   onPress,
@@ -1775,6 +1916,8 @@ export function AreaStartCard({
   category?: MacroCategoryDefinition;
   /** Half-width grid variant for users with many areas. */
   compact?: boolean;
+  /** What tapping does: start the quest, or switch to it (free users). */
+  cta?: 'start' | 'switch';
   rewardCatalog: Record<string, QuestRewardCatalogItem>;
   isPremium: boolean;
   onPress?: () => void;
@@ -1784,6 +1927,29 @@ export function AreaStartCard({
   const lootTiles = loot.items.slice(0, compact ? 1 : 2);
   const lootExtra = loot.items.length - lootTiles.length;
 
+  const ctaChip =
+    cta === 'switch' ? (
+      <span
+        className={cn(
+          'inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border-[1.5px] border-dashed border-border bg-card px-3 text-[10px] font-black uppercase tracking-[0.1em] text-muted-foreground transition-all active:scale-95',
+          compact ? 'w-full' : 'shrink-0 px-4',
+        )}
+      >
+        <Repeat className="h-3.5 w-3.5" strokeWidth={2.75} />
+        Switch
+      </span>
+    ) : (
+      <span
+        className={cn(
+          'inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-amber-500 px-3 text-[11px] font-black uppercase tracking-[0.12em] text-white shadow-[0_3px_0_0_#b45309] transition-all active:translate-y-[2px] active:shadow-none',
+          compact ? 'w-full' : 'shrink-0 px-4',
+        )}
+      >
+        <Play className="h-3.5 w-3.5 fill-current" />
+        Start
+      </span>
+    );
+
   const worth = (loot.flies > 0 || lootTiles.length > 0) && (
     <span className="flex min-w-0 items-center gap-1.5">
       <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground/80">
@@ -1791,13 +1957,11 @@ export function AreaStartCard({
       </span>
       {loot.flies > 0 && <FlyWorth amount={loot.flies} />}
       {lootTiles.map((reward, index) => (
-        <RewardTile
+        <BareRewardIcon
           key={`${reward.type}-${reward.itemId ?? reward.backgroundId ?? index}`}
           reward={reward}
           rewardCatalog={rewardCatalog}
           isPremium={isPremium}
-          paused={true}
-          className="h-8 w-8 rounded-lg"
         />
       ))}
       {lootExtra > 0 && (
@@ -1858,18 +2022,12 @@ export function AreaStartCard({
       {compact ? (
         <div className="flex flex-col gap-2 px-3 py-2.5">
           {worth}
-          <span className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-xl bg-amber-500 px-3 text-[11px] font-black uppercase tracking-[0.12em] text-white shadow-[0_3px_0_0_#b45309] transition-all active:translate-y-[2px] active:shadow-none">
-            <Play className="h-3.5 w-3.5 fill-current" />
-            Start
-          </span>
+          {ctaChip}
         </div>
       ) : (
         <div className="flex items-center justify-between gap-3 px-4 py-3">
           {worth || <span />}
-          <span className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl bg-amber-500 px-4 text-[11px] font-black uppercase tracking-[0.12em] text-white shadow-[0_3px_0_0_#b45309] transition-all active:translate-y-[2px] active:shadow-none">
-            <Play className="h-3.5 w-3.5 fill-current" />
-            Start
-          </span>
+          {ctaChip}
         </div>
       )}
     </button>

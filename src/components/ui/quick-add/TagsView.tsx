@@ -3,7 +3,7 @@
 import React, { useRef, useState } from 'react';
 import { Icon } from '@/components/ui/Icon';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Lock, Plus } from 'lucide-react';
+import { Check, Lock, Pencil, Plus } from 'lucide-react';
 import { TAG_COLORS, TAG_MAX_LENGTH } from './constants';
 import type { SavedTag } from './types';
 import type { TagManager } from './useTagManager';
@@ -49,6 +49,8 @@ export function TagsView({
     setShowColorPicker,
     newTagColor,
     setNewTagColor,
+    manageTagsMode,
+    setManageTagsMode,
     isCreatingTag,
     handleAddTag,
     createAndSaveTag,
@@ -132,21 +134,40 @@ export function TagsView({
     toggleTag(st);
   };
 
+  const unlockedTags = filteredTags.filter((st) => !st.disabled);
+  const lockedTags = filteredTags.filter((st) => st.disabled);
+  const counterLabel =
+    savedTags.length > tagLimit
+      ? `${tagLimit} free · ${savedTags.length - tagLimit} locked`
+      : `${savedTags.length}/${tagLimit}`;
+
   return (
     <div className="space-y-4">
       {savedTags.length > 0 && !showColorPicker && (
         <div>
-          <div className="mb-1.5 flex items-baseline justify-between">
+          <div className="mb-1.5 flex items-center justify-between">
             <span className="text-[11px] font-extrabold uppercase tracking-wide text-muted-foreground">
-              Saved Tags ({savedTags.length}/{tagLimit})
+              Saved tags{' '}
+              <span className="font-bold text-muted-foreground/60">
+                {counterLabel}
+              </span>
             </span>
-            <span className="text-[10px] font-semibold text-muted-foreground/60">
-              Hold to edit
-            </span>
+            <button
+              type="button"
+              onClick={() => setManageTagsMode(!manageTagsMode)}
+              className={`inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-[10px] font-black uppercase tracking-wide transition-colors ${
+                manageTagsMode
+                  ? 'bg-primary/10 text-primary'
+                  : 'text-muted-foreground [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground'
+              }`}
+            >
+              <Pencil className="h-3 w-3" strokeWidth={2.75} />
+              {manageTagsMode ? 'Done' : 'Edit'}
+            </button>
           </div>
 
           <div className="flex max-h-[46vh] flex-wrap content-start items-start gap-2.5 overflow-y-auto px-1 py-1.5">
-            {filteredTags.map((st) => {
+            {unlockedTags.map((st) => {
               const isSelected = selectedTagIds.includes(st.id);
               return (
                 <button
@@ -168,31 +189,67 @@ export function TagsView({
                       lpFired.current = false;
                       return;
                     }
+                    if (manageTagsMode) {
+                      setManagedTag(st);
+                      return;
+                    }
                     handleToggle(st);
                   }}
                   className={`relative inline-flex max-w-full select-none items-center justify-center gap-1.5 rounded-2xl border px-4 py-2.5 text-[13px] font-black uppercase tracking-wider shadow-sm transition-all [@media(hover:hover)]:hover:opacity-75 active:scale-95 ${
-                    st.disabled
-                      ? 'cursor-pointer border-dashed border-border bg-muted text-muted-foreground/70'
-                      : isSelected
-                        ? 'ring-2 ring-offset-1 ring-offset-background'
-                        : ''
+                    isSelected && !manageTagsMode
+                      ? 'ring-2 ring-offset-1 ring-offset-background'
+                      : ''
                   }`}
-                  style={
-                    st.disabled
-                      ? undefined
-                      : {
-                          backgroundColor: `${st.color}20`,
-                          color: st.color,
-                          borderColor: `${st.color}40`,
-                        }
-                  }
+                  style={{
+                    backgroundColor: `${st.color}20`,
+                    color: st.color,
+                    borderColor: `${st.color}40`,
+                    ...(isSelected && !manageTagsMode
+                      ? ({ ['--tw-ring-color' as never]: st.color } as object)
+                      : {}),
+                  }}
                 >
+                  {isSelected && !manageTagsMode && (
+                    <Check className="h-3.5 w-3.5 shrink-0" strokeWidth={3.5} />
+                  )}
                   <span className="truncate">{st.name}</span>
-                  {st.disabled && <Lock className="h-3.5 w-3.5 shrink-0" />}
+                  {manageTagsMode && (
+                    <Pencil
+                      className="h-3 w-3 shrink-0 opacity-70"
+                      strokeWidth={2.75}
+                    />
+                  )}
                 </button>
               );
             })}
           </div>
+
+          {lockedTags.length > 0 && (
+            <div className="mt-2">
+              <div className="mb-1.5 flex items-center gap-1.5 px-1">
+                <Lock
+                  className="h-3 w-3 text-muted-foreground/60"
+                  strokeWidth={2.75}
+                />
+                <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground/60">
+                  Locked · unlock with Plus
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-2 px-1">
+                {lockedTags.map((st) => (
+                  <button
+                    key={st.id}
+                    type="button"
+                    onClick={() => handleToggle(st)}
+                    className="inline-flex max-w-full select-none items-center gap-1.5 rounded-2xl border border-dashed border-border bg-muted px-3.5 py-2 text-[12px] font-black uppercase tracking-wider text-muted-foreground/70 transition-all active:scale-95"
+                  >
+                    <span className="truncate">{st.name}</span>
+                    <Lock className="h-3 w-3 shrink-0" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

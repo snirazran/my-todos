@@ -325,7 +325,10 @@ export async function DELETE(req: NextRequest) {
     await connectMongo();
 
     // Find the tag to get its name (for legacy cleanup)
-    const user = await UserModel.findById(userId, { tags: 1 }).lean();
+    const user = await UserModel.findById(userId, {
+      tags: 1,
+      'focusProfile.categoryTagMap': 1,
+    }).lean();
     const tagToRemove = user?.tags?.find((t: any) => t.id === id);
 
     const pullQuery: any = { tags: id };
@@ -334,6 +337,22 @@ export async function DELETE(req: NextRequest) {
       // We use $in to match either ID or Name
       pullQuery.tags = { $in: [id, tagToRemove.name] };
     }
+
+    // A deleted tag must also stop powering area quests, or the quest map
+    // keeps a dead id and the quest looks half-started.
+    const categoryTagMap = (user as any)?.focusProfile?.categoryTagMap as
+      | Array<{ categoryId: string; tagIds?: string[] }>
+      | undefined;
+    const nextCategoryTagMap = (categoryTagMap ?? [])
+      .map((entry) => ({
+        ...entry,
+        tagIds: (entry.tagIds ?? []).filter((tagId) => tagId !== id),
+      }))
+      .filter((entry) => entry.tagIds.length > 0);
+    const mapChanged =
+      (categoryTagMap ?? []).some((entry) =>
+        (entry.tagIds ?? []).includes(id),
+      );
 
     // Run updates in parallel for better performance
     await Promise.all([
@@ -344,6 +363,15 @@ export async function DELETE(req: NextRequest) {
       ),
       // 2. Remove the tag definition from the user
       UserModel.updateOne({ _id: userId }, { $pull: { tags: { id } } }),
+      // 3. Unlink it from any area quest it powered
+      ...(mapChanged
+        ? [
+            UserModel.updateOne(
+              { _id: userId },
+              { $set: { 'focusProfile.categoryTagMap': nextCategoryTagMap } },
+            ),
+          ]
+        : []),
     ]);
 
     return NextResponse.json({ ok: true });

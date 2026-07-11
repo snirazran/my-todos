@@ -25,6 +25,7 @@ import {
   CategoryQuestPresentationCard,
   DailyChecklistCard,
   getRewardQuantityLabel,
+  RemoveTagConfirm,
   RewardTile,
   StarterQuestCard,
   SwitchFocusConfirm,
@@ -53,6 +54,7 @@ type QuestsResponse = {
   isPremium: boolean;
   claimableCount: number;
   todoCount?: number;
+  frogName?: string | null;
   tags?: Array<{ id: string; name: string; color: string; key?: string }>;
   activeFocusCategoryId?: MacroCategoryId | null;
   rentedFocus?: {
@@ -816,8 +818,34 @@ export function QuestsPanel({
     }
   };
 
+  const [pendingTagRemoval, setPendingTagRemoval] = useState<{
+    categoryId: string;
+    mode: 'remove' | 'switch';
+    resolve: (proceed: boolean) => void;
+  } | null>(null);
+
   const handleSaveFocusTags = async (categoryId: string, newTags: string[]) => {
     if (!data) return;
+    // Warn whenever an original (still-existing) tag is dropped from the
+    // selection — removing everything or switching to a different tag. Adding
+    // more tags on top of the originals is safe and needs no warning.
+    const originalTags = (categoryTagMap.get(categoryId) ?? []).filter(
+      (tagId) => tagCatalog.has(tagId),
+    );
+    const droppedOriginal = originalTags.some(
+      (tagId) => !newTags.includes(tagId),
+    );
+    if (originalTags.length > 0 && droppedOriginal) {
+      const proceed = await new Promise<boolean>((resolve) =>
+        setPendingTagRemoval({
+          categoryId,
+          mode: newTags.length === 0 ? 'remove' : 'switch',
+          resolve,
+        }),
+      );
+      setPendingTagRemoval(null);
+      if (!proceed) return;
+    }
     const nextTags = data.isPremium ? newTags : newTags.slice(0, 1);
     const nextTagSet = new Set(nextTags);
 
@@ -1077,16 +1105,40 @@ export function QuestsPanel({
                           // Until any area is started, no area gets promoted
                           // over the others: show an equal-footing chooser
                           // instead of hero + shelf.
+                          // Tag-based quests count as started only while a
+                          // tag is linked (unlinking returns to the chooser);
+                          // tagless quests count via progress/claims instead.
+                          // Resolve against the real tag catalog so ids left
+                          // behind by a deleted tag don't count as linked.
                           const questStarted = (
                             quest: CategoryQuestProgressView,
-                          ) =>
-                            (categoryTagMap.get(quest.categoryId) ?? [])
-                              .length > 0 ||
-                            quest.claimedObjectiveIds.length > 0 ||
-                            quest.logic.some((block) => block.progress > 0);
+                          ) => {
+                            if (
+                              quest.logic.some(
+                                (block) =>
+                                  block.tagMode === 'focus_category_tags',
+                              )
+                            ) {
+                              return (
+                                categoryTagMap.get(quest.categoryId) ?? []
+                              ).some((tagId) => tagCatalog.has(tagId));
+                            }
+                            return (
+                              quest.claimedObjectiveIds.length > 0 ||
+                              quest.logic.some((block) => block.progress > 0)
+                            );
+                          };
+                          // Chooser unless a quest that can actually run is
+                          // started: for free users a started-but-locked area
+                          // is dormant, so an unstarted active area still
+                          // means "pick where to focus".
                           const chooserMode =
                             filteredCategoryQuests.length > 0 &&
-                            !filteredCategoryQuests.some(questStarted);
+                            !filteredCategoryQuests.some(
+                              (quest) =>
+                                questStarted(quest) &&
+                                !(quest.locked ?? false),
+                            );
 
                           const compactChooser =
                             filteredCategoryQuests.length > 4;
@@ -1101,7 +1153,9 @@ export function QuestsPanel({
                                   Your areas
                                 </p>
                                 <p className="mt-1.5 text-lg font-black leading-tight text-foreground">
-                                  Where should your frog help first?
+                                  Where should{' '}
+                                  {data.frogName?.trim() || 'your frog'} help
+                                  first?
                                 </p>
                                 <p className="mt-0.5 text-xs font-bold text-muted-foreground/80">
                                   {data.isPremium
@@ -1156,8 +1210,20 @@ export function QuestsPanel({
                               />
                             );
 
+                          // Free users with many paused areas get the same
+                          // compact 2-col grid as the chooser; premium keeps
+                          // rows (their progress bars carry real info).
+                          const benchGrid =
+                            !data.isPremium && benchQuests.length > 4;
                           const areaRows = benchQuests.length > 0 && (
-                            <div className="mt-0.5 flex flex-col gap-2.5">
+                            <div
+                              className={cn(
+                                'mt-0.5',
+                                benchGrid
+                                  ? 'grid grid-cols-2 gap-3'
+                                  : 'flex flex-col gap-2.5',
+                              )}
+                            >
                               {benchQuests.map((quest) => {
                                 const linkedTags = (
                                   categoryTagMap.get(quest.categoryId) ?? []
@@ -1178,35 +1244,52 @@ export function QuestsPanel({
                                     : needsTag
                                       ? 'start'
                                       : 'running';
+                                const handlePress = () => {
+                                  if (needsTag && !quest.locked) {
+                                    setStartQuestCategoryId(quest.categoryId);
+                                  } else if (data.isPremium) {
+                                    setPinnedCategoryId(quest.categoryId);
+                                  } else if (quest.locked) {
+                                    setPendingSwitchCategoryId(
+                                      quest.categoryId,
+                                    );
+                                  }
+                                };
                                 return (
                                   <div
                                     key={quest.id}
                                     data-quest-anchor={quest.id}
                                   >
-                                    <AreaRow
-                                      quest={quest}
-                                      category={categoryMap[quest.categoryId]}
-                                      state={rowState}
-                                      finished={isQuestRetired(quest)}
-                                      linkedTags={linkedTags}
-                                      rewardCatalog={data.rewardCatalog}
-                                      isPremium={data.isPremium}
-                                      onPress={() => {
-                                        if (needsTag && !quest.locked) {
-                                          setStartQuestCategoryId(
-                                            quest.categoryId,
-                                          );
-                                        } else if (data.isPremium) {
-                                          setPinnedCategoryId(
-                                            quest.categoryId,
-                                          );
-                                        } else if (quest.locked) {
-                                          setPendingSwitchCategoryId(
-                                            quest.categoryId,
-                                          );
+                                    {benchGrid ? (
+                                      <AreaStartCard
+                                        quest={quest}
+                                        category={
+                                          categoryMap[quest.categoryId]
                                         }
-                                      }}
-                                    />
+                                        compact
+                                        cta={
+                                          needsTag && !quest.locked
+                                            ? 'start'
+                                            : 'switch'
+                                        }
+                                        rewardCatalog={data.rewardCatalog}
+                                        isPremium={data.isPremium}
+                                        onPress={handlePress}
+                                      />
+                                    ) : (
+                                      <AreaRow
+                                        quest={quest}
+                                        category={
+                                          categoryMap[quest.categoryId]
+                                        }
+                                        state={rowState}
+                                        finished={isQuestRetired(quest)}
+                                        linkedTags={linkedTags}
+                                        rewardCatalog={data.rewardCatalog}
+                                        isPremium={data.isPremium}
+                                        onPress={handlePress}
+                                      />
+                                    )}
                                   </div>
                                 );
                               })}
@@ -1347,6 +1430,18 @@ export function QuestsPanel({
       <div className="relative flex h-full w-full flex-col overflow-hidden bg-background">
         {renderContent()}
       </div>
+
+      <RemoveTagConfirm
+        open={!!pendingTagRemoval}
+        mode={pendingTagRemoval?.mode}
+        categoryName={
+          pendingTagRemoval
+            ? categoryMap[pendingTagRemoval.categoryId]?.name
+            : undefined
+        }
+        onConfirm={() => pendingTagRemoval?.resolve(true)}
+        onClose={() => pendingTagRemoval?.resolve(false)}
+      />
 
       <QuestStartSheet
         open={startQuestCategoryId !== null}
