@@ -357,16 +357,16 @@ function ItemCardComponent({
             <FrogSnapshot
               className={frogPreviewClassName}
               indices={previewIndices}
-              width={180}
-              height={180}
+              width={compact ? 224 : 180}
+              height={compact ? 224 : 180}
               visualOffsetY={centerFrog ? 0 : undefined}
             />
           ) : (
             <Frog
               className={frogPreviewClassName}
               indices={previewIndices}
-              width={180}
-              height={180}
+              width={compact ? 224 : 180}
+              height={compact ? 224 : 180}
               visualOffsetY={centerFrog ? 0 : undefined}
               paused={false}
             />

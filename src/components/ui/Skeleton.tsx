@@ -278,15 +278,14 @@ export function QuestsPageSkeleton() {
 
 export function WardrobeGridSkeleton() {
   return (
-    <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4 pb-20 md:pb-4">
-      {Array.from({ length: 8 }).map((_, index) => (
+    <div className="grid grid-cols-3 md:grid-cols-4 gap-2 md:gap-4 pb-20 md:pb-4">
+      {Array.from({ length: 12 }).map((_, index) => (
         <div
           key={index}
-          className="mx-auto flex w-full max-w-[240px] flex-col rounded-2xl border-[3px] border-border bg-card p-2.5 md:p-3.5"
+          className="mx-auto flex w-full max-w-[240px] flex-col rounded-xl border-2 border-border bg-card p-1.5 pb-0 md:p-2 md:pb-0.5"
         >
-          <Skeleton className="mt-4 mb-2 aspect-[1/0.75] rounded-xl md:mt-5 md:mb-3 md:aspect-[1.2/1]" />
-          <Skeleton className="mx-auto h-3 w-2/3 rounded-full" />
-          <Skeleton className="mx-auto mt-3 h-7 w-3/4 rounded-lg md:h-8" />
+          <Skeleton className="mb-0.5 aspect-[1/0.85] rounded-lg" />
+          <Skeleton className="mx-auto my-1 h-5 w-1/2 rounded-lg" />
         </div>
       ))}
     </div>
