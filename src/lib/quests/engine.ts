@@ -539,6 +539,25 @@ function pickSlotReward(rewards: QuestRewards | undefined, seed: string) {
   return [pool[Math.floor(rng() * pool.length)]];
 }
 
+// Bonus rewards stack ON TOP of the base pick: each entry rolls independently
+// with its own chance (1 = guaranteed), seeded so the outcome is stable for
+// the lifetime of the roll.
+function rollBonusRewards(
+  bonusRewards: RecipeSlot['bonusRewards'],
+  seed: string,
+) {
+  const granted: QuestReward[] = [];
+  (bonusRewards ?? []).forEach((entry, index) => {
+    if (!entry?.reward || !isSupportedReward(entry.reward)) return;
+    const chance = Math.min(1, Math.max(0, entry.chance ?? 0));
+    if (chance <= 0) return;
+    if (createSeededRandom(`${seed}:${index}`)() < chance) {
+      granted.push(sanitizeReward(entry.reward));
+    }
+  });
+  return granted;
+}
+
 // Streak pool entries roll their day requirement from the admin-configured
 // range; the rolled length is baked into the metric key (task_streak_N).
 function resolveRecipeMetricKey(
@@ -984,10 +1003,16 @@ export async function syncQuestState(args: {
           metricKey: isMetric
             ? resolveRecipeMetricKey(pick, `${userId}:${templateId}:slot:${index}:streak`)
             : undefined,
-          rewards: pickSlotReward(
-            slot.rewards,
-            `${userId}:${templateId}:slot:${index}:reward`,
-          ),
+          rewards: [
+            ...pickSlotReward(
+              slot.rewards,
+              `${userId}:${templateId}:slot:${index}:reward`,
+            ),
+            ...rollBonusRewards(
+              slot.bonusRewards,
+              `${userId}:${templateId}:slot:${index}:bonus`,
+            ),
+          ],
         };
         return block;
       })
@@ -1156,10 +1181,16 @@ export async function syncQuestState(args: {
                 ? 'focus_category_tags'
                 : 'ignore',
             metricKey,
-            rewards: pickSlotReward(
-              slot.rewards,
-              `${userId}:${templateId}:slot:${index}:reward`,
-            ),
+            rewards: [
+              ...pickSlotReward(
+                slot.rewards,
+                `${userId}:${templateId}:slot:${index}:reward`,
+              ),
+              ...rollBonusRewards(
+                slot.bonusRewards,
+                `${userId}:${templateId}:slot:${index}:bonus`,
+              ),
+            ],
           };
           return block;
         })

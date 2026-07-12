@@ -1,5 +1,5 @@
 import mongoose, { Schema, type Model } from 'mongoose';
-import type { QuestRewards } from '@/lib/quests/types';
+import type { QuestReward, QuestRewards } from '@/lib/quests/types';
 import type { QuestCoverImageFile } from './QuestTemplate';
 
 export type RecipePoolEntry = {
@@ -16,10 +16,19 @@ export type RecipePoolEntry = {
   weight: number;
 };
 
+// Rolled independently of the base reward pick, each with its own chance
+// (0–1; 1 grants on every roll). Lets a slot pay "X flies + a chance of a
+// gift" instead of one-of-a-pool.
+export type RecipeBonusReward = {
+  chance: number;
+  reward: QuestReward;
+};
+
 export type RecipeSlot = {
   id: string;
   pool: RecipePoolEntry[];
   rewards: QuestRewards;
+  bonusRewards?: RecipeBonusReward[];
 };
 
 export interface QuestRecipeDoc {

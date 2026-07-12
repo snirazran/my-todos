@@ -164,10 +164,16 @@ type AdminRecipePoolEntry = AdminRecipePoolEntryStreak & {
   weight: number;
 };
 
+type AdminRecipeBonusReward = {
+  chance: number;
+  reward: QuestReward;
+};
+
 type AdminRecipeSlot = {
   id: string;
   pool: AdminRecipePoolEntry[];
   rewards: QuestReward[];
+  bonusRewards?: AdminRecipeBonusReward[];
 };
 
 type AdminRecipe = {
@@ -561,6 +567,7 @@ export function AdminQuestManagerPage() {
   const [recipeRewardTarget, setRecipeRewardTarget] = useState<{
     recipeId: string;
     slotId: string;
+    kind: 'rewards' | 'bonus';
   } | null>(null);
 
   useEffect(() => {
@@ -1342,6 +1349,28 @@ export function AdminQuestManagerPage() {
     }));
   };
 
+  const updateRecipeBonusChance = (
+    recipeId: string,
+    slotId: string,
+    index: number,
+    percent: number,
+  ) => {
+    const chance = Math.min(100, Math.max(1, Math.round(percent))) / 100;
+    updateRecipe(recipeId, (r) => ({
+      ...r,
+      slots: r.slots.map((slot) =>
+        slot.id === slotId
+          ? {
+              ...slot,
+              bonusRewards: (slot.bonusRewards ?? []).map((bonus, bi) =>
+                bi === index ? { ...bonus, chance } : bonus,
+              ),
+            }
+          : slot,
+      ),
+    }));
+  };
+
   const addRecipeSlot = (recipeId: string) => {
     updateRecipe(recipeId, (r) => ({
       ...r,
@@ -1616,7 +1645,7 @@ export function AdminQuestManagerPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setRecipeRewardTarget({ recipeId: r.recipeId, slotId: slot.id })}
+                    onClick={() => setRecipeRewardTarget({ recipeId: r.recipeId, slotId: slot.id, kind: 'rewards' })}
                     className="inline-flex items-center gap-1 rounded-full border border-emerald-500/25 bg-emerald-500/8 px-2.5 py-1 text-[11px] font-bold text-emerald-600 transition hover:bg-emerald-500/15 dark:text-emerald-400"
                   >
                     <Gift className="h-3 w-3" />
@@ -1637,6 +1666,39 @@ export function AdminQuestManagerPage() {
                       />
                     ))}
                   </div>
+                </div>
+
+                <div className="mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-2">
+                  <button
+                    type="button"
+                    onClick={() => setRecipeRewardTarget({ recipeId: r.recipeId, slotId: slot.id, kind: 'bonus' })}
+                    className="inline-flex items-center gap-1 rounded-full border border-amber-500/25 bg-amber-500/8 px-2.5 py-1 text-[11px] font-bold text-amber-600 transition hover:bg-amber-500/15 dark:text-amber-400"
+                  >
+                    <Gift className="h-3 w-3" />
+                    Bonus
+                  </button>
+                  {(slot.bonusRewards?.length ?? 0) > 0 ? (
+                    (slot.bonusRewards ?? []).map((bonus, bi) => (
+                      <div key={bi} className="flex items-center gap-1.5 leading-[30px]">
+                        <RewardTile
+                          reward={bonus.reward}
+                          rewardCatalog={rewardCatalog}
+                          isPremium={false}
+                        />
+                        <InlinePillNumber
+                          value={Math.round(bonus.chance * 100)}
+                          onChange={(v) =>
+                            updateRecipeBonusChance(r.recipeId, slot.id, bi, v)
+                          }
+                        />
+                        <span className="text-sm font-medium text-muted-foreground">% chance</span>
+                      </div>
+                    ))
+                  ) : (
+                    <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                      lands on top of the reward, at its own odds
+                    </span>
+                  )}
                 </div>
               </div>
             ))}
@@ -1660,6 +1722,11 @@ export function AdminQuestManagerPage() {
     );
   };
 
+  const recipeRewardDialogSlot = recipeRewardTarget
+    ? adminRecipes
+        .find((r) => r.recipeId === recipeRewardTarget.recipeId)
+        ?.slots.find((slot) => slot.id === recipeRewardTarget.slotId)
+    : undefined;
   const recipeRewardDialog = recipeRewardTarget ? (
     <RewardPickerDialog
       open={!!recipeRewardTarget}
@@ -1667,17 +1734,26 @@ export function AdminQuestManagerPage() {
         if (!isOpen) setRecipeRewardTarget(null);
       }}
       rewards={
-        adminRecipes
-          .find((r) => r.recipeId === recipeRewardTarget.recipeId)
-          ?.slots.find((slot) => slot.id === recipeRewardTarget.slotId)
-          ?.rewards ?? []
+        recipeRewardTarget.kind === 'bonus'
+          ? (recipeRewardDialogSlot?.bonusRewards ?? []).map((b) => b.reward)
+          : recipeRewardDialogSlot?.rewards ?? []
       }
       rewardItems={rewardItems}
       rewardCatalog={rewardCatalog}
       onSave={(rewards) => {
-        updateRecipeSlot(recipeRewardTarget.recipeId, recipeRewardTarget.slotId, {
-          rewards: rewards.length > 0 ? rewards : [],
-        });
+        if (recipeRewardTarget.kind === 'bonus') {
+          const previous = recipeRewardDialogSlot?.bonusRewards ?? [];
+          updateRecipeSlot(recipeRewardTarget.recipeId, recipeRewardTarget.slotId, {
+            bonusRewards: rewards.map((reward, i) => ({
+              chance: previous[i]?.chance ?? 1,
+              reward,
+            })),
+          });
+        } else {
+          updateRecipeSlot(recipeRewardTarget.recipeId, recipeRewardTarget.slotId, {
+            rewards: rewards.length > 0 ? rewards : [],
+          });
+        }
         setRecipeRewardTarget(null);
       }}
     />

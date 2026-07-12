@@ -4,6 +4,7 @@ import { requireAdminUserId as requireUserId } from '@/lib/adminAuth';
 import connectMongo from '@/lib/mongoose';
 import QuestRecipeModel, {
   type QuestRecipeDoc,
+  type RecipeBonusReward,
   type RecipePoolEntry,
   type RecipeSlot,
 } from '@/lib/models/QuestRecipe';
@@ -58,6 +59,14 @@ function sanitizePoolEntry(input: any): RecipePoolEntry | null {
   return entry;
 }
 
+function sanitizeBonusReward(input: any): RecipeBonusReward | null {
+  if (!input || typeof input !== 'object') return null;
+  const reward = sanitizeRewards([input.reward])[0];
+  const chance = Number(input.chance);
+  if (!reward || !Number.isFinite(chance) || chance <= 0) return null;
+  return { chance: Math.min(1, chance), reward };
+}
+
 function sanitizeSlot(input: any): RecipeSlot | null {
   if (!input || typeof input !== 'object') return null;
   const pool = Array.isArray(input.pool)
@@ -65,11 +74,17 @@ function sanitizeSlot(input: any): RecipeSlot | null {
     : [];
   const rewards = sanitizeRewards(input.rewards);
   if (pool.length === 0 || rewards.length === 0) return null;
+  const bonusRewards = Array.isArray(input.bonusRewards)
+    ? (input.bonusRewards
+        .map(sanitizeBonusReward)
+        .filter(Boolean) as RecipeBonusReward[])
+    : [];
   return {
     id:
       typeof input.id === 'string' && input.id.trim() ? input.id.trim() : uuid(),
     pool,
     rewards,
+    ...(bonusRewards.length > 0 ? { bonusRewards } : {}),
   };
 }
 

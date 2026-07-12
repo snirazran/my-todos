@@ -9,11 +9,14 @@ function slot(
     type: 'count' | 'focus_minutes' | 'metric_count';
     action?: 'complete' | 'add';
     metricKey?: string;
+    streakDaysMin?: number;
+    streakDaysMax?: number;
     minTarget: number;
     maxTarget: number;
     weight?: number;
   }>,
   rewards: RecipeSlot['rewards'],
+  bonusRewards?: RecipeSlot['bonusRewards'],
 ): RecipeSlot {
   return {
     id: uuid(),
@@ -22,23 +25,36 @@ function slot(
       type: entry.type,
       action: entry.action,
       metricKey: entry.metricKey,
+      streakDaysMin: entry.streakDaysMin,
+      streakDaysMax: entry.streakDaysMax,
       minTarget: entry.minTarget,
       maxTarget: entry.maxTarget,
       weight: Math.max(1, entry.weight ?? 1),
     })),
     rewards,
+    ...(bonusRewards?.length ? { bonusRewards } : {}),
   };
 }
 
-const flies = (min: number, max: number) => [
+const flies = (amount: number) => [
   {
     type: 'FLIES' as const,
-    amountMode: 'random' as const,
-    minAmount: min,
-    maxAmount: max,
+    amountMode: 'fixed' as const,
+    amount,
   },
 ];
 
+const giftBonus = (chance: number) => [
+  {
+    chance,
+    reward: { type: 'BOX' as const, itemId: 'gift_box_1' },
+  },
+];
+
+// Focus ladder: 6 objectives over 3 days, tag-scoped to the focus category.
+// Targets are cumulative thresholds calibrated to ~3-5 tagged completions or
+// ~30-40 tagged focus minutes per day. Free payout: 2+2+3+3+5+8 = 23 flies
+// plus a guaranteed gift on the capstone; premium doubles at claim time.
 export async function ensureDefaultQuestRecipe(): Promise<QuestRecipeDoc | null> {
   await ensureDefaultDailyRecipe();
   const existing = await QuestRecipeModel.findOne({
@@ -55,45 +71,66 @@ export async function ensureDefaultQuestRecipe(): Promise<QuestRecipeDoc | null>
     slots: [
       slot(
         [
-          { type: 'count', action: 'complete', minTarget: 4, maxTarget: 6 },
-          { type: 'focus_minutes', minTarget: 20, maxTarget: 30 },
+          { type: 'count', action: 'complete', minTarget: 2, maxTarget: 3, weight: 3 },
+          { type: 'count', action: 'add', minTarget: 2, maxTarget: 3, weight: 2 },
+          { type: 'focus_minutes', minTarget: 10, maxTarget: 15, weight: 2 },
         ],
-        flies(10, 12),
+        flies(2),
       ),
       slot(
         [
-          { type: 'focus_minutes', minTarget: 30, maxTarget: 45 },
-          { type: 'count', action: 'complete', minTarget: 7, maxTarget: 10 },
+          { type: 'count', action: 'complete', minTarget: 3, maxTarget: 4, weight: 3 },
+          { type: 'focus_minutes', minTarget: 20, maxTarget: 25, weight: 2 },
         ],
-        flies(15, 20),
+        flies(2),
       ),
       slot(
         [
-          { type: 'count', action: 'complete', minTarget: 12, maxTarget: 18 },
-          { type: 'focus_minutes', minTarget: 45, maxTarget: 60 },
+          { type: 'count', action: 'complete', minTarget: 5, maxTarget: 6, weight: 3 },
+          { type: 'focus_minutes', minTarget: 30, maxTarget: 40, weight: 2 },
         ],
-        flies(25, 35),
+        flies(3),
       ),
       slot(
         [
-          { type: 'focus_minutes', minTarget: 60, maxTarget: 90 },
-          { type: 'count', action: 'complete', minTarget: 18, maxTarget: 25 },
-          { type: 'metric_count', metricKey: 'task_streak_3', minTarget: 1, maxTarget: 1 },
+          { type: 'count', action: 'complete', minTarget: 7, maxTarget: 8, weight: 3 },
+          { type: 'focus_minutes', minTarget: 45, maxTarget: 60, weight: 2 },
+          { type: 'metric_count', metricKey: 'buddy_task_completed', minTarget: 1, maxTarget: 1, weight: 1 },
         ],
-        flies(40, 50),
+        flies(3),
       ),
       slot(
         [
-          { type: 'count', action: 'complete', minTarget: 25, maxTarget: 35 },
-          { type: 'focus_minutes', minTarget: 90, maxTarget: 120 },
+          { type: 'count', action: 'complete', minTarget: 9, maxTarget: 11, weight: 3 },
+          { type: 'focus_minutes', minTarget: 70, maxTarget: 90, weight: 2 },
+          {
+            type: 'metric_count',
+            metricKey: 'task_streak_2',
+            streakDaysMin: 2,
+            streakDaysMax: 2,
+            minTarget: 1,
+            maxTarget: 1,
+            weight: 1,
+          },
         ],
-        flies(60, 80),
+        flies(5),
+      ),
+      slot(
+        [
+          { type: 'count', action: 'complete', minTarget: 12, maxTarget: 15, weight: 3 },
+          { type: 'focus_minutes', minTarget: 100, maxTarget: 120, weight: 2 },
+        ],
+        flies(8),
+        giftBonus(1),
       ),
     ],
   });
   return created.toObject() as QuestRecipeDoc;
 }
 
+// Daily roll: 3 objectives, easy -> medium -> hard, all achievable by a
+// day-one user (no economy-loop metrics like trades or sales). Free payout:
+// 2+3+5 = 10 flies plus a 15% gift roll on the capstone.
 export async function ensureDefaultDailyRecipe(): Promise<void> {
   const existing = await QuestRecipeModel.findOne({
     placement: 'daily',
@@ -109,26 +146,29 @@ export async function ensureDefaultDailyRecipe(): Promise<void> {
     slots: [
       slot(
         [
-          { type: 'count', action: 'complete', minTarget: 2, maxTarget: 4 },
-          { type: 'count', action: 'add', minTarget: 2, maxTarget: 3 },
+          { type: 'count', action: 'complete', minTarget: 2, maxTarget: 3, weight: 3 },
+          { type: 'count', action: 'add', minTarget: 2, maxTarget: 3, weight: 2 },
+          { type: 'focus_minutes', minTarget: 10, maxTarget: 15, weight: 2 },
+          { type: 'metric_count', metricKey: 'frog_fed_full', minTarget: 1, maxTarget: 1, weight: 1 },
         ],
-        flies(4, 6),
+        flies(2),
       ),
       slot(
         [
-          { type: 'focus_minutes', minTarget: 15, maxTarget: 25 },
-          { type: 'count', action: 'complete', minTarget: 5, maxTarget: 7 },
-          { type: 'metric_count', metricKey: 'trade_completed', minTarget: 1, maxTarget: 1 },
+          { type: 'count', action: 'complete', minTarget: 4, maxTarget: 6, weight: 3 },
+          { type: 'focus_minutes', minTarget: 15, maxTarget: 25, weight: 3 },
+          { type: 'metric_count', metricKey: 'task_saved_later', minTarget: 1, maxTarget: 1, weight: 1 },
+          { type: 'metric_count', metricKey: 'skin_equipped', minTarget: 1, maxTarget: 1, weight: 1 },
         ],
-        flies(8, 12),
+        flies(3),
       ),
       slot(
         [
-          { type: 'count', action: 'complete', minTarget: 8, maxTarget: 12 },
-          { type: 'focus_minutes', minTarget: 30, maxTarget: 45 },
-          { type: 'metric_count', metricKey: 'skin_sold', minTarget: 1, maxTarget: 2 },
+          { type: 'count', action: 'complete', minTarget: 7, maxTarget: 9, weight: 3 },
+          { type: 'focus_minutes', minTarget: 30, maxTarget: 40, weight: 3 },
         ],
-        flies(14, 20),
+        flies(5),
+        giftBonus(0.15),
       ),
     ],
   });
