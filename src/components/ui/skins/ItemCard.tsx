@@ -222,8 +222,8 @@ function ItemCardComponent({
   const frogPreviewClassName = cn(
     centerFrog
       ? compact
-        ? 'object-contain -translate-y-[2%]'
-        : 'object-contain -translate-y-[6%]'
+        ? 'object-contain -translate-y-1'
+        : 'object-contain -translate-y-3'
       : 'w-[125%] h-[125%] object-contain translate-y-[10%] min-[375px]:translate-y-[2%] min-[425px]:-translate-y-[4%] md:-translate-y-[5%]',
     previewClassName,
   );
