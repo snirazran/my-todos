@@ -65,9 +65,12 @@ export default function GlobalFrogodoroMini() {
   const splitDone = settings.autoStartBreaks;
   const baseColor =
     displayPhase === 'focus'
-      ? 'bg-primary text-primary-foreground'
-      : 'bg-sky-500 dark:bg-sky-600 text-white';
-  const accent = displayPhase === 'focus' ? 'text-primary' : 'text-sky-500';
+      ? 'bg-primary text-primary-foreground dark:bg-green-700 dark:text-white'
+      : 'bg-sky-500 text-white dark:bg-sky-700';
+  const accent =
+    displayPhase === 'focus'
+      ? 'text-primary dark:text-green-700'
+      : 'text-sky-500 dark:text-sky-700';
 
   // Done just acknowledges (silences the alarm) and ends the session.
   const handleDone = () => {
@@ -107,9 +110,9 @@ export default function GlobalFrogodoroMini() {
                     className="pointer-events-auto w-full max-w-[360px] overflow-hidden rounded-[28px] bg-popover shadow-2xl"
                   >
                     {/* Colored top — matches the in-app timer card */}
-                    <div className={`relative px-5 pt-6 pb-5 ${splitDone ? 'bg-sky-500 dark:bg-sky-600 text-white' : baseColor}`}>
+                    <div className={`relative px-5 pt-6 pb-5 ${splitDone ? 'bg-sky-500 text-white dark:bg-sky-700' : baseColor}`}>
                       {splitDone && (
-                        <div aria-hidden className="absolute inset-y-0 left-0 z-0 w-1/2 bg-primary" />
+                        <div aria-hidden className="absolute inset-y-0 left-0 z-0 w-1/2 bg-primary dark:bg-green-700" />
                       )}
                       <div className="relative z-10">
                         {selectedTaskName && (

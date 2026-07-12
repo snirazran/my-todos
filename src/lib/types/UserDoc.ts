@@ -1,4 +1,5 @@
 import type { WardrobeSlot } from '@/lib/skins/catalog';
+import type { RotationInterval } from '@/lib/skins/styleShuffle';
 import type { FocusProfile } from '@/lib/quests/types';
 import type { FrogodoroSettings, PomodoroPhase, SessionStats } from '@/lib/frogodoroStore';
 
@@ -59,6 +60,11 @@ export type UserWardrobe = {
   stolenFlies?: number; // Flies eaten by frog since last acknowledgement
 
   backgrounds?: UserBackgrounds;
+};
+
+export type StyleShufflePrefs = {
+  interval: RotationInterval;
+  lastAutoAt?: Date | string | null;
 };
 
 export type UserSkins = {
@@ -131,6 +137,7 @@ export type UserDoc = {
   quests?: unknown;
   dailyRewards?: DailyRewardProgress;
   notificationPrefs?: NotificationPrefs;
+  styleShuffle?: StyleShufflePrefs | null;
   calendarSyncEnabled?: boolean;
   calendarAccessToken?: string;
   cosmeticOverrides?: Partial<Record<'skin' | 'hat' | 'body' | 'hand_item', number>>;

@@ -26,10 +26,8 @@ import {
   SkinRotationRow,
   SkinRotationDialog,
   StyleShuffleHeaderButton,
-  getRotationInterval,
-  setRotationInterval,
+  useShuffleInterval,
   labelForInterval,
-  type RotationInterval,
 } from '@/components/ui/SkinRotation';
 import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
 import useSWR, { mutate as swrMutate } from 'swr';
@@ -164,7 +162,7 @@ export default function SiteHeader() {
           />
         </div>
       )}
-      {(pathname === '/' || pathname === '/wardrobe') &&
+      {pathname === '/wardrobe' &&
         user &&
         flyBalance !== undefined && (
           <div
@@ -174,9 +172,7 @@ export default function SiteHeader() {
             )}
             aria-disabled={isLoadingScreenVisible}
           >
-            {(pathname === '/' || pathname === '/wardrobe') && (
-              <StyleShuffleHeaderButton />
-            )}
+            <StyleShuffleHeaderButton />
             <PremiumBadge />
             <StreakChip variant="mobile" />
             <FlyCounter
@@ -1535,15 +1531,8 @@ function QuickTilesGrid({
   onOpenIntegrations: () => void;
   calendarSubtitle: string;
 }) {
-  const [rotation, setRotation] = useState<RotationInterval>('disabled');
+  const { value: rotation, setValue: setRotation } = useShuffleInterval();
   const [rotationOpen, setRotationOpen] = useState(false);
-
-  useEffect(() => {
-    setRotation(getRotationInterval());
-    const handler = () => setRotation(getRotationInterval());
-    window.addEventListener('skin-rotation-change', handler);
-    return () => window.removeEventListener('skin-rotation-change', handler);
-  }, []);
 
   return (
     <div className="grid grid-cols-2 gap-3">
@@ -1577,8 +1566,7 @@ function QuickTilesGrid({
         currentValue={rotation}
         onClose={() => setRotationOpen(false)}
         onSelect={(v) => {
-          setRotationInterval(v);
-          setRotation(v);
+          void setRotation(v);
           setRotationOpen(false);
         }}
       />

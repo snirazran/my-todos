@@ -1,19 +1,29 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Check, ChevronRight, Shuffle, X } from 'lucide-react';
+import useSWR from 'swr';
 import { useAuth } from '@/components/auth/AuthContext';
 import { cn } from '@/lib/utils';
 import { Icon } from '@/components/ui/Icon';
-import { mutateInventoryCaches } from '@/hooks/useInventory';
-import { mutateBackgrounds, type BackgroundsApiData } from '@/hooks/useBackgrounds';
-import type { WardrobeSlot } from '@/lib/skins/catalog';
+import {
+  beginEquipMutation,
+  endEquipMutation,
+  mutateInventoryCaches,
+} from '@/hooks/useInventory';
+import { mutateBackgrounds } from '@/hooks/useBackgrounds';
+import {
+  ROTATION_INTERVAL_MS,
+  isRotationInterval,
+  type RotationInterval,
+} from '@/lib/skins/styleShuffle';
 
-const STORAGE_KEY = 'skinRotationInterval';
+const SHUFFLE_API = '/api/skins/shuffle';
+const LEGACY_STORAGE_KEY = 'skinRotationInterval';
 
-export type RotationInterval = 'disabled' | '1m' | '5m' | '10m' | '1h' | '1d';
+export type { RotationInterval };
 
 const OPTIONS: {
   value: RotationInterval;
@@ -28,28 +38,46 @@ const OPTIONS: {
   { value: 'disabled', label: 'Off', hint: 'Keep your current look' },
 ];
 
-const INTERVAL_MS: Record<RotationInterval, number> = {
-  disabled: 0,
-  '1m': 60 * 1000,
-  '5m': 5 * 60 * 1000,
-  '10m': 10 * 60 * 1000,
-  '1h': 60 * 60 * 1000,
-  '1d': 24 * 60 * 60 * 1000,
+const shuffleFetcher = async (url: string) => {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('Failed to load shuffle setting');
+  return (await res.json()) as { interval: RotationInterval };
 };
 
-export function getRotationInterval(): RotationInterval {
-  if (typeof window === 'undefined') return 'disabled';
-  const v = window.localStorage.getItem(STORAGE_KEY);
-  if (v === '1m' || v === '5m' || v === '10m' || v === '1h' || v === '1d')
-    return v;
-  return 'disabled';
-}
+export function useShuffleInterval() {
+  const { user } = useAuth();
+  const { data, mutate } = useSWR(user ? SHUFFLE_API : null, shuffleFetcher);
 
-export function setRotationInterval(value: RotationInterval) {
-  if (typeof window === 'undefined') return;
-  if (value === 'disabled') window.localStorage.removeItem(STORAGE_KEY);
-  else window.localStorage.setItem(STORAGE_KEY, value);
-  window.dispatchEvent(new Event('skin-rotation-change'));
+  const setValue = useCallback(
+    async (interval: RotationInterval) => {
+      try {
+        await mutate(
+          async () => {
+            const res = await fetch(SHUFFLE_API, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ interval }),
+            });
+            if (!res.ok) throw new Error('Failed to save shuffle setting');
+            return { interval };
+          },
+          {
+            optimisticData: { interval },
+            rollbackOnError: true,
+            revalidate: false,
+          },
+        );
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    [mutate],
+  );
+
+  const value: RotationInterval =
+    data && isRotationInterval(data.interval) ? data.interval : 'disabled';
+  return { value, setValue };
 }
 
 export function labelForInterval(v: RotationInterval): string {
@@ -57,15 +85,8 @@ export function labelForInterval(v: RotationInterval): string {
 }
 
 export function SkinRotationRow() {
-  const [value, setValue] = useState<RotationInterval>('disabled');
+  const { value, setValue } = useShuffleInterval();
   const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    setValue(getRotationInterval());
-    const handler = () => setValue(getRotationInterval());
-    window.addEventListener('skin-rotation-change', handler);
-    return () => window.removeEventListener('skin-rotation-change', handler);
-  }, []);
 
   return (
     <>
@@ -87,8 +108,7 @@ export function SkinRotationRow() {
         currentValue={value}
         onClose={() => setOpen(false)}
         onSelect={(v) => {
-          setRotationInterval(v);
-          setValue(v);
+          void setValue(v);
           setOpen(false);
         }}
       />
@@ -222,79 +242,20 @@ export function SkinRotationDialog({
   );
 }
 
-type CatalogItem = { id: string; slot: WardrobeSlot };
-type SkinsResponse = {
-  wardrobe?: {
-    equipped?: Partial<Record<WardrobeSlot, string | null>>;
-    inventory?: Record<string, number>;
-  };
-  catalog?: CatalogItem[];
-};
-type BackgroundsResponse = BackgroundsApiData;
-
-async function rotateOnce() {
+async function rotateOnce(auto = false) {
   window.dispatchEvent(new Event('style-shuffle-start'));
+  beginEquipMutation();
   try {
-    const [skinsRes, bgRes] = await Promise.all([
-      fetch('/api/skins/inventory'),
-      fetch('/api/backgrounds'),
-    ]);
-    if (!skinsRes.ok || !bgRes.ok) return;
+    const res = await fetch(SHUFFLE_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ auto }),
+    });
+    if (!res.ok) return;
+    const data = (await res.json()) as { shuffled?: boolean };
+    if (!data.shuffled) return;
 
-    const skinsData = (await skinsRes.json()) as SkinsResponse;
-    const bgData = (await bgRes.json()) as BackgroundsResponse;
-
-    const inventory = skinsData.wardrobe?.inventory ?? {};
-    const catalog = skinsData.catalog ?? [];
-    const ownedBySlot: Record<WardrobeSlot, string[]> = {
-      skin: [],
-      hat: [],
-      body: [],
-      hand_item: [],
-      container: [],
-    };
-    for (const item of catalog) {
-      if ((inventory[item.id] ?? 0) > 0 && item.slot !== 'container') {
-        ownedBySlot[item.slot]?.push(item.id);
-      }
-    }
-
-    const equipCalls: Promise<unknown>[] = [];
-    const slots: WardrobeSlot[] = ['skin', 'hat', 'body', 'hand_item'];
-    for (const slot of slots) {
-      const owned = ownedBySlot[slot];
-      if (!owned || owned.length === 0) continue;
-      const itemId = owned[Math.floor(Math.random() * owned.length)];
-      equipCalls.push(
-        fetch('/api/skins/inventory', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ slot, itemId }),
-        }),
-      );
-    }
-
-    const ownedBackgrounds = Object.entries(bgData.inventory ?? {})
-      .filter(([, count]) => (count ?? 0) > 0)
-      .map(([id]) => id);
-    let nextBackgroundData: BackgroundsApiData | null = null;
-    if (ownedBackgrounds.length > 0) {
-      const bgId = ownedBackgrounds[Math.floor(Math.random() * ownedBackgrounds.length)];
-      nextBackgroundData = { ...bgData, equipped: bgId };
-      equipCalls.push(
-        fetch('/api/backgrounds/equip', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: bgId }),
-        }),
-      );
-    }
-
-    await Promise.allSettled(equipCalls);
-    // Revalidate the SWR caches the frog/wardrobe/background read from so the
-    // new look shows up live, without needing a navigation or manual refresh.
     mutateInventoryCaches();
-    if (nextBackgroundData) mutateBackgrounds(nextBackgroundData);
     mutateBackgrounds();
     window.dispatchEvent(new Event('wardrobe-refresh'));
     window.dispatchEvent(new Event('background-refresh'));
@@ -302,25 +263,19 @@ async function rotateOnce() {
   } catch {
     // silent
   } finally {
+    endEquipMutation();
     window.dispatchEvent(new Event('style-shuffle-end'));
   }
 }
 
 export function StyleShuffleHeaderButton({ className }: { className?: string }) {
   const [open, setOpen] = useState(false);
-  const [value, setValue] = useState<RotationInterval>('disabled');
+  const { value, setValue } = useShuffleInterval();
   const [spinning, setSpinning] = useState(false);
   const [ring, setRing] = useState(false);
   const [ringKey, setRingKey] = useState(0);
   const stopRequested = useRef(false);
   const failsafeRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    setValue(getRotationInterval());
-    const handler = () => setValue(getRotationInterval());
-    window.addEventListener('skin-rotation-change', handler);
-    return () => window.removeEventListener('skin-rotation-change', handler);
-  }, []);
 
   useEffect(() => {
     const onStart = () => {
@@ -390,8 +345,7 @@ export function StyleShuffleHeaderButton({ className }: { className?: string }) 
         currentValue={value}
         onClose={() => setOpen(false)}
         onSelect={(v) => {
-          setRotationInterval(v);
-          setValue(v);
+          void setValue(v);
           setOpen(false);
         }}
       />
@@ -401,15 +355,25 @@ export function StyleShuffleHeaderButton({ className }: { className?: string }) 
 
 export function GlobalSkinRotation() {
   const { user } = useAuth();
-  const [interval, setIntervalValue] = useState<RotationInterval>('disabled');
+  const { value: interval, setValue } = useShuffleInterval();
   const timerRef = useRef<number | null>(null);
+  const migratedRef = useRef(false);
 
   useEffect(() => {
-    setIntervalValue(getRotationInterval());
-    const handler = () => setIntervalValue(getRotationInterval());
-    window.addEventListener('skin-rotation-change', handler);
-    return () => window.removeEventListener('skin-rotation-change', handler);
-  }, []);
+    if (!user || migratedRef.current) return;
+    migratedRef.current = true;
+    let legacy: string | null = null;
+    try {
+      legacy = window.localStorage.getItem(LEGACY_STORAGE_KEY);
+    } catch {}
+    if (!isRotationInterval(legacy) || legacy === 'disabled') return;
+    void setValue(legacy).then((ok) => {
+      if (!ok) return;
+      try {
+        window.localStorage.removeItem(LEGACY_STORAGE_KEY);
+      } catch {}
+    });
+  }, [user, setValue]);
 
   useEffect(() => {
     if (timerRef.current !== null) {
@@ -417,10 +381,10 @@ export function GlobalSkinRotation() {
       timerRef.current = null;
     }
     if (!user || interval === 'disabled') return;
-    const ms = INTERVAL_MS[interval];
+    const ms = ROTATION_INTERVAL_MS[interval];
     if (ms <= 0) return;
     timerRef.current = window.setInterval(() => {
-      void rotateOnce();
+      void rotateOnce(true);
     }, ms) as unknown as number;
     return () => {
       if (timerRef.current !== null) {

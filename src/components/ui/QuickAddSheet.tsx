@@ -875,12 +875,16 @@ export default function QuickAddSheet({
                 className={`fixed z-[1400] flex max-h-[100dvh] transform-gpu pointer-events-none will-change-transform ${
                   isDesktop
                     ? 'inset-0 items-start justify-center p-6 pt-[18vh]'
-                    : 'inset-x-0 bottom-0 items-end px-3 pt-2 pb-4 sm:px-6 sm:pb-6'
+                    : `inset-x-0 bottom-0 items-end px-3 pt-2 sm:px-6 ${
+                        keyboardActive ? 'pb-2' : 'pb-4 sm:pb-6'
+                      }`
                 }`}
               >
                 <div
                   style={{ maxHeight: sheetMaxHeight }}
-                  className="pointer-events-auto mx-auto flex w-full max-w-[500px] flex-col pb-[env(safe-area-inset-bottom)] sm:max-w-[620px]"
+                  className={`pointer-events-auto mx-auto flex w-full max-w-[500px] flex-col sm:max-w-[620px] ${
+                    keyboardActive ? '' : 'pb-[env(safe-area-inset-bottom)]'
+                  }`}
                 >
                   {isDesktop && (
                     <div className="mb-2 flex shrink-0 justify-end">
@@ -1131,7 +1135,9 @@ export default function QuickAddSheet({
                   </div>
 
                   <div
-                    style={{ minHeight: hasTaskText ? 56 : undefined }}
+                    style={{
+                      minHeight: hasTaskText || keyboardActive ? 56 : undefined,
+                    }}
                     className="pointer-events-none relative min-h-0 rounded-[28px] [clip-path:inset(0_-40px_-40px_-40px)]"
                   >
                     <AnimatePresence initial={false}>

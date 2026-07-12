@@ -100,6 +100,10 @@ const UserSchema = new Schema<UserDoc>(
       type: Schema.Types.Mixed,
       default: undefined,
     },
+    styleShuffle: {
+      type: Schema.Types.Mixed,
+      default: undefined,
+    },
     calendarSyncEnabled: { type: Boolean, default: false },
     calendarAccessToken: { type: String },
     cosmeticOverrides: {

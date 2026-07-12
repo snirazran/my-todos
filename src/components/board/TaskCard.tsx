@@ -110,8 +110,8 @@ export default function TaskCard({
   const MOVE_TOLERANCE = 8;
   // Mouse drags start on movement (Trello-style) — the threshold only exists
   // to keep clicks from becoming accidental micro-drags.
-  const MOUSE_DRAG_THRESHOLD = 6;
-  const LONG_PRESS_DURATION = 220;
+  const MOUSE_DRAG_THRESHOLD = 5;
+  const LONG_PRESS_DURATION = 120;
   const MOUSE_HOLD_DURATION = 150;
   const defaultTouchAction = touchAction || 'auto';
 

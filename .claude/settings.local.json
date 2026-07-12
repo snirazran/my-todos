@@ -303,7 +303,10 @@
       "PowerShell(npx tsc --noEmit 2>$null | Select-String -Pattern \"QuestCards|NextQuestStrip|questClaims|TaskList|BuddyNudge|metricLabels|api\" ; \"exit: $LASTEXITCODE\")",
       "WebFetch(domain:capgo.app)",
       "Bash(mkdir -p /c/Users/snira/AppData/Local/Temp/claude/C--Users-snira-Desktop-Full-Stack-frog-task/ca04efb8-4639-48e9-9a71-6793bb53589c/scratchpad)",
-      "Bash(\"/c/Program Files \\(x86\\)/Microsoft/Edge/Application/msedge.exe\" --headless=new --disable-gpu --hide-scrollbars --force-device-scale-factor=1 --window-size=390,1400 --virtual-time-budget=20000 --screenshot=\"C:\\\\\\\\Users\\\\\\\\snira\\\\\\\\AppData\\\\\\\\Local\\\\\\\\Temp\\\\\\\\claude\\\\\\\\C--Users-snira-Desktop-Full-Stack-frog-task\\\\\\\\ca04efb8-4639-48e9-9a71-6793bb53589c\\\\\\\\scratchpad\\\\\\\\shop390.png\" \"http://localhost:3000/wardrobe?tab=shop\")"
+      "Bash(\"/c/Program Files \\(x86\\)/Microsoft/Edge/Application/msedge.exe\" --headless=new --disable-gpu --hide-scrollbars --force-device-scale-factor=1 --window-size=390,1400 --virtual-time-budget=20000 --screenshot=\"C:\\\\\\\\Users\\\\\\\\snira\\\\\\\\AppData\\\\\\\\Local\\\\\\\\Temp\\\\\\\\claude\\\\\\\\C--Users-snira-Desktop-Full-Stack-frog-task\\\\\\\\ca04efb8-4639-48e9-9a71-6793bb53589c\\\\\\\\scratchpad\\\\\\\\shop390.png\" \"http://localhost:3000/wardrobe?tab=shop\")",
+      "PowerShell(npx next lint --file src/components/ui/SkinRotation.tsx --file src/components/ui/siteHeader.tsx --file src/app/api/skins/shuffle/route.ts --file src/lib/skins/styleShuffle.ts --file src/lib/types/UserDoc.ts --file src/lib/models/User.ts)",
+      "PowerShell(npx eslint src/components/ui/SkinRotation.tsx src/components/ui/siteHeader.tsx src/app/api/skins/shuffle/route.ts src/lib/skins/styleShuffle.ts src/lib/types/UserDoc.ts src/lib/models/User.ts)",
+      "PowerShell(try { \\(Invoke-WebRequest -Uri 'http://localhost:3000/api/skins/shuffle' -UseBasicParsing -TimeoutSec 5\\).StatusCode } catch { if \\($_.Exception.Response\\) { [int]$_.Exception.Response.StatusCode } else { 'no server' } })"
     ]
   }
 }

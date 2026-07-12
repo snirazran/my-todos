@@ -47,8 +47,8 @@ export default function FrogodoroPill({ onClick, taskName }: Props) {
   // left→right as the phase passes.
   const phaseBase =
     phase === 'focus'
-      ? 'bg-primary text-primary-foreground'
-      : 'bg-sky-500 dark:bg-sky-600 text-white';
+      ? 'bg-primary text-primary-foreground dark:bg-green-700 dark:text-white'
+      : 'bg-sky-500 text-white dark:bg-sky-700';
   const phaseFill = 'bg-black/20';
 
   const phaseDuration =

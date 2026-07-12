@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Check } from 'lucide-react';
+import { Check, Compass, Plus } from 'lucide-react';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import type {
   FocusCategoryTagMap,
@@ -88,6 +88,9 @@ export function QuestOnboardingPopup({
   if (!mounted) return null;
 
   const count = selectedCategoryIds.length;
+  const areaNoun = count === 1 ? 'area' : 'areas';
+  const countLabel =
+    count === 0 ? 'Pick at least 1 area' : `${count} ${areaNoun} selected`;
 
   return (
     <BaseSheet
@@ -108,11 +111,15 @@ export function QuestOnboardingPopup({
               }}
             >
               <div>
-                <h2 className="text-2xl font-black tracking-tight text-foreground sm:text-3xl">
+                <p className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+                  <Compass className="h-3.5 w-3.5 text-primary" strokeWidth={2.75} />
+                  Your areas
+                </p>
+                <h2 className="mt-1.5 text-2xl font-black tracking-tight text-foreground sm:text-3xl">
                   {isCompleted ? 'Update your focus' : 'Shape your quests'}
                 </h2>
                 <p className="mt-1.5 max-w-md text-[13px] font-medium leading-relaxed text-muted-foreground">
-                  Pick the areas that guide your quests and task ideas.
+                  Pick the areas that guide your quests.
                 </p>
               </div>
 
@@ -123,7 +130,7 @@ export function QuestOnboardingPopup({
               ref={bindScroll}
               className="min-h-0 flex-1 overflow-y-auto overscroll-none px-6 pb-6 pt-2 sm:px-8"
             >
-              <div className="grid grid-cols-2 gap-3.5 sm:gap-4 lg:grid-cols-3">
+              <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 sm:gap-4">
                 {categories.map((category) => {
                   const selected = selectedCategoryIds.includes(category.id);
 
@@ -134,47 +141,58 @@ export function QuestOnboardingPopup({
                       aria-pressed={selected}
                       onClick={() => toggleCategory(category.id)}
                       className={cn(
-                        'group relative aspect-[4/5] overflow-hidden rounded-[24px] text-left transition-all duration-200',
+                        'group flex flex-col overflow-hidden rounded-[24px] border bg-card text-left shadow-sm transition-all duration-200 active:scale-[0.98]',
                         selected
-                          ? 'ring-[3px] ring-primary'
-                          : 'ring-1 ring-border/60 hover:-translate-y-0.5 hover:ring-border active:scale-[0.98]',
+                          ? 'border-primary ring-2 ring-primary'
+                          : 'border-border/50 [@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:shadow-md',
                       )}
                     >
-                      {category.coverImageUrl ? (
-                        <img
-                          src={category.coverImageUrl}
-                          alt=""
-                          className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"
-                        />
-                      ) : (
-                        <div
-                          className="absolute inset-0"
-                          style={{
-                            background: `linear-gradient(135deg, ${category.backgroundFrom}, ${category.backgroundTo})`,
-                          }}
-                        />
-                      )}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent" />
-
-                      <div
-                        className={cn(
-                          'absolute right-2.5 top-2.5 grid h-8 w-8 place-items-center rounded-full border-2 backdrop-blur-md transition-all',
-                          selected
-                            ? 'border-white bg-primary text-white'
-                            : 'border-white/70 bg-black/25 text-transparent',
+                      <div className="relative h-28 w-full shrink-0 overflow-hidden">
+                        {category.coverImageUrl ? (
+                          <img
+                            src={category.coverImageUrl}
+                            alt=""
+                            className="h-full w-full object-cover transition duration-500 [@media(hover:hover)]:group-hover:scale-105"
+                          />
+                        ) : (
+                          <div
+                            className="h-full w-full"
+                            style={{
+                              background: `linear-gradient(135deg, ${category.backgroundFrom}, ${category.backgroundTo})`,
+                            }}
+                          />
                         )}
-                        aria-hidden
-                      >
-                        <Check className="h-4 w-4 stroke-[3]" />
-                      </div>
-
-                      <div className="absolute inset-x-0 bottom-0 p-3.5">
-                        <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/70">
-                          {category.shortLabel || 'Focus'}
-                        </p>
-                        <h3 className="mt-0.5 text-lg font-black leading-tight tracking-tight text-white sm:text-xl">
+                        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-black/50 to-transparent" />
+                        <span
+                          className="absolute bottom-2 left-3 right-3 truncate uppercase leading-none tracking-wide text-white drop-shadow-[0_3px_0_rgba(15,23,42,0.9)] text-[clamp(0.9375rem,calc(0.5rem_+_2vw),1.125rem)]"
+                          style={{
+                            fontFamily: 'var(--font-display), "Luckiest Guy", cursive',
+                            WebkitTextStroke: '1.5px rgba(15, 23, 42, 0.95)',
+                            paintOrder: 'stroke fill',
+                          }}
+                        >
                           {category.name}
-                        </h3>
+                        </span>
+                        <div
+                          className={cn(
+                            'absolute right-2.5 top-2.5 grid h-7 w-7 place-items-center rounded-full border-2 backdrop-blur-md transition-all',
+                            selected
+                              ? 'border-white bg-primary text-white'
+                              : 'border-white/70 bg-black/25 text-white/80',
+                          )}
+                          aria-hidden
+                        >
+                          {selected ? (
+                            <Check className="h-4 w-4 stroke-[3]" />
+                          ) : (
+                            <Plus className="h-4 w-4 stroke-[3]" />
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex flex-1 items-start px-3 py-2.5">
+                        <p className="line-clamp-2 text-[11px] font-bold leading-snug text-muted-foreground">
+                          {category.onboardingSentence || category.description}
+                        </p>
                       </div>
                     </button>
                   );
@@ -198,7 +216,7 @@ export function QuestOnboardingPopup({
             <div className="shrink-0 border-t border-border/60 bg-popover px-6 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:px-8">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-xs font-bold text-muted-foreground">
-                  {count} selected
+                  {countLabel}
                 </p>
                 <div className="flex items-center gap-2">
                   <button

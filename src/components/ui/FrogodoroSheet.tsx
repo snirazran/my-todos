@@ -445,11 +445,13 @@ export default function FrogodoroSheet({
 
   const getPhaseColor = () =>
     displayPhase === 'focus'
-      ? 'bg-primary text-primary-foreground'
-      : 'bg-sky-500 dark:bg-sky-600 text-white';
+      ? 'bg-primary text-primary-foreground dark:bg-green-700 dark:text-white'
+      : 'bg-sky-500 text-white dark:bg-sky-700';
 
   const getPhaseAccent = () =>
-    displayPhase === 'focus' ? 'text-primary' : 'text-sky-500';
+    displayPhase === 'focus'
+      ? 'text-primary dark:text-green-700'
+      : 'text-sky-500 dark:text-sky-700';
 
   // The actual time spent in whichever phase just finished — shown frozen in
   // the Done state (so a fast-forwarded phase shows real elapsed, not the set
@@ -718,10 +720,10 @@ export default function FrogodoroSheet({
                       transition={{ duration: 0.15 }}
                     >
                       {/* Timer Card */}
-                      <div className={`relative overflow-hidden ${splitDone ? 'bg-sky-500 dark:bg-sky-600 text-white' : getPhaseColor()}`}>
+                      <div className={`relative overflow-hidden ${splitDone ? 'bg-sky-500 text-white dark:bg-sky-700' : getPhaseColor()}`}>
                         {splitDone ? (
                           /* Split background: green (focus) | blue (break) */
-                          <div aria-hidden className="absolute inset-y-0 left-0 z-0 w-1/2 bg-primary" />
+                          <div aria-hidden className="absolute inset-y-0 left-0 z-0 w-1/2 bg-primary dark:bg-green-700" />
                         ) : (
                           /* Elapsed fill — grows bottom→top as the phase passes */
                           <div
