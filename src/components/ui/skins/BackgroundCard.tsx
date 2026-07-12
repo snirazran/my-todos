@@ -163,7 +163,7 @@ export function BackgroundCard({
       <div
         className={cn(
           compact
-            ? 'mt-0 mb-0.5 aspect-[1/0.85] rounded-lg'
+            ? 'mt-0 mb-0.5 aspect-square rounded-lg'
             : 'mt-4 mb-1 md:mt-5 md:mb-2 aspect-[1/0.75] md:aspect-[1.2/1] rounded-xl',
           'mx-auto w-full flex items-center justify-center relative overflow-hidden bg-gradient-to-br shadow-inner',
           config.gradient,

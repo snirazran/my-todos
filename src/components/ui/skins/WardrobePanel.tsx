@@ -1660,14 +1660,7 @@ function WardrobeManagerContent({
                       onPickBackground={openBgPurchase}
                     />
                   )}
-                  {activeFilter === 'all' && (
-                    <div className="mb-3">
-                      <p className="mb-2 px-1 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">
-                        Boosts
-                      </p>
-                      <StreakFreezeShopCard />
-                    </div>
-                  )}
+                  {activeFilter === 'all' && <StreakFreezeShopCard />}
                   {(() => {
                     const cards = mergeWardrobeCards(
                       shopGrid.visibleItems,

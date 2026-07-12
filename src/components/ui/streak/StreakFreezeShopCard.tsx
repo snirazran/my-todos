@@ -3,7 +3,6 @@
 import React, { useState } from 'react';
 import { Snowflake } from 'lucide-react';
 import Fly from '@/components/ui/fly';
-import { cn } from '@/lib/utils';
 import { useLoginStreak, patchStreakView } from '@/hooks/useLoginStreak';
 import { patchInventoryFlies, useInventory } from '@/hooks/useInventory';
 import { FreezePurchaseSheet } from './FreezePurchaseSheet';
@@ -18,8 +17,13 @@ export function StreakFreezeShopCard() {
   const balance = inventoryData?.wardrobe?.flies ?? 0;
   const atCap = view.freezes >= view.freezeCap;
 
+  if (atCap) return null;
+
   return (
-    <>
+    <div className="mb-3">
+      <p className="mb-2 px-1 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">
+        Boosts
+      </p>
       <button
         type="button"
         onClick={() => setBuyOpen(true)}
@@ -35,22 +39,9 @@ export function StreakFreezeShopCard() {
             {view.freezeCap} held
           </p>
         </div>
-        <span
-          className={cn(
-            'flex h-9 shrink-0 items-center justify-center gap-1 rounded-xl px-3 text-xs font-black',
-            atCap
-              ? 'bg-muted text-muted-foreground'
-              : 'bg-sky-500 text-white shadow-[0_3px_0_0_#0369a1]',
-          )}
-        >
-          {atCap ? (
-            'Full'
-          ) : (
-            <>
-              <Fly size={16} paused y={-1} />
-              {view.freezePriceFlies}
-            </>
-          )}
+        <span className="flex h-9 shrink-0 items-center justify-center gap-1 rounded-xl px-3 text-xs font-black bg-sky-500 text-white shadow-[0_3px_0_0_#0369a1]">
+          <Fly size={16} paused y={-1} />
+          {view.freezePriceFlies}
         </span>
       </button>
 
@@ -64,6 +55,6 @@ export function StreakFreezeShopCard() {
           patchInventoryFlies(flyBalance);
         }}
       />
-    </>
+    </div>
   );
 }

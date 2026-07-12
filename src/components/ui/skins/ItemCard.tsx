@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import type { ItemDef, Rarity } from '@/lib/skins/catalog';
 import Frog from '@/components/ui/frog';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GiftRive } from '@/components/ui/gift-box/GiftBox';
 
@@ -217,12 +218,14 @@ function ItemCardComponent({
   };
 
   const isSelected = (selectedCount || 0) > 0;
+  const mdUp = useMediaQuery('(min-width: 768px)');
+  const previewCanvasSize = compact ? (mdUp ? 200 : 152) : 180;
   const centerFrog =
     centerFrogPreview && item.slot !== 'container' && !customPreview;
   const frogPreviewClassName = cn(
     centerFrog
       ? compact
-        ? 'object-contain -translate-y-1'
+        ? 'shrink-0 object-contain -translate-y-2'
         : 'object-contain -translate-y-3'
       : 'w-[125%] h-[125%] object-contain translate-y-[10%] min-[375px]:translate-y-[2%] min-[425px]:-translate-y-[4%] md:-translate-y-[5%]',
     previewClassName,
@@ -316,7 +319,7 @@ function ItemCardComponent({
       <div
         className={cn(
           compact
-            ? 'mt-0 mb-0.5 aspect-[1/0.85] rounded-lg'
+            ? 'mt-0 mb-0.5 aspect-square rounded-lg'
             : 'mt-4 mb-1 md:mt-5 md:mb-2 aspect-[1/0.75] md:aspect-[1.2/1] rounded-xl',
           'mx-auto w-full flex items-center justify-center relative overflow-hidden',
           'bg-gradient-to-br shadow-inner',
@@ -357,16 +360,16 @@ function ItemCardComponent({
             <FrogSnapshot
               className={frogPreviewClassName}
               indices={previewIndices}
-              width={compact ? 224 : 180}
-              height={compact ? 224 : 180}
+              width={previewCanvasSize}
+              height={previewCanvasSize}
               visualOffsetY={centerFrog ? 0 : undefined}
             />
           ) : (
             <Frog
               className={frogPreviewClassName}
               indices={previewIndices}
-              width={compact ? 224 : 180}
-              height={compact ? 224 : 180}
+              width={previewCanvasSize}
+              height={previewCanvasSize}
               visualOffsetY={centerFrog ? 0 : undefined}
               paused={false}
             />
