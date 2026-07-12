@@ -1,13 +1,15 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { mutate } from 'swr';
+import useSWR, { mutate } from 'swr';
 import { Check, Flame, Lock, Play, Timer } from 'lucide-react';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/utils';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { TAG_COLORS } from './quick-add/constants';
+import { fetcher } from './quick-add/utils';
+import type { SavedTag } from './quick-add/types';
 import Fly from './fly';
 import { PlusUpgradeModal } from './PlusUpgradeModal';
 import {
@@ -50,9 +52,20 @@ export function QuestStartSheet({
   const lastQuestRef = useRef(quest);
   if (open && quest) lastQuestRef.current = quest;
   const activeQuest = quest ?? lastQuestRef.current;
-  const accent = activeCategory
-    ? pickTagColor(activeCategory.id)
-    : TAG_COLORS[5].value;
+  const { data: tagsData } = useSWR<{ tags?: SavedTag[] }>(
+    open ? '/api/tags' : null,
+    fetcher,
+  );
+  const existingTag = activeCategory
+    ? (tagsData?.tags ?? []).find(
+        (t) =>
+          t.name.trim().toLowerCase() ===
+          activeCategory.name.trim().toLowerCase(),
+      )
+    : undefined;
+  const accent =
+    existingTag?.color ??
+    (activeCategory ? pickTagColor(activeCategory.id) : TAG_COLORS[5].value);
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -119,6 +132,7 @@ export function QuestStartSheet({
   if (!activeCategory) return null;
 
   const name = activeCategory.name;
+  const tagLabel = existingTag?.name ?? name;
   const exampleTask =
     activeCategory.taskSuggestions?.[0] ?? `A ${name.toLowerCase()} task`;
   const loot = activeQuest ? questLoot(activeQuest) : { flies: 0, items: [] };
@@ -133,7 +147,7 @@ export function QuestStartSheet({
         borderColor: `${accent}40`,
       }}
     >
-      {name}
+      {tagLabel}
     </span>
   );
 
@@ -213,7 +227,7 @@ export function QuestStartSheet({
                       borderColor: `${accent}40`,
                     }}
                   >
-                    {name}
+                    {tagLabel}
                   </span>
                 </div>
                 <span className="text-[15px] font-semibold leading-snug text-foreground">
@@ -393,7 +407,11 @@ export function QuestStartSheet({
           </button>
           {!limitPick && (
             <p className="mt-2.5 text-center text-[12px] font-semibold leading-snug text-muted-foreground">
-              We&apos;ll add a {tagChip} tag — change it anytime.
+              {existingTag ? (
+                <>We&apos;ll use your {tagChip} tag — change it anytime.</>
+              ) : (
+                <>We&apos;ll add a {tagChip} tag — change it anytime.</>
+              )}
             </p>
           )}
           <PlusUpgradeModal

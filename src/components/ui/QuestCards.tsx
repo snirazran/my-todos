@@ -821,6 +821,7 @@ export function DailyChecklistCard({
             onClaim={onClaimStreak}
             rewardCatalog={rewardCatalog}
             isPremium={isPremium}
+            paused={paused}
           />
         ) : null}
       </div>
@@ -844,12 +845,14 @@ function DailyStreakStrip({
   onClaim,
   rewardCatalog,
   isPremium,
+  paused = false,
 }: {
   streak: DailyStreakInfo;
   claiming?: boolean;
   onClaim?: () => void;
   rewardCatalog: Record<string, QuestRewardCatalogItem>;
   isPremium: boolean;
+  paused?: boolean;
 }) {
   const length = Math.max(2, streak.targetLength);
   const cycleDay =
@@ -866,7 +869,7 @@ function DailyStreakStrip({
             rewardCatalog={rewardCatalog}
             isPremium={isPremium}
             compact
-            paused={false}
+            paused={paused}
             hideBadge={prize.type !== 'FLIES'}
             flySize={22}
             hydrateDelayMs={150}
@@ -1797,6 +1800,7 @@ export function AreaRow({
   const rentedTimeLeft = useCountdownLabel(rentedUntil ?? undefined);
   const atLeast380 = useMediaQuery('(min-width: 380px)');
   const atLeast640 = useMediaQuery('(min-width: 640px)');
+  const atLeast820 = useMediaQuery('(min-width: 820px)');
   const thumbWidthClass = atLeast640 ? 'w-[88px]' : atLeast380 ? 'w-[72px]' : 'w-14';
   const claimedObjectiveIds = quest.claimedObjectiveIds ?? [];
   const imageUrl = category?.coverImageUrl ?? quest.coverImageUrl;
@@ -1924,7 +1928,7 @@ export function AreaRow({
           </>
         ) : !finished && (loot.flies > 0 || lootTiles.length > 0) ? (
           <span className="mt-1 flex min-w-0 items-center gap-1.5">
-            {atLeast380 && (
+            {atLeast820 && (
               <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground/80">
                 worth
               </span>
@@ -2017,28 +2021,17 @@ export function AreaStartCard({
   const lootTiles = loot.items.slice(0, compact ? 1 : 2);
   const lootExtra = loot.items.length - lootTiles.length;
 
-  const ctaChip =
-    cta === 'switch' ? (
-      <span
-        className={cn(
-          'inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border-[1.5px] border-amber-500/50 bg-amber-500/10 px-3 text-[10px] font-black uppercase tracking-[0.1em] text-amber-600 transition-all active:scale-95 dark:text-amber-400',
-          compact ? 'w-full' : 'shrink-0 px-4',
-        )}
-      >
-        <Play className="h-3.5 w-3.5 fill-current" />
-        Activate
-      </span>
-    ) : (
-      <span
-        className={cn(
-          'inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-amber-500 px-3 text-[11px] font-black uppercase tracking-[0.12em] text-white shadow-[0_3px_0_0_#b45309] transition-all active:translate-y-[2px] active:shadow-none',
-          compact ? 'w-full' : 'shrink-0 px-4',
-        )}
-      >
-        <Play className="h-3.5 w-3.5 fill-current" />
-        Start
-      </span>
-    );
+  const ctaChip = (
+    <span
+      className={cn(
+        'inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-amber-500 px-3 text-[11px] font-black uppercase tracking-[0.12em] text-white shadow-[0_3px_0_0_#b45309] transition-all active:translate-y-[2px] active:shadow-none',
+        compact ? 'w-full' : 'shrink-0 px-4',
+      )}
+    >
+      <Play className="h-3.5 w-3.5 fill-current" />
+      {cta === 'switch' ? 'Activate' : 'Start'}
+    </span>
+  );
 
   const worth = (loot.flies > 0 || lootTiles.length > 0) && (
     <span className="flex min-w-0 items-center gap-1.5">

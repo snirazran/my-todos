@@ -2180,7 +2180,7 @@ function QuestSeasonEventOverlay({
   const previewDay = Math.min(season.dayCount, season.currentDay + 10);
 
   return createPortal(
-    <div className="fixed inset-0 z-[1200] flex flex-col bg-background md:overflow-hidden">
+    <div className="fixed inset-0 z-[1200] flex flex-col overflow-x-hidden bg-background md:overflow-hidden">
       <div className="relative h-[230px] shrink-0 overflow-hidden md:h-[220px] [@media(max-height:820px)]:md:h-[180px] [@media(max-height:720px)]:md:h-[140px]">
           {hasSeasonCover(season.images) ? (
             <SeasonCoverImage
@@ -2212,7 +2212,7 @@ function QuestSeasonEventOverlay({
               {season.name}
             </h2>
           </div>
-          <div className="pointer-events-none absolute inset-x-0 bottom-10 mx-auto flex max-w-2xl items-center justify-between gap-3 px-5 md:bottom-12">
+          <div className="pointer-events-none absolute inset-x-0 bottom-10 mx-auto flex max-w-2xl items-center justify-between gap-2 px-4 md:bottom-12 [@media(min-width:400px)]:gap-3 [@media(min-width:400px)]:px-5">
             <div className="pointer-events-auto inline-flex h-10 items-center gap-2.5 rounded-full border border-white/20 bg-black/50 py-1 pl-1.5 pr-4 text-white shadow-[0_6px_20px_rgba(0,0,0,0.35)] backdrop-blur-md">
               <span
                 className={cn(
@@ -2236,7 +2236,7 @@ function QuestSeasonEventOverlay({
                 type="button"
                 onClick={onUpgrade}
                 aria-label="Unlock Frog Plus"
-                className="group pointer-events-auto relative isolate inline-flex h-12 items-center gap-2.5 rounded-2xl pl-3 pr-2 text-emerald-950 shadow-[0_12px_32px_-6px_rgba(217,119,6,0.55)] ring-2 ring-amber-200/80 transition-transform duration-150 hover:-translate-y-0.5 hover:shadow-[0_16px_36px_-6px_rgba(217,119,6,0.7)] active:translate-y-0 active:scale-[0.97]"
+                className="group pointer-events-auto relative isolate inline-flex h-12 min-w-0 items-center gap-1.5 rounded-2xl pl-2 pr-2 text-emerald-950 shadow-[0_12px_32px_-6px_rgba(217,119,6,0.55)] ring-2 ring-amber-200/80 transition-transform duration-150 hover:-translate-y-0.5 hover:shadow-[0_16px_36px_-6px_rgba(217,119,6,0.7)] active:translate-y-0 active:scale-[0.97] [@media(min-width:400px)]:gap-2.5 [@media(min-width:400px)]:pl-3"
               >
                 <span
                   aria-hidden
@@ -2247,16 +2247,16 @@ function QuestSeasonEventOverlay({
                   className="animate-shimmer absolute inset-0 -z-10 overflow-hidden rounded-2xl bg-[linear-gradient(110deg,transparent_35%,rgba(255,255,255,0.7)_50%,transparent_65%)] bg-[length:200%_100%] mix-blend-overlay"
                 />
                 <span aria-hidden className="absolute inset-x-0 top-0 -z-10 h-1/2 rounded-t-2xl bg-gradient-to-b from-white/45 to-transparent" />
-                <span className="-my-8 -ml-2 -translate-y-2 inline-flex">
+                <span className="-my-8 -ml-2 -translate-y-2 inline-flex shrink-0">
                   <Icon
                     name="frogPlus"
-                    className="h-20 w-20 drop-shadow-[0_4px_0_rgba(31,98,28,0.35)] animate-wiggle [animation-duration:1.6s]"
+                    className="h-16 w-16 drop-shadow-[0_4px_0_rgba(31,98,28,0.35)] animate-wiggle [animation-duration:1.6s] [@media(min-width:400px)]:h-20 [@media(min-width:400px)]:w-20"
                   />
                 </span>
-                <span className="text-[12px] font-black uppercase tracking-[0.22em] text-emerald-900 drop-shadow-[0_1px_0_rgba(255,255,255,0.5)]">
+                <span className="hidden text-[12px] font-black uppercase tracking-[0.14em] text-emerald-900 drop-shadow-[0_1px_0_rgba(255,255,255,0.5)] [@media(min-width:360px)]:inline [@media(min-width:400px)]:tracking-[0.22em]">
                   Unlock
                 </span>
-                <span className="ml-0.5 inline-flex items-center rounded-lg bg-gradient-to-b from-emerald-600 to-emerald-800 px-2 py-1.5 text-[11px] font-black uppercase leading-none tracking-[0.18em] text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_2px_4px_rgba(0,0,0,0.25)] ring-1 ring-emerald-900/40">
+                <span className="ml-0.5 inline-flex shrink-0 items-center rounded-lg bg-gradient-to-b from-emerald-600 to-emerald-800 px-2 py-1.5 text-[11px] font-black uppercase leading-none tracking-[0.18em] text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_2px_4px_rgba(0,0,0,0.25)] ring-1 ring-emerald-900/40">
                   Plus
                 </span>
               </button>
@@ -2366,36 +2366,36 @@ function QuestSeasonEventOverlay({
           <div className="mx-auto min-h-full max-w-2xl bg-background md:mx-0 md:h-full md:max-w-none md:min-w-full md:bg-transparent md:px-12 md:pt-0 md:pb-0 md:flex md:flex-col md:justify-center [@media(max-height:820px)]:md:px-8 [@media(max-height:720px)]:md:px-6">
             <div className="relative z-10 mx-auto max-w-2xl bg-background md:mx-0 md:max-w-none md:rounded-t-[48px] md:border-0">
 
-        <div className="px-4 pb-5 pt-5 md:pt-4">
+        <div className="px-4 pb-5 pt-5 md:pt-4 [@media(max-width:379px)]:px-2">
           <div className="text-foreground">
-            <div className="grid h-12 grid-cols-[1fr_auto_1fr] items-center gap-2 md:hidden">
-              <div className="flex h-10 items-center justify-center rounded-xl border border-primary/25 bg-primary/10 px-4 text-[11px] font-black uppercase tracking-[0.18em] text-primary">
+            <div className="grid h-12 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 md:hidden">
+              <div className="flex h-10 min-w-0 items-center justify-center rounded-xl border border-primary/25 bg-primary/10 px-4 text-[11px] font-black uppercase tracking-[0.18em] text-primary">
                 <span>Free</span>
               </div>
-              <div className="w-10" />
+              <div className="w-8 [@media(min-width:400px)]:w-10" />
               <button
                 type="button"
                 onClick={isPremium ? undefined : onUpgrade}
                 disabled={isPremium}
                 aria-label="Frog Plus"
-                className="group relative isolate flex h-10 items-center justify-center gap-2 rounded-xl pl-2 pr-1.5 text-[11px] font-black uppercase tracking-[0.18em] text-emerald-900 ring-2 ring-amber-200/80 transition-transform enabled:hover:-translate-y-0.5 enabled:active:translate-y-0 enabled:active:scale-[0.98] disabled:cursor-default"
+                className="group relative isolate flex h-10 min-w-0 items-center justify-center gap-1 rounded-xl pl-2 pr-1.5 text-[11px] font-black uppercase tracking-[0.1em] text-emerald-900 ring-2 ring-amber-200/80 transition-transform enabled:hover:-translate-y-0.5 enabled:active:translate-y-0 enabled:active:scale-[0.98] disabled:cursor-default [@media(min-width:400px)]:gap-2 [@media(min-width:400px)]:tracking-[0.18em]"
               >
                 <span
                   aria-hidden
                   className="absolute inset-0 -z-10 rounded-xl bg-[linear-gradient(125deg,#fde68a_0%,#fbbf24_45%,#f59e0b_75%,#d97706_100%)]"
                 />
                 <span aria-hidden className="absolute inset-x-0 top-0 -z-10 h-1/2 rounded-t-xl bg-gradient-to-b from-white/45 to-transparent" />
-                <span className="-my-6 -ml-2 -translate-y-1 inline-flex">
-                  <Icon name="frogPlus" className="h-16 w-16 drop-shadow-[0_2px_0_rgba(31,98,28,0.35)]" />
+                <span className="-my-6 -ml-2 -translate-y-1 inline-flex shrink-0">
+                  <Icon name="frogPlus" className="h-12 w-12 drop-shadow-[0_2px_0_rgba(31,98,28,0.35)] [@media(min-width:400px)]:h-16 [@media(min-width:400px)]:w-16" />
                 </span>
-                <span className="drop-shadow-[0_1px_0_rgba(255,255,255,0.5)]">Frog</span>
-                <span className="ml-0.5 inline-flex items-center rounded-md bg-gradient-to-b from-emerald-600 to-emerald-800 px-1.5 py-1 text-[10px] font-black uppercase leading-none tracking-[0.16em] text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_2px_3px_rgba(0,0,0,0.22)] ring-1 ring-emerald-900/40">
+                <span className="hidden drop-shadow-[0_1px_0_rgba(255,255,255,0.5)] [@media(min-width:360px)]:inline">Frog</span>
+                <span className="ml-0.5 inline-flex shrink-0 items-center rounded-md bg-gradient-to-b from-emerald-600 to-emerald-800 px-1.5 py-1 text-[10px] font-black uppercase leading-none tracking-[0.16em] text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_2px_3px_rgba(0,0,0,0.22)] ring-1 ring-emerald-900/40">
                   Plus
                 </span>
               </button>
             </div>
 
-            <div ref={timelineRef} className="relative mt-4 rounded-[20px] border border-border/40 bg-muted/40 p-3 md:mt-0 md:border-0 md:bg-transparent md:p-0 md:py-12 md:w-fit md:min-w-full [@media(max-height:820px)]:md:py-8 [@media(max-height:720px)]:md:py-5">
+            <div ref={timelineRef} className="relative mt-4 rounded-[20px] border border-border/40 bg-muted/40 p-3 md:mt-0 md:border-0 md:bg-transparent md:p-0 md:py-12 md:w-fit md:min-w-full [@media(max-width:379px)]:p-1.5 [@media(max-height:820px)]:md:py-8 [@media(max-height:720px)]:md:py-5">
               <div className="absolute bottom-0 left-1/2 top-0 z-0 w-2 -translate-x-1/2 rounded-full bg-border/60 md:left-0 md:right-0 md:top-1/2 md:h-2 md:w-auto md:-translate-y-1/2 md:translate-x-0" />
               <div
                 className="absolute left-1/2 top-0 z-0 w-1 -translate-x-1/2 rounded-full bg-primary shadow-[0_0_14px_rgba(34,197,94,0.28)] md:left-0 md:top-1/2 md:h-1 md:-translate-y-1/2 md:translate-x-0"
@@ -2416,13 +2416,13 @@ function QuestSeasonEventOverlay({
                       key={entry.day}
                       ref={isPreviewStart ? futureDayRowRef : undefined}
                       className={cn(
-                        'relative grid grid-cols-[minmax(0,1fr)_3rem_minmax(0,1fr)] items-center rounded-3xl px-1 py-2 transition-all duration-300 md:flex md:flex-col md:w-[180px] md:shrink-0 md:px-0 md:py-4 [@media(max-height:820px)]:md:w-[150px] [@media(max-height:720px)]:md:w-[124px] [@media(max-height:620px)]:md:w-[104px]',
+                        'relative grid grid-cols-[minmax(0,1fr)_3rem_minmax(0,1fr)] items-center rounded-3xl px-1 py-2 transition-all duration-300 [@media(max-width:379px)]:grid-cols-[minmax(0,1fr)_2.5rem_minmax(0,1fr)] [@media(max-width:379px)]:px-0.5 md:flex md:flex-col md:w-[180px] md:shrink-0 md:px-0 md:py-4 [@media(max-height:820px)]:md:w-[150px] [@media(max-height:720px)]:md:w-[124px] [@media(max-height:620px)]:md:w-[104px]',
                         isCurrent
                           ? 'bg-primary/5 ring-1 ring-primary/15'
                           : 'hover:bg-muted/30',
                       )}
                     >
-                      <div className="flex w-full justify-center pr-2 sm:pr-3 md:pr-0 md:pb-8 [@media(max-height:820px)]:md:pb-5 [@media(max-height:720px)]:md:pb-3">
+                      <div className="flex w-full justify-center pr-2 sm:pr-3 md:pr-0 md:pb-8 [@media(max-width:379px)]:pr-1 [@media(max-height:820px)]:md:pb-5 [@media(max-height:720px)]:md:pb-3">
                         <div className="w-full max-w-[170px] md:max-w-none">
                           {freeReward ? (
                             <SingleRewardCard
@@ -2459,12 +2459,12 @@ function QuestSeasonEventOverlay({
 
                       <div className="relative z-20 flex justify-center md:h-14 md:w-full md:items-center [@media(max-height:820px)]:md:h-10 [@media(max-height:720px)]:md:h-8">
                         {isCurrent && (
-                          <span className="absolute left-1/2 top-1/2 h-14 w-14 -translate-x-1/2 -translate-y-1/2 rounded-[20px] bg-primary/20 animate-ping-ring md:h-16 md:w-16 [@media(max-height:820px)]:md:h-12 [@media(max-height:820px)]:md:w-12" />
+                          <span className="absolute left-1/2 top-1/2 h-14 w-14 -translate-x-1/2 -translate-y-1/2 rounded-[20px] bg-primary/20 animate-ping-ring md:h-16 md:w-16 [@media(max-width:379px)]:h-12 [@media(max-width:379px)]:w-12 [@media(max-width:379px)]:rounded-[16px] [@media(max-height:820px)]:md:h-12 [@media(max-height:820px)]:md:w-12" />
                         )}
                         <div
                           ref={isCurrent ? currentDayRef : undefined}
                           className={cn(
-                            'relative z-10 flex h-12 w-12 flex-col items-center justify-center rounded-[18px] leading-none [@media(max-height:820px)]:md:h-10 [@media(max-height:820px)]:md:w-10 [@media(max-height:820px)]:md:rounded-[14px] [@media(max-height:720px)]:md:h-8 [@media(max-height:720px)]:md:w-8 [@media(max-height:720px)]:md:rounded-xl',
+                            'relative z-10 flex h-12 w-12 flex-col items-center justify-center rounded-[18px] leading-none [@media(max-width:379px)]:h-10 [@media(max-width:379px)]:w-10 [@media(max-width:379px)]:rounded-[14px] [@media(max-height:820px)]:md:h-10 [@media(max-height:820px)]:md:w-10 [@media(max-height:820px)]:md:rounded-[14px] [@media(max-height:720px)]:md:h-8 [@media(max-height:720px)]:md:w-8 [@media(max-height:720px)]:md:rounded-xl',
                             isCurrent
                               ? 'bg-primary text-primary-foreground shadow-[0_4px_0_rgba(0,0,0,0.18)] ring-2 ring-background'
                               : isClaimed
@@ -2476,10 +2476,10 @@ function QuestSeasonEventOverlay({
                             <Check className="h-5 w-5" strokeWidth={4} />
                           ) : (
                             <>
-                              <span className="text-[9px] font-black uppercase tracking-[0.15em] opacity-95 [@media(max-height:720px)]:md:text-[7px]">
+                              <span className="text-[9px] font-black uppercase tracking-[0.15em] opacity-95 [@media(max-width:379px)]:text-[8px] [@media(max-width:379px)]:tracking-[0.1em] [@media(max-height:720px)]:md:text-[7px]">
                                 Day
                               </span>
-                              <span className="text-lg font-black tabular-nums [@media(max-height:820px)]:md:text-base [@media(max-height:720px)]:md:text-sm">
+                              <span className="text-lg font-black tabular-nums [@media(max-width:379px)]:text-base [@media(max-height:820px)]:md:text-base [@media(max-height:720px)]:md:text-sm">
                                 {entry.day}
                               </span>
                             </>
@@ -2487,7 +2487,7 @@ function QuestSeasonEventOverlay({
                         </div>
                       </div>
 
-                      <div className="flex w-full justify-center pl-2 sm:pl-3 md:pl-0 md:pt-8 [@media(max-height:820px)]:md:pt-5 [@media(max-height:720px)]:md:pt-3">
+                      <div className="flex w-full justify-center pl-2 sm:pl-3 md:pl-0 md:pt-8 [@media(max-width:379px)]:pl-1 [@media(max-height:820px)]:md:pt-5 [@media(max-height:720px)]:md:pt-3">
                         <div
                           className="relative w-full max-w-[170px] md:max-w-none"
                         >
