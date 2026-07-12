@@ -36,15 +36,16 @@ async function openNativeGoogleSignIn() {
       }
       if (!googleScreenOpened) return;
 
-      // Give the native plugin a short window to deliver a successful result.
-      // Some SDK versions otherwise leave their promise pending after cancel.
+      // Fallback for SDK versions that leave their promise pending after
+      // cancel. Must be generous: after the browser sheet closes, the SDK
+      // still exchanges the auth code over the network before resolving.
       returnedWithoutResult = setTimeout(() => {
         const error = Object.assign(
           new Error('Native Google sign-in was cancelled'),
           { code: 'auth/popup-closed-by-user' },
         );
         rejectAfterReturn?.(error);
-      }, 1200);
+      }, 8000);
     },
   );
 

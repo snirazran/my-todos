@@ -17,6 +17,7 @@ import { useRegisterOpenSheet } from '@/lib/sheetStore';
 import { useUIStore } from '@/lib/uiStore';
 import { clearSessionCookie } from '@/lib/authCookie';
 import { signOutNativeGoogle } from '@/lib/googleAuth';
+import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { useInventory } from '@/hooks/useInventory';
 import IntegrationsPanel, {
   useCalendarConnections,
@@ -407,6 +408,7 @@ function RightActions({
   compactMobileHome?: boolean;
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const { theme, resolvedTheme, setTheme } = useTheme();
   const activeTheme = resolvedTheme ?? theme;
   const router = useRouter();
@@ -418,6 +420,7 @@ function RightActions({
   // No click-outside listener needed — the settings sheet covers the entire viewport.
 
   const handleSignOut = async () => {
+    setSigningOut(true);
     await Promise.allSettled([
       auth ? signOut(auth) : Promise.resolve(),
       clearSessionCookie(),
@@ -456,13 +459,29 @@ function RightActions({
         ? 'text-violet-400'
         : 'text-amber-500';
 
+  const signOutOverlay =
+    signingOut && typeof document !== 'undefined'
+      ? createPortal(
+          <div className="fixed inset-0 z-[200]">
+            <LoadingScreen />
+          </div>,
+          document.body,
+        )
+      : null;
+
   if (loading)
-    return <div className="w-8 h-8 rounded-full bg-muted animate-pulse" />;
+    return (
+      <>
+        {signOutOverlay}
+        <div className="w-8 h-8 rounded-full bg-muted animate-pulse" />
+      </>
+    );
 
   // NOT AUTHENTICATED
   if (!user) {
     return (
       <div className="flex items-center gap-2">
+        {signOutOverlay}
         {/* Desktop: Theme Toggle adjacent to Sign In */}
         <div className="hidden md:block">
           <ThemeToggle />
@@ -497,6 +516,7 @@ function RightActions({
   // AUTHENTICATED
   return (
     <div className="relative" ref={menuRef}>
+      {signOutOverlay}
       {/* Desktop Trigger */}
       <button
         onClick={() => setIsOpen(!isOpen)}

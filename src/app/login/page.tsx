@@ -13,8 +13,13 @@ import { GoogleIcon } from '@/components/ui/GoogleIcon';
 import { establishSessionCookie } from '@/lib/authCookie';
 import { createEmailLinkSettings } from '@/lib/emailLinkSettings';
 import { useEffect, useRef, useState } from 'react';
-import { Loader2, ArrowLeft, ArrowRight } from 'lucide-react';
-import { motion, AnimatePresence, useAnimationControls } from 'framer-motion';
+import { Loader2, ArrowRight } from 'lucide-react';
+import {
+  motion,
+  AnimatePresence,
+  useAnimationControls,
+  useReducedMotion,
+} from 'framer-motion';
 import { Input } from '@/components/ui/input';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
@@ -52,12 +57,36 @@ const slide = {
   exit: (dir: number) => ({ x: dir * -50, opacity: 0 }),
 };
 
+const ENTER_CONTAINER = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.09, delayChildren: 0.05 } },
+} as const;
+
+const ENTER_ITEM = {
+  hidden: { opacity: 0, y: 14 },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] },
+  },
+} as const;
+
+const ENTER_FROG = {
+  hidden: { opacity: 0, y: 24 },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: { type: 'spring', stiffness: 220, damping: 17 },
+  },
+} as const;
+
 const EMAIL_LINK_STORAGE_KEY = 'emailForSignIn';
 
 function LoginPageInner() {
   const searchParams = useSearchParams();
   const { user: authUser } = useAuth();
   const { showNotification } = useNotification();
+  const reduceMotion = useReducedMotion();
   const navigatedRef = useRef(false);
   const isUpgrade = searchParams?.get('upgrade') === '1';
   const [step, setStep] = useState<Step>('enter');
@@ -256,41 +285,40 @@ function LoginPageInner() {
 
   return (
     <main className="fixed inset-0 flex flex-col items-center justify-center overflow-hidden bg-background px-6 py-10">
-      {/* Back to welcome */}
-      <Link
-        href="/welcome"
-        aria-label="Back"
-        className="absolute left-5 top-[calc(1.25rem+env(safe-area-inset-top))] z-50 flex h-10 w-10 items-center justify-center rounded-full border border-border/60 bg-background text-muted-foreground transition hover:bg-muted"
+      <motion.div
+        variants={ENTER_CONTAINER}
+        initial={reduceMotion ? false : 'hidden'}
+        animate="show"
+        className="flex w-full max-w-sm origin-center flex-col items-center md:scale-110 xl:scale-125"
       >
-        <ArrowLeft className="h-4 w-4" />
-      </Link>
-
-      <div className="flex w-full max-w-sm origin-center flex-col items-center md:scale-110 xl:scale-125">
         {/* Frogress wordmark — curved, matching the loading screen */}
-        <svg
-          aria-label="Frogress"
-          role="img"
-          viewBox="0 0 220 34"
-          className="mb-2 h-12 w-[300px] overflow-visible text-foreground"
-        >
-          <path id="login-brand-arc" d="M 36 22 Q 110 6 184 22" fill="none" />
-          <text
-            fill="currentColor"
-            fontSize="20"
-            fontWeight="800"
-            textAnchor="middle"
-            style={{
-              fontFamily:
-                '"Arial Rounded MT Bold", "Avenir Next Rounded", ui-rounded, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-            }}
+        <motion.div variants={ENTER_ITEM}>
+          <svg
+            aria-label="Frogress"
+            role="img"
+            viewBox="0 0 220 34"
+            className="mb-2 h-12 w-[300px] overflow-visible text-foreground"
           >
-            <textPath href="#login-brand-arc" startOffset="50%">
-              Frogress
-            </textPath>
-          </text>
-        </svg>
+            <path id="login-brand-arc" d="M 36 22 Q 110 6 184 22" fill="none" />
+            <text
+              fill="currentColor"
+              fontSize="20"
+              fontWeight="800"
+              textAnchor="middle"
+              style={{
+                fontFamily:
+                  '"Arial Rounded MT Bold", "Avenir Next Rounded", ui-rounded, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+              }}
+            >
+              <textPath href="#login-brand-arc" startOffset="50%">
+                Frogress
+              </textPath>
+            </text>
+          </svg>
+        </motion.div>
 
         {/* Frog mascot — sits on top of the email input, fly buzzing above. No container. */}
+        <motion.div variants={ENTER_FROG} className="relative z-10 w-full">
         <div className="pointer-events-none relative z-10 flex w-full translate-y-[11px] flex-col items-center">
           {!flyCaught && flyState !== 'hidden' && (
             <motion.div
@@ -335,20 +363,24 @@ function LoginPageInner() {
             />
           </div>
         </div>
+        </motion.div>
 
         {isUpgrade && (
-          <div className="mt-5 w-full rounded-2xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-center shadow-sm dark:border-amber-500/30 dark:bg-amber-500/10">
+          <motion.div
+            variants={ENTER_ITEM}
+            className="mt-5 w-full rounded-2xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-center shadow-sm dark:border-amber-500/30 dark:bg-amber-500/10"
+          >
             <p className="text-sm font-black text-amber-900 dark:text-amber-200">
               You&apos;re in Guest Mode
             </p>
             <p className="mt-0.5 text-xs font-medium text-amber-800/90 dark:text-amber-100/80">
               Create an account to save your progress — your pet and data will be kept.
             </p>
-          </div>
+          </motion.div>
         )}
 
         {/* Step content */}
-        <div className="w-full">
+        <motion.div variants={ENTER_ITEM} className="relative z-0 w-full">
           <AnimatePresence mode="wait" custom={dir}>
             {step === 'enter' && (
               <motion.div
@@ -449,9 +481,12 @@ function LoginPageInner() {
               </motion.div>
             )}
           </AnimatePresence>
-        </div>
+        </motion.div>
 
-        <p className="mt-8 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+        <motion.p
+          variants={ENTER_ITEM}
+          className="mt-8 text-[11px] font-bold uppercase tracking-wider text-muted-foreground"
+        >
           No frog yet?{' '}
           <Link
             href="/welcome"
@@ -459,8 +494,8 @@ function LoginPageInner() {
           >
             Adopt one
           </Link>
-        </p>
-      </div>
+        </motion.p>
+      </motion.div>
 
       {/* Tongue overlay — driven directly by the RAF loop in useFrogTongue */}
       {grab && (

@@ -342,7 +342,7 @@ export function HintButton({ text }: { text: string }) {
 
 export function objectiveCardTone(complete: boolean) {
   return complete
-    ? 'border-lime-500/40 bg-lime-100/60 dark:border-lime-500/25 dark:bg-lime-500/10'
+    ? 'border-lime-500/40 bg-lime-100/80 dark:border-lime-500/25 dark:bg-lime-500/15'
     : 'border-border/50 bg-card';
 }
 

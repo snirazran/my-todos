@@ -78,7 +78,7 @@ export function NextQuestStrip({
         !!claimable,
       )} ${
         claimable
-          ? 'hover:bg-lime-100/80 dark:hover:bg-lime-500/15'
+          ? 'hover:bg-lime-100 dark:hover:bg-lime-500/20'
           : 'hover:bg-muted/40'
       }`}
     >
