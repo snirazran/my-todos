@@ -56,6 +56,7 @@ import { QuestOnboardingPopup } from '@/components/ui/QuestOnboardingPopup';
 import { StyleShuffleHeaderButton } from '@/components/ui/SkinRotation';
 import { StreakChip } from '@/components/ui/streak/StreakChip';
 import { FlyCounter } from '@/components/ui/FlyCounter';
+import { MobileHeaderActions } from '@/components/ui/MobileHeaderActions';
 import { NextQuestStrip } from '@/components/ui/NextQuestStrip';
 import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
 import { BuddyNudgeCard } from '@/components/ui/BuddyNudgeCard';
@@ -511,7 +512,7 @@ export default function Home() {
   return (
     <main className="relative min-h-screen pb-20 overflow-x-hidden md:pb-8">
       {user && (
-        <div className="absolute right-4 top-[calc(env(safe-area-inset-top)+0.5rem)] z-30 flex items-center gap-2 md:hidden">
+        <MobileHeaderActions>
           <StyleShuffleHeaderButton />
           <StreakChip variant="mobile" />
           <FlyCounter
@@ -519,7 +520,7 @@ export default function Home() {
             variant="mobile"
             onClick={openFlyShop}
           />
-        </div>
+        </MobileHeaderActions>
       )}
       <div className="px-3 pt-[calc(3rem+env(safe-area-inset-top))] pb-4 mx-auto max-w-4xl md:px-6 md:pt-12">
         <Header router={router} />

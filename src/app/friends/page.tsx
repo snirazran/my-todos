@@ -44,6 +44,7 @@ import { RARITY_CONFIG } from '@/components/ui/gift-box/constants';
 import { mutateInventoryCaches, useInventory } from '@/hooks/useInventory';
 import { markFlyEarn } from '@/lib/flyEarn';
 import { FlyCounter } from '@/components/ui/FlyCounter';
+import { MobileHeaderActions } from '@/components/ui/MobileHeaderActions';
 import { useUIStore } from '@/lib/uiStore';
 import { showRewardedAd } from '@/lib/ads';
 import type { ItemDef } from '@/lib/skins/catalog';
@@ -162,7 +163,10 @@ export default function FriendsPage() {
     <main className="relative min-h-[100dvh] overflow-x-hidden pb-24 md:pb-12">
       <div className="relative z-10 mx-auto flex w-full flex-col items-center px-4 pt-[calc(env(safe-area-inset-top)+0.5rem)] md:max-w-2xl md:pt-11">
         {/* Friend invites — persistent, over the winter scene */}
-        <div className="absolute right-4 top-[calc(env(safe-area-inset-top)+0.75rem)] z-30 flex items-center gap-2">
+        <MobileHeaderActions
+          visibleOnDesktop
+          className="md:absolute md:top-[calc(env(safe-area-inset-top)+0.75rem)]"
+        >
           <StyleShuffleHeaderButton className="border-0 bg-card/90 shadow-md ring-1 ring-border/60 md:hidden" />
           <button
             type="button"
@@ -186,7 +190,7 @@ export default function FriendsPage() {
               />
             </div>
           )}
-        </div>
+        </MobileHeaderActions>
 
         {/* Self frog */}
         <SelfFrog

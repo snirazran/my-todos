@@ -328,14 +328,13 @@ export function PlusWelcomeCelebration({ onDone }: { onDone: () => void }) {
           ))}
         </div>
 
-        <motion.button
-          {...reveal(0.3 + PLUS_WELCOME_HIGHLIGHTS.length * 0.12 + 0.1)}
+        <button
           type="button"
           onClick={onDone}
           className="mt-[clamp(.875rem,2.5dvh,1.5rem)] w-full max-w-[19rem] rounded-2xl bg-amber-500 py-[clamp(.7rem,1.6dvh,.875rem)] text-base font-black tracking-tight text-white shadow-[0_5px_0_0_#b45309] transition-all hover:bg-amber-400 active:translate-y-1 active:shadow-none"
         >
           Let&apos;s go!
-        </motion.button>
+        </button>
       </motion.div>
     </motion.div>
   );

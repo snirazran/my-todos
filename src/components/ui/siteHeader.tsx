@@ -36,6 +36,7 @@ import { motion, AnimatePresence, useAnimationControls } from 'framer-motion';
 import { ChevronRight } from 'lucide-react';
 import Fly from '@/components/ui/fly';
 import { FlyCounter } from '@/components/ui/FlyCounter';
+import { MobileHeaderActions } from '@/components/ui/MobileHeaderActions';
 import { StreakChip } from '@/components/ui/streak/StreakChip';
 import { PremiumBadge } from '@/components/ui/PremiumBadge';
 import { PremiumFrogAura } from '@/components/ui/PremiumFrogAura';
@@ -166,13 +167,7 @@ export default function SiteHeader() {
       {pathname === '/wardrobe' &&
         user &&
         flyBalance !== undefined && (
-          <div
-            className={cn(
-              'fixed right-4 top-[calc(env(safe-area-inset-top)+0.5rem)] z-[90] flex items-center gap-2 px-2 py-1 md:hidden',
-              isLoadingScreenVisible && 'pointer-events-none',
-            )}
-            aria-disabled={isLoadingScreenVisible}
-          >
+          <MobileHeaderActions disabled={isLoadingScreenVisible}>
             <StyleShuffleHeaderButton />
             <StreakChip variant="mobile" />
             <FlyCounter
@@ -180,7 +175,7 @@ export default function SiteHeader() {
               variant="mobile"
               onClick={openFlyShop}
             />
-          </div>
+          </MobileHeaderActions>
         )}
       <header
         className={cn(
