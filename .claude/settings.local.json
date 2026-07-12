@@ -300,7 +300,8 @@
       "PowerShell(npx tsc --noEmit 2>$null | Select-String -Pattern \"QuestCards|QuestsPanel\" ; \"exit: $LASTEXITCODE\")",
       "PowerShell(npx tsc --noEmit 2>$null | Select-String -Pattern \"QuestCards|QuestsPanel|globals\" ; \"exit: $LASTEXITCODE\")",
       "PowerShell(npx tsc --noEmit 2>$null | Select-String -Pattern \"QuestCards|QuestsPanel|NextQuestStrip|questClaims|TaskList\" ; \"exit: $LASTEXITCODE\")",
-      "PowerShell(npx tsc --noEmit 2>$null | Select-String -Pattern \"QuestCards|NextQuestStrip|questClaims|TaskList|BuddyNudge|metricLabels|api\" ; \"exit: $LASTEXITCODE\")"
+      "PowerShell(npx tsc --noEmit 2>$null | Select-String -Pattern \"QuestCards|NextQuestStrip|questClaims|TaskList|BuddyNudge|metricLabels|api\" ; \"exit: $LASTEXITCODE\")",
+      "WebFetch(domain:capgo.app)"
     ]
   }
 }

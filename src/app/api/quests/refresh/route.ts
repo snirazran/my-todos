@@ -15,6 +15,7 @@ export async function POST(req: NextRequest) {
       userId,
       timezone,
       refreshDaily: scope === 'daily',
+      refreshFocus: scope === 'focus',
       dailySelectionSeed: scope === 'daily' ? `${Date.now()}` : undefined,
     });
 

@@ -1007,12 +1007,13 @@ export async function syncQuestState(args: {
   includeCatalog?: boolean;
   includeCategories?: boolean;
   refreshDaily?: boolean;
+  refreshFocus?: boolean;
   dailySelectionSeed?: string;
 }) {
   const { userId, timezone } = args;
   const includeCatalog = args.includeCatalog ?? true;
   const includeCategories = args.includeCategories ?? true;
-  const [user, tasks, catalog, templates, categories, allExistingDocs, recipes] = await Promise.all([
+  const [user, tasks, catalog, templates, categories, loadedDocs, recipes] = await Promise.all([
     UserModel.findById(userId).lean<UserDoc | null>(),
     TaskModel.find(
       { userId, deletedAt: { $exists: false } },
@@ -1050,12 +1051,25 @@ export async function syncQuestState(args: {
   const todayKey = getZonedToday(timezone);
   const visibilityMetrics = buildVisibilityMetrics(user, tasks, todayKey);
 
+  // Refresh scopes delete the live docs AND drop them from the in-memory
+  // list, otherwise the stale docs would be treated as frozen rolls and the
+  // quests would come back unchanged.
+  let allExistingDocs = loadedDocs;
   if (args.refreshDaily) {
     await QuestModel.deleteMany({
       userId,
       placement: 'daily',
       windowKey: todayKey,
     });
+    allExistingDocs = allExistingDocs.filter(
+      (doc) => !(doc.placement === 'daily' && doc.windowKey === todayKey),
+    );
+  }
+  if (args.refreshFocus) {
+    await QuestModel.deleteMany({ userId, placement: 'category' });
+    allExistingDocs = allExistingDocs.filter(
+      (doc) => doc.placement !== 'category',
+    );
   }
 
   const filteredTemplates = [...templates]

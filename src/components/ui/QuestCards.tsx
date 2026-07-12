@@ -2238,8 +2238,11 @@ function ObjectiveRow({
     return <HintButton text={objectiveHintText(block, linkedTags?.[0]?.name)} />;
   };
 
-  const firstReward = hasRewards ? block.rewards![0] : null;
-  const extraRewardCount = hasRewards ? block.rewards!.length - 1 : 0;
+  const objectiveRewards = hasRewards
+    ? sortStreakPrizes(block.rewards!, rewardCatalog)
+    : [];
+  const shownRewards = objectiveRewards.slice(0, 3);
+  const extraRewardCount = objectiveRewards.length - shownRewards.length;
 
   return (
     <div
@@ -2251,25 +2254,53 @@ function ObjectiveRow({
       aria-disabled={needsTag || undefined}
     >
       <div className="flex items-center gap-2 sm:gap-2.5">
-        {firstReward ? (
-          <div className="relative shrink-0">
-            <RewardTile
-              reward={firstReward}
-              rewardCatalog={rewardCatalog}
-              isPremium={isPremium ?? false}
-              compact
-              paused={paused}
-              className="h-11 w-11 rounded-xl min-[400px]:h-12 min-[400px]:w-12"
-              hydrateDelayMs={150}
-              giftAnimation="box_shake"
-              onClick={() => onOpenRewards?.(block.rewards ?? [])}
-            />
+        {shownRewards.length > 0 ? (
+          <button
+            type="button"
+            onClick={() => onOpenRewards?.(objectiveRewards)}
+            aria-label="See objective rewards"
+            className="relative flex shrink-0 cursor-pointer items-center py-1"
+          >
+            {shownRewards.map((reward, i) => {
+              const centerOffset = i - (shownRewards.length - 1) / 2;
+              return (
+                <div
+                  key={`${reward.type}-${reward.itemId ?? reward.backgroundId ?? reward.amount ?? i}`}
+                  className="relative"
+                  style={{
+                    marginLeft: i === 0 ? 0 : -6,
+                    transform:
+                      shownRewards.length > 1
+                        ? `rotate(${centerOffset * 7}deg) translateY(${Math.abs(centerOffset) * 3}px)`
+                        : undefined,
+                    zIndex: shownRewards.length - i,
+                  }}
+                >
+                  <RewardTile
+                    reward={reward}
+                    rewardCatalog={rewardCatalog}
+                    isPremium={isPremium ?? false}
+                    compact
+                    paused={paused}
+                    className={cn(
+                      'h-11 w-11 rounded-xl min-[400px]:h-12 min-[400px]:w-12',
+                      shownRewards.length > 1 && 'ring-2 ring-card',
+                    )}
+                    hydrateDelayMs={150 + i * 100}
+                    giftAnimation={i === 0 ? 'box_shake' : undefined}
+                  />
+                </div>
+              );
+            })}
             {extraRewardCount > 0 && (
-              <span className="pointer-events-none absolute -bottom-1 -right-1 z-30 flex h-5 min-w-[1.25rem] items-center justify-center rounded-md border border-white/10 bg-black/55 px-1 text-[9px] font-black uppercase tracking-wide text-white shadow-sm backdrop-blur-sm">
+              <span
+                className="pointer-events-none absolute z-30 flex h-5 min-w-[1.25rem] items-center justify-center rounded-md border border-white/10 bg-black/55 px-1 text-[9px] font-black uppercase tracking-wide text-white shadow-sm backdrop-blur-sm"
+                style={{ right: -6, bottom: 0 }}
+              >
                 +{extraRewardCount}
               </span>
             )}
-          </div>
+          </button>
         ) : null}
 
         <div className="min-w-0 flex-1">

@@ -1,5 +1,4 @@
 import { Capacitor } from '@capacitor/core';
-import { App } from '@capacitor/app';
 import { SocialLogin } from '@capgo/capacitor-social-login';
 import {
   GoogleAuthProvider,
@@ -18,49 +17,17 @@ const IOS_CLIENT_ID =
 
 let nativeGoogleInitPromise: Promise<void> | null = null;
 
+// The plugin rejects with a USER_CANCELLED code on both platforms, so no
+// cancel-fallback timer is needed. A JS-side timeout here is actively harmful:
+// the post-logout sign-in runs a consent + token-exchange step after the
+// account sheet closes, and a timer racing that flow discards real logins as
+// "cancelled" (the login succeeds on Google's side, which is why a retry then
+// signs in instantly).
 async function openNativeGoogleSignIn() {
-  let returnedWithoutResult: ReturnType<typeof setTimeout> | null = null;
-  let googleScreenOpened = false;
-  let rejectAfterReturn: ((error: Error) => void) | null = null;
-
-  const returnedToApp = new Promise<never>((_, reject) => {
-    rejectAfterReturn = reject;
+  return SocialLogin.login({
+    provider: 'google',
+    options: { scopes: ['email', 'profile'] },
   });
-  const appStateListener = await App.addListener(
-    'appStateChange',
-    ({ isActive }) => {
-      if (!isActive) {
-        googleScreenOpened = true;
-        if (returnedWithoutResult) clearTimeout(returnedWithoutResult);
-        return;
-      }
-      if (!googleScreenOpened) return;
-
-      // Fallback for SDK versions that leave their promise pending after
-      // cancel. Must be generous: after the browser sheet closes, the SDK
-      // still exchanges the auth code over the network before resolving.
-      returnedWithoutResult = setTimeout(() => {
-        const error = Object.assign(
-          new Error('Native Google sign-in was cancelled'),
-          { code: 'auth/popup-closed-by-user' },
-        );
-        rejectAfterReturn?.(error);
-      }, 8000);
-    },
-  );
-
-  try {
-    return await Promise.race([
-      SocialLogin.login({
-        provider: 'google',
-        options: { scopes: ['email', 'profile'] },
-      }),
-      returnedToApp,
-    ]);
-  } finally {
-    if (returnedWithoutResult) clearTimeout(returnedWithoutResult);
-    await appStateListener.remove();
-  }
 }
 
 export function initNativeGoogleSignIn(): Promise<void> {
