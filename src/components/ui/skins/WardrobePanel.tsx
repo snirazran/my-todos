@@ -1538,9 +1538,9 @@ function WardrobeManagerContent({
 
                     const isWorn = (card: WardrobeCard) =>
                       card.kind === 'item'
-                        ? pinSnapshot.equipped?.[card.item.slot] ===
+                        ? data?.wardrobe?.equipped?.[card.item.slot] ===
                           card.item.id
-                        : card.bg.id === pinSnapshot.bgEquipped;
+                        : card.bg.id === bg.equipped;
                     const giftsAsRow = activeFilter !== 'container';
                     const worn: WardrobeCard[] = [];
                     const gifts: WardrobeCard[] = [];
@@ -1551,10 +1551,12 @@ function WardrobeManagerContent({
                         giftsAsRow &&
                         card.kind === 'item' &&
                         card.item.slot === 'container'
-                      )
+                      ) {
                         gifts.push(card);
-                      else if (isWorn(card)) worn.push(card);
-                      else if (
+                        continue;
+                      }
+                      if (isWorn(card)) worn.push(card);
+                      if (
                         card.kind === 'item' &&
                         pinSnapshot.unseenItems.includes(card.item.id)
                       )
@@ -1635,7 +1637,7 @@ function WardrobeManagerContent({
               )}
             >
               {!canRenderItems ? (
-                <WardrobeGridSkeleton />
+                <WardrobeGridSkeleton showAction />
               ) : activeTab === 'shop' ? (
                 <>
                   {activeFilter === 'all' && !!data?.dailyDeals?.length && (
@@ -1744,7 +1746,7 @@ function WardrobeManagerContent({
               )}
             >
               {!canRenderItems ? (
-                <WardrobeGridSkeleton />
+                <WardrobeGridSkeleton showAction />
               ) : activeTab === 'trade' &&
                 data?.wardrobe?.inventory &&
                 data.catalog ? (
@@ -1880,15 +1882,17 @@ function WardrobeRowCard({
       )}
     >
       {rarityBadge && (
-        <span
-          className={cn(
-            'absolute left-0 top-0 z-20 rounded-br-2xl border-b border-r px-2 py-1 text-[8px] font-black uppercase tracking-wider',
-            config.bg,
-            config.text,
-            config.border,
-          )}
-        >
-          {config.label}
+        <span className="absolute left-0 top-0 z-20 overflow-hidden rounded-br-2xl bg-background">
+          <span
+            className={cn(
+              'block rounded-br-2xl border-b border-r px-2 py-1 text-[8px] font-black uppercase tracking-wider',
+              config.bg,
+              config.text,
+              config.border,
+            )}
+          >
+            {config.label}
+          </span>
         </span>
       )}
       <div className="relative flex h-20 items-end justify-center overflow-hidden rounded-lg bg-muted/40">

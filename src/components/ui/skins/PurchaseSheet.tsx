@@ -303,7 +303,7 @@ export function PurchaseSheet({
                       <span className="inline-flex items-center gap-1.5">
                         Buy another
                         <span className="opacity-40">·</span>
-                        <Fly size={16} paused y={-2} />
+                        <Fly size={28} paused y={-2} />
                         <span className="tabular-nums">{price.toLocaleString()}</span>
                       </span>
                     ) : isGuest ? (
@@ -318,7 +318,7 @@ export function PurchaseSheet({
                   <span className="inline-flex items-center gap-2">
                     Buy
                     <span className="opacity-50">·</span>
-                    <Fly size={20} paused y={-2} />
+                    <Fly size={28} paused y={-2} />
                     <span className="tabular-nums">{price.toLocaleString()}</span>
                   </span>
                 </PrimaryButton>

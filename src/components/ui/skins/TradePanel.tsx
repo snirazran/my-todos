@@ -789,7 +789,13 @@ export function TradePanel({
           </div>
         )}
 
-        <div className="px-4 pb-52 lg:p-4">
+        <div
+          className={cn(
+            pageScroll
+              ? '-mx-4 rounded-none border border-x-0 border-border/40 bg-muted/40 p-3 pb-52 md:mx-0 md:rounded-[20px] md:border-x md:px-4 md:pt-4 lg:rounded-none lg:border-0 lg:bg-transparent lg:p-4'
+              : 'px-4 pb-52 lg:p-4',
+          )}
+        >
           {availableItems.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-40 md:h-64 text-sm border-2 border-dashed text-muted-foreground border-border rounded-xl bg-muted/30">
               <p>Your wardrobe is empty (or filtered out).</p>

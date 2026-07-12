@@ -276,16 +276,25 @@ export function QuestsPageSkeleton() {
   );
 }
 
-export function WardrobeGridSkeleton() {
+export function WardrobeGridSkeleton({
+  showAction = false,
+}: {
+  showAction?: boolean;
+}) {
   return (
     <div className="grid grid-cols-3 md:grid-cols-4 gap-2 md:gap-4 pb-20 md:pb-4">
       {Array.from({ length: 12 }).map((_, index) => (
         <div
           key={index}
-          className="mx-auto flex w-full max-w-[240px] flex-col rounded-xl border-2 border-border bg-card p-1.5 pb-0 md:p-2 md:pb-0.5"
+          className={cn(
+            'mx-auto flex w-full max-w-[240px] flex-col rounded-xl border-2 border-border bg-card p-1.5 md:p-2',
+            showAction ? 'pb-0 md:pb-0.5' : 'pb-1.5 md:pb-2',
+          )}
         >
-          <Skeleton className="mb-0.5 aspect-[1/0.85] rounded-lg" />
-          <Skeleton className="mx-auto my-1 h-5 w-1/2 rounded-lg" />
+          <Skeleton className="aspect-[1/1.1] rounded-lg" />
+          {showAction && (
+            <Skeleton className="mx-auto my-1 h-5 w-1/2 rounded-lg" />
+          )}
         </div>
       ))}
     </div>
