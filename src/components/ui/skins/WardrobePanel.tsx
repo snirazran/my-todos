@@ -1429,9 +1429,9 @@ function WardrobeManagerContent({
               }}
               className={cn(
                 embedded
-                  ? 'relative'
-                  : 'absolute inset-0 overflow-y-auto overscroll-none',
-                'rounded-[20px] border border-border/40 bg-muted/40 p-3 md:p-4 data-[state=inactive]:hidden',
+                  ? 'relative -mx-4 rounded-none border-x-0 md:mx-0 md:rounded-[20px] md:border-x'
+                  : 'absolute inset-0 overflow-y-auto overscroll-none rounded-[20px]',
+                'border border-border/40 bg-muted/40 p-3 md:p-4 data-[state=inactive]:hidden',
               )}
             >
               {!canRenderItems ? (
@@ -1629,9 +1629,9 @@ function WardrobeManagerContent({
               }}
               className={cn(
                 embedded
-                  ? 'relative'
-                  : 'absolute inset-0 overflow-y-auto overscroll-none',
-                'rounded-[20px] border border-border/40 bg-muted/40 p-3 md:p-4 data-[state=inactive]:hidden',
+                  ? 'relative -mx-4 rounded-none border-x-0 md:mx-0 md:rounded-[20px] md:border-x'
+                  : 'absolute inset-0 overflow-y-auto overscroll-none rounded-[20px]',
+                'border border-border/40 bg-muted/40 p-3 md:p-4 data-[state=inactive]:hidden',
               )}
             >
               {!canRenderItems ? (
@@ -1667,22 +1667,43 @@ function WardrobeManagerContent({
                       shopBackgrounds,
                       sortBy,
                     );
+                    const sectionLabel =
+                      {
+                        all: 'All items',
+                        skin: 'Skins',
+                        hat: 'Hats',
+                        body: 'Body',
+                        held: 'Held',
+                        background: 'Backgrounds',
+                        container: 'Gifts',
+                      }[activeFilter] ?? 'All items';
+                    const sectionHeader = (
+                      <p className="mb-2 px-1 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">
+                        {sectionLabel}
+                      </p>
+                    );
                     if (sortBy === 'featured') {
                       return (
-                        <div className={cn(cardGridClass, 'pb-4')}>
-                          {featuredShopOrder(cards, featuredSeed).map(
-                            (card, index) => renderShopCard(card, index),
-                          )}
-                        </div>
+                        <>
+                          {sectionHeader}
+                          <div className={cn(cardGridClass, 'pb-4')}>
+                            {featuredShopOrder(cards, featuredSeed).map(
+                              (card, index) => renderShopCard(card, index),
+                            )}
+                          </div>
+                        </>
                       );
                     }
                     if (sortBy !== 'rarity_asc' && sortBy !== 'rarity_desc') {
                       return (
-                        <div className={cn(cardGridClass, 'pb-4')}>
-                          {cards.map((card, index) =>
-                            renderShopCard(card, index),
-                          )}
-                        </div>
+                        <>
+                          {sectionHeader}
+                          <div className={cn(cardGridClass, 'pb-4')}>
+                            {cards.map((card, index) =>
+                              renderShopCard(card, index),
+                            )}
+                          </div>
+                        </>
                       );
                     }
                     let cardIndex = 0;

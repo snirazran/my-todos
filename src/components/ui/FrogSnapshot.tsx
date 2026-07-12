@@ -20,15 +20,17 @@ export function FrogSnapshot({
   visualOffsetY,
 }: {
   indices?: FrogStampIndices;
-  width?: number;
-  height?: number;
+  width?: number | string;
+  height?: number | string;
   className?: string;
   visualOffsetY?: number;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const indicesRef = useRef(indices);
   indicesRef.current = indices;
-  const resolvedVisualOffsetY = visualOffsetY ?? Math.round(height * 0.17);
+  const resolvedVisualOffsetY =
+    visualOffsetY ??
+    (typeof height === 'number' ? Math.round(height * 0.17) : 0);
   const indicesKey = useMemo(() => JSON.stringify(indices ?? {}), [indices]);
 
   useEffect(() => {

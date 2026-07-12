@@ -91,8 +91,8 @@ interface FrogProps {
   className?: string;
   mouthOpen?: boolean;
   mouthOffset?: { x?: number; y?: number };
-  width?: number;
-  height?: number;
+  width?: number | string;
+  height?: number | string;
   visualOffsetY?: number;
   paused?: boolean;
 
@@ -142,7 +142,8 @@ const Frog = memo(
     useRiveVisibility(rive, wrapperRef, !paused, 'frog', !!mouthOpen);
 
     const resolvedVisualOffsetY =
-      visualOffsetY ?? Math.round(height * 0.17);
+      visualOffsetY ??
+      (typeof height === 'number' ? Math.round(height * 0.17) : 0);
 
     useEffect(() => {
       if (!rive) return;

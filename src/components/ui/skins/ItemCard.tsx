@@ -9,7 +9,6 @@ import { cn } from '@/lib/utils';
 import type { ItemDef, Rarity } from '@/lib/skins/catalog';
 import Frog from '@/components/ui/frog';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
-import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GiftRive } from '@/components/ui/gift-box/GiftBox';
 
@@ -218,8 +217,7 @@ function ItemCardComponent({
   };
 
   const isSelected = (selectedCount || 0) > 0;
-  const mdUp = useMediaQuery('(min-width: 768px)');
-  const previewCanvasSize = compact ? (mdUp ? 200 : 152) : 180;
+  const previewCanvasSize: number | string = compact ? '130%' : 180;
   const centerFrog =
     centerFrogPreview && item.slot !== 'container' && !customPreview;
   const frogPreviewClassName = cn(
