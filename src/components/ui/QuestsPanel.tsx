@@ -987,6 +987,17 @@ export function QuestsPanel({
       if (!res.ok) throw new Error(payload.error || 'Could not switch focus');
       await refreshQuestData();
       setPendingSwitchCategoryId(null);
+      const switchedQuest = (data?.categoryQuests ?? []).find(
+        (q) => q.categoryId === categoryId,
+      );
+      const linkedTags = categoryTagMap.get(categoryId) ?? [];
+      const needsTag =
+        !!switchedQuest?.logic.some(
+          (block) => block.tagMode === 'focus_category_tags',
+        ) && linkedTags.length === 0;
+      if (needsTag) {
+        setStartQuestCategoryId(categoryId);
+      }
     } catch (err: any) {
       setClaimMessage(err.message || 'Could not switch focus');
     } finally {
