@@ -1600,20 +1600,20 @@ export function SwitchFocusConfirm({
           )}
               <h3 className="text-center text-xl font-black text-foreground">
                 {rentAvailable
-                  ? `Run ${categoryName ?? 'this area'} too?`
+                  ? `Run the ${categoryName ?? 'this area'} quest too?`
                   : 'Switch your quest?'}
               </h3>
               {rentAvailable ? (
                 <p className="mx-auto mt-1.5 max-w-[19rem] text-center text-[14px] leading-snug text-muted-foreground">
-                  Keep{' '}
+                  Keep your{' '}
                   <span className="font-bold text-foreground">
-                    {currentFocusName ?? 'your current quest'}
+                    {currentFocusName ?? 'current'}
                   </span>{' '}
-                  going and add{' '}
+                  quest going and run the{' '}
                   <span className="font-bold text-foreground">
                     {categoryName ?? 'this area'}
                   </span>{' '}
-                  alongside it.
+                  quest alongside it.
                 </p>
               ) : (
                 <p className="mx-auto mt-1.5 max-w-[19rem] text-center text-[14px] leading-snug text-muted-foreground">
@@ -1645,26 +1645,28 @@ export function SwitchFocusConfirm({
                       type="button"
                       onClick={handleRent}
                       disabled={rentBusy}
-                      className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl border-2 border-amber-200/90 bg-amber-50 text-[13px] font-black uppercase tracking-[0.11em] text-amber-700 shadow-[0_6px_14px_rgba(180,83,9,0.14),inset_0_1px_0_rgba(255,255,255,0.85)] transition active:scale-[0.98] disabled:opacity-60 dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-300 dark:shadow-none"
+                      className="flex h-16 w-full flex-col items-center justify-center gap-1 rounded-2xl bg-amber-500 text-white shadow-[0_4px_0_0_#b45309] ring-1 ring-[#b45309]/40 transition-all [@media(hover:hover)]:hover:bg-amber-400 active:translate-y-[2px] active:shadow-none disabled:opacity-60"
                     >
-                      <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-amber-200/80 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300">
+                      <span className="flex items-center gap-2 text-[13px] font-black uppercase tracking-[0.11em]">
                         <Play className="h-3.5 w-3.5 fill-current" />
+                        {rentBusy ? (
+                          'Loading...'
+                        ) : (
+                          <>
+                            Progress both
+                            <span className="relative inline-flex shrink-0 items-center overflow-hidden rounded-lg bg-white/25 px-2 py-1 text-[11px] font-black leading-none tracking-[0.08em] text-white ring-1 ring-white/30">
+                              <span className="pointer-events-none absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-white/50 to-transparent animate-shine" />
+                              24 hours
+                            </span>
+                          </>
+                        )}
                       </span>
-                      {rentBusy ? (
-                        'Loading...'
-                      ) : (
-                        <>
-                          Progress both
-                          <span className="relative inline-flex shrink-0 items-center overflow-hidden rounded-lg bg-gradient-to-br from-amber-400 via-orange-400 to-orange-500 px-2 py-1 text-[11px] font-black leading-none tracking-[0.08em] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_2px_5px_rgba(217,119,6,0.35)]">
-                            <span className="pointer-events-none absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-white/50 to-transparent animate-shine" />
-                            24 hours
-                          </span>
-                        </>
+                      {!rentBusy && (
+                        <span className="text-[11px] font-bold normal-case tracking-normal text-white/90">
+                          Watch a short ad — both quests run for 24 hours
+                        </span>
                       )}
                     </button>
-                    <p className="text-center text-[12px] font-medium text-muted-foreground">
-                      Watch a short ad — both quests run for 24 hours.
-                    </p>
                     {rentError && (
                       <p className="text-center text-[12px] font-bold text-red-500">
                         {rentError}
@@ -1672,7 +1674,24 @@ export function SwitchFocusConfirm({
                     )}
                   </div>
                 )}
-                {onUpgrade && (
+                {onUpgrade && rentAvailable && (
+                  <button
+                    type="button"
+                    onClick={onUpgrade}
+                    aria-label="Progress all quests with Frog Plus"
+                    className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl border-2 border-amber-200/90 bg-amber-50 text-[13px] font-black uppercase tracking-[0.11em] text-amber-700 transition active:scale-[0.98] dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-300"
+                  >
+                    <Icon
+                      name="frogPlus"
+                      className="pointer-events-none -my-4 h-10 w-10 shrink-0 drop-shadow-[0_2px_0_rgba(31,98,28,0.3)]"
+                    />
+                    Progress all quests
+                    <span className="inline-flex shrink-0 items-center rounded-lg bg-gradient-to-b from-emerald-600 to-emerald-800 px-2 py-1 text-[11px] font-black uppercase leading-none tracking-normal text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25)] ring-1 ring-emerald-900/40">
+                      Plus
+                    </span>
+                  </button>
+                )}
+                {onUpgrade && !rentAvailable && (
                   <div className="flex flex-col gap-2">
                   <button
                     type="button"

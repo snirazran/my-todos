@@ -63,6 +63,18 @@ export async function checkInStreak(): Promise<CheckInResult | null> {
   }
 }
 
+let prewarmedCheckIn: Promise<CheckInResult | null> | null = null;
+
+export function prewarmStreakCheckIn() {
+  prewarmedCheckIn ??= checkInStreak();
+}
+
+export function takePrewarmedCheckIn(): Promise<CheckInResult | null> | null {
+  const pending = prewarmedCheckIn;
+  prewarmedCheckIn = null;
+  return pending;
+}
+
 export async function rescueStreak(
   rescueId: string,
 ): Promise<RescueResult | null> {

@@ -12,6 +12,7 @@ import {
   localDayKey,
   openStreakSheet,
   subscribeStreakSheet,
+  takePrewarmedCheckIn,
   type StreakSheetRequest,
 } from '@/hooks/useLoginStreak';
 import { StreakSheet } from '@/components/ui/streak/StreakSheet';
@@ -48,7 +49,7 @@ export function StreakCheckInProvider() {
       const today = localDayKey();
       if (lastChecked?.dayKey === today && lastChecked.userId === userId)
         return;
-      const result = await checkInStreak();
+      const result = await (takePrewarmedCheckIn() ?? checkInStreak());
       if (!result) return;
       lastChecked = { dayKey: today, userId };
       recordAppUsageDay();

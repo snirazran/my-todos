@@ -503,11 +503,22 @@ export function QuestsPanel({
   useEffect(() => {
     if (areaUnlockCeremony !== 'playing') return;
     const confettiTimeout = window.setTimeout(() => {
+      const anchors = Array.from(
+        document.querySelectorAll<HTMLElement>('[data-area-unlock-anchor]'),
+      );
+      const visible = anchors.find((el) => el.offsetParent !== null);
+      const rect = visible?.getBoundingClientRect();
+      const origin = rect
+        ? {
+            x: (rect.left + rect.width / 2) / window.innerWidth,
+            y: (rect.top + rect.height / 2) / window.innerHeight,
+          }
+        : { y: 0.55 };
       confetti({
         particleCount: 90,
         spread: 75,
         startVelocity: 38,
-        origin: { y: 0.55 },
+        origin,
         zIndex: 9999,
       });
       try {
@@ -1313,8 +1324,8 @@ export function QuestsPanel({
                                 </p>
                                 <p className="mt-0.5 text-xs font-bold text-muted-foreground/80">
                                   {data.isPremium
-                                    ? 'Start where you want to grow most — or run every area at once.'
-                                    : 'Start where you want to grow most — you can always switch later.'}
+                                    ? 'Pick where you want to grow most — or run every area at once.'
+                                    : 'Pick where you want to grow most.'}
                                 </p>
                               </div>
                               <div

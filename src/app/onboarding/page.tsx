@@ -20,6 +20,7 @@ import { clearSessionCookie, establishSessionCookie } from '@/lib/authCookie';
 import { OnboardingBackground } from '@/components/ui/OnboardingBackground';
 import { useAuth } from '@/components/auth/AuthContext';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
+import { prewarmStreakCheckIn } from '@/hooks/useLoginStreak';
 
 const STEP_IDS = ['name', 'humanName', 'aboutIntro', 'age', 'notifications', 'createAccount'] as const;
 
@@ -203,6 +204,7 @@ export default function OnboardingPage() {
       } catch {
         // best-effort
       } finally {
+        prewarmStreakCheckIn();
         const remaining = CELEBRATION_MS - (Date.now() - celebrationStart);
         if (remaining > 0) {
           await new Promise((resolve) => setTimeout(resolve, remaining));
