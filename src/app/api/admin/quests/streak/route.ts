@@ -18,6 +18,16 @@ const VALID_REWARD_TYPES = new Set<QuestRewardType>([
 const VALID_AMOUNT_MODES = new Set<QuestAmountMode>(['fixed', 'random']);
 
 function sanitizeReward(input: any): QuestReward | null {
+  const reward = sanitizeRewardBase(input);
+  if (!reward) return null;
+  const weight = Math.floor(Number(input.weight));
+  if (Number.isFinite(weight) && weight >= 1) {
+    reward.weight = Math.min(100, weight);
+  }
+  return reward;
+}
+
+function sanitizeRewardBase(input: any): QuestReward | null {
   if (!input || !VALID_REWARD_TYPES.has(input.type)) return null;
 
   if (input.type === 'FLIES') {

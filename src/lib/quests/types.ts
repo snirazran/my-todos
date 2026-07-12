@@ -10,6 +10,8 @@ export type QuestReward = {
   maxAmount?: number;
   itemId?: string;
   backgroundId?: string;
+  // Streak prize pool only: relative draw weight (default 1).
+  weight?: number;
 };
 
 export type QuestRewards = QuestReward[];

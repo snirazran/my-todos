@@ -1859,22 +1859,61 @@ export function AdminQuestManagerPage() {
 
           <div className="min-w-0 flex-1">
             <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-              Prize pool (one drawn at random)
+              Prize pool (one drawn, odds by weight)
             </span>
-            <div className="mt-1 flex flex-wrap items-center gap-2">
+            <div className="mt-1 flex flex-wrap items-center gap-3">
               {streakConfig.rewards.length === 0 ? (
                 <span className="text-xs text-muted-foreground">
                   No prizes yet.
                 </span>
               ) : (
-                streakConfig.rewards.map((reward, ri) => (
-                  <RewardTile
-                    key={`${reward.type}-${reward.itemId ?? reward.backgroundId ?? reward.amount ?? ri}`}
-                    reward={reward}
-                    rewardCatalog={rewardCatalog}
-                    isPremium={false}
-                  />
-                ))
+                (() => {
+                  const totalWeight = streakConfig.rewards.reduce(
+                    (sum, r) => sum + Math.max(1, r.weight ?? 1),
+                    0,
+                  );
+                  return streakConfig.rewards.map((reward, ri) => (
+                    <div
+                      key={`${reward.type}-${reward.itemId ?? reward.backgroundId ?? reward.amount ?? ri}`}
+                      className="flex items-center gap-1.5 leading-[30px]"
+                    >
+                      <RewardTile
+                        reward={reward}
+                        rewardCatalog={rewardCatalog}
+                        isPremium={false}
+                      />
+                      <InlinePillNumber
+                        value={Math.max(1, reward.weight ?? 1)}
+                        onChange={(v) =>
+                          setStreakConfig((prev) =>
+                            prev
+                              ? {
+                                  ...prev,
+                                  rewards: prev.rewards.map((r, i) =>
+                                    i === ri
+                                      ? {
+                                          ...r,
+                                          weight: Math.min(
+                                            100,
+                                            Math.max(1, Math.round(v)),
+                                          ),
+                                        }
+                                      : r,
+                                  ),
+                                }
+                              : prev,
+                          )
+                        }
+                      />
+                      <span className="text-xs font-medium text-muted-foreground">
+                        {Math.round(
+                          (100 * Math.max(1, reward.weight ?? 1)) / totalWeight,
+                        )}
+                        %
+                      </span>
+                    </div>
+                  ));
+                })()
               )}
               <button
                 type="button"

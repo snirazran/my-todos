@@ -112,7 +112,19 @@ export async function syncDailyStreak(args: {
 }
 
 function drawStreakReward(rewards: QuestReward[]): QuestReward {
-  const pick = rewards[Math.floor(Math.random() * rewards.length)];
+  const total = rewards.reduce(
+    (sum, reward) => sum + Math.max(1, reward.weight ?? 1),
+    0,
+  );
+  let roll = Math.random() * total;
+  let pick = rewards[rewards.length - 1];
+  for (const reward of rewards) {
+    roll -= Math.max(1, reward.weight ?? 1);
+    if (roll <= 0) {
+      pick = reward;
+      break;
+    }
+  }
   if (pick.type === 'FLIES' && pick.amountMode === 'random') {
     const min = Math.max(1, pick.minAmount ?? 1);
     const max = Math.max(min, pick.maxAmount ?? min);

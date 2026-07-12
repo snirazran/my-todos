@@ -773,6 +773,19 @@ export function DailyChecklistCard({
             streak={streak}
             claiming={claimingStreak}
             onClaim={onClaimStreak}
+            onShowPrizes={
+              (streak.rewards?.length ?? 0) > 0
+                ? () =>
+                    setRewardPopup({
+                      eyebrow: 'Daily streak',
+                      title: 'Prize pool',
+                      rewards: sortStreakPrizes(
+                        streak.rewards ?? [],
+                        rewardCatalog,
+                      ),
+                    })
+                : undefined
+            }
             rewardCatalog={rewardCatalog}
             isPremium={isPremium}
             paused={paused}
@@ -793,10 +806,38 @@ export function DailyChecklistCard({
   );
 }
 
+const STREAK_PRIZE_RARITY_RANK: Record<string, number> = {
+  legendary: 5,
+  epic: 4,
+  rare: 3,
+  uncommon: 2,
+  common: 1,
+};
+
+function streakPrizeRank(
+  reward: QuestReward,
+  rewardCatalog: Record<string, QuestRewardCatalogItem>,
+) {
+  const lookupId = reward.itemId ?? reward.backgroundId;
+  const item = lookupId ? rewardCatalog[lookupId] : null;
+  return item ? STREAK_PRIZE_RARITY_RANK[item.rarity] ?? 0 : 0;
+}
+
+function sortStreakPrizes(
+  rewards: QuestReward[],
+  rewardCatalog: Record<string, QuestRewardCatalogItem>,
+) {
+  return [...rewards].sort(
+    (a, b) =>
+      streakPrizeRank(b, rewardCatalog) - streakPrizeRank(a, rewardCatalog),
+  );
+}
+
 function DailyStreakStrip({
   streak,
   claiming = false,
   onClaim,
+  onShowPrizes,
   rewardCatalog,
   isPremium,
   paused = false,
@@ -804,6 +845,7 @@ function DailyStreakStrip({
   streak: DailyStreakInfo;
   claiming?: boolean;
   onClaim?: () => void;
+  onShowPrizes?: () => void;
   rewardCatalog: Record<string, QuestRewardCatalogItem>;
   isPremium: boolean;
   paused?: boolean;
@@ -811,25 +853,57 @@ function DailyStreakStrip({
   const length = Math.max(2, streak.targetLength);
   const cycleDay =
     streak.count === 0 ? 0 : ((streak.count - 1) % length) + 1;
-  const prizePool = streak.rewards ?? [];
-  const prize = prizePool[0];
+  const prizePool = sortStreakPrizes(streak.rewards ?? [], rewardCatalog);
+  const shownPrizes = prizePool.slice(0, 3);
+  const extraPrizeCount = prizePool.length - shownPrizes.length;
 
   return (
     <div className="rounded-2xl border border-border/50 bg-card px-3 py-3 shadow-sm sm:px-4">
       <div className="flex items-center gap-2.5">
-        {prize ? (
-          <RewardTile
-            reward={prize}
-            rewardCatalog={rewardCatalog}
-            isPremium={isPremium}
-            compact
-            paused={paused}
-            hideBadge={prize.type !== 'FLIES'}
-            flySize={22}
-            hydrateDelayMs={150}
-            giftAnimation="box_shake"
-            className="h-10 w-10 shrink-0 rounded-xl"
-          />
+        {shownPrizes.length > 0 ? (
+          <button
+            type="button"
+            onClick={onShowPrizes}
+            disabled={!onShowPrizes}
+            aria-label="See streak prizes"
+            className="relative flex shrink-0 items-center py-1 disabled:pointer-events-none"
+          >
+            {shownPrizes.map((reward, i) => {
+              const centerOffset = i - (shownPrizes.length - 1) / 2;
+              return (
+                <div
+                  key={`${reward.type}-${reward.itemId ?? reward.backgroundId ?? reward.amount ?? i}`}
+                  className="relative"
+                  style={{
+                    marginLeft: i === 0 ? 0 : -6,
+                    transform: `rotate(${centerOffset * 7}deg) translateY(${Math.abs(centerOffset) * 3}px)`,
+                    zIndex: shownPrizes.length - i,
+                  }}
+                >
+                  <RewardTile
+                    reward={reward}
+                    rewardCatalog={rewardCatalog}
+                    isPremium={isPremium}
+                    compact
+                    paused={paused}
+                    hideBadge={reward.type !== 'FLIES'}
+                    flySize={22}
+                    hydrateDelayMs={150 + i * 100}
+                    giftAnimation={i === 0 ? 'box_shake' : undefined}
+                    className="h-10 w-10 shrink-0 rounded-xl ring-2 ring-card"
+                  />
+                </div>
+              );
+            })}
+            {extraPrizeCount > 0 && (
+              <span
+                className="absolute rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-black text-muted-foreground ring-2 ring-card"
+                style={{ right: -6, bottom: 0, zIndex: shownPrizes.length + 1 }}
+              >
+                +{extraPrizeCount}
+              </span>
+            )}
+          </button>
         ) : (
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-400/15 text-amber-500">
             <Gift className="h-[18px] w-[18px]" strokeWidth={2.5} />
