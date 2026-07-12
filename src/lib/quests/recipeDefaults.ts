@@ -95,7 +95,6 @@ export async function ensureDefaultQuestRecipe(): Promise<QuestRecipeDoc | null>
         [
           { type: 'count', action: 'complete', minTarget: 7, maxTarget: 8, weight: 3 },
           { type: 'focus_minutes', minTarget: 45, maxTarget: 60, weight: 2 },
-          { type: 'metric_count', metricKey: 'buddy_task_completed', minTarget: 1, maxTarget: 1, weight: 1 },
         ],
         flies(3),
       ),
@@ -128,9 +127,11 @@ export async function ensureDefaultQuestRecipe(): Promise<QuestRecipeDoc | null>
   return created.toObject() as QuestRecipeDoc;
 }
 
-// Daily roll: 3 objectives, easy -> medium -> hard, all achievable by a
-// day-one user (no economy-loop metrics like trades or sales). Free payout:
-// 2+3+5 = 10 flies plus a 15% gift roll on the capstone.
+// Daily roll: 3 objectives, easy -> medium -> hard. Economy-loop metrics
+// (trade/sell/acquire) are in the pools but the engine only rolls them for
+// users who can actually perform them today (see isPoolEntryEligible), so a
+// day-one user never sees a dead objective. Free payout: 2+3+5 = 10 flies
+// plus a 15% gift roll on the capstone.
 export async function ensureDefaultDailyRecipe(): Promise<void> {
   const existing = await QuestRecipeModel.findOne({
     placement: 'daily',
@@ -157,8 +158,8 @@ export async function ensureDefaultDailyRecipe(): Promise<void> {
         [
           { type: 'count', action: 'complete', minTarget: 4, maxTarget: 6, weight: 3 },
           { type: 'focus_minutes', minTarget: 15, maxTarget: 25, weight: 3 },
-          { type: 'metric_count', metricKey: 'task_saved_later', minTarget: 1, maxTarget: 1, weight: 1 },
-          { type: 'metric_count', metricKey: 'skin_equipped', minTarget: 1, maxTarget: 1, weight: 1 },
+          { type: 'metric_count', metricKey: 'skin_acquired', minTarget: 1, maxTarget: 1, weight: 1 },
+          { type: 'metric_count', metricKey: 'skin_sold', minTarget: 1, maxTarget: 1, weight: 1 },
         ],
         flies(3),
       ),
@@ -166,6 +167,7 @@ export async function ensureDefaultDailyRecipe(): Promise<void> {
         [
           { type: 'count', action: 'complete', minTarget: 7, maxTarget: 9, weight: 3 },
           { type: 'focus_minutes', minTarget: 30, maxTarget: 40, weight: 3 },
+          { type: 'metric_count', metricKey: 'trade_completed', minTarget: 1, maxTarget: 1, weight: 1 },
         ],
         flies(5),
         giftBonus(0.15),

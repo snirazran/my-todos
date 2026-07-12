@@ -7,7 +7,7 @@ import TaskModel, { type TaskDoc } from '@/lib/models/Task';
 import QuestCategoryModel, { type QuestCategoryDoc } from '@/lib/models/QuestCategory';
 import connectMongo from '@/lib/mongoose';
 import type { UserDoc } from '@/lib/types/UserDoc';
-import type { ItemDef } from '@/lib/skins/catalog';
+import { TRADE_ITEM_COUNT, type ItemDef } from '@/lib/skins/catalog';
 import { getFullCatalog } from '@/lib/skins/getCatalog';
 import { loadBackgroundPrizes } from '@/lib/skins/gifts';
 import { getZonedToday, getZonedYMD } from '@/lib/utils';
@@ -15,6 +15,7 @@ import { recordDoubleableClaim } from '@/lib/rewards/adDouble';
 import {
   isTagScopedQuestMetric,
   loadQuestCounters,
+  parseTaskStreakDays,
   sumCounters,
   sumCountersForTags,
   taskStreakMetric,
@@ -22,6 +23,7 @@ import {
 } from './metrics';
 import QuestRecipeModel, {
   type QuestRecipeDoc,
+  type RecipePoolEntry,
   type RecipeSlot,
 } from '@/lib/models/QuestRecipe';
 import { ensureDefaultQuestRecipe } from './recipeDefaults';
@@ -573,6 +575,141 @@ function resolveRecipeMetricKey(
   return taskStreakMetric(days);
 }
 
+function shiftDateKey(dateKey: string, deltaDays: number) {
+  const base = new Date(`${dateKey}T00:00:00Z`);
+  base.setUTCDate(base.getUTCDate() + deltaDays);
+  return base.toISOString().slice(0, 10);
+}
+
+// "Close enough" margin for shop-dependent objectives: a normal day's free
+// quest income, so the missing flies are earnable within the quest window.
+const NEARLY_AFFORDABLE_FLIES = 10;
+
+// Whether the user can act on a rolled pool entry right now: trading needs a
+// full set of same-rarity skins (owned, or buyable with current flies plus a
+// day's earnings), selling needs a duplicate, acquiring needs spending power
+// or an unopened gift, and a task streak inside a one-day window needs the
+// run to already be one completion away. Filtering these at roll time keeps
+// dead objectives out of a user's quest.
+function isPoolEntryEligible(args: {
+  entry: RecipePoolEntry;
+  placement: 'daily' | 'category';
+  user: UserDoc;
+  catalog: ItemDef[];
+  tasks: TaskDoc[];
+  todayKey: string;
+}): boolean {
+  const { entry, placement, user, catalog, tasks, todayKey } = args;
+  if (entry.type !== 'metric_count' || !entry.metricKey) return true;
+  const metricKey = entry.metricKey;
+  const inventory = user.wardrobe?.inventory ?? {};
+
+  if (
+    metricKey === 'trade_completed' ||
+    metricKey === 'skin_sold' ||
+    metricKey === 'skin_acquired'
+  ) {
+    if (catalog.length === 0) return false;
+    const byId = new Map(catalog.map((item) => [item.id, item]));
+    const flies = user.wardrobe?.flies ?? 0;
+
+    if (metricKey === 'trade_completed') {
+      const ownedByRarity = new Map<string, number>();
+      for (const [itemId, count] of Object.entries(inventory)) {
+        const def = byId.get(itemId);
+        if (!def || def.slot === 'container' || def.rarity === 'legendary') {
+          continue;
+        }
+        ownedByRarity.set(
+          def.rarity,
+          (ownedByRarity.get(def.rarity) ?? 0) + Math.max(0, count ?? 0),
+        );
+      }
+      if (
+        Array.from(ownedByRarity.values()).some(
+          (total) => total >= TRADE_ITEM_COUNT,
+        )
+      ) {
+        return true;
+      }
+      const cheapestByRarity = new Map<string, number>();
+      for (const item of catalog) {
+        if (item.slot === 'container' || item.rarity === 'legendary') continue;
+        const price = item.priceFlies ?? 0;
+        if (price <= 0) continue;
+        const prev = cheapestByRarity.get(item.rarity);
+        if (prev === undefined || price < prev) {
+          cheapestByRarity.set(item.rarity, price);
+        }
+      }
+      return Array.from(cheapestByRarity.entries()).some(([rarity, price]) => {
+        const missing = TRADE_ITEM_COUNT - (ownedByRarity.get(rarity) ?? 0);
+        return flies + NEARLY_AFFORDABLE_FLIES >= missing * price;
+      });
+    }
+
+    if (metricKey === 'skin_sold') {
+      return Object.entries(inventory).some(([itemId, count]) => {
+        const def = byId.get(itemId);
+        return !!def && def.slot !== 'container' && (count ?? 0) >= 2;
+      });
+    }
+
+    const hasUnopenedGift = Object.entries(inventory).some(([itemId, count]) => {
+      const def = byId.get(itemId);
+      return !!def && def.slot === 'container' && (count ?? 0) >= 1;
+    });
+    if (hasUnopenedGift) return true;
+    const prices = catalog
+      .filter((item) => item.slot !== 'container' && (item.priceFlies ?? 0) > 0)
+      .map((item) => item.priceFlies ?? 0);
+    return (
+      prices.length > 0 &&
+      flies + NEARLY_AFFORDABLE_FLIES >= Math.min(...prices)
+    );
+  }
+
+  if (placement === 'daily') {
+    const fallbackDays = parseTaskStreakDays(metricKey);
+    if (fallbackDays !== null) {
+      const days = Math.max(
+        2,
+        Math.floor(entry.streakDaysMax ?? entry.streakDaysMin ?? fallbackDays),
+      );
+      return tasks.some((task) => {
+        const dates = new Set(task.completedDates ?? []);
+        for (let i = 1; i < days; i += 1) {
+          if (!dates.has(shiftDateKey(todayKey, -i))) return false;
+        }
+        return true;
+      });
+    }
+  }
+
+  return true;
+}
+
+// Eligible entries first; if none remain, fall back to the slot's universal
+// (task/focus) entries so a slot never vanishes from the quest.
+function buildEligiblePool(args: {
+  slot: RecipeSlot;
+  placement: 'daily' | 'category';
+  user: UserDoc;
+  catalog: ItemDef[];
+  tasks: TaskDoc[];
+  todayKey: string;
+}): RecipePoolEntry[] {
+  const base = (args.slot.pool ?? []).filter(
+    (entry) => entry && Math.floor(entry.minTarget) > 0,
+  );
+  const eligible = base.filter((entry) =>
+    isPoolEntryEligible({ ...args, entry }),
+  );
+  if (eligible.length > 0) return eligible;
+  const universal = base.filter((entry) => entry.type !== 'metric_count');
+  return universal.length > 0 ? universal : base;
+}
+
 function pickWeighted<T extends { weight?: number }>(
   entries: T[],
   rng: () => number,
@@ -968,8 +1105,9 @@ export async function syncQuestState(args: {
 
   // An active daily recipe replaces authored daily templates with ONE quest
   // holding an objective per slot (slot order = difficulty order, like the
-  // focus ladders). Rolls are stable per user per local day; the daily
-  // windowKey handles the reset.
+  // focus ladders). The roll is frozen in the day's quest doc once created:
+  // pool eligibility depends on user state (flies, inventory) that changes
+  // during the day, so re-rolling mid-day could swap objectives.
   const dailyRecipe = recipes.find(
     (r) =>
       (r.placement ?? 'category') === 'daily' &&
@@ -978,11 +1116,21 @@ export async function syncQuestState(args: {
   );
   if (dailyRecipe) {
     const templateId = `gend:${todayKey}`;
-    const rolledLogic = (dailyRecipe.slots as RecipeSlot[])
+    const frozenDaily = allExistingDocs.find(
+      (doc) => doc.placement === 'daily' && doc.templateId === templateId,
+    );
+    const rolledLogic = frozenDaily?.logic?.length
+      ? (frozenDaily.logic as QuestLogicBlock[])
+      : (dailyRecipe.slots as RecipeSlot[])
       .map((slot, index) => {
-        const pool = (slot.pool ?? []).filter(
-          (entry) => entry && Math.floor(entry.minTarget) > 0,
-        );
+        const pool = buildEligiblePool({
+          slot,
+          placement: 'daily',
+          user,
+          catalog,
+          tasks,
+          todayKey,
+        });
         const pick = pickWeighted(
           pool,
           createSeededRandom(`${userId}:${templateId}:slot:${index}`),
@@ -1153,11 +1301,20 @@ export async function syncQuestState(args: {
 
       const rollKey = existing?.rollKey ?? crypto.randomUUID();
       const templateId = existing?.templateId ?? `gen:${categoryId}:${rollKey}`;
-      const logic = (recipe.slots as RecipeSlot[])
+      // Same freeze as the daily roll: a live doc keeps its rolled logic so
+      // pool eligibility changes can't swap objectives mid-roll.
+      const logic = existing?.logic?.length
+        ? (existing.logic as QuestLogicBlock[])
+        : (recipe.slots as RecipeSlot[])
         .map((slot, index) => {
-          const pool = (slot.pool ?? []).filter(
-            (entry) => entry && Math.floor(entry.minTarget) > 0,
-          );
+          const pool = buildEligiblePool({
+            slot,
+            placement: 'category',
+            user,
+            catalog,
+            tasks,
+            todayKey,
+          });
           const pick = pickWeighted(
             pool,
             createSeededRandom(`${userId}:${templateId}:slot:${index}`),
