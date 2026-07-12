@@ -1145,10 +1145,15 @@ export function CategoryQuestPresentationCard({
             </span>
           </span>
           {rentedTimeLeft && !isCompleted ? (
-            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-400 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-slate-900 shadow-[0_2px_0_rgba(15,23,42,0.25)]">
-              <Play className="h-3 w-3 fill-current" />
-              Unlocked · {rentedTimeLeft}
-            </span>
+            <button
+              type="button"
+              onClick={onUpgrade}
+              title="Keep every area running with Plus"
+              className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-400 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-slate-900 shadow-[0_2px_0_rgba(15,23,42,0.25)] transition active:scale-95"
+            >
+              <Clock className="h-3 w-3" strokeWidth={3} />
+              {rentedTimeLeft} left
+            </button>
           ) : null}
           {timeLeft && !isCompleted ? (
             <span
@@ -1675,21 +1680,27 @@ export function SwitchFocusConfirm({
                   </div>
                 )}
                 {onUpgrade && rentAvailable && (
-                  <button
-                    type="button"
-                    onClick={onUpgrade}
-                    aria-label="Progress all quests with Frog Plus"
-                    className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl border-2 border-amber-200/90 bg-amber-50 text-[13px] font-black uppercase tracking-[0.11em] text-amber-700 transition active:scale-[0.98] dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-300"
-                  >
-                    <Icon
-                      name="frogPlus"
-                      className="pointer-events-none -my-4 h-10 w-10 shrink-0 drop-shadow-[0_2px_0_rgba(31,98,28,0.3)]"
-                    />
-                    Progress all quests
-                    <span className="inline-flex shrink-0 items-center rounded-lg bg-gradient-to-b from-emerald-600 to-emerald-800 px-2 py-1 text-[11px] font-black uppercase leading-none tracking-normal text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25)] ring-1 ring-emerald-900/40">
-                      Plus
-                    </span>
-                  </button>
+                  <div className="flex flex-col gap-1.5">
+                    <button
+                      type="button"
+                      onClick={onUpgrade}
+                      aria-label="Progress all quests with Frog Plus"
+                      className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl border-2 border-amber-200/90 bg-amber-50 text-[13px] font-black uppercase tracking-[0.11em] text-amber-700 transition active:scale-[0.98] dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-300"
+                    >
+                      <Icon
+                        name="frogPlus"
+                        className="pointer-events-none -my-4 h-10 w-10 shrink-0 drop-shadow-[0_2px_0_rgba(31,98,28,0.3)]"
+                      />
+                      Progress all quests
+                      <span className="inline-flex shrink-0 items-center rounded-lg bg-gradient-to-b from-emerald-600 to-emerald-800 px-2 py-1 text-[11px] font-black uppercase leading-none tracking-normal text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25)] ring-1 ring-emerald-900/40">
+                        Plus
+                      </span>
+                    </button>
+                    <p className="text-center text-[11px] font-medium text-muted-foreground">
+                      Every area, always — with double rewards and unlimited
+                      tags.
+                    </p>
+                  </div>
                 )}
                 {onUpgrade && !rentAvailable && (
                   <div className="flex flex-col gap-2">
@@ -1757,6 +1768,7 @@ export function AreaRow({
   rewardCatalog,
   isPremium,
   onPress,
+  rentedUntil,
 }: {
   quest: QuestCardData & {
     placement: 'category';
@@ -1769,7 +1781,9 @@ export function AreaRow({
   rewardCatalog: Record<string, QuestRewardCatalogItem>;
   isPremium: boolean;
   onPress?: () => void;
+  rentedUntil?: string | null;
 }) {
+  const rentedTimeLeft = useCountdownLabel(rentedUntil ?? undefined);
   const claimedObjectiveIds = quest.claimedObjectiveIds ?? [];
   const imageUrl = category?.coverImageUrl ?? quest.coverImageUrl;
   const totalTarget = quest.logic.reduce(
@@ -1935,6 +1949,11 @@ export function AreaRow({
           <span className="inline-flex items-center gap-1 rounded-xl border-[1.5px] border-amber-500/50 bg-amber-500/10 px-3 py-2 text-[10px] font-black uppercase tracking-[0.1em] text-amber-600 dark:text-amber-400">
             <Play className="h-3.5 w-3.5 fill-current" />
             Activate
+          </span>
+        ) : rentedTimeLeft ? (
+          <span className="inline-flex items-center gap-1 rounded-xl bg-amber-500/15 px-3 py-2 text-[10px] font-black uppercase tracking-[0.1em] text-amber-600 dark:text-amber-400">
+            <Clock className="h-3.5 w-3.5" strokeWidth={2.75} />
+            {rentedTimeLeft}
           </span>
         ) : (
           <span className="pr-1 text-muted-foreground">

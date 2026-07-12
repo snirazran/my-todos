@@ -1453,6 +1453,13 @@ export function QuestsPanel({
                                         rewardCatalog={data.rewardCatalog}
                                         isPremium={data.isPremium}
                                         onPress={handlePress}
+                                        rentedUntil={
+                                          data.rentedFocus?.categoryId ===
+                                          quest.categoryId
+                                            ? data.rentedFocus?.expiresAt ??
+                                              null
+                                            : null
+                                        }
                                       />
                                     )}
                                   </div>
