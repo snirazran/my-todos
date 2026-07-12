@@ -305,6 +305,10 @@ function WardrobeManagerContent({
     );
   }, [activeTab]);
   const [activeFilter, setActiveFilter] = useState<FilterCategory>('all');
+  const [sellMode, setSellMode] = useState(false);
+  useEffect(() => {
+    setSellMode(false);
+  }, [activeTab]);
   const [visitedCategories, setVisitedCategories] = useState<
     Set<FilterCategory>
   >(new Set<FilterCategory>(['all']));
@@ -969,7 +973,14 @@ function WardrobeManagerContent({
         }
         canAfford={true}
         actionLoading={false}
-        onAction={() => handleItemAction(card.item)}
+        sellMode={sellMode}
+        onAction={() => {
+          if (!sellMode) {
+            handleItemAction(card.item);
+            return;
+          }
+          if ((card.item.priceFlies ?? 0) > 0) setItemToSell(card.item);
+        }}
         onSell={() => {
           setItemToSell(card.item);
         }}
@@ -996,8 +1007,15 @@ function WardrobeManagerContent({
         canAfford={bg.balance >= card.bg.priceFlies}
         mode="inventory"
         compact
+        sellMode={sellMode}
         actionLoading={bg.busyId === card.bg.id}
-        onAction={() => bg.handleEquip(card.bg)}
+        onAction={() => {
+          if (!sellMode) {
+            bg.handleEquip(card.bg);
+            return;
+          }
+          if ((card.bg.priceFlies ?? 0) > 0) bg.setSellTarget(card.bg);
+        }}
         onSell={() => bg.setSellTarget(card.bg)}
       />
     );
@@ -1089,6 +1107,22 @@ function WardrobeManagerContent({
         onAction={() => openBgPurchase(card.bg)}
       />
     );
+
+  const sellToggle =
+    activeTab === 'inventory' ? (
+      <button
+        type="button"
+        onClick={() => setSellMode((v) => !v)}
+        className={cn(
+          'h-12 shrink-0 rounded-[18px] border px-3.5 text-xs font-black uppercase tracking-wide transition-all shadow-sm',
+          sellMode
+            ? 'border-primary bg-primary/10 text-primary'
+            : 'border-border/50 bg-card/50 text-muted-foreground backdrop-blur-md hover:bg-accent/50',
+        )}
+      >
+        Sell
+      </button>
+    ) : null;
 
   return (
     <div
@@ -1219,12 +1253,15 @@ function WardrobeManagerContent({
               </TabsList>
 
               {!embedded && (
-                <SortMenu
-                  value={sortBy}
-                  onChange={setSortBy}
-                  showLatest={activeTab === 'inventory'}
-                  showFeatured={activeTab === 'shop'}
-                />
+                <div className="flex items-center gap-2">
+                  {sellToggle}
+                  <SortMenu
+                    value={sortBy}
+                    onChange={setSortBy}
+                    showLatest={activeTab === 'inventory'}
+                    showFeatured={activeTab === 'shop'}
+                  />
+                </div>
               )}
             </div>
 
@@ -1327,10 +1364,11 @@ function WardrobeManagerContent({
               {embedded && (
                 <div
                   className={cn(
-                    'relative z-10 flex shrink-0 items-center self-stretch border-l border-border/40 pl-3',
+                    'relative z-10 flex shrink-0 items-center gap-2 self-stretch border-l border-border/40 pl-3',
                     'bg-background',
                   )}
                 >
+                  {sellToggle}
                   <SortMenu
                     value={sortBy}
                     onChange={setSortBy}

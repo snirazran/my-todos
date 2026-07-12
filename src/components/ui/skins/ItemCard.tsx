@@ -112,6 +112,7 @@ function ItemCardComponent({
   giftAnimation,
   centerFrogPreview = false,
   compact = false,
+  sellMode = false,
 }: {
   item: ItemDef;
   ownedCount: number;
@@ -141,6 +142,7 @@ function ItemCardComponent({
   giftAnimation?: string;
   centerFrogPreview?: boolean;
   compact?: boolean;
+  sellMode?: boolean;
 }) {
   const config = RARITY_CONFIG[item.rarity];
   const isOwned = ownedCount > 0;
@@ -254,6 +256,11 @@ function ItemCardComponent({
         compact
           ? 'p-1.5 pb-0 md:p-2 md:pb-0.5 rounded-xl border-2'
           : 'p-2.5 pb-1 md:p-3.5 md:pb-1.5 rounded-2xl border-[3px]',
+        compact &&
+          mode === 'inventory' &&
+          !sellMode &&
+          item.slot !== 'container' &&
+          'pb-1.5 md:pb-2',
         config.border,
         config.bg,
         isEquipped
@@ -409,7 +416,7 @@ function ItemCardComponent({
               compact && 'mt-1 mb-1.5',
               isSelected
                 ? 'bg-primary text-primary-foreground shadow-md'
-                : 'bg-muted text-muted-foreground group-hover:bg-primary/20 group-hover:text-primary',
+                : 'bg-primary/15 text-primary border border-primary/30 group-hover:bg-primary/25',
             )}
           >
             {actionLoading ? '...' : isSelected ? 'SELECTED' : 'SELECT'}
@@ -462,14 +469,31 @@ function ItemCardComponent({
           </button>
         )}
 
+        {/* Sell Mode Price Chip */}
+        {mode === 'inventory' &&
+          compact &&
+          sellMode &&
+          !customAction &&
+          (item.priceFlies ?? 0) > 0 && (
+            <div className="h-7 w-full flex items-center justify-center gap-1 text-xs md:text-sm font-black tracking-tight text-foreground">
+              <Fly size={26} y={-2} paused={true} />
+              <span className="tabular-nums leading-none">
+                +{Math.floor((item.priceFlies || 0) / 2)}
+              </span>
+            </div>
+          )}
+
         {/* Equip Status Bar (Inventory Mode) */}
-        {mode === 'inventory' && !customAction && item.slot !== 'container' && (
+        {mode === 'inventory' &&
+          !compact &&
+          !customAction &&
+          item.slot !== 'container' && (
           <div
             className={cn(
               'h-7 md:h-8 w-full flex items-center justify-center gap-1 rounded-lg text-[10px] md:text-xs font-black uppercase tracking-wide transition-colors duration-200',
               isEquipped
                 ? 'bg-green-500 text-white shadow-md'
-                : 'bg-muted text-muted-foreground group-hover:bg-primary/20 group-hover:text-primary',
+                : 'bg-primary/15 text-primary border border-primary/30 group-hover:bg-primary/25',
             )}
           >
             {isEquipped ? (
@@ -485,6 +509,7 @@ function ItemCardComponent({
 
         {/* Sell Button (Inventory Mode) */}
         {mode === 'inventory' &&
+          !compact &&
           onSell &&
           (item.priceFlies ?? 0) > 0 &&
           !customAction && (

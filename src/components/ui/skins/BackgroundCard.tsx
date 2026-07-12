@@ -72,6 +72,7 @@ export function BackgroundCard({
   onAction,
   onSell,
   compact = false,
+  sellMode = false,
 }: {
   item: BackgroundItem;
   owned: boolean;
@@ -85,6 +86,7 @@ export function BackgroundCard({
   onAction: (e: React.MouseEvent) => void;
   onSell?: () => void;
   compact?: boolean;
+  sellMode?: boolean;
 }) {
   const config = RARITY_CONFIG[item.rarity];
   const preview = item.images.mobile || item.images.tablet || item.images.web || item.images.webLarge;
@@ -124,6 +126,7 @@ export function BackgroundCard({
         compact
           ? 'p-1.5 pb-0 md:p-2 md:pb-0.5 rounded-xl border-2'
           : 'p-2.5 pb-1 md:p-3.5 md:pb-1.5 rounded-2xl border-[3px]',
+        compact && mode === 'inventory' && !sellMode && 'pb-1.5 md:pb-2',
         config.border,
         config.bg,
         isEquipped
@@ -199,14 +202,23 @@ export function BackgroundCard({
       </div>
 
       <div className={cn('w-full mx-auto md:w-3/4', compact ? 'mt-0' : 'mt-2')}>
-        {mode === 'inventory' ? (
+        {mode === 'inventory' && compact ? (
+          sellMode && (item.priceFlies ?? 0) > 0 ? (
+            <div className="h-7 w-full flex items-center justify-center gap-1 text-xs md:text-sm font-black tracking-tight text-foreground">
+              <Fly size={26} y={-2} paused={true} />
+              <span className="tabular-nums leading-none">
+                +{Math.floor((item.priceFlies || 0) / 2)}
+              </span>
+            </div>
+          ) : null
+        ) : mode === 'inventory' ? (
           <>
             <div
               className={cn(
                 'h-7 md:h-8 w-full flex items-center justify-center gap-1 rounded-lg text-[10px] md:text-xs font-black uppercase tracking-wide transition-colors duration-200',
                 isEquipped
                   ? 'bg-green-500 text-white shadow-md'
-                  : 'bg-muted text-muted-foreground group-hover:bg-primary/20 group-hover:text-primary',
+                  : 'bg-primary/15 text-primary border border-primary/30 group-hover:bg-primary/25',
               )}
             >
               {actionLoading ? (
@@ -248,7 +260,7 @@ export function BackgroundCard({
               compact && 'mt-1 mb-1.5',
               isSelected
                 ? 'bg-primary text-primary-foreground shadow-md'
-                : 'bg-muted text-muted-foreground group-hover:bg-primary/20 group-hover:text-primary',
+                : 'bg-primary/15 text-primary border border-primary/30 group-hover:bg-primary/25',
             )}
           >
             {isSelected ? 'SELECTED' : 'SELECT'}
