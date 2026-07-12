@@ -1136,7 +1136,7 @@ export function QuestsPanel({
                         )}
                         <div className={cn(
                           "flex flex-col gap-8",
-                          data.activeSeason && "relative z-10 -mt-8 pt-8 px-4 md:mx-auto md:mt-6 md:w-full md:max-w-6xl md:px-8 md:pt-0 bg-muted rounded-t-[24px] md:rounded-none md:bg-transparent"
+                          data.activeSeason && "relative z-10 -mt-8 pt-8 px-2.5 md:mx-auto md:mt-6 md:w-full md:max-w-6xl md:px-8 md:pt-0 bg-muted rounded-t-[24px] md:rounded-none md:bg-transparent"
                         )}>
                         {(() => {
                           const dailyQuests = data.dailyQuests ?? [];
@@ -1809,7 +1809,7 @@ function QuestSeasonBanner({
           </div>
         </div>
 
-        <div className="absolute inset-x-3 bottom-10 z-10 mx-auto flex max-w-xl items-center gap-3 rounded-[24px] bg-background p-3 shadow-lg">
+        <div className="absolute inset-x-3 bottom-10 z-10 mx-auto flex max-w-xl items-center gap-1.5 rounded-[24px] bg-background p-3 shadow-lg sm:gap-3">
           {claimedToday ? (
             <>
               <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white shadow-md">
@@ -1829,7 +1829,7 @@ function QuestSeasonBanner({
             </>
           ) : (
             <>
-              <div className="relative flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-muted/60">
+              <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-muted/60 sm:h-20 sm:w-20">
                 {previewReward ? (
                   <SeasonRewardPreview
                     reward={previewReward}
@@ -1841,10 +1841,10 @@ function QuestSeasonBanner({
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-lg font-black text-foreground">
+                <p className="whitespace-nowrap font-black text-foreground text-[clamp(0.75rem,calc(5vw_-_0.25rem),1.125rem)] sm:whitespace-normal">
                   Unlock Day {season.currentDay}!
                 </p>
-                <div className="relative mt-3 h-8 overflow-hidden rounded-full bg-muted">
+                <div className="relative mt-2 h-8 overflow-hidden rounded-full bg-muted sm:mt-3">
                   <div className="absolute inset-1">
                     <div
                       className="h-full min-w-7 rounded-full bg-amber-400 transition-all"
@@ -1853,18 +1853,18 @@ function QuestSeasonBanner({
                   </div>
                   <span className="absolute inset-0 flex items-center justify-center gap-1.5 text-sm font-black tabular-nums text-muted-foreground">
                     {progress} / {season.dailyTargetFlies}
-                    <Fly size={18} y={-3} paused={false} interactive={false} />
+                    <Fly size={26} y={-3} paused={false} interactive={false} />
                   </span>
                 </div>
               </div>
             </>
           )}
-          <div className="relative flex w-[8.5rem] shrink-0 items-center">
+          <div className="relative flex w-[6.25rem] shrink-0 items-center sm:w-[8.5rem]">
             <button
               type="button"
               onClick={onView}
               className={cn(
-                'w-full rounded-2xl px-4 pb-3 pt-4 text-sm font-black text-white transition active:translate-y-1 active:shadow-none',
+                'w-full whitespace-nowrap rounded-2xl px-2.5 pb-3 pt-4 text-xs font-black text-white transition active:translate-y-1 active:shadow-none sm:px-4 sm:text-sm',
                 season.claimable
                   ? 'bg-amber-500 shadow-[0_5px_0_#b45309]'
                   : 'bg-lime-600 shadow-[0_5px_0_#3f6212]',

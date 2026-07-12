@@ -5,6 +5,9 @@ import { mutate } from 'swr';
 import { Check, Flame, Lock, Play, Timer } from 'lucide-react';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { Icon } from '@/components/ui/Icon';
+import { cn } from '@/lib/utils';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { TAG_COLORS } from './quick-add/constants';
 import Fly from './fly';
 import { PlusUpgradeModal } from './PlusUpgradeModal';
 import {
@@ -47,6 +50,9 @@ export function QuestStartSheet({
   const lastQuestRef = useRef(quest);
   if (open && quest) lastQuestRef.current = quest;
   const activeQuest = quest ?? lastQuestRef.current;
+  const accent = activeCategory
+    ? pickTagColor(activeCategory.id)
+    : TAG_COLORS[5].value;
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -55,6 +61,7 @@ export function QuestStartSheet({
   const [limitPick, setLimitPick] = useState<LimitPick | null>(null);
   const [pickedTagId, setPickedTagId] = useState<string | null>(null);
   const [plusOpen, setPlusOpen] = useState(false);
+  const narrow = !useMediaQuery('(min-width: 400px)');
 
   useEffect(() => {
     if (!open) return;
@@ -79,7 +86,7 @@ export function QuestStartSheet({
         payload.tagId = pickedTagId;
       } else {
         payload.tagName = activeCategory.name;
-        payload.tagColor = activeCategory.accent;
+        payload.tagColor = accent;
       }
       const res = await fetch('/api/quests/start', {
         method: 'POST',
@@ -111,7 +118,6 @@ export function QuestStartSheet({
 
   if (!activeCategory) return null;
 
-  const accent = activeCategory.accent || '#22c55e';
   const name = activeCategory.name;
   const exampleTask =
     activeCategory.taskSuggestions?.[0] ?? `A ${name.toLowerCase()} task`;
@@ -141,7 +147,10 @@ export function QuestStartSheet({
       {({ bindScroll }) => (
         <div
           ref={bindScroll}
-          className="mx-auto w-full overflow-y-auto overscroll-none px-5 pb-[calc(env(safe-area-inset-bottom)+24px)] pt-1 sm:pb-6"
+          className={cn(
+            'mx-auto w-full overflow-y-auto overscroll-none pb-[calc(env(safe-area-inset-bottom)+24px)] pt-1 sm:pb-6',
+            narrow ? 'px-4' : 'px-5',
+          )}
         >
           {activeCategory.coverImageUrl ? (
             <div className="relative mb-4 mt-4 h-28 overflow-hidden rounded-[20px] sm:mt-12">
@@ -179,13 +188,21 @@ export function QuestStartSheet({
             . Here&apos;s the whole game:
           </p>
 
-          <div className="rounded-[20px] border border-border/60 bg-muted/30 p-3">
+          <div className={cn(
+              'rounded-[20px] border border-border/60 bg-muted/30',
+              narrow ? 'p-2.5' : 'p-3',
+            )}>
             <p className="mb-2 flex items-center gap-1.5 text-[11px] font-black uppercase tracking-[0.14em] text-muted-foreground">
               <StepDot accent={accent}>1</StepDot>
               Tag your tasks
             </p>
             {/* A task exactly as it looks on the Today list, wearing the tag. */}
-            <div className="flex items-center gap-3 rounded-2xl border border-border/60 bg-card px-3.5 py-2.5 shadow-sm">
+            <div
+              className={cn(
+                'flex items-center rounded-2xl border border-border/60 bg-card py-2.5 shadow-sm',
+                narrow ? 'gap-2.5 px-3' : 'gap-3 px-3.5',
+              )}
+            >
               <div className="min-w-0 flex-1">
                 <div className="mb-1 flex flex-wrap gap-1">
                   <span
@@ -209,8 +226,11 @@ export function QuestStartSheet({
             </div>
           </div>
 
-          <div className="mt-2.5 grid grid-cols-2 gap-2.5">
-            <div className="rounded-[20px] border border-border/60 bg-muted/30 p-3">
+          <div className={cn('mt-2.5 grid grid-cols-2', narrow ? 'gap-2' : 'gap-2.5')}>
+            <div className={cn(
+              'rounded-[20px] border border-border/60 bg-muted/30',
+              narrow ? 'p-2.5' : 'p-3',
+            )}>
               <p className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-[0.14em] text-muted-foreground">
                 <StepDot accent={accent}>2</StepDot>
                 Do them
@@ -242,21 +262,25 @@ export function QuestStartSheet({
                 </span>
               </div>
             </div>
-            <div className="rounded-[20px] border border-border/60 bg-muted/30 p-3">
+            <div className={cn(
+              'rounded-[20px] border border-border/60 bg-muted/30',
+              narrow ? 'p-2.5' : 'p-3',
+            )}>
               <p className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-[0.14em] text-muted-foreground">
                 <StepDot accent={accent}>3</StepDot>
                 Get paid
               </p>
-              <div className="mt-2 flex flex-col items-start gap-1.5">
-                {loot.flies > 0 && <FlyWorth amount={loot.flies} />}
+              <div className="mt-2 flex flex-col items-start gap-2">
+                {loot.flies > 0 && <FlyWorth amount={loot.flies} flySize={30} />}
                 {lootTiles.length > 0 && (
-                  <span className="flex flex-wrap items-center gap-1.5">
+                  <span className="flex flex-wrap items-center gap-2">
                     {lootTiles.map((reward, index) => (
                       <BareRewardIcon
                         key={`${reward.type}-${reward.itemId ?? reward.backgroundId ?? index}`}
                         reward={reward}
                         rewardCatalog={rewardCatalog}
                         isPremium={isPremium}
+                        iconClassName="-ml-1.5"
                       />
                     ))}
                   </span>
@@ -369,7 +393,7 @@ export function QuestStartSheet({
           </button>
           {!limitPick && (
             <p className="mt-2.5 text-center text-[12px] font-semibold leading-snug text-muted-foreground">
-              We&apos;ll create the {tagChip} tag for you — change it any time.
+              We&apos;ll add a {tagChip} tag — change it anytime.
             </p>
           )}
           <PlusUpgradeModal
@@ -381,6 +405,14 @@ export function QuestStartSheet({
       )}
     </BaseSheet>
   );
+}
+
+function pickTagColor(seed: string) {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+  }
+  return TAG_COLORS[hash % TAG_COLORS.length].value;
 }
 
 function StepDot({

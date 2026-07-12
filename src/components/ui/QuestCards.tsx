@@ -21,6 +21,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/utils';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { metricObjectiveLabel } from '@/lib/quests/metricLabels';
 import type { ItemDef } from '@/lib/skins/catalog';
 import type {
@@ -149,14 +150,25 @@ const TASK_STREAK_METRIC_PATTERN = /^task_streak_(\d+)$/;
 export function FlyWorth({
   amount,
   flySize = 28,
+  numberClassName,
+  iconClassName,
 }: {
   amount: number;
   flySize?: number;
+  numberClassName?: string;
+  iconClassName?: string;
 }) {
   return (
     <span className="inline-flex items-center gap-1">
-      <Fly size={flySize} y={-1} paused interactive={false} />
-      <span className="translate-y-[2px] text-[13px] font-black tabular-nums text-foreground">
+      <span className={cn('inline-flex', iconClassName)}>
+        <Fly size={flySize} y={-1} paused interactive={false} />
+      </span>
+      <span
+        className={cn(
+          'translate-y-[2px] text-[13px] font-black tabular-nums text-foreground',
+          numberClassName,
+        )}
+      >
         {amount}
       </span>
     </span>
@@ -191,10 +203,16 @@ export function BareRewardIcon({
   reward,
   rewardCatalog,
   isPremium,
+  numberClassName,
+  iconClassName,
+  compact = false,
 }: {
   reward: QuestReward;
   rewardCatalog: Record<string, QuestRewardCatalogItem>;
   isPremium: boolean;
+  numberClassName?: string;
+  iconClassName?: string;
+  compact?: boolean;
 }) {
   const lookupId = reward.itemId ?? reward.backgroundId;
   const item = lookupId ? rewardCatalog[lookupId] : null;
@@ -203,7 +221,13 @@ export function BareRewardIcon({
   if (item?.slot === 'container') {
     return (
       <span className="inline-flex items-center gap-1">
-        <span className="-my-1.5 h-11 w-11 shrink-0 -translate-y-[8px]">
+        <span
+          className={cn(
+            '-my-1.5 shrink-0',
+            compact ? 'h-8 w-8 -translate-y-[5px]' : 'h-11 w-11 -translate-y-[8px]',
+            iconClassName,
+          )}
+        >
           <GiftRive
             className="h-full w-full"
             color={item.riveIndex}
@@ -211,7 +235,12 @@ export function BareRewardIcon({
             animation="box_shake"
           />
         </span>
-        <span className="translate-y-[2px] text-[13px] font-black tabular-nums text-foreground">
+        <span
+          className={cn(
+            'translate-y-[2px] text-[13px] font-black tabular-nums text-foreground',
+            numberClassName,
+          )}
+        >
           {quantity}
         </span>
       </span>
@@ -358,34 +387,15 @@ export function formatQuestObjective(block: QuestCardLogicBlock) {
   return `${actionLabel} ${targetLabel} ${scopeLabel}`;
 }
 
-function InlineTagChips({ tags }: { tags: QuestTagChip[] }) {
-  if (tags.length === 0) return null;
-  return (
-    <>
-      <QuestTagPill tag={tags[0]} compact />
-      {tags.length > 1 && (
-        <span className="text-[11px] font-black text-muted-foreground">
-          +{tags.length - 1}
-        </span>
-      )}
-    </>
-  );
-}
-
-function renderFocusScopedMetricObjective(
-  block: QuestCardLogicBlock,
-  tags: QuestTagChip[],
-) {
+function renderFocusScopedMetricObjective(block: QuestCardLogicBlock) {
   if (block.metricKey === 'buddy_task_completed') {
     const target = Math.max(1, block.target ?? 1);
     return (
-      <>
-        <span>{target === 1 ? 'Finish a' : `Finish ${target}`}</span>
-        <InlineTagChips tags={tags} />
-        <span>
-          {target === 1 ? 'task with your buddy' : 'tasks with your buddy'}
-        </span>
-      </>
+      <span>
+        {target === 1
+          ? 'Finish a task with your buddy'
+          : `Finish ${target} tasks with your buddy`}
+      </span>
     );
   }
 
@@ -396,15 +406,11 @@ function renderFocusScopedMetricObjective(
     const days = Number(streakMatch[1]);
     const target = Math.max(1, block.target ?? 1);
     return (
-      <>
-        <span>
-          {target === 1
-            ? `Reach a ${days}-day streak on a repeating`
-            : `Reach a ${days}-day streak on ${target} repeating`}
-        </span>
-        <InlineTagChips tags={tags} />
-        <span>{target === 1 ? 'task' : 'tasks'}</span>
-      </>
+      <span>
+        {target === 1
+          ? `Reach a ${days}-day streak on a repeating task`
+          : `Reach a ${days}-day streak on ${target} repeating tasks`}
+      </span>
     );
   }
 
@@ -426,7 +432,7 @@ function renderObjectiveLabel(
     block.tagMode === 'focus_category_tags' &&
     tags.length > 0
   ) {
-    return renderFocusScopedMetricObjective(block, tags);
+    return renderFocusScopedMetricObjective(block);
   }
 
   if (block.type === 'metric_count' || block.tagMode !== 'focus_category_tags') {
@@ -449,19 +455,16 @@ function renderObjectiveLabel(
       : 'Complete';
 
   if (tags.length > 0) {
-    const leadIn = isMinutes
-      ? `${actionLabel} ${targetLabel} minutes on`
-      : `${actionLabel} ${targetLabel}`;
+    const suffix =
+      isMinutes || !(numericTarget === 1 && !targetLabel.includes('-'))
+        ? 'tasks'
+        : 'task';
     return (
-      <>
-        <span>{leadIn}</span>
-        <InlineTagChips tags={tags} />
-        <span>
-          {isMinutes || !(numericTarget === 1 && !targetLabel.includes('-'))
-            ? 'tasks'
-            : 'task'}
-        </span>
-      </>
+      <span>
+        {isMinutes
+          ? `${actionLabel} ${targetLabel} minutes on ${suffix}`
+          : `${actionLabel} ${targetLabel} ${suffix}`}
+      </span>
     );
   }
 
@@ -692,7 +695,7 @@ export function StarterQuestCard({
         {shownBlocks.map((block) => (
           <div
             key={block.id}
-            className="rounded-[20px] border border-border/50 bg-card px-4 py-1 shadow-sm"
+            className="rounded-[20px] border border-border/50 bg-card px-3 py-1 shadow-sm sm:px-4"
           >
             <ObjectiveRow
               block={block}
@@ -855,16 +858,19 @@ function DailyStreakStrip({
   const prize = prizePool[0];
 
   return (
-    <div className="rounded-[20px] border border-border/50 bg-card px-4 py-3 shadow-sm">
+    <div className="rounded-[20px] border border-border/50 bg-card px-3 py-3 shadow-sm sm:px-4">
       <div className="flex items-center gap-2.5">
         {prize ? (
           <RewardTile
             reward={prize}
             rewardCatalog={rewardCatalog}
             isPremium={isPremium}
-            paused={true}
+            compact
+            paused={false}
             hideBadge={prize.type !== 'FLIES'}
             flySize={22}
+            hydrateDelayMs={150}
+            giftAnimation="box_shake"
             className="h-10 w-10 shrink-0 rounded-xl"
           />
         ) : (
@@ -949,7 +955,7 @@ function DailyChecklistQuestRows({
       {visibleLogic.map((block) => (
         <div
           key={block.id}
-          className="rounded-[20px] border border-border/50 bg-card px-4 py-1 shadow-sm"
+          className="rounded-[20px] border border-border/50 bg-card px-3 py-1 shadow-sm sm:px-4"
         >
           <ObjectiveRow
             block={block}
@@ -1011,6 +1017,7 @@ export function CategoryQuestPresentationCard({
   onRented?: () => void;
 }) {
   const heroImageUrl = category?.coverImageUrl ?? quest.coverImageUrl;
+  const showWorthLabel = useMediaQuery('(min-width: 365px)');
   const timeLeft = useCountdownLabel(quest.expiresAt);
   const rentedTimeLeft = useCountdownLabel(rentedUntil ?? undefined);
   const [rewardPopup, setRewardPopup] = useState<RewardPopupState | null>(null);
@@ -1267,7 +1274,7 @@ export function CategoryQuestPresentationCard({
         {shownBlocks.map((block) => (
           <div
             key={block.id}
-            className="rounded-[20px] border border-border/50 bg-card px-4 py-1 shadow-sm"
+            className="rounded-[20px] border border-border/50 bg-card px-3 py-1 shadow-sm sm:px-4"
           >
             <ObjectiveRow
               block={block}
@@ -1345,7 +1352,7 @@ export function CategoryQuestPresentationCard({
           <button
             type="button"
             onClick={() => setShowAllObjectives((v) => !v)}
-            className="flex w-full items-center gap-2 rounded-[20px] border border-dashed border-border/60 bg-muted/30 px-4 py-2.5 text-[11px] font-black uppercase tracking-[0.1em] text-muted-foreground transition hover:bg-muted/60"
+            className="flex w-full items-center gap-2 rounded-[20px] border border-dashed border-border/60 bg-muted/30 px-3 py-2.5 text-[clamp(0.625rem,calc(0.375rem_+_1.25vw),0.6875rem)] font-black uppercase tracking-[0.1em] text-muted-foreground transition hover:bg-muted/60 sm:px-4"
           >
             <ChevronDown
               className={cn(
@@ -1357,29 +1364,34 @@ export function CategoryQuestPresentationCard({
             {showAllObjectives ? (
               'Show less'
             ) : (
-              <span className="flex min-w-0 items-center gap-1.5">
-                <span className="shrink-0">{foldedBlocks.length} more</span>
-                {linkedTags[0] ? (
-                  <QuestTagPill tag={linkedTags[0]} compact />
-                ) : null}
-                <span className="shrink-0">
-                  objective{foldedBlocks.length > 1 ? 's' : ''}
-                </span>
+              <span className="shrink-0">
+                {foldedBlocks.length} more quest
+                {foldedBlocks.length > 1 ? 's' : ''}
               </span>
             )}
             {!showAllObjectives &&
               (foldedFlies > 0 || foldedItems.length > 0) && (
-                <span className="ml-auto flex items-center gap-1.5 normal-case tracking-normal">
-                  <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground/80">
-                    worth
-                  </span>
-                  {foldedFlies > 0 && <FlyWorth amount={foldedFlies} />}
+                <span className="ml-auto flex shrink-0 items-center gap-1.5 normal-case tracking-normal">
+                  {showWorthLabel && (
+                    <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground/80">
+                      worth
+                    </span>
+                  )}
+                  {foldedFlies > 0 && (
+                    <FlyWorth
+                      amount={foldedFlies}
+                      numberClassName="translate-y-0 text-[clamp(0.6875rem,calc(0.1875rem_+_2.5vw),0.8125rem)]"
+                      iconClassName="-translate-y-[2px]"
+                    />
+                  )}
                   {foldedItems.map((reward, index) => (
                     <BareRewardIcon
                       key={`${reward.type}-${reward.itemId ?? reward.backgroundId ?? index}`}
                       reward={reward}
                       rewardCatalog={rewardCatalog}
                       isPremium={isPremium}
+                      numberClassName="translate-y-0 text-[clamp(0.6875rem,calc(0.1875rem_+_2.5vw),0.8125rem)]"
+                      iconClassName="-translate-y-[10px]"
                     />
                   ))}
                 </span>
@@ -1453,12 +1465,11 @@ export function RemoveTagConfirm({
           <p className="mx-auto mt-1.5 max-w-[20rem] text-center text-[14px] leading-snug text-muted-foreground">
             {switching ? (
               <>
-                Progress from the current tag stops counting — the{' '}
+                The{' '}
                 <span className="font-bold text-foreground">
                   {categoryName ?? 'area'}
                 </span>{' '}
-                quest will recount using the new tag instead. Rewards you
-                already claimed stay yours.
+                quest recounts from the new tag. Claimed rewards stay yours.
               </>
             ) : (
               <>
@@ -1466,8 +1477,8 @@ export function RemoveTagConfirm({
                 <span className="font-bold text-foreground">
                   {categoryName ?? 'area'}
                 </span>{' '}
-                quest stops counting and its progress hides until you link a
-                tag again. Rewards you already claimed stay yours.
+                quest pauses until you link a tag again. Claimed rewards stay
+                yours.
               </>
             )}
           </p>
@@ -1784,6 +1795,9 @@ export function AreaRow({
   rentedUntil?: string | null;
 }) {
   const rentedTimeLeft = useCountdownLabel(rentedUntil ?? undefined);
+  const atLeast380 = useMediaQuery('(min-width: 380px)');
+  const atLeast640 = useMediaQuery('(min-width: 640px)');
+  const thumbWidthClass = atLeast640 ? 'w-[88px]' : atLeast380 ? 'w-[72px]' : 'w-14';
   const claimedObjectiveIds = quest.claimedObjectiveIds ?? [];
   const imageUrl = category?.coverImageUrl ?? quest.coverImageUrl;
   const totalTarget = quest.logic.reduce(
@@ -1812,14 +1826,19 @@ export function AreaRow({
       type="button"
       onClick={onPress}
       className={cn(
-        'flex w-full items-center gap-3 rounded-[20px] border bg-card p-3 text-left shadow-sm transition active:scale-[0.98]',
+        'flex w-full items-center gap-2.5 rounded-[20px] border bg-card p-3 text-left shadow-sm transition active:scale-[0.98] sm:gap-3',
         quest.claimable && !finished
           ? 'border-amber-400 ring-1 ring-amber-400/40'
           : 'border-border/50',
         finished && 'opacity-70',
       )}
     >
-      <div className="relative h-14 w-[88px] shrink-0 overflow-hidden rounded-xl">
+      <div
+        className={cn(
+          'relative h-14 shrink-0 overflow-hidden rounded-xl',
+          thumbWidthClass,
+        )}
+      >
         {imageUrl ? (
           <img
             src={imageUrl}
@@ -1904,17 +1923,20 @@ export function AreaRow({
             ) : null}
           </>
         ) : !finished && (loot.flies > 0 || lootTiles.length > 0) ? (
-          <span className="mt-1 flex items-center gap-1.5">
-            <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground/80">
-              worth
-            </span>
-            {loot.flies > 0 && <FlyWorth amount={loot.flies} />}
+          <span className="mt-1 flex min-w-0 items-center gap-1.5">
+            {atLeast380 && (
+              <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground/80">
+                worth
+              </span>
+            )}
+            {loot.flies > 0 && <FlyWorth amount={loot.flies} flySize={20} />}
             {lootTiles.map((reward, index) => (
               <BareRewardIcon
                 key={`${reward.type}-${reward.itemId ?? reward.backgroundId ?? index}`}
                 reward={reward}
                 rewardCatalog={rewardCatalog}
                 isPremium={isPremium}
+                compact
               />
             ))}
             {lootExtra > 0 && (
@@ -1941,14 +1963,14 @@ export function AreaRow({
             Ready
           </span>
         ) : state === 'start' ? (
-          <span className="inline-flex items-center gap-1 rounded-xl border-[1.5px] border-dashed border-amber-500/60 bg-amber-500/10 px-3 py-2 text-[10px] font-black uppercase tracking-[0.1em] text-amber-600 dark:text-amber-400">
+          <span className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-amber-500 px-4 text-[11px] font-black uppercase tracking-[0.12em] text-white shadow-[0_3px_0_0_#b45309] transition-all active:translate-y-[2px] active:shadow-none">
             <Play className="h-3.5 w-3.5 fill-current" />
             Start
           </span>
         ) : state === 'paused' ? (
-          <span className="inline-flex items-center gap-1 rounded-xl border-[1.5px] border-amber-500/50 bg-amber-500/10 px-3 py-2 text-[10px] font-black uppercase tracking-[0.1em] text-amber-600 dark:text-amber-400">
+          <span className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-amber-500 px-4 text-[11px] font-black uppercase tracking-[0.12em] text-white shadow-[0_3px_0_0_#b45309] transition-all active:translate-y-[2px] active:shadow-none">
             <Play className="h-3.5 w-3.5 fill-current" />
-            Activate
+            Start
           </span>
         ) : rentedTimeLeft ? (
           <span className="inline-flex items-center gap-1 rounded-xl bg-amber-500/15 px-3 py-2 text-[10px] font-black uppercase tracking-[0.1em] text-amber-600 dark:text-amber-400">
@@ -2165,7 +2187,7 @@ function ObjectiveRow({
           type="button"
           onClick={onClaimObjective}
           disabled={claimingObjective}
-          className="inline-flex h-8 items-center justify-center rounded-xl bg-amber-500 px-3.5 text-[10px] font-black uppercase tracking-[0.15em] text-white shadow-[0_3px_0_0_#b45309] transition-all hover:translate-y-[-1px] hover:shadow-[0_4px_0_0_#b45309] active:translate-y-[2px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex h-8 items-center justify-center rounded-xl bg-amber-500 px-3 text-[10px] font-black uppercase tracking-[0.15em] text-white shadow-[0_3px_0_0_#b45309] transition-all hover:translate-y-[-1px] hover:shadow-[0_4px_0_0_#b45309] active:translate-y-[2px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60 min-[400px]:px-3.5"
         >
           <span className="mr-[-0.15em]">
             {claimingObjective ? 'Claiming...' : 'Claim'}
@@ -2198,7 +2220,7 @@ function ObjectiveRow({
       )}
       aria-disabled={needsTag || undefined}
     >
-      <div className="flex items-center gap-2.5">
+      <div className="flex items-center gap-2 sm:gap-2.5">
         {firstReward ? (
           <div className="relative shrink-0">
             <RewardTile
@@ -2207,7 +2229,7 @@ function ObjectiveRow({
               isPremium={isPremium ?? false}
               compact
               paused={paused}
-              className="h-12 w-12 rounded-xl"
+              className="h-11 w-11 rounded-xl min-[400px]:h-12 min-[400px]:w-12"
               hydrateDelayMs={150}
               giftAnimation="box_shake"
               onClick={() => onOpenRewards?.(block.rewards ?? [])}
@@ -2223,7 +2245,7 @@ function ObjectiveRow({
         <div className="min-w-0 flex-1">
           <p
             className={cn(
-              'flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm font-black leading-snug',
+              'flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[clamp(0.75rem,calc(0.125rem_+_3.125vw),0.875rem)] font-black leading-snug',
               stepDone
                 ? 'text-emerald-600 line-through decoration-emerald-500/60 dark:text-emerald-400'
                 : 'text-foreground',
@@ -2303,7 +2325,7 @@ function HintButton({ text }: { text: string }) {
           event.stopPropagation();
           setOpen((v) => !v);
         }}
-        className="inline-flex h-8 items-center justify-center rounded-xl border border-border/70 bg-background px-3.5 text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground shadow-[0_3px_0_0_rgba(15,23,42,0.08)] transition-all hover:text-foreground active:translate-y-[2px] active:shadow-none"
+        className="inline-flex h-8 items-center justify-center rounded-xl border border-border/70 bg-background px-3 text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground shadow-[0_3px_0_0_rgba(15,23,42,0.08)] transition-all hover:text-foreground active:translate-y-[2px] active:shadow-none min-[400px]:px-3.5"
       >
         <span className="mr-[-0.15em]">Hint</span>
       </button>
