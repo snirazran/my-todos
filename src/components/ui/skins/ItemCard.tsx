@@ -7,6 +7,7 @@ import { Check, Info, Loader2, X } from 'lucide-react';
 import Fly from '@/components/ui/fly';
 import { cn } from '@/lib/utils';
 import type { ItemDef, Rarity } from '@/lib/skins/catalog';
+import { RarityCornerBadge } from './RarityCornerBadge';
 import Frog from '@/components/ui/frog';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -301,20 +302,7 @@ function ItemCardComponent({
       </AnimatePresence>
 
       {/* Rarity Tag */}
-      {!hideRarity && (
-        <div className="absolute top-0 left-0 z-20 overflow-hidden rounded-br-2xl bg-background">
-          <div
-            className={cn(
-              'px-2 py-1 md:px-2.5 rounded-br-2xl text-[9px] md:text-[10px] font-black uppercase tracking-wider border-b border-r',
-              config.bg,
-              config.text,
-              config.border,
-            )}
-          >
-            {config.label}
-          </div>
-        </div>
-      )}
+      {!hideRarity && <RarityCornerBadge rarity={item.rarity} />}
 
       <div
         className={cn(

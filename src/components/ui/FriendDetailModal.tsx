@@ -31,6 +31,8 @@ import { useInventory, mutateInventoryCaches } from '@/hooks/useInventory';
 import { mutateBackgrounds } from '@/hooks/useBackgrounds';
 import type { BackgroundItem } from '@/hooks/useBackgrounds';
 import type { Rarity } from '@/lib/skins/catalog';
+import { RarityCornerBadge } from '@/components/ui/skins/RarityCornerBadge';
+import { DragScrollRow } from '@/components/ui/DragScrollRow';
 
 type PeekTarget =
   | {
@@ -346,7 +348,7 @@ export function FriendDetailModal({
                     <p className="px-1 text-[11px] font-black uppercase tracking-[0.14em] text-muted-foreground">
                       Their look
                     </p>
-                    <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    <DragScrollRow className="gap-2 px-1 pt-1">
                       {(entry.equippedItems ?? []).map((item) => (
                         <LookChip
                           key={item.id}
@@ -404,7 +406,7 @@ export function FriendDetailModal({
                           }
                         />
                       )}
-                    </div>
+                    </DragScrollRow>
                   </div>
                 )}
 
@@ -528,25 +530,17 @@ function LookChip({
     <button
       type="button"
       onClick={onClick}
+      aria-label={`View ${name}`}
       className={cn(
-        'flex w-[168px] shrink-0 flex-col items-stretch rounded-2xl border-[3px] bg-card p-2.5 text-left shadow-sm transition-transform active:scale-[0.97]',
+        'relative flex w-[168px] shrink-0 flex-col items-stretch overflow-hidden rounded-2xl border-[3px] p-2.5 text-left shadow-sm transition-transform active:scale-[0.97]',
         config.border,
+        config.bg,
       )}
     >
-      <div className="flex aspect-[1/0.75] w-full items-end justify-center overflow-hidden rounded-xl bg-muted/40">
+      <RarityCornerBadge rarity={rarity} />
+      <div className="mt-4 flex aspect-[1/0.75] w-full items-end justify-center overflow-hidden rounded-xl bg-muted/40">
         {preview}
       </div>
-      <p className="mt-1.5 truncate text-sm font-black text-foreground">
-        {name}
-      </p>
-      <p
-        className={cn(
-          'truncate text-[10px] font-black uppercase tracking-wider',
-          config.text,
-        )}
-      >
-        {config.label}
-      </p>
     </button>
   );
 }
@@ -607,15 +601,6 @@ function ItemPeekSheet({
         target ? (
           <div className="flex flex-col px-5 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-3 sm:px-6 sm:pb-6 sm:pt-7">
             <div className="flex items-center gap-2 pr-12">
-              <span
-                className={cn(
-                  'rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em]',
-                  config.bg,
-                  config.text,
-                )}
-              >
-                {config.label}
-              </span>
               <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                 {target.kind === 'bg' ? 'Background' : 'Wardrobe item'}
               </span>
@@ -623,11 +608,12 @@ function ItemPeekSheet({
 
             <div
               className={cn(
-                'mx-auto mt-4 flex aspect-square w-full max-w-[260px] items-end justify-center overflow-hidden rounded-[28px] border-2 bg-gradient-to-br',
+                'relative mx-auto mt-4 flex aspect-square w-full max-w-[260px] items-end justify-center overflow-hidden rounded-[28px] border-2 bg-gradient-to-br',
                 config.border,
                 config.gradient,
               )}
             >
+              <RarityCornerBadge rarity={target.rarity} />
               {target.kind === 'item' ? (
                 <FrogSnapshot
                   className="h-[118%] w-[118%] -translate-y-[12%] object-contain"
@@ -645,10 +631,10 @@ function ItemPeekSheet({
               )}
             </div>
 
-            <h2 className="mt-4 text-center text-xl font-black tracking-tight text-foreground">
+            <h2 className="sr-only">
               {target.name}
             </h2>
-            <p className="mt-1 text-center text-[13px] font-semibold text-muted-foreground">
+            <p className="mt-4 text-center text-[13px] font-semibold text-muted-foreground">
               {scarcity}
             </p>
 
