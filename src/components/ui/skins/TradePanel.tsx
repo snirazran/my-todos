@@ -107,6 +107,7 @@ const RARITY_CONFIG: Record<
 import { FilterCategory } from './FilterBar';
 import { SortOrder } from './SortMenu';
 import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { BackgroundCard } from './BackgroundCard';
 import { backgroundPreview } from '@/hooks/useBackgroundActions';
 import type { BackgroundItem } from '@/hooks/useBackgrounds';
@@ -165,6 +166,11 @@ export function TradePanel({
   const [gridInitialSize, setGridInitialSize] = useState(4);
   const [gridBatchSize, setGridBatchSize] = useState(6);
   const inventoryScrollRef = useRef<HTMLDivElement | null>(null);
+  const threeCol = useMediaQuery('(min-width: 380px)');
+  const cardGridClass = cn(
+    'grid md:grid-cols-4 md:gap-4',
+    threeCol ? 'grid-cols-3 gap-2' : 'grid-cols-2 gap-3',
+  );
   // Mobile-only collapse for the contract slot grid. Auto-expands when items are added,
   // auto-collapses when cleared. Desktop (lg+) ignores this and always shows the grid.
   const [isContractExpanded, setIsContractExpanded] = useState(false);
@@ -823,6 +829,7 @@ export function TradePanel({
                           isNew={unseenItems.includes(entry.id)}
                           deferPreview
                           centerFrogPreview
+                          compact
                           pausePreview={true}
                           previewDelayMs={index * 20}
                         />
@@ -834,6 +841,7 @@ export function TradePanel({
                           isEquipped={false}
                           canAfford
                           mode="trade"
+                          compact
                           actionLoading={false}
                           selectedCount={selected}
                           onAction={() => handleSelect(entry)}
@@ -845,7 +853,7 @@ export function TradePanel({
 
                 if (sortBy !== 'rarity_asc' && sortBy !== 'rarity_desc') {
                   return (
-                    <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4 pb-4">
+                    <div className={cn(cardGridClass, 'pb-4')}>
                       {availableGrid.visibleItems.map((entry, index) =>
                         renderTradeEntry(entry, index),
                       )}
@@ -874,7 +882,7 @@ export function TradePanel({
                     >
                       {RARITY_CONFIG[group.rarity].label}
                     </p>
-                    <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4">
+                    <div className={cardGridClass}>
                       {group.entries.map((entry) =>
                         renderTradeEntry(entry, entryIndex++),
                       )}

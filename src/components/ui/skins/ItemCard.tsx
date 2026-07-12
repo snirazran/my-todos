@@ -111,6 +111,7 @@ function ItemCardComponent({
   previewTopLeftBadge,
   giftAnimation,
   centerFrogPreview = false,
+  compact = false,
 }: {
   item: ItemDef;
   ownedCount: number;
@@ -139,6 +140,7 @@ function ItemCardComponent({
   /** Optional gift-box animation override (e.g. 'box_shake'). */
   giftAnimation?: string;
   centerFrogPreview?: boolean;
+  compact?: boolean;
 }) {
   const config = RARITY_CONFIG[item.rarity];
   const isOwned = ownedCount > 0;
@@ -217,7 +219,9 @@ function ItemCardComponent({
     centerFrogPreview && item.slot !== 'container' && !customPreview;
   const frogPreviewClassName = cn(
     centerFrog
-      ? 'object-contain -translate-y-[6%]'
+      ? compact
+        ? 'object-contain -translate-y-[2%]'
+        : 'object-contain -translate-y-[6%]'
       : 'w-[125%] h-[125%] object-contain translate-y-[10%] min-[375px]:translate-y-[2%] min-[425px]:-translate-y-[4%] md:-translate-y-[5%]',
     previewClassName,
   );
@@ -246,7 +250,10 @@ function ItemCardComponent({
       // UX TWEAK: Smaller padding on mobile (p-2.5) -> Normal on desktop (md:p-3.5)
       // Added min-h-[220px] to ensure card has presence even if image fails
       className={cn(
-        'group relative flex flex-col p-2.5 pb-1 md:p-3.5 md:pb-1.5 transition-[color,background-color,border-color,box-shadow] duration-300 rounded-2xl border-[3px] overflow-hidden cursor-pointer w-full max-w-[240px] lg:max-w-[360px] mx-auto',
+        'group relative flex flex-col transition-[color,background-color,border-color,box-shadow] duration-300 overflow-hidden cursor-pointer w-full max-w-[240px] lg:max-w-[360px] mx-auto',
+        compact
+          ? 'p-1.5 pb-0 md:p-2 md:pb-0.5 rounded-xl border-2'
+          : 'p-2.5 pb-1 md:p-3.5 md:pb-1.5 rounded-2xl border-[3px]',
         config.border,
         config.bg,
         isEquipped
@@ -261,7 +268,7 @@ function ItemCardComponent({
     >
       {/* Selected Indicator */}
       <AnimatePresence>
-        {isEquipped && !customAction && (
+        {isEquipped && !customAction && !compact && (
           <motion.div
             initial={{ scale: 0, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -301,7 +308,10 @@ function ItemCardComponent({
 
       <div
         className={cn(
-          'mt-4 mb-1 md:mt-5 md:mb-2 mx-auto w-full aspect-[1/0.75] md:aspect-[1.2/1] rounded-xl flex items-center justify-center relative overflow-hidden',
+          compact
+            ? 'mt-0 mb-0.5 aspect-[1/0.85] rounded-lg'
+            : 'mt-4 mb-1 md:mt-5 md:mb-2 aspect-[1/0.75] md:aspect-[1.2/1] rounded-xl',
+          'mx-auto w-full flex items-center justify-center relative overflow-hidden',
           'bg-gradient-to-br shadow-inner',
           config.gradient,
         )}
@@ -370,6 +380,19 @@ function ItemCardComponent({
             x{ownedCount}
           </div>
         )}
+        <AnimatePresence>
+          {compact && isEquipped && !customAction && (
+            <motion.div
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 550, damping: 18 }}
+              className="absolute bottom-1 right-1 z-20 p-1 text-white bg-green-500 rounded-full shadow-md"
+            >
+              <Check className="w-3 h-3 stroke-[4]" />
+            </motion.div>
+          )}
+        </AnimatePresence>
         {previewTopLeftBadge ? (
           <div className="absolute left-1 top-1 z-20 md:left-1.5 md:top-1.5">
             {previewTopLeftBadge}
@@ -383,6 +406,7 @@ function ItemCardComponent({
           <div
             className={cn(
               'h-7 md:h-8 w-full flex items-center justify-center rounded-lg text-[10px] md:text-xs font-black uppercase tracking-wide transition-colors',
+              compact && 'mt-1 mb-1.5',
               isSelected
                 ? 'bg-primary text-primary-foreground shadow-md'
                 : 'bg-muted text-muted-foreground group-hover:bg-primary/20 group-hover:text-primary',
@@ -410,9 +434,12 @@ function ItemCardComponent({
             }}
             disabled={actionLoading}
             className={cn(
-              'group/buy w-full flex items-center justify-center gap-1 h-8 text-sm md:text-base font-black tracking-tight transition-colors active:scale-95 bg-transparent border-0 shadow-none',
+              'group/buy w-full flex items-center justify-center gap-1 font-black tracking-tight transition-colors active:scale-95 bg-transparent border-0 shadow-none',
+              compact ? 'h-7 text-xs md:text-sm' : 'h-8 text-sm md:text-base',
               canAfford
-                ? cn(config.text, 'hover:brightness-110')
+                ? compact
+                  ? 'text-foreground hover:brightness-110'
+                  : cn(config.text, 'hover:brightness-110')
                 : 'text-red-500 dark:text-red-400',
               actionLoading && 'opacity-60 cursor-wait',
             )}
@@ -424,9 +451,9 @@ function ItemCardComponent({
             ) : (
               <>
                 <Fly
-                  size={22}
+                  size={compact ? 26 : 22}
                   className="transition-transform group-hover/buy:scale-110"
-                  y={-3}
+                  y={compact ? -2 : -3}
                   paused={true}
                 />
                 <span className="tabular-nums leading-none">{item.priceFlies}</span>

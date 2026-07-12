@@ -112,11 +112,21 @@ export function DailyDealsShelf({
                 isPremium ? onBuy(item, deal.dealPrice) : onUpgrade()
               }
               className={cn(
-                'flex w-[148px] shrink-0 flex-col items-stretch rounded-xl border-2 bg-gradient-to-br p-2 text-left shadow-sm transition-transform active:scale-[0.97]',
+                'relative flex w-[148px] shrink-0 flex-col items-stretch overflow-hidden rounded-xl border-2 bg-gradient-to-br p-2 text-left shadow-sm transition-transform active:scale-[0.97]',
                 config.border,
                 config.gradient,
               )}
             >
+              <div
+                className={cn(
+                  'absolute top-0 left-0 z-20 px-2 py-1 rounded-br-2xl text-[9px] font-black uppercase tracking-wider border-b border-r',
+                  config.bg,
+                  config.text,
+                  config.border,
+                )}
+              >
+                {config.label}
+              </div>
               <div className="relative flex h-24 items-end justify-center overflow-hidden rounded-lg bg-background/50">
                 <FrogSnapshot
                   className="h-[120%] w-[120%] object-contain"
@@ -125,23 +135,12 @@ export function DailyDealsShelf({
                   height={170}
                 />
               </div>
-              <p className="mt-1.5 truncate text-xs font-black text-foreground">
-                {item.name}
-              </p>
-              <p
-                className={cn(
-                  'truncate text-[9px] font-black uppercase tracking-wider',
-                  config.text,
-                )}
-              >
-                {config.label}
-              </p>
-              <div className="mt-1 flex items-baseline gap-1.5">
+              <div className="mt-1.5 flex items-center justify-center gap-1.5">
                 <span className="text-[11px] font-bold tabular-nums text-muted-foreground line-through decoration-2 opacity-70">
                   {deal.priceFlies.toLocaleString()}
                 </span>
                 <span className="inline-flex items-center gap-1 text-sm font-black tabular-nums text-foreground">
-                  <Fly size={14} paused y={-1} />
+                  <Fly size={26} paused y={-2} />
                   {deal.dealPrice.toLocaleString()}
                 </span>
               </div>

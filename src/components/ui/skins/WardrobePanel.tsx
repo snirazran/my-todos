@@ -39,6 +39,7 @@ import { motion, type DragControls } from 'framer-motion';
 import { AnimatedNumber } from '@/components/ui/AnimatedNumber';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 
 import { TradePanel } from './TradePanel';
 import GiftBoxOpening from '@/components/ui/gift-box/GiftBoxOpening';
@@ -113,6 +114,59 @@ function mergeWardrobeCards(
     }
   });
   return all;
+}
+
+function hashSeed(str: string) {
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+function mulberry32(seed: number) {
+  let a = seed;
+  return () => {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function featuredShopOrder(
+  cards: WardrobeCard[],
+  seed: string,
+): WardrobeCard[] {
+  const shuffled = cards
+    .map((card) => ({ card, key: hashSeed(`${seed}|${card.kind}|${card.id}`) }))
+    .sort((a, b) => a.key - b.key)
+    .map((entry) => entry.card);
+
+  const hot: WardrobeCard[] = [];
+  const rest: WardrobeCard[] = [];
+  for (const card of shuffled) {
+    (rarityRank[card.rarity] >= rarityRank.rare ? hot : rest).push(card);
+  }
+  if (!hot.length || !rest.length) return shuffled;
+
+  const rand = mulberry32(hashSeed(seed) ^ cards.length);
+  const total = cards.length;
+  const out: (WardrobeCard | undefined)[] = new Array(total);
+  const stride = total / hot.length;
+  hot.forEach((card, i) => {
+    const width = Math.max(1, Math.floor(stride));
+    let slot = Math.floor(i * stride) + Math.floor(rand() * width);
+    if (i === 0) slot = Math.min(slot, 5);
+    slot = Math.min(slot, total - 1);
+    while (out[slot]) slot = (slot + 1) % total;
+    out[slot] = card;
+  });
+  let r = 0;
+  for (let i = 0; i < total; i++) if (!out[i]) out[i] = rest[r++];
+  return out as WardrobeCard[];
 }
 
 function groupCardsByRarity(cards: WardrobeCard[]) {
@@ -242,7 +296,13 @@ function WardrobeManagerContent({
     setActiveTab(defaultTab);
   }, [defaultTab]);
   useEffect(() => {
-    setSortBy(activeTab === 'inventory' ? 'latest' : 'rarity_asc');
+    setSortBy(
+      activeTab === 'inventory'
+        ? 'latest'
+        : activeTab === 'shop'
+          ? 'featured'
+          : 'rarity_asc',
+    );
   }, [activeTab]);
   const [activeFilter, setActiveFilter] = useState<FilterCategory>('all');
   const [visitedCategories, setVisitedCategories] = useState<
@@ -284,6 +344,14 @@ function WardrobeManagerContent({
 
   const inventoryScrollRef = React.useRef<HTMLDivElement | null>(null);
   const shopScrollRef = React.useRef<HTMLDivElement | null>(null);
+
+  const threeCol = useMediaQuery('(min-width: 380px)');
+  const cardGridClass = cn(
+    'grid md:grid-cols-4 md:gap-4',
+    threeCol ? 'grid-cols-3 gap-2' : 'grid-cols-2 gap-3',
+  );
+  const today = new Date();
+  const featuredSeed = `${user?.uid ?? 'guest'}|${today.getFullYear()}-${today.getMonth() + 1}-${today.getDate()}`;
 
   const stickySentinelRef = React.useRef<HTMLDivElement | null>(null);
   const [isStuck, setIsStuck] = React.useState(false);
@@ -909,6 +977,7 @@ function WardrobeManagerContent({
         isNew={unseenInventorySet.has(card.item.id)}
         deferPreview
         centerFrogPreview
+        compact
         giftAnimation="box_shake"
         pausePreview={
           (card.item.slot !== 'container' && isDragging) ||
@@ -926,6 +995,7 @@ function WardrobeManagerContent({
         isEquipped={bg.equipped === card.bg.id}
         canAfford={bg.balance >= card.bg.priceFlies}
         mode="inventory"
+        compact
         actionLoading={bg.busyId === card.bg.id}
         onAction={() => bg.handleEquip(card.bg)}
         onSell={() => bg.setSellTarget(card.bg)}
@@ -937,9 +1007,9 @@ function WardrobeManagerContent({
       <WardrobeRowCard
         key={card.item.id}
         rarity={card.rarity}
-        name={card.item.name}
         sublabel={SLOT_LABEL[card.item.slot]}
         equipped={data?.wardrobe?.equipped?.[card.item.slot] === card.item.id}
+        rarityBadge
         onClick={() => handleItemAction(card.item)}
       >
         <FrogSnapshot
@@ -953,9 +1023,9 @@ function WardrobeManagerContent({
       <WardrobeRowCard
         key={`bg-${card.bg.id}`}
         rarity={card.rarity}
-        name={card.bg.name}
         sublabel="Background"
         equipped={bg.equipped === card.bg.id}
+        rarityBadge
         onClick={() => bg.handleEquip(card.bg)}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -972,14 +1042,13 @@ function WardrobeManagerContent({
       <WardrobeRowCard
         key={card.item.id}
         rarity={card.rarity}
-        name={card.item.name}
-        sublabel={RARITY_CONFIG[card.rarity].label}
-        sublabelClass={RARITY_CONFIG[card.rarity].text}
+        sublabel={SLOT_LABEL[card.item.slot]}
         count={data?.wardrobe?.inventory?.[card.item.id] ?? 0}
         isNew={unseenInventorySet.has(card.item.id)}
+        rarityBadge
         onClick={() => handleItemAction(card.item)}
       >
-        <div className="h-full w-full py-1">
+        <div className="h-[115%] w-[115%]">
           <GiftRive
             color={card.item.riveIndex}
             animation="box_shake"
@@ -1002,6 +1071,7 @@ function WardrobeManagerContent({
         onAction={() => openItemPurchase(card.item)}
         deferPreview
         centerFrogPreview
+        compact
         pausePreview={card.item.slot !== 'container'}
         previewDelayMs={index * 20}
       />
@@ -1014,6 +1084,7 @@ function WardrobeManagerContent({
         isEquipped={bg.equipped === card.bg.id}
         canAfford={bg.balance >= card.bg.priceFlies && !isGuest}
         mode="shop"
+        compact
         actionLoading={bg.busyId === card.bg.id}
         onAction={() => openBgPurchase(card.bg)}
       />
@@ -1152,6 +1223,7 @@ function WardrobeManagerContent({
                   value={sortBy}
                   onChange={setSortBy}
                   showLatest={activeTab === 'inventory'}
+                  showFeatured={activeTab === 'shop'}
                 />
               )}
             </div>
@@ -1263,6 +1335,7 @@ function WardrobeManagerContent({
                     value={sortBy}
                     onChange={setSortBy}
                     showLatest={activeTab === 'inventory'}
+                    showFeatured={activeTab === 'shop'}
                   />
                 </div>
               )}
@@ -1370,7 +1443,7 @@ function WardrobeManagerContent({
                           >
                             {label}
                           </p>
-                          <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4">
+                          <div className={cardGridClass}>
                             {cards.map((card) =>
                               renderInventoryCard(card, cardIndex++),
                             )}
@@ -1385,7 +1458,7 @@ function WardrobeManagerContent({
                         pinSnapshot.bgEquipped,
                       );
                       return (
-                        <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4 pb-4">
+                        <div className={cn(cardGridClass, 'pb-4')}>
                           {cards.map((card, index) =>
                             renderInventoryCard(card, index),
                           )}
@@ -1460,15 +1533,15 @@ function WardrobeManagerContent({
                       <>
                         {rowSection(
                           'worn',
-                          'On your frog',
-                          'text-emerald-600',
+                          'Currently wearing',
+                          'text-foreground',
                           worn,
                           renderWornRowCard,
                         )}
                         {rowSection(
                           'gifts',
                           'Gifts',
-                          'text-amber-500',
+                          'text-foreground',
                           gifts,
                           renderGiftRowCard,
                         )}
@@ -1563,9 +1636,18 @@ function WardrobeManagerContent({
                       shopBackgrounds,
                       sortBy,
                     );
+                    if (sortBy === 'featured') {
+                      return (
+                        <div className={cn(cardGridClass, 'pb-4')}>
+                          {featuredShopOrder(cards, featuredSeed).map(
+                            (card, index) => renderShopCard(card, index),
+                          )}
+                        </div>
+                      );
+                    }
                     if (sortBy !== 'rarity_asc' && sortBy !== 'rarity_desc') {
                       return (
-                        <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4 pb-4">
+                        <div className={cn(cardGridClass, 'pb-4')}>
                           {cards.map((card, index) =>
                             renderShopCard(card, index),
                           )}
@@ -1583,7 +1665,7 @@ function WardrobeManagerContent({
                         >
                           {RARITY_CONFIG[group.rarity].label}
                         </p>
-                        <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4">
+                        <div className={cardGridClass}>
                           {group.cards.map((card) =>
                             renderShopCard(card, cardIndex++),
                           )}
@@ -1720,16 +1802,18 @@ function WardrobeRowCard({
   count,
   isNew,
   equipped,
+  rarityBadge,
   onClick,
   children,
 }: {
   rarity: ItemDef['rarity'];
-  name: string;
+  name?: string;
   sublabel: string;
   sublabelClass?: string;
   count?: number;
   isNew?: boolean;
   equipped?: boolean;
+  rarityBadge?: boolean;
   onClick: () => void;
   children: React.ReactNode;
 }) {
@@ -1739,14 +1823,31 @@ function WardrobeRowCard({
       type="button"
       onClick={onClick}
       className={cn(
-        'relative flex w-[132px] shrink-0 flex-col items-stretch rounded-xl border-2 bg-card p-2 text-left shadow-sm transition-transform active:scale-[0.97]',
+        'relative flex w-[132px] shrink-0 flex-col items-stretch overflow-hidden rounded-xl border-2 bg-card p-2 text-left shadow-sm transition-transform active:scale-[0.97]',
         config.border,
       )}
     >
-      <div className="relative flex h-16 items-end justify-center overflow-hidden rounded-lg bg-muted/40">
+      {rarityBadge && (
+        <span
+          className={cn(
+            'absolute left-0 top-0 z-20 rounded-br-2xl border-b border-r px-2 py-1 text-[8px] font-black uppercase tracking-wider',
+            config.bg,
+            config.text,
+            config.border,
+          )}
+        >
+          {config.label}
+        </span>
+      )}
+      <div className="relative flex h-20 items-end justify-center overflow-hidden rounded-lg bg-muted/40">
         {children}
         {isNew && (
-          <span className="absolute left-1 top-1 z-20 animate-pulse rounded-md bg-red-500 px-1.5 py-0.5 text-[8px] font-black uppercase text-white shadow-sm">
+          <span
+            className={cn(
+              'absolute left-1 z-20 animate-pulse rounded-md bg-red-500 px-1.5 py-0.5 text-[8px] font-black uppercase text-white shadow-sm',
+              rarityBadge ? 'bottom-1' : 'top-1',
+            )}
+          >
             New
           </span>
         )}
@@ -1761,12 +1862,15 @@ function WardrobeRowCard({
           </span>
         )}
       </div>
-      <p className="mt-1.5 truncate text-xs font-black text-foreground">
-        {name}
-      </p>
+      {name && (
+        <p className="mt-1.5 truncate text-xs font-black text-foreground">
+          {name}
+        </p>
+      )}
       <p
         className={cn(
           'truncate text-[10px] font-semibold',
+          !name && 'mt-1.5',
           sublabelClass ?? 'text-muted-foreground',
         )}
       >

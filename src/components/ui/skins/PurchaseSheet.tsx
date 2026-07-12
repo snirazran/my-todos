@@ -234,11 +234,7 @@ export function PurchaseSheet({
               </AnimatePresence>
             </div>
 
-            {/* Title */}
-            <h2 className="mt-4 text-center text-2xl font-black tracking-tight text-foreground">
-              {target.name}
-            </h2>
-            <p className="mt-1 text-center text-sm font-medium text-muted-foreground">
+            <p className="mt-4 text-center text-sm font-medium text-muted-foreground">
               {phase === 'success'
                 ? 'Added to your wardrobe.'
                 : owned

@@ -7,6 +7,7 @@ import { ArrowUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export type SortOrder =
+  | 'featured'
   | 'latest'
   | 'rarity_asc'
   | 'rarity_desc'
@@ -17,10 +18,12 @@ export function SortMenu({
   value,
   onChange,
   showLatest = true,
+  showFeatured = false,
 }: {
   value: SortOrder;
   onChange: (v: SortOrder) => void;
   showLatest?: boolean;
+  showFeatured?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -50,6 +53,7 @@ export function SortMenu({
   }, [open]);
 
   const options: { label: string; val: SortOrder }[] = [
+    ...(showFeatured ? [{ label: 'Featured', val: 'featured' as SortOrder }] : []),
     ...(showLatest ? [{ label: 'Recently Added', val: 'latest' as SortOrder }] : []),
     { label: 'Rarity: Low to High', val: 'rarity_asc' },
     { label: 'Rarity: High to Low', val: 'rarity_desc' },

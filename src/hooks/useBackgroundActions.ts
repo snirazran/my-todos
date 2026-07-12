@@ -25,6 +25,7 @@ const rarityRank: Record<BackgroundItem['rarity'], number> = {
 };
 
 export type BackgroundSortOrder =
+  | 'featured'
   | 'latest'
   | 'rarity_asc'
   | 'rarity_desc'

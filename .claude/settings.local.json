@@ -301,7 +301,9 @@
       "PowerShell(npx tsc --noEmit 2>$null | Select-String -Pattern \"QuestCards|QuestsPanel|globals\" ; \"exit: $LASTEXITCODE\")",
       "PowerShell(npx tsc --noEmit 2>$null | Select-String -Pattern \"QuestCards|QuestsPanel|NextQuestStrip|questClaims|TaskList\" ; \"exit: $LASTEXITCODE\")",
       "PowerShell(npx tsc --noEmit 2>$null | Select-String -Pattern \"QuestCards|NextQuestStrip|questClaims|TaskList|BuddyNudge|metricLabels|api\" ; \"exit: $LASTEXITCODE\")",
-      "WebFetch(domain:capgo.app)"
+      "WebFetch(domain:capgo.app)",
+      "Bash(mkdir -p /c/Users/snira/AppData/Local/Temp/claude/C--Users-snira-Desktop-Full-Stack-frog-task/ca04efb8-4639-48e9-9a71-6793bb53589c/scratchpad)",
+      "Bash(\"/c/Program Files \\(x86\\)/Microsoft/Edge/Application/msedge.exe\" --headless=new --disable-gpu --hide-scrollbars --force-device-scale-factor=1 --window-size=390,1400 --virtual-time-budget=20000 --screenshot=\"C:\\\\\\\\Users\\\\\\\\snira\\\\\\\\AppData\\\\\\\\Local\\\\\\\\Temp\\\\\\\\claude\\\\\\\\C--Users-snira-Desktop-Full-Stack-frog-task\\\\\\\\ca04efb8-4639-48e9-9a71-6793bb53589c\\\\\\\\scratchpad\\\\\\\\shop390.png\" \"http://localhost:3000/wardrobe?tab=shop\")"
     ]
   }
 }
