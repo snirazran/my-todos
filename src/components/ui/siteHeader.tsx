@@ -38,6 +38,7 @@ import Fly from '@/components/ui/fly';
 import { FlyCounter } from '@/components/ui/FlyCounter';
 import { StreakChip } from '@/components/ui/streak/StreakChip';
 import { PremiumBadge } from '@/components/ui/PremiumBadge';
+import { PremiumFrogAura } from '@/components/ui/PremiumFrogAura';
 import { CurrencyShop } from './shop/CurrencyShop';
 import { HelpCenterPanel, ContactPanel } from '@/components/ui/HelpCenter';
 import { cn } from '@/lib/utils';
@@ -173,7 +174,6 @@ export default function SiteHeader() {
             aria-disabled={isLoadingScreenVisible}
           >
             <StyleShuffleHeaderButton />
-            <PremiumBadge />
             <StreakChip variant="mobile" />
             <FlyCounter
               balance={flyBalance}
@@ -1146,29 +1146,38 @@ function MainView({
 
       {plusInfoOpen && createPortal(
         <div
-          className="fixed inset-0 z-[1360] flex items-center justify-center bg-black/50 backdrop-blur-sm px-5"
+          className="fixed inset-0 z-[1360] flex items-center justify-center bg-black/60 backdrop-blur-sm px-5"
           onClick={() => setPlusInfoOpen(false)}
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="relative isolate w-full max-w-sm rounded-3xl px-6 pt-7 pb-6 text-emerald-950 ring-2 ring-amber-200/80"
+            className="relative w-full max-w-sm overflow-hidden rounded-[28px] bg-card shadow-2xl ring-1 ring-border/60"
           >
-            <span
-              aria-hidden
-              className="absolute inset-0 -z-10 rounded-3xl bg-[linear-gradient(125deg,#fde68a_0%,#fbbf24_45%,#f59e0b_75%,#d97706_100%)]"
-            />
-            <span aria-hidden className="absolute inset-x-0 top-0 -z-10 h-1/2 rounded-t-3xl bg-gradient-to-b from-white/45 to-transparent" />
-            <button
-              type="button"
-              onClick={() => setPlusInfoOpen(false)}
-              aria-label="Close"
-              className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-emerald-900/15 text-emerald-900 hover:bg-emerald-900/25"
-            >
-              <X className="h-4 w-4" />
-            </button>
-            <div className="flex flex-col items-center text-center">
-              <Icon name="frogPlus" className="h-20 w-20 drop-shadow-[0_3px_0_rgba(31,98,28,0.35)]" />
-              <p className="mt-2 text-lg font-black tracking-tight flex items-center gap-2">
+            <div className="relative isolate px-6 pb-6 pt-7 text-center text-emerald-950">
+              <span
+                aria-hidden
+                className="absolute inset-0 -z-10 bg-[linear-gradient(125deg,#fde68a_0%,#fbbf24_45%,#f59e0b_75%,#d97706_100%)]"
+              />
+              <span
+                aria-hidden
+                className="absolute inset-x-0 top-0 -z-10 h-1/2 bg-gradient-to-b from-white/45 to-transparent"
+              />
+              <button
+                type="button"
+                onClick={() => setPlusInfoOpen(false)}
+                aria-label="Close"
+                className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-emerald-900/15 text-emerald-900 transition-colors hover:bg-emerald-900/25"
+              >
+                <X className="h-4 w-4" />
+              </button>
+              <div className="relative mx-auto h-24 w-44">
+                <Icon
+                  name="frogPlus"
+                  className="absolute left-1/2 top-1/2 h-20 w-20 -translate-x-1/2 -translate-y-1/2 drop-shadow-[0_3px_0_rgba(31,98,28,0.35)]"
+                />
+                <PremiumFrogAura show compact alwaysPlay />
+              </div>
+              <p className="mt-2 flex items-center justify-center gap-2 text-xl font-black tracking-tight">
                 Frogress
                 <span className="inline-flex items-center rounded-md bg-gradient-to-b from-emerald-600 to-emerald-800 px-1.5 py-0.5 text-[10px] font-black uppercase leading-none tracking-[0.18em] text-amber-100 ring-1 ring-emerald-900/40">
                   Plus
@@ -1177,18 +1186,22 @@ function MainView({
               <p className="mt-1 text-sm font-bold text-emerald-900/85">
                 Your subscription is active 🎉
               </p>
+            </div>
+
+            <div className="px-6 py-5">
               {premiumUntilLabel && (
-                <div className="mt-4 w-full rounded-xl bg-white/55 px-4 py-3 ring-1 ring-amber-300/60">
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-900/70">
+                <div className="rounded-2xl border border-border/50 bg-muted/40 px-4 py-3 text-center">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">
                     Renews / Expires
                   </p>
-                  <p className="mt-0.5 text-base font-black tracking-tight text-emerald-950">
+                  <p className="mt-0.5 text-lg font-black tracking-tight text-foreground">
                     {premiumUntilLabel}
                   </p>
                 </div>
               )}
-              <p className="mt-4 text-xs font-medium text-emerald-900/70">
-                Thanks for supporting Frogress — you&apos;re helping us keep building 🐸
+              <p className="mt-4 text-center text-xs font-semibold text-muted-foreground">
+                Thanks for supporting Frogress — you&apos;re helping us keep
+                building 🐸
               </p>
             </div>
           </div>
@@ -1416,9 +1429,15 @@ function PromoCard({
       type="button"
       onClick={onAction}
       disabled={disabled}
-      className="w-full text-left rounded-2xl bg-violet-500 dark:bg-violet-600 text-white px-4 py-4 flex items-center gap-3 shadow-sm transition-transform active:scale-[0.98] disabled:opacity-70 disabled:active:scale-100"
+      className="group relative isolate w-full overflow-hidden text-left rounded-2xl bg-[linear-gradient(125deg,#8b5cf6_0%,#7c3aed_55%,#6d28d9_100%)] text-white px-4 py-4 flex items-center gap-3 shadow-md ring-1 ring-white/15 transition-transform active:scale-[0.98] disabled:opacity-70 disabled:active:scale-100"
     >
-      <div className="flex items-center justify-center w-11 h-11 shrink-0">{icon}</div>
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-x-4 top-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent"
+      />
+      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/20">
+        {icon}
+      </div>
       <div className="flex-1 min-w-0">
         <p className="text-base font-black tracking-tight flex items-center gap-2">
           {title}
@@ -1428,11 +1447,11 @@ function PromoCard({
             </span>
           )}
         </p>
-        <p className="text-xs font-medium text-white/90">{subtitle}</p>
+        <p className="text-xs font-semibold text-white/85">{subtitle}</p>
       </div>
       <span
         aria-hidden
-        className="bg-white text-violet-700 font-black text-xs rounded-xl px-3 py-2 shadow-sm shrink-0"
+        className="shrink-0 rounded-xl bg-white px-3.5 py-2 text-xs font-black tracking-tight text-violet-700 shadow-[0_3px_0_0_rgba(76,29,149,0.6)] transition-all group-active:translate-y-0.5 group-active:shadow-none"
       >
         {actionLabel}
       </span>

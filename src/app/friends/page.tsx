@@ -14,7 +14,7 @@ import {
   Flame,
 } from 'lucide-react';
 import { Icon } from '@/components/ui/Icon';
-import { PremiumBadge } from '@/components/ui/PremiumBadge';
+import { PremiumFrogAura } from '@/components/ui/PremiumFrogAura';
 import { StyleShuffleHeaderButton } from '@/components/ui/SkinRotation';
 import useSWR from 'swr';
 import { useAuth } from '@/components/auth/AuthContext';
@@ -153,6 +153,10 @@ export default function FriendsPage() {
       sharedFrom(b) - sharedFrom(a) ||
       (a.name || a.frogName).localeCompare(b.name || b.frogName),
   );
+  const receivedToday =
+    friendsData?.contribution?.receivedToday ??
+    leaderboard.reduce((sum, f) => sum + sharedFrom(f), 0);
+  const topStreak = friends.reduce((max, f) => Math.max(max, f.streak ?? 0), 0);
 
   return (
     <main className="relative min-h-[100dvh] overflow-x-hidden pb-24 md:pb-12">
@@ -160,7 +164,6 @@ export default function FriendsPage() {
         {/* Friend invites — persistent, over the winter scene */}
         <div className="absolute right-4 top-[calc(env(safe-area-inset-top)+0.75rem)] z-30 flex items-center gap-2">
           <StyleShuffleHeaderButton className="border-0 bg-card/90 shadow-md ring-1 ring-border/60 md:hidden" />
-          <PremiumBadge className="border-0 bg-card/90 shadow-md ring-1 ring-border/60 backdrop-blur-sm md:hidden" />
           <button
             type="button"
             onClick={() => setInboxOpen(true)}
@@ -195,9 +198,9 @@ export default function FriendsPage() {
         <button
           type="button"
           onClick={() => setAddOpen(true)}
-          className="relative z-20 -mt-3 flex w-[min(20rem,80vw)] items-center justify-center gap-2 rounded-2xl bg-card px-10 py-3.5 text-lg font-black tracking-tight text-primary shadow-lg ring-1 ring-primary/25 transition-transform active:scale-[0.98]"
+          className="relative z-20 -mt-3 flex w-[min(20rem,80vw)] items-center justify-center gap-2 rounded-2xl bg-card px-10 py-3.5 text-lg font-black tracking-tight text-[#4f9149] shadow-lg ring-1 ring-[#4f9149]/30 transition-transform active:scale-[0.98]"
         >
-          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm">
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#4f9149] text-white shadow-sm">
             <Plus className="h-5 w-5" strokeWidth={3} />
           </span>
           Add friend
@@ -222,7 +225,7 @@ export default function FriendsPage() {
               onClick={() => setInboxOpen(true)}
               className="mb-4 flex items-center gap-3 rounded-2xl border border-border/50 bg-card/80 px-3.5 py-2.5 text-left shadow-sm backdrop-blur-xl transition-transform active:scale-[0.99]"
             >
-              <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
+              <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#4f9149] text-white">
                 <UserPlus className="h-5 w-5" strokeWidth={2.5} />
                 <span className="absolute -right-1 -top-1 flex h-4 min-w-[1rem] items-center justify-center rounded-full border-2 border-card bg-rose-500 px-1 text-[9px] font-black leading-none text-white">
                   {pendingCount > 9 ? '9+' : pendingCount}
@@ -248,6 +251,18 @@ export default function FriendsPage() {
             />
           </div>
 
+          {/* Pond report — what friends did for you today */}
+          {hasRealFriends && (
+            <div className="mb-5 grid w-full grid-cols-3 gap-2">
+              <StatTile
+                value={friends.length}
+                label={friends.length === 1 ? 'Friend' : 'Friends'}
+              />
+              <StatTile value={receivedToday} label="Flies for you today" highlight />
+              <StatTile value={topStreak} label="Top friend streak" flame={topStreak > 0} />
+            </div>
+          )}
+
           {/* Leaderboard — focus is how much each friend shares with you */}
           <div className="w-full">
             <div className="mb-2.5 px-1.5">
@@ -268,6 +283,7 @@ export default function FriendsPage() {
                     <LeaderboardRow
                       key={`${entry.userId}-${i}`}
                       entry={entry}
+                      rank={i + 1}
                       buddyInvites={buddyInviteByFriend.get(entry.userId) ?? 0}
                       onOpen={() => setDetailTarget(entry)}
                       paused={isAnyPanelOpen}
@@ -275,10 +291,21 @@ export default function FriendsPage() {
                   ))}
                 </ul>
               ) : (
-                <div className="px-4 py-14 text-center">
-                  <p className="text-sm font-bold text-muted-foreground">
-                    Add friends to earn flies together
+                <div className="flex flex-col items-center px-4 py-12 text-center">
+                  <p className="text-sm font-black tracking-tight text-foreground">
+                    No friends yet
                   </p>
+                  <p className="mt-1 max-w-[16rem] text-xs font-semibold text-muted-foreground">
+                    Friends share the flies they catch — you both earn more
+                    together.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setAddOpen(true)}
+                    className="mt-4 rounded-xl bg-[#4f9149] px-5 py-2.5 text-sm font-black tracking-tight text-white shadow-[0_3px_0_0_#34631f] transition-all active:translate-y-0.5 active:shadow-none"
+                  >
+                    Add your first friend
+                  </button>
                 </div>
               )}
             </div>
@@ -412,6 +439,44 @@ function RemoveFriendDialog({
       )}
     </AnimatePresence>,
     document.body,
+  );
+}
+
+function StatTile({
+  value,
+  label,
+  highlight = false,
+  flame = false,
+}: {
+  value: number;
+  label: string;
+  highlight?: boolean;
+  flame?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        'flex flex-col items-center justify-center rounded-2xl border px-2 py-2.5 text-center',
+        highlight
+          ? 'border-primary/30 bg-primary/10'
+          : 'border-border/50 bg-card/60',
+      )}
+    >
+      <span
+        className={cn(
+          'flex items-center gap-1 text-xl font-black tabular-nums leading-none tracking-tight',
+          highlight
+            ? 'text-emerald-600 dark:text-emerald-400'
+            : 'text-foreground',
+        )}
+      >
+        {flame && <Flame className="h-4 w-4 fill-orange-400 text-orange-500" />}
+        {value}
+      </span>
+      <span className="mt-1 text-[10px] font-bold uppercase leading-tight tracking-[0.1em] text-muted-foreground">
+        {label}
+      </span>
+    </div>
   );
 }
 
@@ -575,18 +640,41 @@ function FlyClaimRewardOverlay({
 function LeaderboardRow({
   entry,
   onOpen,
+  rank,
   buddyInvites = 0,
   paused = false,
 }: {
   entry: LeaderboardEntry;
   onOpen: () => void;
+  rank?: number;
   buddyInvites?: number;
   paused?: boolean;
 }) {
+  const frogBoxRef = useRef<HTMLDivElement>(null);
+  const [frogBoxWidth, setFrogBoxWidth] = useState(0);
+  React.useEffect(() => {
+    const el = frogBoxRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(() => setFrogBoxWidth(el.clientWidth));
+    observer.observe(el);
+    setFrogBoxWidth(el.clientWidth);
+    return () => observer.disconnect();
+  }, []);
+  const rowFlySize = Math.round(
+    Math.min(34, Math.max(26, 26 + (frogBoxWidth - 96) * 0.0625)),
+  );
   const shared = entry.givesYou ?? contributionFrom(entry.fliesToday);
   const flex =
     entry.flexRarity && rarityRank[entry.flexRarity] >= rarityRank.epic
       ? RARITY_CONFIG[entry.flexRarity]
+      : null;
+  const medal =
+    shared > 0 && rank && rank <= 3
+      ? [
+          'bg-amber-400 text-amber-950',
+          'bg-slate-300 text-slate-800',
+          'bg-amber-700 text-amber-50',
+        ][rank - 1]
       : null;
 
   return (
@@ -601,18 +689,37 @@ function LeaderboardRow({
             : 'border-border/50 hover:border-emerald-300',
         )}
       >
+        {medal && (
+          <span
+            className={cn(
+              'absolute left-1.5 top-1.5 z-10 flex h-6 w-6 items-center justify-center rounded-full border-2 border-card text-[11px] font-black shadow-sm',
+              medal,
+            )}
+          >
+            {rank}
+          </span>
+        )}
         {buddyInvites > 0 && (
-          <span className="absolute -left-1 -top-1 z-10 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full border-2 border-background bg-rose-500 px-1 text-[10px] font-black text-white">
+          <span className="absolute -left-1 -top-1 z-20 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full border-2 border-background bg-rose-500 px-1 text-[10px] font-black text-white">
             {buddyInvites > 9 ? '9+' : buddyInvites}
           </span>
         )}
-        <div className="flex h-[78px] w-[96px] shrink-0 items-end justify-center self-center overflow-hidden min-[360px]:h-[102px] min-[360px]:w-[132px] min-[400px]:h-[124px] min-[400px]:w-[164px] sm:h-[124px] sm:w-48 md:h-[172px] md:w-56">
+        <div
+          ref={frogBoxRef}
+          className="relative flex aspect-[6/5] w-[40%] min-w-[96px] max-w-[224px] shrink-0 items-end justify-center self-center overflow-hidden"
+        >
           <Frog
-            className="min-[360px]:-translate-y-2 min-[400px]:-translate-y-3.5 md:-translate-y-10"
-            width={224}
-            height={185}
+            className="translate-y-[15%]"
+            width="145%"
+            height="145%"
             indices={entry.indices}
             paused={paused}
+          />
+          <PremiumFrogAura
+            show={!!entry.premium}
+            paused={paused}
+            compact
+            flySize={rowFlySize}
           />
         </div>
 
@@ -646,10 +753,23 @@ function LeaderboardRow({
         </div>
 
         <div className="flex shrink-0 items-center gap-1.5">
-          <Fly size={28} y={-4} interactive={false} paused={paused} />
-          <span className="text-xl font-black tabular-nums leading-none text-emerald-600 sm:text-2xl">
-            +{shared}
-          </span>
+          {shared > 0 ? (
+            <span className="flex items-center gap-1 rounded-full bg-emerald-500/10 py-1 pl-1.5 pr-2.5">
+              <Fly size={26} y={-2} interactive={false} paused={paused} />
+              <span className="text-lg font-black tabular-nums leading-none text-emerald-600 dark:text-emerald-400 sm:text-xl">
+                +{shared}
+              </span>
+            </span>
+          ) : (
+            <span className="flex items-center gap-1 rounded-full bg-muted/60 py-1 pl-1.5 pr-2.5 opacity-70">
+              <span className="grayscale">
+                <Fly size={22} y={-2} interactive={false} paused={paused} />
+              </span>
+              <span className="text-sm font-black tabular-nums leading-none text-muted-foreground">
+                +0
+              </span>
+            </span>
+          )}
           <ChevronRight className="h-5 w-5 text-muted-foreground/60" />
         </div>
       </button>
@@ -703,7 +823,7 @@ function InviteRewardBanner({
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-center gap-3 rounded-[18px] border border-primary/25 bg-primary/5 px-3.5 py-3 text-left transition-transform active:scale-[0.99]"
+      className="flex w-full items-center gap-3 rounded-[18px] border border-[#4f9149]/25 bg-[#4f9149]/5 px-3.5 py-3 text-left transition-transform active:scale-[0.99]"
     >
       <span className="relative flex h-16 w-16 shrink-0 items-center justify-center self-center overflow-hidden rounded-2xl bg-emerald-500/10 ring-1 ring-emerald-500/15">
         {isOutfit && item ? (
@@ -721,7 +841,7 @@ function InviteRewardBanner({
         )}
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-[11px] font-black uppercase tracking-[0.14em] text-emerald-600">
+        <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[#4f9149]">
           Invite &amp; earn
         </p>
         <p className="text-sm font-black leading-tight tracking-tight text-foreground sm:text-base">
@@ -730,7 +850,7 @@ function InviteRewardBanner({
             : `Gift a skin to earn rewards`}
         </p>
       </div>
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white shadow-sm">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#4f9149] text-white shadow-sm">
         <ChevronRight className="h-5 w-5" strokeWidth={2.5} />
       </span>
     </button>
@@ -747,6 +867,7 @@ function SelfFrog({
   return (
     <div className="pointer-events-none relative z-30 flex shrink-0 origin-bottom flex-col items-center md:scale-110 lg:scale-100">
       <Frog width={240} height={270} indices={indices} paused={paused} />
+      <PremiumFrogAura paused={paused} />
     </div>
   );
 }

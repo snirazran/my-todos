@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { AnimatePresence, motion, useAnimationControls } from 'framer-motion';
 import Frog, { type FrogHandle } from '@/components/ui/frog';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
+import { PremiumFrogAura } from '@/components/ui/PremiumFrogAura';
 import { WardrobePageContent } from '@/components/ui/skins/WardrobePanel';
 import { useInventory } from '@/hooks/useInventory';
 import { useIsFrogHungry } from '@/hooks/useFrogHunger';
@@ -93,6 +94,7 @@ function WardrobePageInner() {
               indices={previewIndices}
               paused={false}
             />
+            <PremiumFrogAura />
           </div>
         </div>
 

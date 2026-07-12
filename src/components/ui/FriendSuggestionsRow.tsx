@@ -123,7 +123,7 @@ export function FriendSuggestionsRow({ enabled }: { enabled: boolean }) {
                     'flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl px-3 text-xs font-black transition-colors',
                     sent
                       ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400'
-                      : 'bg-emerald-500 text-white shadow-[0_3px_0_0_#047857] hover:bg-emerald-400 active:translate-y-0.5 active:shadow-none',
+                      : 'bg-[#4f9149] text-white shadow-[0_3px_0_0_#34631f] hover:bg-[#5aa354] active:translate-y-0.5 active:shadow-none',
                   )}
                 >
                   {busyId === s.userId ? (

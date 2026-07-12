@@ -28,7 +28,7 @@ type FlyProps = {
   interactive?: boolean;
 };
 
-const Fly = memo(forwardRef<HTMLDivElement, FlyProps>(
+const Fly = memo(forwardRef<HTMLSpanElement, FlyProps>(
   (
     {
       onClick,
@@ -43,7 +43,7 @@ const Fly = memo(forwardRef<HTMLDivElement, FlyProps>(
     },
     ref,
   ) => {
-    const innerRef = useRef<HTMLDivElement>(null);
+    const innerRef = useRef<HTMLSpanElement>(null);
     useImperativeHandle(ref, () => innerRef.current!);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const handleRef = useRef<FlyCanvasHandle | null>(null);
@@ -149,7 +149,7 @@ const Fly = memo(forwardRef<HTMLDivElement, FlyProps>(
     );
 
     return (
-      <div
+      <span
         ref={innerRef}
         onClick={handleClick}
         className={className}
@@ -169,7 +169,7 @@ const Fly = memo(forwardRef<HTMLDivElement, FlyProps>(
           ref={canvasRef}
           style={{ width: '100%', height: '100%', display: 'block' }}
         />
-      </div>
+      </span>
     );
   }
 ));

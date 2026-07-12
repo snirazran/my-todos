@@ -347,7 +347,7 @@ function OverviewStep({
           <button
             onClick={onInviteFriends}
             disabled={!config.giftOptions?.length}
-            className="h-12 w-full rounded-2xl bg-emerald-500 font-black tracking-tight text-white transition-colors hover:bg-emerald-600 active:scale-[0.98] disabled:opacity-60"
+            className="h-12 w-full rounded-2xl bg-[#4f9149] font-black tracking-tight text-white shadow-[0_4px_0_0_#34631f] transition-all hover:bg-[#5aa354] active:translate-y-1 active:shadow-none disabled:opacity-60"
           >
             {config.giftOptions?.length ? 'Invite friends' : 'No gifts configured yet'}
           </button>

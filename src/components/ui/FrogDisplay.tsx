@@ -8,6 +8,7 @@ import Frog, {
 } from '@/components/ui/frog';
 import Fly from '@/components/ui/fly';
 import { FrogSpeechBubble } from './FrogSpeechBubble';
+import { PremiumFrogAura } from './PremiumFrogAura';
 import { useInventory } from '@/hooks/useInventory';
 import { useLoginStreak } from '@/hooks/useLoginStreak';
 import useSWR from 'swr';
@@ -205,6 +206,8 @@ export function FrogDisplay({
             paused={paused}
           />
         </div>
+
+        {!isGuest && <PremiumFrogAura paused={paused} />}
 
         {/* SPEECH BUBBLE - NOW INSIDE FROG'S CONTAINER */}
 

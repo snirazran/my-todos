@@ -34,6 +34,8 @@ import { useUIStore } from '@/lib/uiStore';
 import { AdminCosmeticsPopup } from '@/components/ui/AdminCosmeticsPopup';
 import { AdminGiftManagerPopup } from '@/components/ui/AdminGiftManagerPopup';
 import { AdminGuard } from '@/components/auth/AdminGuard';
+import { PlusWelcomeCelebration } from '@/components/ui/PlusUpgradeModal';
+import { createPortal } from 'react-dom';
 
 type Template = {
   id: string;
@@ -516,6 +518,7 @@ function AdminPageContent() {
 function PremiumControls() {
   const [premiumUntil, setPremiumUntil] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [celebrating, setCelebrating] = useState(false);
 
   useEffect(() => {
     fetch('/api/user')
@@ -533,7 +536,15 @@ function PremiumControls() {
         body: JSON.stringify({ action, days }),
       });
       const data = await res.json();
-      if (data.success) setPremiumUntil(data.premiumUntil);
+      if (data.success) {
+        setPremiumUntil(data.premiumUntil);
+        mutate(
+          (key) =>
+            typeof key === 'string' &&
+            (key.startsWith('/api/user') || key.startsWith('/api/quests')),
+        );
+        if (action === 'add') setCelebrating(true);
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -592,6 +603,13 @@ function PremiumControls() {
           Remove Premium
         </button>
       </div>
+
+      {celebrating &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <PlusWelcomeCelebration onDone={() => setCelebrating(false)} />,
+          document.body,
+        )}
     </div>
   );
 }

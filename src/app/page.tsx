@@ -54,7 +54,6 @@ import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import { randomUUID } from '@/lib/uuid';
 import { QuestOnboardingPopup } from '@/components/ui/QuestOnboardingPopup';
 import { StyleShuffleHeaderButton } from '@/components/ui/SkinRotation';
-import { PremiumBadge } from '@/components/ui/PremiumBadge';
 import { StreakChip } from '@/components/ui/streak/StreakChip';
 import { FlyCounter } from '@/components/ui/FlyCounter';
 import { NextQuestStrip } from '@/components/ui/NextQuestStrip';
@@ -514,7 +513,6 @@ export default function Home() {
       {user && (
         <div className="absolute right-4 top-[calc(env(safe-area-inset-top)+0.5rem)] z-30 flex items-center gap-2 md:hidden">
           <StyleShuffleHeaderButton />
-          <PremiumBadge />
           <StreakChip variant="mobile" />
           <FlyCounter
             balance={flyBalance}

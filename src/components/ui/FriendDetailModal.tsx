@@ -16,6 +16,7 @@ import {
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
 import { useUIStore } from '@/lib/uiStore';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
+import { PremiumFrogAura } from '@/components/ui/PremiumFrogAura';
 import {
   contributionFrom,
   type FriendSummary,
@@ -301,8 +302,9 @@ export function FriendDetailModal({
 
                 {/* Frog — sits above the white sheet below it */}
                 <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-center">
-                  <div className="-translate-y-[26px]">
+                  <div className="relative -translate-y-[26px]">
                     <Frog width={230} height={210} indices={entry.indices} />
+                    <PremiumFrogAura show={!!entry.premium} alwaysPlay />
                   </div>
                 </div>
               </div>
