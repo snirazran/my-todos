@@ -1599,28 +1599,46 @@ export function SwitchFocusConfirm({
             </div>
           )}
               <h3 className="text-center text-xl font-black text-foreground">
-                Switch your quest?
+                {rentAvailable
+                  ? `Run ${categoryName ?? 'this area'} too?`
+                  : 'Switch your quest?'}
               </h3>
-              <p className="mx-auto mt-1.5 max-w-[19rem] text-center text-[14px] leading-snug text-muted-foreground">
-                Switching to{' '}
-                <span className="font-bold text-foreground">
-                  {categoryName ?? 'this focus'}
-                </span>{' '}
-                quest resets your{' '}
-                <span className="font-bold text-foreground">
-                  {currentFocusName ?? 'current'}
-                </span>{' '}
-                quest progress.
-              </p>
+              {rentAvailable ? (
+                <p className="mx-auto mt-1.5 max-w-[19rem] text-center text-[14px] leading-snug text-muted-foreground">
+                  Keep{' '}
+                  <span className="font-bold text-foreground">
+                    {currentFocusName ?? 'your current quest'}
+                  </span>{' '}
+                  going and add{' '}
+                  <span className="font-bold text-foreground">
+                    {categoryName ?? 'this area'}
+                  </span>{' '}
+                  alongside it.
+                </p>
+              ) : (
+                <p className="mx-auto mt-1.5 max-w-[19rem] text-center text-[14px] leading-snug text-muted-foreground">
+                  Switching to{' '}
+                  <span className="font-bold text-foreground">
+                    {categoryName ?? 'this focus'}
+                  </span>{' '}
+                  quest resets your{' '}
+                  <span className="font-bold text-foreground">
+                    {currentFocusName ?? 'current'}
+                  </span>{' '}
+                  quest progress.
+                </p>
+              )}
               <div className="mt-5 flex flex-col gap-4">
-                <button
-                  type="button"
-                  onClick={onConfirm}
-                  disabled={switching}
-                  className="h-12 w-full rounded-2xl bg-primary text-[14px] font-black uppercase tracking-wide text-primary-foreground transition active:scale-[0.98] disabled:opacity-60"
-                >
-                  {switching ? 'Switching...' : 'Switch quest'}
-                </button>
+                {!rentAvailable && (
+                  <button
+                    type="button"
+                    onClick={onConfirm}
+                    disabled={switching}
+                    className="h-12 w-full rounded-2xl bg-primary text-[14px] font-black uppercase tracking-wide text-primary-foreground transition active:scale-[0.98] disabled:opacity-60"
+                  >
+                    {switching ? 'Switching...' : 'Switch quest'}
+                  </button>
+                )}
                 {rentAvailable && (
                   <div className="flex flex-col gap-1.5">
                     <button
@@ -1645,7 +1663,7 @@ export function SwitchFocusConfirm({
                       )}
                     </button>
                     <p className="text-center text-[12px] font-medium text-muted-foreground">
-                      Keep your current quest and unlock this one too.
+                      Watch a short ad — both quests run for 24 hours.
                     </p>
                     {rentError && (
                       <p className="text-center text-[12px] font-bold text-red-500">
@@ -1687,6 +1705,18 @@ export function SwitchFocusConfirm({
                     Finish multiple focus quests at the same time.
                   </p>
                   </div>
+                )}
+                {rentAvailable && (
+                  <button
+                    type="button"
+                    onClick={onConfirm}
+                    disabled={switching}
+                    className="mx-auto pt-1 text-[12px] font-bold text-muted-foreground underline decoration-border underline-offset-4 transition hover:text-foreground disabled:opacity-60"
+                  >
+                    {switching
+                      ? 'Switching...'
+                      : `Or switch quests instead — resets ${currentFocusName ?? 'current'} progress`}
+                  </button>
                 )}
               </div>
         </div>
@@ -1883,9 +1913,9 @@ export function AreaRow({
             Start
           </span>
         ) : state === 'paused' ? (
-          <span className="inline-flex items-center gap-1 rounded-xl border-[1.5px] border-dashed border-border px-3 py-2 text-[10px] font-black uppercase tracking-[0.1em] text-muted-foreground">
-            <Repeat className="h-3.5 w-3.5" strokeWidth={2.75} />
-            Switch
+          <span className="inline-flex items-center gap-1 rounded-xl border-[1.5px] border-amber-500/50 bg-amber-500/10 px-3 py-2 text-[10px] font-black uppercase tracking-[0.1em] text-amber-600 dark:text-amber-400">
+            <Play className="h-3.5 w-3.5 fill-current" />
+            Activate
           </span>
         ) : (
           <span className="pr-1 text-muted-foreground">
@@ -1931,12 +1961,12 @@ export function AreaStartCard({
     cta === 'switch' ? (
       <span
         className={cn(
-          'inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border-[1.5px] border-dashed border-border bg-card px-3 text-[10px] font-black uppercase tracking-[0.1em] text-muted-foreground transition-all active:scale-95',
+          'inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border-[1.5px] border-amber-500/50 bg-amber-500/10 px-3 text-[10px] font-black uppercase tracking-[0.1em] text-amber-600 transition-all active:scale-95 dark:text-amber-400',
           compact ? 'w-full' : 'shrink-0 px-4',
         )}
       >
-        <Repeat className="h-3.5 w-3.5" strokeWidth={2.75} />
-        Switch
+        <Play className="h-3.5 w-3.5 fill-current" />
+        Activate
       </span>
     ) : (
       <span

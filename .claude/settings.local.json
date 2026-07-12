@@ -294,7 +294,8 @@
       "PowerShell(\\(Get-Content node_modules/tailwindcss/package.json | ConvertFrom-Json\\).version)",
       "WebFetch(domain:www.deconstructoroffun.com)",
       "Bash(echo \"build-exit:$?\")",
-      "Bash(echo \"tsc:$?\")"
+      "Bash(echo \"tsc:$?\")",
+      "PowerShell(npx tsc --noEmit 2>&1 | Select-Object -First 30)"
     ]
   }
 }

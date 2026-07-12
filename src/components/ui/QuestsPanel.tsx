@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
+import confetti from 'canvas-confetti';
 import useSWR, { preload } from 'swr';
 import { Icon } from '@/components/ui/Icon';
 import { QuestsPageSkeleton } from '@/components/ui/Skeleton';
@@ -54,6 +55,8 @@ type QuestsResponse = {
   isPremium: boolean;
   claimableCount: number;
   todoCount?: number;
+  areaQuestsUnlocked?: boolean;
+  areaQuestsUnlockedAt?: string | null;
   frogName?: string | null;
   tags?: Array<{ id: string; name: string; color: string; key?: string }>;
   activeFocusCategoryId?: MacroCategoryId | null;
@@ -262,6 +265,105 @@ function getFocusQuestSortScore(quest: CategoryQuestProgressView) {
   };
 }
 
+const AREA_UNLOCK_CELEBRATED_KEY = 'frog:areaQuestsUnlockCelebrated';
+
+function AreaQuestsTeaser({
+  completedSteps,
+  targetSteps,
+  unlocking,
+}: {
+  completedSteps: number;
+  targetSteps: number;
+  unlocking: boolean;
+}) {
+  const shownSteps = Math.min(completedSteps, targetSteps);
+  const remaining = Math.max(1, targetSteps - shownSteps);
+  const complete = shownSteps >= targetSteps;
+  const pct = Math.min(100, (shownSteps / targetSteps) * 100);
+
+  return (
+    <motion.div
+      data-area-unlock-anchor
+      animate={
+        unlocking
+          ? { rotate: [0, -1.6, 1.6, -1.2, 1.2, -0.6, 0.6, 0], scale: 1.02 }
+          : { rotate: 0, scale: 1 }
+      }
+      transition={{ duration: 0.5, ease: 'easeInOut' }}
+      className={cn(
+        'relative overflow-hidden rounded-[24px] border bg-card shadow-sm transition-colors duration-500',
+        complete ? 'border-emerald-500/30' : 'border-primary/20',
+      )}
+    >
+      <div
+        className={cn(
+          'pointer-events-none absolute inset-0 bg-gradient-to-br via-transparent to-transparent transition-opacity duration-500',
+          complete ? 'from-emerald-500/[0.08]' : 'from-primary/[0.07]',
+        )}
+      />
+      <div className="relative px-4 py-4">
+          <div className="flex items-center gap-3">
+            <div
+              className={cn(
+                'flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border-2 shadow-sm transition-colors duration-500',
+                'border-emerald-400 bg-gradient-to-br from-emerald-100 to-emerald-50 dark:from-emerald-900/40 dark:to-emerald-950/40 shadow-emerald-900/10',
+                complete
+                  ? 'text-emerald-500'
+                  : 'text-emerald-600 dark:text-emerald-400',
+              )}
+            >
+              {complete ? (
+                <Check className="h-5 w-5" strokeWidth={3} />
+              ) : (
+                <Lock className="h-5 w-5" strokeWidth={2.75} />
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[15px] font-black leading-snug text-foreground">
+                {complete
+                  ? 'Area quests unlocked!'
+                  : `Complete ${remaining} more quest${remaining === 1 ? '' : 's'}`}
+              </p>
+              <div className="relative mt-2 h-5 overflow-hidden rounded-full bg-muted">
+                <div className="absolute inset-[3px]">
+                  <div
+                    className={cn(
+                      'h-full min-w-4 rounded-full transition-all duration-500',
+                      complete ? 'bg-emerald-500' : 'bg-amber-400',
+                    )}
+                    style={{ width: pct > 0 ? `${pct}%` : '1rem' }}
+                  />
+                </div>
+                <span className="absolute inset-0 flex items-center justify-center text-[10px] font-black tabular-nums text-foreground/70">
+                  {shownSteps}
+                  {' / '}
+                  {targetSteps}
+                </span>
+                <span
+                  aria-hidden
+                  className={cn(
+                    'absolute inset-0 flex items-center justify-center text-[10px] font-black tabular-nums',
+                    complete ? 'text-emerald-950/80' : 'text-amber-950/80',
+                  )}
+                  style={{ clipPath: `inset(0 ${100 - pct}% 0 0)` }}
+                >
+                  {shownSteps}
+                  {' / '}
+                  {targetSteps}
+                </span>
+              </div>
+              <p className="mt-2 text-[11px] font-bold leading-snug text-muted-foreground">
+                {complete
+                  ? 'Your life areas are ready below'
+                  : 'Unlocks quests and rewards for the life areas you picked'}
+              </p>
+            </div>
+          </div>
+        </div>
+    </motion.div>
+  );
+}
+
 export function QuestsPanel({
   isGuest,
   onQuestsChanged,
@@ -305,6 +407,10 @@ export function QuestsPanel({
     instance: number;
   } | null>(null);
   const [flyGainToast, setFlyGainToast] = useState<FlyGainToast | null>(null);
+  const [areaUnlockCeremony, setAreaUnlockCeremony] = useState<
+    'idle' | 'pending' | 'playing' | 'done'
+  >('idle');
+  const sawLockedAreasRef = useRef(false);
   const [pinnedCategoryId, setPinnedCategoryId] = useState<string | null>(null);
   const [pendingSwitchCategoryId, setPendingSwitchCategoryId] = useState<
     string | null
@@ -336,6 +442,87 @@ export function QuestsPanel({
     await mutateQuests();
     await onQuestsChanged?.();
   };
+
+  const serverAreaUnlocked = data?.areaQuestsUnlocked;
+  const serverAreaUnlockedAt = data?.areaQuestsUnlockedAt;
+  useEffect(() => {
+    if (serverAreaUnlocked === false) {
+      sawLockedAreasRef.current = true;
+      return;
+    }
+    if (
+      !serverAreaUnlocked ||
+      areaUnlockCeremony !== 'idle' ||
+      rewardRevealQueue.length > 0
+    ) {
+      return;
+    }
+    let shouldCelebrate = sawLockedAreasRef.current;
+    if (!shouldCelebrate) {
+      // First page visit after unlocking elsewhere: celebrate once per
+      // device, and only while the unlock is still fresh.
+      const unlockedAtMs = serverAreaUnlockedAt
+        ? Date.parse(serverAreaUnlockedAt)
+        : NaN;
+      const fresh =
+        Number.isFinite(unlockedAtMs) &&
+        Date.now() - unlockedAtMs < 3 * 24 * 60 * 60 * 1000;
+      let seen = false;
+      try {
+        seen =
+          window.localStorage.getItem(AREA_UNLOCK_CELEBRATED_KEY) === '1';
+      } catch {}
+      shouldCelebrate = fresh && !seen;
+    }
+    if (!shouldCelebrate) return;
+    try {
+      window.localStorage.setItem(AREA_UNLOCK_CELEBRATED_KEY, '1');
+    } catch {}
+    setAreaUnlockCeremony('pending');
+  }, [
+    serverAreaUnlocked,
+    serverAreaUnlockedAt,
+    areaUnlockCeremony,
+    rewardRevealQueue.length,
+  ]);
+
+  useEffect(() => {
+    if (areaUnlockCeremony !== 'pending') return;
+    const anchors = Array.from(
+      document.querySelectorAll<HTMLElement>('[data-area-unlock-anchor]'),
+    );
+    const visible = anchors.find((el) => el.offsetParent !== null);
+    visible?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const timeout = window.setTimeout(
+      () => setAreaUnlockCeremony('playing'),
+      visible ? 750 : 150,
+    );
+    return () => window.clearTimeout(timeout);
+  }, [areaUnlockCeremony]);
+
+  useEffect(() => {
+    if (areaUnlockCeremony !== 'playing') return;
+    const confettiTimeout = window.setTimeout(() => {
+      confetti({
+        particleCount: 90,
+        spread: 75,
+        startVelocity: 38,
+        origin: { y: 0.55 },
+        zIndex: 9999,
+      });
+      try {
+        navigator.vibrate?.([20, 30, 40]);
+      } catch {}
+    }, 450);
+    const doneTimeout = window.setTimeout(
+      () => setAreaUnlockCeremony('done'),
+      1500,
+    );
+    return () => {
+      window.clearTimeout(confettiTimeout);
+      window.clearTimeout(doneTimeout);
+    };
+  }, [areaUnlockCeremony]);
 
   useEffect(() => {
     const balance = inventoryData?.wardrobe?.flies;
@@ -947,9 +1134,10 @@ export function QuestsPanel({
                           );
 
                           // Progressive disclosure: brand-new frogs only see the
-                          // starter + daily quests. Focus quests appear once a few
-                          // early objectives are done (or the user already has a
-                          // focus footprint from before).
+                          // starter + daily quests. The server stamps
+                          // areaQuestsUnlocked once earned (it never re-locks);
+                          // the local calc is a fallback for stale payloads and
+                          // still drives the teaser's progress dots.
                           const FOCUS_UNLOCK_TARGET = 3;
                           const completedEarlyObjectives = [
                             ...(data.onboardingQuests ?? []),
@@ -972,44 +1160,10 @@ export function QuestsPanel({
                             );
                           const focusUnlocked =
                             filteredCategoryQuests.length === 0 ||
-                            hasFocusFootprint ||
-                            completedEarlyObjectives >= FOCUS_UNLOCK_TARGET;
-                          const remainingUnlockSteps = Math.max(
-                            1,
-                            FOCUS_UNLOCK_TARGET - completedEarlyObjectives,
-                          );
-                          const focusTeaser = (
-                            <div className="flex flex-col items-center gap-2.5 rounded-[28px] border-2 border-dashed border-border/70 bg-muted/30 px-5 py-7 text-center">
-                              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                                <Compass className="h-6 w-6" strokeWidth={2.5} />
-                              </div>
-                              <p className="text-sm font-black text-foreground">
-                                Area quests
-                              </p>
-                              <p className="max-w-[250px] text-xs font-bold leading-snug text-muted-foreground">
-                                Finish {remainingUnlockSteps} more quest{' '}
-                                {remainingUnlockSteps === 1 ? 'step' : 'steps'}{' '}
-                                above to unlock extra rewards for the areas of
-                                your life you chose to work on.
-                              </p>
-                              <div className="flex items-center gap-1.5 pt-0.5">
-                                {Array.from(
-                                  { length: FOCUS_UNLOCK_TARGET },
-                                  (_, i) => (
-                                    <span
-                                      key={i}
-                                      className={cn(
-                                        'h-2 w-5 rounded-full',
-                                        i < completedEarlyObjectives
-                                          ? 'bg-primary'
-                                          : 'border border-border/60 bg-muted',
-                                      )}
-                                    />
-                                  ),
-                                )}
-                              </div>
-                            </div>
-                          );
+                            (data.areaQuestsUnlocked ??
+                              (hasFocusFootprint ||
+                                completedEarlyObjectives >=
+                                  FOCUS_UNLOCK_TARGET));
                           const renderOnboardingCard = (quest: QuestProgressView) => (
                             <div
                               key={quest.id}
@@ -1159,8 +1313,8 @@ export function QuestsPanel({
                                 </p>
                                 <p className="mt-0.5 text-xs font-bold text-muted-foreground/80">
                                   {data.isPremium
-                                    ? 'Do tasks in an area, earn its rewards — start as many as you like'
-                                    : 'Do tasks in an area, earn its rewards — pick one, switch any time'}
+                                    ? 'Start where you want to grow most — or run every area at once.'
+                                    : 'Start where you want to grow most — you can always switch later.'}
                                 </p>
                               </div>
                               <div
@@ -1313,6 +1467,57 @@ export function QuestsPanel({
                             </div>
                           );
 
+                          const focusContent = chooserMode
+                            ? areaChooser
+                            : focusSection;
+                          const ceremonyActive =
+                            areaUnlockCeremony === 'pending' ||
+                            areaUnlockCeremony === 'playing';
+                          let focusSlot: React.ReactNode;
+                          if (!focusUnlocked || ceremonyActive) {
+                            focusSlot = (
+                              <div className="flex flex-col gap-2 pb-6">
+                                <div className="px-1">
+                                  <p className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+                                    <Compass
+                                      className="h-3.5 w-3.5 text-primary"
+                                      strokeWidth={2.75}
+                                    />
+                                    Your areas
+                                  </p>
+                                </div>
+                                <AreaQuestsTeaser
+                                  completedSteps={
+                                    ceremonyActive
+                                      ? FOCUS_UNLOCK_TARGET
+                                      : Math.min(
+                                          completedEarlyObjectives,
+                                          FOCUS_UNLOCK_TARGET,
+                                        )
+                                  }
+                                  targetSteps={FOCUS_UNLOCK_TARGET}
+                                  unlocking={areaUnlockCeremony === 'playing'}
+                                />
+                              </div>
+                            );
+                          } else if (areaUnlockCeremony === 'done') {
+                            focusSlot = (
+                              <motion.div
+                                initial={{ opacity: 0, y: 24, scale: 0.97 }}
+                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                transition={{
+                                  type: 'spring',
+                                  stiffness: 240,
+                                  damping: 24,
+                                }}
+                              >
+                                {focusContent}
+                              </motion.div>
+                            );
+                          } else {
+                            focusSlot = focusContent;
+                          }
+
                           return (
                             <>
                               {/* Mobile: onboarding, daily checklist, focus hero + up-next shelf */}
@@ -1323,15 +1528,7 @@ export function QuestsPanel({
                                   </div>
                                 )}
                                 <div>{dailySection}</div>
-                                {focusUnlocked ? (
-                                  chooserMode ? (
-                                    areaChooser
-                                  ) : (
-                                    focusSection
-                                  )
-                                ) : (
-                                  focusTeaser
-                                )}
+                                {focusSlot}
                               </div>
 
                               {/* Desktop: left column stacks starter + daily, hero fills
@@ -1342,11 +1539,7 @@ export function QuestsPanel({
                                     {onboardingQuests.map(renderOnboardingCard)}
                                     {dailySection}
                                   </div>
-                                  {focusUnlocked
-                                    ? chooserMode
-                                      ? areaChooser
-                                      : focusSection
-                                    : focusTeaser}
+                                  {focusSlot}
                                 </div>
                               </div>
                             </>

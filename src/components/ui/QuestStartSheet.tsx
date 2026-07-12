@@ -362,7 +362,7 @@ export function QuestStartSheet({
             type="button"
             onClick={handleStart}
             disabled={submitting || (!!limitPick && !pickedTagId)}
-            className="mt-6 flex h-14 w-full items-center justify-center gap-2 rounded-[28px] bg-[#4f9149] text-[16px] font-black text-white shadow-[0_4px_0_0_#34631f] ring-1 ring-[#34631f]/40 transition-all [@media(hover:hover)]:hover:brightness-105 active:translate-y-1 active:shadow-none disabled:pointer-events-none disabled:opacity-50 disabled:grayscale"
+            className="mt-6 flex h-14 w-full items-center justify-center gap-2 rounded-[28px] bg-[#4f9149] text-[16px] font-black text-white shadow-[0_4px_0_0_#34631f] ring-1 ring-[#34631f]/40 transition-all [@media(hover:hover)]:hover:bg-[#579e51] active:translate-y-1 active:shadow-none disabled:pointer-events-none disabled:opacity-50 disabled:grayscale"
           >
             <Play className="h-4 w-4 fill-current" />
             {submitting ? 'Starting...' : 'Start quest'}

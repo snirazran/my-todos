@@ -58,7 +58,7 @@ export default function CelebrationStep({ frogName, humanName }: Props) {
         initial={{ scale: 0.6, y: 24 }}
         animate={{ scale: 1, y: 0 }}
         transition={{ type: 'spring', stiffness: 260, damping: 18 }}
-        className="pointer-events-none"
+        className="pointer-events-none h-[259px] w-[230px]"
       >
         <Frog
           width={230}

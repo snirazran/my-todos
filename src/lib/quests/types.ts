@@ -87,6 +87,9 @@ export type FocusProfile = {
   categoryTagMap: FocusCategoryTagMap[];
   suggestedContentCreatedAt?: Date | string | null;
   unlockedAnimationIds?: string[];
+  // Set once when the area-quests section is first unlocked; never cleared,
+  // so the section can't re-lock after daily quests reset.
+  areaQuestsUnlockedAt?: Date | string | null;
   // Free users may only actively progress one focus quest at a time; this is
   // the category they've chosen. Ignored for premium (all focuses are active).
   activeFocusCategoryId?: MacroCategoryId | null;

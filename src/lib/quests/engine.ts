@@ -95,6 +95,7 @@ export function normalizeFocusProfile(user: UserDoc): FocusProfile {
     suggestedContentCreatedAt:
       user.focusProfile?.suggestedContentCreatedAt ?? null,
     unlockedAnimationIds: user.focusProfile?.unlockedAnimationIds ?? [],
+    areaQuestsUnlockedAt: user.focusProfile?.areaQuestsUnlockedAt ?? null,
     activeFocusCategoryId: user.focusProfile?.activeFocusCategoryId ?? null,
     rentedFocus: user.focusProfile?.rentedFocus ?? null,
   };

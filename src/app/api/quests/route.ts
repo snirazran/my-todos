@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
+import UserModel from '@/lib/models/User';
 import { buildRewardCatalog, syncQuestState } from '@/lib/quests/engine';
 import { loadStreakConfig, syncDailyStreak } from '@/lib/quests/streak';
 import { getActiveQuestSeasonView } from '@/lib/quests/seasons';
@@ -21,6 +22,51 @@ const categoryCoverRef = (categoryId: string) =>
   `/api/quests/cover?type=category&id=${encodeURIComponent(categoryId)}`;
 
 const FREE_TAG_LIMIT = 6;
+const AREA_UNLOCK_STEP_TARGET = 3;
+const AREA_UNLOCK_LIFETIME_TASKS = 10;
+
+async function resolveAreaQuestsUnlocked(
+  userId: string,
+  dashboard: Awaited<ReturnType<typeof syncQuestState>>,
+): Promise<Date | null> {
+  const existing = dashboard.focusProfile.areaQuestsUnlockedAt;
+  if (existing) return new Date(existing);
+
+  const earlySteps = [
+    ...(dashboard.onboardingQuests ?? []),
+    ...dashboard.dailyQuests,
+  ].reduce(
+    (sum, quest) =>
+      sum +
+      quest.logic.filter((block) => block.progress >= Math.max(1, block.target))
+        .length,
+    0,
+  );
+  const hasFocusFootprint =
+    (dashboard.focusProfile.categoryTagMap?.length ?? 0) > 0 ||
+    dashboard.categoryQuests.some(
+      (quest) =>
+        quest.claimedObjectiveIds.length > 0 ||
+        quest.logic.some((block) => block.progress > 0),
+    );
+  const lifetimeTaskCompletions = dashboard.tasks.reduce(
+    (sum, task) =>
+      sum + (task.completedDates?.length ?? 0) + (task.completed ? 1 : 0),
+    0,
+  );
+
+  const unlocked =
+    hasFocusFootprint ||
+    earlySteps >= AREA_UNLOCK_STEP_TARGET ||
+    lifetimeTaskCompletions >= AREA_UNLOCK_LIFETIME_TASKS;
+  if (!unlocked) return null;
+  const unlockedAt = new Date();
+  await UserModel.updateOne(
+    { _id: userId },
+    { $set: { 'focusProfile.areaQuestsUnlockedAt': unlockedAt } },
+  );
+  return unlockedAt;
+}
 
 function withTemplateCover<T extends { templateId?: string; coverImageUrl?: string }>(
   quest: T,
@@ -225,6 +271,11 @@ export async function GET(req: Request) {
       dailyQuests: dashboard.dailyQuests,
       todayKey: getZonedToday(timezone),
     });
+    const areaQuestsUnlockedAt = await resolveAreaQuestsUnlocked(
+      userId,
+      dashboard,
+    );
+    const areaQuestsUnlocked = !!areaQuestsUnlockedAt;
     // Count prizes ready to collect. Quests no longer have an end-reward —
     // only per-objective rewards are claimable, so count one per completed
     // objective with unclaimed rewards.
@@ -400,6 +451,8 @@ export async function GET(req: Request) {
           claimablesRewardCatalog,
           activeCount,
           activeFocusCategoryId: dashboard.activeFocusCategoryId,
+          areaQuestsUnlocked,
+          areaQuestsUnlockedAt,
           dailyStreak,
           onboarding: {
             complete: !!dashboard.focusProfile.completedAt,
@@ -441,6 +494,8 @@ export async function GET(req: Request) {
         claimableCount,
         activeCount,
         activeFocusCategoryId: dashboard.activeFocusCategoryId,
+        areaQuestsUnlocked,
+        areaQuestsUnlockedAt,
         rentedFocus: dashboard.rentedFocus,
         frogName: (dashboard.user as { frogName?: string }).frogName ?? null,
         dailyStreak,
