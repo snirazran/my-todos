@@ -1443,11 +1443,6 @@ export function QuestsPanel({
                                           categoryMap[quest.categoryId]
                                         }
                                         compact
-                                        cta={
-                                          needsTag && !quest.locked
-                                            ? 'start'
-                                            : 'switch'
-                                        }
                                         rewardCatalog={data.rewardCatalog}
                                         isPremium={data.isPremium}
                                         onPress={handlePress}

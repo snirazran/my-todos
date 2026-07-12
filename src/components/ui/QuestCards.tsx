@@ -22,7 +22,10 @@ import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/utils';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
-import { metricObjectiveLabel } from '@/lib/quests/metricLabels';
+import {
+  metricObjectiveLabel,
+  objectiveHintText,
+} from '@/lib/quests/metricLabels';
 import type { ItemDef } from '@/lib/skins/catalog';
 import type {
   MacroCategoryDefinition,
@@ -36,6 +39,11 @@ import { GiftRive } from './gift-box/GiftBox';
 import { ItemCard } from './skins/ItemCard';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { rewardedAdsAvailable, showRewardedAd } from '@/lib/ads';
+import {
+  HintButton,
+  ObjectiveProgressBar,
+  objectiveCardTone,
+} from '@/lib/questClaims';
 
 export type QuestRewardCatalogItem = Pick<
   ItemDef,
@@ -296,63 +304,6 @@ export function questLoot(quest: {
       ),
     items: rewards.filter((reward) => reward.type !== 'FLIES'),
   };
-}
-
-const METRIC_HINT_COPY: Record<string, string> = {
-  trade_completed:
-    'In the Wardrobe, trade three same-rarity skins for one of a higher rarity.',
-  skin_sold: 'Sell a skin you no longer want from the Wardrobe.',
-  skin_acquired: 'Buy a skin in the Wardrobe shop, or win one from a gift box.',
-  friend_invited:
-    'Invite a friend from the Friends page — you both get a gift when they join.',
-  buddy_task_completed:
-    'Finish a shared task with your buddy — it counts once you both check it off.',
-  task_saved_later: "Use a task's menu to move it to Saved Tasks.",
-  skin_equipped: 'Equip a skin on your frog in the Wardrobe.',
-  focus_tag_linked:
-    'On the Quests page, tap Start quest on a focus quest and pick a focus.',
-  frog_fed_full:
-    'Feed your frog flies on the home screen until its belly is full.',
-};
-
-function objectiveHintText(
-  block: QuestCardLogicBlock,
-  linkedTags?: QuestTagChip[],
-): string {
-  if (block.helpText) return block.helpText;
-
-  const usesFocusTags = block.tagMode === 'focus_category_tags';
-  const tagName = usesFocusTags
-    ? linkedTags?.[0]?.name
-    : block.resolvedTagNames?.[0] ?? block.resolvedTagName;
-  const tagScoped =
-    usesFocusTags ||
-    !!block.resolvedTagName ||
-    (block.resolvedTagNames?.length ?? 0) > 0 ||
-    !!block.previewTagLabel;
-  const scopeSuffix = !tagScoped
-    ? ''
-    : tagName
-      ? ` Only tasks tagged “${tagName}” count.`
-      : ' Tap Start quest on the area card first.';
-
-  if (block.type === 'focus_minutes') {
-    return `Start a focus timer on a task — every focused minute counts.${scopeSuffix}`;
-  }
-  if (block.type === 'metric_count') {
-    const streakMatch = block.metricKey
-      ? TASK_STREAK_METRIC_PATTERN.exec(block.metricKey)
-      : null;
-    const base = streakMatch
-      ? `Complete the same repeating task ${streakMatch[1]} days in a row.`
-      : METRIC_HINT_COPY[block.metricKey ?? ''] ??
-        'Keep using the app — this one fills up on its own.';
-    return `${base}${scopeSuffix}`;
-  }
-  if (block.action === 'add') {
-    return `Tap the + button to add a new task.${scopeSuffix}`;
-  }
-  return `Check off a task on your list — your frog snacks on the fly.${scopeSuffix}`;
 }
 
 export function formatQuestObjective(block: QuestCardLogicBlock) {
@@ -695,7 +646,10 @@ export function StarterQuestCard({
         {shownBlocks.map((block) => (
           <div
             key={block.id}
-            className="rounded-[20px] border border-border/50 bg-card px-3 py-1 shadow-sm sm:px-4"
+            className={cn(
+              'rounded-2xl border px-3 py-1 shadow-sm sm:px-4',
+              objectiveCardTone(block.progress >= Math.max(1, block.target)),
+            )}
           >
             <ObjectiveRow
               block={block}
@@ -786,7 +740,7 @@ export function DailyChecklistCard({
 
       <div className="flex flex-col gap-2.5">
         {allDone ? (
-          <div className="flex flex-col items-center gap-1.5 rounded-[20px] border border-border/50 bg-card px-4 py-5 text-center shadow-sm">
+          <div className="flex flex-col items-center gap-1.5 rounded-2xl border border-border/50 bg-card px-4 py-5 text-center shadow-sm">
             <Check className="h-8 w-8 text-emerald-500" strokeWidth={3.5} />
             <p className="text-sm font-black text-foreground">
               All daily quests done!
@@ -861,7 +815,7 @@ function DailyStreakStrip({
   const prize = prizePool[0];
 
   return (
-    <div className="rounded-[20px] border border-border/50 bg-card px-3 py-3 shadow-sm sm:px-4">
+    <div className="rounded-2xl border border-border/50 bg-card px-3 py-3 shadow-sm sm:px-4">
       <div className="flex items-center gap-2.5">
         {prize ? (
           <RewardTile
@@ -896,14 +850,16 @@ function DailyStreakStrip({
           </p>
         </div>
         {streak.claimable && onClaim ? (
-          <button
-            type="button"
-            onClick={onClaim}
-            disabled={claiming}
-            className="inline-flex h-8 shrink-0 items-center justify-center rounded-xl bg-amber-500 px-3.5 text-[10px] font-black uppercase tracking-[0.15em] text-white shadow-[0_3px_0_0_#b45309] transition-all hover:translate-y-[-1px] hover:shadow-[0_4px_0_0_#b45309] active:translate-y-[2px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {claiming ? 'Claiming...' : 'Claim'}
-          </button>
+          <span className={cn('inline-flex shrink-0', !claiming && 'claim-wobble')}>
+            <button
+              type="button"
+              onClick={onClaim}
+              disabled={claiming}
+              className="inline-flex h-9 items-center justify-center rounded-xl bg-amber-500 px-4 text-[13px] font-black text-white shadow-[0_3px_0_0_#b45309] transition-all hover:translate-y-[-1px] hover:shadow-[0_4px_0_0_#b45309] active:translate-y-[2px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {claiming ? 'Claiming...' : 'Claim'}
+            </button>
+          </span>
         ) : length <= 7 ? (
           <div className="flex shrink-0 items-center gap-1">
             {Array.from({ length }, (_, i) => (
@@ -958,7 +914,10 @@ function DailyChecklistQuestRows({
       {visibleLogic.map((block) => (
         <div
           key={block.id}
-          className="rounded-[20px] border border-border/50 bg-card px-3 py-1 shadow-sm sm:px-4"
+          className={cn(
+            'rounded-2xl border px-3 py-1 shadow-sm sm:px-4',
+            objectiveCardTone(block.progress >= Math.max(1, block.target)),
+          )}
         >
           <ObjectiveRow
             block={block}
@@ -1076,9 +1035,21 @@ export function CategoryQuestPresentationCard({
     .filter((reward) => reward.type !== 'FLIES')
     .slice(0, 2);
 
+  const showObjectives = !isCompleted && !needsFocusTags;
+
   return (
-    <div>
-      <div className="overflow-hidden rounded-[24px] border border-border/50 bg-card shadow-sm">
+    <div
+      className={cn(
+        showObjectives &&
+          'rounded-[22px] border border-border/40 bg-card/60 p-2 shadow-sm dark:bg-card/40',
+      )}
+    >
+      <div
+        className={cn(
+          'overflow-hidden border border-border/50 bg-card shadow-sm',
+          showObjectives ? 'rounded-2xl' : 'rounded-[24px]',
+        )}
+      >
       <div className="relative overflow-hidden">
         {heroImageUrl ? (
           <img
@@ -1200,7 +1171,7 @@ export function CategoryQuestPresentationCard({
           <span className="min-w-0 flex-1 text-[13px] font-black leading-snug text-foreground">
             Get rewarded for {category?.name ?? 'these'} tasks
           </span>
-          <span className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-xl bg-[#4f9149] px-4 text-[11px] font-black uppercase tracking-[0.12em] text-white shadow-[0_3px_0_0_#34631f] transition-all active:translate-y-[2px] active:shadow-none">
+          <span className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-xl bg-[#4f9149] px-4 text-[13px] font-black text-white shadow-[0_3px_0_0_#34631f] transition-all active:translate-y-[2px] active:shadow-none">
             <Play className="h-3.5 w-3.5 fill-current" />
             Start quest
           </span>
@@ -1270,14 +1241,17 @@ export function CategoryQuestPresentationCard({
       {!isCompleted && !needsFocusTags && (
         <div
           className={cn(
-            'mt-2.5 flex flex-col gap-2.5',
+            'mt-2 flex flex-col gap-2',
             locked && 'pointer-events-none select-none opacity-50 saturate-50',
           )}
         >
         {shownBlocks.map((block) => (
           <div
             key={block.id}
-            className="rounded-[20px] border border-border/50 bg-card px-3 py-1 shadow-sm sm:px-4"
+            className={cn(
+              'rounded-2xl border px-3 py-1 shadow-sm sm:px-4',
+              objectiveCardTone(block.progress >= Math.max(1, block.target)),
+            )}
           >
             <ObjectiveRow
               block={block}
@@ -1355,23 +1329,13 @@ export function CategoryQuestPresentationCard({
           <button
             type="button"
             onClick={() => setShowAllObjectives((v) => !v)}
-            className="flex w-full items-center gap-2 rounded-[20px] border border-dashed border-border/60 bg-muted/30 px-3 py-2.5 text-[clamp(0.625rem,calc(0.375rem_+_1.25vw),0.6875rem)] font-black uppercase tracking-[0.1em] text-muted-foreground transition hover:bg-muted/60 sm:px-4"
+            className="flex w-full items-center gap-2 rounded-2xl border border-dashed border-border/60 bg-muted/30 px-3 py-2.5 text-[clamp(0.625rem,calc(0.375rem_+_1.25vw),0.6875rem)] font-black uppercase tracking-[0.1em] text-muted-foreground transition hover:bg-muted/60 sm:px-4"
           >
-            <ChevronDown
-              className={cn(
-                'h-3.5 w-3.5 transition-transform',
-                showAllObjectives && 'rotate-180',
-              )}
-              strokeWidth={3}
-            />
-            {showAllObjectives ? (
-              'Show less'
-            ) : (
-              <span className="shrink-0">
-                {foldedBlocks.length} more quest
-                {foldedBlocks.length > 1 ? 's' : ''}
-              </span>
-            )}
+            <span className="shrink-0">
+              {showAllObjectives
+                ? 'Show less'
+                : `Show ${foldedBlocks.length} more`}
+            </span>
             {!showAllObjectives &&
               (foldedFlies > 0 || foldedItems.length > 0) && (
                 <span className="ml-auto flex shrink-0 items-center gap-1.5 normal-case tracking-normal">
@@ -1399,6 +1363,16 @@ export function CategoryQuestPresentationCard({
                   ))}
                 </span>
               )}
+            <ChevronDown
+              className={cn(
+                'h-3.5 w-3.5 shrink-0 transition-transform',
+                showAllObjectives && 'rotate-180',
+                (showAllObjectives ||
+                  (foldedFlies <= 0 && foldedItems.length === 0)) &&
+                  'ml-auto',
+              )}
+              strokeWidth={3}
+            />
           </button>
         )}
         </div>
@@ -1967,12 +1941,12 @@ export function AreaRow({
             Ready
           </span>
         ) : state === 'start' ? (
-          <span className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-amber-500 px-4 text-[11px] font-black uppercase tracking-[0.12em] text-white shadow-[0_3px_0_0_#b45309] transition-all active:translate-y-[2px] active:shadow-none">
+          <span className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-amber-500 px-4 text-[13px] font-black text-white shadow-[0_3px_0_0_#b45309] transition-all active:translate-y-[2px] active:shadow-none">
             <Play className="h-3.5 w-3.5 fill-current" />
             Start
           </span>
         ) : state === 'paused' ? (
-          <span className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-amber-500 px-4 text-[11px] font-black uppercase tracking-[0.12em] text-white shadow-[0_3px_0_0_#b45309] transition-all active:translate-y-[2px] active:shadow-none">
+          <span className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-amber-500 px-4 text-[13px] font-black text-white shadow-[0_3px_0_0_#b45309] transition-all active:translate-y-[2px] active:shadow-none">
             <Play className="h-3.5 w-3.5 fill-current" />
             Start
           </span>
@@ -1998,7 +1972,6 @@ export function AreaStartCard({
   quest,
   category,
   compact = false,
-  cta = 'start',
   rewardCatalog,
   isPremium,
   onPress,
@@ -2010,8 +1983,6 @@ export function AreaStartCard({
   category?: MacroCategoryDefinition;
   /** Half-width grid variant for users with many areas. */
   compact?: boolean;
-  /** What tapping does: start the quest, or switch to it (free users). */
-  cta?: 'start' | 'switch';
   rewardCatalog: Record<string, QuestRewardCatalogItem>;
   isPremium: boolean;
   onPress?: () => void;
@@ -2024,12 +1995,12 @@ export function AreaStartCard({
   const ctaChip = (
     <span
       className={cn(
-        'inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-amber-500 px-3 text-[11px] font-black uppercase tracking-[0.12em] text-white shadow-[0_3px_0_0_#b45309] transition-all active:translate-y-[2px] active:shadow-none',
+        'inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-amber-500 px-3 text-[13px] font-black text-white shadow-[0_3px_0_0_#b45309] transition-all active:translate-y-[2px] active:shadow-none',
         compact ? 'w-full' : 'shrink-0 px-4',
       )}
     >
       <Play className="h-3.5 w-3.5 fill-current" />
-      {cta === 'switch' ? 'Activate' : 'Start'}
+      Start
     </span>
   );
 
@@ -2118,15 +2089,6 @@ export function AreaStartCard({
 }
 
 // Matches the season banner palette: amber while in progress, lime when done.
-function progressBarColor(complete: boolean, claimed: boolean) {
-  return claimed || complete ? 'bg-lime-600' : 'bg-amber-400';
-}
-
-// Dark label tone matching the bar hue, so the count reads on the fill.
-function progressTextColor(complete: boolean, claimed: boolean) {
-  return claimed || complete ? 'text-lime-950' : 'text-amber-950';
-}
-
 function ObjectiveRow({
   block,
   objectiveClaimed,
@@ -2162,7 +2124,6 @@ function ObjectiveRow({
 }) {
   const safeTarget = Math.max(1, block.target);
   const objectiveComplete = block.progress >= safeTarget;
-  const pct = Math.min(100, (block.progress / safeTarget) * 100);
   const hasRewards = (block.rewards?.length ?? 0) > 0;
   const objectiveClaimable =
     hasRewards && objectiveComplete && !objectiveClaimed;
@@ -2176,16 +2137,18 @@ function ObjectiveRow({
   const renderActionSlot = () => {
     if (objectiveClaimable && onClaimObjective) {
       return (
-        <button
-          type="button"
-          onClick={onClaimObjective}
-          disabled={claimingObjective}
-          className="inline-flex h-8 items-center justify-center rounded-xl bg-amber-500 px-3 text-[10px] font-black uppercase tracking-[0.15em] text-white shadow-[0_3px_0_0_#b45309] transition-all hover:translate-y-[-1px] hover:shadow-[0_4px_0_0_#b45309] active:translate-y-[2px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60 min-[400px]:px-3.5"
+        <span
+          className={cn('inline-flex', !claimingObjective && 'claim-wobble')}
         >
-          <span className="mr-[-0.15em]">
+          <button
+            type="button"
+            onClick={onClaimObjective}
+            disabled={claimingObjective}
+            className="inline-flex h-9 items-center justify-center rounded-xl bg-amber-500 px-3.5 text-[13px] font-black text-white shadow-[0_3px_0_0_#b45309] transition-all hover:translate-y-[-1px] hover:shadow-[0_4px_0_0_#b45309] active:translate-y-[2px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60 min-[400px]:px-4"
+          >
             {claimingObjective ? 'Claiming...' : 'Claim'}
-          </span>
-        </button>
+          </button>
+        </span>
       );
     }
     if (stepDone) {
@@ -2198,7 +2161,7 @@ function ObjectiveRow({
         </div>
       );
     }
-    return <HintButton text={objectiveHintText(block, linkedTags)} />;
+    return <HintButton text={objectiveHintText(block, linkedTags?.[0]?.name)} />;
   };
 
   const firstReward = hasRewards ? block.rewards![0] : null;
@@ -2252,82 +2215,18 @@ function ObjectiveRow({
             })}
           </p>
 
-          <div className="relative mt-1.5 h-5 overflow-hidden rounded-full bg-muted">
-            <div className="absolute inset-[3px]">
-              <div
-                className={cn(
-                  'h-full min-w-4 rounded-full transition-all duration-500',
-                  progressBarColor(objectiveComplete, objectiveClaimed ?? false),
-                )}
-                style={{ width: pct > 0 ? `${pct}%` : '1rem' }}
-              />
-            </div>
-            <span className="absolute inset-0 flex items-center justify-center text-[10px] font-black tabular-nums text-foreground/70">
-              {Math.min(block.progress, safeTarget)}
-              {' / '}
-              {block.targetLabel ?? block.target}
-            </span>
-            {/* Same label clipped to the filled width, in a dark tone that reads
-                on the emerald/amber bar regardless of theme. */}
-            <span
-              aria-hidden
-              className={cn(
-                'absolute inset-0 flex items-center justify-center text-[10px] font-black tabular-nums',
-                progressTextColor(objectiveComplete, objectiveClaimed ?? false),
-              )}
-              style={{ clipPath: `inset(0 ${100 - pct}% 0 0)` }}
-            >
-              {Math.min(block.progress, safeTarget)}
-              {' / '}
-              {block.targetLabel ?? block.target}
-            </span>
-          </div>
+          <ObjectiveProgressBar
+            className="mt-1.5"
+            progress={block.progress}
+            target={block.target}
+            targetLabel={block.targetLabel}
+            complete={objectiveComplete || (objectiveClaimed ?? false)}
+          />
         </div>
 
         <div className="shrink-0">{renderActionSlot()}</div>
       </div>
     </div>
-  );
-}
-
-function HintButton({ text }: { text: string }) {
-  const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLSpanElement | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-
-    const handlePointerDown = (event: PointerEvent) => {
-      if (containerRef.current?.contains(event.target as Node)) return;
-      setOpen(false);
-    };
-
-    document.addEventListener('pointerdown', handlePointerDown);
-    return () => {
-      document.removeEventListener('pointerdown', handlePointerDown);
-    };
-  }, [open]);
-
-  return (
-    <span ref={containerRef} className="relative inline-flex">
-      <button
-        type="button"
-        aria-label="How to do this"
-        aria-expanded={open}
-        onClick={(event) => {
-          event.stopPropagation();
-          setOpen((v) => !v);
-        }}
-        className="inline-flex h-8 items-center justify-center rounded-xl border border-border/70 bg-background px-3 text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground shadow-[0_3px_0_0_rgba(15,23,42,0.08)] transition-all hover:text-foreground active:translate-y-[2px] active:shadow-none min-[400px]:px-3.5"
-      >
-        <span className="mr-[-0.15em]">Hint</span>
-      </button>
-      {open && (
-        <span className="absolute bottom-full right-0 z-30 mb-2 w-56 rounded-xl border border-border bg-popover px-3 py-2 text-left text-xs font-medium normal-case tracking-normal leading-snug text-popover-foreground shadow-lg">
-          {text}
-        </span>
-      )}
-    </span>
   );
 }
 

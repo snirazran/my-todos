@@ -126,6 +126,72 @@ export function metricObjectiveLabel(
   return copy.label(Math.max(1, target), options);
 }
 
+const METRIC_HINT_COPY: Record<string, string> = {
+  trade_completed:
+    'In the Wardrobe, trade three same-rarity skins for one of a higher rarity.',
+  skin_sold: 'Sell a skin you no longer want from the Wardrobe.',
+  skin_acquired: 'Buy a skin in the Wardrobe shop, or win one from a gift box.',
+  friend_invited:
+    'Invite a friend from the Friends page — you both get a gift when they join.',
+  buddy_task_completed:
+    'Finish a shared task with your buddy — it counts once you both check it off.',
+  task_saved_later: "Use a task's menu to move it to Saved Tasks.",
+  skin_equipped: 'Equip a skin on your frog in the Wardrobe.',
+  focus_tag_linked:
+    'On the Quests page, tap Start quest on a focus quest and pick a focus.',
+  frog_fed_full:
+    'Feed your frog flies on the home screen until its belly is full.',
+};
+
+export function objectiveHintText(
+  block: {
+    type?: string;
+    action?: string;
+    tagMode?: string;
+    metricKey?: string;
+    helpText?: string;
+    resolvedTagName?: string;
+    resolvedTagNames?: string[];
+    previewTagLabel?: string;
+  },
+  focusTagName?: string,
+): string {
+  if (block.helpText) return block.helpText;
+
+  const usesFocusTags = block.tagMode === 'focus_category_tags';
+  const tagName = usesFocusTags
+    ? focusTagName
+    : block.resolvedTagNames?.[0] ?? block.resolvedTagName;
+  const tagScoped =
+    usesFocusTags ||
+    !!block.resolvedTagName ||
+    (block.resolvedTagNames?.length ?? 0) > 0 ||
+    !!block.previewTagLabel;
+  const scopeSuffix = !tagScoped
+    ? ''
+    : tagName
+      ? ` Only tasks tagged “${tagName}” count.`
+      : ' Tap Start quest on the area card first.';
+
+  if (block.type === 'focus_minutes') {
+    return `Start a focus timer on a task — every focused minute counts.${scopeSuffix}`;
+  }
+  if (block.type === 'metric_count') {
+    const streakMatch = block.metricKey
+      ? TASK_STREAK_LABEL_PATTERN.exec(block.metricKey)
+      : null;
+    const base = streakMatch
+      ? `Complete the same repeating task ${streakMatch[1]} days in a row.`
+      : METRIC_HINT_COPY[block.metricKey ?? ''] ??
+        'Keep using the app — this one fills up on its own.';
+    return `${base}${scopeSuffix}`;
+  }
+  if (block.action === 'add') {
+    return `Tap the + button to add a new task.${scopeSuffix}`;
+  }
+  return `Check off a task on your list — your frog snacks on the fly.${scopeSuffix}`;
+}
+
 export function metricRemainingLabel(
   metricKey: string | undefined,
   remaining: number,

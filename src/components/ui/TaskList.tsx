@@ -64,6 +64,7 @@ import TagsPopup from '@/components/ui/TagsPopup';
 import { EditTaskDialog } from '@/components/ui/EditTaskDialog';
 import { TimePopup } from '@/components/ui/TimePopup';
 import { BuddyBadge } from '@/components/ui/BuddyBadge';
+import { objectiveCardTone } from '@/lib/questClaims';
 import { format } from 'date-fns';
 
 interface Task {
@@ -1372,18 +1373,14 @@ export default function TaskList({
             !exitAction ? (
             /* Empty State: Tasks exist but all filtered/completed */
             allTasksCompleted && selectedTags.length === 0 ? (
-              <motion.div
-                initial={{ opacity: 0, y: 8, scale: 0.98 }}
-                animate={{
-                  opacity: quickAddOpen ? 0 : 1,
-                  y: 0,
-                  scale: 1,
-                }}
-                transition={{
-                  duration: quickAddOpen ? 0 : 0.4,
-                  ease: [0.22, 1, 0.36, 1],
-                }}
-                className="relative mb-2 overflow-hidden rounded-[16px] border border-[#d9e8c9] bg-[radial-gradient(circle_at_50%_-15%,rgba(251,204,87,0.30),transparent_43%),linear-gradient(145deg,#fffdf4_0%,#f5faed_55%,#edf7e9_100%)] px-4 py-3 dark:border-primary/20 dark:bg-[radial-gradient(circle_at_50%_-15%,rgba(251,204,87,0.12),transparent_43%),linear-gradient(145deg,rgba(31,98,28,0.14),rgba(31,98,28,0.06))]"
+              <div
+                className={`fly-caught-enter relative mb-2 rounded-2xl border p-3 shadow-sm ${objectiveCardTone(
+                  true,
+                )} ${
+                  quickAddOpen
+                    ? 'opacity-0'
+                    : 'opacity-100 transition-opacity duration-300'
+                }`}
               >
                 <div className="flex items-center gap-3">
                   <div className="flex h-11 w-11 shrink-0 items-center justify-center">
@@ -1394,10 +1391,10 @@ export default function TaskList({
                     />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-[15px] font-black leading-tight tracking-tight text-[#244b23] dark:text-foreground">
+                    <p className="text-[13px] font-black leading-tight tracking-tight text-foreground">
                       Every fly caught!
                     </p>
-                    <p className="mt-0.5 text-[12px] font-semibold leading-snug text-[#52704f] dark:text-muted-foreground">
+                    <p className="mt-0.5 text-[12px] font-semibold leading-snug text-muted-foreground">
                       All {tasks.length} of today&apos;s{' '}
                       {tasks.length === 1 ? 'task' : 'tasks'} done — your frog
                       is full and happy.
@@ -1415,7 +1412,7 @@ export default function TaskList({
                     Add
                   </button>
                 </div>
-              </motion.div>
+              </div>
             ) : (
               <motion.div
                 initial={{ opacity: 0 }}

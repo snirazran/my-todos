@@ -211,6 +211,41 @@
   animation: quest-anchor-glow 1.9s ease-out;
 }
 
+@keyframes fly-caught-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0) scale(0.98);
+  }
+}
+.fly-caught-enter {
+  animation: fly-caught-enter 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform, opacity;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fly-caught-enter {
+    animation: none;
+  }
+}
+
+@keyframes claim-wobble {
+  0%,
+  100% {
+    transform: rotate(-2deg);
+  }
+  50% {
+    transform: rotate(2deg);
+  }
+}
+.claim-wobble {
+  animation: claim-wobble 1s ease-in-out infinite;
+  transform-origin: 50% 60%;
+}
+@media (prefers-reduced-motion: reduce) {
+  .claim-wobble {
+    animation: none;
+  }
+}
+
 @keyframes shuffle-ping {
   0% {
     transform: scale(1);

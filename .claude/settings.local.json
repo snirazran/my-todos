@@ -296,7 +296,11 @@
       "Bash(echo \"build-exit:$?\")",
       "Bash(echo \"tsc:$?\")",
       "PowerShell(npx tsc --noEmit 2>&1 | Select-Object -First 30)",
-      "PowerShell(npx tsc --noEmit -p tsconfig.json 2>&1 | Select-Object -First 40)"
+      "PowerShell(npx tsc --noEmit -p tsconfig.json 2>&1 | Select-Object -First 40)",
+      "PowerShell(npx tsc --noEmit 2>$null | Select-String -Pattern \"QuestCards|QuestsPanel\" ; \"exit: $LASTEXITCODE\")",
+      "PowerShell(npx tsc --noEmit 2>$null | Select-String -Pattern \"QuestCards|QuestsPanel|globals\" ; \"exit: $LASTEXITCODE\")",
+      "PowerShell(npx tsc --noEmit 2>$null | Select-String -Pattern \"QuestCards|QuestsPanel|NextQuestStrip|questClaims|TaskList\" ; \"exit: $LASTEXITCODE\")",
+      "PowerShell(npx tsc --noEmit 2>$null | Select-String -Pattern \"QuestCards|NextQuestStrip|questClaims|TaskList|BuddyNudge|metricLabels|api\" ; \"exit: $LASTEXITCODE\")"
     ]
   }
 }

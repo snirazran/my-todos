@@ -5,9 +5,11 @@ import { useRouter } from 'next/navigation';
 import { ChevronRight, Tags } from 'lucide-react';
 import type { QuestRewardCatalogItem } from '@/components/ui/QuestCards';
 import {
+  HintButton,
   ObjectiveLabel,
-  QuestProgressBar,
+  ObjectiveProgressBar,
   QuestRewardTileBadge,
+  objectiveCardTone,
   setQuestScrollTarget,
   trackableEyebrow,
   type Claimable,
@@ -56,17 +58,28 @@ export function NextQuestStrip({
         ? nextUp.questId ?? null
         : null;
 
+  const goToQuests = () => {
+    if (targetQuestId) setQuestScrollTarget(targetQuestId);
+    router.push('/quests');
+  };
+
   return (
-    <button
-      type="button"
-      onClick={() => {
-        if (targetQuestId) setQuestScrollTarget(targetQuestId);
-        router.push('/quests');
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={goToQuests}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          goToQuests();
+        }
       }}
-      className={`group relative mx-1.5 mb-2 flex w-[calc(100%-0.75rem)] items-center gap-3 overflow-hidden rounded-[18px] border p-3 text-left shadow-sm transition-colors md:mx-4 md:w-[calc(100%-2rem)] ${
+      className={`group relative mx-1.5 mb-2 flex w-[calc(100%-0.75rem)] cursor-pointer items-center gap-3 rounded-2xl border p-3 text-left shadow-sm transition-colors md:mx-4 md:w-[calc(100%-2rem)] ${objectiveCardTone(
+        !!claimable,
+      )} ${
         claimable
-          ? 'border-amber-400/40 bg-amber-500/10 hover:bg-amber-500/15'
-          : 'border-primary/10 bg-primary/5 hover:bg-primary/10'
+          ? 'hover:bg-lime-100/80 dark:hover:bg-lime-500/15'
+          : 'hover:bg-muted/40'
       }`}
     >
       {claimable ? (
@@ -79,7 +92,7 @@ export function NextQuestStrip({
             />
           </div>
           <div className="flex min-w-0 flex-1 flex-col leading-tight">
-            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-amber-600 dark:text-amber-400">
+            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-lime-700 dark:text-lime-400">
               {claimableCount > 1
                 ? `${claimableCount} rewards ready`
                 : 'Reward ready'}
@@ -99,8 +112,10 @@ export function NextQuestStrip({
               )}
             </span>
           </div>
-          <span className="inline-flex h-8 shrink-0 items-center justify-center rounded-xl bg-amber-500 px-3.5 text-[10px] font-black uppercase tracking-[0.15em] text-white shadow-[0_3px_0_0_#b45309] transition-all group-hover:translate-y-[-1px] group-hover:shadow-[0_4px_0_0_#b45309] group-active:translate-y-[2px] group-active:shadow-none">
-            Claim
+          <span className="claim-wobble inline-flex shrink-0">
+            <span className="inline-flex h-9 items-center justify-center rounded-xl bg-amber-500 px-4 text-[13px] font-black text-white shadow-[0_3px_0_0_#b45309] transition-all group-hover:translate-y-[-1px] group-hover:shadow-[0_4px_0_0_#b45309] group-active:translate-y-[2px] group-active:shadow-none">
+              Claim
+            </span>
           </span>
         </>
       ) : nextUp ? (
@@ -132,21 +147,23 @@ export function NextQuestStrip({
                     tags={nextUp.tags}
                   />
                 </span>
-                <div className="mt-1.5 flex items-center gap-2">
-                  <QuestProgressBar
-                    from={nextUp.progress / Math.max(1, nextUp.target)}
-                    to={nextUp.progress / Math.max(1, nextUp.target)}
-                  />
-                  <span className="shrink-0 text-[11px] font-bold tabular-nums text-muted-foreground">
-                    {Math.min(nextUp.progress, nextUp.target)}/{nextUp.target}
-                  </span>
-                </div>
+                <ObjectiveProgressBar
+                  className="mt-1.5"
+                  progress={nextUp.progress}
+                  target={nextUp.target}
+                />
               </>
             )}
           </div>
-          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+          {nextUp.hint && !nextUp.needsFocusTags ? (
+            <span className="shrink-0">
+              <HintButton text={nextUp.hint} />
+            </span>
+          ) : (
+            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+          )}
         </>
       ) : null}
-    </button>
+    </div>
   );
 }

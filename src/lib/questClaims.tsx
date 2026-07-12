@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { mutate } from 'swr';
@@ -45,6 +45,7 @@ export type Trackable = {
   progress: number;
   target: number;
   reward?: any;
+  hint?: string;
 };
 
 type ShowNotification = (
@@ -294,6 +295,102 @@ export function QuestProgressBar({
         className="h-full rounded-full bg-primary transition-[width] duration-700 ease-out"
         style={{ width: `${Math.max(ratio * 100, ratio > 0 ? 4 : 0)}%` }}
       />
+    </div>
+  );
+}
+
+export function HintButton({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLSpanElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (containerRef.current?.contains(event.target as Node)) return;
+      setOpen(false);
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+    };
+  }, [open]);
+
+  return (
+    <span ref={containerRef} className="relative inline-flex">
+      <button
+        type="button"
+        aria-label="How to do this"
+        aria-expanded={open}
+        onClick={(event) => {
+          event.stopPropagation();
+          setOpen((v) => !v);
+        }}
+        className="inline-flex h-8 items-center justify-center rounded-xl border border-border/70 bg-background px-3 text-[12px] font-black text-muted-foreground shadow-[0_3px_0_0_rgba(15,23,42,0.08)] transition-all hover:text-foreground active:translate-y-[2px] active:shadow-none min-[400px]:px-3.5"
+      >
+        Hint
+      </button>
+      {open && (
+        <span className="absolute bottom-full right-0 z-30 mb-2 w-56 rounded-xl border border-border bg-popover px-3 py-2 text-left text-xs font-medium normal-case tracking-normal leading-snug text-popover-foreground shadow-lg">
+          {text}
+        </span>
+      )}
+    </span>
+  );
+}
+
+export function objectiveCardTone(complete: boolean) {
+  return complete
+    ? 'border-lime-500/40 bg-lime-100/60 dark:border-lime-500/25 dark:bg-lime-500/10'
+    : 'border-border/50 bg-card';
+}
+
+export function ObjectiveProgressBar({
+  progress,
+  target,
+  targetLabel,
+  complete,
+  className,
+}: {
+  progress: number;
+  target: number;
+  targetLabel?: string;
+  complete?: boolean;
+  className?: string;
+}) {
+  const safeTarget = Math.max(1, target);
+  const pct = Math.min(100, (Math.max(0, progress) / safeTarget) * 100);
+  const done = complete ?? progress >= safeTarget;
+  const countLabel = (
+    <>
+      {Math.min(progress, safeTarget)}
+      {' / '}
+      {targetLabel ?? target}
+    </>
+  );
+  return (
+    <div
+      className={`relative h-5 overflow-hidden rounded-full bg-muted ${className ?? ''}`}
+    >
+      <div className="absolute inset-[3px]">
+        <div
+          className={`h-full min-w-4 rounded-full transition-all duration-500 ${done ? 'bg-lime-600' : 'bg-amber-400'}`}
+          style={{ width: pct > 0 ? `${pct}%` : '1rem' }}
+        />
+      </div>
+      <span className="absolute inset-0 flex items-center justify-center text-[10px] font-black tabular-nums text-foreground/70">
+        {countLabel}
+      </span>
+      {/* Same label clipped to the filled width, in a dark tone that reads
+          on the lime/amber bar regardless of theme. */}
+      <span
+        aria-hidden
+        className={`absolute inset-0 flex items-center justify-center text-[10px] font-black tabular-nums ${done ? 'text-lime-950' : 'text-amber-950'}`}
+        style={{ clipPath: `inset(0 ${100 - pct}% 0 0)` }}
+      >
+        {countLabel}
+      </span>
     </div>
   );
 }

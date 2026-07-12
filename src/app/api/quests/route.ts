@@ -10,6 +10,7 @@ import { getCachedCatalog } from '@/lib/skins/getCatalog';
 import {
   metricObjectiveLabel,
   metricRemainingLabel,
+  objectiveHintText,
 } from '@/lib/quests/metricLabels';
 
 const isDataUrl = (value: unknown): value is string =>
@@ -148,6 +149,7 @@ type TrackableEntry = {
   progress: number;
   target: number;
   reward?: any;
+  hint?: string;
 };
 
 function objectiveRemainingLabel(
@@ -406,6 +408,7 @@ export async function GET(req: Request) {
           progress: Math.max(0, block.progress),
           target,
           reward: block.rewards?.[0],
+          hint: objectiveHintText(block, questFocusTags(quest)[0]?.name),
         });
       }
     }
