@@ -98,6 +98,7 @@ export function FriendDetailModal({
   allFriends?: FriendSummary[];
 }) {
   useRegisterOpenSheet(!!entry);
+  const router = useRouter();
   const { data } = useBackgrounds(!!entry);
   const { data: inventoryData } = useInventory(!!entry);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -306,7 +307,7 @@ export function FriendDetailModal({
                 <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-center">
                   <div className="relative -translate-y-[26px]">
                     <Frog width={230} height={210} indices={entry.indices} />
-                    <PremiumFrogAura show={!!entry.premium} alwaysPlay />
+                    <PremiumFrogAura show={!!entry.premium} />
                   </div>
                 </div>
               </div>
@@ -334,6 +335,29 @@ export function FriendDetailModal({
                       </p>
                     )}
                 </div>
+
+                {/* Live focus presence — invite to focus alongside them */}
+                {entry.focusing && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      router.push('/');
+                    }}
+                    className="flex items-center justify-between gap-2 rounded-2xl bg-primary/10 px-4 py-3 text-left transition-colors hover:bg-primary/15"
+                  >
+                    <span className="flex items-center gap-2 text-sm font-black text-primary">
+                      <span className="relative flex h-2.5 w-2.5">
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-60" />
+                        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary" />
+                      </span>
+                      Focusing right now
+                    </span>
+                    <span className="text-xs font-bold text-primary/70">
+                      Join them →
+                    </span>
+                  </button>
+                )}
 
                 {/* Flies shared stats */}
                 <div className="grid grid-cols-2 gap-2.5">

@@ -128,7 +128,7 @@ interface SortableTaskItemProps {
   isGuest?: boolean;
   isGlowActive?: boolean;
   isSortDragging?: boolean;
-  onStartTimer?: (task: Task) => void;
+  onStartTimer?: (task: Task, opts?: { autoStart?: boolean }) => void;
   onOpenDetail?: (task: Task) => void;
   paused?: boolean;
 }
@@ -356,13 +356,13 @@ const SortableTaskItem = React.forwardRef<
       const offset = info.offset.x;
       const velocity = info.velocity.x;
 
-      // Action: Swipe Right (Positive) -> Start Timer
+      // Action: Swipe Right (Positive) -> Start Timer immediately
       if (offset > swipeThreshold && onStartTimer && !isDone) {
         blockImmediatePostSwipeClick();
         window.dispatchEvent(
           new CustomEvent('task-swipe-open', { detail: { id: null } }),
         );
-        onStartTimer(task);
+        onStartTimer(task, { autoStart: true });
         animate(x, 0, { type: 'spring', stiffness: 600, damping: 28 });
       }
       // Action: Swipe Left (Negative) -> Open Edit Sheet
@@ -852,7 +852,7 @@ export default function TaskList({
     data: { startTime: string; endTime: string; reminder: string },
     scope?: 'one' | 'all',
   ) => Promise<void> | void;
-  onStartTimer?: (task: { id: string; text: string; completed: boolean; tags?: string[]; frogodoroSession?: Task['frogodoroSession']; frogodoroSettings?: Record<string, unknown> }) => void;
+  onStartTimer?: (task: { id: string; text: string; completed: boolean; tags?: string[]; frogodoroSession?: Task['frogodoroSession']; frogodoroSettings?: Record<string, unknown> }, opts?: { autoStart?: boolean }) => void;
   onUpdateDetails?: (
     taskId: string,
     details: { notes?: string; checklist?: { id: string; text: string; done: boolean }[] },
@@ -1506,7 +1506,7 @@ export default function TaskList({
                           }
                           onStartTimer={
                             !isCompleted && onStartTimer
-                              ? (t) => onStartTimer(t)
+                              ? (t, o) => onStartTimer(t, o)
                               : undefined
                           }
                           onOpenDetail={(t) => setActionSheetId(t.id)}

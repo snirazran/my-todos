@@ -62,6 +62,17 @@ interface FrogodoroState {
   // client hydration and display ticks never trigger a publish — which is what
   // makes the server the single source of truth with no echo loop.
   pendingSync: number;
+  // Deep-focus pledge: finish the focus phase without pausing → bonus fly.
+  // Sticky user preference; the server is the authority for the actual award.
+  deepFocus: boolean;
+  // Whether the current phase has been paused at least once (breaks the
+  // deep-focus pledge), and the same flag frozen at the last completion so the
+  // Done screen can show/hide the bonus.
+  pausedThisPhase: boolean;
+  lastPhasePaused: boolean;
+  // The focus duration to restore after an overtime ("+5 keep going") session
+  // temporarily shrinks settings.focusDuration. Null when not in overtime.
+  overtimePrevFocusDuration: number | null;
 
   // Actions
   setSettings: (settings: FrogodoroSettings) => void;
@@ -81,6 +92,10 @@ interface FrogodoroState {
   // opens the popup, and set whether the alarm is awaiting acknowledgement.
   registerCompletion: (completedPhase: PomodoroPhase, awaitDone: boolean) => void;
   setAwaitingDone: (value: boolean) => void;
+  setDeepFocus: (value: boolean) => void;
+  // Overtime: immediately start a short extra focus run on the same task
+  // (used by "+5 keep going" on the Done screen).
+  extendFocus: (seconds: number) => void;
   setSelectedTaskName: (name: string) => void;
   // Records the actual elapsed time of a completed phase for the Done screen.
   setPhaseElapsedResult: (phase: PomodoroPhase, seconds: number) => void;
@@ -133,6 +148,10 @@ export const useFrogodoroStore = create<FrogodoroState>()(
       lastFocusElapsed: 0,
       lastBreakElapsed: 0,
       pendingSync: 0,
+      deepFocus: false,
+      pausedThisPhase: false,
+      lastPhasePaused: false,
+      overtimePrevFocusDuration: null,
 
       setSettings: (settings) =>
         set((state) => {
@@ -219,6 +238,7 @@ export const useFrogodoroStore = create<FrogodoroState>()(
             },
             lastFocusElapsed: freshSession ? 0 : state.lastFocusElapsed,
             lastBreakElapsed: freshSession ? 0 : state.lastBreakElapsed,
+            pausedThisPhase: freshSession ? false : state.pausedThisPhase,
             pendingSync: state.pendingSync + 1,
           };
         });
@@ -233,25 +253,35 @@ export const useFrogodoroStore = create<FrogodoroState>()(
             ...state.remainingByPhase,
             [state.phase]: state.timeLeft,
           },
+          pausedThisPhase: state.isRunning ? true : state.pausedThisPhase,
           pendingSync: state.pendingSync + 1,
         }));
       },
 
       stopTimer: () => {
-        set((state) => ({
-          timerActive: false,
-          isRunning: false,
-          endTime: null,
-          timeLeft: getPhaseDuration(state.phase, state.settings),
-          phaseElapsed: 0,
-          startedByPhase: { focus: false, break: false },
-          remainingByPhase: {
-            focus: getPhaseDuration('focus', state.settings),
-            break: getPhaseDuration('break', state.settings),
-          },
-          activeTimerRev: null,
-          pendingSync: state.pendingSync + 1,
-        }));
+        set((state) => {
+          const settings =
+            state.overtimePrevFocusDuration != null
+              ? { ...state.settings, focusDuration: state.overtimePrevFocusDuration }
+              : state.settings;
+          return {
+            settings,
+            overtimePrevFocusDuration: null,
+            timerActive: false,
+            isRunning: false,
+            endTime: null,
+            timeLeft: getPhaseDuration(state.phase, settings),
+            phaseElapsed: 0,
+            pausedThisPhase: false,
+            startedByPhase: { focus: false, break: false },
+            remainingByPhase: {
+              focus: getPhaseDuration('focus', settings),
+              break: getPhaseDuration('break', settings),
+            },
+            activeTimerRev: null,
+            pendingSync: state.pendingSync + 1,
+          };
+        });
       },
 
       tickTimer: (newTimeLeft) =>
@@ -291,6 +321,8 @@ export const useFrogodoroStore = create<FrogodoroState>()(
             lastCompletionId: state.lastCompletionId + 1,
             lastCompletedTaskId: state.selectedTaskId,
             lastCompletedPhase: state.phase,
+            lastPhasePaused: state.pausedThisPhase,
+            pausedThisPhase: false,
           };
 
           const phaseDuration = getPhaseDuration(state.phase, state.settings);
@@ -361,10 +393,35 @@ export const useFrogodoroStore = create<FrogodoroState>()(
           lastCompletionId: state.lastCompletionId + 1,
           lastCompletedTaskId: state.selectedTaskId,
           lastCompletedPhase: completedPhase,
+          lastPhasePaused: state.pausedThisPhase,
+          pausedThisPhase: false,
           awaitingDone: awaitDone,
         })),
 
       setAwaitingDone: (value) => set({ awaitingDone: value }),
+
+      setDeepFocus: (value) => set({ deepFocus: value }),
+
+      extendFocus: (seconds) =>
+        set((state) => {
+          const breakFull = getPhaseDuration('break', state.settings);
+          return {
+            phase: 'focus',
+            timerActive: true,
+            isRunning: true,
+            endTime: Date.now() + seconds * 1000,
+            timeLeft: seconds,
+            phaseElapsed: 0,
+            awaitingDone: false,
+            pausedThisPhase: false,
+            settings: { ...state.settings, focusDuration: seconds / 60 },
+            overtimePrevFocusDuration:
+              state.overtimePrevFocusDuration ?? state.settings.focusDuration,
+            remainingByPhase: { focus: seconds, break: breakFull },
+            startedByPhase: { focus: true, break: false },
+            pendingSync: state.pendingSync + 1,
+          };
+        }),
 
       setSelectedTaskName: (name) => set({ selectedTaskName: name }),
 
@@ -492,6 +549,8 @@ export const useFrogodoroStore = create<FrogodoroState>()(
           },
           sessionStats: timer.sessionStats,
           activeTimerRev: timer.rev ?? null,
+          pausedThisPhase:
+            timer.deepFocusBroken === true ? true : prev.pausedThisPhase,
         });
       },
       setActiveTimerRev: (rev) => set({ activeTimerRev: rev }),

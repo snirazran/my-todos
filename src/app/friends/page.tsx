@@ -731,7 +731,6 @@ function LeaderboardRow({
           />
           <PremiumFrogAura
             show={!!entry.premium}
-            paused={paused}
             compact
             flySize={rowFlySize}
           />
@@ -762,6 +761,15 @@ function LeaderboardRow({
               <Flame className="h-3.5 w-3.5 fill-orange-400" />
               {entry.streak}
               <span className="font-bold text-orange-400/80">day streak</span>
+            </p>
+          )}
+          {entry.focusing && (
+            <p className="mt-0.5 flex items-center gap-1.5 text-xs font-black text-primary">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-60" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+              </span>
+              Focusing now
             </p>
           )}
         </div>
@@ -881,7 +889,7 @@ function SelfFrog({
   return (
     <div className="pointer-events-none relative z-30 flex shrink-0 origin-bottom flex-col items-center md:scale-110 lg:scale-100">
       <Frog width={240} height={270} indices={indices} paused={paused} />
-      <PremiumFrogAura paused={paused} />
+      <PremiumFrogAura />
     </div>
   );
 }

@@ -1170,7 +1170,7 @@ function MainView({
                   name="frogPlus"
                   className="absolute left-1/2 top-1/2 h-20 w-20 -translate-x-1/2 -translate-y-1/2 drop-shadow-[0_3px_0_rgba(31,98,28,0.35)]"
                 />
-                <PremiumFrogAura show compact alwaysPlay />
+                <PremiumFrogAura show compact />
               </div>
               <p className="mt-2 flex items-center justify-center gap-2 text-xl font-black tracking-tight">
                 Frogress

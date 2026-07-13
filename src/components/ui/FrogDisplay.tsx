@@ -207,7 +207,7 @@ export function FrogDisplay({
           />
         </div>
 
-        {!isGuest && <PremiumFrogAura paused={paused} />}
+        {!isGuest && <PremiumFrogAura />}
 
         {/* SPEECH BUBBLE - NOW INSIDE FROG'S CONTAINER */}
 

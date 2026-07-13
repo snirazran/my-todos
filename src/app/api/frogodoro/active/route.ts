@@ -72,6 +72,8 @@ function normalizeTimer(input: unknown): ActiveFrogodoroTimer | null {
       ...(timer.sessionStats ?? {}),
     },
     rev: typeof timer.rev === 'number' ? timer.rev : undefined,
+    deepFocus: timer.deepFocus === true,
+    deepFocusBroken: timer.deepFocusBroken === true,
     updatedAt: new Date().toISOString(),
   };
 }
@@ -185,10 +187,21 @@ export async function PUT(req: NextRequest) {
             Math.max(0, Math.round(phaseDurationSec - timer.timeLeft)),
           )
         : carriedSaved;
+    const pausedMidFocus =
+      samePhase &&
+      timer.phase === 'focus' &&
+      existingTimer.status === 'running' &&
+      timer.status === 'paused';
+    const deepFocusBroken = samePhase
+      ? existingTimer.deepFocusBroken === true ||
+        timer.deepFocusBroken === true ||
+        pausedMidFocus
+      : timer.deepFocusBroken === true;
     const stored: ActiveFrogodoroTimer = {
       ...timer,
       rev: prevRev + 1,
       savedElapsed,
+      deepFocusBroken,
     };
     console.log(
       `Frogodoro PUT /active clientId=${stored.clientId} status=${stored.status} finished=${stored.finished === true}`,

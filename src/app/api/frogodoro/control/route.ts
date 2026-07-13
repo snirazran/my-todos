@@ -162,6 +162,9 @@ export async function POST(req: NextRequest) {
         timeLeft: timer.status === 'running' ? timeLeft : timer.timeLeft,
         endsAt: null,
         finished: false,
+        deepFocusBroken:
+          timer.deepFocusBroken === true ||
+          (timer.phase === 'focus' && timer.status === 'running'),
         rev: (timer.rev ?? 0) + 1,
         updatedAt: new Date(now).toISOString(),
       };

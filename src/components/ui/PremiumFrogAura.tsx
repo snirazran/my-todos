@@ -15,19 +15,16 @@ const COMPACT_VARS = {
   '--premium-fly-y-max': '6px',
 } as React.CSSProperties;
 
+// The companion fly never pauses: it ignores the global slide/sheet Rive
+// pause and every popup — a Plus perk should always feel alive.
 export function PremiumFrogAura({
-  paused = false,
   show,
-  alwaysPlay = false,
   compact = false,
   flySize,
   className,
 }: {
-  paused?: boolean;
   /** Overrides the self premium check (e.g. viewing a friend's frog). */
   show?: boolean;
-  /** Keep the fly animating inside an open sheet (which holds the global Rive pause). */
-  alwaysPlay?: boolean;
   /** Small fly with a tight orbit, for clipped row-sized frog containers. */
   compact?: boolean;
   /** Fly canvas size in px; defaults to 26 (compact) / 46. */
@@ -70,8 +67,7 @@ export function PremiumFrogAura({
                 <Fly
                   size={flySize ?? (compact ? 26 : 46)}
                   interactive={false}
-                  paused={paused}
-                  alwaysPlay={alwaysPlay}
+                  alwaysPlay
                 />
               </div>
             </div>

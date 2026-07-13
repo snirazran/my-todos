@@ -16,6 +16,10 @@ import type {
   LiveActivityRef,
 } from '@/lib/types/UserDoc';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
+import {
+  DEEP_FOCUS_MIN_SECONDS,
+  DEEP_FOCUS_BONUS_FLIES,
+} from '@/lib/focusFlies';
 import TaskModel from '@/lib/models/Task';
 import { taskAnalyticsProperties } from '@/lib/analytics/engagement';
 
@@ -62,6 +66,7 @@ function getNextTimer(timer: ActiveFrogodoroTimer, now: Date) {
           ? new Date(boundary + nextDuration * 1000).toISOString()
           : null,
         finished: !autoStart,
+        deepFocusBroken: false,
         settings,
         sessionStats: {
           ...sessionStats,
@@ -85,6 +90,7 @@ function getNextTimer(timer: ActiveFrogodoroTimer, now: Date) {
       timeLeft: nextDuration,
       endsAt: null,
       finished: true,
+      deepFocusBroken: false,
       settings,
       sessionStats: {
         ...sessionStats,
@@ -232,6 +238,18 @@ async function processOneDueTimer(
       timezone,
     });
   }
+  const deepFocusEarned =
+    next.completedPhase === 'focus' &&
+    timer.deepFocus === true &&
+    timer.deepFocusBroken !== true &&
+    next.completedDuration >= DEEP_FOCUS_MIN_SECONDS;
+  if (deepFocusEarned) {
+    await UserModel.updateOne(
+      { _id: userId },
+      { $inc: { 'wardrobe.flies': DEEP_FOCUS_BONUS_FLIES } },
+    );
+  }
+
   if (next.completedPhase === 'focus') {
     const task = await TaskModel.findOne({ userId, id: timer.taskId }).lean();
     await recordAnalyticsEvent({

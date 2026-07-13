@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Pause, Play, SkipForward, Square } from 'lucide-react';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import { useUIStore } from '@/lib/uiStore';
+import { useDeepFocusPauseGuard } from '@/hooks/useDeepFocusPauseGuard';
 
 /**
  * Compact circular timer for pages that don't host the full Frogodoro UI
@@ -30,6 +31,7 @@ export default function CircularTimer() {
 
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
   const [expanded, setExpanded] = useState(false);
+  const { armed: pauseArmed, guardPause } = useDeepFocusPauseGuard();
   const wardrobeDockVisible = useUIStore(
     (s) => s.isWardrobeStuck && s.wardrobeTab === 'inventory',
   );
@@ -95,7 +97,7 @@ export default function CircularTimer() {
   };
 
   const handlePlayPause = () => {
-    if (isRunning) pauseTimer();
+    if (isRunning) guardPause(pauseTimer);
     else startTimer();
   };
   const handleStop = () => {
@@ -140,18 +142,25 @@ export default function CircularTimer() {
             <button type="button" aria-label="Skip" onClick={handleSkip} className={ctrlBtn}>
               <SkipForward className="h-4 w-4 fill-current" />
             </button>
-            <button
-              type="button"
-              aria-label={isRunning ? 'Pause' : 'Resume'}
-              onClick={handlePlayPause}
-              className={ctrlBtn}
-            >
-              {isRunning ? (
-                <Pause className="h-4 w-4 fill-current" />
-              ) : (
-                <Play className="h-4 w-4 fill-current" />
+            <div className="relative">
+              {pauseArmed && (
+                <span className="absolute right-full top-1/2 mr-2 -translate-y-1/2 whitespace-nowrap rounded-full bg-amber-500 px-2.5 py-1 text-[11px] font-black text-white shadow-lg">
+                  Tap again — +1 fly lost
+                </span>
               )}
-            </button>
+              <button
+                type="button"
+                aria-label={isRunning ? 'Pause' : 'Resume'}
+                onClick={handlePlayPause}
+                className={`${ctrlBtn} ${pauseArmed ? 'ring-2 ring-amber-500' : ''}`}
+              >
+                {isRunning ? (
+                  <Pause className="h-4 w-4 fill-current" />
+                ) : (
+                  <Play className="h-4 w-4 fill-current" />
+                )}
+              </button>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

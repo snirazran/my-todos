@@ -58,6 +58,7 @@ public final class FrogTimerNotification {
             return;
         }
         ensureChannel(nm);
+        nm.cancel(ALARM_NOTIF_ID);
 
         boolean isFocus = !"break".equals(phase);
         String label = isFocus ? "Focus" : "Break";

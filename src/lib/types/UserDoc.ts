@@ -11,6 +11,12 @@ export type DailyFlyProgress = {
   limitNotified?: boolean;
 };
 
+export type FocusFlyDaily = {
+  date: string;
+  focusSeconds: number;
+  earned: number;
+};
+
 export type FriendFlyDaily = {
   date: string;
   credited: Record<string, number>;
@@ -50,6 +56,8 @@ export type UserWardrobe = {
   unseenItems?: string[];
   flies: number;
   flyDaily?: DailyFlyProgress;
+  /** Flies earned from focus time (1 per 5 focused minutes, daily-capped). */
+  focusFlyDaily?: FocusFlyDaily;
   friendFlyDaily?: FriendFlyDaily;
   /** Lifetime flies each friend has contributed to you (by friend userId). */
   friendFlyTotals?: Record<string, number>;
@@ -194,6 +202,12 @@ export type ActiveFrogodoroTimer = {
   // A phase just ended into a non-auto-start state and is awaiting Done — the
   // alarm is ringing across devices. Cleared when any surface acknowledges Done.
   finished?: boolean;
+  // Deep-focus mode: the user pledged to finish this focus phase without
+  // pausing. Set at start; `deepFocusBroken` flips true on any mid-phase pause
+  // (from any surface). An unbroken deep focus of ≥15 min earns a bonus fly at
+  // completion.
+  deepFocus?: boolean;
+  deepFocusBroken?: boolean;
 };
 
 export type NotificationPrefs = {

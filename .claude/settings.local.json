@@ -310,7 +310,11 @@
       "PowerShell(npx tsc --noEmit 2>$null | Select-Object -First 20)",
       "WebFetch(domain:www.joshwcomeau.com)",
       "Bash(./node_modules/.bin/eslint src/components/ui/HintCoach.tsx src/lib/hints/guides.ts src/lib/uiStore.ts src/lib/questClaims.tsx src/components/ui/NextQuestStrip.tsx)",
-      "Bash(python -c ' *)"
+      "Bash(python -c ' *)",
+      "Bash(perl -pi -e 's/<PremiumFrogAura paused=\\\\{paused\\\\} \\\\/>/<PremiumFrogAura \\\\/>/g' src/components/ui/FrogDisplay.tsx src/app/friends/page.tsx)",
+      "Bash(perl -0pi -e 's/\\(<PremiumFrogAura\\\\n\\\\s*show=\\\\{!!entry\\\\.premium\\\\}\\\\n\\)\\\\s*paused=\\\\{paused\\\\}\\\\n/$1/' src/app/friends/page.tsx)",
+      "Bash(perl -pi -e 's/<PremiumFrogAura show alwaysPlay compact flySize=\\\\{50\\\\} \\\\/>/<PremiumFrogAura show compact flySize={50} \\\\/>/; s/<PremiumFrogAura show alwaysPlay \\\\/>/<PremiumFrogAura show \\\\/>/; s/<PremiumFrogAura show compact alwaysPlay \\\\/>/<PremiumFrogAura show compact \\\\/>/; s/<PremiumFrogAura show=\\\\{!!entry\\\\.premium\\\\} alwaysPlay \\\\/>/<PremiumFrogAura show={!!entry.premium} \\\\/>/' src/components/ui/PlusUpgradeModal.tsx src/components/ui/siteHeader.tsx src/components/ui/FriendDetailModal.tsx)",
+      "Bash(echo \"clean: $?\")"
     ]
   }
 }

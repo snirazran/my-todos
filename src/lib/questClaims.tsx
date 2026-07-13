@@ -46,6 +46,7 @@ export type Trackable = {
   categoryName?: string;
   objectiveLabel: string;
   remainingLabel: string;
+  objectiveType?: string;
   tags?: ObjectiveTagChip[];
   needsFocusTags?: boolean;
   progress: number;

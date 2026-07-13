@@ -272,6 +272,8 @@ export function GlobalTimer() {
       settings: s.settings,
       sessionStats: s.sessionStats,
       rev: s.activeTimerRev ?? undefined,
+      deepFocus: s.deepFocus || undefined,
+      deepFocusBroken: s.pausedThisPhase || undefined,
     };
   }, []);
 

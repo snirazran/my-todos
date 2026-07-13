@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import { Pause, Play, SkipForward, Square } from 'lucide-react';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
+import { useDeepFocusPauseGuard } from '@/hooks/useDeepFocusPauseGuard';
 import { cn } from '@/lib/utils';
 
 interface Props {
@@ -29,6 +30,7 @@ export default function FrogodoroPill({ onClick, taskName }: Props) {
   } = useFrogodoroStore();
 
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
+  const { armed: pauseArmed, guardPause } = useDeepFocusPauseGuard();
 
   useEffect(() => {
     setPortalTarget(document.getElementById('frog-bottom-stack-top'));
@@ -64,7 +66,7 @@ export default function FrogodoroPill({ onClick, taskName }: Props) {
   // must persist the unsaved time here first, like handleSkip and the sheet do.
   const handlePlayPause = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (isRunning) pauseTimer();
+    if (isRunning) guardPause(pauseTimer);
     else startTimer();
   };
   const handleStop = (e: React.MouseEvent) => {
@@ -228,18 +230,25 @@ export default function FrogodoroPill({ onClick, taskName }: Props) {
         >
           <Square className="h-3.5 w-3.5 fill-current" />
         </button>
-        <button
-          type="button"
-          onClick={handlePlayPause}
-          aria-label={isRunning ? 'Pause' : 'Resume'}
-          className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-white transition-colors hover:bg-white/30 active:scale-95"
-        >
-          {isRunning ? (
-            <Pause className="h-4 w-4 fill-current" />
-          ) : (
-            <Play className="h-4 w-4 fill-current" />
+        <div className="relative">
+          {pauseArmed && (
+            <span className="absolute bottom-full left-1/2 mb-2 -translate-x-1/2 whitespace-nowrap rounded-full bg-amber-500 px-2.5 py-1 text-[11px] font-black text-white shadow-lg">
+              Tap again — +1 fly lost
+            </span>
           )}
-        </button>
+          <button
+            type="button"
+            onClick={handlePlayPause}
+            aria-label={isRunning ? 'Pause' : 'Resume'}
+            className={`flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-white transition-colors hover:bg-white/30 active:scale-95 ${pauseArmed ? 'ring-2 ring-amber-400' : ''}`}
+          >
+            {isRunning ? (
+              <Pause className="h-4 w-4 fill-current" />
+            ) : (
+              <Play className="h-4 w-4 fill-current" />
+            )}
+          </button>
+        </div>
         <button
           type="button"
           onClick={handleSkip}

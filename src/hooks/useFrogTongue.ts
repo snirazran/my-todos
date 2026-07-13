@@ -19,6 +19,8 @@ export type TongueKey = string;
 export interface TongueRequest {
   key: TongueKey;
   completed: boolean;
+  /** Skip the love emote at the end (a grab that comes back empty). */
+  silent?: boolean;
   onPersist: () => Promise<void> | void;
 }
 
@@ -53,6 +55,7 @@ export function useFrogTongue({
   const [grab, setGrab] = useState<{
     key: string;
     completed: boolean;
+    silent?: boolean;
     originDoc: { x: number; y: number };
     targetDoc: { x: number; y: number };
     returnToY: number;
@@ -162,7 +165,7 @@ export function useFrogTongue({
   const [visuallyDone, setVisuallyDone] = useState<Set<string>>(new Set());
 
   const triggerTongue = useCallback(
-    async ({ key, completed, onPersist }: TongueRequest) => {
+    async ({ key, completed, silent = false, onPersist }: TongueRequest) => {
       if (cinematic || grab || performance.now() < cooldownUntil.current) {
         if (!completed) await onPersist();
         return;
@@ -228,6 +231,7 @@ export function useFrogTongue({
       setGrab({
         key,
         completed,
+        silent,
         originDoc,
         targetDoc,
         returnToY: startY,
@@ -416,7 +420,7 @@ export function useFrogTongue({
           pathNode.style.visibility = 'hidden';
         }
 
-        frogRef.current?.fireEmote('love');
+        if (!grab.silent) frogRef.current?.fireEmote('love');
 
         const persist = Promise.resolve(grab.onPersist()).catch((error) => {
           console.error('Failed to persist tongue action', error);

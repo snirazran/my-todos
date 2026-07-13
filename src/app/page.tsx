@@ -38,6 +38,10 @@ import Fly from '@/components/ui/fly';
 import TaskList from '@/components/ui/TaskList';
 import QuickAddSheet from '@/components/ui/QuickAddSheet';
 import FrogodoroSheet from '@/components/ui/FrogodoroSheet';
+import {
+  HomeFocusFlies,
+  HOME_FOCUS_FLY_PREFIX,
+} from '@/components/ui/HomeFocusFlies';
 import FrogodoroPill from '@/components/ui/FrogodoroPill';
 import { useFrogodoroUiStore } from '@/lib/frogodoroUiStore';
 import { FilterDropdown } from '@/components/ui/FilterDropdown';
@@ -140,7 +144,7 @@ export default function Home() {
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   const frogRef = useRef<FrogHandle>(null);
-  const flyRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const flyRefs = useRef<Record<string, HTMLElement | null>>({});
   const isInitialLoad = useRef(true);
 
   const [guestTasks, setGuestTasks] = useState<Task[]>(demoTasks);
@@ -148,6 +152,7 @@ export default function Home() {
   const [quickText, setQuickText] = useState('');
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [timerTask, setTimerTask] = useState<Task | null>(null);
+  const [timerAutoStart, setTimerAutoStart] = useState(false);
   const [showTimer, setShowTimer] = useState(false);
   const [frogodoroHydrated, setFrogodoroHydrated] = useState(
     () => useFrogodoroStore.persist?.hasHydrated?.() ?? false,
@@ -578,11 +583,34 @@ export default function Home() {
 
         <div className="relative flex flex-col items-stretch gap-2">
           <div className="relative z-10 flex flex-col gap-2 lg:gap-4">
+            {user &&
+              (() => {
+                // Covers both the fly keys (home-focus-fly-N) and the miss
+                // aim key (home-focus-miss) — hiding the layer mid-lunge
+                // unmounts the flies and desyncs both surfaces.
+                const focusGrabActive =
+                  !!grab && grab.key.startsWith('home-focus');
+                return (
+                  <HomeFocusFlies
+                    frogRef={frogRef}
+                    frogBoxRef={frogBoxRef}
+                    flyRefs={flyRefs}
+                    triggerTongue={triggerTongue}
+                    visuallyDone={visuallyDone}
+                    tongueEnabled={showTimer}
+                    hidden={
+                      ((cinematic || !!grab) && !focusGrabActive) ||
+                      (isAnyPanelOpen && !showTimer)
+                    }
+                  />
+                );
+              })()}
             <FrogDisplay
               frogRef={frogRef}
               frogBoxRef={frogBoxRef}
               mouthOpen={!!grab}
               mouthOffset={FROG_TONGUE_MOUTH_OFFSET}
+              isCatching={!!grab && !grab.silent}
               indices={frogIndices}
               openWardrobe={isWardrobeOpen}
               onOpenChange={setWardrobeOpen}
@@ -590,14 +618,13 @@ export default function Home() {
               rate={rate}
               done={giftDone}
               total={giftTotal}
-              isCatching={cinematic}
               hunger={user ? hungerStatus.hunger : 1000}
               maxHunger={user ? hungerStatus.maxHunger : 10000}
               animateHunger={!!user}
               isGuest={!user}
               questClaimableCount={questsData?.claimableCount ?? 0}
               questActiveCount={questsData?.activeCount ?? 0}
-              paused={isAnyPanelOpen}
+              paused={isAnyPanelOpen && !showTimer}
             />
           </div>
 
@@ -771,12 +798,13 @@ export default function Home() {
                     }
                     return scheduleTask(id, data, scope);
                   }}
-                  onStartTimer={(t) => {
+                  onStartTimer={(t, opts) => {
                     if (!user) {
                       router.push('/login');
                       return;
                     }
                     setTimerTask(t as Task);
+                    setTimerAutoStart(!!opts?.autoStart);
                     setShowTimer(true);
                   }}
                   onUpdateDetails={(id, details) => {
@@ -858,13 +886,16 @@ export default function Home() {
               visibility and transform directly — no React re-renders. */}
           <g ref={tipGroupEl} style={{ visibility: 'hidden' }}>
             <circle r={10} fill="transparent" />
-            <image
-              href="/fly.svg"
-              x={-FLY_PX / 2}
-              y={-FLY_PX / 2}
-              width={FLY_PX}
-              height={FLY_PX}
-            />
+            {/* A silent grab (focus-hunt miss) comes back empty-tipped */}
+            {!grab.silent && (
+              <image
+                href="/fly.svg"
+                x={-FLY_PX / 2}
+                y={-FLY_PX / 2}
+                width={FLY_PX}
+                height={FLY_PX}
+              />
+            )}
           </g>
         </svg>
       )}
@@ -984,9 +1015,13 @@ export default function Home() {
 
       <FrogodoroSheet
         open={showTimer}
-        onOpenChange={setShowTimer}
+        onOpenChange={(v) => {
+          setShowTimer(v);
+          if (!v) setTimerAutoStart(false);
+        }}
         task={timerTask}
         tags={tags}
+        autoStart={timerAutoStart}
         onMutateToday={() => mutateToday()}
       />
 

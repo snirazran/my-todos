@@ -3,8 +3,9 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check } from 'lucide-react';
+import { Check, Zap } from 'lucide-react';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
+import { FocusCelebration } from '@/components/ui/FocusCelebration';
 import { useFrogodoroUiStore } from '@/lib/frogodoroUiStore';
 import { useSheetStore } from '@/lib/sheetStore';
 import { useUIStore } from '@/lib/uiStore';
@@ -46,6 +47,9 @@ export default function GlobalFrogodoroMini() {
     sessionStats,
     setAwaitingDone,
     stopTimer,
+    deepFocus,
+    lastPhasePaused,
+    extendFocus,
   } = useFrogodoroStore();
 
   const [mounted, setMounted] = useState(false);
@@ -77,6 +81,15 @@ export default function GlobalFrogodoroMini() {
     setAwaitingDone(false);
     stopTimer();
   };
+
+  const handleKeepGoing = () => {
+    setAwaitingDone(false);
+    extendFocus(5 * 60);
+  };
+
+  const celebrateFocus = displayPhase === 'focus' && !splitDone;
+  const bonusFly =
+    celebrateFocus && deepFocus && !lastPhasePaused && lastFocusElapsed >= 15 * 60;
 
   return (
     <>
@@ -124,7 +137,16 @@ export default function GlobalFrogodoroMini() {
                           Time&apos;s up!
                         </p>
 
-                        {splitDone ? (
+                        {celebrateFocus ? (
+                          <div className="mb-5">
+                            <FocusCelebration
+                              seconds={lastFocusElapsed}
+                              bonusFly={bonusFly}
+                              fliesCaught={Math.floor(lastFocusElapsed / 300)}
+                              compact
+                            />
+                          </div>
+                        ) : splitDone ? (
                           <div className="mb-5 flex">
                             <div className="flex-1 text-center">
                               <p className="text-[11px] font-black uppercase tracking-widest text-white/80">Focus</p>
@@ -145,13 +167,24 @@ export default function GlobalFrogodoroMini() {
                           </p>
                         )}
 
-                        <button
-                          onClick={handleDone}
-                          className={`mx-auto flex items-center justify-center gap-1.5 rounded-2xl bg-white px-10 py-3 text-[15px] font-black uppercase tracking-widest shadow-[0_6px_0_rgba(0,0,0,0.15)] transition-all active:translate-y-1.5 active:shadow-none ${accent}`}
-                        >
-                          <Check className="h-5 w-5" />
-                          Done
-                        </button>
+                        <div className="flex items-center justify-center gap-2.5">
+                          {celebrateFocus && (
+                            <button
+                              onClick={handleKeepGoing}
+                              className="flex items-center justify-center gap-1 rounded-2xl bg-white/20 px-4 py-3 text-[13px] font-black uppercase tracking-widest text-white shadow-[0_6px_0_rgba(0,0,0,0.15)] transition-all hover:bg-white/30 active:translate-y-1.5 active:shadow-none"
+                            >
+                              <Zap className="h-4 w-4 fill-current" />
+                              +5 more
+                            </button>
+                          )}
+                          <button
+                            onClick={handleDone}
+                            className={`flex items-center justify-center gap-1.5 rounded-2xl bg-white px-8 py-3 text-[15px] font-black uppercase tracking-widest shadow-[0_6px_0_rgba(0,0,0,0.15)] transition-all active:translate-y-1.5 active:shadow-none ${accent}`}
+                          >
+                            <Check className="h-5 w-5" />
+                            Done
+                          </button>
+                        </div>
                       </div>
                     </div>
 

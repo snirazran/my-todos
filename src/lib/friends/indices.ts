@@ -40,6 +40,8 @@ export type FriendSummary = {
   streak?: number;
   /** Whether this user has an active premium subscription. */
   premium?: boolean;
+  /** Whether this friend is in a running focus session right now. */
+  focusing?: boolean;
   /** Catalog details of this friend's equipped wardrobe items. */
   equippedItems?: FriendEquippedItem[];
   /** Highest rarity among this friend's equipped items. */

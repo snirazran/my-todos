@@ -33,9 +33,16 @@ import {
   type TimerSound,
 } from '@/lib/timerSounds';
 import { useNotificationStatus } from '@/hooks/useNotificationStatus';
-import { Bell, Volume2 } from 'lucide-react';
+import { Bell, Volume2, Zap } from 'lucide-react';
 import { useIntros } from '@/hooks/useIntros';
 import { FrogodoroIntroSheet } from '@/components/ui/FirstTimeIntros';
+import { FocusCelebration } from '@/components/ui/FocusCelebration';
+import { FocusScene } from '@/components/ui/FocusScene';
+import { fliesCaughtFor, deepFocusPledgeLive } from '@/lib/focusFlies';
+import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
+import Fly from '@/components/ui/fly';
+import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
+import useSWR from 'swr';
 
 interface Task {
   id: string;
@@ -55,6 +62,9 @@ type Props = Readonly<{
   onOpenChange: (v: boolean) => void;
   task: Task | null;
   tags?: { id: string; name: string; color: string }[];
+  // Start the timer immediately on open (swipe-to-focus / join flows) instead
+  // of waiting for the START tap. Ignored while a session is already active.
+  autoStart?: boolean;
   onMutateToday?: () => void;
 }>;
 
@@ -63,6 +73,7 @@ export default function FrogodoroSheet({
   onOpenChange,
   task,
   tags: userTags = [],
+  autoStart = false,
   onMutateToday,
 }: Props) {
   useRegisterOpenSheet(open);
@@ -70,14 +81,24 @@ export default function FrogodoroSheet({
   const [isDesktop, setIsDesktop] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [showPond, setShowPond] = useState(false);
+  const [confirmStop, setConfirmStop] = useState(false);
+  const [confirmPause, setConfirmPause] = useState(false);
+  const catchChipRef = useRef<HTMLDivElement | null>(null);
+  const [chipPulse, setChipPulse] = useState(0);
   const { seenIntros, markIntroSeen } = useIntros(open);
   const [introOpen, setIntroOpen] = useState(false);
 
   // First open ever (per account): explain the timer once — sprints, sync,
-  // and that it survives closing the app.
+  // and that it survives closing the app. First-timers also get a shorter
+  // 15-minute default focus: an easier first win than the classic 25.
   useEffect(() => {
     if (!open || !seenIntros || seenIntros.frogodoro) return;
     markIntroSeen('frogodoro');
+    const store = useFrogodoroStore.getState();
+    if (!task?.frogodoroSettings && !store.timerActive) {
+      store.setSettings({ ...store.settings, focusDuration: 15 });
+    }
     setIntroOpen(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, seenIntros?.frogodoro]);
@@ -107,7 +128,26 @@ export default function FrogodoroSheet({
     lastCompletedPhase,
     lastFocusElapsed,
     lastBreakElapsed,
+    lastPhasePaused,
+    deepFocus,
+    setDeepFocus,
+    extendFocus,
+    pausedThisPhase,
   } = useFrogodoroStore();
+  const { indices: frogIndices } = useWardrobeIndices(open);
+
+  const { data: pondData } = useSWR<{
+    today: string;
+    days: Array<{ date: string; focusTime: number; breakTime: number; tasks: number }>;
+  }>(
+    open && showPond
+      ? `/api/frogodoro/history?days=7&tz=${encodeURIComponent(
+          Intl.DateTimeFormat().resolvedOptions().timeZone,
+        )}`
+      : null,
+    (url: string) => fetch(url).then((r) => r.json()),
+    { revalidateOnFocus: false },
+  );
   const addOpenSheet = useFrogodoroUiStore((s) => s.addOpenSheet);
   const removeOpenSheet = useFrogodoroUiStore((s) => s.removeOpenSheet);
 
@@ -163,6 +203,22 @@ export default function FrogodoroSheet({
     }
   }, [open, task]);
 
+  // One-tap start: begin the session as soon as the sheet opens with a task
+  // selected, once per open, only from a clean idle state.
+  const autoStartedRef = useRef(false);
+  useEffect(() => {
+    if (!open) {
+      autoStartedRef.current = false;
+      return;
+    }
+    if (!autoStart || autoStartedRef.current || !task) return;
+    const store = useFrogodoroStore.getState();
+    if (store.timerActive || store.awaitingDone) return;
+    if (store.selectedTaskId !== task.id) return;
+    autoStartedRef.current = true;
+    startTimer();
+  }, [open, autoStart, task, selectedTaskId, startTimer]);
+
   // Keep the store's task name in sync so the global completion popup can show
   // it (it has no access to task data on its own).
   useEffect(() => {
@@ -188,6 +244,9 @@ export default function FrogodoroSheet({
     if (wasOpen && !open) {
       setShowSettings(false);
       setShowHelp(false);
+      setShowPond(false);
+      setConfirmStop(false);
+      setConfirmPause(false);
       stopTimerSound();
       setPreviewingId(null);
       // Dismissing the popup also acknowledges a finished session: silence the
@@ -315,8 +374,20 @@ export default function FrogodoroSheet({
     }
   };
 
+  const pledgeLive = deepFocusPledgeLive({
+    deepFocus,
+    pausedThisPhase,
+    phase,
+    focusDurationMinutes: settings.focusDuration,
+  });
+
   const toggleTimer = () => {
     if (isRunning) {
+      // Pausing breaks the deep-focus pledge — warn before losing the bonus.
+      if (pledgeLive && timerActive) {
+        setConfirmPause(true);
+        return;
+      }
       pauseTimer();
     } else {
       startTimer();
@@ -334,16 +405,32 @@ export default function FrogodoroSheet({
 
   // Stop ends the current session and stays on the popup (now idle), so you can
   // pick a mode and start a new session if you like.
-  const handleStopTimer = async () => {
+  const performStop = async () => {
     const taskId = selectedTaskId;
     const unsavedElapsed = Math.max(0, liveElapsed - storeElapsed);
     const currentPhase = phase;
 
+    setConfirmStop(false);
     if (taskId && unsavedElapsed > 0) {
       await saveSessionToDb(taskId, currentPhase, unsavedElapsed);
       onMutateToday?.();
     }
     stopTimer();
+  };
+
+  // Ending a focus session with meaningful time on the clock asks first — a
+  // gentle nudge to keep going, never a punishment (the minutes still count).
+  const handleStopTimer = () => {
+    if (phase === 'focus' && timerActive && liveElapsed >= 60 && timeLeft > 60) {
+      setConfirmStop(true);
+      return;
+    }
+    void performStop();
+  };
+
+  const handleKeepGoing = () => {
+    setAwaitingDone(false);
+    extendFocus(5 * 60);
   };
 
   // Fast-forward: end the current phase now and switch to the other tab. No
@@ -479,6 +566,22 @@ export default function FrogodoroSheet({
   const focusSeconds = lastFocusElapsed;
   const breakSeconds = lastBreakElapsed;
 
+  const celebrateFocus = awaitingDone && displayPhase === 'focus' && !splitDone;
+  const deepFocusBonusEarned =
+    celebrateFocus && deepFocus && !lastPhasePaused && lastFocusElapsed >= 15 * 60;
+
+  // Focused seconds this session (same store-derived formula the home hero
+  // uses, so every surface shows the same swarm/caught count). 1 fly per 5
+  // focused minutes — drives the live catch animation and the caught chip.
+  const sessionFocusLive =
+    sessionStats.focusTime +
+    (phase === 'focus' ? Math.max(0, liveElapsed - storeElapsed) : 0);
+  const fliesCaught = fliesCaughtFor(sessionFocusLive);
+  // What this session can reach if it runs to the end — the visible goal.
+  const fliesPotential = fliesCaughtFor(
+    sessionFocusLive + (phase === 'focus' ? Math.max(0, timeLeft) : 0),
+  );
+
   if (!mounted) return null;
 
   const sheetPortal = createPortal(
@@ -490,7 +593,7 @@ export default function FrogodoroSheet({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => onOpenChange(false)}
-            className="fixed inset-0 z-[999] bg-black/80"
+            className="fixed inset-0 z-[999] bg-black/85 backdrop-blur-sm"
           />
 
           <div className="fixed inset-0 z-[1000] flex items-end justify-center pointer-events-none px-3 pb-4 sm:items-center sm:p-6">
@@ -530,7 +633,130 @@ export default function FrogodoroSheet({
 
                 {/* Help Sub-View */}
                 <AnimatePresence mode="wait">
-                  {showHelp ? (
+                  {showPond ? (
+                    <motion.div
+                      key="pond"
+                      initial={{ opacity: 0, x: 40 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 40 }}
+                      transition={{ duration: 0.2 }}
+                      className="p-5"
+                    >
+                      <div className="mb-5 flex items-center justify-between">
+                        <h3 className="text-lg font-black text-foreground">Fly catches</h3>
+                        <button
+                          onClick={() => setShowPond(false)}
+                          className="flex h-8 w-8 items-center justify-center rounded-full bg-muted/60 text-muted-foreground transition-colors hover:bg-muted"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+
+                      {(() => {
+                        const days = pondData?.days ?? [];
+                        const fliesOf = (focusTime: number) =>
+                          Math.min(12, Math.floor(focusTime / 300));
+                        const weekFlies = days.reduce(
+                          (sum, d) => sum + fliesOf(d.focusTime),
+                          0,
+                        );
+                        const weekMinutes = Math.round(
+                          days.reduce((sum, d) => sum + d.focusTime, 0) / 60,
+                        );
+                        const dayLetter = (date: string) =>
+                          ['S', 'M', 'T', 'W', 'T', 'F', 'S'][
+                            new Date(`${date}T00:00:00`).getDay()
+                          ];
+                        return (
+                          <>
+                            <p className="mb-3 text-sm text-muted-foreground">
+                              Your frog catches a fly for every{' '}
+                              <span className="font-bold text-foreground">5 focused minutes</span>.
+                            </p>
+                            <div className="rounded-2xl border border-border/50 bg-primary/5 px-3 pb-3 pt-4">
+                              <div className="flex items-end justify-between gap-1">
+                                {days.map((d) => {
+                                  const flies = fliesOf(d.focusTime);
+                                  const mins = Math.round(d.focusTime / 60);
+                                  const isToday = d.date === pondData?.today;
+                                  return (
+                                    <div
+                                      key={d.date}
+                                      className="flex flex-1 flex-col items-center gap-1.5"
+                                      title={`${mins} min focused`}
+                                    >
+                                      <div className="flex h-12 flex-col items-center justify-end gap-0.5">
+                                        {flies > 0 ? (
+                                          <>
+                                            <Fly size={22} interactive={false} alwaysPlay paused />
+                                            <span className="text-[11px] font-black tabular-nums text-primary">
+                                              ×{flies}
+                                            </span>
+                                          </>
+                                        ) : (
+                                          <span className="mb-1 h-2.5 w-2.5 rounded-full bg-muted-foreground/15" />
+                                        )}
+                                      </div>
+                                      <span
+                                        className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
+                                          isToday
+                                            ? 'bg-primary text-white'
+                                            : 'text-muted-foreground/70'
+                                        }`}
+                                      >
+                                        {dayLetter(d.date)}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                                {days.length === 0 && (
+                                  <p className="w-full py-4 text-center text-sm text-muted-foreground">
+                                    Loading your week…
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+
+                            {weekFlies > 0 ? (
+                              <div className="mt-3 flex gap-2">
+                                <div className="flex-1 rounded-2xl bg-primary/8 px-3 py-2.5 text-center dark:bg-primary/15">
+                                  <p className="flex items-center justify-center gap-1.5 text-lg font-black tabular-nums text-foreground">
+                                    <Fly size={22} interactive={false} alwaysPlay paused />
+                                    {weekFlies}
+                                  </p>
+                                  <p className="text-[10px] font-bold uppercase tracking-wider text-primary/70">
+                                    Flies this week
+                                  </p>
+                                </div>
+                                <div className="flex-1 rounded-2xl bg-primary/8 px-3 py-2.5 text-center dark:bg-primary/15">
+                                  <p className="text-lg font-black tabular-nums text-foreground">
+                                    {weekMinutes}m
+                                  </p>
+                                  <p className="text-[10px] font-bold uppercase tracking-wider text-primary/70">
+                                    Focused
+                                  </p>
+                                </div>
+                              </div>
+                            ) : (
+                              days.length > 0 && (
+                                <p className="mt-3 text-center text-sm text-muted-foreground">
+                                  No catches yet this week — start a focus and let
+                                  your frog hunt.
+                                </p>
+                              )
+                            )}
+                          </>
+                        );
+                      })()}
+
+                      <button
+                        onClick={() => setShowPond(false)}
+                        className="mt-4 w-full rounded-2xl bg-primary py-3 text-sm font-black text-primary-foreground shadow-md shadow-primary/20 transition-all active:scale-[0.98]"
+                      >
+                        Back to timer
+                      </button>
+                    </motion.div>
+                  ) : showHelp ? (
                     <motion.div
                       key="help"
                       initial={{ opacity: 0, x: 40 }}
@@ -672,20 +898,41 @@ export default function FrogodoroSheet({
                           </div>
                         </section>
 
-                        {/* Auto-start */}
-                        <button
-                          type="button"
-                          onClick={() => setLocalSettings({ ...localSettings, autoStartBreaks: !localSettings.autoStartBreaks })}
-                          className="flex w-full items-center justify-between rounded-2xl border border-border/60 px-4 py-3.5 text-left transition-colors hover:bg-muted/30"
-                        >
-                          <div>
-                            <p className="text-sm font-medium text-foreground">Auto-start breaks</p>
-                            <p className="text-xs text-muted-foreground">Breaks begin automatically</p>
+                        {/* Behavior */}
+                        <section className="space-y-2.5">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Behavior</p>
+                          <div className="divide-y divide-border/60 rounded-2xl border border-border/60">
+                            <button
+                              type="button"
+                              onClick={() => setLocalSettings({ ...localSettings, autoStartBreaks: !localSettings.autoStartBreaks })}
+                              className="flex w-full items-center justify-between px-4 py-3.5 text-left transition-colors hover:bg-muted/30"
+                            >
+                              <div>
+                                <p className="text-sm font-medium text-foreground">Auto-start breaks</p>
+                                <p className="text-xs text-muted-foreground">Breaks begin automatically</p>
+                              </div>
+                              <span className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${localSettings.autoStartBreaks ? 'bg-primary' : 'bg-muted-foreground/25'}`}>
+                                <span className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${localSettings.autoStartBreaks ? 'translate-x-5' : 'translate-x-0'}`} />
+                              </span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setDeepFocus(!deepFocus)}
+                              className="flex w-full items-center justify-between px-4 py-3.5 text-left transition-colors hover:bg-muted/30"
+                            >
+                              <div>
+                                <p className="flex items-center gap-1 text-sm font-medium text-foreground">
+                                  <Zap className="h-3.5 w-3.5 fill-amber-500 text-amber-500" />
+                                  Deep focus
+                                </p>
+                                <p className="text-xs text-muted-foreground">Finish a 15m+ focus without pausing → +1 fly</p>
+                              </div>
+                              <span className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${deepFocus ? 'bg-primary' : 'bg-muted-foreground/25'}`}>
+                                <span className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${deepFocus ? 'translate-x-5' : 'translate-x-0'}`} />
+                              </span>
+                            </button>
                           </div>
-                          <span className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${localSettings.autoStartBreaks ? 'bg-primary' : 'bg-muted-foreground/25'}`}>
-                            <span className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${localSettings.autoStartBreaks ? 'translate-x-5' : 'translate-x-0'}`} />
-                          </span>
-                        </button>
+                        </section>
 
                         {/* Sound */}
                         <section className="space-y-2.5">
@@ -756,7 +1003,73 @@ export default function FrogodoroSheet({
                         {/* Help + Settings + Close — top-right, with gaps. The
                             settings gear lives here so it's always reachable,
                             even mid-session. */}
+                        {/* Session catch goal: caught / possible for this
+                            session length, plus the live deep-focus bonus —
+                            visible while the pledge holds, gone if it breaks.
+                            Pulses when a snatched fly lands; +1 floats up. */}
+                        {timerActive &&
+                          !awaitingDone &&
+                          phase === 'focus' &&
+                          fliesPotential > 0 && (
+                            <div className="absolute top-3 left-3 z-10">
+                              <motion.div
+                                ref={catchChipRef}
+                                key={chipPulse}
+                                initial={chipPulse > 0 ? { scale: 1.35 } : false}
+                                animate={{ scale: 1 }}
+                                transition={{ type: 'spring', stiffness: 420, damping: 16 }}
+                                className="flex items-center gap-1 rounded-full bg-black/25 py-1 pl-1.5 pr-2.5 shadow-inner"
+                              >
+                                <Fly size={24} interactive={false} alwaysPlay paused />
+                                <span className="text-[13px] font-black tabular-nums text-white">
+                                  {fliesCaught}/{fliesPotential}
+                                </span>
+                                <AnimatePresence>
+                                  {pledgeLive && (
+                                    <motion.span
+                                      initial={{ opacity: 0, width: 0 }}
+                                      animate={{ opacity: 1, width: 'auto' }}
+                                      exit={{ opacity: 0, width: 0 }}
+                                      className="flex items-center gap-0.5 overflow-hidden text-[12px] font-black text-amber-300"
+                                    >
+                                      <Zap className="h-3 w-3 fill-current" />
+                                      +1
+                                    </motion.span>
+                                  )}
+                                </AnimatePresence>
+                              </motion.div>
+                              <AnimatePresence>
+                                {chipPulse > 0 && (
+                                  <motion.span
+                                    key={`gain-${chipPulse}`}
+                                    initial={{ opacity: 0, y: 6 }}
+                                    animate={{ opacity: 1, y: -16 }}
+                                    exit={{ opacity: 0, y: -26 }}
+                                    transition={{ duration: 0.8, ease: 'easeOut' }}
+                                    onAnimationComplete={() => {
+                                      window.setTimeout(
+                                        () => setChipPulse((p) => (p > 0 ? 0 : p)),
+                                        600,
+                                      );
+                                    }}
+                                    className="pointer-events-none absolute left-1/2 top-0 flex -translate-x-1/2 items-center gap-1 rounded-full bg-white/95 px-2 py-0.5 text-xs font-black text-primary shadow"
+                                  >
+                                    <Fly size={16} interactive={false} paused />
+                                    +1
+                                  </motion.span>
+                                )}
+                              </AnimatePresence>
+                            </div>
+                          )}
+
                         <div className="absolute top-3 right-3 z-10 flex items-center gap-2.5">
+                          <button
+                            onClick={() => setShowPond(true)}
+                            aria-label="Fly catches this week"
+                            className="flex items-center justify-center w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 transition-colors text-white"
+                          >
+                            <Fly size={26} interactive={false} alwaysPlay paused />
+                          </button>
                           <button
                             onClick={() => setShowHelp(true)}
                             aria-label="How it works"
@@ -823,9 +1136,18 @@ export default function FrogodoroSheet({
                           </div>
                         )}
 
-                        {/* Time Display — split focus/break summary with auto-start
+                        {/* Time Display — celebration payoff for a finished focus
+                            session, split focus/break summary with auto-start
                             breaks, otherwise the single phase time/countdown. */}
-                        {splitDone ? (
+                        {celebrateFocus ? (
+                          <div className="mb-4">
+                            <FocusCelebration
+                              seconds={lastFocusElapsed}
+                              bonusFly={deepFocusBonusEarned}
+                              fliesCaught={Math.floor(lastFocusElapsed / 300)}
+                            />
+                          </div>
+                        ) : splitDone ? (
                           <div className="mb-4 flex items-stretch">
                             <div className="flex-1 text-center">
                               <p className="text-[11px] font-black uppercase tracking-widest text-white/80">Focus</p>
@@ -877,13 +1199,42 @@ export default function FrogodoroSheet({
                         </div>
                         )}
 
+                        {/* The frog perches on the START/PAUSE button from the
+                            moment the sheet opens; when a focus session starts
+                            the flies slide in from the sides, the frog lunges
+                            and misses, and truly catches one per 5 focused
+                            minutes. */}
+                        {!awaitingDone && (
+                          <div className="relative z-30">
+                            <FocusScene
+                              indices={frogIndices}
+                              running={isRunning}
+                              showFlies={timerActive && phase === 'focus'}
+                              caught={fliesCaught}
+                              focusSeconds={phaseDuration}
+                              counterRef={catchChipRef}
+                              onGainLand={() => setChipPulse((p) => p + 1)}
+                              suspended={confirmStop || confirmPause}
+                            />
+                          </div>
+                        )}
+
                         {/* Controls — when the session is over, the only action
                             is Done (which silences the alarm and closes). */}
                         {awaitingDone ? (
-                          <div className="flex items-center justify-center">
+                          <div className="flex items-center justify-center gap-2.5">
+                            {celebrateFocus && (
+                              <button
+                                onClick={handleKeepGoing}
+                                className="relative flex items-center justify-center rounded-2xl bg-white/20 px-4 py-3 text-[13px] font-black uppercase tracking-widest text-white shadow-[0_6px_0_rgba(0,0,0,0.15)] transition-all hover:bg-white/30 active:translate-y-1.5 active:shadow-[0_0_0_rgba(0,0,0,0.15)]"
+                              >
+                                <Zap className="mr-1 h-4 w-4 fill-current" />
+                                +5 MORE
+                              </button>
+                            )}
                             <button
                               onClick={handleDone}
-                              className={`relative flex items-center justify-center px-12 py-3 bg-white dark:bg-slate-50 text-[16px]
+                              className={`relative flex items-center justify-center px-10 py-3 bg-white dark:bg-slate-50 text-[16px]
                                 font-black uppercase tracking-widest rounded-2xl shadow-[0_6px_0_rgba(0,0,0,0.15)]
                                 active:shadow-[0_0_0_rgba(0,0,0,0.15)] active:translate-y-1.5 transition-all ${getPhaseAccent()}`}
                             >
@@ -892,7 +1243,7 @@ export default function FrogodoroSheet({
                             </button>
                           </div>
                         ) : (
-                        <div className="flex items-center justify-center gap-3">
+                        <div className="relative z-10 flex items-center justify-center gap-3">
                           {/* Left: Stop ends the active session. Idle → spacer so
                               START stays centred. */}
                           {timerActive ? (
@@ -935,6 +1286,34 @@ export default function FrogodoroSheet({
                           )}
                         </div>
                         )}
+
+                        {/* Deep-focus pledge — finish without pausing → bonus
+                            fly. Collapses smoothly on start instead of
+                            snapping the layout. */}
+                        <AnimatePresence initial={false}>
+                          {!awaitingDone && !timerActive && phase === 'focus' && (
+                            <motion.div
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: 'auto', opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
+                              className="overflow-hidden"
+                            >
+                              <button
+                                type="button"
+                                onClick={() => setDeepFocus(!deepFocus)}
+                                className={`mx-auto mt-3 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold transition-colors active:scale-95 ${
+                                  deepFocus
+                                    ? 'bg-white text-primary shadow'
+                                    : 'bg-white/15 text-white/90 hover:bg-white/25'
+                                }`}
+                              >
+                                <Zap className={`h-3.5 w-3.5 ${deepFocus ? 'fill-current' : ''}`} />
+                                Deep focus · finish without pausing for +1 fly
+                              </button>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
 
                         {/* Enable-notifications hint — so timer-complete alerts can land */}
                         {canEnableNotifs && (
@@ -981,6 +1360,111 @@ export default function FrogodoroSheet({
                           })()}
                         </div>
                       )}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* Gentle early-stop confirm — the frog would rather you keep
+                    going, but ending still keeps every earned minute. */}
+                <AnimatePresence>
+                  {confirmStop && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="absolute inset-0 z-30 flex items-center justify-center rounded-[28px] bg-black/60 p-6 backdrop-blur-sm"
+                    >
+                      <motion.div
+                        initial={{ scale: 0.94, y: 8 }}
+                        animate={{ scale: 1, y: 0 }}
+                        exit={{ scale: 0.94, y: 8 }}
+                        className="w-full max-w-[300px] rounded-3xl bg-popover p-5 text-center shadow-2xl"
+                      >
+                        <div className="mx-auto -mt-1 flex justify-center">
+                          <FrogSnapshot
+                            indices={{ ...frogIndices, mood: 1 }}
+                            width={72}
+                            height={76}
+                            visualOffsetY={4}
+                          />
+                        </div>
+                        <p className="mt-1 text-base font-black text-foreground">
+                          End focus early?
+                        </p>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {`Your ${Math.max(1, Math.floor(liveElapsed / 60))} focused ${
+                            Math.floor(liveElapsed / 60) === 1 ? 'minute' : 'minutes'
+                          } still count — but you're on a roll.`}
+                          {pledgeLive && (
+                            <span className="mt-1 flex items-center justify-center gap-1 font-bold text-amber-600 dark:text-amber-400">
+                              <Zap className="h-3.5 w-3.5 fill-current" />
+                              Deep focus +1 fly will be lost
+                            </span>
+                          )}
+                        </p>
+                        <button
+                          onClick={() => setConfirmStop(false)}
+                          className="mt-4 w-full rounded-2xl bg-primary py-3 text-sm font-black uppercase tracking-widest text-primary-foreground shadow-md shadow-primary/20 transition-all active:scale-[0.98]"
+                        >
+                          Keep going
+                        </button>
+                        <button
+                          onClick={() => void performStop()}
+                          className="mt-2 w-full rounded-2xl py-2.5 text-sm font-bold text-muted-foreground transition-colors hover:bg-muted/40"
+                        >
+                          End session
+                        </button>
+                      </motion.div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* Deep-focus pause warning — pausing forfeits the +1 fly */}
+                <AnimatePresence>
+                  {confirmPause && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="absolute inset-0 z-30 flex items-center justify-center rounded-[28px] bg-black/60 p-6 backdrop-blur-sm"
+                    >
+                      <motion.div
+                        initial={{ scale: 0.94, y: 8 }}
+                        animate={{ scale: 1, y: 0 }}
+                        exit={{ scale: 0.94, y: 8 }}
+                        className="w-full max-w-[300px] rounded-3xl bg-popover p-5 text-center shadow-2xl"
+                      >
+                        <div className="mx-auto -mt-1 flex justify-center">
+                          <FrogSnapshot
+                            indices={{ ...frogIndices, mood: 1 }}
+                            width={72}
+                            height={76}
+                            visualOffsetY={4}
+                          />
+                        </div>
+                        <p className="mt-1 text-base font-black text-foreground">
+                          Break deep focus?
+                        </p>
+                        <p className="mt-1 flex items-center justify-center gap-1 text-sm font-bold text-amber-600 dark:text-amber-400">
+                          <Zap className="h-3.5 w-3.5 fill-current" />
+                          Pausing loses the +1 bonus fly
+                        </p>
+                        <button
+                          onClick={() => setConfirmPause(false)}
+                          className="mt-4 w-full rounded-2xl bg-primary py-3 text-sm font-black uppercase tracking-widest text-primary-foreground shadow-md shadow-primary/20 transition-all active:scale-[0.98]"
+                        >
+                          Keep going
+                        </button>
+                        <button
+                          onClick={() => {
+                            setConfirmPause(false);
+                            pauseTimer();
+                          }}
+                          className="mt-2 w-full rounded-2xl py-2.5 text-sm font-bold text-muted-foreground transition-colors hover:bg-muted/40"
+                        >
+                          Pause anyway
+                        </button>
+                      </motion.div>
                     </motion.div>
                   )}
                 </AnimatePresence>

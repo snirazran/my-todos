@@ -138,6 +138,7 @@ type TrackableEntry = {
   categoryName?: string;
   objectiveLabel: string;
   remainingLabel: string;
+  objectiveType?: string;
   tags?: ObjectiveTagChip[];
   needsFocusTags?: boolean;
   progress: number;
@@ -394,6 +395,7 @@ export async function GET(req: Request) {
             block,
             questFocusTags(quest)[0]?.name,
           ),
+          objectiveType: block.type,
           tags:
             block.tagMode === 'focus_category_tags'
               ? questFocusTags(quest)

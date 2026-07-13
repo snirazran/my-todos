@@ -53,7 +53,7 @@ export async function GET(req: NextRequest) {
     const [users, me, catalog] = await Promise.all([
       UserModel.find({ _id: { $in: friendIds } })
         .select(
-          'name frogName premiumUntil quests.loginStreak wardrobe.equipped wardrobe.flyDaily wardrobe.backgrounds.equipped',
+          'name frogName premiumUntil quests.loginStreak wardrobe.equipped wardrobe.flyDaily wardrobe.backgrounds.equipped activeFrogodoroTimer.status activeFrogodoroTimer.phase activeFrogodoroTimer.endsAt',
         )
         .lean(),
       UserModel.findById(userId)
@@ -89,10 +89,22 @@ export async function GET(req: NextRequest) {
         flyDaily?: DailyFlyProgress;
         backgrounds?: { equipped?: string | null };
       };
+      activeFrogodoroTimer?: {
+        status?: string;
+        phase?: string;
+        endsAt?: string | null;
+      } | null;
     }): FriendSummary => {
       const fliesToday = fliesEarnedOn(u.wardrobe?.flyDaily, today);
       const equippedItems = equippedToItems(u.wardrobe?.equipped, byId);
+      const timer = u.activeFrogodoroTimer;
+      const focusing =
+        timer?.status === 'running' &&
+        timer.phase === 'focus' &&
+        !!timer.endsAt &&
+        new Date(timer.endsAt).getTime() > Date.now();
       return {
+        focusing,
         userId: u._id,
         name: u.name ?? '',
         frogName: u.frogName ?? 'Frog',
