@@ -2,7 +2,7 @@
 
 import useSWR from 'swr';
 
-export type IntroKey = 'bellyFull' | 'frogodoro';
+export type IntroKey = 'bellyFull' | 'frogodoro' | 'savedTask';
 
 type IntrosResponse = { seenIntros?: Partial<Record<IntroKey, boolean>> };
 

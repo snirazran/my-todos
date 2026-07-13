@@ -34,16 +34,7 @@ async function resolveAreaQuestsUnlocked(
   const existing = dashboard.focusProfile.areaQuestsUnlockedAt;
   if (existing) return new Date(existing);
 
-  const earlySteps = [
-    ...(dashboard.onboardingQuests ?? []),
-    ...dashboard.dailyQuests,
-  ].reduce(
-    (sum, quest) =>
-      sum +
-      quest.logic.filter((block) => block.progress >= Math.max(1, block.target))
-        .length,
-    0,
-  );
+  const earlySteps = dashboard.earlyObjectiveSteps;
   const hasFocusFootprint =
     (dashboard.focusProfile.categoryTagMap?.length ?? 0) > 0 ||
     dashboard.categoryQuests.some(
@@ -521,6 +512,7 @@ export async function GET(req: Request) {
           withTemplateCover(q, dashboard.templatesWithCover),
         ),
         dailyQuestsGated: dashboard.dailyQuestsGated,
+        earlyObjectiveSteps: dashboard.earlyObjectiveSteps,
         categoryQuests: dashboard.categoryQuests.map((q) =>
           withTemplateCover(q, dashboard.templatesWithCover),
         ),

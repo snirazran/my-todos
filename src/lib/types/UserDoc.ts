@@ -164,6 +164,7 @@ export type UserDoc = {
   seenIntros?: {
     bellyFull?: boolean;
     frogodoro?: boolean;
+    savedTask?: boolean;
   };
 };
 

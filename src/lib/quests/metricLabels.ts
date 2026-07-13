@@ -73,13 +73,20 @@ export const QUEST_METRIC_COPY: Record<string, MetricCopy> = {
     remaining: (n) => `Equip ${n} more ${n === 1 ? 'skin' : 'skins'}`,
   },
   focus_tag_linked: {
-    adminLabel: 'Focus tag linked',
+    adminLabel: 'Area quest started',
     label: (n) =>
-      n === 1 ? 'Link a tag to a focus quest' : `Link tags to ${n} focus quests`,
+      n === 1 ? 'Start an area quest' : `Start ${n} area quests`,
+    remaining: (n) =>
+      n === 1 ? 'Start an area quest' : `Start ${n} more area quests`,
+  },
+  focus_started: {
+    adminLabel: 'Focus timers started',
+    label: (n) =>
+      n === 1 ? 'Start a focus timer' : `Start ${n} focus timers`,
     remaining: (n) =>
       n === 1
-        ? 'Link a tag to a focus quest'
-        : `Link tags to ${n} more focus quests`,
+        ? 'Start a focus timer'
+        : `Start ${n} more focus timers`,
   },
   frog_fed_full: {
     adminLabel: 'Frog fed to full',
@@ -138,7 +145,9 @@ const METRIC_HINT_COPY: Record<string, string> = {
   task_saved_later: "Use a task's menu to move it to Saved Tasks.",
   skin_equipped: 'Equip a skin on your frog in the Wardrobe.',
   focus_tag_linked:
-    'On the Quests page, tap Start quest on a focus quest and pick a focus.',
+    'On the Quests page, start an area quest and pick your focus.',
+  focus_started:
+    'Start the focus timer on any task — any length counts.',
   frog_fed_full:
     'Feed your frog flies on the home screen until its belly is full.',
 };

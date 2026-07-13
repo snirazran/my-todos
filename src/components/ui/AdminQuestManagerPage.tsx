@@ -3422,9 +3422,12 @@ function ObjectivesEditorDialog({
           rewards={rewardPickerBlock.rewards ?? []}
           rewardItems={rewardItems}
           rewardCatalog={rewardCatalog}
-          singleSelect
+          maxSelect={2}
           onSave={(rewards) => {
-            onUpdate(rewardPickerForBlockId!, { rewards: normalizeRewardList(rewards).length > 0 ? normalizeRewardList(rewards) : undefined });
+            const next = normalizeRewardList(rewards).slice(0, 2);
+            onUpdate(rewardPickerForBlockId!, {
+              rewards: next.length > 0 ? next : undefined,
+            });
             setRewardPickerForBlockId(null);
           }}
         />
@@ -3517,6 +3520,7 @@ function RewardPickerDialog({
   rewardItems,
   rewardCatalog,
   singleSelect = false,
+  maxSelect,
   confirmSave = false,
   onRequestConfirmSave,
   onSave,
@@ -3527,10 +3531,17 @@ function RewardPickerDialog({
   rewardItems: MetaRewardItem[];
   rewardCatalog: Record<string, QuestRewardCatalogItem>;
   singleSelect?: boolean;
+  /** Cap the selection at N rewards; picking past the cap replaces the oldest. */
+  maxSelect?: number;
   confirmSave?: boolean;
   onRequestConfirmSave?: () => void;
   onSave: (rewards: QuestReward[]) => void;
 }) {
+  const selectLimit = singleSelect ? 1 : (maxSelect ?? Infinity);
+  const normalizeCapped = (list: QuestReward[]) =>
+    Number.isFinite(selectLimit)
+      ? normalizeRewardList(list).slice(0, selectLimit)
+      : normalizeRewardList(list);
   const [activeTab, setActiveTab] = useState<RewardPickerTab>('flies');
   const [draft, setDraft] = useState<QuestReward[]>(() =>
     normalizeRewardList(rewards),
@@ -3538,8 +3549,9 @@ function RewardPickerDialog({
 
   useEffect(() => {
     if (!open) return;
-    setDraft(singleSelect ? normalizeSingleReward(rewards) : normalizeRewardList(rewards));
-  }, [open, rewards, singleSelect]);
+    setDraft(normalizeCapped(rewards));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, rewards, selectLimit]);
 
   const fliesReward = draft.find((reward) => reward.type === 'FLIES');
   const itemOptions = rewardItems.filter(
@@ -3554,10 +3566,11 @@ function RewardPickerDialog({
       if (existing) {
         return current.filter((reward) => reward.type !== 'FLIES');
       }
-      if (singleSelect) {
-        return [{ type: 'FLIES', amountMode: 'fixed', amount: 50 }];
-      }
-      return [{ type: 'FLIES', amountMode: 'fixed', amount: 50 }, ...current];
+      const next: QuestReward[] = [
+        { type: 'FLIES', amountMode: 'fixed', amount: 50 },
+        ...current,
+      ];
+      return Number.isFinite(selectLimit) ? next.slice(0, selectLimit) : next;
     });
   };
 
@@ -3589,18 +3602,17 @@ function RewardPickerDialog({
           (reward) => !(reward.type === type && reward.itemId === itemId),
         );
       }
-      if (singleSelect) {
-        return [
-          {
-            type,
-            itemId,
-            ...(type === 'BOX'
-              ? { amount: 1, amountMode: 'fixed' as const }
-              : {}),
-          },
-        ];
-      }
-      return [...current, { type, itemId, ...(type === 'BOX' ? { amount: 1, amountMode: 'fixed' as const } : {}) }];
+      const next: QuestReward[] = [
+        ...current,
+        {
+          type,
+          itemId,
+          ...(type === 'BOX' ? { amount: 1, amountMode: 'fixed' as const } : {}),
+        },
+      ];
+      return Number.isFinite(selectLimit)
+        ? next.slice(Math.max(0, next.length - selectLimit))
+        : next;
     });
   };
 
@@ -3614,10 +3626,13 @@ function RewardPickerDialog({
           (reward) => !(reward.type === 'BACKGROUND' && reward.backgroundId === backgroundId),
         );
       }
-      if (singleSelect) {
-        return [{ type: 'BACKGROUND', backgroundId }];
-      }
-      return [...current, { type: 'BACKGROUND', backgroundId }];
+      const next: QuestReward[] = [
+        ...current,
+        { type: 'BACKGROUND', backgroundId },
+      ];
+      return Number.isFinite(selectLimit)
+        ? next.slice(Math.max(0, next.length - selectLimit))
+        : next;
     });
   };
 
@@ -3626,7 +3641,7 @@ function RewardPickerDialog({
       onRequestConfirmSave();
       return;
     }
-    onSave(singleSelect ? normalizeSingleReward(draft) : normalizeRewardList(draft));
+    onSave(normalizeCapped(draft));
     onOpenChange(false);
   };
 

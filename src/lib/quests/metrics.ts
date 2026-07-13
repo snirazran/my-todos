@@ -11,6 +11,7 @@ export type QuestMetricKey =
   | 'skin_equipped'
   | 'frog_fed_full'
   | 'focus_tag_linked'
+  | 'focus_started'
   | `task_streak_${number}`;
 
 export const QUEST_METRIC_KEYS: QuestMetricKey[] = [
@@ -24,6 +25,7 @@ export const QUEST_METRIC_KEYS: QuestMetricKey[] = [
   'skin_equipped',
   'frog_fed_full',
   'focus_tag_linked',
+  'focus_started',
 ];
 
 const TASK_STREAK_PATTERN = /^task_streak_(\d+)$/;

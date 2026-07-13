@@ -21,7 +21,10 @@ import BacklogTray from '@/components/board/BacklogTray';
 import { TASK_SAVED_EVENT } from '@/lib/hints/guides';
 import { notifyQuestClaims } from '@/lib/questClaims';
 import { useIntros } from '@/hooks/useIntros';
-import { BellyFullIntroSheet } from '@/components/ui/FirstTimeIntros';
+import {
+  BellyFullIntroSheet,
+  SavedTaskIntroSheet,
+} from '@/components/ui/FirstTimeIntros';
 //fix
 import { useAuth } from '@/components/auth/AuthContext';
 import { motion, AnimatePresence, useAnimation } from 'framer-motion';
@@ -157,6 +160,7 @@ export default function Home() {
   const [isBacklogOpen, setIsBacklogOpen] = useState(false);
   const [bellyIntroOpen, setBellyIntroOpen] = useState(false);
   const scheduledBellyIntroRef = useRef(false);
+  const [savedIntroOpen, setSavedIntroOpen] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [isHeaderMenuOpen, setIsHeaderMenuOpen] = useState(false);
@@ -207,6 +211,24 @@ export default function Home() {
 
   const { showNotification, stackHeight: notificationStackHeight } = useNotification();
   const { seenIntros, markIntroSeen } = useIntros(!!user);
+  const seenIntrosRef = useRef(seenIntros);
+  seenIntrosRef.current = seenIntros;
+  const markIntroSeenRef = useRef(markIntroSeen);
+  markIntroSeenRef.current = markIntroSeen;
+
+  // First save-for-later ever: explain where saved tasks live. Delayed past
+  // the row's exit animation and the guide's own dismissal.
+  useEffect(() => {
+    if (!user) return;
+    const onSaved = () => {
+      const seen = seenIntrosRef.current;
+      if (!seen || seen.savedTask) return;
+      markIntroSeenRef.current('savedTask');
+      window.setTimeout(() => setSavedIntroOpen(true), 900);
+    };
+    window.addEventListener(TASK_SAVED_EVENT, onSaved);
+    return () => window.removeEventListener(TASK_SAVED_EVENT, onSaved);
+  }, [user]);
 
   // First time the belly is full (wherever it was filled — planner completes
   // count too), explain the hunger mechanic on the next home visit.
@@ -1056,6 +1078,11 @@ export default function Home() {
       <BellyFullIntroSheet
         open={bellyIntroOpen}
         onClose={() => setBellyIntroOpen(false)}
+      />
+
+      <SavedTaskIntroSheet
+        open={savedIntroOpen}
+        onClose={() => setSavedIntroOpen(false)}
       />
 
       <BacklogTray

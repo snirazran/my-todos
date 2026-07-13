@@ -1508,17 +1508,56 @@ export async function syncQuestState(args: {
     (quest) => quest.placement === 'onboarding',
   );
 
-  // New users see one goal at a time: while the first onboarding quest has
-  // incomplete objectives, daily quests stay hidden so its objectives don't
-  // double-progress against a system nobody introduced yet. Completing the
-  // last First Hops objective reveals the dailies as their own unlock beat.
-  const firstOnboardingQuest = onboardingQuests[0];
+  // New users see one goal at a time: while the FIRST-EVER onboarding quest
+  // has incomplete objectives, daily quests stay hidden so its objectives
+  // don't double-progress against a system nobody introduced yet. Once it's
+  // done the gate never re-engages — later onboarding quests (which replace
+  // it in the one-at-a-time display) don't gate anything.
+  const firstOnboardingTemplateId = onboardingCandidates[0]?.templateId;
+  const firstOnboardingQuest = firstOnboardingTemplateId
+    ? onboardingQuests.find(
+        (quest) => quest.templateId === firstOnboardingTemplateId,
+      )
+    : undefined;
   const dailyQuestsGated =
     !!firstOnboardingQuest &&
     firstOnboardingQuest.logic.some(
       (block) => block.progress < Math.max(1, block.target),
     );
   const visibleDailyQuests = dailyQuestsGated ? [] : dailyQuests;
+
+  // Lifetime completed objectives across starter + daily quests — drives the
+  // "Your areas" unlock. Counted from the stored docs of PAST onboarding
+  // quests too (the display drops each one once fully claimed; without this
+  // the teaser's progress visibly reset when First Hops finished).
+  const displayedOnboardingIds = new Set(
+    onboardingQuests.map((quest) => quest.templateId),
+  );
+  const pastOnboardingSteps = allExistingDocs
+    .filter(
+      (doc) =>
+        doc.placement === 'onboarding' &&
+        !displayedOnboardingIds.has(doc.templateId),
+    )
+    .reduce(
+      (sum, doc) =>
+        sum +
+        (doc.logic ?? []).filter(
+          (block) =>
+            (block.progress ?? 0) >= Math.max(1, block.target ?? 1),
+        ).length,
+      0,
+    );
+  const earlyObjectiveSteps =
+    pastOnboardingSteps +
+    [...onboardingQuests, ...dailyQuests].reduce(
+      (sum, quest) =>
+        sum +
+        quest.logic.filter(
+          (block) => block.progress >= Math.max(1, block.target),
+        ).length,
+      0,
+    );
 
   const templatesWithCover = new Set(
     templates
@@ -1560,6 +1599,7 @@ export async function syncQuestState(args: {
     templatesWithCover,
     dailyQuests: visibleDailyQuests,
     dailyQuestsGated,
+    earlyObjectiveSteps,
     categoryQuests: gatedCategoryQuests,
     onboardingQuests,
     rewardCatalog: includeCatalog

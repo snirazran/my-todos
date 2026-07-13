@@ -98,6 +98,11 @@ export function HintCoach() {
   // Hide the overlay while the anchor is animating (sheet opening/closing) —
   // a ring chasing a sliding control reads as a glitch.
   const [settled, setSettled] = useState(true);
+  // While the user scrolls, position updates must be instant — the glide
+  // transition (meant for slow layout drifts) reads as the ring lagging
+  // behind its target.
+  const [scrolling, setScrolling] = useState(false);
+  const scrollQuietTimerRef = useRef<number | null>(null);
   const lastRectRef = useRef<Rect | null>(null);
   const stepNavRef = useRef<{
     key: string | null;
@@ -299,12 +304,26 @@ export function HintCoach() {
       setSettled(!moved);
       setRect((prev) => (rectsEqual(prev, next) ? prev : next));
     };
+    const onScroll = () => {
+      setScrolling(true);
+      if (scrollQuietTimerRef.current) {
+        window.clearTimeout(scrollQuietTimerRef.current);
+      }
+      scrollQuietTimerRef.current = window.setTimeout(
+        () => setScrolling(false),
+        160,
+      );
+      update();
+    };
     const interval = window.setInterval(update, 150);
-    window.addEventListener('scroll', update, true);
+    window.addEventListener('scroll', onScroll, true);
     window.addEventListener('resize', update);
     return () => {
       window.clearInterval(interval);
-      window.removeEventListener('scroll', update, true);
+      if (scrollQuietTimerRef.current) {
+        window.clearTimeout(scrollQuietTimerRef.current);
+      }
+      window.removeEventListener('scroll', onScroll, true);
       window.removeEventListener('resize', update);
     };
   }, [el, stepKey, step]);
@@ -381,7 +400,11 @@ export function HintCoach() {
               at controls inside open sheets; below the reward reveal (9999). */}
           <div
             aria-hidden
-            className="pointer-events-none fixed z-[2000] transition-[top,left,width,height] duration-200 ease-out"
+            className={`pointer-events-none fixed z-[2000] ${
+              scrolling
+                ? ''
+                : 'transition-[top,left,width,height] duration-200 ease-out'
+            }`}
             style={{
               top: rect.top - RING_PADDING,
               left: rect.left - RING_PADDING,
@@ -416,7 +439,9 @@ export function HintCoach() {
             )}
           </div>
           <div
-            className="pointer-events-none fixed z-[2000] flex w-[260px] -translate-x-1/2 justify-center transition-[top,left,bottom] duration-200 ease-out"
+            className={`pointer-events-none fixed z-[2000] flex w-[260px] -translate-x-1/2 justify-center ${
+              scrolling ? '' : 'transition-[top,left,bottom] duration-200 ease-out'
+            }`}
             style={{
               left: labelCenter,
               top: labelBelow

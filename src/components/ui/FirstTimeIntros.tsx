@@ -6,9 +6,11 @@ import {
   Check,
   Clock,
   MonitorSmartphone,
+  Plus,
   ScrollText,
   Smartphone,
 } from 'lucide-react';
+import { Icon as AppIcon } from '@/components/ui/Icon';
 import { Capacitor } from '@capacitor/core';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import Fly from '@/components/ui/fly';
@@ -157,6 +159,45 @@ export function BellyFullIntroSheet({
     <IntroShell open={open} onClose={onClose}>
       <h2 className="mt-2 text-center text-xl font-black text-foreground">
         Full belly. Happy me.
+      </h2>
+      <FrogPerch open={open} />
+      <IntroRows rows={rows} />
+      <IntroCta label="Got it" onClick={onClose} />
+    </IntroShell>
+  );
+}
+
+export function SavedTaskIntroSheet({
+  open,
+  onClose,
+}: {
+  open: boolean;
+  onClose: () => void;
+}) {
+  const rows = [
+    {
+      icon: <AppIcon name="planner" label="Planner" className="h-6 w-6" />,
+      text: (
+        <>
+          It’s waiting in <b>Saved Tasks</b> on the Planner — drag it onto any
+          day
+        </>
+      ),
+    },
+    {
+      icon: <Plus className="h-5 w-5" strokeWidth={2.75} />,
+      text: (
+        <>
+          Or grab it while <b>adding a task</b> — your saved ones are right
+          there
+        </>
+      ),
+    },
+  ];
+  return (
+    <IntroShell open={open} onClose={onClose}>
+      <h2 className="mt-2 text-center text-xl font-black text-foreground">
+        Saved. Not forgotten.
       </h2>
       <FrogPerch open={open} />
       <IntroRows rows={rows} />

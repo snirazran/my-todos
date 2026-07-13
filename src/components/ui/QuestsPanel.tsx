@@ -84,6 +84,7 @@ type QuestsResponse = {
   macroCategories: MacroCategoryDefinition[];
   dailyQuests: DailyQuestProgressView[];
   dailyQuestsGated?: boolean;
+  earlyObjectiveSteps?: number;
   categoryQuests: CategoryQuestProgressView[];
   onboardingQuests?: QuestProgressView[];
   activeSeason?: QuestSeasonView | null;
@@ -974,18 +975,23 @@ export function QuestsPanel({
                           // api/quests/route.ts — the server decides the
                           // unlock, this only drives the card's display.
                           const FOCUS_UNLOCK_TARGET = 6;
-                          const completedEarlyObjectives = [
-                            ...(data.onboardingQuests ?? []),
-                            ...dailyQuests,
-                          ].reduce(
-                            (sum, quest) =>
-                              sum +
-                              quest.logic.filter(
-                                (block) =>
-                                  block.progress >= Math.max(1, block.target),
-                              ).length,
-                            0,
-                          );
+                          // Server-computed lifetime count (includes past
+                          // onboarding quests the display has retired); the
+                          // local sum is only a stale-payload fallback.
+                          const completedEarlyObjectives =
+                            data.earlyObjectiveSteps ??
+                            [
+                              ...(data.onboardingQuests ?? []),
+                              ...dailyQuests,
+                            ].reduce(
+                              (sum, quest) =>
+                                sum +
+                                quest.logic.filter(
+                                  (block) =>
+                                    block.progress >= Math.max(1, block.target),
+                                ).length,
+                              0,
+                            );
                           const hasFocusFootprint =
                             (data.onboarding?.categoryTagMap?.length ?? 0) > 0 ||
                             filteredCategoryQuests.some(

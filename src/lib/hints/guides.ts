@@ -110,6 +110,8 @@ const GUIDES: Record<string, HintGuide> = {
       },
     ],
   },
+  // Ends at the save itself — the first-ever save then pops the one-time
+  // "where saved tasks live" intro sheet (SavedTaskIntroSheet).
   'save-later': {
     id: 'save-later',
     steps: [
@@ -135,33 +137,10 @@ const GUIDES: Record<string, HintGuide> = {
         label: 'Save it for later',
         timeoutMs: 60_000,
         // Advance only on the actual save event: advancing on pointerdown
-        // navigates to the planner before the button's click handler runs,
-        // killing the save it was supposed to trigger.
+        // closes the sheet before the button's click handler runs, killing
+        // the save it was supposed to trigger.
         advanceOnAnchorDown: false,
         advanceOnEvent: { event: TASK_SAVED_EVENT, goTo: 3 },
-      },
-      {
-        href: '/planner',
-        anchor: 'saved-tasks',
-        label:
-          'Your task waits in Saved Tasks — tap to see it. You can grab it back onto any day, whenever you want.',
-        timeoutMs: 20_000,
-      },
-      {
-        anchor: 'saved-task-card',
-        label:
-          'There it is — drag it onto a day when you’re ready. Close the tray when you’re done.',
-        advanceOnAnchorDown: false,
-        dismissOnAnchorDown: true,
-        outsideInteractionCancels: false,
-        advanceOnEvent: { event: BACKLOG_CLOSED_EVENT, goTo: 5 },
-        timeoutMs: 20_000,
-      },
-      {
-        href: '/quests',
-        anchor: 'claim-objective',
-        label: 'Nice — claim your reward!',
-        timeoutMs: 20_000,
       },
     ],
   },
@@ -211,7 +190,7 @@ const GUIDES: Record<string, HintGuide> = {
       {
         href: '/quests',
         anchor: 'start-focus-quest',
-        label: 'Start a focus quest and pick your focus',
+        label: 'Start an area quest — pick your life area',
       },
     ],
   },
@@ -233,6 +212,7 @@ const METRIC_GUIDE_IDS: Record<string, string> = {
   skin_sold: 'sell-skin',
   trade_completed: 'trade-skins',
   focus_tag_linked: 'start-focus-quest',
+  focus_started: 'focus',
   friend_invited: 'invite-friend',
   task_saved_later: 'save-later',
   frog_fed_full: 'feed-frog',

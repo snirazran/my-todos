@@ -433,8 +433,22 @@ export function GlobalTimer() {
     }
 
     const payload = buildTimerPayload();
-    if (payload) void publishActiveTimer(payload);
-  }, [pendingSync, buildTimerPayload]);
+    if (payload) {
+      void publishActiveTimer(payload).then(() => {
+        // A fresh focus start can complete "start a focus timer" objectives
+        // server-side — refresh quest state so the strip reacts right away.
+        if (payload.phase === 'focus' && payload.status === 'running') {
+          window.setTimeout(
+            () =>
+              void notifyQuestClaims(showNotification, {
+                progressToast: false,
+              }),
+            900,
+          );
+        }
+      });
+    }
+  }, [pendingSync, buildTimerPayload, showNotification]);
 
   // Sync timer state across windows/devices in real time via SSE. A GET resync
   // gates the (authenticated) connection — logged-out users get a 401 and never

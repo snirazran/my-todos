@@ -17,6 +17,7 @@ import type {
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
 import TaskModel from '@/lib/models/Task';
 import { taskAnalyticsProperties } from '@/lib/analytics/engagement';
+import { bumpQuestMetric } from '@/lib/quests/metrics';
 
 export const dynamic = 'force-dynamic';
 
@@ -202,6 +203,11 @@ export async function PUT(req: NextRequest) {
     publishTimerEvent(userId, stored, seq);
 
     if (!existingTimer && stored.phase === 'focus' && stored.status === 'running') {
+      await bumpQuestMetric({
+        userId,
+        metric: 'focus_started',
+        timezone: prefs?.timezone || 'UTC',
+      });
       const task = await TaskModel.findOne({ userId, id: stored.taskId }).lean();
       await recordAnalyticsEvent({
         userId,
