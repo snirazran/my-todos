@@ -218,13 +218,20 @@ async function processOneDueTimer(
   publishTimerEvent(userId, nextTimer, seq);
 
   const timezone = prefs?.timezone || 'UTC';
-  await saveTimerProgress({
-    userId,
-    taskId: timer.taskId,
-    phase: next.completedPhase,
-    seconds: next.completedDuration,
-    timezone,
-  });
+  // Clients flush partial progress while the phase runs (pause, periodic
+  // live-progress saves) and record it as savedElapsed — only the remainder
+  // is saved here, or pause+resume sessions get double-counted.
+  const alreadySaved = Math.max(0, Math.floor(timer.savedElapsed ?? 0));
+  const remainingSeconds = Math.max(0, next.completedDuration - alreadySaved);
+  if (remainingSeconds > 0) {
+    await saveTimerProgress({
+      userId,
+      taskId: timer.taskId,
+      phase: next.completedPhase,
+      seconds: remainingSeconds,
+      timezone,
+    });
+  }
   if (next.completedPhase === 'focus') {
     const task = await TaskModel.findOne({ userId, id: timer.taskId }).lean();
     await recordAnalyticsEvent({

@@ -126,11 +126,14 @@ export function GlobalTimer() {
     return stop;
   }, [awaitingDone]);
 
-  // Save Progress API Caller
+  // Save Progress API Caller. totalPhaseElapsed (when known) tells the server
+  // how much of the current phase is now persisted in total, so the
+  // phase-completion save only adds the remainder.
   const saveProgress = async (
     taskId: string,
     phaseForSave: PomodoroPhase,
     seconds: number,
+    totalPhaseElapsed?: number,
   ) => {
     const today = format(new Date(), 'yyyy-MM-dd');
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -151,6 +154,12 @@ export function GlobalTimer() {
         body: JSON.stringify({
           session,
           timezone,
+          ...(typeof totalPhaseElapsed === 'number'
+            ? {
+                activePhaseElapsed: Math.max(0, Math.round(totalPhaseElapsed)),
+                activePhase: phaseForSave,
+              }
+            : {}),
         }),
       });
     } catch (e) {
@@ -560,7 +569,7 @@ export function GlobalTimer() {
         const elapsed = phaseDuration - timeLeft;
         const unsavedElapsed = elapsed - phaseElapsed;
         if (unsavedElapsed > 0) {
-          saveProgress(selectedTaskId, phase, unsavedElapsed);
+          saveProgress(selectedTaskId, phase, unsavedElapsed, elapsed);
           setPhaseElapsed(elapsed);
           // Fold the just-elapsed time into sessionStats synchronously so the
           // stats display doesn't momentarily drop to 0 between resetting
@@ -577,6 +586,43 @@ export function GlobalTimer() {
     }
     prevIsRunning.current = isRunning;
   }, [isRunning, phase, phaseElapsed, selectedTaskId, setPhaseElapsed, settings, timeLeft]);
+
+  // Live progress: while a focus phase runs on the owning device, persist the
+  // unsaved elapsed time every minute so focus quests advance during the
+  // session instead of only at pause/completion. The server subtracts these
+  // flushes from the completion save via savedElapsed, so nothing is counted
+  // twice.
+  useEffect(() => {
+    if (!isRunning || !endTime) return;
+    const interval = setInterval(() => {
+      if (!ownsTimerRef.current) return;
+      if (phaseRef.current !== 'focus') return;
+      const taskId = selectedTaskIdRef.current;
+      if (!taskId) return;
+      const phaseDuration = getPhaseDuration(
+        phaseRef.current,
+        settingsRef.current,
+      );
+      const elapsed = Math.max(0, phaseDuration - timeLeftRef.current);
+      const unsaved = elapsed - phaseElapsedRef.current;
+      if (unsaved < 45) return;
+      saveProgress(taskId, 'focus', unsaved, elapsed);
+      setPhaseElapsed(elapsed);
+      const store = useFrogodoroStore.getState();
+      const stats = store.sessionStats;
+      store.updateSessionStats({
+        focusTime: stats.focusTime + unsaved,
+        breakTime: stats.breakTime,
+      });
+      window.setTimeout(
+        () =>
+          void notifyQuestClaims(showNotification, { progressToast: false }),
+        1200,
+      );
+    }, 60_000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isRunning, endTime, setPhaseElapsed, showNotification]);
 
   // The Main Loop
   useEffect(() => {

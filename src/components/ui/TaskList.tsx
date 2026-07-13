@@ -1349,7 +1349,10 @@ export default function TaskList({
           {/* Header Menu Removed - Moved to Page */}
         </div>
 
-        <div className="w-full rounded-[18px] bg-muted/70 dark:bg-background border border-border/50 shadow-sm overflow-hidden">
+        <div
+          className="w-full rounded-[18px] bg-muted/70 dark:bg-background border border-border/50 shadow-sm overflow-hidden"
+          data-hint="task-list"
+        >
         <div
           className={`p-1.5 pb-0 space-y-0 overflow-y-visible md:p-2 md:pb-0 ${exitAction ? 'overflow-x-visible' : 'overflow-x-hidden'}`}
           ref={scrollContainerRef}
@@ -1369,7 +1372,6 @@ export default function TaskList({
                   }
                   className="w-full flex items-center gap-1.5 px-2 py-2 border border-dashed border-muted-foreground/20 bg-muted/5 hover:bg-muted/10 rounded-xl transition-all cursor-pointer group disabled:pointer-events-none"
                   disabled={quickAddOpen}
-                  data-hint="add-task"
                 >
                   <div className="flex items-center justify-center w-11 h-11 rounded-full bg-muted border border-muted-foreground/10 shrink-0 md:w-12 md:h-12">
                     <Plus className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors md:w-6 md:h-6" strokeWidth={2.5} />
@@ -1528,7 +1530,6 @@ export default function TaskList({
               onClick={() => onAddRequested('', null, { preselectToday: true })}
               disabled={quickAddOpen}
               className="group relative flex w-full items-center gap-1 px-2.5 py-2.5 rounded-xl border border-dashed border-muted-foreground/20 bg-muted/5 cursor-pointer hover:bg-muted/10 transition-all active:scale-[0.99] disabled:pointer-events-none disabled:opacity-0 md:px-3.5 md:py-3.5"
-              data-hint="add-task"
             >
               {/* Spacer matching the task grip column so the label lines up with task text */}
               <span aria-hidden className="flex-shrink-0 w-2.5 md:w-3" />

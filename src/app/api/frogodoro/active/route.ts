@@ -161,7 +161,34 @@ export async function PUT(req: NextRequest) {
     )?.liveActivityStartClockSkewMs;
     const prefs = (existing as { notificationPrefs?: NotificationPrefs } | null)
       ?.notificationPrefs;
-    const stored: ActiveFrogodoroTimer = { ...timer, rev: prevRev + 1 };
+    // savedElapsed tracks how much of the CURRENT phase the client has already
+    // persisted to the task session. Carry it while the phase continues, reset
+    // it when the phase/task changes, and on a client pause mark everything
+    // elapsed as saved — the pausing client flushes exactly that amount before
+    // publishing.
+    const samePhase =
+      !!existingTimer &&
+      existingTimer.taskId === timer.taskId &&
+      existingTimer.phase === timer.phase;
+    const carriedSaved = samePhase
+      ? Math.max(0, Math.floor(existingTimer.savedElapsed ?? 0))
+      : 0;
+    const phaseDurationSec =
+      (timer.phase === 'focus'
+        ? timer.settings.focusDuration
+        : timer.settings.breakDuration) * 60;
+    const savedElapsed =
+      samePhase && timer.status === 'paused' && timer.clientId
+        ? Math.max(
+            carriedSaved,
+            Math.max(0, Math.round(phaseDurationSec - timer.timeLeft)),
+          )
+        : carriedSaved;
+    const stored: ActiveFrogodoroTimer = {
+      ...timer,
+      rev: prevRev + 1,
+      savedElapsed,
+    };
     console.log(
       `Frogodoro PUT /active clientId=${stored.clientId} status=${stored.status} finished=${stored.finished === true}`,
     );

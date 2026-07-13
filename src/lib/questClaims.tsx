@@ -164,7 +164,14 @@ export function primeQuestsPageCache(): void {
     .catch(() => {});
 }
 
-export async function notifyQuestClaims(show: ShowNotification): Promise<void> {
+export async function notifyQuestClaims(
+  show: ShowNotification,
+  opts?: {
+    // Recurring background refreshes (live focus ticks) pass false so a toast
+    // doesn't pop every minute; new-claimable toasts still show.
+    progressToast?: boolean;
+  },
+): Promise<void> {
   const data = await fetchHome();
   primeQuestsPageCache();
   if (!data) return;
@@ -188,7 +195,7 @@ export async function notifyQuestClaims(show: ShowNotification): Promise<void> {
       { durationMs: 6000 },
     );
   }
-  if (claimToastShown || !prevProgress) return;
+  if (claimToastShown || !prevProgress || opts?.progressToast === false) return;
   let best: { trackable: Trackable; from: number } | null = null;
   for (const t of data.trackables) {
     const from = prevProgress.get(t.id);

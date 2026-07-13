@@ -180,6 +180,10 @@ export type ActiveFrogodoroTimer = {
   sessionStats: SessionStats;
   updatedAt: string;
   rev?: number;
+  // Seconds of the CURRENT phase already persisted to the task's session
+  // (client pause/periodic flushes). The phase-completion save subtracts this
+  // so incremental flushes and the final save never double-count.
+  savedElapsed?: number;
   // A phase just ended into a non-auto-start state and is awaiting Done — the
   // alarm is ringing across devices. Cleared when any surface acknowledges Done.
   finished?: boolean;

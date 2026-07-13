@@ -8,6 +8,9 @@ import { useUIStore } from '@/lib/uiStore';
 import { guideById } from '@/lib/hints/guides';
 
 const FIND_TIMEOUT_MS = 12_000;
+// Grace window for re-acquiring a lost anchor (list re-renders) before the
+// loss is treated as the user abandoning the guide.
+const REACQUIRE_TIMEOUT_MS = 1600;
 const RING_PADDING = 5;
 
 type Rect = { top: number; left: number; width: number; height: number };
@@ -25,6 +28,48 @@ function rectsEqual(a: Rect | null, b: Rect | null) {
 function measure(el: HTMLElement): Rect {
   const r = el.getBoundingClientRect();
   return { top: r.top, left: r.left, width: r.width, height: r.height };
+}
+
+// True when the element is genuinely on screen for the user: rendered,
+// non-hidden, and (only when acquiring — checkCover) the top-most content at
+// its center. The cover check keeps the finder from latching onto a closed
+// sheet's still-mounted, painted-over controls, but must NOT run during
+// tracking: open sheets legitimately float transparent gesture layers over
+// their content, which would read as "covered" and kill a valid highlight.
+function isUsableAnchor(
+  el: HTMLElement,
+  rect: Rect,
+  checkCover: boolean,
+): boolean {
+  if (!el.isConnected || rect.width < 1 || rect.height < 1) return false;
+  const hidden =
+    typeof (el as any).checkVisibility === 'function'
+      ? !(el as any).checkVisibility({
+          checkOpacity: true,
+          checkVisibilityCSS: true,
+        })
+      : false;
+  if (hidden) return false;
+  if (!checkCover) return true;
+  // Probe several points, not just the center: decorative layers (the frog's
+  // oversized transparent canvas) can overlap part of an anchor without
+  // actually obscuring it. A genuinely buried anchor fails every probe.
+  const cy = rect.top + rect.height / 2;
+  const probes = [0.5, 0.2, 0.8].map(
+    (fraction) => [rect.left + rect.width * fraction, cy] as const,
+  );
+  let sawInViewportProbe = false;
+  for (const [px, py] of probes) {
+    if (px < 0 || py < 0 || px >= window.innerWidth || py >= window.innerHeight) {
+      continue;
+    }
+    sawInViewportProbe = true;
+    const hit = document.elementFromPoint(px, py);
+    if (!hit || hit === el || el.contains(hit) || hit.contains(el)) {
+      return true;
+    }
+  }
+  return !sawInViewportProbe;
 }
 
 export function HintCoach() {
@@ -47,6 +92,13 @@ export function HintCoach() {
   const [coarsePointer, setCoarsePointer] = useState(false);
   const [el, setEl] = useState<HTMLElement | null>(null);
   const [rect, setRect] = useState<Rect | null>(null);
+  // Bumped when a tracked anchor is lost so the search effect runs again
+  // (with its timeout) instead of leaving a zombie guide with no anchor.
+  const [searchNonce, setSearchNonce] = useState(0);
+  // Hide the overlay while the anchor is animating (sheet opening/closing) —
+  // a ring chasing a sliding control reads as a glitch.
+  const [settled, setSettled] = useState(true);
+  const lastRectRef = useRef<Rect | null>(null);
   const stepNavRef = useRef<{
     key: string | null;
     pushed: boolean;
@@ -70,6 +122,15 @@ export function HintCoach() {
       dismissHintGuide();
     }
   }, [activeHint, guide, dismissHintGuide]);
+
+  useEffect(() => {
+    if (!activeHint) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') dismissHintGuide();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [activeHint, dismissHintGuide]);
 
   // Navigate to the step's route at most once per step. The guide must never
   // fight the user for control: any navigation they make themselves simply
@@ -114,6 +175,15 @@ export function HintCoach() {
     return () => window.removeEventListener(event, onEvent);
   }, [stepKey, step, goToHintStep]);
 
+  // Once a step has shown its target, losing it means the user backed out of
+  // the surface it lived on (closed the sheet without acting). A short grace
+  // window lets list re-renders re-attach; past that, the guide cancels
+  // instead of lying in wait to re-appear on the next open.
+  const hadAnchorRef = useRef(false);
+  useEffect(() => {
+    hadAnchorRef.current = false;
+  }, [stepKey]);
+
   // Find the anchor element; give up quietly if it never shows.
   useEffect(() => {
     setEl(null);
@@ -121,18 +191,48 @@ export function HintCoach() {
     if (!step || !stepKey) return;
     if (step.href && pathname !== step.href) return;
 
+    if (!hadAnchorRef.current && step.skipWhenPresent) {
+      const alreadyPresent = Array.from(
+        document.querySelectorAll<HTMLElement>(step.skipWhenPresent),
+      ).some((candidate) => {
+        const r = candidate.getBoundingClientRect();
+        return r.width > 0 && r.height > 0;
+      });
+      if (alreadyPresent) {
+        advanceHintStep();
+        return;
+      }
+    }
+
     const selector = step.selector ?? `[data-hint="${step.anchor}"]`;
-    const timeoutMs = step.timeoutMs ?? FIND_TIMEOUT_MS;
+    const timeoutMs = hadAnchorRef.current
+      ? REACQUIRE_TIMEOUT_MS
+      : step.timeoutMs ?? FIND_TIMEOUT_MS;
     const startedAt = Date.now();
     const find = () => {
+      if (step.requirePresent) {
+        const present = Array.from(
+          document.querySelectorAll<HTMLElement>(step.requirePresent),
+        ).some((candidate) => {
+          const r = candidate.getBoundingClientRect();
+          return r.width > 0 && r.height > 0;
+        });
+        if (!present) return false;
+      }
       const candidates = Array.from(
         document.querySelectorAll<HTMLElement>(selector),
       );
       for (const candidate of candidates) {
-        const r = candidate.getBoundingClientRect();
-        if (r.width > 0 && r.height > 0) {
+        const r = measure(candidate);
+        if (isUsableAnchor(candidate, r, step.coverCheck !== false)) {
+          hadAnchorRef.current = true;
+          lastRectRef.current = r;
+          // Start hidden: if the anchor is inside an opening sheet the next
+          // measurements still move, and the ring must not paint mid-slide.
+          // A static anchor settles on the first tracker tick (~150ms).
+          setSettled(false);
           setEl(candidate);
-          setRect(measure(candidate));
+          setRect(r);
           return true;
         }
       }
@@ -151,7 +251,7 @@ export function HintCoach() {
       }
     }, 200);
     return () => window.clearInterval(interval);
-  }, [stepKey, step, pathname, dismissHintGuide]);
+  }, [stepKey, step, pathname, searchNonce, dismissHintGuide, advanceHintStep]);
 
   // Keep the spotlight glued to the element; restart the search if it leaves
   // the DOM (sheet closed, list re-rendered).
@@ -160,16 +260,43 @@ export function HintCoach() {
 
     if (scrolledRef.current !== stepKey) {
       scrolledRef.current = stepKey;
-      el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      // Only scroll when the anchor isn't comfortably in view — a smooth
+      // scroll while the user is already reaching for a visible target makes
+      // their tap land on whatever slides under the finger.
+      const r = el.getBoundingClientRect();
+      const comfortablyVisible =
+        r.top >= 72 && r.bottom <= window.innerHeight - 96;
+      if (!comfortablyVisible) {
+        el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
     }
 
     const update = () => {
-      if (!el.isConnected) {
+      const next = measure(el);
+      const requiredGone =
+        !!step?.requirePresent &&
+        !Array.from(
+          document.querySelectorAll<HTMLElement>(step.requirePresent),
+        ).some((candidate) => {
+          const r = candidate.getBoundingClientRect();
+          return r.width > 0 && r.height > 0;
+        });
+      if (requiredGone || !isUsableAnchor(el, next, false)) {
         setEl(null);
         setRect(null);
+        setSearchNonce((n) => n + 1);
         return;
       }
-      const next = measure(el);
+      const previous = lastRectRef.current;
+      lastRectRef.current = next;
+      // Small drifts (a toolbar lifting for a toast) are followed with a CSS
+      // glide on the overlay; only big jumps — sheets sliding, page scrolls —
+      // hide it until the anchor comes to rest.
+      const moved =
+        !!previous &&
+        Math.abs(previous.top - next.top) + Math.abs(previous.left - next.left) >
+          120;
+      setSettled(!moved);
       setRect((prev) => (rectsEqual(prev, next) ? prev : next));
     };
     const interval = window.setInterval(update, 150);
@@ -180,28 +307,51 @@ export function HintCoach() {
       window.removeEventListener('scroll', update, true);
       window.removeEventListener('resize', update);
     };
-  }, [el, stepKey]);
+  }, [el, stepKey, step]);
 
-  // Touching the anchor advances the guide (or finishes it on the last step);
-  // touching anywhere else — outside the anchor and the label — closes it.
+  // Touching the anchor advances the guide (or finishes it on the last step).
+  // Outside taps: single-step hints close on any of them; multi-step
+  // walkthroughs close only when the tap lands on an unrelated interactive
+  // control (a button that isn't part of the flow signals the user is doing
+  // something else), so plain taps and scrolls don't kill them mid-flow.
   const labelRef = useRef<HTMLSpanElement | null>(null);
+  const isSingleStep = (guide?.steps.length ?? 0) === 1;
   useEffect(() => {
     if (!el) return;
     const onPointerDown = (event: PointerEvent) => {
       const target = event.target as Node;
-      if (el.contains(target)) {
+      const inAnchor =
+        el.contains(target) ||
+        (step?.alsoAdvanceOn &&
+          target instanceof Element &&
+          !!target.closest(step.alsoAdvanceOn));
+      if (inAnchor) {
+        if (step?.dismissOnAnchorDown) {
+          dismissHintGuide();
+          return;
+        }
         if (step?.advanceOnAnchorDown === false) return;
         if (isLastStep) dismissHintGuide();
         else advanceHintStep();
         return;
       }
       if (labelRef.current?.contains(target)) return;
-      dismissHintGuide();
+      if (isSingleStep) {
+        dismissHintGuide();
+        return;
+      }
+      if (step?.outsideInteractionCancels === false) return;
+      const interactive =
+        target instanceof Element &&
+        !!target.closest(
+          'button, [role="button"], a, input, textarea, select, [data-hint]',
+        );
+      if (interactive) dismissHintGuide();
     };
     document.addEventListener('pointerdown', onPointerDown, true);
     return () =>
       document.removeEventListener('pointerdown', onPointerDown, true);
-  }, [el, step, isLastStep, advanceHintStep, dismissHintGuide]);
+  }, [el, step, isLastStep, isSingleStep, advanceHintStep, dismissHintGuide]);
 
   const borderRadius = useMemo(() => {
     if (!el) return '16px';
@@ -225,11 +375,13 @@ export function HintCoach() {
 
   return createPortal(
     <>
-      {rect && (
+      {rect && settled && (
         <>
+          {/* Above BaseSheet (backdrop 1050 / sheet 1051) so guides can point
+              at controls inside open sheets; below the reward reveal (9999). */}
           <div
             aria-hidden
-            className="pointer-events-none fixed z-[80]"
+            className="pointer-events-none fixed z-[2000] transition-[top,left,width,height] duration-200 ease-out"
             style={{
               top: rect.top - RING_PADDING,
               left: rect.left - RING_PADDING,
@@ -264,7 +416,7 @@ export function HintCoach() {
             )}
           </div>
           <div
-            className="pointer-events-none fixed z-[80] flex w-[260px] -translate-x-1/2 justify-center"
+            className="pointer-events-none fixed z-[2000] flex w-[260px] -translate-x-1/2 justify-center transition-[top,left,bottom] duration-200 ease-out"
             style={{
               left: labelCenter,
               top: labelBelow

@@ -14,8 +14,32 @@ export type HintStep = {
   gesture?: 'swipe-left' | 'swipe-right';
   // Jump to an absolute step index when this window event fires.
   advanceOnEvent?: { event: string; goTo: number };
+  // Skip this step immediately when an element matching this CSS selector is
+  // already on screen (e.g. "add a task first" steps that only apply to
+  // empty lists).
+  skipWhenPresent?: string;
+  // Hold the step's highlight until an element matching this CSS selector is
+  // on screen — keeps "any task in this list" rings from appearing around an
+  // empty list while the user is still creating the first task.
+  requirePresent?: string;
   // Touching the anchor advances to the next step (default true).
   advanceOnAnchorDown?: boolean;
+  // Touching the anchor ends the guide immediately — for steps where
+  // grabbing the target IS the taught action (dragging the saved task) and
+  // advancing would navigate mid-gesture.
+  dismissOnAnchorDown?: boolean;
+  // Pressing an unrelated interactive element cancels the guide (default
+  // true). Steps whose own flow requires such a press (closing the saved
+  // tray) opt out.
+  outsideInteractionCancels?: boolean;
+  // Elements outside the highlighted anchor that still count as doing the
+  // step (CSS selector) — e.g. the floating + button while the task list is
+  // ringed with "or add a new one".
+  alsoAdvanceOn?: string;
+  // Skip the top-most-element test at acquisition (default on). Needed for
+  // always-visible anchors that sit under oversized transparent layers the
+  // hit-test can't see through (the frog's full-width Rive canvas).
+  coverCheck?: boolean;
   // How long to wait for the anchor before giving up quietly.
   timeoutMs?: number;
 };
@@ -36,7 +60,18 @@ const GUIDES: Record<string, HintGuide> = {
   'complete-task': {
     id: 'complete-task',
     steps: [
-      { href: '/', anchor: 'task-fly', label: 'Tap the fly to finish this task' },
+      {
+        href: '/',
+        anchor: 'add-task',
+        label: 'Add a task to finish first',
+        skipWhenPresent: '[data-hint="task-fly"]',
+      },
+      {
+        anchor: 'task-list',
+        label: 'Tap the fly on any task to finish it',
+        requirePresent: '[data-hint="task-fly"]',
+        timeoutMs: 90_000,
+      },
     ],
   },
   focus: {
@@ -44,12 +79,23 @@ const GUIDES: Record<string, HintGuide> = {
     steps: [
       {
         href: '/',
-        anchor: 'task-row',
-        label: 'Open this task and hit Focus',
-        labelCoarse: 'Swipe this task right to focus — or tap to open it',
-        gesture: 'swipe-right',
+        anchor: 'add-task',
+        label: 'Add a task to focus on first',
+        skipWhenPresent: '[data-hint="task-row"]',
       },
-      { anchor: 'focus-button', label: 'Start the focus timer' },
+      {
+        anchor: 'task-list',
+        label: 'Open any task and hit Focus',
+        labelCoarse: 'Swipe any task right to focus — or tap to open it',
+        gesture: 'swipe-right',
+        requirePresent: '[data-hint="task-row"]',
+        timeoutMs: 90_000,
+      },
+      {
+        anchor: 'focus-button',
+        label: 'Start the focus timer',
+        timeoutMs: 60_000,
+      },
     ],
   },
   'feed-frog': {
@@ -60,6 +106,7 @@ const GUIDES: Record<string, HintGuide> = {
         anchor: 'hunger-bar',
         label:
           'Your frog’s belly — every task you finish feeds it. Fill it to the top!',
+        coverCheck: false,
       },
     ],
   },
@@ -68,20 +115,30 @@ const GUIDES: Record<string, HintGuide> = {
     steps: [
       {
         href: '/',
-        anchor: 'task-row',
-        selector:
-          '[data-hint="task-row"][data-savable="true"], [data-hint="add-task"]',
-        label: 'Pick a task you won’t need today — or add a new one',
+        anchor: 'add-task',
+        label: 'Add a task you won’t need today',
+        skipWhenPresent: '[data-hint="task-row"][data-savable="true"]',
+      },
+      {
+        anchor: 'task-list',
+        label: 'Open any task you won’t need today — or add a new one',
         labelCoarse:
-          'Swipe left on a task you won’t need today — or add a new one',
+          'Swipe left on any task you won’t need today — or add a new one',
         gesture: 'swipe-left',
-        advanceOnEvent: { event: TASK_SAVED_EVENT, goTo: 2 },
+        requirePresent: '[data-hint="task-row"][data-savable="true"]',
+        timeoutMs: 90_000,
+        alsoAdvanceOn: '[data-hint="add-task"]',
+        advanceOnEvent: { event: TASK_SAVED_EVENT, goTo: 3 },
       },
       {
         anchor: 'save-later-button',
         label: 'Save it for later',
         timeoutMs: 60_000,
-        advanceOnEvent: { event: TASK_SAVED_EVENT, goTo: 2 },
+        // Advance only on the actual save event: advancing on pointerdown
+        // navigates to the planner before the button's click handler runs,
+        // killing the save it was supposed to trigger.
+        advanceOnAnchorDown: false,
+        advanceOnEvent: { event: TASK_SAVED_EVENT, goTo: 3 },
       },
       {
         href: '/planner',
@@ -95,7 +152,9 @@ const GUIDES: Record<string, HintGuide> = {
         label:
           'There it is — drag it onto a day when you’re ready. Close the tray when you’re done.',
         advanceOnAnchorDown: false,
-        advanceOnEvent: { event: BACKLOG_CLOSED_EVENT, goTo: 4 },
+        dismissOnAnchorDown: true,
+        outsideInteractionCancels: false,
+        advanceOnEvent: { event: BACKLOG_CLOSED_EVENT, goTo: 5 },
         timeoutMs: 20_000,
       },
       {

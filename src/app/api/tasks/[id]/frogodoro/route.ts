@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import TaskModel from '@/lib/models/Task';
+import UserModel from '@/lib/models/User';
 import { addFrogodoroSession } from '@/lib/frogodoroSessions';
 import { syncQuestState } from '@/lib/quests/engine';
 import { notifyTaskChanged } from '@/lib/taskSync';
@@ -45,6 +46,29 @@ export async function PUT(
         session.breakTime ?? 0,
       );
       isModified = true;
+
+      // Record how much of the current phase has been persisted so the
+      // phase-completion save (frogodoroTimerProcessor) only adds the
+      // remainder instead of the full duration.
+      const activePhaseElapsed = Number(body.activePhaseElapsed);
+      const activePhase =
+        body.activePhase === 'break' ? 'break' : ('focus' as const);
+      if (Number.isFinite(activePhaseElapsed) && activePhaseElapsed > 0) {
+        await UserModel.updateOne(
+          {
+            _id: userId,
+            'activeFrogodoroTimer.taskId': id,
+            'activeFrogodoroTimer.phase': activePhase,
+          },
+          {
+            $max: {
+              'activeFrogodoroTimer.savedElapsed': Math.floor(
+                activePhaseElapsed,
+              ),
+            },
+          },
+        ).catch(() => {});
+      }
     }
 
     if (isModified) {
