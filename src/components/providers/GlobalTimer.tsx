@@ -587,9 +587,11 @@ export function GlobalTimer() {
     prevIsRunning.current = isRunning;
   }, [isRunning, phase, phaseElapsed, selectedTaskId, setPhaseElapsed, settings, timeLeft]);
 
-  // Live progress: while a focus phase runs on the owning device, persist the
-  // unsaved elapsed time every minute so focus quests advance during the
-  // session instead of only at pause/completion. The server subtracts these
+  // Live progress: while a focus phase runs on the owning device, persist
+  // each full unsaved minute so focus quests advance during the session
+  // instead of only at pause/completion. Checked every 15s against actual
+  // elapsed time (an interval counted from resume drifts after pauses and
+  // lags the quest bar behind the visible timer). The server subtracts these
   // flushes from the completion save via savedElapsed, so nothing is counted
   // twice.
   useEffect(() => {
@@ -605,7 +607,7 @@ export function GlobalTimer() {
       );
       const elapsed = Math.max(0, phaseDuration - timeLeftRef.current);
       const unsaved = elapsed - phaseElapsedRef.current;
-      if (unsaved < 45) return;
+      if (unsaved < 60) return;
       saveProgress(taskId, 'focus', unsaved, elapsed);
       setPhaseElapsed(elapsed);
       const store = useFrogodoroStore.getState();
@@ -619,7 +621,7 @@ export function GlobalTimer() {
           void notifyQuestClaims(showNotification, { progressToast: false }),
         1200,
       );
-    }, 60_000);
+    }, 15_000);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isRunning, endTime, setPhaseElapsed, showNotification]);
