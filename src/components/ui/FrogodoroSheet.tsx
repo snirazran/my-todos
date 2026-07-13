@@ -34,6 +34,8 @@ import {
 } from '@/lib/timerSounds';
 import { useNotificationStatus } from '@/hooks/useNotificationStatus';
 import { Bell, Volume2 } from 'lucide-react';
+import { useIntros } from '@/hooks/useIntros';
+import { FrogodoroIntroSheet } from '@/components/ui/FirstTimeIntros';
 
 interface Task {
   id: string;
@@ -68,6 +70,17 @@ export default function FrogodoroSheet({
   const [isDesktop, setIsDesktop] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const { seenIntros, markIntroSeen } = useIntros(open);
+  const [introOpen, setIntroOpen] = useState(false);
+
+  // First open ever (per account): explain the timer once — sprints, sync,
+  // and that it survives closing the app.
+  useEffect(() => {
+    if (!open || !seenIntros || seenIntros.frogodoro) return;
+    markIntroSeen('frogodoro');
+    setIntroOpen(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, seenIntros?.frogodoro]);
   const dragControls = useDragControls();
   const overscroll = useSheetOverscrollDrag();
 
@@ -468,7 +481,7 @@ export default function FrogodoroSheet({
 
   if (!mounted) return null;
 
-  return createPortal(
+  const sheetPortal = createPortal(
     <AnimatePresence>
       {open && (
         <>
@@ -552,6 +565,10 @@ export default function FrogodoroSheet({
                             <span className="text-xs font-black text-sky-500 tabular-nums">{formatDurationSetting(settings.breakDuration)}</span>
                           </div>
                         </div>
+                        <p className="text-sm text-muted-foreground leading-relaxed">
+                          Every focused minute also counts toward your{' '}
+                          <span className="font-bold text-foreground">quests</span>.
+                        </p>
                       </div>
 
                       <button
@@ -974,5 +991,17 @@ export default function FrogodoroSheet({
       )}
     </AnimatePresence>,
     document.body,
+  );
+
+  return (
+    <>
+      {sheetPortal}
+      <FrogodoroIntroSheet
+        open={introOpen}
+        onClose={() => setIntroOpen(false)}
+        focusMinutes={settings.focusDuration}
+        breakMinutes={settings.breakDuration}
+      />
+    </>
   );
 }

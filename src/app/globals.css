@@ -159,6 +159,15 @@
     transform: translateX(380%) skewX(-14deg);
   }
 }
+@keyframes fly-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-7px);
+  }
+}
 /* Ambient version: one sweep, then rest for most of the cycle. */
 @keyframes bar-shine-idle {
   0% {

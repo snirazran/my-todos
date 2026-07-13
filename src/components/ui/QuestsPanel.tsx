@@ -7,7 +7,16 @@ import confetti from 'canvas-confetti';
 import useSWR, { preload } from 'swr';
 import { Icon } from '@/components/ui/Icon';
 import { QuestsPageSkeleton } from '@/components/ui/Skeleton';
-import { Check, Clock, Compass, Gift, Lock, ScrollText, X } from 'lucide-react';
+import {
+  CalendarDays,
+  Check,
+  Clock,
+  Compass,
+  Gift,
+  Lock,
+  ScrollText,
+  X,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import TagsPopup from './TagsPopup';
 import type { ItemDef } from '@/lib/skins/catalog';
@@ -74,6 +83,7 @@ type QuestsResponse = {
   };
   macroCategories: MacroCategoryDefinition[];
   dailyQuests: DailyQuestProgressView[];
+  dailyQuestsGated?: boolean;
   categoryQuests: CategoryQuestProgressView[];
   onboardingQuests?: QuestProgressView[];
   activeSeason?: QuestSeasonView | null;
@@ -327,6 +337,77 @@ function AreaQuestsTeaser({
           </div>
         </div>
     </motion.div>
+  );
+}
+
+// Mirrors the "Your areas" locked card: daily quests stay behind the first
+// onboarding quest so new users chase one goal at a time.
+function DailyQuestsLockedCard({
+  claimed,
+  total,
+  questName,
+}: {
+  claimed: number;
+  total: number;
+  questName?: string;
+}) {
+  const safeTotal = Math.max(1, total);
+  const shown = Math.max(0, Math.min(claimed, safeTotal));
+  const pct = Math.min(100, (shown / safeTotal) * 100);
+  const remaining = Math.max(0, safeTotal - shown);
+  return (
+    <div>
+      <div className="flex items-center gap-1.5 px-1 pb-2 text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+        <CalendarDays className="h-3.5 w-3.5 text-primary" strokeWidth={2.75} />
+        Daily quests
+      </div>
+      <div className="relative overflow-hidden rounded-[24px] border border-primary/20 bg-card shadow-sm">
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/[0.07] via-transparent to-transparent" />
+        <div className="relative px-4 py-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border-2 border-emerald-400 bg-gradient-to-br from-emerald-100 to-emerald-50 text-emerald-600 shadow-sm shadow-emerald-900/10 dark:from-emerald-900/40 dark:to-emerald-950/40 dark:text-emerald-400">
+              <Lock className="h-5 w-5" strokeWidth={2.75} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[15px] font-black leading-snug text-foreground">
+                Complete {remaining} more {remaining === 1 ? 'quest' : 'quests'}
+              </p>
+              <div className="relative mt-2 h-5 overflow-hidden rounded-full bg-muted">
+                <div className="absolute inset-[3px]">
+                  <div
+                    className="relative h-full min-w-8 overflow-hidden rounded-full bg-amber-400 transition-all duration-500"
+                    style={{ width: pct > 0 ? `${pct}%` : '2rem' }}
+                  >
+                    <span
+                      aria-hidden
+                      className="pointer-events-none absolute inset-y-0 left-0 w-1/2 bg-white/30 animate-[bar-shine-idle_2.8s_ease-in-out_infinite] motion-reduce:hidden"
+                    />
+                  </div>
+                </div>
+                <span className="absolute inset-0 flex items-center justify-center text-[10px] font-black tabular-nums text-foreground/70">
+                  {shown}
+                  {' / '}
+                  {safeTotal}
+                </span>
+                <span
+                  aria-hidden
+                  className="absolute inset-0 flex items-center justify-center text-[10px] font-black tabular-nums text-amber-950/80"
+                  style={{ clipPath: `inset(0 ${100 - pct}% 0 0)` }}
+                >
+                  {shown}
+                  {' / '}
+                  {safeTotal}
+                </span>
+              </div>
+              <p className="mt-2 text-[11px] font-bold leading-snug text-muted-foreground">
+                Finish {questName ?? 'your starter quest'} to unlock daily
+                quests
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -889,7 +970,10 @@ export function QuestsPanel({
                           // areaQuestsUnlocked once earned (it never re-locks);
                           // the local calc is a fallback for stale payloads and
                           // still drives the teaser's progress dots.
-                          const FOCUS_UNLOCK_TARGET = 3;
+                          // Must match AREA_UNLOCK_STEP_TARGET in
+                          // api/quests/route.ts — the server decides the
+                          // unlock, this only drives the card's display.
+                          const FOCUS_UNLOCK_TARGET = 6;
                           const completedEarlyObjectives = [
                             ...(data.onboardingQuests ?? []),
                             ...dailyQuests,
@@ -1098,8 +1182,19 @@ export function QuestsPanel({
                               </div>
                             </div>
                           );
-                          const dailySection =
-                            dailyQuests.length === 0 ? (
+                          const gateQuest = (data.onboardingQuests ?? [])[0];
+                          const gateBlocks = gateQuest?.logic ?? [];
+                          const gateDone = gateBlocks.filter(
+                            (block) =>
+                              block.progress >= Math.max(1, block.target),
+                          ).length;
+                          const dailySection = data.dailyQuestsGated ? (
+                            <DailyQuestsLockedCard
+                              claimed={gateDone}
+                              total={gateBlocks.length}
+                              questName={gateQuest?.title}
+                            />
+                          ) : dailyQuests.length === 0 ? (
                               <PanelCard>No active daily quests here.</PanelCard>
                             ) : (
                               <DailyChecklistCard

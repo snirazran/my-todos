@@ -24,7 +24,7 @@ const categoryCoverRef = (categoryId: string) =>
   `/api/quests/cover?type=category&id=${encodeURIComponent(categoryId)}`;
 
 const FREE_TAG_LIMIT = 6;
-const AREA_UNLOCK_STEP_TARGET = 3;
+const AREA_UNLOCK_STEP_TARGET = 6;
 const AREA_UNLOCK_LIFETIME_TASKS = 10;
 
 async function resolveAreaQuestsUnlocked(
@@ -520,6 +520,7 @@ export async function GET(req: Request) {
         dailyQuests: dashboard.dailyQuests.map((q) =>
           withTemplateCover(q, dashboard.templatesWithCover),
         ),
+        dailyQuestsGated: dashboard.dailyQuestsGated,
         categoryQuests: dashboard.categoryQuests.map((q) =>
           withTemplateCover(q, dashboard.templatesWithCover),
         ),

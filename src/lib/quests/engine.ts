@@ -1508,6 +1508,18 @@ export async function syncQuestState(args: {
     (quest) => quest.placement === 'onboarding',
   );
 
+  // New users see one goal at a time: while the first onboarding quest has
+  // incomplete objectives, daily quests stay hidden so its objectives don't
+  // double-progress against a system nobody introduced yet. Completing the
+  // last First Hops objective reveals the dailies as their own unlock beat.
+  const firstOnboardingQuest = onboardingQuests[0];
+  const dailyQuestsGated =
+    !!firstOnboardingQuest &&
+    firstOnboardingQuest.logic.some(
+      (block) => block.progress < Math.max(1, block.target),
+    );
+  const visibleDailyQuests = dailyQuestsGated ? [] : dailyQuests;
+
   const templatesWithCover = new Set(
     templates
       .filter((t) => typeof t.coverImageUrl === 'string' && t.coverImageUrl.length > 0)
@@ -1546,7 +1558,8 @@ export async function syncQuestState(args: {
       : null,
     macroCategories: categories.map(categoryDocToDefinition),
     templatesWithCover,
-    dailyQuests,
+    dailyQuests: visibleDailyQuests,
+    dailyQuestsGated,
     categoryQuests: gatedCategoryQuests,
     onboardingQuests,
     rewardCatalog: includeCatalog

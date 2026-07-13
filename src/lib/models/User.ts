@@ -121,6 +121,10 @@ const UserSchema = new Schema<UserDoc>(
     },
     liveActivityStartToken: { type: String, default: null },
     onboardingCompleted: { type: Boolean, default: false },
+    seenIntros: {
+      type: Schema.Types.Mixed,
+      default: undefined,
+    },
   },
   { collection: 'users' },
 );

@@ -159,6 +159,12 @@ export type UserDoc = {
   liveActivityStartClockSkewMs?: number | null;
   liveActivityRemoteStart?: { key: string; attemptedAt: string } | null;
   onboardingCompleted?: boolean;
+  // One-time in-app explainers the user has already seen (belly mechanic,
+  // frogodoro timer intro). Server-side so they never repeat across devices.
+  seenIntros?: {
+    bellyFull?: boolean;
+    frogodoro?: boolean;
+  };
 };
 
 export type LiveActivityRef = {

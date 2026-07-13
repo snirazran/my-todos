@@ -20,6 +20,8 @@ import {
 import BacklogTray from '@/components/board/BacklogTray';
 import { TASK_SAVED_EVENT } from '@/lib/hints/guides';
 import { notifyQuestClaims } from '@/lib/questClaims';
+import { useIntros } from '@/hooks/useIntros';
+import { BellyFullIntroSheet } from '@/components/ui/FirstTimeIntros';
 //fix
 import { useAuth } from '@/components/auth/AuthContext';
 import { motion, AnimatePresence, useAnimation } from 'framer-motion';
@@ -153,6 +155,8 @@ export default function Home() {
   /* State */
   const [activeTab, setActiveTab] = useState<HomeTab>('all');
   const [isBacklogOpen, setIsBacklogOpen] = useState(false);
+  const [bellyIntroOpen, setBellyIntroOpen] = useState(false);
+  const scheduledBellyIntroRef = useRef(false);
   const [showCompleted, setShowCompleted] = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [isHeaderMenuOpen, setIsHeaderMenuOpen] = useState(false);
@@ -202,6 +206,29 @@ export default function Home() {
   }, [cinematic, setIsCinematicActive]);
 
   const { showNotification, stackHeight: notificationStackHeight } = useNotification();
+  const { seenIntros, markIntroSeen } = useIntros(!!user);
+
+  // First time the belly is full (wherever it was filled — planner completes
+  // count too), explain the hunger mechanic on the next home visit.
+  useEffect(() => {
+    if (!user || bellyIntroOpen) return;
+    if (!seenIntros || seenIntros.bellyFull) return;
+    const max = hungerStatus.maxHunger;
+    if (!max || hungerStatus.hunger < max) return;
+    if (scheduledBellyIntroRef.current) return;
+    scheduledBellyIntroRef.current = true;
+    window.setTimeout(() => {
+      setBellyIntroOpen(true);
+      markIntroSeen('bellyFull');
+    }, 1200);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    user,
+    bellyIntroOpen,
+    seenIntros,
+    hungerStatus.hunger,
+    hungerStatus.maxHunger,
+  ]);
 
   useEffect(() => {
     const persistApi = useFrogodoroStore.persist;
@@ -1025,6 +1052,11 @@ export default function Home() {
       >
         <Plus className="h-6 w-6 stroke-[3]" />
       </button>
+
+      <BellyFullIntroSheet
+        open={bellyIntroOpen}
+        onClose={() => setBellyIntroOpen(false)}
+      />
 
       <BacklogTray
         isOpen={isBacklogOpen}
