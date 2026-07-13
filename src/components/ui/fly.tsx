@@ -26,6 +26,10 @@ type FlyProps = {
   alwaysPlay?: boolean;
   onLoad?: () => void;
   interactive?: boolean;
+  /** Extra backing-store resolution for flies rendered inside scale
+   * transforms (pulse/pop animations) — without it the compositor stretches
+   * the bitmap past its pixel density and the fly blurs. */
+  oversample?: number;
 };
 
 const Fly = memo(forwardRef<HTMLSpanElement, FlyProps>(
@@ -40,6 +44,7 @@ const Fly = memo(forwardRef<HTMLSpanElement, FlyProps>(
       alwaysPlay = false,
       onLoad,
       interactive = true,
+      oversample = 1,
     },
     ref,
   ) => {
@@ -72,7 +77,10 @@ const Fly = memo(forwardRef<HTMLSpanElement, FlyProps>(
       const canvas = canvasRef.current;
       if (!canvas) return;
       const applySize = () => {
-        const px = Math.max(1, Math.round(size * riveDevicePixelRatio()));
+        const px = Math.max(
+          1,
+          Math.round(size * riveDevicePixelRatio() * Math.max(1, oversample)),
+        );
         if (canvas.width !== px || canvas.height !== px) {
           canvas.width = px;
           canvas.height = px;
@@ -92,7 +100,7 @@ const Fly = memo(forwardRef<HTMLSpanElement, FlyProps>(
       };
       watchDpr();
       return () => mql?.removeEventListener('change', onDprChange);
-    }, [size]);
+    }, [size, oversample]);
 
     useEffect(() => {
       const el = innerRef.current;

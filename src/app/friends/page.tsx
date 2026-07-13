@@ -41,7 +41,11 @@ import { cn } from '@/lib/utils';
 import { RewardCard } from '@/components/ui/gift-box/RewardCard';
 import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
 import { RARITY_CONFIG } from '@/components/ui/gift-box/constants';
-import { mutateInventoryCaches, useInventory } from '@/hooks/useInventory';
+import {
+  mutateInventoryCaches,
+  patchInventoryFlies,
+  useInventory,
+} from '@/hooks/useInventory';
 import { markFlyEarn } from '@/lib/flyEarn';
 import { FlyCounter } from '@/components/ui/FlyCounter';
 import { MobileHeaderActions } from '@/components/ui/MobileHeaderActions';
@@ -126,6 +130,9 @@ export default function FriendsPage() {
       const granted = Math.max(0, Math.floor(data?.granted ?? 0));
       if (granted > 0) {
         markFlyEarn();
+        if (typeof flyBalance === 'number') {
+          patchInventoryFlies(flyBalance + granted);
+        }
         mutateInventoryCaches();
         await mutateFriends();
         setClaimReward(granted);
@@ -133,7 +140,7 @@ export default function FriendsPage() {
     } finally {
       setClaiming(false);
     }
-  }, [claiming, claimable, tz, mutateFriends]);
+  }, [claiming, claimable, tz, mutateFriends, flyBalance]);
 
   React.useEffect(() => {
     if (!loading && !user) router.replace('/login');
@@ -248,7 +255,7 @@ export default function FriendsPage() {
           )}
 
           {/* Invite & earn */}
-          <div className="mb-5 w-full">
+          <div className="mb-5 w-full" data-hint="invite-friend">
             <InviteRewardBanner
               onClick={() => setInviteOpen(true)}
               paused={isAnyPanelOpen}

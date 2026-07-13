@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import TaskBoard from '@/components/board/TaskBoard';
 import { LeftTongueProvider } from '@/components/board/LeftTongue';
 import { FlyGainPopup } from '@/components/ui/FlyGainPopup';
-import { seedQuestClaims } from '@/lib/questClaims';
+import { notifyQuestClaims, seedQuestClaims } from '@/lib/questClaims';
 import { PlannerPageSkeleton } from '@/components/ui/Skeleton';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import {
@@ -59,6 +59,19 @@ export default function ManageTasksPage() {
     : 'UTC';
 
   const { showNotification } = useNotification();
+
+  // Board writes land as whole-column PUTs (adds, removes, reorders alike),
+  // so quest progress is refreshed on a short debounce after the last write.
+  const questRefreshTimerRef = useRef<number | null>(null);
+  const scheduleQuestRefresh = useCallback(() => {
+    if (questRefreshTimerRef.current) {
+      window.clearTimeout(questRefreshTimerRef.current);
+    }
+    questRefreshTimerRef.current = window.setTimeout(() => {
+      questRefreshTimerRef.current = null;
+      void notifyQuestClaims(showNotification);
+    }, 600);
+  }, [showNotification]);
 
   // Guards against out-of-order full refetches: rapid completions fire several
   // overlapping board-refresh GETs, and a slower earlier one must not clobber a
@@ -313,8 +326,9 @@ export default function ManageTasksPage() {
           console.warn('saveDate failed', e);
         }
       });
+      scheduleQuestRefresh();
     },
-    [tz, trackWrite],
+    [tz, trackWrite, scheduleQuestRefresh],
   );
 
   const saveBacklog = useCallback(
@@ -335,8 +349,9 @@ export default function ManageTasksPage() {
           console.warn('saveBacklog failed', e);
         }
       });
+      scheduleQuestRefresh();
     },
-    [tz, trackWrite],
+    [tz, trackWrite, scheduleQuestRefresh],
   );
 
   const removeOnDate = useCallback(
@@ -357,8 +372,9 @@ export default function ManageTasksPage() {
           refetchAll();
         }
       });
+      scheduleQuestRefresh();
     },
-    [tz, refetchAll, trackWrite],
+    [tz, refetchAll, trackWrite, scheduleQuestRefresh],
   );
 
   const removeFromBacklog = useCallback(
@@ -376,8 +392,9 @@ export default function ManageTasksPage() {
           refetchAll();
         }
       });
+      scheduleQuestRefresh();
     },
-    [tz, refetchAll, trackWrite],
+    [tz, refetchAll, trackWrite, scheduleQuestRefresh],
   );
 
   const onAddTask = useCallback(
@@ -428,8 +445,9 @@ export default function ManageTasksPage() {
         console.error('Add failed', e);
       }
       await refetchAll();
+      scheduleQuestRefresh();
     },
-    [tz, refetchAll],
+    [tz, refetchAll, scheduleQuestRefresh],
   );
 
   const onToggleRepeat = useCallback(

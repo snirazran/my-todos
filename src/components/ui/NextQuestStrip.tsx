@@ -1,20 +1,28 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronRight, Tags } from 'lucide-react';
 import type { QuestRewardCatalogItem } from '@/components/ui/QuestCards';
+import {
+  enqueueQuestRewardReveal,
+  type RevealCatalog,
+} from '@/components/ui/questRewardReveal';
 import {
   HintButton,
   ObjectiveLabel,
   ObjectiveProgressBar,
   QuestRewardTileBadge,
   objectiveCardTone,
+  primeQuestsPageCache,
+  refreshQuestHomeView,
   setQuestScrollTarget,
   trackableEyebrow,
+  useCompletionReveal,
   type Claimable,
   type Trackable,
 } from '@/lib/questClaims';
+import { useUIStore } from '@/lib/uiStore';
 
 export function NextQuestStrip({
   claimables,
@@ -28,6 +36,8 @@ export function NextQuestStrip({
   isPremium?: boolean;
 }) {
   const router = useRouter();
+  const startHintGuide = useUIStore((state) => state.startHintGuide);
+  const [claiming, setClaiming] = useState(false);
 
   const claimable =
     claimables?.find((c) => c.placement === 'onboarding') ?? claimables?.[0];
@@ -48,6 +58,25 @@ export function NextQuestStrip({
     })[0];
   }, [trackables]);
 
+  // Hold the just-finished trackable on screen so its progress bar visibly
+  // fills before the card swaps to the "Reward ready" state.
+  const heldTrackableRef = useRef<Trackable | null>(null);
+  useEffect(() => {
+    if (nextUp && !claimable) heldTrackableRef.current = nextUp;
+  });
+  useCompletionReveal(nextUp?.id ?? 'strip:none', false);
+  const claimableRevealed = useCompletionReveal(
+    claimable?.id ?? 'strip:none',
+    !!claimable,
+  );
+  const held = heldTrackableRef.current;
+  const fillingTrackable =
+    claimable && !claimableRevealed && held && held.id === claimable.id
+      ? { ...held, progress: Math.max(1, held.target) }
+      : null;
+  const displayNextUp = fillingTrackable ?? nextUp;
+  const showClaimable = !!claimable && !fillingTrackable;
+
   if (!claimable && !nextUp) return null;
 
   const resolvedCatalog = catalog ?? {};
@@ -63,6 +92,55 @@ export function NextQuestStrip({
     router.push('/quests');
   };
 
+  const handleClaim = async (target: Claimable) => {
+    if (claiming) return;
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const request =
+      target.kind === 'objective' && target.questId && target.objectiveId
+        ? {
+            url: '/api/quests/claim-objective',
+            body: {
+              questId: target.questId,
+              objectiveId: target.objectiveId,
+              timezone,
+            },
+          }
+        : target.kind === 'season' && target.seasonId
+          ? {
+              url: '/api/quests/season/claim',
+              body: { seasonId: target.seasonId, timezone },
+            }
+          : null;
+    if (!request) {
+      goToQuests();
+      return;
+    }
+    setClaiming(true);
+    try {
+      const res = await fetch(request.url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request.body),
+      });
+      const payload = await res.json();
+      if (!res.ok) throw new Error(payload.error || 'Claim failed');
+      enqueueQuestRewardReveal(payload.rewardSummary, {
+        catalog: (catalog ?? {}) as RevealCatalog,
+        isPremium: !!isPremium,
+        showFlyGainPill: false,
+      });
+      primeQuestsPageCache();
+      await refreshQuestHomeView();
+    } catch {
+      // Stale claimable (expired daily, claimed elsewhere) — re-sync so the
+      // strip stops offering it.
+      primeQuestsPageCache();
+      await refreshQuestHomeView();
+    } finally {
+      setClaiming(false);
+    }
+  };
+
   return (
     <div
       role="button"
@@ -74,24 +152,26 @@ export function NextQuestStrip({
           goToQuests();
         }
       }}
-      className={`group relative mx-1.5 mb-2 flex w-[calc(100%-0.75rem)] cursor-pointer items-center gap-3 rounded-2xl border p-3 text-left shadow-sm transition-colors md:mx-4 md:w-[calc(100%-2rem)] ${objectiveCardTone(
-        !!claimable,
+      className={`group relative mx-1.5 mb-2 flex w-[calc(100%-0.75rem)] cursor-pointer items-center gap-3 rounded-2xl border p-3 text-left shadow-sm transition-colors duration-300 md:mx-4 md:w-[calc(100%-2rem)] ${objectiveCardTone(
+        showClaimable,
       )} ${
-        claimable
+        showClaimable
           ? 'hover:bg-lime-100 dark:hover:bg-lime-500/20'
           : 'hover:bg-muted/40'
       }`}
     >
-      {claimable ? (
+      {showClaimable && claimable ? (
         <>
-          <div className="h-12 w-12 shrink-0 animate-quest-pulse">
-            <QuestRewardTileBadge
-              reward={claimable.reward}
-              catalog={resolvedCatalog}
-              isPremium={!!isPremium}
-            />
+          <div className="h-12 w-12 shrink-0 animate-[reward-pop_0.4s_ease-out_both] motion-reduce:animate-none">
+            <div className="h-full w-full animate-quest-pulse">
+              <QuestRewardTileBadge
+                reward={claimable.reward}
+                catalog={resolvedCatalog}
+                isPremium={!!isPremium}
+              />
+            </div>
           </div>
-          <div className="flex min-w-0 flex-1 flex-col leading-tight">
+          <div className="flex min-w-0 flex-1 flex-col leading-tight animate-[reward-pop_0.4s_ease-out_0.07s_both] motion-reduce:animate-none">
             <span className="text-[10px] font-black uppercase tracking-[0.14em] text-lime-700 dark:text-lime-400">
               {claimableCount > 1
                 ? `${claimableCount} rewards ready`
@@ -112,24 +192,34 @@ export function NextQuestStrip({
               )}
             </span>
           </div>
-          <span className="claim-wobble inline-flex shrink-0">
-            <span className="inline-flex h-9 items-center justify-center rounded-xl bg-amber-500 px-4 text-[13px] font-black text-white shadow-[0_3px_0_0_#b45309] transition-all group-hover:translate-y-[-1px] group-hover:shadow-[0_4px_0_0_#b45309] group-active:translate-y-[2px] group-active:shadow-none">
-              Claim
+          <span
+            className="inline-flex shrink-0 animate-[reward-pop_0.45s_ease-out_0.14s_both] motion-reduce:animate-none"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <span className={claiming ? 'inline-flex' : 'claim-wobble inline-flex'}>
+              <button
+                type="button"
+                disabled={claiming}
+                onClick={() => void handleClaim(claimable)}
+                className="inline-flex h-9 items-center justify-center rounded-xl bg-amber-500 px-4 text-[13px] font-black text-white shadow-[0_3px_0_0_#b45309] transition-all hover:translate-y-[-1px] hover:shadow-[0_4px_0_0_#b45309] active:translate-y-[2px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {claiming ? 'Claiming...' : 'Claim'}
+              </button>
             </span>
           </span>
         </>
-      ) : nextUp ? (
+      ) : displayNextUp ? (
         <>
           <QuestRewardTileBadge
-            reward={nextUp.reward}
+            reward={displayNextUp.reward}
             catalog={resolvedCatalog}
             isPremium={!!isPremium}
           />
           <div className="flex min-w-0 flex-1 flex-col leading-tight">
             <span className="text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">
-              {trackableEyebrow(nextUp)}
+              {trackableEyebrow(displayNextUp)}
             </span>
-            {nextUp.needsFocusTags ? (
+            {displayNextUp.needsFocusTags ? (
               <>
                 <span className="mt-0.5 text-[13px] font-black text-foreground">
                   Pick a tag to start this quest
@@ -143,21 +233,28 @@ export function NextQuestStrip({
               <>
                 <span className="mt-0.5 text-[13px] font-black text-foreground">
                   <ObjectiveLabel
-                    label={nextUp.remainingLabel}
-                    tags={nextUp.tags}
+                    label={displayNextUp.remainingLabel}
+                    tags={displayNextUp.tags}
                   />
                 </span>
                 <ObjectiveProgressBar
                   className="mt-1.5"
-                  progress={nextUp.progress}
-                  target={nextUp.target}
+                  progress={displayNextUp.progress}
+                  target={displayNextUp.target}
                 />
               </>
             )}
           </div>
-          {nextUp.hint && !nextUp.needsFocusTags ? (
-            <span className="shrink-0">
-              <HintButton text={nextUp.hint} />
+          {displayNextUp.hint && !displayNextUp.needsFocusTags ? (
+            <span className="shrink-0" onClick={(event) => event.stopPropagation()}>
+              <HintButton
+                text={displayNextUp.hint}
+                onShowMe={
+                  displayNextUp.guideId
+                    ? () => startHintGuide(displayNextUp.guideId!)
+                    : undefined
+                }
+              />
             </span>
           ) : (
             <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />

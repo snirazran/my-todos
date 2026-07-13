@@ -15,6 +15,7 @@ import TaskModel, {
 import type { DailyFlyProgress } from '@/lib/types/UserDoc';
 import {
   calculateHunger,
+  HUNGER_FULL_SNAP_MS,
   MAX_HUNGER_MS,
   TASK_HUNGER_REWARD_MS,
 } from '@/lib/hungerLogic';
@@ -494,6 +495,9 @@ async function awardFlyForTask(
     MAX_HUNGER_MS,
     Math.max(0, currentHungerState.hunger) + TASK_HUNGER_REWARD_MS,
   );
+  if (MAX_HUNGER_MS - newHunger <= HUNGER_FULL_SNAP_MS) {
+    newHunger = MAX_HUNGER_MS;
+  }
   const finalHungerStatus = { ...currentHungerState, hunger: newHunger };
   if (
     newHunger >= MAX_HUNGER_MS &&
@@ -624,8 +628,21 @@ async function unawardFlyForTask(
 
   let nextEarned = daily.earned;
   let nextBalance = balance;
+  let nextHunger = Math.max(0, hungerStatus.hunger);
 
   if (wasRewarded) {
+    const hungerBefore = nextHunger;
+    nextHunger = Math.max(0, hungerBefore - TASK_HUNGER_REWARD_MS);
+    setFields['wardrobe.hunger'] = nextHunger;
+    setFields['wardrobe.lastHungerUpdate'] = new Date();
+    if (hungerBefore >= MAX_HUNGER_MS && nextHunger < MAX_HUNGER_MS) {
+      await bumpQuestMetric({
+        userId,
+        metric: 'frog_fed_full',
+        amount: -1,
+        timezone: tz,
+      });
+    }
     const granted = daily.taskFlies?.[taskId] ?? 1;
     if (countTowardDaily) nextEarned = Math.max(0, daily.earned - granted);
     nextBalance = Math.max(0, balance - granted);
@@ -654,7 +671,7 @@ async function unawardFlyForTask(
       limitHit: nextEarned >= limit,
       isPremium: premium,
     },
-    hungerStatus,
+    hungerStatus: { ...hungerStatus, hunger: nextHunger },
     dailyTasksCount,
   };
 }

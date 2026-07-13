@@ -12,6 +12,7 @@ import {
   metricRemainingLabel,
   objectiveHintText,
 } from '@/lib/quests/metricLabels';
+import { guideIdForBlock } from '@/lib/hints/guides';
 
 const isDataUrl = (value: unknown): value is string =>
   typeof value === 'string' && value.startsWith('data:');
@@ -127,11 +128,13 @@ type ObjectiveTagChip = {
 type ClaimableEntry = {
   id: string;
   questId?: string;
+  objectiveId?: string;
   kind: 'objective' | 'season';
   placement?: 'daily' | 'category' | 'onboarding';
   categoryName?: string;
   objectiveLabel?: string;
   tags?: ObjectiveTagChip[];
+  seasonId?: string;
   seasonName?: string;
   day?: number;
   reward?: any;
@@ -150,6 +153,7 @@ type TrackableEntry = {
   target: number;
   reward?: any;
   hint?: string;
+  guideId?: string;
 };
 
 function objectiveRemainingLabel(
@@ -354,6 +358,7 @@ export async function GET(req: Request) {
           claimables.push({
             id: `${quest.id}:${block.id}`,
             questId: quest.id,
+            objectiveId: block.id,
             kind: 'objective',
             placement: quest.placement,
             categoryName:
@@ -409,6 +414,7 @@ export async function GET(req: Request) {
           target,
           reward: block.rewards?.[0],
           hint: objectiveHintText(block, questFocusTags(quest)[0]?.name),
+          guideId: guideIdForBlock(block) ?? undefined,
         });
       }
     }
@@ -422,6 +428,7 @@ export async function GET(req: Request) {
       claimables.push({
         id: `season:${activeSeason.id}:${activeSeason.currentDay}`,
         kind: 'season',
+        seasonId: activeSeason.id,
         seasonName: activeSeason.name,
         day: activeSeason.currentDay,
         reward: seasonReward,

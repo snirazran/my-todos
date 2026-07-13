@@ -286,6 +286,7 @@ export default React.memo(function BacklogTray({
                   key={t.id}
                   layout={!isMobile}
                   className="w-full relative"
+                  data-hint="saved-task-card"
                 >
                   <div className="group relative">
                     <TaskCard

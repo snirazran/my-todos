@@ -18,6 +18,8 @@ import {
   Filter,
 } from 'lucide-react';
 import BacklogTray from '@/components/board/BacklogTray';
+import { TASK_SAVED_EVENT } from '@/lib/hints/guides';
+import { notifyQuestClaims } from '@/lib/questClaims';
 //fix
 import { useAuth } from '@/components/auth/AuthContext';
 import { motion, AnimatePresence, useAnimation } from 'framer-motion';
@@ -629,6 +631,7 @@ export default function Home() {
                           flyRefs.current[task.id] = el;
                         }}
                         className="relative flex items-center justify-center w-11 h-11 border-2 rounded-full bg-muted border-muted-foreground/20 shrink-0 md:h-12 md:w-12"
+                        data-hint="task-fly"
                       >
                         {showFlyCoach && (
                           <>
@@ -691,6 +694,7 @@ export default function Home() {
                       return;
                     }
                     moveTaskToBacklog(id);
+                    window.dispatchEvent(new Event(TASK_SAVED_EVENT));
                   }}
                   onReorder={(reordered) => {
                     reorderTasks(reordered);
@@ -921,6 +925,7 @@ export default function Home() {
                 { id: randomUUID(), text, completed: false, tags },
               ]);
             }
+            if (user) void notifyQuestClaims(showNotification);
           } catch (e) {
             console.error('Failed to add task or refresh state:', e);
           }
@@ -996,6 +1001,7 @@ export default function Home() {
       <button
         type="button"
         aria-label="Add task"
+        data-hint="add-task"
         onClick={() => {
           if (!user) {
             router.push('/login');

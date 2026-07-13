@@ -35,18 +35,20 @@ import {
   type QuestTagChip,
 } from './QuestCards';
 import { QuestStartSheet } from './QuestStartSheet';
-import { RewardCard } from './gift-box/RewardCard';
-import GiftBoxOpening from './gift-box/GiftBoxOpening';
 import { SingleRewardCard } from './daily-reward/RewardCard';
-import { RotatingRays } from './gift-box/RotatingRays';
 import { RARITY_CONFIG as GIFT_RARITY_CONFIG } from './gift-box/constants';
 import Fly from './fly';
-import { FlyCounter } from './FlyCounter';
-import { mutateInventoryCaches, useInventory } from '@/hooks/useInventory';
-import { markFlyEarn } from '@/lib/flyEarn';
-import { showRewardedAd } from '@/lib/ads';
-import { takeQuestScrollTarget } from '@/lib/questClaims';
-import { maybeRequestAppRating } from '@/lib/rateApp';
+import { useInventory } from '@/hooks/useInventory';
+import {
+  enqueueQuestRewardReveal,
+  useQuestRevealQueueLength,
+  type QuestRewardSummary,
+  type RevealCatalog,
+} from './questRewardReveal';
+import {
+  refreshQuestHomeView,
+  takeQuestScrollTarget,
+} from '@/lib/questClaims';
 import { PlusUpgradeModal } from './PlusUpgradeModal';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import Frog, { type WardrobeSlot } from './frog';
@@ -139,36 +141,6 @@ function hasSeasonCover(images?: SeasonImages | null) {
   return !!(images.mobile || images.tablet || images.web || images.webLarge);
 }
 
-type QuestRewardSummary = {
-  fliesGranted?: number;
-  flyBalanceBefore?: number;
-  flyBalanceAfter?: number;
-  grantedItemIds?: string[];
-  grantedBackgroundIds?: string[];
-  doubleClaimId?: string;
-};
-
-type QuestRewardRevealEntry = {
-  key: string;
-  item: ItemDef & { kind?: 'item' | 'background'; imageUrl?: string };
-  fliesGranted?: number;
-  flyBalanceBefore?: number;
-  flyBalanceAfter?: number;
-  quantity?: number;
-  baseQuantity?: number;
-  baseFlies?: number;
-  isQuestReward?: boolean;
-  doubleClaimId?: string;
-  doubled?: boolean;
-};
-
-type FlyGainToast = {
-  id: number;
-  amount: number;
-  from: number;
-  to: number;
-};
-
 const fetcher = async <T,>(url: string) => {
   const res = await fetch(url);
   if (!res.ok) throw new Error('Request failed');
@@ -182,17 +154,6 @@ export function getQuestsUrl(timezone: string) {
 export function prefetchQuests() {
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   void preload(getQuestsUrl(timezone), fetcher);
-}
-
-function createFlyRewardItem(amount: number): ItemDef {
-  return {
-    id: `flies-${amount}`,
-    name: `${amount} Flies`,
-    slot: 'hand_item',
-    rarity: 'uncommon',
-    riveIndex: 0,
-    icon: '',
-  };
 }
 
 // A quest is "finished" when every objective is done — i.e. claimed (for
@@ -328,11 +289,16 @@ function AreaQuestsTeaser({
                 <div className="absolute inset-[3px]">
                   <div
                     className={cn(
-                      'h-full min-w-4 rounded-full transition-all duration-500',
+                      'relative h-full min-w-8 overflow-hidden rounded-full transition-all duration-500',
                       complete ? 'bg-emerald-500' : 'bg-amber-400',
                     )}
-                    style={{ width: pct > 0 ? `${pct}%` : '1rem' }}
-                  />
+                    style={{ width: pct > 0 ? `${pct}%` : '2rem' }}
+                  >
+                    <span
+                      aria-hidden
+                      className="pointer-events-none absolute inset-y-0 left-0 w-1/2 bg-white/30 animate-[bar-shine-idle_2.8s_ease-in-out_infinite] motion-reduce:hidden"
+                    />
+                  </div>
                 </div>
                 <span className="absolute inset-0 flex items-center justify-center text-[10px] font-black tabular-nums text-foreground/70">
                   {shownSteps}
@@ -387,26 +353,6 @@ export function QuestsPanel({
     useState<MacroCategoryId | null>(null);
   const [startQuestCategoryId, setStartQuestCategoryId] =
     useState<MacroCategoryId | null>(null);
-  const [rewardRevealQueue, setRewardRevealQueue] = useState<
-    QuestRewardRevealEntry[]
-  >([]);
-  const prevRevealCountRef = useRef(0);
-  useEffect(() => {
-    if (prevRevealCountRef.current > 0 && rewardRevealQueue.length === 0) {
-      maybeRequestAppRating();
-    }
-    prevRevealCountRef.current = rewardRevealQueue.length;
-  }, [rewardRevealQueue.length]);
-  // When opening a quest gift reward, play the full "tap to unwrap" gift-box
-  // flow instead of revealing the prize instantly. `remaining` lets multi-copy
-  // rewards be unwrapped one box at a time; `instance` re-mounts GiftBoxOpening
-  // for each subsequent box.
-  const [giftOpening, setGiftOpening] = useState<{
-    entry: QuestRewardRevealEntry;
-    remaining: number;
-    instance: number;
-  } | null>(null);
-  const [flyGainToast, setFlyGainToast] = useState<FlyGainToast | null>(null);
   const [areaUnlockCeremony, setAreaUnlockCeremony] = useState<
     'idle' | 'pending' | 'playing' | 'done'
   >('idle');
@@ -415,13 +361,10 @@ export function QuestsPanel({
   const [pendingSwitchCategoryId, setPendingSwitchCategoryId] = useState<
     string | null
   >(null);
-  const rewardRevealIdRef = useRef(0);
-  const flyGainToastIdRef = useRef(0);
-  const knownFlyBalanceRef = useRef(0);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const initialTopPinnedRef = useRef(false);
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const { data: inventoryData } = useInventory(!isGuest, true);
+  useInventory(!isGuest, true);
 
   const {
     data,
@@ -441,7 +384,15 @@ export function QuestsPanel({
   const refreshQuestData = async () => {
     await mutateQuests();
     await onQuestsChanged?.();
+    void refreshQuestHomeView();
   };
+
+  const revealQueueLength = useQuestRevealQueueLength();
+  const queueRewardReveal = (summary?: QuestRewardSummary) =>
+    enqueueQuestRewardReveal(summary, {
+      catalog: (data?.rewardCatalog ?? {}) as RevealCatalog,
+      isPremium: data?.isPremium ?? false,
+    });
 
   const serverAreaUnlocked = data?.areaQuestsUnlocked;
   const serverAreaUnlockedAt = data?.areaQuestsUnlockedAt;
@@ -453,7 +404,7 @@ export function QuestsPanel({
     if (
       !serverAreaUnlocked ||
       areaUnlockCeremony !== 'idle' ||
-      rewardRevealQueue.length > 0
+      revealQueueLength > 0
     ) {
       return;
     }
@@ -483,7 +434,7 @@ export function QuestsPanel({
     serverAreaUnlocked,
     serverAreaUnlockedAt,
     areaUnlockCeremony,
-    rewardRevealQueue.length,
+    revealQueueLength,
   ]);
 
   useEffect(() => {
@@ -536,23 +487,10 @@ export function QuestsPanel({
   }, [areaUnlockCeremony]);
 
   useEffect(() => {
-    const balance = inventoryData?.wardrobe?.flies;
-    if (typeof balance === 'number' && Number.isFinite(balance)) {
-      knownFlyBalanceRef.current = balance;
-    }
-  }, [inventoryData?.wardrobe?.flies]);
-
-  useEffect(() => {
     if (!claimMessage) return;
     const timeout = window.setTimeout(() => setClaimMessage(null), 5000);
     return () => window.clearTimeout(timeout);
   }, [claimMessage]);
-
-  useEffect(() => {
-    if (!flyGainToast) return;
-    const timeout = window.setTimeout(() => setFlyGainToast(null), 3200);
-    return () => window.clearTimeout(timeout);
-  }, [flyGainToast]);
 
   useEffect(() => {
     if (isLoading || !data || initialTopPinnedRef.current) return;
@@ -719,215 +657,6 @@ export function QuestsPanel({
   const pendingSwitchCategory = pendingSwitchCategoryId
     ? categoryMap[pendingSwitchCategoryId]
     : null;
-
-  const queueRewardReveal = (summary?: QuestRewardSummary) => {
-    const grantedItemIds = Array.isArray(summary?.grantedItemIds)
-      ? summary.grantedItemIds
-      : [];
-    const catalog = data?.rewardCatalog ?? {};
-    const nextEntries: QuestRewardRevealEntry[] = [];
-    const fliesGranted = Math.max(0, Math.floor(summary?.fliesGranted ?? 0));
-    const isPremium = data?.isPremium ?? false;
-
-    if (fliesGranted > 0) {
-      const baseFlies = isPremium ? Math.floor(fliesGranted / 2) : fliesGranted;
-      const flyBalanceBefore =
-        typeof summary?.flyBalanceBefore === 'number'
-          ? summary.flyBalanceBefore
-          : knownFlyBalanceRef.current;
-      const flyBalanceAfter =
-        typeof summary?.flyBalanceAfter === 'number'
-          ? summary.flyBalanceAfter
-          : flyBalanceBefore + fliesGranted;
-      knownFlyBalanceRef.current = flyBalanceAfter;
-      nextEntries.push({
-        key: `flies-${fliesGranted}-${rewardRevealIdRef.current}`,
-        item: createFlyRewardItem(fliesGranted),
-        fliesGranted,
-        flyBalanceBefore,
-        flyBalanceAfter,
-        baseFlies: isPremium ? baseFlies : undefined,
-        isQuestReward: true,
-        doubleClaimId: summary?.doubleClaimId,
-      });
-      rewardRevealIdRef.current += 1;
-    }
-
-    // Consolidate duplicate item IDs into single entries with quantity
-    const itemCounts: Record<string, number> = {};
-    for (const itemId of grantedItemIds) {
-      itemCounts[itemId] = (itemCounts[itemId] ?? 0) + 1;
-    }
-
-    const uniqueItemIds = Object.keys(itemCounts);
-    for (const itemId of uniqueItemIds) {
-      const item = catalog[itemId];
-      if (!item) continue;
-      const count = itemCounts[itemId];
-      const key = `${item.id}-${rewardRevealIdRef.current}`;
-      rewardRevealIdRef.current += 1;
-      const baseCount = isPremium ? Math.floor(count / 2) || 1 : count;
-      nextEntries.push({
-        key,
-        item,
-        quantity: count > 1 ? count : undefined,
-        baseQuantity: isPremium && count > 1 ? baseCount : undefined,
-        isQuestReward: true,
-        doubleClaimId: summary?.doubleClaimId,
-      });
-    }
-
-    // Background rewards — reveal each as a card showing the background image.
-    const grantedBackgroundIds = Array.isArray(summary?.grantedBackgroundIds)
-      ? summary.grantedBackgroundIds
-      : [];
-    const bgCounts: Record<string, number> = {};
-    for (const bgId of grantedBackgroundIds) {
-      bgCounts[bgId] = (bgCounts[bgId] ?? 0) + 1;
-    }
-    for (const bgId of Object.keys(bgCounts)) {
-      const meta = catalog[bgId] as (ItemDef & { imageUrl?: string }) | undefined;
-      if (!meta) continue;
-      const count = bgCounts[bgId];
-      const key = `${bgId}-${rewardRevealIdRef.current}`;
-      rewardRevealIdRef.current += 1;
-      const baseCount = isPremium ? Math.floor(count / 2) || 1 : count;
-      nextEntries.push({
-        key,
-        item: {
-          id: meta.id,
-          name: meta.name,
-          slot: 'skin',
-          rarity: meta.rarity,
-          riveIndex: 0,
-          icon: '',
-          priceFlies: 0,
-          kind: 'background',
-          imageUrl: meta.imageUrl,
-        },
-        quantity: count > 1 ? count : undefined,
-        baseQuantity: isPremium && count > 1 ? baseCount : undefined,
-        isQuestReward: true,
-        doubleClaimId: summary?.doubleClaimId,
-      });
-    }
-
-    if (!nextEntries.length) return 0;
-    setRewardRevealQueue((current) => [...current, ...nextEntries]);
-    return nextEntries.length;
-  };
-
-  const showFlyGainToast = (entry: QuestRewardRevealEntry) => {
-    if (!entry.fliesGranted) return;
-    const amount = Math.max(0, Math.floor(entry.fliesGranted));
-    if (amount <= 0) return;
-    const from =
-      typeof entry.flyBalanceBefore === 'number'
-        ? entry.flyBalanceBefore
-        : Math.max(0, knownFlyBalanceRef.current - amount);
-    const to =
-      typeof entry.flyBalanceAfter === 'number'
-        ? entry.flyBalanceAfter
-        : from + amount;
-
-    setFlyGainToast({
-      id: ++flyGainToastIdRef.current,
-      amount,
-      from,
-      to,
-    });
-  };
-
-  const handleRewardRevealClaim = (entry?: QuestRewardRevealEntry) => {
-    if (entry?.fliesGranted) {
-      showFlyGainToast(entry);
-    }
-    if (entry?.isQuestReward) {
-      markFlyEarn();
-      mutateInventoryCaches();
-    }
-    setRewardRevealQueue((current) => current.slice(1));
-  };
-
-  const handleRewardRevealOpenGift = (entry: QuestRewardRevealEntry) => {
-    if (entry.item.slot !== 'container') {
-      handleRewardRevealClaim(entry);
-      return;
-    }
-    if (giftOpening) return;
-
-    // Launch the full "tap to unwrap" gift-box experience. Each box is
-    // unwrapped (and its prize revealed) by GiftBoxOpening itself.
-    setClaimMessage(null);
-    setGiftOpening({
-      entry,
-      remaining: entry.quantity ?? 1,
-      instance: 0,
-    });
-  };
-
-  const doublingClaimRef = useRef(false);
-  const handleWatchAdDouble = async (entry: QuestRewardRevealEntry) => {
-    const claimId = entry.doubleClaimId;
-    if (!claimId || entry.doubled || doublingClaimRef.current) return;
-    doublingClaimRef.current = true;
-    try {
-      const outcome = await showRewardedAd('quest_reward_double');
-      if (outcome !== 'rewarded') return;
-      const res = await fetch('/api/rewards/double', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ claimId }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data?.granted) return;
-      markFlyEarn();
-      mutateInventoryCaches();
-      setRewardRevealQueue((queue) =>
-        queue.map((e) => {
-          if (e.doubleClaimId !== claimId) return e;
-          const next: QuestRewardRevealEntry = { ...e, doubled: true };
-          if (e.fliesGranted) {
-            const balanceAfter =
-              typeof data?.summary?.flyBalanceAfter === 'number'
-                ? data.summary.flyBalanceAfter
-                : (e.flyBalanceAfter ?? 0) + e.fliesGranted;
-            next.baseFlies = e.fliesGranted;
-            next.fliesGranted = e.fliesGranted * 2;
-            next.flyBalanceAfter = balanceAfter;
-            knownFlyBalanceRef.current = balanceAfter;
-          } else {
-            const base = e.quantity ?? 1;
-            next.baseQuantity = base;
-            next.quantity = base * 2;
-          }
-          return next;
-        }),
-      );
-    } finally {
-      doublingClaimRef.current = false;
-    }
-  };
-
-  // Called when a single gift box from the tap-to-unwrap flow is dismissed
-  // (prize claimed or closed). Advance to the next copy, or finish and remove
-  // the gift entry from the reveal queue once every box is done.
-  const handleGiftBoxClosed = () => {
-    markFlyEarn();
-    mutateInventoryCaches();
-    setGiftOpening((current) => {
-      if (!current) return null;
-      const remaining = current.remaining - 1;
-      if (remaining > 0) {
-        return { ...current, remaining, instance: current.instance + 1 };
-      }
-      const entryKey = current.entry.key;
-      setRewardRevealQueue((queue) =>
-        queue[0]?.key === entryKey ? queue.slice(1) : queue,
-      );
-      return null;
-    });
-  };
 
   const [claimingStreak, setClaimingStreak] = useState(false);
   const handleClaimStreak = async () => {
@@ -1575,26 +1304,6 @@ export function QuestsPanel({
                   </div>
                 )}
               </div>
-              <QuestRewardRevealOverlay
-                queue={rewardRevealQueue}
-                isPremium={data?.isPremium ?? false}
-                onClaim={handleRewardRevealClaim}
-                onOpenGift={handleRewardRevealOpenGift}
-                onWatchAd={handleWatchAdDouble}
-                paused={false}
-              />
-              {giftOpening && (
-                <GiftBoxOpening
-                  key={`${giftOpening.entry.key}-${giftOpening.instance}`}
-                  giftBoxId={giftOpening.entry.item.id}
-                  onClose={handleGiftBoxClosed}
-                  onWin={() => {
-                    markFlyEarn();
-                    mutateInventoryCaches();
-                  }}
-                />
-              )}
-              <FlyGainToastPill toast={flyGainToast} />
               <QuestSeasonEventOverlay
                 season={data?.activeSeason ?? null}
                 open={seasonEventOpen}
@@ -1853,9 +1562,14 @@ function QuestSeasonBanner({
                 <div className="relative mt-2 h-8 overflow-hidden rounded-full bg-muted sm:mt-3">
                   <div className="absolute inset-1">
                     <div
-                      className="h-full min-w-7 rounded-full bg-amber-400 transition-all"
+                      className="relative h-full min-w-7 overflow-hidden rounded-full bg-amber-400 transition-all"
                       style={{ width: pct > 0 ? `${pct}%` : '1.75rem' }}
-                    />
+                    >
+                      <span
+                        aria-hidden
+                        className="pointer-events-none absolute inset-y-0 left-0 w-1/2 bg-white/30 animate-[bar-shine-idle_2.8s_ease-in-out_infinite] motion-reduce:hidden"
+                      />
+                    </div>
                   </div>
                   <span className="absolute inset-0 flex items-center justify-center gap-1.5 text-sm font-black tabular-nums text-muted-foreground">
                     {progress} / {season.dailyTargetFlies}
@@ -2773,188 +2487,6 @@ function LockedPlusPreview({
           </button>
         )}
       </motion.div>
-    </motion.div>
-  );
-}
-
-function PremiumFlyCounter({
-  baseAmount,
-  finalAmount,
-  paused = false,
-}: {
-  baseAmount: number;
-  finalAmount: number;
-  paused?: boolean;
-}) {
-  const [displayAmount, setDisplayAmount] = useState(baseAmount);
-  const [showDouble, setShowDouble] = useState(false);
-
-  useEffect(() => {
-    const doubleTimer = setTimeout(() => {
-      setShowDouble(true);
-      // Animate counting up from base to final
-      const duration = 600;
-      const steps = 20;
-      const increment = (finalAmount - baseAmount) / steps;
-      let current = baseAmount;
-      let step = 0;
-      const interval = setInterval(() => {
-        step++;
-        current = Math.min(
-          baseAmount + Math.round(increment * step),
-          finalAmount,
-        );
-        setDisplayAmount(current);
-        if (step >= steps) clearInterval(interval);
-      }, duration / steps);
-      return () => clearInterval(interval);
-    }, 800);
-    return () => clearTimeout(doubleTimer);
-  }, [baseAmount, finalAmount]);
-
-  return (
-    <div className="relative flex items-center justify-center w-full h-full">
-      <Fly size={132} paused={paused} interactive={false} />
-      <motion.span
-        key={displayAmount}
-        animate={showDouble ? { scale: [1.3, 1] } : {}}
-        transition={{ type: 'spring', stiffness: 400, damping: 15 }}
-        className="absolute z-40 px-3 py-1 text-sm font-black text-white border shadow-sm right-3 top-3 rounded-xl border-white/20 bg-black/45 backdrop-blur-sm"
-      >
-        x{displayAmount}
-      </motion.span>
-    </div>
-  );
-}
-
-function QuestRewardRevealOverlay({
-  queue,
-  isPremium,
-  onClaim,
-  onOpenGift,
-  onWatchAd,
-  paused = false,
-}: {
-  queue: QuestRewardRevealEntry[];
-  isPremium: boolean;
-  onClaim: (entry: QuestRewardRevealEntry) => void;
-  onOpenGift: (entry: QuestRewardRevealEntry) => void;
-  onWatchAd: (entry: QuestRewardRevealEntry) => void | Promise<void>;
-  paused?: boolean;
-}) {
-  const entry = queue[0] ?? null;
-  if (typeof document === 'undefined') return null;
-
-  return createPortal(
-    <AnimatePresence mode="wait">
-      {entry && (
-        <motion.div
-          key={entry.key}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden pointer-events-auto"
-        >
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="absolute inset-0 bg-slate-950/90 backdrop-blur-sm"
-          />
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="absolute inset-0 z-0 flex items-center justify-center"
-          >
-            <RotatingRays
-              colorClass={GIFT_RARITY_CONFIG[entry.item.rarity].rays}
-            />
-            <div className="absolute inset-0 bg-radial-gradient from-transparent to-slate-950/80" />
-          </motion.div>
-          <div className="relative z-10 flex flex-col items-center justify-center w-full max-w-md p-6">
-            <RewardCard
-              key={entry.key}
-              prize={entry.item}
-              claiming={false}
-              onClaim={
-                entry.item.slot === 'container'
-                  ? () => onOpenGift(entry)
-                  : () => onClaim(entry)
-              }
-              onOpenLater={
-                entry.item.slot === 'container' ? () => onClaim(entry) : undefined
-              }
-              quantity={entry.quantity}
-              baseQuantity={entry.baseQuantity}
-              isPremium={isPremium && !!entry.isQuestReward}
-              showDoubleUpsell={
-                !isPremium &&
-                !!entry.isQuestReward &&
-                !!entry.doubleClaimId &&
-                !entry.doubled
-              }
-              onWatchAd={() => onWatchAd(entry)}
-              rewardAmount={entry.fliesGranted || undefined}
-              paused={paused}
-              customPreview={
-                entry.fliesGranted ? (
-                  entry.baseFlies ? (
-                    <PremiumFlyCounter
-                      baseAmount={entry.baseFlies}
-                      finalAmount={entry.fliesGranted}
-                    />
-                  ) : (
-                    <div className="relative flex items-center justify-center w-full h-full">
-                      <Fly size={132} paused={paused} interactive={false} />
-                      <span className="absolute z-40 px-3 py-1 text-sm font-black text-white border shadow-sm right-3 top-3 rounded-xl border-white/20 bg-black/45 backdrop-blur-sm">
-                        x{entry.fliesGranted}
-                      </span>
-                    </div>
-                  )
-                ) : undefined
-              }
-              slotLabel={entry.fliesGranted ? 'currency' : undefined}
-            />
-          </div>
-        </motion.div>
-      )}
-    </AnimatePresence>,
-    document.body,
-  );
-}
-
-function FlyGainToastPill({ toast }: { toast: FlyGainToast | null }) {
-  if (typeof document === 'undefined') return null;
-
-  return createPortal(
-    <AnimatePresence mode="wait">
-      {toast && <FlyGainPill key={toast.id} toast={toast} />}
-    </AnimatePresence>,
-    document.body,
-  );
-}
-
-// Shows the same FlyCounter used in the home header, sliding in at the top of
-// the event overlay. Mounts at `from` so the count-up + "+N" pulse fire when
-// the balance ticks to `to` (FlyCounter skips the bump on its first render).
-function FlyGainPill({ toast }: { toast: FlyGainToast }) {
-  const [value, setValue] = useState(toast.from);
-
-  useEffect(() => {
-    const startTimer = window.setTimeout(() => setValue(toast.to), 260);
-    return () => window.clearTimeout(startTimer);
-  }, [toast.to]);
-
-  return (
-    <motion.div
-      className="fixed inset-x-0 top-[calc(env(safe-area-inset-top)+3rem)] z-[10000] flex justify-center px-4"
-      initial={{ opacity: 1, y: -42, scale: 0.96 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 1, y: -140, scale: 0.96 }}
-      transition={{ duration: 0.42, ease: [0.32, 0.72, 0, 1] }}
-    >
-      <FlyCounter balance={value} variant="desktop" alwaysCelebrate />
     </motion.div>
   );
 }

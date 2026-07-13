@@ -49,6 +49,7 @@ export default function BacklogBox({
         type="button"
         onClick={onClick}
         aria-label="Saved tasks"
+        data-hint="saved-tasks"
         className={`grid h-full w-full place-items-center rounded-full border shadow-lg shadow-black/5 transition-colors dark:shadow-black/20 ${
           isDragOver
             ? 'border-primary bg-primary/12 text-primary'

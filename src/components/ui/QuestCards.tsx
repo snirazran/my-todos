@@ -43,7 +43,10 @@ import {
   HintButton,
   ObjectiveProgressBar,
   objectiveCardTone,
+  useCompletionReveal,
 } from '@/lib/questClaims';
+import { guideIdForBlock } from '@/lib/hints/guides';
+import { useUIStore } from '@/lib/uiStore';
 
 export type QuestRewardCatalogItem = Pick<
   ItemDef,
@@ -584,6 +587,30 @@ function useHiddenClaimedObjectives(
   return hiddenIds;
 }
 
+// Objective card wrapper that lets the progress bar visibly fill before the
+// row flips to its finished styling (see useCompletionReveal).
+function ObjectiveRevealCard({
+  revealKey,
+  complete,
+  children,
+}: {
+  revealKey: string;
+  complete: boolean;
+  children: (suppressComplete: boolean) => React.ReactNode;
+}) {
+  const revealed = useCompletionReveal(revealKey, complete);
+  return (
+    <div
+      className={cn(
+        'rounded-2xl border px-3 py-1 shadow-sm sm:px-4 transition-colors duration-300',
+        objectiveCardTone(complete && revealed),
+      )}
+    >
+      {children(complete && !revealed)}
+    </div>
+  );
+}
+
 export function StarterQuestCard({
   quest,
   rewardCatalog,
@@ -644,30 +671,31 @@ export function StarterQuestCard({
       </div>
       <div className="flex flex-col gap-2.5">
         {shownBlocks.map((block) => (
-          <div
+          <ObjectiveRevealCard
             key={block.id}
-            className={cn(
-              'rounded-2xl border px-3 py-1 shadow-sm sm:px-4',
-              objectiveCardTone(block.progress >= Math.max(1, block.target)),
-            )}
+            revealKey={`${quest.id}:${block.id}`}
+            complete={block.progress >= Math.max(1, block.target)}
           >
-            <ObjectiveRow
-              block={block}
-              objectiveClaimed={claimedObjectiveIds.includes(block.id)}
-              claimingObjective={claimingObjectiveId === block.id}
-              isPremium={isPremium}
-              rewardCatalog={rewardCatalog}
-              paused={true}
-              onOpenRewards={(rewards) =>
-                setRewardPopup({ eyebrow: 'Objective', title: 'Rewards', rewards })
-              }
-              onClaimObjective={
-                onClaimObjective ? () => onClaimObjective(block.id) : undefined
-              }
-              isLast
-              isFirst
-            />
-          </div>
+            {(suppressComplete) => (
+              <ObjectiveRow
+                block={block}
+                objectiveClaimed={claimedObjectiveIds.includes(block.id)}
+                claimingObjective={claimingObjectiveId === block.id}
+                isPremium={isPremium}
+                rewardCatalog={rewardCatalog}
+                paused={true}
+                suppressComplete={suppressComplete}
+                onOpenRewards={(rewards) =>
+                  setRewardPopup({ eyebrow: 'Objective', title: 'Rewards', rewards })
+                }
+                onClaimObjective={
+                  onClaimObjective ? () => onClaimObjective(block.id) : undefined
+                }
+                isLast
+                isFirst
+              />
+            )}
+          </ObjectiveRevealCard>
         ))}
       </div>
       <RewardDetailsPopup
@@ -986,30 +1014,31 @@ function DailyChecklistQuestRows({
   return (
     <>
       {visibleLogic.map((block) => (
-        <div
+        <ObjectiveRevealCard
           key={block.id}
-          className={cn(
-            'rounded-2xl border px-3 py-1 shadow-sm sm:px-4',
-            objectiveCardTone(block.progress >= Math.max(1, block.target)),
-          )}
+          revealKey={`${quest.id}:${block.id}`}
+          complete={block.progress >= Math.max(1, block.target)}
         >
-          <ObjectiveRow
-            block={block}
-            objectiveClaimed={claimedObjectiveIds.includes(block.id)}
-            claimingObjective={claimingObjectiveId === block.id}
-            isPremium={isPremium}
-            rewardCatalog={rewardCatalog}
-            paused={true}
-            onOpenRewards={onOpenRewards}
-            onClaimObjective={
-              onClaimObjective
-                ? () => onClaimObjective(quest.id, block.id)
-                : undefined
-            }
-            isLast
-            isFirst
-          />
-        </div>
+          {(suppressComplete) => (
+            <ObjectiveRow
+              block={block}
+              objectiveClaimed={claimedObjectiveIds.includes(block.id)}
+              claimingObjective={claimingObjectiveId === block.id}
+              isPremium={isPremium}
+              rewardCatalog={rewardCatalog}
+              paused={true}
+              suppressComplete={suppressComplete}
+              onOpenRewards={onOpenRewards}
+              onClaimObjective={
+                onClaimObjective
+                  ? () => onClaimObjective(quest.id, block.id)
+                  : undefined
+              }
+              isLast
+              isFirst
+            />
+          )}
+        </ObjectiveRevealCard>
       ))}
     </>
   );
@@ -1231,6 +1260,7 @@ export function CategoryQuestPresentationCard({
             onClick={onStartQuest ?? onEditTags}
             className="absolute inset-0 z-20"
             aria-label="Start quest"
+            data-hint="start-focus-quest"
           />
         )}
       </div>
@@ -1241,6 +1271,7 @@ export function CategoryQuestPresentationCard({
           type="button"
           onClick={onStartQuest ?? onEditTags}
           className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+          data-hint="start-focus-quest"
         >
           <span className="min-w-0 flex-1 text-[13px] font-black leading-snug text-foreground">
             Get rewarded for {category?.name ?? 'these'} tasks
@@ -1320,13 +1351,13 @@ export function CategoryQuestPresentationCard({
           )}
         >
         {shownBlocks.map((block) => (
-          <div
+          <ObjectiveRevealCard
             key={block.id}
-            className={cn(
-              'rounded-2xl border px-3 py-1 shadow-sm sm:px-4',
-              objectiveCardTone(block.progress >= Math.max(1, block.target)),
-            )}
+            revealKey={`${quest.id}:${block.id}`}
+            complete={block.progress >= Math.max(1, block.target)}
           >
+            {(suppressComplete) => (
+              <>
             <ObjectiveRow
               block={block}
               objectiveClaimed={claimedObjectiveIds.includes(block.id)}
@@ -1334,6 +1365,7 @@ export function CategoryQuestPresentationCard({
               isPremium={isPremium}
               rewardCatalog={rewardCatalog}
               paused={true}
+              suppressComplete={suppressComplete}
               onOpenRewards={(rewards) =>
                 setRewardPopup({
                   eyebrow: 'Objective',
@@ -1396,7 +1428,9 @@ export function CategoryQuestPresentationCard({
                 ) : null}
               </div>
             )}
-          </div>
+              </>
+            )}
+          </ObjectiveRevealCard>
         ))}
         {(foldedBlocks.length > 0 ||
           (showAllObjectives && orderedOpen.length > 2)) && (
@@ -2179,6 +2213,7 @@ function ObjectiveRow({
   categoryAccent,
   onPickTags,
   forceDimmed = false,
+  suppressComplete = false,
 }: {
   block: QuestCardLogicBlock;
   objectiveClaimed?: boolean;
@@ -2195,12 +2230,15 @@ function ObjectiveRow({
   categoryAccent?: string;
   onPickTags?: () => void;
   forceDimmed?: boolean;
+  suppressComplete?: boolean;
 }) {
   const safeTarget = Math.max(1, block.target);
-  const objectiveComplete = block.progress >= safeTarget;
+  const objectiveComplete = !suppressComplete && block.progress >= safeTarget;
   const hasRewards = (block.rewards?.length ?? 0) > 0;
   const objectiveClaimable =
     hasRewards && objectiveComplete && !objectiveClaimed;
+  const startHintGuide = useUIStore((state) => state.startHintGuide);
+  const guideId = guideIdForBlock(block);
 
   const stepDone = objectiveClaimed || (objectiveComplete && !hasRewards);
   const needsTag =
@@ -2212,12 +2250,16 @@ function ObjectiveRow({
     if (objectiveClaimable && onClaimObjective) {
       return (
         <span
-          className={cn('inline-flex', !claimingObjective && 'claim-wobble')}
+          className={cn(
+            'inline-flex animate-[reward-pop_0.45s_ease-out_both] motion-reduce:animate-none',
+            !claimingObjective && 'claim-wobble',
+          )}
         >
           <button
             type="button"
             onClick={onClaimObjective}
             disabled={claimingObjective}
+            data-hint="claim-objective"
             className="inline-flex h-9 items-center justify-center rounded-xl bg-amber-500 px-3.5 text-[13px] font-black text-white shadow-[0_3px_0_0_#b45309] transition-all hover:translate-y-[-1px] hover:shadow-[0_4px_0_0_#b45309] active:translate-y-[2px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60 min-[400px]:px-4"
           >
             {claimingObjective ? 'Claiming...' : 'Claim'}
@@ -2227,7 +2269,7 @@ function ObjectiveRow({
     }
     if (stepDone) {
       return (
-        <div className="flex h-8 items-center gap-1.5 rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-2.5">
+        <div className="flex h-8 items-center gap-1.5 rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-2.5 animate-[reward-pop_0.45s_ease-out_both] motion-reduce:animate-none">
           <Check className="w-3 h-3 text-emerald-500" />
           <span className="text-[10px] font-black uppercase tracking-[0.12em] text-emerald-600/70 dark:text-emerald-400/70">
             {objectiveClaimed ? 'Claimed' : 'Done'}
@@ -2235,7 +2277,14 @@ function ObjectiveRow({
         </div>
       );
     }
-    return <HintButton text={objectiveHintText(block, linkedTags?.[0]?.name)} />;
+    return (
+      <HintButton
+        text={objectiveHintText(block, linkedTags?.[0]?.name)}
+        onShowMe={
+          guideId && !needsTag ? () => startHintGuide(guideId) : undefined
+        }
+      />
+    );
   };
 
   const objectiveRewards = hasRewards
@@ -2525,6 +2574,7 @@ export const RewardTile = memo(function RewardTile({
   giftAnimation,
   frogClassName,
   flySize,
+  flyOversample,
 }: {
   reward: QuestReward;
   rewardCatalog: Record<string, QuestRewardCatalogItem>;
@@ -2541,6 +2591,8 @@ export const RewardTile = memo(function RewardTile({
   frogClassName?: string;
   /** Optional size override for the fly reward icon. */
   flySize?: number;
+  /** Backing-resolution headroom for flies shown inside scale animations. */
+  flyOversample?: number;
 }) {
   const { ref, hasHydrated } = useDelayedHydration<HTMLDivElement>(
     hydrateDelayMs,
@@ -2595,6 +2647,7 @@ export const RewardTile = memo(function RewardTile({
             y={-1}
             paused={paused}
             interactive={false}
+            oversample={flyOversample}
           />
         </div>
       ) : item?.slot === 'background' ? (

@@ -5,6 +5,7 @@ import { useAuth } from '@/components/auth/AuthContext';
 import { useNotification } from '@/components/providers/NotificationProvider';
 import { useReminderScheduler } from '@/hooks/useReminderScheduler';
 import { INVENTORY_KEY, INVENTORY_SUMMARY_KEY } from '@/hooks/useInventory';
+import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
 import { markFlyEarn } from '@/lib/flyEarn';
 import { notifyQuestClaims, seedQuestClaims } from '@/lib/questClaims';
 import Fly from '@/components/ui/fly';
@@ -155,6 +156,16 @@ export function useTaskData({
     revalidateOnFocus: false,
   });
 
+  // Wallet balance lives in the inventory summary cache, which every
+  // fly-granting flow (task rewards, quest claims, shop, friends) patches;
+  // todayData's flyStatus only refreshes on task fetches and goes stale when
+  // flies arrive from elsewhere.
+  const { data: inventorySummary } = useSWR<{
+    wardrobe?: { flies?: number };
+  }>(user ? INVENTORY_SUMMARY_KEY : null, bootstrapFetcher, {
+    revalidateOnFocus: false,
+  });
+
   // --- External Event Listeners ---
   useEffect(() => {
     const handleUpdate = () => {
@@ -247,12 +258,17 @@ export function useTaskData({
   );
 
   const weeklyIds = new Set(todayData?.weeklyIds || []);
-  const flyStatus = todayData?.flyStatus || {
+  const summaryFlies = inventorySummary?.wardrobe?.flies;
+  const baseFlyStatus = todayData?.flyStatus || {
     balance: 0,
     earnedToday: 0,
     limit: 50,
     limitHit: false,
   };
+  const flyStatus =
+    typeof summaryFlies === 'number' && Number.isFinite(summaryFlies)
+      ? { ...baseFlyStatus, balance: summaryFlies }
+      : baseFlyStatus;
   const hungerStatus = todayData?.hungerStatus || {
     hunger: 0,
     stolenFlies: 0,
@@ -506,6 +522,7 @@ export function useTaskData({
             }),
           });
         });
+        void notifyQuestClaims(showNotification);
       } catch (e) {
         console.error('Move to backlog failed', e);
         // Rollback
@@ -669,6 +686,7 @@ export function useTaskData({
           }),
         });
         cancelNotification(taskId);
+        void notifyQuestClaims(showNotification);
       } catch (e) {
         console.error('Delete failed', e);
         // Rollback
@@ -680,7 +698,7 @@ export function useTaskData({
         });
       }
     },
-    [todayData, tasks, mutateToday, dateStr],
+    [todayData, tasks, mutateToday, dateStr, showNotification],
   );
 
   /**
@@ -749,13 +767,22 @@ export function useTaskData({
           body: JSON.stringify({ taskId, deleteSeries: true, timezone: tz }),
         });
         cancelNotification(taskId);
+        void notifyQuestClaims(showNotification);
       } catch (e) {
         console.error('Delete series failed', e);
         if (prevToday) mutateToday(prevToday, { revalidate: false });
         if (prevBacklog) mutateBacklog(prevBacklog, { revalidate: false });
       }
     },
-    [todayData, backlogData, mutateToday, mutateBacklog, tz, cancelNotification],
+    [
+      todayData,
+      backlogData,
+      mutateToday,
+      mutateBacklog,
+      tz,
+      cancelNotification,
+      showNotification,
+    ],
   );
 
   /**

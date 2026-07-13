@@ -36,6 +36,12 @@ interface UIState {
 
   wardrobeTab: string;
   setWardrobeTab: (tab: string) => void;
+
+  activeHint: { guideId: string; stepIndex: number; runId: number } | null;
+  startHintGuide: (guideId: string) => void;
+  advanceHintStep: () => void;
+  goToHintStep: (stepIndex: number) => void;
+  dismissHintGuide: () => void;
 }
 
 export const useUIStore = create<UIState>()(
@@ -76,6 +82,28 @@ export const useUIStore = create<UIState>()(
 
       wardrobeTab: 'inventory',
       setWardrobeTab: (tab: string) => set({ wardrobeTab: tab }),
+
+      activeHint: null,
+      startHintGuide: (guideId: string) =>
+        set({ activeHint: { guideId, stepIndex: 0, runId: Date.now() } }),
+      advanceHintStep: () =>
+        set((state) =>
+          state.activeHint
+            ? {
+                activeHint: {
+                  ...state.activeHint,
+                  stepIndex: state.activeHint.stepIndex + 1,
+                },
+              }
+            : {},
+        ),
+      goToHintStep: (stepIndex: number) =>
+        set((state) =>
+          state.activeHint
+            ? { activeHint: { ...state.activeHint, stepIndex } }
+            : {},
+        ),
+      dismissHintGuide: () => set({ activeHint: null }),
     }),
     {
       name: 'frogress-ui-storage',

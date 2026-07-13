@@ -8,7 +8,7 @@ import QuestModel from '@/lib/models/Quest';
 import ReferralModel from '@/lib/models/Referral';
 import { getAdminAuth } from '@/lib/firebaseAdmin';
 import connectMongo from '@/lib/mongoose';
-import { MAX_HUNGER_MS } from '@/lib/hungerLogic';
+import { MAX_HUNGER_MS, TASK_HUNGER_REWARD_MS } from '@/lib/hungerLogic';
 import { getZonedToday } from '@/lib/utils';
 import { v4 as uuid } from 'uuid';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
@@ -120,7 +120,7 @@ export async function POST(req: NextRequest) {
         equipped: {},
         inventory: {},
         flies: 0,
-        hunger: MAX_HUNGER_MS,
+        hunger: MAX_HUNGER_MS - 2 * TASK_HUNGER_REWARD_MS,
         lastHungerUpdate: now,
         stolenFlies: 0,
       },

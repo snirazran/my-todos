@@ -267,7 +267,7 @@ export function FrogDisplay({
         {/* Hunger: state label + 6 fly-meal pips (each pip = 8h) */}
         <div className="relative flex items-center w-full h-full px-3">
           {typeof hunger === 'number' ? (
-            <div className="flex items-center gap-2.5 w-full">
+            <div className="flex items-center gap-2.5 w-full" data-hint="hunger-bar">
               <span
                 className={cn(
                   'w-[64px] shrink-0 text-[11px] font-black tracking-[0.06em] whitespace-nowrap transition-colors duration-300',

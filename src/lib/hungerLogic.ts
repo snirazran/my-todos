@@ -2,6 +2,10 @@ import { UserDoc } from '@/lib/types/UserDoc';
 
 export const MAX_HUNGER_MS = 48 * 60 * 60 * 1000; // 48 hours (6 units * 8h)
 export const TASK_HUNGER_REWARD_MS = 8 * 60 * 60 * 1000; // 8 hours (1 unit)
+// Continuous drain means a task's +8h almost never lands exactly on MAX; the
+// belly pips round up visually, so awards within half a pip snap to full to
+// match what the user sees.
+export const HUNGER_FULL_SNAP_MS = 4 * 60 * 60 * 1000;
 export const PENALTY_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 export const FLIES_PER_PENALTY = 1;
 export const HUNGRY_MOOD_THRESHOLD = 0.2;

@@ -349,8 +349,12 @@ function progressForLogicBlock(args: {
   }
 
   if (block.action === 'add') {
-    return countAddedTasks(tasks, timezone, startDate, endDate, (task) =>
-      matchesLogicBlock(task, block),
+    return countAddedTasks(
+      tasks,
+      timezone,
+      startDate,
+      endDate,
+      (task) => !task.isStarter && matchesLogicBlock(task, block),
     );
   }
 
@@ -1025,6 +1029,7 @@ export async function syncQuestState(args: {
         createdAt: 1,
         tags: 1,
         frogodoroSessions: 1,
+        isStarter: 1,
       },
     ).lean<TaskDoc[]>(),
     includeCatalog

@@ -428,6 +428,17 @@ const SortableTaskItem = React.forwardRef<
         // overflow setting, only its children's are.
         className={`relative mb-1.5 w-full rounded-xl shadow-[0_1px_2px_rgba(0,0,0,0.12)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.5)] md:mb-2 ${isDragging ? 'z-30' : isMenuOpen ? 'z-50 border border-primary/30' : 'z-auto'}`}
         data-is-active={!isDone}
+        data-hint={isDone ? undefined : 'task-row'}
+        data-savable={
+          !isDone &&
+          !isWeekly &&
+          !task.isStarter &&
+          (task.repeatMode ?? 'none') === 'none' &&
+          !task.repeatGroupId &&
+          onDoLater
+            ? 'true'
+            : undefined
+        }
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={isExitingLater ? { opacity: 1 } : { opacity: 0 }}
@@ -1358,6 +1369,7 @@ export default function TaskList({
                   }
                   className="w-full flex items-center gap-1.5 px-2 py-2 border border-dashed border-muted-foreground/20 bg-muted/5 hover:bg-muted/10 rounded-xl transition-all cursor-pointer group disabled:pointer-events-none"
                   disabled={quickAddOpen}
+                  data-hint="add-task"
                 >
                   <div className="flex items-center justify-center w-11 h-11 rounded-full bg-muted border border-muted-foreground/10 shrink-0 md:w-12 md:h-12">
                     <Plus className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors md:w-6 md:h-6" strokeWidth={2.5} />
@@ -1516,6 +1528,7 @@ export default function TaskList({
               onClick={() => onAddRequested('', null, { preselectToday: true })}
               disabled={quickAddOpen}
               className="group relative flex w-full items-center gap-1 px-2.5 py-2.5 rounded-xl border border-dashed border-muted-foreground/20 bg-muted/5 cursor-pointer hover:bg-muted/10 transition-all active:scale-[0.99] disabled:pointer-events-none disabled:opacity-0 md:px-3.5 md:py-3.5"
+              data-hint="add-task"
             >
               {/* Spacer matching the task grip column so the label lines up with task text */}
               <span aria-hidden className="flex-shrink-0 w-2.5 md:w-3" />

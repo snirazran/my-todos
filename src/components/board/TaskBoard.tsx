@@ -9,6 +9,7 @@ import React, {
 } from 'react';
 import { usePathname } from 'next/navigation';
 import { randomUUID } from '@/lib/uuid';
+import { BACKLOG_CLOSED_EVENT } from '@/lib/hints/guides';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   ArrowDownToLine,
@@ -1874,7 +1875,10 @@ export default function TaskBoard({
 
       <BacklogTray
         isOpen={backlogOpen}
-        onClose={() => setBacklogOpen(false)}
+        onClose={() => {
+          setBacklogOpen(false);
+          window.dispatchEvent(new Event(BACKLOG_CLOSED_EVENT));
+        }}
         tasks={backlog}
         onGrab={onGrab}
         setCardRef={setCardRef}

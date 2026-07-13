@@ -135,6 +135,64 @@
     opacity: 0;
   }
 }
+/* Reward reveal juice — compositor-only (transform/opacity) so it stays
+   smooth on phones. */
+@keyframes reward-pop {
+  0% {
+    transform: scale(0.85);
+    opacity: 0;
+  }
+  55% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+@keyframes bar-shine {
+  0% {
+    transform: translateX(-130%) skewX(-14deg);
+  }
+  100% {
+    transform: translateX(380%) skewX(-14deg);
+  }
+}
+/* Ambient version: one sweep, then rest for most of the cycle. */
+@keyframes bar-shine-idle {
+  0% {
+    transform: translateX(-140%) skewX(-14deg);
+  }
+  38% {
+    transform: translateX(340%) skewX(-14deg);
+  }
+  100% {
+    transform: translateX(340%) skewX(-14deg);
+  }
+}
+@keyframes hint-swipe-right {
+  0%,
+  100% {
+    transform: translateX(-8px);
+    opacity: 0.35;
+  }
+  50% {
+    transform: translateX(16px);
+    opacity: 1;
+  }
+}
+@keyframes hint-swipe-left {
+  0%,
+  100% {
+    transform: translateX(8px);
+    opacity: 0.35;
+  }
+  50% {
+    transform: translateX(-16px);
+    opacity: 1;
+  }
+}
 @keyframes shimmer {
   0% {
     background-position: -200% center;

@@ -1229,6 +1229,7 @@ function WardrobeManagerContent({
                   value="inventory"
                   className={tabTriggerClass}
                   onClick={scrollPageToTop}
+                  data-hint="wardrobe-inventory-tab"
                 >
                   <Shirt className="w-4 h-4" />
                   <span className="hidden xs:inline">Wardrobe</span>
@@ -1238,6 +1239,7 @@ function WardrobeManagerContent({
                   value="shop"
                   className={tabTriggerClass}
                   onClick={scrollPageToTop}
+                  data-hint="wardrobe-shop-tab"
                 >
                   <ShoppingBag className="w-4 h-4" />
                   <span>Shop</span>
@@ -1246,6 +1248,7 @@ function WardrobeManagerContent({
                   value="trade"
                   className={tabTriggerClass}
                   onClick={scrollPageToTop}
+                  data-hint="wardrobe-trade-tab"
                 >
                   <Repeat className="w-4 h-4" />
                   <span>Trade</span>

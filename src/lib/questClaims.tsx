@@ -1,11 +1,15 @@
 'use client';
 
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useReducer, useRef, useState, type ReactNode } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { mutate } from 'swr';
 import { Check } from 'lucide-react';
 import type { QuestRewardCatalogItem } from '@/components/ui/QuestCards';
+import {
+  enqueueQuestRewardReveal,
+  type RevealCatalog,
+} from '@/components/ui/questRewardReveal';
 
 const RewardTile = dynamic(
   () => import('@/components/ui/QuestCards').then((m) => m.RewardTile),
@@ -23,11 +27,13 @@ export type ObjectiveTagChip = {
 export type Claimable = {
   id: string;
   questId?: string;
+  objectiveId?: string;
   kind: 'objective' | 'season';
   placement?: 'daily' | 'category' | 'onboarding';
   categoryName?: string;
   objectiveLabel?: string;
   tags?: ObjectiveTagChip[];
+  seasonId?: string;
   seasonName?: string;
   day?: number;
   reward?: any;
@@ -46,6 +52,7 @@ export type Trackable = {
   target: number;
   reward?: any;
   hint?: string;
+  guideId?: string;
 };
 
 type ShowNotification = (
@@ -131,8 +138,35 @@ export async function seedQuestClaims(): Promise<void> {
   }
 }
 
+// Silently re-sync the home-view cache and baselines after quest state
+// changed elsewhere (quests-page claims), so returning to the home strip
+// never flashes the stale pre-claim payload — and never toasts.
+export async function refreshQuestHomeView(): Promise<void> {
+  const data = await fetchHome();
+  if (data) {
+    baseline = new Set(data.claimables.map((c) => c.id));
+    progressBaseline = toProgressMap(data.trackables);
+  }
+}
+
+// Keep the full quests-page cache in step with the home view. Without this,
+// navigating to /quests right after progressing a quest paints the stale
+// cached payload first (old progress), then revalidates — replaying the
+// fill/celebration animation from zero.
+export function primeQuestsPageCache(): void {
+  const key = `/api/quests?timezone=${encodeURIComponent(currentTimezone())}`;
+  fetch(key)
+    .then(async (res) => {
+      if (!res.ok) return;
+      const data = await res.json();
+      mutate(key, data, { revalidate: false });
+    })
+    .catch(() => {});
+}
+
 export async function notifyQuestClaims(show: ShowNotification): Promise<void> {
   const data = await fetchHome();
+  primeQuestsPageCache();
   if (!data) return;
   const ids = new Set(data.claimables.map((c) => c.id));
   const prev = baseline;
@@ -221,6 +255,7 @@ export function QuestRewardTileBadge({
         className="h-12 w-12 rounded-xl"
         frogClassName="-translate-y-[18%]"
         flySize={30}
+        flyOversample={1.25}
         giftAnimation="box_shake"
       />
       <span className="absolute -right-0.5 -top-1 z-20 flex min-w-4 items-center justify-center rounded-sm border border-white/10 bg-black/50 px-1 py-0.5 text-[8px] font-bold uppercase tracking-wide text-white shadow-sm backdrop-blur-sm">
@@ -299,7 +334,13 @@ export function QuestProgressBar({
   );
 }
 
-export function HintButton({ text }: { text: string }) {
+export function HintButton({
+  text,
+  onShowMe,
+}: {
+  text: string;
+  onShowMe?: () => void;
+}) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLSpanElement | null>(null);
 
@@ -332,12 +373,63 @@ export function HintButton({ text }: { text: string }) {
         Hint
       </button>
       {open && (
-        <span className="absolute bottom-full right-0 z-30 mb-2 w-56 rounded-xl border border-border bg-popover px-3 py-2 text-left text-xs font-medium normal-case tracking-normal leading-snug text-popover-foreground shadow-lg">
+        <span
+          className="absolute bottom-full right-0 z-30 mb-2 flex w-56 flex-col gap-2 rounded-xl border border-border bg-popover px-3 py-2 text-left text-xs font-medium normal-case tracking-normal leading-snug text-popover-foreground shadow-lg"
+          onClick={(event) => event.stopPropagation()}
+        >
           {text}
+          {onShowMe && (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                setOpen(false);
+                onShowMe();
+              }}
+              className="inline-flex h-8 items-center justify-center self-start rounded-lg bg-amber-500 px-3 text-[11px] font-black uppercase tracking-wide text-white shadow-[0_2px_0_0_#b45309] transition-all active:translate-y-[1px] active:shadow-none"
+            >
+              Show me
+            </button>
+          )}
         </span>
       )}
     </span>
   );
+}
+
+// Completion reveal: when an objective finishes while the user is watching,
+// hold the "done" styling back briefly so the progress bar visibly fills to
+// 100% first, then flip. Objectives that are already complete when first
+// rendered (page load, navigation) flip instantly. Module-level state keeps
+// the answer consistent across every component watching the same objective.
+const REVEAL_DELAY_MS = 1000;
+const revealSeenIncomplete = new Set<string>();
+const revealCompletedAt = new Map<string, number>();
+
+export function useCompletionReveal(id: string, complete: boolean): boolean {
+  const [, forceRender] = useReducer((n: number) => n + 1, 0);
+
+  if (!complete) {
+    revealSeenIncomplete.add(id);
+    revealCompletedAt.delete(id);
+  } else if (revealSeenIncomplete.has(id) && !revealCompletedAt.has(id)) {
+    revealCompletedAt.set(id, Date.now());
+  }
+
+  const completedAt = revealCompletedAt.get(id);
+  const revealed =
+    complete &&
+    (completedAt === undefined || Date.now() - completedAt >= REVEAL_DELAY_MS);
+
+  useEffect(() => {
+    if (!complete || revealed) return;
+    const at = revealCompletedAt.get(id) ?? Date.now();
+    const remaining = Math.max(0, REVEAL_DELAY_MS - (Date.now() - at)) + 30;
+    const timer = window.setTimeout(forceRender, remaining);
+    return () => window.clearTimeout(timer);
+  }, [id, complete, revealed]);
+
+  return revealed;
 }
 
 export function objectiveCardTone(complete: boolean) {
@@ -375,10 +467,21 @@ export function ObjectiveProgressBar({
     >
       <div className="absolute inset-[3px]">
         <div
-          className={`h-full min-w-4 rounded-full transition-all duration-500 ${done ? 'bg-lime-600' : 'bg-amber-400'}`}
-          style={{ width: pct > 0 ? `${pct}%` : '1rem' }}
-        />
+          className={`relative h-full min-w-8 overflow-hidden rounded-full transition-all duration-500 ${done ? 'bg-lime-600' : 'bg-amber-400'}`}
+          style={{ width: pct > 0 ? `${pct}%` : '2rem' }}
+        >
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-y-0 left-0 w-1/2 bg-white/30 animate-[bar-shine-idle_2.8s_ease-in-out_infinite] motion-reduce:hidden"
+          />
+        </div>
       </div>
+      {done && (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-y-0 left-0 w-1/3 bg-white/40 animate-[bar-shine_0.7s_ease-out_0.35s_both] motion-reduce:hidden"
+        />
+      )}
       <span className="absolute inset-0 flex items-center justify-center text-[10px] font-black tabular-nums text-foreground/70">
         {countLabel}
       </span>
@@ -423,11 +526,63 @@ function ClaimRewardToast({
   isPremium: boolean;
 }) {
   const router = useRouter();
+  const [claiming, setClaiming] = useState(false);
   const goToQuest = () => {
     if (claimable.kind === 'objective' && claimable.questId) {
       setQuestScrollTarget(claimable.questId);
     }
     router.push('/quests');
+  };
+  // Claims right here — the global reveal host plays the reward popup on
+  // whichever page the toast was tapped from.
+  const handleClaimPress = async (event: React.MouseEvent) => {
+    event.stopPropagation();
+    if (claiming) return;
+    const timezone = currentTimezone();
+    const request =
+      claimable.kind === 'objective' &&
+      claimable.questId &&
+      claimable.objectiveId
+        ? {
+            url: '/api/quests/claim-objective',
+            body: {
+              questId: claimable.questId,
+              objectiveId: claimable.objectiveId,
+              timezone,
+            },
+          }
+        : claimable.kind === 'season' && claimable.seasonId
+          ? {
+              url: '/api/quests/season/claim',
+              body: { seasonId: claimable.seasonId, timezone },
+            }
+          : null;
+    if (!request) {
+      goToQuest();
+      return;
+    }
+    setClaiming(true);
+    try {
+      const res = await fetch(request.url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request.body),
+      });
+      const payload = await res.json();
+      if (!res.ok) throw new Error(payload.error || 'Claim failed');
+      enqueueQuestRewardReveal(payload.rewardSummary, {
+        catalog: catalog as RevealCatalog,
+        isPremium,
+        showFlyGainPill: window.location.pathname !== '/',
+      });
+      primeQuestsPageCache();
+      await refreshQuestHomeView();
+    } catch {
+      primeQuestsPageCache();
+      await refreshQuestHomeView();
+    } finally {
+      setClaiming(false);
+    }
   };
   return (
     <div
@@ -462,10 +617,11 @@ function ClaimRewardToast({
       </div>
       <button
         type="button"
-        onClick={goToQuest}
-        className="inline-flex h-9 shrink-0 items-center justify-center rounded-xl bg-amber-500 px-4 text-[10px] font-black uppercase tracking-[0.15em] text-white shadow-[0_3px_0_0_#b45309] transition-all hover:translate-y-[-1px] hover:shadow-[0_4px_0_0_#b45309] active:translate-y-[2px] active:shadow-none"
+        disabled={claiming}
+        onClick={(event) => void handleClaimPress(event)}
+        className="inline-flex h-9 shrink-0 items-center justify-center rounded-xl bg-amber-500 px-4 text-[10px] font-black uppercase tracking-[0.15em] text-white shadow-[0_3px_0_0_#b45309] transition-all hover:translate-y-[-1px] hover:shadow-[0_4px_0_0_#b45309] active:translate-y-[2px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60"
       >
-        <span className="mr-[-0.15em]">Claim</span>
+        <span className="mr-[-0.15em]">{claiming ? '...' : 'Claim'}</span>
       </button>
     </div>
   );

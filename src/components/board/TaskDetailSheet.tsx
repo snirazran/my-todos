@@ -847,6 +847,7 @@ export default function TaskDetailSheet({
                       icon={
                         <AppIcon name="clock" label="Focus" className="h-6 w-6" />
                       }
+                      dataHint="focus-button"
                     />
                   )}
                   {isRepeating && onSkipToday ? (
@@ -866,6 +867,7 @@ export default function TaskDetailSheet({
                           className="h-5 w-5"
                         />
                       }
+                      dataHint="save-later-button"
                     />
                   ) : null}
                 </div>
@@ -924,14 +926,17 @@ function SecondaryButton({
   label,
   icon,
   onClick,
+  dataHint,
 }: {
   label: string;
   icon: React.ReactNode;
   onClick: () => void;
+  dataHint?: string;
 }) {
   return (
     <button
       onClick={onClick}
+      data-hint={dataHint}
       className="flex h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-[22px] bg-popover text-[14px] font-black text-foreground ring-1 ring-border/80 shadow-[0_3px_0_0_rgba(0,0,0,0.18)] transition-all active:translate-y-0.5 active:shadow-none [@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:shadow-[0_4px_0_0_rgba(0,0,0,0.18)]"
     >
       {icon}
