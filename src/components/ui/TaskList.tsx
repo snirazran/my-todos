@@ -429,6 +429,7 @@ const SortableTaskItem = React.forwardRef<
         className={`relative mb-1.5 w-full rounded-xl shadow-[0_1px_2px_rgba(0,0,0,0.12)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.5)] md:mb-2 ${isDragging ? 'z-30' : isMenuOpen ? 'z-50 border border-primary/30' : 'z-auto'}`}
         data-is-active={!isDone}
         data-hint={isDone ? undefined : 'task-row'}
+        data-tag-ids={isDone ? undefined : task.tags?.join(',') || undefined}
         data-savable={
           !isDone &&
           !isWeekly &&

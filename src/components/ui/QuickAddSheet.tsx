@@ -1011,6 +1011,9 @@ export default function QuickAddSheet({
                               key={tag.id}
                               type="button"
                               title="Hold to edit"
+                              data-hint="quickadd-tag"
+                              data-tag-id={tag.id}
+                              data-selected={selected ? 'true' : undefined}
                               onPointerDown={(e) => {
                                 // Keep the textarea focused so mobile browsers do
                                 // not start hiding the keyboard before `onClick`.

@@ -51,6 +51,10 @@ export type HintStep = {
   // on screen — keeps "any task in this list" rings from appearing around an
   // empty list while the user is still creating the first task.
   requirePresent?: string;
+  // Narrow skipWhenPresent / requirePresent by the elements' data-tag-id(s)
+  // vs the guide context's tagIds ('hit' = overlap required).
+  skipWhenPresentTagMatch?: 'hit' | 'miss';
+  requirePresentTagMatch?: 'hit' | 'miss';
   // Touching the anchor advances to the next step (default true).
   advanceOnAnchorDown?: boolean;
   // Touching the anchor ends the guide immediately — for steps where
@@ -74,6 +78,20 @@ export type HintStep = {
   flyGlow?: 'all' | 'tagged';
   // Keep the anchor for label placement/advance but don't draw its ring.
   hideRing?: boolean;
+  // Branch: while this step shows, jump to `goTo` the moment a visible
+  // element matches `selector` (e.g. the user opened the task sheet or the
+  // quick-add). tagMatch filters by data-tag-id(s) vs context.tagIds:
+  // 'hit' requires overlap, 'miss' requires none.
+  presentJumps?: {
+    selector: string;
+    goTo: number;
+    tagMatch?: 'hit' | 'miss';
+  }[];
+  // Restrict the anchor search to elements whose data-tag-id(s) overlap the
+  // guide context's tagIds (glowing the RIGHT tag chip).
+  matchTagIds?: boolean;
+  // Touching the anchor jumps to this step instead of advancing by one.
+  goToOnAnchorDown?: number;
   // How long to wait for the anchor before giving up quietly.
   timeoutMs?: number;
 };
@@ -252,25 +270,96 @@ const GUIDES: Record<string, HintGuide> = {
         label: 'Add a task and tag it {tags}',
       },
       {
-        anchor: 'tag-picker',
-        selector: '[data-hint="tag-picker"], [data-hint="task-tags-button"]',
-        label: 'Pick the {tags} tag',
+        anchor: 'quickadd-tag',
+        matchTagIds: true,
+        label: 'Pick this tag',
         timeoutMs: 90_000,
       },
     ],
   },
+  // Branching flow: glowing flies mark already-tagged tasks; opening an
+  // untagged task detours through its Tags button → the right chip in the
+  // tags popup; the quick-add path glows the right chip in the strip. Both
+  // detours land back on the fly-glow step once the tag is on.
   'complete-tagged-task': {
     id: 'complete-tagged-task',
     steps: [
       {
         href: '/',
+        anchor: 'add-task',
+        label: 'Add a task and tag it {tags}',
+        skipWhenPresent: '[data-hint="task-fly"]',
+        outsideInteractionCancels: false,
+        presentJumps: [{
+            selector:
+              '[data-hint="quickadd-tag"]:not([data-selected="true"])',
+            tagMatch: 'hit',
+            goTo: 5,
+          }],
+      },
+      {
         anchor: 'task-list',
         label:
-          'Finish any task tagged {tags} — or add one and tag it',
+          'No task is tagged {tags} yet — open one and tag it, or add a new one',
+        skipWhenPresent: '[data-hint="task-fly"]',
+        skipWhenPresentTagMatch: 'hit',
+        outsideInteractionCancels: false,
+        advanceOnAnchorDown: false,
+        presentJumps: [
+          {
+            selector: '[data-hint="task-tags-button"]',
+            tagMatch: 'miss',
+            goTo: 3,
+          },
+          {
+            selector:
+              '[data-hint="quickadd-tag"]:not([data-selected="true"])',
+            tagMatch: 'hit',
+            goTo: 5,
+          },
+        ],
+        timeoutMs: 120_000,
+      },
+      {
+        anchor: 'task-list',
+        label: 'Finish any task tagged {tags}',
         requirePresent: '[data-hint="task-fly"]',
+        requirePresentTagMatch: 'hit',
         flyGlow: 'tagged',
         hideRing: true,
-        alsoAdvanceOn: '[data-hint="add-task"]',
+        outsideInteractionCancels: false,
+        presentJumps: [
+          {
+            selector: '[data-hint="task-tags-button"]',
+            tagMatch: 'miss',
+            goTo: 3,
+          },
+          {
+            selector:
+              '[data-hint="quickadd-tag"]:not([data-selected="true"])',
+            tagMatch: 'hit',
+            goTo: 5,
+          },
+        ],
+        timeoutMs: 120_000,
+      },
+      {
+        anchor: 'task-tags-button',
+        label: 'Tag it {tags} first',
+        timeoutMs: 60_000,
+      },
+      {
+        anchor: 'tags-popup-tag',
+        matchTagIds: true,
+        label: 'Pick this tag',
+        goToOnAnchorDown: 2,
+        timeoutMs: 60_000,
+      },
+      {
+        anchor: 'quickadd-tag',
+        matchTagIds: true,
+        label: 'Pick this tag',
+        goToOnAnchorDown: 2,
         timeoutMs: 90_000,
       },
     ],
@@ -283,6 +372,36 @@ const GUIDES: Record<string, HintGuide> = {
         anchor: 'add-task',
         label: 'Add a task tagged {tags} to focus on',
         skipWhenPresent: '[data-hint="task-row"]',
+        outsideInteractionCancels: false,
+        presentJumps: [{
+            selector:
+              '[data-hint="quickadd-tag"]:not([data-selected="true"])',
+            tagMatch: 'hit',
+            goTo: 5,
+          }],
+      },
+      {
+        anchor: 'task-list',
+        label:
+          'No task is tagged {tags} yet — open one and tag it, or add a new one',
+        skipWhenPresent: '[data-hint="task-row"]',
+        skipWhenPresentTagMatch: 'hit',
+        outsideInteractionCancels: false,
+        advanceOnAnchorDown: false,
+        presentJumps: [
+          {
+            selector: '[data-hint="task-tags-button"]',
+            tagMatch: 'miss',
+            goTo: 3,
+          },
+          {
+            selector:
+              '[data-hint="quickadd-tag"]:not([data-selected="true"])',
+            tagMatch: 'hit',
+            goTo: 5,
+          },
+        ],
+        timeoutMs: 120_000,
       },
       {
         anchor: 'task-list',
@@ -290,6 +409,46 @@ const GUIDES: Record<string, HintGuide> = {
         labelCoarse: 'Swipe a task tagged {tags} right — or tap to open it',
         gesture: 'swipe-right',
         requirePresent: '[data-hint="task-row"]',
+        requirePresentTagMatch: 'hit',
+        outsideInteractionCancels: false,
+        advanceOnAnchorDown: false,
+        presentJumps: [
+          {
+            selector: '[data-hint="task-tags-button"]',
+            tagMatch: 'miss',
+            goTo: 3,
+          },
+          {
+            selector: '[data-hint="task-tags-button"]',
+            tagMatch: 'hit',
+            goTo: 6,
+          },
+          {
+            selector:
+              '[data-hint="quickadd-tag"]:not([data-selected="true"])',
+            tagMatch: 'hit',
+            goTo: 5,
+          },
+        ],
+        timeoutMs: 120_000,
+      },
+      {
+        anchor: 'task-tags-button',
+        label: 'Tag it {tags} first',
+        timeoutMs: 60_000,
+      },
+      {
+        anchor: 'tags-popup-tag',
+        matchTagIds: true,
+        label: 'Pick this tag',
+        goToOnAnchorDown: 6,
+        timeoutMs: 60_000,
+      },
+      {
+        anchor: 'quickadd-tag',
+        matchTagIds: true,
+        label: 'Pick this tag',
+        goToOnAnchorDown: 2,
         timeoutMs: 90_000,
       },
       {

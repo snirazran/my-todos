@@ -173,6 +173,8 @@ export function TagsView({
                 <button
                   key={st.id}
                   type="button"
+                  data-hint="tags-popup-tag"
+                  data-tag-id={st.id}
                   onPointerDown={(e) => startLongPress(st, e)}
                   onPointerMove={moveLongPress}
                   onPointerUp={cancelLongPress}

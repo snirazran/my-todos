@@ -740,7 +740,11 @@ export default function TaskDetailSheet({
                           </ToolbarIconButton>
                         )}
                         {onAddTags && (
-                          <span data-hint="task-tags-button" className="inline-flex">
+                          <span
+                            data-hint="task-tags-button"
+                            data-tag-ids={taskTags.join(',') || undefined}
+                            className="inline-flex"
+                          >
                             <ToolbarIconButton
                               label="Tags"
                               active={taskTags.length > 0}

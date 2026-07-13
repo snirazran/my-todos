@@ -30,6 +30,20 @@ function measure(el: HTMLElement): Rect {
   return { top: r.top, left: r.left, width: r.width, height: r.height };
 }
 
+function elementTagIds(el: HTMLElement): string[] {
+  const raw = el.dataset.tagIds ?? el.dataset.tagId ?? '';
+  return raw.split(',').filter(Boolean);
+}
+
+function tagCondition(
+  el: HTMLElement,
+  contextTagIds: string[],
+  match: 'hit' | 'miss',
+): boolean {
+  const overlap = elementTagIds(el).some((id) => contextTagIds.includes(id));
+  return match === 'hit' ? overlap : !overlap;
+}
+
 // True when the element is genuinely on screen for the user: rendered,
 // non-hidden, and (only when acquiring — checkCover) the top-most content at
 // its center. The cover check keeps the finder from latching onto a closed
@@ -180,6 +194,37 @@ export function HintCoach() {
     return () => window.removeEventListener(event, onEvent);
   }, [stepKey, step, goToHintStep]);
 
+  // Presence-driven branches: jump when a surface the user opened (task
+  // sheet, quick-add) shows a matching element. Delayed slightly so a sheet
+  // that is merely mounted-but-closing can't trigger it.
+  useEffect(() => {
+    if (!step?.presentJumps?.length || !stepKey) return;
+    const contextTagIds = activeHint?.context?.tagIds ?? [];
+    const check = () => {
+      for (const jump of step.presentJumps!) {
+        const found = Array.from(
+          document.querySelectorAll<HTMLElement>(jump.selector),
+        ).some((candidate) => {
+          if (
+            jump.tagMatch &&
+            !tagCondition(candidate, contextTagIds, jump.tagMatch)
+          ) {
+            return false;
+          }
+          // Cover-checked: a surface that is merely mounted behind another
+          // sheet (task sheet under the tags popup) must not trigger jumps.
+          return isUsableAnchor(candidate, measure(candidate), true);
+        });
+        if (found) {
+          goToHintStep(jump.goTo);
+          return;
+        }
+      }
+    };
+    const interval = window.setInterval(check, 300);
+    return () => window.clearInterval(interval);
+  }, [stepKey, step, activeHint?.context, goToHintStep]);
+
   // Once a step has shown its target, losing it means the user backed out of
   // the surface it lived on (closed the sheet without acting). A short grace
   // window lets list re-renders re-attach; past that, the guide cancels
@@ -197,9 +242,16 @@ export function HintCoach() {
     if (step.href && pathname !== step.href) return;
 
     if (!hadAnchorRef.current && step.skipWhenPresent) {
+      const skipTagIds = activeHint?.context?.tagIds ?? [];
       const alreadyPresent = Array.from(
         document.querySelectorAll<HTMLElement>(step.skipWhenPresent),
       ).some((candidate) => {
+        if (
+          step.skipWhenPresentTagMatch &&
+          !tagCondition(candidate, skipTagIds, step.skipWhenPresentTagMatch)
+        ) {
+          return false;
+        }
         const r = candidate.getBoundingClientRect();
         return r.width > 0 && r.height > 0;
       });
@@ -216,18 +268,32 @@ export function HintCoach() {
     const startedAt = Date.now();
     const find = () => {
       if (step.requirePresent) {
+        const requireTagIds = activeHint?.context?.tagIds ?? [];
         const present = Array.from(
           document.querySelectorAll<HTMLElement>(step.requirePresent),
         ).some((candidate) => {
+          if (
+            step.requirePresentTagMatch &&
+            !tagCondition(candidate, requireTagIds, step.requirePresentTagMatch)
+          ) {
+            return false;
+          }
           const r = candidate.getBoundingClientRect();
           return r.width > 0 && r.height > 0;
         });
         if (!present) return false;
       }
+      const contextTagIds = activeHint?.context?.tagIds ?? [];
       const candidates = Array.from(
         document.querySelectorAll<HTMLElement>(selector),
       );
       for (const candidate of candidates) {
+        if (
+          step.matchTagIds &&
+          !tagCondition(candidate, contextTagIds, 'hit')
+        ) {
+          continue;
+        }
         const r = measure(candidate);
         if (isUsableAnchor(candidate, r, step.coverCheck !== false)) {
           hadAnchorRef.current = true;
@@ -283,6 +349,16 @@ export function HintCoach() {
         !Array.from(
           document.querySelectorAll<HTMLElement>(step.requirePresent),
         ).some((candidate) => {
+          if (
+            step.requirePresentTagMatch &&
+            !tagCondition(
+              candidate,
+              activeHint?.context?.tagIds ?? [],
+              step.requirePresentTagMatch,
+            )
+          ) {
+            return false;
+          }
           const r = candidate.getBoundingClientRect();
           return r.width > 0 && r.height > 0;
         });
@@ -393,6 +469,10 @@ export function HintCoach() {
           return;
         }
         if (step?.advanceOnAnchorDown === false) return;
+        if (typeof step?.goToOnAnchorDown === 'number') {
+          goToHintStep(step.goToOnAnchorDown);
+          return;
+        }
         if (isLastStep) dismissHintGuide();
         else advanceHintStep();
         return;
@@ -413,7 +493,15 @@ export function HintCoach() {
     document.addEventListener('pointerdown', onPointerDown, true);
     return () =>
       document.removeEventListener('pointerdown', onPointerDown, true);
-  }, [el, step, isLastStep, isSingleStep, advanceHintStep, dismissHintGuide]);
+  }, [
+    el,
+    step,
+    isLastStep,
+    isSingleStep,
+    advanceHintStep,
+    goToHintStep,
+    dismissHintGuide,
+  ]);
 
   const borderRadius = useMemo(() => {
     if (!el) return '16px';

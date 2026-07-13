@@ -309,7 +309,8 @@
       "PowerShell(try { \\(Invoke-WebRequest -Uri 'http://localhost:3000/api/skins/shuffle' -UseBasicParsing -TimeoutSec 5\\).StatusCode } catch { if \\($_.Exception.Response\\) { [int]$_.Exception.Response.StatusCode } else { 'no server' } })",
       "PowerShell(npx tsc --noEmit 2>$null | Select-Object -First 20)",
       "WebFetch(domain:www.joshwcomeau.com)",
-      "Bash(./node_modules/.bin/eslint src/components/ui/HintCoach.tsx src/lib/hints/guides.ts src/lib/uiStore.ts src/lib/questClaims.tsx src/components/ui/NextQuestStrip.tsx)"
+      "Bash(./node_modules/.bin/eslint src/components/ui/HintCoach.tsx src/lib/hints/guides.ts src/lib/uiStore.ts src/lib/questClaims.tsx src/components/ui/NextQuestStrip.tsx)",
+      "Bash(python -c ' *)"
     ]
   }
 }
