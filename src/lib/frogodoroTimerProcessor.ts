@@ -7,6 +7,8 @@ import {
 import { sendTimerControlPush, sendTimerFinishedPush } from '@/lib/notifications/timer';
 import { buildLiveActivityData } from '@/lib/liveActivityData';
 import { scheduleFrogodoroTimerProcessing } from '@/lib/frogodoroDelayedTimer';
+import { timerHuntExtras } from '@/lib/frogodoroSync';
+import { iosAlarmFile } from '@/lib/timerSoundFiles';
 import { publishTimerEvent } from '@/lib/frogodoroEvents';
 import { syncQuestState } from '@/lib/quests/engine';
 import { getZonedToday } from '@/lib/utils';
@@ -281,6 +283,7 @@ async function processOneDueTimer(
           timeLeft: total,
           totalSeconds: total,
           taskName: '',
+          ...timerHuntExtras(nextTimer, now.getTime()),
         },
         now.getTime(),
       );
@@ -295,6 +298,7 @@ async function processOneDueTimer(
       // (shows "Time's up" + a Done button) rather than ending it. The completed
       // phase drives the label/color; the Done action clears it later.
       const total = getPhaseDuration(next.completedPhase, nextTimer.settings);
+      const extras = timerHuntExtras(nextTimer, now.getTime());
       const data = buildLiveActivityData(
         {
           active: true,
@@ -305,6 +309,7 @@ async function processOneDueTimer(
           timeLeft: 0,
           totalSeconds: total,
           taskName: '',
+          ...extras,
         },
         now.getTime(),
       );
@@ -312,7 +317,14 @@ async function processOneDueTimer(
         pushToken: live.pushToken,
         activityId: live.id,
         data,
-        alert: { title: "Time's up", body: 'Your session finished.' },
+        alert: {
+          title: "Time's up",
+          body:
+            next.completedPhase === 'focus' && extras.fliesCaught > 0
+              ? `${extras.fliesCaught} ${extras.fliesCaught === 1 ? 'fly' : 'flies'} caught — tap Done to collect.`
+              : 'Your session finished.',
+          sound: iosAlarmFile(timer.settings.timerSound),
+        },
       });
     }
   }
@@ -328,9 +340,16 @@ async function processOneDueTimer(
         endTime: new Date(nextTimer.endsAt).getTime(),
         timeLeft: nextTimer.timeLeft,
         taskName: '',
+        rev: nextTimer.rev,
+        ...timerHuntExtras(nextTimer, now.getTime()),
       });
     } else {
-      await sendTimerFinishedPush({ userId, tokens, phase: next.completedPhase });
+      await sendTimerFinishedPush({
+        userId,
+        tokens,
+        phase: next.completedPhase,
+        sound: timer.settings.timerSound,
+      });
     }
   }
 

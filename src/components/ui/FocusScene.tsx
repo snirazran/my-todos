@@ -217,7 +217,7 @@ export function FocusScene({
       {showFlies && (
         <div
           aria-hidden
-          className="pointer-events-none absolute -top-16 inset-x-0 h-32"
+          className="pointer-events-none absolute -top-24 inset-x-0 h-32"
         >
           {FOCUS_DRIFTS.slice(0, flyCount).map((drift, i) => {
             const key = `scene-fly-${i}`;

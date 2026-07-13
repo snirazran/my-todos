@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import { reconcileLiveTimer } from '@/lib/liveTimer';
+import { fliesCaughtFor, deepFocusPledgeLive } from '@/lib/focusFlies';
 
 export function LiveTimerController() {
   const [foregroundTick, setForegroundTick] = useState(0);
@@ -15,6 +16,10 @@ export function LiveTimerController() {
   const awaitingDone = useFrogodoroStore((s) => s.awaitingDone);
   const lastCompletedPhase = useFrogodoroStore((s) => s.lastCompletedPhase);
   const settings = useFrogodoroStore((s) => s.settings);
+  const sessionFocusTime = useFrogodoroStore((s) => s.sessionStats.focusTime);
+  const phaseElapsed = useFrogodoroStore((s) => s.phaseElapsed);
+  const deepFocus = useFrogodoroStore((s) => s.deepFocus);
+  const pausedThisPhase = useFrogodoroStore((s) => s.pausedThisPhase);
 
   // While the alarm is ringing (awaitingDone) keep the activity alive in its
   // finished state — show the phase that just ended, not the queued next one.
@@ -44,6 +49,26 @@ export function LiveTimerController() {
     };
   }, []);
 
+  // Hunt state for the native surfaces — same math as the timer sheet's chip.
+  const liveElapsed =
+    displayPhase === 'focus' ? Math.max(0, totalSeconds - timeLeft) : 0;
+  const sessionFocusLive =
+    sessionFocusTime +
+    (phase === 'focus' && !awaitingDone
+      ? Math.max(0, liveElapsed - phaseElapsed)
+      : 0);
+  const fliesCaught = fliesCaughtFor(sessionFocusLive);
+  const fliesPotential =
+    displayPhase === 'focus'
+      ? fliesCaughtFor(sessionFocusLive + (awaitingDone ? 0 : Math.max(0, timeLeft)))
+      : fliesCaught;
+  const pledgeLive = deepFocusPledgeLive({
+    deepFocus,
+    pausedThisPhase,
+    phase: displayPhase,
+    focusDurationMinutes: settings.focusDuration,
+  });
+
   useEffect(() => {
     void reconcileLiveTimer({
       active,
@@ -54,6 +79,10 @@ export function LiveTimerController() {
       totalSeconds,
       taskName: '',
       finished: awaitingDone,
+      fliesCaught,
+      fliesPotential,
+      deepFocus: pledgeLive,
+      sound: settings.timerSound,
     });
   }, [
     displayPhase,
@@ -64,6 +93,10 @@ export function LiveTimerController() {
     totalSeconds,
     awaitingDone,
     foregroundTick,
+    fliesCaught,
+    fliesPotential,
+    pledgeLive,
+    settings.timerSound,
   ]);
 
   return null;

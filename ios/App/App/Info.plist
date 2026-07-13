@@ -49,6 +49,8 @@
 	<true/>
 	<key>NSSupportsLiveActivitiesFrequentUpdates</key>
 	<true/>
+	<key>NSAlarmKitUsageDescription</key>
+	<string>Frogress rings a real alarm when your focus timer finishes, even in Silent mode.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>

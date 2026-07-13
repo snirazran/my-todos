@@ -4,17 +4,17 @@ import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { FrogHandle } from '@/components/ui/frog';
 import type { TongueRequest } from '@/hooks/useFrogTongue';
+import { useFrogTongue, TONGUE_STROKE } from '@/hooks/useFrogTongue';
 import { DriftFly, FOCUS_DRIFTS } from '@/components/ui/FocusFlyLayer';
 import { entrySideFor } from '@/components/ui/FocusScene';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import { fliesCaughtFor, sceneFlyCount } from '@/lib/focusFlies';
 import { onFocusHunt } from '@/lib/focusHuntBus';
-import { markFlyEarn } from '@/lib/flyEarn';
-import { mutateInventoryCaches } from '@/hooks/useInventory';
 
 export const HOME_FOCUS_FLY_PREFIX = 'home-focus-fly-';
 const MISS_KEY = 'home-focus-miss';
 const BAND_H = 176;
+const FLY_PX = 34;
 
 function visibleRatio(rect: DOMRect): number {
   const vw = window.innerWidth;
@@ -26,16 +26,21 @@ function visibleRatio(rect: DOMRect): number {
 }
 
 /**
- * Live focus-session presence on the home hero, mirroring the timer sheet's
- * FocusScene exactly: same drift choreography (shared FOCUS_DRIFTS), same
- * swarm size, flies freeze in place on pause, and — while the Frogodoro sheet
- * is open — every hunt event the sheet's scene broadcasts (miss lunges and
- * real catches) replays here on the same fly index in the same frame, through
- * the page's task tongue (one shared tongue per frog, so task grabs and focus
- * grabs can never overlap).
+ * Live focus-session presence around a page's own frog (home hero, wardrobe,
+ * friends), mirroring the timer sheet's scene: same drift choreography, same
+ * swarm size, flies freeze in place on pause.
  *
- * These flies ignore the global slide/sheet Rive pause — this layer and the
- * premium companion are the only deliberate exemptions.
+ * Hunting works everywhere: when the Frogodoro sheet is open, this layer
+ * replays the sheet's broadcast hunt events through the provided page tongue
+ * (same fly index, same frame); when the sheet is closed — or on pages with
+ * no tongue of their own — it runs its own miss/catch lunges through an
+ * internal tongue instance. One tongue is in flight at a time either way
+ * (the hook serializes concurrent grabs).
+ *
+ * The fly band is positioned INSIDE the page's frog container (measured once
+ * against the frog's live geometry, like the premium companion fly) so it
+ * scrolls natively with the content — a fixed, per-frame-tracked band
+ * flickers under mobile scrolling.
  */
 export function HomeFocusFlies({
   frogRef,
@@ -45,18 +50,22 @@ export function HomeFocusFlies({
   visuallyDone,
   tongueEnabled = false,
   onSpeech,
+  onGrabActive,
   hidden = false,
 }: {
   frogRef: React.RefObject<FrogHandle | null>;
   frogBoxRef?: React.RefObject<HTMLDivElement | null>;
-  /** The page tongue's shared fly-ref map — this layer registers into it. */
+  /** The page tongue's shared fly-ref map — provided on home, absent on
+   *  wardrobe/friends (an internal tongue instance takes over there). */
   flyRefs?: React.MutableRefObject<Record<string, HTMLElement | null>>;
   triggerTongue?: (req: TongueRequest) => Promise<void>;
   visuallyDone?: Set<string>;
-  /** Frogodoro sheet is open — hunt events mirror through the real tongue. */
+  /** Frogodoro sheet is open — hunt events mirror the sheet's conductor. */
   tongueEnabled?: boolean;
   /** Receives the shared catch line so this surface's bubble matches. */
   onSpeech?: (line: string) => void;
+  /** Mirrors whether the internal tongue is in flight (host opens the mouth). */
+  onGrabActive?: (active: boolean) => void;
   /** Visually suppressed (task-grab cinematic, other panel) — the catch
    *  bookkeeping keeps running so no fly-gain celebration is lost. */
   hidden?: boolean;
@@ -68,28 +77,23 @@ export function HomeFocusFlies({
   const [missPos, setMissPos] = useState<{ x: number; y: number } | null>(null);
   const bandRef = useRef<HTMLDivElement | null>(null);
 
-  // Root anchor: the band tracks the FROG's live viewport geometry (via its
-  // handle), portaled to <body>. Each page wraps its frog in a different
-  // container (full-width hero, bare frog box…), so anchoring to the frog
-  // itself is the only placement that renders identically everywhere.
+  const internalFlyRefs = useRef<Record<string, HTMLElement | null>>({});
+  const ownTongue = useFrogTongue({
+    frogRef,
+    frogBoxRef,
+    flyRefs: internalFlyRefs,
+    durationMs: 950,
+  });
+  const usingOwnTongue = !triggerTongue;
+  const effTrigger = triggerTongue ?? ownTongue.triggerTongue;
+  const effFlyRefs = flyRefs ?? internalFlyRefs;
+  const effVisuallyDone = visuallyDone ?? ownTongue.visuallyDone;
+
+  const ownGrabActive = usingOwnTongue && !!ownTongue.grab;
   useEffect(() => {
-    let raf = 0;
-    const tick = () => {
-      const el = bandRef.current;
-      const box = frogRef.current?.getBoxRect?.();
-      const mouth = frogRef.current?.getMouthPoint?.();
-      if (el && box && mouth && box.width > 0) {
-        const bandW = Math.min(470, window.innerWidth * 0.92);
-        const left = box.left + box.width / 2 - bandW / 2;
-        const top = mouth.y - BAND_H + 42;
-        el.style.width = `${bandW}px`;
-        el.style.transform = `translate(${left}px, ${top}px)`;
-      }
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [frogRef]);
+    if (usingOwnTongue) onGrabActive?.(ownGrabActive);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ownGrabActive, usingOwnTongue]);
 
   const sessionOnFocus = timerActive && phase === 'focus';
   const running = sessionOnFocus && isRunning;
@@ -104,11 +108,55 @@ export function HomeFocusFlies({
   const stateRef = useRef({ tongueEnabled, hidden, running });
   stateRef.current = { tongueEnabled, hidden, running };
 
+  // Positioned inside the frog container, measured against the frog's live
+  // geometry — no per-frame viewport tracking, so scrolling can't flicker it.
+  useEffect(() => {
+    let raf = 0;
+    let tries = 0;
+    const measure = () => {
+      const el = bandRef.current;
+      const host = el?.offsetParent as HTMLElement | null;
+      const box = frogRef.current?.getBoxRect?.();
+      const mouth = frogRef.current?.getMouthPoint?.();
+      if (!el || !host || !box || !mouth || box.width === 0) {
+        if (tries++ < 30) raf = requestAnimationFrame(measure);
+        return;
+      }
+      const hostRect = host.getBoundingClientRect();
+      const bandW = Math.min(470, window.innerWidth * 0.92);
+      el.style.width = `${bandW}px`;
+      el.style.left = `${box.left + box.width / 2 - hostRect.left - bandW / 2}px`;
+      el.style.top = `${mouth.y - hostRect.top - BAND_H + 8}px`;
+    };
+    measure();
+    const onResize = () => {
+      tries = 0;
+      measure();
+    };
+    window.addEventListener('resize', onResize);
+    const interval = window.setInterval(measure, 2500);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('resize', onResize);
+      window.clearInterval(interval);
+    };
+  }, [frogRef, sessionOnFocus]);
+
   const frogVisibleEnough = () => {
-    const rect = frogBoxRef?.current?.getBoundingClientRect();
-    // Stricter than the tongue hook's 0.75 cinematic threshold, so a
-    // background grab can never trigger the camera scroll behind the sheet.
-    return rect ? visibleRatio(rect) >= 0.85 : false;
+    const rect =
+      frogBoxRef?.current?.getBoundingClientRect() ??
+      frogRef.current?.getBoxRect?.();
+    // Stricter than the tongue hook's 0.75 cinematic threshold, so a grab
+    // from this layer can never trigger the camera scroll.
+    return rect ? visibleRatio(rect as DOMRect) >= 0.85 : false;
+  };
+
+  const pickLiveFly = () => {
+    for (let i = 0; i < flyCount; i++) {
+      const k = `${HOME_FOCUS_FLY_PREFIX}${i}`;
+      if (!eaten.has(k) && effFlyRefs.current[k]) return k;
+    }
+    return null;
   };
 
   const eatAndRespawn = (key: string) => {
@@ -123,113 +171,127 @@ export function HomeFocusFlies({
     }, 4000);
   };
 
-  // Economy bookkeeping on every real catch (regardless of visuals): the
-  // server credits the fly on the next progress flush (≤60s away), so open
-  // the earn window and nudge the balance caches so the standard
-  // currency-gain animation fires as soon as the credit lands. When the
-  // sheet is closed the tongue can't mirror, so a love emote reacts instead.
+  // Catch visuals when the sheet is closed (the bus mirror owns them when
+  // it's open; the wallet/economy side lives app-wide in GlobalTimer): lunge
+  // at the fly, or fall back to a love emote if the frog isn't in view.
   const prevCaughtRef = useRef(caught);
   useEffect(() => {
-    if (caught > prevCaughtRef.current && running) {
-      markFlyEarn(120_000);
-      mutateInventoryCaches();
-      const t1 = window.setTimeout(mutateInventoryCaches, 20_000);
-      const t2 = window.setTimeout(mutateInventoryCaches, 70_000);
-      if (!tongueEnabled && !hidden) {
+    if (caught > prevCaughtRef.current && running && !tongueEnabled && !hidden) {
+      const key = pickLiveFly();
+      if (key && frogVisibleEnough()) {
+        void effTrigger({
+          key,
+          completed: false,
+          onPersist: () => eatAndRespawn(key),
+        });
+      } else {
         frogRef.current?.fireEmote('love');
       }
-      prevCaughtRef.current = caught;
-      return () => {
-        window.clearTimeout(t1);
-        window.clearTimeout(t2);
-      };
     }
     prevCaughtRef.current = caught;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [caught, running, hidden]);
 
-  // Mirror the sheet scene's hunt: same fly index, same overshoot, same frame.
+  const lungeMiss = (overshoot: number, jitterX: number, flyIndex?: number): boolean => {
+    const key =
+      flyIndex !== undefined ? `${HOME_FOCUS_FLY_PREFIX}${flyIndex}` : pickLiveFly();
+    const el = key ? effFlyRefs.current[key] : null;
+    const mouth = frogRef.current?.getMouthPoint();
+    if (!el || !mouth || !frogVisibleEnough()) return false;
+    const rect = el.getBoundingClientRect();
+    const fx = rect.left + rect.width / 2;
+    const fy = rect.top + rect.height / 2;
+    const dx = fx - mouth.x;
+    const dy = fy - mouth.y;
+    const len = Math.hypot(dx, dy) || 1;
+    setMissPos({
+      x: fx + (dx / len) * overshoot + jitterX,
+      y: fy + (dy / len) * overshoot,
+    });
+    requestAnimationFrame(() => {
+      void effTrigger({
+        key: MISS_KEY,
+        completed: false,
+        silent: true,
+        onPersist: () => setMissPos(null),
+      });
+    });
+    return true;
+  };
+
+  // Sheet open: mirror the conductor's hunt — same fly index, same frame.
   useEffect(() => {
-    if (!triggerTongue || !flyRefs) return;
     return onFocusHunt((event) => {
       const { tongueEnabled: enabled, hidden: isHidden, running: isLive } =
         stateRef.current;
       if (!enabled || isHidden || !isLive || !frogVisibleEnough()) return;
-      const key = `${HOME_FOCUS_FLY_PREFIX}${event.flyIndex}`;
-      const el = flyRefs.current[key];
-      if (!el) return;
-
       if (event.type === 'catch') {
         onSpeech?.(event.line);
-        void triggerTongue({
+        const key = `${HOME_FOCUS_FLY_PREFIX}${event.flyIndex}`;
+        if (!effFlyRefs.current[key]) return;
+        void effTrigger({
           key,
           completed: false,
           onPersist: () => eatAndRespawn(key),
         });
         return;
       }
-
-      const mouth = frogRef.current?.getMouthPoint();
-      if (!mouth) return;
-      const rect = el.getBoundingClientRect();
-      const fx = rect.left + rect.width / 2;
-      const fy = rect.top + rect.height / 2;
-      const dx = fx - mouth.x;
-      const dy = fy - mouth.y;
-      const len = Math.hypot(dx, dy) || 1;
-      setMissPos({
-        x: fx + (dx / len) * event.overshoot + event.jitterX,
-        y: fy + (dy / len) * event.overshoot,
-      });
-      requestAnimationFrame(() => {
-        void triggerTongue({
-          key: MISS_KEY,
-          completed: false,
-          silent: true,
-          onPersist: () => setMissPos(null),
-        });
-      });
+      lungeMiss(event.overshoot, event.jitterX, event.flyIndex);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [triggerTongue, flyRefs]);
+  }, []);
+
+  // Sheet closed: this layer is its own conductor for misses — same rhythm
+  // as the sheet scene (first lunge early, then a loose 45–90s beat). A
+  // skipped attempt (frog scrolled out of view, fly mid-respawn) retries in
+  // seconds instead of waiting out the full interval, so the cadence FEELS
+  // the same as the popup's.
+  useEffect(() => {
+    if (!running || hidden || tongueEnabled) return;
+    let timer = 0;
+    const schedule = (delay: number) => {
+      timer = window.setTimeout(() => {
+        const fired = lungeMiss(44 + Math.random() * 26, Math.random() * 28 - 14);
+        schedule(fired ? 45000 + Math.random() * 45000 : 8000 + Math.random() * 7000);
+      }, delay);
+    };
+    schedule(9000 + Math.random() * 5000);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [running, hidden, tongueEnabled]);
 
   if (!sessionOnFocus) return null;
 
   return (
     <>
       {/* `hidden` only hides visually — unmounting would replay the fly
-          entry and lose the shared drift phase on every panel open/close.
-          The band is fixed + body-portaled and follows the frog each frame,
-          so placement is frog-relative on every page. */}
-      {createPortal(
-        <div
-          ref={bandRef}
-          aria-hidden
-          className="pointer-events-none fixed left-0 top-0 z-30 h-44"
-          style={{ visibility: hidden ? 'hidden' : 'visible' }}
-        >
-          {FOCUS_DRIFTS.slice(0, flyCount).map((drift, i) => {
-            const key = `${HOME_FOCUS_FLY_PREFIX}${i}`;
-            const isHidden = eaten.has(key) || (visuallyDone?.has(key) ?? false);
-            const epoch = respawn[key] ?? 0;
-            return (
-              <DriftFly
-                key={`${key}-${epoch}`}
-                drift={drift}
-                running={running}
-                hidden={isHidden}
-                size={38}
-                entryFromX={entrySideFor(drift)}
-                forceEntry={epoch > 0}
-                flyRef={(el) => {
-                  if (flyRefs) flyRefs.current[key] = el;
-                }}
-              />
-            );
-          })}
-        </div>,
-        document.body,
-      )}
+          entry and lose the shared drift phase on every panel open/close. */}
+      <div
+        ref={bandRef}
+        aria-hidden
+        className="pointer-events-none absolute z-30"
+        style={{ height: BAND_H, visibility: hidden ? 'hidden' : 'visible' }}
+      >
+        {FOCUS_DRIFTS.slice(0, flyCount).map((drift, i) => {
+          const key = `${HOME_FOCUS_FLY_PREFIX}${i}`;
+          const isHidden = eaten.has(key) || effVisuallyDone.has(key);
+          const epoch = respawn[key] ?? 0;
+          return (
+            <DriftFly
+              key={`${key}-${epoch}`}
+              drift={drift}
+              running={running}
+              hidden={isHidden}
+              size={38}
+              entryFromX={entrySideFor(drift)}
+              forceEntry={epoch > 0}
+              flyRef={(el) => {
+                effFlyRefs.current[key] = el;
+              }}
+            />
+          );
+        })}
+      </div>
 
       {/* Invisible aim point for missed grabs — just past the fly, away from
           the frog */}
@@ -237,7 +299,7 @@ export function HomeFocusFlies({
         createPortal(
           <span
             ref={(el) => {
-              if (flyRefs) flyRefs.current[MISS_KEY] = el;
+              effFlyRefs.current[MISS_KEY] = el;
             }}
             aria-hidden
             style={{
@@ -249,6 +311,51 @@ export function HomeFocusFlies({
               pointerEvents: 'none',
             }}
           />,
+          document.body,
+        )}
+
+      {/* Internal tongue overlay — pages without their own tongue (wardrobe,
+          friends). Empty tip on silent misses. */}
+      {usingOwnTongue &&
+        ownTongue.grab &&
+        createPortal(
+          <svg
+            key={ownTongue.grab.startAt}
+            className="pointer-events-none fixed inset-0 z-40"
+            width={ownTongue.vp.w}
+            height={ownTongue.vp.h}
+            viewBox={`0 0 ${ownTongue.vp.w} ${ownTongue.vp.h}`}
+            preserveAspectRatio="none"
+            style={{ width: ownTongue.vp.w, height: ownTongue.vp.h }}
+          >
+            <defs>
+              <linearGradient id="home-focus-tongue-grad" x1="0" y1="0" x2="0" y2="1">
+                <stop stopColor="#ff6b6b" />
+                <stop offset="1" stopColor="#f43f5e" />
+              </linearGradient>
+            </defs>
+            <path
+              ref={ownTongue.tonguePathEl}
+              d="M0 0 L0 0"
+              fill="none"
+              stroke="url(#home-focus-tongue-grad)"
+              strokeWidth={TONGUE_STROKE}
+              strokeLinecap="round"
+              vectorEffect="non-scaling-stroke"
+            />
+            <g ref={ownTongue.tipGroupEl} style={{ visibility: 'hidden' }}>
+              <circle r={10} fill="transparent" />
+              {!ownTongue.grab.silent && (
+                <image
+                  href="/fly.svg"
+                  x={-FLY_PX / 2}
+                  y={-FLY_PX / 2}
+                  width={FLY_PX}
+                  height={FLY_PX}
+                />
+              )}
+            </g>
+          </svg>,
           document.body,
         )}
     </>

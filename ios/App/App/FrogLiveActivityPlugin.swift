@@ -52,6 +52,19 @@ public class FrogLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         }
         let state = Self.state(from: data)
 
+        // Keep the AlarmKit finish alarm in step with the island: running →
+        // scheduled at endTime; paused/finished → cancelled (APNs alert covers
+        // the killed-app case; AlarmKit covers Silent/Focus while alive).
+        if state.paused || state.finished == true || state.endTime <= 0 {
+            FrogAlarmKit.cancel()
+        } else {
+            FrogAlarmKit.sync(
+                endTimeMs: state.endTime,
+                phase: state.label.lowercased().contains("break") ? "break" : "focus",
+                soundId: state.sound
+            )
+        }
+
         enqueue {
             do {
                 let content = ActivityContent(state: state, staleDate: self.staleDate(state))
@@ -71,12 +84,18 @@ public class FrogLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
                     self.current = activity
                     self.observe(activity)
                     if state.finished == true {
+                        let sound: AlertConfiguration.AlertSound
+                        if let file = Self.alertSound(for: state.sound) {
+                            sound = .named(file)
+                        } else {
+                            sound = .default
+                        }
                         await activity.update(
                             content,
                             alertConfiguration: AlertConfiguration(
                                 title: "Time's up",
                                 body: LocalizedStringResource(stringLiteral: state.subtitle),
-                                sound: .default
+                                sound: sound
                             )
                         )
                     } else {
@@ -108,6 +127,7 @@ public class FrogLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func end(_ call: CAPPluginCall) {
         guard #available(iOS 16.2, *) else { call.resolve(); return }
+        FrogAlarmKit.cancel()
         enqueue {
             for activity in Activity<FrogTimerAttributes>.activities {
                 await activity.end(nil, dismissalPolicy: .immediate)
@@ -319,7 +339,19 @@ public class FrogLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
             ringStart: double("ringStart"),
             ringEnd: double("ringEnd"),
             paused: data["paused"] as? Bool ?? false,
-            finished: data["finished"] as? Bool ?? false
+            finished: data["finished"] as? Bool ?? false,
+            fliesCaught: double("fliesCaught"),
+            fliesPotential: double("fliesPotential"),
+            deepFocus: data["deepFocus"] as? Bool ?? false,
+            sound: data["sound"] as? String ?? "",
+            confirmPause: false
         )
+    }
+
+    // Maps a timer sound id to its bundled .caf (Library/Sounds); nil = default.
+    static func alertSound(for soundId: String?) -> String? {
+        guard let soundId, !soundId.isEmpty, soundId != "none" else { return nil }
+        let known = ["frog", "classic", "dreamscape", "lofi", "stardust"]
+        return known.contains(soundId) ? "\(soundId).caf" : nil
     }
 }

@@ -16,6 +16,10 @@ interface FrogTimerPlugin {
     endTime: number;
     timeLeft: number;
     taskName: string;
+    fliesCaught?: number;
+    fliesPotential?: number;
+    deepFocus?: boolean;
+    sound?: string;
   }): Promise<void>;
   stop(): Promise<void>;
   setControlConfig(opts: { origin: string; token: string }): Promise<void>;
@@ -156,11 +160,14 @@ function ensureIosListeners(): void {
 
 function computeSignature(snap: LiveTimerSnapshot): string | null {
   if (!snap.active) return null;
-  if (snap.finished) return `done:${snap.phase}`;
+  // Hunt state is part of the signature so a mid-run catch or a broken
+  // deep-focus pledge refreshes the island/notification in place.
+  const hunt = `${snap.fliesCaught ?? 0}/${snap.fliesPotential ?? 0}:${snap.deepFocus ? 1 : 0}`;
+  if (snap.finished) return `done:${snap.phase}:${hunt}`;
   if (snap.isRunning && snap.endTime) {
-    return `run:${snap.phase}:${snap.endTime}`;
+    return `run:${snap.phase}:${snap.endTime}:${hunt}`;
   }
-  return `pause:${snap.phase}:${Math.round(snap.timeLeft)}`;
+  return `pause:${snap.phase}:${Math.round(snap.timeLeft)}:${hunt}`;
 }
 
 export async function reconcileLiveTimer(snap: LiveTimerSnapshot): Promise<void> {
@@ -185,6 +192,10 @@ export async function reconcileLiveTimer(snap: LiveTimerSnapshot): Promise<void>
           endTime: snap.endTime ?? 0,
           timeLeft: snap.timeLeft,
           taskName: snap.taskName,
+          fliesCaught: snap.fliesCaught ?? 0,
+          fliesPotential: snap.fliesPotential ?? 0,
+          deepFocus: snap.deepFocus === true,
+          sound: snap.sound ?? '',
         });
       }
     } catch (err) {

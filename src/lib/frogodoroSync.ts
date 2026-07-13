@@ -9,6 +9,7 @@ import {
 } from '@/lib/notifications/liveActivity';
 import { buildLiveActivityData } from '@/lib/liveActivityData';
 import { sendTimerControlPush } from '@/lib/notifications/timer';
+import { fliesCaughtFor, deepFocusPledgeLive } from '@/lib/focusFlies';
 import type {
   ActiveFrogodoroTimer,
   LiveActivityRef,
@@ -21,6 +22,47 @@ export function phaseTotalSeconds(timer: ActiveFrogodoroTimer): number {
       ? timer.settings.focusDuration
       : timer.settings.breakDuration;
   return Math.max(1, Math.round(minutes * 60));
+}
+
+// The hunt state native surfaces render (island/notification fly chip):
+// flies caught this session, the session's reachable total, whether the
+// deep-focus +1 pledge is live, and the chosen finish sound. Mirrors the
+// timer sheet's math (sessionStats + live elapsed of a running focus).
+export function timerHuntExtras(
+  timer: ActiveFrogodoroTimer,
+  now = Date.now(),
+): {
+  fliesCaught: number;
+  fliesPotential: number;
+  deepFocus: boolean;
+  sound: string;
+} {
+  const total = phaseTotalSeconds(timer);
+  const running = timer.status === 'running' && !!timer.endsAt;
+  const remaining = running
+    ? Math.max(0, Math.round((new Date(timer.endsAt as string).getTime() - now) / 1000))
+    : Math.max(0, timer.timeLeft);
+  const phaseElapsed = timer.phase === 'focus' ? Math.max(0, total - remaining) : 0;
+  const flushed = Math.max(0, Math.floor(timer.savedElapsed ?? 0));
+  const sessionFocus =
+    (timer.sessionStats?.focusTime ?? 0) +
+    (timer.phase === 'focus' ? Math.max(0, phaseElapsed - flushed) : 0);
+  const fliesCaught = fliesCaughtFor(sessionFocus);
+  const fliesPotential =
+    timer.phase === 'focus'
+      ? fliesCaughtFor(sessionFocus + remaining)
+      : fliesCaught;
+  return {
+    fliesCaught,
+    fliesPotential,
+    deepFocus: deepFocusPledgeLive({
+      deepFocus: timer.deepFocus === true,
+      pausedThisPhase: timer.deepFocusBroken === true,
+      phase: timer.phase,
+      focusDurationMinutes: timer.settings.focusDuration,
+    }),
+    sound: timer.settings.timerSound ?? '',
+  };
 }
 
 function tokenLabel(token: string | null | undefined): string {
@@ -113,6 +155,7 @@ export async function fanOutTimerState(
       timeLeft: finished ? 0 : timer.timeLeft,
       totalSeconds: phaseTotalSeconds(timer),
       taskName: '',
+      ...timerHuntExtras(timer),
     });
 
     if (live?.id && live.pushToken) {
@@ -160,6 +203,8 @@ export async function fanOutTimerState(
         endTime: timer.endsAt ? new Date(timer.endsAt).getTime() : 0,
         timeLeft: timer.timeLeft,
         taskName: '',
+        rev: timer.rev,
+        ...timerHuntExtras(timer),
       }),
     );
   }

@@ -3,6 +3,7 @@
 import { Capacitor } from '@capacitor/core';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import type { PomodoroPhase } from '@/lib/frogodoroStore';
+import { iosAlarmFile } from '@/lib/timerSoundFiles';
 
 /**
  * Frogodoro timer-completion notifications.
@@ -55,9 +56,13 @@ export async function scheduleTimerNotifications(opts: {
   endTime: number;
   autoStartBreak: boolean;
   breakDurationSec: number;
+  timerSound?: string;
 }): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
-  const { phase, endTime, autoStartBreak, breakDurationSec } = opts;
+  // Android's ring is the native setAlarmClock alarm (exact, Doze-proof,
+  // looping sound) — a second scheduled notification would double-fire.
+  if (Capacitor.getPlatform() === 'android') return;
+  const { phase, endTime, autoStartBreak, breakDurationSec, timerSound } = opts;
 
   try {
     const perms = await LocalNotifications.checkPermissions();
@@ -70,7 +75,10 @@ export async function scheduleTimerNotifications(opts: {
     await cancelTimerNotifications();
     if (endTime <= Date.now()) return;
 
-    const notifSound = undefined;
+    // iOS: the user's chosen alarm as a bundled .caf (Library/Sounds).
+    // Android: the native setAlarmClock path owns the finish sound.
+    const notifSound =
+      Capacitor.getPlatform() === 'ios' ? iosAlarmFile(timerSound) : undefined;
 
     const first = phaseEndContent(phase, autoStartBreak);
     const notifications = [

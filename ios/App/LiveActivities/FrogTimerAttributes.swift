@@ -21,5 +21,12 @@ struct FrogTimerAttributes: ActivityAttributes {
         var ringEnd: Double       // epoch ms (run end) for the live ring
         var paused: Bool
         var finished: Bool?      // phase ended, alarm ringing, awaiting Done
+        // The hunt (optional — older payloads/widgets tolerate absence):
+        var fliesCaught: Double?     // flies caught this session
+        var fliesPotential: Double?  // session's reachable total
+        var deepFocus: Bool?         // +1 pledge is live
+        var sound: String?           // chosen finish sound id (e.g. "dreamscape")
+        // Two-tap pause guard: set locally by the pause intent for ~3s.
+        var confirmPause: Bool?
     }
 }

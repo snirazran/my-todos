@@ -5,5 +5,8 @@ import SwiftUI
 struct LiveActivitiesBundle: WidgetBundle {
     var body: some Widget {
         FrogTimerLiveActivity()
+        if #available(iOS 18.0, *) {
+            FrogFocusControlWidget()
+        }
     }
 }

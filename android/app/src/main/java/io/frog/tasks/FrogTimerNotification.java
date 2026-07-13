@@ -1,5 +1,6 @@
 package io.frog.tasks;
 
+import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
@@ -16,15 +17,20 @@ import androidx.core.app.NotificationCompat;
 
 /**
  * Shared builder for the Frogodoro live-timer notification (the Android
- * equivalent of the iOS Live Activity). Used both by {@link FrogTimerPlugin}
- * (foreground, JS-driven) and {@link FrogTimerMessagingService} (background /
- * killed, driven by a data push from the server), so a state change made on
- * any device renders the same notification regardless of which path posts it.
+ * equivalent of the iOS Live Activity). Used by {@link FrogTimerPlugin}
+ * (foreground, JS-driven), {@link FrogTimerMessagingService} (background /
+ * killed, driven by a data push from the server), {@link FrogTimerAlarmReceiver}
+ * and {@link FrogBootReceiver}, so a state change made anywhere renders the
+ * same notification regardless of which path posts it.
+ *
+ * Carries the hunt: flies caught / reachable this session and the deep-focus
+ * +1 pledge, mirroring the in-app chip. On Android 16+ the live notification
+ * requests promoted-ongoing status (status-bar chip / lock-screen prominence).
  */
 public final class FrogTimerNotification {
     public static final String CHANNEL_ID = "frogodoro_live_timer";
     public static final int NOTIF_ID = 770001;
-    public static final String ALARM_CHANNEL_ID = "frogodoro_alarm";
+    public static final String ALARM_CHANNEL_ID = "frogodoro_alarm_v2";
     public static final int ALARM_NOTIF_ID = 770002;
 
     private FrogTimerNotification() {}
@@ -45,28 +51,28 @@ public final class FrogTimerNotification {
         }
     }
 
-    public static void show(
-            Context ctx,
-            String phase,
-            boolean isRunning,
-            long endTime,
-            int timeLeft,
-            String taskName) {
+    private static String huntText(FrogTimerState s) {
+        if (!"focus".equals(s.phase) || s.fliesPotential <= 0) return null;
+        String text = "🪰 " + s.fliesCaught + "/" + s.fliesPotential;
+        if (s.deepFocus) text += " · ⚡+1";
+        return text;
+    }
+
+    public static void show(Context ctx, FrogTimerState s, boolean pauseArmed) {
         NotificationManager nm =
                 (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
         if (nm == null) {
             return;
         }
         ensureChannel(nm);
-        nm.cancel(ALARM_NOTIF_ID);
 
-        boolean isFocus = !"break".equals(phase);
+        boolean isFocus = !"break".equals(s.phase);
         String label = isFocus ? "Focus" : "Break";
         int color = isFocus ? Color.parseColor("#16a34a") : Color.parseColor("#0ea5e9");
 
         String title = label;
-        if (taskName != null && !taskName.isEmpty()) {
-            title = label + " · " + taskName;
+        if (s.taskName != null && !s.taskName.isEmpty()) {
+            title = label + " · " + s.taskName;
         }
 
         NotificationCompat.Builder b = new NotificationCompat.Builder(ctx, CHANNEL_ID)
@@ -79,40 +85,60 @@ public final class FrogTimerNotification {
                 .setPriority(NotificationCompat.PRIORITY_LOW)
                 .setCategory(NotificationCompat.CATEGORY_STOPWATCH);
 
+        String hunt = huntText(s);
+        if (hunt != null) {
+            b.setSubText(hunt);
+        }
+
+        // Android 16+ promoted ongoing (status-bar chip, AOD). Reflection so
+        // the code builds against older androidx.core too.
+        requestPromotedOngoing(b);
+
         PendingIntent contentPI = buildLaunchIntent(ctx);
         if (contentPI != null) {
             b.setContentIntent(contentPI);
         }
 
-        if (isRunning && endTime > 0) {
+        if (s.isRunning && s.endTime > 0) {
             b.setUsesChronometer(true);
             b.setShowWhen(true);
-            b.setWhen(endTime);
+            b.setWhen(s.endTime);
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 b.setChronometerCountDown(true);
             }
-            b.setContentText(label + " in progress");
+            b.setContentText(
+                    pauseArmed
+                            ? "Pausing loses the ⚡+1 fly — tap Pause again"
+                            : label + " in progress");
         } else {
             b.setUsesChronometer(false);
             b.setShowWhen(false);
-            int m = timeLeft / 60;
-            int s = timeLeft % 60;
-            b.setContentText(String.format("Paused · %d:%02d left", m, s));
+            int m = s.timeLeft / 60;
+            int sec = s.timeLeft % 60;
+            b.setContentText(String.format("Paused · %d:%02d left", m, sec));
         }
 
-        if (isRunning) {
-            b.addAction(0, "Pause",
-                    actionIntent(ctx, "pause", phase, endTime, timeLeft, taskName, 11));
+        if (s.isRunning) {
+            b.addAction(0, pauseArmed ? "Pause anyway" : "Pause", actionIntent(ctx, "pause", 11));
         } else {
-            b.addAction(0, "Resume",
-                    actionIntent(ctx, "resume", phase, endTime, timeLeft, taskName, 12));
+            b.addAction(0, "Resume", actionIntent(ctx, "resume", 12));
         }
-        b.addAction(0, "Stop",
-                actionIntent(ctx, "stop", phase, endTime, timeLeft, taskName, 13));
+        b.addAction(0, "Stop", actionIntent(ctx, "stop", 13));
 
+        nm.cancel(ALARM_NOTIF_ID);
         try {
             nm.notify(NOTIF_ID, b.build());
         } catch (Exception ignored) {
+        }
+    }
+
+    private static void requestPromotedOngoing(NotificationCompat.Builder b) {
+        try {
+            b.getClass()
+                    .getMethod("setRequestPromotedOngoing", boolean.class)
+                    .invoke(b, true);
+        } catch (Throwable ignored) {
+            // androidx.core < 1.17 or OS < 16 — plain ongoing notification.
         }
     }
 
@@ -135,29 +161,29 @@ public final class FrogTimerNotification {
                 ch.setShowBadge(false);
                 ch.enableVibration(true);
                 ch.setVibrationPattern(new long[]{0, 500, 250, 500, 250, 500});
-                AudioAttributes attrs = new AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_ALARM)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                        .build();
-                ch.setSound(alarmSound(), attrs);
+                // The looping ring comes from FrogAlarmSoundService (user's
+                // chosen sound on the ALARM stream); the channel itself stays
+                // silent so the two never overlap.
+                ch.setSound(null, null);
                 nm.createNotificationChannel(ch);
             }
         }
     }
 
-    public static void showAlarm(Context ctx, String phase) {
-        NotificationManager nm =
-                (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
-        if (nm == null) {
-            return;
-        }
-        ensureAlarmChannel(nm);
-
-        boolean isFocus = !"break".equals(phase);
+    /** The ringing notification — also used by the sound service's startForeground. */
+    public static Notification buildAlarm(Context ctx, FrogTimerState s) {
+        boolean isFocus = !"break".equals(s.phase);
         String title = isFocus ? "Focus finished" : "Break finished";
-        String body = isFocus
-                ? "Time for a break. You earned it!"
-                : "Ready to focus whenever you are.";
+        String body;
+        if (isFocus && s.fliesCaught > 0) {
+            body = s.fliesCaught == 1
+                    ? "1 fly caught — tap Done to collect."
+                    : s.fliesCaught + " flies caught — tap Done to collect.";
+        } else {
+            body = isFocus
+                    ? "Time for a break. You earned it!"
+                    : "Ready to focus whenever you are.";
+        }
         int color = isFocus ? Color.parseColor("#16a34a") : Color.parseColor("#0ea5e9");
 
         NotificationCompat.Builder b = new NotificationCompat.Builder(ctx, ALARM_CHANNEL_ID)
@@ -166,9 +192,10 @@ public final class FrogTimerNotification {
                 .setColorized(true)
                 .setContentTitle(title)
                 .setContentText(body)
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setPriority(NotificationCompat.PRIORITY_MAX)
                 .setCategory(NotificationCompat.CATEGORY_ALARM)
-                .setAutoCancel(true)
+                .setAutoCancel(false)
+                .setOngoing(true)
                 .setVibrate(new long[]{0, 500, 250, 500, 250, 500});
 
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
@@ -178,13 +205,28 @@ public final class FrogTimerNotification {
         PendingIntent contentPI = buildLaunchIntent(ctx);
         if (contentPI != null) {
             b.setContentIntent(contentPI);
+            // Real alarm behaviour: light the screen / show over the lock
+            // screen while ringing (alarm-category apps hold this right).
+            b.setFullScreenIntent(contentPI, true);
         }
 
-        b.addAction(0, "Done", actionIntent(ctx, "done", phase, 0L, 0, "", 14));
+        if (isFocus) {
+            b.addAction(0, "+5 more", actionIntent(ctx, "more5", 15));
+        }
+        b.addAction(0, "Done", actionIntent(ctx, "done", 14));
+        return b.build();
+    }
 
+    public static void showAlarm(Context ctx, FrogTimerState s) {
+        NotificationManager nm =
+                (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
+        if (nm == null) {
+            return;
+        }
+        ensureAlarmChannel(nm);
         nm.cancel(NOTIF_ID);
         try {
-            nm.notify(ALARM_NOTIF_ID, b.build());
+            nm.notify(ALARM_NOTIF_ID, buildAlarm(ctx, s));
         } catch (Exception ignored) {
         }
     }
@@ -211,21 +253,10 @@ public final class FrogTimerNotification {
         return PendingIntent.getActivity(ctx, 0, launch, flags);
     }
 
-    private static PendingIntent actionIntent(
-            Context ctx,
-            String action,
-            String phase,
-            long endTime,
-            int timeLeft,
-            String taskName,
-            int requestCode) {
+    private static PendingIntent actionIntent(Context ctx, String action, int requestCode) {
         Intent intent = new Intent(ctx, FrogTimerActionReceiver.class);
         intent.setAction("io.frog.tasks.TIMER_ACTION_" + action);
         intent.putExtra(FrogTimerActionReceiver.EXTRA_ACTION, action);
-        intent.putExtra(FrogTimerActionReceiver.EXTRA_PHASE, phase);
-        intent.putExtra(FrogTimerActionReceiver.EXTRA_END_TIME, endTime);
-        intent.putExtra(FrogTimerActionReceiver.EXTRA_TIME_LEFT, timeLeft);
-        intent.putExtra(FrogTimerActionReceiver.EXTRA_TASK_NAME, taskName);
         int flags = PendingIntent.FLAG_UPDATE_CURRENT;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             flags |= PendingIntent.FLAG_IMMUTABLE;

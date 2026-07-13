@@ -20,6 +20,13 @@ import type { ActiveFrogodoroTimer } from '@/lib/types/UserDoc';
 import { getCurrentLiveActivityState } from '@/lib/liveTimer';
 import { notifyQuestClaims } from '@/lib/questClaims';
 import { useNotification } from '@/components/providers/NotificationProvider';
+import { fliesCaughtFor } from '@/lib/focusFlies';
+import { markFlyEarn } from '@/lib/flyEarn';
+import {
+  mutateInventoryCaches,
+  patchInventoryFlies,
+  useInventory,
+} from '@/hooks/useInventory';
 
 function getPhaseDuration(phase: PomodoroPhase, settings: FrogodoroSettings): number {
   return phase === 'focus' ? settings.focusDuration * 60 : settings.breakDuration * 60;
@@ -58,6 +65,41 @@ export function GlobalTimer() {
   } = useFrogodoroStore();
 
   const { showNotification } = useNotification();
+
+  // Focus-fly economy, app-wide: each 5-minute catch optimistically bumps the
+  // wallet (the counter animates like a task-grab gain on whatever page shows
+  // it) and opens the earn window; the server credit lands on the next
+  // progress flush and the delayed revalidations reconcile to truth.
+  const { data: inventorySummary } = useInventory(timerActive, true);
+  const walletFliesRef = useRef<number | undefined>(undefined);
+  walletFliesRef.current = inventorySummary?.wardrobe?.flies;
+  const sessionFocusLive =
+    sessionStats.focusTime +
+    (phase === 'focus' && timerActive
+      ? Math.max(
+          0,
+          getPhaseDuration('focus', settings) - timeLeft - phaseElapsed,
+        )
+      : 0);
+  const fliesCaughtLive = fliesCaughtFor(sessionFocusLive);
+  const prevCaughtRef = useRef(fliesCaughtLive);
+  useEffect(() => {
+    if (fliesCaughtLive > prevCaughtRef.current && timerActive) {
+      markFlyEarn(120_000);
+      if (typeof walletFliesRef.current === 'number') {
+        patchInventoryFlies(walletFliesRef.current + 1);
+      }
+      const t1 = window.setTimeout(mutateInventoryCaches, 25_000);
+      const t2 = window.setTimeout(mutateInventoryCaches, 75_000);
+      prevCaughtRef.current = fliesCaughtLive;
+      return () => {
+        window.clearTimeout(t1);
+        window.clearTimeout(t2);
+      };
+    }
+    prevCaughtRef.current = fliesCaughtLive;
+  }, [fliesCaughtLive, timerActive]);
+
   const prevCompletionIdRef = useRef(lastCompletionId);
   useEffect(() => {
     if (lastCompletionId === prevCompletionIdRef.current) return;
@@ -746,6 +788,7 @@ export function GlobalTimer() {
         endTime,
         autoStartBreak: phase === 'focus' && settings.autoStartBreaks,
         breakDurationSec: settings.breakDuration * 60,
+        timerSound: settings.timerSound,
       });
     } else {
       void cancelTimerNotifications();

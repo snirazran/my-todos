@@ -9,6 +9,13 @@ export interface LiveTimerSnapshot {
   totalSeconds: number;
   taskName: string;
   finished?: boolean;
+  // The hunt, carried to native surfaces: flies caught this session, the
+  // session's reachable total, and whether the deep-focus +1 pledge is live.
+  fliesCaught?: number;
+  fliesPotential?: number;
+  deepFocus?: boolean;
+  // The user's chosen finish sound id (timerSounds.ts), for native alarms.
+  sound?: string;
 }
 
 export const FOCUS_COLOR = '#16a34a';
@@ -45,6 +52,10 @@ export type LiveActivityData = {
   ringEnd: number;
   paused: boolean;
   finished: boolean;
+  fliesCaught: number;
+  fliesPotential: number;
+  deepFocus: boolean;
+  sound: string;
 };
 
 export function buildLiveActivityData(snap: LiveTimerSnapshot, now = Date.now()): LiveActivityData {
@@ -71,5 +82,9 @@ export function buildLiveActivityData(snap: LiveTimerSnapshot, now = Date.now())
     ringEnd: endTime,
     paused: !snap.isRunning,
     finished,
+    fliesCaught: Math.max(0, Math.floor(snap.fliesCaught ?? 0)),
+    fliesPotential: Math.max(0, Math.floor(snap.fliesPotential ?? 0)),
+    deepFocus: snap.deepFocus === true,
+    sound: snap.sound ?? '',
   };
 }

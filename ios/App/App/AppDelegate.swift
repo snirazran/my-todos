@@ -13,9 +13,45 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // Initialize Firebase so @capacitor-firebase/messaging can mint FCM tokens.
         FirebaseApp.configure()
         FrogLiveActivityPlugin.startActivityObservation()
+        installAlarmSounds()
         clearAppBadge(application)
         // Override point for customization after application launch.
         return true
+    }
+
+    /// Copies the bundled alarm .caf files (shipped inside Capacitor's web
+    /// assets at public/alarms/ios) into Library/Sounds, where iOS looks up
+    /// custom notification/Live Activity alert sounds by filename. Idempotent;
+    /// re-copies when the bundled file size changes (asset update).
+    private func installAlarmSounds() {
+        DispatchQueue.global(qos: .utility).async {
+            let fm = FileManager.default
+            guard
+                let library = fm.urls(for: .libraryDirectory, in: .userDomainMask).first,
+                let sourceDir = Bundle.main.url(
+                    forResource: "ios",
+                    withExtension: nil,
+                    subdirectory: "public/alarms"
+                )
+            else { return }
+            let soundsDir = library.appendingPathComponent("Sounds", isDirectory: true)
+            try? fm.createDirectory(at: soundsDir, withIntermediateDirectories: true)
+            guard
+                let files = try? fm.contentsOfDirectory(
+                    at: sourceDir,
+                    includingPropertiesForKeys: [.fileSizeKey]
+                )
+            else { return }
+            for src in files where src.pathExtension == "caf" {
+                let dst = soundsDir.appendingPathComponent(src.lastPathComponent)
+                let srcSize = (try? src.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+                let dstSize =
+                    (try? dst.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? -1
+                if srcSize == dstSize { continue }
+                try? fm.removeItem(at: dst)
+                try? fm.copyItem(at: src, to: dst)
+            }
+        }
     }
 
     func applicationWillResignActive(_ application: UIApplication) {

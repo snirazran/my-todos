@@ -219,10 +219,16 @@ export default function Home() {
     isBacklogOpen ||
     anySheetOpen;
 
+  // Focus-hunt lunges run through the same tongue but are ambient theater —
+  // none of the task-grab cinematic chrome (skip overlay, scroll lock,
+  // pointer freeze) should fire for them.
+  const focusHuntGrab = !!grab && grab.key.startsWith('home-focus');
+  const taskCinematic = cinematic && !focusHuntGrab;
+
   // Sync cinematic state with UI store
   useEffect(() => {
-    setIsCinematicActive(cinematic);
-  }, [cinematic, setIsCinematicActive]);
+    setIsCinematicActive(taskCinematic);
+  }, [taskCinematic, setIsCinematicActive]);
 
   const { showNotification, stackHeight: notificationStackHeight } = useNotification();
   const { seenIntros, markIntroSeen } = useIntros(!!user);
@@ -462,7 +468,7 @@ export default function Home() {
 
   // Block Scrolling during cinematic
   useEffect(() => {
-    if (!cinematic) return;
+    if (!taskCinematic) return;
     const el = mainScrollRef.current ?? window;
     const stop = (e: Event) => e.preventDefault();
     el.addEventListener('wheel', stop, { passive: false });
@@ -471,7 +477,7 @@ export default function Home() {
       el.removeEventListener('wheel', stop as any);
       el.removeEventListener('touchmove', stop as any);
     };
-  }, [cinematic]);
+  }, [taskCinematic]);
 
   const persistGuestTask = (taskId: string, completed: boolean) => {
     setGuestTasks((prev) => {
@@ -644,7 +650,7 @@ export default function Home() {
 
           <div
             className="relative z-20 -mx-3 mt-[14px] flex flex-col gap-2 rounded-t-[24px] bg-background px-1.5 pt-5 md:mx-auto md:mt-14 md:w-full md:max-w-2xl md:px-8 lg:gap-4"
-            style={{ pointerEvents: cinematic ? 'none' : 'auto' }}
+            style={{ pointerEvents: taskCinematic ? 'none' : 'auto' }}
           >
             <div className="flex flex-col gap-2 w-full">
               <div className="flex items-center justify-between px-2 md:px-0">
@@ -915,7 +921,7 @@ export default function Home() {
       )}
 
       {/* Full-screen blocker + skip button during tongue animation */}
-      {cinematic && <CinematicOverlay onSkip={speedUpTongue} />}
+      {taskCinematic && <CinematicOverlay onSkip={speedUpTongue} />}
 
       <QuickAddSheet
         open={showQuickAdd}

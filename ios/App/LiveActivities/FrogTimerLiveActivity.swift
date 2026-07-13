@@ -209,15 +209,17 @@ private func finishedHeader(_ state: FrogTimerAttributes.ContentState) -> some V
 private func islandControls(_ state: FrogTimerAttributes.ContentState) -> some View {
     if #available(iOS 17.0, *) {
         let tint = Color(hex: state.color)
+        let armed = state.confirmPause == true
         HStack(spacing: 8) {
             if state.finished == true {
+                CircleControlButton(systemImage: "goforward.plus", action: "more5", fg: tint, bg: tint.opacity(0.3))
                 CircleControlButton(systemImage: "checkmark", action: "done", fg: tint, bg: tint.opacity(0.3))
             } else {
                 CircleControlButton(
                     systemImage: state.paused ? "play.fill" : "pause.fill",
                     action: state.paused ? "resume" : "pause",
-                    fg: tint,
-                    bg: tint.opacity(0.3)
+                    fg: armed ? .black : tint,
+                    bg: armed ? Color(hex: "#fbbf24") : tint.opacity(0.3)
                 )
                 CircleControlButton(systemImage: "xmark", action: "stop", fg: .white, bg: .white.opacity(0.2))
             }
@@ -228,9 +230,40 @@ private func islandControls(_ state: FrogTimerAttributes.ContentState) -> some V
     }
 }
 
+// The hunt chip: flies caught / reachable this session, plus the live deep-
+// focus +1 pledge. Hidden outside focus sessions.
+@available(iOS 16.1, *)
+@ViewBuilder
+private func huntChip(_ state: FrogTimerAttributes.ContentState, compact: Bool = false) -> some View {
+    let potential = Int(state.fliesPotential ?? 0)
+    if potential > 0 {
+        HStack(spacing: 3) {
+            Text("🪰")
+                .font(.system(size: compact ? 11 : 13))
+            Text("\(Int(state.fliesCaught ?? 0))/\(potential)")
+                .font(.system(size: compact ? 11 : 13, weight: .heavy))
+                .monospacedDigit()
+                .foregroundColor(.white)
+            if state.deepFocus == true {
+                Text("⚡+1")
+                    .font(.system(size: compact ? 10 : 12, weight: .heavy))
+                    .foregroundColor(Color(hex: "#fbbf24"))
+            }
+        }
+        .padding(.horizontal, compact ? 6 : 8)
+        .padding(.vertical, compact ? 2 : 3)
+        .background(Capsule().fill(Color.white.opacity(0.14)))
+    }
+}
+
 @available(iOS 16.1, *)
 struct FrogTimerLiveActivity: Widget {
     var body: some WidgetConfiguration {
+        // NOTE: once the widget extension's deployment target is iOS 18+,
+        // append `.supplementalActivityFamilies([.small])` here so watchOS 11
+        // renders this activity in the Smart Stack with the small family.
+        // (Callable only unconditionally — `if #available` can't unify the
+        // two opaque WidgetConfiguration types.)
         ActivityConfiguration(for: FrogTimerAttributes.self) { context in
             let state = resolvedState(context)
             lockScreen(state)
@@ -251,11 +284,23 @@ struct FrogTimerLiveActivity: Widget {
                 }
                 DynamicIslandExpandedRegion(.center) {
                     if state.finished != true {
-                        Text(state.label)
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundColor(Color(hex: state.color))
-                            .lineLimit(1)
+                        if state.confirmPause == true {
+                            Text("⚡ +1 lost — tap again")
+                                .font(.system(size: 12, weight: .heavy))
+                                .foregroundColor(Color(hex: "#fbbf24"))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.7)
+                                .frame(maxHeight: .infinity, alignment: .center)
+                        } else {
+                            VStack(spacing: 3) {
+                                Text(state.label)
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundColor(Color(hex: state.color))
+                                    .lineLimit(1)
+                                huntChip(state, compact: true)
+                            }
                             .frame(maxHeight: .infinity, alignment: .center)
+                        }
                     }
                 }
                 DynamicIslandExpandedRegion(.trailing) {
@@ -290,6 +335,12 @@ struct FrogTimerLiveActivity: Widget {
                 finishedHeader(state)
                 Spacer(minLength: 8)
                 if #available(iOS 17.0, *) {
+                    CircleControlButton(
+                        systemImage: "goforward.plus",
+                        action: "more5",
+                        fg: Color(hex: state.color),
+                        bg: Color(hex: state.color).opacity(0.25)
+                    )
                     DoneButton(tint: Color(hex: state.color))
                 }
             }
@@ -297,10 +348,21 @@ struct FrogTimerLiveActivity: Widget {
             HStack(spacing: 12) {
                 islandControls(state)
                 Spacer(minLength: 8)
-                Text(state.label)
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundColor(Color(hex: state.color))
-                    .lineLimit(1)
+                if state.confirmPause == true {
+                    Text("⚡ +1 lost\ntap again")
+                        .font(.system(size: 12, weight: .heavy))
+                        .foregroundColor(Color(hex: "#fbbf24"))
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                } else {
+                    VStack(alignment: .trailing, spacing: 3) {
+                        Text(state.label)
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundColor(Color(hex: state.color))
+                            .lineLimit(1)
+                        huntChip(state)
+                    }
+                }
                 TimeView(state: state, font: .system(size: 40, weight: .bold))
                     .multilineTextAlignment(.trailing)
                     .frame(width: 120, alignment: .trailing)

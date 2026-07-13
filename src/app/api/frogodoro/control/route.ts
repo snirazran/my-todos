@@ -16,8 +16,8 @@ import type {
 
 export const dynamic = 'force-dynamic';
 
-type Action = 'pause' | 'resume' | 'stop' | 'done';
-const actions = new Set<Action>(['pause', 'resume', 'stop', 'done']);
+type Action = 'pause' | 'resume' | 'stop' | 'done' | 'more5';
+const actions = new Set<Action>(['pause', 'resume', 'stop', 'done', 'more5']);
 
 type UserFields = {
   _id: unknown;
@@ -179,6 +179,25 @@ export async function POST(req: NextRequest) {
         timeLeft,
         endsAt: new Date(now + timeLeft * 1000).toISOString(),
         finished: false,
+        rev: (timer.rev ?? 0) + 1,
+        updatedAt: new Date(now).toISOString(),
+      };
+    } else if (action === 'more5') {
+      // "+5 more" from the ringing state: a 5-minute focus continuation on
+      // the same task (mirrors the web extendFocus — the shrunken
+      // focusDuration is what makes hydration render 5:00, and the client
+      // restores the original duration on stop).
+      const extendSec = 5 * 60;
+      next = {
+        ...timer,
+        phase: 'focus',
+        status: 'running',
+        timeLeft: extendSec,
+        endsAt: new Date(now + extendSec * 1000).toISOString(),
+        finished: false,
+        deepFocusBroken: false,
+        savedElapsed: 0,
+        settings: { ...timer.settings, focusDuration: 5 },
         rev: (timer.rev ?? 0) + 1,
         updatedAt: new Date(now).toISOString(),
       };

@@ -888,10 +888,26 @@ function SelfFrog({
   paused?: boolean;
 }) {
   const frogRef = useRef<FrogHandle | null>(null);
+  const frogBoxRef = useRef<HTMLDivElement | null>(null);
+  const [mouthOpen, setMouthOpen] = useState(false);
   return (
-    <div className="pointer-events-none relative z-30 flex shrink-0 origin-bottom flex-col items-center md:scale-110 lg:scale-100">
-      <HomeFocusFlies frogRef={frogRef} />
-      <Frog ref={frogRef} width={240} height={270} indices={indices} paused={paused} />
+    <div
+      ref={frogBoxRef}
+      className="pointer-events-none relative z-30 flex shrink-0 origin-bottom flex-col items-center md:scale-110 lg:scale-100"
+    >
+      <HomeFocusFlies
+        frogRef={frogRef}
+        frogBoxRef={frogBoxRef}
+        onGrabActive={setMouthOpen}
+      />
+      <Frog
+        ref={frogRef}
+        width={240}
+        height={270}
+        indices={indices}
+        paused={paused}
+        mouthOpen={mouthOpen}
+      />
       <PremiumFrogAura />
     </div>
   );

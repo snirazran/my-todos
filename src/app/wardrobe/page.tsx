@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useMemo, useRef } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AnimatePresence, motion, useAnimationControls } from 'framer-motion';
 import Frog, { type FrogHandle } from '@/components/ui/frog';
@@ -21,6 +21,8 @@ function WardrobePageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const frogRef = useRef<FrogHandle>(null);
+  const frogBoxRef = useRef<HTMLDivElement>(null);
+  const [frogMouthOpen, setFrogMouthOpen] = useState(false);
   const { data } = useInventory(true);
   const isFrogHungry = useIsFrogHungry(true);
   const { data: bgData } = useBackgrounds(true);
@@ -83,16 +85,21 @@ function WardrobePageInner() {
           )}
         >
           <div
+            ref={frogBoxRef}
             className={cn(
               'relative z-50 translate-y-[72px] pointer-events-none md:translate-y-[5.15rem]',
               'origin-bottom transition-[opacity,transform] duration-300 ease-out',
               isStuck && 'opacity-0 scale-95',
             )}
           >
-            <HomeFocusFlies frogRef={frogRef} />
+            <HomeFocusFlies
+              frogRef={frogRef}
+              frogBoxRef={frogBoxRef}
+              onGrabActive={setFrogMouthOpen}
+            />
             <Frog
               ref={frogRef}
-              mouthOpen={false}
+              mouthOpen={frogMouthOpen}
               indices={previewIndices}
               paused={false}
             />

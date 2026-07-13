@@ -58,6 +58,23 @@
             android:name=".FrogTimerActionReceiver"
             android:exported="false" />
 
+        <receiver
+            android:name=".FrogTimerAlarmReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".FrogBootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <service
+            android:name=".FrogAlarmSoundService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
+
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="push_default" />
@@ -86,4 +103,13 @@
     <!-- Exact, on-time delivery of Frogodoro timer-end notifications (timer/alarm app). -->
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <!-- Real alarm behaviour when a session finishes: light the screen and
+         loop the chosen sound until acknowledged. -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <!-- Re-arm the finish alarm + live notification after a reboot. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Android 16+ Live Updates: status-bar chip for the running timer. -->
+    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
 </manifest>

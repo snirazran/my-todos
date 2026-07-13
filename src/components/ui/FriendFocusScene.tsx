@@ -89,7 +89,7 @@ export function FriendFocusScene({
     <>
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-14 z-10 h-32"
+        className="pointer-events-none absolute inset-x-0 top-6 z-10 h-32"
       >
         {FOCUS_DRIFTS.slice(0, 2).map((drift, i) => (
           <DriftFly

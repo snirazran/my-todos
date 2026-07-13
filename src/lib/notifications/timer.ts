@@ -128,6 +128,11 @@ export async function sendTimerControlPush({
   endTime,
   timeLeft,
   taskName,
+  rev,
+  fliesCaught,
+  fliesPotential,
+  deepFocus,
+  sound,
 }: {
   userId: string;
   tokens: string[];
@@ -136,6 +141,11 @@ export async function sendTimerControlPush({
   endTime: number;
   timeLeft: number;
   taskName: string;
+  rev?: number;
+  fliesCaught?: number;
+  fliesPotential?: number;
+  deepFocus?: boolean;
+  sound?: string;
 }) {
   if (tokens.length === 0) return { sent: 0 };
 
@@ -154,6 +164,11 @@ export async function sendTimerControlPush({
           endTime: String(endTime),
           timeLeft: String(timeLeft),
           taskName,
+          rev: String(rev ?? 0),
+          fliesCaught: String(fliesCaught ?? 0),
+          fliesPotential: String(fliesPotential ?? 0),
+          deepFocus: deepFocus ? '1' : '0',
+          sound: sound ?? '',
         },
         android: { priority: 'high' as const },
         apns: {
@@ -192,10 +207,12 @@ export async function sendTimerFinishedPush({
   userId,
   tokens,
   phase,
+  sound,
 }: {
   userId: string;
   tokens: string[];
   phase: PomodoroPhase;
+  sound?: string;
 }) {
   if (tokens.length === 0) return { sent: 0 };
 
@@ -210,6 +227,7 @@ export async function sendTimerFinishedPush({
         data: {
           type: 'timer_finished',
           phase,
+          sound: sound ?? '',
         },
         android: { priority: 'high' as const },
         apns: {

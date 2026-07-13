@@ -3,11 +3,17 @@ import ActivityKit
 import Foundation
 import UserNotifications
 
-// Powers the Live Activity buttons (Pause / Resume / Stop / Done). Interactive
-// Live Activity buttons require iOS 17+. perform() runs in the app's process
-// (even if the app is closed): it updates the activity locally for instant
-// feedback, then POSTs the action to the server (auth via the push token the
-// plugin stashed in the App Group) so every other surface stays in sync.
+// Powers the Live Activity buttons (Pause / Resume / Stop / Done / +5).
+// Interactive Live Activity buttons require iOS 17+. perform() runs in the
+// app's process (even if the app is closed): it updates the activity locally
+// for instant feedback, then POSTs the action to the server (auth via the
+// push token the plugin stashed in the App Group) so every other surface
+// stays in sync.
+//
+// Deep-focus guard: while the +1 pledge is live, the first Pause tap arms a
+// 3-second "tap again" state on the island instead of pausing — pausing
+// forfeits the bonus fly, and that must never happen on a mis-tap.
+//
 // Must be a member of BOTH the App and LiveActivities targets.
 @available(iOS 17.0, *)
 struct FrogTimerControlIntent: LiveActivityIntent {
@@ -21,20 +27,54 @@ struct FrogTimerControlIntent: LiveActivityIntent {
     init(action: String) { self.action = action }
 
     func perform() async throws -> some IntentResult {
-        // Update the island locally and return immediately so the button releases
-        // instantly (awaiting the network here keeps the button stuck in its
-        // pending state — that's what made it feel dead). The server POST runs
-        // under performExpiringActivity, which keeps the process alive past
-        // perform()'s return so the request still lands when the app is
-        // backgrounded/suspended (a plain detached Task is killed on re-suspend).
-        let perfStart = Date()
         NSLog("FrogControl: perform start action=%@", action)
+
+        // Deep-focus two-tap arm: swallow the first pause tap.
+        if action == "pause", let activity = Self.currentActivity() {
+            let s = activity.content.state
+            if s.deepFocus == true && s.confirmPause != true && !s.paused {
+                var armed = s
+                armed.confirmPause = true
+                await activity.update(ActivityContent(state: armed, staleDate: nil))
+                Self.scheduleConfirmPauseRevert(activityId: activity.id)
+                return .result()
+            }
+        }
+
         await applyLocally()
-        NSLog("FrogControl: applyLocally done action=%@ dt=%.0fms", action, Date().timeIntervalSince(perfStart) * 1000)
-        let activityId = Activity<FrogTimerAttributes>.activities.first?.id
+        let activityId = Self.currentActivity()?.id
         let controlSeq = Self.nextControlSeq()
         Self.postToServer(action: action, controlSeq: controlSeq, activityId: activityId)
         return .result()
+    }
+
+    // The set of live activities can contain a doomed duplicate mid-reconcile;
+    // always prefer an active/stale one (mirrors the plugin's selection).
+    static func currentActivity() -> Activity<FrogTimerAttributes>? {
+        let all = Activity<FrogTimerAttributes>.activities
+        return all.first { $0.activityState == .active || $0.activityState == .stale }
+            ?? all.first
+    }
+
+    // Best-effort: clear the armed state if the user doesn't confirm within 3s.
+    // performExpiringActivity keeps the process alive long enough.
+    private static func scheduleConfirmPauseRevert(activityId: String) {
+        ProcessInfo.processInfo.performExpiringActivity(withReason: "FrogConfirmPauseRevert") { expired in
+            guard !expired else { return }
+            Thread.sleep(forTimeInterval: 3.0)
+            let semaphore = DispatchSemaphore(value: 0)
+            Task {
+                if let activity = currentActivity(),
+                   activity.id == activityId,
+                   activity.content.state.confirmPause == true {
+                    var s = activity.content.state
+                    s.confirmPause = false
+                    await activity.update(ActivityContent(state: s, staleDate: nil))
+                }
+                semaphore.signal()
+            }
+            semaphore.wait()
+        }
     }
 
     private func applyLocally() async {
@@ -43,7 +83,7 @@ struct FrogTimerControlIntent: LiveActivityIntent {
                 withIdentifiers: ["880001", "880002"]
             )
         }
-        guard let activity = Activity<FrogTimerAttributes>.activities.first else {
+        guard let activity = Self.currentActivity() else {
             NSLog("FrogControl: applyLocally no activity (count=%d) action=%@",
                   Activity<FrogTimerAttributes>.activities.count, action)
             return
@@ -54,10 +94,14 @@ struct FrogTimerControlIntent: LiveActivityIntent {
 
         switch action {
         case "pause":
+            FrogAlarmKit.cancel()
             var ns = s
             let remaining = s.ringEnd > 0 ? max(0, (s.ringEnd - nowMs) / 1000) : s.ringValue
             ns.paused = true
             ns.finished = false
+            ns.confirmPause = false
+            // Pausing breaks the pledge — drop the +1 badge immediately.
+            ns.deepFocus = false
             ns.endTime = 0
             ns.ringStart = 0
             ns.ringEnd = 0
@@ -67,15 +111,41 @@ struct FrogTimerControlIntent: LiveActivityIntent {
         case "resume":
             var ns = s
             let end = nowMs + ns.ringValue * 1000
+            FrogAlarmKit.sync(
+                endTimeMs: end,
+                phase: s.label.lowercased().contains("break") ? "break" : "focus",
+                soundId: s.sound
+            )
             ns.paused = false
             ns.finished = false
+            ns.confirmPause = false
             ns.endTime = end
             ns.ringStart = end - ns.ringTotal * 1000
             ns.ringEnd = end
             await activity.update(
                 ActivityContent(state: ns, staleDate: Date(timeIntervalSince1970: end / 1000))
             )
+        case "more5":
+            // 5 more minutes of focus, alarm silenced, island back to running.
+            var ns = s
+            let total: Double = 5 * 60
+            let end = nowMs + total * 1000
+            FrogAlarmKit.sync(endTimeMs: end, phase: "focus", soundId: s.sound)
+            ns.paused = false
+            ns.finished = false
+            ns.confirmPause = false
+            ns.label = "Focus"
+            ns.subtitle = ""
+            ns.endTime = end
+            ns.ringValue = total
+            ns.ringTotal = total
+            ns.ringStart = nowMs
+            ns.ringEnd = end
+            await activity.update(
+                ActivityContent(state: ns, staleDate: Date(timeIntervalSince1970: end / 1000))
+            )
         case "stop", "done":
+            FrogAlarmKit.cancel()
             await activity.end(nil, dismissalPolicy: .immediate)
         default:
             break
@@ -110,11 +180,10 @@ struct FrogTimerControlIntent: LiveActivityIntent {
             return
         }
 
-        // performExpiringActivity keeps the process from being suspended while the
-        // request is in flight, but does NOT block perform() from returning — so
-        // the button stays responsive and the POST still completes in the
-        // background. The semaphore holds the assertion open until the request
-        // finishes (or the OS signals expiry).
+        // performExpiringActivity keeps the process from being suspended while
+        // the request is in flight, but does NOT block perform() from returning.
+        // Up to 3 attempts with short backoff — a dropped pause POST otherwise
+        // leaves the server running while the island shows paused.
         ProcessInfo.processInfo.performExpiringActivity(withReason: "FrogTimerControl") { expired in
             guard !expired else {
                 NSLog("FrogControl: expiring activity ended before POST completed")
@@ -129,16 +198,22 @@ struct FrogTimerControlIntent: LiveActivityIntent {
             if let activityId { payload["activityId"] = activityId }
             request.httpBody = try? JSONSerialization.data(withJSONObject: payload)
 
-            let semaphore = DispatchSemaphore(value: 0)
-            URLSession.shared.dataTask(with: request) { _, response, error in
-                if let http = response as? HTTPURLResponse {
-                    NSLog("FrogControl: POST %@ -> %d", action, http.statusCode)
-                } else if let error {
-                    NSLog("FrogControl: POST %@ failed: %@", action, error.localizedDescription)
-                }
-                semaphore.signal()
-            }.resume()
-            semaphore.wait()
+            for attempt in 1...3 {
+                let semaphore = DispatchSemaphore(value: 0)
+                var succeeded = false
+                URLSession.shared.dataTask(with: request) { _, response, error in
+                    if let http = response as? HTTPURLResponse {
+                        NSLog("FrogControl: POST %@ attempt %d -> %d", action, attempt, http.statusCode)
+                        succeeded = (200..<300).contains(http.statusCode)
+                    } else if let error {
+                        NSLog("FrogControl: POST %@ attempt %d failed: %@", action, attempt, error.localizedDescription)
+                    }
+                    semaphore.signal()
+                }.resume()
+                semaphore.wait()
+                if succeeded { return }
+                if attempt < 3 { Thread.sleep(forTimeInterval: Double(attempt) * 1.5) }
+            }
         }
     }
 
