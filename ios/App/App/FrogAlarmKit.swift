@@ -54,12 +54,18 @@ enum FrogAlarmKit {
                     tintColor: Color(red: 0x16 / 255, green: 0xa3 / 255, blue: 0x4a / 255)
                 )
                 let date = Date(timeIntervalSince1970: endTimeMs / 1000)
-                var configuration = AlarmManager.AlarmConfiguration(
-                    schedule: .fixed(date),
-                    attributes: attributes
-                )
+                let configuration: AlarmManager.AlarmConfiguration<FrogAlarmMetadata>
                 if let soundId, !soundId.isEmpty, soundId != "none" {
-                    configuration.sound = .named("\(soundId).caf")
+                    configuration = AlarmManager.AlarmConfiguration(
+                        schedule: .fixed(date),
+                        attributes: attributes,
+                        sound: .named("\(soundId).caf")
+                    )
+                } else {
+                    configuration = AlarmManager.AlarmConfiguration(
+                        schedule: .fixed(date),
+                        attributes: attributes
+                    )
                 }
 
                 let id = UUID()
