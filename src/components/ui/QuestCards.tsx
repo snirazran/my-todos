@@ -45,7 +45,7 @@ import {
   objectiveCardTone,
   useCompletionReveal,
 } from '@/lib/questClaims';
-import { guideIdForBlock } from '@/lib/hints/guides';
+import { guideContextForBlock, guideIdForBlock } from '@/lib/hints/guides';
 import { useUIStore } from '@/lib/uiStore';
 
 export type QuestRewardCatalogItem = Pick<
@@ -2281,7 +2281,27 @@ function ObjectiveRow({
       <HintButton
         text={objectiveHintText(block, linkedTags?.[0]?.name)}
         onShowMe={
-          guideId && !needsTag ? () => startHintGuide(guideId) : undefined
+          guideId && !needsTag
+            ? () => {
+                const context = guideContextForBlock(block);
+                const tagNames =
+                  context?.tagNames ??
+                  (linkedTags?.length
+                    ? linkedTags.map((tag) => tag.name)
+                    : undefined);
+                const chipSource = linkedTags?.length
+                  ? linkedTags
+                  : undefined;
+                startHintGuide(guideId, {
+                  ...context,
+                  tagNames,
+                  tags:
+                    chipSource?.filter((tag) =>
+                      tagNames ? tagNames.includes(tag.name) : true,
+                    ) ?? undefined,
+                });
+              }
+            : undefined
         }
       />
     );

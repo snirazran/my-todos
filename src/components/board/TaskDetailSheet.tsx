@@ -715,6 +715,7 @@ export default function TaskDetailSheet({
                     <div className="mt-3 flex shrink-0 items-center gap-1.5">
                       {onSetRepeat && (
                         <button
+                          data-hint="repeat-button"
                           onClick={() => setShowRepeat(true)}
                           className={`inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-bold transition-transform active:scale-95 ${
                             isRepeating
@@ -739,13 +740,15 @@ export default function TaskDetailSheet({
                           </ToolbarIconButton>
                         )}
                         {onAddTags && (
-                          <ToolbarIconButton
-                            label="Tags"
-                            active={taskTags.length > 0}
-                            onClick={onAddTags}
-                          >
-                            <Tag className="h-5 w-5" />
-                          </ToolbarIconButton>
+                          <span data-hint="task-tags-button" className="inline-flex">
+                            <ToolbarIconButton
+                              label="Tags"
+                              active={taskTags.length > 0}
+                              onClick={onAddTags}
+                            >
+                              <Tag className="h-5 w-5" />
+                            </ToolbarIconButton>
+                          </span>
                         )}
                         {onDelete && (
                           <button

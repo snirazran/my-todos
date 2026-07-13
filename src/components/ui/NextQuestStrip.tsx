@@ -251,7 +251,11 @@ export function NextQuestStrip({
                 text={displayNextUp.hint}
                 onShowMe={
                   displayNextUp.guideId
-                    ? () => startHintGuide(displayNextUp.guideId!)
+                    ? () =>
+                        startHintGuide(
+                          displayNextUp.guideId!,
+                          displayNextUp.guideContext,
+                        )
                     : undefined
                 }
               />

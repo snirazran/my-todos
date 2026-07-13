@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import type { HintGuideContext } from '@/lib/hints/guides';
 
 interface UIState {
   isWardrobeOpen: boolean;
@@ -37,8 +38,13 @@ interface UIState {
   wardrobeTab: string;
   setWardrobeTab: (tab: string) => void;
 
-  activeHint: { guideId: string; stepIndex: number; runId: number } | null;
-  startHintGuide: (guideId: string) => void;
+  activeHint: {
+    guideId: string;
+    stepIndex: number;
+    runId: number;
+    context?: HintGuideContext;
+  } | null;
+  startHintGuide: (guideId: string, context?: HintGuideContext) => void;
   advanceHintStep: () => void;
   goToHintStep: (stepIndex: number) => void;
   dismissHintGuide: () => void;
@@ -84,8 +90,10 @@ export const useUIStore = create<UIState>()(
       setWardrobeTab: (tab: string) => set({ wardrobeTab: tab }),
 
       activeHint: null,
-      startHintGuide: (guideId: string) =>
-        set({ activeHint: { guideId, stepIndex: 0, runId: Date.now() } }),
+      startHintGuide: (guideId, context) =>
+        set({
+          activeHint: { guideId, stepIndex: 0, runId: Date.now(), context },
+        }),
       advanceHintStep: () =>
         set((state) =>
           state.activeHint

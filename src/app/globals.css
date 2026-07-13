@@ -159,6 +159,12 @@
     transform: translateX(380%) skewX(-14deg);
   }
 }
+/* HintCoach multi-target glow: applied as a class so it rides its element
+   through scrolling and re-renders. Circular pulse sized for the fly bullet. */
+.hint-fly-glow {
+  box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.9), 0 0 14px 4px rgba(251, 191, 36, 0.5);
+  animation: demo-glow-breathe 2.4s ease-in-out infinite;
+}
 @keyframes fly-bob {
   0%,
   100% {

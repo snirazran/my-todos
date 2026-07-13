@@ -989,6 +989,7 @@ export default function QuickAddSheet({
                       >
                         <div
                           ref={tagScroll.ref}
+                          data-hint="tag-picker"
                           onScroll={updateTagFade}
                           onMouseDown={tagScroll.handlers.onMouseDown}
                           onMouseLeave={tagScroll.handlers.onMouseLeave}

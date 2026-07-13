@@ -1,3 +1,32 @@
+// Values interpolated into step labels: {tags} → quoted tag names,
+// {days} → streak length. Provided by the surface starting the guide.
+// `tags` (with colors) renders real tag chips inside the label; `tagIds`
+// scopes fly-glow steps to tasks carrying those tags.
+export type HintGuideContext = {
+  tagNames?: string[];
+  days?: number;
+  tags?: { id?: string; name: string; color: string }[];
+  tagIds?: string[];
+};
+
+export function formatHintLabel(
+  label: string,
+  context?: HintGuideContext | null,
+): string {
+  let next = label;
+  if (next.includes('{tags}')) {
+    const names = (context?.tagNames ?? []).filter(Boolean);
+    next = next.replace(
+      '{tags}',
+      names.length > 0 ? names.map((name) => `“${name}”`).join(' or ') : 'the quest tag',
+    );
+  }
+  if (next.includes('{days}')) {
+    next = next.replace('{days}', String(context?.days ?? 2));
+  }
+  return next;
+}
+
 export type HintStep = {
   // Route the step lives on; the coach navigates there if needed. Steps
   // without an href stay wherever the previous step left the user.
@@ -40,6 +69,11 @@ export type HintStep = {
   // always-visible anchors that sit under oversized transparent layers the
   // hit-test can't see through (the frog's full-width Rive canvas).
   coverCheck?: boolean;
+  // Glow every task fly instead of ringing the anchor ('tagged' limits the
+  // glow to tasks carrying the guide context's tagIds). Implies hideRing.
+  flyGlow?: 'all' | 'tagged';
+  // Keep the anchor for label placement/advance but don't draw its ring.
+  hideRing?: boolean;
   // How long to wait for the anchor before giving up quietly.
   timeoutMs?: number;
 };
@@ -70,6 +104,8 @@ const GUIDES: Record<string, HintGuide> = {
         anchor: 'task-list',
         label: 'Tap the fly on any task to finish it',
         requirePresent: '[data-hint="task-fly"]',
+        flyGlow: 'all',
+        hideRing: true,
         timeoutMs: 90_000,
       },
     ],
@@ -204,6 +240,101 @@ const GUIDES: Record<string, HintGuide> = {
       },
     ],
   },
+  // Tag-scoped variants for area-quest objectives: same flow as their plain
+  // twins, with the quest's tags woven into the copy and a final step on the
+  // tag picker.
+  'add-tagged-task': {
+    id: 'add-tagged-task',
+    steps: [
+      {
+        href: '/',
+        anchor: 'add-task',
+        label: 'Add a task and tag it {tags}',
+      },
+      {
+        anchor: 'tag-picker',
+        selector: '[data-hint="tag-picker"], [data-hint="task-tags-button"]',
+        label: 'Pick the {tags} tag',
+        timeoutMs: 90_000,
+      },
+    ],
+  },
+  'complete-tagged-task': {
+    id: 'complete-tagged-task',
+    steps: [
+      {
+        href: '/',
+        anchor: 'task-list',
+        label:
+          'Finish any task tagged {tags} — or add one and tag it',
+        requirePresent: '[data-hint="task-fly"]',
+        flyGlow: 'tagged',
+        hideRing: true,
+        alsoAdvanceOn: '[data-hint="add-task"]',
+        timeoutMs: 90_000,
+      },
+    ],
+  },
+  'focus-tagged': {
+    id: 'focus-tagged',
+    steps: [
+      {
+        href: '/',
+        anchor: 'add-task',
+        label: 'Add a task tagged {tags} to focus on',
+        skipWhenPresent: '[data-hint="task-row"]',
+      },
+      {
+        anchor: 'task-list',
+        label: 'Open a task tagged {tags} and hit Focus',
+        labelCoarse: 'Swipe a task tagged {tags} right — or tap to open it',
+        gesture: 'swipe-right',
+        requirePresent: '[data-hint="task-row"]',
+        timeoutMs: 90_000,
+      },
+      {
+        anchor: 'focus-button',
+        label: 'Start the focus timer',
+        timeoutMs: 60_000,
+      },
+    ],
+  },
+  streak: {
+    id: 'streak',
+    steps: [
+      {
+        href: '/',
+        anchor: 'task-list',
+        selector: '[data-hint="task-list"], [data-hint="add-task"]',
+        label:
+          'Streaks need a repeating task — open one (or add it), then turn on Repeat',
+        timeoutMs: 90_000,
+        alsoAdvanceOn: '[data-hint="add-task"]',
+      },
+      {
+        anchor: 'repeat-button',
+        label: 'Turn on Repeat',
+        timeoutMs: 90_000,
+      },
+      {
+        anchor: 'task-list',
+        label: 'Now finish it {days} times in a row — starting today',
+        timeoutMs: 30_000,
+      },
+    ],
+  },
+  buddy: {
+    id: 'buddy',
+    steps: [
+      {
+        href: '/friends',
+        anchor: 'friends-list',
+        label:
+          'Pick a friend and team up on a task — it counts when you both finish it',
+        timeoutMs: 30_000,
+      },
+    ],
+  },
 };
 
 const METRIC_GUIDE_IDS: Record<string, string> = {
@@ -216,7 +347,10 @@ const METRIC_GUIDE_IDS: Record<string, string> = {
   friend_invited: 'invite-friend',
   task_saved_later: 'save-later',
   frog_fed_full: 'feed-frog',
+  buddy_task_completed: 'buddy',
 };
+
+const TASK_STREAK_GUIDE_PATTERN = /^task_streak_(\d+)$/;
 
 export function guideById(guideId: string | undefined): HintGuide | null {
   if (!guideId) return null;
@@ -227,13 +361,48 @@ export function guideIdForBlock(block: {
   type?: string;
   action?: string;
   metricKey?: string;
+  tagMode?: string;
 }): string | null {
-  if (block.type === 'focus_minutes') return 'focus';
+  const tagScoped =
+    block.tagMode === 'focus_category_tags' ||
+    block.tagMode === 'random_user_tag';
+  if (block.type === 'focus_minutes') {
+    return tagScoped ? 'focus-tagged' : 'focus';
+  }
   if (block.type === 'metric_count') {
+    if (TASK_STREAK_GUIDE_PATTERN.test(block.metricKey ?? '')) return 'streak';
     return METRIC_GUIDE_IDS[block.metricKey ?? ''] ?? null;
   }
   if (block.type === 'count') {
-    return block.action === 'add' ? 'add-task' : 'complete-task';
+    if (block.action === 'add') {
+      return tagScoped ? 'add-tagged-task' : 'add-task';
+    }
+    return tagScoped ? 'complete-tagged-task' : 'complete-task';
   }
   return null;
+}
+
+export function guideContextForBlock(block: {
+  metricKey?: string;
+  resolvedTagNames?: string[];
+  resolvedTagName?: string;
+  resolvedTagIds?: string[];
+  resolvedTagId?: string;
+}): HintGuideContext | undefined {
+  const tagNames =
+    block.resolvedTagNames?.length
+      ? block.resolvedTagNames
+      : block.resolvedTagName
+        ? [block.resolvedTagName]
+        : undefined;
+  const tagIds =
+    block.resolvedTagIds?.length
+      ? block.resolvedTagIds
+      : block.resolvedTagId
+        ? [block.resolvedTagId]
+        : undefined;
+  const streakMatch = TASK_STREAK_GUIDE_PATTERN.exec(block.metricKey ?? '');
+  const days = streakMatch ? Number(streakMatch[1]) : undefined;
+  if (!tagNames && !tagIds && days === undefined) return undefined;
+  return { tagNames, tagIds, days };
 }

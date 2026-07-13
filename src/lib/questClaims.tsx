@@ -53,6 +53,7 @@ export type Trackable = {
   reward?: any;
   hint?: string;
   guideId?: string;
+  guideContext?: import('@/lib/hints/guides').HintGuideContext;
 };
 
 type ShowNotification = (

@@ -285,7 +285,10 @@ export default function FriendsPage() {
               </p>
             </div>
 
-            <div className="w-full overflow-hidden rounded-[18px] border border-border/50 bg-card/40 p-1.5 shadow-sm">
+            <div
+              className="w-full overflow-hidden rounded-[18px] border border-border/50 bg-card/40 p-1.5 shadow-sm"
+              data-hint="friends-list"
+            >
               {!friendsData ? (
                 <FriendsLeaderboardSkeleton rows={3} />
               ) : hasRealFriends ? (

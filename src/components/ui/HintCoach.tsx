@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import { usePathname, useRouter } from 'next/navigation';
 import { ChevronsLeft, ChevronsRight, X } from 'lucide-react';
 import { useUIStore } from '@/lib/uiStore';
-import { guideById } from '@/lib/hints/guides';
+import { formatHintLabel, guideById } from '@/lib/hints/guides';
 
 const FIND_TIMEOUT_MS = 12_000;
 // Grace window for re-acquiring a lost anchor (list re-renders) before the
@@ -328,6 +328,36 @@ export function HintCoach() {
     };
   }, [el, stepKey, step]);
 
+  // Fly-glow steps light up every matching task fly (class-based so the glow
+  // rides the elements through scroll/re-renders) instead of ringing the
+  // anchor container.
+  useEffect(() => {
+    if (!el || !step?.flyGlow) return;
+    const contextTagIds = activeHint?.context?.tagIds ?? [];
+    const apply = () => {
+      const flies = Array.from(
+        document.querySelectorAll<HTMLElement>('[data-hint="task-fly"]'),
+      );
+      for (const fly of flies) {
+        const matches =
+          step.flyGlow === 'all' ||
+          (contextTagIds.length > 0 &&
+            (fly.dataset.tagIds ?? '')
+              .split(',')
+              .some((id) => id && contextTagIds.includes(id)));
+        fly.classList.toggle('hint-fly-glow', matches);
+      }
+    };
+    apply();
+    const interval = window.setInterval(apply, 400);
+    return () => {
+      window.clearInterval(interval);
+      document
+        .querySelectorAll<HTMLElement>('.hint-fly-glow')
+        .forEach((glowing) => glowing.classList.remove('hint-fly-glow'));
+    };
+  }, [el, step, activeHint?.context]);
+
   // Touching the anchor advances the guide (or finishes it on the last step).
   // Outside taps: single-step hints close on any of them; multi-step
   // walkthroughs close only when the tap lands on an unrelated interactive
@@ -339,8 +369,21 @@ export function HintCoach() {
     if (!el) return;
     const onPointerDown = (event: PointerEvent) => {
       const target = event.target as Node;
+      // Fly-glow steps: only the glowing flies advance; other taps inside the
+      // anchor (opening a row to finish it from the sheet) neither advance
+      // nor cancel.
+      if (step?.flyGlow) {
+        const inGlowingFly =
+          target instanceof Element && !!target.closest('.hint-fly-glow');
+        if (inGlowingFly) {
+          if (isLastStep) dismissHintGuide();
+          else advanceHintStep();
+          return;
+        }
+        if (el.contains(target)) return;
+      }
       const inAnchor =
-        el.contains(target) ||
+        (!step?.flyGlow && el.contains(target)) ||
         (step?.alsoAdvanceOn &&
           target instanceof Element &&
           !!target.closest(step.alsoAdvanceOn));
@@ -380,7 +423,43 @@ export function HintCoach() {
 
   if (!mounted || !activeHint || !step) return null;
 
-  const label = coarsePointer && step.labelCoarse ? step.labelCoarse : step.label;
+  const rawLabel = coarsePointer && step.labelCoarse ? step.labelCoarse : step.label;
+  const contextTags = activeHint.context?.tags?.filter((tag) => tag.name);
+  // With colored tag data available, {tags} renders as real chips; otherwise
+  // it falls back to quoted names via formatHintLabel.
+  const label =
+    contextTags?.length && rawLabel.includes('{tags}')
+      ? rawLabel.split('{tags}').flatMap((part, index, parts) => {
+          const nodes: React.ReactNode[] = [
+            <span key={`t-${index}`}>
+              {formatHintLabel(part, activeHint.context)}
+            </span>,
+          ];
+          if (index < parts.length - 1) {
+            nodes.push(
+              <span
+                key={`chips-${index}`}
+                className="mx-0.5 inline-flex flex-wrap items-center gap-1 align-middle"
+              >
+                {contextTags.map((tag) => (
+                  <span
+                    key={tag.id ?? tag.name}
+                    className="inline-flex max-w-[7rem] items-center rounded-md border px-1.5 py-px text-[10px] font-black uppercase tracking-wide"
+                    style={{
+                      backgroundColor: `${tag.color}20`,
+                      borderColor: `${tag.color}55`,
+                      color: tag.color,
+                    }}
+                  >
+                    <span className="truncate">{tag.name}</span>
+                  </span>
+                ))}
+              </span>,
+            );
+          }
+          return nodes;
+        })
+      : formatHintLabel(rawLabel, activeHint.context);
   const showGesture = coarsePointer && !!step.gesture;
 
   const viewportHeight = window.innerHeight;
@@ -412,14 +491,14 @@ export function HintCoach() {
               height: rect.height + RING_PADDING * 2,
             }}
           >
-            <span
-              className="absolute inset-0 ring-[3px] ring-amber-400/90 animate-[demo-glow-breathe_2.4s_ease-in-out_infinite]"
-              style={{ borderRadius }}
-            />
-            <span
-              className="absolute inset-0 ring-[3px] ring-amber-400 animate-[demo-sonar_2.4s_cubic-bezier(0,0,0.2,1)_infinite] motion-reduce:hidden"
-              style={{ borderRadius }}
-            />
+            {/* Steady glow — the sonar pulse stays exclusive to the very
+                first onboarding fly coach. */}
+            {!step.hideRing && !step.flyGlow && (
+              <span
+                className="absolute inset-0 ring-[3px] ring-amber-400/90 shadow-[0_0_16px_4px_rgba(251,191,36,0.55)]"
+                style={{ borderRadius }}
+              />
+            )}
             {showGesture && (
               <span className="absolute inset-0 flex items-center justify-center">
                 <span

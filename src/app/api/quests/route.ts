@@ -12,7 +12,7 @@ import {
   metricRemainingLabel,
   objectiveHintText,
 } from '@/lib/quests/metricLabels';
-import { guideIdForBlock } from '@/lib/hints/guides';
+import { guideContextForBlock, guideIdForBlock } from '@/lib/hints/guides';
 
 const isDataUrl = (value: unknown): value is string =>
   typeof value === 'string' && value.startsWith('data:');
@@ -145,6 +145,7 @@ type TrackableEntry = {
   reward?: any;
   hint?: string;
   guideId?: string;
+  guideContext?: import('@/lib/hints/guides').HintGuideContext;
 };
 
 function objectiveRemainingLabel(
@@ -406,6 +407,20 @@ export async function GET(req: Request) {
           reward: block.rewards?.[0],
           hint: objectiveHintText(block, questFocusTags(quest)[0]?.name),
           guideId: guideIdForBlock(block) ?? undefined,
+          guideContext: (() => {
+            const context = guideContextForBlock(block);
+            const focusTags = questFocusTags(quest);
+            const tagNames =
+              context?.tagNames ??
+              (focusTags.length > 0
+                ? focusTags.map((tag) => tag.name)
+                : undefined);
+            const tags = focusTags.length > 0 ? focusTags : undefined;
+            const tagIds = context?.tagIds ?? tags?.map((tag) => tag.id);
+            return context || tagNames
+              ? { ...context, tagNames, tags, tagIds }
+              : undefined;
+          })(),
         });
       }
     }

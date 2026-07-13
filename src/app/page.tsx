@@ -681,6 +681,7 @@ export default function Home() {
                         }}
                         className="relative flex items-center justify-center w-11 h-11 border-2 rounded-full bg-muted border-muted-foreground/20 shrink-0 md:h-12 md:w-12"
                         data-hint="task-fly"
+                        data-tag-ids={task.tags?.join(',') || undefined}
                       >
                         {showFlyCoach && (
                           <>

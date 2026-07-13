@@ -5,6 +5,7 @@ import QuestTemplateModel, {
 import UserModel from '@/lib/models/User';
 import TaskModel, { type TaskDoc } from '@/lib/models/Task';
 import QuestCategoryModel, { type QuestCategoryDoc } from '@/lib/models/QuestCategory';
+import FriendshipModel from '@/lib/models/Friendship';
 import connectMongo from '@/lib/mongoose';
 import type { UserDoc } from '@/lib/types/UserDoc';
 import { TRADE_ITEM_COUNT, type ItemDef } from '@/lib/skins/catalog';
@@ -602,11 +603,16 @@ function isPoolEntryEligible(args: {
   catalog: ItemDef[];
   tasks: TaskDoc[];
   todayKey: string;
+  hasFriends: boolean;
 }): boolean {
   const { entry, placement, user, catalog, tasks, todayKey } = args;
   if (entry.type !== 'metric_count' || !entry.metricKey) return true;
   const metricKey = entry.metricKey;
   const inventory = user.wardrobe?.inventory ?? {};
+
+  // Buddy objectives are dead weight for a user with no friends to buddy up
+  // with — never roll them into a quest.
+  if (metricKey === 'buddy_task_completed' && !args.hasFriends) return false;
 
   if (
     metricKey === 'trade_completed' ||
@@ -702,6 +708,7 @@ function buildEligiblePool(args: {
   catalog: ItemDef[];
   tasks: TaskDoc[];
   todayKey: string;
+  hasFriends: boolean;
 }): RecipePoolEntry[] {
   const base = (args.slot.pool ?? []).filter(
     (entry) => entry && Math.floor(entry.minTarget) > 0,
@@ -1052,6 +1059,10 @@ export async function syncQuestState(args: {
 
   if (!user) throw new Error('User not found');
 
+  const hasFriends = !!(await FriendshipModel.exists({
+    $or: [{ userA: userId }, { userB: userId }],
+  }));
+
   const profile = normalizeFocusProfile(user);
   const todayKey = getZonedToday(timezone);
   const visibilityMetrics = buildVisibilityMetrics(user, tasks, todayKey);
@@ -1149,6 +1160,7 @@ export async function syncQuestState(args: {
           catalog,
           tasks,
           todayKey,
+          hasFriends,
         });
         const pick = pickWeighted(
           pool,
@@ -1333,6 +1345,7 @@ export async function syncQuestState(args: {
             catalog,
             tasks,
             todayKey,
+            hasFriends,
           });
           const pick = pickWeighted(
             pool,
