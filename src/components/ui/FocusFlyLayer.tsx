@@ -1,13 +1,13 @@
 'use client';
 
-import React, { useEffect } from 'react';
-import { motion, useAnimationControls } from 'framer-motion';
+import React, { useEffect, useRef } from 'react';
 import Fly from '@/components/ui/fly';
+import { driftElapsedMs } from '@/lib/focusDriftClock';
 
-// The one drift choreography every focus surface uses (timer sheet + home
-// hero), so the swarms mirror each other. Px offsets from each fly's anchor;
-// each path swings wide, dips toward the frog once per loop, returns to its
-// anchor so the repeat is seamless.
+// The one drift choreography every focus surface uses (timer sheet, home
+// hero, wardrobe, friends), so the swarms mirror each other. Px offsets from
+// each fly's anchor; each path swings wide, dips toward the frog once per
+// loop, returns to its anchor so the repeat is seamless.
 export const FOCUS_DRIFTS = [
   {
     anchor: { left: '12%', top: 18 },
@@ -43,11 +43,39 @@ export const FOCUS_DRIFTS = [
 
 export type FocusDrift = (typeof FOCUS_DRIFTS)[number];
 
+const ENTRY_MS = 900;
+// A session is "just starting" for this long after the drift clock begins —
+// the only remount window that plays the slide-in entry.
+const FRESH_START_MS = 1500;
+
+function easeInOut(t: number): number {
+  return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+}
+
+function easeOutCubic(t: number): number {
+  return 1 - Math.pow(1 - t, 3);
+}
+
+// Piecewise keyframe interpolation with per-segment easing — the same shape
+// the framer keyframe loop drew, but derived from an absolute phase.
+function interp(values: readonly number[], phase: number): number {
+  const segments = values.length - 1;
+  const scaled = Math.min(0.9999, Math.max(0, phase)) * segments;
+  const index = Math.floor(scaled);
+  const local = easeInOut(scaled - index);
+  return values[index] + (values[index + 1] - values[index]) * local;
+}
+
 /**
- * One drifting fly. Pausing freezes it exactly where it is (`controls.stop`),
- * and resuming continues from the frozen spot (leading `null` keyframe = start
- * from current value) — no snap back to the anchor. Ignores the global
- * slide/sheet Rive pause by design.
+ * One drifting fly, positioned every frame from the shared pause-aware drift
+ * clock: phase = elapsed % duration. Any surface mounting at any moment
+ * (popup opening, page navigation, hide/show) computes the identical
+ * position, so the swarms are always in sync and never "re-enter" on a
+ * remount. Pausing freezes the clock — flies hold exactly where they are.
+ *
+ * The off-screen entry glide plays only when the session just started or the
+ * fly is a respawn (`forceEntry`). Ignores the global slide/sheet Rive pause
+ * by design.
  */
 export function DriftFly({
   drift,
@@ -55,65 +83,73 @@ export function DriftFly({
   size = 34,
   hidden = false,
   entryFromX = 0,
+  forceEntry = false,
+  localClock = false,
   flyRef,
 }: {
   drift: FocusDrift;
   running: boolean;
   size?: number;
   hidden?: boolean;
-  /** Respawn entry: start this many px off to the side (fully off-screen)
-   *  and glide in to join the drift loop — like the welcome-page fly. */
+  /** Respawn/start entry: glide in from this many px to the side. */
   entryFromX?: number;
+  /** Play the entry even mid-session (a respawned fly). */
+  forceEntry?: boolean;
+  /** Decorative scenes (a friend's frog) run on wall time instead of the
+   *  shared session clock, so they animate without a session of our own. */
+  localClock?: boolean;
   flyRef?: (el: HTMLElement | null) => void;
 }) {
-  const controls = useAnimationControls();
+  const spanRef = useRef<HTMLSpanElement | null>(null);
+  const entryStartRef = useRef<number | null>(null);
 
-  // Two-phase: a one-shot glide to the anchor (covers both the off-screen
-  // entry and resuming from a mid-path freeze), then the infinite loop over
-  // EXPLICIT keyframes. The loop must never contain a `null`/entry frame —
-  // framer repeats from the resolved first keyframe, so anything dynamic in
-  // frame 0 replays every cycle (flies re-entering from off-screen forever).
   useEffect(() => {
-    let cancelled = false;
-    if (running) {
-      void (async () => {
-        await controls.start({
-          x: drift.x[0],
-          y: drift.y[0],
-          opacity: 1,
-          transition: { duration: 0.9, ease: 'easeOut' },
-        });
-        if (cancelled) return;
-        await controls.start({
-          x: [...drift.x],
-          y: [...drift.y],
-          transition: {
-            x: { duration: drift.duration, repeat: Infinity, ease: 'easeInOut' },
-            y: { duration: drift.duration, repeat: Infinity, ease: 'easeInOut' },
-          },
-        });
-      })();
-    } else {
-      controls.stop();
-      void controls.start({ opacity: 0.7, transition: { duration: 0.3 } });
-    }
-    return () => {
-      cancelled = true;
+    const clock = localClock ? () => performance.now() : driftElapsedMs;
+    const doEntry =
+      entryFromX !== 0 &&
+      (forceEntry || localClock || driftElapsedMs() < FRESH_START_MS);
+    entryStartRef.current = doEntry ? performance.now() : null;
+
+    let raf = 0;
+    const tick = () => {
+      const el = spanRef.current;
+      if (el) {
+        const durationMs = drift.duration * 1000;
+        const phase = (clock() % durationMs) / durationMs;
+        let x = interp(drift.x, phase);
+        let y = interp(drift.y, phase);
+        if (entryStartRef.current !== null) {
+          const k = Math.min(
+            1,
+            (performance.now() - entryStartRef.current) / ENTRY_MS,
+          );
+          const e = easeOutCubic(k);
+          x = entryFromX + (x - entryFromX) * e;
+          y = y * e;
+          if (k >= 1) entryStartRef.current = null;
+        }
+        el.style.transform = `translate(${x}px, ${y}px)`;
+      }
+      raf = requestAnimationFrame(tick);
     };
-  }, [running, controls, drift]);
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [drift, entryFromX, forceEntry, localClock]);
 
   return (
-    <motion.span
-      ref={flyRef}
-      className="absolute"
+    <span
+      ref={(el) => {
+        spanRef.current = el;
+        flyRef?.(el);
+      }}
+      className="absolute transition-opacity duration-300"
       style={{
         ...drift.anchor,
         visibility: hidden ? 'hidden' : 'visible',
+        opacity: running ? 1 : 0.7,
       }}
-      initial={{ opacity: entryFromX ? 1 : 0, x: entryFromX, y: drift.y[0] }}
-      animate={controls}
     >
       <Fly size={size} interactive={false} alwaysPlay paused={!running} />
-    </motion.span>
+    </span>
   );
 }

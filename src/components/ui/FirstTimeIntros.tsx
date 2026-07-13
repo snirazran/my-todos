@@ -44,7 +44,7 @@ function IntroShell({
       className="md:max-w-md"
     >
       {() => (
-        <div className="px-6 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-2">
+        <div className="max-h-[calc(100dvh-6rem)] overflow-y-auto overscroll-contain px-6 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-2">
           {children}
         </div>
       )}
@@ -245,6 +245,15 @@ export function FrogodoroIntroSheet({
 
   const rows = [
     {
+      icon: <Fly size={30} interactive={false} alwaysPlay oversample={1.5} />,
+      text: (
+        <>
+          Your frog hunts while you work — <b>1 fly caught every 5 focused
+          minutes</b>
+        </>
+      ),
+    },
+    {
       icon: <ScrollText className="h-5 w-5" strokeWidth={2.5} />,
       text: (
         <>
@@ -276,6 +285,9 @@ export function FrogodoroIntroSheet({
       <h2 className="mt-2 text-center text-xl font-black text-foreground">
         Focus, frog-style
       </h2>
+      <p className="mt-0.5 text-center text-[12px] font-bold text-muted-foreground">
+        Focus time is hunting time
+      </p>
       <FrogPerch open={open} />
       <div className="rounded-2xl border border-border/50 bg-muted/30 px-3 pb-3 pt-3.5">
         <div className="flex h-14 w-full gap-1">

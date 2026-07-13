@@ -14,6 +14,7 @@ import { mutateInventoryCaches } from '@/hooks/useInventory';
 
 export const HOME_FOCUS_FLY_PREFIX = 'home-focus-fly-';
 const MISS_KEY = 'home-focus-miss';
+const BAND_H = 176;
 
 function visibleRatio(rect: DOMRect): number {
   const vw = window.innerWidth;
@@ -43,6 +44,7 @@ export function HomeFocusFlies({
   triggerTongue,
   visuallyDone,
   tongueEnabled = false,
+  onSpeech,
   hidden = false,
 }: {
   frogRef: React.RefObject<FrogHandle | null>;
@@ -53,6 +55,8 @@ export function HomeFocusFlies({
   visuallyDone?: Set<string>;
   /** Frogodoro sheet is open — hunt events mirror through the real tongue. */
   tongueEnabled?: boolean;
+  /** Receives the shared catch line so this surface's bubble matches. */
+  onSpeech?: (line: string) => void;
   /** Visually suppressed (task-grab cinematic, other panel) — the catch
    *  bookkeeping keeps running so no fly-gain celebration is lost. */
   hidden?: boolean;
@@ -62,6 +66,30 @@ export function HomeFocusFlies({
   const [eaten, setEaten] = useState<Set<string>>(new Set());
   const [respawn, setRespawn] = useState<Record<string, number>>({});
   const [missPos, setMissPos] = useState<{ x: number; y: number } | null>(null);
+  const bandRef = useRef<HTMLDivElement | null>(null);
+
+  // Root anchor: the band tracks the FROG's live viewport geometry (via its
+  // handle), portaled to <body>. Each page wraps its frog in a different
+  // container (full-width hero, bare frog box…), so anchoring to the frog
+  // itself is the only placement that renders identically everywhere.
+  useEffect(() => {
+    let raf = 0;
+    const tick = () => {
+      const el = bandRef.current;
+      const box = frogRef.current?.getBoxRect?.();
+      const mouth = frogRef.current?.getMouthPoint?.();
+      if (el && box && mouth && box.width > 0) {
+        const bandW = Math.min(470, window.innerWidth * 0.92);
+        const left = box.left + box.width / 2 - bandW / 2;
+        const top = mouth.y - BAND_H + 42;
+        el.style.width = `${bandW}px`;
+        el.style.transform = `translate(${left}px, ${top}px)`;
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [frogRef]);
 
   const sessionOnFocus = timerActive && phase === 'focus';
   const running = sessionOnFocus && isRunning;
@@ -132,6 +160,7 @@ export function HomeFocusFlies({
       if (!el) return;
 
       if (event.type === 'catch') {
+        onSpeech?.(event.line);
         void triggerTongue({
           key,
           completed: false,
@@ -164,33 +193,43 @@ export function HomeFocusFlies({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [triggerTongue, flyRefs]);
 
-  if (!sessionOnFocus || hidden) return null;
+  if (!sessionOnFocus) return null;
 
   return (
     <>
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-[4%] z-30 h-44"
-      >
-        {FOCUS_DRIFTS.slice(0, flyCount).map((drift, i) => {
-          const key = `${HOME_FOCUS_FLY_PREFIX}${i}`;
-          const isHidden = eaten.has(key) || (visuallyDone?.has(key) ?? false);
-          const epoch = respawn[key] ?? 0;
-          return (
-            <DriftFly
-              key={`${key}-${epoch}`}
-              drift={drift}
-              running={running}
-              hidden={isHidden}
-              size={38}
-              entryFromX={running ? entrySideFor(drift) : 0}
-              flyRef={(el) => {
-                if (flyRefs) flyRefs.current[key] = el;
-              }}
-            />
-          );
-        })}
-      </div>
+      {/* `hidden` only hides visually — unmounting would replay the fly
+          entry and lose the shared drift phase on every panel open/close.
+          The band is fixed + body-portaled and follows the frog each frame,
+          so placement is frog-relative on every page. */}
+      {createPortal(
+        <div
+          ref={bandRef}
+          aria-hidden
+          className="pointer-events-none fixed left-0 top-0 z-30 h-44"
+          style={{ visibility: hidden ? 'hidden' : 'visible' }}
+        >
+          {FOCUS_DRIFTS.slice(0, flyCount).map((drift, i) => {
+            const key = `${HOME_FOCUS_FLY_PREFIX}${i}`;
+            const isHidden = eaten.has(key) || (visuallyDone?.has(key) ?? false);
+            const epoch = respawn[key] ?? 0;
+            return (
+              <DriftFly
+                key={`${key}-${epoch}`}
+                drift={drift}
+                running={running}
+                hidden={isHidden}
+                size={38}
+                entryFromX={entrySideFor(drift)}
+                forceEntry={epoch > 0}
+                flyRef={(el) => {
+                  if (flyRefs) flyRefs.current[key] = el;
+                }}
+              />
+            );
+          })}
+        </div>,
+        document.body,
+      )}
 
       {/* Invisible aim point for missed grabs — just past the fly, away from
           the frog */}

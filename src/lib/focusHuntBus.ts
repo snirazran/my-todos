@@ -6,7 +6,7 @@
 
 export type FocusHuntEvent =
   | { type: 'miss'; flyIndex: number; overshoot: number; jitterX: number }
-  | { type: 'catch'; flyIndex: number };
+  | { type: 'catch'; flyIndex: number; line: string };
 
 type Listener = (event: FocusHuntEvent) => void;
 

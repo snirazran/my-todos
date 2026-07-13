@@ -153,6 +153,16 @@ export default function Home() {
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [timerTask, setTimerTask] = useState<Task | null>(null);
   const [timerAutoStart, setTimerAutoStart] = useState(false);
+  const [focusSpeech, setFocusSpeech] = useState<string | null>(null);
+  const focusSpeechTimerRef = useRef(0);
+  const handleFocusSpeech = useCallback((line: string) => {
+    setFocusSpeech(line);
+    window.clearTimeout(focusSpeechTimerRef.current);
+    focusSpeechTimerRef.current = window.setTimeout(
+      () => setFocusSpeech(null),
+      4000,
+    );
+  }, []);
   const [showTimer, setShowTimer] = useState(false);
   const [frogodoroHydrated, setFrogodoroHydrated] = useState(
     () => useFrogodoroStore.persist?.hasHydrated?.() ?? false,
@@ -598,6 +608,7 @@ export default function Home() {
                     triggerTongue={triggerTongue}
                     visuallyDone={visuallyDone}
                     tongueEnabled={showTimer}
+                    onSpeech={handleFocusSpeech}
                     hidden={
                       ((cinematic || !!grab) && !focusGrabActive) ||
                       (isAnyPanelOpen && !showTimer)
@@ -610,7 +621,10 @@ export default function Home() {
               frogBoxRef={frogBoxRef}
               mouthOpen={!!grab}
               mouthOffset={FROG_TONGUE_MOUTH_OFFSET}
-              isCatching={!!grab && !grab.silent}
+              isCatching={
+                !!grab && !grab.silent && !grab.key.startsWith('home-focus')
+              }
+              fixedSpeech={focusSpeech}
               indices={frogIndices}
               openWardrobe={isWardrobeOpen}
               onOpenChange={setWardrobeOpen}

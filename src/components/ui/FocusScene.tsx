@@ -70,8 +70,8 @@ export function FocusScene({
   const speechTimerRef = useRef(0);
   const prevCaughtRef = useRef(caught);
 
-  const speakCatch = useCallback((caughtNow: number) => {
-    setSpeech(pickFrogLine('catch', { done: caughtNow }));
+  const speakLine = useCallback((line: string) => {
+    setSpeech(line);
     window.clearTimeout(speechTimerRef.current);
     speechTimerRef.current = window.setTimeout(() => setSpeech(null), 4000);
   }, []);
@@ -141,11 +141,14 @@ export function FocusScene({
     const caughtNow = caught;
     prevCaughtRef.current = caught;
     const index = pickLiveIndex();
-    emitFocusHunt({ type: 'catch', flyIndex: Math.max(0, index) });
+    // One line for every surface — the bus carries it so home shows the
+    // exact same text at the same moment.
+    const line = pickFrogLine('catch', { done: caughtNow });
+    emitFocusHunt({ type: 'catch', flyIndex: Math.max(0, index), line });
+    speakLine(line);
     if (index < 0 || suspended) {
       frogRef.current?.fireEmote('love');
       launchGain();
-      speakCatch(caughtNow);
       return;
     }
     const key = `scene-fly-${index}`;
@@ -155,7 +158,6 @@ export function FocusScene({
       completed: false,
       onPersist: () => {
         launchGain();
-        speakCatch(caughtNow);
         eatAndRespawn(key);
       },
     });
@@ -215,7 +217,7 @@ export function FocusScene({
       {showFlies && (
         <div
           aria-hidden
-          className="pointer-events-none absolute -top-28 inset-x-0 h-36"
+          className="pointer-events-none absolute -top-16 inset-x-0 h-32"
         >
           {FOCUS_DRIFTS.slice(0, flyCount).map((drift, i) => {
             const key = `scene-fly-${i}`;
@@ -227,7 +229,8 @@ export function FocusScene({
                 drift={drift}
                 running={running}
                 hidden={hidden}
-                entryFromX={running ? entrySideFor(drift) : 0}
+                entryFromX={entrySideFor(drift)}
+                forceEntry={epoch > 0}
                 flyRef={(el) => {
                   flyRefs.current[key] = el;
                 }}
@@ -237,17 +240,6 @@ export function FocusScene({
         </div>
       )}
 
-      {/* Catch speech — same bubble as the home frog */}
-      <div aria-hidden className="absolute -top-40 inset-x-0 h-16">
-        {speech && (
-          <FrogSpeechBubble
-            rate={0}
-            done={0}
-            total={0}
-            fixedMessage={speech}
-          />
-        )}
-      </div>
 
       {/* Invisible aim point for missed grabs — just past the fly, away from
           the frog. Portaled to body: the sheet's transformed container would
@@ -305,6 +297,18 @@ export function FocusScene({
           marginBottom: -6,
         }}
       >
+        {/* Catch speech — same bubble, same in-frog-container placement as
+            the home frog (FrogDisplay), so it can't be buried by the card's
+            stacking. */}
+        {speech && (
+          <FrogSpeechBubble
+            rate={0}
+            done={0}
+            total={0}
+            fixedMessage={speech}
+            className="!top-2"
+          />
+        )}
         <Frog
           ref={frogRef}
           width={frogWidth}

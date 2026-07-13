@@ -22,7 +22,8 @@ import { mutateFriendsCaches } from '@/hooks/useFriendsSync';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { useIsFrogHungry } from '@/hooks/useFrogHunger';
 import { useRegisterOpenSheet, useSheetStore } from '@/lib/sheetStore';
-import Frog from '@/components/ui/frog';
+import Frog, { type FrogHandle } from '@/components/ui/frog';
+import { HomeFocusFlies } from '@/components/ui/HomeFocusFlies';
 import Fly from '@/components/ui/fly';
 import {
   FriendsPageSkeleton,
@@ -886,9 +887,11 @@ function SelfFrog({
   indices: Partial<Record<'skin' | 'hat' | 'body' | 'hand_item' | 'mood', number>>;
   paused?: boolean;
 }) {
+  const frogRef = useRef<FrogHandle | null>(null);
   return (
     <div className="pointer-events-none relative z-30 flex shrink-0 origin-bottom flex-col items-center md:scale-110 lg:scale-100">
-      <Frog width={240} height={270} indices={indices} paused={paused} />
+      <HomeFocusFlies frogRef={frogRef} />
+      <Frog ref={frogRef} width={240} height={270} indices={indices} paused={paused} />
       <PremiumFrogAura />
     </div>
   );

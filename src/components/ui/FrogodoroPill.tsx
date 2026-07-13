@@ -205,13 +205,27 @@ export default function FrogodoroPill({ onClick, taskName }: Props) {
 
         <div className="flex flex-1 items-center justify-between gap-3 min-w-0">
           <div className="flex flex-col min-w-0 leading-tight">
-            <span className="text-[10px] font-black uppercase tracking-[0.12em] opacity-80">
-              {isRunning ? (phase === 'focus' ? 'Focus' : 'Break') : 'Paused'}
-            </span>
-            {taskName && (
-              <span className="text-sm font-bold truncate opacity-95">
-                {taskName}
+            {pauseArmed ? (
+              <span className="text-[11px] font-black text-amber-300">
+                Tap again — +1 fly lost
               </span>
+            ) : (
+              <>
+                <span className="text-[10px] font-black uppercase tracking-[0.12em] opacity-80">
+                  {isRunning
+                    ? phase === 'focus'
+                      ? taskName
+                        ? 'Focusing on'
+                        : 'Focusing'
+                      : 'On a break'
+                    : 'Paused'}
+                </span>
+                {taskName && (
+                  <span className="text-sm font-bold truncate opacity-95">
+                    {taskName}
+                  </span>
+                )}
+              </>
             )}
           </div>
           <span className="text-base font-black tabular-nums shrink-0">
@@ -230,25 +244,18 @@ export default function FrogodoroPill({ onClick, taskName }: Props) {
         >
           <Square className="h-3.5 w-3.5 fill-current" />
         </button>
-        <div className="relative">
-          {pauseArmed && (
-            <span className="absolute bottom-full left-1/2 mb-2 -translate-x-1/2 whitespace-nowrap rounded-full bg-amber-500 px-2.5 py-1 text-[11px] font-black text-white shadow-lg">
-              Tap again — +1 fly lost
-            </span>
+        <button
+          type="button"
+          onClick={handlePlayPause}
+          aria-label={isRunning ? 'Pause' : 'Resume'}
+          className={`flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-white transition-colors hover:bg-white/30 active:scale-95 ${pauseArmed ? 'ring-2 ring-amber-400' : ''}`}
+        >
+          {isRunning ? (
+            <Pause className="h-4 w-4 fill-current" />
+          ) : (
+            <Play className="h-4 w-4 fill-current" />
           )}
-          <button
-            type="button"
-            onClick={handlePlayPause}
-            aria-label={isRunning ? 'Pause' : 'Resume'}
-            className={`flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-white transition-colors hover:bg-white/30 active:scale-95 ${pauseArmed ? 'ring-2 ring-amber-400' : ''}`}
-          >
-            {isRunning ? (
-              <Pause className="h-4 w-4 fill-current" />
-            ) : (
-              <Play className="h-4 w-4 fill-current" />
-            )}
-          </button>
-        </div>
+        </button>
         <button
           type="button"
           onClick={handleSkip}

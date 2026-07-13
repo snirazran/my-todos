@@ -1038,21 +1038,23 @@ export default function FrogodoroSheet({
                                   )}
                                 </AnimatePresence>
                               </motion.div>
+                              {/* +1 slips out from under the chip — same
+                                  gesture as the home currency pill's gain. */}
                               <AnimatePresence>
                                 {chipPulse > 0 && (
                                   <motion.span
                                     key={`gain-${chipPulse}`}
-                                    initial={{ opacity: 0, y: 6 }}
-                                    animate={{ opacity: 1, y: -16 }}
-                                    exit={{ opacity: 0, y: -26 }}
-                                    transition={{ duration: 0.8, ease: 'easeOut' }}
+                                    initial={{ opacity: 0, y: -14 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -6 }}
+                                    transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
                                     onAnimationComplete={() => {
                                       window.setTimeout(
                                         () => setChipPulse((p) => (p > 0 ? 0 : p)),
-                                        600,
+                                        1400,
                                       );
                                     }}
-                                    className="pointer-events-none absolute left-1/2 top-0 flex -translate-x-1/2 items-center gap-1 rounded-full bg-white/95 px-2 py-0.5 text-xs font-black text-primary shadow"
+                                    className="pointer-events-none absolute left-1/2 top-full z-[-1] mt-1.5 flex -translate-x-1/2 items-center gap-1 rounded-full bg-white/95 px-2 py-0.5 text-xs font-black text-primary shadow"
                                   >
                                     <Fly size={16} interactive={false} paused />
                                     +1

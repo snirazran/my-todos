@@ -6,7 +6,8 @@ import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MoreVertical, X, UserMinus, Users, Check, Loader2, Clock } from 'lucide-react';
 import useSWR from 'swr';
-import Frog from '@/components/ui/frog';
+import Frog, { type FrogHandle } from '@/components/ui/frog';
+import { FriendFocusScene } from '@/components/ui/FriendFocusScene';
 import Fly from '@/components/ui/fly';
 import {
   useBackgrounds,
@@ -98,7 +99,9 @@ export function FriendDetailModal({
   allFriends?: FriendSummary[];
 }) {
   useRegisterOpenSheet(!!entry);
-  const router = useRouter();
+  const friendFrogRef = React.useRef<FrogHandle | null>(null);
+  const friendFrogBoxRef = React.useRef<HTMLDivElement | null>(null);
+  const [friendMouthOpen, setFriendMouthOpen] = useState(false);
   const { data } = useBackgrounds(!!entry);
   const { data: inventoryData } = useInventory(!!entry);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -303,10 +306,24 @@ export function FriendDetailModal({
                   </div>
                 </div>
 
+                {/* Focusing right now — flies + tongue lunges over the banner */}
+                <FriendFocusScene
+                  frogRef={friendFrogRef}
+                  frogBoxRef={friendFrogBoxRef}
+                  active={!!entry.focusing}
+                  onGrabActive={setFriendMouthOpen}
+                />
+
                 {/* Frog — sits above the white sheet below it */}
                 <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-center">
-                  <div className="relative -translate-y-[26px]">
-                    <Frog width={230} height={210} indices={entry.indices} />
+                  <div ref={friendFrogBoxRef} className="relative -translate-y-[26px]">
+                    <Frog
+                      ref={friendFrogRef}
+                      width={230}
+                      height={210}
+                      indices={entry.indices}
+                      mouthOpen={friendMouthOpen}
+                    />
                     <PremiumFrogAura show={!!entry.premium} />
                   </div>
                 </div>
@@ -336,27 +353,17 @@ export function FriendDetailModal({
                     )}
                 </div>
 
-                {/* Live focus presence — invite to focus alongside them */}
+                {/* Live focus presence — indicator only for now */}
                 {entry.focusing && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onClose();
-                      router.push('/');
-                    }}
-                    className="flex items-center justify-between gap-2 rounded-2xl bg-primary/10 px-4 py-3 text-left transition-colors hover:bg-primary/15"
-                  >
-                    <span className="flex items-center gap-2 text-sm font-black text-primary">
-                      <span className="relative flex h-2.5 w-2.5">
-                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-60" />
-                        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary" />
-                      </span>
+                  <div className="flex items-center justify-center gap-2 rounded-2xl bg-primary/10 px-4 py-3">
+                    <span className="relative flex h-2.5 w-2.5">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-60" />
+                      <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary" />
+                    </span>
+                    <span className="text-sm font-black text-primary">
                       Focusing right now
                     </span>
-                    <span className="text-xs font-bold text-primary/70">
-                      Join them →
-                    </span>
-                  </button>
+                  </div>
                 )}
 
                 {/* Flies shared stats */}
