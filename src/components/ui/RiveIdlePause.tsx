@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { setRiveIdle } from '@/lib/riveIdlePause';
+import { installPerfDebug } from '@/lib/perfDebug';
 
 const IDLE_MS = 20_000;
 // Input events (pointermove especially) fire in bursts; restarting the timer
@@ -27,6 +28,7 @@ const EVENTS: (keyof WindowEventMap)[] = [
  */
 export function RiveIdlePause() {
   useEffect(() => {
+    installPerfDebug();
     if (!Capacitor.isNativePlatform()) return;
     let timer = 0;
     let lastArm = 0;
