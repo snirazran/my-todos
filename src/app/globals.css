@@ -356,6 +356,7 @@
    producing frames at 60fps and the GPU pipeline awake. First touch removes
    the class and everything resumes mid-cycle. */
 .app-idle .animate-shimmer,
+.app-idle .animate-shine,
 .app-idle .plus-name-shimmer,
 .app-idle .claim-wobble,
 .app-idle .animate-ping-ring,

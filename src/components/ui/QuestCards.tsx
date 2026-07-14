@@ -2792,7 +2792,7 @@ export const RewardTile = memo(function RewardTile({
 function RewardTileGloss() {
   return (
     <div className="absolute inset-0 overflow-hidden rounded-[inherit]">
-      <div className="absolute inset-y-[-24%] left-0 w-1/3 bg-gradient-to-r from-transparent via-white/65 to-transparent opacity-90 animate-shine dark:via-current dark:opacity-20" />
+      <div className="absolute inset-y-[-24%] left-0 w-1/3 bg-gradient-to-r from-transparent via-white/65 to-transparent opacity-90 animate-[shine_1.35s_ease-in-out_2_both] dark:via-current dark:opacity-20" />
     </div>
   );
 }
