@@ -36,13 +36,19 @@ const ARTBOARD_NAME = 'main';
 const STATE_MACHINE = 'State Machine 1';
 const MOUTH_TRIGGER = 'open_mouth';
 const OPEN_MOUTH_BINDING = 'openMouth';
+const OPEN_MOUTH_BINDING_SNAKE = 'open_mouth';
+const CLOSE_MOUTH_BINDING = 'close_mouth';
 const SLEEPING_BINDING = 'sleeping';
 const BREATHING_BINDING = 'breathing';
 // How long emote_sleep_entry needs before the instance can freeze on the
 // sleeping pose. Tune to the entry timeline's real length.
 const SLEEP_ENTRY_PAUSE_MS = 1600;
-const BREATH_MIN_MS = 5000;
-const BREATH_JITTER_MS = 5000;
+// Resting rhythm: mostly single breaths with short irregular gaps, plus the
+// occasional longer still moment — uniform long gaps read as "switched off".
+const nextBreathDelayMs = () =>
+  Math.random() < 0.3
+    ? 5000 + Math.random() * 4000
+    : 1800 + Math.random() * 2700;
 
 // Legacy Rive numeric inputs (all are integers in the older state machine)
 const INPUTS = {
@@ -204,6 +210,14 @@ const Frog = memo(
       OPEN_MOUTH_BINDING,
       viewModelInstance,
     );
+    const { trigger: triggerOpenMouthSnake } = useViewModelInstanceTrigger(
+      OPEN_MOUTH_BINDING_SNAKE,
+      viewModelInstance,
+    );
+    const { trigger: triggerCloseMouth } = useViewModelInstanceTrigger(
+      CLOSE_MOUTH_BINDING,
+      viewModelInstance,
+    );
     const { trigger: triggerEmoteLove } = useViewModelInstanceTrigger(
       EMOTE_BINDINGS.loveOnce,
       viewModelInstance,
@@ -279,15 +293,12 @@ const Frog = memo(
       if (paused) return;
       let t = 0;
       const schedule = () => {
-        t = window.setTimeout(
-          () => {
-            if (rive?.isPlaying && !useRiveIdlePause.getState().idle) {
-              triggerBreathing();
-            }
-            schedule();
-          },
-          BREATH_MIN_MS + Math.random() * BREATH_JITTER_MS,
-        );
+        t = window.setTimeout(() => {
+          if (rive?.isPlaying && !useRiveIdlePause.getState().idle) {
+            triggerBreathing();
+          }
+          schedule();
+        }, nextBreathDelayMs());
       };
       schedule();
       return () => window.clearTimeout(t);
@@ -309,13 +320,25 @@ const Frog = memo(
       INPUTS.hand_item,
     );
 
-    /* ---- mouth trigger ---- */
+    /* ---- mouth trigger: open on grab, explicit close when it ends ---- */
+    const wasMouthOpenRef = useRef(false);
     useEffect(() => {
-      if (!mouthOpen) return;
-
-      triggerOpenMouth();
-      mouthTrigger?.fire();
-    }, [mouthOpen, mouthTrigger, triggerOpenMouth]);
+      if (mouthOpen) {
+        wasMouthOpenRef.current = true;
+        triggerOpenMouth();
+        triggerOpenMouthSnake();
+        mouthTrigger?.fire();
+      } else if (wasMouthOpenRef.current) {
+        wasMouthOpenRef.current = false;
+        triggerCloseMouth();
+      }
+    }, [
+      mouthOpen,
+      mouthTrigger,
+      triggerOpenMouth,
+      triggerOpenMouthSnake,
+      triggerCloseMouth,
+    ]);
 
     const setBoundSlotIndex = React.useCallback(
       (slot: WardrobeSlot, index: number) => {
