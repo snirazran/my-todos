@@ -14,6 +14,11 @@
 		504EC30F1FED79650016851F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30E1FED79650016851F /* Assets.xcassets */; };
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
+		60A1AC113005ABF7008C7297 /* Sounds/frog.caf in Resources */ = {isa = PBXBuildFile; fileRef = 60A1AC013005ABF7008C7297 /* Sounds/frog.caf */; };
+		60A1AC123005ABF7008C7297 /* Sounds/classic.caf in Resources */ = {isa = PBXBuildFile; fileRef = 60A1AC023005ABF7008C7297 /* Sounds/classic.caf */; };
+		60A1AC133005ABF7008C7297 /* Sounds/dreamscape.caf in Resources */ = {isa = PBXBuildFile; fileRef = 60A1AC033005ABF7008C7297 /* Sounds/dreamscape.caf */; };
+		60A1AC143005ABF7008C7297 /* Sounds/lofi.caf in Resources */ = {isa = PBXBuildFile; fileRef = 60A1AC043005ABF7008C7297 /* Sounds/lofi.caf */; };
+		60A1AC153005ABF7008C7297 /* Sounds/stardust.caf in Resources */ = {isa = PBXBuildFile; fileRef = 60A1AC053005ABF7008C7297 /* Sounds/stardust.caf */; };
 		60AE542A2FE030AE00222D18 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 60AE54292FE030AE00222D18 /* GoogleService-Info.plist */; };
 		60AE54322FE060ED00222D18 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 60AE54312FE060ED00222D18 /* WidgetKit.framework */; };
 		60AE54342FE060ED00222D18 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 60AE54332FE060ED00222D18 /* SwiftUI.framework */; };
@@ -32,11 +37,6 @@
 		60F4FD473005AB4D008C7297 /* FrogAlarmKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60F4FD453005AB4D008C7297 /* FrogAlarmKit.swift */; };
 		60F4FD493005AB74008C7297 /* FrogAppShortcuts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60F4FD483005AB74008C7297 /* FrogAppShortcuts.swift */; };
 		60F4FD4B3005ABF6008C7297 /* FrogControlWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60F4FD4A3005ABF6008C7297 /* FrogControlWidget.swift */; };
-		60A1AC113005ABF7008C7297 /* frog.caf in Resources */ = {isa = PBXBuildFile; fileRef = 60A1AC013005ABF7008C7297 /* frog.caf */; };
-		60A1AC123005ABF7008C7297 /* classic.caf in Resources */ = {isa = PBXBuildFile; fileRef = 60A1AC023005ABF7008C7297 /* classic.caf */; };
-		60A1AC133005ABF7008C7297 /* dreamscape.caf in Resources */ = {isa = PBXBuildFile; fileRef = 60A1AC033005ABF7008C7297 /* dreamscape.caf */; };
-		60A1AC143005ABF7008C7297 /* lofi.caf in Resources */ = {isa = PBXBuildFile; fileRef = 60A1AC043005ABF7008C7297 /* lofi.caf */; };
-		60A1AC153005ABF7008C7297 /* stardust.caf in Resources */ = {isa = PBXBuildFile; fileRef = 60A1AC053005ABF7008C7297 /* stardust.caf */; };
 		A084ECDBA7D38E1E42DFC39D /* Pods_App.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */; };
 		F76207B087AC76F6689761F7 /* Pods_LiveActivitiesExtension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0A77A78A14762DCD2132693B /* Pods_LiveActivitiesExtension.framework */; };
 /* End PBXBuildFile section */
@@ -77,17 +77,17 @@
 		504EC3111FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		504EC3131FED79650016851F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
+		60A1AC013005ABF7008C7297 /* Sounds/frog.caf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Sounds/frog.caf; sourceTree = "<group>"; };
+		60A1AC023005ABF7008C7297 /* Sounds/classic.caf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Sounds/classic.caf; sourceTree = "<group>"; };
+		60A1AC033005ABF7008C7297 /* Sounds/dreamscape.caf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Sounds/dreamscape.caf; sourceTree = "<group>"; };
+		60A1AC043005ABF7008C7297 /* Sounds/lofi.caf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Sounds/lofi.caf; sourceTree = "<group>"; };
+		60A1AC053005ABF7008C7297 /* Sounds/stardust.caf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Sounds/stardust.caf; sourceTree = "<group>"; };
 		60AE54292FE030AE00222D18 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		60AE542B2FE030E700222D18 /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
 		60AE54302FE060ED00222D18 /* LiveActivitiesExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = LiveActivitiesExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		60AE54312FE060ED00222D18 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		60AE54332FE060ED00222D18 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		60AE54452FE0612600222D18 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		60A1AC013005ABF7008C7297 /* frog.caf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Sounds/frog.caf; sourceTree = "<group>"; };
-		60A1AC023005ABF7008C7297 /* classic.caf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Sounds/classic.caf; sourceTree = "<group>"; };
-		60A1AC033005ABF7008C7297 /* dreamscape.caf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Sounds/dreamscape.caf; sourceTree = "<group>"; };
-		60A1AC043005ABF7008C7297 /* lofi.caf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Sounds/lofi.caf; sourceTree = "<group>"; };
-		60A1AC053005ABF7008C7297 /* stardust.caf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Sounds/stardust.caf; sourceTree = "<group>"; };
 		60AE54462FE0612600222D18 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		60AE54472FE0612600222D18 /* LiveActivities.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveActivities.swift; sourceTree = "<group>"; };
 		60AE54482FE0612600222D18 /* LiveActivitiesBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveActivitiesBundle.swift; sourceTree = "<group>"; };
@@ -186,11 +186,11 @@
 			children = (
 				60F4FD4A3005ABF6008C7297 /* FrogControlWidget.swift */,
 				60AE54452FE0612600222D18 /* Assets.xcassets */,
-				60A1AC013005ABF7008C7297 /* frog.caf */,
-				60A1AC023005ABF7008C7297 /* classic.caf */,
-				60A1AC033005ABF7008C7297 /* dreamscape.caf */,
-				60A1AC043005ABF7008C7297 /* lofi.caf */,
-				60A1AC053005ABF7008C7297 /* stardust.caf */,
+				60A1AC013005ABF7008C7297 /* Sounds/frog.caf */,
+				60A1AC023005ABF7008C7297 /* Sounds/classic.caf */,
+				60A1AC033005ABF7008C7297 /* Sounds/dreamscape.caf */,
+				60A1AC043005ABF7008C7297 /* Sounds/lofi.caf */,
+				60A1AC053005ABF7008C7297 /* Sounds/stardust.caf */,
 				60AE54462FE0612600222D18 /* Info.plist */,
 				60AE54472FE0612600222D18 /* LiveActivities.swift */,
 				60AE54482FE0612600222D18 /* LiveActivitiesBundle.swift */,
@@ -314,11 +314,11 @@
 			buildActionMask = 2147483647;
 			files = (
 				60AE544C2FE0612600222D18 /* Assets.xcassets in Resources */,
-				60A1AC113005ABF7008C7297 /* frog.caf in Resources */,
-				60A1AC123005ABF7008C7297 /* classic.caf in Resources */,
-				60A1AC133005ABF7008C7297 /* dreamscape.caf in Resources */,
-				60A1AC143005ABF7008C7297 /* lofi.caf in Resources */,
-				60A1AC153005ABF7008C7297 /* stardust.caf in Resources */,
+				60A1AC113005ABF7008C7297 /* Sounds/frog.caf in Resources */,
+				60A1AC123005ABF7008C7297 /* Sounds/classic.caf in Resources */,
+				60A1AC133005ABF7008C7297 /* Sounds/dreamscape.caf in Resources */,
+				60A1AC143005ABF7008C7297 /* Sounds/lofi.caf in Resources */,
+				60A1AC153005ABF7008C7297 /* Sounds/stardust.caf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -571,13 +571,13 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 17;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = M7BKYJ6U55;
 				INFOPLIST_FILE = App/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Frogress;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
-				MARKETING_VERSION = 1.0.6;
+				MARKETING_VERSION = 1.0.7;
 				OTHER_SWIFT_FLAGS = "$(inherited) \"-D\" \"COCOAPODS\" \"-DDEBUG\"";
 				PRODUCT_BUNDLE_IDENTIFIER = io.frog.tasks;
 				PRODUCT_NAME = Frogress;
@@ -595,13 +595,13 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 17;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = M7BKYJ6U55;
 				INFOPLIST_FILE = App/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Frogress;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
-				MARKETING_VERSION = 1.0.6;
+				MARKETING_VERSION = 1.0.7;
 				PRODUCT_BUNDLE_IDENTIFIER = io.frog.tasks;
 				PRODUCT_NAME = Frogress;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "";

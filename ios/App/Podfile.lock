@@ -25,6 +25,8 @@ PODS:
   - CapacitorFirebaseMessaging (8.3.0):
     - Capacitor
     - FirebaseMessaging (~> 12.7.0)
+  - CapacitorHaptics (8.0.2):
+    - Capacitor
   - CapacitorLiveActivities (8.0.0):
     - Capacitor
   - CapacitorLocalNotifications (8.0.2):
@@ -145,6 +147,7 @@ DEPENDENCIES:
   - "CapacitorCommunityInAppReview (from `../../node_modules/.pnpm/@capacitor-community+in-app-review@8.0.0_@capacitor+core@8.0.2/node_modules/@capacitor-community/in-app-review`)"
   - "CapacitorCordova (from `../../node_modules/.pnpm/@capacitor+ios@8.0.2_@capacitor+core@8.0.2/node_modules/@capacitor/ios`)"
   - "CapacitorFirebaseMessaging (from `../../node_modules/.pnpm/@capacitor-firebase+messaging@8.3.0_@capacitor+core@8.0.2_firebase@12.9.0/node_modules/@capacitor-firebase/messaging`)"
+  - "CapacitorHaptics (from `../../node_modules/.pnpm/@capacitor+haptics@8.0.2_@capacitor+core@8.0.2/node_modules/@capacitor/haptics`)"
   - "CapacitorLiveActivities (from `../../node_modules/.pnpm/capacitor-live-activities@8.0.0_patch_hash=2k5dzarcuu653ce4cc6mygid7m_@capacitor+core@8.0.2/node_modules/capacitor-live-activities`)"
   - "CapacitorLocalNotifications (from `../../node_modules/.pnpm/@capacitor+local-notifications@8.0.2_@capacitor+core@8.0.2/node_modules/@capacitor/local-notifications`)"
   - "CapacitorMlkitBarcodeScanning (from `../../node_modules/.pnpm/@capacitor-mlkit+barcode-scanning@8.1.0_@capacitor+core@8.0.2/node_modules/@capacitor-mlkit/barcode-scanning`)"
@@ -194,6 +197,8 @@ EXTERNAL SOURCES:
     :path: "../../node_modules/.pnpm/@capacitor+ios@8.0.2_@capacitor+core@8.0.2/node_modules/@capacitor/ios"
   CapacitorFirebaseMessaging:
     :path: "../../node_modules/.pnpm/@capacitor-firebase+messaging@8.3.0_@capacitor+core@8.0.2_firebase@12.9.0/node_modules/@capacitor-firebase/messaging"
+  CapacitorHaptics:
+    :path: "../../node_modules/.pnpm/@capacitor+haptics@8.0.2_@capacitor+core@8.0.2/node_modules/@capacitor/haptics"
   CapacitorLiveActivities:
     :path: "../../node_modules/.pnpm/capacitor-live-activities@8.0.0_patch_hash=2k5dzarcuu653ce4cc6mygid7m_@capacitor+core@8.0.2/node_modules/capacitor-live-activities"
   CapacitorLocalNotifications:
@@ -219,6 +224,7 @@ SPEC CHECKSUMS:
   CapacitorCommunityInAppReview: 4492bdd34aad4d27ed87949376022cc93b294ea1
   CapacitorCordova: 921bdb690ebe82421b24fce45552fd3dea2ae43a
   CapacitorFirebaseMessaging: d48c9156ee96e166416f1d910cb8de53143cea5f
+  CapacitorHaptics: 296f771ecd89c7a1bd92a7b6826a7d268e2e70f5
   CapacitorLiveActivities: 55cc80423a5630f6ab61ed53f5fed8e370c7325c
   CapacitorLocalNotifications: 4db83a7f6bdd2f30dcedf5c6f92c415065467a24
   CapacitorMlkitBarcodeScanning: 31c6af9f39873ff69e16ed5b39ebe2e1915f16fe
@@ -248,6 +254,6 @@ SPEC CHECKSUMS:
   RevenueCat: f4427b8a1daa7a04a26cb20d60807aa818d9420b
   RevenuecatPurchasesCapacitor: c31daadc8c3b89ff31686b6ea07ff99bc21c96b7
 
-PODFILE CHECKSUM: 1f32ca3c09910fcd8f51a3ad9b69759b94f06f10
+PODFILE CHECKSUM: 5f24c0e133ca57629d43ca4b2b23ee62fe574680
 
 COCOAPODS: 1.16.2
