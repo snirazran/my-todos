@@ -22,6 +22,7 @@ import {
 import { useRiveAsset } from '@/hooks/useRiveAsset';
 import { useRiveVisibility } from '@/hooks/useRiveVisibility';
 import { riveDevicePixelRatio } from '@/lib/riveLoader';
+import { useRiveIdlePause } from '@/lib/riveIdlePause';
 
 // Stable layout constant — defined once at module level to prevent useRive from seeing
 // a new object reference on every render, which can cause unnecessary reinitialization.
@@ -35,6 +36,13 @@ const ARTBOARD_NAME = 'main';
 const STATE_MACHINE = 'State Machine 1';
 const MOUTH_TRIGGER = 'open_mouth';
 const OPEN_MOUTH_BINDING = 'openMouth';
+const SLEEPING_BINDING = 'sleeping';
+const BREATHING_BINDING = 'breathing';
+// How long emote_sleep_entry needs before the instance can freeze on the
+// sleeping pose. Tune to the entry timeline's real length.
+const SLEEP_ENTRY_PAUSE_MS = 1600;
+const BREATH_MIN_MS = 5000;
+const BREATH_JITTER_MS = 5000;
 
 // Legacy Rive numeric inputs (all are integers in the older state machine)
 const INPUTS = {
@@ -143,15 +151,6 @@ const Frog = memo(
       { shouldUseIntersectionObserver: false },
     );
 
-    useRiveVisibility(
-      rive,
-      wrapperRef,
-      !paused,
-      'frog',
-      !!mouthOpen,
-      ignoreIdlePause,
-    );
-
     const resolvedVisualOffsetY =
       visualOffsetY ??
       (typeof height === 'number' ? Math.round(height * 0.17) : 0);
@@ -221,6 +220,14 @@ const Frog = memo(
       EMOTE_BINDINGS.questionRepeat,
       viewModelInstance,
     );
+    const sleepingBinding = useViewModelInstanceNumber(
+      SLEEPING_BINDING,
+      viewModelInstance,
+    );
+    const { trigger: triggerBreathing } = useViewModelInstanceTrigger(
+      BREATHING_BINDING,
+      viewModelInstance,
+    );
 
     useEffect(() => {
       if (loveRepeatBinding.value !== null) {
@@ -230,6 +237,61 @@ const Frog = memo(
         questionRepeatBinding.setValue(emote === 'question');
       }
     }, [emote, loveRepeatBinding, questionRepeatBinding]);
+
+    // A .riv with the sleeping binding choreographs its own idle (sleep pose,
+    // then freeze); older exports fall back to the hook's immediate pause.
+    const sleepSupported = sleepingBinding.value !== null;
+    useRiveVisibility(
+      rive,
+      wrapperRef,
+      !paused,
+      'frog',
+      !!mouthOpen,
+      ignoreIdlePause || sleepSupported,
+    );
+
+    const idle = useRiveIdlePause((s) => s.idle);
+
+    /* ---- idle sleep: play emote_sleep_entry, freeze on the sleeping pose;
+       waking resumes playback and lets emote_sleep_exit run ---- */
+    const sleepPausedRef = useRef(false);
+    useEffect(() => {
+      if (!rive || !sleepSupported || ignoreIdlePause) return;
+      if (idle && !paused) {
+        sleepingBinding.setValue(1);
+        const t = window.setTimeout(() => {
+          rive.pause();
+          sleepPausedRef.current = true;
+        }, SLEEP_ENTRY_PAUSE_MS);
+        return () => window.clearTimeout(t);
+      }
+      sleepingBinding.setValue(0);
+      if (sleepPausedRef.current) {
+        sleepPausedRef.current = false;
+        rive.play();
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [rive, idle, paused, ignoreIdlePause, sleepSupported, sleepingBinding]);
+
+    /* ---- ambient breathing: a short one-shot every few seconds; between
+       breaths the state machine settles and the runtime sleeps ---- */
+    useEffect(() => {
+      if (paused) return;
+      let t = 0;
+      const schedule = () => {
+        t = window.setTimeout(
+          () => {
+            if (rive?.isPlaying && !useRiveIdlePause.getState().idle) {
+              triggerBreathing();
+            }
+            schedule();
+          },
+          BREATH_MIN_MS + Math.random() * BREATH_JITTER_MS,
+        );
+      };
+      schedule();
+      return () => window.clearTimeout(t);
+    }, [rive, paused, triggerBreathing]);
 
     // Legacy state machine inputs, kept so older .riv backups still work.
     const mouthTrigger = useStateMachineInput(
