@@ -1333,6 +1333,18 @@ export default function TaskList({
     activeAreaLimitsRef.current = null;
     const { active, over } = event;
 
+    // A held tap activates the delay-based sort sensor without any movement,
+    // and dnd-kit swallows the click that would have opened the detail sheet.
+    // Treat a no-movement "drag" as the tap it really was.
+    if (
+      Math.abs(event.delta.x) < 5 &&
+      Math.abs(event.delta.y) < 5 &&
+      typeof active.id === 'string'
+    ) {
+      setActionSheetId(active.id);
+      return;
+    }
+
     if (!over || !onReorder) return;
 
     if (active.id !== over.id) {

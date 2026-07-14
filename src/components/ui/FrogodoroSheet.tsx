@@ -200,6 +200,7 @@ export default function FrogodoroSheet({
   const [showPond, setShowPond] = useState(false);
   const [confirmStop, setConfirmStop] = useState(false);
   const [confirmPause, setConfirmPause] = useState(false);
+  const [confirmTaskSwitch, setConfirmTaskSwitch] = useState(false);
   const catchChipRef = useRef<HTMLDivElement | null>(null);
   const [chipPulse, setChipPulse] = useState(0);
   const { seenIntros, markIntroSeen } = useIntros(open);
@@ -244,6 +245,7 @@ export default function FrogodoroSheet({
     awaitingDone,
     setAwaitingDone,
     setSelectedTaskName,
+    selectedTaskName,
     lastCompletedPhase,
     lastFocusElapsed,
     lastBreakElapsed,
@@ -272,6 +274,7 @@ export default function FrogodoroSheet({
       awaitingDone: s.awaitingDone,
       setAwaitingDone: s.setAwaitingDone,
       setSelectedTaskName: s.setSelectedTaskName,
+      selectedTaskName: s.selectedTaskName,
       lastCompletedPhase: s.lastCompletedPhase,
       lastFocusElapsed: s.lastFocusElapsed,
       lastBreakElapsed: s.lastBreakElapsed,
@@ -390,24 +393,52 @@ export default function FrogodoroSheet({
     setLocalSettings(settings);
   }, [settings]);
 
-  // When opened with a task, select it in the store
-  useEffect(() => {
-    if (open && task && task.id !== selectedTaskId) {
-      setTask(
-        task.id,
-        task.frogodoroSettings
-          ? { ...DEFAULT_SETTINGS, ...(task.frogodoroSettings as Record<string, unknown>) } as typeof DEFAULT_SETTINGS
-          : undefined,
-      );
-      if (task.frogodoroSession) {
-        const db = task.frogodoroSession;
-        updateSessionStats({
-          focusTime: db.focusTime ?? 0,
-          breakTime: db.breakTime ?? 0,
-        });
-      }
+  // When opened with a task, select it in the store. Binding a different task
+  // resets the store's session, so while another task's timer is mid-session
+  // the bind waits behind a confirm instead of silently killing that session.
+  const bindTaskToStore = () => {
+    if (!task) return;
+    setTask(
+      task.id,
+      task.frogodoroSettings
+        ? { ...DEFAULT_SETTINGS, ...(task.frogodoroSettings as Record<string, unknown>) } as typeof DEFAULT_SETTINGS
+        : undefined,
+    );
+    if (task.frogodoroSession) {
+      const db = task.frogodoroSession;
+      updateSessionStats({
+        focusTime: db.focusTime ?? 0,
+        breakTime: db.breakTime ?? 0,
+      });
     }
+  };
+  useEffect(() => {
+    if (!(open && task && task.id !== selectedTaskId)) return;
+    const store = useFrogodoroStore.getState();
+    if (store.timerActive && store.selectedTaskId) {
+      setConfirmTaskSwitch(true);
+      return;
+    }
+    bindTaskToStore();
   }, [open, task]);
+
+  // Confirmed: flush the old task's unsaved minutes, end its session, then
+  // bind this task as usual.
+  const performTaskSwitch = async () => {
+    const live = useFrogodoroStore.getState();
+    const oldTaskId = live.selectedTaskId;
+    const unsavedElapsed = Math.max(
+      0,
+      liveElapsedSeconds(live) - live.phaseElapsed,
+    );
+    setConfirmTaskSwitch(false);
+    if (oldTaskId && unsavedElapsed > 0) {
+      await saveSessionToDb(oldTaskId, live.phase, unsavedElapsed);
+      onMutateToday?.();
+    }
+    stopTimer();
+    bindTaskToStore();
+  };
 
   // One-tap start: begin the session as soon as the sheet opens with a task
   // selected, once per open, only from a clean idle state.
@@ -426,10 +457,14 @@ export default function FrogodoroSheet({
   }, [open, autoStart, task, selectedTaskId, startTimer]);
 
   // Keep the store's task name in sync so the global completion popup can show
-  // it (it has no access to task data on its own).
+  // it (it has no access to task data on its own). Only once this task is the
+  // bound one — while the switch confirm is pending, the name must keep
+  // describing the task whose session is still running.
   useEffect(() => {
-    if (open && task?.text) setSelectedTaskName(task.text);
-  }, [open, task, setSelectedTaskName]);
+    if (open && task?.text && task.id === selectedTaskId) {
+      setSelectedTaskName(task.text);
+    }
+  }, [open, task, selectedTaskId, setSelectedTaskName]);
 
   // While this sheet is open, suppress the global completion popup — this sheet
   // shows its own Done.
@@ -453,6 +488,7 @@ export default function FrogodoroSheet({
       setShowPond(false);
       setConfirmStop(false);
       setConfirmPause(false);
+      setConfirmTaskSwitch(false);
       stopTimerSound();
       setPreviewingId(null);
       // Dismissing the popup also acknowledges a finished session: silence the
@@ -1465,7 +1501,9 @@ export default function FrogodoroSheet({
                                 focusSeconds={phaseDuration}
                                 counterRef={catchChipRef}
                                 onGainLand={() => setChipPulse((p) => p + 1)}
-                                suspended={confirmStop || confirmPause}
+                                suspended={
+                                  confirmStop || confirmPause || confirmTaskSwitch
+                                }
                               />
                             ) : (
                               <div className="relative flex flex-col items-center">
@@ -1636,19 +1674,20 @@ export default function FrogodoroSheet({
 
                 {/* Gentle early-stop confirm — the frog would rather you keep
                     going, but ending still keeps every earned minute. */}
+                {createPortal(
                 <AnimatePresence>
                   {confirmStop && (
                     <motion.div
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
-                      className="absolute inset-0 z-30 flex items-center justify-center rounded-[28px] bg-black/60 p-6 backdrop-blur-sm"
+                      className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/60 p-6 backdrop-blur-sm"
                     >
                       <motion.div
                         initial={{ scale: 0.94, y: 8 }}
                         animate={{ scale: 1, y: 0 }}
                         exit={{ scale: 0.94, y: 8 }}
-                        className="w-full max-w-[300px] rounded-3xl bg-popover p-5 text-center shadow-2xl"
+                        className="relative w-full max-w-[300px] rounded-3xl bg-popover p-5 text-center shadow-2xl"
                       >
                         <div className="mx-auto -mt-1 flex justify-center">
                           <FrogSnapshot
@@ -1687,22 +1726,25 @@ export default function FrogodoroSheet({
                       </motion.div>
                     </motion.div>
                   )}
-                </AnimatePresence>
+                </AnimatePresence>,
+                  document.body,
+                )}
 
                 {/* Deep-focus pause warning — pausing forfeits the +1 fly */}
+                {createPortal(
                 <AnimatePresence>
                   {confirmPause && (
                     <motion.div
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
-                      className="absolute inset-0 z-30 flex items-center justify-center rounded-[28px] bg-black/60 p-6 backdrop-blur-sm"
+                      className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/60 p-6 backdrop-blur-sm"
                     >
                       <motion.div
                         initial={{ scale: 0.94, y: 8 }}
                         animate={{ scale: 1, y: 0 }}
                         exit={{ scale: 0.94, y: 8 }}
-                        className="w-full max-w-[300px] rounded-3xl bg-popover p-5 text-center shadow-2xl"
+                        className="relative w-full max-w-[300px] rounded-3xl bg-popover p-5 text-center shadow-2xl"
                       >
                         <div className="mx-auto -mt-1 flex justify-center">
                           <FrogSnapshot
@@ -1737,7 +1779,66 @@ export default function FrogodoroSheet({
                       </motion.div>
                     </motion.div>
                   )}
-                </AnimatePresence>
+                </AnimatePresence>,
+                  document.body,
+                )}
+
+                {/* Another task's timer is mid-session — starting here would
+                    end it, so confirm before switching. */}
+                {createPortal(
+                <AnimatePresence>
+                  {confirmTaskSwitch && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/60 p-6 backdrop-blur-sm"
+                    >
+                      <motion.div
+                        initial={{ scale: 0.94, y: 8 }}
+                        animate={{ scale: 1, y: 0 }}
+                        exit={{ scale: 0.94, y: 8 }}
+                        className="relative w-full max-w-[300px] rounded-3xl bg-popover p-5 text-center shadow-2xl"
+                      >
+                        <div className="mx-auto -mt-1 flex justify-center">
+                          <FrogSnapshot
+                            indices={{ ...frogIndices, mood: 1 }}
+                            width={72}
+                            height={76}
+                            visualOffsetY={4}
+                          />
+                        </div>
+                        <p className="mt-1 text-base font-black text-foreground">
+                          Timer already running
+                        </p>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {selectedTaskName
+                            ? `Your frog is mid-session on "${selectedTaskName}".`
+                            : 'Your frog is mid-session on another task.'}{' '}
+                          Switching starts fresh here — the focused minutes so
+                          far stay saved.
+                        </p>
+                        <button
+                          onClick={() => {
+                            setConfirmTaskSwitch(false);
+                            onOpenChange(false);
+                          }}
+                          className="mt-4 w-full rounded-2xl bg-primary py-3 text-sm font-black uppercase tracking-widest text-primary-foreground shadow-md shadow-primary/20 transition-all active:scale-[0.98]"
+                        >
+                          Keep current timer
+                        </button>
+                        <button
+                          onClick={() => void performTaskSwitch()}
+                          className="mt-2 w-full rounded-2xl py-2.5 text-sm font-bold text-muted-foreground transition-colors hover:bg-muted/40"
+                        >
+                          Switch to this task
+                        </button>
+                      </motion.div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>,
+                  document.body,
+                )}
               </div>
             </motion.div>
           </div>
