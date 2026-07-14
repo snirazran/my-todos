@@ -141,16 +141,19 @@ export function FrogDisplay({
     [],
   );
 
-  // Constant visual decay
+  // Constant visual decay. One tick per minute: at multi-day hunger scales a
+  // 1s tick moves the bar sub-pixel, but each tick re-renders and re-runs the
+  // 700ms width transition — a full-viewport layout burn for an invisible
+  // change.
   React.useEffect(() => {
     if (!animateHunger) return;
 
     const interval = setInterval(() => {
       setDisplayedHunger((prev) => {
         if (prev <= 0) return 0;
-        return prev - 1000;
+        return prev - 60_000;
       });
-    }, 1000);
+    }, 60_000);
 
     return () => clearInterval(interval);
   }, [animateHunger]);
