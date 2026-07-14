@@ -97,6 +97,7 @@ export function FriendFocusScene({
             drift={drift}
             running
             localClock
+            alwaysPlay
             size={30}
             flyRef={(el) => {
               flyRefs.current[`friend-fly-${i}`] = el;

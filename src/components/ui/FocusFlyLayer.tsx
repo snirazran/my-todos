@@ -3,6 +3,7 @@
 import React, { useEffect, useRef } from 'react';
 import Fly from '@/components/ui/fly';
 import { driftElapsedMs } from '@/lib/focusDriftClock';
+import { useRiveInteractionPause } from '@/lib/riveInteractionPause';
 
 // The one drift choreography every focus surface uses (timer sheet, home
 // hero, wardrobe, friends), so the swarms mirror each other. Px offsets from
@@ -67,15 +68,19 @@ function interp(values: readonly number[], phase: number): number {
 }
 
 /**
- * One drifting fly, positioned every frame from the shared pause-aware drift
- * clock: phase = elapsed % duration. Any surface mounting at any moment
- * (popup opening, page navigation, hide/show) computes the identical
- * position, so the swarms are always in sync and never "re-enter" on a
- * remount. Pausing freezes the clock — flies hold exactly where they are.
+ * One drifting fly, positioned from the shared pause-aware drift clock:
+ * phase = elapsed % duration. Any surface mounting at any moment (popup
+ * opening, page navigation, hide/show) computes the identical position, so
+ * the swarms are always in sync and never "re-enter" on a remount. Pausing
+ * freezes the clock — flies hold exactly where they are.
+ *
+ * The rAF loop only runs while there is motion to draw: a hidden fly, a
+ * paused session, or a page fly frozen by the global slide/sheet Rive pause
+ * positions itself once and stops. Only in-sheet scenes pass `alwaysPlay` to
+ * keep animating while the sheet holds that pause.
  *
  * The off-screen entry glide plays only when the session just started or the
- * fly is a respawn (`forceEntry`). Ignores the global slide/sheet Rive pause
- * by design.
+ * fly is a respawn (`forceEntry`).
  */
 export function DriftFly({
   drift,
@@ -85,6 +90,7 @@ export function DriftFly({
   entryFromX = 0,
   forceEntry = false,
   localClock = false,
+  alwaysPlay = false,
   flyRef,
 }: {
   drift: FocusDrift;
@@ -98,43 +104,64 @@ export function DriftFly({
   /** Decorative scenes (a friend's frog) run on wall time instead of the
    *  shared session clock, so they animate without a session of our own. */
   localClock?: boolean;
+  /** Keep animating while a sheet/scroll holds the global Rive pause — for
+   *  flies rendered inside the open sheet itself. */
+  alwaysPlay?: boolean;
   flyRef?: (el: HTMLElement | null) => void;
 }) {
   const spanRef = useRef<HTMLSpanElement | null>(null);
   const entryStartRef = useRef<number | null>(null);
+  const entryDecidedRef = useRef(false);
+  const pauseHeld = useRiveInteractionPause((s) => s.count > 0);
+  const suspended = pauseHeld && !alwaysPlay;
 
   useEffect(() => {
+    if (!entryDecidedRef.current) {
+      entryDecidedRef.current = true;
+      const doEntry =
+        entryFromX !== 0 &&
+        (forceEntry || localClock || driftElapsedMs() < FRESH_START_MS);
+      entryStartRef.current = doEntry ? performance.now() : null;
+    }
     const clock = localClock ? () => performance.now() : driftElapsedMs;
-    const doEntry =
-      entryFromX !== 0 &&
-      (forceEntry || localClock || driftElapsedMs() < FRESH_START_MS);
-    entryStartRef.current = doEntry ? performance.now() : null;
+
+    const position = () => {
+      const el = spanRef.current;
+      if (!el) return;
+      const durationMs = drift.duration * 1000;
+      const phase = (clock() % durationMs) / durationMs;
+      let x = interp(drift.x, phase);
+      let y = interp(drift.y, phase);
+      if (entryStartRef.current !== null) {
+        const k = Math.min(
+          1,
+          (performance.now() - entryStartRef.current) / ENTRY_MS,
+        );
+        const e = easeOutCubic(k);
+        x = entryFromX + (x - entryFromX) * e;
+        y = y * e;
+        if (k >= 1) entryStartRef.current = null;
+      }
+      el.style.transform = `translate(${x}px, ${y}px)`;
+    };
+
+    if (hidden) return;
+
+    const clockLive = (localClock || running) && !suspended;
+    if (!clockLive && entryStartRef.current === null) {
+      position();
+      return;
+    }
 
     let raf = 0;
     const tick = () => {
-      const el = spanRef.current;
-      if (el) {
-        const durationMs = drift.duration * 1000;
-        const phase = (clock() % durationMs) / durationMs;
-        let x = interp(drift.x, phase);
-        let y = interp(drift.y, phase);
-        if (entryStartRef.current !== null) {
-          const k = Math.min(
-            1,
-            (performance.now() - entryStartRef.current) / ENTRY_MS,
-          );
-          const e = easeOutCubic(k);
-          x = entryFromX + (x - entryFromX) * e;
-          y = y * e;
-          if (k >= 1) entryStartRef.current = null;
-        }
-        el.style.transform = `translate(${x}px, ${y}px)`;
-      }
+      position();
+      if (!clockLive && entryStartRef.current === null) return;
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [drift, entryFromX, forceEntry, localClock]);
+  }, [drift, entryFromX, forceEntry, localClock, running, hidden, suspended]);
 
   return (
     <span
@@ -149,7 +176,12 @@ export function DriftFly({
         opacity: running ? 1 : 0.7,
       }}
     >
-      <Fly size={size} interactive={false} alwaysPlay paused={!running} />
+      <Fly
+        size={size}
+        interactive={false}
+        alwaysPlay={alwaysPlay}
+        paused={!running || hidden}
+      />
     </span>
   );
 }

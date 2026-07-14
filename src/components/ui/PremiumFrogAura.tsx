@@ -6,6 +6,7 @@ import Fly from '@/components/ui/fly';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/components/auth/AuthContext';
 import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
+import { useRiveInteractionPause } from '@/lib/riveInteractionPause';
 
 const COMPACT_VARS = {
   '--premium-fly-top': '0%',
@@ -15,8 +16,9 @@ const COMPACT_VARS = {
   '--premium-fly-y-max': '6px',
 } as React.CSSProperties;
 
-// The companion fly never pauses: it ignores the global slide/sheet Rive
-// pause and every popup — a Plus perk should always feel alive.
+// The companion fly freezes with the global slide/sheet Rive pause: while a
+// sheet covers it there's nothing to see, and one always-animating canvas
+// keeps the whole 60fps render pipeline (and the phone's thermals) alive.
 export function PremiumFrogAura({
   show,
   compact = false,
@@ -40,6 +42,7 @@ export function PremiumFrogAura({
     { revalidateOnFocus: false },
   );
   const active = isSelf ? !!data?.isPremium : show;
+  const pauseHeld = useRiveInteractionPause((s) => s.count > 0);
 
   const phase = React.useMemo(() => {
     const t = Date.now() / 1000;
@@ -49,6 +52,10 @@ export function PremiumFrogAura({
       tilt: { animationDelay: `${-(t % 14.8).toFixed(3)}s` },
     };
   }, []);
+
+  const playState: React.CSSProperties | undefined = pauseHeld
+    ? { animationPlayState: 'paused' }
+    : undefined;
 
   if (!active) return null;
 
@@ -60,14 +67,14 @@ export function PremiumFrogAura({
         className={cn('pointer-events-none absolute inset-0', className)}
         style={compact ? COMPACT_VARS : undefined}
       >
-        <div className="premium-fly-orbit" style={phase.orbit}>
-          <div className="premium-fly-bob" style={phase.bob}>
-            <div className="premium-fly-tilt" style={phase.tilt}>
+        <div className="premium-fly-orbit" style={{ ...phase.orbit, ...playState }}>
+          <div className="premium-fly-bob" style={{ ...phase.bob, ...playState }}>
+            <div className="premium-fly-tilt" style={{ ...phase.tilt, ...playState }}>
               <div className="premium-fly-gold">
+                <span className="premium-fly-glow" aria-hidden />
                 <Fly
                   size={flySize ?? (compact ? 26 : 46)}
                   interactive={false}
-                  alwaysPlay
                 />
               </div>
             </div>

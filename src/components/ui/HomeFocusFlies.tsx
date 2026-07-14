@@ -9,7 +9,6 @@ import { DriftFly, FOCUS_DRIFTS } from '@/components/ui/FocusFlyLayer';
 import { entrySideFor } from '@/components/ui/FocusScene';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import { fliesCaughtFor, sceneFlyCount } from '@/lib/focusFlies';
-import { onFocusHunt } from '@/lib/focusHuntBus';
 
 export const HOME_FOCUS_FLY_PREFIX = 'home-focus-fly-';
 const MISS_KEY = 'home-focus-miss';
@@ -27,15 +26,16 @@ function visibleRatio(rect: DOMRect): number {
 
 /**
  * Live focus-session presence around a page's own frog (home hero, wardrobe,
- * friends), mirroring the timer sheet's scene: same drift choreography, same
+ * friends), matching the timer sheet's scene: same drift choreography, same
  * swarm size, flies freeze in place on pause.
  *
- * Hunting works everywhere: when the Frogodoro sheet is open, this layer
- * replays the sheet's broadcast hunt events through the provided page tongue
- * (same fly index, same frame); when the sheet is closed — or on pages with
- * no tongue of their own — it runs its own miss/catch lunges through an
- * internal tongue instance. One tongue is in flight at a time either way
- * (the hook serializes concurrent grabs).
+ * While the Frogodoro sheet is open this layer is fully suppressed — the
+ * sheet's own scene is the one on screen, so animating a copy behind the
+ * backdrop only burns frames. Positions never diverge: the shared drift
+ * clock is absolute (elapsed % duration), so when the sheet closes the flies
+ * reappear exactly where the sheet's scene showed them. When the sheet is
+ * closed, this layer runs its own miss/catch lunges through the page tongue
+ * (home) or an internal tongue instance (wardrobe/friends).
  *
  * The fly band is positioned INSIDE the page's frog container (measured once
  * against the frog's live geometry, like the premium companion fly) so it
@@ -48,8 +48,7 @@ export function HomeFocusFlies({
   flyRefs,
   triggerTongue,
   visuallyDone,
-  tongueEnabled = false,
-  onSpeech,
+  sheetOpen = false,
   onGrabActive,
   hidden = false,
 }: {
@@ -60,10 +59,8 @@ export function HomeFocusFlies({
   flyRefs?: React.MutableRefObject<Record<string, HTMLElement | null>>;
   triggerTongue?: (req: TongueRequest) => Promise<void>;
   visuallyDone?: Set<string>;
-  /** Frogodoro sheet is open — hunt events mirror the sheet's conductor. */
-  tongueEnabled?: boolean;
-  /** Receives the shared catch line so this surface's bubble matches. */
-  onSpeech?: (line: string) => void;
+  /** Frogodoro sheet is open — its scene owns the show; suppress this layer. */
+  sheetOpen?: boolean;
   /** Mirrors whether the internal tongue is in flight (host opens the mouth). */
   onGrabActive?: (active: boolean) => void;
   /** Visually suppressed (task-grab cinematic, other panel) — the catch
@@ -104,9 +101,7 @@ export function HomeFocusFlies({
     (phase === 'focus' ? Math.max(0, liveElapsed - phaseElapsed) : 0);
   const caught = fliesCaughtFor(focusLive);
   const flyCount = sceneFlyCount(phaseFull);
-
-  const stateRef = useRef({ tongueEnabled, hidden, running });
-  stateRef.current = { tongueEnabled, hidden, running };
+  const suppressed = hidden || sheetOpen;
 
   // Positioned inside the frog container, measured against the frog's live
   // geometry — no per-frame viewport tracking, so scrolling can't flicker it.
@@ -176,7 +171,7 @@ export function HomeFocusFlies({
   // at the fly, or fall back to a love emote if the frog isn't in view.
   const prevCaughtRef = useRef(caught);
   useEffect(() => {
-    if (caught > prevCaughtRef.current && running && !tongueEnabled && !hidden) {
+    if (caught > prevCaughtRef.current && running && !suppressed) {
       const key = pickLiveFly();
       if (key && frogVisibleEnough()) {
         void effTrigger({
@@ -190,7 +185,7 @@ export function HomeFocusFlies({
     }
     prevCaughtRef.current = caught;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [caught, running, hidden]);
+  }, [caught, running, suppressed]);
 
   const lungeMiss = (overshoot: number, jitterX: number, flyIndex?: number): boolean => {
     const key =
@@ -219,35 +214,13 @@ export function HomeFocusFlies({
     return true;
   };
 
-  // Sheet open: mirror the conductor's hunt — same fly index, same frame.
-  useEffect(() => {
-    return onFocusHunt((event) => {
-      const { tongueEnabled: enabled, hidden: isHidden, running: isLive } =
-        stateRef.current;
-      if (!enabled || isHidden || !isLive || !frogVisibleEnough()) return;
-      if (event.type === 'catch') {
-        onSpeech?.(event.line);
-        const key = `${HOME_FOCUS_FLY_PREFIX}${event.flyIndex}`;
-        if (!effFlyRefs.current[key]) return;
-        void effTrigger({
-          key,
-          completed: false,
-          onPersist: () => eatAndRespawn(key),
-        });
-        return;
-      }
-      lungeMiss(event.overshoot, event.jitterX, event.flyIndex);
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   // Sheet closed: this layer is its own conductor for misses — same rhythm
   // as the sheet scene (first lunge early, then a loose 45–90s beat). A
   // skipped attempt (frog scrolled out of view, fly mid-respawn) retries in
   // seconds instead of waiting out the full interval, so the cadence FEELS
   // the same as the popup's.
   useEffect(() => {
-    if (!running || hidden || tongueEnabled) return;
+    if (!running || suppressed) return;
     let timer = 0;
     const schedule = (delay: number) => {
       timer = window.setTimeout(() => {
@@ -258,23 +231,29 @@ export function HomeFocusFlies({
     schedule(9000 + Math.random() * 5000);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [running, hidden, tongueEnabled]);
+  }, [running, suppressed]);
 
   if (!sessionOnFocus) return null;
 
   return (
     <>
-      {/* `hidden` only hides visually — unmounting would replay the fly
-          entry and lose the shared drift phase on every panel open/close. */}
+      {/* Suppression only hides — unmounting would drop the eaten/respawn
+          state on every panel open/close. Hidden DriftFlies stop their rAF
+          and canvas playback, and re-derive their position from the shared
+          drift clock the moment they're shown again. */}
       <div
         ref={bandRef}
         aria-hidden
         className="pointer-events-none absolute z-30"
-        style={{ height: BAND_H, visibility: hidden ? 'hidden' : 'visible' }}
+        style={{
+          height: BAND_H,
+          visibility: suppressed ? 'hidden' : 'visible',
+        }}
       >
         {FOCUS_DRIFTS.slice(0, flyCount).map((drift, i) => {
           const key = `${HOME_FOCUS_FLY_PREFIX}${i}`;
-          const isHidden = eaten.has(key) || effVisuallyDone.has(key);
+          const isHidden =
+            suppressed || eaten.has(key) || effVisuallyDone.has(key);
           const epoch = respawn[key] ?? 0;
           return (
             <DriftFly

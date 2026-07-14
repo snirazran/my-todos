@@ -9,7 +9,6 @@ import { useFrogTongue, TONGUE_STROKE } from '@/hooks/useFrogTongue';
 import { DriftFly, FOCUS_DRIFTS } from '@/components/ui/FocusFlyLayer';
 import { FrogSpeechBubble } from '@/components/ui/FrogSpeechBubble';
 import { sceneFlyCount } from '@/lib/focusFlies';
-import { emitFocusHunt } from '@/lib/focusHuntBus';
 import { pickFrogLine } from '@/lib/frogSpeech';
 import type { WardrobeSlot } from '@/lib/skins/catalog';
 
@@ -131,8 +130,7 @@ export function FocusScene({
   }, []);
 
   // Real catch: the tongue lands on an actual fly. The hook fires the love
-  // emote at the end. The event is broadcast so the home frog mirrors the
-  // exact same lunge on the same fly index in the same frame.
+  // emote at the end.
   useEffect(() => {
     if (caught <= prevCaughtRef.current) {
       prevCaughtRef.current = caught;
@@ -141,10 +139,7 @@ export function FocusScene({
     const caughtNow = caught;
     prevCaughtRef.current = caught;
     const index = pickLiveIndex();
-    // One line for every surface — the bus carries it so home shows the
-    // exact same text at the same moment.
     const line = pickFrogLine('catch', { done: caughtNow });
-    emitFocusHunt({ type: 'catch', flyIndex: Math.max(0, index), line });
     speakLine(line);
     if (index < 0 || suspended) {
       frogRef.current?.fireEmote('love');
@@ -168,7 +163,6 @@ export function FocusScene({
   // and returns empty. First one early (teaches the mechanic once), then a
   // loose 45–90s rhythm: personality actions read as scripted when they
   // repeat often, and a focus surface must stay glanceable, not busy.
-  // Broadcast so the home frog whiffs at the same fly at the same moment.
   useEffect(() => {
     if (!running || !showFlies || suspended) return;
     let timer = 0;
@@ -180,7 +174,6 @@ export function FocusScene({
       if (index < 0 || !el || !mouth) return;
       const overshoot = 44 + Math.random() * 26;
       const jitterX = Math.random() * 28 - 14;
-      emitFocusHunt({ type: 'miss', flyIndex: index, overshoot, jitterX });
       const rect = el.getBoundingClientRect();
       const fx = rect.left + rect.width / 2;
       const fy = rect.top + rect.height / 2;
@@ -229,6 +222,7 @@ export function FocusScene({
                 drift={drift}
                 running={running}
                 hidden={hidden}
+                alwaysPlay
                 entryFromX={entrySideFor(drift)}
                 forceEntry={epoch > 0}
                 flyRef={(el) => {
