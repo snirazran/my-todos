@@ -14,6 +14,7 @@ import { useLoginStreak } from '@/hooks/useLoginStreak';
 import useSWR from 'swr';
 import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
 import type { FrogSpeechContext } from '@/lib/frogSpeech';
+import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import { cn } from '@/lib/utils';
 import { prefetchQuests } from './QuestsPanel';
 
@@ -82,6 +83,7 @@ export function FrogDisplay({
     true,
   );
   const [clickedAt, setClickedAt] = React.useState(0);
+  const timerLive = useFrogodoroStore((s) => s.timerActive && s.isRunning);
 
   const speechEnabled = showSpeechBubble && !isGuest;
   const { view: streakView } = useLoginStreak(speechEnabled);
@@ -204,6 +206,7 @@ export function FrogDisplay({
             mouthOffset={mouthOffset}
             indices={indices}
             paused={paused}
+            ignoreIdlePause={timerLive}
           />
         </div>
 

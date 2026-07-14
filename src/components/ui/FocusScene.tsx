@@ -308,6 +308,7 @@ export function FocusScene({
           width={frogWidth}
           height={Math.round(frogWidth * 1.125)}
           indices={indices}
+          ignoreIdlePause
           mouthOpen={!!grab}
           mouthOffset={{
             x: Math.round(-18 * (frogWidth / 240)),

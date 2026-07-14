@@ -7,6 +7,7 @@ import {
 } from '@rive-app/react-canvas-lite';
 import { FLY_RIVE_ASSET_URL, preloadRiveAsset } from './riveLoader';
 import { useRiveInteractionPause } from './riveInteractionPause';
+import { useRiveIdlePause } from './riveIdlePause';
 
 /**
  * Shared renderer for the idle fly.
@@ -39,6 +40,7 @@ interface Entry {
   playing: boolean;
   hasFrame: boolean;
   ignoreInteractionPause: boolean;
+  ignoreIdlePause: boolean;
 }
 
 interface Mip {
@@ -102,9 +104,22 @@ useRiveInteractionPause.subscribe((state) => {
   syncMasterPlayback();
 });
 
+// The idle pause is a separate axis from ignoreInteractionPause: alwaysPlay
+// bypasses the sheet/scroll pause, ignoreIdlePause bypasses "nobody has
+// touched the app in a while" (focus-session flies that stay alive while the
+// user is AFK watching the timer).
+let idlePaused = false;
+useRiveIdlePause.subscribe((state) => {
+  if (state.idle === idlePaused) return;
+  idlePaused = state.idle;
+  syncMasterPlayback();
+});
+
 function entryNeedsFrames(e: Entry) {
   return (
-    (e.playing && (!interactionPaused || e.ignoreInteractionPause)) ||
+    (e.playing &&
+      (!idlePaused || e.ignoreIdlePause) &&
+      (!interactionPaused || e.ignoreInteractionPause)) ||
     !e.hasFrame
   );
 }
@@ -214,7 +229,7 @@ function ensureMaster() {
 
 export function attachFlyCanvas(
   canvas: HTMLCanvasElement,
-  opts?: { ignoreInteractionPause?: boolean },
+  opts?: { ignoreInteractionPause?: boolean; ignoreIdlePause?: boolean },
 ): FlyCanvasHandle | null {
   const ctx = canvas.getContext('2d');
   if (!ctx) return null;
@@ -224,6 +239,7 @@ export function attachFlyCanvas(
     playing: false,
     hasFrame: false,
     ignoreInteractionPause: opts?.ignoreInteractionPause ?? false,
+    ignoreIdlePause: opts?.ignoreIdlePause ?? false,
   };
   entries.set(canvas, entry);
   ensureMaster();

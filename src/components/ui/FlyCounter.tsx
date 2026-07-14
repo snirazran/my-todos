@@ -15,8 +15,6 @@ interface Props {
   balance: number;
   variant?: Variant;
   onClick?: () => void;
-  /** Force-pause the fly Rive regardless of sheet state. */
-  paused?: boolean;
   /**
    * Celebrate every increment regardless of the earn window. Used by toast
    * pills and demos that feed the counter a scripted balance; the default
@@ -30,14 +28,12 @@ export function FlyCounter({
   balance,
   variant = 'desktop',
   onClick,
-  paused = false,
   alwaysCelebrate = false,
 }: Props) {
-  // Pause the fly while any sheet/popup is open (read here, in the leaf, rather
-  // than in the layout-level header — subscribing in the header trips Next's
-  // dev HMR/PPR refresh loop).
+  // Held gains celebrate once the screen is clear again (read here, in the
+  // leaf, rather than in the layout-level header — subscribing in the header
+  // trips Next's dev HMR/PPR refresh loop).
   const anySheetOpen = useSheetStore((s) => s.count > 0);
-  const flyPaused = paused || anySheetOpen;
   const prevRef = useRef(balance);
   // Skip the very first run so initial load / login doesn't trigger the
   // bump animation — only real increments after mount should fire it.
@@ -123,7 +119,9 @@ export function FlyCounter({
         animate={flyControls}
         className="flex items-center"
       >
-        <Fly size={flySize} paused={flyPaused} y={flyY} />
+        {/* Static frame — a wallet icon doesn't earn a permanent 60fps render
+            loop; the celebrate shimmy on the wrapper still sells the gain. */}
+        <Fly size={flySize} paused y={flyY} />
       </motion.div>
 
       <AnimatedNumber

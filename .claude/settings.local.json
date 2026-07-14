@@ -323,7 +323,10 @@
       "Bash(sh gradlew :app:compileDebugJavaWithJavac)",
       "WebFetch(domain:medium.com)",
       "Bash(npx tailwindcss *)",
-      "PowerShell(npx cap sync)"
+      "PowerShell(npx cap sync)",
+      "Bash(echo \"leftovers exit: $?\")",
+      "Bash(git -C /Users/snirazran/Fullstack/my-todos log --oneline -3)",
+      "Bash(git -C /Users/snirazran/Fullstack/my-todos show --stat HEAD)"
     ]
   }
 }

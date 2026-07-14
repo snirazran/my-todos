@@ -667,7 +667,7 @@ export default function Home() {
               isGuest={!user}
               questClaimableCount={questsData?.claimableCount ?? 0}
               questActiveCount={questsData?.activeCount ?? 0}
-              paused={isAnyPanelOpen && !showTimer}
+              paused={isAnyPanelOpen}
             />
           </div>
 

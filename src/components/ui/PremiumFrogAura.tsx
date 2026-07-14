@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/components/auth/AuthContext';
 import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
 import { useRiveInteractionPause } from '@/lib/riveInteractionPause';
+import { useRiveIdlePause } from '@/lib/riveIdlePause';
 
 const COMPACT_VARS = {
   '--premium-fly-top': '0%',
@@ -43,6 +44,8 @@ export function PremiumFrogAura({
   );
   const active = isSelf ? !!data?.isPremium : show;
   const pauseHeld = useRiveInteractionPause((s) => s.count > 0);
+  const idle = useRiveIdlePause((s) => s.idle);
+  const frozen = pauseHeld || idle;
 
   const phase = React.useMemo(() => {
     const t = Date.now() / 1000;
@@ -53,7 +56,7 @@ export function PremiumFrogAura({
     };
   }, []);
 
-  const playState: React.CSSProperties | undefined = pauseHeld
+  const playState: React.CSSProperties | undefined = frozen
     ? { animationPlayState: 'paused' }
     : undefined;
 

@@ -100,6 +100,9 @@ interface FrogProps {
   indices?: Partial<Record<WardrobeSlot, number>>;
   /** Looping emote held on while mounted (emoteLoveRepeat / emoteQuestionRepeat) */
   emote?: FrogEmote | null;
+  /** Keep animating through the global idle pause — for focus-session frogs
+   *  that must stay alive while the user is AFK watching the timer. */
+  ignoreIdlePause?: boolean;
 }
 
 const Frog = memo(
@@ -114,6 +117,7 @@ const Frog = memo(
       paused = false,
       indices,
       emote = null,
+      ignoreIdlePause = false,
     },
     ref,
   ) {
@@ -139,7 +143,14 @@ const Frog = memo(
       { shouldUseIntersectionObserver: false },
     );
 
-    useRiveVisibility(rive, wrapperRef, !paused, 'frog', !!mouthOpen);
+    useRiveVisibility(
+      rive,
+      wrapperRef,
+      !paused,
+      'frog',
+      !!mouthOpen,
+      ignoreIdlePause,
+    );
 
     const resolvedVisualOffsetY =
       visualOffsetY ??

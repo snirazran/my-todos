@@ -180,6 +180,7 @@ export function DriftFly({
         size={size}
         interactive={false}
         alwaysPlay={alwaysPlay}
+        ignoreIdlePause
         paused={!running || hidden}
       />
     </span>

@@ -1,6 +1,7 @@
 import { useEffect, useState, type RefObject, useId } from 'react';
 import { type Rive, EventType } from '@rive-app/react-canvas-lite';
 import { useRiveStatsStore } from '@/lib/riveStatsStore';
+import { useRiveIdlePause } from '@/lib/riveIdlePause';
 import { useUIStore } from '@/lib/uiStore';
 
 const FORCE_PLAY_GRACE_MS = 2500;
@@ -10,6 +11,10 @@ const FORCE_PLAY_GRACE_MS = 2500;
  * While `forcePlay` is true (and for a short grace period after it drops), the
  * animation keeps playing even off-screen so in-flight one-shot timelines
  * (mouth open/close, emotes) finish instead of freezing mid-animation.
+ *
+ * The global idle flag pauses even visible instances — an untouched screen
+ * doesn't need a 60fps mascot — but `forcePlay` outranks it so a one-shot
+ * fired while idle (a focus-session catch) still animates.
  */
 export function useRiveVisibility(
   rive: Rive | null,
@@ -17,10 +22,12 @@ export function useRiveVisibility(
   enabled = true,
   label = 'unknown',
   forcePlay = false,
+  ignoreIdle = false,
 ) {
   const instanceId = useId();
   const fullId = `${label}-${instanceId}`;
   const isDebugMode = useUIStore((s) => s.isDebugMode);
+  const idle = useRiveIdlePause((s) => s.idle);
   
   // Use stable selectors for actions to prevent re-renders when other instances update
   const registerInstance = useRiveStatsStore((s) => s.registerInstance);
@@ -99,6 +106,19 @@ export function useRiveVisibility(
       };
     }
 
+    if (idle && !ignoreIdle) {
+      rive.pause();
+      if (isDebugMode) updateStatus();
+      return () => {
+        if (rafId) cancelAnimationFrame(rafId);
+        if (isDebugMode) {
+          rive.off(EventType.Play, updateStatus);
+          rive.off(EventType.Pause, updateStatus);
+          rive.off(EventType.Stop, updateStatus);
+        }
+      };
+    }
+
     if (ref.current) {
       observer = new IntersectionObserver(
         (entries) => {
@@ -129,5 +149,15 @@ export function useRiveVisibility(
         rive.off(EventType.Stop, updateStatus);
       }
     };
-  }, [rive, ref, enabled, forceHeld, fullId, updateInstance, isDebugMode]);
+  }, [
+    rive,
+    ref,
+    enabled,
+    forceHeld,
+    idle,
+    ignoreIdle,
+    fullId,
+    updateInstance,
+    isDebugMode,
+  ]);
 }

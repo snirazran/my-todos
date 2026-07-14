@@ -24,6 +24,9 @@ type FlyProps = {
   paused?: boolean;
   /** Keep animating while a sheet/scroll holds the global Rive pause (for flies rendered inside an open sheet). */
   alwaysPlay?: boolean;
+  /** Keep animating through the global idle pause (focus-session flies that
+   * stay alive while the user is AFK watching the timer). */
+  ignoreIdlePause?: boolean;
   onLoad?: () => void;
   interactive?: boolean;
   /** Extra backing-store resolution for flies rendered inside scale
@@ -42,6 +45,7 @@ const Fly = memo(forwardRef<HTMLSpanElement, FlyProps>(
       y = 0,
       paused = false,
       alwaysPlay = false,
+      ignoreIdlePause = false,
       onLoad,
       interactive = true,
       oversample = 1,
@@ -64,6 +68,7 @@ const Fly = memo(forwardRef<HTMLSpanElement, FlyProps>(
       if (!canvas) return;
       const handle = attachFlyCanvas(canvas, {
         ignoreInteractionPause: alwaysPlay,
+        ignoreIdlePause,
       });
       handleRef.current = handle;
       onLoadRef.current?.();
@@ -71,7 +76,7 @@ const Fly = memo(forwardRef<HTMLSpanElement, FlyProps>(
         handle?.detach();
         handleRef.current = null;
       };
-    }, [alwaysPlay]);
+    }, [alwaysPlay, ignoreIdlePause]);
 
     useEffect(() => {
       const canvas = canvasRef.current;
