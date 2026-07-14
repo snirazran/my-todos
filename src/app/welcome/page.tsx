@@ -72,6 +72,8 @@ export default function WelcomePage() {
     grab,
     tipGroupEl,
     tonguePathEl,
+    worldGroupEl,
+    fxGroupEl,
     triggerTongue,
     visuallyDone,
   } = useFrogTongue({
@@ -286,25 +288,29 @@ export default function WelcomePage() {
             </linearGradient>
           </defs>
 
-          <path
-            ref={tonguePathEl}
-            d="M0 0 L0 0"
-            fill="none"
-            stroke="url(#welcome-tongue-grad)"
-            strokeWidth={TONGUE_STROKE}
-            strokeLinecap="round"
-            vectorEffect="non-scaling-stroke"
-          />
-
-          <g ref={tipGroupEl} style={{ visibility: 'hidden' }}>
-            <circle r={10} fill="transparent" />
-            <image
-              href="/fly.svg"
-              x={-FLY_PX / 2}
-              y={-FLY_PX / 2}
-              width={FLY_PX}
-              height={FLY_PX}
+          <g ref={worldGroupEl}>
+            <path
+              ref={tonguePathEl}
+              d="M0 0 L0 0"
+              fill="none"
+              stroke="url(#welcome-tongue-grad)"
+              strokeWidth={TONGUE_STROKE}
+              strokeLinecap="round"
+              vectorEffect="non-scaling-stroke"
             />
+
+            <g ref={fxGroupEl} />
+
+            <g ref={tipGroupEl} style={{ visibility: 'hidden' }}>
+              <circle r={10} fill="transparent" />
+              <image
+                href="/fly.svg"
+                x={-FLY_PX / 2}
+                y={-FLY_PX / 2}
+                width={FLY_PX}
+                height={FLY_PX}
+              />
+            </g>
           </g>
         </svg>
       )}

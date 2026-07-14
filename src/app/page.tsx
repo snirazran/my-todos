@@ -189,6 +189,8 @@ export default function Home() {
     grab,
     tipGroupEl,
     tonguePathEl,
+    worldGroupEl,
+    fxGroupEl,
     triggerTongue,
     visuallyDone,
     speedUpTongue,
@@ -560,6 +562,7 @@ export default function Home() {
     await triggerTongue({
       key: taskId,
       completed,
+      allowGolden: true,
       onPersist: async () => {
         if (user) {
           await toggleTask(taskId, true);
@@ -913,32 +916,46 @@ export default function Home() {
             </linearGradient>
           </defs>
 
-          {/* Plain <path> — stroke visibility driven entirely by the RAF
-              loop via stroke-dasharray (no framer-motion needed). */}
-          <path
-            ref={tonguePathEl}
-            d="M0 0 L0 0"
-            fill="none"
-            stroke="url(#tongue-grad)"
-            strokeWidth={TONGUE_STROKE}
-            strokeLinecap="round"
-            vectorEffect="non-scaling-stroke"
-          />
+          {/* World group holds the tongue in DOC coordinates; the RAF loop
+              moves only its translate per frame, so the path geometry is
+              parsed once instead of every frame. */}
+          <g ref={worldGroupEl}>
+            <path
+              ref={tonguePathEl}
+              d="M0 0 L0 0"
+              fill="none"
+              stroke="url(#tongue-grad)"
+              strokeWidth={TONGUE_STROKE}
+              strokeLinecap="round"
+              vectorEffect="non-scaling-stroke"
+            />
 
-          {/* Tip group is always in the DOM; the RAF loop toggles its
-              visibility and transform directly — no React re-renders. */}
-          <g ref={tipGroupEl} style={{ visibility: 'hidden' }}>
-            <circle r={10} fill="transparent" />
-            {/* A silent grab (focus-hunt miss) comes back empty-tipped */}
-            {!grab.silent && (
-              <image
-                href="/fly.svg"
-                x={-FLY_PX / 2}
-                y={-FLY_PX / 2}
-                width={FLY_PX}
-                height={FLY_PX}
-              />
-            )}
+            <g ref={fxGroupEl} />
+
+            {/* Tip group is always in the DOM; the RAF loop toggles its
+                visibility and transform directly — no React re-renders. */}
+            <g ref={tipGroupEl} style={{ visibility: 'hidden' }}>
+              <circle r={10} fill="transparent" />
+              {grab.golden && <circle r={17} fill="#fbbf24" opacity={0.35} />}
+              {/* A silent grab (focus-hunt miss) comes back empty-tipped */}
+              {!grab.silent && (
+                <image
+                  href="/fly.svg"
+                  x={-FLY_PX / 2}
+                  y={-FLY_PX / 2}
+                  width={FLY_PX}
+                  height={FLY_PX}
+                  style={
+                    grab.golden
+                      ? {
+                          filter:
+                            'sepia(1) saturate(4) hue-rotate(-18deg) brightness(1.2)',
+                        }
+                      : undefined
+                  }
+                />
+              )}
+            </g>
           </g>
         </svg>
       )}

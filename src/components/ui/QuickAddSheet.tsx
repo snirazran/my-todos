@@ -29,6 +29,7 @@ import {
 import Fly from '@/components/ui/fly';
 import { Icon as AppIcon } from '@/components/ui/Icon';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
+import { hapticSuccess } from '@/lib/haptics';
 import { PlusUpgradeModal } from './PlusUpgradeModal';
 import { PickerSheet } from './quick-add/PickerSheet';
 import { TagManagerSheet } from './quick-add/TagManagerSheet';
@@ -381,6 +382,12 @@ export default function QuickAddSheet({
     )
       cancelLongPress();
   };
+  // Tapping a tag while the keyboard is up blurs the input, and the sheet
+  // reflows under the finger before the click can dispatch — so the click is
+  // lost and the tag needs a second tap. Commit the toggle on pointerup
+  // instead for those taps, and swallow the click if it does arrive.
+  const kbTagTapRef = useRef(false);
+  const swallowTagClickUntil = useRef(0);
 
   const [pickedDays, setPickedDays] = useState<DisplayDay[]>([]);
   const [activePicker, setActivePicker] = useState<ActivePicker>(null);
@@ -758,6 +765,7 @@ export default function QuickAddSheet({
   };
 
   const handleSubmit = async () => {
+    hapticSuccess();
     if (!pickedBacklogTaskId) {
       return doSubmit(false);
     }
@@ -1024,24 +1032,44 @@ export default function QuickAddSheet({
                                 // compatibility-event behavior), which silently
                                 // broke the row's click-and-drag scroll whenever
                                 // the textarea had focus.
-                                if (
+                                kbTagTapRef.current =
                                   e.pointerType !== 'mouse' &&
-                                  document.activeElement === inputRef.current
-                                ) {
+                                  document.activeElement === inputRef.current;
+                                if (kbTagTapRef.current) {
                                   e.preventDefault();
                                 }
                                 startLongPress(tag, e);
                               }}
                               onPointerMove={moveLongPress}
-                              onPointerUp={cancelLongPress}
+                              onPointerUp={() => {
+                                const wasTap = lpStart.current !== null;
+                                cancelLongPress();
+                                if (
+                                  kbTagTapRef.current &&
+                                  wasTap &&
+                                  !lpFired.current &&
+                                  !tag.disabled
+                                ) {
+                                  kbTagTapRef.current = false;
+                                  swallowTagClickUntil.current =
+                                    performance.now() + 400;
+                                  tagManager.toggleTag(tag);
+                                }
+                              }}
                               onPointerLeave={cancelLongPress}
-                              onPointerCancel={cancelLongPress}
+                              onPointerCancel={() => {
+                                kbTagTapRef.current = false;
+                                cancelLongPress();
+                              }}
                               onContextMenu={(e) => {
                                 e.preventDefault();
                                 cancelLongPress();
                                 setManagedTag(tag);
                               }}
                               onClick={tagScroll.guard(() => {
+                                if (performance.now() < swallowTagClickUntil.current) {
+                                  return;
+                                }
                                 if (lpFired.current) {
                                   lpFired.current = false;
                                   return;

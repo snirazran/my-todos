@@ -7,6 +7,7 @@ import {
   type WheelPickerOption,
 } from '@ncdai/react-wheel-picker';
 import '@ncdai/react-wheel-picker/style.css';
+import { hapticTick } from '@/lib/haptics';
 
 export type WheelColumnSpec = {
   items: readonly number[];
@@ -50,7 +51,10 @@ export function Wheel({
               key={i}
               options={options}
               value={col.value}
-              onValueChange={col.onChange}
+              onValueChange={(value) => {
+                if (value !== col.value) hapticTick();
+                col.onChange(value);
+              }}
               optionItemHeight={44}
               visibleCount={12}
               classNames={{

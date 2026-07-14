@@ -16,7 +16,8 @@ import {
 import Fly from '@/components/ui/fly';
 import { TimeTag } from '@/components/ui/TimeTag';
 import { Icon } from '@/components/ui/Icon';
-import { hapticSuccess, hapticTick } from '@/lib/haptics';
+import { hapticImpact, hapticSuccess, hapticTick } from '@/lib/haptics';
+import { useTaskTimerPhase } from '@/hooks/useTaskTimerPhase';
 import {
   AnimatePresence,
   motion,
@@ -37,6 +38,7 @@ import {
   useSensor,
   useSensors,
   DragEndEvent,
+  DragOverEvent,
   TouchSensor,
   Modifier,
   MeasuringStrategy,
@@ -187,6 +189,33 @@ const SortableTaskItem = React.forwardRef<
       () => renderBullet ? renderBullet(task, false, paused) : null,
       [task.id, task.completed, paused, renderBullet],
     );
+
+    const timerPhase = useTaskTimerPhase(task.id);
+
+    const wasDoneRef = React.useRef(isDone);
+    useEffect(() => {
+      if (
+        isDone &&
+        !wasDoneRef.current &&
+        containerRef.current &&
+        !window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      ) {
+        try {
+          containerRef.current.animate(
+            [
+              { transform: 'scale(1)' },
+              { transform: 'scale(0.972)', offset: 0.4 },
+              { transform: 'scale(1.006)', offset: 0.75 },
+              { transform: 'scale(1)' },
+            ],
+            { duration: 320, easing: 'ease-out', composite: 'add' },
+          );
+        } catch {
+          // ignore
+        }
+      }
+      wasDoneRef.current = isDone;
+    }, [isDone]);
 
     // Motion Values for Swipe
     const x = useMotionValue(0);
@@ -623,8 +652,15 @@ const SortableTaskItem = React.forwardRef<
               relative flex w-full items-center gap-1 px-2.5 py-2.5 md:gap-1 md:px-3.5 md:py-3.5
               transition-colors duration-200 rounded-xl
               bg-card dark:bg-muted
-              border border-transparent shadow-none
-              ${isHovered && isDesktop && !isDone ? 'border-primary/40' : ''}
+              border shadow-none
+              ${
+                timerPhase && !isDone
+                  ? timerPhase === 'break'
+                    ? 'border-sky-500/70 dark:border-sky-400/70'
+                    : 'border-primary/70 dark:border-primary/80'
+                  : 'border-transparent'
+              }
+              ${isHovered && isDesktop && !isDone && !timerPhase ? 'border-primary/40' : ''}
               ${
                 isGlowActive && !isDone
                   ? 'ring-2 ring-primary shadow-[0_0_30px_rgba(var(--primary),0.3)]'
@@ -716,10 +752,10 @@ const SortableTaskItem = React.forwardRef<
                 )}
                 <span className="flex flex-wrap items-center gap-1.5">
                   <motion.span
-                    className={`text-[15px] font-semibold leading-snug break-words transition-colors duration-200 md:text-[17px] ${
+                    className={`text-[15px] font-semibold leading-snug break-words line-through decoration-2 transition-[color,text-decoration-color] duration-300 md:text-[17px] ${
                       isDone
-                        ? 'text-muted-foreground line-through'
-                        : 'text-foreground'
+                        ? 'text-muted-foreground decoration-current'
+                        : 'text-foreground decoration-transparent'
                     }`}
                     animate={{
                       opacity: isDone ? 0.8 : 1,
@@ -1301,6 +1337,8 @@ export default function TaskList({
   ).length;
 
   const handleDragStart = () => {
+    hapticImpact();
+    lastDragOverIdRef.current = null;
     setIsAnyDragging(true);
     // Calculate boundary
     const activeNodes = document.querySelectorAll('[data-is-active="true"]');
@@ -1330,6 +1368,19 @@ export default function TaskList({
   const handleDragCancel = () => {
     setIsAnyDragging(false);
     activeAreaLimitsRef.current = null;
+  };
+
+  const lastDragOverIdRef = useRef<string | number | null>(null);
+  const handleDragOver = (event: DragOverEvent) => {
+    const overId = event.over?.id;
+    if (
+      overId != null &&
+      overId !== event.active.id &&
+      overId !== lastDragOverIdRef.current
+    ) {
+      lastDragOverIdRef.current = overId;
+      hapticTick();
+    }
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -1371,6 +1422,7 @@ export default function TaskList({
         );
 
         const finalOrder = [...reorderedActive, ...completedTasks, ...hiddenTasks];
+        hapticTick();
         onReorder(finalOrder);
       }
     }
@@ -1504,21 +1556,34 @@ export default function TaskList({
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center">
-                    <Icon
-                      name="planner"
-                      label="Today's tasks completed"
-                      className="h-10 w-10"
-                    />
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-background shadow-sm ring-1 ring-primary/20">
+                    <Fly size={30} y={-2} paused={paused} />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-[13px] font-black leading-tight tracking-tight text-foreground">
+                    <p className="text-[14px] font-black leading-tight tracking-tight text-foreground">
                       Every fly caught!
                     </p>
-                    <p className="mt-0.5 text-[12px] font-semibold leading-snug text-muted-foreground">
-                      All {tasks.length} of today&apos;s{' '}
-                      {tasks.length === 1 ? 'task' : 'tasks'} done — your frog
-                      is full and happy.
+                    <div
+                      className="mt-1.5 flex items-center gap-[5px]"
+                      aria-label={`${tasks.length} of ${tasks.length} tasks done`}
+                    >
+                      {Array.from({
+                        length: Math.min(tasks.length, 12),
+                      }).map((_, i) => (
+                        <span
+                          key={i}
+                          className="belly-dot h-[7px] w-[7px] rounded-full bg-primary shadow-[0_0_6px_rgba(74,222,128,0.35)]"
+                          style={{ animationDelay: `${120 + i * 50}ms` }}
+                        />
+                      ))}
+                      {tasks.length > 12 && (
+                        <span className="text-[10px] font-black leading-none text-primary">
+                          +{tasks.length - 12}
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-1.5 text-[12px] font-semibold leading-snug text-muted-foreground">
+                      Your frog is full and happy.
                     </p>
                   </div>
                   <button
@@ -1565,6 +1630,7 @@ export default function TaskList({
               sensors={sensors}
               collisionDetection={closestCorners}
               onDragStart={handleDragStart}
+              onDragOver={handleDragOver}
               onDragEnd={handleDragEnd}
               onDragCancel={handleDragCancel}
               modifiers={[restrictToActiveArea]}

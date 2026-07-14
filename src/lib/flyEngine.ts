@@ -175,7 +175,11 @@ function sourceFor(target: number): HTMLCanvasElement | null {
 }
 
 function blit(e: Entry) {
-  if (!mipsValid) return;
+  if (!mipsValid) {
+    if (!masterReady) return;
+    updateMips();
+    mipsValid = true;
+  }
   const src = sourceFor(Math.max(e.canvas.width, e.canvas.height));
   if (!src) return;
   e.ctx.clearRect(0, 0, e.canvas.width, e.canvas.height);

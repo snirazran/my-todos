@@ -398,6 +398,24 @@
   }
 }
 
+@keyframes belly-dot-pop {
+  from {
+    opacity: 0;
+    transform: scale(0);
+  }
+  60% {
+    transform: scale(1.35);
+  }
+}
+.belly-dot {
+  animation: belly-dot-pop 0.35s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .belly-dot {
+    animation: none;
+  }
+}
+
 @keyframes claim-wobble {
   0%,
   100% {

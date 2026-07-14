@@ -116,6 +116,10 @@ interface FrogProps {
   /** Keep animating through the global idle pause — for focus-session frogs
    *  that must stay alive while the user is AFK watching the timer. */
   ignoreIdlePause?: boolean;
+  /** Fires once when the canvas becomes visible (rive loaded + indices
+   *  applied) — lets a static placeholder crossfade out instead of
+   *  unmounting while the live canvas is still transparent. */
+  onDressed?: () => void;
 }
 
 const Frog = memo(
@@ -131,6 +135,7 @@ const Frog = memo(
       indices,
       emote = null,
       ignoreIdlePause = false,
+      onDressed,
     },
     ref,
   ) {
@@ -138,10 +143,13 @@ const Frog = memo(
     const riveUrl = useRiveAsset('/frog_idle.riv');
     const [dressed, setDressed] = React.useState(false);
     const dressedRef = useRef(false);
+    const onDressedRef = useRef(onDressed);
+    onDressedRef.current = onDressed;
     const markDressed = React.useCallback(() => {
       if (dressedRef.current) return;
       dressedRef.current = true;
       setDressed(true);
+      onDressedRef.current?.();
     }, []);
 
     const { RiveComponent, rive } = useRive(
@@ -164,11 +172,8 @@ const Frog = memo(
       if (!rive) return;
       const el = wrapperRef.current;
       if (!el) return;
-      // 1.5 instead of the global 2: the frog is the largest continuously
-      // rasterized canvas in the app, and at its render size the difference
-      // is invisible while the per-frame pixel cost drops ~44%.
       const resize = () =>
-        rive.resizeDrawingSurfaceToCanvas(riveDevicePixelRatio(1.5));
+        rive.resizeDrawingSurfaceToCanvas(riveDevicePixelRatio());
       resize();
       const raf = requestAnimationFrame(resize);
       const observer = new ResizeObserver(() => resize());

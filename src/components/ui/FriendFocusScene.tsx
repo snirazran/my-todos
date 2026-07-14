@@ -28,7 +28,15 @@ export function FriendFocusScene({
   const flyRefs = useRef<Record<string, HTMLElement | null>>({});
   const [missPos, setMissPos] = useState<{ x: number; y: number } | null>(null);
 
-  const { grab, vp, tonguePathEl, tipGroupEl, triggerTongue } = useFrogTongue({
+  const {
+    grab,
+    vp,
+    tonguePathEl,
+    tipGroupEl,
+    worldGroupEl,
+    fxGroupEl,
+    triggerTongue,
+  } = useFrogTongue({
     frogRef,
     frogBoxRef,
     flyRefs,
@@ -142,17 +150,20 @@ export function FriendFocusScene({
                 <stop offset="1" stopColor="#f43f5e" />
               </linearGradient>
             </defs>
-            <path
-              ref={tonguePathEl}
-              d="M0 0 L0 0"
-              fill="none"
-              stroke="url(#friend-tongue-grad)"
-              strokeWidth={TONGUE_STROKE}
-              strokeLinecap="round"
-              vectorEffect="non-scaling-stroke"
-            />
-            <g ref={tipGroupEl} style={{ visibility: 'hidden' }}>
-              <circle r={10} fill="transparent" />
+            <g ref={worldGroupEl}>
+              <path
+                ref={tonguePathEl}
+                d="M0 0 L0 0"
+                fill="none"
+                stroke="url(#friend-tongue-grad)"
+                strokeWidth={TONGUE_STROKE}
+                strokeLinecap="round"
+                vectorEffect="non-scaling-stroke"
+              />
+              <g ref={fxGroupEl} />
+              <g ref={tipGroupEl} style={{ visibility: 'hidden' }}>
+                <circle r={10} fill="transparent" />
+              </g>
             </g>
           </svg>,
           document.body,

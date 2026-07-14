@@ -1748,11 +1748,11 @@ export default function TaskBoard({
           ['--stack' as string]: `${notificationStackHeight}px`,
           transition: 'padding 200ms ease',
         }}
-        className={`fixed bottom-0 left-0 right-0 px-3 md:px-4 pb-[calc(env(safe-area-inset-bottom)+84px+var(--stack))] md:pb-[calc(env(safe-area-inset-bottom)+92px+var(--stack))] pointer-events-none ${
+        className={`fixed bottom-0 left-0 right-0 px-3 md:px-4 pb-[calc(env(safe-area-inset-bottom)+84px+var(--stack))] md:pb-[calc(env(safe-area-inset-bottom)+92px+var(--stack))] pointer-events-none transition-opacity duration-150 ${
           // Above the drag ghost (z-[100]) while dragging so the drop-zone
           // label isn't hidden under the card that's hovering over it.
           drag?.active ? 'z-[105]' : 'z-[40]'
-        }`}
+        } ${scrollLocked ? 'invisible opacity-0' : ''}`}
       >
         <div className="pointer-events-auto mx-auto flex w-[88vw] max-w-none flex-col items-center justify-center md:w-full md:max-w-[480px]">
           {isMobile ? (

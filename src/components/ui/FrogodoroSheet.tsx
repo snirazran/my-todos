@@ -13,6 +13,7 @@ import {
   Minus,
   Square,
   Check,
+  ChevronRight,
   Lock,
   Scroll,
 } from 'lucide-react';
@@ -45,6 +46,7 @@ import type { Trackable } from '@/lib/questClaims';
 import { FocusScene } from '@/components/ui/FocusScene';
 import { fliesCaughtFor, deepFocusPledgeLive } from '@/lib/focusFlies';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
+import { requestFrogStamp } from '@/lib/frogStampEngine';
 import Frog from '@/components/ui/frog';
 import Fly from '@/components/ui/fly';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
@@ -196,13 +198,51 @@ export default function FrogodoroSheet({
   // slide-in/out never competes with Rive canvas setup (same pattern as
   // BaseSheet's `entered`).
   const [sheetEntered, setSheetEntered] = useState(false);
+  // Snapshot → live-rive handoff: the live frog canvas stays transparent
+  // until rive loads and the outfit indices apply, then fades itself in over
+  // ~150ms. The static stamp must stay FULLY OPAQUE on top until that fade-in
+  // has finished — fading both layers at once dips the combined opacity and
+  // reads as a flicker — and only then fade out over identical pixels.
+  const [frogSwap, setFrogSwap] = useState<'snapshot' | 'fading' | 'live'>(
+    'snapshot',
+  );
+  const frogFadeTimersRef = useRef<number[]>([]);
+  const handleFrogReady = () => {
+    if (frogFadeTimersRef.current.length > 0) return;
+    frogFadeTimersRef.current.push(
+      window.setTimeout(() => {
+        setFrogSwap((s) => (s === 'snapshot' ? 'fading' : s));
+      }, 200),
+      window.setTimeout(() => {
+        setFrogSwap('live');
+      }, 430),
+    );
+  };
+  useEffect(() => {
+    if (!open) {
+      setFrogSwap('snapshot');
+      for (const t of frogFadeTimersRef.current) window.clearTimeout(t);
+      frogFadeTimersRef.current = [];
+    }
+  }, [open]);
+
+  // Boot the stamp engine while the sheet is still closed, so the very first
+  // open doesn't show a blank frog spot while the engine cold-starts.
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      const c = document.createElement('canvas');
+      c.width = 4;
+      c.height = 4;
+      requestFrogStamp(c, {});
+    }, 1200);
+    return () => window.clearTimeout(t);
+  }, []);
   const [showSettings, setShowSettings] = useState(false);
-  const [showHelp, setShowHelp] = useState(false);
   const [showPond, setShowPond] = useState(false);
   const [confirmStop, setConfirmStop] = useState(false);
   const [confirmPause, setConfirmPause] = useState(false);
   const [confirmTaskSwitch, setConfirmTaskSwitch] = useState(false);
-  const catchChipRef = useRef<HTMLDivElement | null>(null);
+  const catchChipRef = useRef<HTMLElement | null>(null);
   const [chipPulse, setChipPulse] = useState(0);
   const { seenIntros, markIntroSeen } = useIntros(open);
   const [introOpen, setIntroOpen] = useState(false);
@@ -485,7 +525,6 @@ export default function FrogodoroSheet({
     prevOpenRef.current = open;
     if (wasOpen && !open) {
       setShowSettings(false);
-      setShowHelp(false);
       setShowPond(false);
       setConfirmStop(false);
       setConfirmPause(false);
@@ -1011,55 +1050,6 @@ export default function FrogodoroSheet({
                         Back to timer
                       </button>
                     </motion.div>
-                  ) : showHelp ? (
-                    <motion.div
-                      key="help"
-                      initial={{ opacity: 0, x: 40 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: 40 }}
-                      transition={{ duration: 0.2 }}
-                      className="p-5"
-                    >
-                      <div className="flex items-center justify-between mb-5">
-                        <h3 className="text-lg font-black text-foreground">How it works</h3>
-                        <button
-                          onClick={() => setShowHelp(false)}
-                          className="flex items-center justify-center w-8 h-8 rounded-full bg-muted/60 text-muted-foreground hover:bg-muted transition-colors"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-
-                      <div className="space-y-3">
-                        <p className="text-sm text-muted-foreground leading-relaxed">
-                          Switch between <span className="font-bold text-primary">Focus</span> and <span className="font-bold text-sky-500">Break</span> as you go. We just count the total seconds you spend in each — no session limits, no rules.
-                        </p>
-                        <div className="overflow-hidden border rounded-2xl border-border/50 bg-muted/10">
-                          <div className="flex items-center gap-3 px-4 py-2.5 bg-primary/5 border-b border-border/30">
-                            <div className="w-2.5 h-2.5 rounded-full bg-primary shrink-0" />
-                            <p className="flex-1 text-sm font-semibold text-foreground">Focus</p>
-                            <span className="text-xs font-black text-primary tabular-nums">{formatDurationSetting(settings.focusDuration)}</span>
-                          </div>
-                          <div className="flex items-center gap-3 px-4 py-2.5 bg-sky-500/5">
-                            <div className="w-2.5 h-2.5 rounded-full bg-sky-400 shrink-0" />
-                            <p className="flex-1 text-sm font-semibold text-foreground">Break</p>
-                            <span className="text-xs font-black text-sky-500 tabular-nums">{formatDurationSetting(settings.breakDuration)}</span>
-                          </div>
-                        </div>
-                        <p className="text-sm text-muted-foreground leading-relaxed">
-                          Every focused minute also counts toward your{' '}
-                          <span className="font-bold text-foreground">quests</span>.
-                        </p>
-                      </div>
-
-                      <button
-                        onClick={() => setShowHelp(false)}
-                        className="mt-4 w-full py-3 rounded-2xl font-black text-sm bg-primary text-primary-foreground shadow-md shadow-primary/20 active:scale-[0.98] transition-all"
-                      >
-                        Got it!
-                      </button>
-                    </motion.div>
-
                   ) : showSettings ? (
                     <motion.div
                       key="settings"
@@ -1260,23 +1250,32 @@ export default function FrogodoroSheet({
                             session length, plus the live deep-focus bonus —
                             visible while the pledge holds, gone if it breaks.
                             Pulses when a snatched fly lands; +1 floats up. */}
-                        {timerActive &&
-                          !awaitingDone &&
-                          phase === 'focus' &&
-                          fliesPotential > 0 && (
+                        {!awaitingDone && (
                             <div className="absolute top-3 left-3 z-10">
-                              <motion.div
-                                ref={catchChipRef}
+                              <motion.button
+                                type="button"
+                                ref={catchChipRef as React.RefObject<HTMLButtonElement>}
                                 key={chipPulse}
                                 initial={chipPulse > 0 ? { scale: 1.35 } : false}
                                 animate={{ scale: 1 }}
                                 transition={{ type: 'spring', stiffness: 420, damping: 16 }}
-                                className="flex items-center gap-1 rounded-full bg-black/25 py-1 pl-1.5 pr-2.5 shadow-inner"
+                                onClick={() => {
+                                  hapticTick();
+                                  setShowPond(true);
+                                }}
+                                aria-label="Fly catches this week"
+                                className="flex items-center gap-1 rounded-full bg-black/25 py-1 pl-1.5 pr-2.5 shadow-inner transition-colors hover:bg-black/35 active:scale-95"
                               >
                                 <Fly size={24} interactive={false} alwaysPlay paused />
-                                <span className="text-[13px] font-black tabular-nums text-white">
-                                  {fliesCaught}/{fliesPotential}
-                                </span>
+                                {timerActive &&
+                                phase === 'focus' &&
+                                fliesPotential > 0 ? (
+                                  <span className="text-[13px] font-black tabular-nums text-white">
+                                    {fliesCaught}/{fliesPotential}
+                                  </span>
+                                ) : (
+                                  <ChevronRight className="h-3.5 w-3.5 text-white/80" />
+                                )}
                                 <AnimatePresence>
                                   {pledgeLive && (
                                     <motion.span
@@ -1290,7 +1289,7 @@ export default function FrogodoroSheet({
                                     </motion.span>
                                   )}
                                 </AnimatePresence>
-                              </motion.div>
+                              </motion.button>
                               {/* +1 slips out from under the chip — same
                                   gesture as the home currency pill's gain. */}
                               <AnimatePresence>
@@ -1318,27 +1317,17 @@ export default function FrogodoroSheet({
                           )}
 
                         <div className="absolute top-3 right-3 z-10 flex items-center gap-2.5">
-                          <button
-                            onClick={() => setShowPond(true)}
-                            aria-label="Fly catches this week"
-                            className="flex items-center justify-center w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 transition-colors text-white"
-                          >
-                            <Fly size={26} interactive={false} alwaysPlay paused />
-                          </button>
-                          <button
-                            onClick={() => setShowHelp(true)}
-                            aria-label="How it works"
-                            className="flex items-center justify-center w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 transition-colors text-white text-sm font-black leading-none"
-                          >
-                            ?
-                          </button>
                           {!awaitingDone && (
                             <button
-                              onClick={() => setShowSettings(true)}
+                              onClick={() => {
+                                hapticTick();
+                                setShowSettings(true);
+                              }}
                               aria-label="Settings"
-                              className="flex items-center justify-center w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 transition-colors text-white"
+                              className="flex h-8 items-center gap-1.5 rounded-full bg-white/95 px-3 text-[12px] font-black uppercase tracking-wide text-emerald-900 shadow-[0_2px_0_rgba(0,0,0,0.18)] transition-all hover:bg-white active:translate-y-[1px] active:shadow-none"
                             >
-                              <Settings2 className="w-4 h-4" />
+                              <Settings2 className="h-4 w-4" />
+                              Settings
                             </button>
                           )}
                           <button
@@ -1367,18 +1356,18 @@ export default function FrogodoroSheet({
                           !timerActive &&
                           !awaitingDone &&
                           phase === 'focus' && (
-                            <div className="-mt-1 mb-3 flex justify-center px-6">
+                            <div className="-mt-2 mb-4 flex justify-center px-6">
                               {sessionAreas.matchedNames.length > 0 ? (
-                                <span className="flex max-w-full items-center gap-1.5 rounded-full bg-black/25 px-3 py-1 text-[11px] font-bold text-white shadow-inner">
-                                  <Scroll className="h-3.5 w-3.5 shrink-0 opacity-90" />
+                                <span className="flex max-w-full items-center gap-1 rounded-full bg-black/15 px-2.5 py-1 text-[10px] font-bold text-white/80">
+                                  <Scroll className="h-3 w-3 shrink-0 opacity-80" />
                                   <span className="truncate">
                                     Counts toward{' '}
                                     {sessionAreas.matchedNames.join(' · ')}
                                   </span>
                                 </span>
                               ) : (
-                                <span className="flex max-w-full items-center gap-1.5 rounded-full bg-black/15 px-3 py-1 text-[11px] font-bold text-white/70">
-                                  <Scroll className="h-3.5 w-3.5 shrink-0 opacity-70" />
+                                <span className="flex max-w-full items-center gap-1 rounded-full bg-black/10 px-2.5 py-1 text-[10px] font-bold text-white/60">
+                                  <Scroll className="h-3 w-3 shrink-0 opacity-60" />
                                   <span className="truncate">
                                     Not linked to an area quest — tag this task to
                                     link one
@@ -1488,6 +1477,63 @@ export default function FrogodoroSheet({
                         </div>
                         )}
 
+                        {/* Deep-focus pledge lives with the session config —
+                            phase, duration, pledge, then START. A real switch
+                            so it reads as a control, not a caption. */}
+                        <AnimatePresence initial={false}>
+                          {!awaitingDone && !timerActive && phase === 'focus' && (
+                            <motion.div
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: 'auto', opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
+                              className="overflow-hidden"
+                            >
+                              <button
+                                type="button"
+                                role="switch"
+                                aria-checked={deepFocus}
+                                onClick={() => {
+                                  hapticTick();
+                                  setDeepFocus(!deepFocus);
+                                }}
+                                className="mx-auto mb-2 flex w-full max-w-[300px] items-center justify-between gap-3 rounded-2xl bg-black/20 px-4 py-2.5 text-left shadow-inner transition-colors hover:bg-black/30 active:scale-[0.99]"
+                              >
+                                <span className="flex min-w-0 items-center gap-2.5">
+                                  <Zap
+                                    className={`h-4 w-4 shrink-0 transition-colors ${
+                                      deepFocus
+                                        ? 'fill-amber-300 text-amber-300'
+                                        : 'text-white/60'
+                                    }`}
+                                  />
+                                  <span className="min-w-0">
+                                    <span className="block text-[12px] font-black leading-tight text-white">
+                                      Deep focus
+                                    </span>
+                                    <span className="block truncate text-[11px] font-semibold leading-tight text-white/70">
+                                      Finish without pausing · +1 fly
+                                    </span>
+                                  </span>
+                                </span>
+                                <span
+                                  className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+                                    deepFocus ? 'bg-white' : 'bg-white/25'
+                                  }`}
+                                >
+                                  <span
+                                    className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full shadow-sm transition-all ${
+                                      deepFocus
+                                        ? 'translate-x-5 bg-primary'
+                                        : 'translate-x-0 bg-white'
+                                    }`}
+                                  />
+                                </span>
+                              </button>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+
                         {/* The frog perches on the START/PAUSE button from the
                             moment the sheet opens; when a focus session starts
                             the flies slide in from the sides, the frog lunges
@@ -1495,7 +1541,7 @@ export default function FrogodoroSheet({
                             minutes. */}
                         {!awaitingDone && (
                           <div className="relative z-30">
-                            {sheetEntered ? (
+                            {sheetEntered && (
                               <FocusScene
                                 indices={frogIndices}
                                 running={isRunning}
@@ -1504,12 +1550,20 @@ export default function FrogodoroSheet({
                                 focusSeconds={phaseDuration}
                                 counterRef={catchChipRef}
                                 onGainLand={() => setChipPulse((p) => p + 1)}
+                                onFrogReady={handleFrogReady}
                                 suspended={
                                   confirmStop || confirmPause || confirmTaskSwitch
                                 }
                               />
-                            ) : (
-                              <div className="relative flex flex-col items-center">
+                            )}
+                            {frogSwap !== 'live' && (
+                              <div
+                                className={`flex flex-col items-center transition-opacity duration-200 ${
+                                  sheetEntered
+                                    ? 'pointer-events-none absolute inset-x-0 top-0 z-40'
+                                    : 'relative'
+                                } ${frogSwap === 'fading' ? 'opacity-0' : 'opacity-100'}`}
+                              >
                                 <div
                                   className="pointer-events-none relative z-30"
                                   style={{
@@ -1548,18 +1602,30 @@ export default function FrogodoroSheet({
                                 className="pointer-events-none absolute left-1/2 z-30 -translate-x-1/2"
                                 style={{ bottom: 'calc(100% - 8px)' }}
                               >
-                                {sheetEntered ? (
+                                {sheetEntered && (
                                   <Frog
                                     width={144}
                                     height={162}
                                     indices={frogIndices}
+                                    onDressed={handleFrogReady}
                                   />
-                                ) : (
-                                  <FrogSnapshot
-                                    indices={frogIndices}
-                                    width={144}
-                                    height={162}
-                                  />
+                                )}
+                                {frogSwap !== 'live' && (
+                                  <div
+                                    className={`transition-opacity duration-200 ${
+                                      sheetEntered ? 'absolute inset-0' : ''
+                                    } ${
+                                      frogSwap === 'fading'
+                                        ? 'opacity-0'
+                                        : 'opacity-100'
+                                    }`}
+                                  >
+                                    <FrogSnapshot
+                                      indices={frogIndices}
+                                      width={144}
+                                      height={162}
+                                    />
+                                  </div>
                                 )}
                               </div>
                               <button
@@ -1618,33 +1684,6 @@ export default function FrogodoroSheet({
                         </div>
                         )}
 
-                        {/* Deep-focus pledge — finish without pausing → bonus
-                            fly. Collapses smoothly on start instead of
-                            snapping the layout. */}
-                        <AnimatePresence initial={false}>
-                          {!awaitingDone && !timerActive && phase === 'focus' && (
-                            <motion.div
-                              initial={{ height: 0, opacity: 0 }}
-                              animate={{ height: 'auto', opacity: 1 }}
-                              exit={{ height: 0, opacity: 0 }}
-                              transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
-                              className="overflow-hidden"
-                            >
-                              <button
-                                type="button"
-                                onClick={() => setDeepFocus(!deepFocus)}
-                                className={`mx-auto mt-3 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold transition-colors active:scale-95 ${
-                                  deepFocus
-                                    ? 'bg-white text-primary shadow'
-                                    : 'bg-white/15 text-white/90 hover:bg-white/25'
-                                }`}
-                              >
-                                <Zap className={`h-3.5 w-3.5 ${deepFocus ? 'fill-current' : ''}`} />
-                                Deep focus · finish without pausing for +1 fly
-                              </button>
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
 
                         {/* Enable-notifications hint — so timer-complete alerts can land */}
                         {canEnableNotifs && (

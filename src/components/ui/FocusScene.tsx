@@ -39,6 +39,7 @@ export function FocusScene({
   counterRef,
   onGainLand,
   suspended = false,
+  onFrogReady,
 }: {
   indices?: Partial<Record<WardrobeSlot, number>>;
   running: boolean;
@@ -52,6 +53,8 @@ export function FocusScene({
   /** An overlay is covering the scene (stop-confirm etc.) — no tongue fires;
    *  a real catch still rewards via the no-tongue fallback. */
   suspended?: boolean;
+  /** Fires once the live frog canvas is visible (rive loaded + dressed). */
+  onFrogReady?: () => void;
 }) {
   const frogRef = useRef<FrogHandle | null>(null);
   const frogBoxRef = useRef<HTMLDivElement | null>(null);
@@ -95,8 +98,16 @@ export function FocusScene({
     });
   }, [counterRef]);
 
-  const { grab, vp, tonguePathEl, tipGroupEl, triggerTongue, visuallyDone } =
-    useFrogTongue({
+  const {
+    grab,
+    vp,
+    tonguePathEl,
+    tipGroupEl,
+    worldGroupEl,
+    fxGroupEl,
+    triggerTongue,
+    visuallyDone,
+  } = useFrogTongue({
       frogRef,
       frogBoxRef,
       flyRefs,
@@ -308,6 +319,7 @@ export function FocusScene({
           width={frogWidth}
           height={Math.round(frogWidth * 1.125)}
           indices={indices}
+          onDressed={onFrogReady}
           ignoreIdlePause
           mouthOpen={!!grab}
           mouthOffset={{
@@ -337,26 +349,29 @@ export function FocusScene({
                 <stop offset="1" stopColor="#f43f5e" />
               </linearGradient>
             </defs>
-            <path
-              ref={tonguePathEl}
-              d="M0 0 L0 0"
-              fill="none"
-              stroke="url(#focus-tongue-grad)"
-              strokeWidth={TONGUE_STROKE}
-              strokeLinecap="round"
-              vectorEffect="non-scaling-stroke"
-            />
-            <g ref={tipGroupEl} style={{ visibility: 'hidden' }}>
-              <circle r={10} fill="transparent" />
-              {!missMode && (
-                <image
-                  href="/fly.svg"
-                  x={-FLY_PX / 2}
-                  y={-FLY_PX / 2}
-                  width={FLY_PX}
-                  height={FLY_PX}
-                />
-              )}
+            <g ref={worldGroupEl}>
+              <path
+                ref={tonguePathEl}
+                d="M0 0 L0 0"
+                fill="none"
+                stroke="url(#focus-tongue-grad)"
+                strokeWidth={TONGUE_STROKE}
+                strokeLinecap="round"
+                vectorEffect="non-scaling-stroke"
+              />
+              <g ref={fxGroupEl} />
+              <g ref={tipGroupEl} style={{ visibility: 'hidden' }}>
+                <circle r={10} fill="transparent" />
+                {!missMode && (
+                  <image
+                    href="/fly.svg"
+                    x={-FLY_PX / 2}
+                    y={-FLY_PX / 2}
+                    width={FLY_PX}
+                    height={FLY_PX}
+                  />
+                )}
+              </g>
             </g>
           </svg>,
           document.body,

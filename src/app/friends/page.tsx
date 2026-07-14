@@ -22,6 +22,7 @@ import { mutateFriendsCaches } from '@/hooks/useFriendsSync';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { useIsFrogHungry } from '@/hooks/useFrogHunger';
 import { useRegisterOpenSheet, useSheetStore } from '@/lib/sheetStore';
+import { hapticCelebrate, hapticTick } from '@/lib/haptics';
 import Frog, { type FrogHandle } from '@/components/ui/frog';
 import { HomeFocusFlies } from '@/components/ui/HomeFocusFlies';
 import Fly from '@/components/ui/fly';
@@ -573,6 +574,10 @@ function FlyClaimRewardOverlay({
   const [displayAmount, setDisplayAmount] = useState(amount);
   const [doubling, setDoubling] = useState(false);
   const doubledRef = useRef(false);
+
+  React.useEffect(() => {
+    hapticCelebrate();
+  }, []);
   const prize = useMemo(() => makeFlyPrize(displayAmount), [displayAmount]);
 
   const handleWatchAd = async () => {
@@ -696,7 +701,10 @@ function LeaderboardRow({
     <li>
       <button
         type="button"
-        onClick={onOpen}
+        onClick={() => {
+          hapticTick();
+          onOpen();
+        }}
         className={cn(
           'relative flex w-full items-center gap-2 rounded-xl border bg-card py-1.5 pl-1.5 pr-3 text-left transition-all hover:-translate-y-0.5 hover:shadow-md active:scale-[0.99] sm:gap-2.5 sm:py-2',
           flex

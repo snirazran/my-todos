@@ -11,7 +11,7 @@ import { RARITY_CONFIG } from '@/components/ui/gift-box/constants';
 import type { ItemDef } from '@/lib/skins/catalog';
 import type { DailyDeal } from '@/lib/skins/dailyDeal';
 
-function useCountdown(endsAt: string | undefined) {
+export function useCountdown(endsAt: string | undefined) {
   const [label, setLabel] = React.useState('');
   React.useEffect(() => {
     if (!endsAt) return;

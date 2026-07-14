@@ -18,6 +18,7 @@ import type { Task } from './helpers';
 import Fly from '@/components/ui/fly';
 import { useLeftTongue } from './LeftTongue';
 import { hapticImpact } from '@/lib/haptics';
+import { useTaskTimerPhase } from '@/hooks/useTaskTimerPhase';
 
 type OnGrabParams = {
   clientX: number;
@@ -324,6 +325,8 @@ export default function TaskCard({
     ? 'inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-bold tracking-normal uppercase transition-colors border shadow-sm'
     : 'inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[9px] font-bold tracking-wider uppercase transition-colors border shadow-sm';
 
+  const timerPhase = useTaskTimerPhase(task.id);
+
   return (
     <div
       ref={setRefs}
@@ -354,9 +357,16 @@ export default function TaskCard({
         // (for the hover/active/menu highlight below) but transparent at
         // rest.
         compact
-          ? 'bg-card dark:bg-muted border border-transparent shadow-[0_1px_2px_rgba(0,0,0,0.12)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.5)]'
-          : 'bg-card border border-border/80 shadow-sm',
-        task.completed
+          ? 'bg-card dark:bg-muted border shadow-[0_1px_2px_rgba(0,0,0,0.12)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.5)]'
+          : 'bg-card border shadow-sm',
+        timerPhase && !task.completed
+          ? timerPhase === 'break'
+            ? 'border-sky-500/70 dark:border-sky-400/70'
+            : 'border-primary/70 dark:border-primary/80'
+          : compact
+            ? 'border-transparent'
+            : 'border-border/80',
+        task.completed || (timerPhase && !task.completed)
           ? ''
           : 'md:hover:border-primary/40 active:border-primary/40',
         compact ? 'mb-1' : 'mb-2.5',

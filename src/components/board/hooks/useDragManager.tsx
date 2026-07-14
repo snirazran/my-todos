@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { hapticImpact, hapticTick } from '@/lib/haptics';
 
 export type DragState = {
   active: boolean;
@@ -93,6 +94,8 @@ export function useDragManager() {
   const dragActiveRef = useRef(false);
   const dragFromDayRef = useRef<number>(0);
   const targetDayRef = useRef<number | null>(null);
+  const hapticIndexRef = useRef<number | null>(null);
+  const hapticDayRef = useRef<number | null>(null);
 
   // remember scroller inline styles so we can restore after drag
   const prevTouchAction = useRef<string>('');
@@ -201,9 +204,12 @@ export function useDragManager() {
       pxVelRef.current = 0;
       pxVelSmoothedRef.current = 0;
 
+      hapticImpact();
       dragActiveRef.current = true;
       dragFromDayRef.current = day;
       targetDayRef.current = day;
+      hapticIndexRef.current = null;
+      hapticDayRef.current = day;
       dragOffsetRef.current = { dx: clientX - rect.left, dy: clientY - rect.top };
       grabPointRef.current = { x: clientX, y: clientY };
       autoScrollArmedXRef.current = false;
@@ -494,7 +500,14 @@ export function useDragManager() {
         newDay = targetDayRef.current;
       }
 
-      if (newDay != null) targetDayRef.current = newDay;
+      if (newDay != null) {
+        targetDayRef.current = newDay;
+        if (hapticDayRef.current !== null && newDay !== hapticDayRef.current) {
+          hapticDayRef.current = newDay;
+          hapticIndexRef.current = null;
+          hapticTick();
+        }
+      }
 
       // Find Index (Vertical Auto-Scroll mixed in here usually, but let's separate index logic)
       // First, Vertical Scroll:
@@ -558,6 +571,13 @@ export function useDragManager() {
            if (!placed) newIndex = cardEls.length;
         }
         
+        if (hapticIndexRef.current === null) {
+          hapticIndexRef.current = newIndex;
+        } else if (newIndex !== hapticIndexRef.current) {
+          hapticIndexRef.current = newIndex;
+          hapticTick();
+        }
+
         setTargetIndex(prev => prev === newIndex ? prev : newIndex);
       }
 

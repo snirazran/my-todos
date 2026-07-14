@@ -5,11 +5,12 @@ import Link from 'next/link';
 import { useAuth } from '@/components/auth/AuthContext';
 import { usePathname, useRouter } from 'next/navigation';
 import {
-  ShoppingBag,
   Sparkles,
   LogIn,
   LogOut,
 } from 'lucide-react';
+import { useWardrobeBadges } from '@/components/ui/WardrobePopup';
+import { TRADE_ITEM_COUNT } from '@/lib/skins/catalog';
 import { Icon } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
@@ -45,9 +46,9 @@ import { HelpCenterPanel, ContactPanel } from '@/components/ui/HelpCenter';
 import { cn } from '@/lib/utils';
 
 const wardrobeItems = [
-  { tab: 'inventory' as const, label: 'Inventory', iconName: 'wardrobe' as const, color: 'bg-primary/10' },
-  { tab: 'shop' as const, label: 'Shop', icon: ShoppingBag, color: 'text-violet-500 bg-violet-500/10' },
-  { tab: 'trade' as const, label: 'Trade', iconName: 'repeat' as const, color: 'bg-amber-500/10' },
+  { tab: 'inventory' as const, label: 'Inventory', color: 'bg-primary/10' },
+  { tab: 'shop' as const, label: 'Shop', color: 'bg-sky-500/10' },
+  { tab: 'trade' as const, label: 'Trade', color: 'bg-amber-500/10' },
 ];
 
 export default function SiteHeader() {
@@ -62,6 +63,8 @@ export default function SiteHeader() {
   const { unseenCount, unseenContainerCount, data: inventoryData } = useInventory(!!user, true);
   const flyBalance = inventoryData?.wardrobe?.flies;
   const inventoryBadge = unseenCount + unseenContainerCount;
+  const { tradeSpares } = useWardrobeBadges();
+  const tradeSparesReady = tradeSpares >= TRADE_ITEM_COUNT;
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const [wardrobeDropdownOpen, setWardrobeDropdownOpen] = useState(false);
   const wardrobeRef = useRef<HTMLDivElement>(null);
@@ -130,7 +133,8 @@ export default function SiteHeader() {
       iconName: 'wardrobe' as const,
       onClick: () => {
         if (!user) { router.push('/login'); return; }
-        router.push('/wardrobe');
+        hapticTick();
+        setWardrobeDropdownOpen((prev) => !prev);
       },
       isActive: pathname === '/wardrobe',
     },
@@ -239,29 +243,61 @@ export default function SiteHeader() {
                         className="absolute left-1/2 -translate-x-1/2 top-full mt-2 z-50 w-72 origin-top"
                       >
                         <div className="p-3 bg-popover border border-border rounded-2xl shadow-xl ring-1 ring-black/5">
-                          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground px-1 pb-2">
-                            Style Studio
-                          </p>
+                          <div className="flex items-baseline justify-between px-1 pb-2">
+                            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                              Dress your frog
+                            </p>
+                            {typeof flyBalance === 'number' && (
+                              <span className="flex items-center gap-1 text-[11px] font-black tabular-nums text-foreground">
+                                <img src="/fly.svg" alt="" className="h-4 w-4" />
+                                {flyBalance.toLocaleString()}
+                              </span>
+                            )}
+                          </div>
                           <div className="grid grid-cols-3 gap-2">
-                            {wardrobeItems.map((wItem) => (
-                              <button
-                                key={wItem.tab}
-                                onClick={() => {
-                                  setWardrobeDropdownOpen(false);
-                                  router.push(`/wardrobe?tab=${wItem.tab}`);
-                                }}
-                                className="flex flex-col items-center gap-2 p-3 rounded-xl bg-muted/50 hover:bg-muted transition-all active:scale-95"
-                              >
-                                <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${wItem.color}`}>
-                                  {'iconName' in wItem && wItem.iconName ? (
-                                    <Icon name={wItem.iconName} label={wItem.label} className="w-5 h-5" />
-                                  ) : 'icon' in wItem && wItem.icon ? (
-                                    (() => { const WIcon = wItem.icon; return <WIcon className="w-5 h-5" />; })()
-                                  ) : null}
-                                </div>
-                                <span className="text-xs font-bold text-foreground">{wItem.label}</span>
-                              </button>
-                            ))}
+                            {wardrobeItems.map((wItem) => {
+                              const badge =
+                                wItem.tab === 'inventory'
+                                  ? inventoryBadge
+                                  : wItem.tab === 'trade' && tradeSparesReady
+                                    ? tradeSpares
+                                    : 0;
+                              return (
+                                <button
+                                  key={wItem.tab}
+                                  onClick={() => {
+                                    hapticTick();
+                                    setWardrobeDropdownOpen(false);
+                                    router.push(`/wardrobe?tab=${wItem.tab}`);
+                                  }}
+                                  className="relative flex flex-col items-center gap-2 p-3 rounded-xl bg-muted/50 hover:bg-muted transition-all active:scale-95"
+                                >
+                                  {badge > 0 && (
+                                    <span
+                                      className={`absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-popover px-1 text-[10px] font-black text-white shadow-sm ${
+                                        wItem.tab === 'inventory'
+                                          ? 'bg-rose-500'
+                                          : 'bg-amber-500'
+                                      }`}
+                                    >
+                                      {badge > 9 ? '9+' : badge}
+                                    </span>
+                                  )}
+                                  <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${wItem.color}`}>
+                                    {wItem.tab === 'shop' ? (
+                                      <img src="/fly.svg" alt="" className="h-6 w-6" />
+                                    ) : (
+                                      <Icon
+                                        name={wItem.tab === 'inventory' ? 'wardrobe' : 'repeat'}
+                                        label={wItem.label}
+                                        className="w-6 h-6"
+                                      />
+                                    )}
+                                  </div>
+                                  <span className="text-xs font-bold text-foreground">{wItem.label}</span>
+                                </button>
+                              );
+                            })}
                           </div>
                         </div>
                       </motion.div>
@@ -374,12 +410,20 @@ import {
   AlertTriangle,
   ChevronLeft,
   Vibrate,
+  Volume2,
 } from 'lucide-react';
 import {
   useHapticsEnabled,
   setHapticsEnabled,
   hapticImpact,
+  hapticTick,
 } from '@/lib/haptics';
+import {
+  useCatchSoundsEnabled,
+  setCatchSoundsEnabled,
+  primeCatchSounds,
+  playPop,
+} from '@/lib/catchSounds';
 import { useTheme } from 'next-themes';
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
@@ -1284,6 +1328,7 @@ function PreferencesView({
 
       <MenuSection title="Feedback">
         <HapticsToggleRow />
+        <CatchSoundsToggleRow />
       </MenuSection>
 
       <MenuSection title="Quests">
@@ -1320,6 +1365,46 @@ function HapticsToggleRow() {
           <Vibrate className="w-7 h-7 text-emerald-500" />
         </div>
         <span className="font-bold text-sm">Haptic Vibrations</span>
+      </span>
+      <span
+        className={cn(
+          'inline-flex h-6 w-11 shrink-0 items-center rounded-full p-0.5 transition-colors',
+          enabled ? 'bg-emerald-500' : 'bg-muted',
+        )}
+      >
+        <span
+          className={cn(
+            'h-5 w-5 rounded-full bg-white shadow transition-transform',
+            enabled ? 'translate-x-5' : 'translate-x-0',
+          )}
+        />
+      </span>
+    </button>
+  );
+}
+
+function CatchSoundsToggleRow() {
+  const enabled = useCatchSoundsEnabled();
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={enabled}
+      aria-label="Toggle catch sounds"
+      onClick={() => {
+        setCatchSoundsEnabled(!enabled);
+        if (!enabled) {
+          primeCatchSounds();
+          playPop();
+        }
+      }}
+      className="flex w-full items-center justify-between bg-card px-4 py-4 transition-colors first:rounded-t-2xl last:rounded-b-2xl hover:bg-accent/50"
+    >
+      <span className="flex items-center gap-3">
+        <div className="flex h-9 w-12 items-center justify-center">
+          <Volume2 className="w-7 h-7 text-emerald-500" />
+        </div>
+        <span className="font-bold text-sm">Catch Sounds</span>
       </span>
       <span
         className={cn(

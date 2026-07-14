@@ -313,26 +313,29 @@ export function HomeFocusFlies({
                 <stop offset="1" stopColor="#f43f5e" />
               </linearGradient>
             </defs>
-            <path
-              ref={ownTongue.tonguePathEl}
-              d="M0 0 L0 0"
-              fill="none"
-              stroke="url(#home-focus-tongue-grad)"
-              strokeWidth={TONGUE_STROKE}
-              strokeLinecap="round"
-              vectorEffect="non-scaling-stroke"
-            />
-            <g ref={ownTongue.tipGroupEl} style={{ visibility: 'hidden' }}>
-              <circle r={10} fill="transparent" />
-              {!ownTongue.grab.silent && (
-                <image
-                  href="/fly.svg"
-                  x={-FLY_PX / 2}
-                  y={-FLY_PX / 2}
-                  width={FLY_PX}
-                  height={FLY_PX}
-                />
-              )}
+            <g ref={ownTongue.worldGroupEl}>
+              <path
+                ref={ownTongue.tonguePathEl}
+                d="M0 0 L0 0"
+                fill="none"
+                stroke="url(#home-focus-tongue-grad)"
+                strokeWidth={TONGUE_STROKE}
+                strokeLinecap="round"
+                vectorEffect="non-scaling-stroke"
+              />
+              <g ref={ownTongue.fxGroupEl} />
+              <g ref={ownTongue.tipGroupEl} style={{ visibility: 'hidden' }}>
+                <circle r={10} fill="transparent" />
+                {!ownTongue.grab.silent && (
+                  <image
+                    href="/fly.svg"
+                    x={-FLY_PX / 2}
+                    y={-FLY_PX / 2}
+                    width={FLY_PX}
+                    height={FLY_PX}
+                  />
+                )}
+              </g>
             </g>
           </svg>,
           document.body,

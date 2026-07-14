@@ -17,6 +17,7 @@ import {
   patchInventoryFlies,
 } from '@/hooks/useInventory';
 import { markFlyEarn } from '@/lib/flyEarn';
+import { hapticCelebrate } from '@/lib/haptics';
 import { showRewardedAd } from '@/lib/ads';
 import { maybeRequestAppRating } from '@/lib/rateApp';
 import { useRiveInteractionPause } from '@/lib/riveInteractionPause';
@@ -406,6 +407,12 @@ function QuestRewardRevealOverlay({
 }) {
   const entry = queue[0] ?? null;
   const isPremium = entry?.grantPremium ?? false;
+
+  const entryKey = entry?.key ?? null;
+  useEffect(() => {
+    if (entryKey != null) hapticCelebrate();
+  }, [entryKey]);
+
   if (typeof document === 'undefined') return null;
 
   // The backdrop + rays mount ONCE for the whole queue and only the card

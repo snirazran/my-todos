@@ -3,6 +3,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FrogHandle } from '@/components/ui/frog';
 import { hapticImpact } from '@/lib/haptics';
+import {
+  playGulp,
+  playPop,
+  playThwip,
+  primeCatchSounds,
+} from '@/lib/catchSounds';
 
 export const TONGUE_MS = 1111;
 export const OFFSET_MS = 160;
@@ -11,9 +17,22 @@ const PRE_LINGER_MS = 180;
 const CAM_START_DELAY = 140;
 const ORIGIN_Y_ADJ = -5;
 export const TONGUE_STROKE = 8;
-export const HIT_AT = 0.5;
+export const HIT_AT = 0.42;
+const HOLD_END = 0.5;
+const LUT_N = 96;
+const COMBO_WINDOW_MS = 8000;
+const COMBO_SPEED = [1, 0.85, 0.72];
+const GOLDEN_CHANCE = 0.05;
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
 const FOLLOW_EASE = (t: number) =>
   t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+const EXTEND_EASE = (x: number) => 1 - Math.pow(1 - x, 4);
+const RETRACT_EASE = (x: number) => x * x * (3 - 2 * x);
+
+const prefersReducedMotion = () =>
+  typeof window !== 'undefined' &&
+  window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 export type TongueKey = string;
 
@@ -22,6 +41,8 @@ export interface TongueRequest {
   completed: boolean;
   /** Skip the love emote at the end (a grab that comes back empty). */
   silent?: boolean;
+  /** Allow this grab to roll a rare golden catch. */
+  allowGolden?: boolean;
   onPersist: () => Promise<void> | void;
 }
 
@@ -34,6 +55,14 @@ export interface UseFrogTongueOptions {
   durationMs?: number;
   originYOffset?: number;
   keepTargetHiddenUntilPersist?: boolean;
+}
+
+interface Geom {
+  d: string;
+  total: number;
+  pts: Float32Array;
+  p1: { x: number; y: number };
+  p2: { x: number; y: number };
 }
 
 export function useFrogTongue({
@@ -51,15 +80,20 @@ export function useFrogTongue({
   const speedRef = useRef(1);
   const timeOffsetRef = useRef(0);
   const lastTickRef = useRef(0);
+  const comboRef = useRef(0);
+  const lastCatchEndRef = useRef(-Infinity);
   const [cinematic, setCinematic] = useState(false);
 
   const [grab, setGrab] = useState<{
     key: string;
     completed: boolean;
     silent?: boolean;
+    golden: boolean;
+    combo: number;
+    reduced: boolean;
+    duration: number;
     originDoc: { x: number; y: number };
     targetDoc: { x: number; y: number };
-    returnToY: number;
     startAt: number;
     camStartAt: number;
     follow: boolean;
@@ -68,19 +102,20 @@ export function useFrogTongue({
     onPersist: () => Promise<void> | void;
   } | null>(null);
 
-  /* ------------------------------------------------------------------ */
-  /*  Direct-DOM refs for the tongue tip group                          */
-  /*  (replaces tip / tipVisible React state → zero re-renders / frame) */
-  /* ------------------------------------------------------------------ */
+  /* Direct-DOM refs — the RAF loop drives these without React re-renders.
+   * worldGroupEl wraps the tongue in DOC coordinates: per frame only its
+   * translate changes, so the path geometry is never re-parsed for scroll. */
   const tipGroupEl = useRef<SVGGElement | null>(null);
+  const worldGroupEl = useRef<SVGGElement | null>(null);
+  const fxGroupEl = useRef<SVGGElement | null>(null);
+  const tonguePathEl = useRef<SVGPathElement | null>(null);
 
   const [vp, setVp] = useState({ w: 0, h: 0 });
 
-  const tonguePathEl = useRef<SVGPathElement | null>(null);
-  const geomRef = useRef<{
-    total: number;
-    getPointAtLength: (s: number) => DOMPoint;
+  const runRef = useRef<{
+    geom: Geom;
     hidImpact: boolean;
+    thwipDone: boolean;
     raf: number;
   } | null>(null);
 
@@ -166,7 +201,13 @@ export function useFrogTongue({
   const [visuallyDone, setVisuallyDone] = useState<Set<string>>(new Set());
 
   const triggerTongue = useCallback(
-    async ({ key, completed, silent = false, onPersist }: TongueRequest) => {
+    async ({
+      key,
+      completed,
+      silent = false,
+      allowGolden = false,
+      onPersist,
+    }: TongueRequest) => {
       if (cinematic || grab || performance.now() < cooldownUntil.current) {
         if (!completed) await onPersist();
         return;
@@ -178,8 +219,21 @@ export function useFrogTongue({
         return;
       }
 
+      if (!silent) primeCatchSounds();
+
+      const reduced = prefersReducedMotion();
+      let combo = 0;
+      if (!silent) {
+        combo =
+          performance.now() - lastCatchEndRef.current < COMBO_WINDOW_MS
+            ? Math.min(comboRef.current + 1, COMBO_SPEED.length - 1)
+            : 0;
+        comboRef.current = combo;
+      }
+      const golden = allowGolden && !silent && Math.random() < GOLDEN_CHANCE;
+      const duration = durationMs * COMBO_SPEED[combo];
+
       const sc = getSC();
-      const startY = sc ? sc.scrollTop : window.scrollY;
       const vh = sc ? sc.clientHeight : window.innerHeight;
 
       const originDoc0 = getMouthDoc();
@@ -209,10 +263,15 @@ export function useFrogTongue({
       setCinematic(true);
 
       if (needCine) {
-        await animateScrollTo(frogFocusY, PRE_PAN_MS, speedRef, sc);
-        await new Promise((r) =>
-          setTimeout(r, PRE_LINGER_MS / speedRef.current),
-        );
+        if (reduced) {
+          if (sc) sc.scrollTop = flyFocusY;
+          else window.scrollTo(0, flyFocusY);
+        } else {
+          await animateScrollTo(frogFocusY, PRE_PAN_MS, speedRef, sc);
+          await new Promise((r) =>
+            setTimeout(r, PRE_LINGER_MS / speedRef.current),
+          );
+        }
       }
 
       const originDoc = getMouthDoc();
@@ -233,18 +292,21 @@ export function useFrogTongue({
         key,
         completed,
         silent,
+        golden,
+        combo,
+        reduced,
+        duration,
         originDoc,
         targetDoc,
-        returnToY: startY,
         startAt,
         camStartAt,
-        follow: needCine,
+        follow: needCine && !reduced,
         frogFocusY,
         flyFocusY,
         onPersist,
       });
     },
-    [cinematic, grab, flyRefs, frogBoxRef, getFlyDoc, getMouthDoc],
+    [cinematic, grab, durationMs, flyRefs, frogBoxRef, getFlyDoc, getMouthDoc],
   );
 
   /* ================================================================= */
@@ -258,62 +320,138 @@ export function useFrogTongue({
     const sc = getSC();
     const scTop = sc ? sc.getBoundingClientRect().top : 0;
 
-    /* Use grab.targetDoc directly – these coordinates were captured in
-       triggerTongue at the correct scroll position. Moving targets
-       explicitly opt in to live DOM tracking until impact. */
     const p0Doc = getMouthDoc();
-    let p2Doc = grab.targetDoc;
+
+    const tmp = document.createElementNS(SVG_NS, 'path');
 
     const buildGeom = (
       p0: { x: number; y: number },
       p2: { x: number; y: number },
-    ) => {
+    ): Geom => {
       const p1 = { x: (p0.x + p2.x) / 2, y: p0.y - 120 };
-      const tmp = document.createElementNS(
-        'http://www.w3.org/2000/svg',
-        'path',
-      );
-      tmp.setAttribute(
-        'd',
-        `M ${p0.x} ${p0.y} Q ${p1.x} ${p1.y} ${p2.x} ${p2.y}`,
-      );
+      const d = `M ${p0.x} ${p0.y} Q ${p1.x} ${p1.y} ${p2.x} ${p2.y}`;
+      tmp.setAttribute('d', d);
       const total = tmp.getTotalLength();
-      return { tmp, total, p1 };
+      const pts = new Float32Array((LUT_N + 1) * 2);
+      for (let i = 0; i <= LUT_N; i++) {
+        const pt = tmp.getPointAtLength((total * i) / LUT_N);
+        pts[i * 2] = pt.x;
+        pts[i * 2 + 1] = pt.y;
+      }
+      return { d, total, pts, p1, p2 };
     };
 
-    let { tmp, total, p1: p1Doc } = buildGeom(p0Doc, p2Doc);
-    geomRef.current = {
-      total,
-      getPointAtLength: (s: number) => tmp.getPointAtLength(s),
-      hidImpact: false,
-      raf: 0,
+    const pointAt = (g: Geom, s: number) => {
+      const f = Math.min(1, Math.max(0, s / g.total)) * LUT_N;
+      const i = Math.min(LUT_N - 1, Math.floor(f));
+      const fr = f - i;
+      return {
+        x: g.pts[i * 2] + (g.pts[i * 2 + 2] - g.pts[i * 2]) * fr,
+        y: g.pts[i * 2 + 1] + (g.pts[i * 2 + 3] - g.pts[i * 2 + 1]) * fr,
+      };
     };
+
+    let geom = buildGeom(p0Doc, grab.targetDoc);
+    runRef.current = { geom, hidImpact: false, thwipDone: false, raf: 0 };
 
     const pathNode = tonguePathEl.current;
+    const world = worldGroupEl.current;
+
     if (pathNode) {
       pathNode.style.visibility = 'visible';
-      pathNode.style.strokeDasharray = `0 ${total}`;
+      pathNode.style.strokeDasharray = `0 ${geom.total}`;
       pathNode.style.strokeDashoffset = '0';
+      if (world) pathNode.setAttribute('d', geom.d);
     }
 
-    const seedViewportPath = () => {
-      const offX = sc ? 0 : window.scrollX;
-      const offY = (sc ? sc.scrollTop : window.scrollY) - scTop;
-      const p0V = { x: p0Doc.x - offX, y: p0Doc.y - offY };
-      const p1V = { x: p1Doc.x - offX, y: p1Doc.y - offY };
-      const p2V = { x: p2Doc.x - offX, y: p2Doc.y - offY };
+    const setViewportPath = (offX: number, offY: number) => {
       pathNode?.setAttribute(
         'd',
-        `M ${p0V.x} ${p0V.y} Q ${p1V.x} ${p1V.y} ${p2V.x} ${p2V.y}`,
+        `M ${geom.pts[0] - offX} ${geom.pts[1] - offY} Q ${
+          geom.p1.x - offX
+        } ${geom.p1.y - offY} ${geom.p2.x - offX} ${geom.p2.y - offY}`,
       );
     };
-    seedViewportPath();
+
+    const pulseFrog = (
+      keyframes: Keyframe[],
+      options: KeyframeAnimationOptions,
+    ) => {
+      const box = frogBoxRef?.current;
+      if (!box) return;
+      try {
+        const prevOrigin = box.style.transformOrigin;
+        box.style.transformOrigin = '50% 88%';
+        const anim = box.animate(keyframes, {
+          ...options,
+          composite: 'add',
+        });
+        const restore = () => {
+          box.style.transformOrigin = prevOrigin;
+        };
+        anim.onfinish = restore;
+        anim.oncancel = restore;
+      } catch {
+        // ignore
+      }
+    };
+
+    const spawnFx = (
+      x: number,
+      y: number,
+      kind: 'ring' | 'sparkle',
+      golden: boolean,
+    ) => {
+      const g = fxGroupEl.current;
+      if (!g) return;
+      const c = document.createElementNS(SVG_NS, 'circle');
+      if (kind === 'ring') {
+        c.setAttribute('cx', `${x}`);
+        c.setAttribute('cy', `${y}`);
+        c.setAttribute('r', '7');
+        c.setAttribute('fill', 'none');
+        c.setAttribute('stroke', golden ? '#fbbf24' : '#fb7185');
+        c.setAttribute('stroke-width', '3');
+      } else {
+        c.setAttribute('cx', `${x + (Math.random() - 0.5) * 16}`);
+        c.setAttribute('cy', `${y + (Math.random() - 0.5) * 16}`);
+        c.setAttribute('r', `${1.5 + Math.random() * 1.5}`);
+        c.setAttribute('fill', '#fde68a');
+      }
+      c.style.transformBox = 'fill-box';
+      c.style.transformOrigin = 'center';
+      g.appendChild(c);
+      try {
+        const anim =
+          kind === 'ring'
+            ? c.animate(
+                [
+                  { opacity: 0.9, transform: 'scale(0.4)' },
+                  { opacity: 0, transform: 'scale(2.8)' },
+                ],
+                { duration: 380, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' },
+              )
+            : c.animate(
+                [
+                  { opacity: 1, transform: 'translateY(0)' },
+                  { opacity: 0, transform: 'translateY(-9px)' },
+                ],
+                { duration: 450, easing: 'ease-out' },
+              );
+        anim.onfinish = () => c.remove();
+        anim.oncancel = () => c.remove();
+      } catch {
+        c.remove();
+      }
+    };
 
     let raf = 0;
+    let frame = 0;
     timeOffsetRef.current = 0;
     lastTickRef.current = 0;
 
     const tick = () => {
+      frame++;
       const realNow = performance.now();
       if (lastTickRef.current > 0 && speedRef.current > 1) {
         const dt = realNow - lastTickRef.current;
@@ -322,22 +460,39 @@ export function useFrogTongue({
       lastTickRef.current = realNow;
       const now = realNow + timeOffsetRef.current;
 
-      const tRaw = (now - grab.startAt) / durationMs;
+      const tRaw = (now - grab.startAt) / grab.duration;
       const t = Math.max(0, Math.min(1, tRaw));
+
+      const run = runRef.current!;
+
+      if (!run.thwipDone && t > 0) {
+        run.thwipDone = true;
+        if (!grab.silent) playThwip();
+      }
 
       if (trackMovingTarget && t <= HIT_AT) {
         const flyEl = flyRefs.current[grab.key];
         if (flyEl?.isConnected) {
-          p2Doc = getFlyDoc(flyEl);
-          ({ tmp, total, p1: p1Doc } = buildGeom(p0Doc, p2Doc));
-          geomRef.current!.total = total;
-          geomRef.current!.getPointAtLength = (s: number) =>
-            tmp.getPointAtLength(s);
+          const np2 = getFlyDoc(flyEl);
+          if (
+            Math.abs(np2.x - geom.p2.x) > 0.5 ||
+            Math.abs(np2.y - geom.p2.y) > 0.5
+          ) {
+            geom = buildGeom(p0Doc, np2);
+            run.geom = geom;
+            if (world && pathNode) pathNode.setAttribute('d', geom.d);
+          }
         }
       }
 
-      const forward =
-        t <= HIT_AT ? t / HIT_AT : 1 - (t - HIT_AT) / (1 - HIT_AT);
+      let forward: number;
+      if (t <= HIT_AT) {
+        forward = EXTEND_EASE(t / HIT_AT);
+      } else if (t <= HOLD_END) {
+        forward = 1;
+      } else {
+        forward = 1 - RETRACT_EASE((t - HOLD_END) / (1 - HOLD_END));
+      }
 
       /* ---------------------------------------------------------------
        * Predict the scroll position the browser will PAINT this frame.
@@ -347,7 +502,8 @@ export function useFrogTongue({
       if (grab.follow) {
         if (now >= grab.camStartAt && t <= HIT_AT) {
           const seg =
-            (now - grab.camStartAt) / (durationMs * HIT_AT - CAM_START_DELAY);
+            (now - grab.camStartAt) /
+            Math.max(1, grab.duration * HIT_AT - CAM_START_DELAY);
           const clamped = Math.max(0, Math.min(1, seg));
           const eased = FOLLOW_EASE(clamped);
           paintScrollY =
@@ -363,46 +519,67 @@ export function useFrogTongue({
 
       const offX = sc ? 0 : window.scrollX;
       const offY = paintScrollY - scTop;
-      const p0V = { x: p0Doc.x - offX, y: p0Doc.y - offY };
-      const p1V = { x: p1Doc.x - offX, y: p1Doc.y - offY };
-      const p2V = { x: p2Doc.x - offX, y: p2Doc.y - offY };
 
-      if (pathNode) {
-        pathNode.setAttribute(
-          'd',
-          `M ${p0V.x} ${p0V.y} Q ${p1V.x} ${p1V.y} ${p2V.x} ${p2V.y}`,
-        );
-        const visibleLen = total * forward;
-        pathNode.style.strokeDasharray = `${visibleLen} ${total}`;
+      if (world) {
+        world.setAttribute('transform', `translate(${-offX} ${-offY})`);
+      } else {
+        setViewportPath(offX, offY);
       }
 
-      const sLen = total * forward;
-      const pt = geomRef.current!.getPointAtLength(sLen);
-      const ahead = geomRef.current!.getPointAtLength(
-        Math.min(total, sLen + 1),
-      );
+      if (pathNode) {
+        pathNode.style.strokeDasharray = `${geom.total * forward} ${geom.total}`;
+      }
+
+      const sLen = geom.total * forward;
+      const pt = pointAt(geom, sLen);
+      const ahead = pointAt(geom, Math.min(geom.total, sLen + 2));
       const dx = ahead.x - pt.x,
         dy = ahead.y - pt.y;
       const len = Math.hypot(dx, dy) || 1;
-      const ox = (dx / len) * (TONGUE_STROKE / 2);
-      const oy = (dy / len) * (TONGUE_STROKE / 2);
-      const tipX = pt.x + ox - offX;
-      const tipY = pt.y + oy - offY;
+      const tipDocX = pt.x + (dx / len) * (TONGUE_STROKE / 2);
+      const tipDocY = pt.y + (dy / len) * (TONGUE_STROKE / 2);
 
       if (tipGroupEl.current) {
-        tipGroupEl.current.setAttribute(
-          'transform',
-          `translate(${tipX}, ${tipY})`,
-        );
+        const tx = world ? tipDocX : tipDocX - offX;
+        const ty = world ? tipDocY : tipDocY - offY;
+        tipGroupEl.current.setAttribute('transform', `translate(${tx}, ${ty})`);
       }
 
-      if (!geomRef.current!.hidImpact && t >= HIT_AT) {
-        geomRef.current!.hidImpact = true;
-        if (!grab.silent) hapticImpact();
-        setVisuallyDone((prev) => new Set(prev).add(grab.key));
+      if (!run.hidImpact && t >= HIT_AT) {
+        run.hidImpact = true;
+        const flyEl = flyRefs.current[grab.key];
+        if (flyEl) flyEl.style.visibility = 'hidden';
+        window.setTimeout(() => {
+          setVisuallyDone((prev) => new Set(prev).add(grab.key));
+        }, 30);
         if (tipGroupEl.current) {
           tipGroupEl.current.style.visibility = 'visible';
         }
+        if (!grab.silent) {
+          hapticImpact();
+          playPop(grab.combo);
+          if (!grab.reduced) {
+            spawnFx(tipDocX, tipDocY, 'ring', grab.golden);
+            pulseFrog(
+              [
+                { transform: 'translateY(0)' },
+                { transform: 'translateY(3px)', offset: 0.45 },
+                { transform: 'translateY(0)' },
+              ],
+              { duration: 130, easing: 'ease-out' },
+            );
+          }
+        }
+      }
+
+      if (
+        grab.golden &&
+        !grab.reduced &&
+        t > HOLD_END &&
+        t < 1 &&
+        frame % 3 === 0
+      ) {
+        spawnFx(tipDocX, tipDocY, 'sparkle', true);
       }
 
       /* --- camera follow at the END of tick --- */
@@ -418,11 +595,26 @@ export function useFrogTongue({
           tipGroupEl.current.style.visibility = 'hidden';
         }
         if (pathNode) {
-          pathNode.style.strokeDasharray = `0 ${total}`;
+          pathNode.style.strokeDasharray = `0 ${geom.total}`;
           pathNode.style.visibility = 'hidden';
         }
 
-        if (!grab.silent) frogRef.current?.fireEmote('love');
+        if (!grab.silent) {
+          frogRef.current?.fireEmote('love');
+          playGulp(grab.combo, grab.golden);
+          lastCatchEndRef.current = performance.now();
+          if (!grab.reduced) {
+            pulseFrog(
+              [
+                { transform: 'scale(1, 1)' },
+                { transform: 'scale(1.05, 0.93)', offset: 0.35 },
+                { transform: 'scale(0.97, 1.04)', offset: 0.7 },
+                { transform: 'scale(1, 1)' },
+              ],
+              { duration: 280, easing: 'ease-out' },
+            );
+          }
+        }
 
         const persist = Promise.resolve(grab.onPersist()).catch((error) => {
           console.error('Failed to persist tongue action', error);
@@ -452,7 +644,7 @@ export function useFrogTongue({
 
     setCinematic(true);
     raf = requestAnimationFrame(tick);
-    if (geomRef.current) geomRef.current.raf = raf;
+    if (runRef.current) runRef.current.raf = raf;
     return () => {
       cancelAnimationFrame(raf);
       animatingRef.current = false;
@@ -460,13 +652,17 @@ export function useFrogTongue({
         tipGroupEl.current.style.visibility = 'hidden';
       }
       if (pathNode) {
-        pathNode.style.strokeDasharray = `0 ${total}`;
+        pathNode.style.strokeDasharray = `0 ${geom.total}`;
         pathNode.style.visibility = 'hidden';
+      }
+      if (fxGroupEl.current) {
+        fxGroupEl.current.replaceChildren();
       }
     };
   }, [
-    durationMs,
     flyRefs,
+    frogBoxRef,
+    frogRef,
     getFlyDoc,
     getMouthDoc,
     grab,
@@ -485,6 +681,8 @@ export function useFrogTongue({
     grab,
     tipGroupEl,
     tonguePathEl,
+    worldGroupEl,
+    fxGroupEl,
     triggerTongue,
     visuallyDone,
     speedUpTongue,

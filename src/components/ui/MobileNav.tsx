@@ -2,15 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { ShoppingBag } from 'lucide-react';
 import { Icon } from '@/components/ui/Icon';
 import { useAuth } from '@/components/auth/AuthContext';
 import { useInventory } from '@/hooks/useInventory';
 import useSWR from 'swr';
 import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
 import { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { WardrobePopup } from '@/components/ui/WardrobePopup';
+import { hapticTick } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
 
 export default function MobileNav() {
@@ -23,8 +22,22 @@ export default function MobileNav() {
   const [wardrobePopupOpen, setWardrobePopupOpen] = useState(false);
   const [pendingHref, setPendingHref] = useState<string | null>(null);
 
+  // The nav rides above the popup's backdrop while it's open — and must stay
+  // raised until the exit animation lands, or the sheet slides down OVER the
+  // nav the moment `open` flips false.
+  const [navRaised, setNavRaised] = useState(false);
+  useEffect(() => {
+    if (wardrobePopupOpen) {
+      setNavRaised(true);
+      return;
+    }
+    const t = window.setTimeout(() => setNavRaised(false), 300);
+    return () => window.clearTimeout(t);
+  }, [wardrobePopupOpen]);
+
   useEffect(() => {
     setPendingHref(null);
+    setWardrobePopupOpen(false);
   }, [pathname]);
 
   const { data: questsData } = useSWR<{
@@ -104,7 +117,12 @@ export default function MobileNav() {
 
   return (
     <>
-      <nav className="fixed bottom-0 left-0 z-50 w-full bg-background/90 backdrop-blur-lg md:hidden pb-[env(safe-area-inset-bottom)]">
+      <nav
+        className={cn(
+          'fixed bottom-0 left-0 w-full bg-background/90 backdrop-blur-lg md:hidden pb-[env(safe-area-inset-bottom)]',
+          navRaised ? 'z-[100]' : 'z-50',
+        )}
+      >
         <div className="grid grid-cols-5 h-[76px] py-2.5">
           {navItems.map((item) => {
             const target = item.protected && !user ? '/login' : item.href;
@@ -147,12 +165,43 @@ export default function MobileNav() {
               </div>
             );
 
+            if (item.label === 'Wardrobe' && user) {
+              return (
+                <button
+                  key={item.href}
+                  type="button"
+                  onClick={() => {
+                    hapticTick();
+                    setWardrobePopupOpen((prev) => !prev);
+                  }}
+                  className={`flex flex-col items-center justify-center w-full h-full transition-[color,transform] active:scale-95 ${
+                    isActive
+                      ? 'text-primary'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {content}
+                </button>
+              );
+            }
+
             return (
               <Link
                 key={item.href}
                 href={target}
                 prefetch={true}
-                onClick={() => {
+                onClick={(e) => {
+                  if (wardrobePopupOpen) {
+                    e.preventDefault();
+                    setWardrobePopupOpen(false);
+                    window.setTimeout(() => {
+                      if (target === item.href && pathname !== item.href) {
+                        setPendingHref(item.href);
+                      }
+                      router.push(target);
+                    }, 230);
+                    return;
+                  }
                   if (target === item.href && pathname !== item.href) {
                     setPendingHref(item.href);
                   }
@@ -175,112 +224,12 @@ export default function MobileNav() {
         onClose={() => setWardrobePopupOpen(false)}
         onSelect={(tab) => {
           setWardrobePopupOpen(false);
-          router.push(`/wardrobe?tab=${tab}`);
+          window.setTimeout(() => {
+            router.push(`/wardrobe?tab=${tab}`);
+          }, 230);
         }}
       />
     </>
   );
 }
 
-function WardrobePopup({
-  open,
-  onClose,
-  onSelect,
-}: {
-  open: boolean;
-  onClose: () => void;
-  onSelect: (tab: 'inventory' | 'shop' | 'trade') => void;
-}) {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-  if (!mounted) return null;
-
-  const items = [
-    {
-      tab: 'inventory' as const,
-      label: 'Inventory',
-      iconName: 'wardrobe' as const,
-      color: 'bg-primary/10',
-    },
-    {
-      tab: 'shop' as const,
-      label: 'Shop',
-      icon: ShoppingBag,
-      color: 'text-violet-500 bg-violet-500/10',
-    },
-    {
-      tab: 'trade' as const,
-      label: 'Trade',
-      iconName: 'repeat' as const,
-      color: 'bg-amber-500/10',
-    },
-  ];
-
-  return createPortal(
-    <AnimatePresence>
-      {open && (
-        <>
-          {/* Backdrop */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="fixed inset-0 z-[48] bg-background/70 backdrop-blur-sm md:hidden"
-          />
-
-          {/* Sheet — anchored just above the nav bar */}
-          <motion.div
-            initial={{ y: '100%' }}
-            animate={{ y: 0 }}
-            exit={{ y: '100%' }}
-            transition={{ type: 'spring', damping: 28, stiffness: 220 }}
-            className="fixed left-0 right-0 z-[49] bg-background border-t border-border rounded-t-3xl shadow-2xl md:hidden"
-            style={{ bottom: 'calc(4rem + env(safe-area-inset-bottom))' }}
-          >
-            {/* Drag handle */}
-            <div className="flex justify-center pt-3 pb-2">
-              <div className="w-10 h-1 rounded-full bg-border" />
-            </div>
-
-            {/* Header */}
-            <div className="flex items-center gap-3 px-5 pb-3">
-              <div className="h-10 w-10 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0">
-                <Icon name="wardrobe" label="Wardrobe" className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground leading-none mb-0.5">
-                  Style Studio
-                </p>
-                <h2 className="text-xl font-black text-foreground leading-none">
-                  Wardrobe
-                </h2>
-              </div>
-            </div>
-
-            {/* Cards */}
-            <div className="grid grid-cols-3 gap-3 px-4 pb-5">
-              {items.map((item) => (
-                <button
-                  key={item.tab}
-                  onClick={() => onSelect(item.tab)}
-                  className="flex flex-col items-center gap-2.5 p-4 rounded-2xl bg-card border border-border/50 active:scale-95 transition-all"
-                >
-                  <div className={`h-14 w-14 rounded-2xl flex items-center justify-center ${item.color}`}>
-                    {'iconName' in item && item.iconName ? (
-                      <Icon name={item.iconName} label={item.label} className="w-7 h-7" />
-                    ) : 'icon' in item && item.icon ? (
-                      (() => { const LucideIcon = item.icon; return <LucideIcon className="w-7 h-7" />; })()
-                    ) : null}
-                  </div>
-                  <span className="text-sm font-bold text-foreground">{item.label}</span>
-                </button>
-              ))}
-            </div>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>,
-    document.body,
-  );
-}

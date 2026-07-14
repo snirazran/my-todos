@@ -936,6 +936,7 @@ function WardrobeManagerContent({
       : 0;
 
   const openItemPurchase = (item: ItemDef, dealPrice: number | null = null) => {
+    hapticTick();
     setPurchaseDealPrice(dealPrice);
     setPurchaseCard({
       kind: 'item',
@@ -947,6 +948,7 @@ function WardrobeManagerContent({
   };
 
   const openBgPurchase = (bgItem: BackgroundItem) => {
+    hapticTick();
     setPurchaseDealPrice(null);
     setPurchaseCard({
       kind: 'bg',

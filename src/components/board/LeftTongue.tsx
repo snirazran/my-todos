@@ -24,9 +24,13 @@ import React, {
   useState,
 } from 'react';
 import { hapticImpact } from '@/lib/haptics';
+import { playPop, playThwip, primeCatchSounds } from '@/lib/catchSounds';
 
 const DURATION_MS = 850; // full extend + retract
-const HIT_AT = 0.46; // fraction of the run where the tongue reaches the fly
+const HIT_AT = 0.42; // fraction of the run where the tongue reaches the fly
+const HOLD_END = 0.5; // short hit-stop: the tongue sticks to the fly briefly
+const EXTEND_EASE = (x: number) => 1 - Math.pow(1 - x, 4);
+const RETRACT_EASE = (x: number) => x * x * (3 - 2 * x);
 const ORIGIN_PAD = 72; // how far past the left edge the tongue is anchored
 const ORIGIN_RISE = 140; // how much higher than the fly the tongue enters
 const ARC_LIFT = 56; // upward bow of the tongue's curve
@@ -125,6 +129,8 @@ export function LeftTongueProvider({ children }: { children: React.ReactNode }) 
       y: target.y - ARC_LIFT,
     };
 
+    primeCatchSounds();
+    playThwip();
     busyRef.current = true;
     setGrab({
       key,
@@ -185,14 +191,21 @@ export function LeftTongueProvider({ children }: { children: React.ReactNode }) 
         if (el) {
           const r = el.getBoundingClientRect();
           if (r.width > 0 && r.height > 0) {
-            target = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+            const nx = r.left + r.width / 2;
+            const ny = r.top + r.height / 2;
+            if (Math.abs(nx - target.x) > 0.5 || Math.abs(ny - target.y) > 0.5) {
+              target = { x: nx, y: ny };
+              ({ d, total } = applyTarget(target));
+              if (node) node.setAttribute('d', d);
+            }
           }
         }
-        ({ d, total } = applyTarget(target));
-        if (node) node.setAttribute('d', d);
       }
 
-      const forward = t <= HIT_AT ? t / HIT_AT : 1 - (t - HIT_AT) / (1 - HIT_AT);
+      let forward: number;
+      if (t <= HIT_AT) forward = EXTEND_EASE(t / HIT_AT);
+      else if (t <= HOLD_END) forward = 1;
+      else forward = 1 - RETRACT_EASE((t - HOLD_END) / (1 - HOLD_END));
       const len = total * forward;
 
       if (node) node.style.strokeDasharray = `${len} ${total}`;
@@ -207,6 +220,7 @@ export function LeftTongueProvider({ children }: { children: React.ReactNode }) 
       if (!hitDone && t >= HIT_AT) {
         hitDone = true;
         hapticImpact();
+        playPop();
         setHidden((prev) => new Set(prev).add(grab.key));
         if (tipEl.current) tipEl.current.style.visibility = 'visible';
       }

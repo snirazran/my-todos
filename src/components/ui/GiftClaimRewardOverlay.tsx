@@ -1,10 +1,12 @@
 'use client';
 
+import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RewardCard } from '@/components/ui/gift-box/RewardCard';
 import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
 import { RARITY_CONFIG } from '@/components/ui/gift-box/constants';
+import { hapticCelebrate } from '@/lib/haptics';
 import type { ItemDef } from '@/lib/skins/catalog';
 
 export function GiftClaimRewardOverlay({
@@ -16,6 +18,10 @@ export function GiftClaimRewardOverlay({
   inviterName: string;
   onClose: () => void;
 }) {
+  useEffect(() => {
+    hapticCelebrate();
+  }, []);
+
   if (typeof document === 'undefined') return null;
 
   const rarity = RARITY_CONFIG[gift.rarity] ? gift.rarity : 'uncommon';
