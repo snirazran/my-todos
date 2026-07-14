@@ -5,7 +5,7 @@ import { Capacitor } from '@capacitor/core';
 import { setRiveIdle } from '@/lib/riveIdlePause';
 import { installPerfDebug } from '@/lib/perfDebug';
 
-const IDLE_MS = 20_000;
+const IDLE_MS = 45_000;
 // Input events (pointermove especially) fire in bursts; restarting the timer
 // at most once a second keeps the handler nearly free.
 const RESET_THROTTLE_MS = 1_000;
