@@ -18,9 +18,9 @@ export const urlCache = new Map<string, string>();
 // from surviving browser/CDN caches.
 export const FLY_RIVE_ASSET_URL = '/fly_idle.riv?v=52410464';
 
-export const riveDevicePixelRatio = () => {
+export const riveDevicePixelRatio = (cap = 2) => {
   if (typeof window === 'undefined') return 1;
-  return Math.min(window.devicePixelRatio || 1, 2);
+  return Math.min(window.devicePixelRatio || 1, cap);
 };
 const promiseCache = new Map<string, Promise<string>>();
 

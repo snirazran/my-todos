@@ -160,8 +160,11 @@ const Frog = memo(
       if (!rive) return;
       const el = wrapperRef.current;
       if (!el) return;
+      // 1.5 instead of the global 2: the frog is the largest continuously
+      // rasterized canvas in the app, and at its render size the difference
+      // is invisible while the per-frame pixel cost drops ~44%.
       const resize = () =>
-        rive.resizeDrawingSurfaceToCanvas(riveDevicePixelRatio());
+        rive.resizeDrawingSurfaceToCanvas(riveDevicePixelRatio(1.5));
       resize();
       const raf = requestAnimationFrame(resize);
       const observer = new ResizeObserver(() => resize());
