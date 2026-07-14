@@ -10,6 +10,7 @@ import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
 import Fly from '@/components/ui/fly';
 import { cn } from '@/lib/utils';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
+import { hapticCelebrate, hapticImpact } from '@/lib/haptics';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import {
   useLoginStreak,
@@ -198,9 +199,7 @@ function RevealStep({
         zIndex: 99999,
         colors: ['#fb923c', '#fbbf24', '#fde68a', '#ffffff'],
       });
-      try {
-        navigator.vibrate?.([25, 30, 55]);
-      } catch {}
+      hapticCelebrate();
     }, 1100);
     return () => {
       window.clearTimeout(frogTimer);
@@ -350,9 +349,7 @@ function CommitStep({
         const payload = await res.json();
         if (payload.view) {
           patchStreakView(payload.view);
-          try {
-            navigator.vibrate?.(20);
-          } catch {}
+          hapticImpact();
           onPicked(payload.view);
           return;
         }

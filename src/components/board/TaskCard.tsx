@@ -17,6 +17,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import type { Task } from './helpers';
 import Fly from '@/components/ui/fly';
 import { useLeftTongue } from './LeftTongue';
+import { hapticImpact } from '@/lib/haptics';
 
 type OnGrabParams = {
   clientX: number;
@@ -260,11 +261,7 @@ export default function TaskCard({
           };
           window.addEventListener('touchmove', guard, { passive: false });
           touchScrollGuardRef.current = guard;
-          try {
-            navigator.vibrate?.(15);
-          } catch {
-            // ignore
-          }
+          hapticImpact();
         }
 
         onGrabRef.current({

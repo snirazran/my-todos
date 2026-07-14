@@ -21,6 +21,7 @@ import { getCurrentLiveActivityState } from '@/lib/liveTimer';
 import { notifyQuestClaims } from '@/lib/questClaims';
 import { useNotification } from '@/components/providers/NotificationProvider';
 import { fliesCaughtFor } from '@/lib/focusFlies';
+import { hapticCelebrate, hapticImpact } from '@/lib/haptics';
 import { markFlyEarn } from '@/lib/flyEarn';
 import {
   mutateInventoryCaches,
@@ -160,6 +161,10 @@ export function GlobalTimer() {
   // On native, the looping web audio would hijack the Dynamic Island as a
   // "Now Playing" media control (and the user picked a one-shot sound anyway),
   // so there the OS notification sound provides the audio instead.
+  useEffect(() => {
+    if (awaitingDone) hapticCelebrate();
+  }, [awaitingDone]);
+
   useEffect(() => {
     if (!awaitingDone || Capacitor.isNativePlatform()) return;
     const stop = playTimerSoundUntilStopped(
@@ -403,6 +408,7 @@ export function GlobalTimer() {
         // sound the alarm until the user clicks Done.
         if (timer.status === 'running') {
           playTransitionBeep();
+          hapticImpact();
         } else {
           registerCompletion(completedPhase, true);
         }
@@ -768,6 +774,7 @@ export function GlobalTimer() {
             // effect plays the looping alarm; an auto-started break just beeps.
             if (willAutoStart) {
               playTransitionBeep();
+              hapticImpact();
             }
             completePhase(willAutoStart);
           }

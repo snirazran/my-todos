@@ -8,6 +8,7 @@ import { MoreVertical, X, UserMinus, Users, Check, Loader2, Clock } from 'lucide
 import useSWR from 'swr';
 import Frog, { type FrogHandle } from '@/components/ui/frog';
 import { FriendFocusScene } from '@/components/ui/FriendFocusScene';
+import { hapticImpact } from '@/lib/haptics';
 import Fly from '@/components/ui/fly';
 import {
   useBackgrounds,
@@ -135,9 +136,7 @@ export function FriendDetailModal({
 
   const equipPeekTarget = async () => {
     if (!peekTarget) return false;
-    try {
-      navigator.vibrate?.(14);
-    } catch {}
+    hapticImpact();
     const res =
       peekTarget.kind === 'item'
         ? await fetch('/api/skins/inventory', {

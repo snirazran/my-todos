@@ -30,6 +30,7 @@ import { mutateFriendsCaches } from '@/hooks/useFriendsSync';
 import { notifyQuestClaims } from '@/lib/questClaims';
 import { queuePlusIntroOnce } from '@/lib/plusIntro';
 import { useLeftTongue } from './LeftTongue';
+import { hapticSuccess, hapticTick } from '@/lib/haptics';
 
 // Hoisted so the motion wrapper gets a stable transition reference (a new
 // object each render would make framer reconfigure the animation every time).
@@ -265,6 +266,8 @@ export default React.memo(function TaskList({
     const completing = !t.completed;
     if (completing && isBusy()) return;
     if (completing) stopTimerIfActive(t.id);
+    if (completing) hapticSuccess();
+    else hapticTick();
 
     const persist = () => {
       // Scope to this column's date so sibling instances of a repeating task

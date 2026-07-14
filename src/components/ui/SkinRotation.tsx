@@ -7,6 +7,7 @@ import { Check, ChevronRight, Shuffle, X } from 'lucide-react';
 import useSWR from 'swr';
 import { useAuth } from '@/components/auth/AuthContext';
 import { cn } from '@/lib/utils';
+import { hapticImpact } from '@/lib/haptics';
 import { Icon } from '@/components/ui/Icon';
 import {
   beginEquipMutation,
@@ -135,9 +136,7 @@ export function SkinRotationDialog({
   const shuffleNow = async () => {
     if (shuffling) return;
     setShuffling(true);
-    try {
-      navigator.vibrate?.(14);
-    } catch {}
+    hapticImpact();
     await rotateOnce();
     setShuffling(false);
     onClose();

@@ -7,6 +7,7 @@ import Fly from '@/components/ui/fly';
 import { AnimatedNumber } from '@/components/ui/AnimatedNumber';
 import { useSheetStore } from '@/lib/sheetStore';
 import { isFlyEarnActive } from '@/lib/flyEarn';
+import { hapticTick } from '@/lib/haptics';
 
 type Variant = 'mobile' | 'desktop';
 
@@ -74,9 +75,7 @@ export function FlyCounter({
       y: [0, -3, 0, -1, 0],
       transition: { duration: 0.55, ease: [0.32, 0.72, 0, 1] },
     });
-    try {
-      navigator.vibrate?.(12);
-    } catch {}
+    hapticTick();
     if (bumpTimer.current) window.clearTimeout(bumpTimer.current);
     bumpTimer.current = window.setTimeout(() => setBump(null), 1200);
   }, [pillControls, flyControls]);
@@ -129,6 +128,7 @@ export function FlyCounter({
 
       <AnimatedNumber
         value={balance}
+        haptics
         className="text-xs font-black tabular-nums text-foreground"
       />
 

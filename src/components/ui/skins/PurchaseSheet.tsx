@@ -9,6 +9,7 @@ import Fly from '@/components/ui/fly';
 import { AnimatedNumber } from '@/components/ui/AnimatedNumber';
 import { cn } from '@/lib/utils';
 import { useUIStore } from '@/lib/uiStore';
+import { hapticSuccess } from '@/lib/haptics';
 import type { Rarity } from '@/lib/skins/catalog';
 
 const RARITY: Record<
@@ -135,9 +136,7 @@ export function PurchaseSheet({
     setBusy(false);
     if (ok) {
       fireConfetti(primaryRef.current, RARITY_CONFETTI[target?.rarity ?? 'common']);
-      try {
-        navigator.vibrate?.(28);
-      } catch {}
+      hapticSuccess();
       setPhase('success');
     }
   };
@@ -257,7 +256,7 @@ export function PurchaseSheet({
                 </Row>
                 <Row label="Your balance">
                   <Fly size={24} paused y={-2} />
-                  <AnimatedNumber value={balance} className="tabular-nums" />
+                  <AnimatedNumber value={balance} haptics className="tabular-nums" />
                 </Row>
                 <div className="my-2.5 border-t border-dashed border-border/70" />
                 <Row label="Balance after" strong>
@@ -275,7 +274,7 @@ export function PurchaseSheet({
               <div className="mt-4 flex items-center justify-center gap-1.5 text-sm font-bold text-muted-foreground">
                 <span>Balance</span>
                 <Fly size={24} paused y={-2} />
-                <AnimatedNumber value={balance} className="tabular-nums text-foreground" />
+                <AnimatedNumber value={balance} haptics className="tabular-nums text-foreground" />
               </div>
             )}
 

@@ -35,6 +35,7 @@ import {
   type TimerSound,
 } from '@/lib/timerSounds';
 import { useNotificationStatus } from '@/hooks/useNotificationStatus';
+import { hapticImpact, hapticTick } from '@/lib/haptics';
 import { Bell, Volume2, Zap } from 'lucide-react';
 import { useIntros } from '@/hooks/useIntros';
 import { FrogodoroIntroSheet } from '@/components/ui/FirstTimeIntros';
@@ -617,8 +618,10 @@ export default function FrogodoroSheet({
         setConfirmPause(true);
         return;
       }
+      hapticTick();
       pauseTimer();
     } else {
+      hapticImpact();
       startTimer();
     }
   };

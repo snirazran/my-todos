@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useReducer, useRef, useState, type ReactNode } from 'react';
+import { hapticSuccess, hapticTick } from '@/lib/haptics';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { mutate } from 'swr';
@@ -417,6 +418,7 @@ export function HintButton({
 const REVEAL_DELAY_MS = 1000;
 const revealSeenIncomplete = new Set<string>();
 const revealCompletedAt = new Map<string, number>();
+const revealHapticFired = new Set<string>();
 
 export function useCompletionReveal(id: string, complete: boolean): boolean {
   const [, forceRender] = useReducer((n: number) => n + 1, 0);
@@ -424,6 +426,7 @@ export function useCompletionReveal(id: string, complete: boolean): boolean {
   if (!complete) {
     revealSeenIncomplete.add(id);
     revealCompletedAt.delete(id);
+    revealHapticFired.delete(id);
   } else if (revealSeenIncomplete.has(id) && !revealCompletedAt.has(id)) {
     revealCompletedAt.set(id, Date.now());
   }
@@ -440,6 +443,13 @@ export function useCompletionReveal(id: string, complete: boolean): boolean {
     const timer = window.setTimeout(forceRender, remaining);
     return () => window.clearTimeout(timer);
   }, [id, complete, revealed]);
+
+  useEffect(() => {
+    if (!revealed) return;
+    if (!revealCompletedAt.has(id) || revealHapticFired.has(id)) return;
+    revealHapticFired.add(id);
+    hapticSuccess();
+  }, [id, revealed]);
 
   return revealed;
 }
@@ -466,6 +476,12 @@ export function ObjectiveProgressBar({
   const safeTarget = Math.max(1, target);
   const pct = Math.min(100, (Math.max(0, progress) / safeTarget) * 100);
   const done = complete ?? progress >= safeTarget;
+  const prevProgress = useRef(progress);
+  useEffect(() => {
+    const prev = prevProgress.current;
+    prevProgress.current = progress;
+    if (progress > prev) hapticTick();
+  }, [progress]);
   const countLabel = (
     <>
       {Math.min(progress, safeTarget)}

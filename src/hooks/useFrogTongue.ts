@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FrogHandle } from '@/components/ui/frog';
+import { hapticImpact } from '@/lib/haptics';
 
 export const TONGUE_MS = 1111;
 export const OFFSET_MS = 160;
@@ -397,6 +398,7 @@ export function useFrogTongue({
 
       if (!geomRef.current!.hidImpact && t >= HIT_AT) {
         geomRef.current!.hidImpact = true;
+        if (!grab.silent) hapticImpact();
         setVisuallyDone((prev) => new Set(prev).add(grab.key));
         if (tipGroupEl.current) {
           tipGroupEl.current.style.visibility = 'visible';

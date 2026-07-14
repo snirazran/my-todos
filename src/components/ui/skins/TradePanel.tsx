@@ -12,6 +12,7 @@ import {
   Dices,
   Play,
 } from 'lucide-react';
+import { hapticTick, hapticImpact, hapticCelebrate } from '@/lib/haptics';
 import { rewardedAdsAvailable, showRewardedAd } from '@/lib/ads';
 import { cn } from '@/lib/utils';
 import {
@@ -327,24 +328,19 @@ export function TradePanel({
   }, [selectedIds]);
 
   // --- Actions ---
-  const haptic = (pattern: number | number[]) => {
-    try {
-      navigator.vibrate?.(pattern);
-    } catch {}
-  };
-
   const handleSelect = (entry: TradeEntry) => {
     if (selectedIds.length >= TRADE_ITEM_COUNT) return;
     if (targetRarity && entry.rarity !== targetRarity) return;
     const currentlySelected = selectedCounts[entry.uid] || 0;
     if (currentlySelected < entry.owned) {
-      haptic(selectedIds.length + 1 === TRADE_ITEM_COUNT ? [10, 30, 16] : 8);
+      if (selectedIds.length + 1 === TRADE_ITEM_COUNT) hapticImpact();
+      else hapticTick();
       setSelectedIds((prev) => [...prev, entry.uid]);
     }
   };
 
   const handleRemove = (index: number) => {
-    haptic(6);
+    hapticTick();
     setSelectedIds((prev) => prev.filter((_, i) => i !== index));
   };
 
@@ -375,7 +371,7 @@ export function TradePanel({
       setRerollError(null);
       setShowRerollUpsell(false);
       setSelectedIds([]);
-      haptic([12, 40, 20]);
+      hapticCelebrate();
       if (onTradeSuccess) onTradeSuccess();
 
       confetti({
@@ -426,7 +422,7 @@ export function TradePanel({
       setRerollClaimId(null);
       setShowRerollUpsell(false);
       setTradeResult(data.reward);
-      haptic([12, 40, 20]);
+      hapticCelebrate();
       if (onTradeSuccess) onTradeSuccess();
       confetti({
         particleCount: 80,

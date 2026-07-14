@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
 import confetti from 'canvas-confetti';
+import { hapticCelebrate } from '@/lib/haptics';
 
 const Frog = dynamic(() => import('@/components/ui/frog'), { ssr: false });
 
@@ -42,9 +43,7 @@ export default function CelebrationStep({ frogName, humanName }: Props) {
         disableForReducedMotion: true,
       });
     }, 450);
-    try {
-      navigator.vibrate?.([30, 40, 60]);
-    } catch {}
+    hapticCelebrate();
     return () => clearTimeout(encore);
   }, []);
 

@@ -23,6 +23,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import { hapticImpact } from '@/lib/haptics';
 
 const DURATION_MS = 850; // full extend + retract
 const HIT_AT = 0.46; // fraction of the run where the tongue reaches the fly
@@ -205,6 +206,7 @@ export function LeftTongueProvider({ children }: { children: React.ReactNode }) 
       // tongue's fly so it rides back out with the retracting tip.
       if (!hitDone && t >= HIT_AT) {
         hitDone = true;
+        hapticImpact();
         setHidden((prev) => new Set(prev).add(grab.key));
         if (tipEl.current) tipEl.current.style.visibility = 'visible';
       }

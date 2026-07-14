@@ -16,6 +16,7 @@ import {
 import Fly from '@/components/ui/fly';
 import { TimeTag } from '@/components/ui/TimeTag';
 import { Icon } from '@/components/ui/Icon';
+import { hapticSuccess, hapticTick } from '@/lib/haptics';
 import {
   AnimatePresence,
   motion,
@@ -1208,6 +1209,9 @@ export default function TaskList({
   ) => {
     const isCompleting =
       forceState === true || (forceState === undefined && !task.completed);
+
+    if (isCompleting) hapticSuccess();
+    else hapticTick();
 
     if (isCompleting) {
       if (!skipDelay) {

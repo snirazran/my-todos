@@ -12,6 +12,7 @@ import { rewardedAdsAvailable, showRewardedAd } from '@/lib/ads';
 import { RARITY_CONFIG } from './constants';
 import { RotatingRays } from './RotatingRays';
 import { GiftBox } from './GiftBox';
+import { hapticCelebrate, hapticImpact, hapticTick } from '@/lib/haptics';
 import { DoubleRewardUpsell, GoldenRewardButton, RewardCard } from './RewardCard';
 import { FUNNY_SENTENCES } from './funnySentences';
 
@@ -47,6 +48,15 @@ export default function GiftBoxOpening({
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (phase === 'shaking') {
+      hapticImpact();
+      const rattle = window.setInterval(() => hapticTick(), 180);
+      return () => window.clearInterval(rattle);
+    }
+    if (phase === 'revealed') hapticCelebrate();
+  }, [phase]);
 
   // Handle opening logic
   const handleOpen = async () => {

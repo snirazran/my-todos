@@ -9,6 +9,7 @@ import React, {
 } from 'react';
 import { usePathname } from 'next/navigation';
 import { randomUUID } from '@/lib/uuid';
+import { hapticTick } from '@/lib/haptics';
 import { BACKLOG_CLOSED_EVENT } from '@/lib/hints/guides';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
@@ -643,11 +644,7 @@ export default function TaskBoard({
               : 0;
         const armedNow = rawPull >= PULL_ARM;
         if (armedNow && !edgeArmedHapticRef.current) {
-          try {
-            navigator.vibrate?.(10);
-          } catch {
-            // ignore
-          }
+          hapticTick();
         }
         edgeArmedHapticRef.current = armedNow;
 

@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import confetti from 'canvas-confetti';
+import { hapticCelebrate } from '@/lib/haptics';
 import { Flame, Snowflake, Trophy } from 'lucide-react';
 import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
 import Fly from '@/components/ui/fly';
@@ -73,9 +74,7 @@ export function StreakCelebration({
       origin: { y: 0.4 },
       zIndex: 99999,
     });
-    try {
-      navigator.vibrate?.([30, 40, 60]);
-    } catch {}
+    hapticCelebrate();
   }, [open]);
 
   const milestone = result.milestoneEvents[result.milestoneEvents.length - 1];

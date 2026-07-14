@@ -322,7 +322,8 @@
       "Bash(sh gradlew :app:compileDebugJavaWithJavac -q)",
       "Bash(sh gradlew :app:compileDebugJavaWithJavac)",
       "WebFetch(domain:medium.com)",
-      "Bash(npx tailwindcss *)"
+      "Bash(npx tailwindcss *)",
+      "PowerShell(npx cap sync)"
     ]
   }
 }

@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { hapticCelebrate, hapticImpact, hapticTick } from '@/lib/haptics';
 import { AnimatePresence, motion } from 'framer-motion';
 import Fly from '@/components/ui/fly';
 import { GiftRive } from '@/components/ui/gift-box/GiftBox';
@@ -49,6 +50,15 @@ export function GiftRevealOverlay({
 }) {
   const [phase, setPhase] = useState<'box' | 'opening' | 'reveal'>('box');
   const rarity = RARITY_CONFIG[prize.rarity] ? prize.rarity : 'uncommon';
+
+  useEffect(() => {
+    if (phase === 'opening') {
+      hapticImpact();
+      const rattle = window.setInterval(() => hapticTick(), 180);
+      return () => window.clearInterval(rattle);
+    }
+    if (phase === 'reveal') hapticCelebrate();
+  }, [phase]);
 
   const handleOpen = () => {
     if (phase !== 'box') return;

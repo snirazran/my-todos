@@ -9,6 +9,7 @@ import { AnimatedNumber } from '@/components/ui/AnimatedNumber';
 import Fly from '@/components/ui/fly';
 import { cn } from '@/lib/utils';
 import { useUIStore } from '@/lib/uiStore';
+import { hapticSuccess } from '@/lib/haptics';
 import type { LoginStreakView } from '@/lib/streak/types';
 
 export function FreezePurchaseSheet({
@@ -72,9 +73,7 @@ export function FreezePurchaseSheet({
         zIndex: 99999,
         colors: ['#38bdf8', '#0ea5e9', '#bae6fd'],
       });
-      try {
-        navigator.vibrate?.(28);
-      } catch {}
+      hapticSuccess();
       setPhase('success');
     } finally {
       setBusy(false);
@@ -150,7 +149,7 @@ export function FreezePurchaseSheet({
                 <span className="text-muted-foreground">Your balance</span>
                 <span className="flex items-center gap-1.5">
                   <Fly size={18} paused y={-2} />
-                  <AnimatedNumber value={balance} className="tabular-nums" />
+                  <AnimatedNumber value={balance} haptics className="tabular-nums" />
                 </span>
               </div>
             </div>

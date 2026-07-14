@@ -11,6 +11,7 @@ import { AnimatedNumber } from '@/components/ui/AnimatedNumber';
 import { useUIStore } from '@/lib/uiStore';
 import { useInventory, patchInventoryFlies } from '@/hooks/useInventory';
 import { rewardedAdsAvailable, showRewardedAd } from '@/lib/ads';
+import { hapticSuccess } from '@/lib/haptics';
 import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
 import { getFlyPackPrices, purchaseFlyPack } from '@/lib/purchases';
 import type { FlyPackId } from '@/lib/flyPacks';
@@ -82,6 +83,7 @@ export function CurrencyShop() {
                 <Fly size={22} y={-1} alwaysPlay />
                 <AnimatedNumber
                   value={balance}
+                  haptics
                   className="text-[13px] font-extrabold tabular-nums text-muted-foreground"
                 />
                 <span className="text-[13px] font-extrabold text-muted-foreground">
@@ -259,9 +261,7 @@ function FreeFliesCard({ open }: { open: boolean }) {
         zIndex: 99999,
         colors: ['#4ade80', '#22c55e', '#bbf7d0'],
       });
-      try {
-        navigator.vibrate?.(28);
-      } catch {}
+      hapticSuccess();
     } finally {
       setBusy(false);
     }

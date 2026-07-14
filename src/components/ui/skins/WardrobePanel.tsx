@@ -6,6 +6,7 @@ import {
   useInventory,
 } from '@/hooks/useInventory';
 import { markFlyEarn } from '@/lib/flyEarn';
+import { hapticTick, hapticImpact } from '@/lib/haptics';
 import { useMemo, useState, useEffect } from 'react';
 import React from 'react';
 import { useAuth } from '@/components/auth/AuthContext';
@@ -656,12 +657,6 @@ function WardrobeManagerContent({
 
   const equipQueue = React.useRef<Promise<void>>(Promise.resolve());
 
-  const haptic = (ms: number) => {
-    try {
-      navigator.vibrate?.(ms);
-    } catch {}
-  };
-
   const sendEquip = (slot: WardrobeSlot, itemId: string | null) => {
     beginEquipMutation();
     equipQueue.current = equipQueue.current
@@ -708,14 +703,15 @@ function WardrobeManagerContent({
   const toggleEquip = (slot: WardrobeSlot, itemId: string) => {
     if (!data?.wardrobe?.equipped) return;
     const isEquipped = data.wardrobe.equipped[slot] === itemId;
-    haptic(isEquipped ? 8 : 14);
+    if (isEquipped) hapticTick();
+    else hapticImpact();
     applyEquip(slot, isEquipped ? null : itemId);
   };
 
   const equipItemDirect = async (item: ItemDef) => {
     if (!data?.wardrobe?.equipped) return;
     if (data.wardrobe.equipped[item.slot] === item.id) return;
-    haptic(14);
+    hapticImpact();
     applyEquip(item.slot, item.id);
   };
 

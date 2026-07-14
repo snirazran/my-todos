@@ -373,7 +373,13 @@ import {
   HelpCircle,
   AlertTriangle,
   ChevronLeft,
+  Vibrate,
 } from 'lucide-react';
+import {
+  useHapticsEnabled,
+  setHapticsEnabled,
+  hapticImpact,
+} from '@/lib/haptics';
 import { useTheme } from 'next-themes';
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
@@ -1276,6 +1282,10 @@ function PreferencesView({
         </motion.button>
       </MenuSection>
 
+      <MenuSection title="Feedback">
+        <HapticsToggleRow />
+      </MenuSection>
+
       <MenuSection title="Quests">
         <MenuRow
           icon={<Icon name="compass" label="Quest Focus" className="w-10 h-10" />}
@@ -1288,6 +1298,43 @@ function PreferencesView({
         <SkinRotationRow />
       </MenuSection>
     </div>
+  );
+}
+
+function HapticsToggleRow() {
+  const enabled = useHapticsEnabled();
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={enabled}
+      aria-label="Toggle haptic feedback"
+      onClick={() => {
+        setHapticsEnabled(!enabled);
+        if (!enabled) hapticImpact();
+      }}
+      className="flex w-full items-center justify-between bg-card px-4 py-4 transition-colors first:rounded-t-2xl last:rounded-b-2xl hover:bg-accent/50"
+    >
+      <span className="flex items-center gap-3">
+        <div className="flex h-9 w-12 items-center justify-center">
+          <Vibrate className="w-7 h-7 text-emerald-500" />
+        </div>
+        <span className="font-bold text-sm">Haptic Vibrations</span>
+      </span>
+      <span
+        className={cn(
+          'inline-flex h-6 w-11 shrink-0 items-center rounded-full p-0.5 transition-colors',
+          enabled ? 'bg-emerald-500' : 'bg-muted',
+        )}
+      >
+        <span
+          className={cn(
+            'h-5 w-5 rounded-full bg-white shadow transition-transform',
+            enabled ? 'translate-x-5' : 'translate-x-0',
+          )}
+        />
+      </span>
+    </button>
   );
 }
 

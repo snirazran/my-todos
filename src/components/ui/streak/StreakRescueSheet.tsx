@@ -12,6 +12,7 @@ import { useRegisterOpenSheet } from '@/lib/sheetStore';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { rescueStreak } from '@/hooks/useLoginStreak';
 import { showRewardedAd } from '@/lib/ads';
+import { hapticCelebrate } from '@/lib/haptics';
 import { StreakCelebration } from './StreakCelebration';
 import type {
   CheckInResult,
@@ -102,9 +103,7 @@ export function StreakRescueSheet({
           zIndex: 99999,
           colors: ['#fb923c', '#fbbf24', '#fde68a', '#ffffff'],
         });
-        try {
-          navigator.vibrate?.([25, 30, 55]);
-        } catch {}
+        hapticCelebrate();
       } else {
         setAdsWatched(result.rescue?.adsWatched ?? adsWatched + 1);
       }

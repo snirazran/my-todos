@@ -7,6 +7,7 @@ import confetti from 'canvas-confetti';
 import useSWR, { preload } from 'swr';
 import { Icon } from '@/components/ui/Icon';
 import { QuestsPageSkeleton } from '@/components/ui/Skeleton';
+import { hapticCelebrate } from '@/lib/haptics';
 import {
   CalendarDays,
   Check,
@@ -558,9 +559,7 @@ export function QuestsPanel({
         origin,
         zIndex: 9999,
       });
-      try {
-        navigator.vibrate?.([20, 30, 40]);
-      } catch {}
+      hapticCelebrate();
     }, 450);
     const doneTimeout = window.setTimeout(
       () => setAreaUnlockCeremony('done'),

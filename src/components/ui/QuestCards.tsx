@@ -2,6 +2,7 @@
 
 import { memo, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { hapticSuccess } from '@/lib/haptics';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   CalendarDays,
@@ -1675,9 +1676,7 @@ export function SwitchFocusConfirm({
         return;
       }
       if (payload.unlocked) {
-        try {
-          navigator.vibrate?.(28);
-        } catch {}
+        hapticSuccess();
         onRented?.();
         onClose();
       }
