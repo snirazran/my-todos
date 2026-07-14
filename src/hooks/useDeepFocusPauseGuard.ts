@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import { deepFocusPledgeLive } from '@/lib/focusFlies';
 
@@ -12,7 +13,15 @@ import { deepFocusPledgeLive } from '@/lib/focusFlies';
  */
 export function useDeepFocusPauseGuard() {
   const { deepFocus, pausedThisPhase, phase, settings, timerActive } =
-    useFrogodoroStore();
+    useFrogodoroStore(
+      useShallow((s) => ({
+        deepFocus: s.deepFocus,
+        pausedThisPhase: s.pausedThisPhase,
+        phase: s.phase,
+        settings: s.settings,
+        timerActive: s.timerActive,
+      })),
+    );
   const [armed, setArmed] = useState(false);
   const disarmTimer = useRef(0);
 

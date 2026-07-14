@@ -675,7 +675,7 @@ export function StreakSheet({
               exit={{ opacity: 0, x: -60 }}
               transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
               onClick={(event) => event.stopPropagation()}
-              className="mx-auto h-full w-full sm:max-w-md md:h-[min(720px,100%)] md:overflow-hidden md:rounded-[32px] md:shadow-2xl"
+              className="mx-auto h-full w-full md:h-[min(720px,100%)] md:max-w-md md:overflow-hidden md:rounded-[32px] md:shadow-2xl"
             >
               {step === 'reveal' && celebration && (
                 <RevealStep

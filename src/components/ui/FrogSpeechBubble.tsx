@@ -7,6 +7,8 @@ import {
   pickFrogLine,
   type FrogSpeechContext,
 } from '@/lib/frogSpeech';
+import { useSheetStore } from '@/lib/sheetStore';
+import { useFrogodoroStore } from '@/lib/frogodoroStore';
 
 interface FrogSpeechBubbleProps {
   rate: number;
@@ -61,6 +63,16 @@ export function FrogSpeechBubble({
   useEffect(() => {
     if (fixedMessage !== undefined) return;
     const timer = setTimeout(() => {
+      // A sheet/popup is covering the page (e.g. the Frogodoro timer opened
+      // right after load) or a focus session is live: greeting now would show
+      // welcome text over the timer. Skip WITHOUT consuming the welcome slot,
+      // so the greeting still lands on the next uncovered visit.
+      if (
+        useSheetStore.getState().count > 0 ||
+        useFrogodoroStore.getState().timerActive
+      ) {
+        return;
+      }
       const slot = consumeWelcomeSlot();
       if (!slot.show) return;
       const current = factsRef.current;

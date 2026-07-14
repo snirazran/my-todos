@@ -3,12 +3,16 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useShallow } from 'zustand/react/shallow';
 import { Check, Zap } from 'lucide-react';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import { FocusCelebration } from '@/components/ui/FocusCelebration';
 import { useFrogodoroUiStore } from '@/lib/frogodoroUiStore';
 import { useSheetStore } from '@/lib/sheetStore';
 import { useUIStore } from '@/lib/uiStore';
+import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
+import Frog from '@/components/ui/frog';
+import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
 import CircularTimer from '@/components/ui/CircularTimer';
 
 function formatTime(seconds: number) {
@@ -37,6 +41,8 @@ export default function GlobalFrogodoroMini() {
   const openSheets = useFrogodoroUiStore((s) => s.openSheets);
   const blockingPopups = useSheetStore((s) => s.count);
   const loadingScreenVisible = useUIStore((s) => s.isLoadingScreenVisible);
+  // Selector pick (no timeLeft): the global mini renders on every page, so it
+  // must not re-render on each 1-second tick of the running timer.
   const {
     awaitingDone,
     lastCompletedPhase,
@@ -50,7 +56,22 @@ export default function GlobalFrogodoroMini() {
     deepFocus,
     lastPhasePaused,
     extendFocus,
-  } = useFrogodoroStore();
+  } = useFrogodoroStore(
+    useShallow((s) => ({
+      awaitingDone: s.awaitingDone,
+      lastCompletedPhase: s.lastCompletedPhase,
+      lastFocusElapsed: s.lastFocusElapsed,
+      lastBreakElapsed: s.lastBreakElapsed,
+      selectedTaskName: s.selectedTaskName,
+      settings: s.settings,
+      sessionStats: s.sessionStats,
+      setAwaitingDone: s.setAwaitingDone,
+      stopTimer: s.stopTimer,
+      deepFocus: s.deepFocus,
+      lastPhasePaused: s.lastPhasePaused,
+      extendFocus: s.extendFocus,
+    })),
+  );
 
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -64,6 +85,13 @@ export default function GlobalFrogodoroMini() {
   // A full sheet open already shows its own Done — don't stack the global one.
   const showDone =
     awaitingDone && openSheets === 0 && !hostWillHandle && !loadingScreenVisible;
+  const { indices: frogIndices } = useWardrobeIndices(showDone);
+  // Live frog mounts only after the card's pop-in settles (static stamp until
+  // then) so the entrance never competes with Rive canvas setup.
+  const [cardEntered, setCardEntered] = useState(false);
+  useEffect(() => {
+    if (!showDone) setCardEntered(false);
+  }, [showDone]);
 
   const displayPhase = lastCompletedPhase ?? 'focus';
   const splitDone = settings.autoStartBreaks;
@@ -120,6 +148,9 @@ export default function GlobalFrogodoroMini() {
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.96 }}
                     transition={{ type: 'tween', duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+                    onAnimationComplete={() => {
+                      if (showDone) setCardEntered(true);
+                    }}
                     className="pointer-events-auto w-full max-w-[360px] overflow-hidden rounded-[28px] bg-popover shadow-2xl"
                   >
                     {/* Colored top — matches the in-app timer card */}
@@ -144,6 +175,7 @@ export default function GlobalFrogodoroMini() {
                               bonusFly={bonusFly}
                               fliesCaught={Math.floor(lastFocusElapsed / 300)}
                               compact
+                              showFrog={false}
                             />
                           </div>
                         ) : splitDone ? (
@@ -167,7 +199,7 @@ export default function GlobalFrogodoroMini() {
                           </p>
                         )}
 
-                        <div className="flex items-center justify-center gap-2.5">
+                        <div className="mt-20 flex items-end justify-center gap-2.5">
                           {celebrateFocus && (
                             <button
                               onClick={handleKeepGoing}
@@ -177,13 +209,34 @@ export default function GlobalFrogodoroMini() {
                               +5 more
                             </button>
                           )}
-                          <button
-                            onClick={handleDone}
-                            className={`flex items-center justify-center gap-1.5 rounded-2xl bg-white px-8 py-3 text-[15px] font-black uppercase tracking-widest shadow-[0_6px_0_rgba(0,0,0,0.15)] transition-all active:translate-y-1.5 active:shadow-none ${accent}`}
-                          >
-                            <Check className="h-5 w-5" />
-                            Done
-                          </button>
+                          <div className="relative">
+                            {/* Same perch as the full sheet's Done screen. */}
+                            <div
+                              className="pointer-events-none absolute left-1/2 z-30 -translate-x-1/2"
+                              style={{ bottom: 'calc(100% - 5px)' }}
+                            >
+                              {cardEntered ? (
+                                <Frog
+                                  width={144}
+                                  height={162}
+                                  indices={frogIndices}
+                                />
+                              ) : (
+                                <FrogSnapshot
+                                  indices={frogIndices}
+                                  width={144}
+                                  height={162}
+                                />
+                              )}
+                            </div>
+                            <button
+                              onClick={handleDone}
+                              className={`relative flex items-center justify-center gap-1.5 rounded-2xl bg-white px-8 py-3 text-[15px] font-black uppercase tracking-widest shadow-[0_6px_0_rgba(0,0,0,0.15)] transition-all active:translate-y-1.5 active:shadow-none ${accent}`}
+                            >
+                              <Check className="h-5 w-5" />
+                              Done
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>

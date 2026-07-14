@@ -32,6 +32,11 @@
 		60F4FD473005AB4D008C7297 /* FrogAlarmKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60F4FD453005AB4D008C7297 /* FrogAlarmKit.swift */; };
 		60F4FD493005AB74008C7297 /* FrogAppShortcuts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60F4FD483005AB74008C7297 /* FrogAppShortcuts.swift */; };
 		60F4FD4B3005ABF6008C7297 /* FrogControlWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60F4FD4A3005ABF6008C7297 /* FrogControlWidget.swift */; };
+		60A1AC113005ABF7008C7297 /* frog.caf in Resources */ = {isa = PBXBuildFile; fileRef = 60A1AC013005ABF7008C7297 /* frog.caf */; };
+		60A1AC123005ABF7008C7297 /* classic.caf in Resources */ = {isa = PBXBuildFile; fileRef = 60A1AC023005ABF7008C7297 /* classic.caf */; };
+		60A1AC133005ABF7008C7297 /* dreamscape.caf in Resources */ = {isa = PBXBuildFile; fileRef = 60A1AC033005ABF7008C7297 /* dreamscape.caf */; };
+		60A1AC143005ABF7008C7297 /* lofi.caf in Resources */ = {isa = PBXBuildFile; fileRef = 60A1AC043005ABF7008C7297 /* lofi.caf */; };
+		60A1AC153005ABF7008C7297 /* stardust.caf in Resources */ = {isa = PBXBuildFile; fileRef = 60A1AC053005ABF7008C7297 /* stardust.caf */; };
 		A084ECDBA7D38E1E42DFC39D /* Pods_App.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */; };
 		F76207B087AC76F6689761F7 /* Pods_LiveActivitiesExtension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0A77A78A14762DCD2132693B /* Pods_LiveActivitiesExtension.framework */; };
 /* End PBXBuildFile section */
@@ -78,6 +83,11 @@
 		60AE54312FE060ED00222D18 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		60AE54332FE060ED00222D18 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		60AE54452FE0612600222D18 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		60A1AC013005ABF7008C7297 /* frog.caf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Sounds/frog.caf; sourceTree = "<group>"; };
+		60A1AC023005ABF7008C7297 /* classic.caf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Sounds/classic.caf; sourceTree = "<group>"; };
+		60A1AC033005ABF7008C7297 /* dreamscape.caf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Sounds/dreamscape.caf; sourceTree = "<group>"; };
+		60A1AC043005ABF7008C7297 /* lofi.caf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Sounds/lofi.caf; sourceTree = "<group>"; };
+		60A1AC053005ABF7008C7297 /* stardust.caf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Sounds/stardust.caf; sourceTree = "<group>"; };
 		60AE54462FE0612600222D18 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		60AE54472FE0612600222D18 /* LiveActivities.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveActivities.swift; sourceTree = "<group>"; };
 		60AE54482FE0612600222D18 /* LiveActivitiesBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveActivitiesBundle.swift; sourceTree = "<group>"; };
@@ -176,6 +186,11 @@
 			children = (
 				60F4FD4A3005ABF6008C7297 /* FrogControlWidget.swift */,
 				60AE54452FE0612600222D18 /* Assets.xcassets */,
+				60A1AC013005ABF7008C7297 /* frog.caf */,
+				60A1AC023005ABF7008C7297 /* classic.caf */,
+				60A1AC033005ABF7008C7297 /* dreamscape.caf */,
+				60A1AC043005ABF7008C7297 /* lofi.caf */,
+				60A1AC053005ABF7008C7297 /* stardust.caf */,
 				60AE54462FE0612600222D18 /* Info.plist */,
 				60AE54472FE0612600222D18 /* LiveActivities.swift */,
 				60AE54482FE0612600222D18 /* LiveActivitiesBundle.swift */,
@@ -299,6 +314,11 @@
 			buildActionMask = 2147483647;
 			files = (
 				60AE544C2FE0612600222D18 /* Assets.xcassets in Resources */,
+				60A1AC113005ABF7008C7297 /* frog.caf in Resources */,
+				60A1AC123005ABF7008C7297 /* classic.caf in Resources */,
+				60A1AC133005ABF7008C7297 /* dreamscape.caf in Resources */,
+				60A1AC143005ABF7008C7297 /* lofi.caf in Resources */,
+				60A1AC153005ABF7008C7297 /* stardust.caf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

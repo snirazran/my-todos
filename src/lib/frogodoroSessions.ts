@@ -4,6 +4,7 @@ import {
   FOCUS_FLY_RATE_SECONDS,
   FOCUS_FLY_DAILY_CAP,
 } from '@/lib/focusFlies';
+import { FLY_HUNGER_REWARD_MS, MAX_HUNGER_MS } from '@/lib/hungerLogic';
 
 // Credits flies for focused time: 1 fly per 5 focused minutes, capped per day.
 // Runs as a single aggregation-pipeline update so concurrent flushes (live
@@ -55,27 +56,42 @@ async function awardFocusFlies(
     },
     {
       $set: {
-        'wardrobe.focusFlyDaily': '$_focusFlyNext',
-        'wardrobe.flies': {
-          $add: [
-            { $ifNull: ['$wardrobe.flies', 0] },
+        _focusFlyGained: {
+          $max: [
+            0,
             {
-              $max: [
-                0,
-                {
-                  $subtract: [
-                    '$_focusFlyNext.earned',
-                    { $ifNull: ['$_focusFlyPrev.earned', 0] },
-                  ],
-                },
+              $subtract: [
+                '$_focusFlyNext.earned',
+                { $ifNull: ['$_focusFlyPrev.earned', 0] },
               ],
             },
           ],
         },
       },
     },
-    { $unset: ['_focusFlyPrev', '_focusFlyNext'] },
-  ]);
+    {
+      $set: {
+        'wardrobe.focusFlyDaily': '$_focusFlyNext',
+        'wardrobe.flies': {
+          $add: [{ $ifNull: ['$wardrobe.flies', 0] }, '$_focusFlyGained'],
+        },
+        // Caught flies feed the frog too — same clamp-at-full as task feeding;
+        // the lazy drain in calculateHunger keeps working off lastHungerUpdate.
+        'wardrobe.hunger': {
+          $min: [
+            MAX_HUNGER_MS,
+            {
+              $add: [
+                { $ifNull: ['$wardrobe.hunger', MAX_HUNGER_MS] },
+                { $multiply: [FLY_HUNGER_REWARD_MS, '$_focusFlyGained'] },
+              ],
+            },
+          ],
+        },
+      },
+    },
+    { $unset: ['_focusFlyPrev', '_focusFlyNext', '_focusFlyGained'] },
+  ], { updatePipeline: true });
 }
 
 export async function addFrogodoroSession(

@@ -19,6 +19,7 @@ import {
 import { markFlyEarn } from '@/lib/flyEarn';
 import { showRewardedAd } from '@/lib/ads';
 import { maybeRequestAppRating } from '@/lib/rateApp';
+import { useRiveInteractionPause } from '@/lib/riveInteractionPause';
 
 export type QuestRewardSummary = {
   fliesGranted?: number;
@@ -335,6 +336,19 @@ function handleGiftBoxClosed() {
 export function QuestRewardRevealHost() {
   const { queue, giftOpening, flyGainToast } = useStore(revealStore);
 
+  // The reveal covers the page with a near-opaque backdrop, but it isn't a
+  // sheet, so nothing paused the ambient Rives (home frog flies, card flies)
+  // burning frames underneath it. Hold the global interaction pause while a
+  // reveal or gift-opening is on screen; the overlay's own Rives opt out via
+  // alwaysPlay.
+  const revealActive = queue.length > 0 || !!giftOpening;
+  useEffect(() => {
+    if (!revealActive) return;
+    const { acquire, release } = useRiveInteractionPause.getState();
+    acquire();
+    return release;
+  }, [revealActive]);
+
   const prevRevealCountRef = useRef(0);
   useEffect(() => {
     if (prevRevealCountRef.current > 0 && queue.length === 0) {
@@ -394,34 +408,35 @@ function QuestRewardRevealOverlay({
   const isPremium = entry?.grantPremium ?? false;
   if (typeof document === 'undefined') return null;
 
+  // The backdrop + rays mount ONCE for the whole queue and only the card
+  // swaps per entry — chained claims used to tear down and re-rasterize the
+  // giant ray layer (with a black flash) on every single claim.
   return createPortal(
-    <AnimatePresence mode="wait">
+    <AnimatePresence>
       {entry && (
         <motion.div
-          key={entry.key}
+          key="reveal-overlay"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           className="fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden pointer-events-auto"
         >
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="absolute inset-0 bg-slate-950/90 backdrop-blur-sm"
-          />
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="absolute inset-0 z-0 flex items-center justify-center"
-          >
+          <div className="absolute inset-0 bg-slate-950/90" />
+          <div className="absolute inset-0 z-0 flex items-center justify-center">
             <RotatingRays
               colorClass={GIFT_RARITY_CONFIG[entry.item.rarity].rays}
             />
             <div className="absolute inset-0 bg-radial-gradient from-transparent to-slate-950/80" />
-          </motion.div>
-          <div className="relative z-10 flex flex-col items-center justify-center w-full max-w-md p-6">
+          </div>
+          <AnimatePresence mode="wait">
+          <motion.div
+            key={entry.key}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="relative z-10 flex flex-col items-center justify-center w-full max-w-md p-6"
+          >
             <RewardCard
               key={entry.key}
               prize={entry.item}
@@ -455,7 +470,12 @@ function QuestRewardRevealOverlay({
                     />
                   ) : (
                     <div className="relative flex items-center justify-center w-full h-full">
-                      <Fly size={132} paused={paused} interactive={false} />
+                      <Fly
+                        size={132}
+                        paused={paused}
+                        interactive={false}
+                        alwaysPlay
+                      />
                       <span className="absolute z-40 px-3 py-1 text-sm font-black text-white border shadow-sm right-3 top-3 rounded-xl border-white/20 bg-black/45 backdrop-blur-sm">
                         x{entry.fliesGranted}
                       </span>
@@ -465,7 +485,8 @@ function QuestRewardRevealOverlay({
               }
               slotLabel={entry.fliesGranted ? 'currency' : undefined}
             />
-          </div>
+          </motion.div>
+          </AnimatePresence>
         </motion.div>
       )}
     </AnimatePresence>,
@@ -510,7 +531,7 @@ function PremiumFlyCounter({
 
   return (
     <div className="relative flex items-center justify-center w-full h-full">
-      <Fly size={132} paused={paused} interactive={false} />
+      <Fly size={132} paused={paused} interactive={false} alwaysPlay />
       <motion.span
         key={displayAmount}
         animate={showDouble ? { scale: [1.3, 1] } : {}}

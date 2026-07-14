@@ -10,6 +10,7 @@ import {
   Clock,
   Compass,
   Gift,
+  Moon,
   Pencil,
   Play,
   Repeat,
@@ -46,6 +47,7 @@ import {
   useCompletionReveal,
 } from '@/lib/questClaims';
 import { guideContextForBlock, guideIdForBlock } from '@/lib/hints/guides';
+import { scoreQuestPriority } from '@/lib/quests/priority';
 import { useUIStore } from '@/lib/uiStore';
 
 export type QuestRewardCatalogItem = Pick<
@@ -91,6 +93,7 @@ type QuestCardData = {
   durationMinutes?: number;
   startedAt?: string;
   expiresAt?: string;
+  lastProgressAt?: string;
   logic: QuestCardLogicBlock[];
   completed: boolean;
   claimable: boolean;
@@ -1140,6 +1143,26 @@ export function CategoryQuestPresentationCard({
 
   const showObjectives = !isCompleted && !needsFocusTags;
 
+  const heroPriority = scoreQuestPriority({
+    placement: 'category',
+    progress: quest.logic.reduce(
+      (sum, block) =>
+        sum + Math.min(Math.max(0, block.progress), Math.max(1, block.target)),
+      0,
+    ),
+    target: quest.logic.reduce(
+      (sum, block) => sum + Math.max(1, block.target),
+      0,
+    ),
+    lastProgressAt: quest.lastProgressAt,
+    expiresAt: quest.expiresAt,
+  });
+  const resetAtRisk =
+    !isCompleted &&
+    !needsFocusTags &&
+    heroPriority.reason === 'expiring' &&
+    heroPriority.proximity < 0.5;
+
   return (
     <div
       className={cn(
@@ -1241,7 +1264,10 @@ export function CategoryQuestPresentationCard({
           ) : null}
           {timeLeft && !isCompleted ? (
             <span
-              className="inline-flex shrink-0 items-center gap-1.5 text-[13px] uppercase leading-none tracking-wide text-white drop-shadow-[0_2px_0_rgba(15,23,42,0.85)]"
+              className={cn(
+                'inline-flex shrink-0 items-center gap-1.5 text-[13px] uppercase leading-none tracking-wide drop-shadow-[0_2px_0_rgba(15,23,42,0.85)]',
+                resetAtRisk ? 'text-amber-300' : 'text-white',
+              )}
               style={{
                 fontFamily: 'var(--font-display), "Luckiest Guy", cursive',
                 WebkitTextStroke: '1.4px rgba(15, 23, 42, 0.9)',
@@ -1906,6 +1932,15 @@ export function AreaRow({
       !claimedObjectiveIds.includes(block.id) &&
       block.progress < Math.max(1, block.target),
   );
+  const priority = scoreQuestPriority({
+    placement: 'category',
+    progress: totalProgress,
+    target: totalTarget,
+    lastProgressAt: quest.lastProgressAt,
+    expiresAt: quest.expiresAt,
+  });
+  const quiet =
+    state === 'running' && !finished && priority.reason === 'neglected';
 
   return (
     <button
@@ -1955,6 +1990,15 @@ export function AreaRow({
           </span>
           {state === 'running' && !finished && linkedTags[0] ? (
             <QuestTagPill tag={linkedTags[0]} compact />
+          ) : null}
+          {quiet ? (
+            <span
+              title={`No progress for ${priority.staleDays} days`}
+              className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-amber-600 dark:text-amber-400"
+            >
+              <Moon className="h-2.5 w-2.5" strokeWidth={3} />
+              {priority.staleDays}d
+            </span>
           ) : null}
         </p>
         {state === 'running' && !finished ? (

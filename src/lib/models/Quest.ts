@@ -26,6 +26,8 @@ export interface QuestDoc {
   claimedObjectiveIds: string[];
   completedAt?: Date | null;
   claimedAt?: Date | null;
+  // Last time synced progress increased; drives staleness in quest priority.
+  lastProgressAt?: Date | null;
   // Generated (recipe-rolled) quests: local day the quest finished; a new roll
   // is generated once the user's local date moves past it.
   regenAfterDay?: string;
@@ -61,6 +63,7 @@ const QuestSchema = new Schema<QuestDoc>(
     claimedObjectiveIds: { type: [String], default: [] },
     completedAt: { type: Date, default: null },
     claimedAt: { type: Date, default: null },
+    lastProgressAt: { type: Date, default: null },
     regenAfterDay: { type: String, default: undefined },
   },
   {

@@ -97,14 +97,10 @@ export const RewardCard = ({
   }, [claiming]);
 
   const handleClaimClick = () => {
-    setLocalClaiming(true); // 1. You turn this ON
-
-    // 2. You wait 200ms and call the parent
+    setLocalClaiming(true);
     setTimeout(() => {
       onClaim();
     }, 200);
-
-    // 3. ❌ MISSING: You never setLocalClaiming(false) here or anywhere else.
   };
 
   const cardVariants: Variants = {
@@ -476,7 +472,7 @@ export function DoubleRewardUpsell({
     <>
       {!showPlus && (
         <div
-          className="fixed inset-0 z-[10002] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm px-4 pb-6 sm:pb-0"
+          className="fixed inset-0 z-[10002] flex items-end sm:items-center justify-center bg-black/70 px-4 pb-6 sm:pb-0"
           role="dialog"
           aria-modal="true"
           onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
@@ -540,7 +536,12 @@ export function DoubleRewardUpsell({
                   <span className="flex items-center gap-1.5 text-[26px] font-black leading-none text-[#4f9149] dark:text-[#7dc276]">
                     {count * 2}
                     {rewardAmount ? (
-                      <Fly size={30} interactive={false} className="-translate-y-1" />
+                      <Fly
+                        size={30}
+                        interactive={false}
+                        alwaysPlay
+                        className="-translate-y-1"
+                      />
                     ) : (
                       <span className="inline-flex h-12 w-auto aspect-[282/381] -translate-y-2">
                         <GiftRive className="h-full w-full" color={giftColor} paused={false} />

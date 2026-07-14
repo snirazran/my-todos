@@ -3,7 +3,8 @@
 import React, { useMemo } from 'react';
 import useSWR from 'swr';
 import { motion } from 'framer-motion';
-import { Sparkles } from 'lucide-react';
+import { Moon, Sparkles } from 'lucide-react';
+import { rankByQuestPriority } from '@/lib/quests/priority';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
@@ -15,7 +16,7 @@ type HomeView = {
   trackables?: Trackable[];
 };
 
-function questHomeKey() {
+export function questHomeKey() {
   const tz =
     typeof window !== 'undefined'
       ? Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -33,11 +34,15 @@ export function FocusCelebration({
   bonusFly = false,
   fliesCaught = 0,
   compact = false,
+  showFrog = true,
 }: {
   seconds: number;
   bonusFly?: boolean;
   fliesCaught?: number;
   compact?: boolean;
+  // The full-sheet Done screen seats the frog on the DONE button instead
+  // (FrogodoroSheet), so it hides this one.
+  showFrog?: boolean;
 }) {
   const { indices } = useWardrobeIndices(true);
   const { data } = useSWR<HomeView>(questHomeKey(), bootstrapFetcher, {
@@ -60,6 +65,24 @@ export function FocusCelebration({
     return trackables.slice(0, compact ? 1 : 2);
   }, [data?.trackables, compact]);
 
+  // One quiet reminder for the area that's been waiting longest, so sessions
+  // don't only reinforce the areas already moving.
+  const neglectedArea = useMemo(() => {
+    if (compact) return null;
+    const shownIds = new Set(focusQuests.map((t) => t.id));
+    const candidates = (data?.trackables ?? []).filter(
+      (t) =>
+        t.placement === 'category' &&
+        !t.needsFocusTags &&
+        !!t.categoryName &&
+        !shownIds.has(t.id),
+    );
+    const ranked = rankByQuestPriority(candidates);
+    return (
+      ranked.find(({ result }) => result.reason === 'neglected') ?? null
+    );
+  }, [data?.trackables, focusQuests, compact]);
+
   const focusClaimable = useMemo(
     () =>
       (data?.claimables ?? []).find((c) =>
@@ -72,39 +95,51 @@ export function FocusCelebration({
 
   return (
     <div className="relative flex flex-col items-center">
-      {/* Burst dots behind the frog */}
-      <div aria-hidden className="pointer-events-none absolute top-6 left-1/2">
-        {[...Array(8)].map((_, i) => {
-          const angle = (i / 8) * Math.PI * 2;
-          return (
-            <motion.span
-              key={i}
-              initial={{ x: 0, y: 0, opacity: 0.9, scale: 1 }}
-              animate={{
-                x: Math.cos(angle) * (compact ? 44 : 60),
-                y: Math.sin(angle) * (compact ? 34 : 46),
-                opacity: 0,
-                scale: 0.4,
-              }}
-              transition={{ duration: 0.9, delay: 0.15, ease: 'easeOut' }}
-              className="absolute h-2 w-2 rounded-full bg-white/80"
-            />
-          );
-        })}
-      </div>
+      {showFrog && (
+        <>
+          {/* Burst dots behind the frog */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute top-6 left-1/2"
+          >
+            {[...Array(8)].map((_, i) => {
+              const angle = (i / 8) * Math.PI * 2;
+              return (
+                <motion.span
+                  key={i}
+                  initial={{ x: 0, y: 0, opacity: 0.9, scale: 1 }}
+                  animate={{
+                    x: Math.cos(angle) * (compact ? 44 : 60),
+                    y: Math.sin(angle) * (compact ? 34 : 46),
+                    opacity: 0,
+                    scale: 0.4,
+                  }}
+                  transition={{ duration: 0.9, delay: 0.15, ease: 'easeOut' }}
+                  className="absolute h-2 w-2 rounded-full bg-white/80"
+                />
+              );
+            })}
+          </div>
 
-      <motion.div
-        initial={{ scale: 0.6, y: 12, opacity: 0 }}
-        animate={{ scale: 1, y: 0, opacity: 1 }}
-        transition={{ type: 'spring', stiffness: 320, damping: 18, delay: 0.05 }}
-      >
-        <FrogSnapshot
-          indices={indices}
-          width={frogSize}
-          height={frogSize * 1.05}
-          visualOffsetY={0}
-        />
-      </motion.div>
+          <motion.div
+            initial={{ scale: 0.6, y: 12, opacity: 0 }}
+            animate={{ scale: 1, y: 0, opacity: 1 }}
+            transition={{
+              type: 'spring',
+              stiffness: 320,
+              damping: 18,
+              delay: 0.05,
+            }}
+          >
+            <FrogSnapshot
+              indices={indices}
+              width={frogSize}
+              height={frogSize * 1.05}
+              visualOffsetY={0}
+            />
+          </motion.div>
+        </>
+      )}
 
       <motion.p
         initial={{ opacity: 0, y: 8 }}
@@ -180,6 +215,27 @@ export function FocusCelebration({
             );
           })}
         </div>
+      )}
+
+      {neglectedArea && (
+        <motion.div
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 1.1 }}
+          className="mt-3 w-full px-2"
+        >
+          <div className="flex items-center gap-2 rounded-xl bg-black/20 px-3 py-2">
+            <Moon className="h-3.5 w-3.5 shrink-0 text-white/80" />
+            <div className="min-w-0 leading-tight">
+              <p className="truncate text-[11px] font-black text-white">
+                {neglectedArea.item.categoryName} misses you
+              </p>
+              <p className="truncate text-[10px] font-bold text-white/75">
+                {neglectedArea.item.remainingLabel}
+              </p>
+            </div>
+          </div>
+        </motion.div>
       )}
     </div>
   );

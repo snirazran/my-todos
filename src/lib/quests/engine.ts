@@ -527,6 +527,7 @@ function questDocToView(doc: QuestDoc): QuestProgressView {
     durationMinutes: doc.durationMinutes,
     startedAt: doc.startedAt?.toISOString(),
     expiresAt: doc.expiresAt?.toISOString(),
+    lastProgressAt: (doc.lastProgressAt ?? doc.createdAt)?.toISOString(),
     target: doc.target,
     progress: doc.progress,
     completed,
@@ -972,6 +973,10 @@ async function syncQuestForTemplate(args: {
 
   const nextCompletedAt = completed ? doc.completedAt ?? new Date() : null;
 
+  const prevQuestProgress = (doc as any).isNew ? 0 : Math.max(0, doc.progress);
+  const nextLastProgressAt =
+    progress > prevQuestProgress ? new Date() : doc.lastProgressAt ?? null;
+
   let changed = !!(doc as any).isNew;
   changed = setQuestField(doc, 'questId', questId) || changed;
   changed = setQuestField(doc, 'placement', template.placement) || changed;
@@ -986,6 +991,7 @@ async function syncQuestForTemplate(args: {
   changed = setQuestField(doc, 'target', target) || changed;
   changed = setQuestField(doc, 'progress', progress) || changed;
   changed = setQuestField(doc, 'completedAt', nextCompletedAt) || changed;
+  changed = setQuestField(doc, 'lastProgressAt', nextLastProgressAt) || changed;
 
   if (changed) {
     doc.markModified('logic');

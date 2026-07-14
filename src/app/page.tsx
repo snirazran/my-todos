@@ -28,6 +28,7 @@ import {
 //fix
 import { useAuth } from '@/components/auth/AuthContext';
 import { motion, AnimatePresence, useAnimation } from 'framer-motion';
+import { useShallow } from 'zustand/react/shallow';
 import { useUIStore } from '@/lib/uiStore';
 import { useSheetStore } from '@/lib/sheetStore';
 import {
@@ -294,20 +295,37 @@ export default function Home() {
     return persistApi.onFinishHydration(prime);
   }, []);
 
-  // Live frogodoro session stats for the active task
+  // Live frogodoro session stats for the active task. timeLeft is subscribed
+  // separately and frozen (null) while the timer sheet covers the board, so
+  // the whole page doesn't re-render every second underneath the open popup.
   const {
     selectedTaskId: frogTaskId,
     sessionStats,
     settings: frogSettings,
     phase: frogPhase,
-    timeLeft: frogTimeLeft,
     isRunning: frogRunning,
     timerActive: frogTimerActive,
     phaseElapsed: frogPhaseElapsed,
     stopTimer: frogStopTimer,
     lastCompletionId,
     lastCompletedTaskId,
-  } = useFrogodoroStore();
+  } = useFrogodoroStore(
+    useShallow((s) => ({
+      selectedTaskId: s.selectedTaskId,
+      sessionStats: s.sessionStats,
+      settings: s.settings,
+      phase: s.phase,
+      isRunning: s.isRunning,
+      timerActive: s.timerActive,
+      phaseElapsed: s.phaseElapsed,
+      stopTimer: s.stopTimer,
+      lastCompletionId: s.lastCompletionId,
+      lastCompletedTaskId: s.lastCompletedTaskId,
+    })),
+  );
+  const frogTimeLeft = useFrogodoroStore((s) =>
+    showTimer ? null : s.timeLeft,
+  );
 
   // This page hosts the full timer UI (pill + sheet), so suppress the global
   // mini overlay while it's mounted.
@@ -322,7 +340,12 @@ export default function Home() {
     frogPhase === 'focus'
       ? frogSettings.focusDuration * 60
       : frogSettings.breakDuration * 60;
-  const frogLiveElapsed = frogPhaseDuration - frogTimeLeft;
+  // Frozen (sheet open, board covered): fall back to the last saved elapsed;
+  // the board catches up the moment the sheet closes.
+  const frogLiveElapsed =
+    frogTimeLeft === null
+      ? frogPhaseElapsed
+      : frogPhaseDuration - frogTimeLeft;
   const frogHasActivity =
     sessionStats.focusTime > 0 ||
     sessionStats.breakTime > 0 ||
@@ -510,7 +533,19 @@ export default function Home() {
     // If this task has an active timer (running or paused), flush any unsaved
     // elapsed time, then fully stop the timer so the pill disappears.
     if (frogTaskId === taskId && frogTimerActive) {
-      const unsavedElapsed = Math.max(0, frogLiveElapsed - frogPhaseElapsed);
+      const live = useFrogodoroStore.getState();
+      const liveDuration = Math.max(
+        1,
+        Math.round(
+          (live.phase === 'focus'
+            ? live.settings.focusDuration
+            : live.settings.breakDuration) * 60,
+        ),
+      );
+      const unsavedElapsed = Math.max(
+        0,
+        liveDuration - live.timeLeft - live.phaseElapsed,
+      );
       if (unsavedElapsed > 0) {
         const today = format(new Date(), 'yyyy-MM-dd');
         const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;

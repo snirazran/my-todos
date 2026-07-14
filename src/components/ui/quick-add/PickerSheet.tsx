@@ -87,6 +87,7 @@ type Props = {
   selectedTagIds: string[];
   setSelectedTagIds: React.Dispatch<React.SetStateAction<string[]>>;
   onPremiumLimit: () => void;
+  questTagIds?: ReadonlySet<string>;
 
   tagInputRef: React.RefObject<HTMLInputElement | null>;
 };
@@ -136,6 +137,7 @@ export function PickerSheet(props: Props) {
     selectedTagIds,
     setSelectedTagIds,
     onPremiumLimit,
+    questTagIds,
     tagInputRef,
   } = props;
 
@@ -248,6 +250,7 @@ export function PickerSheet(props: Props) {
               onPremiumLimit={onPremiumLimit}
               onDone={() => setActivePicker(null)}
               tagInputRef={tagInputRef}
+              questTagIds={questTagIds}
             />
           )}
 

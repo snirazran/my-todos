@@ -116,6 +116,8 @@ export type QuestProgressView = {
   durationMinutes?: number;
   startedAt?: string;
   expiresAt?: string;
+  // Last time synced progress increased (quest creation date if never).
+  lastProgressAt?: string;
   target: number;
   progress: number;
   completed: boolean;

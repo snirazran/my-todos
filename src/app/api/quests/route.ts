@@ -135,6 +135,7 @@ type TrackableEntry = {
   id: string;
   questId: string;
   placement: 'daily' | 'category' | 'onboarding';
+  categoryId?: string;
   categoryName?: string;
   objectiveLabel: string;
   remainingLabel: string;
@@ -147,6 +148,8 @@ type TrackableEntry = {
   hint?: string;
   guideId?: string;
   guideContext?: import('@/lib/hints/guides').HintGuideContext;
+  lastProgressAt?: string;
+  expiresAt?: string;
 };
 
 function objectiveRemainingLabel(
@@ -383,6 +386,8 @@ export async function GET(req: Request) {
           id: `${quest.id}:${block.id}`,
           questId: quest.id,
           placement: quest.placement,
+          categoryId:
+            quest.placement === 'category' ? quest.categoryId : undefined,
           categoryName:
             quest.placement === 'category'
               ? categoryNameById.get(quest.categoryId ?? '')
@@ -407,6 +412,8 @@ export async function GET(req: Request) {
           progress: Math.max(0, block.progress),
           target,
           reward: block.rewards?.[0],
+          lastProgressAt: quest.lastProgressAt,
+          expiresAt: quest.expiresAt,
           hint: objectiveHintText(block, questFocusTags(quest)[0]?.name),
           guideId: guideIdForBlock(block) ?? undefined,
           guideContext: (() => {

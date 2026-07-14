@@ -43,6 +43,7 @@ export type Trackable = {
   id: string;
   questId?: string;
   placement: 'daily' | 'category' | 'onboarding';
+  categoryId?: string;
   categoryName?: string;
   objectiveLabel: string;
   remainingLabel: string;
@@ -55,6 +56,8 @@ export type Trackable = {
   hint?: string;
   guideId?: string;
   guideContext?: import('@/lib/hints/guides').HintGuideContext;
+  lastProgressAt?: string;
+  expiresAt?: string;
 };
 
 type ShowNotification = (

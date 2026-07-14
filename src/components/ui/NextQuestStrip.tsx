@@ -22,6 +22,10 @@ import {
   type Claimable,
   type Trackable,
 } from '@/lib/questClaims';
+import {
+  priorityReasonLabel,
+  rankByQuestPriority,
+} from '@/lib/quests/priority';
 import { useUIStore } from '@/lib/uiStore';
 
 export function NextQuestStrip({
@@ -43,20 +47,15 @@ export function NextQuestStrip({
     claimables?.find((c) => c.placement === 'onboarding') ?? claimables?.[0];
   const claimableCount = claimables?.length ?? 0;
 
-  const nextUp = useMemo(() => {
+  const rankedNextUp = useMemo(() => {
     if (!trackables?.length) return null;
-    return [...trackables].sort((a, b) => {
-      const aTarget = Math.max(1, a.target);
-      const bTarget = Math.max(1, b.target);
-      return (
-        Number(b.placement === 'onboarding') -
-          Number(a.placement === 'onboarding') ||
-        Number(a.needsFocusTags ?? false) - Number(b.needsFocusTags ?? false) ||
-        b.progress / bTarget - a.progress / aTarget ||
-        aTarget - a.progress - (bTarget - b.progress)
-      );
-    })[0];
+    return rankByQuestPriority(trackables)[0] ?? null;
   }, [trackables]);
+  const nextUp = rankedNextUp?.item ?? null;
+  const nextUpReason = rankedNextUp?.result.reason ?? null;
+  const nextUpReasonLabel = rankedNextUp
+    ? priorityReasonLabel(rankedNextUp.result)
+    : null;
 
   // Hold the just-finished trackable on screen so its progress bar visibly
   // fills before the card swaps to the "Reward ready" state.
@@ -218,6 +217,18 @@ export function NextQuestStrip({
           <div className="flex min-w-0 flex-1 flex-col leading-tight">
             <span className="text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">
               {trackableEyebrow(displayNextUp)}
+              {!fillingTrackable && nextUpReasonLabel ? (
+                <span
+                  className={
+                    nextUpReason === 'almost-there'
+                      ? 'text-lime-600 dark:text-lime-400'
+                      : 'text-amber-600 dark:text-amber-400'
+                  }
+                >
+                  {' · '}
+                  {nextUpReasonLabel}
+                </span>
+              ) : null}
             </span>
             {displayNextUp.needsFocusTags ? (
               <>

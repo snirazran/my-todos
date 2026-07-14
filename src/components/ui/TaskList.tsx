@@ -5,13 +5,13 @@ import {
   CalendarCheck,
   CalendarClock,
   Repeat,
-  Pencil,
   Filter,
   CalendarDays,
   Plus,
   Flame,
   Pen,
   ListChecks,
+  EyeOff,
 } from 'lucide-react';
 import Fly from '@/components/ui/fly';
 import { TimeTag } from '@/components/ui/TimeTag';
@@ -22,7 +22,6 @@ import {
   PanInfo,
   useMotionValue,
   useTransform,
-  useMotionTemplate,
   animate,
   useAnimation,
 } from 'framer-motion';
@@ -106,6 +105,10 @@ interface Task {
 const animateLayoutChanges: AnimateLayoutChanges = (args) =>
   args.isSorting || args.wasDragging ? defaultAnimateLayoutChanges(args) : true;
 
+const SWIPE_ACTION_WIDTH = 88;
+const SWIPE_SNAP_THRESHOLD = 32;
+const SWIPE_SPRING = { type: 'spring' as const, stiffness: 520, damping: 34 };
+
 interface SortableTaskItemProps {
   task: Task;
   isDone: boolean;
@@ -125,6 +128,7 @@ interface SortableTaskItemProps {
   isWeekly?: boolean;
   disableLayout?: boolean;
   onDoLater?: (task: Task) => void;
+  onSkipToday?: (task: Task) => void;
   isGuest?: boolean;
   isGlowActive?: boolean;
   isSortDragging?: boolean;
@@ -151,6 +155,7 @@ const SortableTaskItem = React.forwardRef<
       isWeekly,
       disableLayout,
       onDoLater,
+      onSkipToday,
       isGlowActive,
       isSortDragging,
       onStartTimer,
@@ -160,11 +165,12 @@ const SortableTaskItem = React.forwardRef<
     ref,
   ) => {
     /* Swipe Logic */
-    const [isOpen, setIsOpen] = useState(false);
+    const [openSide, setOpenSide] = useState<'timer' | 'secondary' | null>(null);
+    const isOpen = openSide !== null;
     const [isSwiping, setIsSwiping] = useState(false);
-    const [hasTriggeredExit, setHasTriggeredExit] = useState(false); // Immediate exit tracking
     const isDraggingRef = React.useRef(false);
     const hasActionTriggeredRef = React.useRef(false);
+    const dragStartSideRef = React.useRef<'timer' | 'secondary' | null>(null);
     const actionBlockTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(
       null,
     );
@@ -183,7 +189,30 @@ const SortableTaskItem = React.forwardRef<
 
     // Motion Values for Swipe
     const x = useMotionValue(0);
-    const swipeThreshold = 60;
+    const isRepeating =
+      !!isWeekly ||
+      !!task.repeatGroupId ||
+      (!!task.repeatMode && task.repeatMode !== 'none');
+    const secondaryAction = isRepeating
+      ? onSkipToday
+      : task.isStarter
+        ? undefined
+        : onDoLater;
+    const secondaryLabel = isRepeating ? 'Skip today' : 'Save later';
+
+    const snapSwipe = React.useCallback(
+      (side: 'timer' | 'secondary' | null) => {
+        setOpenSide(side);
+        const target =
+          side === 'timer'
+            ? SWIPE_ACTION_WIDTH
+            : side === 'secondary'
+              ? -SWIPE_ACTION_WIDTH
+              : 0;
+        animate(x, target, SWIPE_SPRING);
+      },
+      [x],
+    );
 
     useEffect(() => {
       const checkDesktop = () => setIsDesktop(window.innerWidth >= 768);
@@ -219,54 +248,42 @@ const SortableTaskItem = React.forwardRef<
       disabled: isDragDisabled || isOpen,
       animateLayoutChanges,
     });
+    const showSwipeActions =
+      (isOpen || isSwiping) && !isDragging && !isSortDragging;
 
     // Clear hover state and reset swipe position when any sort drag starts
     useEffect(() => {
       if (isDragging || isSortDragging) {
         setSwipeBlocked(true);
         setIsHovered(false);
-        setIsOpen(false);
+        setOpenSide(null);
         x.set(0);
       } else if (swipeBlocked) {
         const timer = setTimeout(() => setSwipeBlocked(false), 200);
         return () => clearTimeout(timer);
       }
-    }, [isDragging, isSortDragging]);
+    }, [isDragging, isSortDragging, swipeBlocked, x]);
 
-    // Transform values based on drag position x
-    // Right Swipe (Positive X) -> Start Timer (Emerald)
+    // Transform values based on drag position x. Releasing only reveals the
+    // corresponding action; the user must tap the button to run it.
     const timerActionOpacity = useTransform(x, [0, 25], [0, 1]);
-    const timerActionScale = useTransform(x, [0, swipeThreshold], [0.8, 1.2]);
-    // Desaturated until the swipe passes the trigger threshold, then snaps to
-    // full color to signal "release to start timer" (mirrors the edit icon's
-    // gray -> blue snap on the other side).
-    const timerActionGray = useTransform(
+    const timerActionScale = useTransform(
       x,
-      [swipeThreshold - 1, swipeThreshold],
-      [1, 0],
+      [0, SWIPE_ACTION_WIDTH],
+      [0.9, 1],
     );
-    const timerActionFilter = useMotionTemplate`grayscale(${timerActionGray})`;
-    // Left Swipe (Negative X) -> Edit Sheet (Sky/Blue)
-    const editActionOpacity = useTransform(x, [-25, 0], [1, 0]);
-    const editActionScale = useTransform(x, [-swipeThreshold, 0], [1.2, 0.8]);
-    const editActionColor = useTransform(
+    const secondaryActionOpacity = useTransform(x, [-25, 0], [1, 0]);
+    const secondaryActionScale = useTransform(
       x,
-      [-swipeThreshold, -(swipeThreshold - 1)],
-      ['#3b82f6', '#9ca3af'],
+      [-SWIPE_ACTION_WIDTH, 0],
+      [1, 0.9],
     );
-
-    // Sync exit state
-    useEffect(() => {
-      if (isExitingLater) {
-        setHasTriggeredExit(true);
-      }
-    }, [isExitingLater]);
 
     useEffect(() => {
       const handleOtherSwipe = (e: Event) => {
         const detail = (e as CustomEvent).detail;
         if (detail.id !== task.id) {
-          setIsOpen(false);
+          snapSwipe(null);
         }
       };
 
@@ -282,7 +299,7 @@ const SortableTaskItem = React.forwardRef<
           return;
         }
 
-        setIsOpen(false);
+        snapSwipe(null);
       };
 
       window.addEventListener('task-swipe-open', handleOtherSwipe);
@@ -293,7 +310,7 @@ const SortableTaskItem = React.forwardRef<
 
         // Also close on scroll
         const handleScroll = () => {
-          setIsOpen(false);
+          snapSwipe(null);
         };
         window.addEventListener('scroll', handleScroll, {
           capture: true,
@@ -312,7 +329,7 @@ const SortableTaskItem = React.forwardRef<
       return () => {
         window.removeEventListener('task-swipe-open', handleOtherSwipe);
       };
-    }, [task.id, isOpen]);
+    }, [task.id, isOpen, snapSwipe]);
 
     useEffect(() => {
       return () => {
@@ -337,6 +354,10 @@ const SortableTaskItem = React.forwardRef<
       isDraggingRef.current = true;
       setIsSwiping(true);
       lockedAxisRef.current = null;
+      dragStartSideRef.current = openSide;
+      window.dispatchEvent(
+        new CustomEvent('task-swipe-open', { detail: { id: task.id } }),
+      );
     };
 
     const handleDragEnd = (_: any, info: PanInfo) => {
@@ -349,33 +370,65 @@ const SortableTaskItem = React.forwardRef<
 
       // If a sort (vertical) drag was active, ignore horizontal swipe result
       if (swipeBlocked) {
-        animate(x, 0, { type: 'spring', stiffness: 600, damping: 28 });
+        snapSwipe(null);
         return;
       }
 
-      const offset = info.offset.x;
-      const velocity = info.velocity.x;
+      const projectedX = x.get() + info.velocity.x * 0.06;
+      const startSide = dragStartSideRef.current;
+      dragStartSideRef.current = null;
 
-      // Action: Swipe Right (Positive) -> Start Timer immediately
-      if (offset > swipeThreshold && onStartTimer && !isDone) {
+      // Closing an open tray cannot cross through zero and open the opposite
+      // tray during the same gesture.
+      if (startSide === 'timer') {
         blockImmediatePostSwipeClick();
-        window.dispatchEvent(
-          new CustomEvent('task-swipe-open', { detail: { id: null } }),
+        snapSwipe(
+          projectedX > SWIPE_SNAP_THRESHOLD && onStartTimer && !isDone
+            ? 'timer'
+            : null,
         );
-        onStartTimer(task, { autoStart: true });
-        animate(x, 0, { type: 'spring', stiffness: 600, damping: 28 });
-      }
-      // Action: Swipe Left (Negative) -> Open Edit Sheet
-      else if (offset < -swipeThreshold || velocity < -200) {
+      } else if (startSide === 'secondary') {
         blockImmediatePostSwipeClick();
-        window.dispatchEvent(
-          new CustomEvent('task-edit-request', { detail: { id: task.id } }),
+        snapSwipe(
+          projectedX < -SWIPE_SNAP_THRESHOLD && secondaryAction && !isDone
+            ? 'secondary'
+            : null,
         );
-        animate(x, 0, { type: 'spring', stiffness: 600, damping: 28 });
+      } else if (
+        projectedX > SWIPE_SNAP_THRESHOLD &&
+        onStartTimer &&
+        !isDone
+      ) {
+        blockImmediatePostSwipeClick();
+        snapSwipe('timer');
+      } else if (
+        projectedX < -SWIPE_SNAP_THRESHOLD &&
+        secondaryAction &&
+        !isDone
+      ) {
+        blockImmediatePostSwipeClick();
+        snapSwipe('secondary');
       } else {
-        // Snap back
-        animate(x, 0, { type: 'spring', stiffness: 600, damping: 28 });
+        snapSwipe(null);
       }
+    };
+
+    const handleTimerAction = (event: React.MouseEvent<HTMLButtonElement>) => {
+      event.stopPropagation();
+      if (!onStartTimer || isDone) return;
+      blockImmediatePostSwipeClick();
+      snapSwipe(null);
+      onStartTimer(task, { autoStart: true });
+    };
+
+    const handleSecondaryAction = (
+      event: React.MouseEvent<HTMLButtonElement>,
+    ) => {
+      event.stopPropagation();
+      if (!secondaryAction || isDone) return;
+      blockImmediatePostSwipeClick();
+      snapSwipe(null);
+      secondaryAction(task);
     };
 
     const handleCardClick = (e: React.MouseEvent) => {
@@ -383,7 +436,7 @@ const SortableTaskItem = React.forwardRef<
       if (isExitingLater || hasActionTriggeredRef.current) return;
 
       if (isOpen) {
-        setIsOpen(false);
+        snapSwipe(null);
         return;
       }
       // Clicking the row body opens the detail card; only the fly/circle on the
@@ -455,35 +508,60 @@ const SortableTaskItem = React.forwardRef<
           }}
           className={`group relative w-full rounded-xl ${isDragging ? 'overflow-visible shadow-none' : isExitingLater ? 'overflow-visible shadow-none' : isGlowActive && !isDone ? 'overflow-visible shadow-none' : isOpen || isSwiping ? 'overflow-hidden bg-muted/70 shadow-none' : 'overflow-hidden'} ${isExitingLater ? 'will-change-transform' : ''}`}
         >
-          {/* Swipe Actions Layer (Behind) - Now on Left (revealed by Right Swipe) */}
-          {/* Swipe Actions Layer (Visible when dragging Right -> Do Later) */}
-          {/* Positioned on Left to be revealed by Right drag */}
-          <div className="absolute inset-y-0 left-0 flex items-center pl-4">
-            <motion.div
-              className="flex items-center justify-center w-10 h-10"
-              style={{
-                opacity: timerActionOpacity,
-                scale: timerActionScale,
-                filter: timerActionFilter,
-              }}
+          {/* Swipe actions stay behind the row until the drag snaps open. A
+              swipe never performs an action by itself. */}
+          {onStartTimer && !isDone && showSwipeActions && (
+            <button
+              type="button"
+              aria-label={`Start focus timer for ${task.text}`}
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={handleTimerAction}
+              className="absolute inset-y-0 left-0 flex w-[88px] flex-col items-center justify-center gap-0.5 rounded-l-xl bg-emerald-600 text-white"
             >
-              <Icon name="clock" className="w-10 h-10" />
-            </motion.div>
-          </div>
+              <motion.span
+                className="flex flex-col items-center justify-center"
+                style={{ opacity: timerActionOpacity, scale: timerActionScale }}
+              >
+                <Icon name="clock" className="-mb-1 h-10 w-10 drop-shadow-sm" />
+                <span className="text-[10px] font-black uppercase tracking-wide">
+                  Focus
+                </span>
+              </motion.span>
+            </button>
+          )}
 
-          {/* Swipe Edit Affordance (revealed by Left Swipe) */}
-          <div className="absolute inset-y-0 right-0 flex items-center pr-4">
-            <motion.div
-              className="flex items-center justify-center w-8 h-8 rounded-full shadow-sm border border-transparent text-white"
-              style={{
-                opacity: editActionOpacity,
-                scale: editActionScale,
-                backgroundColor: editActionColor,
-              }}
+          {secondaryAction && !isDone && showSwipeActions && (
+            <button
+              type="button"
+              aria-label={
+                isRepeating
+                  ? `Skip ${task.text} today`
+                  : `Save ${task.text} for later`
+              }
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={handleSecondaryAction}
+              className={`absolute inset-y-0 right-0 flex w-[88px] flex-col items-center justify-center gap-1 rounded-r-xl text-white ${
+                isRepeating ? 'bg-slate-500' : 'bg-amber-500'
+              }`}
             >
-              <Pencil className="w-4 h-4" />
-            </motion.div>
-          </div>
+              <motion.span
+                className="flex flex-col items-center justify-center gap-1"
+                style={{
+                  opacity: secondaryActionOpacity,
+                  scale: secondaryActionScale,
+                }}
+              >
+                {isRepeating ? (
+                  <EyeOff className="h-6 w-6" strokeWidth={2.75} />
+                ) : (
+                  <Icon name="saved" className="h-8 w-8" />
+                )}
+                <span className="text-[10px] font-black uppercase tracking-wide">
+                  {secondaryLabel}
+                </span>
+              </motion.span>
+            </button>
+          )}
 
           {/* Foreground Card (Swipeable) */}
           <motion.div
@@ -493,7 +571,20 @@ const SortableTaskItem = React.forwardRef<
             onDirectionLock={(axis) => {
               lockedAxisRef.current = axis;
             }}
-            dragConstraints={{ left: -70, right: 70 }}
+            dragConstraints={{
+              left:
+                openSide === 'timer'
+                  ? 0
+                  : secondaryAction
+                    ? -SWIPE_ACTION_WIDTH
+                    : 0,
+              right:
+                openSide === 'secondary'
+                  ? 0
+                  : onStartTimer && !isDone
+                    ? SWIPE_ACTION_WIDTH
+                    : 0,
+            }}
             dragElastic={0}
             dragMomentum={false}
             onDragStart={handleDragStart}
@@ -503,7 +594,15 @@ const SortableTaskItem = React.forwardRef<
             onMouseLeave={() => isDesktop && setIsHovered(false)}
             initial={false}
             animate={{
-              x: isExitingLater ? (isDesktop ? 800 : 450) : isOpen ? -100 : 0,
+              x: isExitingLater
+                ? isDesktop
+                  ? 800
+                  : 450
+                : openSide === 'timer'
+                  ? SWIPE_ACTION_WIDTH
+                  : openSide === 'secondary'
+                    ? -SWIPE_ACTION_WIDTH
+                    : 0,
             }}
             style={{
               x: x,
@@ -531,7 +630,7 @@ const SortableTaskItem = React.forwardRef<
                   : ''
               }
 
-              select-none active:border-primary/40 active:bg-muted/40
+              select-none active:border-primary/40 active:bg-muted
               has-[[data-completion-target]:active]:border-transparent has-[[data-completion-target]:active]:bg-card dark:has-[[data-completion-target]:active]:bg-muted
               ${isDragging ? 'z-[100] opacity-100 shadow-lg shadow-black/15 ring-2 ring-primary/40 dark:shadow-black/40' : ''}
               ${isDone && !isDragging && isHovered && isDesktop ? 'bg-accent/50' : ''}
@@ -549,11 +648,11 @@ const SortableTaskItem = React.forwardRef<
               />
             )}
 
-            {/* Grab affordance (left) — visual hint only; the whole row is the
-                drag activator. Highlights to primary while dragging. */}
+            {/* Visual grab affordance. The full row remains the sortable
+                activator so vertical movement is measured correctly. */}
             <div
-              aria-hidden
-              className={`relative z-10 -ml-1 flex-shrink-0 flex items-center justify-center self-stretch transition-colors cursor-grab active:cursor-grabbing ${isDone ? 'text-muted-foreground/20' : isDragging ? 'text-primary' : 'text-muted-foreground/40 md:group-hover:text-primary/70'}`}
+              aria-hidden="true"
+              className={`relative z-10 -ml-1 flex w-5 flex-shrink-0 items-center justify-center self-stretch transition-colors ${isDone ? 'text-muted-foreground/20' : isDragging ? 'text-primary' : 'text-muted-foreground/40 md:group-hover:text-primary/70'}`}
             >
               <EllipsisVertical className="h-4 w-4 md:h-[18px] md:w-[18px]" />
             </div>
@@ -710,6 +809,9 @@ const SortableTaskItem = React.forwardRef<
               tabIndex={0}
               data-completion-target
               aria-label={isDone ? 'Mark not done' : 'Mark done'}
+              onPointerDown={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
               onClick={(e) => {
                 e.stopPropagation();
                 if (
@@ -941,16 +1043,6 @@ export default function TaskList({
     taskId: string | null;
   }>({ open: false, taskId: null });
 
-  // Listen for swipe-left edit requests from individual cards
-  React.useEffect(() => {
-    const handler = (e: Event) => {
-      const id = (e as CustomEvent).detail?.id as string | undefined;
-      if (id) setActionSheetId(id);
-    };
-    window.addEventListener('task-edit-request', handler);
-    return () => window.removeEventListener('task-edit-request', handler);
-  }, []);
-
   const [delayedCompleted, setDelayedCompleted] = useState<Set<string>>(
     new Set(),
   );
@@ -979,31 +1071,29 @@ export default function TaskList({
     }
   }, [isAnyDragging]);
 
-  // Narrow viewports run the horizontal swipe gesture (start timer / edit); the
-  // reorder activation must coexist with it.
-  const [isNarrow, setIsNarrow] = useState(false);
-  useEffect(() => {
-    const check = () => setIsNarrow(window.innerWidth < 768);
-    check();
-    window.addEventListener('resize', check);
-    return () => window.removeEventListener('resize', check);
+  const [usesSwipeTrays, setUsesSwipeTrays] = useState(false);
+  React.useEffect(() => {
+    const media = window.matchMedia('(max-width: 767px)');
+    const update = () => setUsesSwipeTrays(media.matches);
+    update();
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
   }, []);
 
-  // DnD Sensors — grab anywhere on the row. dnd-kit's `delay`+`tolerance` and
-  // `distance` activation constraints are mutually exclusive: with delay+
-  // tolerance, a pointer move past `tolerance` during the delay ABORTS the sort,
-  // which is what lets a horizontal swipe escape and reach framer-motion's
-  // drag="x". `distance` has no abort, so it swallows the swipe. Desktop has no
-  // swipe, so it keeps the snappier no-hold distance activation; narrow/touch
-  // use delay+tolerance so swiping a row still works.
-  const swipeFriendly = useMemo(() => ({ delay: 150, tolerance: 8 }), []);
+  // On desktop this matches Planner's 5px mouse pickup. In the narrow layout,
+  // a very short hold leaves quick horizontal movement available to the swipe
+  // tray while making vertical reorder feel effectively immediate.
   const mouseOptions = useMemo(
-    () => ({ activationConstraint: isNarrow ? swipeFriendly : { distance: 5 } }),
-    [isNarrow, swipeFriendly],
+    () => ({
+      activationConstraint: usesSwipeTrays
+        ? { delay: 60, tolerance: 8 }
+        : { distance: 5 },
+    }),
+    [usesSwipeTrays],
   );
   const touchOptions = useMemo(
-    () => ({ activationConstraint: swipeFriendly }),
-    [swipeFriendly],
+    () => ({ activationConstraint: { delay: 120, tolerance: 8 } }),
+    [],
   );
   const keyboardOptions = useMemo(
     () => ({ coordinateGetter: sortableKeyboardCoordinates }),
@@ -1501,6 +1591,13 @@ export default function TaskList({
                                   setExitAction({ id: t.id, type: 'later' });
                                   setTimeout(() => onDoLater(t.id), 0);
                                   setTimeout(() => setExitAction(null), 800);
+                                }
+                              : undefined
+                          }
+                          onSkipToday={
+                            !isCompleted
+                              ? (t) => {
+                                  void onDeleteToday(t.id);
                                 }
                               : undefined
                           }

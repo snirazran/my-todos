@@ -1309,6 +1309,7 @@ export default function QuickAddSheet({
                   setSelectedTagIds={setTags}
                   onPremiumLimit={() => setShowPremiumLimit(true)}
                   tagInputRef={tagInputRef}
+                  questTagIds={questTagIds}
                 />
               </AnimatePresence>
             </>

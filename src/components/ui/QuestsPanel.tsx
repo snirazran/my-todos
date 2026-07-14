@@ -58,6 +58,10 @@ import {
   refreshQuestHomeView,
   takeQuestScrollTarget,
 } from '@/lib/questClaims';
+import {
+  priorityReasonLabel,
+  rankByQuestPriority,
+} from '@/lib/quests/priority';
 import { PlusUpgradeModal } from './PlusUpgradeModal';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import Frog, { type WardrobeSlot } from './frog';
@@ -736,6 +740,54 @@ export function QuestsPanel({
       filteredCategoryQuests.filter((quest) => quest.id !== heroQuest?.id),
     [filteredCategoryQuests, heroQuest?.id],
   );
+
+  // "Up next" chips: the 2-3 areas most worth a session right now, so running
+  // several areas in parallel doesn't quietly abandon the slow ones.
+  const upNextAreas = useMemo(() => {
+    const candidates = filteredCategoryQuests.filter((quest) => {
+      if (quest.locked ?? false) return false;
+      if (isQuestRetired(quest) || quest.claimable) return false;
+      const linkedTags = categoryTagMap.get(quest.categoryId) ?? [];
+      const needsTag =
+        quest.logic.some((block) => block.tagMode === 'focus_category_tags') &&
+        linkedTags.length === 0;
+      return !needsTag;
+    });
+    if (candidates.length < 2) return [];
+    return rankByQuestPriority(
+      candidates.map((quest) => ({
+        placement: 'category' as const,
+        progress: quest.progress,
+        target: quest.target,
+        lastProgressAt: quest.lastProgressAt,
+        expiresAt: quest.expiresAt,
+        quest,
+      })),
+    ).slice(0, 3);
+  }, [filteredCategoryQuests, categoryTagMap]);
+
+  const handleUpNextPress = (quest: CategoryQuestProgressView) => {
+    if (data?.isPremium) {
+      setPinnedCategoryId(quest.categoryId);
+    }
+    window.setTimeout(() => {
+      const anchors = Array.from(
+        document.querySelectorAll<HTMLElement>(
+          `[data-quest-anchor~="${CSS.escape(quest.id)}"]`,
+        ),
+      );
+      for (const el of anchors) {
+        if (el.offsetParent === null) continue;
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.classList.add('quest-anchor-highlight');
+        window.setTimeout(
+          () => el.classList.remove('quest-anchor-highlight'),
+          2000,
+        );
+        break;
+      }
+    }, 60);
+  };
   const pendingSwitchCategory = pendingSwitchCategoryId
     ? categoryMap[pendingSwitchCategoryId]
     : null;
@@ -1315,6 +1367,43 @@ export function QuestsPanel({
                                   Your areas
                                 </p>
                               </div>
+                              {upNextAreas.length > 0 && (
+                                <div className="flex flex-wrap items-center gap-1.5 px-1 pb-1">
+                                  <span className="text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+                                    Up next
+                                  </span>
+                                  {upNextAreas.map(({ item, result }) => {
+                                    const category =
+                                      categoryMap[item.quest.categoryId];
+                                    const label = priorityReasonLabel(result);
+                                    return (
+                                      <button
+                                        key={item.quest.id}
+                                        type="button"
+                                        onClick={() =>
+                                          handleUpNextPress(item.quest)
+                                        }
+                                        className="flex items-center gap-1.5 rounded-full border border-border/70 bg-card px-2.5 py-1 text-[11px] font-bold text-foreground shadow-sm transition-all hover:bg-muted/50 active:scale-95"
+                                      >
+                                        {category?.shortLabel ||
+                                          category?.name ||
+                                          'Area'}
+                                        {label && (
+                                          <span
+                                            className={
+                                              result.reason === 'almost-there'
+                                                ? 'text-lime-600 dark:text-lime-400'
+                                                : 'text-amber-600 dark:text-amber-400'
+                                            }
+                                          >
+                                            {label}
+                                          </span>
+                                        )}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              )}
                               {focusEmptyStates}
                               {heroQuest && renderFocusCard(heroQuest)}
                               {areaRows}
@@ -1382,7 +1471,7 @@ export function QuestsPanel({
                                   </div>
                                 )}
                                 <div>{dailySection}</div>
-                                {focusSlot}
+                                {!data.dailyQuestsGated && focusSlot}
                               </div>
 
                               {/* Desktop: left column stacks starter + daily, hero fills
@@ -1393,7 +1482,7 @@ export function QuestsPanel({
                                     {onboardingQuests.map(renderOnboardingCard)}
                                     {dailySection}
                                   </div>
-                                  {focusSlot}
+                                  {!data.dailyQuestsGated && focusSlot}
                                 </div>
                               </div>
                             </>

@@ -320,7 +320,9 @@
       "Bash(/usr/libexec/java_home)",
       "Bash(JAVA_HOME=$\\(/usr/libexec/java_home \\) ./gradlew :app:compileDebugJavaWithJavac -q)",
       "Bash(sh gradlew :app:compileDebugJavaWithJavac -q)",
-      "Bash(sh gradlew :app:compileDebugJavaWithJavac)"
+      "Bash(sh gradlew :app:compileDebugJavaWithJavac)",
+      "WebFetch(domain:medium.com)",
+      "Bash(npx tailwindcss *)"
     ]
   }
 }
