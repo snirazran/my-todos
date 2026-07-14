@@ -15,6 +15,7 @@ import {
 import { useRiveAsset } from '@/hooks/useRiveAsset';
 import { useRiveVisibility } from '@/hooks/useRiveVisibility';
 import { riveDevicePixelRatio } from '@/lib/riveLoader';
+import { useRiveIdlePause } from '@/lib/riveIdlePause';
 
 // Define layout outside component to maintain reference stability
 const RIVE_LAYOUT = new Layout({
@@ -28,6 +29,13 @@ const shakeVariants = {
   revealed: { x: 0, rotate: 0 },
 };
 
+// Ambient rhythm for the one-shot boxShake/boxJump triggers: mostly short
+// irregular gaps with the occasional longer still moment.
+const nextNudgeDelayMs = () =>
+  Math.random() < 0.25
+    ? 4500 + Math.random() * 3000
+    : 1800 + Math.random() * 2200;
+
 // --- FIXED: Removed all delay logic, just simple rendering ---
 export const GiftRive = React.memo(
   ({
@@ -38,7 +46,7 @@ export const GiftRive = React.memo(
     isMilestone = false,
     paused = false,
     color = 0,
-    animation,
+    ambient = 'shake',
   }: {
     width?: number;
     height?: number;
@@ -47,28 +55,23 @@ export const GiftRive = React.memo(
     isMilestone?: boolean;
     paused?: boolean;
     color?: number;
-    /** Play a specific animation (e.g. 'box_shake') instead of the default
-     *  State Machine. Color is still applied via the view-model binding. */
+    /** Which one-shot the ambient scheduler fires every few seconds. */
+    ambient?: 'shake' | 'jump';
+    /** Legacy raw-animation override — ignored. The state machine drives all
+     *  motion now via the ambient boxShake/boxJump triggers. */
     animation?: string;
   }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const riveUrl = useRiveAsset('/idle_gift.riv');
-    // When playing a raw animation (e.g. box_shake) the state machine's
-    // color logic is bypassed, so also play the matching color_* animation.
-    // Gift indices: 0 = common, 1 = rare, 2 = legendary.
-    const colorAnim =
-      color === 0 ? 'color_green' : color === 1 ? 'color_blue' : 'color_red';
     const { rive, RiveComponent } = useRive({
       src: riveUrl || undefined,
-      ...(animation
-        ? { animations: [animation, colorAnim] }
-        : { stateMachines: 'State Machine 1' }),
+      stateMachines: 'State Machine 1',
       autoplay: true,
       autoBind: true,
       layout: RIVE_LAYOUT,
     });
 
-    useRiveVisibility(rive, containerRef, !paused);
+    useRiveVisibility(rive, containerRef, !paused, 'gift');
 
     const viewModel = useViewModel(rive, { useDefault: true });
     const viewModelInstance = useViewModelInstance(viewModel, {
@@ -92,6 +95,32 @@ export const GiftRive = React.memo(
       'start_box_open',
       viewModelInstance,
     );
+    const { trigger: triggerBoxShake } = useViewModelInstanceTrigger(
+      'boxShake',
+      viewModelInstance,
+    );
+    const { trigger: triggerBoxJump } = useViewModelInstanceTrigger(
+      'boxJump',
+      viewModelInstance,
+    );
+
+    /* ---- ambient motion: a one-shot shake or jump every few seconds;
+       between nudges the state machine settles on the static idle pose ---- */
+    useEffect(() => {
+      if (paused || triggerOpen) return;
+      let t = 0;
+      const schedule = () => {
+        t = window.setTimeout(() => {
+          if (rive?.isPlaying && !useRiveIdlePause.getState().idle) {
+            if (ambient === 'jump') triggerBoxJump();
+            else triggerBoxShake();
+          }
+          schedule();
+        }, nextNudgeDelayMs());
+      };
+      schedule();
+      return () => window.clearTimeout(t);
+    }, [rive, paused, triggerOpen, ambient, triggerBoxShake, triggerBoxJump]);
 
     useEffect(() => {
       if (!rive) return;
@@ -261,7 +290,7 @@ export const GiftBox = ({
         variants={shakeVariants}
         className="relative w-[450px] h-[450px] md:w-[500px] md:h-[500px]"
       >
-        <GiftRive triggerOpen={phase === 'shaking'} isMilestone={isMilestone} color={color} />
+        <GiftRive triggerOpen={phase === 'shaking'} isMilestone={isMilestone} color={color} ambient="jump" />
       </motion.div>
 
       <motion.div

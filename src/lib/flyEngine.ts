@@ -20,9 +20,12 @@ import { useRiveIdlePause } from './riveIdlePause';
  */
 
 const MASTER_SIZE = 288;
+const FLY_STATE_MACHINE = 'State Machine 1';
 const FLY_VIEW_MODEL = 'ViewModel1';
 const FLY_VIEW_MODEL_INSTANCE = 'Instance';
 const FLY_LIGHT_MODE_PROPERTY = 'light_mode';
+const FLY_WINGS_TRIGGER = 'wings';
+const FLY_WINGS_IDLE_STATE = 'Wings_idle';
 // Halving mip levels: blits pick the smallest level that still covers the
 // target canvas, so no single drawImage downscales by more than ~2x (a big
 // one-step downscale bypasses filtering and looks pixelated).
@@ -59,6 +62,7 @@ let creating = false;
 let interactionPaused = false;
 let themeObserver: MutationObserver | null = null;
 let flyLightMode: { value: number } | null = null;
+let flyWings: { trigger: () => void } | null = null;
 
 function syncFlyTheme() {
   if (!flyLightMode || typeof document === 'undefined') return;
@@ -85,7 +89,17 @@ function bindFlyTheme() {
   if (!instance) return;
   master.bindViewModelInstance(instance);
   flyLightMode = instance.number(FLY_LIGHT_MODE_PROPERTY);
+  flyWings = instance.trigger(FLY_WINGS_TRIGGER);
   syncFlyTheme();
+  flyWings?.trigger();
+}
+
+// The wings timeline is a one-shot: the state machine settles back on
+// Wings_idle when it ends, so re-fire the trigger every time that state is
+// re-entered to chain flaps into a continuous flying effect.
+function onStateChange(event: { data?: unknown }) {
+  if (!Array.isArray(event.data)) return;
+  if (event.data.includes(FLY_WINGS_IDLE_STATE)) flyWings?.trigger();
 }
 
 function observeTheme() {
@@ -131,7 +145,10 @@ function syncMasterPlayback() {
     if (entryNeedsFrames(e)) needed = true;
   });
   if (needed) {
-    if (!master.isPlaying) master.play();
+    if (!master.isPlaying) {
+      master.play();
+      flyWings?.trigger();
+    }
   } else if (master.isPlaying) {
     master.pause();
   }
@@ -211,7 +228,7 @@ function ensureMaster() {
     master = new Rive({
       src: url,
       canvas: masterCanvas!,
-      animations: ['Wings', 'Body'],
+      stateMachines: FLY_STATE_MACHINE,
       autoplay: true,
       autoBind: false,
       shouldDisableRiveListeners: true,
@@ -221,6 +238,7 @@ function ensureMaster() {
         bindFlyTheme();
         observeTheme();
         master!.on(EventType.Advance, onAdvance);
+        master!.on(EventType.StateChange, onStateChange);
         syncMasterPlayback();
       },
     });

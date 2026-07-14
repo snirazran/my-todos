@@ -113,6 +113,7 @@ export function GiftRevealOverlay({
                   className="h-full w-full"
                   color={boxColorFor(prize.rarity)}
                   triggerOpen={phase === 'opening'}
+                  ambient="jump"
                 />
               </div>
               <p className="mt-3 text-base font-black uppercase tracking-widest text-white/80">

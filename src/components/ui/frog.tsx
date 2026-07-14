@@ -43,12 +43,11 @@ const BREATHING_BINDING = 'breathing';
 // How long emote_sleep_entry needs before the instance can freeze on the
 // sleeping pose. Tune to the entry timeline's real length.
 const SLEEP_ENTRY_PAUSE_MS = 1600;
-// Resting rhythm: mostly single breaths with short irregular gaps, plus the
-// occasional longer still moment — uniform long gaps read as "switched off".
-const nextBreathDelayMs = () =>
-  Math.random() < 0.3
-    ? 5000 + Math.random() * 4000
-    : 1800 + Math.random() * 2700;
+// Trigger-to-trigger period. Breathing reads as alive when it's periodic:
+// ~20 breaths/min (relaxed-character range) with just enough jitter to not
+// feel metronomic. Must stay longer than the breath timeline itself or
+// triggers land mid-breath and get swallowed, which reads as erratic.
+const nextBreathDelayMs = () => 2700 + Math.random() * 500;
 
 // Legacy Rive numeric inputs (all are integers in the older state machine)
 const INPUTS = {
