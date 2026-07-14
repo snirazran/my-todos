@@ -350,6 +350,24 @@
   }
 }
 
+/* While the app is idle (no input for a while, native only — see
+   RiveIdlePause), every decorative CSS loop pauses. Any single running
+   animation, even a compositor-cheap transform float, keeps the WebView
+   producing frames at 60fps and the GPU pipeline awake. First touch removes
+   the class and everything resumes mid-cycle. */
+.app-idle .animate-shimmer,
+.app-idle .plus-name-shimmer,
+.app-idle .claim-wobble,
+.app-idle .animate-ping-ring,
+.app-idle .hint-fly-glow,
+.app-idle .skeleton::after,
+.app-idle .animate-pulse,
+.app-idle .animate-bounce,
+.app-idle .animate-spin,
+.app-idle [class*='animate-['] {
+  animation-play-state: paused !important;
+}
+
 @keyframes quest-anchor-glow {
   0%,
   55% {

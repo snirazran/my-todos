@@ -18,5 +18,6 @@ export const useRiveIdlePause = create<RiveIdlePauseStore>(() => ({
 export const setRiveIdle = (idle: boolean) => {
   if (useRiveIdlePause.getState().idle !== idle) {
     useRiveIdlePause.setState({ idle });
+    document.documentElement.classList.toggle('app-idle', idle);
   }
 };

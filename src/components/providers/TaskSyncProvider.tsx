@@ -17,6 +17,7 @@ import {
   shouldSuppressEquipEcho,
 } from '@/hooks/useInventory';
 import { mutateFriendsCaches } from '@/hooks/useFriendsSync';
+import { useRiveIdlePause } from '@/lib/riveIdlePause';
 
 const NATIVE_SYNC_INTERVAL_MS = 10_000;
 const TASK_EVENT_LAST_ID_KEY = 'frogress.taskSyncLastEventId';
@@ -225,13 +226,23 @@ export function TaskSyncProvider({ children }: { children: ReactNode }) {
     if (!Capacitor.isNativePlatform()) return;
     if (pathname !== '/' && pathname !== '/planner') return;
 
+    // Idle-gated: each poll wakes the radio, and those wakeups (not the
+    // payload) dominate its energy cost. While the user is AFK the data
+    // can't be acted on anyway; one catch-up sync fires on wake.
     const poll = () => {
       if (document.visibilityState !== 'visible') return;
+      if (useRiveIdlePause.getState().idle) return;
       notifyTaskSync({ reason: 'native-poll' });
     };
     const intervalId = window.setInterval(poll, NATIVE_SYNC_INTERVAL_MS);
+    const unsubIdle = useRiveIdlePause.subscribe((state, prev) => {
+      if (prev.idle && !state.idle) poll();
+    });
 
-    return () => window.clearInterval(intervalId);
+    return () => {
+      window.clearInterval(intervalId);
+      unsubIdle();
+    };
   }, [pathname, user]);
 
   return children;
