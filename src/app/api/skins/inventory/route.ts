@@ -52,6 +52,11 @@ async function ensureWardrobe(uid: string) {
 }
 
 export async function GET(req: NextRequest) {
+  const timezone =
+    req.nextUrl.searchParams.get('timezone') ||
+    req.headers.get('x-timezone') ||
+    'UTC';
+
   try {
     const userId = await requireUserId();
     const isSummary =
@@ -119,7 +124,7 @@ export async function GET(req: NextRequest) {
           lastHungerUpdate: wardrobe.lastHungerUpdate,
         },
         catalog: fullCatalog.filter((item) => equippedIds.has(item.id)),
-        dailyDeals: getDailyDeals(fullCatalog),
+        dailyDeals: getDailyDeals(fullCatalog, new Date(), timezone),
         unseenCount: unseenIds.filter((id) => !containerIds.has(id)).length,
         unseenContainerCount: unseenIds.filter((id) => containerIds.has(id))
           .length,
@@ -131,7 +136,7 @@ export async function GET(req: NextRequest) {
     return json({
       wardrobe,
       catalog: fullCatalog,
-      dailyDeals: getDailyDeals(fullCatalog),
+      dailyDeals: getDailyDeals(fullCatalog, new Date(), timezone),
       isPremium: isPremiumActive(premiumUser?.premiumUntil),
     });
   } catch {
@@ -146,7 +151,7 @@ export async function GET(req: NextRequest) {
         unseenItems: [],
       },
       catalog: guestCatalog,
-      dailyDeals: getDailyDeals([...guestCatalog]),
+      dailyDeals: getDailyDeals([...guestCatalog], new Date(), timezone),
       isPremium: false,
     });
   }

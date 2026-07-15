@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { Icon as AppIcon } from '@/components/ui/Icon';
 import { BaseSheet } from '@/components/ui/BaseSheet';
+import { TimerClockIcon } from '@/components/ui/TimerClockIcon';
 import Fly from '@/components/ui/fly';
 import type { ChecklistItem } from '@/hooks/useTaskData';
 import type { RepeatMode, RepeatRule } from '@/components/ui/quick-add/utils';
@@ -34,6 +35,7 @@ import { parseYmd, todayYmd } from '@/components/board/helpers';
 import { useBuddyState } from '@/hooks/useBuddyState';
 import { BuddyFrogFace } from '@/components/ui/BuddyBadge';
 import { randomUUID } from '@/lib/uuid';
+import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import { TaskRepeatPopup } from './TaskRepeatPopup';
 import RichNotesEditor from './RichNotesEditor';
 
@@ -848,13 +850,9 @@ export default function TaskDetailSheet({
               (onStartTimer || (isRepeating && onSkipToday) || onDoLater) && (
                 <div className="flex shrink-0 gap-2.5">
                   {onStartTimer && (
-                    <SecondaryButton
-                      label="Focus"
+                    <TaskFocusButton
+                      taskId={displayTask?.id ?? ''}
                       onClick={runAndClose(onStartTimer)}
-                      icon={
-                        <AppIcon name="clock" label="Focus" className="h-6 w-6" />
-                      }
-                      dataHint="focus-button"
                     />
                   )}
                   {isRepeating && onSkipToday ? (
@@ -934,21 +932,84 @@ function SecondaryButton({
   icon,
   onClick,
   dataHint,
+  activePhase = null,
 }: {
-  label: string;
+  label: React.ReactNode;
   icon: React.ReactNode;
   onClick: () => void;
   dataHint?: string;
+  activePhase?: 'focus' | 'break' | null;
 }) {
   return (
     <button
       onClick={onClick}
       data-hint={dataHint}
-      className="flex h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-[22px] bg-popover text-[14px] font-black text-foreground ring-1 ring-border/80 shadow-[0_3px_0_0_rgba(0,0,0,0.18)] transition-all active:translate-y-0.5 active:shadow-none [@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:shadow-[0_4px_0_0_rgba(0,0,0,0.18)]"
+      className={`flex h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-[22px] text-[14px] font-black ring-1 transition-all active:translate-y-0.5 active:shadow-none [@media(hover:hover)]:hover:-translate-y-0.5 ${
+        activePhase === 'focus'
+          ? 'bg-[#4f9149] text-white ring-[#34631f]/50 shadow-[0_3px_0_0_#34631f] [@media(hover:hover)]:hover:shadow-[0_4px_0_0_#34631f]'
+          : activePhase === 'break'
+            ? 'bg-sky-500 text-white ring-sky-700/50 shadow-[0_3px_0_0_#0369a1] [@media(hover:hover)]:hover:shadow-[0_4px_0_0_#0369a1] dark:bg-sky-700'
+            : 'bg-popover text-foreground ring-border/80 shadow-[0_3px_0_0_rgba(0,0,0,0.18)] [@media(hover:hover)]:hover:shadow-[0_4px_0_0_rgba(0,0,0,0.18)]'
+      }`}
     >
       {icon}
       <span className="truncate">{label}</span>
     </button>
+  );
+}
+
+function formatTimer(seconds: number) {
+  const safeSeconds = Math.max(0, Math.round(seconds));
+  const minutes = Math.floor(safeSeconds / 60);
+  const remainder = safeSeconds % 60;
+  return `${String(minutes).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`;
+}
+
+function TaskFocusButton({
+  taskId,
+  onClick,
+}: {
+  taskId: string;
+  onClick: () => void;
+}) {
+  const isFocusing = useFrogodoroStore(
+    (state) => state.timerActive && state.selectedTaskId === taskId,
+  );
+  const timeLeft = useFrogodoroStore((state) =>
+    state.timerActive && state.selectedTaskId === taskId ? state.timeLeft : 0,
+  );
+  const phase = useFrogodoroStore((state) => state.phase);
+  const isRunning = useFrogodoroStore(
+    (state) =>
+      state.timerActive &&
+      state.isRunning &&
+      state.selectedTaskId === taskId,
+  );
+
+  return (
+    <SecondaryButton
+      activePhase={isFocusing ? phase : null}
+      label={
+        isFocusing ? (
+          <span className="inline-flex min-w-0 items-center gap-1.5 whitespace-nowrap text-[clamp(11px,3.3vw,14px)] max-[380px]:gap-1">
+            <span>{phase === 'break' ? 'On break' : 'Focusing'}</span>
+            <span className="tabular-nums text-white/90">
+              {formatTimer(timeLeft)}
+            </span>
+          </span>
+        ) : (
+          'Focus'
+        )
+      }
+      onClick={onClick}
+      icon={
+        <TimerClockIcon
+          running={isRunning}
+          className={`h-6 w-6 ${isFocusing ? 'max-[360px]:hidden' : ''}`}
+        />
+      }
+      dataHint="focus-button"
+    />
   );
 }
 

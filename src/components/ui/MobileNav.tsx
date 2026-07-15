@@ -191,6 +191,7 @@ export default function MobileNav() {
                 href={target}
                 prefetch={true}
                 onClick={(e) => {
+                  hapticTick();
                   if (wardrobePopupOpen) {
                     e.preventDefault();
                     setWardrobePopupOpen(false);

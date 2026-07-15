@@ -52,7 +52,13 @@ async function loadBootstrap(): Promise<BootstrapResponse | null> {
  * revalidations) goes straight to the individual endpoint.
  */
 export async function bootstrapFetcher<T = unknown>(url: string): Promise<T> {
-  const direct = () => fetch(url).then((res) => res.json() as Promise<T>);
+  const direct = () => {
+    const directUrl =
+      typeof window !== 'undefined' && url.startsWith('/api/skins/inventory')
+        ? `${url}${url.includes('?') ? '&' : '?'}timezone=${encodeURIComponent(clientTimezone())}`
+        : url;
+    return fetch(directUrl).then((res) => res.json() as Promise<T>);
+  };
   if (typeof window === 'undefined') return direct();
 
   const slice = sliceForUrl(url);

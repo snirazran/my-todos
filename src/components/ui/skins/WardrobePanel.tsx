@@ -787,7 +787,10 @@ function WardrobeManagerContent({
       const res = await fetch('/api/skins/shop', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ itemId: item.id }),
+        body: JSON.stringify({
+          itemId: item.id,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        }),
       });
 
       if (!res.ok) throw new Error('Failed');

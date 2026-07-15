@@ -80,6 +80,8 @@ interface FrogodoroState {
   startTimer: () => void;
   pauseTimer: () => void;
   stopTimer: () => void;
+  /** Clears this device's timer UI without publishing a server-side stop. */
+  resetLocalTimer: () => void;
   tickTimer: (newTimeLeft: number) => void;
   switchPhase: (phase: PomodoroPhase) => void;
   completePhase: (
@@ -280,6 +282,48 @@ export const useFrogodoroStore = create<FrogodoroState>()(
             },
             activeTimerRev: null,
             pendingSync: state.pendingSync + 1,
+          };
+        });
+      },
+
+      resetLocalTimer: () => {
+        set((state) => {
+          const settings =
+            state.overtimePrevFocusDuration != null
+              ? {
+                  ...state.settings,
+                  focusDuration: state.overtimePrevFocusDuration,
+                }
+              : state.settings;
+          return {
+            settings,
+            selectedTaskId: '',
+            selectedTaskName: '',
+            phase: 'focus',
+            timerActive: false,
+            isRunning: false,
+            timeLeft: getPhaseDuration('focus', settings),
+            endTime: null,
+            currentSessionSpend: 0,
+            sessionStats: DEFAULT_SESSION_STATS,
+            phaseElapsed: 0,
+            remainingByPhase: {
+              focus: getPhaseDuration('focus', settings),
+              break: getPhaseDuration('break', settings),
+            },
+            startedByPhase: { focus: false, break: false },
+            lastCompletedTaskId: '',
+            lastCompletedPhase: null,
+            awaitingDone: false,
+            activeTimerRev: null,
+            lastFocusElapsed: 0,
+            lastBreakElapsed: 0,
+            // Deliberately preserve pendingSync. Incrementing it would make the
+            // publisher interpret logout as a user-requested server stop.
+            pendingSync: state.pendingSync,
+            pausedThisPhase: false,
+            lastPhasePaused: false,
+            overtimePrevFocusDuration: null,
           };
         });
       },

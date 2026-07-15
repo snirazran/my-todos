@@ -78,6 +78,20 @@ type HomeData = {
 let baseline: Set<string> | null = null;
 let progressBaseline: Map<string, number> | null = null;
 
+/**
+ * Claimable IDs are an append-only "already observed" set for this app
+ * session. Quest requests can overlap and resolve out of order; replacing the
+ * set with each response lets an older/partial response forget rewards, so a
+ * later unrelated refresh replays every currently claimable reward toast.
+ */
+function observeClaimables(claimables: Claimable[]): Set<string> | null {
+  const previous = baseline ? new Set(baseline) : null;
+  const observed = baseline ?? new Set<string>();
+  for (const claimable of claimables) observed.add(claimable.id);
+  baseline = observed;
+  return previous;
+}
+
 const QUEST_SCROLL_KEY = 'quest-scroll-target';
 
 export function setQuestScrollTarget(questId: string) {
@@ -140,7 +154,7 @@ export async function seedQuestClaims(): Promise<void> {
   if (baseline !== null) return;
   const data = await fetchHome();
   if (data) {
-    baseline = new Set(data.claimables.map((c) => c.id));
+    observeClaimables(data.claimables);
     progressBaseline = toProgressMap(data.trackables);
   }
 }
@@ -151,7 +165,7 @@ export async function seedQuestClaims(): Promise<void> {
 export async function refreshQuestHomeView(): Promise<void> {
   const data = await fetchHome();
   if (data) {
-    baseline = new Set(data.claimables.map((c) => c.id));
+    observeClaimables(data.claimables);
     progressBaseline = toProgressMap(data.trackables);
   }
 }
@@ -182,10 +196,8 @@ export async function notifyQuestClaims(
   const data = await fetchHome();
   primeQuestsPageCache();
   if (!data) return;
-  const ids = new Set(data.claimables.map((c) => c.id));
-  const prev = baseline;
+  const prev = observeClaimables(data.claimables);
   const prevProgress = progressBaseline;
-  baseline = ids;
   progressBaseline = toProgressMap(data.trackables);
   if (prev === null) return;
   let claimToastShown = false;

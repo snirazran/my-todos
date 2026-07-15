@@ -20,6 +20,7 @@ import type { ActiveFrogodoroTimer } from '@/lib/types/UserDoc';
 import { getCurrentLiveActivityState } from '@/lib/liveTimer';
 import { notifyQuestClaims } from '@/lib/questClaims';
 import { useNotification } from '@/components/providers/NotificationProvider';
+import { useAuth } from '@/components/auth/AuthContext';
 import { fliesCaughtFor } from '@/lib/focusFlies';
 import { hapticCelebrate, hapticImpact } from '@/lib/haptics';
 import { markFlyEarn } from '@/lib/flyEarn';
@@ -44,6 +45,8 @@ function getClientId() {
 }
 
 export function GlobalTimer() {
+  const { user, loading: authLoading } = useAuth();
+  const authUserId = authLoading ? null : user?.uid ?? null;
   const {
     isRunning,
     timerActive,
@@ -71,7 +74,10 @@ export function GlobalTimer() {
   // wallet (the counter animates like a task-grab gain on whatever page shows
   // it) and opens the earn window; the server credit lands on the next
   // progress flush and the delayed revalidations reconcile to truth.
-  const { data: inventorySummary } = useInventory(timerActive, true);
+  const { data: inventorySummary } = useInventory(
+    !!authUserId && timerActive,
+    true,
+  );
   const walletFliesRef = useRef<number | undefined>(undefined);
   walletFliesRef.current = inventorySummary?.wardrobe?.flies;
   const sessionFocusLive =
@@ -328,6 +334,7 @@ export function GlobalTimer() {
   // it arrives via SSE, the initial GET, a resync, or the advance response.
   const applyRemoteTimer = useCallback(
     (timer: ActiveFrogodoroTimer | null, serverNow: number, seq: number) => {
+      if (!authUserId) return;
       // While our own write is outstanding, never let an incoming read (SSE
       // initial snapshot, echo, or a resync) apply — it can carry null or an
       // older endsAt that lands in the window before our PUT response records
@@ -424,7 +431,7 @@ export function GlobalTimer() {
         store.setAwaitingDone(!!timer.finished);
       }
     },
-    [registerCompletion],
+    [authUserId, registerCompletion],
   );
 
   const applyNativeLiveActivityState = useCallback(async () => {
@@ -454,6 +461,7 @@ export function GlobalTimer() {
   // ticks never bump it, so they never publish — this is what makes the server
   // the single source of truth with no echo loop.
   useEffect(() => {
+    if (!authUserId) return;
     if (pendingSync === 0) return;
     // Not ready to sync yet (first server reconcile hasn't run). The first-load
     // adopt path in applyRemoteTimer will push local state once it does.
@@ -498,13 +506,14 @@ export function GlobalTimer() {
         }
       });
     }
-  }, [pendingSync, buildTimerPayload, showNotification]);
+  }, [authUserId, pendingSync, buildTimerPayload, showNotification]);
 
   // Sync timer state across windows/devices in real time via SSE. A GET resync
   // gates the (authenticated) connection — logged-out users get a 401 and never
   // open the stream — and also serves as a periodic + on-focus backstop that
   // re-establishes the stream if it drops (e.g. iOS suspending the app).
   useEffect(() => {
+    if (!authUserId) return;
     let cancelled = false;
     let es: EventSource | null = null;
 
@@ -617,7 +626,7 @@ export function GlobalTimer() {
       appStateHandle?.remove();
       es?.close();
     };
-  }, [applyNativeLiveActivityState, applyRemoteTimer]);
+  }, [authUserId, applyNativeLiveActivityState, applyRemoteTimer]);
 
   // Detect pause/stop to flush partial time for any phase
   useEffect(() => {

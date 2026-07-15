@@ -75,6 +75,7 @@ export function SingleRewardCard({
   forceFullOpacity,
   lockOverlay,
   hideAction,
+  compact,
   giftAnimation,
   rewards,
   rewardCatalog,
@@ -97,8 +98,11 @@ export function SingleRewardCard({
   forceFullOpacity?: boolean;
   lockOverlay?: boolean;
   /** Suppress the Claim/Unlock button while keeping the card state visuals —
-   *  used when several cards share one lane and only one should carry it. */
+   *  used when overlapping cards share one lane and only the top one carries it. */
   hideAction?: boolean;
+  /** Render the ItemCard in compact mode — tighter chrome and a taller
+   *  preview box, so the inner panel fills more of a small card. */
+  compact?: boolean;
   /** Optional gift-box animation override (e.g. 'box_shake'). */
   giftAnimation?: string;
   /** Full reward list for this lane. When it holds more than one, the preview
@@ -212,6 +216,7 @@ export function SingleRewardCard({
       >
         <ItemCard
           item={itemDef}
+          compact={compact}
           // Fanned tiles carry their own badges; a card-level count would
           // double up and only describe one of the two prizes.
           ownedCount={

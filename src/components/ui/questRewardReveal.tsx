@@ -17,7 +17,7 @@ import {
   patchInventoryFlies,
 } from '@/hooks/useInventory';
 import { markFlyEarn } from '@/lib/flyEarn';
-import { hapticCelebrate } from '@/lib/haptics';
+import { hapticCelebrate, hapticTick } from '@/lib/haptics';
 import { showRewardedAd } from '@/lib/ads';
 import { maybeRequestAppRating } from '@/lib/rateApp';
 import { useRiveInteractionPause } from '@/lib/riveInteractionPause';
@@ -514,6 +514,7 @@ function PremiumFlyCounter({
   const [showDouble, setShowDouble] = useState(false);
 
   useEffect(() => {
+    let interval: ReturnType<typeof setInterval> | undefined;
     const doubleTimer = setTimeout(() => {
       setShowDouble(true);
       // Animate counting up from base to final
@@ -522,18 +523,22 @@ function PremiumFlyCounter({
       const increment = (finalAmount - baseAmount) / steps;
       let current = baseAmount;
       let step = 0;
-      const interval = setInterval(() => {
+      interval = setInterval(() => {
         step++;
-        current = Math.min(
+        const next = Math.min(
           baseAmount + Math.round(increment * step),
           finalAmount,
         );
+        if (next !== current) hapticTick();
+        current = next;
         setDisplayAmount(current);
         if (step >= steps) clearInterval(interval);
       }, duration / steps);
-      return () => clearInterval(interval);
     }, 800);
-    return () => clearTimeout(doubleTimer);
+    return () => {
+      clearTimeout(doubleTimer);
+      if (interval) clearInterval(interval);
+    };
   }, [baseAmount, finalAmount]);
 
   return (

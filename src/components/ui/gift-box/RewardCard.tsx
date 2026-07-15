@@ -8,6 +8,7 @@ import { Icon } from '@/components/ui/Icon';
 import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
 import { rewardedAdsAvailable } from '@/lib/ads';
 import { ItemDef } from '@/lib/skins/catalog';
+import { hapticTick } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
 import { RARITY_CONFIG } from './constants';
 import { GiftRive } from './GiftBox';
@@ -405,6 +406,7 @@ function QuantityBadge({
   useEffect(() => {
     if (!baseQuantity || !showContent || baseQuantity >= quantity) return;
     const timer = setTimeout(() => {
+      hapticTick();
       setDisplayQty(quantity);
       setBumped(true);
     }, 800);

@@ -126,8 +126,22 @@ export const GiftRive = React.memo(
       if (!rive) return;
       const el = containerRef.current;
       if (!el) return;
-      const resize = () =>
-        rive.resizeDrawingSurfaceToCanvas(riveDevicePixelRatio());
+      // Size the backing store from the layout box (like <Fly/>):
+      // resizeDrawingSurfaceToCanvas measures the transformed rect, which
+      // skews the resolution inside rotated/scaled wrappers.
+      const resize = () => {
+        const canvas = el.querySelector('canvas');
+        if (!(canvas instanceof HTMLCanvasElement)) return;
+        const dpr = riveDevicePixelRatio();
+        const width = Math.round(el.clientWidth * dpr);
+        const height = Math.round(el.clientHeight * dpr);
+        if (!width || !height) return;
+        if (canvas.width === width && canvas.height === height) return;
+        canvas.width = width;
+        canvas.height = height;
+        rive.resizeToCanvas();
+        rive.drawFrame();
+      };
       resize();
       const raf = requestAnimationFrame(resize);
       const observer = new ResizeObserver(() => resize());

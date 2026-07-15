@@ -1018,6 +1018,7 @@ export function MoveToWebCard({
   paused?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
+  const [rewardPopupOpen, setRewardPopupOpen] = useState(false);
   const host = moveToWeb.webUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
 
   const copyUrl = async () => {
@@ -1032,28 +1033,35 @@ export function MoveToWebCard({
 
   return (
     <div className="rounded-2xl border border-border/50 bg-card px-3 py-3 shadow-sm sm:px-4">
-      <div className="flex items-center gap-2.5">
-        <RewardTile
-          reward={moveToWeb.reward}
-          rewardCatalog={rewardCatalog}
-          isPremium={isPremium}
-          compact
-          paused={paused}
-          hideBadge={moveToWeb.reward.type !== 'FLIES'}
-          flySize={22}
-          giftAnimation="box_shake"
-          className="h-10 w-10 shrink-0 rounded-xl ring-2 ring-card"
-        />
+      <div className="flex items-center gap-2 sm:gap-2.5">
+        <button
+          type="button"
+          onClick={() => setRewardPopupOpen(true)}
+          aria-label="See quest reward"
+          className="relative flex shrink-0 cursor-pointer items-center py-1"
+        >
+          <RewardTile
+            reward={moveToWeb.reward}
+            rewardCatalog={rewardCatalog}
+            isPremium={isPremium}
+            compact
+            paused={paused}
+            hideBadge={moveToWeb.reward.type !== 'FLIES'}
+            flySize={22}
+            giftAnimation="box_shake"
+            className="h-11 w-11 rounded-xl min-[400px]:h-12 min-[400px]:w-12"
+          />
+        </button>
         <div className="min-w-0 flex-1">
           <p className="text-[12px] font-black leading-tight text-foreground">
             {moveToWeb.claimable
               ? 'Your reward is ready!'
-              : 'Your pond works on computers too'}
+              : 'Plan your week on the big screen'}
           </p>
           <p className="mt-0.5 text-[11px] font-bold leading-tight text-muted-foreground">
             {moveToWeb.claimable
               ? 'Thanks for hopping onto the web'
-              : 'Log in on the web to unlock this prize'}
+              : 'Log in on your computer once to unlock this prize'}
           </p>
         </div>
         {moveToWeb.claimable && onClaim ? (
@@ -1105,6 +1113,16 @@ export function MoveToWebCard({
           </span>
         </button>
       )}
+      <RewardDetailsPopup
+        open={rewardPopupOpen}
+        eyebrow="Web quest"
+        title="Reward"
+        rewards={[moveToWeb.reward]}
+        rewardCatalog={rewardCatalog}
+        isPremium={isPremium}
+        onClose={() => setRewardPopupOpen(false)}
+        paused={paused}
+      />
     </div>
   );
 }

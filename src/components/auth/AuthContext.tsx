@@ -14,6 +14,7 @@ import {
   establishSessionCookie,
   sessionCookieNeedsRefresh,
 } from '@/lib/authCookie';
+import { useFrogodoroStore } from '@/lib/frogodoroStore';
 
 interface AuthContextType {
   user: User | null;
@@ -34,6 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error(
         'Firebase Auth is not initialized. Check your environment variables (NEXT_PUBLIC_FIREBASE_API_KEY).',
       );
+      useFrogodoroStore.getState().resetLocalTimer();
       setLoading(false);
       return;
     }
@@ -52,6 +54,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (user) {
         await ensureSessionCookie(user);
       } else {
+        // Logout is local to this device. Hide and erase its persisted timer
+        // state without calling stopTimer(), which would clear the shared
+        // server timer that another signed-in device may still be using.
+        useFrogodoroStore.getState().resetLocalTimer();
         await clearSessionCookie();
       }
       setLoading(false);

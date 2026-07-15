@@ -191,7 +191,7 @@ export default function TagsPopup({
         {({ bindScroll }) => (
           <div
             ref={bindScroll}
-            className="mx-auto w-full overflow-y-auto overscroll-none px-5 pb-[calc(env(safe-area-inset-bottom)+32px)] pt-1 sm:pb-8"
+            className="mx-auto min-h-0 w-full flex-1 touch-pan-y overflow-y-auto overscroll-contain px-5 pb-[calc(env(safe-area-inset-bottom)+32px)] pt-1 sm:pb-8"
           >
             {/* Header */}
             <div className="relative mb-5 flex h-9 items-center justify-center">

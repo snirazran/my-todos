@@ -17,13 +17,14 @@ export async function POST(req: NextRequest) {
   try {
     const userId = await requireUserId();
 
-    let body: { itemId?: string };
+    let body: { itemId?: string; timezone?: string };
     try {
       body = await req.json();
     } catch {
       return json({ error: 'Invalid JSON' }, 400);
     }
     const itemId = body.itemId;
+    const timezone = body.timezone || 'UTC';
 
     await connectMongo();
     const fullCatalog = await getFullCatalog();
@@ -51,7 +52,9 @@ export async function POST(req: NextRequest) {
 
     // Check balance
     let price = byId[itemId].priceFlies ?? 0;
-    const deal = getDailyDeals(fullCatalog).find((d) => d.itemId === itemId);
+    const deal = getDailyDeals(fullCatalog, new Date(), timezone).find(
+      (d) => d.itemId === itemId,
+    );
     if (deal && isPremiumActive(user.premiumUntil)) {
       price = deal.dealPrice;
     }

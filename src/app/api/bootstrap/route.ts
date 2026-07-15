@@ -62,7 +62,13 @@ export async function GET(req: NextRequest) {
     run(() => getFriends(sub(`/api/friends?tz=${encodeURIComponent(timezone)}`))),
     run(() => getFriendRequests()),
     run(() => getBuddyInvites()),
-    run(() => getInventory(sub('/api/skins/inventory?view=summary'))),
+    run(() =>
+      getInventory(
+        sub(
+          `/api/skins/inventory?view=summary&timezone=${encodeURIComponent(timezone)}`,
+        ),
+      ),
+    ),
     run(() => getBackgrounds()),
     run(() => getBuddyState()),
   ]);
