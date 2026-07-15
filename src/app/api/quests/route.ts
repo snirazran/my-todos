@@ -144,6 +144,7 @@ type TrackableEntry = {
   needsFocusTags?: boolean;
   progress: number;
   target: number;
+  tierIndex?: number;
   reward?: any;
   hint?: string;
   guideId?: string;
@@ -377,7 +378,8 @@ export async function GET(req: Request) {
     const trackables: TrackableEntry[] = [];
     for (const quest of [...(dashboard.onboardingQuests ?? []), ...dashboard.dailyQuests, ...dashboard.categoryQuests]) {
       if (quest.claimed || quest.locked) continue;
-      for (const block of quest.logic) {
+      for (let tierIndex = 0; tierIndex < quest.logic.length; tierIndex++) {
+        const block = quest.logic[tierIndex];
         const target = Math.max(1, block.target);
         if ((block.rewards?.length ?? 0) === 0) continue;
         if (block.progress >= target) continue;
@@ -386,6 +388,7 @@ export async function GET(req: Request) {
           id: `${quest.id}:${block.id}`,
           questId: quest.id,
           placement: quest.placement,
+          tierIndex,
           categoryId:
             quest.placement === 'category' ? quest.categoryId : undefined,
           categoryName:

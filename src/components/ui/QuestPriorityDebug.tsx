@@ -50,7 +50,6 @@ export function QuestPriorityDebug({
           const { input, result } = entry;
           const remaining = Math.max(1, input.target) - input.progress;
           const flags: string[] = [];
-          if (input.placement === 'onboarding') flags.push('pinned first: onboarding');
           if (input.needsFocusTags) flags.push('pushed last: needs a tag');
           return (
             <li
@@ -83,7 +82,9 @@ export function QuestPriorityDebug({
                 {result.reason
                   ? `reason: ${result.reason} (${REASON_EXPLANATIONS[result.reason]})`
                   : 'reason: none'}
-                {` · tie-break: ${remaining} to go`}
+                {input.tierIndex !== undefined
+                  ? ` · tie-break: tier ${input.tierIndex + 1}, then ${remaining} to go`
+                  : ` · tie-break: ${remaining} to go`}
                 {flags.length > 0 ? ` · ${flags.join(' · ')}` : ''}
               </div>
             </li>

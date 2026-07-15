@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useAuth } from '@/components/auth/AuthContext';
 import { usePathname, useRouter } from 'next/navigation';
 import {
-  Sparkles,
   LogIn,
   LogOut,
 } from 'lucide-react';
@@ -182,10 +181,6 @@ export default function SiteHeader() {
           <span className="text-2xl font-black tracking-tighter text-transparent bg-gradient-to-r from-primary via-emerald-500 to-primary bg-clip-text transition-all group-hover:opacity-80">
             Frogress
           </span>
-          <Sparkles
-            className="h-5 w-5 text-emerald-400 animate-[float_3s_ease-in-out_infinite]"
-            aria-hidden
-          />
         </Link>
 
         <CurrencyShop />

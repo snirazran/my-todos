@@ -48,7 +48,10 @@ import {
   useCompletionReveal,
 } from '@/lib/questClaims';
 import { guideContextForBlock, guideIdForBlock } from '@/lib/hints/guides';
-import { scoreQuestPriority } from '@/lib/quests/priority';
+import {
+  resetCountdownLabel,
+  scoreQuestPriority,
+} from '@/lib/quests/priority';
 import { useUIStore } from '@/lib/uiStore';
 
 export type QuestRewardCatalogItem = Pick<
@@ -1161,7 +1164,8 @@ export function CategoryQuestPresentationCard({
   const resetAtRisk =
     !isCompleted &&
     !needsFocusTags &&
-    heroPriority.reason === 'expiring' &&
+    heroPriority.hoursUntilReset !== null &&
+    heroPriority.hoursUntilReset < 6 &&
     heroPriority.proximity < 0.5;
 
   return (
@@ -1940,6 +1944,10 @@ export function AreaRow({
   });
   const quiet =
     state === 'running' && !finished && priority.reason === 'neglected';
+  const resetLabel =
+    state === 'running' && !finished
+      ? resetCountdownLabel(priority.hoursUntilReset)
+      : null;
 
   return (
     <button
@@ -1997,6 +2005,20 @@ export function AreaRow({
             >
               <Moon className="h-2.5 w-2.5" strokeWidth={3} />
               {priority.staleDays}d
+            </span>
+          ) : null}
+          {resetLabel ? (
+            <span
+              className={cn(
+                'ml-auto inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[9px] font-black uppercase tracking-wide',
+                priority.hoursUntilReset !== null &&
+                  priority.hoursUntilReset < 6
+                  ? 'text-amber-600 dark:text-amber-400'
+                  : 'text-muted-foreground',
+              )}
+            >
+              <Clock className="h-2.5 w-2.5" strokeWidth={3} />
+              {resetLabel}
             </span>
           ) : null}
         </p>

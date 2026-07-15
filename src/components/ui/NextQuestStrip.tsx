@@ -48,9 +48,23 @@ export function NextQuestStrip({
     claimables?.find((c) => c.placement === 'onboarding') ?? claimables?.[0];
   const claimableCount = claimables?.length ?? 0;
 
-  const ranked = useMemo(() => {
-    if (!trackables?.length) return [];
-    return rankByQuestPriority(trackables);
+  const { ranked, laterTiers } = useMemo(() => {
+    const rankedAll = trackables?.length
+      ? rankByQuestPriority(trackables)
+      : [];
+    const seenQuests = new Set<string>();
+    const ranked: typeof rankedAll = [];
+    const laterTiers: typeof rankedAll = [];
+    for (const entry of rankedAll) {
+      const key = entry.item.questId ?? entry.item.id;
+      if (seenQuests.has(key)) {
+        laterTiers.push(entry);
+        continue;
+      }
+      seenQuests.add(key);
+      ranked.push(entry);
+    }
+    return { ranked, laterTiers };
   }, [trackables]);
   const rankedNextUp = ranked[0] ?? null;
   const nextUp = rankedNextUp?.item ?? null;
@@ -288,9 +302,14 @@ export function NextQuestStrip({
           input: item,
           result,
         }))}
+        excluded={laterTiers.map(({ item }) => ({
+          label: `[${item.placement}] ${item.remainingLabel}`,
+          reason: 'later tier of a quest already listed',
+        }))}
         notes={[
-          'order: onboarding first → needs-tag last → score → fewest remaining',
-          'pool: all open objectives (onboarding + daily + areas)',
+          'order: needs-tag last → score (2 decimals) → lower tier → fewest remaining',
+          'pool: best objective per quest (onboarding + daily + areas)',
+          'urgency counts only when resetting sooner than half the pool median',
         ]}
       />
     </div>

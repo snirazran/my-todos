@@ -59,10 +59,7 @@ import {
   refreshQuestHomeView,
   takeQuestScrollTarget,
 } from '@/lib/questClaims';
-import {
-  priorityReasonLabel,
-  rankByQuestPriority,
-} from '@/lib/quests/priority';
+import { rankByQuestPriority } from '@/lib/quests/priority';
 import { QuestPriorityDebug } from '@/components/ui/QuestPriorityDebug';
 import { PlusUpgradeModal } from './PlusUpgradeModal';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
@@ -686,7 +683,50 @@ export function QuestsPanel({
       ),
     [data?.tags],
   );
+  const upNextRanking = useMemo(() => {
+    const excluded: { label: string; reason: string }[] = [];
+    const candidates = (data?.categoryQuests ?? []).filter((quest) => {
+      const category = categoryMap[quest.categoryId];
+      const label = category?.shortLabel || category?.name || quest.title;
+      if (quest.locked ?? false) {
+        excluded.push({ label, reason: 'locked' });
+        return false;
+      }
+      if (isQuestRetired(quest)) {
+        excluded.push({ label, reason: 'retired' });
+        return false;
+      }
+      if (quest.claimable) {
+        excluded.push({ label, reason: 'has a claimable reward' });
+        return false;
+      }
+      const linkedTags = categoryTagMap.get(quest.categoryId) ?? [];
+      const needsTag =
+        quest.logic.some((block) => block.tagMode === 'focus_category_tags') &&
+        linkedTags.length === 0;
+      if (needsTag) {
+        excluded.push({ label, reason: 'needs a tag picked first' });
+        return false;
+      }
+      return true;
+    });
+    const ranked = rankByQuestPriority(
+      candidates.map((quest) => ({
+        placement: 'category' as const,
+        progress: quest.progress,
+        target: quest.target,
+        lastProgressAt: quest.lastProgressAt,
+        expiresAt: quest.expiresAt,
+        quest,
+      })),
+    );
+    return { ranked, excluded };
+  }, [data?.categoryQuests, categoryTagMap, categoryMap]);
+
   const filteredCategoryQuests = useMemo(() => {
+    const priorityRank = new Map(
+      upNextRanking.ranked.map(({ item }, index) => [item.quest.id, index]),
+    );
     const quests = data?.categoryQuests ?? [];
     return [...quests].sort((a, b) => {
       const aScore = getFocusQuestSortScore(a);
@@ -696,12 +736,14 @@ export function QuestsPanel({
         Number(isQuestRetired(a)) - Number(isQuestRetired(b)) ||
         Number(a.locked ?? false) - Number(b.locked ?? false) ||
         bScore.claimable - aScore.claimable ||
+        (priorityRank.get(a.id) ?? Number.MAX_SAFE_INTEGER) -
+          (priorityRank.get(b.id) ?? Number.MAX_SAFE_INTEGER) ||
         bScore.bestProgressRatio - aScore.bestProgressRatio ||
         aScore.nearestRemaining - bScore.nearestRemaining ||
         bScore.totalProgress - aScore.totalProgress
       );
     });
-  }, [data?.categoryQuests]);
+  }, [data?.categoryQuests, upNextRanking]);
 
   const editingFocusCategory = editingFocusCategoryId
     ? categoryMap[editingFocusCategoryId]
@@ -741,75 +783,6 @@ export function QuestsPanel({
     [filteredCategoryQuests, heroQuest?.id],
   );
 
-  // "Up next" chips: the 2-3 areas most worth a session right now, so running
-  // several areas in parallel doesn't quietly abandon the slow ones.
-  const upNextRanking = useMemo(() => {
-    const excluded: { label: string; reason: string }[] = [];
-    const candidates = filteredCategoryQuests.filter((quest) => {
-      const category = categoryMap[quest.categoryId];
-      const label = category?.shortLabel || category?.name || quest.title;
-      if (quest.locked ?? false) {
-        excluded.push({ label, reason: 'locked' });
-        return false;
-      }
-      if (isQuestRetired(quest)) {
-        excluded.push({ label, reason: 'retired' });
-        return false;
-      }
-      if (quest.claimable) {
-        excluded.push({ label, reason: 'has a claimable reward' });
-        return false;
-      }
-      const linkedTags = categoryTagMap.get(quest.categoryId) ?? [];
-      const needsTag =
-        quest.logic.some((block) => block.tagMode === 'focus_category_tags') &&
-        linkedTags.length === 0;
-      if (needsTag) {
-        excluded.push({ label, reason: 'needs a tag picked first' });
-        return false;
-      }
-      return true;
-    });
-    const ranked = rankByQuestPriority(
-      candidates.map((quest) => ({
-        placement: 'category' as const,
-        progress: quest.progress,
-        target: quest.target,
-        lastProgressAt: quest.lastProgressAt,
-        expiresAt: quest.expiresAt,
-        quest,
-      })),
-    );
-    return { ranked, excluded };
-  }, [filteredCategoryQuests, categoryTagMap, categoryMap]);
-  const upNextAreas = useMemo(
-    () =>
-      upNextRanking.ranked.length < 2 ? [] : upNextRanking.ranked.slice(0, 3),
-    [upNextRanking],
-  );
-
-  const handleUpNextPress = (quest: CategoryQuestProgressView) => {
-    if (data?.isPremium) {
-      setPinnedCategoryId(quest.categoryId);
-    }
-    window.setTimeout(() => {
-      const anchors = Array.from(
-        document.querySelectorAll<HTMLElement>(
-          `[data-quest-anchor~="${CSS.escape(quest.id)}"]`,
-        ),
-      );
-      for (const el of anchors) {
-        if (el.offsetParent === null) continue;
-        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        el.classList.add('quest-anchor-highlight');
-        window.setTimeout(
-          () => el.classList.remove('quest-anchor-highlight'),
-          2000,
-        );
-        break;
-      }
-    }, 60);
-  };
   const pendingSwitchCategory = pendingSwitchCategoryId
     ? categoryMap[pendingSwitchCategoryId]
     : null;
@@ -1389,43 +1362,6 @@ export function QuestsPanel({
                                   Your areas
                                 </p>
                               </div>
-                              {upNextAreas.length > 0 && (
-                                <div className="flex flex-wrap items-center gap-1.5 px-1 pb-1">
-                                  <span className="text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">
-                                    Up next
-                                  </span>
-                                  {upNextAreas.map(({ item, result }) => {
-                                    const category =
-                                      categoryMap[item.quest.categoryId];
-                                    const label = priorityReasonLabel(result);
-                                    return (
-                                      <button
-                                        key={item.quest.id}
-                                        type="button"
-                                        onClick={() =>
-                                          handleUpNextPress(item.quest)
-                                        }
-                                        className="flex items-center gap-1.5 rounded-full border border-border/70 bg-card px-2.5 py-1 text-[11px] font-bold text-foreground shadow-sm transition-all hover:bg-muted/50 active:scale-95"
-                                      >
-                                        {category?.shortLabel ||
-                                          category?.name ||
-                                          'Area'}
-                                        {label && (
-                                          <span
-                                            className={
-                                              result.reason === 'almost-there'
-                                                ? 'text-lime-600 dark:text-lime-400'
-                                                : 'text-amber-600 dark:text-amber-400'
-                                            }
-                                          >
-                                            {label}
-                                          </span>
-                                        )}
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-                              )}
                               <div className="px-1 empty:hidden">
                                 <QuestPriorityDebug
                                   title="up-next areas"
@@ -1445,16 +1381,15 @@ export function QuestsPanel({
                                   )}
                                   excluded={upNextRanking.excluded}
                                   notes={[
-                                    upNextRanking.ranked.length < 2
-                                      ? 'chips hidden: fewer than 2 candidates'
-                                      : 'chips show top 3',
-                                    `big card is NOT priority-ranked: ${
+                                    'urgency counts only when resetting sooner than half the pool median',
+                                    `big card: ${
                                       data?.isPremium
                                         ? pinnedCategoryId
-                                          ? 'premium pinned pick'
-                                          : 'premium default (top of claimable-first sort)'
+                                          ? 'your tapped pick (this visit only)'
+                                          : 'claimable first, then top priority'
                                         : 'your active focus area'
                                     }`,
+                                    'rows below follow the same order',
                                   ]}
                                 />
                               </div>

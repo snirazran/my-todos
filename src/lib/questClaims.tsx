@@ -53,6 +53,7 @@ export type Trackable = {
   needsFocusTags?: boolean;
   progress: number;
   target: number;
+  tierIndex?: number;
   reward?: any;
   hint?: string;
   guideId?: string;

@@ -18,8 +18,13 @@ export type PriorityInput = {
   needsFocusTags?: boolean;
   progress: number;
   target: number;
+  tierIndex?: number;
   lastProgressAt?: string;
   expiresAt?: string;
+};
+
+export type PriorityOptions = {
+  typicalHoursUntilReset?: number | null;
 };
 
 export type PriorityResult = {
@@ -35,6 +40,7 @@ export type PriorityResult = {
 export function scoreQuestPriority(
   input: PriorityInput,
   now: number = Date.now(),
+  options?: PriorityOptions,
 ): PriorityResult {
   const target = Math.max(1, input.target);
   const proximity = Math.min(1, Math.max(0, input.progress) / target);
@@ -54,7 +60,10 @@ export function scoreQuestPriority(
     const at = Date.parse(input.expiresAt);
     if (Number.isFinite(at)) {
       hoursUntilReset = Math.max(0, (at - now) / HOUR_MS);
-      if (hoursUntilReset <= URGENT_WITHIN_HOURS) {
+      const typical = options?.typicalHoursUntilReset ?? null;
+      const soonerThanPool =
+        typical === null || hoursUntilReset <= typical * 0.5;
+      if (hoursUntilReset <= URGENT_WITHIN_HOURS && soonerThanPool) {
         urgency = 1 - hoursUntilReset / URGENT_WITHIN_HOURS;
       }
     }
@@ -77,16 +86,25 @@ export function scoreQuestPriority(
   return { score, reason, staleDays, hoursUntilReset, proximity, staleness, urgency };
 }
 
+function quantizeScore(score: number): number {
+  return Math.round(score * 100);
+}
+
+function median(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
 export function compareQuestPriority(
   a: { input: PriorityInput; result: PriorityResult },
   b: { input: PriorityInput; result: PriorityResult },
 ): number {
   return (
-    Number(b.input.placement === 'onboarding') -
-      Number(a.input.placement === 'onboarding') ||
     Number(a.input.needsFocusTags ?? false) -
       Number(b.input.needsFocusTags ?? false) ||
-    b.result.score - a.result.score ||
+    quantizeScore(b.result.score) - quantizeScore(a.result.score) ||
+    (a.input.tierIndex ?? 0) - (b.input.tierIndex ?? 0) ||
     Math.max(1, a.input.target) -
       a.input.progress -
       (Math.max(1, b.input.target) - b.input.progress)
@@ -97,8 +115,17 @@ export function rankByQuestPriority<T extends PriorityInput>(
   items: T[],
   now: number = Date.now(),
 ): { item: T; result: PriorityResult }[] {
+  const horizons = items
+    .map((item) => (item.expiresAt ? Date.parse(item.expiresAt) : NaN))
+    .filter((at) => Number.isFinite(at))
+    .map((at) => Math.max(0, (at - now) / HOUR_MS));
+  const typicalHoursUntilReset =
+    horizons.length >= 2 ? median(horizons) : null;
   return items
-    .map((item) => ({ item, result: scoreQuestPriority(item, now) }))
+    .map((item) => ({
+      item,
+      result: scoreQuestPriority(item, now, { typicalHoursUntilReset }),
+    }))
     .sort((a, b) =>
       compareQuestPriority(
         { input: a.item, result: a.result },
@@ -107,14 +134,20 @@ export function rankByQuestPriority<T extends PriorityInput>(
     );
 }
 
+export function resetCountdownLabel(
+  hoursUntilReset: number | null,
+): string | null {
+  if (hoursUntilReset === null) return null;
+  if (hoursUntilReset < 1) return 'Resets soon';
+  if (hoursUntilReset < 24) {
+    return `Resets in ${Math.max(1, Math.round(hoursUntilReset))}h`;
+  }
+  return `Resets in ${Math.round(hoursUntilReset / 24)}d`;
+}
+
 export function priorityReasonLabel(result: PriorityResult): string | null {
   if (result.reason === 'expiring') {
-    if (result.hoursUntilReset === null) return null;
-    if (result.hoursUntilReset < 1) return 'Resets soon';
-    if (result.hoursUntilReset < 24) {
-      return `Resets in ${Math.max(1, Math.round(result.hoursUntilReset))}h`;
-    }
-    return `Resets in ${Math.round(result.hoursUntilReset / 24)}d`;
+    return resetCountdownLabel(result.hoursUntilReset);
   }
   if (result.reason === 'neglected') {
     return `Quiet for ${result.staleDays} days`;
