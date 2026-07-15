@@ -44,21 +44,33 @@ export function CrossGiftProvider() {
   useEffect(() => {
     if (loading || !user || helloSentRef.current) return;
     helloSentRef.current = true;
-    void (async () => {
+    let cancelled = false;
+    const sendHello = async (attempt: number) => {
       try {
         const res = await fetch('/api/cross-gift/hello', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ platform: currentPlatform() }),
         });
-        if (!res.ok) return;
+        if (!res.ok) throw new Error(`hello failed: ${res.status}`);
         const data = (await res.json()) as CrossGiftStatus;
+        if (cancelled) return;
         setStatus(data);
         void swrMutate(CROSS_GIFT_SWR_KEY, data, false);
+        if (data.firstSeen) {
+          void swrMutate(
+            (key) => typeof key === 'string' && key.startsWith('/api/quests'),
+          );
+        }
       } catch {
-        /* retry next session */
+        if (cancelled || attempt >= 2) return;
+        setTimeout(() => void sendHello(attempt + 1), 3000 * (attempt + 1));
       }
-    })();
+    };
+    void sendHello(0);
+    return () => {
+      cancelled = true;
+    };
   }, [user, loading]);
 
   // Bank the /try funnel reward for users who signed in through a path that

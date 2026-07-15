@@ -324,7 +324,7 @@ export function NextQuestStrip({
           reason: 'later tier of a quest already listed',
         }))}
         notes={[
-          'order: needs-tag last → score (2 decimals) → lower tier → fewest remaining → sooner reset',
+          'order: needs-tag last → onboarding first → score (2 decimals) → lower tier → fewest remaining → sooner reset',
           'pool: best objective per quest (onboarding + daily + areas)',
           'urgency counts only when resetting sooner than half the pool median',
         ]}

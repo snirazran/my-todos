@@ -41,7 +41,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    if (!user.platformsSeen?.[platform]) {
+    const firstSeen = !user.platformsSeen?.[platform];
+    if (firstSeen) {
       await UserModel.updateOne(
         { _id: userId, [`platformsSeen.${platform}`]: { $exists: false } },
         { $set: { [`platformsSeen.${platform}`]: new Date() } },
@@ -55,6 +56,7 @@ export async function POST(req: NextRequest) {
       platform,
       claimed,
       otherPlatformSeen,
+      firstSeen,
       claimable: !claimed && otherPlatformSeen && !hasMoveToWebQuest(user),
       flies: CROSS_GIFT_FLIES,
     };

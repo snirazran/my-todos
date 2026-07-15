@@ -8,6 +8,7 @@ export type CrossGiftStatus = {
   claimable: boolean;
   claimed: boolean;
   otherPlatformSeen: boolean;
+  firstSeen?: boolean;
   flies: number;
 };
 

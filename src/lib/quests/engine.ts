@@ -1527,22 +1527,34 @@ export async function syncQuestState(args: {
     (quest) => quest.placement === 'onboarding',
   );
 
-  // New users see one goal at a time: while the FIRST-EVER onboarding quest
-  // has incomplete objectives, daily quests stay hidden so its objectives
-  // don't double-progress against a system nobody introduced yet. Once it's
-  // done the gate never re-engages — later onboarding quests (which replace
-  // it in the one-at-a-time display) don't gate anything.
-  const firstOnboardingTemplateId = onboardingCandidates[0]?.templateId;
-  const firstOnboardingQuest = firstOnboardingTemplateId
-    ? onboardingQuests.find(
-        (quest) => quest.templateId === firstOnboardingTemplateId,
-      )
-    : undefined;
-  const dailyQuestsGated =
-    !!firstOnboardingQuest &&
-    firstOnboardingQuest.logic.some(
-      (block) => block.progress < Math.max(1, block.target),
+  // New users see one goal at a time: daily quests stay hidden until the
+  // first TWO onboarding quests have all objectives complete, so onboarding
+  // objectives don't double-progress against a system nobody introduced yet.
+  // Displayed quests carry fresh progress; finished ones fall back to their
+  // stored doc (a candidate with no doc yet hasn't even been reached).
+  const onboardingProgressComplete = (templateId: string) => {
+    const view = onboardingQuests.find(
+      (quest) => quest.templateId === templateId,
     );
+    if (view) {
+      return view.logic.every(
+        (block) => block.progress >= Math.max(1, block.target),
+      );
+    }
+    const doc = onboardingDocFor(templateId);
+    return (
+      !!doc &&
+      (doc.logic ?? []).every(
+        (block) => (block.progress ?? 0) >= Math.max(1, block.target ?? 1),
+      )
+    );
+  };
+  const firstOnboardingComplete = onboardingCandidates[0]
+    ? onboardingProgressComplete(onboardingCandidates[0].templateId)
+    : true;
+  const dailyQuestsGated = onboardingCandidates
+    .slice(0, 2)
+    .some((template) => !onboardingProgressComplete(template.templateId));
   const visibleDailyQuests = dailyQuestsGated ? [] : dailyQuests;
 
   // Lifetime completed objectives across starter + daily quests — drives the
@@ -1618,6 +1630,7 @@ export async function syncQuestState(args: {
     templatesWithCover,
     dailyQuests: visibleDailyQuests,
     dailyQuestsGated,
+    firstOnboardingComplete,
     earlyObjectiveSteps,
     categoryQuests: gatedCategoryQuests,
     onboardingQuests,

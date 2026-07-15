@@ -90,6 +90,7 @@ type QuestsResponse = {
   macroCategories: MacroCategoryDefinition[];
   dailyQuests: DailyQuestProgressView[];
   dailyQuestsGated?: boolean;
+  firstOnboardingComplete?: boolean;
   earlyObjectiveSteps?: number;
   categoryQuests: CategoryQuestProgressView[];
   onboardingQuests?: QuestProgressView[];
@@ -1524,7 +1525,8 @@ export function QuestsPanel({
                                   </div>
                                 )}
                                 <div>{dailySection}</div>
-                                {!data.dailyQuestsGated && focusSlot}
+                                {(data.firstOnboardingComplete ??
+                                  !data.dailyQuestsGated) && focusSlot}
                               </div>
 
                               {/* Desktop: left column stacks starter + daily, hero fills
@@ -1535,7 +1537,8 @@ export function QuestsPanel({
                                     {onboardingQuests.map(renderOnboardingCard)}
                                     {dailySection}
                                   </div>
-                                  {!data.dailyQuestsGated && focusSlot}
+                                  {(data.firstOnboardingComplete ??
+                                    !data.dailyQuestsGated) && focusSlot}
                                 </div>
                               </div>
                             </>
@@ -2358,8 +2361,6 @@ function QuestSeasonEventOverlay({
                 {season.rewardsByDay.map((entry) => {
                   const isCurrent = entry.day === season.currentDay;
                   const isClaimed = season.claimedDays.includes(entry.day);
-                  const freeReward = entry.freeRewards[0];
-                  const premiumReward = entry.premiumRewards[0];
 
                   const isPreviewStart = entry.day === previewDay;
 
@@ -2375,36 +2376,39 @@ function QuestSeasonEventOverlay({
                       )}
                     >
                       <div className="flex w-full justify-center pr-2 sm:pr-3 md:pr-0 md:pb-8 [@media(max-width:379px)]:pr-1 [@media(max-height:820px)]:md:pb-5 [@media(max-height:720px)]:md:pb-3">
-                        <div className="w-full max-w-[170px] md:max-w-none">
-                          {freeReward ? (
-                            <SingleRewardCard
-                              day={entry.day}
-                              rewardType={freeReward.type}
-                              amount={freeReward.amount}
-                              itemId={freeReward.itemId}
-                              rewards={entry.freeRewards}
-                              rewardCatalog={rewardCatalog}
-                              giftAnimation="box_shake"
-                              status={
-                                isClaimed
-                                  ? 'CLAIMED'
-                                  : isCurrent && season.claimable
-                                    ? 'READY'
-                                    : entry.day < season.currentDay
-                                      ? 'MISSED'
-                                      : 'LOCKED'
-                              }
-                              isToday={isCurrent}
-                              hideDayLabel
-                              hideDropRates
-                              forceFullOpacity
-                              pausePreview={paused || !isCurrent}
-                              onClick={
-                                isCurrent && season.claimable && !claimedToday
-                                  ? onClaim
-                                  : undefined
-                              }
-                            />
+                        <div className="flex w-full max-w-[170px] flex-col gap-2 md:max-w-none">
+                          {entry.freeRewards.length > 0 ? (
+                            entry.freeRewards.map((reward, rewardIndex) => (
+                              <SingleRewardCard
+                                key={`${entry.day}-free-${rewardIndex}`}
+                                day={entry.day}
+                                rewardType={reward.type}
+                                amount={reward.amount}
+                                itemId={reward.itemId}
+                                rewardCatalog={rewardCatalog}
+                                giftAnimation="box_shake"
+                                status={
+                                  isClaimed
+                                    ? 'CLAIMED'
+                                    : isCurrent && season.claimable
+                                      ? 'READY'
+                                      : entry.day < season.currentDay
+                                        ? 'MISSED'
+                                        : 'LOCKED'
+                                }
+                                isToday={isCurrent}
+                                hideDayLabel
+                                hideDropRates
+                                forceFullOpacity
+                                hideAction={rewardIndex > 0}
+                                pausePreview={paused || !isCurrent}
+                                onClick={
+                                  isCurrent && season.claimable && !claimedToday
+                                    ? onClaim
+                                    : undefined
+                                }
+                              />
+                            ))
                           ) : (
                             <div className="h-32 w-full rounded-2xl bg-white/5" />
                           )}
@@ -2442,74 +2446,82 @@ function QuestSeasonEventOverlay({
                       </div>
 
                       <div className="flex w-full justify-center pl-2 sm:pl-3 md:pl-0 md:pt-8 [@media(max-width:379px)]:pl-1 [@media(max-height:820px)]:md:pt-5 [@media(max-height:720px)]:md:pt-3">
-                        <div
-                          className="relative w-full max-w-[170px] md:max-w-none"
-                        >
-                          {premiumReward ? (
-                            <SingleRewardCard
-                              day={entry.day}
-                              rewardType={premiumReward.type}
-                              amount={premiumReward.amount}
-                              itemId={premiumReward.itemId}
-                              rewards={entry.premiumRewards}
-                              rewardCatalog={rewardCatalog}
-                              giftAnimation="box_shake"
-                              status={
-                                !isPremium
-                                  ? entry.day < season.currentDay
-                                    ? 'MISSED'
-                                    : 'LOCKED_PREMIUM'
-                                  : isClaimed
-                                    ? 'CLAIMED'
-                                    : isCurrent && season.claimable
-                                      ? 'READY'
-                                      : entry.day < season.currentDay
+                        <div className="flex w-full max-w-[170px] flex-col gap-2 md:max-w-none">
+                          {entry.premiumRewards.length > 0 ? (
+                            entry.premiumRewards.map((reward, rewardIndex) => (
+                              <div
+                                key={`${entry.day}-plus-${rewardIndex}`}
+                                className="relative w-full"
+                              >
+                                <SingleRewardCard
+                                  day={entry.day}
+                                  rewardType={reward.type}
+                                  amount={reward.amount}
+                                  itemId={reward.itemId}
+                                  rewardCatalog={rewardCatalog}
+                                  giftAnimation="box_shake"
+                                  status={
+                                    !isPremium
+                                      ? entry.day < season.currentDay
                                         ? 'MISSED'
-                                        : 'LOCKED'
-                              }
-                              isPremiumTier
-                              isToday={isCurrent}
-                              hideDayLabel
-                              hideDropRates
-                              forceFullOpacity
-                              lockOverlay={!isPremium}
-                              pausePreview={paused || !isCurrent}
-                              onClick={
-                                !isPremium
-                                  ? isCurrent &&
-                                    season.claimable &&
-                                    !claimedToday
-                                    ? onUpgrade
-                                    : undefined
-                                  : isCurrent &&
-                                      season.claimable &&
-                                      !claimedToday
-                                    ? onClaim
-                                    : undefined
-                              }
-                            />
+                                        : 'LOCKED_PREMIUM'
+                                      : isClaimed
+                                        ? 'CLAIMED'
+                                        : isCurrent && season.claimable
+                                          ? 'READY'
+                                          : entry.day < season.currentDay
+                                            ? 'MISSED'
+                                            : 'LOCKED'
+                                  }
+                                  isPremiumTier
+                                  isToday={isCurrent}
+                                  hideDayLabel
+                                  hideDropRates
+                                  forceFullOpacity
+                                  lockOverlay={!isPremium}
+                                  hideAction={rewardIndex > 0}
+                                  pausePreview={paused || !isCurrent}
+                                  onClick={
+                                    !isPremium
+                                      ? isCurrent &&
+                                        season.claimable &&
+                                        !claimedToday
+                                        ? onUpgrade
+                                        : undefined
+                                      : isCurrent &&
+                                          season.claimable &&
+                                          !claimedToday
+                                        ? onClaim
+                                        : undefined
+                                  }
+                                />
+                                {!isPremium && (
+                                  <button
+                                    type="button"
+                                    aria-label="Preview Plus reward"
+                                    onClick={() =>
+                                      setLockedPreview({
+                                        day: entry.day,
+                                        rewardType: reward.type,
+                                        amount: reward.amount,
+                                        itemId: reward.itemId,
+                                      })
+                                    }
+                                    className={cn(
+                                      'absolute left-0 right-0 top-0 z-30 cursor-pointer rounded-2xl bg-transparent',
+                                      rewardIndex === 0 &&
+                                        isCurrent &&
+                                        season.claimable &&
+                                        !claimedToday
+                                        ? 'bottom-12'
+                                        : 'bottom-0',
+                                    )}
+                                  />
+                                )}
+                              </div>
+                            ))
                           ) : (
                             <div className="h-32 w-full rounded-2xl bg-white/5" />
-                          )}
-                          {!isPremium && premiumReward && (
-                            <button
-                              type="button"
-                              aria-label="Preview Plus reward"
-                              onClick={() =>
-                                setLockedPreview({
-                                  day: entry.day,
-                                  rewardType: premiumReward.type,
-                                  amount: premiumReward.amount,
-                                  itemId: premiumReward.itemId,
-                                })
-                              }
-                              className={cn(
-                                'absolute left-0 right-0 top-0 z-30 cursor-pointer rounded-2xl bg-transparent',
-                                isCurrent && season.claimable && !claimedToday
-                                  ? 'bottom-12'
-                                  : 'bottom-0',
-                              )}
-                            />
                           )}
                         </div>
                       </div>

@@ -74,6 +74,7 @@ export function SingleRewardCard({
   hideDropRates,
   forceFullOpacity,
   lockOverlay,
+  hideAction,
   giftAnimation,
   rewards,
   rewardCatalog,
@@ -95,6 +96,9 @@ export function SingleRewardCard({
   hideDropRates?: boolean;
   forceFullOpacity?: boolean;
   lockOverlay?: boolean;
+  /** Suppress the Claim/Unlock button while keeping the card state visuals —
+   *  used when several cards share one lane and only one should carry it. */
+  hideAction?: boolean;
   /** Optional gift-box animation override (e.g. 'box_shake'). */
   giftAnimation?: string;
   /** Full reward list for this lane. When it holds more than one, the preview
@@ -168,7 +172,7 @@ export function SingleRewardCard({
 
   const muted = status === 'LOCKED' || isMissed || (isLockedPremium && !isToday);
   let customAction: React.ReactNode;
-  if (isReady) {
+  if (isReady && !hideAction) {
     customAction = (
       <Button
         onClick={(e) => {
@@ -180,7 +184,7 @@ export function SingleRewardCard({
         Claim
       </Button>
     );
-  } else if (canUnlock) {
+  } else if (canUnlock && !hideAction) {
     customAction = (
       <Button
         onClick={(e) => {

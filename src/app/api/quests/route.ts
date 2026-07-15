@@ -277,10 +277,13 @@ export async function GET(req: Request) {
       dailyQuests: dashboard.dailyQuests,
       todayKey: getZonedToday(timezone),
     });
-    const moveToWeb = await syncMoveToWeb({
+    const moveToWebSynced = await syncMoveToWeb({
       user: dashboard.user,
       config: moveToWebConfig,
     });
+    const moveToWeb = dashboard.firstOnboardingComplete
+      ? moveToWebSynced
+      : null;
     const areaQuestsUnlockedAt = await resolveAreaQuestsUnlocked(
       userId,
       dashboard,
@@ -553,6 +556,7 @@ export async function GET(req: Request) {
           withTemplateCover(q, dashboard.templatesWithCover),
         ),
         dailyQuestsGated: dashboard.dailyQuestsGated,
+        firstOnboardingComplete: dashboard.firstOnboardingComplete,
         earlyObjectiveSteps: dashboard.earlyObjectiveSteps,
         categoryQuests: dashboard.categoryQuests.map((q) =>
           withTemplateCover(q, dashboard.templatesWithCover),
