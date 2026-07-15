@@ -16,6 +16,9 @@ export type QuestReward = {
 
 export type QuestRewards = QuestReward[];
 
+/** Max rewards an admin can stack on one lane (free/premium) of a season day. */
+export const SEASON_REWARDS_PER_LANE = 2;
+
 export type QuestPlacement = 'daily' | 'category' | 'onboarding';
 export type QuestSubject = 'task' | 'any';
 export type QuestCountAction = 'complete' | 'add';

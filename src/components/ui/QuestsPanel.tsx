@@ -2382,6 +2382,8 @@ function QuestSeasonEventOverlay({
                               rewardType={freeReward.type}
                               amount={freeReward.amount}
                               itemId={freeReward.itemId}
+                              rewards={entry.freeRewards}
+                              rewardCatalog={rewardCatalog}
                               giftAnimation="box_shake"
                               status={
                                 isClaimed
@@ -2449,6 +2451,8 @@ function QuestSeasonEventOverlay({
                               rewardType={premiumReward.type}
                               amount={premiumReward.amount}
                               itemId={premiumReward.itemId}
+                              rewards={entry.premiumRewards}
+                              rewardCatalog={rewardCatalog}
                               giftAnimation="box_shake"
                               status={
                                 !isPremium

@@ -860,7 +860,7 @@ function streakPrizeRank(
   return item ? STREAK_PRIZE_RARITY_RANK[item.rarity] ?? 0 : 0;
 }
 
-function sortStreakPrizes(
+export function sortStreakPrizes(
   rewards: QuestReward[],
   rewardCatalog: Record<string, QuestRewardCatalogItem>,
 ) {

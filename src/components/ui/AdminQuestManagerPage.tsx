@@ -47,6 +47,7 @@ import type {
   QuestVisibilityMetric,
   QuestVisibilityOperator,
 } from '@/lib/quests/types';
+import { SEASON_REWARDS_PER_LANE } from '@/lib/quests/types';
 import {
   formatQuestObjective,
   type QuestCardLogicBlock,
@@ -496,6 +497,10 @@ function normalizeSingleReward(rewards: QuestReward[]) {
   return normalizeRewardList(rewards).slice(0, 1);
 }
 
+function normalizeSeasonLaneRewards(rewards: QuestReward[]) {
+  return normalizeRewardList(rewards).slice(0, SEASON_REWARDS_PER_LANE);
+}
+
 function rewardTypeLabel(type: QuestRewardType) {
   if (type === 'FLIES') return 'Flies';
   if (type === 'BOX') return 'Box';
@@ -553,6 +558,14 @@ export function AdminQuestManagerPage() {
   const [savingStreak, setSavingStreak] = useState(false);
   const [streakRewardPickerOpen, setStreakRewardPickerOpen] = useState(false);
 
+  // Automatic monthly season config
+  const [seasonAutoConfig, setSeasonAutoConfig] = useState<{
+    isActive: boolean;
+    dailyTargetFlies: number;
+    limits: { min: number; max: number };
+  } | null>(null);
+  const [savingSeasonAuto, setSavingSeasonAuto] = useState(false);
+
   // Move to web config
   const [moveToWebConfig, setMoveToWebConfig] = useState<{
     isActive: boolean;
@@ -589,7 +602,7 @@ export function AdminQuestManagerPage() {
     setLoading(true);
     setResult(null);
     try {
-      const [templatesRes, metaRes, categoriesRes, seasonsRes, recipesRes, streakRes, loginStreakRes, moveToWebRes] = await Promise.all([
+      const [templatesRes, metaRes, categoriesRes, seasonsRes, recipesRes, streakRes, loginStreakRes, moveToWebRes, seasonAutoRes] = await Promise.all([
         fetch('/api/admin/quests', { credentials: 'include' }),
         fetch('/api/admin/quests/meta', { credentials: 'include' }),
         fetch('/api/admin/quests/categories', { credentials: 'include' }),
@@ -598,6 +611,7 @@ export function AdminQuestManagerPage() {
         fetch('/api/admin/quests/streak', { credentials: 'include' }),
         fetch('/api/admin/streak/login', { credentials: 'include' }),
         fetch('/api/admin/quests/move-to-web', { credentials: 'include' }),
+        fetch('/api/admin/quests/seasons/auto', { credentials: 'include' }),
       ]);
       const templatesData = await templatesRes.json();
       const metaData = await metaRes.json();
@@ -626,6 +640,10 @@ export function AdminQuestManagerPage() {
       const moveToWebData = await moveToWebRes.json();
       if (moveToWebRes.ok && moveToWebData.moveToWeb) {
         setMoveToWebConfig(moveToWebData.moveToWeb);
+      }
+      const seasonAutoData = await seasonAutoRes.json();
+      if (seasonAutoRes.ok && seasonAutoData.seasonAuto) {
+        setSeasonAutoConfig(seasonAutoData.seasonAuto);
       }
     } catch (error) {
       setResult({
@@ -2510,6 +2528,126 @@ export function AdminQuestManagerPage() {
   };
 
   // ── Interactive preview-centered quest editor ─────────────────────────────
+  const saveSeasonAutoConfig = async () => {
+    if (!seasonAutoConfig) return;
+    setSavingSeasonAuto(true);
+    setResult(null);
+    try {
+      const res = await fetch('/api/admin/quests/seasons/auto', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          isActive: seasonAutoConfig.isActive,
+          dailyTargetFlies: seasonAutoConfig.dailyTargetFlies,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not save automatic seasons');
+      setSeasonAutoConfig(data.seasonAuto);
+      setResult({ type: 'success', message: 'Automatic seasons saved' });
+    } catch (error) {
+      setResult({
+        type: 'error',
+        message:
+          error instanceof Error
+            ? error.message
+            : 'Could not save automatic seasons',
+      });
+    } finally {
+      setSavingSeasonAuto(false);
+    }
+  };
+
+  const renderSeasonAutoCard = () => {
+    if (!seasonAutoConfig) return null;
+    return (
+      <div className="rounded-2xl border border-border/40 bg-card/60 px-4 py-3.5">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-bold text-foreground">
+              Automatic monthly seasons
+            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Every calendar month gets its own season with the standard prize
+              ladder — gifts every 5th day, a finale on the last day. This takes
+              over the dates and prizes, switching off any season you made by
+              hand. You can still edit each month&apos;s prizes after it starts.
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={seasonAutoConfig.isActive}
+            onClick={() =>
+              setSeasonAutoConfig((prev) =>
+                prev ? { ...prev, isActive: !prev.isActive } : prev,
+              )
+            }
+            className={cn(
+              'relative h-6 w-11 shrink-0 rounded-full transition-colors',
+              seasonAutoConfig.isActive ? 'bg-emerald-500' : 'bg-muted',
+            )}
+          >
+            <span
+              className={cn(
+                'absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform',
+                seasonAutoConfig.isActive
+                  ? 'translate-x-[22px]'
+                  : 'translate-x-0.5',
+              )}
+            />
+          </button>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-end gap-4">
+          <label className="block">
+            <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+              Daily target (flies)
+            </span>
+            <input
+              type="number"
+              min={seasonAutoConfig.limits.min}
+              max={seasonAutoConfig.limits.max}
+              value={seasonAutoConfig.dailyTargetFlies}
+              onChange={(e) =>
+                setSeasonAutoConfig((prev) =>
+                  prev
+                    ? {
+                        ...prev,
+                        dailyTargetFlies: Math.min(
+                          prev.limits.max,
+                          Math.max(
+                            prev.limits.min,
+                            Math.floor(Number(e.target.value) || prev.limits.min),
+                          ),
+                        ),
+                      }
+                    : prev,
+                )
+              }
+              className="mt-1 block h-10 w-28 rounded-xl border border-border/50 bg-background px-3 text-sm font-bold text-foreground"
+            />
+            <span className="mt-1 block text-[10px] text-muted-foreground">
+              {seasonAutoConfig.limits.min}–{seasonAutoConfig.limits.max} flies
+            </span>
+          </label>
+
+          <div className="min-w-0 flex-1" />
+
+          <Button
+            size="sm"
+            className="rounded-xl font-black"
+            onClick={() => void saveSeasonAutoConfig()}
+            disabled={savingSeasonAuto}
+          >
+            {savingSeasonAuto ? 'Saving…' : 'Save automatic seasons'}
+          </Button>
+        </div>
+      </div>
+    );
+  };
+
   const renderSeason = () => {
     const selectedDayRewards =
       seasonRewardPickerTarget === null
@@ -2541,6 +2679,8 @@ export function AdminQuestManagerPage() {
             {result.message}
           </div>
         )}
+
+        {renderSeasonAutoCard()}
 
         <div className="overflow-hidden rounded-[28px] border border-border/50 bg-card shadow-sm">
           <div className="relative h-[260px] overflow-hidden">
@@ -2716,11 +2856,13 @@ export function AdminQuestManagerPage() {
                             {tier === 'free' ? 'Free' : 'Premium'}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            {rewards[0] ? '1 reward' : 'No reward'}
+                            {rewards.length === 0
+                              ? 'No reward'
+                              : `${rewards.length} reward${rewards.length > 1 ? 's' : ''}`}
                           </p>
                         </div>
                         <div className="flex shrink-0 -space-x-2">
-                          {rewards.slice(0, 1).map((reward, index) => (
+                          {rewards.slice(0, SEASON_REWARDS_PER_LANE).map((reward, index) => (
                             <RewardTile
                               key={`${entry.day}-${tier}-${reward.type}-${reward.itemId ?? reward.amount ?? index}`}
                               reward={reward}
@@ -2767,12 +2909,12 @@ export function AdminQuestManagerPage() {
           rewards={selectedDayRewards}
           rewardItems={rewardItems}
           rewardCatalog={rewardCatalog}
-          singleSelect
+          maxSelect={SEASON_REWARDS_PER_LANE}
           confirmSave={confirmSeasonPrizeSave}
           onRequestConfirmSave={() => setConfirmSeasonPrizeSave(true)}
           onSave={(rewards) => {
             if (seasonRewardPickerTarget === null) return;
-            const nextRewards = normalizeSingleReward(rewards);
+            const nextRewards = normalizeSeasonLaneRewards(rewards);
             setSeasonForm((prev) => ({
               ...prev,
               dayRewards: prev.dayRewards.map((entry) =>

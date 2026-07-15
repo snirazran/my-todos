@@ -9,6 +9,7 @@ import {
   sanitizeSeasonRewards,
   seasonToAdminView,
 } from '@/lib/quests/seasons';
+import { SEASON_REWARDS_PER_LANE } from '@/lib/quests/types';
 import type {
   QuestAmountMode,
   QuestReward,
@@ -74,11 +75,11 @@ function sanitizeDayRewards(input: unknown) {
     freeRewards: entry.freeRewards
       .map(sanitizeReward)
       .filter(Boolean)
-      .slice(0, 1) as QuestReward[],
+      .slice(0, SEASON_REWARDS_PER_LANE) as QuestReward[],
     premiumRewards: entry.premiumRewards
       .map(sanitizeReward)
       .filter(Boolean)
-      .slice(0, 1) as QuestReward[],
+      .slice(0, SEASON_REWARDS_PER_LANE) as QuestReward[],
   }));
   return normalized.filter(
     (entry) => entry.freeRewards.length > 0 || entry.premiumRewards.length > 0,

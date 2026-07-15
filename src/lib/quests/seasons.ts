@@ -5,8 +5,13 @@ import QuestSeasonModel, {
   type QuestSeasonImages,
 } from '@/lib/models/QuestSeason';
 import UserModel from '@/lib/models/User';
+import QuestSeasonAutoConfigModel, {
+  SEASON_AUTO_CONFIG_ID,
+  type QuestSeasonAutoConfigDoc,
+} from '@/lib/models/QuestSeasonAutoConfig';
 import { getZonedToday, getZonedYMD } from '@/lib/utils';
-import type { QuestRewards } from '@/lib/quests/types';
+import { SEASON_REWARDS_PER_LANE } from '@/lib/quests/types';
+import type { QuestReward, QuestRewards } from '@/lib/quests/types';
 
 function emptySeasonImages(): QuestSeasonImages {
   return { mobile: '', tablet: '', web: '', webLarge: '' };
@@ -168,7 +173,7 @@ export async function getActiveQuestSeasonView(args: {
   timezone: string;
 }) {
   const now = new Date();
-  const [season, user] = await Promise.all([
+  const [existing, user] = await Promise.all([
     QuestSeasonModel.findOne({
       isActive: true,
       startsAt: { $lte: now },
@@ -179,7 +184,13 @@ export async function getActiveQuestSeasonView(args: {
     UserModel.findById(args.userId).lean(),
   ]);
 
-  if (!season || !user) return null;
+  if (!user) return null;
+
+  // Automatic mode owns the calendar and overrides whatever is running; it
+  // also means the board never goes blank at a month boundary. Falls back to
+  // the hand-made season when automatic mode is off.
+  const season = (await ensureAutoSeason(now)) ?? existing;
+  if (!season) return null;
 
   const today = getZonedToday(args.timezone);
   const seasonState = getUserQuestSeasonState(user, season.seasonId);
@@ -230,6 +241,177 @@ export function buildDefaultSeasonRewards(dayCount: number): QuestSeasonDayRewar
     freeRewards: [{ type: 'FLIES', amountMode: 'fixed', amount: 50 }],
     premiumRewards: [{ type: 'FLIES', amountMode: 'fixed', amount: 100 }],
   }));
+}
+
+// ── Automatic monthly seasons ────────────────────────────────────────────────
+
+export const SIMPLE_GIFT_ID = 'gift_box_1';
+export const FANCY_GIFT_ID = 'gift_box_rare';
+export const AMAZING_GIFT_ID = 'gift_box_legendary';
+
+const MILESTONE_EVERY = 5;
+
+const flies = (amount: number): QuestReward => ({
+  type: 'FLIES',
+  amountMode: 'fixed',
+  amount,
+});
+const gift = (itemId: string): QuestReward => ({
+  type: 'BOX',
+  itemId,
+  amount: 1,
+  amountMode: 'fixed',
+});
+
+export function monthKeyOf(date: Date) {
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+/** First instant of `date`'s month through the first instant of the next, in UTC. */
+export function monthBounds(date: Date) {
+  const startsAt = new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1),
+  );
+  const endsAt = new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1),
+  );
+  return { startsAt, endsAt };
+}
+
+// Spreads a range across tiles instead of using amountMode:'random' — the board
+// tile must show the number it will actually pay, and grantRewardsToUser awards
+// maxAmount for random rewards anyway.
+function fliesForRegularTile(day: number, min: number, max: number) {
+  const span = max - min + 1;
+  return min + ((day - 1) % span);
+}
+
+/**
+ * The monthly ladder: milestones on every 5th tile, FINALE on the last tile of
+ * the month (28-31). Milestones past the 5th (only tile 30 of a 31-day month)
+ * reuse the tile-25 treatment.
+ */
+export function buildMonthlySeasonRewards(
+  dayCount: number,
+): QuestSeasonDayReward[] {
+  const milestoneLadder: Array<{
+    freeRewards: QuestRewards;
+    premiumRewards: QuestRewards;
+  }> = [
+    { freeRewards: [gift(SIMPLE_GIFT_ID)], premiumRewards: [gift(FANCY_GIFT_ID)] },
+    {
+      freeRewards: [gift(SIMPLE_GIFT_ID), flies(20)],
+      premiumRewards: [gift(FANCY_GIFT_ID), flies(40)],
+    },
+    { freeRewards: [gift(FANCY_GIFT_ID)], premiumRewards: [gift(AMAZING_GIFT_ID)] },
+    {
+      freeRewards: [gift(FANCY_GIFT_ID), flies(30)],
+      premiumRewards: [gift(AMAZING_GIFT_ID), flies(60)],
+    },
+    { freeRewards: [gift(FANCY_GIFT_ID)], premiumRewards: [gift(AMAZING_GIFT_ID)] },
+  ];
+
+  let regularIndex = 0;
+
+  return Array.from({ length: dayCount }, (_, index) => {
+    const day = index + 1;
+
+    if (day === dayCount) {
+      return {
+        day,
+        freeRewards: [gift(AMAZING_GIFT_ID)],
+        premiumRewards: [gift(AMAZING_GIFT_ID), flies(60)],
+      };
+    }
+
+    if (day % MILESTONE_EVERY === 0) {
+      const step = day / MILESTONE_EVERY - 1;
+      const entry =
+        milestoneLadder[Math.min(step, milestoneLadder.length - 1)];
+      return { day, freeRewards: [...entry.freeRewards], premiumRewards: [...entry.premiumRewards] };
+    }
+
+    regularIndex += 1;
+    const premiumRewards: QuestRewards = [fliesForRegularTile(day, 6, 10)].map(
+      (amount) => flies(amount),
+    );
+    if (regularIndex % 3 === 0) premiumRewards.push(gift(SIMPLE_GIFT_ID));
+
+    return {
+      day,
+      freeRewards: [flies(fliesForRegularTile(day, 3, 5))],
+      premiumRewards,
+    };
+  });
+}
+
+/**
+ * While automatic mode is on it owns the calendar: each month gets its own
+ * season, overriding any hand-made season that overlaps it. Rolled once per
+ * month, so later admin edits to the generated ladder stick.
+ *
+ * Idempotent: `seasonId` is unique-indexed, so a concurrent create loses with
+ * E11000 and refetches the winner (same idiom as the quest engine).
+ */
+export async function ensureAutoSeason(now = new Date()) {
+  const config = await QuestSeasonAutoConfigModel.findOne({
+    configId: SEASON_AUTO_CONFIG_ID,
+  }).lean<QuestSeasonAutoConfigDoc | null>();
+  if (!config?.isActive) return null;
+
+  const { startsAt, endsAt } = monthBounds(now);
+  const monthKey = monthKeyOf(now);
+  const seasonId = `auto:${monthKey}`;
+  const dayCount = getSeasonDayCount(startsAt, endsAt);
+
+  // Steady state: already rolled this month, so keep it along with any edits
+  // made since. One indexed lookup — this is the hot path.
+  const rolled = await QuestSeasonModel.findOne({
+    seasonId,
+  }).lean<QuestSeasonDoc | null>();
+  if (rolled) return rolled;
+
+  // Rolling a new month: stand down every other season overlapping it, so the
+  // override is real in the data and not just in what this function returns.
+  await QuestSeasonModel.updateMany(
+    {
+      seasonId: { $ne: seasonId },
+      isActive: true,
+      startsAt: { $lt: endsAt },
+      endsAt: { $gt: startsAt },
+    },
+    { $set: { isActive: false } },
+  );
+
+  // Auto seasons have no artwork of their own; reuse the most recent season's.
+  const previous = await QuestSeasonModel.findOne({ endsAt: { $lte: startsAt } })
+    .sort({ endsAt: -1 })
+    .lean<QuestSeasonDoc | null>();
+
+  const name = startsAt.toLocaleString('en-US', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+
+  try {
+    return await QuestSeasonModel.create({
+      seasonId,
+      name,
+      images: normalizeSeasonImages(previous?.images),
+      startsAt,
+      endsAt,
+      dailyTargetFlies: config.dailyTargetFlies ?? 3,
+      dayRewards: buildMonthlySeasonRewards(dayCount),
+      isActive: true,
+    });
+  } catch (err: any) {
+    // A concurrent request rolled it first — use theirs.
+    if (err?.code === 11000) {
+      return QuestSeasonModel.findOne({ seasonId }).lean<QuestSeasonDoc | null>();
+    }
+    throw err;
+  }
 }
 
 export function sanitizeSeasonRewards(input: unknown): QuestSeasonDayReward[] {
