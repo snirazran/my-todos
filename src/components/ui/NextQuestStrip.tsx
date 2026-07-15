@@ -25,6 +25,7 @@ import {
 import {
   priorityReasonLabel,
   rankByQuestPriority,
+  resetCountdownLabel,
 } from '@/lib/quests/priority';
 import { QuestPriorityDebug } from '@/components/ui/QuestPriorityDebug';
 import { useUIStore } from '@/lib/uiStore';
@@ -72,6 +73,10 @@ export function NextQuestStrip({
   const nextUpReasonLabel = rankedNextUp
     ? priorityReasonLabel(rankedNextUp.result)
     : null;
+  const nextUpHoursLeft = rankedNextUp?.result.hoursUntilReset ?? null;
+  const nextUpResetLabel = nextUpReasonLabel
+    ? null
+    : resetCountdownLabel(nextUpHoursLeft);
 
   // Hold the just-finished trackable on screen so its progress bar visibly
   // fills before the card swaps to the "Reward ready" state.
@@ -244,6 +249,17 @@ export function NextQuestStrip({
                 >
                   {' · '}
                   {nextUpReasonLabel}
+                </span>
+              ) : !fillingTrackable && nextUpResetLabel ? (
+                <span
+                  className={
+                    nextUpHoursLeft !== null && nextUpHoursLeft < 6
+                      ? 'text-amber-600 dark:text-amber-400'
+                      : undefined
+                  }
+                >
+                  {' · '}
+                  {nextUpResetLabel}
                 </span>
               ) : null}
             </span>
