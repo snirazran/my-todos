@@ -39,8 +39,13 @@ export type HintStep = {
   label: string;
   // Copy for touch devices, when the interaction differs (swipes).
   labelCoarse?: string;
-  // Animated swipe indicator shown on touch devices.
+  // Animated swipe indicator shown on mobile-width viewports.
   gesture?: 'swipe-left' | 'swipe-right';
+  // Mobile-width viewports: nudge task rows right (peeking the Focus action
+  // under them) instead of drawing a gesture arrow. 'tagged' peeks and
+  // gold-rings every row carrying the guide context's tagIds; 'first' peeks
+  // the topmost open row while the whole list keeps the regular ring.
+  rowPeek?: 'tagged' | 'first';
   // Jump to an absolute step index when this window event fires.
   advanceOnEvent?: { event: string; goTo: number };
   // Skip this step immediately when an element matching this CSS selector is
@@ -141,7 +146,7 @@ const GUIDES: Record<string, HintGuide> = {
         anchor: 'task-list',
         label: 'Open any task and hit Focus',
         labelCoarse: 'Swipe any task right to focus — or tap to open it',
-        gesture: 'swipe-right',
+        rowPeek: 'first',
         requirePresent: '[data-hint="task-row"]',
         timeoutMs: 90_000,
       },
@@ -407,7 +412,8 @@ const GUIDES: Record<string, HintGuide> = {
         anchor: 'task-list',
         label: 'Open a task tagged {tags} and hit Focus',
         labelCoarse: 'Swipe a task tagged {tags} right — or tap to open it',
-        gesture: 'swipe-right',
+        rowPeek: 'tagged',
+        hideRing: true,
         requirePresent: '[data-hint="task-row"]',
         requirePresentTagMatch: 'hit',
         outsideInteractionCancels: false,

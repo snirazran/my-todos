@@ -67,6 +67,8 @@ import { EditTaskDialog } from '@/components/ui/EditTaskDialog';
 import { TimePopup } from '@/components/ui/TimePopup';
 import { BuddyBadge } from '@/components/ui/BuddyBadge';
 import { objectiveCardTone } from '@/lib/questClaims';
+import { useUIStore } from '@/lib/uiStore';
+import { guideById } from '@/lib/hints/guides';
 import { format } from 'date-fns';
 
 interface Task {
@@ -138,6 +140,7 @@ interface SortableTaskItemProps {
   onStartTimer?: (task: Task, opts?: { autoStart?: boolean }) => void;
   onOpenDetail?: (task: Task) => void;
   paused?: boolean;
+  hintPeekPrimary?: boolean;
 }
 
 const SortableTaskItem = React.forwardRef<
@@ -164,6 +167,7 @@ const SortableTaskItem = React.forwardRef<
       onStartTimer,
       onOpenDetail,
       paused = false,
+      hintPeekPrimary = false,
     },
     ref,
   ) => {
@@ -280,6 +284,89 @@ const SortableTaskItem = React.forwardRef<
     });
     const showSwipeActions =
       (isOpen || isSwiping) && !isDragging && !isSortDragging;
+
+    const activeHint = useUIStore((s) => s.activeHint);
+    const hintStep = activeHint
+      ? guideById(activeHint.guideId)?.steps[activeHint.stepIndex] ?? null
+      : null;
+    const hintStepKey = activeHint
+      ? `${activeHint.runId}:${activeHint.guideId}:${activeHint.stepIndex}`
+      : null;
+    const hintTagIds = activeHint?.context?.tagIds ?? [];
+    const hintPeekTarget =
+      !isDone &&
+      (hintStep?.rowPeek === 'tagged'
+        ? (task.tags ?? []).some((id) => hintTagIds.includes(id))
+        : hintStep?.rowPeek === 'first'
+          ? hintPeekPrimary
+          : false);
+    const hintRowGlow = hintPeekTarget && hintStep?.rowPeek === 'tagged';
+
+    // Demo nudge: slide the row right with the same motion value the real
+    // swipe uses, so the Focus action genuinely peeks out and a user grab at
+    // any moment takes over from the current position. First touch on the
+    // row retires the demo for this hint step.
+    const peekRetiredRef = React.useRef<string | null>(null);
+    useEffect(() => {
+      if (!hintPeekTarget || !hintStepKey || !onStartTimer) return;
+      if (isDesktop || isOpen || isDragging || isSortDragging || isExitingLater || swipeBlocked) {
+        return;
+      }
+      if (peekRetiredRef.current === hintStepKey) return;
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+      let cancelled = false;
+      let controls: ReturnType<typeof animate> | null = null;
+      let timer: ReturnType<typeof setTimeout> | null = null;
+
+      const loop = () => {
+        if (cancelled) return;
+        setIsSwiping(true);
+        controls = animate(x, 52, { type: 'spring', stiffness: 320, damping: 26 });
+        timer = setTimeout(() => {
+          if (cancelled) return;
+          controls = animate(x, 0, SWIPE_SPRING);
+          timer = setTimeout(() => {
+            if (cancelled) return;
+            if (!isDraggingRef.current) setIsSwiping(false);
+            timer = setTimeout(loop, 2200);
+          }, 420);
+        }, 700);
+      };
+      timer = setTimeout(loop, 400);
+
+      const el = containerRef.current;
+      const onPointerDown = () => {
+        cancelled = true;
+        peekRetiredRef.current = hintStepKey;
+        if (timer) clearTimeout(timer);
+        controls?.stop();
+        controls = animate(x, 0, SWIPE_SPRING);
+      };
+      el?.addEventListener('pointerdown', onPointerDown);
+
+      return () => {
+        cancelled = true;
+        if (timer) clearTimeout(timer);
+        controls?.stop();
+        el?.removeEventListener('pointerdown', onPointerDown);
+        if (!isDraggingRef.current) {
+          if (x.get() !== 0) animate(x, 0, SWIPE_SPRING);
+          setIsSwiping(false);
+        }
+      };
+    }, [
+      hintPeekTarget,
+      hintStepKey,
+      onStartTimer,
+      isDesktop,
+      isOpen,
+      isDragging,
+      isSortDragging,
+      isExitingLater,
+      swipeBlocked,
+      x,
+    ]);
 
     // Clear hover state and reset swipe position when any sort drag starts
     useEffect(() => {
@@ -509,7 +596,7 @@ const SortableTaskItem = React.forwardRef<
         // box-shadow on a clipped child is invisible no matter how it's
         // styled. This layer's *own* shadow isn't affected by its own
         // overflow setting, only its children's are.
-        className={`relative mb-1.5 w-full rounded-xl shadow-[0_1px_2px_rgba(0,0,0,0.12)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.5)] md:mb-2 ${isDragging ? 'z-30' : isMenuOpen ? 'z-50 border border-primary/30' : 'z-auto'}`}
+        className={`relative mb-1.5 w-full rounded-xl shadow-[0_1px_2px_rgba(0,0,0,0.12)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.5)] md:mb-2 ${isDragging ? 'z-30' : isMenuOpen ? 'z-50 border border-primary/30' : 'z-auto'} ${hintRowGlow ? 'hint-row-glow' : ''}`}
         data-is-active={!isDone}
         data-hint={isDone ? undefined : 'task-row'}
         data-tag-ids={isDone ? undefined : task.tags?.join(',') || undefined}
@@ -1646,6 +1733,11 @@ export default function TaskList({
                   <AnimatePresence initial={false} mode="popLayout">
                     {sortedVisibleTasks.map((task) => {
                       const isCompleted = task.completed || vSet.has(task.id);
+                      const isHintPeekPrimary =
+                        task.id ===
+                        sortedVisibleTasks.find(
+                          (t) => !(t.completed || vSet.has(t.id)),
+                        )?.id;
                       const isMenuOpen = menu?.id === task.id;
                       const isExitingLater =
                         exitAction?.id === task.id &&
@@ -1690,6 +1782,7 @@ export default function TaskList({
                           }
                           onOpenDetail={(t) => setActionSheetId(t.id)}
                           paused={paused}
+                          hintPeekPrimary={isHintPeekPrimary}
                         />
                       );
                     })}

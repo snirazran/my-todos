@@ -103,7 +103,7 @@ export function HintCoach() {
     : null;
 
   const [mounted, setMounted] = useState(false);
-  const [coarsePointer, setCoarsePointer] = useState(false);
+  const [mobileWidth, setMobileWidth] = useState(false);
   const [el, setEl] = useState<HTMLElement | null>(null);
   const [rect, setRect] = useState<Rect | null>(null);
   // Bumped when a tracked anchor is lost so the search effect runs again
@@ -126,10 +126,13 @@ export function HintCoach() {
   }>({ key: null, pushed: false, arrived: false, startPath: '' });
   const scrolledRef = useRef<string | null>(null);
 
+  // Swipe availability is gated by viewport width (TaskList disables the
+  // drag at >=768px), so the swipe copy and gestures must key off the same
+  // width — not the pointer type.
   useEffect(() => {
     setMounted(true);
-    const query = window.matchMedia('(pointer: coarse)');
-    const update = () => setCoarsePointer(query.matches);
+    const query = window.matchMedia('(max-width: 767px)');
+    const update = () => setMobileWidth(query.matches);
     update();
     query.addEventListener('change', update);
     return () => query.removeEventListener('change', update);
@@ -511,7 +514,7 @@ export function HintCoach() {
 
   if (!mounted || !activeHint || !step) return null;
 
-  const rawLabel = coarsePointer && step.labelCoarse ? step.labelCoarse : step.label;
+  const rawLabel = mobileWidth && step.labelCoarse ? step.labelCoarse : step.label;
   const contextTags = activeHint.context?.tags?.filter((tag) => tag.name);
   // With colored tag data available, {tags} renders as real chips; otherwise
   // it falls back to quoted names via formatHintLabel.
@@ -548,7 +551,7 @@ export function HintCoach() {
           return nodes;
         })
       : formatHintLabel(rawLabel, activeHint.context);
-  const showGesture = coarsePointer && !!step.gesture;
+  const showGesture = mobileWidth && !!step.gesture;
 
   const viewportHeight = window.innerHeight;
   const viewportWidth = window.innerWidth;
