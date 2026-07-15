@@ -26,6 +26,7 @@ import {
   priorityReasonLabel,
   rankByQuestPriority,
 } from '@/lib/quests/priority';
+import { QuestPriorityDebug } from '@/components/ui/QuestPriorityDebug';
 import { useUIStore } from '@/lib/uiStore';
 
 export function NextQuestStrip({
@@ -47,10 +48,11 @@ export function NextQuestStrip({
     claimables?.find((c) => c.placement === 'onboarding') ?? claimables?.[0];
   const claimableCount = claimables?.length ?? 0;
 
-  const rankedNextUp = useMemo(() => {
-    if (!trackables?.length) return null;
-    return rankByQuestPriority(trackables)[0] ?? null;
+  const ranked = useMemo(() => {
+    if (!trackables?.length) return [];
+    return rankByQuestPriority(trackables);
   }, [trackables]);
+  const rankedNextUp = ranked[0] ?? null;
   const nextUp = rankedNextUp?.item ?? null;
   const nextUpReason = rankedNextUp?.result.reason ?? null;
   const nextUpReasonLabel = rankedNextUp
@@ -141,6 +143,7 @@ export function NextQuestStrip({
   };
 
   return (
+    <>
     <div
       role="button"
       tabIndex={0}
@@ -277,5 +280,20 @@ export function NextQuestStrip({
         </>
       ) : null}
     </div>
+    <div className="mx-1.5 mb-2 w-[calc(100%-0.75rem)] md:mx-4 md:w-[calc(100%-2rem)] empty:hidden">
+      <QuestPriorityDebug
+        title="home next-up"
+        entries={ranked.map(({ item, result }) => ({
+          label: `[${item.placement}] ${item.remainingLabel}`,
+          input: item,
+          result,
+        }))}
+        notes={[
+          'order: onboarding first → needs-tag last → score → fewest remaining',
+          'pool: all open objectives (onboarding + daily + areas)',
+        ]}
+      />
+    </div>
+    </>
   );
 }

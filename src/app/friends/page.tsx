@@ -51,6 +51,7 @@ import {
 import { markFlyEarn } from '@/lib/flyEarn';
 import { FlyCounter } from '@/components/ui/FlyCounter';
 import { MobileHeaderActions } from '@/components/ui/MobileHeaderActions';
+import { MobileMenuCluster } from '@/components/ui/siteHeader';
 import { useUIStore } from '@/lib/uiStore';
 import { showRewardedAd } from '@/lib/ads';
 import type { ItemDef } from '@/lib/skins/catalog';
@@ -171,10 +172,12 @@ export default function FriendsPage() {
   return (
     <main className="relative min-h-[100dvh] overflow-x-hidden pb-24 md:pb-12">
       <div className="relative z-10 mx-auto flex w-full flex-col items-center px-4 pt-[calc(env(safe-area-inset-top)+0.5rem)] md:max-w-2xl md:pt-11">
+        <MobileMenuCluster position="absolute" />
         {/* Friend invites — persistent, over the winter scene */}
         <MobileHeaderActions
+          position="absolute"
           visibleOnDesktop
-          className="md:absolute md:top-[calc(env(safe-area-inset-top)+0.75rem)]"
+          className="md:top-[calc(env(safe-area-inset-top)+0.75rem)]"
         >
           <StyleShuffleHeaderButton className="border-0 bg-card/90 shadow-md ring-1 ring-border/60 md:hidden" />
           <button

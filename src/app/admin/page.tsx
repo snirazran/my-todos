@@ -485,7 +485,7 @@ function AdminPageContent() {
                     Debug Mode
                   </Label>
                   <p className="text-[11px] text-muted-foreground">
-                    Show Rive stats and dev tools.
+                    Show Rive stats, quest priority scoring, and dev tools.
                   </p>
                 </div>
               </div>

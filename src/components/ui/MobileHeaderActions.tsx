@@ -6,6 +6,7 @@ type MobileHeaderActionsProps = {
   className?: string;
   disabled?: boolean;
   visibleOnDesktop?: boolean;
+  position?: 'fixed' | 'absolute';
 };
 
 export function MobileHeaderActions({
@@ -13,11 +14,13 @@ export function MobileHeaderActions({
   className,
   disabled = false,
   visibleOnDesktop = false,
+  position = 'fixed',
 }: MobileHeaderActionsProps) {
   return (
     <div
       className={cn(
-        'fixed right-4 top-[calc(env(safe-area-inset-top)+0.5rem)] z-[90] flex items-center gap-2',
+        'right-4 top-[calc(env(safe-area-inset-top)+0.5rem)] z-[90] flex items-center gap-2',
+        position === 'absolute' ? 'absolute' : 'fixed',
         !visibleOnDesktop && 'md:hidden',
         disabled && 'pointer-events-none',
         className,

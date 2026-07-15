@@ -226,6 +226,9 @@ export default function MobileNav() {
           setWardrobePopupOpen(false);
           window.setTimeout(() => {
             router.push(`/wardrobe?tab=${tab}`);
+            document
+              .getElementById('main-scroll')
+              ?.scrollTo({ top: 0, behavior: 'smooth' });
           }, 230);
         }}
       />

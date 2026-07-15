@@ -21,6 +21,7 @@ import { OnboardingGate } from '@/components/providers/OnboardingGate';
 import { AnalyticsProvider } from '@/components/providers/AnalyticsProvider';
 import { HintCoach } from '@/components/ui/HintCoach';
 import { QuestRewardRevealHost } from '@/components/ui/questRewardReveal';
+import { ButtonHaptics } from '@/components/providers/ButtonHaptics';
 
 export default function Providers({ children }: { children: ReactNode }) {
   return (
@@ -39,6 +40,7 @@ export default function Providers({ children }: { children: ReactNode }) {
       >
         <TaskSyncProvider>
           <NotificationProvider>
+            <ButtonHaptics />
             <AnalyticsProvider />
             <GlobalTimer />
             <GlobalFrogodoroMini />

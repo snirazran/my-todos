@@ -151,23 +151,7 @@ export default function SiteHeader() {
 
   return (
     <>
-      {(pathname === '/' || pathname === '/wardrobe' || pathname === '/friends') && (
-        <div
-          className={cn(
-            'fixed left-3 top-[calc(env(safe-area-inset-top)+0.5rem)] z-[90] flex items-center px-2 py-1 md:hidden',
-            isLoadingScreenVisible && 'pointer-events-none',
-          )}
-          aria-disabled={isLoadingScreenVisible}
-        >
-          <RightActions
-            user={user}
-            loading={loading}
-            onSignIn={() => router.push('/login')}
-            onSignOut={() => window.location.replace('/login')}
-            compactMobileHome
-          />
-        </div>
-      )}
+      {pathname === '/wardrobe' && <MobileMenuCluster />}
       {pathname === '/wardrobe' &&
         user &&
         flyBalance !== undefined && (
@@ -269,6 +253,9 @@ export default function SiteHeader() {
                                     hapticTick();
                                     setWardrobeDropdownOpen(false);
                                     router.push(`/wardrobe?tab=${wItem.tab}`);
+                                    document
+                                      .getElementById('main-scroll')
+                                      ?.scrollTo({ top: 0, behavior: 'smooth' });
                                   }}
                                   className="relative flex flex-col items-center gap-2 p-3 rounded-xl bg-muted/50 hover:bg-muted transition-all active:scale-95"
                                 >
@@ -434,6 +421,34 @@ import { useNotificationStatus } from '@/hooks/useNotificationStatus';
 import { InviteFriendsModal } from '@/components/ui/InviteFriendsModal';
 import { CommunityPanel } from '@/components/ui/CommunityModal';
 import { ProfilePanel } from '@/components/ui/ProfileModal';
+
+export function MobileMenuCluster({
+  position = 'fixed',
+}: {
+  position?: 'fixed' | 'absolute';
+}) {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+  const { isLoadingScreenVisible } = useUIStore();
+  return (
+    <div
+      className={cn(
+        'left-3 top-[calc(env(safe-area-inset-top)+0.5rem)] z-[90] flex items-center px-2 py-1 md:hidden',
+        position === 'absolute' ? 'absolute' : 'fixed',
+        isLoadingScreenVisible && 'pointer-events-none',
+      )}
+      aria-disabled={isLoadingScreenVisible}
+    >
+      <RightActions
+        user={user}
+        loading={loading}
+        onSignIn={() => router.push('/login')}
+        onSignOut={() => window.location.replace('/login')}
+        compactMobileHome
+      />
+    </div>
+  );
+}
 
 function RightActions({
   user,

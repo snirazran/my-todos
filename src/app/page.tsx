@@ -69,6 +69,7 @@ import { StyleShuffleHeaderButton } from '@/components/ui/SkinRotation';
 import { StreakChip } from '@/components/ui/streak/StreakChip';
 import { FlyCounter } from '@/components/ui/FlyCounter';
 import { MobileHeaderActions } from '@/components/ui/MobileHeaderActions';
+import { MobileMenuCluster } from '@/components/ui/siteHeader';
 import { NextQuestStrip } from '@/components/ui/NextQuestStrip';
 import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
 import { BuddyNudgeCard } from '@/components/ui/BuddyNudgeCard';
@@ -611,8 +612,9 @@ export default function Home() {
 
   return (
     <main className="relative min-h-screen pb-20 overflow-x-hidden md:pb-8">
+      <MobileMenuCluster position="absolute" />
       {user && (
-        <MobileHeaderActions>
+        <MobileHeaderActions position="absolute">
           <StyleShuffleHeaderButton />
           <StreakChip variant="mobile" />
           <FlyCounter

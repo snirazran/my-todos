@@ -5,6 +5,12 @@ const URGENT_WITHIN_HOURS = 48;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const HOUR_MS = 60 * 60 * 1000;
 
+export const PRIORITY_WEIGHTS = {
+  proximity: 0.5,
+  staleness: 0.3,
+  urgency: 0.2,
+} as const;
+
 export type PriorityReason = 'expiring' | 'neglected' | 'almost-there' | null;
 
 export type PriorityInput = {
@@ -22,6 +28,8 @@ export type PriorityResult = {
   staleDays: number;
   hoursUntilReset: number | null;
   proximity: number;
+  staleness: number;
+  urgency: number;
 };
 
 export function scoreQuestPriority(
@@ -52,7 +60,10 @@ export function scoreQuestPriority(
     }
   }
 
-  const score = 0.5 * proximity + 0.3 * staleness + 0.2 * urgency;
+  const score =
+    PRIORITY_WEIGHTS.proximity * proximity +
+    PRIORITY_WEIGHTS.staleness * staleness +
+    PRIORITY_WEIGHTS.urgency * urgency;
 
   let reason: PriorityReason = null;
   if (urgency > 0 && proximity < 1) {
@@ -63,7 +74,7 @@ export function scoreQuestPriority(
     reason = 'almost-there';
   }
 
-  return { score, reason, staleDays, hoursUntilReset, proximity };
+  return { score, reason, staleDays, hoursUntilReset, proximity, staleness, urgency };
 }
 
 export function compareQuestPriority(

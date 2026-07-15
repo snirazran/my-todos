@@ -63,6 +63,7 @@ import {
   priorityReasonLabel,
   rankByQuestPriority,
 } from '@/lib/quests/priority';
+import { QuestPriorityDebug } from '@/components/ui/QuestPriorityDebug';
 import { PlusUpgradeModal } from './PlusUpgradeModal';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import Frog, { type WardrobeSlot } from './frog';
@@ -742,18 +743,34 @@ export function QuestsPanel({
 
   // "Up next" chips: the 2-3 areas most worth a session right now, so running
   // several areas in parallel doesn't quietly abandon the slow ones.
-  const upNextAreas = useMemo(() => {
+  const upNextRanking = useMemo(() => {
+    const excluded: { label: string; reason: string }[] = [];
     const candidates = filteredCategoryQuests.filter((quest) => {
-      if (quest.locked ?? false) return false;
-      if (isQuestRetired(quest) || quest.claimable) return false;
+      const category = categoryMap[quest.categoryId];
+      const label = category?.shortLabel || category?.name || quest.title;
+      if (quest.locked ?? false) {
+        excluded.push({ label, reason: 'locked' });
+        return false;
+      }
+      if (isQuestRetired(quest)) {
+        excluded.push({ label, reason: 'retired' });
+        return false;
+      }
+      if (quest.claimable) {
+        excluded.push({ label, reason: 'has a claimable reward' });
+        return false;
+      }
       const linkedTags = categoryTagMap.get(quest.categoryId) ?? [];
       const needsTag =
         quest.logic.some((block) => block.tagMode === 'focus_category_tags') &&
         linkedTags.length === 0;
-      return !needsTag;
+      if (needsTag) {
+        excluded.push({ label, reason: 'needs a tag picked first' });
+        return false;
+      }
+      return true;
     });
-    if (candidates.length < 2) return [];
-    return rankByQuestPriority(
+    const ranked = rankByQuestPriority(
       candidates.map((quest) => ({
         placement: 'category' as const,
         progress: quest.progress,
@@ -762,8 +779,14 @@ export function QuestsPanel({
         expiresAt: quest.expiresAt,
         quest,
       })),
-    ).slice(0, 3);
-  }, [filteredCategoryQuests, categoryTagMap]);
+    );
+    return { ranked, excluded };
+  }, [filteredCategoryQuests, categoryTagMap, categoryMap]);
+  const upNextAreas = useMemo(
+    () =>
+      upNextRanking.ranked.length < 2 ? [] : upNextRanking.ranked.slice(0, 3),
+    [upNextRanking],
+  );
 
   const handleUpNextPress = (quest: CategoryQuestProgressView) => {
     if (data?.isPremium) {
@@ -1403,6 +1426,38 @@ export function QuestsPanel({
                                   })}
                                 </div>
                               )}
+                              <div className="px-1 empty:hidden">
+                                <QuestPriorityDebug
+                                  title="up-next areas"
+                                  entries={upNextRanking.ranked.map(
+                                    ({ item, result }) => {
+                                      const category =
+                                        categoryMap[item.quest.categoryId];
+                                      return {
+                                        label:
+                                          category?.shortLabel ||
+                                          category?.name ||
+                                          item.quest.title,
+                                        input: item,
+                                        result,
+                                      };
+                                    },
+                                  )}
+                                  excluded={upNextRanking.excluded}
+                                  notes={[
+                                    upNextRanking.ranked.length < 2
+                                      ? 'chips hidden: fewer than 2 candidates'
+                                      : 'chips show top 3',
+                                    `big card is NOT priority-ranked: ${
+                                      data?.isPremium
+                                        ? pinnedCategoryId
+                                          ? 'premium pinned pick'
+                                          : 'premium default (top of claimable-first sort)'
+                                        : 'your active focus area'
+                                    }`,
+                                  ]}
+                                />
+                              </div>
                               {focusEmptyStates}
                               {heroQuest && renderFocusCard(heroQuest)}
                               {areaRows}
