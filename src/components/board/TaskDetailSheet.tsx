@@ -1003,10 +1003,14 @@ function TaskFocusButton({
       }
       onClick={onClick}
       icon={
-        <TimerClockIcon
-          running={isRunning}
-          className={`h-6 w-6 ${isFocusing ? 'max-[360px]:hidden' : ''}`}
-        />
+        isFocusing ? (
+          <TimerClockIcon
+            running={isRunning}
+            className="h-6 w-6 max-[360px]:hidden"
+          />
+        ) : (
+          <AppIcon name="clock" label="Focus" className="h-6 w-6" />
+        )
       }
       dataHint="focus-button"
     />

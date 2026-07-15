@@ -145,14 +145,14 @@ export function PlusUpgradeModal({
             exit={{ opacity: 0 }}
             transition={{ duration: 0.25, ease: 'easeOut' }}
             onClick={onClose}
-            className="fixed inset-0 z-[9998] bg-black/60 backdrop-blur-sm"
+            className="fixed inset-0 z-[10008] bg-black/60 backdrop-blur-sm"
           />
           <motion.div
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
             exit={{ y: '100%', transition: { type: 'spring', damping: 34, stiffness: 380 } }}
             transition={{ type: 'spring', damping: 27, stiffness: 260, mass: 0.9 }}
-            className="pointer-events-none fixed inset-0 z-[9999] flex will-change-transform md:items-center md:justify-center md:p-6"
+            className="pointer-events-none fixed inset-0 z-[10009] flex will-change-transform md:items-center md:justify-center md:p-6"
           >
             <div className="pointer-events-auto no-scrollbar relative mx-auto flex h-full w-full flex-col overflow-y-auto overflow-x-hidden bg-[#6c6fce] text-white md:h-[min(720px,calc(100dvh-3rem))] md:w-[min(100vw-3rem,28rem)] md:rounded-[32px] md:shadow-2xl">
               <button
@@ -264,7 +264,7 @@ export function PlusWelcomeCelebration({ onDone }: { onDone: () => void }) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[10002] flex overflow-x-hidden overflow-y-auto px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(.75rem,env(safe-area-inset-top))]"
+      className="fixed inset-0 z-[10010] flex overflow-x-hidden overflow-y-auto px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(.75rem,env(safe-area-inset-top))]"
     >
       <div className="absolute inset-0 bg-slate-950/90 backdrop-blur-sm" />
       <div className="pointer-events-none fixed inset-0 overflow-hidden">

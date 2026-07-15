@@ -1,12 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, Variants } from 'framer-motion';
-import { Loader2, Gift, Sparkles, Crown, Play, Star, X, ArrowRight } from 'lucide-react';
+import { Loader2, Crown, Play } from 'lucide-react';
 import Frog from '@/components/ui/frog';
-import Fly from '@/components/ui/fly';
-import { Icon } from '@/components/ui/Icon';
 import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
-import { rewardedAdsAvailable } from '@/lib/ads';
+import { rewardedAdsAvailable, takePlusOfferAfterAd } from '@/lib/ads';
 import { ItemDef } from '@/lib/skins/catalog';
 import { hapticTick } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
@@ -28,9 +25,10 @@ type RewardCardProps = {
   isPremium?: boolean;
   showDoubleUpsell?: boolean;
   rewardAmount?: number;
-  /** When provided, the "Watch a short ad" option calls this (stub for a real
-   *  rewarded-ad SDK) instead of just closing. */
-  onWatchAd?: () => void;
+  /** Tapping "Double Reward" calls this directly (it should run the rewarded
+   *  ad and grant the double); when ads are unavailable the button opens the
+   *  Plus paywall instead. */
+  onWatchAd?: () => void | Promise<void>;
   paused?: boolean;
 };
 
@@ -86,7 +84,8 @@ export const RewardCard = ({
 }: RewardCardProps) => {
   const [showContent, setShowContent] = useState(false);
   const [localClaiming, setLocalClaiming] = useState(false);
-  const [showUpsellPopup, setShowUpsellPopup] = useState(false);
+  const [watchingAd, setWatchingAd] = useState(false);
+  const [showPlus, setShowPlus] = useState(false);
   const config = RARITY_CONFIG[prize.rarity];
   const glowColor = GLOW_COLORS[prize.rarity];
 
@@ -102,6 +101,25 @@ export const RewardCard = ({
     setTimeout(() => {
       onClaim();
     }, 200);
+  };
+
+  const canWatchAd = !!onWatchAd && rewardedAdsAvailable();
+
+  const handleDoubleClick = async () => {
+    if (watchingAd) return;
+    if (!canWatchAd) {
+      setShowPlus(true);
+      return;
+    }
+    setWatchingAd(true);
+    try {
+      await onWatchAd?.();
+      if (takePlusOfferAfterAd()) {
+        setTimeout(() => setShowPlus(true), 1600);
+      }
+    } finally {
+      setWatchingAd(false);
+    }
   };
 
   const cardVariants: Variants = {
@@ -343,9 +361,6 @@ export const RewardCard = ({
             </>
           ) : (
             <>
-              {prize.slot !== 'container' && (
-                <Sparkles className="relative z-20 w-5 h-5" />
-              )}
               <span className="relative z-20 uppercase tracking-[0.14em]">
                 {prize.slot === 'container'
                   ? quantity && quantity > 1
@@ -368,25 +383,38 @@ export const RewardCard = ({
         )}
         {showDoubleUpsell && (
           <GoldenRewardButton
-            onClick={() => setShowUpsellPopup(true)}
-            disabled={isProcessing || !showContent}
+            onClick={handleDoubleClick}
+            disabled={isProcessing || !showContent || watchingAd}
           >
-            <span className="flex items-center justify-center w-7 h-7 text-[11px] font-black text-amber-900 rounded-lg bg-white/30 shadow-inner">
-              x2
-            </span>
-            Double Reward
+            {watchingAd ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Loading ad...
+              </>
+            ) : (
+              <>
+                <span className="flex items-center justify-center w-7 h-7 text-[11px] font-black text-amber-900 rounded-lg bg-white/30 shadow-inner">
+                  x2
+                </span>
+                <span className="flex flex-col items-start leading-tight">
+                  <span>
+                    {rewardAmount ? `Claim ${rewardAmount * 2}` : 'Double Reward'}
+                  </span>
+                  <span className="text-[10px] font-bold normal-case tracking-normal text-white/80">
+                    {canWatchAd ? 'watch a short ad' : 'with Plus'}
+                  </span>
+                </span>
+                {canWatchAd && <Play className="w-4 h-4 fill-current" />}
+              </>
+            )}
           </GoldenRewardButton>
         )}
       </div>
-      {showUpsellPopup && (
-        <DoubleRewardUpsell
-          onClose={() => setShowUpsellPopup(false)}
-          onWatchAd={onWatchAd}
-          rewardAmount={rewardAmount}
-          giftCount={prize.slot === 'container' ? quantity ?? 1 : undefined}
-          giftColor={prize.slot === 'container' ? prize.riveIndex : undefined}
-        />
-      )}
+      <PlusUpgradeModal
+        open={showPlus}
+        placement="double_reward"
+        onClose={() => setShowPlus(false)}
+      />
     </motion.div>
   );
 };
@@ -424,217 +452,3 @@ function QuantityBadge({
   );
 }
 
-export function DoubleRewardUpsell({
-  onClose,
-  onWatchAd,
-  rewardAmount,
-  giftCount,
-  giftColor,
-  titleOverride,
-  description,
-  watchLabel,
-  watchSubtext = 'just watch a short ad',
-  plusTitle = 'Never watch an ad again',
-  plusSubtitle = 'Plus auto-doubles every reward',
-  noThanksLabel,
-  closeOnWatch = true,
-  watchAvailable,
-  heroIcon,
-  plusPlacement = 'double_reward',
-}: {
-  onClose: () => void;
-  onWatchAd?: () => void | Promise<void>;
-  rewardAmount?: number;
-  giftCount?: number;
-  giftColor?: number;
-  titleOverride?: string;
-  description?: string;
-  watchLabel?: string;
-  watchSubtext?: string;
-  plusTitle?: string;
-  plusSubtitle?: string;
-  noThanksLabel?: string;
-  closeOnWatch?: boolean;
-  watchAvailable?: boolean;
-  heroIcon?: React.ReactNode;
-  plusPlacement?: string;
-}) {
-  const [showPlus, setShowPlus] = useState(false);
-  const [watching, setWatching] = useState(false);
-  const canWatchAd = !!onWatchAd && (watchAvailable ?? rewardedAdsAvailable());
-  const count = rewardAmount ?? giftCount;
-  let title = titleOverride ?? 'Double your reward!';
-  if (rewardAmount && !titleOverride) {
-    title = 'Double your flies!';
-  } else if (giftCount && !titleOverride) {
-    title = giftCount > 1 ? 'Double your gifts!' : 'Double your gift!';
-  }
-
-  return createPortal(
-    <>
-      {!showPlus && (
-        <div
-          className="fixed inset-0 z-[10002] flex items-end sm:items-center justify-center bg-black/70 px-4 pb-6 sm:pb-0"
-          role="dialog"
-          aria-modal="true"
-          onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
-          onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-          onPointerDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
-        >
-          <motion.div
-            initial={{ opacity: 0, scale: 0.85, y: 24 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            transition={{ type: 'spring', stiffness: 380, damping: 26 }}
-            className="relative w-full max-w-sm overflow-hidden rounded-[28px] border border-slate-200/80 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900"
-            onMouseDown={(e) => e.stopPropagation()}
-            onClick={(e) => e.stopPropagation()}
-            onPointerDown={(e) => e.stopPropagation()}
-          >
-            <button
-              className="absolute right-3.5 top-3.5 z-10 rounded-xl p-1.5 text-slate-300 transition-colors hover:bg-slate-100 hover:text-slate-500 dark:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-400"
-              onClick={onClose}
-              aria-label="Close"
-            >
-              <X className="w-4 h-4" />
-            </button>
-
-            <div className="relative overflow-hidden bg-gradient-to-b from-[#edf5ec] to-white px-6 pb-5 pt-8 text-center dark:from-emerald-950/40 dark:to-slate-900">
-              <motion.div
-                aria-hidden
-                animate={{ rotate: 360 }}
-                transition={{ duration: 24, repeat: Infinity, ease: 'linear' }}
-                className="pointer-events-none absolute left-1/2 top-16 h-[340px] w-[340px] text-[#4f9149] opacity-[0.12] dark:opacity-[0.08]"
-                style={{
-                  x: '-50%',
-                  y: '-50%',
-                  background:
-                    'repeating-conic-gradient(from 0deg, transparent 0deg, transparent 15deg, currentColor 15deg, currentColor 22deg)',
-                  maskImage: 'radial-gradient(circle, black 20%, transparent 65%)',
-                  WebkitMaskImage: 'radial-gradient(circle, black 20%, transparent 65%)',
-                }}
-              />
-              <motion.div
-                initial={{ scale: 0, rotate: -30 }}
-                animate={{ scale: 1, rotate: -6 }}
-                transition={{ type: 'spring', stiffness: 320, damping: 14, delay: 0.1 }}
-                className="relative mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-[#5ca355] to-[#457f40] text-2xl font-black text-white shadow-[0_4px_0_0_#34631f]"
-              >
-                {heroIcon ?? '×2'}
-              </motion.div>
-              <h4 className="relative mt-4 text-[22px] font-black leading-tight text-slate-900 dark:text-white">
-                {title}
-              </h4>
-              {count ? (
-                <motion.div
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.25 }}
-                  className="relative mt-2 flex items-center justify-center gap-2.5"
-                >
-                  <span className="text-lg font-black text-slate-300 line-through decoration-2 dark:text-slate-600">
-                    {count}
-                  </span>
-                  <ArrowRight className="w-4 h-4 text-slate-300 dark:text-slate-600" />
-                  <span className="flex items-center gap-1.5 text-[26px] font-black leading-none text-[#4f9149] dark:text-[#7dc276]">
-                    {count * 2}
-                    {rewardAmount ? (
-                      <Fly
-                        size={30}
-                        interactive={false}
-                        alwaysPlay
-                        className="-translate-y-1"
-                      />
-                    ) : (
-                      <span className="inline-flex h-12 w-auto aspect-[282/381] -translate-y-2">
-                        <GiftRive className="h-full w-full" color={giftColor} paused={false} />
-                      </span>
-                    )}
-                  </span>
-                </motion.div>
-              ) : (
-                <p className="relative mt-1.5 text-sm font-semibold text-slate-400 dark:text-slate-500">
-                  {description ?? 'One short ad. Twice the reward.'}
-                </p>
-              )}
-            </div>
-
-            {canWatchAd && (
-              <div className="px-5 pt-2">
-                <button
-                  type="button"
-                  disabled={watching}
-                  onClick={async () => {
-                    if (!onWatchAd || watching) return;
-                    setWatching(true);
-                    try {
-                      await onWatchAd();
-                      if (closeOnWatch) onClose();
-                    } finally {
-                      setWatching(false);
-                    }
-                  }}
-                  className="w-full rounded-2xl bg-gradient-to-r from-[#4f9149] via-[#5ca355] to-[#4f9149] bg-[length:200%_100%] animate-[shimmer_2.5s_ease-in-out_infinite] py-3.5 text-white shadow-[0_4px_0_0_#34631f] transition hover:brightness-105 active:translate-y-[3px] active:shadow-none"
-                >
-                  <span className="flex items-center justify-center gap-2 text-lg font-black uppercase tracking-[0.08em]">
-                    <Play className="w-5 h-5 fill-current" />
-                    {watching
-                      ? 'Loading ad...'
-                      : watchLabel ?? (count ? `Claim ${count * 2} free` : 'Double it free')}
-                  </span>
-                  <span className="mt-0.5 block text-[11px] font-bold text-white/75">
-                    {watchSubtext}
-                  </span>
-                </button>
-              </div>
-            )}
-
-            <div className="px-5 pt-2.5">
-              <button
-                type="button"
-                onClick={() => setShowPlus(true)}
-                className="group relative isolate flex w-full items-center gap-3 rounded-2xl px-3.5 py-3 text-left text-emerald-950 ring-2 ring-amber-200/80 transition-transform active:scale-[0.98]"
-              >
-                <span
-                  aria-hidden
-                  className="absolute inset-0 -z-10 rounded-2xl bg-[linear-gradient(125deg,#fde68a_0%,#fbbf24_45%,#f59e0b_75%,#d97706_100%)]"
-                />
-                <span aria-hidden className="absolute inset-x-0 top-0 -z-10 h-1/2 rounded-t-2xl bg-gradient-to-b from-white/45 to-transparent" />
-                <span className="-my-3 -ml-1 inline-flex shrink-0">
-                  <Icon
-                    name="frogPlus"
-                    className="h-12 w-12 drop-shadow-[0_3px_0_rgba(31,98,28,0.35)]"
-                  />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-black tracking-tight text-emerald-900 drop-shadow-[0_1px_0_rgba(255,255,255,0.5)]">
-                    {plusTitle}
-                  </p>
-                  <p className="mt-0.5 text-xs font-semibold text-emerald-900/75">
-                    {plusSubtitle}
-                  </p>
-                </div>
-                <span
-                  aria-hidden
-                  className="inline-flex shrink-0 items-center rounded-xl bg-gradient-to-b from-emerald-600 to-emerald-800 px-2.5 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_2px_4px_rgba(0,0,0,0.25)] ring-1 ring-emerald-900/40"
-                >
-                  Try free
-                </span>
-              </button>
-            </div>
-
-            <div className="px-5 pb-4 pt-1.5">
-              <button
-                className="w-full rounded-xl py-2.5 text-sm font-semibold text-slate-400 transition-all hover:bg-slate-100 hover:text-slate-600 dark:text-slate-500 dark:hover:bg-slate-800 dark:hover:text-slate-300"
-                onClick={onClose}
-              >
-                {noThanksLabel ?? (count ? `No thanks, keep ${count}` : 'No thanks')}
-              </button>
-            </div>
-          </motion.div>
-        </div>
-      )}
-      <PlusUpgradeModal open={showPlus} placement={plusPlacement} onClose={() => setShowPlus(false)} />
-    </>,
-    document.body,
-  );
-}

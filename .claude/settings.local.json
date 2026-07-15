@@ -330,7 +330,14 @@
       "WebFetch(domain:valdemird.com)",
       "Bash(afinfo /Users/snirazran/Fullstack/my-todos/public/gulp.wav)",
       "Skill(claude-in-chrome)",
-      "Bash(python *)"
+      "Bash(python *)",
+      "WebFetch(domain:www.gamerefinery.com)",
+      "WebFetch(domain:admob.google.com)",
+      "Bash(cd \"/c/Users/snira/Desktop/Full-Stack/frog-task\")",
+      "Bash(wc -l)",
+      "Bash(head -n 455 src/components/ui/gift-box/RewardCard.tsx)",
+      "Bash(mv /tmp/rc.tmp src/components/ui/gift-box/RewardCard.tsx)",
+      "Bash(echo 'was __TRACKED_VAR__ lines, now __CMDSUB_OUTPUT__')"
     ]
   }
 }

@@ -8,6 +8,49 @@ const TEST_REWARDED_ANDROID = 'ca-app-pub-3940256099942544/5224354917';
 
 export type RewardedAdResult = 'rewarded' | 'dismissed' | 'failed';
 
+const PLUS_OFFER_AD_COUNT_KEY = 'plusOffer.rewardedAdCount';
+const PLUS_OFFER_LAST_SHOWN_KEY = 'plusOffer.lastShownAt';
+const PLUS_OFFER_AD_THRESHOLD = 3;
+const PLUS_OFFER_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+
+function readStoredNumber(key: string) {
+  try {
+    return Number(window.localStorage.getItem(key)) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+function writeStoredNumber(key: string, value: number) {
+  try {
+    window.localStorage.setItem(key, String(value));
+  } catch {
+    /* storage is best-effort */
+  }
+}
+
+function recordRewardedAdCompleted() {
+  writeStoredNumber(
+    PLUS_OFFER_AD_COUNT_KEY,
+    readStoredNumber(PLUS_OFFER_AD_COUNT_KEY) + 1,
+  );
+}
+
+/** Frequency-capped Plus pitch: true once per 24h at most, and only after the
+ *  user has completed a few rewarded ads since the last pitch. Consuming the
+ *  offer resets the counter, so callers should show the paywall when it
+ *  returns true. */
+export function takePlusOfferAfterAd(): boolean {
+  if (readStoredNumber(PLUS_OFFER_AD_COUNT_KEY) < PLUS_OFFER_AD_THRESHOLD) {
+    return false;
+  }
+  const lastShown = readStoredNumber(PLUS_OFFER_LAST_SHOWN_KEY);
+  if (Date.now() - lastShown < PLUS_OFFER_COOLDOWN_MS) return false;
+  writeStoredNumber(PLUS_OFFER_AD_COUNT_KEY, 0);
+  writeStoredNumber(PLUS_OFFER_LAST_SHOWN_KEY, Date.now());
+  return true;
+}
+
 export function rewardedAdsAvailable() {
   return Capacitor.isNativePlatform();
 }
@@ -62,6 +105,7 @@ export async function showRewardedAd(placement = 'unknown'): Promise<RewardedAdR
       const finish = (result: RewardedAdResult) => {
         if (settled) return;
         settled = true;
+        if (result === 'rewarded') recordRewardedAdCompleted();
         trackAnalyticsEvent(
           result === 'rewarded'
             ? 'ad_completed'

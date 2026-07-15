@@ -5,15 +5,20 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/components/auth/AuthContext';
 import { useRouter } from 'next/navigation';
-import { X } from 'lucide-react';
+import { Play, X } from 'lucide-react';
 import { ItemDef, byId } from '@/lib/skins/catalog';
 import { cn } from '@/lib/utils';
-import { rewardedAdsAvailable, showRewardedAd } from '@/lib/ads';
+import {
+  rewardedAdsAvailable,
+  showRewardedAd,
+  takePlusOfferAfterAd,
+} from '@/lib/ads';
+import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
 import { RARITY_CONFIG } from './constants';
 import { RotatingRays } from './RotatingRays';
 import { GiftBox } from './GiftBox';
 import { hapticCelebrate, hapticImpact, hapticTick } from '@/lib/haptics';
-import { DoubleRewardUpsell, GoldenRewardButton, RewardCard } from './RewardCard';
+import { GoldenRewardButton, RewardCard } from './RewardCard';
 import { FUNNY_SENTENCES } from './funnySentences';
 
 export default function GiftBoxOpening({
@@ -38,7 +43,7 @@ export default function GiftBoxOpening({
   const [revealCount, setRevealCount] = useState(0);
   const [adBusy, setAdBusy] = useState(false);
   const [adError, setAdError] = useState<string | null>(null);
-  const [showOpenAnotherUpsell, setShowOpenAnotherUpsell] = useState(false);
+  const [showPlusOffer, setShowPlusOffer] = useState(false);
   const [loadingText, setLoadingText] = useState(
     () => FUNNY_SENTENCES[Math.floor(Math.random() * FUNNY_SENTENCES.length)],
   );
@@ -152,7 +157,6 @@ export default function GiftBoxOpening({
       }
       const claimId = doubleClaimId;
       setDoubleClaimId(null);
-      setShowOpenAnotherUpsell(false);
       setPhase('shaking');
       const animationPromise = new Promise((resolve) =>
         setTimeout(resolve, 1500),
@@ -168,6 +172,9 @@ export default function GiftBoxOpening({
         setRevealCount((c) => c + 1);
         setPrize(data.prize);
         if (onWin) onWin(data.prize);
+        if (takePlusOfferAfterAd()) {
+          setTimeout(() => setShowPlusOffer(true), 1600);
+        }
       } else {
         setAdError('Could not open another gift — it was already claimed.');
       }
@@ -278,33 +285,38 @@ export default function GiftBoxOpening({
                   className="mt-4 flex w-full max-w-[280px] flex-col items-center gap-1.5"
                 >
                   <GoldenRewardButton
-                    onClick={() => setShowOpenAnotherUpsell(true)}
+                    onClick={() => {
+                      if (rewardedAdsAvailable()) void handleDouble();
+                      else setShowPlusOffer(true);
+                    }}
                     disabled={adBusy}
                     className="py-4 text-lg"
                   >
-                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/30 text-[11px] font-black text-amber-900 shadow-inner">
-                      x2
-                    </span>
-                    {adBusy ? 'Loading ad...' : 'Open Another'}
+                    {adBusy ? (
+                      'Loading ad...'
+                    ) : (
+                      <>
+                        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/30 text-[11px] font-black text-amber-900 shadow-inner">
+                          x2
+                        </span>
+                        <span className="flex flex-col items-start leading-tight">
+                          <span>Open Another</span>
+                          <span className="text-[10px] font-bold normal-case tracking-normal text-white/80">
+                            {rewardedAdsAvailable()
+                              ? 'watch a short ad'
+                              : 'with Plus'}
+                          </span>
+                        </span>
+                        {rewardedAdsAvailable() && (
+                          <Play className="w-4 h-4 fill-current" />
+                        )}
+                      </>
+                    )}
                   </GoldenRewardButton>
                   {adError && (
                     <p className="text-center text-xs font-bold text-red-300">
                       {adError}
                     </p>
-                  )}
-                  {showOpenAnotherUpsell && (
-                    <DoubleRewardUpsell
-                      onClose={() => setShowOpenAnotherUpsell(false)}
-                      onWatchAd={handleDouble}
-                      titleOverride="Open another gift?"
-                      description="One short ad. One more surprise."
-                      watchLabel="Open another free"
-                      watchSubtext="just watch a short ad"
-                      plusTitle="Never watch an ad again"
-                      plusSubtitle="Plus auto-doubles every reward"
-                      noThanksLabel="No thanks, I'll keep 1 gift"
-                      closeOnWatch={false}
-                    />
                   )}
                 </motion.div>
               )}
@@ -312,6 +324,12 @@ export default function GiftBoxOpening({
           )}
         </AnimatePresence>
       </div>
+
+      <PlusUpgradeModal
+        open={showPlusOffer}
+        placement="gift_double"
+        onClose={() => setShowPlusOffer(false)}
+      />
 
       {/* --- GUEST PROMPT OVERLAY --- */}
       <AnimatePresence>

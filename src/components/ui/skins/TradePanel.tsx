@@ -13,7 +13,12 @@ import {
   Play,
 } from 'lucide-react';
 import { hapticTick, hapticImpact, hapticCelebrate } from '@/lib/haptics';
-import { rewardedAdsAvailable, showRewardedAd } from '@/lib/ads';
+import {
+  rewardedAdsAvailable,
+  showRewardedAd,
+  takePlusOfferAfterAd,
+} from '@/lib/ads';
+import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
 import { cn } from '@/lib/utils';
 import {
   ItemDef,
@@ -29,7 +34,6 @@ import { ItemCard } from './ItemCard';
 
 // Import from gift-box for the reward UI
 import {
-  DoubleRewardUpsell,
   GoldenRewardButton,
   RewardCard,
 } from '@/components/ui/gift-box/RewardCard';
@@ -160,7 +164,7 @@ export function TradePanel({
   const [rerollClaimId, setRerollClaimId] = useState<string | null>(null);
   const [rerollBusy, setRerollBusy] = useState(false);
   const [rerollError, setRerollError] = useState<string | null>(null);
-  const [showRerollUpsell, setShowRerollUpsell] = useState(false);
+  const [showPlusOffer, setShowPlusOffer] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const [inventoryHasScrolled, setInventoryHasScrolled] = useState(false);
@@ -369,7 +373,6 @@ export function TradePanel({
       setTradeResult(data.reward);
       setRerollClaimId(data.rerollClaimId ?? null);
       setRerollError(null);
-      setShowRerollUpsell(false);
       setSelectedIds([]);
       hapticCelebrate();
       if (onTradeSuccess) onTradeSuccess();
@@ -391,7 +394,6 @@ export function TradePanel({
     setTradeResult(null);
     setRerollClaimId(null);
     setRerollError(null);
-    setShowRerollUpsell(false);
   };
 
   const handleReroll = async () => {
@@ -420,7 +422,6 @@ export function TradePanel({
         return;
       }
       setRerollClaimId(null);
-      setShowRerollUpsell(false);
       setTradeResult(data.reward);
       hapticCelebrate();
       if (onTradeSuccess) onTradeSuccess();
@@ -430,6 +431,9 @@ export function TradePanel({
         origin: { y: 0.6 },
         colors: ['#FFD700', '#FFA500', '#FF4500'],
       });
+      if (!isPremium && takePlusOfferAfterAd()) {
+        setTimeout(() => setShowPlusOffer(true), 1600);
+      }
     } finally {
       setRerollBusy(false);
     }
@@ -702,7 +706,13 @@ export function TradePanel({
                   className="mt-4 flex w-full max-w-[280px] flex-col items-center gap-1.5"
                 >
                   <GoldenRewardButton
-                    onClick={() => setShowRerollUpsell(true)}
+                    onClick={() => {
+                      if (isPremium || rewardedAdsAvailable()) {
+                        void handleReroll();
+                      } else {
+                        setShowPlusOffer(true);
+                      }
+                    }}
                     disabled={rerollBusy}
                     className="py-4 text-lg"
                   >
@@ -711,10 +721,22 @@ export function TradePanel({
                         <Dices className="h-4 w-4" />
                         {rerollBusy ? 'Rerolling...' : 'Reroll Reward'}
                       </>
+                    ) : rerollBusy ? (
+                      'Loading ad...'
                     ) : (
                       <>
                         <Dices className="h-5 w-5" strokeWidth={2.75} />
-                        {rerollBusy ? 'Loading ad...' : 'Reroll Reward'}
+                        <span className="flex flex-col items-start leading-tight">
+                          <span>Reroll Reward</span>
+                          <span className="text-[10px] font-bold normal-case tracking-normal text-white/80">
+                            {rewardedAdsAvailable()
+                              ? 'watch a short ad'
+                              : 'with Plus'}
+                          </span>
+                        </span>
+                        {rewardedAdsAvailable() && (
+                          <Play className="w-4 h-4 fill-current" />
+                        )}
                       </>
                     )}
                   </GoldenRewardButton>
@@ -726,27 +748,16 @@ export function TradePanel({
                 </motion.div>
               )}
             </div>
-            {showRerollUpsell && (
-              <DoubleRewardUpsell
-                onClose={() => setShowRerollUpsell(false)}
-                onWatchAd={handleReroll}
-                titleOverride="Reroll this reward?"
-                description={`One short ad. Swap it for another ${tradeResult.rarity}.`}
-                watchLabel={isPremium ? 'Reroll free' : 'Reroll free'}
-                watchSubtext={isPremium ? 'included with Plus' : 'just watch a short ad'}
-                plusTitle="Reroll without ads"
-                plusSubtitle="Unlock ad-free rerolls anytime"
-                noThanksLabel="Keep this reward"
-                watchAvailable={isPremium || rewardedAdsAvailable()}
-                closeOnWatch={false}
-                heroIcon={<Dices className="h-8 w-8" strokeWidth={3} />}
-                plusPlacement="trade_reroll"
-              />
-            )}
           </div>,
           document.body
         )
       }
+
+      <PlusUpgradeModal
+        open={showPlusOffer}
+        placement="trade_reroll"
+        onClose={() => setShowPlusOffer(false)}
+      />
 
       {/* --- INVENTORY + CONTRACT SIDEBAR (lg+) --- */}
       <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-4 lg:items-start">
