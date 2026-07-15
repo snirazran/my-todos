@@ -5,7 +5,7 @@ import { hapticSuccess, hapticTick } from '@/lib/haptics';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { mutate } from 'swr';
-import { Check } from 'lucide-react';
+import { Check, Lightbulb, Play } from 'lucide-react';
 import type { QuestRewardCatalogItem } from '@/components/ui/QuestCards';
 import {
   enqueueQuestRewardReveal,
@@ -308,12 +308,13 @@ export function ObjectiveLabel({
     return <span className={`truncate ${textClass ?? ''}`}>{label}</span>;
   }
   return (
-    <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1">
-      <span className={textClass}>{label} with</span>
-      {tags.map((tag) => (
-        <QuestTagPillInline key={tag.id} tag={tag} />
-      ))}
-      <span className={textClass}>{tags.length > 1 ? 'tags' : 'tag'}</span>
+    <span className="flex min-w-0 flex-col gap-1">
+      <span className={textClass}>{label}</span>
+      <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+        {tags.map((tag) => (
+          <QuestTagPillInline key={tag.id} tag={tag} />
+        ))}
+      </span>
     </span>
   );
 }
@@ -350,9 +351,11 @@ export function QuestProgressBar({
 
 export function HintButton({
   text,
+  tags,
   onShowMe,
 }: {
   text: string;
+  tags?: ObjectiveTagChip[];
   onShowMe?: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -388,10 +391,29 @@ export function HintButton({
       </button>
       {open && (
         <span
-          className="absolute bottom-full right-0 z-30 mb-2 flex w-56 flex-col gap-2 rounded-xl border border-border bg-popover px-3 py-2 text-left text-xs font-medium normal-case tracking-normal leading-snug text-popover-foreground shadow-lg"
+          role="dialog"
+          className="absolute bottom-full right-0 z-30 mb-2.5 flex w-[17rem] max-w-[calc(100vw-2rem)] flex-col gap-2.5 rounded-2xl border border-border bg-popover p-3.5 text-left normal-case tracking-normal text-popover-foreground shadow-xl ring-1 ring-black/5"
           onClick={(event) => event.stopPropagation()}
         >
-          {text}
+          <span className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+            <Lightbulb className="h-3.5 w-3.5 text-amber-500" strokeWidth={2.75} />
+            How to do this
+          </span>
+          <span className="text-[12.5px] font-medium leading-relaxed text-foreground">
+            {text}
+          </span>
+          {tags?.length ? (
+            <span className="flex flex-col gap-1.5 rounded-xl bg-muted/60 px-2.5 py-2">
+              <span className="text-[9.5px] font-black uppercase tracking-[0.12em] text-muted-foreground">
+                {tags.length > 1 ? 'Only these tags count' : 'Only this tag counts'}
+              </span>
+              <span className="flex flex-wrap items-center gap-1.5">
+                {tags.map((tag) => (
+                  <QuestTagPillInline key={tag.id} tag={tag} />
+                ))}
+              </span>
+            </span>
+          ) : null}
           {onShowMe && (
             <button
               type="button"
@@ -400,11 +422,16 @@ export function HintButton({
                 setOpen(false);
                 onShowMe();
               }}
-              className="inline-flex h-8 items-center justify-center self-start rounded-lg bg-amber-500 px-3 text-[11px] font-black uppercase tracking-wide text-white shadow-[0_2px_0_0_#b45309] transition-all active:translate-y-[1px] active:shadow-none"
+              className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-xl bg-amber-500 px-3 text-[12px] font-black uppercase tracking-wide text-white shadow-[0_3px_0_0_#b45309] transition-all hover:translate-y-[-1px] hover:shadow-[0_4px_0_0_#b45309] active:translate-y-[2px] active:shadow-none"
             >
+              <Play className="h-3 w-3 fill-current" />
               Show me
             </button>
           )}
+          <span
+            aria-hidden
+            className="absolute right-6 top-full h-2.5 w-2.5 -translate-y-1/2 rotate-45 rounded-[2px] border-b border-r border-border bg-popover"
+          />
         </span>
       )}
     </span>

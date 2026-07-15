@@ -417,7 +417,9 @@ export async function GET(req: Request) {
           reward: block.rewards?.[0],
           lastProgressAt: quest.lastProgressAt,
           expiresAt: quest.expiresAt,
-          hint: objectiveHintText(block, questFocusTags(quest)[0]?.name),
+          hint: objectiveHintText(block, questFocusTags(quest)[0]?.name, {
+            omitTagScope: block.tagMode === 'focus_category_tags',
+          }),
           guideId: guideIdForBlock(block) ?? undefined,
           guideContext: (() => {
             const context = guideContextForBlock(block);

@@ -164,6 +164,7 @@ export function objectiveHintText(
     previewTagLabel?: string;
   },
   focusTagName?: string,
+  options?: { omitTagScope?: boolean },
 ): string {
   if (block.helpText) return block.helpText;
 
@@ -179,7 +180,9 @@ export function objectiveHintText(
   const scopeSuffix = !tagScoped
     ? ''
     : tagName
-      ? ` Only tasks tagged “${tagName}” count.`
+      ? options?.omitTagScope
+        ? ''
+        : ` Only tasks tagged “${tagName}” count.`
       : ' Tap Start quest on the area card first.';
 
   if (block.type === 'focus_minutes') {

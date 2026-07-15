@@ -293,6 +293,7 @@ export function NextQuestStrip({
             <span className="shrink-0" onClick={(event) => event.stopPropagation()}>
               <HintButton
                 text={displayNextUp.hint}
+                tags={displayNextUp.tags}
                 onShowMe={
                   displayNextUp.guideId
                     ? () =>

@@ -1995,9 +1995,6 @@ export function AreaRow({
           <span className="truncate text-[14px] font-black text-foreground">
             {category?.name ?? quest.title}
           </span>
-          {state === 'running' && !finished && linkedTags[0] ? (
-            <QuestTagPill tag={linkedTags[0]} compact />
-          ) : null}
           {quiet ? (
             <span
               title={`No progress for ${priority.staleDays} days`}
@@ -2022,6 +2019,13 @@ export function AreaRow({
             </span>
           ) : null}
         </p>
+        {state === 'running' && !finished && linkedTags.length > 0 ? (
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            {linkedTags.map((tag) => (
+              <QuestTagPill key={tag.id} tag={tag} compact />
+            ))}
+          </div>
+        ) : null}
         {state === 'running' && !finished ? (
           <>
             <div className="mt-1.5 flex items-center gap-2">
@@ -2344,7 +2348,12 @@ function ObjectiveRow({
     }
     return (
       <HintButton
-        text={objectiveHintText(block, linkedTags?.[0]?.name)}
+        text={objectiveHintText(block, linkedTags?.[0]?.name, {
+          omitTagScope: block.tagMode === 'focus_category_tags',
+        })}
+        tags={
+          block.tagMode === 'focus_category_tags' ? linkedTags : undefined
+        }
         onShowMe={
           guideId && !needsTag
             ? () => {
