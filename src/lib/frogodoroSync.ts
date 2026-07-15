@@ -182,9 +182,18 @@ export async function fanOutTimerState(
             pushToStartToken: startToken,
             data,
             staleDate: deviceEndTime,
-          }).then((res) =>
-            res.gone || res.reason === 'BadDeviceToken' ? clearStartToken() : undefined,
-          ),
+          }).then((res) => {
+            if (res.gone || res.reason === 'BadDeviceToken') return clearStartToken();
+            // A transient failure must release the reservation, or no retry can
+            // happen until the next state change 30s+ later.
+            if (!res.ok) {
+              return UserModel.updateOne(
+                { _id: userId },
+                { $unset: { liveActivityRemoteStart: 1 } },
+              );
+            }
+            return undefined;
+          }),
         );
       }
     } else {

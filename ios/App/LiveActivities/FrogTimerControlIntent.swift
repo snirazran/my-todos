@@ -35,7 +35,11 @@ struct FrogTimerControlIntent: LiveActivityIntent {
             if s.deepFocus == true && s.confirmPause != true && !s.paused {
                 var armed = s
                 armed.confirmPause = true
-                await activity.update(ActivityContent(state: armed, staleDate: nil))
+                // Keep the stale date — dropping it on a running state would
+                // disable the widget's stale rescue at endTime.
+                await activity.update(
+                    ActivityContent(state: armed, staleDate: Self.staleDate(for: armed))
+                )
                 Self.scheduleConfirmPauseRevert(activityId: activity.id)
                 return .result()
             }
@@ -69,7 +73,9 @@ struct FrogTimerControlIntent: LiveActivityIntent {
                    activity.content.state.confirmPause == true {
                     var s = activity.content.state
                     s.confirmPause = false
-                    await activity.update(ActivityContent(state: s, staleDate: nil))
+                    await activity.update(
+                        ActivityContent(state: s, staleDate: staleDate(for: s))
+                    )
                 }
                 semaphore.signal()
             }
@@ -215,6 +221,12 @@ struct FrogTimerControlIntent: LiveActivityIntent {
                 if attempt < 3 { Thread.sleep(forTimeInterval: Double(attempt) * 1.5) }
             }
         }
+    }
+
+    // Mirrors FrogLiveActivityPlugin.staleDate: running → endTime, else none.
+    private static func staleDate(for state: FrogTimerAttributes.ContentState) -> Date? {
+        guard !state.paused, state.endTime > 0 else { return nil }
+        return Date(timeIntervalSince1970: state.endTime / 1000)
     }
 
     private static func mmss(_ seconds: Double) -> String {

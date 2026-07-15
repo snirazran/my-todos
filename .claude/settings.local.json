@@ -337,7 +337,15 @@
       "Bash(wc -l)",
       "Bash(head -n 455 src/components/ui/gift-box/RewardCard.tsx)",
       "Bash(mv /tmp/rc.tmp src/components/ui/gift-box/RewardCard.tsx)",
-      "Bash(echo 'was __TRACKED_VAR__ lines, now __CMDSUB_OUTPUT__')"
+      "Bash(echo 'was __TRACKED_VAR__ lines, now __CMDSUB_OUTPUT__')",
+      "WebFetch(domain:swiftandsour.com)",
+      "Bash(NODE_OPTIONS= pnpm exec tsc --noEmit)",
+      "Bash(echo \"TSC_EXIT=$?\")",
+      "Bash(NODE_OPTIONS= pnpm exec eslint \"src/app/api/frogodoro/live-activity/route.ts\" \"src/lib/frogodoroSync.ts\" \"src/lib/liveTimer.ts\" \"src/components/providers/GlobalTimer.tsx\")",
+      "Bash(echo \"ESLINT_EXIT=$?\")",
+      "Bash(NODE_OPTIONS= pnpm run lint -- --file src/app/api/frogodoro/live-activity/route.ts --file src/lib/frogodoroSync.ts --file src/lib/liveTimer.ts --file src/components/providers/GlobalTimer.tsx)",
+      "Bash(echo \"LINT_EXIT=$?\")",
+      "Bash(NODE_OPTIONS= pnpm exec next lint --file src/app/api/frogodoro/live-activity/route.ts --file src/lib/frogodoroSync.ts --file src/lib/liveTimer.ts --file src/components/providers/GlobalTimer.tsx)"
     ]
   }
 }

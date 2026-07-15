@@ -576,13 +576,16 @@ export function GlobalTimer() {
     // Coming back from the background, the SSE was almost certainly suspended;
     // its EventSource can still read non-null (so connect() would no-op). Tear it
     // down and resync from scratch so the store snaps to server truth.
+    // Strictly ordered: island state first, server truth second. If the island
+    // read landed after the resync, its stale snapshot would clobber fresher
+    // server state — and the seq guard would then drop every later read that
+    // could correct it.
     const forceResync = () => {
       if (es) {
         es.close();
         es = null;
       }
-      void applyNativeLiveActivityState();
-      void resync();
+      void applyNativeLiveActivityState().finally(() => void resync());
     };
 
     void resync();

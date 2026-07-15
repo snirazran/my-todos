@@ -115,6 +115,41 @@ async function putLiveActivity(body: Record<string, string | number>): Promise<v
   }
 }
 
+// Asks the server to create/refresh the island via APNs when the local
+// creation was skipped (the app left the foreground between Start and the
+// native call). Deduped per signature so backgrounded reconciles can't spam
+// the APNs budget.
+let remoteStartRequestedSig: string | null = null;
+
+async function requestRemoteStart(sig: string): Promise<void> {
+  if (remoteStartRequestedSig === sig) return;
+  remoteStartRequestedSig = sig;
+  const attempt = async (): Promise<boolean> => {
+    try {
+      const res = await fetch('/api/frogodoro/live-activity', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ needsRemoteStart: true }),
+      });
+      if (!res.ok) return false;
+      const data = await res.json().catch(() => null);
+      return data?.remoteStart !== false;
+    } catch {
+      return false;
+    }
+  };
+  if (await attempt()) return;
+  // The /active PUT this start belongs to may not have landed yet — one
+  // delayed retry covers the race (if the webview gets suspended first, the
+  // timeout fires on resume, where the fallback is a harmless reconcile).
+  await new Promise((resolve) => setTimeout(resolve, 2000));
+  if (remoteStartRequestedSig !== sig) return;
+  if (!(await attempt())) {
+    remoteStartRequestedSig = null;
+  }
+}
+
 async function deletePushToken(): Promise<void> {
   try {
     await fetch('/api/frogodoro/live-activity', {
@@ -210,7 +245,12 @@ export async function reconcileLiveTimer(snap: LiveTimerSnapshot): Promise<void>
   // iOS only allows creating a Live Activity from the app while it is in the
   // foreground. Cross-device/background starts are handled by APNs push-to-start
   // from the server; keep the local signature unchanged so foregrounding retries.
-  if (desiredSig && !isDocumentForegrounded()) return;
+  if (desiredSig && !isDocumentForegrounded()) {
+    if (snap.isRunning && snap.endTime && !snap.finished) {
+      void requestRemoteStart(desiredSig);
+    }
+    return;
+  }
 
   signature = desiredSig;
 
@@ -225,6 +265,9 @@ export async function reconcileLiveTimer(snap: LiveTimerSnapshot): Promise<void>
     const result = await FrogLiveActivity.show({ data: buildLiveActivityData(snap) });
     if (result?.skipped) {
       signature = null;
+      if (snap.isRunning && snap.endTime && !snap.finished) {
+        void requestRemoteStart(desiredSig);
+      }
     }
   } catch (err) {
     console.error('FrogLiveActivity failed:', err);

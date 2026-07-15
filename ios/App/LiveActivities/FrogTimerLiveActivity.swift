@@ -21,6 +21,14 @@ private func endDate(_ state: FrogTimerAttributes.ContentState) -> Date {
     Date(timeIntervalSince1970: state.endTime / 1000)
 }
 
+// A stale "running" state can carry an endTime already in the past (a missed
+// pause/stop update); an inverted ClosedRange traps and blanks the island.
+@available(iOS 16.1, *)
+private func timerRange(_ state: FrogTimerAttributes.ContentState) -> ClosedRange<Date> {
+    let end = endDate(state)
+    return min(Date(), end)...end
+}
+
 @available(iOS 16.1, *)
 private func ringFraction(_ state: FrogTimerAttributes.ContentState) -> Double {
     guard state.ringTotal > 0 else { return 0 }
@@ -56,7 +64,7 @@ private struct TimeView: View {
             if state.paused || state.endTime <= 0 {
                 Text(state.timeText)
             } else {
-                Text(timerInterval: Date()...endDate(state), countsDown: true)
+                Text(timerInterval: timerRange(state), countsDown: true)
             }
         }
         .font(font)
