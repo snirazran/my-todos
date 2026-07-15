@@ -710,16 +710,42 @@ export function QuestsPanel({
       }
       return true;
     });
-    const ranked = rankByQuestPriority(
-      candidates.map((quest) => ({
-        placement: 'category' as const,
-        progress: quest.progress,
-        target: quest.target,
-        lastProgressAt: quest.lastProgressAt,
-        expiresAt: quest.expiresAt,
-        quest,
-      })),
-    );
+    const blockEntries = candidates.flatMap((quest) => {
+      const claimedIds = quest.claimedObjectiveIds ?? [];
+      return quest.logic.flatMap((block, tierIndex) => {
+        const target = Math.max(1, block.target);
+        if ((block.rewards?.length ?? 0) === 0) return [];
+        if (block.progress >= target) return [];
+        if (claimedIds.includes(block.id)) return [];
+        return [
+          {
+            placement: 'category' as const,
+            progress: Math.max(0, block.progress),
+            target,
+            tierIndex,
+            lastProgressAt: quest.lastProgressAt,
+            expiresAt: quest.expiresAt,
+            quest,
+          },
+        ];
+      });
+    });
+    const rankedBlocks = rankByQuestPriority(blockEntries);
+    const seenQuests = new Set<string>();
+    const ranked: typeof rankedBlocks = [];
+    for (const entry of rankedBlocks) {
+      if (seenQuests.has(entry.item.quest.id)) continue;
+      seenQuests.add(entry.item.quest.id);
+      ranked.push(entry);
+    }
+    for (const quest of candidates) {
+      if (seenQuests.has(quest.id)) continue;
+      const category = categoryMap[quest.categoryId];
+      excluded.push({
+        label: category?.shortLabel || category?.name || quest.title,
+        reason: 'no open rewarded objectives',
+      });
+    }
     return { ranked, excluded };
   }, [data?.categoryQuests, categoryTagMap, categoryMap]);
 
@@ -1381,6 +1407,7 @@ export function QuestsPanel({
                                   )}
                                   excluded={upNextRanking.excluded}
                                   notes={[
+                                    'areas ranked by their best remaining objective (same engine as home)',
                                     'urgency counts only when resetting sooner than half the pool median',
                                     `big card: ${
                                       data?.isPremium

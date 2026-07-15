@@ -107,7 +107,9 @@ export function compareQuestPriority(
     (a.input.tierIndex ?? 0) - (b.input.tierIndex ?? 0) ||
     Math.max(1, a.input.target) -
       a.input.progress -
-      (Math.max(1, b.input.target) - b.input.progress)
+      (Math.max(1, b.input.target) - b.input.progress) ||
+    (a.result.hoursUntilReset ?? Number.MAX_VALUE) -
+      (b.result.hoursUntilReset ?? Number.MAX_VALUE)
   );
 }
 
