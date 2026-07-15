@@ -10,7 +10,9 @@ import {
   ChevronDown,
   Clock,
   Compass,
+  Copy,
   Gift,
+  Monitor,
   Moon,
   Pencil,
   Play,
@@ -989,6 +991,120 @@ function DailyStreakStrip({
           </span>
         )}
       </div>
+    </div>
+  );
+}
+
+export type MoveToWebInfo = {
+  complete: boolean;
+  claimable: boolean;
+  reward: QuestReward;
+  webUrl: string;
+};
+
+export function MoveToWebCard({
+  moveToWeb,
+  rewardCatalog,
+  isPremium,
+  claiming = false,
+  onClaim,
+  paused = false,
+}: {
+  moveToWeb: MoveToWebInfo;
+  rewardCatalog: Record<string, QuestRewardCatalogItem>;
+  isPremium: boolean;
+  claiming?: boolean;
+  onClaim?: () => void;
+  paused?: boolean;
+}) {
+  const [copied, setCopied] = useState(false);
+  const host = moveToWeb.webUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
+
+  const copyUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(moveToWeb.webUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* clipboard unavailable — the URL is still shown */
+    }
+  };
+
+  return (
+    <div className="rounded-2xl border border-border/50 bg-card px-3 py-3 shadow-sm sm:px-4">
+      <div className="flex items-center gap-2.5">
+        <RewardTile
+          reward={moveToWeb.reward}
+          rewardCatalog={rewardCatalog}
+          isPremium={isPremium}
+          compact
+          paused={paused}
+          hideBadge={moveToWeb.reward.type !== 'FLIES'}
+          flySize={22}
+          giftAnimation="box_shake"
+          className="h-10 w-10 shrink-0 rounded-xl ring-2 ring-card"
+        />
+        <div className="min-w-0 flex-1">
+          <p className="text-[12px] font-black leading-tight text-foreground">
+            {moveToWeb.claimable
+              ? 'Your reward is ready!'
+              : 'Your pond works on computers too'}
+          </p>
+          <p className="mt-0.5 text-[11px] font-bold leading-tight text-muted-foreground">
+            {moveToWeb.claimable
+              ? 'Thanks for hopping onto the web'
+              : 'Log in on the web to unlock this prize'}
+          </p>
+        </div>
+        {moveToWeb.claimable && onClaim ? (
+          <span
+            className={cn('inline-flex shrink-0', !claiming && 'claim-wobble')}
+          >
+            <button
+              type="button"
+              onClick={onClaim}
+              disabled={claiming}
+              className="inline-flex h-9 items-center justify-center rounded-xl bg-amber-500 px-4 text-[13px] font-black text-white shadow-[0_3px_0_0_#b45309] transition-all hover:translate-y-[-1px] hover:shadow-[0_4px_0_0_#b45309] active:translate-y-[2px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {claiming ? 'Claiming...' : 'Claim'}
+            </button>
+          </span>
+        ) : (
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-500/10 text-sky-500">
+            <Monitor className="h-[18px] w-[18px]" strokeWidth={2.5} />
+          </div>
+        )}
+      </div>
+      {!moveToWeb.claimable && (
+        <button
+          type="button"
+          onClick={() => void copyUrl()}
+          aria-label={`Copy ${host}`}
+          className="mt-2.5 flex w-full items-center gap-2 rounded-xl border border-dashed border-border bg-muted/50 px-3 py-2 text-left transition-colors hover:bg-muted active:scale-[0.99]"
+        >
+          <span className="min-w-0 flex-1 truncate text-[12px] font-black text-foreground">
+            {host}
+          </span>
+          <span
+            className={cn(
+              'inline-flex shrink-0 items-center gap-1 text-[10px] font-black uppercase tracking-[0.12em]',
+              copied ? 'text-emerald-500' : 'text-muted-foreground',
+            )}
+          >
+            {copied ? (
+              <>
+                <Check className="h-3.5 w-3.5" strokeWidth={3} />
+                Copied
+              </>
+            ) : (
+              <>
+                <Copy className="h-3.5 w-3.5" strokeWidth={2.75} />
+                Copy
+              </>
+            )}
+          </span>
+        </button>
+      )}
     </div>
   );
 }

@@ -10,6 +10,7 @@ import {
   type CrossGiftPlatform,
   type CrossGiftStatus,
 } from '@/lib/crossGift';
+import { hasMoveToWebQuest } from '@/lib/quests/moveToWeb';
 
 export async function POST(req: NextRequest) {
   let userId: string;
@@ -34,7 +35,7 @@ export async function POST(req: NextRequest) {
     await connectMongo();
 
     const user = await UserModel.findById(userId)
-      .select('platformsSeen crossGiftBonus')
+      .select('platformsSeen crossGiftBonus quests')
       .lean();
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -54,7 +55,7 @@ export async function POST(req: NextRequest) {
       platform,
       claimed,
       otherPlatformSeen,
-      claimable: !claimed && otherPlatformSeen,
+      claimable: !claimed && otherPlatformSeen && !hasMoveToWebQuest(user),
       flies: CROSS_GIFT_FLIES,
     };
     return NextResponse.json(status);

@@ -38,6 +38,8 @@ export async function POST(req: NextRequest) {
         _id: userId,
         crossGiftBonus: null,
         [`platformsSeen.${otherPlatform(platform)}`]: { $exists: true },
+        // The move-to-web quest pays these users instead.
+        'quests.moveToWeb.startedAt': { $exists: false },
       },
       {
         $set: {

@@ -15,6 +15,7 @@ import {
   Footprints,
   Gift,
   Layers3,
+  Monitor,
   Pencil,
   Plus,
   ScrollText,
@@ -193,6 +194,7 @@ type ViewLevel =
   | 'focus'
   | 'onboarding'
   | 'streaks'
+  | 'moveToWeb'
   | 'season'
   | 'category'
   | 'form';
@@ -551,6 +553,15 @@ export function AdminQuestManagerPage() {
   const [savingStreak, setSavingStreak] = useState(false);
   const [streakRewardPickerOpen, setStreakRewardPickerOpen] = useState(false);
 
+  // Move to web config
+  const [moveToWebConfig, setMoveToWebConfig] = useState<{
+    isActive: boolean;
+    reward: QuestReward | null;
+  } | null>(null);
+  const [savingMoveToWeb, setSavingMoveToWeb] = useState(false);
+  const [moveToWebRewardPickerOpen, setMoveToWebRewardPickerOpen] =
+    useState(false);
+
   // Login streak (app-entry) config
   const [loginStreakConfig, setLoginStreakConfig] =
     useState<AdminLoginStreakConfig | null>(null);
@@ -578,7 +589,7 @@ export function AdminQuestManagerPage() {
     setLoading(true);
     setResult(null);
     try {
-      const [templatesRes, metaRes, categoriesRes, seasonsRes, recipesRes, streakRes, loginStreakRes] = await Promise.all([
+      const [templatesRes, metaRes, categoriesRes, seasonsRes, recipesRes, streakRes, loginStreakRes, moveToWebRes] = await Promise.all([
         fetch('/api/admin/quests', { credentials: 'include' }),
         fetch('/api/admin/quests/meta', { credentials: 'include' }),
         fetch('/api/admin/quests/categories', { credentials: 'include' }),
@@ -586,6 +597,7 @@ export function AdminQuestManagerPage() {
         fetch('/api/admin/quest-recipes', { credentials: 'include' }),
         fetch('/api/admin/quests/streak', { credentials: 'include' }),
         fetch('/api/admin/streak/login', { credentials: 'include' }),
+        fetch('/api/admin/quests/move-to-web', { credentials: 'include' }),
       ]);
       const templatesData = await templatesRes.json();
       const metaData = await metaRes.json();
@@ -610,6 +622,10 @@ export function AdminQuestManagerPage() {
       const loginStreakData = await loginStreakRes.json();
       if (loginStreakRes.ok && loginStreakData.loginStreak) {
         setLoginStreakConfig(loginStreakData.loginStreak);
+      }
+      const moveToWebData = await moveToWebRes.json();
+      if (moveToWebRes.ok && moveToWebData.moveToWeb) {
+        setMoveToWebConfig(moveToWebData.moveToWeb);
       }
     } catch (error) {
       setResult({
@@ -1151,6 +1167,24 @@ export function AdminQuestManagerPage() {
       </button>
 
       <button
+        onClick={() => setView('moveToWeb')}
+        className="group rounded-2xl border border-border/40 bg-card/60 p-6 text-left transition hover:border-sky-500/25 hover:bg-sky-500/[0.04]"
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-sky-500/10 text-sky-600 dark:text-sky-400">
+            <Monitor className="h-6 w-6" />
+          </div>
+          <ChevronRight className="h-5 w-5 text-muted-foreground/30 transition group-hover:translate-x-0.5 group-hover:text-muted-foreground" />
+        </div>
+        <p className="mt-5 text-lg font-black text-foreground">Move to Web</p>
+        <p className="mt-1 text-sm text-muted-foreground">Nudge phone-only users to log in on the web.</p>
+        <p className="mt-4 text-3xl font-black text-foreground">
+          {moveToWebConfig ? (moveToWebConfig.isActive ? 'On' : 'Off') : '–'}
+        </p>
+        <p className="text-xs text-muted-foreground">move to web</p>
+      </button>
+
+      <button
         onClick={() => startEditingSeason(seasons[0])}
         className="group rounded-2xl border border-border/40 bg-card/60 p-6 text-left transition hover:border-amber-500/25 hover:bg-amber-500/[0.04]"
       >
@@ -1270,6 +1304,15 @@ export function AdminQuestManagerPage() {
         <div className="rounded-2xl bg-muted/30 p-4 text-sm text-muted-foreground">Loading...</div>
       )}
       {renderLoginStreakCard()}
+    </div>
+  );
+
+  const renderMoveToWeb = () => (
+    <div className="space-y-4">
+      {loading && !moveToWebConfig && (
+        <div className="rounded-2xl bg-muted/30 p-4 text-sm text-muted-foreground">Loading...</div>
+      )}
+      {renderMoveToWebCard()}
     </div>
   );
 
@@ -1945,6 +1988,129 @@ export function AdminQuestManagerPage() {
           onSave={(rewards) => {
             setStreakConfig((prev) => (prev ? { ...prev, rewards } : prev));
             setStreakRewardPickerOpen(false);
+          }}
+        />
+      </div>
+    );
+  };
+
+  const saveMoveToWebConfig = async () => {
+    if (!moveToWebConfig) return;
+    setSavingMoveToWeb(true);
+    setResult(null);
+    try {
+      const res = await fetch('/api/admin/quests/move-to-web', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          isActive: moveToWebConfig.isActive,
+          reward: moveToWebConfig.reward,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not save move to web');
+      setMoveToWebConfig(data.moveToWeb);
+      setResult({ type: 'success', message: 'Move to web saved' });
+    } catch (error) {
+      setResult({
+        type: 'error',
+        message:
+          error instanceof Error ? error.message : 'Could not save move to web',
+      });
+    } finally {
+      setSavingMoveToWeb(false);
+    }
+  };
+
+  const renderMoveToWebCard = () => {
+    if (!moveToWebConfig) return null;
+    return (
+      <div className="rounded-2xl border border-border/40 bg-card/60 px-4 py-3.5">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-bold text-foreground">Move to web</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Shows under the daily quests for users who play on their phone but
+              have never opened the web. They complete it by logging in on the
+              web, then claim the prize below. It never appears as “up next”.
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={moveToWebConfig.isActive}
+            onClick={() =>
+              setMoveToWebConfig((prev) =>
+                prev ? { ...prev, isActive: !prev.isActive } : prev,
+              )
+            }
+            className={cn(
+              'relative h-6 w-11 shrink-0 rounded-full transition-colors',
+              moveToWebConfig.isActive ? 'bg-emerald-500' : 'bg-muted',
+            )}
+          >
+            <span
+              className={cn(
+                'absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform',
+                moveToWebConfig.isActive
+                  ? 'translate-x-[22px]'
+                  : 'translate-x-0.5',
+              )}
+            />
+          </button>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-end gap-4">
+          <div className="min-w-0 flex-1">
+            <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+              Prize (every user gets this one)
+            </span>
+            <div className="mt-1 flex flex-wrap items-center gap-3">
+              {moveToWebConfig.reward ? (
+                <RewardTile
+                  reward={moveToWebConfig.reward}
+                  rewardCatalog={rewardCatalog}
+                  isPremium={false}
+                />
+              ) : (
+                <span className="text-xs text-muted-foreground">
+                  No prize yet.
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => setMoveToWebRewardPickerOpen(true)}
+                className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-background px-3 py-1.5 text-xs font-bold text-muted-foreground transition hover:border-primary/30 hover:text-foreground"
+              >
+                <Pencil className="h-3 w-3" />
+                {moveToWebConfig.reward ? 'Change prize' : 'Pick prize'}
+              </button>
+            </div>
+          </div>
+
+          <Button
+            size="sm"
+            className="rounded-xl font-black"
+            onClick={() => void saveMoveToWebConfig()}
+            disabled={savingMoveToWeb}
+          >
+            {savingMoveToWeb ? 'Saving…' : 'Save move to web'}
+          </Button>
+        </div>
+
+        <RewardPickerDialog
+          open={moveToWebRewardPickerOpen}
+          onOpenChange={setMoveToWebRewardPickerOpen}
+          rewards={moveToWebConfig.reward ? [moveToWebConfig.reward] : []}
+          rewardItems={rewardItems}
+          rewardCatalog={rewardCatalog}
+          singleSelect
+          onSave={(rewards) => {
+            setMoveToWebConfig((prev) =>
+              prev ? { ...prev, reward: rewards[0] ?? null } : prev,
+            );
+            setMoveToWebRewardPickerOpen(false);
           }}
         />
       </div>
@@ -2872,6 +3038,7 @@ export function AdminQuestManagerPage() {
     view === 'focus' ? 'Quest Manager' :
     view === 'onboarding' ? 'Quest Manager' :
     view === 'streaks' ? 'Quest Manager' :
+    view === 'moveToWeb' ? 'Quest Manager' :
     view === 'season' ? 'Quest Manager' :
     view === 'category' ? 'Focus Quests' :
     form.placement === 'daily' ? 'Daily Quests' :
@@ -2908,6 +3075,7 @@ export function AdminQuestManagerPage() {
             {view === 'focus' && 'Focus Quests'}
             {view === 'onboarding' && 'Onboarding Quests'}
             {view === 'streaks' && 'Streak Manager'}
+            {view === 'moveToWeb' && 'Move to Web'}
             {view === 'season' && 'Season'}
             {view === 'category' && (selectedCategory?.name ?? 'Category')}
             {view === 'form' && (form.id ? 'Edit Quest' : 'New Quest')}
@@ -2941,6 +3109,7 @@ export function AdminQuestManagerPage() {
                 {view === 'focus' && renderFocus()}
                 {view === 'onboarding' && renderOnboarding()}
                 {view === 'streaks' && renderStreaks()}
+                {view === 'moveToWeb' && renderMoveToWeb()}
                 {view === 'season' && renderSeason()}
                 {view === 'category' && renderCategory()}
               </>

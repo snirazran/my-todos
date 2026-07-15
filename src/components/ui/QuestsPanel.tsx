@@ -36,12 +36,14 @@ import {
   CategoryQuestPresentationCard,
   DailyChecklistCard,
   getRewardQuantityLabel,
+  MoveToWebCard,
   RemoveTagConfirm,
   RewardTile,
   StarterQuestCard,
   SwitchFocusConfirm,
   type AreaRowState,
   type DailyStreakInfo,
+  type MoveToWebInfo,
   type QuestTagChip,
 } from './QuestCards';
 import { QuestStartSheet } from './QuestStartSheet';
@@ -79,6 +81,7 @@ type QuestsResponse = {
     expiresAt: string | null;
   } | null;
   dailyStreak?: DailyStreakInfo | null;
+  moveToWeb?: MoveToWebInfo | null;
   onboarding: {
     complete: boolean;
     selectedCategoryIds: MacroCategoryId[];
@@ -835,6 +838,26 @@ export function QuestsPanel({
     }
   };
 
+  const [claimingMoveToWeb, setClaimingMoveToWeb] = useState(false);
+  const handleClaimMoveToWeb = async () => {
+    if (claimingMoveToWeb) return;
+    setClaimingMoveToWeb(true);
+    setClaimMessage(null);
+    try {
+      const res = await fetch('/api/quests/move-to-web/claim', {
+        method: 'POST',
+      });
+      const payload = await res.json();
+      if (!res.ok) throw new Error(payload.error || 'Claim failed');
+      queueRewardReveal(payload.rewardSummary);
+      await refreshQuestData();
+    } catch (err: any) {
+      setClaimMessage(err.message || 'Claim failed');
+    } finally {
+      setClaimingMoveToWeb(false);
+    }
+  };
+
   const handleClaimObjective = async (questId: string, objectiveId: string) => {
     if (claimingObjectiveId) return;
     setClaimingObjectiveId(objectiveId);
@@ -1267,7 +1290,7 @@ export function QuestsPanel({
                             (block) =>
                               block.progress >= Math.max(1, block.target),
                           ).length;
-                          const dailySection = data.dailyQuestsGated ? (
+                          const dailyGroup = data.dailyQuestsGated ? (
                             <DailyQuestsLockedCard
                               claimed={gateDone}
                               total={gateBlocks.length}
@@ -1288,6 +1311,20 @@ export function QuestsPanel({
                                 paused={false}
                               />
                             );
+                          const dailySection = data.moveToWeb ? (
+                            <div className="flex flex-col gap-2.5">
+                              {dailyGroup}
+                              <MoveToWebCard
+                                moveToWeb={data.moveToWeb}
+                                rewardCatalog={data.rewardCatalog}
+                                isPremium={data.isPremium}
+                                claiming={claimingMoveToWeb}
+                                onClaim={handleClaimMoveToWeb}
+                              />
+                            </div>
+                          ) : (
+                            dailyGroup
+                          );
 
                           // Free users with many paused areas get the same
                           // compact 2-col grid as the chooser; premium keeps

@@ -4,6 +4,7 @@ import connectMongo from '@/lib/mongoose';
 import UserModel from '@/lib/models/User';
 import { buildRewardCatalog, syncQuestState } from '@/lib/quests/engine';
 import { loadStreakConfig, syncDailyStreak } from '@/lib/quests/streak';
+import { loadMoveToWebConfig, syncMoveToWeb } from '@/lib/quests/moveToWeb';
 import { getActiveQuestSeasonView } from '@/lib/quests/seasons';
 import { getZonedToday } from '@/lib/utils';
 import { getCachedCatalog } from '@/lib/skins/getCatalog';
@@ -258,21 +259,27 @@ export async function GET(req: Request) {
       view === 'home' ||
       searchParams.get('includeCategories') === '1';
 
-    const [dashboard, activeSeason, streakConfig] = await Promise.all([
-      syncQuestState({
-        userId,
-        timezone,
-        includeCatalog: !isSummary,
-        includeCategories,
-      }),
-      getActiveQuestSeasonView({ userId, timezone }),
-      loadStreakConfig(),
-    ]);
+    const [dashboard, activeSeason, streakConfig, moveToWebConfig] =
+      await Promise.all([
+        syncQuestState({
+          userId,
+          timezone,
+          includeCatalog: !isSummary,
+          includeCategories,
+        }),
+        getActiveQuestSeasonView({ userId, timezone }),
+        loadStreakConfig(),
+        loadMoveToWebConfig(),
+      ]);
     const dailyStreak = await syncDailyStreak({
       user: dashboard.user,
       config: streakConfig,
       dailyQuests: dashboard.dailyQuests,
       todayKey: getZonedToday(timezone),
+    });
+    const moveToWeb = await syncMoveToWeb({
+      user: dashboard.user,
+      config: moveToWebConfig,
     });
     const areaQuestsUnlockedAt = await resolveAreaQuestsUnlocked(
       userId,
@@ -302,8 +309,9 @@ export async function GET(req: Request) {
     const seasonDailyClaimable =
       activeSeason && activeSeason.claimable && !activeSeason.claimedToday ? 1 : 0;
     const streakClaimable = dailyStreak?.claimable ? 1 : 0;
+    const moveToWebClaimable = moveToWeb?.claimable ? 1 : 0;
     const claimableCount =
-      questClaimable + seasonDailyClaimable + streakClaimable;
+      questClaimable + seasonDailyClaimable + streakClaimable + moveToWebClaimable;
 
     const categoryNameById = new Map<string, string>(
       (dashboard.macroCategories ?? []).map((c: any) => [c.id, c.name]),
@@ -517,6 +525,9 @@ export async function GET(req: Request) {
     const streakRewardCatalog = dailyStreak?.rewards?.length
       ? buildRewardCatalog(dashboard.catalog, [dailyStreak.rewards])
       : {};
+    const moveToWebRewardCatalog = moveToWeb?.reward
+      ? buildRewardCatalog(dashboard.catalog, [[moveToWeb.reward]])
+      : {};
 
     return NextResponse.json(
       {
@@ -529,6 +540,7 @@ export async function GET(req: Request) {
         rentedFocus: dashboard.rentedFocus,
         frogName: (dashboard.user as { frogName?: string }).frogName ?? null,
         dailyStreak,
+        moveToWeb,
         onboarding: {
           complete: !!dashboard.focusProfile.completedAt,
           selectedCategoryIds: dashboard.focusProfile.selectedCategoryIds,
@@ -553,6 +565,7 @@ export async function GET(req: Request) {
           ...dashboard.rewardCatalog,
           ...seasonRewardCatalog,
           ...streakRewardCatalog,
+          ...moveToWebRewardCatalog,
         },
       },
       {
