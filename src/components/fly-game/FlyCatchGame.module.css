@@ -1,0 +1,185 @@
+.shell {
+  --game-green: hsl(var(--primary));
+  --game-ink: hsl(var(--primary-foreground));
+  min-height: 100dvh;
+  isolation: isolate;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+
+.noise {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.22'/%3E%3C/svg%3E");
+  opacity: 0.08;
+  mix-blend-mode: soft-light;
+}
+
+.arena {
+  position: relative;
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  contain: layout paint;
+  background: transparent;
+}
+
+.flySlot {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 12;
+  width: 54px;
+  height: 54px;
+  display: grid;
+  place-items: center;
+  will-change: transform;
+  border-radius: 999px;
+  cursor: crosshair;
+}
+
+.flySlot::before,
+.flySlot::after {
+  content: '';
+  position: absolute;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.normal::before {
+  inset: 8px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.gold::before {
+  inset: 3px;
+  border: 2px solid rgba(253, 224, 71, 0.9);
+  box-shadow: 0 0 14px #facc15, 0 0 30px rgba(250, 204, 21, 0.75);
+  animation: glow 0.75s ease-in-out infinite alternate;
+}
+
+.time::before {
+  inset: 3px;
+  border: 2px solid rgba(103, 232, 249, 0.95);
+  box-shadow: 0 0 15px #22d3ee, 0 0 30px rgba(34, 211, 238, 0.6);
+  animation: glow 0.8s ease-in-out infinite alternate;
+}
+
+.trap::before {
+  inset: 3px;
+  border: 2px dashed rgba(251, 113, 133, 0.95);
+  background: rgba(127, 29, 29, 0.28);
+  box-shadow: 0 0 16px rgba(244, 63, 94, 0.9);
+  animation: danger 0.6s ease-in-out infinite alternate;
+}
+
+.kindBadge {
+  position: absolute;
+  right: -8px;
+  top: -7px;
+  min-width: 27px;
+  height: 19px;
+  padding: 0 5px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: white;
+  color: #07170f;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.35);
+}
+
+.tongue {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: tongueSnap 300ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.scorePop {
+  position: absolute;
+  z-index: 25;
+  pointer-events: none;
+  font-size: 21px;
+  font-weight: 1000;
+  text-shadow: 0 3px 12px rgba(0, 0, 0, 0.65);
+  animation: scoreFloat 650ms ease-out both;
+}
+
+.countdown {
+  text-shadow: 0 8px 0 rgba(0, 0, 0, 0.18), 0 0 50px rgba(167, 243, 106, 0.5);
+  animation: countPunch 700ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.timerUrgent {
+  animation: urgent 0.55s ease-in-out infinite alternate;
+}
+
+.swipeEntrance header {
+  animation: gameHudEnter 420ms cubic-bezier(0.22, 1, 0.36, 1) 40ms both;
+}
+
+.swipeEntrance section > div:first-child {
+  animation: gameHudEnter 460ms cubic-bezier(0.22, 1, 0.36, 1) 100ms both;
+}
+
+.swipeEntrance .arena {
+  animation: gameArenaEnter 520ms cubic-bezier(0.22, 1, 0.36, 1) 150ms both;
+}
+
+@keyframes glow {
+  to { transform: scale(1.1); opacity: 0.72; }
+}
+
+@keyframes danger {
+  to { transform: rotate(8deg) scale(1.08); opacity: 0.72; }
+}
+
+@keyframes tongueSnap {
+  0% { stroke-dashoffset: 1; opacity: 0; }
+  42% { stroke-dashoffset: 0; opacity: 1; }
+  62% { stroke-dashoffset: 0; opacity: 1; }
+  100% { stroke-dashoffset: -1; opacity: 0; }
+}
+
+@keyframes scoreFloat {
+  0% { transform: translate(-50%, 0) scale(0.7); opacity: 0; }
+  25% { transform: translate(-50%, -10px) scale(1.14); opacity: 1; }
+  100% { transform: translate(-50%, -46px) scale(0.95); opacity: 0; }
+}
+
+@keyframes countPunch {
+  0% { transform: scale(0.35) rotate(-8deg); opacity: 0; }
+  35% { transform: scale(1.14) rotate(2deg); opacity: 1; }
+  100% { transform: scale(0.9); opacity: 0.88; }
+}
+
+@keyframes urgent {
+  to { transform: scale(1.06); color: #fda4af; }
+}
+
+@keyframes gameHudEnter {
+  from { transform: translateY(-22px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes gameArenaEnter {
+  from { transform: translateY(70px) scale(0.985); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+@media (max-width: 420px), (max-height: 720px) {
+  .flySlot { width: 48px; height: 48px; }
+  .kindBadge { right: -6px; top: -5px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gold::before,
+  .time::before,
+  .trap::before,
+  .timerUrgent,
+  .swipeEntrance header,
+  .swipeEntrance section > div:first-child,
+  .swipeEntrance .arena { animation: none; }
+}

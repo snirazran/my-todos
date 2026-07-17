@@ -142,6 +142,12 @@ export type UserDoc = {
   } | null;
   // One-time gift earned in the /try ad-landing funnel, banked at sign-in.
   funnelGift?: { itemId: string; grantedAt: Date | string } | null;
+  flyGameReward?: {
+    runId: string;
+    score: number;
+    amount: number;
+    claimedAt: Date | string;
+  };
   quests?: unknown;
   dailyRewards?: DailyRewardProgress;
   notificationPrefs?: NotificationPrefs;

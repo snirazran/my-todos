@@ -22,6 +22,7 @@ import { AnalyticsProvider } from '@/components/providers/AnalyticsProvider';
 import { HintCoach } from '@/components/ui/HintCoach';
 import { QuestRewardRevealHost } from '@/components/ui/questRewardReveal';
 import { ButtonHaptics } from '@/components/providers/ButtonHaptics';
+import { FlyGameClaimer } from '@/components/providers/FlyGameClaimer';
 
 export default function Providers({ children }: { children: ReactNode }) {
   return (
@@ -49,6 +50,7 @@ export default function Providers({ children }: { children: ReactNode }) {
             <PushNotificationInit />
             <ReferralClaimer />
             <FriendLinkClaimer />
+            <FlyGameClaimer />
             <BuddyApprovalBanner />
             <DeepLinkHandler />
             <StreakCheckInProvider />

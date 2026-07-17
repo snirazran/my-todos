@@ -75,6 +75,7 @@ export default function MobileNav() {
   if (
     pathname === '/welcome' ||
     pathname === '/try' ||
+    pathname === '/fly-catch' ||
     pathname === '/login' ||
     pathname === '/register' ||
     pathname === '/onboarding' ||

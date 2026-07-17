@@ -506,12 +506,14 @@ export function ObjectiveProgressBar({
   targetLabel,
   complete,
   className,
+  haptics = true,
 }: {
   progress: number;
   target: number;
   targetLabel?: string;
   complete?: boolean;
   className?: string;
+  haptics?: boolean;
 }) {
   const safeTarget = Math.max(1, target);
   const pct = Math.min(100, (Math.max(0, progress) / safeTarget) * 100);
@@ -520,8 +522,8 @@ export function ObjectiveProgressBar({
   useEffect(() => {
     const prev = prevProgress.current;
     prevProgress.current = progress;
-    if (progress > prev) hapticTick();
-  }, [progress]);
+    if (haptics && progress > prev) hapticTick();
+  }, [haptics, progress]);
   const countLabel = (
     <>
       {Math.min(progress, safeTarget)}

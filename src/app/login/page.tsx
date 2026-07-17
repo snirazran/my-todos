@@ -81,6 +81,7 @@ const ENTER_FROG = {
 } as const;
 
 const EMAIL_LINK_STORAGE_KEY = 'emailForSignIn';
+const POST_LOGIN_ROUTE_KEY = 'frogress.post-login-route';
 
 function LoginPageInner() {
   const searchParams = useSearchParams();
@@ -89,6 +90,11 @@ function LoginPageInner() {
   const reduceMotion = useReducedMotion();
   const navigatedRef = useRef(false);
   const isUpgrade = searchParams?.get('upgrade') === '1';
+  const requestedNext = searchParams?.get('next');
+  const postLoginRoute =
+    requestedNext && requestedNext.startsWith('/') && !requestedNext.startsWith('//')
+      ? requestedNext
+      : '/';
   const [step, setStep] = useState<Step>('enter');
   const [dir, setDir] = useState(1);
 
@@ -205,7 +211,7 @@ function LoginPageInner() {
     const timer = setTimeout(async () => {
       if (navigatedRef.current) return;
       try {
-        navigateOnce(await prepareSignedInRoute());
+        navigateOnce(await prepareSignedInRoute(postLoginRoute));
       } catch {
         navigateOnce('/');
       }
@@ -220,7 +226,7 @@ function LoginPageInner() {
       const current = auth.currentUser;
       const shouldLink = isUpgrade && current?.isAnonymous;
       await signInWithGoogle({ linkTo: shouldLink ? current : null });
-      const route = await prepareSignedInRoute();
+      const route = await prepareSignedInRoute(postLoginRoute);
       // The decorative tongue animation uses requestAnimationFrame, which can
       // pause around a native Google popup. Never gate authentication on it.
       navigateOnce(route);
@@ -251,6 +257,7 @@ function LoginPageInner() {
             createEmailLinkSettings(`${origin}/auth/email-callback`),
           );
           window.localStorage.setItem(EMAIL_LINK_STORAGE_KEY, trimmed);
+          window.localStorage.setItem(POST_LOGIN_ROUTE_KEY, postLoginRoute);
           setDir(1);
           setStep('email-sent');
           setResendIn(30);

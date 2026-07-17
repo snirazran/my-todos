@@ -52,6 +52,7 @@ import { markFlyEarn } from '@/lib/flyEarn';
 import { FlyCounter } from '@/components/ui/FlyCounter';
 import { MobileHeaderActions } from '@/components/ui/MobileHeaderActions';
 import { MobileMenuCluster } from '@/components/ui/siteHeader';
+import { FlyCatchSwipeLauncher } from '@/components/ui/FlyCatchSwipeLauncher';
 import { useUIStore } from '@/lib/uiStore';
 import { showRewardedAd } from '@/lib/ads';
 import type { ItemDef } from '@/lib/skins/catalog';
@@ -204,23 +205,25 @@ export default function FriendsPage() {
           )}
         </MobileHeaderActions>
 
-        {/* Self frog */}
-        <SelfFrog
-          indices={{ ...indices, mood: isFrogHungry ? 1 : 0 }}
-          paused={isAnyPanelOpen}
-        />
+        <FlyCatchSwipeLauncher source="friends" className="flex flex-col items-center">
+          {/* Self frog */}
+          <SelfFrog
+            indices={{ ...indices, mood: isFrogHungry ? 1 : 0 }}
+            paused={isAnyPanelOpen}
+          />
 
         {/* Add friend — frog sits right on top of it */}
-        <button
-          type="button"
-          onClick={() => setAddOpen(true)}
-          className="relative z-20 -mt-3 flex w-[min(20rem,80vw)] items-center justify-center gap-2 rounded-2xl bg-card px-10 py-3.5 text-lg font-black tracking-tight text-[#4f9149] shadow-lg ring-1 ring-[#4f9149]/30 transition-transform active:scale-[0.98]"
-        >
-          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#4f9149] text-white shadow-sm">
-            <Plus className="h-5 w-5" strokeWidth={3} />
-          </span>
-          Add friend
-        </button>
+          <button
+            type="button"
+            onClick={() => setAddOpen(true)}
+            className="relative z-20 -mt-3 flex w-[min(20rem,80vw)] items-center justify-center gap-2 rounded-2xl bg-card px-10 py-3.5 text-lg font-black tracking-tight text-[#4f9149] shadow-lg ring-1 ring-[#4f9149]/30 transition-transform active:scale-[0.98]"
+          >
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#4f9149] text-white shadow-sm">
+              <Plus className="h-5 w-5" strokeWidth={3} />
+            </span>
+            Add friend
+          </button>
+        </FlyCatchSwipeLauncher>
 
         {/* Rising sheet */}
         <div className="relative z-10 -mx-4 mt-8 flex w-[calc(100%+2rem)] flex-col self-stretch rounded-t-[24px] bg-background px-4 pb-12 pt-5 md:mt-24 md:px-8">

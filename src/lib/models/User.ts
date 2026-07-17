@@ -86,6 +86,10 @@ const UserSchema = new Schema<UserDoc>(
       type: Schema.Types.Mixed,
       default: null,
     },
+    flyGameReward: {
+      type: Schema.Types.Mixed,
+      default: undefined,
+    },
     quests: {
       type: Schema.Types.Mixed,
       default: undefined,

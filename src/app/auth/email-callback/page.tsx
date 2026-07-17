@@ -16,6 +16,7 @@ import { establishSessionCookie } from '@/lib/authCookie';
 const Frog = dynamic(() => import('@/components/ui/frog'), { ssr: false });
 
 const EMAIL_LINK_STORAGE_KEY = 'emailForSignIn';
+const POST_LOGIN_ROUTE_KEY = 'frogress.post-login-route';
 
 export default function EmailCallbackPage() {
   const router = useRouter();
@@ -54,7 +55,11 @@ export default function EmailCallbackPage() {
         }),
       });
       const data = await res.json().catch(() => ({}));
-      router.replace(data?.isNewUser ? '/onboarding' : '/');
+      const storedRoute = window.localStorage.getItem(POST_LOGIN_ROUTE_KEY);
+      window.localStorage.removeItem(POST_LOGIN_ROUTE_KEY);
+      const safeRoute =
+        storedRoute?.startsWith('/') && !storedRoute.startsWith('//') ? storedRoute : '/';
+      router.replace(data?.isNewUser ? '/onboarding' : safeRoute);
     } catch (err: any) {
       const map: Record<string, string> = {
         'auth/invalid-action-code':

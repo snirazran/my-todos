@@ -15,6 +15,7 @@ import { backgroundPreview } from '@/hooks/useBackgroundActions';
 import { byId as staticById, type WardrobeSlot } from '@/lib/skins/catalog';
 import { useUIStore } from '@/lib/uiStore';
 import { WardrobePageSkeleton } from '@/components/ui/Skeleton';
+import { FlyCatchSwipeLauncher } from '@/components/ui/FlyCatchSwipeLauncher';
 import { cn } from '@/lib/utils';
 
 function WardrobePageInner() {
@@ -78,34 +79,35 @@ function WardrobePageInner() {
   return (
     <main className="relative min-h-[100dvh] md:min-h-[calc(100vh-4rem)] flex flex-col overflow-x-clip">
       <div className="relative z-10 flex flex-1 flex-col w-full min-h-[100dvh] md:min-h-[calc(100vh-4rem)] max-w-3xl mx-auto px-4 md:px-6">
-        <div
-          className={cn(
-            'relative flex shrink-0 items-end justify-center pointer-events-none h-[calc(204px+env(safe-area-inset-top))] md:h-[calc(222px+env(safe-area-inset-top))]',
-            isStuck ? 'z-[5]' : 'z-40',
-          )}
+        <FlyCatchSwipeLauncher
+          source="wardrobe"
+          disabled={isStuck}
+          className={cn('shrink-0', isStuck ? 'z-[5]' : 'z-40')}
         >
-          <div
-            ref={frogBoxRef}
-            className={cn(
-              'relative z-50 translate-y-[72px] pointer-events-none md:translate-y-[5.15rem]',
-              'origin-bottom transition-[opacity,transform] duration-300 ease-out',
-              isStuck && 'opacity-0 scale-95',
-            )}
-          >
-            <HomeFocusFlies
-              frogRef={frogRef}
-              frogBoxRef={frogBoxRef}
-              onGrabActive={setFrogMouthOpen}
-            />
-            <Frog
-              ref={frogRef}
-              mouthOpen={frogMouthOpen}
-              indices={previewIndices}
-              paused={false}
-            />
-            <PremiumFrogAura />
+          <div className="relative flex h-[calc(204px+env(safe-area-inset-top))] items-end justify-center pointer-events-none md:h-[calc(222px+env(safe-area-inset-top))]">
+            <div
+              ref={frogBoxRef}
+              className={cn(
+                'relative z-50 translate-y-[72px] pointer-events-none md:translate-y-[5.15rem]',
+                'origin-bottom transition-[opacity,transform] duration-300 ease-out',
+                isStuck && 'opacity-0 scale-95',
+              )}
+            >
+              <HomeFocusFlies
+                frogRef={frogRef}
+                frogBoxRef={frogBoxRef}
+                onGrabActive={setFrogMouthOpen}
+              />
+              <Frog
+                ref={frogRef}
+                mouthOpen={frogMouthOpen}
+                indices={previewIndices}
+                paused={false}
+              />
+              <PremiumFrogAura />
+            </div>
           </div>
-        </div>
+        </FlyCatchSwipeLauncher>
 
         <section className="relative z-10 flex flex-col flex-1 px-4 -mx-4 md:-mx-6 md:px-6">
           <WardrobePageContent

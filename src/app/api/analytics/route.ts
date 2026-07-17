@@ -30,6 +30,11 @@ const CLIENT_EVENTS = new Set([
   'try_cosmetic_previewed',
   'try_continued',
   'try_store_clicked',
+  'fly_game_viewed',
+  'fly_game_started',
+  'fly_game_completed',
+  'fly_game_shared',
+  'fly_game_signup_clicked',
   'fly_shop_viewed',
   'fly_pack_selected',
   'fly_pack_purchase_started',
@@ -84,6 +89,7 @@ export async function POST(req: NextRequest) {
     name !== 'app_opened' &&
     name !== 'page_viewed' &&
     !name.startsWith('try_') &&
+    !name.startsWith('fly_game_') &&
     name !== 'referral_invite_opened' &&
     name !== 'friend_link_opened'
   ) {

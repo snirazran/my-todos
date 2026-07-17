@@ -146,7 +146,7 @@ export default function SiteHeader() {
   ];
 
   // Desktop keeps a full header. Mobile only gets lightweight home-page controls.
-  if (pathname === '/onboarding' || pathname === '/welcome' || pathname === '/try' || pathname === '/login' || pathname?.startsWith('/auth/')) return null;
+  if (pathname === '/onboarding' || pathname === '/welcome' || pathname === '/try' || pathname === '/fly-catch' || pathname === '/login' || pathname?.startsWith('/auth/')) return null;
 
   return (
     <>
@@ -1278,6 +1278,18 @@ function MainView({
         />
       </MenuSection>
 
+      <div className="overflow-hidden rounded-2xl border border-border/50 bg-card">
+        <MenuRow
+          icon={
+            <span className="grid h-8 w-8 place-items-center rounded-full bg-emerald-500/10 ring-1 ring-emerald-500/20">
+              <Fly size={28} interactive={false} alwaysPlay />
+            </span>
+          }
+          label="Fly Catch"
+          onClick={() => window.location.assign('/fly-catch')}
+        />
+      </div>
+
       {/* Admin */}
       {isAdmin && (
         <MenuSection title="Admin">
@@ -1692,6 +1704,18 @@ function QuickTilesGrid({
 
   return (
     <div className="grid grid-cols-2 gap-3">
+      {/* Fly Catch now lives in the Support section.
+        <QuickTile
+          icon={
+            <span className="grid h-12 w-12 place-items-center rounded-full bg-emerald-500/12 ring-1 ring-emerald-500/20">
+              <Fly size={40} interactive={false} alwaysPlay />
+            </span>
+          }
+          title="Fly Catch"
+          subtitle="30 seconds · catch one more · climb the leaderboard"
+          onClick={() => window.location.assign('/fly-catch')}
+        />
+      */}
       <QuickTile
         icon={<Icon name="compass" label="Focus areas" className="h-[52px] w-[52px]" />}
         title="Focus areas"

@@ -13,6 +13,7 @@ import { AuthContext } from '@/components/auth/AuthContext';
 import { GlobalPageBackground } from '@/components/ui/GlobalPageBackground';
 import { RiveWarmup } from '@/components/providers/RiveWarmup';
 import { RIVE_WASM_VERSION } from '@/lib/riveWasmVersion';
+import { MainScroll } from '@/components/providers/MainScroll';
 
 const poppins = Poppins({
   subsets: ['latin'],
@@ -51,6 +52,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://frogress.com'),
   title: 'Frogress',
   description: 'Frogress Todo List App',
   icons: {
@@ -143,10 +145,10 @@ export default function RootLayout({
           <Providers>
             <div className="flex flex-col h-full">
               <SiteHeader />
-              <main id="main-scroll" className="flex-1 overflow-y-auto relative pb-16 md:pb-0 no-scrollbar">
+              <MainScroll>
                 <GlobalPageBackground />
                 {children}
-              </main>
+              </MainScroll>
               <MobileNav />
               <RiveCounter />
               <RiveScrollPause />

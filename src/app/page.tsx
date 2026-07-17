@@ -70,6 +70,7 @@ import { StreakChip } from '@/components/ui/streak/StreakChip';
 import { FlyCounter } from '@/components/ui/FlyCounter';
 import { MobileHeaderActions } from '@/components/ui/MobileHeaderActions';
 import { MobileMenuCluster } from '@/components/ui/siteHeader';
+import { FlyCatchSwipeLauncher } from '@/components/ui/FlyCatchSwipeLauncher';
 import { NextQuestStrip } from '@/components/ui/NextQuestStrip';
 import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
 import { BuddyNudgeCard } from '@/components/ui/BuddyNudgeCard';
@@ -628,7 +629,8 @@ export default function Home() {
         <Header router={router} />
 
         <div className="relative flex flex-col items-stretch gap-2">
-          <div className="relative z-10 flex flex-col gap-2 lg:gap-4">
+          <FlyCatchSwipeLauncher source="home" className="relative z-10">
+            <div className="flex flex-col gap-2 lg:gap-4">
             {user &&
               (() => {
                 // Covers both the fly keys (home-focus-fly-N) and the miss
@@ -674,7 +676,8 @@ export default function Home() {
               questActiveCount={questsData?.activeCount ?? 0}
               paused={isAnyPanelOpen}
             />
-          </div>
+            </div>
+          </FlyCatchSwipeLauncher>
 
           <div
             className="relative z-20 -mx-3 mt-[14px] flex flex-col gap-2 rounded-t-[24px] bg-background px-1.5 pt-5 md:mx-auto md:mt-14 md:w-full md:max-w-2xl md:px-8 lg:gap-4"
@@ -733,7 +736,7 @@ export default function Home() {
 
               <div className="min-h-[360px] pb-16" ref={taskListRef}>
                 {renderGuestPrompt()}
-                {user && (
+                {/* The visible Fly Catch card was replaced by the frog swipe gesture.
                   <NextQuestStrip
                     claimables={questsData?.claimables}
                     trackables={questsData?.trackables}
@@ -741,6 +744,21 @@ export default function Home() {
                     isPremium={isPremium}
                   />
                 )}
+                {user && (
+                  <Link
+                    href="/fly-catch"
+                    className="group mx-2 mb-2 flex items-center gap-3 overflow-hidden rounded-2xl border border-emerald-500/20 bg-gradient-to-r from-emerald-500/10 via-card to-amber-400/10 px-3 py-2.5 transition hover:border-emerald-500/35 hover:shadow-sm md:mx-0"
+                  >
+                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-emerald-500/12 ring-1 ring-emerald-500/20 transition-transform group-hover:scale-105">
+                      <Fly size={32} interactive={false} alwaysPlay />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-black">Catch one more</span>
+                      <span className="block truncate text-[11px] font-semibold text-muted-foreground">30-second Fly Catch · climb the leaderboard</span>
+                    </span>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-emerald-600 transition-transform group-hover:translate-x-0.5" />
+                  </Link>
+                */}
                 <TaskList
                   tasks={data}
                   toggle={handleToggle}
