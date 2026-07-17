@@ -1,7 +1,7 @@
 'use client';
 
 import type { PointerEvent, ReactNode } from 'react';
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { hapticImpact, hapticTick } from '@/lib/haptics';
 import {
@@ -36,6 +36,57 @@ export function FlyCatchSwipeLauncher({
   const armedRef = useRef(false);
   const draggingRef = useRef(false);
   const suppressClickRef = useRef(false);
+  const dragRafRef = useRef(0);
+  const pendingArmedRef = useRef(false);
+  const scrollLockRef = useRef<{
+    element: HTMLElement;
+    overflowY: string;
+    overscrollBehavior: string;
+  } | null>(null);
+
+  const restoreScroll = () => {
+    const lock = scrollLockRef.current;
+    if (!lock) return;
+    lock.element.style.overflowY = lock.overflowY;
+    lock.element.style.overscrollBehavior = lock.overscrollBehavior;
+    scrollLockRef.current = null;
+  };
+
+  const flushDrag = () => {
+    dragRafRef.current = 0;
+    useFlyCatchOverlay
+      .getState()
+      .controller?.drag(pullRef.current, pendingArmedRef.current);
+  };
+
+  const queueDrag = (armed: boolean) => {
+    pendingArmedRef.current = armed;
+    if (dragRafRef.current) return;
+    dragRafRef.current = requestAnimationFrame(flushDrag);
+  };
+
+  const lockScroll = () => {
+    if (scrollLockRef.current) return;
+    const element = document.getElementById('main-scroll');
+    if (!element) return;
+    scrollLockRef.current = {
+      element,
+      overflowY: element.style.overflowY,
+      overscrollBehavior: element.style.overscrollBehavior,
+    };
+    element.style.overflowY = 'hidden';
+    element.style.overscrollBehavior = 'none';
+  };
+
+  useEffect(
+    () => () => {
+      cancelAnimationFrame(dragRafRef.current);
+      restoreScroll();
+      const overlay = useFlyCatchOverlay.getState();
+      if (!overlay.open) overlay.deactivate();
+    },
+    [],
+  );
 
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (disabled || event.button !== 0) return;
@@ -50,6 +101,11 @@ export function FlyCatchSwipeLauncher({
     armedRef.current = false;
     draggingRef.current = false;
     suppressClickRef.current = false;
+    pendingArmedRef.current = false;
+    // Mount the invisible game before the first drag frame. Previously it was
+    // mounted at the threshold-crossing move, which made mobile WebViews flash
+    // and drop frames while the finger was already moving.
+    overlay.activate(source);
     try {
       event.currentTarget.setPointerCapture(event.pointerId);
     } catch {}
@@ -57,6 +113,7 @@ export function FlyCatchSwipeLauncher({
 
   const onPointerMove = (event: PointerEvent<HTMLDivElement>) => {
     if (pointerRef.current !== event.pointerId) return;
+    if (event.cancelable) event.preventDefault();
     const now = performance.now();
     const dt = Math.max(1, now - lastTRef.current);
     const instant = (event.clientY - lastYRef.current) / dt;
@@ -69,7 +126,7 @@ export function FlyCatchSwipeLauncher({
     if (!draggingRef.current) {
       if (pull < DRAG_START_DISTANCE) return;
       draggingRef.current = true;
-      useFlyCatchOverlay.getState().activate(source);
+      lockScroll();
     }
     if (pull > 10) suppressClickRef.current = true;
 
@@ -78,14 +135,24 @@ export function FlyCatchSwipeLauncher({
       armedRef.current = armed;
       if (armed) hapticTick();
     }
-    useFlyCatchOverlay.getState().controller?.drag(pull, armed);
+    queueDrag(armed);
   };
 
   const finishPointer = (event: PointerEvent<HTMLDivElement>, cancelled = false) => {
     if (pointerRef.current !== event.pointerId) return;
     pointerRef.current = null;
-    if (!draggingRef.current) return;
+    if (!draggingRef.current) {
+      useFlyCatchOverlay.getState().deactivate();
+      return;
+    }
     draggingRef.current = false;
+    restoreScroll();
+    // Settle from the finger's final position, even if its last move was still
+    // waiting for the next animation frame.
+    if (dragRafRef.current) {
+      cancelAnimationFrame(dragRafRef.current);
+      flushDrag();
+    }
     const velocity = Math.max(0, velocityRef.current);
     const shouldOpen =
       !cancelled &&
@@ -99,11 +166,15 @@ export function FlyCatchSwipeLauncher({
 
   return (
     <div
-      className={cn('relative touch-pan-x select-none', className)}
+      className={cn(
+        'relative touch-none select-none overscroll-none [-webkit-tap-highlight-color:transparent]',
+        className,
+      )}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={(event) => finishPointer(event)}
       onPointerCancel={(event) => finishPointer(event, true)}
+      onLostPointerCapture={(event) => finishPointer(event, true)}
       onClickCapture={(event) => {
         if (!suppressClickRef.current) return;
         event.preventDefault();
