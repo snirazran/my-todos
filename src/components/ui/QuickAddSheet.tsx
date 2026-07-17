@@ -13,9 +13,11 @@ import {
 import {
   Bell,
   CalendarDays,
+  Check,
   Lock,
   Plus,
   Repeat,
+  Rows3,
   X,
 } from 'lucide-react';
 import {
@@ -300,6 +302,7 @@ export default function QuickAddSheet({
   categoryTagMap,
   submitLabel = 'Add Task',
   defaultRepeatDaily = false,
+  sections = [],
 }: QuickAddSheetProps) {
   const [text, setText] = useState(initialText);
   const [repeat, setRepeat] = useState<RepeatChoice>(defaultRepeat);
@@ -318,6 +321,8 @@ export default function QuickAddSheet({
   }, [open]);
   const [showPremiumLimit, setShowPremiumLimit] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
+  const [pickedSectionId, setPickedSectionId] = useState<string | null>(null);
+  const [showSectionPicker, setShowSectionPicker] = useState(false);
   const [pickedBacklogTaskId, setPickedBacklogTaskId] = useState<string | null>(null);
   const [pickedBacklogText, setPickedBacklogText] = useState<string | null>(null);
   const [pickedNotes, setPickedNotes] = useState<string | undefined>(undefined);
@@ -573,6 +578,8 @@ export default function QuickAddSheet({
     setShowSavedConfirm(false);
     setHasSuggestionContent(false);
     setManagedTag(null);
+    setPickedSectionId(null);
+    setShowSectionPicker(false);
 
     const initialDate = defaultDateKey ?? ymdLocal(new Date());
     setSelectedDateKey(initialDate);
@@ -581,6 +588,22 @@ export default function QuickAddSheet({
   }, [open, initialText, defaultRepeat, defaultPickedDay, defaultDateKey, daysOrder]);
 
   const isLater = pickedDays.includes(7);
+  const pickedSection =
+    sections.find((s) => s.id === pickedSectionId) ?? null;
+  const sectionBtnRef = useRef<HTMLButtonElement>(null);
+  const [sectionMenuPos, setSectionMenuPos] = useState<{
+    left: number;
+    bottom: number;
+  } | null>(null);
+  const openSectionPicker = () => {
+    const r = sectionBtnRef.current?.getBoundingClientRect();
+    if (!r) return;
+    setSectionMenuPos({
+      left: Math.max(8, Math.min(r.left, window.innerWidth - 232)),
+      bottom: window.innerHeight - r.top + 8,
+    });
+    setShowSectionPicker(true);
+  };
   const todayKey = ymdLocal(new Date());
   const tomorrowDate = new Date();
   tomorrowDate.setDate(tomorrowDate.getDate() + 1);
@@ -739,6 +762,7 @@ export default function QuickAddSheet({
         repeatRule: repeat === 'custom' ? repeatRule : null,
         notes: pickedBacklogTaskId ? pickedNotes : undefined,
         checklist: pickedBacklogTaskId ? pickedChecklist : undefined,
+        sectionId: pickedSectionId ?? undefined,
       });
       if (removeSavedTask && pickedBacklogTaskId) {
         const backlogKey = '/api/tasks?view=board&day=-1';
@@ -955,7 +979,7 @@ export default function QuickAddSheet({
                             }
                             onFocus={() => setInputFocused(true)}
                             onBlur={() => setInputFocused(false)}
-                            placeholder="What needs doing?"
+                            placeholder="Add a task"
                             disabled={isSubmitting}
                             spellCheck={false}
                             autoComplete="off"
@@ -1145,6 +1169,23 @@ export default function QuickAddSheet({
                             label={repeatShortLabel}
                             onClick={() => setActivePicker('repeat')}
                           />
+                        )}
+                        {sections.length > 0 && !isLater && (
+                          <button
+                            ref={sectionBtnRef}
+                            type="button"
+                            onClick={openSectionPicker}
+                            className={`inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-bold transition-transform active:scale-95 ${
+                              pickedSection
+                                ? 'bg-primary/10 text-primary'
+                                : 'bg-muted/70 text-muted-foreground'
+                            }`}
+                          >
+                            <Rows3 className="h-4 w-4 shrink-0" />
+                            <span className="max-w-[110px] truncate whitespace-nowrap">
+                              {pickedSection?.name ?? 'Section'}
+                            </span>
+                          </button>
                         )}
                         <div className="ml-auto flex items-center gap-1">
                           <ToolbarIcon
@@ -1371,6 +1412,56 @@ export default function QuickAddSheet({
           setManagedTag(null);
         }}
       />
+
+      {mounted && showSectionPicker && sectionMenuPos && createPortal(
+        <>
+          <div
+            className="fixed inset-0 z-[1499]"
+            onPointerDown={() => setShowSectionPicker(false)}
+          />
+          <div
+            className="fixed z-[1500] w-56 overflow-hidden rounded-2xl border border-border/70 bg-popover py-1 shadow-xl"
+            style={{ left: sectionMenuPos.left, bottom: sectionMenuPos.bottom }}
+          >
+            <div className="max-h-[40vh] overflow-y-auto">
+              <button
+                type="button"
+                onClick={() => {
+                  setPickedSectionId(null);
+                  setShowSectionPicker(false);
+                }}
+                className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-[14px] font-bold text-foreground transition-colors [@media(hover:hover)]:hover:bg-muted/60"
+              >
+                <span className="grid h-4 w-4 shrink-0 place-items-center">
+                  {!pickedSection && (
+                    <Check className="h-4 w-4 text-primary" strokeWidth={3} />
+                  )}
+                </span>
+                No section
+              </button>
+              {sections.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => {
+                    setPickedSectionId(s.id);
+                    setShowSectionPicker(false);
+                  }}
+                  className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-[14px] font-bold text-foreground transition-colors [@media(hover:hover)]:hover:bg-muted/60"
+                >
+                  <span className="grid h-4 w-4 shrink-0 place-items-center">
+                    {pickedSectionId === s.id && (
+                      <Check className="h-4 w-4 text-primary" strokeWidth={3} />
+                    )}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate">{s.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </>,
+        document.body,
+      )}
 
       {mounted && showSavedConfirm && createPortal(
         <div

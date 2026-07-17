@@ -1,5 +1,6 @@
 import {
   CheckCircle2,
+  ChevronDown,
   Circle,
   EllipsisVertical,
   CalendarCheck,
@@ -7,11 +8,13 @@ import {
   Repeat,
   Filter,
   CalendarDays,
+  Pencil,
   Plus,
   Flame,
   Pen,
   ListChecks,
   EyeOff,
+  Trash2,
 } from 'lucide-react';
 import Fly from '@/components/ui/fly';
 import { TimeTag } from '@/components/ui/TimeTag';
@@ -32,6 +35,7 @@ import { useRouter } from 'next/navigation';
 import useSWR from 'swr';
 import {
   DndContext,
+  closestCenter,
   closestCorners,
   KeyboardSensor,
   MouseSensor,
@@ -39,6 +43,7 @@ import {
   useSensors,
   DragEndEvent,
   DragOverEvent,
+  DragStartEvent,
   TouchSensor,
   Modifier,
   MeasuringStrategy,
@@ -105,7 +110,26 @@ interface Task {
   /** Consecutive-completion streak for a repeating task, as of today. */
   streak?: number;
   isStarter?: boolean;
+  sectionId?: string | null;
 }
+
+export interface TaskListSection {
+  id: string;
+  name: string;
+  order: number;
+  collapsed: boolean;
+}
+
+const SECTION_PREFIX = 'section:';
+const sectionSortableId = (id: string) => `${SECTION_PREFIX}${id}`;
+const sectionIdFromSortable = (id: string | number) =>
+  typeof id === 'string' && id.startsWith(SECTION_PREFIX)
+    ? id.slice(SECTION_PREFIX.length)
+    : null;
+
+type ListRow =
+  | { kind: 'task'; task: Task }
+  | { kind: 'header'; section: TaskListSection; count: number; doneCount: number };
 
 const animateLayoutChanges: AnimateLayoutChanges = (args) =>
   args.isSorting || args.wasDragging ? defaultAnimateLayoutChanges(args) : true;
@@ -1020,6 +1044,252 @@ const SortableTaskItem = React.forwardRef<
   },
 );
 
+function SortableSectionHeader({
+  section,
+  count,
+  doneCount,
+  isFirst,
+  onToggleCollapsed,
+  onRename,
+  onDelete,
+}: {
+  section: TaskListSection;
+  count: number;
+  doneCount: number;
+  isFirst: boolean;
+  onToggleCollapsed: () => void;
+  onRename: (name: string) => void;
+  onDelete: () => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: sectionSortableId(section.id),
+    animateLayoutChanges,
+  });
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const renameRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (renaming) {
+      renameRef.current?.focus();
+      renameRef.current?.select();
+    }
+  }, [renaming]);
+
+  const commitRename = () => {
+    const next = renameRef.current?.value.trim();
+    setRenaming(false);
+    if (next && next !== section.name) onRename(next);
+  };
+
+  // dnd-kit's Mouse/Touch sensors listen on mousedown/touchstart (not
+  // pointerdown), so interactive children must stop those to avoid the held
+  // tap being captured as a drag that swallows their click.
+  const stopDndActivation = {
+    onPointerDown: (e: React.PointerEvent) => e.stopPropagation(),
+    onMouseDown: (e: React.MouseEvent) => e.stopPropagation(),
+    onTouchStart: (e: React.TouchEvent) => e.stopPropagation(),
+  };
+
+  const remaining = count - doneCount;
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Translate.toString(transform),
+        transition,
+        zIndex: isDragging ? 30 : menuOpen ? 40 : 1,
+      }}
+      {...attributes}
+      {...(renaming ? {} : listeners)}
+      data-is-active="true"
+      data-section-header="true"
+      className={`relative w-full select-none ${isFirst ? 'mt-1' : 'mt-3'} mb-1.5 ${
+        isDragging ? 'opacity-90' : ''
+      }`}
+    >
+      <div
+        onClick={renaming ? undefined : onToggleCollapsed}
+        className={`group flex min-h-[40px] cursor-pointer items-center gap-1.5 rounded-xl px-1.5 py-1 transition-colors ${
+          isDragging ? 'bg-popover shadow-md ring-1 ring-border/70' : ''
+        }`}
+      >
+        <motion.span
+          initial={false}
+          animate={{ rotate: section.collapsed ? -90 : 0 }}
+          transition={{ duration: 0.18, ease: 'easeOut' }}
+          className="grid h-7 w-7 shrink-0 place-items-center text-muted-foreground/70"
+        >
+          <ChevronDown className="h-4 w-4" strokeWidth={2.75} />
+        </motion.span>
+
+        {renaming ? (
+          <input
+            ref={renameRef}
+            defaultValue={section.name}
+            maxLength={60}
+            {...stopDndActivation}
+            onBlur={commitRename}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                commitRename();
+              } else if (e.key === 'Escape') {
+                setRenaming(false);
+              }
+            }}
+            className="min-w-0 flex-1 bg-transparent text-[13px] font-black uppercase tracking-[0.12em] text-foreground focus:outline-none"
+          />
+        ) : (
+          <span className="min-w-0 flex-1 truncate text-[13px] font-black uppercase tracking-[0.12em] text-muted-foreground">
+            {section.name}
+          </span>
+        )}
+
+        {count > 0 && !renaming && (
+          <span
+            className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-black tabular-nums leading-none ${
+              remaining === 0
+                ? 'bg-green-500/10 text-green-600 dark:text-green-400'
+                : 'bg-muted text-muted-foreground'
+            }`}
+          >
+            {remaining === 0 ? '✓' : remaining}
+          </span>
+        )}
+
+        {!renaming && (
+          <button
+            type="button"
+            aria-label={`Section options for ${section.name}`}
+            {...stopDndActivation}
+            onClick={(e) => {
+              e.stopPropagation();
+              setMenuOpen((v) => !v);
+            }}
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-muted-foreground/50 transition-colors [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground"
+          >
+            <EllipsisVertical className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+
+      {menuOpen && (
+        <>
+          <div
+            className="fixed inset-0 z-40"
+            onMouseDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              setMenuOpen(false);
+            }}
+          />
+          <div className="absolute right-1 top-full z-50 mt-1 w-44 overflow-hidden rounded-2xl border border-border/70 bg-popover py-1 shadow-lg">
+            <button
+              type="button"
+              {...stopDndActivation}
+              onClick={(e) => {
+                e.stopPropagation();
+                setMenuOpen(false);
+                setRenaming(true);
+              }}
+              className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-[14px] font-bold text-foreground transition-colors [@media(hover:hover)]:hover:bg-muted/60"
+            >
+              <Pencil className="h-4 w-4 text-muted-foreground" />
+              Rename
+            </button>
+            <button
+              type="button"
+              {...stopDndActivation}
+              onClick={(e) => {
+                e.stopPropagation();
+                setMenuOpen(false);
+                onDelete();
+              }}
+              className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-[14px] font-bold text-rose-500 transition-colors [@media(hover:hover)]:hover:bg-rose-500/10"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete section
+            </button>
+            <p className="px-3.5 pb-1.5 pt-1 text-[11px] font-medium leading-snug text-muted-foreground">
+              Tasks stay on your list.
+            </p>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function AddSectionRow({
+  onCreate,
+  disabled,
+}: {
+  onCreate: (name: string) => void;
+  disabled?: boolean;
+}) {
+  const [editing, setEditing] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editing) inputRef.current?.focus();
+  }, [editing]);
+
+  const commit = () => {
+    const name = inputRef.current?.value.trim();
+    setEditing(false);
+    if (name) onCreate(name);
+  };
+
+  if (!editing) {
+    return (
+      <button
+        type="button"
+        onClick={() => setEditing(true)}
+        disabled={disabled}
+        className="mt-1 flex w-full items-center justify-center gap-1.5 rounded-xl py-2 text-[13px] font-bold text-muted-foreground/60 transition-colors [@media(hover:hover)]:hover:text-foreground disabled:pointer-events-none"
+      >
+        <Plus className="h-3.5 w-3.5" strokeWidth={2.75} />
+        New section
+      </button>
+    );
+  }
+
+  return (
+    <div className="mt-1 flex items-center gap-1.5 rounded-xl border border-dashed border-muted-foreground/25 bg-muted/10 px-2.5 py-1">
+      <span className="grid h-7 w-7 shrink-0 place-items-center text-muted-foreground/70">
+        <ChevronDown className="h-4 w-4" strokeWidth={2.75} />
+      </span>
+      <input
+        ref={inputRef}
+        maxLength={60}
+        placeholder="Section name"
+        enterKeyHint="done"
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            commit();
+          } else if (e.key === 'Escape') {
+            if (inputRef.current) inputRef.current.value = '';
+            setEditing(false);
+          }
+        }}
+        className="min-w-0 flex-1 bg-transparent py-1.5 text-[13px] font-black uppercase tracking-[0.12em] text-foreground placeholder:font-bold placeholder:normal-case placeholder:tracking-normal placeholder:text-muted-foreground/50 focus:outline-none"
+      />
+    </div>
+  );
+}
+
 export default function TaskList({
   tasks,
   toggle,
@@ -1050,6 +1320,12 @@ export default function TaskList({
   isFrozen = false,
   quickAddOpen = false,
   paused = false,
+  sections = [],
+  onCreateSection,
+  onRenameSection,
+  onDeleteSection,
+  onSetSectionCollapsed,
+  onReorderSections,
 }: {
   tasks: Task[];
   toggle: (id: string, completed?: boolean) => void;
@@ -1114,6 +1390,12 @@ export default function TaskList({
   isFrozen?: boolean;
   quickAddOpen?: boolean;
   paused?: boolean;
+  sections?: TaskListSection[];
+  onCreateSection?: (name: string) => void;
+  onRenameSection?: (sectionId: string, name: string) => void;
+  onDeleteSection?: (sectionId: string) => void;
+  onSetSectionCollapsed?: (sectionId: string, collapsed: boolean) => void;
+  onReorderSections?: (orderedIds: string[]) => void;
 }) {
   const router = useRouter(); // Import might be needed if not present
   const userTags = tags || [];
@@ -1171,6 +1453,31 @@ export default function TaskList({
     new Set(),
   );
   const [isAnyDragging, setIsAnyDragging] = useState(false);
+  const [draggingSectionId, setDraggingSectionId] = useState<string | null>(
+    null,
+  );
+  const expandTimerRef = useRef<number | null>(null);
+  const clearDraggingSection = (delayMs = 0) => {
+    if (expandTimerRef.current !== null) {
+      window.clearTimeout(expandTimerRef.current);
+      expandTimerRef.current = null;
+    }
+    if (delayMs <= 0) {
+      setDraggingSectionId(null);
+      return;
+    }
+    expandTimerRef.current = window.setTimeout(() => {
+      expandTimerRef.current = null;
+      setDraggingSectionId(null);
+    }, delayMs);
+  };
+  useEffect(
+    () => () => {
+      if (expandTimerRef.current !== null)
+        window.clearTimeout(expandTimerRef.current);
+    },
+    [],
+  );
   const activeAreaLimitsRef = React.useRef<{
     top: number;
     bottom: number;
@@ -1414,7 +1721,59 @@ export default function TaskList({
 
   // Combined for DnD context and empty-state checks
   const sortedVisibleTasks = [...sortedActiveTasks, ...completedTasks];
-  const activeTaskIds = sortedActiveTasks.map((t) => t.id);
+
+  // ---- Sections: group active tasks under their headers ----
+  // Unsectioned tasks first (no header), then each section in order. Completed
+  // tasks keep sinking to the single bottom pile regardless of section.
+  const sectionsSorted = [...sections].sort((a, b) => a.order - b.order);
+  const hasSections = sectionsSorted.length > 0;
+  const knownSectionIds = new Set(sectionsSorted.map((s) => s.id));
+  const rows: ListRow[] = (() => {
+    if (!hasSections)
+      return sortedActiveTasks.map((t) => ({ kind: 'task' as const, task: t }));
+    const bySection = new Map<string | null, Task[]>();
+    for (const t of sortedActiveTasks) {
+      const key =
+        t.sectionId && knownSectionIds.has(t.sectionId) ? t.sectionId : null;
+      const list = bySection.get(key);
+      if (list) list.push(t);
+      else bySection.set(key, [t]);
+    }
+    const doneBySection = new Map<string, number>();
+    for (const t of completedTasks) {
+      if (t.sectionId && knownSectionIds.has(t.sectionId))
+        doneBySection.set(
+          t.sectionId,
+          (doneBySection.get(t.sectionId) ?? 0) + 1,
+        );
+    }
+    const out: ListRow[] = (bySection.get(null) ?? []).map((t) => ({
+      kind: 'task' as const,
+      task: t,
+    }));
+    for (const s of sectionsSorted) {
+      const secTasks = bySection.get(s.id) ?? [];
+      const done = doneBySection.get(s.id) ?? 0;
+      out.push({
+        kind: 'header',
+        section: s,
+        count: secTasks.length + done,
+        doneCount: done,
+      });
+      if (!s.collapsed && draggingSectionId === null)
+        for (const t of secTasks) out.push({ kind: 'task', task: t });
+    }
+    return out;
+  })();
+  const rowIds = rows.map((r) =>
+    r.kind === 'task' ? r.task.id : sectionSortableId(r.section.id),
+  );
+  // While a header is being dragged, only headers participate in sorting —
+  // unsectioned tasks stay frozen in place instead of shifting around it.
+  const activeTaskIds =
+    draggingSectionId !== null
+      ? rowIds.filter((id) => sectionIdFromSortable(id) !== null)
+      : rowIds;
   const allTasksCompleted =
     tasks.length > 0 && tasks.every((task) => task.completed);
 
@@ -1423,19 +1782,37 @@ export default function TaskList({
     (t) => t.completed && !vSet.has(t.id) && !delayedCompleted.has(t.id),
   ).length;
 
-  const handleDragStart = () => {
+  const handleDragStart = (event: DragStartEvent) => {
     hapticImpact();
     lastDragOverIdRef.current = null;
     setIsAnyDragging(true);
-    // Calculate boundary
-    const activeNodes = document.querySelectorAll('[data-is-active="true"]');
+    // Grabbing a header tucks every section down to its bare header row so
+    // sections reorder as whole blocks; they re-expand on drop.
+    const grabbedSectionId = sectionIdFromSortable(event.active.id);
+    if (expandTimerRef.current !== null) {
+      window.clearTimeout(expandTimerRef.current);
+      expandTimerRef.current = null;
+    }
+    setDraggingSectionId(grabbedSectionId);
+    computeActiveAreaLimits(grabbedSectionId !== null);
+  };
+
+  // Boundary for the drag corridor. Header drags are confined to the header
+  // stack (a section can never sit between unsectioned tasks). popLayout-
+  // exiting rows are position: absolute at their old spot while they fade —
+  // they must not count, or the corridor stays sized to the pre-collapse
+  // layout.
+  const computeActiveAreaLimits = (headersOnly = false) => {
+    const activeNodes = Array.from(
+      document.querySelectorAll(
+        headersOnly ? '[data-section-header="true"]' : '[data-is-active="true"]',
+      ),
+    ).filter((n) => getComputedStyle(n as HTMLElement).position !== 'absolute');
     const container = scrollContainerRef.current;
 
     if (activeNodes.length > 0 && container) {
       const containerRect = container.getBoundingClientRect();
-      const rects = Array.from(activeNodes).map((n) =>
-        n.getBoundingClientRect(),
-      );
+      const rects = activeNodes.map((n) => n.getBoundingClientRect());
 
       // Calculate limits relative to the container's *content* top
       // We add scrollTop because we want the position relative to the start of the scrollable content
@@ -1452,8 +1829,28 @@ export default function TaskList({
     }
   };
 
+  // The tuck-in happens on the render *after* drag start, so the corridor
+  // measured at drag start spans the old expanded list — remeasure once the
+  // compact layout is in and again when the exit fades finish.
+  useEffect(() => {
+    if (draggingSectionId === null) return;
+    const remeasure = () => computeActiveAreaLimits(true);
+    let raf2 = 0;
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(remeasure);
+    });
+    const settle = window.setTimeout(remeasure, 260);
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+      window.clearTimeout(settle);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draggingSectionId]);
+
   const handleDragCancel = () => {
     setIsAnyDragging(false);
+    clearDraggingSection();
     activeAreaLimitsRef.current = null;
   };
 
@@ -1475,6 +1872,8 @@ export default function TaskList({
     activeAreaLimitsRef.current = null;
     const { active, over } = event;
 
+    const activeSectionId = sectionIdFromSortable(active.id);
+
     // A held tap activates the delay-based sort sensor without any movement,
     // and dnd-kit swallows the click that would have opened the detail sheet.
     // Treat a no-movement "drag" as the tap it really was.
@@ -1483,36 +1882,87 @@ export default function TaskList({
       Math.abs(event.delta.y) < 5 &&
       typeof active.id === 'string'
     ) {
-      setActionSheetId(active.id);
+      clearDraggingSection();
+      if (activeSectionId) {
+        const s = sectionsSorted.find((x) => x.id === activeSectionId);
+        if (s) {
+          hapticTick();
+          onSetSectionCollapsed?.(s.id, !s.collapsed);
+        }
+      } else {
+        setActionSheetId(active.id);
+      }
       return;
     }
 
-    if (!over || !onReorder) return;
-
-    if (active.id !== over.id) {
-      // Only reorder within active tasks (completed are in a separate section)
-      const oldIndex = sortedActiveTasks.findIndex((t) => t.id === active.id);
-      const newIndex = sortedActiveTasks.findIndex((t) => t.id === over.id);
-
-      if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
-        const reorderedActive = arrayMove(
-          sortedActiveTasks,
-          oldIndex,
-          newIndex,
-        );
-
-        // Rebuild full list: reordered active + completed + hidden
-        const activeIds = new Set(sortedActiveTasks.map((t) => t.id));
-        const completedIds = new Set(completedTasks.map((t) => t.id));
-        const hiddenTasks = tasks.filter(
-          (t) => !activeIds.has(t.id) && !completedIds.has(t.id),
-        );
-
-        const finalOrder = [...reorderedActive, ...completedTasks, ...hiddenTasks];
-        hapticTick();
-        onReorder(finalOrder);
-      }
+    if (!over || active.id === over.id) {
+      clearDraggingSection();
+      return;
     }
+
+    const oldIndex = rowIds.indexOf(String(active.id));
+    const newIndex = rowIds.indexOf(String(over.id));
+    if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) {
+      clearDraggingSection();
+      return;
+    }
+
+    // Dragging a section header reorders sections; tasks follow their section
+    // by id, so only the header order needs persisting. The sections stay
+    // tucked until the drop transition finishes settling the header into its
+    // compact slot — expanding at the same instant moves the target under it
+    // and reads as a bounce.
+    if (activeSectionId) {
+      if (!onReorderSections) {
+        clearDraggingSection();
+        return;
+      }
+      const movedIds = arrayMove(rowIds, oldIndex, newIndex);
+      const orderedSectionIds = movedIds
+        .map((id) => sectionIdFromSortable(id))
+        .filter((id): id is string => !!id);
+      hapticTick();
+      onReorderSections(orderedSectionIds);
+      clearDraggingSection(280);
+      return;
+    }
+
+    if (!onReorder) return;
+
+    // Dragging a task: recompute its position AND its section from where it
+    // landed — every task belongs to the header above it (none = unsectioned).
+    const movedRows = arrayMove(rows, oldIndex, newIndex);
+    let currentSection: string | null = null;
+    const reorderedActive: Task[] = [];
+    const sectionByTaskId = new Map<string, string | null>();
+    for (const row of movedRows) {
+      if (row.kind === 'header') {
+        currentSection = row.section.id;
+        continue;
+      }
+      sectionByTaskId.set(row.task.id, currentSection);
+      reorderedActive.push({ ...row.task, sectionId: currentSection });
+    }
+    // Tasks hidden inside collapsed sections aren't in `rows`; keep them in
+    // place (after their section's visible block) with their section intact.
+    const placedIds = new Set(reorderedActive.map((t) => t.id));
+    const collapsedTasks = sortedActiveTasks.filter((t) => !placedIds.has(t.id));
+
+    // Rebuild full list: reordered active + collapsed + completed + hidden
+    const activeIds = new Set(sortedActiveTasks.map((t) => t.id));
+    const completedIds = new Set(completedTasks.map((t) => t.id));
+    const hiddenTasks = tasks.filter(
+      (t) => !activeIds.has(t.id) && !completedIds.has(t.id),
+    );
+
+    const finalOrder = [
+      ...reorderedActive,
+      ...collapsedTasks,
+      ...completedTasks,
+      ...hiddenTasks,
+    ];
+    hapticTick();
+    onReorder(finalOrder);
   };
 
   const openMenu = (e: React.MouseEvent<HTMLButtonElement>, task: Task) => {
@@ -1715,7 +2165,9 @@ export default function TaskList({
             /* List Content */
             <DndContext
               sensors={sensors}
-              collisionDetection={closestCorners}
+              collisionDetection={
+                draggingSectionId !== null ? closestCenter : closestCorners
+              }
               onDragStart={handleDragStart}
               onDragOver={handleDragOver}
               onDragEnd={handleDragEnd}
@@ -1731,7 +2183,31 @@ export default function TaskList({
                   strategy={verticalListSortingStrategy}
                 >
                   <AnimatePresence initial={false} mode="popLayout">
-                    {sortedVisibleTasks.map((task) => {
+                    {[
+                      ...rows,
+                      ...completedTasks.map(
+                        (task) => ({ kind: 'task', task }) as ListRow,
+                      ),
+                    ].map((row) => {
+                      if (row.kind === 'header') {
+                        const s = row.section;
+                        return (
+                          <SortableSectionHeader
+                            key={sectionSortableId(s.id)}
+                            section={s}
+                            count={row.count}
+                            doneCount={row.doneCount}
+                            isFirst={rows[0] === row}
+                            onToggleCollapsed={() => {
+                              hapticTick();
+                              onSetSectionCollapsed?.(s.id, !s.collapsed);
+                            }}
+                            onRename={(name) => onRenameSection?.(s.id, name)}
+                            onDelete={() => onDeleteSection?.(s.id)}
+                          />
+                        );
+                      }
+                      const task = row.task;
                       const isCompleted = task.completed || vSet.has(task.id);
                       const isHintPeekPrimary =
                         task.id ===
@@ -1813,6 +2289,12 @@ export default function TaskList({
                 <Plus className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors md:h-6 md:w-6" strokeWidth={2.5} />
               </div>
             </button>
+            {onCreateSection && sections.length < 10 && (
+              <AddSectionRow
+                onCreate={onCreateSection}
+                disabled={quickAddOpen}
+              />
+            )}
           </div>
         )}
         </div>

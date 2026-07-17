@@ -383,6 +383,7 @@ import {
   Settings,
   Bell,
   BellRing,
+  BarChart3,
   Mail,
   SlidersHorizontal,
   Database,
@@ -416,6 +417,7 @@ import { useNotificationStatus } from '@/hooks/useNotificationStatus';
 import { InviteFriendsModal } from '@/components/ui/InviteFriendsModal';
 import { CommunityPanel } from '@/components/ui/CommunityModal';
 import { ProfilePanel } from '@/components/ui/ProfileModal';
+import { useFrogodoroUiStore } from '@/lib/frogodoroUiStore';
 
 export function MobileMenuCluster({
   position = 'fixed',
@@ -427,6 +429,7 @@ export function MobileMenuCluster({
   const { isLoadingScreenVisible } = useUIStore();
   return (
     <div
+      data-fly-fade
       className={cn(
         'left-3 top-[calc(env(safe-area-inset-top)+0.5rem)] z-[90] flex items-center px-2 py-1 md:hidden',
         position === 'absolute' ? 'absolute' : 'fixed',
@@ -661,6 +664,7 @@ function MobileSheet({
   const [toast, setToast] = useState<string | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [plusOpen, setPlusOpen] = useState(false);
+  const openFocusLauncher = useFrogodoroUiStore((state) => state.openFocusLauncher);
   const { canEnable: canEnableNotifs, isEnabled: notifsEnabled, isNative, isWeb, enableOrConfigure, disable: disableNotifs, loading: notifLoading } = useNotificationStatus();
   const { data: userInfo, mutate: refreshUserInfo } = useSWR<UserInfo>(
     showAuth && user ? '/api/user' : null,
@@ -785,6 +789,10 @@ function MobileSheet({
                   onOpenNotifications={() => setView('notifications')}
                   onOpenPreferences={() => setView('preferences')}
                   onOpenIntegrations={() => setView('integrations')}
+                  onOpenFocusTimer={() => {
+                    onClose();
+                    window.setTimeout(openFocusLauncher, 240);
+                  }}
                   onOpenQuestFocus={() => {
                     onOpenQuestOnboarding();
                     onClose();
@@ -1001,6 +1009,7 @@ function MainView({
   onOpenNotifications,
   onOpenPreferences,
   onOpenIntegrations,
+  onOpenFocusTimer,
   onOpenQuestFocus,
   onInviteFriends,
   onOpenCommunity,
@@ -1030,6 +1039,7 @@ function MainView({
   onOpenNotifications: () => void;
   onOpenPreferences: () => void;
   onOpenIntegrations: () => void;
+  onOpenFocusTimer: () => void;
   onOpenQuestFocus: () => void;
   onInviteFriends: () => void;
   onOpenCommunity: () => void;
@@ -1083,6 +1093,7 @@ function MainView({
         onOpenQuestFocus={onOpenQuestFocus}
         onOpenPreferences={onOpenPreferences}
         onOpenIntegrations={onOpenIntegrations}
+        onOpenFocusTimer={onOpenFocusTimer}
         calendarSubtitle={
           needsAttention
             ? 'Action needed'
@@ -1613,11 +1624,13 @@ function QuickTile({
   title,
   subtitle,
   onClick,
+  className,
 }: {
   icon: React.ReactNode;
   title: string;
   subtitle?: string;
   onClick: () => void;
+  className?: string;
 }) {
   return (
     <motion.button
@@ -1627,7 +1640,10 @@ function QuickTile({
       animate={{ opacity: 1, scale: 1 }}
       whileTap={{ scale: 0.98 }}
       transition={{ type: 'spring', stiffness: 380, damping: 26 }}
-      className="flex min-h-24 w-full items-center gap-3 rounded-2xl border border-border/50 bg-card px-4 py-3 text-left transition-all active:scale-[0.98] hover:bg-accent/50 max-[359px]:gap-2 max-[359px]:px-3"
+      className={cn(
+        'flex min-h-24 w-full items-center gap-3 rounded-2xl border border-border/50 bg-card px-4 py-3 text-left transition-[background-color,border-color,box-shadow,transform] active:scale-[0.98] hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary max-[359px]:gap-2 max-[359px]:px-3',
+        className,
+      )}
     >
       <div className="flex h-10 w-10 shrink-0 items-center justify-center">{icon}</div>
       <div className="min-w-0 flex-1">
@@ -1690,6 +1706,7 @@ function QuickTilesGrid({
   onOpenQuestFocus,
   onOpenPreferences,
   onOpenIntegrations,
+  onOpenFocusTimer,
   calendarSubtitle,
 }: {
   theme?: string;
@@ -1697,6 +1714,7 @@ function QuickTilesGrid({
   onOpenQuestFocus: () => void;
   onOpenPreferences: () => void;
   onOpenIntegrations: () => void;
+  onOpenFocusTimer: () => void;
   calendarSubtitle: string;
 }) {
   const { value: rotation, setValue: setRotation } = useShuffleInterval();
@@ -1727,6 +1745,22 @@ function QuickTilesGrid({
         title="Style Shuffle"
         subtitle={labelForInterval(rotation)}
         onClick={() => setRotationOpen(true)}
+      />
+      <QuickTile
+        icon={
+          <span className="grid h-11 w-11 place-items-center rounded-2xl bg-violet-500/10 text-violet-500 ring-1 ring-violet-500/20">
+            <BarChart3 className="h-6 w-6" aria-hidden="true" />
+          </span>
+        }
+        title="Your patterns"
+        subtitle="See what’s working"
+        onClick={() => window.location.assign('/insights')}
+      />
+      <QuickTile
+        icon={<Icon name="clock" label="Focus timer" className="h-[52px] w-[52px]" />}
+        title="Focus timer"
+        subtitle="Task or focus area"
+        onClick={onOpenFocusTimer}
       />
       <QuickTile
         icon={<Icon name="googleCalendar" label="Calendar sync" className="h-8 w-8" />}

@@ -57,6 +57,14 @@ export interface Task {
   endTime?: string;
   reminder?: string;
   isStarter?: boolean;
+  sectionId?: string | null;
+}
+
+export interface TaskSection {
+  id: string;
+  name: string;
+  order: number;
+  collapsed: boolean;
 }
 
 export type FlyStatus = {
@@ -77,6 +85,7 @@ export type HungerStatus = {
 interface TasksResponse {
   tasks: Task[];
   weeklyIds?: string[];
+  sections?: TaskSection[];
   flyStatus: FlyStatus;
   hungerStatus?: HungerStatus;
   dailyTasksCount?: number;
@@ -855,11 +864,146 @@ export function useTaskData({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           day: dow,
-          tasks: newTasks.map((t) => ({ id: t.id })),
+          tasks: newTasks.map((t) => ({
+            id: t.id,
+            sectionId: t.sectionId ?? null,
+          })),
         }),
       });
     },
     [todayData, mutateToday],
+  );
+
+  const mutateSections = useCallback(
+    (updater: (cur: TaskSection[]) => TaskSection[]) => {
+      if (!todayData) return;
+      mutateToday(
+        { ...todayData, sections: updater(todayData.sections ?? []) },
+        { revalidate: false },
+      );
+    },
+    [todayData, mutateToday],
+  );
+
+  const createSection = useCallback(
+    async (name: string) => {
+      const trimmed = name.trim();
+      if (!trimmed) return;
+      const id = crypto.randomUUID?.() ?? `sec_${Date.now()}`;
+      mutateSections((cur) => [
+        ...cur,
+        {
+          id,
+          name: trimmed,
+          order: (cur[cur.length - 1]?.order ?? 0) + 1,
+          collapsed: false,
+        },
+      ]);
+      try {
+        await fetch('/api/sections', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, name: trimmed }),
+        });
+      } catch (e) {
+        console.error('Create section failed', e);
+        mutateToday();
+      }
+    },
+    [mutateSections, mutateToday],
+  );
+
+  const renameSection = useCallback(
+    async (sectionId: string, name: string) => {
+      const trimmed = name.trim();
+      if (!trimmed) return;
+      mutateSections((cur) =>
+        cur.map((s) => (s.id === sectionId ? { ...s, name: trimmed } : s)),
+      );
+      try {
+        await fetch('/api/sections', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sectionId, name: trimmed }),
+        });
+      } catch (e) {
+        console.error('Rename section failed', e);
+        mutateToday();
+      }
+    },
+    [mutateSections, mutateToday],
+  );
+
+  const setSectionCollapsed = useCallback(
+    async (sectionId: string, collapsed: boolean) => {
+      mutateSections((cur) =>
+        cur.map((s) => (s.id === sectionId ? { ...s, collapsed } : s)),
+      );
+      try {
+        await fetch('/api/sections', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sectionId, collapsed }),
+        });
+      } catch (e) {
+        console.error('Collapse section failed', e);
+      }
+    },
+    [mutateSections],
+  );
+
+  const deleteSection = useCallback(
+    async (sectionId: string) => {
+      if (todayData) {
+        mutateToday(
+          {
+            ...todayData,
+            sections: (todayData.sections ?? []).filter(
+              (s) => s.id !== sectionId,
+            ),
+            tasks: todayData.tasks.map((t) =>
+              t.sectionId === sectionId ? { ...t, sectionId: null } : t,
+            ),
+          },
+          { revalidate: false },
+        );
+      }
+      try {
+        await fetch(`/api/sections?sectionId=${encodeURIComponent(sectionId)}`, {
+          method: 'DELETE',
+        });
+      } catch (e) {
+        console.error('Delete section failed', e);
+        mutateToday();
+      }
+    },
+    [todayData, mutateToday],
+  );
+
+  const reorderSections = useCallback(
+    async (orderedIds: string[]) => {
+      mutateSections((cur) => {
+        const byId = new Map(cur.map((s) => [s.id, s]));
+        const next: TaskSection[] = [];
+        orderedIds.forEach((id, i) => {
+          const s = byId.get(id);
+          if (s) next.push({ ...s, order: i + 1 });
+        });
+        for (const s of cur) if (!orderedIds.includes(s.id)) next.push(s);
+        return next;
+      });
+      try {
+        await fetch('/api/sections', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ order: orderedIds }),
+        });
+      } catch (e) {
+        console.error('Reorder sections failed', e);
+        mutateToday();
+      }
+    },
+    [mutateSections, mutateToday],
   );
 
   /**
@@ -1191,6 +1335,8 @@ export function useTaskData({
 
   const tags = tagsData?.tags || [];
 
+  const sections = todayData?.sections ?? [];
+
   return {
     tasks,
     backlogTasks,
@@ -1199,6 +1345,7 @@ export function useTaskData({
     flyStatus,
     hungerStatus,
     weeklyIds,
+    sections,
     tags,
     isLoading: isLoadingToday || isLoadingBacklog,
 
@@ -1219,5 +1366,10 @@ export function useTaskData({
     updateTaskTags,
     deleteTaskSeries,
     duplicateTask,
+    createSection,
+    renameSection,
+    setSectionCollapsed,
+    deleteSection,
+    reorderSections,
   };
 }

@@ -321,8 +321,9 @@ function progressForLogicBlock(args: {
   startDate: string;
   endDate: string;
   counters?: QuestCounterEntry[];
+  focusCategoryId?: string;
 }) {
-  const { block, tasks, timezone, startDate, endDate, counters } = args;
+  const { block, tasks, timezone, startDate, endDate, counters, focusCategoryId } = args;
 
   if (block.type === 'metric_count') {
     if (!block.metricKey) return 0;
@@ -343,9 +344,17 @@ function progressForLogicBlock(args: {
 
   if (block.type === 'focus_minutes') {
     return Math.floor(
-      sumFocusSeconds(tasks, startDate, endDate, (task) =>
-        matchesLogicBlock(task, block),
-      ) / 60,
+      sumFocusSeconds(tasks, startDate, endDate, (task) => {
+        if (task.type !== 'focus-area') return matchesLogicBlock(task, block);
+        if (focusCategoryId) return task.focusAreaId === focusCategoryId;
+        const scopedTags =
+          block.tagMode === 'random_user_tag' && block.resolvedTagId
+            ? [block.resolvedTagId]
+            : block.tagMode === 'focus_category_tags'
+              ? block.resolvedTagIds
+              : undefined;
+        return scopedTags ? hasAnyTag(task, scopedTags) : true;
+      }) / 60,
     );
   }
 
@@ -940,6 +949,8 @@ async function syncQuestForTemplate(args: {
       startDate,
       endDate,
       counters,
+      focusCategoryId:
+        template.placement === 'category' ? template.categoryId : undefined,
     });
     const prevBlock = prevBlocksById.get(block.id);
     const prevOffset = Math.max(0, prevBlock?.progressOffset ?? 0);
@@ -1041,6 +1052,7 @@ export async function syncQuestState(args: {
         date: 1,
         createdAt: 1,
         tags: 1,
+        focusAreaId: 1,
         frogodoroSessions: 1,
         isStarter: 1,
       },

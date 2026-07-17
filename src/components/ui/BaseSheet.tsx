@@ -51,6 +51,13 @@ export interface BaseSheetProps {
   showClose?: boolean;
   /** Accessible label for the close button. */
   closeAriaLabel?: string;
+  /**
+   * Lift the sheet above the on-screen keyboard (mobile only). Pass the
+   * visualViewport inset from useKeyboardInset.
+   */
+  bottomInset?: number;
+  /** Extra inline styles for the sheet panel (e.g. keyboard-aware maxHeight). */
+  panelStyle?: React.CSSProperties;
 }
 
 const defaultDesktopTransition: Transition = {
@@ -99,6 +106,8 @@ export function BaseSheet({
   hideHandle = false,
   showClose = true,
   closeAriaLabel,
+  bottomInset = 0,
+  panelStyle,
 }: BaseSheetProps) {
   const resolvedMobileTransition = mobileTransition ?? defaultMobileTransition;
   const [mounted, setMounted] = useState(false);
@@ -197,7 +206,11 @@ export function BaseSheet({
           {/* Sheet wrapper */}
           <div
             className="pointer-events-none fixed inset-0 flex items-end justify-center p-0 sm:items-center sm:p-6"
-            style={{ zIndex: zIndex + 1 }}
+            style={{
+              zIndex: zIndex + 1,
+              bottom: isDesktop ? 0 : bottomInset,
+              transition: 'bottom 280ms cubic-bezier(0.32,0.72,0,1)',
+            }}
           >
             <motion.div
               variants={sheetVariants}
@@ -245,7 +258,7 @@ export function BaseSheet({
                   animate(backdropOpacity, 1, snapBackSpring);
                 }
               }}
-              style={{ willChange: 'transform' }}
+              style={{ willChange: 'transform', ...panelStyle }}
               className={cn(
                 'pointer-events-auto relative flex w-full flex-col overflow-hidden rounded-t-[24px] border border-border/50 bg-card text-card-foreground shadow-lg sm:rounded-[34px] sm:shadow-2xl',
                 className,

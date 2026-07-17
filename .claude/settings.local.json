@@ -345,7 +345,13 @@
       "Bash(echo \"ESLINT_EXIT=$?\")",
       "Bash(NODE_OPTIONS= pnpm run lint -- --file src/app/api/frogodoro/live-activity/route.ts --file src/lib/frogodoroSync.ts --file src/lib/liveTimer.ts --file src/components/providers/GlobalTimer.tsx)",
       "Bash(echo \"LINT_EXIT=$?\")",
-      "Bash(NODE_OPTIONS= pnpm exec next lint --file src/app/api/frogodoro/live-activity/route.ts --file src/lib/frogodoroSync.ts --file src/lib/liveTimer.ts --file src/components/providers/GlobalTimer.tsx)"
+      "Bash(NODE_OPTIONS= pnpm exec next lint --file src/app/api/frogodoro/live-activity/route.ts --file src/lib/frogodoroSync.ts --file src/lib/liveTimer.ts --file src/components/providers/GlobalTimer.tsx)",
+      "Bash(lsof -nP -iTCP -sTCP:LISTEN)",
+      "Bash(awk '{print $3, $4, $11, $12}')",
+      "WebFetch(domain:culturedcode.com)",
+      "Bash(awk 'NR>=2640 && NR<=2900 && \\(/updateOne|deleteOne|orderOverrides|occursHere|dateForDay|weekDates\\\\[/\\)' /Users/snirazran/Fullstack/my-todos/src/app/api/tasks/route.ts)",
+      "Bash(echo \"exit code: $?\")",
+      "Bash(echo \"done: $?\")"
     ]
   }
 }

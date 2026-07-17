@@ -1,13 +1,30 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import useSWR from 'swr';
 import { Icon } from '@/components/ui/Icon';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Check, Lock, Pencil, Plus } from 'lucide-react';
+import { Check, Lock, Pencil, Plus, Sparkles } from 'lucide-react';
 import { TAG_COLORS, TAG_MAX_LENGTH } from './constants';
+import { fetcher } from './utils';
 import type { SavedTag } from './types';
 import type { TagManager } from './useTagManager';
 import { TagManagerSheet } from './TagManagerSheet';
+
+type QuestContext = {
+  isPremium?: boolean;
+  activeFocusCategoryId?: string | null;
+  onboarding?: {
+    selectedCategoryIds?: string[];
+    categoryTagMap?: { categoryId: string; tagIds: string[] }[];
+  };
+  macroCategories?: {
+    id: string;
+    name: string;
+    shortLabel?: string;
+    accent?: string;
+  }[];
+};
 
 type Props = {
   tagManager: TagManager;
@@ -26,6 +43,8 @@ type Props = {
   suggestedTagName?: string;
   /** Tags currently connected to the active area quest. */
   questTagIds?: ReadonlySet<string>;
+  /** Show the "connect to focus area" chips when creating a new tag. */
+  showFocusConnect?: boolean;
 };
 
 export function TagsView({
@@ -41,6 +60,7 @@ export function TagsView({
   doneLabel = 'Done',
   suggestedTagName,
   questTagIds,
+  showFocusConnect = true,
 }: Props) {
   const {
     savedTags,
@@ -68,6 +88,92 @@ export function TagsView({
   // True while the user is typing a brand-new tag (colour picker auto-opened by
   // the input's onChange). Drives the bottom button's "Create" label/action.
   const isCreatingNewTag = showColorPicker && !!tagInput.trim();
+
+  const tz =
+    typeof window !== 'undefined'
+      ? Intl.DateTimeFormat().resolvedOptions().timeZone
+      : 'UTC';
+  const questKey = `/api/quests?view=home&timezone=${encodeURIComponent(tz)}`;
+  const { data: questContext, mutate: mutateQuests } = useSWR<QuestContext>(
+    showFocusConnect ? questKey : null,
+    fetcher,
+    { revalidateOnFocus: false },
+  );
+  const isPremium = !!questContext?.isPremium;
+  const activeFocusCategoryId = questContext?.activeFocusCategoryId ?? null;
+  const focusAreas = useMemo(() => {
+    const categories = questContext?.macroCategories ?? [];
+    const selected = questContext?.onboarding?.selectedCategoryIds ?? [];
+    return selected
+      .map((id) => categories.find((entry) => entry.id === id))
+      .filter((entry): entry is NonNullable<typeof entry> => !!entry);
+  }, [questContext]);
+  const categoryTagMap = questContext?.onboarding?.categoryTagMap ?? [];
+
+  const [newTagAreaId, setNewTagAreaId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!showColorPicker) setNewTagAreaId(null);
+  }, [showColorPicker]);
+
+  const newTagAreaOccupant = useMemo(() => {
+    if (!newTagAreaId) return null;
+    const occupiedId = categoryTagMap.find(
+      (entry) => entry.categoryId === newTagAreaId,
+    )?.tagIds[0];
+    if (!occupiedId) return null;
+    return savedTags.find((t) => t.id === occupiedId) ?? null;
+  }, [newTagAreaId, categoryTagMap, savedTags]);
+
+  const connectTagToArea = async (tagId: string, areaId: string) => {
+    const onboarding = questContext?.onboarding;
+    if (!onboarding?.selectedCategoryIds?.length) return;
+    const nextMap = (onboarding.categoryTagMap ?? [])
+      .map((entry) => ({
+        categoryId: entry.categoryId,
+        tagIds: entry.tagIds.filter((id) => id !== tagId),
+      }))
+      .filter((entry) => entry.tagIds.length > 0 && entry.categoryId !== areaId);
+    const existing =
+      (onboarding.categoryTagMap ?? [])
+        .find((entry) => entry.categoryId === areaId)
+        ?.tagIds.filter((id) => id !== tagId) ?? [];
+    nextMap.push({
+      categoryId: areaId,
+      tagIds: isPremium ? [...existing, tagId] : [tagId],
+    });
+    try {
+      const res = await fetch('/api/quests/onboarding', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          selectedCategoryIds: onboarding.selectedCategoryIds,
+          categoryTagMap: nextMap,
+          createSuggestions: false,
+          timezone: tz,
+        }),
+      });
+      if (!res.ok) throw new Error('Focus connect failed');
+      await mutateQuests();
+      window.dispatchEvent(new Event('tags-updated'));
+    } catch (error) {
+      console.error('Failed to connect tag to focus area', error);
+    }
+  };
+
+  const handleCreate = async () => {
+    const areaId = newTagAreaId;
+    const createdId = await createAndSaveTag();
+    setNewTagAreaId(null);
+    if (createdId && areaId) await connectTagToArea(createdId, areaId);
+  };
+
+  const submitTagInput = () => {
+    if (isCreatingNewTag) {
+      void handleCreate();
+    } else {
+      handleAddTag();
+    }
+  };
 
   const trimmedSuggestion = (suggestedTagName ?? '').trim();
   const suggestionExists = savedTags.some(
@@ -325,6 +431,98 @@ export function TagsView({
                   />
                 ))}
               </div>
+
+              {showFocusConnect && focusAreas.length > 0 && (
+                <div className="mt-4 border-t border-border/60 pt-3.5">
+                  <div className="mb-1 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wide text-muted-foreground">
+                      <Sparkles className="h-3.5 w-3.5" />
+                      Connect to focus area
+                    </span>
+                    <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground/60">
+                      Optional
+                    </span>
+                  </div>
+                  <p className="mb-2.5 text-[12px] font-medium leading-snug text-muted-foreground">
+                    Tasks with this tag will count toward that area&rsquo;s
+                    quest.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {focusAreas.map((area) => {
+                      const isPicked = newTagAreaId === area.id;
+                      const isActiveFocus =
+                        !isPremium && activeFocusCategoryId === area.id;
+                      const accent = area.accent || '#22c55e';
+                      const occupied =
+                        !isPremium &&
+                        (categoryTagMap.find(
+                          (entry) => entry.categoryId === area.id,
+                        )?.tagIds.length ?? 0) > 0;
+                      return (
+                        <button
+                          key={area.id}
+                          type="button"
+                          onClick={() =>
+                            setNewTagAreaId(isPicked ? null : area.id)
+                          }
+                          className={`inline-flex h-10 items-center gap-1.5 rounded-2xl border px-3 text-[12px] font-black uppercase tracking-wider transition-all active:scale-95 ${
+                            isPicked
+                              ? 'ring-2 ring-offset-1 ring-offset-background'
+                              : ''
+                          }`}
+                          style={{
+                            backgroundColor: `${accent}${isPicked ? '2b' : '14'}`,
+                            borderColor: `${accent}40`,
+                            color: accent,
+                            ...(isPicked
+                              ? ({
+                                  ['--tw-ring-color' as never]: accent,
+                                } as object)
+                              : {}),
+                          }}
+                        >
+                          {isPicked ? (
+                            <Check className="h-3.5 w-3.5" strokeWidth={3.5} />
+                          ) : occupied ? (
+                            <Lock
+                              className="h-3 w-3 opacity-70"
+                              strokeWidth={2.75}
+                            />
+                          ) : null}
+                          <span className="truncate">{area.name}</span>
+                          {isActiveFocus && (
+                            <span
+                              className="rounded-md px-1.5 py-0.5 text-[8px] font-black tracking-[0.14em] text-white"
+                              style={{ backgroundColor: accent }}
+                            >
+                              ACTIVE
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {!isPremium && newTagAreaOccupant && (
+                    <button
+                      type="button"
+                      onClick={onPremiumLimit}
+                      className="mt-2.5 inline-flex items-center gap-1.5 rounded-xl bg-amber-400/10 px-3 py-2 text-left text-[11px] font-bold leading-snug text-amber-700 transition-colors hover:bg-amber-400/20 dark:text-amber-300"
+                    >
+                      <Lock className="h-3.5 w-3.5 shrink-0" strokeWidth={2.75} />
+                      <span>
+                        Replaces{' '}
+                        <span style={{ color: newTagAreaOccupant.color }}>
+                          {newTagAreaOccupant.name}
+                        </span>{' '}
+                        — free plan connects 1 tag per area.{' '}
+                        <span className="underline underline-offset-2">
+                          Keep both with Plus
+                        </span>
+                      </span>
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </motion.div>
         )}
@@ -353,7 +551,7 @@ export function TagsView({
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
-                handleAddTag();
+                submitTagInput();
               }
             }}
             maxLength={TAG_MAX_LENGTH}
@@ -363,7 +561,7 @@ export function TagsView({
         </div>
         <button
           type="button"
-          onClick={handleAddTag}
+          onClick={submitTagInput}
           disabled={!tagInput}
           aria-label={showColorPicker ? 'Pick color' : 'Add tag'}
           className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-primary text-primary-foreground transition-all hover:brightness-110 active:scale-95 disabled:opacity-30 disabled:active:scale-100"
@@ -376,9 +574,10 @@ export function TagsView({
         type="button"
         onClick={async () => {
           // Writing a brand-new tag → the button creates + selects it (with the
-          // chosen colour) and stays open so the user can keep going / press Done.
+          // chosen colour, connected to the picked focus area) and stays open
+          // so the user can keep going / press Done.
           if (isCreatingNewTag) {
-            await createAndSaveTag();
+            await handleCreate();
           } else {
             onDone();
           }

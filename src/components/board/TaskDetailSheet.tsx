@@ -5,7 +5,6 @@ import {
   Bell,
   CalendarDays,
   CalendarPlus,
-  Check,
   CheckCircle2,
   ChevronUp,
   EyeOff,
@@ -13,7 +12,6 @@ import {
   ListChecks,
   Pen,
   Pencil,
-  Plus,
   Repeat,
   RotateCcw,
   Tag,
@@ -34,16 +32,19 @@ import {
 import { parseYmd, todayYmd } from '@/components/board/helpers';
 import { useBuddyState } from '@/hooks/useBuddyState';
 import { BuddyFrogFace } from '@/components/ui/BuddyBadge';
-import { randomUUID } from '@/lib/uuid';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
+import { useKeyboardInset } from '@/components/ui/quick-add/useKeyboardInset';
+import { hapticSuccess, hapticTick } from '@/lib/haptics';
+import {
+  ChecklistCheckbox,
+  ChecklistEditor,
+  ChecklistProgress,
+} from './ChecklistEditor';
 import { TaskRepeatPopup } from './TaskRepeatPopup';
 import RichNotesEditor from './RichNotesEditor';
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-// Common-sense limits for the task card.
-const ITEM_MAX = 120;
-const MAX_ITEMS = 20;
 const PREVIEW_ITEMS = 3;
 
 export interface TaskDetailTask {
@@ -98,8 +99,6 @@ interface TaskDetailSheetProps {
   monthlyAnchorYmd?: string;
 }
 
-const newId = () => randomUUID();
-
 export default function TaskDetailSheet({
   open,
   onOpenChange,
@@ -132,13 +131,14 @@ export default function TaskDetailSheet({
 
   const [notes, setNotes] = useState('');
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
-  const [newItem, setNewItem] = useState('');
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [checklistFocus, setChecklistFocus] = useState<string | null>(null);
   const [tab, setTab] = useState<'notes' | 'checklist'>('notes');
   const [expanded, setExpanded] = useState(false);
   const [showRepeat, setShowRepeat] = useState(false);
 
-  const newItemRef = useRef<HTMLInputElement>(null);
+  const { inset: kbInset, height: vvHeight } = useKeyboardInset(open);
+  const [inputFocused, setInputFocused] = useState(false);
+  const keyboardActive = inputFocused && kbInset > 0;
 
   // Seed local state only when a *different* task opens — not on every task
   // object change. Otherwise persisting a checklist edit re-runs this and snaps
@@ -147,16 +147,53 @@ export default function TaskDetailSheet({
     if (open && task) {
       setNotes(task.notes ?? '');
       setChecklist(task.checklist ?? []);
-      setNewItem('');
-      setEditingId(null);
+      setChecklistFocus(null);
       const hasNotes = !!(task.notes ?? '').trim();
       const hasChecklist = (task.checklist?.length ?? 0) > 0;
       setTab(hasNotes || !hasChecklist ? 'notes' : 'checklist');
       setExpanded(false);
       setShowRepeat(false);
+      setInputFocused(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, task?.id]);
+
+  const isEditableTarget = (el: EventTarget | null) => {
+    const node = el as HTMLElement | null;
+    if (!node) return false;
+    return (
+      node.tagName === 'INPUT' ||
+      node.tagName === 'TEXTAREA' ||
+      !!node.closest?.('[contenteditable="true"]')
+    );
+  };
+
+  // Focus hopping between checklist rows fires blur→focus back-to-back; the
+  // short delay keeps keyboardActive stable so the layout doesn't flash.
+  const blurTimerRef = useRef<number | null>(null);
+  const handleFocusCapture = (e: React.FocusEvent) => {
+    if (!isEditableTarget(e.target)) return;
+    if (blurTimerRef.current !== null) {
+      window.clearTimeout(blurTimerRef.current);
+      blurTimerRef.current = null;
+    }
+    setInputFocused(true);
+  };
+  const handleBlurCapture = (e: React.FocusEvent) => {
+    if (!isEditableTarget(e.target)) return;
+    if (blurTimerRef.current !== null) window.clearTimeout(blurTimerRef.current);
+    blurTimerRef.current = window.setTimeout(() => {
+      blurTimerRef.current = null;
+      setInputFocused(false);
+    }, 120);
+  };
+  useEffect(
+    () => () => {
+      if (blurTimerRef.current !== null)
+        window.clearTimeout(blurTimerRef.current);
+    },
+    [],
+  );
 
   const tagDetails = useMemo(() => {
     const byId = new Map(tags.map((t) => [t.id, t] as const));
@@ -194,13 +231,21 @@ export default function TaskDetailSheet({
     if ((displayTask.notes ?? '') !== notes) persist({ notes });
   };
 
-  const openEditor = (which: 'notes' | 'checklist') => {
+  const openEditor = (which: 'notes' | 'checklist', focusId?: string) => {
+    if (which === 'checklist') {
+      setChecklistFocus(focusId ?? (checklist.length === 0 ? 'new' : null));
+    }
     setTab(which);
     setExpanded(true);
   };
 
   const collapseEditor = () => {
     commitNotes();
+    const trimmed = checklist.filter((it) => it.text.trim());
+    if (trimmed.length !== checklist.length) {
+      setChecklist(trimmed);
+      persist({ checklist: trimmed });
+    }
     setExpanded(false);
   };
 
@@ -209,25 +254,15 @@ export default function TaskDetailSheet({
     persist({ checklist: next });
   };
 
-  const addItem = () => {
-    const text = newItem.trim().slice(0, ITEM_MAX);
-    if (!text || checklist.length >= MAX_ITEMS) return;
-    setAndPersistChecklist([...checklist, { id: newId(), text, done: false }]);
-    setNewItem('');
+  const toggleItem = (id: string) => {
+    const next = checklist.map((it) =>
+      it.id === id ? { ...it, done: !it.done } : it,
+    );
+    const becameDone = next.find((it) => it.id === id)?.done ?? false;
+    if (becameDone && next.every((it) => it.done)) hapticSuccess();
+    else hapticTick();
+    setAndPersistChecklist(next);
   };
-
-  const toggleItem = (id: string) =>
-    setAndPersistChecklist(
-      checklist.map((it) => (it.id === id ? { ...it, done: !it.done } : it)),
-    );
-
-  const editItem = (id: string, text: string) =>
-    setChecklist((cur) =>
-      cur.map((it) => (it.id === id ? { ...it, text } : it)),
-    );
-
-  const removeItem = (id: string) =>
-    setAndPersistChecklist(checklist.filter((it) => it.id !== id));
 
   const doneCount = checklist.filter((it) => it.done).length;
   // For weekly tasks use their stored weekday; otherwise anchor to the date the
@@ -292,11 +327,23 @@ export default function TaskDetailSheet({
         zIndex={1400}
         hideHandle
         showClose={false}
+        bottomInset={keyboardActive ? kbInset : 0}
+        panelStyle={
+          keyboardActive && vvHeight
+            ? { maxHeight: Math.max(260, vvHeight - 8) }
+            : undefined
+        }
       >
         {({ bindScroll, dragControls }) => (
           <div
             ref={bindScroll}
-            className="flex flex-1 min-h-0 flex-col gap-3 overflow-hidden px-3 pt-1 pb-[calc(env(safe-area-inset-bottom)+14px)] sm:pb-2"
+            onFocusCapture={handleFocusCapture}
+            onBlurCapture={handleBlurCapture}
+            className={`flex flex-1 min-h-0 flex-col gap-3 overflow-hidden px-3 pt-1 ${
+              keyboardActive
+                ? 'pb-2'
+                : 'pb-[calc(env(safe-area-inset-bottom)+14px)] sm:pb-2'
+            }`}
           >
             {/* Main card — mirrors the QuickAddSheet shell */}
             <div
@@ -438,19 +485,13 @@ export default function TaskDetailSheet({
                                 key={it.id}
                                 className="flex items-center gap-2.5 rounded-xl px-1 py-1.5"
                               >
+                                <ChecklistCheckbox
+                                  checked={it.done}
+                                  onToggle={() => toggleItem(it.id)}
+                                  size={20}
+                                />
                                 <button
-                                  onClick={() => toggleItem(it.id)}
-                                  aria-label={it.done ? 'Mark not done' : 'Mark done'}
-                                  className={`grid h-5 w-5 shrink-0 place-items-center rounded-md border-2 transition-colors ${
-                                    it.done
-                                      ? 'border-primary bg-primary text-primary-foreground'
-                                      : 'border-muted-foreground/40 text-transparent hover:border-primary/60'
-                                  }`}
-                                >
-                                  <Check className="h-3 w-3" strokeWidth={3.5} />
-                                </button>
-                                <button
-                                  onClick={() => openEditor('checklist')}
+                                  onClick={() => openEditor('checklist', it.id)}
                                   className={`min-w-0 flex-1 truncate text-left text-[14px] leading-snug transition-colors ${
                                     it.done
                                       ? 'text-muted-foreground line-through'
@@ -495,7 +536,21 @@ export default function TaskDetailSheet({
                     )}
 
                     {expanded && (
-                      <div className="mt-3 flex h-[min(320px,40dvh)] shrink-0 flex-col">
+                      <div
+                        style={
+                          keyboardActive && vvHeight
+                            ? {
+                                height: Math.max(
+                                  150,
+                                  Math.min(340, vvHeight - 240),
+                                ),
+                              }
+                            : undefined
+                        }
+                        className={`mt-3 flex shrink-0 flex-col ${
+                          keyboardActive ? '' : 'h-[min(340px,40dvh)]'
+                        }`}
+                      >
                         <div className="flex shrink-0 items-center gap-2">
                           <div className="flex flex-1 gap-1 rounded-full bg-muted/70 p-1">
                             <TabButton
@@ -536,30 +591,16 @@ export default function TaskDetailSheet({
                           ) : (
                             <div className="flex min-h-0 flex-1 flex-col">
                               {checklist.length > 0 ? (
-                                <div className="mb-3 flex shrink-0 items-center gap-2.5">
-                                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
-                                    <div
-                                      className="h-full rounded-full bg-primary transition-[width] duration-300"
-                                      style={{
-                                        width: `${(doneCount / checklist.length) * 100}%`,
-                                      }}
-                                    />
-                                  </div>
-                                  <span className="shrink-0 text-[12px] font-bold tabular-nums text-muted-foreground">
-                                    {doneCount}/{checklist.length}
-                                  </span>
-                                  <span
-                                    title="Each checked step adds a bonus fly when you complete the task"
-                                    className="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-[12px] font-black tabular-nums leading-none text-primary"
-                                  >
-                                    <Fly size={16} y={-1} interactive={false} paused={doneCount === 0} />
-                                    +{doneCount}
-                                  </span>
+                                <div className="mb-2 shrink-0">
+                                  <ChecklistProgress
+                                    done={doneCount}
+                                    total={checklist.length}
+                                  />
                                 </div>
                               ) : (
-                                <div className="mb-2 flex min-h-0 flex-1 flex-col items-center justify-center gap-1.5 rounded-2xl bg-muted/30 px-6 py-4 text-center">
-                                  <Fly size={38} y={-2} interactive={false} />
-                                  <p className="text-[14px] font-black text-foreground">
+                                <div className="mb-2 flex shrink-0 flex-col items-center gap-1 rounded-2xl bg-muted/30 px-6 py-3 text-center">
+                                  <Fly size={32} y={-2} interactive={false} />
+                                  <p className="text-[13px] font-black text-foreground">
                                     Break it into steps
                                   </p>
                                   <p className="text-[12px] font-medium leading-snug text-muted-foreground">
@@ -570,143 +611,15 @@ export default function TaskDetailSheet({
                                 </div>
                               )}
 
-                              <div
-                                className={`min-h-0 overflow-y-auto ${
-                                  checklist.length > 0 ? 'flex-1' : 'shrink-0'
-                                }`}
-                              >
-                                <div className="space-y-2">
-                                {checklist.map((it) => {
-                                  const isEditing = editingId === it.id;
-                                  return (
-                                    <div
-                                      key={it.id}
-                                      className={`group flex items-center gap-2.5 rounded-2xl border px-3 py-2.5 transition-all focus-within:border-primary/50 focus-within:bg-card ${
-                                        it.done
-                                          ? 'border-primary/30 bg-primary/[0.06]'
-                                          : 'border-border/50 bg-muted/30 hover:bg-muted/50'
-                                      }`}
-                                    >
-                                      <button
-                                        onClick={() => toggleItem(it.id)}
-                                        aria-label={it.done ? 'Mark not done' : 'Mark done'}
-                                        className={`grid h-6 w-6 shrink-0 place-items-center rounded-lg border-2 transition-colors ${
-                                          it.done
-                                            ? 'border-primary bg-primary text-primary-foreground'
-                                            : 'border-muted-foreground/40 text-transparent hover:border-primary/60'
-                                        }`}
-                                      >
-                                        <Check className="h-4 w-4" strokeWidth={3} />
-                                      </button>
-
-                                      {isEditing ? (
-                                        <input
-                                          autoFocus
-                                          value={it.text}
-                                          maxLength={ITEM_MAX}
-                                          onChange={(e) => editItem(it.id, e.target.value)}
-                                          onBlur={() => {
-                                            persist({ checklist });
-                                            setEditingId(null);
-                                          }}
-                                          onKeyDown={(e) => {
-                                            if (e.key === 'Enter' || e.key === 'Escape') {
-                                              e.preventDefault();
-                                              e.currentTarget.blur();
-                                            }
-                                          }}
-                                          className="min-w-0 flex-1 bg-transparent text-[16px] text-foreground focus:outline-none sm:text-[15px]"
-                                        />
-                                      ) : (
-                                        <button
-                                          onClick={() => setEditingId(it.id)}
-                                          className={`min-w-0 flex-1 break-words text-left text-[16px] transition-colors sm:text-[15px] ${
-                                            it.done
-                                              ? 'text-muted-foreground line-through'
-                                              : 'text-foreground'
-                                          }`}
-                                        >
-                                          {it.text || (
-                                            <span className="text-muted-foreground/50">
-                                              Untitled step
-                                            </span>
-                                          )}
-                                        </button>
-                                      )}
-
-                                      {isEditing ? (
-                                        <button
-                                          onMouseDown={(e) => e.preventDefault()}
-                                          onClick={() => {
-                                            persist({ checklist });
-                                            setEditingId(null);
-                                          }}
-                                          aria-label="Done editing"
-                                          className="shrink-0 rounded-lg p-1.5 text-primary transition-colors hover:bg-primary/10"
-                                        >
-                                          <Check className="h-[18px] w-[18px]" strokeWidth={3} />
-                                        </button>
-                                      ) : (
-                                        <button
-                                          onClick={() => removeItem(it.id)}
-                                          aria-label="Remove item"
-                                          className="shrink-0 rounded-lg p-1.5 text-muted-foreground/40 transition-opacity hover:text-rose-500 sm:opacity-0 sm:group-hover:opacity-100"
-                                        >
-                                          <X className="h-4 w-4" />
-                                        </button>
-                                      )}
-                                      <Fly
-                                        size={26}
-                                        y={-2}
-                                        interactive={false}
-                                        paused={!it.done}
-                                        className={`shrink-0 transition-all duration-300 ${
-                                          it.done ? 'opacity-100' : 'opacity-30 grayscale'
-                                        }`}
-                                      />
-                                    </div>
-                                  );
-                                })}
-                                </div>
-
-                              {checklist.length < MAX_ITEMS && (
-                                <div className="mt-2 flex shrink-0 items-center gap-3 rounded-2xl border-2 border-dashed border-border/60 px-3 py-2.5 transition-colors focus-within:border-primary/50">
-                                  <span className="grid h-6 w-6 shrink-0 place-items-center rounded-lg border-2 border-dashed border-muted-foreground/40 text-muted-foreground">
-                                    <Plus className="h-4 w-4" strokeWidth={2.5} />
-                                  </span>
-                                  <input
-                                    ref={newItemRef}
-                                    value={newItem}
-                                    maxLength={ITEM_MAX}
-                                    onChange={(e) => setNewItem(e.target.value)}
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter') {
-                                        e.preventDefault();
-                                        addItem();
-                                      }
-                                    }}
-                                    onBlur={addItem}
-                                    placeholder="Add an item…"
-                                    className="min-w-0 flex-1 bg-transparent text-[16px] text-foreground placeholder:text-muted-foreground/60 focus:outline-none sm:text-[15px]"
-                                  />
-                                  {newItem.trim() && (
-                                    <button
-                                      onMouseDown={(e) => e.preventDefault()}
-                                      onClick={addItem}
-                                      className="shrink-0 rounded-lg bg-primary px-3 py-1 text-[13px] font-black text-primary-foreground transition-transform active:scale-95"
-                                    >
-                                      Add
-                                    </button>
-                                  )}
-                                </div>
-                              )}
-
-                              {checklist.length >= MAX_ITEMS && (
-                                <p className="mt-2 px-1 text-[11px] font-bold text-muted-foreground">
-                                  Maximum {MAX_ITEMS} items reached.
-                                </p>
-                              )}
-                              </div>
+                              <ChecklistEditor
+                                items={checklist}
+                                autoFocus={checklistFocus}
+                                className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
+                                onChange={(next, { persist: persistNow }) => {
+                                  setChecklist(next);
+                                  if (persistNow) persist({ checklist: next });
+                                }}
+                              />
                             </div>
                           )}
                         </div>
@@ -714,6 +627,7 @@ export default function TaskDetailSheet({
                     )}
 
                     {/* Toolbar — same anatomy as the QuickAddSheet bottom row */}
+                    {!keyboardActive && (
                     <div className="mt-3 flex shrink-0 items-center gap-1.5">
                       {onSetRepeat && (
                         <button
@@ -768,6 +682,7 @@ export default function TaskDetailSheet({
                         )}
                       </div>
                     </div>
+                    )}
                   </>
                 )}
               </div>
@@ -805,7 +720,7 @@ export default function TaskDetailSheet({
             )}
 
             {/* Primary action — the chunky CTA, twin of Add Task */}
-            {isCompleted ? (
+            {keyboardActive ? null : isCompleted ? (
               onComplete && (
                 <button
                   onClick={runAndClose(onComplete)}
@@ -847,6 +762,7 @@ export default function TaskDetailSheet({
 
             {/* Secondary actions */}
             {!minimal &&
+              !keyboardActive &&
               (onStartTimer || (isRepeating && onSkipToday) || onDoLater) && (
                 <div className="flex shrink-0 gap-2.5">
                   {onStartTimer && (

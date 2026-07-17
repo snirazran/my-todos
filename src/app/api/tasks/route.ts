@@ -22,6 +22,7 @@ import {
 import { syncQuestState, isPremiumUser } from '@/lib/quests/engine';
 import { getZonedToday, getZonedYMD } from '@/lib/utils';
 import { notifyTaskChanged } from '@/lib/taskSync';
+import { TaskSectionModel } from '@/lib/models/TaskSection';
 import { severBond, handleBuddyCompletion } from '@/lib/buddy/server';
 import { bumpQuestMetric, taskStreakMetric } from '@/lib/quests/metrics';
 import {
@@ -799,6 +800,10 @@ export async function createTasksForUser(
   const buddyFields = opts?.bondId
     ? { bondId: opts.bondId, buddyUserId: opts.buddyUserId }
     : {};
+  const sectionFields =
+    typeof body?.sectionId === 'string' && body.sectionId
+      ? { sectionId: body.sectionId }
+      : {};
 
   const text = String(body?.text ?? '').trim();
   const rawDays: number[] = Array.isArray(body?.days) ? body.days : [];
@@ -878,6 +883,7 @@ export async function createTasksForUser(
       repeatEndDate,
       repeatDayOfMonth,
       ...buddyFields,
+      ...sectionFields,
     });
     return {
       ok: true,
@@ -898,6 +904,7 @@ export async function createTasksForUser(
           repeatEndDate,
           repeatDayOfMonth,
           ...buddyFields,
+          ...sectionFields,
         },
       ],
     };
@@ -933,6 +940,7 @@ export async function createTasksForUser(
       repeatEndDate,
       repeatRule: rule,
       ...buddyFields,
+      ...sectionFields,
     });
     return {
       ok: true,
@@ -953,6 +961,7 @@ export async function createTasksForUser(
           repeatEndDate,
           repeatRule: rule,
           ...buddyFields,
+          ...sectionFields,
         },
       ],
     };
@@ -1008,6 +1017,7 @@ export async function createTasksForUser(
         repeatStartDate,
         repeatEndDate,
         ...buddyFields,
+        ...sectionFields,
       });
       createdIds.push(id);
       createdTasks.push({
@@ -1026,6 +1036,7 @@ export async function createTasksForUser(
         repeatStartDate,
         repeatEndDate,
         ...buddyFields,
+        ...sectionFields,
       });
     }
     return { ok: true, ids: createdIds, tasks: createdTasks, repeatGroupId };
@@ -1052,6 +1063,7 @@ export async function createTasksForUser(
       endTime,
       reminder,
       ...buddyFields,
+      ...sectionFields,
     });
     createdIds.push(id);
     createdTasks.push({
@@ -1068,6 +1080,7 @@ export async function createTasksForUser(
       endTime: task.endTime,
       reminder: task.reminder,
       ...buddyFields,
+      ...sectionFields,
     });
   }
   for (const d of days) {
@@ -1128,6 +1141,7 @@ export async function createTasksForUser(
         endTime,
         reminder,
         ...buddyFields,
+        ...sectionFields,
       });
       createdTasks.push({
         id: task.id,
@@ -1143,6 +1157,7 @@ export async function createTasksForUser(
         endTime: task.endTime,
         reminder: task.reminder,
         ...buddyFields,
+        ...sectionFields,
       });
     }
   }
@@ -2076,16 +2091,24 @@ async function handleDailyGet(req: NextRequest, userId: string, tz: string) {
       endTime: t.endTime,
       reminder: t.reminder,
       isStarter: t.isStarter,
+      sectionId: t.sectionId,
     }))
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-  const { flyStatus, hungerStatus, dailyTasksCount } = await currentFlyStatus(
-    userId,
-    tz,
-  );
+  const [{ flyStatus, hungerStatus, dailyTasksCount }, sectionDocs] =
+    await Promise.all([
+      currentFlyStatus(userId, tz),
+      TaskSectionModel.find({ userId }).sort({ order: 1 }).lean(),
+    ]);
   return NextResponse.json({
     date,
     tasks: output,
     weeklyIds: Array.from(weeklyIdsForUI),
+    sections: sectionDocs.map((s) => ({
+      id: s.id,
+      name: s.name,
+      order: s.order,
+      collapsed: !!s.collapsed,
+    })),
     flyStatus,
     hungerStatus,
     dailyTasksCount,
@@ -2591,7 +2614,22 @@ type BoardTaskInput = {
     focusTime?: number;
     breakTime?: number;
   } | null;
+  sectionId?: string | null;
 };
+
+/**
+ * Section assignment for a reordered task. `sectionId: null` explicitly clears
+ * the section; an absent property leaves the stored value untouched.
+ */
+function sectionOps(t: { sectionId?: string | null } | undefined): {
+  set: Record<string, unknown>;
+  unset: Record<string, 1>;
+} {
+  if (!t || !('sectionId' in t)) return { set: {}, unset: {} };
+  if (typeof t.sectionId === 'string' && t.sectionId)
+    return { set: { sectionId: t.sectionId }, unset: {} };
+  return { set: {}, unset: { sectionId: 1 } };
+}
 
 async function handleBoardPut(
   uid: string,
@@ -2753,6 +2791,10 @@ async function handleBoardPut(
       const endTime = t.endTime ?? endById.get(t.id);
       const reminderVal = t.reminder ?? reminderById.get(t.id);
 
+      const sec = sectionOps(t);
+      const secUnset = Object.keys(sec.unset).length
+        ? { $unset: sec.unset }
+        : {};
       if (ttype === 'weekly')
         return TaskModel.updateOne(
           { userId: uid, type: 'weekly', id: t.id },
@@ -2763,7 +2805,9 @@ async function handleBoardPut(
               [`orderOverrides.${weekDates[weekday]}`]: i + 1,
               updatedAt: now,
               tags,
+              ...sec.set,
             },
+            ...secUnset,
           },
         );
       if (ttype === 'regular')
@@ -2779,7 +2823,9 @@ async function handleBoardPut(
               startTime,
               endTime,
               reminder: reminderVal,
+              ...sec.set,
             },
+            ...secUnset,
           },
         );
       if (ttype === 'backlog')
@@ -2806,7 +2852,9 @@ async function handleBoardPut(
                 startTime,
                 endTime,
                 reminder: reminderVal,
+                ...sec.set,
               },
+              ...secUnset,
               $setOnInsert: { userId: uid, type: 'regular', createdAt: now },
             },
             { upsert: true },
@@ -2828,7 +2876,9 @@ async function handleBoardPut(
             startTime,
             endTime,
             reminder: reminderVal,
+            ...sec.set,
           },
+          ...secUnset,
           $setOnInsert: { userId: uid, type: 'regular', createdAt: now },
         },
         { upsert: true },
@@ -2951,6 +3001,7 @@ async function handleBoardPutByDate(
                 ? dowFromYMD(dateKey) === doc.dayOfWeek
                 : false;
         if (occursHere) {
+          const sec = sectionOps(t);
           return TaskModel.updateOne(
             { userId: uid, id: t.id },
             {
@@ -2958,7 +3009,9 @@ async function handleBoardPutByDate(
                 [`orderOverrides.${dateKey}`]: i + 1,
                 updatedAt: now,
                 tags,
+                ...sec.set,
               },
+              ...(Object.keys(sec.unset).length ? { $unset: sec.unset } : {}),
             },
           );
         }
@@ -2975,6 +3028,7 @@ async function handleBoardPutByDate(
               notes,
               checklist,
               ...scheduleFields,
+              ...sectionOps(t).set,
             },
             $unset: {
               dayOfWeek: 1,
@@ -2985,6 +3039,7 @@ async function handleBoardPutByDate(
               repeatStartDate: 1,
               repeatEndDate: 1,
               checklistDoneByDate: 1,
+              ...sectionOps(t).unset,
             },
           },
         );
@@ -3018,6 +3073,7 @@ async function handleBoardPutByDate(
           ),
         ]);
       // regular or unknown -> upsert as regular on this date
+      const sec = sectionOps(t);
       return TaskModel.updateOne(
         { userId: uid, type: 'regular', id: t.id },
         {
@@ -3031,7 +3087,9 @@ async function handleBoardPutByDate(
             date: dateKey,
             order: i + 1,
             updatedAt: now,
+            ...sec.set,
           },
+          ...(Object.keys(sec.unset).length ? { $unset: sec.unset } : {}),
           $setOnInsert: {
             userId: uid,
             type: 'regular',

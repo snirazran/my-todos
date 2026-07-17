@@ -119,6 +119,7 @@ export default function MobileNav() {
   return (
     <>
       <nav
+        data-app-bottom-nav
         className={cn(
           'fixed bottom-0 left-0 w-full bg-background/90 backdrop-blur-lg md:hidden pb-[env(safe-area-inset-bottom)]',
           navRaised ? 'z-[100]' : 'z-50',

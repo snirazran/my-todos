@@ -1,18 +1,22 @@
 'use client';
 
 import type { PointerEvent, ReactNode } from 'react';
-import { useCallback, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { ChevronUp } from 'lucide-react';
+import { useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { hapticImpact, hapticTick } from '@/lib/haptics';
+import {
+  useFlyCatchOverlay,
+  type FlyCatchSource,
+} from '@/lib/flyCatchOverlayStore';
 
-const RELEASE_DISTANCE = 72;
-const FAST_RELEASE_DISTANCE = 42;
+const RELEASE_DISTANCE = 96;
+const FAST_RELEASE_DISTANCE = 52;
+const FAST_RELEASE_VELOCITY = 0.55;
+const DRAG_START_DISTANCE = 8;
 
 type Props = {
   children: ReactNode;
-  source: 'home' | 'wardrobe' | 'friends';
+  source: FlyCatchSource;
   className?: string;
   disabled?: boolean;
 };
@@ -23,102 +27,74 @@ export function FlyCatchSwipeLauncher({
   className,
   disabled = false,
 }: Props) {
-  const router = useRouter();
-  const contentRef = useRef<HTMLDivElement>(null);
-  const startYRef = useRef(0);
-  const startAtRef = useRef(0);
-  const pullRef = useRef(0);
   const pointerRef = useRef<number | null>(null);
+  const startYRef = useRef(0);
+  const lastYRef = useRef(0);
+  const lastTRef = useRef(0);
+  const velocityRef = useRef(0);
+  const pullRef = useRef(0);
   const armedRef = useRef(false);
-  const launchingRef = useRef(false);
+  const draggingRef = useRef(false);
   const suppressClickRef = useRef(false);
-  const [dragging, setDragging] = useState(false);
-  const [launching, setLaunching] = useState(false);
-
-  const gameHref = `/fly-catch?entry=swipe&start=1&source=${source}`;
-
-  const resetVisuals = useCallback(() => {
-    const content = contentRef.current;
-    if (!content) return;
-    content.style.transition = 'transform 220ms cubic-bezier(.22,1,.36,1), opacity 180ms ease-out';
-    content.style.transform = '';
-    content.style.opacity = '';
-    window.setTimeout(() => {
-      if (!launchingRef.current && contentRef.current) {
-        contentRef.current.style.transition = '';
-      }
-    }, 230);
-  }, []);
-
-  const launch = useCallback(() => {
-    if (disabled || launchingRef.current) return;
-    launchingRef.current = true;
-    suppressClickRef.current = true;
-    setDragging(false);
-    setLaunching(true);
-    hapticImpact();
-    router.prefetch('/fly-catch');
-
-    const content = contentRef.current;
-    if (content) {
-      content.style.transition = 'transform 300ms cubic-bezier(.32,.72,0,1), opacity 220ms ease-out';
-      content.style.transform = 'translate3d(0,-150px,0) scale(.95)';
-      content.style.opacity = '0';
-    }
-
-    window.setTimeout(() => router.push(gameHref), 260);
-  }, [disabled, gameHref, router]);
 
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
-    if (disabled || launchingRef.current || event.button !== 0) return;
+    if (disabled || event.button !== 0) return;
+    const overlay = useFlyCatchOverlay.getState();
+    if (overlay.open || overlay.active) return;
     pointerRef.current = event.pointerId;
     startYRef.current = event.clientY;
-    startAtRef.current = performance.now();
+    lastYRef.current = event.clientY;
+    lastTRef.current = performance.now();
+    velocityRef.current = 0;
     pullRef.current = 0;
     armedRef.current = false;
+    draggingRef.current = false;
     suppressClickRef.current = false;
-    event.currentTarget.setPointerCapture(event.pointerId);
-    router.prefetch('/fly-catch');
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {}
   };
 
   const onPointerMove = (event: PointerEvent<HTMLDivElement>) => {
-    if (pointerRef.current !== event.pointerId || launchingRef.current) return;
-    const pull = Math.min(112, Math.max(0, startYRef.current - event.clientY));
+    if (pointerRef.current !== event.pointerId) return;
+    const now = performance.now();
+    const dt = Math.max(1, now - lastTRef.current);
+    const instant = (event.clientY - lastYRef.current) / dt;
+    velocityRef.current = velocityRef.current * 0.3 + instant * 0.7;
+    lastYRef.current = event.clientY;
+    lastTRef.current = now;
+
+    const pull = Math.max(0, event.clientY - startYRef.current);
     pullRef.current = pull;
-    if (pull < 3) return;
-    suppressClickRef.current = pull > 10;
-    setDragging(true);
-
-    const content = contentRef.current;
-    if (content) {
-      content.style.transition = 'none';
-      content.style.transform = `translate3d(0,${-pull * 0.58}px,0) scale(${1 - pull * 0.00055})`;
-      content.style.opacity = String(1 - pull / 360);
+    if (!draggingRef.current) {
+      if (pull < DRAG_START_DISTANCE) return;
+      draggingRef.current = true;
+      useFlyCatchOverlay.getState().activate(source);
     }
+    if (pull > 10) suppressClickRef.current = true;
 
-    if (pull >= RELEASE_DISTANCE && !armedRef.current) {
-      armedRef.current = true;
-      hapticTick();
-    } else if (pull < RELEASE_DISTANCE && armedRef.current) {
-      armedRef.current = false;
+    const armed = pull >= RELEASE_DISTANCE;
+    if (armed !== armedRef.current) {
+      armedRef.current = armed;
+      if (armed) hapticTick();
     }
+    useFlyCatchOverlay.getState().controller?.drag(pull, armed);
   };
 
   const finishPointer = (event: PointerEvent<HTMLDivElement>, cancelled = false) => {
     if (pointerRef.current !== event.pointerId) return;
     pointerRef.current = null;
-    const elapsed = Math.max(1, performance.now() - startAtRef.current);
-    const velocity = pullRef.current / elapsed;
-    const shouldLaunch =
+    if (!draggingRef.current) return;
+    draggingRef.current = false;
+    const velocity = Math.max(0, velocityRef.current);
+    const shouldOpen =
       !cancelled &&
+      !disabled &&
       (pullRef.current >= RELEASE_DISTANCE ||
-        (pullRef.current >= FAST_RELEASE_DISTANCE && velocity >= 0.65));
-
-    if (shouldLaunch) launch();
-    else {
-      setDragging(false);
-      resetVisuals();
-    }
+        (pullRef.current >= FAST_RELEASE_DISTANCE &&
+          velocity >= FAST_RELEASE_VELOCITY));
+    if (shouldOpen) hapticImpact();
+    useFlyCatchOverlay.getState().controller?.settle(shouldOpen, velocity);
   };
 
   return (
@@ -136,21 +112,7 @@ export function FlyCatchSwipeLauncher({
       }}
       data-fly-catch-swipe
     >
-      <div ref={contentRef} className="relative will-change-transform">
-        {children}
-      </div>
-
-      <div
-        aria-hidden
-        className={cn(
-          'pointer-events-none absolute bottom-0 left-1/2 z-[65] flex -translate-x-1/2 translate-y-2 items-center gap-1 rounded-full border border-white/50 bg-card/90 px-3 py-1 text-[9px] font-black uppercase tracking-[0.12em] text-primary opacity-0 shadow-md backdrop-blur-md transition-all',
-          dragging && '-translate-y-1 scale-105 opacity-100',
-          launching && '-translate-y-8 scale-110 opacity-0',
-        )}
-      >
-        <ChevronUp className={cn('h-3.5 w-3.5', dragging && 'animate-bounce')} strokeWidth={3} />
-        Release the swarm
-      </div>
+      {children}
     </div>
   );
 }

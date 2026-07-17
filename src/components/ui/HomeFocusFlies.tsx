@@ -244,6 +244,7 @@ export function HomeFocusFlies({
       <div
         ref={bandRef}
         aria-hidden
+        data-fly-fade
         className="pointer-events-none absolute z-30"
         style={{
           height: BAND_H,

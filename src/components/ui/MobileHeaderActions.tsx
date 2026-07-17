@@ -18,6 +18,7 @@ export function MobileHeaderActions({
 }: MobileHeaderActionsProps) {
   return (
     <div
+      data-fly-fade
       className={cn(
         'right-4 top-[calc(env(safe-area-inset-top)+0.5rem)] z-[90] flex items-center gap-2',
         position === 'absolute' ? 'absolute' : 'fixed',

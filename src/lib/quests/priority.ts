@@ -103,8 +103,6 @@ export function compareQuestPriority(
   return (
     Number(a.input.needsFocusTags ?? false) -
       Number(b.input.needsFocusTags ?? false) ||
-    Number(b.input.placement === 'onboarding') -
-      Number(a.input.placement === 'onboarding') ||
     quantizeScore(b.result.score) - quantizeScore(a.result.score) ||
     (a.input.tierIndex ?? 0) - (b.input.tierIndex ?? 0) ||
     Math.max(1, a.input.target) -

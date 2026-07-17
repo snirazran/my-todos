@@ -124,11 +124,24 @@ function GameBackground({ images, className }: { images: BackgroundImages; class
   );
 }
 
-export default function FlyCatchGame() {
+type FlyCatchGameProps = {
+  embedded?: boolean;
+  autoStart?: boolean;
+  onExit?: (href?: string) => void;
+};
+
+export default function FlyCatchGame({
+  embedded = false,
+  autoStart: embeddedAutoStart = false,
+  onExit,
+}: FlyCatchGameProps = {}) {
   const searchParams = useSearchParams();
   const challengeScore = Math.max(0, Number(searchParams.get('challenge')) || 0);
-  const swipeEntry = searchParams.get('entry') === 'swipe';
-  const autoStart = swipeEntry && searchParams.get('start') === '1';
+  const swipeEntry = !embedded && searchParams.get('entry') === 'swipe';
+  const autoStart = embedded
+    ? embeddedAutoStart
+    : swipeEntry && searchParams.get('start') === '1';
+  const entering = embedded && !embeddedAutoStart;
   const { user, loading: authLoading } = useAuth();
   const { indices } = useWardrobeIndices(!!user);
   const { data: backgroundData } = useBackgrounds(true);
@@ -175,7 +188,6 @@ export default function FlyCatchGame() {
   const [statusMessage, setStatusMessage] = useState('');
   const [personalBest, setPersonalBest] = useState(false);
   const [submissionState, setSubmissionState] = useState<'idle' | 'submitting' | 'submitted' | 'error'>('idle');
-  const [showResultLeaderboard, setShowResultLeaderboard] = useState(false);
 
   useEffect(() => {
     const saved = readStoredGame();
@@ -296,7 +308,6 @@ export default function FlyCatchGame() {
     stats.score = calculateFlyGameScore(stats);
     setResult(stats);
     setSubmissionState('idle');
-    setShowResultLeaderboard(false);
     const localPersonalBest = stats.score > best;
     setPersonalBest(localPersonalBest);
     trackAnalyticsEvent('fly_game_completed', {
@@ -355,6 +366,18 @@ export default function FlyCatchGame() {
       setStatusMessage(error instanceof Error ? error.message : 'Score submission failed');
     }
   }, [bankReward, loadLeaderboard, nickname, result, submissionState, user]);
+
+  useEffect(() => {
+    if (
+      phase === 'result' &&
+      result &&
+      user &&
+      submissionState === 'idle' &&
+      sessionRef.current
+    ) {
+      void submitScore();
+    }
+  }, [phase, result, user, submissionState, submitScore]);
 
   const runLoop = useCallback(() => {
     let last = performance.now();
@@ -448,7 +471,6 @@ export default function FlyCatchGame() {
     setRewardState(leaderboard?.rewardClaimed ? 'used' : 'idle');
     setPersonalBest(false);
     setSubmissionState('idle');
-    setShowResultLeaderboard(false);
     setResult(null);
     setHud({ score: 0, combo: 0, catches: 0, misses: 0 });
     statsRef.current = { ...EMPTY_STATS };
@@ -666,17 +688,30 @@ export default function FlyCatchGame() {
   const activeBackgroundImages = activeBackground?.images ?? DEFAULT_BACKGROUND_IMAGES;
 
   return (
-    <div className={cn(styles.shell, 'relative w-full overflow-x-hidden bg-background text-foreground')}>
-      <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden" aria-hidden>
+    <div
+      className={cn(styles.shell, 'relative w-full overflow-x-hidden bg-background text-foreground')}
+      style={embedded ? { background: 'transparent' } : undefined}
+    >
+      <div
+        data-fly-game-bg
+        className={cn('pointer-events-none absolute inset-0 z-0 overflow-hidden', entering && 'opacity-0')}
+        aria-hidden
+      >
         <GameBackground images={activeBackgroundImages} />
         <div className="absolute inset-0 z-[1] bg-gradient-to-b from-black/5 via-transparent to-black/20" />
       </div>
 
       <div className={cn('relative z-10 mx-auto flex min-h-[100dvh] w-full max-w-7xl flex-col px-0 pb-0 pt-[max(12px,env(safe-area-inset-top))] sm:px-5 lg:px-8', swipeEntry && styles.swipeEntrance)}>
-        <header className="mx-3 mb-3 grid h-14 min-w-0 grid-cols-[1fr_auto_1fr] items-center gap-2 sm:mx-0 sm:gap-3">
-          <Link href={user ? '/' : '/welcome'} aria-label="Back to Frogress" className="grid h-9 w-9 place-items-center rounded-full border border-border bg-card/85 text-foreground shadow-sm backdrop-blur-md transition hover:bg-accent" data-game-control>
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
+        <header data-fly-game-hud className={cn('mx-3 mb-3 grid h-14 min-w-0 grid-cols-[1fr_auto_1fr] items-center gap-2 sm:mx-0 sm:gap-3', entering && 'opacity-0')}>
+          {embedded ? (
+            <button type="button" onClick={() => onExit?.()} aria-label="Back to Frogress" className="grid h-9 w-9 place-items-center rounded-full border border-border bg-card/85 text-foreground shadow-sm backdrop-blur-md transition hover:bg-accent" data-game-control>
+              <ArrowLeft className="h-4 w-4" />
+            </button>
+          ) : (
+            <Link href={user ? '/' : '/welcome'} aria-label="Back to Frogress" className="grid h-9 w-9 place-items-center rounded-full border border-border bg-card/85 text-foreground shadow-sm backdrop-blur-md transition hover:bg-accent" data-game-control>
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+          )}
           <div className={cn('min-w-24 rounded-2xl border border-white/30 bg-card/85 px-5 py-1.5 text-center shadow-sm backdrop-blur-2xl', timeSeconds <= 5 && phase === 'playing' && styles.timerUrgent)}>
             <p className="text-[8px] font-black uppercase tracking-[0.2em] text-muted-foreground">Time</p>
             <p className="font-display text-3xl leading-none text-foreground">{timeSeconds}</p>
@@ -690,7 +725,7 @@ export default function FlyCatchGame() {
 
         <div className="flex min-h-0 min-w-0 flex-1">
           <section className="flex min-h-0 min-w-0 flex-1 flex-col">
-            <div className="mx-3 mb-2 flex items-center gap-2.5 rounded-2xl border border-border/50 bg-card/90 p-2.5 shadow-sm backdrop-blur-xl sm:mx-0">
+            <div data-fly-game-hud className={cn('mx-3 mb-2 flex items-center gap-2.5 rounded-2xl border border-border/50 bg-card/90 p-2.5 shadow-sm backdrop-blur-xl sm:mx-0', entering && 'opacity-0')}>
               <div className="relative grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-xl bg-primary/10">
                 <Fly size={42} interactive={false} alwaysPlay ignoreIdlePause />
               </div>
@@ -732,7 +767,7 @@ export default function FlyCatchGame() {
 
               <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex h-64 items-end justify-center">
                 <div className="relative mb-3 w-[min(82%,390px)]">
-                  <div className="absolute bottom-12 left-1/2 z-[15] -translate-x-1/2">
+                  <div data-fly-game-frog className={cn('absolute bottom-12 left-1/2 z-[15] -translate-x-1/2', entering && 'invisible')}>
                     <div className="absolute inset-x-8 bottom-7 h-10 rounded-[50%] bg-black/35 blur-md" />
                   <Frog
                     ref={frogRef}
@@ -744,7 +779,7 @@ export default function FlyCatchGame() {
                     ignoreIdlePause
                   />
                   </div>
-                  <div className="relative z-10 grid h-16 grid-cols-2 items-center rounded-[20px] border border-white/30 bg-card/85 px-3 shadow-lg backdrop-blur-2xl">
+                  <div data-fly-game-card className={cn('relative z-10 grid h-16 grid-cols-2 items-center rounded-[20px] border border-white/30 bg-card/85 px-3 shadow-lg backdrop-blur-2xl', entering && 'opacity-0')}>
                     <div className="border-r border-border/60 px-4 text-left">
                       <p className="text-[8px] font-black uppercase tracking-[0.18em] text-muted-foreground">Score</p>
                       <p className="font-display text-2xl leading-none text-foreground">{hud.score}</p>
@@ -757,178 +792,197 @@ export default function FlyCatchGame() {
                 </div>
               </div>
 
-              {phase === 'lobby' ? (
-                <div className="absolute inset-0 z-30 grid place-items-center bg-background/15 p-3 backdrop-blur-[2px] sm:p-5" data-game-control>
-                  <div className="w-full max-w-md rounded-[28px] border border-border bg-card/95 p-5 text-center shadow-2xl backdrop-blur-xl sm:p-6">
-                    {challengeScore ? <div className="mx-auto mb-3 inline-flex items-center gap-2 rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1.5 text-xs font-black text-amber-700 dark:text-amber-300"><Zap className="h-3.5 w-3.5" /> You were challenged to beat {challengeScore}</div> : null}
-                    <p className="font-display text-4xl leading-[0.95] text-foreground sm:text-5xl">FROGRESS<br /><span className="text-primary">ONE MORE FLY.</span></p>
-                    <p className="mx-auto mt-3 max-w-sm text-sm font-semibold leading-relaxed text-muted-foreground">Catch flies. Build momentum. Every miss costs 1 — and the red ones bite back.</p>
-                    {!user ? (
-                      <label className="mx-auto mt-4 block max-w-xs text-left">
-                        <span className="mb-1 block text-[10px] font-black uppercase tracking-widest text-muted-foreground">Leaderboard name</span>
-                        <input value={nickname} onChange={(event) => setNickname(event.target.value.slice(0, 22))} maxLength={22} className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm font-bold text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15" />
-                      </label>
-                    ) : null}
-                    <button type="button" onClick={() => void startGame()} className="mx-auto mt-4 flex h-14 w-full max-w-xs items-center justify-center gap-2 rounded-2xl bg-primary text-base font-black text-primary-foreground shadow-lg shadow-primary/20 transition hover:brightness-105 active:scale-[.98]" data-game-control>
-                      <Play className="h-5 w-5 fill-current" /> START CATCHING
-                    </button>
-                    <div className="mt-4 flex flex-wrap justify-center gap-2 text-[10px] font-black uppercase tracking-wider">
-                      <span className="rounded-full bg-muted px-2.5 py-1.5 text-muted-foreground">Normal +1</span>
-                      <span className="rounded-full bg-amber-400/15 px-2.5 py-1.5 text-amber-700 dark:text-amber-300">Glow +3</span>
-                      <span className="rounded-full bg-cyan-400/15 px-2.5 py-1.5 text-cyan-700 dark:text-cyan-300">Blue +2s</span>
-                      <span className="rounded-full bg-rose-400/15 px-2.5 py-1.5 text-rose-700 dark:text-rose-300">Red −4</span>
-                    </div>
-                  </div>
-                </div>
-              ) : null}
-
               {phase === 'countdown' ? (
                 <div className="absolute inset-0 z-30 grid place-items-center bg-background/30 backdrop-blur-[2px]" data-game-control>
                   <div key={countdown} className={cn(styles.countdown, 'font-display text-[130px] text-primary')}>{countdown}</div>
                 </div>
               ) : null}
 
-              {phase === 'result' && result ? (
-                <div className="absolute inset-0 z-30 flex items-start justify-center overflow-y-auto bg-background/35 p-3 backdrop-blur-md sm:p-6" data-game-control>
-                  <div className="mx-auto w-full max-w-lg rounded-[28px] border border-border bg-card/95 p-5 text-center shadow-2xl sm:p-6">
-                    <p className="mt-1 text-xs font-black uppercase tracking-[0.22em] text-primary">{personalBest ? 'New personal best' : 'Run complete'}</p>
-                    <p className="font-display text-7xl leading-none text-foreground sm:text-8xl">{result.score}</p>
-                    <p className="mt-1 text-sm font-bold text-muted-foreground">×{result.maxCombo} best combo</p>
-                    {submissionState === 'submitted' && rank ? <div className="mx-auto mt-3 flex w-fit items-center gap-2 rounded-full border border-amber-400/25 bg-amber-400/10 px-4 py-2 text-sm font-black text-amber-700 dark:text-amber-300"><Trophy className="h-4 w-4" /> You placed #{rank}</div> : null}
-                    {submissionState === 'idle' ? <p className="mt-3 text-xs font-bold text-muted-foreground">Submit to save your rank and unlock earned rewards.</p> : null}
-                    {statusMessage ? <p className="mt-3 text-xs font-bold text-destructive">{statusMessage}</p> : null}
-
-                    {/* Gift rewards were removed from Fly Catch.
-                      <div className="mt-4 w-full rounded-2xl border border-amber-400/35 bg-gradient-to-r from-amber-400/15 via-orange-400/10 to-amber-400/15 p-3 text-left shadow-sm">
-                        <div className="flex items-center gap-3">
-                          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-amber-400/20"><Gift className="h-6 w-6 text-amber-500" /></div>
-                          <div className="min-w-0 flex-1"><p className="text-sm font-black">High-score gift unlocked</p><p className="text-xs font-semibold text-muted-foreground">Open it with Frogress’s full gift reveal.</p></div>
-                          {user ? (
-                            <button
-                              type="button"
-                              disabled={bestGiftState === 'claiming' || bestGiftState === 'opened'}
-                              onClick={() => {
-                                if (bestGiftState === 'ready') {
-                                  setGiftOpeningSource('best');
-                                  giftOpeningCountedRef.current = false;
-                                  setGiftOpening(true);
-                                  return;
-                                }
-                                const session = sessionRef.current;
-                                if (session) void claimBestGift({ ...session, personalBest: true });
-                              }}
-                              className="shrink-0 rounded-xl bg-amber-500 px-3 py-2 text-xs font-black text-white shadow-[0_3px_0_#b45309] active:translate-y-[2px] active:shadow-none disabled:opacity-60"
-                            >
-                              {bestGiftState === 'claiming' ? 'CLAIMING…' : bestGiftState === 'opened' ? 'OPENED' : 'OPEN GIFT'}
-                            </button>
-                          ) : null}
-                        </div>
-                      </div>
-                    */}
-
-                    {/* Rare gift catches were removed from Fly Catch.
-                      <div className="mt-3 w-full rounded-2xl border border-amber-400/35 bg-card/90 p-3 text-left shadow-sm">
-                        <div className="flex items-center gap-3">
-                          <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-amber-400/15"><GiftRive width={48} height={48} ambient="jump" /></div>
-                          <div className="min-w-0 flex-1"><p className="text-sm font-black">You caught {caughtGiftCount} rare {caughtGiftCount === 1 ? 'gift' : 'gifts'}!</p><p className="text-xs font-semibold text-muted-foreground">Open {caughtGiftCount === 1 ? 'it' : 'them'} now or later from Inventory.</p></div>
-                          {user ? (
-                            <button
-                              type="button"
-                              disabled={runGiftState === 'claiming' || runGiftState === 'opened'}
-                              onClick={() => {
-                                setGiftOpeningSource('run');
-                                giftOpeningCountedRef.current = false;
-                                setGiftOpening(true);
-                              }}
-                              className="shrink-0 rounded-xl bg-amber-500 px-3 py-2 text-xs font-black text-white shadow-[0_3px_0_#b45309] active:translate-y-[2px] active:shadow-none disabled:opacity-60"
-                            >
-                              {runGiftState === 'claiming' ? 'CLAIMING…' : `OPEN${caughtGiftCount > 1 ? ' NEXT' : ''}`}
-                            </button>
-                          ) : null}
-                        </div>
-                      </div>
-                    */}
-
-                    <div className="mt-4 grid w-full grid-cols-3 gap-2 text-center">
-                      <div className="rounded-xl bg-muted/70 p-2"><p className="font-display text-xl">{best}</p><p className="text-[9px] font-black uppercase text-muted-foreground">Best</p></div>
-                      <div className="rounded-xl bg-muted/70 p-2"><p className="font-display text-xl">{result.catches}</p><p className="text-[9px] font-black uppercase text-muted-foreground">Caught</p></div>
-                      <div className="rounded-xl bg-muted/70 p-2"><p className="font-display text-xl">{result.misses}</p><p className="text-[9px] font-black uppercase text-muted-foreground">Missed</p></div>
-                    </div>
-
-                    <button
-                      type="button"
-                      disabled={submissionState === 'submitting' || submissionState === 'submitted'}
-                      onClick={() => void submitScore()}
-                      className={cn('mt-5 flex h-14 w-full items-center justify-center gap-2 rounded-2xl px-4 text-sm font-black transition active:scale-[.98] disabled:cursor-default', submissionState === 'submitted' ? 'border border-primary/30 bg-primary/10 text-primary' : 'bg-primary text-primary-foreground shadow-lg shadow-primary/20')}
-                    >
-                      {submissionState === 'submitting' ? 'SUBMITTING…' : submissionState === 'submitted' ? <><Check className="h-4 w-4" /> SCORE SUBMITTED{rank ? ` · #${rank}` : ''}</> : submissionState === 'error' ? 'TRY SUBMIT AGAIN' : <><Trophy className="h-4 w-4" /> SUBMIT SCORE</>}
-                    </button>
-
-                    <div className="mt-3 grid w-full grid-cols-3 gap-2">
-                      <button type="button" onClick={() => void shareScore()} className="flex h-12 items-center justify-center gap-1.5 rounded-xl border border-border bg-muted/60 px-2 text-xs font-black text-foreground transition hover:bg-muted active:scale-[.98]">
-                        {shareState === 'shared' || shareState === 'copied' ? <Check className="h-4 w-4" /> : <Share2 className="h-4 w-4" />}
-                        {shareState === 'copied' ? 'COPIED' : shareState === 'shared' ? 'SHARED' : 'SHARE'}
-                      </button>
-                      <Link href="/wardrobe?tab=shop" className="flex h-12 items-center justify-center rounded-xl border border-border bg-muted/60 px-2 text-xs font-black text-foreground transition hover:bg-muted active:scale-[.98]">
-                        SHOP
-                      </Link>
-                      <button type="button" onClick={() => void startGame()} className="flex h-12 items-center justify-center gap-1.5 rounded-xl border border-border bg-muted/60 px-2 text-xs font-black text-foreground transition hover:bg-muted active:scale-[.98]">
-                        <RotateCcw className="h-4 w-4" /> AGAIN
-                      </button>
-                    </div>
-
-                    {submissionState === 'submitted' && !user ? (
-                      <div className="mt-4 w-full rounded-2xl border border-amber-400/20 bg-amber-400/[.08] p-4 text-left">
-                        <div className="flex gap-3">
-                          <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center"><Fly size={24} interactive={false} /></span>
-                          <div>
-                            <p className="text-sm font-black">Keep {rewardAmount || result.score} flies</p>
-                            <p className="mt-0.5 text-xs font-semibold text-muted-foreground">Sign in to save the run and add the rewards to your real Frogress inventory.</p>
-                          </div>
-                        </div>
-                        <Link href="/login?next=%2Ffly-catch" onClick={() => trackAnalyticsEvent('fly_game_signup_clicked', { score: result.score, fly_amount: rewardAmount || result.score })} className="mt-3 flex h-12 w-full items-center justify-center rounded-xl bg-primary text-sm font-black text-primary-foreground">SAVE SCORE &amp; BANK FLIES</Link>
-                      </div>
-                    ) : submissionState === 'submitted' && rewardState === 'banked' ? (
-                      <div className="mt-4 flex w-full items-center justify-between gap-3 rounded-2xl border border-primary/25 bg-primary/10 p-4 text-left">
-                        <div><p className="text-sm font-black text-primary">{rewardAmount} flies banked!</p><p className="text-xs font-semibold text-muted-foreground">Spend them on a look that feels like you.</p></div>
-                        <Link href="/wardrobe?tab=shop" className="shrink-0 rounded-xl bg-primary px-3 py-2 text-xs font-black text-primary-foreground">OPEN SHOP</Link>
-                      </div>
-                    ) : submissionState === 'submitted' && rewardState === 'banking' ? (
-                      <p className="mt-4 text-sm font-bold text-muted-foreground">Banking your starter flies…</p>
-                    ) : submissionState === 'submitted' && rewardState === 'used' ? (
-                      <p className="mt-4 text-xs font-bold text-muted-foreground">Starter reward already claimed — your high score can still rule the board.</p>
-                    ) : null}
-
-                    {submissionState === 'submitted' ? (
-                      <button type="button" onClick={() => setShowResultLeaderboard((current) => !current)} className="mt-4 flex h-10 w-full items-center justify-center gap-2 rounded-xl text-xs font-black text-muted-foreground transition hover:bg-muted/60 hover:text-foreground">
-                        <Crown className="h-4 w-4 text-amber-500" /> {showResultLeaderboard ? 'HIDE LEADERBOARD' : 'VIEW LEADERBOARD'}
-                      </button>
-                    ) : null}
-
-                    {submissionState === 'submitted' && showResultLeaderboard ? <div className="mt-2 w-full rounded-2xl border border-border bg-muted/45 p-3 text-left">
-                      <div className="mb-2 flex items-center justify-between">
-                        <div className="flex items-center gap-2"><Crown className="h-4 w-4 text-amber-500" /><p className="text-xs font-black uppercase tracking-wider">Top catchers</p></div>
-                        {rank ? <span className="text-[10px] font-black text-primary">You’re #{rank}</span> : null}
-                      </div>
-                      <div className="space-y-1">
-                        {loadingBoard ? Array.from({ length: 3 }, (_, index) => <div key={index} className="h-8 animate-pulse rounded-lg bg-muted" />) : leaderboard?.leaders.length ? leaderboard.leaders.slice(0, 5).map((entry) => (
-                          <div key={`${entry.rank}-${entry.name}`} className="grid grid-cols-[22px_1fr_auto] items-center gap-2 rounded-lg bg-background/75 px-2.5 py-1.5">
-                            <span className={cn('text-center text-[10px] font-black', entry.rank === 1 ? 'text-amber-500' : 'text-muted-foreground')}>{entry.rank}</span>
-                            <span className="truncate text-xs font-bold">{entry.name}</span>
-                            <span className="font-display text-base">{entry.score}</span>
-                          </div>
-                        )) : <p className="py-2 text-center text-xs font-bold text-muted-foreground">Be the first frog on the board.</p>}
-                      </div>
-                      {!user ? <p className="mt-2 text-center text-[10px] font-bold text-muted-foreground">Sign in to attach this score to your frog.</p> : null}
-                    </div> : null}
-                  </div>
-                </div>
-              ) : null}
             </div>
           </section>
 
         </div>
       </div>
+
+      {phase === 'lobby' && !embedded ? (
+        <div className="absolute inset-0 z-30 grid place-items-center overflow-y-auto bg-background/25 p-3 backdrop-blur-md sm:p-5" data-game-control>
+          <div className="w-full max-w-md rounded-[28px] border border-border bg-card/95 p-5 text-center shadow-2xl sm:p-6">
+            {challengeScore ? <div className="mx-auto mb-3 inline-flex items-center gap-2 rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1.5 text-xs font-black text-amber-700 dark:text-amber-300"><Zap className="h-3.5 w-3.5" /> You were challenged to beat {challengeScore}</div> : null}
+            <p className="font-display text-4xl leading-[0.95] text-foreground sm:text-5xl">FROGRESS<br /><span className="text-primary">ONE MORE FLY.</span></p>
+            <p className="mx-auto mt-2.5 max-w-sm text-sm font-semibold leading-relaxed text-muted-foreground">Catch as many flies as you can in 30 seconds.</p>
+
+            <div className="mt-4 grid grid-cols-4 gap-2">
+              <div className="rounded-2xl border border-border/60 bg-muted/40 px-1 py-2.5">
+                <div className="mx-auto grid h-9 w-9 place-items-center rounded-full bg-muted"><Fly size={26} interactive={false} /></div>
+                <p className="mt-1.5 text-sm font-black leading-none text-foreground">+1</p>
+                <p className="mt-0.5 text-[9px] font-black uppercase tracking-wider text-muted-foreground">Fly</p>
+              </div>
+              <div className="rounded-2xl border border-amber-400/30 bg-amber-400/10 px-1 py-2.5">
+                <div className="mx-auto grid h-9 w-9 place-items-center rounded-full bg-amber-400/20 shadow-[0_0_10px_rgba(250,204,21,0.5)]"><Fly size={26} interactive={false} /></div>
+                <p className="mt-1.5 text-sm font-black leading-none text-amber-600 dark:text-amber-300">+3</p>
+                <p className="mt-0.5 text-[9px] font-black uppercase tracking-wider text-amber-700/80 dark:text-amber-300/80">Glow</p>
+              </div>
+              <div className="rounded-2xl border border-cyan-400/30 bg-cyan-400/10 px-1 py-2.5">
+                <div className="mx-auto grid h-9 w-9 place-items-center rounded-full bg-cyan-400/20"><Fly size={26} interactive={false} /></div>
+                <p className="mt-1.5 text-sm font-black leading-none text-cyan-600 dark:text-cyan-300">+2s</p>
+                <p className="mt-0.5 text-[9px] font-black uppercase tracking-wider text-cyan-700/80 dark:text-cyan-300/80">Time</p>
+              </div>
+              <div className="rounded-2xl border border-rose-400/30 bg-rose-400/10 px-1 py-2.5">
+                <div className="mx-auto grid h-9 w-9 place-items-center rounded-full bg-rose-400/20"><Fly size={26} interactive={false} /></div>
+                <p className="mt-1.5 text-sm font-black leading-none text-rose-600 dark:text-rose-300">−4</p>
+                <p className="mt-0.5 text-[9px] font-black uppercase tracking-wider text-rose-700/80 dark:text-rose-300/80">Trap</p>
+              </div>
+            </div>
+
+            {!user ? (
+              <label className="mx-auto mt-4 block max-w-xs text-left">
+                <span className="mb-1 block text-[10px] font-black uppercase tracking-widest text-muted-foreground">Leaderboard name</span>
+                <input value={nickname} onChange={(event) => setNickname(event.target.value.slice(0, 22))} maxLength={22} className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm font-bold text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15" />
+              </label>
+            ) : null}
+            <button type="button" onClick={() => void startGame()} className="mt-4 flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-primary text-base font-black text-primary-foreground shadow-lg shadow-primary/20 transition hover:brightness-105 active:scale-[.98]" data-game-control>
+              <Play className="h-5 w-5 fill-current" /> START CATCHING
+            </button>
+            <p className="mt-2 text-[11px] font-bold text-muted-foreground">Every miss costs 1 — and the red ones bite back.</p>
+          </div>
+        </div>
+      ) : null}
+
+      {phase === 'result' && result ? (
+        <div className="absolute inset-0 z-30 flex items-stretch justify-center bg-background/35 px-3 pb-[max(16px,env(safe-area-inset-bottom))] pt-[calc(env(safe-area-inset-top)+56px)] backdrop-blur-md sm:px-6" data-game-control>
+          {embedded ? (
+            <button type="button" onClick={() => onExit?.()} aria-label="Back to tasks" className="absolute left-4 top-[calc(env(safe-area-inset-top)+12px)] z-20 grid h-10 w-10 place-items-center rounded-full border border-border bg-card/90 text-foreground shadow-sm transition hover:bg-accent">
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+          ) : (
+            <Link href={user ? '/' : '/welcome'} aria-label="Back to tasks" className="absolute left-4 top-[calc(env(safe-area-inset-top)+12px)] z-20 grid h-10 w-10 place-items-center rounded-full border border-border bg-card/90 text-foreground shadow-sm transition hover:bg-accent">
+              <ArrowLeft className="h-5 w-5" />
+            </Link>
+          )}
+          <div className="relative mx-auto flex w-full max-w-lg flex-col">
+            <div className={cn('absolute left-1/2 top-0 z-10 grid h-16 w-16 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-4 border-card shadow-lg', personalBest ? 'bg-gradient-to-b from-amber-300 to-amber-500 text-white' : 'bg-gradient-to-b from-primary/85 to-primary text-primary-foreground')}>
+              <Trophy className="h-7 w-7" strokeWidth={2.5} />
+            </div>
+            <div className="flex max-h-full min-h-0 flex-col overflow-hidden rounded-[28px] border border-border bg-card/95 text-center shadow-2xl">
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-3 pt-11 sm:px-6">
+              <p className={cn('text-xs font-black uppercase tracking-[0.22em]', personalBest ? 'text-amber-500' : 'text-primary')}>{personalBest ? 'New personal best' : 'Run complete'}</p>
+              <p className={cn(styles.resultScore, 'mt-1 font-display text-6xl leading-none text-foreground sm:text-7xl')}>{result.score}</p>
+              <div className="mt-2.5 flex flex-wrap items-center justify-center gap-2">
+                <div className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/30 bg-amber-400/10 px-3.5 py-1.5 text-xs font-black uppercase tracking-wider text-amber-700 dark:text-amber-300">
+                  <Zap className="h-3.5 w-3.5" /> ×{result.maxCombo} best combo
+                </div>
+                {!personalBest && best > result.score && best - result.score <= 9 ? (
+                  <div className="inline-flex items-center gap-1.5 rounded-full border border-rose-400/30 bg-rose-400/10 px-3.5 py-1.5 text-xs font-black uppercase tracking-wider text-rose-600 dark:text-rose-300">
+                    {best - result.score} away from your best
+                  </div>
+                ) : null}
+              </div>
+              {statusMessage ? <p className="mt-3 text-xs font-bold text-destructive">{statusMessage}</p> : null}
+
+              <div className="mt-5 grid w-full grid-cols-3 gap-2 text-center">
+                <div className="rounded-2xl border border-border/50 bg-muted/50 py-3"><p className="font-display text-2xl leading-none">{best}</p><p className="mt-1 text-[9px] font-black uppercase tracking-wider text-muted-foreground">Best</p></div>
+                <div className="rounded-2xl border border-border/50 bg-muted/50 py-3"><p className="font-display text-2xl leading-none">{result.catches}</p><p className="mt-1 text-[9px] font-black uppercase tracking-wider text-muted-foreground">Caught</p></div>
+                <div className="rounded-2xl border border-border/50 bg-muted/50 py-3"><p className="font-display text-2xl leading-none">{result.misses}</p><p className="mt-1 text-[9px] font-black uppercase tracking-wider text-muted-foreground">Missed</p></div>
+              </div>
+
+              {(() => {
+                const leaders = leaderboard?.leaders ?? [];
+                const youName = leaderboard?.playerName || nickname;
+                const nextAbove =
+                  rank && rank > 1
+                    ? leaders.find((entry) => entry.rank === rank - 1)
+                    : null;
+                const gap = nextAbove
+                  ? Math.max(1, nextAbove.score - result.score + 1)
+                  : 0;
+                return (
+                  <div className="mt-4 w-full rounded-2xl border border-border bg-muted/45 p-3 text-left">
+                    <div className="mb-2 flex items-center justify-between">
+                      <div className="flex items-center gap-2"><Crown className="h-4 w-4 text-amber-500" /><p className="text-xs font-black uppercase tracking-wider">Top catchers</p></div>
+                      {rank ? <span className="text-[10px] font-black text-primary">You&rsquo;re #{rank}</span> : null}
+                    </div>
+                    <div className="space-y-1">
+                      {loadingBoard ? (
+                        Array.from({ length: 3 }, (_, index) => <div key={index} className="h-8 animate-pulse rounded-lg bg-muted" />)
+                      ) : leaders.length ? (
+                        leaders.slice(0, 3).map((entry) => (
+                          <div key={`${entry.rank}-${entry.name}`} className={cn('grid grid-cols-[22px_1fr_auto] items-center gap-2 rounded-lg px-2.5 py-1.5', rank === entry.rank ? 'bg-primary/10 ring-1 ring-primary/30' : 'bg-background/75')}>
+                            <span className={cn('text-center text-[10px] font-black', entry.rank === 1 ? 'text-amber-500' : 'text-muted-foreground')}>{entry.rank}</span>
+                            <span className={cn('truncate text-xs font-bold', rank === entry.rank && 'text-primary')}>{rank === entry.rank ? `${entry.name} (you)` : entry.name}</span>
+                            <span className="font-display text-base">{entry.score}</span>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="py-2 text-center text-xs font-bold text-muted-foreground">Be the first frog on the board.</p>
+                      )}
+                      {rank && rank > 3 ? (
+                        <>
+                          <p className="text-center text-[10px] font-black leading-none text-muted-foreground/60">···</p>
+                          <div className="grid grid-cols-[22px_1fr_auto] items-center gap-2 rounded-lg bg-primary/10 px-2.5 py-1.5 ring-1 ring-primary/30">
+                            <span className="text-center text-[10px] font-black text-primary">{rank}</span>
+                            <span className="truncate text-xs font-bold text-primary">{youName} (you)</span>
+                            <span className="font-display text-base">{result.score}</span>
+                          </div>
+                        </>
+                      ) : null}
+                    </div>
+                    {rank === 1 ? (
+                      <p className="mt-2.5 rounded-xl bg-amber-400/15 px-3 py-2 text-center text-[11px] font-black uppercase tracking-wide text-amber-700 dark:text-amber-300">You rule the pond 👑</p>
+                    ) : nextAbove ? (
+                      <p className="mt-2.5 rounded-xl bg-primary/10 px-3 py-2 text-center text-[11px] font-black uppercase tracking-wide text-primary">Catch {gap} more to pass {nextAbove.name}</p>
+                    ) : !rank && !loadingBoard ? (
+                      <p className="mt-2.5 text-center text-[11px] font-bold text-muted-foreground">Submit your score to claim your spot.</p>
+                    ) : null}
+                  </div>
+                );
+              })()}
+
+              {submissionState === 'submitted' && !user ? (
+                <div className="mt-4 w-full rounded-2xl border border-amber-400/20 bg-amber-400/[.08] p-4 text-left">
+                  <div className="flex gap-3">
+                    <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center"><Fly size={24} interactive={false} /></span>
+                    <div>
+                      <p className="text-sm font-black">Keep {rewardAmount || result.score} flies</p>
+                      <p className="mt-0.5 text-xs font-semibold text-muted-foreground">Sign in to save the run and add the rewards to your real Frogress inventory.</p>
+                    </div>
+                  </div>
+                  <Link href="/login?next=%2Ffly-catch" onClick={(event) => { trackAnalyticsEvent('fly_game_signup_clicked', { score: result.score, fly_amount: rewardAmount || result.score }); if (embedded) { event.preventDefault(); onExit?.('/login?next=%2Ffly-catch'); } }} className="mt-3 flex h-12 w-full items-center justify-center rounded-xl bg-primary text-sm font-black text-primary-foreground">SAVE SCORE &amp; BANK FLIES</Link>
+                </div>
+              ) : submissionState === 'submitted' && rewardState === 'banked' ? (
+                <div className="mt-4 flex w-full items-center gap-3 rounded-2xl border border-primary/25 bg-primary/10 p-4 text-left">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/15"><Fly size={28} interactive={false} /></span>
+                  <div><p className="text-sm font-black text-primary">{rewardAmount} flies banked!</p><p className="text-xs font-semibold text-muted-foreground">They&rsquo;re waiting in your inventory.</p></div>
+                </div>
+              ) : submissionState === 'submitted' && rewardState === 'banking' ? (
+                <p className="mt-4 text-sm font-bold text-muted-foreground">Banking your flies…</p>
+              ) : null}
+              </div>
+
+              <div className="shrink-0 border-t border-border/50 px-5 pb-4 pt-3 sm:px-6">
+                <button
+                  type="button"
+                  disabled={submissionState === 'submitting' || submissionState === 'submitted'}
+                  onClick={() => void submitScore()}
+                  className={cn('flex h-12 w-full items-center justify-center gap-2 rounded-2xl px-4 text-sm font-black transition active:scale-[.98] disabled:cursor-default', submissionState === 'submitted' ? 'border border-primary/30 bg-primary/10 text-primary' : 'bg-primary text-primary-foreground shadow-lg shadow-primary/20')}
+                >
+                  {submissionState === 'submitting' ? 'SUBMITTING…' : submissionState === 'submitted' ? <><Check className="h-4 w-4" /> SCORE SUBMITTED{rank ? ` · #${rank}` : ''}</> : submissionState === 'error' ? 'TRY SUBMIT AGAIN' : <><Trophy className="h-4 w-4" /> SUBMIT SCORE</>}
+                </button>
+                {submissionState === 'idle' && !user ? <p className="mt-1.5 text-[11px] font-bold text-muted-foreground">Submitting saves your rank and banks the flies you earned.</p> : null}
+
+                <div className="mt-2.5 grid w-full grid-cols-2 gap-2">
+                  <button type="button" onClick={() => void shareScore()} className="flex h-11 items-center justify-center gap-1.5 rounded-2xl border border-border bg-muted/60 px-2 text-xs font-black text-foreground transition hover:bg-muted active:scale-[.98]">
+                    {shareState === 'shared' || shareState === 'copied' ? <Check className="h-4 w-4" /> : <Share2 className="h-4 w-4" />}
+                    {shareState === 'copied' ? 'LINK COPIED' : shareState === 'shared' ? 'SENT' : 'CHALLENGE'}
+                  </button>
+                  <button type="button" onClick={() => void startGame()} className="flex h-11 items-center justify-center gap-1.5 rounded-2xl border border-border bg-muted/60 px-2 text-xs font-black text-foreground transition hover:bg-muted active:scale-[.98]">
+                    <RotateCcw className="h-4 w-4" /> AGAIN
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
       {/* The game now uses the app's equipped background and real Wardrobe route.
         <BackgroundPicker
           catalog={backgroundCatalog}

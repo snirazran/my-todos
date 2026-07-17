@@ -27,17 +27,38 @@ const INITIAL_PAST = 7;
 const INITIAL_FUTURE = 7;
 const EXTEND_STEP = 7;
 
+function getInitialPlannerDate(fallback: string) {
+  if (typeof window === 'undefined') return fallback;
+
+  const requested = new URLSearchParams(window.location.search).get('date');
+  if (!requested || !/^\d{4}-\d{2}-\d{2}$/.test(requested)) return fallback;
+
+  const parsed = parseYmd(requested);
+  const [year, month, day] = requested.split('-').map(Number);
+  const isRealDate =
+    parsed.getFullYear() === year &&
+    parsed.getMonth() === month - 1 &&
+    parsed.getDate() === day;
+
+  return isRealDate ? requested : fallback;
+}
+
 export default function ManageTasksPage() {
   const today = todayYmd();
+  const [initialDate] = useState(() => getInitialPlannerDate(today));
   const [tasksByDate, setTasksByDate] = useState<Record<string, Task[]>>({});
   const [backlog, setBacklog] = useState<Task[]>([]);
   const [accountCreatedAt, setAccountCreatedAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Sliding window of dates currently rendered
-  const [windowStart, setWindowStart] = useState<string>(addDays(today, -INITIAL_PAST));
-  const [windowEnd, setWindowEnd] = useState<string>(addDays(today, INITIAL_FUTURE));
-  const [activeDateKey, setActiveDateKey] = useState<string>(today);
+  const [windowStart, setWindowStart] = useState<string>(() =>
+    addDays(initialDate, -INITIAL_PAST),
+  );
+  const [windowEnd, setWindowEnd] = useState<string>(() =>
+    addDays(initialDate, INITIAL_FUTURE),
+  );
+  const [activeDateKey, setActiveDateKey] = useState<string>(initialDate);
 
   useEffect(() => {
     void seedQuestClaims();

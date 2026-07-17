@@ -193,6 +193,7 @@ export function FrogDisplay({
     // Added mb-12 to create the requested space from the tabs below
 
     <div
+      data-fly-hero
       className={`${className} flex flex-col items-center mb-2 md:mb-2 relative md:-translate-y-6`}
     >
       <div
@@ -200,6 +201,7 @@ export function FrogDisplay({
         className="relative z-50 -mb-6 transition-transform duration-500 origin-top scale-100 pointer-events-none -translate-y-9 md:mb-6 md:scale-100 md:translate-y-3"
       >
         <div
+          data-fly-hero-frog
           className="cursor-pointer pointer-events-auto"
           onClick={() => setClickedAt(Date.now())}
         >
@@ -253,6 +255,7 @@ export function FrogDisplay({
             */}
 
       <div
+        data-fly-hero-card
         className="relative z-10 -mt-6 flex items-center justify-center
 
               w-[340px] max-w-[min(94vw,100%)] h-[50px] px-2

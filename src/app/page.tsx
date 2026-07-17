@@ -62,6 +62,7 @@ import {
   HungerStatus,
 } from '@/hooks/useTaskData';
 import { HUNGRY_MOOD_THRESHOLD } from '@/lib/hungerLogic';
+import { patchInventoryFlies } from '@/hooks/useInventory';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import { randomUUID } from '@/lib/uuid';
 import { QuestOnboardingPopup } from '@/components/ui/QuestOnboardingPopup';
@@ -142,6 +143,12 @@ export default function Home() {
     updateTaskTags,
     duplicateTask,
     tags,
+    sections,
+    createSection,
+    renameSection,
+    setSectionCollapsed,
+    deleteSection,
+    reorderSections,
   } = useTaskData();
 
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -680,6 +687,7 @@ export default function Home() {
           </FlyCatchSwipeLauncher>
 
           <div
+            data-fly-sheet
             className="relative z-20 -mx-3 mt-[14px] flex flex-col gap-2 rounded-t-[24px] bg-background px-1.5 pt-5 md:mx-auto md:mt-14 md:w-full md:max-w-2xl md:px-8 lg:gap-4"
             style={{ pointerEvents: taskCinematic ? 'none' : 'auto' }}
           >
@@ -842,6 +850,18 @@ export default function Home() {
                   onReorder={(reordered) => {
                     reorderTasks(reordered);
                   }}
+                  sections={user ? sections : []}
+                  onCreateSection={
+                    user
+                      ? createSection
+                      : () => {
+                          router.push('/login');
+                        }
+                  }
+                  onRenameSection={renameSection}
+                  onDeleteSection={deleteSection}
+                  onSetSectionCollapsed={setSectionCollapsed}
+                  onReorderSections={reorderSections}
                   pendingToToday={pendingToToday}
                   onToggleRepeat={(id) => {
                     if (!user) {
@@ -990,6 +1010,7 @@ export default function Home() {
         defaultRepeat="this-week"
         focusCategoryIds={questOnboarding?.selectedCategoryIds}
         categoryTagMap={questOnboarding?.categoryTagMap}
+        sections={user ? sections : []}
         onSubmit={async ({
           text,
           days,
@@ -1003,6 +1024,7 @@ export default function Home() {
           repeatRule,
           notes,
           checklist,
+          sectionId,
         }) => {
           try {
             const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -1026,6 +1048,7 @@ export default function Home() {
                 repeatRule,
                 notes,
                 checklist,
+                sectionId,
               }),
             });
             const data = await res.json();
@@ -1129,6 +1152,17 @@ export default function Home() {
           // For now, manual fetch + mutate.
           await fetch('/api/hunger/acknowledge', { method: 'POST' });
           mutateToday();
+        }}
+        onRecover={async () => {
+          const res = await fetch('/api/hunger/recover', { method: 'POST' });
+          const payload = await res.json().catch(() => ({}));
+          if (!res.ok || !payload.granted) {
+            throw new Error(payload.error ?? 'Recovery failed');
+          }
+          if (typeof payload.balance === 'number') {
+            patchInventoryFlies(payload.balance);
+          }
+          await mutateToday();
         }}
       />
 

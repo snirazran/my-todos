@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { Capacitor } from '@capacitor/core';
+import { usePathname } from 'next/navigation';
 import { setRiveIdle } from '@/lib/riveIdlePause';
 import { installPerfDebug } from '@/lib/perfDebug';
 
@@ -9,6 +10,13 @@ const IDLE_MS = 45_000;
 // Input events (pointermove especially) fire in bursts; restarting the timer
 // at most once a second keeps the handler nearly free.
 const RESET_THROTTLE_MS = 1_000;
+
+const ALWAYS_ANIMATED_ROUTES = [
+  '/onboarding',
+  '/login',
+  '/welcome',
+  '/register',
+];
 
 const EVENTS: (keyof WindowEventMap)[] = [
   'pointerdown',
@@ -24,12 +32,22 @@ const EVENTS: (keyof WindowEventMap)[] = [
  * Flips the global Rive idle flag after IDLE_MS without user input, and
  * clears it on the first touch. Mounted once in the root layout, next to
  * SheetRivePause. Native-only: battery/thermals are a phone problem, and the
- * desktop web build shouldn't drop its ambient motion.
+ * desktop web build shouldn't drop its ambient motion. Auth and onboarding
+ * screens stay animated so their mascot scenes never enter the sleep state.
  */
 export function RiveIdlePause() {
+  const pathname = usePathname();
+
   useEffect(() => {
     installPerfDebug();
     if (!Capacitor.isNativePlatform()) return;
+    const alwaysAnimate = ALWAYS_ANIMATED_ROUTES.some(
+      (route) => pathname === route || pathname.startsWith(`${route}/`),
+    );
+    if (alwaysAnimate) {
+      setRiveIdle(false);
+      return;
+    }
     let timer = 0;
     let lastArm = 0;
 
@@ -63,6 +81,6 @@ export function RiveIdlePause() {
       document.removeEventListener('visibilitychange', onVisibility);
       setRiveIdle(false);
     };
-  }, []);
+  }, [pathname]);
   return null;
 }

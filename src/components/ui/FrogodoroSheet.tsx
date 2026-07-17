@@ -65,6 +65,12 @@ interface Task {
   frogodoroSettings?: Record<string, unknown>;
 }
 
+function getTaskDisplayName(task: Pick<Task, 'id' | 'text'>) {
+  return task.id.startsWith('focus-area:')
+    ? task.text.replace(/^Focus:\s*/i, '')
+    : task.text;
+}
+
 // The store's timeLeft ticks every second; only the leaf components below
 // subscribe to it, so the tick never re-renders the whole sheet. These helpers
 // derive the per-second values from a state snapshot (render subscriptions and
@@ -191,6 +197,7 @@ export default function FrogodoroSheet({
   onMutateToday,
 }: Props) {
   useRegisterOpenSheet(open);
+  const taskDisplayName = task ? getTaskDisplayName(task) : '';
   const [mounted, setMounted] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
   // Heavy Rive content (the live frog scene) mounts only after the sheet's
@@ -503,7 +510,7 @@ export default function FrogodoroSheet({
   // describing the task whose session is still running.
   useEffect(() => {
     if (open && task?.text && task.id === selectedTaskId) {
-      setSelectedTaskName(task.text);
+      setSelectedTaskName(getTaskDisplayName(task));
     }
   }, [open, task, selectedTaskId, setSelectedTaskName]);
 
@@ -633,7 +640,7 @@ export default function FrogodoroSheet({
       breakTime: currentPhase === 'break' ? elapsed : 0,
     };
     try {
-      await fetch(`/api/tasks/${taskId}/frogodoro`, {
+      await fetch(`/api/tasks/${encodeURIComponent(taskId)}/frogodoro`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ session, timezone }),
@@ -1327,7 +1334,7 @@ export default function FrogodoroSheet({
                               className="flex h-8 items-center gap-1.5 rounded-full bg-white/95 px-3 text-[12px] font-black uppercase tracking-wide text-emerald-900 shadow-[0_2px_0_rgba(0,0,0,0.18)] transition-all hover:bg-white active:translate-y-[1px] active:shadow-none"
                             >
                               <Settings2 className="h-4 w-4" />
-                              Settings
+                              <span className="hidden min-[360px]:inline">Settings</span>
                             </button>
                           )}
                           <button
@@ -1343,7 +1350,7 @@ export default function FrogodoroSheet({
                         {task && (
                           <div className="mb-3 px-10 text-center">
                             <p className="break-words text-lg font-black leading-tight text-white">
-                              {task.text}
+                              {taskDisplayName}
                             </p>
                           </div>
                         )}
@@ -1427,11 +1434,11 @@ export default function FrogodoroSheet({
                           <div className="mb-4 flex items-stretch">
                             <div className="flex-1 text-center">
                               <p className="text-[11px] font-black uppercase tracking-widest text-white/80">Focus</p>
-                              <p className="text-[44px] font-black leading-none tracking-tighter text-white drop-shadow-lg tabular-nums">{formatTime(focusSeconds)}</p>
+                              <p className="text-[clamp(32px,11vw,44px)] font-black leading-none tracking-tighter text-white drop-shadow-lg tabular-nums">{formatTime(focusSeconds)}</p>
                             </div>
                             <div className="flex-1 text-center">
                               <p className="text-[11px] font-black uppercase tracking-widest text-white/80">Break</p>
-                              <p className="text-[44px] font-black leading-none tracking-tighter text-white drop-shadow-lg tabular-nums">{formatTime(breakSeconds)}</p>
+                              <p className="text-[clamp(32px,11vw,44px)] font-black leading-none tracking-tighter text-white drop-shadow-lg tabular-nums">{formatTime(breakSeconds)}</p>
                             </div>
                           </div>
                         ) : (
@@ -1454,7 +1461,7 @@ export default function FrogodoroSheet({
                                   </button>
                                 )}
 
-                                <div className="min-w-[210px] text-center text-[72px] font-black leading-none tracking-tighter text-white drop-shadow-lg tabular-nums">
+                                <div className="min-w-0 text-center text-[clamp(44px,16vw,72px)] font-black leading-none tracking-tighter text-white drop-shadow-lg tabular-nums min-[420px]:min-w-[210px]">
                                   <CountdownText
                                     frozen={awaitingDone ? completedDuration : null}
                                   />
@@ -1511,7 +1518,7 @@ export default function FrogodoroSheet({
                                     <span className="block text-[12px] font-black leading-tight text-white">
                                       Deep focus
                                     </span>
-                                    <span className="block truncate text-[11px] font-semibold leading-tight text-white/70">
+                                    <span className="block text-[11px] font-semibold leading-tight text-white/70">
                                       Finish without pausing · +1 fly
                                     </span>
                                   </span>
@@ -1589,7 +1596,7 @@ export default function FrogodoroSheet({
                             {celebrateFocus && (
                               <button
                                 onClick={handleKeepGoing}
-                                className="relative flex items-center justify-center rounded-2xl bg-white/20 px-4 py-3 text-[13px] font-black uppercase tracking-widest text-white shadow-[0_6px_0_rgba(0,0,0,0.15)] transition-all hover:bg-white/30 active:translate-y-1.5 active:shadow-[0_0_0_rgba(0,0,0,0.15)]"
+                                className="relative flex items-center justify-center rounded-2xl bg-white/20 px-3 py-3 text-[13px] font-black uppercase tracking-widest text-white shadow-[0_6px_0_rgba(0,0,0,0.15)] transition-all hover:bg-white/30 active:translate-y-1.5 active:shadow-[0_0_0_rgba(0,0,0,0.15)] min-[380px]:px-4"
                               >
                                 <Zap className="mr-1 h-4 w-4 fill-current" />
                                 +5 MORE
@@ -1630,7 +1637,7 @@ export default function FrogodoroSheet({
                               </div>
                               <button
                                 onClick={handleDone}
-                                className={`relative flex items-center justify-center px-10 py-3 bg-white dark:bg-slate-50 text-[16px]
+                                className={`relative flex items-center justify-center px-7 min-[380px]:px-10 py-3 bg-white dark:bg-slate-50 text-[16px]
                                   font-black uppercase tracking-widest rounded-2xl shadow-[0_6px_0_rgba(0,0,0,0.15)]
                                   active:shadow-[0_0_0_rgba(0,0,0,0.15)] active:translate-y-1.5 transition-all ${getPhaseAccent()}`}
                               >

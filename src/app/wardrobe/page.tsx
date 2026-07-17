@@ -84,7 +84,7 @@ function WardrobePageInner() {
           disabled={isStuck}
           className={cn('shrink-0', isStuck ? 'z-[5]' : 'z-40')}
         >
-          <div className="relative flex h-[calc(204px+env(safe-area-inset-top))] items-end justify-center pointer-events-none md:h-[calc(222px+env(safe-area-inset-top))]">
+          <div data-fly-hero className="relative flex h-[calc(204px+env(safe-area-inset-top))] items-end justify-center pointer-events-none md:h-[calc(222px+env(safe-area-inset-top))]">
             <div
               ref={frogBoxRef}
               className={cn(
@@ -98,18 +98,20 @@ function WardrobePageInner() {
                 frogBoxRef={frogBoxRef}
                 onGrabActive={setFrogMouthOpen}
               />
-              <Frog
-                ref={frogRef}
-                mouthOpen={frogMouthOpen}
-                indices={previewIndices}
-                paused={false}
-              />
+              <div data-fly-hero-frog>
+                <Frog
+                  ref={frogRef}
+                  mouthOpen={frogMouthOpen}
+                  indices={previewIndices}
+                  paused={false}
+                />
+              </div>
               <PremiumFrogAura />
             </div>
           </div>
         </FlyCatchSwipeLauncher>
 
-        <section className="relative z-10 flex flex-col flex-1 px-4 -mx-4 md:-mx-6 md:px-6">
+        <section data-fly-sheet className="relative z-10 flex flex-col flex-1 px-4 -mx-4 md:-mx-6 md:px-6">
           <WardrobePageContent
             defaultTab={defaultTab}
             onClose={() => router.push('/')}

@@ -55,6 +55,7 @@ export function GlobalPageBackground() {
   return (
     <div
       aria-hidden
+      data-fly-page-bg
       className="pointer-events-none absolute left-0 right-0 top-0 -z-10 h-[calc(400px+env(safe-area-inset-top))] w-full overflow-hidden md:h-[440px]"
     >
       <AnimatePresence initial={false}>

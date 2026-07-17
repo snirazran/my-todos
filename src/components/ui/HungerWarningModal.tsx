@@ -1,16 +1,18 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import Frog from '@/components/ui/frog';
 import type { WardrobeSlot } from '@/components/ui/frog';
 import Fly from '@/components/ui/fly';
-import { Utensils } from 'lucide-react';
+import { Loader2, Play, Utensils } from 'lucide-react';
+import { rewardedAdsAvailable, showRewardedAd } from '@/lib/ads';
 
 interface Props {
   stolenFlies: number;
   onAcknowledge: () => void;
+  onRecover: () => Promise<void>;
   open: boolean;
   indices?: Partial<Record<WardrobeSlot, number>>;
 }
@@ -18,11 +20,46 @@ interface Props {
 export function HungerWarningModal({
   stolenFlies,
   onAcknowledge,
+  onRecover,
   open,
   indices,
 }: Props) {
+  const [recovering, setRecovering] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const canWatchAd = rewardedAdsAvailable();
+
+  useEffect(() => {
+    if (open) return;
+    setRecovering(false);
+    setError(null);
+  }, [open]);
+
+  const handleRecover = async () => {
+    if (recovering) return;
+    setRecovering(true);
+    setError(null);
+    try {
+      const adResult = await showRewardedAd('frog_hunger_recovery');
+      if (adResult !== 'rewarded') {
+        if (adResult === 'failed') {
+          setError('Ad not available right now - try again in a moment.');
+        }
+        return;
+      }
+      await onRecover();
+    } catch (err) {
+      console.error('Could not recover eaten flies', err);
+      setError('Could not return your flies - try again.');
+    } finally {
+      setRecovering(false);
+    }
+  };
+
   return (
-    <Dialog open={open} onOpenChange={(val) => !val && onAcknowledge()}>
+    <Dialog
+      open={open}
+      onOpenChange={(val) => !val && !recovering && onAcknowledge()}
+    >
       <DialogContent className="sm:max-w-[360px] border-none bg-transparent shadow-none p-0 outline-none">
         <DialogTitle className="sr-only">I was Starving!</DialogTitle>
         <div className="relative flex flex-col items-center bg-card/95 backdrop-blur-2xl border border-border/60 rounded-[32px] p-6 shadow-2xl overflow-hidden ring-1 ring-black/5">
@@ -64,13 +101,45 @@ export function HungerWarningModal({
             </span>
           </div>
 
-          {/* Action */}
-          <Button
-            onClick={onAcknowledge}
-            className="w-full h-12 rounded-2xl text-base font-bold bg-primary text-primary-foreground hover:bg-primary/90 transition-all active:scale-95 shadow-lg shadow-primary/20"
-          >
-            I'll Do My Tasks
-          </Button>
+          {/* Actions */}
+          <div className="flex w-full flex-col gap-3">
+            {canWatchAd && (
+              <button
+                type="button"
+                onClick={handleRecover}
+                disabled={recovering}
+                className="flex h-16 w-full flex-col items-center justify-center gap-1 rounded-2xl bg-amber-500 text-white shadow-[0_4px_0_0_#b45309] ring-1 ring-[#b45309]/40 transition-all [@media(hover:hover)]:hover:bg-amber-400 active:translate-y-[2px] active:shadow-none disabled:opacity-60"
+              >
+                <span className="flex items-center gap-2 text-[13px] font-black uppercase tracking-[0.11em]">
+                  {recovering ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Play className="h-3.5 w-3.5 fill-current" />
+                  )}
+                  {recovering ? 'Loading ad...' : 'Get my flies back'}
+                </span>
+                {!recovering && (
+                  <span className="text-[11px] font-bold normal-case tracking-normal text-white/90">
+                    Watch a short ad to recover all {stolenFlies}
+                  </span>
+                )}
+              </button>
+            )}
+
+            {error && (
+              <p className="text-center text-xs font-bold text-red-500">
+                {error}
+              </p>
+            )}
+
+            <Button
+              onClick={onAcknowledge}
+              disabled={recovering}
+              className="h-12 w-full rounded-2xl bg-primary text-base font-bold text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 active:scale-95"
+            >
+              I'll Do My Tasks
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

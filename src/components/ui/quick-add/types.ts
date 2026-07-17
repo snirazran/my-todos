@@ -33,6 +33,8 @@ export type QuickAddSubmit = {
   /** Carried over when restoring a saved task so its card details survive. */
   notes?: string;
   checklist?: ChecklistItem[];
+  /** Today-list section to file the task under. */
+  sectionId?: string | null;
 };
 
 export type QuickAddSheetProps = Readonly<{
@@ -52,6 +54,8 @@ export type QuickAddSheetProps = Readonly<{
   defaultRepeatDaily?: boolean;
   focusCategoryIds?: MacroCategoryId[];
   categoryTagMap?: FocusCategoryTagMap[];
+  /** Today-list sections the task can be filed under (chip hidden when empty). */
+  sections?: ReadonlyArray<{ id: string; name: string }>;
 }>;
 
 export type ActivePicker = 'tags' | 'date' | 'repeat' | null;

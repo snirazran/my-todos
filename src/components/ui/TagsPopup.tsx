@@ -219,6 +219,7 @@ export default function TagsPopup({
               doneLabel={isSaving ? 'Saving...' : saveLabel}
               suggestedTagName={displaySuggested}
               questTagIds={questTagIds}
+              showFocusConnect={!currentFocusCategoryId}
             />
           </div>
         )}

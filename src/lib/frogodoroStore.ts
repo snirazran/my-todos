@@ -211,7 +211,11 @@ export const useFrogodoroStore = create<FrogodoroState>()(
             lastFocusElapsed: isSameTask ? state.lastFocusElapsed : 0,
             lastBreakElapsed: isSameTask ? state.lastBreakElapsed : 0,
             activeTimerRev: isSameTask ? state.activeTimerRev : null,
-            pendingSync: isSameTask ? state.pendingSync : state.pendingSync + 1,
+            // Selecting an idle target is local setup, not a timer action.
+            // Bumping pendingSync here makes GlobalTimer send DELETE /active;
+            // that request can race the subsequent Start PUT and stop a newly
+            // opened Settings focus-area timer immediately.
+            pendingSync: state.pendingSync,
           };
         });
       },

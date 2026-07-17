@@ -1,6 +1,6 @@
 import mongoose, { Schema, type Model } from 'mongoose';
 
-export type TaskType = 'weekly' | 'regular' | 'backlog';
+export type TaskType = 'weekly' | 'regular' | 'backlog' | 'focus-area';
 export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
 export interface TaskDoc {
@@ -60,6 +60,9 @@ export interface TaskDoc {
   bondId?: string; // links this task to a shared "buddy" bond (TaskBond)
   buddyUserId?: string; // the friend this task is shared with
   isStarter?: boolean; // seeded "Grab your first fly" onboarding task
+  sectionId?: string; // Today-list section (TaskSection) this task is grouped under
+  /** Hidden timer target used when focus time is assigned directly to an area. */
+  focusAreaId?: string;
 }
 
 const TaskSchema = new Schema<TaskDoc>(
@@ -67,7 +70,7 @@ const TaskSchema = new Schema<TaskDoc>(
     userId: { type: String, ref: 'User', required: true, index: true },
     type: {
       type: String,
-      enum: ['weekly', 'regular', 'backlog'],
+      enum: ['weekly', 'regular', 'backlog', 'focus-area'],
       required: true,
     },
     id: { type: String, required: true, index: true },
@@ -148,6 +151,8 @@ const TaskSchema = new Schema<TaskDoc>(
     bondId: { type: String, index: true },
     buddyUserId: { type: String },
     isStarter: { type: Boolean, default: undefined },
+    sectionId: { type: String, default: undefined },
+    focusAreaId: { type: String, default: undefined, index: true },
   },
   {
     collection: 'tasks',

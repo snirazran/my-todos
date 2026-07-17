@@ -215,6 +215,7 @@ export default function FriendsPage() {
         {/* Add friend — frog sits right on top of it */}
           <button
             type="button"
+            data-fly-fade
             onClick={() => setAddOpen(true)}
             className="relative z-20 -mt-3 flex w-[min(20rem,80vw)] items-center justify-center gap-2 rounded-2xl bg-card px-10 py-3.5 text-lg font-black tracking-tight text-[#4f9149] shadow-lg ring-1 ring-[#4f9149]/30 transition-transform active:scale-[0.98]"
           >
@@ -226,7 +227,7 @@ export default function FriendsPage() {
         </FlyCatchSwipeLauncher>
 
         {/* Rising sheet */}
-        <div className="relative z-10 -mx-4 mt-8 flex w-[calc(100%+2rem)] flex-col self-stretch rounded-t-[24px] bg-background px-4 pb-12 pt-5 md:mt-24 md:px-8">
+        <div data-fly-sheet className="relative z-10 -mx-4 mt-8 flex w-[calc(100%+2rem)] flex-col self-stretch rounded-t-[24px] bg-background px-4 pb-12 pt-5 md:mt-24 md:px-8">
           {/* Claim flies — the page's main action */}
           {hasRealFriends && (
             <ClaimHeroCard
@@ -907,6 +908,7 @@ function SelfFrog({
   return (
     <div
       ref={frogBoxRef}
+      data-fly-hero
       className="pointer-events-none relative z-30 flex shrink-0 origin-bottom flex-col items-center md:scale-110 lg:scale-100"
     >
       <HomeFocusFlies
@@ -914,14 +916,16 @@ function SelfFrog({
         frogBoxRef={frogBoxRef}
         onGrabActive={setMouthOpen}
       />
-      <Frog
-        ref={frogRef}
-        width={240}
-        height={270}
-        indices={indices}
-        paused={paused}
-        mouthOpen={mouthOpen}
-      />
+      <div data-fly-hero-frog>
+        <Frog
+          ref={frogRef}
+          width={240}
+          height={270}
+          indices={indices}
+          paused={paused}
+          mouthOpen={mouthOpen}
+        />
+      </div>
       <PremiumFrogAura />
     </div>
   );

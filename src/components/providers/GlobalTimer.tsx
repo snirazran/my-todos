@@ -201,7 +201,7 @@ export function GlobalTimer() {
       }),
     );
     try {
-      await fetch(`/api/tasks/${taskId}/frogodoro`, {
+      await fetch(`/api/tasks/${encodeURIComponent(taskId)}/frogodoro`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -14,6 +14,7 @@ import { GlobalPageBackground } from '@/components/ui/GlobalPageBackground';
 import { RiveWarmup } from '@/components/providers/RiveWarmup';
 import { RIVE_WASM_VERSION } from '@/lib/riveWasmVersion';
 import { MainScroll } from '@/components/providers/MainScroll';
+import { FlyCatchOverlay } from '@/components/fly-game/FlyCatchOverlay';
 
 const poppins = Poppins({
   subsets: ['latin'],
@@ -150,6 +151,7 @@ export default function RootLayout({
                 {children}
               </MainScroll>
               <MobileNav />
+              <FlyCatchOverlay />
               <RiveCounter />
               <RiveScrollPause />
               <SheetRivePause />

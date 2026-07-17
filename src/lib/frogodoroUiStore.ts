@@ -1,6 +1,9 @@
 import { create } from 'zustand';
 
 interface FrogodoroUiState {
+  focusLauncherOpen: boolean;
+  openFocusLauncher: () => void;
+  closeFocusLauncher: () => void;
   // How many mounted pages are currently rendering the full Frogodoro UI
   // (pill + sheet) — Home and Planner. The global mini overlay only shows when
   // this is 0, so pages like Quests/Wardrobe still get a minimal timer +
@@ -17,6 +20,9 @@ interface FrogodoroUiState {
 
 // Deliberately NOT persisted — it's transient mount state.
 export const useFrogodoroUiStore = create<FrogodoroUiState>((set) => ({
+  focusLauncherOpen: false,
+  openFocusLauncher: () => set({ focusLauncherOpen: true }),
+  closeFocusLauncher: () => set({ focusLauncherOpen: false }),
   fullTimerHosts: 0,
   addFullTimerHost: () =>
     set((s) => ({ fullTimerHosts: s.fullTimerHosts + 1 })),
