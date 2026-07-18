@@ -356,7 +356,16 @@
       "Bash(git -C /Users/snirazran/Fullstack/my-todos log --oneline -5)",
       "Bash(git -C /Users/snirazran/Fullstack/my-todos diff HEAD --stat)",
       "Bash(git -C /Users/snirazran/Fullstack/my-todos diff HEAD src/components/ui/TaskList.tsx)",
-      "Bash(git -C /Users/snirazran/Fullstack/my-todos diff HEAD src/components/ui/QuickAddSheet.tsx)"
+      "Bash(git -C /Users/snirazran/Fullstack/my-todos diff HEAD src/components/ui/QuickAddSheet.tsx)",
+      "Bash(git -C /Users/snirazran/Fullstack/my-todos log --oneline -10 -- src/app/page.tsx)",
+      "Bash(git -C /Users/snirazran/Fullstack/my-todos diff HEAD --stat -- src/app/page.tsx)",
+      "Bash(git -C /Users/snirazran/Fullstack/my-todos log -3 --format=\"%h %ad %s\" --date=format:\"%b %d %H:%M\" -- src/app/page.tsx)",
+      "Bash(git -C /Users/snirazran/Fullstack/my-todos diff fb0a0e0 82e4f9c -- src/app/page.tsx)",
+      "Bash(git -C /Users/snirazran/Fullstack/my-todos log -S \"NextQuestStrip\" --oneline --date=format:\"%b %d %H:%M\" --format=\"%h %ad %s\" -- src/app/page.tsx)",
+      "Bash(git -C /Users/snirazran/Fullstack/my-todos log --all --oneline --format=\"%h %ad %s\" --date=format:\"%b %d\" -G \"NextQuestStrip\" -- src/app/page.tsx)",
+      "Bash(git -C /Users/snirazran/Fullstack/my-todos log -1 --format=\"%h %ad\" --date=format:\"%b %d %H:%M\" 427e298)",
+      "Bash(git -C /Users/snirazran/Fullstack/my-todos show 427e298 --stat)",
+      "Bash(git -C /Users/snirazran/Fullstack/my-todos show 142c7eb -- src/app/page.tsx)"
     ]
   }
 }

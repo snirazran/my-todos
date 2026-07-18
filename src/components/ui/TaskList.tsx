@@ -2297,7 +2297,7 @@ export default function TaskList({
   return (
     <>
       <div dir="ltr" className="w-full px-1.5 pt-0 pb-3 overflow-visible md:px-4">
-        <div className="flex flex-row items-center justify-end mb-2 gap-3 relative">
+        <div className="relative mb-2 flex flex-row items-center justify-end gap-3 px-1.5 md:px-2">
           {tasks.length > 0 && (
             <span
               aria-live="polite"

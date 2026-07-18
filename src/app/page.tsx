@@ -744,7 +744,7 @@ export default function Home() {
 
               <div className="min-h-[360px] pb-16" ref={taskListRef}>
                 {renderGuestPrompt()}
-                {/* The visible Fly Catch card was replaced by the frog swipe gesture.
+                {user && (
                   <NextQuestStrip
                     claimables={questsData?.claimables}
                     trackables={questsData?.trackables}
@@ -752,21 +752,7 @@ export default function Home() {
                     isPremium={isPremium}
                   />
                 )}
-                {user && (
-                  <Link
-                    href="/fly-catch"
-                    className="group mx-2 mb-2 flex items-center gap-3 overflow-hidden rounded-2xl border border-emerald-500/20 bg-gradient-to-r from-emerald-500/10 via-card to-amber-400/10 px-3 py-2.5 transition hover:border-emerald-500/35 hover:shadow-sm md:mx-0"
-                  >
-                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-emerald-500/12 ring-1 ring-emerald-500/20 transition-transform group-hover:scale-105">
-                      <Fly size={32} interactive={false} alwaysPlay />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-black">Catch one more</span>
-                      <span className="block truncate text-[11px] font-semibold text-muted-foreground">30-second Fly Catch · climb the leaderboard</span>
-                    </span>
-                    <ChevronRight className="h-4 w-4 shrink-0 text-emerald-600 transition-transform group-hover:translate-x-0.5" />
-                  </Link>
-                */}
+                {/* The visible Fly Catch card was replaced by the frog swipe gesture. */}
                 <TaskList
                   tasks={data}
                   toggle={handleToggle}

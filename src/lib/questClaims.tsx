@@ -319,14 +319,30 @@ export function ObjectiveLabel({
   if (!tags?.length) {
     return <span className={`truncate ${textClass ?? ''}`}>{label}</span>;
   }
+  // Tags flow inline after the text; the last word is glued to the first tag
+  // so a wrap can never strand the tag alone on its own line.
+  const words = (label ?? '').trim().split(/\s+/);
+  const lastWord = words.pop() ?? '';
+  const lead = words.join(' ');
+  const [firstTag, ...restTags] = tags;
   return (
-    <span className="flex min-w-0 flex-col gap-1">
-      <span className={textClass}>{label}</span>
-      <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
-        {tags.map((tag) => (
-          <QuestTagPillInline key={tag.id} tag={tag} />
-        ))}
+    <span className="min-w-0">
+      {lead && (
+        <>
+          <span className={textClass}>{lead}</span>{' '}
+        </>
+      )}
+      <span className="inline-flex max-w-full items-center gap-1.5 whitespace-nowrap align-middle">
+        {lastWord && (
+          <span className={`truncate ${textClass ?? ''}`}>{lastWord}</span>
+        )}
+        <QuestTagPillInline tag={firstTag} />
       </span>
+      {restTags.map((tag) => (
+        <span key={tag.id} className="ml-1.5 inline-flex align-middle">
+          <QuestTagPillInline tag={tag} />
+        </span>
+      ))}
     </span>
   );
 }
