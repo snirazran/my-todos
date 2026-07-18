@@ -44,8 +44,13 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(welcomeUrl);
   }
 
-  // If user IS authenticated and tries to access login/register, redirect to home
-  if (isAuth && isAuthRoute) {
+  // If user IS authenticated and tries to access login/register, redirect to home.
+  // Guests (anonymous auth) also carry a session cookie, so the upgrade flow
+  // must stay reachable for them.
+  const isUpgradeFlow =
+    req.nextUrl.pathname.startsWith('/login') &&
+    req.nextUrl.searchParams.get('upgrade') === '1';
+  if (isAuth && isAuthRoute && !isUpgradeFlow) {
     const homeUrl = new URL('/', req.url);
     return NextResponse.redirect(homeUrl);
   }

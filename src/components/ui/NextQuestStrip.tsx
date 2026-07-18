@@ -17,7 +17,6 @@ import {
   primeQuestsPageCache,
   refreshQuestHomeView,
   setQuestScrollTarget,
-  trackableEyebrow,
   useCompletionReveal,
   type Claimable,
   type Trackable,
@@ -69,7 +68,6 @@ export function NextQuestStrip({
   }, [trackables]);
   const rankedNextUp = ranked[0] ?? null;
   const nextUp = rankedNextUp?.item ?? null;
-  const nextUpReason = rankedNextUp?.result.reason ?? null;
   const nextUpReasonLabel = rankedNextUp
     ? priorityReasonLabel(rankedNextUp.result)
     : null;
@@ -173,12 +171,12 @@ export function NextQuestStrip({
           goToQuests();
         }
       }}
-      className={`group relative mx-1.5 mb-2 flex w-[calc(100%-0.75rem)] cursor-pointer items-center gap-3 rounded-2xl border p-3 text-left shadow-sm transition-colors duration-300 md:mx-4 md:w-[calc(100%-2rem)] ${objectiveCardTone(
-        showClaimable,
-      )} ${
+      className={`group relative mx-1.5 flex w-[calc(100%-0.75rem)] cursor-pointer items-center text-left transition-colors duration-300 md:mx-4 md:w-[calc(100%-2rem)] ${
         showClaimable
-          ? 'hover:bg-lime-100 dark:hover:bg-lime-500/20'
-          : 'hover:bg-muted/40'
+          ? `mb-2 gap-3 rounded-2xl border p-3 shadow-sm ${objectiveCardTone(
+              true,
+            )} hover:bg-lime-100 dark:hover:bg-lime-500/20`
+          : 'mb-1.5 gap-2 rounded-full px-1 py-0.5 hover:bg-muted/30'
       }`}
     >
       {showClaimable && claimable ? (
@@ -235,60 +233,44 @@ export function NextQuestStrip({
             reward={displayNextUp.reward}
             catalog={resolvedCatalog}
             isPremium={!!isPremium}
+            small
           />
-          <div className="flex min-w-0 flex-1 flex-col leading-tight">
-            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">
-              {trackableEyebrow(displayNextUp)}
-              {!fillingTrackable && nextUpReasonLabel ? (
-                <span
-                  className={
-                    nextUpReason === 'almost-there'
-                      ? 'text-lime-600 dark:text-lime-400'
-                      : 'text-amber-600 dark:text-amber-400'
-                  }
-                >
-                  {' · '}
-                  {nextUpReasonLabel}
-                </span>
-              ) : !fillingTrackable && nextUpResetLabel ? (
-                <span
-                  className={
-                    nextUpHoursLeft !== null && nextUpHoursLeft < 6
-                      ? 'text-amber-600 dark:text-amber-400'
-                      : undefined
-                  }
-                >
-                  {' · '}
-                  {nextUpResetLabel}
-                </span>
-              ) : null}
-            </span>
-            {displayNextUp.needsFocusTags ? (
-              <>
-                <span className="mt-0.5 text-[13px] font-black text-foreground">
-                  Pick a tag to start this quest
-                </span>
-                <span className="mt-1.5 inline-flex w-fit items-center gap-1.5 rounded-lg border border-dashed border-primary/50 bg-primary/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.14em] text-primary">
-                  <Tags className="h-3 w-3" strokeWidth={2.75} />
-                  Pick a tag
-                </span>
-              </>
-            ) : (
-              <>
-                <span className="mt-0.5 text-[13px] font-black text-foreground">
+          {displayNextUp.needsFocusTags ? (
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <span className="min-w-0 flex-1 truncate text-[12px] font-black text-foreground">
+                Pick a tag to start this quest
+              </span>
+              <span className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-dashed border-primary/50 bg-primary/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.14em] text-primary">
+                <Tags className="h-3 w-3" strokeWidth={2.75} />
+                Pick a tag
+              </span>
+            </div>
+          ) : (
+            <ObjectiveProgressBar
+              className="min-w-0 flex-1"
+              heightClassName="h-8"
+              progress={displayNextUp.progress}
+              target={displayNextUp.target}
+              inlineLabel={
+                <>
                   <ObjectiveLabel
                     label={displayNextUp.remainingLabel}
                     tags={displayNextUp.tags}
+                    maxTags={1}
                   />
-                </span>
-                <ObjectiveProgressBar
-                  className="mt-1.5"
-                  progress={displayNextUp.progress}
-                  target={displayNextUp.target}
-                />
-              </>
-            )}
-          </div>
+                  {!fillingTrackable && nextUpReasonLabel ? (
+                    <span className="ml-1 shrink-0 whitespace-nowrap">
+                      · {nextUpReasonLabel}
+                    </span>
+                  ) : !fillingTrackable && nextUpResetLabel ? (
+                    <span className="ml-1 shrink-0 whitespace-nowrap">
+                      · {nextUpResetLabel}
+                    </span>
+                  ) : null}
+                </>
+              }
+            />
+          )}
           {displayNextUp.hint && !displayNextUp.needsFocusTags ? (
             <span className="shrink-0" onClick={(event) => event.stopPropagation()}>
               <HintButton

@@ -694,16 +694,16 @@ export default function Home() {
           >
             <div className="flex flex-col gap-2 w-full">
               <GuestAccountBanner />
+              {user && (
+                <NextQuestStrip
+                  claimables={questsData?.claimables}
+                  trackables={questsData?.trackables}
+                  catalog={questsData?.claimablesRewardCatalog}
+                  isPremium={isPremium}
+                />
+              )}
               <div className="min-h-[360px] pb-16" ref={taskListRef}>
                 {renderGuestPrompt()}
-                {user && (
-                  <NextQuestStrip
-                    claimables={questsData?.claimables}
-                    trackables={questsData?.trackables}
-                    catalog={questsData?.claimablesRewardCatalog}
-                    isPremium={isPremium}
-                  />
-                )}
                 <div className="mb-2 flex items-center justify-between px-2 md:px-0">
                   <div className="flex items-center gap-2 ml-3 cursor-pointer group md:gap-2.5">
                     <Icon name="planner" className="w-7 h-7 md:w-8 md:h-8" />

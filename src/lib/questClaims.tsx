@@ -265,10 +265,12 @@ export function QuestRewardTileBadge({
   reward,
   catalog,
   isPremium,
+  small,
 }: {
   reward: any;
   catalog: Catalog;
   isPremium: boolean;
+  small?: boolean;
 }) {
   if (!reward) return null;
   return (
@@ -278,9 +280,9 @@ export function QuestRewardTileBadge({
         rewardCatalog={catalog}
         isPremium={isPremium}
         hideBadge
-        className="h-12 w-12 rounded-xl"
+        className={small ? 'h-9 w-9 rounded-lg' : 'h-12 w-12 rounded-xl'}
         frogClassName="-translate-y-[18%]"
-        flySize={30}
+        flySize={small ? 22 : 30}
         flyOversample={1.25}
         giftAnimation="box_shake"
       />
@@ -310,21 +312,25 @@ export function ObjectiveLabel({
   label,
   tags,
   strikeText = false,
+  maxTags,
 }: {
   label?: string;
   tags?: ObjectiveTagChip[];
   strikeText?: boolean;
+  maxTags?: number;
 }) {
   const textClass = strikeText ? 'line-through' : undefined;
   if (!tags?.length) {
     return <span className={`truncate ${textClass ?? ''}`}>{label}</span>;
   }
+  const shownTags = maxTags ? tags.slice(0, maxTags) : tags;
+  const hiddenCount = tags.length - shownTags.length;
   // Tags flow inline after the text; the last word is glued to the first tag
   // so a wrap can never strand the tag alone on its own line.
   const words = (label ?? '').trim().split(/\s+/);
   const lastWord = words.pop() ?? '';
   const lead = words.join(' ');
-  const [firstTag, ...restTags] = tags;
+  const [firstTag, ...restTags] = shownTags;
   return (
     <span className="min-w-0">
       {lead && (
@@ -343,6 +349,11 @@ export function ObjectiveLabel({
           <QuestTagPillInline tag={tag} />
         </span>
       ))}
+      {hiddenCount > 0 && (
+        <span className="ml-1 inline-flex shrink-0 items-center rounded-full bg-foreground/10 px-1.5 py-0.5 text-[9px] font-black tabular-nums align-middle">
+          +{hiddenCount}
+        </span>
+      )}
     </span>
   );
 }
@@ -523,6 +534,8 @@ export function ObjectiveProgressBar({
   complete,
   className,
   haptics = true,
+  heightClassName = 'h-5',
+  inlineLabel,
 }: {
   progress: number;
   target: number;
@@ -530,6 +543,8 @@ export function ObjectiveProgressBar({
   complete?: boolean;
   className?: string;
   haptics?: boolean;
+  heightClassName?: string;
+  inlineLabel?: React.ReactNode;
 }) {
   const safeTarget = Math.max(1, target);
   const pct = Math.min(100, (Math.max(0, progress) / safeTarget) * 100);
@@ -547,9 +562,20 @@ export function ObjectiveProgressBar({
       {targetLabel ?? target}
     </>
   );
+  const overlayClass = inlineLabel
+    ? 'absolute inset-0 flex items-center justify-between gap-2 px-3 text-[11px] font-black tabular-nums'
+    : 'absolute inset-0 flex items-center justify-center text-[10px] font-black tabular-nums';
+  const overlayContent = inlineLabel ? (
+    <>
+      <span className="flex min-w-0 items-center truncate">{inlineLabel}</span>
+      <span className="shrink-0">{countLabel}</span>
+    </>
+  ) : (
+    countLabel
+  );
   return (
     <div
-      className={`relative h-5 overflow-hidden rounded-full bg-muted ${className ?? ''}`}
+      className={`relative ${heightClassName} overflow-hidden rounded-full bg-muted ${className ?? ''}`}
     >
       <div className="absolute inset-[3px]">
         <div
@@ -568,17 +594,17 @@ export function ObjectiveProgressBar({
           className="pointer-events-none absolute inset-y-0 left-0 w-1/3 bg-white/40 animate-[bar-shine_0.7s_ease-out_0.35s_both] motion-reduce:hidden"
         />
       )}
-      <span className="absolute inset-0 flex items-center justify-center text-[10px] font-black tabular-nums text-foreground/70">
-        {countLabel}
+      <span className={`${overlayClass} text-foreground/70`}>
+        {overlayContent}
       </span>
       {/* Same label clipped to the filled width, in a dark tone that reads
           on the lime/amber bar regardless of theme. */}
       <span
         aria-hidden
-        className={`absolute inset-0 flex items-center justify-center text-[10px] font-black tabular-nums ${done ? 'text-lime-950' : 'text-amber-950'}`}
+        className={`${overlayClass} ${done ? 'text-lime-950' : 'text-amber-950'}`}
         style={{ clipPath: `inset(0 ${100 - pct}% 0 0)` }}
       >
-        {countLabel}
+        {overlayContent}
       </span>
     </div>
   );
