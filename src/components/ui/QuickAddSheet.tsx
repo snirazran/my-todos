@@ -733,22 +733,36 @@ export default function QuickAddSheet({
   };
 
   // Focus areas are user-defined docs with arbitrary ids, so matching goes
-  // through semantic buckets: task text → bucket, then a tag connected to an
-  // area whose NAME fits the bucket, else any tag whose own name fits.
+  // through semantic buckets: task text → bucket → a tag connected to a
+  // SELECTED focus area. Areas the user hasn't picked (and tags not connected
+  // to any picked area) are never suggested.
+  const suggestionEntries = useMemo(() => {
+    const resolvedTagMap =
+      categoryTagMap ?? questContext?.onboarding?.categoryTagMap;
+    const selectedIds =
+      focusCategoryIds ?? questContext?.onboarding?.selectedCategoryIds;
+    return (resolvedTagMap ?? []).filter(
+      (entry) =>
+        entry.tagIds.length > 0 &&
+        (!selectedIds || selectedIds.includes(entry.categoryId as any)),
+    );
+  }, [categoryTagMap, focusCategoryIds, questContext]);
+
   const questTagSuggestion = useMemo(() => {
-    if (!hasTaskText) return null;
+    if (!hasTaskText || suggestionEntries.length === 0) return null;
     const buckets = matchSuggestionBuckets(text);
     if (buckets.length === 0) return null;
     const candidates = tagManager.savedTags.filter(
       (t) => !t.disabled && !tags.includes(t.id),
     );
     if (candidates.length === 0) return null;
-    const resolvedTagMap =
-      categoryTagMap ?? questContext?.onboarding?.categoryTagMap;
     const categoryName = (id: string) =>
       questContext?.macroCategories?.find((c) => c.id === id)?.name ?? id;
+    const connectedIds = new Set(
+      suggestionEntries.flatMap((entry) => entry.tagIds),
+    );
     for (const bucket of buckets) {
-      for (const entry of resolvedTagMap ?? []) {
+      for (const entry of suggestionEntries) {
         if (!nameMatchesBucket(bucket, categoryName(entry.categoryId)))
           continue;
         const connected =
@@ -758,19 +772,76 @@ export default function QuickAddSheet({
           ) ?? candidates.find((t) => entry.tagIds.includes(t.id));
         if (connected) return connected;
       }
-      const byName = candidates.find((t) => nameMatchesBucket(bucket, t.name));
+      const byName = candidates.find(
+        (t) => connectedIds.has(t.id) && nameMatchesBucket(bucket, t.name),
+      );
       if (byName) return byName;
     }
     return null;
   }, [
     hasTaskText,
     text,
-    categoryTagMap,
+    suggestionEntries,
     questContext,
     tagManager.savedTags,
     tags,
   ]);
-  const showQuestTagSuggestion = !!questTagSuggestion && text !== nlDismissed;
+
+  // AI fallback: when keyword matching misses, ask the server (Haiku) to pick
+  // among the same focus-connected tags. Cached per text, debounced, aborted
+  // on change so a fast typist never fans out requests.
+  const [aiSuggestion, setAiSuggestion] = useState<{
+    key: string;
+    tagId: string | null;
+  } | null>(null);
+  const aiCacheRef = useRef<Map<string, string | null>>(new Map());
+
+  useEffect(() => {
+    if (!open || !hasTaskText || questTagSuggestion) return;
+    if (suggestionEntries.length === 0) return;
+    const key = text.trim().toLowerCase();
+    if (key.length < 4) return;
+    const cache = aiCacheRef.current;
+    if (cache.has(key)) {
+      setAiSuggestion({ key, tagId: cache.get(key) ?? null });
+      return;
+    }
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      try {
+        const res = await fetch('/api/tags/suggest', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: key }),
+          signal: controller.signal,
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        const tagId = typeof data?.tagId === 'string' ? data.tagId : null;
+        if (cache.size > 200) cache.clear();
+        cache.set(key, tagId);
+        setAiSuggestion({ key, tagId });
+      } catch {
+        // Aborted or offline — keyword matching already had its chance.
+      }
+    }, 900);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [open, hasTaskText, text, questTagSuggestion, suggestionEntries]);
+
+  const aiTagSuggestion = useMemo(() => {
+    if (!aiSuggestion?.tagId) return null;
+    if (aiSuggestion.key !== text.trim().toLowerCase()) return null;
+    const tag = tagManager.savedTags.find((t) => t.id === aiSuggestion.tagId);
+    if (!tag || tag.disabled || tags.includes(tag.id)) return null;
+    return tag;
+  }, [aiSuggestion, text, tagManager.savedTags, tags]);
+
+  const questTagSuggestionResolved = questTagSuggestion ?? aiTagSuggestion;
+  const showQuestTagSuggestion =
+    !!questTagSuggestionResolved && text !== nlDismissed;
 
   const repeatMode =
     repeat === 'custom'
@@ -1112,27 +1183,41 @@ export default function QuickAddSheet({
                               <Plus className="h-3 w-3 shrink-0 stroke-[3]" />
                             </button>
                           )}
-                          {showQuestTagSuggestion && questTagSuggestion && (
+                          {showQuestTagSuggestion && questTagSuggestionResolved && (
                             <button
                               type="button"
                               onPointerDown={(e) => e.preventDefault()}
                               onClick={() =>
                                 setTags((prev) =>
-                                  prev.includes(questTagSuggestion.id)
+                                  prev.includes(questTagSuggestionResolved.id)
                                     ? prev
-                                    : [...prev, questTagSuggestion.id],
+                                    : [...prev, questTagSuggestionResolved.id],
                                 )
                               }
-                              className="inline-flex h-9 min-w-0 items-center gap-1.5 rounded-xl border px-3 text-[11px] font-black uppercase tracking-wider shadow-sm transition-all active:scale-95 [@media(hover:hover)]:hover:opacity-75"
+                              className={`relative inline-flex h-9 min-w-0 items-center gap-1.5 rounded-xl border pr-3 text-[11px] font-black uppercase tracking-wider shadow-sm transition-all active:scale-95 [@media(hover:hover)]:hover:opacity-75 ${
+                                questTagIds.has(questTagSuggestionResolved.id)
+                                  ? 'pl-[56px]'
+                                  : 'pl-3'
+                              }`}
                               style={{
-                                backgroundColor: `${questTagSuggestion.color}20`,
-                                color: questTagSuggestion.color,
-                                borderColor: `${questTagSuggestion.color}40`,
+                                backgroundColor: `${questTagSuggestionResolved.color}20`,
+                                color: questTagSuggestionResolved.color,
+                                borderColor: `${questTagSuggestionResolved.color}40`,
                               }}
                             >
+                              {questTagIds.has(questTagSuggestionResolved.id) && (
+                                <span
+                                  className="pointer-events-none absolute left-1 top-1/2 grid h-12 w-11 -translate-y-1/2 -rotate-3 place-items-center rounded-[10px] border bg-popover shadow-sm"
+                                  style={{
+                                    borderColor: `${questTagSuggestionResolved.color}40`,
+                                  }}
+                                >
+                                  <AppIcon name="quests" className="h-7 w-7" />
+                                </span>
+                              )}
                               <Plus className="h-3.5 w-3.5 shrink-0 stroke-[3]" />
                               <span className="max-w-[128px] truncate">
-                                {questTagSuggestion.name}
+                                {questTagSuggestionResolved.name}
                               </span>
                             </button>
                           )}

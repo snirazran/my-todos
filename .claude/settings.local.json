@@ -365,7 +365,8 @@
       "Bash(git -C /Users/snirazran/Fullstack/my-todos log --all --oneline --format=\"%h %ad %s\" --date=format:\"%b %d\" -G \"NextQuestStrip\" -- src/app/page.tsx)",
       "Bash(git -C /Users/snirazran/Fullstack/my-todos log -1 --format=\"%h %ad\" --date=format:\"%b %d %H:%M\" 427e298)",
       "Bash(git -C /Users/snirazran/Fullstack/my-todos show 427e298 --stat)",
-      "Bash(git -C /Users/snirazran/Fullstack/my-todos show 142c7eb -- src/app/page.tsx)"
+      "Bash(git -C /Users/snirazran/Fullstack/my-todos show 142c7eb -- src/app/page.tsx)",
+      "Skill(claude-api)"
     ]
   }
 }
