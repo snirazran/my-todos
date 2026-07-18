@@ -835,6 +835,8 @@ export function useTaskData({
    */
   const reorderTasks = useCallback(
     async (newTasks: Task[]) => {
+      const sectionsToExpand: string[] = [];
+
       // Optimistic
       if (todayData) {
         // CRITICAL: We must update the 'order' property on the tasks themselves,
@@ -848,28 +850,60 @@ export function useTaskData({
         const otherTasks = todayData.tasks.filter(
           (t) => !reorderedIds.has(t.id),
         );
+        const previousTasks = new Map(todayData.tasks.map((t) => [t.id, t]));
+        const movedIntoSectionIds = new Set<string>();
+
+        for (const task of newTasks) {
+          const previousSectionId =
+            previousTasks.get(task.id)?.sectionId ?? null;
+          const nextSectionId = task.sectionId ?? null;
+          if (nextSectionId && nextSectionId !== previousSectionId) {
+            movedIntoSectionIds.add(nextSectionId);
+          }
+        }
+
+        for (const section of todayData.sections ?? []) {
+          if (section.collapsed && movedIntoSectionIds.has(section.id)) {
+            sectionsToExpand.push(section.id);
+          }
+        }
+        const expandingSectionIds = new Set(sectionsToExpand);
 
         await mutateToday(
           {
             ...todayData,
             tasks: [...reorderedOptimistic, ...otherTasks],
+            sections: (todayData.sections ?? []).map((section) =>
+              expandingSectionIds.has(section.id)
+                ? { ...section, collapsed: false }
+                : section,
+            ),
           },
           { revalidate: false },
         );
       }
 
       const dow = new Date().getDay();
-      await fetch('/api/tasks?view=board', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          day: dow,
-          tasks: newTasks.map((t) => ({
-            id: t.id,
-            sectionId: t.sectionId ?? null,
-          })),
+      await Promise.all([
+        fetch('/api/tasks?view=board', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            day: dow,
+            tasks: newTasks.map((t) => ({
+              id: t.id,
+              sectionId: t.sectionId ?? null,
+            })),
+          }),
         }),
-      });
+        ...sectionsToExpand.map((sectionId) =>
+          fetch('/api/sections', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sectionId, collapsed: false }),
+          }),
+        ),
+      ]);
     },
     [todayData, mutateToday],
   );

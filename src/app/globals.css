@@ -609,6 +609,15 @@ body.dragging {
   -webkit-mask-image: linear-gradient(to right, black 90%, transparent 100%);
 }
 
+/* Tag chips: readable text derived from the user-picked tag color — darkened
+   on light surfaces, lightened on dark surfaces. */
+.tag-chip {
+  color: color-mix(in srgb, var(--tag-color) 65%, black);
+}
+.dark .tag-chip {
+  color: color-mix(in srgb, var(--tag-color) 65%, white);
+}
+
 /* ── App-like feel on touch devices (iPhone web / Capacitor): disable text &
    image selection plus the long-press callout menu. Form fields stay
    selectable so users can still type and edit. ── */

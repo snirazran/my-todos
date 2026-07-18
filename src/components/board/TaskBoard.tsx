@@ -1256,11 +1256,19 @@ export default function TaskBoard({
       // Where the task gets filed (finalToDay) and where the *view* settles
       // are separate decisions. You can drop a task into a column that's
       // still mostly off-screen — dragging near the edge auto-scrolls the
-      // board toward it, but that scroll may not have finished. So on
-      // release, snap the view to whichever column is currently more
-      // visible (pageIndexRef, the same "current page" tracked while
-      // swiping) rather than forcing it to jump to wherever the task landed.
-      const settleDay = pageIndexRef.current;
+      // board toward it, but that scroll may not have finished. For a
+      // one-column move, snap the view to whichever column is currently
+      // more visible (pageIndexRef, the same "current page" tracked while
+      // swiping) rather than forcing it to jump to wherever the task
+      // landed. For a longer move the user deliberately traveled there, so
+      // follow the task to its destination column instead of settling on
+      // some column passed along the way.
+      const settleDay =
+        drag.fromDay !== BACKLOG_IDX &&
+        finalToDay !== BACKLOG_IDX &&
+        Math.abs(finalToDay - drag.fromDay) > 1
+          ? finalToDay
+          : pageIndexRef.current;
       const shouldGlideToColumn =
         settleDay !== BACKLOG_IDX && window.innerWidth < 768;
 

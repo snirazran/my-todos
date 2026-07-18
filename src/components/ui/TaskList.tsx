@@ -17,6 +17,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import Fly from '@/components/ui/fly';
+import { createPortal } from 'react-dom';
 import { TimeTag } from '@/components/ui/TimeTag';
 import { Icon } from '@/components/ui/Icon';
 import { hapticImpact, hapticSuccess, hapticTick } from '@/lib/haptics';
@@ -28,7 +29,6 @@ import {
   useMotionValue,
   useTransform,
   animate,
-  useAnimation,
 } from 'framer-motion';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
@@ -136,6 +136,7 @@ const animateLayoutChanges: AnimateLayoutChanges = (args) =>
 
 const SWIPE_ACTION_WIDTH = 88;
 const SWIPE_SNAP_THRESHOLD = 32;
+const SWIPE_COMMIT_X = SWIPE_ACTION_WIDTH + 40;
 const SWIPE_SPRING = { type: 'spring' as const, stiffness: 520, damping: 34 };
 
 interface SortableTaskItemProps {
@@ -165,6 +166,7 @@ interface SortableTaskItemProps {
   onOpenDetail?: (task: Task) => void;
   paused?: boolean;
   hintPeekPrimary?: boolean;
+  isDesktop?: boolean;
 }
 
 const SortableTaskItem = React.forwardRef<
@@ -192,6 +194,7 @@ const SortableTaskItem = React.forwardRef<
       onOpenDetail,
       paused = false,
       hintPeekPrimary = false,
+      isDesktop = false,
     },
     ref,
   ) => {
@@ -206,7 +209,6 @@ const SortableTaskItem = React.forwardRef<
       null,
     );
     const containerRef = React.useRef<HTMLDivElement>(null);
-    const [isDesktop, setIsDesktop] = useState(false);
     const [isHovered, setIsHovered] = useState(false);
     const [swipeBlocked, setSwipeBlocked] = useState(false);
     // Axis framer locked the swipe to ('x' once a horizontal swipe is committed).
@@ -258,6 +260,18 @@ const SortableTaskItem = React.forwardRef<
         : onDoLater;
     const secondaryLabel = isRepeating ? 'Skip today' : 'Save later';
 
+    const pastCommitRef = React.useRef(false);
+    useEffect(() => {
+      const unsub = x.on('change', (v) => {
+        const past = Math.abs(v) >= SWIPE_COMMIT_X;
+        if (past && !pastCommitRef.current && isDraggingRef.current) {
+          hapticImpact();
+        }
+        pastCommitRef.current = past;
+      });
+      return unsub;
+    }, [x]);
+
     const snapSwipe = React.useCallback(
       (side: 'timer' | 'secondary' | null) => {
         setOpenSide(side);
@@ -271,13 +285,6 @@ const SortableTaskItem = React.forwardRef<
       },
       [x],
     );
-
-    useEffect(() => {
-      const checkDesktop = () => setIsDesktop(window.innerWidth >= 768);
-      checkDesktop();
-      window.addEventListener('resize', checkDesktop);
-      return () => window.removeEventListener('resize', checkDesktop);
-    }, []);
 
     // Once a horizontal swipe is locked, block the browser's native vertical
     // scroll for the rest of the gesture. framer's drag='x' sets
@@ -410,14 +417,14 @@ const SortableTaskItem = React.forwardRef<
     const timerActionOpacity = useTransform(x, [0, 25], [0, 1]);
     const timerActionScale = useTransform(
       x,
-      [0, SWIPE_ACTION_WIDTH],
-      [0.9, 1],
+      [0, SWIPE_ACTION_WIDTH, SWIPE_COMMIT_X],
+      [0.9, 1, 1.18],
     );
     const secondaryActionOpacity = useTransform(x, [-25, 0], [1, 0]);
     const secondaryActionScale = useTransform(
       x,
-      [-SWIPE_ACTION_WIDTH, 0],
-      [1, 0.9],
+      [-SWIPE_COMMIT_X, -SWIPE_ACTION_WIDTH, 0],
+      [1.18, 1, 0.9],
     );
 
     useEffect(() => {
@@ -519,6 +526,21 @@ const SortableTaskItem = React.forwardRef<
       const startSide = dragStartSideRef.current;
       dragStartSideRef.current = null;
 
+      // A swipe held past the commit threshold runs the action directly on
+      // release — no second tap needed. Short swipes still just reveal.
+      if (x.get() >= SWIPE_COMMIT_X && onStartTimer && !isDone) {
+        blockImmediatePostSwipeClick();
+        snapSwipe(null);
+        onStartTimer(task, { autoStart: true });
+        return;
+      }
+      if (x.get() <= -SWIPE_COMMIT_X && secondaryAction && !isDone) {
+        blockImmediatePostSwipeClick();
+        snapSwipe(null);
+        secondaryAction(task);
+        return;
+      }
+
       // Closing an open tray cannot cross through zero and open the opposite
       // tray during the same gesture.
       if (startSide === 'timer') {
@@ -614,6 +636,19 @@ const SortableTaskItem = React.forwardRef<
         style={{ ...style, overflow: 'hidden' }}
         {...attributes}
         {...listeners}
+        onKeyDown={(e: React.KeyboardEvent) => {
+          (listeners as any)?.onKeyDown?.(e);
+          if (
+            e.key === 'Enter' &&
+            !e.defaultPrevented &&
+            e.target === e.currentTarget &&
+            !isDragging &&
+            !isOpen
+          ) {
+            e.preventDefault();
+            onOpenDetail?.(task);
+          }
+        }}
         // The card's own drop shadow has to live here, on the outermost
         // layer — its children below are clipped by this element's own
         // `overflow: hidden` (needed for the swipe-reveal actions), and any
@@ -726,7 +761,10 @@ const SortableTaskItem = React.forwardRef<
                     ? SWIPE_ACTION_WIDTH
                     : 0,
             }}
-            dragElastic={0}
+            dragElastic={{
+              right: onStartTimer && !isDone ? 0.5 : 0,
+              left: secondaryAction && !isDone ? 0.5 : 0,
+            }}
             dragMomentum={false}
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
@@ -823,6 +861,17 @@ const SortableTaskItem = React.forwardRef<
                             startTime={task.startTime}
                             endTime={task.endTime}
                             reminder={task.reminder}
+                            overdue={(() => {
+                              if (isDone) return false;
+                              const ref = task.endTime || task.startTime;
+                              const [h, m] = ref.split(':').map(Number);
+                              if (!Number.isFinite(h)) return false;
+                              const now = new Date();
+                              return (
+                                now.getHours() * 60 + now.getMinutes() >
+                                h * 60 + (m || 0)
+                              );
+                            })()}
                           />
                         </motion.span>
                       )}
@@ -839,18 +888,18 @@ const SortableTaskItem = React.forwardRef<
                             exit={{ opacity: 0, scale: 0 }}
                             transition={{ duration: 0.2 }}
                             key={tagId}
-                            className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[9px] font-bold uppercase md:text-[11px] tracking-normal shadow-sm transition-colors ${
+                            className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-normal shadow-sm transition-colors ${
                               !color
                                 ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-200 border-indigo-100 dark:border-indigo-800/50'
-                                : ''
+                                : 'tag-chip'
                             }`}
                             style={
                               color
-                                ? {
+                                ? ({
                                     backgroundColor: `${color}20`,
-                                    color: color,
                                     borderColor: `${color}40`,
-                                  }
+                                    '--tag-color': color,
+                                  } as React.CSSProperties)
                                 : undefined
                             }
                           >
@@ -880,10 +929,19 @@ const SortableTaskItem = React.forwardRef<
                   )}
                   {isWeekly && (task.streak ?? 0) > 0 && (
                     <span
-                      className="inline-flex flex-shrink-0 items-center gap-0.5 text-orange-500 no-underline"
-                      title={`${task.streak} in a row`}
+                      className={`inline-flex flex-shrink-0 items-center gap-0.5 no-underline ${
+                        isDone ? 'text-orange-500' : 'text-orange-400/80'
+                      }`}
+                      title={
+                        isDone
+                          ? `${task.streak} in a row`
+                          : `${task.streak} in a row — finish today to keep it`
+                      }
                     >
-                      <Flame className="h-4 w-4" fill="currentColor" />
+                      <Flame
+                        className={`h-4 w-4 ${isDone ? '' : 'motion-safe:animate-pulse'}`}
+                        fill={isDone ? 'currentColor' : 'none'}
+                      />
                       <span className="text-[12px] font-black tabular-nums leading-none">
                         ×{task.streak}
                       </span>
@@ -950,6 +1008,55 @@ const SortableTaskItem = React.forwardRef<
                   </div>
                 )}
             </div>
+
+            {isDesktop && !isDone && (onStartTimer || secondaryAction) && (
+              <div
+                className={`relative z-10 hidden flex-shrink-0 items-center gap-0.5 md:flex transition-opacity duration-150 ${
+                  isHovered && !isDragging
+                    ? 'opacity-100'
+                    : 'pointer-events-none opacity-0'
+                }`}
+              >
+                {onStartTimer && (
+                  <button
+                    type="button"
+                    title="Start focus timer"
+                    aria-label={`Start focus timer for ${task.text}`}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={handleTimerAction}
+                    className="grid h-9 w-9 place-items-center rounded-full text-muted-foreground/60 transition-colors hover:bg-emerald-500/10 hover:text-emerald-600 dark:hover:text-emerald-400"
+                  >
+                    <Icon name="clock" className="h-6 w-6" />
+                  </button>
+                )}
+                {secondaryAction && (
+                  <button
+                    type="button"
+                    title={secondaryLabel}
+                    aria-label={
+                      isRepeating
+                        ? `Skip ${task.text} today`
+                        : `Save ${task.text} for later`
+                    }
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={handleSecondaryAction}
+                    className={`grid h-9 w-9 place-items-center rounded-full text-muted-foreground/60 transition-colors ${
+                      isRepeating
+                        ? 'hover:bg-muted hover:text-foreground'
+                        : 'hover:bg-amber-500/10 hover:text-amber-600 dark:hover:text-amber-400'
+                    }`}
+                  >
+                    {isRepeating ? (
+                      <EyeOff className="h-5 w-5" />
+                    ) : (
+                      <Icon name="saved" className="h-5 w-5" />
+                    )}
+                  </button>
+                )}
+              </div>
+            )}
 
             {/* Completion indicator (right) — only this toggles completion */}
             <div
@@ -1073,8 +1180,23 @@ function SortableSectionHeader({
     animateLayoutChanges,
   });
   const [menuOpen, setMenuOpen] = useState(false);
+  const [menuPosition, setMenuPosition] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
   const [renaming, setRenaming] = useState(false);
   const renameRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const closeMenu = () => setMenuOpen(false);
+    window.addEventListener('scroll', closeMenu, true);
+    window.addEventListener('resize', closeMenu);
+    return () => {
+      window.removeEventListener('scroll', closeMenu, true);
+      window.removeEventListener('resize', closeMenu);
+    };
+  }, [menuOpen]);
 
   useEffect(() => {
     if (renaming) {
@@ -1108,8 +1230,6 @@ function SortableSectionHeader({
         transition,
         zIndex: isDragging ? 30 : menuOpen ? 40 : 1,
       }}
-      {...attributes}
-      {...(renaming ? {} : listeners)}
       data-is-active="true"
       data-section-header="true"
       className={`relative w-full select-none ${isFirst ? 'mt-1' : 'mt-3'} mb-1.5 ${
@@ -1117,6 +1237,8 @@ function SortableSectionHeader({
       }`}
     >
       <div
+        {...attributes}
+        {...(renaming ? {} : listeners)}
         onClick={renaming ? undefined : onToggleCollapsed}
         className={`group flex min-h-[40px] cursor-pointer items-center gap-1.5 rounded-xl px-1.5 py-1 transition-colors ${
           isDragging ? 'bg-popover shadow-md ring-1 ring-border/70' : ''
@@ -1166,66 +1288,92 @@ function SortableSectionHeader({
           </span>
         )}
 
-        {!renaming && (
+        {!renaming && !section.collapsed && (
           <button
             type="button"
             aria-label={`Section options for ${section.name}`}
             {...stopDndActivation}
             onClick={(e) => {
               e.stopPropagation();
-              setMenuOpen((v) => !v);
+              if (menuOpen) {
+                setMenuOpen(false);
+                return;
+              }
+              const rect = e.currentTarget.getBoundingClientRect();
+              const menuWidth = 176;
+              const menuHeight = 96;
+              const viewportPadding = 8;
+              const left = Math.max(
+                viewportPadding,
+                Math.min(
+                  rect.right - menuWidth,
+                  window.innerWidth - menuWidth - viewportPadding,
+                ),
+              );
+              const opensDown =
+                rect.bottom + 4 + menuHeight <=
+                window.innerHeight - viewportPadding;
+              const top = opensDown
+                ? rect.bottom + 4
+                : Math.max(viewportPadding, rect.top - menuHeight - 4);
+              setMenuPosition({ top, left });
+              setMenuOpen(true);
             }}
             className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-muted-foreground/50 transition-colors [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground"
           >
-            <EllipsisVertical className="h-4 w-4" />
+            <Pencil className="h-4 w-4" />
           </button>
         )}
       </div>
 
-      {menuOpen && (
-        <>
-          <div
-            className="fixed inset-0 z-40"
-            onMouseDown={(e) => e.stopPropagation()}
-            onTouchStart={(e) => e.stopPropagation()}
-            onPointerDown={(e) => {
-              e.stopPropagation();
-              setMenuOpen(false);
-            }}
-          />
-          <div className="absolute right-1 top-full z-50 mt-1 w-44 overflow-hidden rounded-2xl border border-border/70 bg-popover py-1 shadow-lg">
-            <button
-              type="button"
-              {...stopDndActivation}
-              onClick={(e) => {
+      {menuOpen &&
+        menuPosition &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <>
+            <div
+              className="fixed inset-0 z-[9998]"
+              onMouseDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
+              onPointerDown={(e) => {
                 e.stopPropagation();
                 setMenuOpen(false);
-                setRenaming(true);
               }}
-              className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-[14px] font-bold text-foreground transition-colors [@media(hover:hover)]:hover:bg-muted/60"
+            />
+            <div
+              className="fixed z-[9999] w-44 overflow-hidden rounded-2xl border border-border/70 bg-popover py-1 shadow-lg"
+              style={{ top: menuPosition.top, left: menuPosition.left }}
             >
-              <Pencil className="h-4 w-4 text-muted-foreground" />
-              Rename
-            </button>
-            <button
-              type="button"
-              {...stopDndActivation}
-              onClick={(e) => {
-                e.stopPropagation();
-                setMenuOpen(false);
-                onDelete();
-              }}
-              className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-[14px] font-bold text-rose-500 transition-colors [@media(hover:hover)]:hover:bg-rose-500/10"
-            >
-              <Trash2 className="h-4 w-4" />
-              Delete section
-            </button>
-            <p className="px-3.5 pb-1.5 pt-1 text-[11px] font-medium leading-snug text-muted-foreground">
-              Tasks stay on your list.
-            </p>
-          </div>
-        </>
-      )}
+              <button
+                type="button"
+                {...stopDndActivation}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMenuOpen(false);
+                  setRenaming(true);
+                }}
+                className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-[14px] font-bold text-foreground transition-colors [@media(hover:hover)]:hover:bg-muted/60"
+              >
+                <Pencil className="h-4 w-4 text-muted-foreground" />
+                Rename
+              </button>
+              <button
+                type="button"
+                {...stopDndActivation}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMenuOpen(false);
+                  onDelete();
+                }}
+                className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-[14px] font-bold text-rose-500 transition-colors [@media(hover:hover)]:hover:bg-rose-500/10"
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete section
+              </button>
+            </div>
+          </>,
+          document.body,
+        )}
     </div>
   );
 }
@@ -1284,9 +1432,44 @@ function AddSectionRow({
             setEditing(false);
           }
         }}
-        className="min-w-0 flex-1 bg-transparent py-1.5 text-[13px] font-black uppercase tracking-[0.12em] text-foreground placeholder:font-bold placeholder:normal-case placeholder:tracking-normal placeholder:text-muted-foreground/50 focus:outline-none"
+        className="min-w-0 flex-1 bg-transparent py-1.5 text-[16px] font-black uppercase tracking-[0.12em] text-foreground placeholder:font-bold placeholder:normal-case placeholder:tracking-normal placeholder:text-muted-foreground/50 focus:outline-none"
       />
     </div>
+  );
+}
+
+function EmptyAddRow({
+  label,
+  quickAddOpen,
+  onClick,
+}: {
+  label: string;
+  quickAddOpen: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: quickAddOpen ? 0 : 1 }}
+      transition={{ duration: quickAddOpen ? 0 : 0.5 }}
+      className="mb-2"
+    >
+      <button
+        onClick={onClick}
+        className="w-full flex items-center gap-1.5 px-2 py-2 border border-dashed border-muted-foreground/20 bg-muted/5 hover:bg-muted/10 rounded-xl transition-all cursor-pointer group disabled:pointer-events-none"
+        disabled={quickAddOpen}
+      >
+        <div className="flex items-center justify-center w-11 h-11 rounded-full bg-muted border border-muted-foreground/10 shrink-0 md:w-12 md:h-12">
+          <Plus
+            className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors md:w-6 md:h-6"
+            strokeWidth={2.5}
+          />
+        </div>
+        <p className="text-[15px] font-semibold text-muted-foreground group-hover:text-foreground transition-colors md:text-[17px]">
+          {label}
+        </p>
+      </button>
+    </motion.div>
   );
 }
 
@@ -1452,6 +1635,48 @@ export default function TaskList({
   const [delayedCompleted, setDelayedCompleted] = useState<Set<string>>(
     new Set(),
   );
+  const [undoToast, setUndoToast] = useState<{
+    id: string;
+    text: string;
+  } | null>(null);
+  const undoTimerRef = useRef<number | null>(null);
+  const prevCompletedRef = useRef<Map<string, boolean> | null>(null);
+
+  // Any completion — checkmark tap, fly catch, detail sheet — surfaces a
+  // transient Undo toast, keyed off the task actually flipping to done.
+  useEffect(() => {
+    const prev = prevCompletedRef.current;
+    prevCompletedRef.current = new Map(tasks.map((t) => [t.id, !!t.completed]));
+    if (!prev) return;
+    const flipped = tasks.find(
+      (t) => t.completed && prev.get(t.id) === false,
+    );
+    if (!flipped) return;
+    setUndoToast({ id: flipped.id, text: flipped.text });
+    if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
+    undoTimerRef.current = window.setTimeout(() => setUndoToast(null), 4000);
+  }, [tasks]);
+
+  useEffect(
+    () => () => {
+      if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
+    },
+    [],
+  );
+
+  const handleUndoComplete = () => {
+    if (!undoToast) return;
+    hapticTick();
+    const id = undoToast.id;
+    setUndoToast(null);
+    if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
+    setDelayedCompleted((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+    toggle(id, false);
+  };
   const [isAnyDragging, setIsAnyDragging] = useState(false);
   const [draggingSectionId, setDraggingSectionId] = useState<string | null>(
     null,
@@ -1511,23 +1736,59 @@ export default function TaskList({
     return () => media.removeEventListener('change', update);
   }, []);
 
-  // On desktop this matches Planner's 5px mouse pickup. In the narrow layout,
-  // a very short hold leaves quick horizontal movement available to the swipe
-  // tray while making vertical reorder feel effectively immediate.
+  const [, setMinuteTick] = useState(0);
+  React.useEffect(() => {
+    const id = window.setInterval(() => setMinuteTick((t) => t + 1), 60_000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'n' && e.key !== '/') return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (quickAddOpen || dialog || actionSheetId || menu || scheduleDialog)
+        return;
+      const el = document.activeElement as HTMLElement | null;
+      if (
+        el &&
+        (el.tagName === 'INPUT' ||
+          el.tagName === 'TEXTAREA' ||
+          el.isContentEditable)
+      )
+        return;
+      e.preventDefault();
+      onAddRequested('', null, { preselectToday: true });
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [quickAddOpen, dialog, actionSheetId, menu, scheduleDialog, onAddRequested]);
+
+  // On desktop this matches Planner's 5px mouse pickup. Touch and narrow
+  // layouts require a deliberate hold so a regular tap never enters the
+  // reorder state, while horizontal task swipes remain available.
   const mouseOptions = useMemo(
     () => ({
       activationConstraint: usesSwipeTrays
-        ? { delay: 60, tolerance: 8 }
+        ? { delay: 250, tolerance: 8 }
         : { distance: 5 },
     }),
     [usesSwipeTrays],
   );
   const touchOptions = useMemo(
-    () => ({ activationConstraint: { delay: 120, tolerance: 8 } }),
+    () => ({ activationConstraint: { delay: 250, tolerance: 8 } }),
     [],
   );
+  // Space picks up / drops a row for keyboard sorting; Enter stays free so a
+  // focused row can open its detail sheet.
   const keyboardOptions = useMemo(
-    () => ({ coordinateGetter: sortableKeyboardCoordinates }),
+    () => ({
+      coordinateGetter: sortableKeyboardCoordinates,
+      keyboardCodes: {
+        start: ['Space'],
+        cancel: ['Escape'],
+        end: ['Space'],
+      },
+    }),
     [],
   );
   const sensors = useSensors(
@@ -1874,22 +2135,17 @@ export default function TaskList({
 
     const activeSectionId = sectionIdFromSortable(active.id);
 
-    // A held tap activates the delay-based sort sensor without any movement,
-    // and dnd-kit swallows the click that would have opened the detail sheet.
-    // Treat a no-movement "drag" as the tap it really was.
+    // A held tap on a task can activate the delay-based sort sensor without
+    // movement, and dnd-kit then swallows the detail-sheet click. Section
+    // headers have a dedicated reorder handle, so a stationary handle release
+    // should do nothing rather than toggling the section.
     if (
       Math.abs(event.delta.x) < 5 &&
       Math.abs(event.delta.y) < 5 &&
       typeof active.id === 'string'
     ) {
       clearDraggingSection();
-      if (activeSectionId) {
-        const s = sectionsSorted.find((x) => x.id === activeSectionId);
-        if (s) {
-          hapticTick();
-          onSetSectionCollapsed?.(s.id, !s.collapsed);
-        }
-      } else {
+      if (!activeSectionId) {
         setActionSheetId(active.id);
       }
       return;
@@ -2042,11 +2298,18 @@ export default function TaskList({
     <>
       <div dir="ltr" className="w-full px-1.5 pt-0 pb-3 overflow-visible md:px-4">
         <div className="flex flex-row items-center justify-end mb-2 gap-3 relative">
-          {/* Header Menu Removed - Moved to Page */}
+          {tasks.length > 0 && (
+            <span
+              aria-live="polite"
+              className="text-[11px] font-bold tabular-nums text-muted-foreground/70"
+            >
+              {tasks.filter((t) => t.completed).length} of {tasks.length} done
+            </span>
+          )}
         </div>
 
         <div
-          className="w-full rounded-[18px] bg-muted/70 dark:bg-background border border-border/50 shadow-sm overflow-hidden"
+          className="w-full rounded-[18px] bg-[hsl(150_12%_94%)] dark:bg-background border border-border/50 shadow-sm overflow-hidden"
           data-hint="task-list"
         >
         <div
@@ -2055,29 +2318,11 @@ export default function TaskList({
         >
           {tasks.length === 0 && !exitAction ? (
             /* Empty State: No Tasks at all */
-            <>
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: quickAddOpen ? 0 : 1 }}
-                transition={{ duration: quickAddOpen ? 0 : 0.5 }}
-                className="mb-2"
-              >
-                <button
-                  onClick={() =>
-                    onAddRequested('', null, { preselectToday: true })
-                  }
-                  className="w-full flex items-center gap-1.5 px-2 py-2 border border-dashed border-muted-foreground/20 bg-muted/5 hover:bg-muted/10 rounded-xl transition-all cursor-pointer group disabled:pointer-events-none"
-                  disabled={quickAddOpen}
-                >
-                  <div className="flex items-center justify-center w-11 h-11 rounded-full bg-muted border border-muted-foreground/10 shrink-0 md:w-12 md:h-12">
-                    <Plus className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors md:w-6 md:h-6" strokeWidth={2.5} />
-                  </div>
-                  <p className="text-[15px] font-semibold text-muted-foreground group-hover:text-foreground transition-colors md:text-[17px]">
-                    Add your first task
-                  </p>
-                </button>
-              </motion.div>
-            </>
+            <EmptyAddRow
+              label="Add your first task"
+              quickAddOpen={quickAddOpen}
+              onClick={() => onAddRequested('', null, { preselectToday: true })}
+            />
           ) : tasks.length > 0 &&
             sortedVisibleTasks.length === 0 &&
             !exitAction ? (
@@ -2137,29 +2382,17 @@ export default function TaskList({
                 </div>
               </div>
             ) : (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: quickAddOpen ? 0 : 1 }}
-                transition={{ duration: quickAddOpen ? 0 : 0.5 }}
-                className="mb-2"
-              >
-                <button
-                  onClick={() =>
-                    onAddRequested('', null, { preselectToday: true })
-                  }
-                  className="w-full flex items-center gap-1.5 px-2 py-2 border border-dashed border-muted-foreground/20 bg-muted/5 hover:bg-muted/10 rounded-xl transition-all cursor-pointer group disabled:pointer-events-none"
-                  disabled={quickAddOpen}
-                >
-                  <div className="flex items-center justify-center w-11 h-11 rounded-full bg-muted border border-muted-foreground/10 shrink-0 md:w-12 md:h-12">
-                    <Plus className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors md:w-6 md:h-6" strokeWidth={2.5} />
-                  </div>
-                  <p className="text-[15px] font-semibold text-muted-foreground group-hover:text-foreground transition-colors md:text-[17px]">
-                    {selectedTags.length > 0
-                      ? 'No tasks match your filters'
-                      : 'Add another task'}
-                  </p>
-                </button>
-              </motion.div>
+              <EmptyAddRow
+                label={
+                  selectedTags.length > 0
+                    ? 'No tasks match your filters'
+                    : 'Add another task'
+                }
+                quickAddOpen={quickAddOpen}
+                onClick={() =>
+                  onAddRequested('', null, { preselectToday: true })
+                }
+              />
             )
           ) : (
             /* List Content */
@@ -2185,10 +2418,29 @@ export default function TaskList({
                   <AnimatePresence initial={false} mode="popLayout">
                     {[
                       ...rows,
+                      ...(completedTasks.length > 0
+                        ? [{ kind: 'completed-divider' } as const]
+                        : []),
                       ...completedTasks.map(
                         (task) => ({ kind: 'task', task }) as ListRow,
                       ),
                     ].map((row) => {
+                      if (row.kind === 'completed-divider') {
+                        return (
+                          <div
+                            key="completed-divider"
+                            className="flex items-center gap-2 px-1.5 pb-1.5 pt-3"
+                          >
+                            <span className="text-[11px] font-black uppercase tracking-[0.14em] text-muted-foreground/60">
+                              Completed
+                            </span>
+                            <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-black tabular-nums leading-none text-muted-foreground">
+                              {completedTasks.length}
+                            </span>
+                            <span className="h-px flex-1 bg-border/60" />
+                          </div>
+                        );
+                      }
                       if (row.kind === 'header') {
                         const s = row.section;
                         return (
@@ -2259,6 +2511,7 @@ export default function TaskList({
                           onOpenDetail={(t) => setActionSheetId(t.id)}
                           paused={paused}
                           hintPeekPrimary={isHintPeekPrimary}
+                          isDesktop={!usesSwipeTrays}
                         />
                       );
                     })}
@@ -2588,6 +2841,36 @@ export default function TaskList({
         }
       />
 
+      {typeof document !== 'undefined' &&
+        createPortal(
+          <AnimatePresence>
+            {undoToast && (
+              <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 16 }}
+                transition={{ type: 'spring', stiffness: 500, damping: 34 }}
+                className="pointer-events-none fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+84px)] z-[9980] flex justify-center px-4 md:bottom-6"
+              >
+                <div className="pointer-events-auto flex w-full max-w-sm items-center gap-2.5 rounded-2xl border border-border/60 bg-popover py-1.5 pl-3 pr-1.5 shadow-lg">
+                  <CheckCircle2 className="h-5 w-5 shrink-0 text-green-500" />
+                  <span className="min-w-0 flex-1 truncate text-[13px] font-bold text-foreground">
+                    {undoToast.text}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleUndoComplete}
+                    className="shrink-0 rounded-xl px-3 py-2 text-[13px] font-black text-primary transition-colors [@media(hover:hover)]:hover:bg-primary/10"
+                  >
+                    Undo
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>,
+          document.body,
+        )}
+
       <style jsx>{`
         @keyframes fadeInUp {
           from {
@@ -2601,69 +2884,5 @@ export default function TaskList({
         }
       `}</style>
     </>
-  );
-}
-// Helper component for add-only animation
-function TaskCounter({
-  count,
-  pendingCount,
-}: {
-  count: number;
-  pendingCount?: number;
-}) {
-  const controls = useAnimation();
-  const prevCount = React.useRef(count);
-
-  React.useEffect(() => {
-    if (count > prevCount.current) {
-      // Only animate if count INCREASED
-      controls.start({
-        scale: [1, 1.35, 1],
-        color: [
-          'hsl(var(--muted-foreground))',
-          'hsl(var(--primary))',
-          'hsl(var(--muted-foreground))',
-        ],
-        transition: { duration: 0.3, ease: 'easeInOut' },
-      });
-    }
-    prevCount.current = count;
-  }, [count, controls]);
-
-  if (count === 0 && (!pendingCount || pendingCount === 0)) return null;
-
-  return (
-    <div className="flex items-center gap-1.5">
-      {count > 0 && (
-        <motion.span
-          animate={controls}
-          className={`flex h-5 min-w-[20px] items-center justify-center rounded-full bg-secondary px-1 text-[11px] font-bold text-muted-foreground ${count === 0 ? 'hidden' : ''}`}
-        >
-          {count}
-        </motion.span>
-      )}
-      {(pendingCount ?? 0) > 0 && (
-        <svg
-          className="w-3.5 h-3.5 animate-spin text-muted-foreground/60"
-          xmlns="http://www.w3.org/2000/svg"
-          fill="none"
-          viewBox="0 0 24 24"
-        >
-          <circle
-            className="opacity-25"
-            cx="12"
-            cy="12"
-            r="10"
-            stroke="currentColor"
-            strokeWidth="4"
-          ></circle>
-          <path
-            className="opacity-75"
-            fill="currentColor"
-            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-          ></path>
-        </svg>
-      )}
-    </div>
   );
 }

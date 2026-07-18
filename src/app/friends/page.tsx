@@ -6,12 +6,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import {
   ChevronRight,
-  Plus,
   UserPlus,
   Bell,
   UserMinus,
   Loader2,
   Flame,
+  Gift,
 } from 'lucide-react';
 import { Icon } from '@/components/ui/Icon';
 import { PremiumFrogAura } from '@/components/ui/PremiumFrogAura';
@@ -59,7 +59,7 @@ import type { ItemDef } from '@/lib/skins/catalog';
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
-type LeaderboardEntry = FriendSummary;
+type LeaderboardEntry = FriendSummary & { isYou?: boolean };
 
 export default function FriendsPage() {
   const router = useRouter();
@@ -160,18 +160,23 @@ export default function FriendsPage() {
 
   const sharedFrom = (f: FriendSummary) =>
     f.givesYou ?? contributionFrom(f.fliesToday);
-  const leaderboard: LeaderboardEntry[] = [...friends].sort(
+  const leaderboard: LeaderboardEntry[] = [
+    ...friends,
+    ...(friendsData?.me ? [{ ...friendsData.me, isYou: true }] : []),
+  ].sort(
     (a, b) =>
-      sharedFrom(b) - sharedFrom(a) ||
+      b.fliesToday - a.fliesToday ||
+      (b.streak ?? 0) - (a.streak ?? 0) ||
       (a.name || a.frogName).localeCompare(b.name || b.frogName),
   );
   const receivedToday =
     friendsData?.contribution?.receivedToday ??
-    leaderboard.reduce((sum, f) => sum + sharedFrom(f), 0);
+    friends.reduce((sum, f) => sum + sharedFrom(f), 0);
   const topStreak = friends.reduce((max, f) => Math.max(max, f.streak ?? 0), 0);
 
   return (
     <main className="relative min-h-[100dvh] overflow-x-hidden pb-24 md:pb-12">
+      <h1 className="sr-only">Friends</h1>
       <div className="relative z-10 mx-auto flex w-full flex-col items-center px-4 pt-[calc(env(safe-area-inset-top)+0.5rem)] md:max-w-2xl md:pt-11">
         <MobileMenuCluster position="absolute" />
         {/* Friend invites — persistent, over the winter scene */}
@@ -185,7 +190,7 @@ export default function FriendsPage() {
             type="button"
             onClick={() => setInboxOpen(true)}
             aria-label="Friend invites"
-            className="relative flex h-10 w-10 items-center justify-center rounded-full bg-card/90 text-primary shadow-md ring-1 ring-border/60 backdrop-blur-sm transition-transform active:scale-95"
+            className="relative flex h-11 w-11 touch-manipulation items-center justify-center rounded-full bg-card/90 text-primary shadow-md ring-1 ring-border/60 backdrop-blur-sm transition-transform active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
           >
             <Bell className="h-6 w-6" />
             {alertsCount > 0 && (
@@ -212,17 +217,24 @@ export default function FriendsPage() {
             paused={isAnyPanelOpen}
           />
 
-        {/* Add friend — frog sits right on top of it */}
+          {/* Primary growth action — one solid perch under the frog. */}
           <button
             type="button"
             data-fly-fade
-            onClick={() => setAddOpen(true)}
-            className="relative z-20 -mt-3 flex w-[min(20rem,80vw)] items-center justify-center gap-2 rounded-2xl bg-card px-10 py-3.5 text-lg font-black tracking-tight text-[#4f9149] shadow-lg ring-1 ring-[#4f9149]/30 transition-transform active:scale-[0.98]"
+            onClick={() => setInviteOpen(true)}
+            className="relative z-20 -mt-3 flex min-h-14 w-[min(21rem,84vw)] touch-manipulation items-center justify-center gap-3 rounded-[20px] bg-[#4f9149] px-6 py-3 text-left text-white shadow-[0_5px_0_#34631f] transition-[transform,filter,box-shadow] hover:brightness-105 active:translate-y-0.5 active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#4f9149]"
           >
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#4f9149] text-white shadow-sm">
-              <Plus className="h-5 w-5" strokeWidth={3} />
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/15">
+              <Gift className="h-5 w-5" strokeWidth={2.75} />
             </span>
-            Add friend
+            <span className="min-w-0">
+              <span className="block text-base font-black tracking-tight">
+                Invite friends
+              </span>
+              <span className="block text-[11px] font-bold text-white/80">
+                Send a skin · unlock rewards
+              </span>
+            </span>
           </button>
         </FlyCatchSwipeLauncher>
 
@@ -278,20 +290,41 @@ export default function FriendsPage() {
                 value={friends.length}
                 label={friends.length === 1 ? 'Friend' : 'Friends'}
               />
-              <StatTile value={receivedToday} label="Flies for you today" highlight />
-              <StatTile value={topStreak} label="Top friend streak" flame={topStreak > 0} />
+              <StatTile
+                value={receivedToday}
+                label="Flies for you today"
+                compactLabel="Flies today"
+                highlight
+              />
+              <StatTile
+                value={topStreak}
+                label="Top friend streak"
+                compactLabel="Best streak"
+                flame={topStreak > 0}
+              />
             </div>
           )}
 
-          {/* Leaderboard — focus is how much each friend shares with you */}
+          {/* Leaderboard — visible competition plus each friend's contribution. */}
           <div className="w-full">
-            <div className="mb-2.5 px-1.5">
-              <h2 className="text-lg font-black tracking-tight text-foreground">
-                Top contributors today
-              </h2>
-              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
-                They catch 2 · you get 1
-              </p>
+            <div className="mb-2.5 flex items-center justify-between gap-2 px-1.5 min-[360px]:gap-3">
+              <div className="min-w-0">
+                <h2 className="text-lg font-black tracking-tight text-foreground">
+                  Today&apos;s pond
+                </h2>
+                <p className="whitespace-nowrap text-[10px] font-bold uppercase tracking-[0.11em] text-muted-foreground min-[360px]:text-[11px] min-[360px]:tracking-[0.14em]">
+                  Catches · tap for looks
+                </p>
+              </div>
+              <button
+                type="button"
+                aria-label="Add friend"
+                onClick={() => setAddOpen(true)}
+                className="flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center gap-1.5 rounded-xl border border-[#4f9149]/25 bg-[#4f9149]/8 px-0 text-xs font-black text-[#4f9149] transition-colors hover:bg-[#4f9149]/14 active:bg-[#4f9149]/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f9149] focus-visible:ring-offset-2 min-[360px]:w-auto min-[360px]:px-3"
+              >
+                <UserPlus className="h-4 w-4" strokeWidth={2.75} />
+                <span className="hidden min-[360px]:inline">Add</span>
+              </button>
             </div>
 
             <div
@@ -300,36 +333,53 @@ export default function FriendsPage() {
             >
               {!friendsData ? (
                 <FriendsLeaderboardSkeleton rows={3} />
-              ) : hasRealFriends ? (
-                <ul className="flex flex-col gap-1.5">
-                  {leaderboard.map((entry, i) => (
-                    <LeaderboardRow
-                      key={`${entry.userId}-${i}`}
-                      entry={entry}
-                      rank={i + 1}
-                      buddyInvites={buddyInviteByFriend.get(entry.userId) ?? 0}
-                      onOpen={() => setDetailTarget(entry)}
-                      paused={isAnyPanelOpen}
-                    />
-                  ))}
-                </ul>
               ) : (
-                <div className="flex flex-col items-center px-4 py-12 text-center">
-                  <p className="text-sm font-black tracking-tight text-foreground">
-                    No friends yet
-                  </p>
-                  <p className="mt-1 max-w-[16rem] text-xs font-semibold text-muted-foreground">
-                    Friends share the flies they catch — you both earn more
-                    together.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => setAddOpen(true)}
-                    className="mt-4 rounded-xl bg-[#4f9149] px-5 py-2.5 text-sm font-black tracking-tight text-white shadow-[0_3px_0_0_#34631f] transition-all active:translate-y-0.5 active:shadow-none"
-                  >
-                    Add your first friend
-                  </button>
-                </div>
+                <>
+                  {leaderboard.length > 0 && (
+                    <ul className="flex flex-col gap-1.5">
+                      {leaderboard.map((entry, i) => (
+                        <LeaderboardRow
+                          key={entry.userId}
+                          entry={entry}
+                          rank={i + 1}
+                          buddyInvites={
+                            entry.isYou
+                              ? 0
+                              : (buddyInviteByFriend.get(entry.userId) ?? 0)
+                          }
+                          onOpen={() =>
+                            entry.isYou
+                              ? router.push('/wardrobe')
+                              : setDetailTarget(entry)
+                          }
+                          paused={isAnyPanelOpen}
+                        />
+                      ))}
+                    </ul>
+                  )}
+                  {!hasRealFriends && (
+                    <div className="mx-1 mt-1.5 flex items-center gap-3 rounded-xl border border-dashed border-[#4f9149]/30 bg-[#4f9149]/5 px-3 py-3">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#4f9149]/12 text-[#4f9149]">
+                        <UserPlus className="h-5 w-5" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-black tracking-tight text-foreground">
+                          Your frog needs a crew
+                        </p>
+                        <p className="text-xs font-semibold text-muted-foreground">
+                          Compare looks and collect half their daily catch.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setInviteOpen(true)}
+                        className="min-h-11 shrink-0 touch-manipulation rounded-xl bg-[#4f9149] px-3 text-xs font-black text-white shadow-[0_3px_0_#34631f] transition-[transform,box-shadow] active:translate-y-0.5 active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f9149] focus-visible:ring-offset-2"
+                      >
+                        Invite
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -443,7 +493,7 @@ function RemoveFriendDialog({
                 <button
                   onClick={handleRemove}
                   disabled={removing}
-                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-rose-500 py-3.5 text-base font-black tracking-tight text-white shadow-[0_5px_0_#be123c] transition-all hover:bg-rose-600 active:translate-y-0.5 disabled:opacity-60"
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-rose-500 py-3.5 text-base font-black tracking-tight text-white shadow-[0_5px_0_#be123c] transition-[background-color,transform,box-shadow,opacity] hover:bg-rose-600 active:translate-y-0.5 disabled:opacity-60"
                 >
                   {removing && <Loader2 className="h-5 w-5 animate-spin" />}
                   {removing ? 'Removing…' : 'Remove friend'}
@@ -468,18 +518,20 @@ function RemoveFriendDialog({
 function StatTile({
   value,
   label,
+  compactLabel,
   highlight = false,
   flame = false,
 }: {
   value: number;
   label: string;
+  compactLabel?: string;
   highlight?: boolean;
   flame?: boolean;
 }) {
   return (
     <div
       className={cn(
-        'flex flex-col items-center justify-center rounded-2xl border px-2 py-2.5 text-center',
+        'flex flex-col items-center justify-center rounded-2xl border px-1 py-2.5 text-center min-[360px]:px-2',
         highlight
           ? 'border-primary/30 bg-primary/10'
           : 'border-border/50 bg-card/60',
@@ -496,8 +548,13 @@ function StatTile({
         {flame && <Flame className="h-4 w-4 fill-orange-400 text-orange-500" />}
         {value}
       </span>
-      <span className="mt-1 text-[10px] font-bold uppercase leading-tight tracking-[0.1em] text-muted-foreground">
-        {label}
+      <span className="mt-1 text-[9px] font-bold uppercase leading-tight tracking-[0.08em] text-muted-foreground min-[360px]:text-[10px] min-[360px]:tracking-[0.1em]">
+        <span className={cn(compactLabel && 'min-[360px]:hidden')}>
+          {compactLabel ?? label}
+        </span>
+        {compactLabel && (
+          <span className="hidden min-[360px]:inline">{label}</span>
+        )}
       </span>
     </div>
   );
@@ -536,7 +593,7 @@ function ClaimHeroCard({
       type="button"
       onClick={onClaim}
       disabled={claiming}
-      className="group mb-5 flex w-full items-center gap-3 overflow-hidden rounded-[20px] border border-primary/30 bg-gradient-to-br from-emerald-50 to-emerald-100/70 px-4 py-3.5 text-left shadow-sm dark:from-primary/15 dark:to-primary/5 disabled:opacity-70"
+      className="group mb-5 flex w-full touch-manipulation items-center gap-3 overflow-hidden rounded-[20px] border border-primary/30 bg-gradient-to-br from-emerald-50 to-emerald-100/70 px-4 py-3.5 text-left shadow-sm dark:from-primary/15 dark:to-primary/5 disabled:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
     >
       <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-500/15">
         <Fly size={36} interactive={false} paused={paused} />
@@ -549,7 +606,7 @@ function ClaimHeroCard({
           Your cut of your friends&apos; catch today
         </p>
       </div>
-      <span className="inline-flex h-10 shrink-0 items-center justify-center rounded-xl bg-amber-500 px-5 text-[11px] font-black uppercase tracking-[0.15em] text-white shadow-[0_3px_0_0_#b45309] transition-all group-hover:-translate-y-[1px] group-hover:shadow-[0_4px_0_0_#b45309] group-active:translate-y-[2px] group-active:shadow-none">
+      <span className="inline-flex h-10 shrink-0 items-center justify-center rounded-xl bg-amber-500 px-5 text-[11px] font-black uppercase tracking-[0.15em] text-white shadow-[0_3px_0_0_#b45309] transition-[transform,box-shadow] group-hover:-translate-y-[1px] group-hover:shadow-[0_4px_0_0_#b45309] group-active:translate-y-[2px] group-active:shadow-none">
         {claiming ? 'Claiming…' : 'Claim'}
       </span>
     </button>
@@ -691,12 +748,13 @@ function LeaderboardRow({
     Math.min(34, Math.max(26, 26 + (frogBoxWidth - 96) * 0.0625)),
   );
   const shared = entry.givesYou ?? contributionFrom(entry.fliesToday);
+  const look = entry.flexRarity ? RARITY_CONFIG[entry.flexRarity] : null;
   const flex =
     entry.flexRarity && rarityRank[entry.flexRarity] >= rarityRank.epic
       ? RARITY_CONFIG[entry.flexRarity]
       : null;
   const medal =
-    shared > 0 && rank && rank <= 3
+    entry.fliesToday > 0 && rank && rank <= 3
       ? [
           'bg-amber-400 text-amber-950',
           'bg-slate-300 text-slate-800',
@@ -713,7 +771,7 @@ function LeaderboardRow({
           onOpen();
         }}
         className={cn(
-          'relative flex w-full items-center gap-2 rounded-xl border bg-card py-1.5 pl-1.5 pr-3 text-left transition-all hover:-translate-y-0.5 hover:shadow-md active:scale-[0.99] sm:gap-2.5 sm:py-2',
+          'relative flex w-full touch-manipulation items-center gap-1 rounded-xl border bg-card py-1.5 pl-1 pr-1.5 text-left transition-[transform,border-color,box-shadow] hover:-translate-y-0.5 hover:shadow-md active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 min-[360px]:gap-2 min-[360px]:pl-1.5 min-[360px]:pr-2.5 sm:gap-2.5 sm:py-2 sm:pr-3',
           flex
             ? cn('border-2', flex.border, 'shadow-md', flex.glow)
             : 'border-border/50 hover:border-emerald-300',
@@ -736,7 +794,7 @@ function LeaderboardRow({
         )}
         <div
           ref={frogBoxRef}
-          className="relative flex aspect-[6/5] w-[40%] min-w-[96px] max-w-[224px] shrink-0 items-end justify-center self-center overflow-hidden"
+          className="relative flex aspect-[6/5] w-[34%] min-w-[82px] max-w-[150px] shrink-0 items-end justify-center self-center overflow-hidden min-[360px]:w-[37%] min-[360px]:min-w-[94px] sm:w-[40%] sm:min-w-[110px] sm:max-w-[224px]"
         >
           <Frog
             className="translate-y-[15%]"
@@ -753,17 +811,22 @@ function LeaderboardRow({
         </div>
 
         <div className="min-w-0 flex-1">
-          <p className="flex items-center gap-1 text-sm font-black leading-tight tracking-tight text-foreground sm:text-base">
+          <p className="flex min-w-0 items-center gap-1 text-[13px] font-black leading-tight tracking-tight text-foreground min-[360px]:text-sm sm:text-base">
             <span
               className={cn('truncate', entry.premium && 'plus-name-shimmer')}
             >
               {entry.name || entry.frogName}
             </span>
+            {entry.isYou && (
+              <span className="rounded-full bg-[#4f9149]/12 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-[0.12em] text-[#4f9149]">
+                You
+              </span>
+            )}
             {entry.premium && (
               <Icon
                 name="frogPlus"
                 label="Frogress Plus"
-                className="h-7 w-7 shrink-0 sm:h-8 sm:w-8"
+                className="h-5 w-5 shrink-0 min-[360px]:h-6 min-[360px]:w-6 sm:h-8 sm:w-8"
               />
             )}
           </p>
@@ -772,13 +835,26 @@ function LeaderboardRow({
               {entry.frogName}
             </p>
           )}
-          {(entry.streak ?? 0) > 0 && (
-            <p className="mt-0.5 flex items-center gap-0.5 text-xs font-black text-orange-500">
-              <Flame className="h-3.5 w-3.5 fill-orange-400" />
-              {entry.streak}
-              <span className="font-bold text-orange-400/80">day streak</span>
-            </p>
-          )}
+          <div className="mt-1 flex flex-col items-start gap-1 min-[360px]:flex-row min-[360px]:flex-wrap min-[360px]:items-center">
+            {(entry.streak ?? 0) > 0 && (
+              <span className="flex items-center gap-0.5 rounded-full bg-orange-500/10 px-1.5 py-0.5 text-[10px] font-black text-orange-500">
+                <Flame className="h-3 w-3 fill-orange-400" />
+                {entry.streak}d
+              </span>
+            )}
+            {look && (entry.equippedItems?.length ?? 0) > 0 && (
+              <span
+                className={cn(
+                  'max-w-full truncate whitespace-nowrap rounded-full px-1.5 py-0.5 text-[10px] font-black',
+                  look.bg,
+                  look.text,
+                )}
+              >
+                {look.label}
+                <span className="hidden min-[360px]:inline"> look</span>
+              </span>
+            )}
+          </div>
           {entry.focusing && (
             <p className="mt-0.5 flex items-center gap-1.5 text-xs font-black text-primary">
               <span className="relative flex h-2 w-2">
@@ -790,25 +866,39 @@ function LeaderboardRow({
           )}
         </div>
 
-        <div className="flex shrink-0 items-center gap-1.5">
-          {shared > 0 ? (
-            <span className="flex items-center gap-1 rounded-full bg-emerald-500/10 py-1 pl-1.5 pr-2.5">
-              <Fly size={26} y={-2} interactive={false} paused={paused} />
-              <span className="text-lg font-black tabular-nums leading-none text-emerald-600 dark:text-emerald-400 sm:text-xl">
-                +{shared}
+        <div className="flex shrink-0 items-center gap-1 min-[360px]:gap-1.5">
+          <span
+            className={cn(
+              'flex min-w-[46px] flex-col items-center rounded-xl px-1 py-1 min-[360px]:min-w-[58px] min-[360px]:px-2',
+              entry.fliesToday > 0
+                ? 'bg-emerald-500/10'
+                : 'bg-muted/60 opacity-70',
+            )}
+          >
+            <span className="flex items-center gap-0.5">
+              <span className={cn(entry.fliesToday <= 0 && 'grayscale')}>
+                <Fly size={20} y={-2} interactive={false} paused={paused} />
+              </span>
+              <span
+                className={cn(
+                  'text-sm font-black tabular-nums leading-none min-[360px]:text-base sm:text-lg',
+                  entry.fliesToday > 0
+                    ? 'text-emerald-600 dark:text-emerald-400'
+                    : 'text-muted-foreground',
+                )}
+              >
+                {entry.fliesToday}
               </span>
             </span>
-          ) : (
-            <span className="flex items-center gap-1 rounded-full bg-muted/60 py-1 pl-1.5 pr-2.5 opacity-70">
-              <span className="grayscale">
-                <Fly size={22} y={-2} interactive={false} paused={paused} />
-              </span>
-              <span className="text-sm font-black tabular-nums leading-none text-muted-foreground">
-                +0
-              </span>
+            <span className="mt-0.5 whitespace-nowrap text-[7px] font-black uppercase tracking-[0.06em] text-muted-foreground min-[360px]:text-[8px] min-[360px]:tracking-[0.08em]">
+              {entry.isYou
+                ? 'your catch'
+                : shared > 0
+                  ? `+${shared} to you`
+                  : 'caught'}
             </span>
-          )}
-          <ChevronRight className="h-5 w-5 text-muted-foreground/60" />
+          </span>
+          <ChevronRight className="hidden h-5 w-5 text-muted-foreground/60 min-[380px]:block" />
         </div>
       </button>
     </li>
@@ -852,18 +942,26 @@ function InviteRewardBanner({
 
   const rewards = config?.rewards ?? [];
   const claimed = status?.claimedCount ?? 0;
-  const nextReward =
-    rewards.find((r) => r.tier > claimed) ?? rewards[rewards.length - 1] ?? null;
-  const item = nextReward?.item ?? null;
+  const pending = status?.pendingCount ?? 0;
+  const nextReward = rewards.find((r) => r.tier > claimed) ?? null;
+  const previewReward = nextReward ?? rewards[rewards.length - 1] ?? null;
+  const item = previewReward?.item ?? null;
   const isOutfit = !!item && item.slot !== 'container';
+  const completedAllRewards = rewards.length > 0 && !nextReward;
+  const target =
+    nextReward?.tier ?? previewReward?.tier ?? Math.max(1, claimed);
+  const needed = Math.max(0, target - claimed);
+  const progress = completedAllRewards
+    ? 100
+    : Math.min(100, Math.round((claimed / Math.max(1, target)) * 100));
 
   return (
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-center gap-3 rounded-[18px] border border-[#4f9149]/25 bg-[#4f9149]/5 px-3.5 py-3 text-left transition-transform active:scale-[0.99]"
+      className="group flex w-full touch-manipulation items-center gap-2 rounded-[18px] border border-[#4f9149]/25 bg-[#4f9149]/5 px-2.5 py-3 text-left shadow-sm transition-[transform,border-color,box-shadow] hover:border-[#4f9149]/45 hover:shadow-md active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f9149] focus-visible:ring-offset-2 min-[360px]:gap-3 min-[360px]:px-3.5"
     >
-      <span className="relative flex h-16 w-16 shrink-0 items-center justify-center self-center overflow-hidden rounded-2xl bg-emerald-500/10 ring-1 ring-emerald-500/15">
+      <span className="relative flex h-14 w-14 shrink-0 items-center justify-center self-center overflow-hidden rounded-2xl bg-emerald-500/10 ring-1 ring-emerald-500/15 min-[360px]:h-16 min-[360px]:w-16">
         {isOutfit && item ? (
           <Frog
             className="-translate-y-[14px]"
@@ -879,17 +977,40 @@ function InviteRewardBanner({
         )}
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[#4f9149]">
-          Invite &amp; earn
+        <p className="text-[9px] font-black uppercase tracking-[0.1em] text-[#4f9149] min-[360px]:text-[11px] min-[360px]:tracking-[0.14em]">
+          Invite · gift · unlock
         </p>
-        <p className="text-sm font-black leading-tight tracking-tight text-foreground sm:text-base">
-          {isOutfit
-            ? `Gift a skin, unlock this skin`
-            : `Gift a skin to earn rewards`}
+        <p className="text-xs font-black leading-tight tracking-tight text-foreground min-[360px]:text-sm sm:text-base">
+          {nextReward
+            ? `${needed} more ${needed === 1 ? 'friend' : 'friends'} unlocks ${item?.name ?? nextReward.label}`
+            : 'Keep growing your pond'}
         </p>
+        <div className="mt-2 flex items-center gap-2">
+          <span
+            role="progressbar"
+            aria-label="Invite reward progress"
+            aria-valuemin={0}
+            aria-valuemax={target}
+            aria-valuenow={Math.min(claimed, target)}
+            className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-[#4f9149]/15"
+          >
+            <span
+              className="block h-full w-full origin-left rounded-full bg-[#4f9149] transition-transform duration-300"
+              style={{ transform: `scaleX(${progress / 100})` }}
+            />
+          </span>
+          <span className="shrink-0 text-[10px] font-black tabular-nums text-muted-foreground">
+            {completedAllRewards ? `${claimed} joined` : `${claimed}/${target} joined`}
+          </span>
+        </div>
+        {pending > 0 && (
+          <p className="mt-1 text-[10px] font-bold text-amber-600 dark:text-amber-400">
+            {pending} {pending === 1 ? 'gift is' : 'gifts are'} waiting to be claimed
+          </p>
+        )}
       </div>
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#4f9149] text-white shadow-sm">
-        <ChevronRight className="h-5 w-5" strokeWidth={2.5} />
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#4f9149] text-white shadow-sm transition-transform group-hover:translate-x-0.5 min-[360px]:h-9 min-[360px]:w-9">
+        <ChevronRight className="h-4 w-4 min-[360px]:h-5 min-[360px]:w-5" strokeWidth={2.5} />
       </span>
     </button>
   );

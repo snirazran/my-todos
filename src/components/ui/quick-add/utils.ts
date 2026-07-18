@@ -151,3 +151,324 @@ export function customRepeatLabel(rule: RepeatRule): string {
     .join(', ');
   return dom ? `${base} on the ${dom}` : base;
 }
+
+const NL_DAY_NAMES = [
+  'sunday',
+  'monday',
+  'tuesday',
+  'wednesday',
+  'thursday',
+  'friday',
+  'saturday',
+];
+
+export interface ParsedNaturalInput {
+  dateKey?: string;
+  startTime?: string;
+  cleaned: string;
+}
+
+/** Detect a date/time phrase in free text, e.g. "call mom tomorrow at 3pm". */
+export function parseNaturalInput(text: string): ParsedNaturalInput | null {
+  let working = text;
+  let dateKey: string | undefined;
+  let startTime: string | undefined;
+
+  const cut = (index: number, length: number) => {
+    working = working.slice(0, index) + working.slice(index + length);
+  };
+
+  const dateMatch = working.match(
+    /(?:^|\s)(today|tonight|tomorrow|tmrw|sunday|monday|tuesday|wednesday|thursday|friday|saturday)(?=\s|$)/i,
+  );
+  if (dateMatch && dateMatch.index !== undefined) {
+    const word = dateMatch[1].toLowerCase();
+    const d = new Date();
+    if (word === 'tomorrow' || word === 'tmrw') {
+      d.setDate(d.getDate() + 1);
+    } else if (word !== 'today' && word !== 'tonight') {
+      const idx = NL_DAY_NAMES.indexOf(word);
+      const delta = (idx - d.getDay() + 7) % 7 || 7;
+      d.setDate(d.getDate() + delta);
+    }
+    dateKey = ymdLocal(d);
+    cut(dateMatch.index, dateMatch[0].length);
+  }
+
+  const ampm = working.match(
+    /(?:^|\s)(?:at\s+)?(\d{1,2})(?::([0-5]\d))?\s*(am|pm)(?=\s|$)/i,
+  );
+  const colon24 = working.match(
+    /(?:^|\s)(?:at\s+)?([01]?\d|2[0-3]):([0-5]\d)(?=\s|$)/,
+  );
+  const namedTime = working.match(/(?:^|\s)(noon|midday|midnight)(?=\s|$)/i);
+  const bareAt = working.match(/(?:^|\s)at\s+(\d{1,2})(?=\s|$)/);
+
+  if (ampm && ampm.index !== undefined) {
+    let h = Number(ampm[1]) % 12;
+    if (ampm[3].toLowerCase() === 'pm') h += 12;
+    if (h < 24) {
+      startTime = `${pad(h)}:${ampm[2] ?? '00'}`;
+      cut(ampm.index, ampm[0].length);
+    }
+  } else if (colon24 && colon24.index !== undefined) {
+    startTime = `${pad(Number(colon24[1]))}:${colon24[2]}`;
+    cut(colon24.index, colon24[0].length);
+  } else if (namedTime && namedTime.index !== undefined) {
+    startTime = namedTime[1].toLowerCase() === 'midnight' ? '00:00' : '12:00';
+    cut(namedTime.index, namedTime[0].length);
+  } else if (bareAt && bareAt.index !== undefined) {
+    const raw = Number(bareAt[1]);
+    if (raw >= 1 && raw <= 23) {
+      const h = raw <= 7 ? raw + 12 : raw;
+      startTime = `${pad(h)}:00`;
+      cut(bareAt.index, bareAt[0].length);
+    }
+  }
+
+  if (!dateKey && !startTime) return null;
+
+  const cleaned = working
+    .replace(/\s+(at|on|by)\s*$/i, '')
+    .replace(/^\s*(at|on|by)\s+/i, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+  if (!cleaned) return null;
+
+  return { dateKey, startTime, cleaned };
+}
+
+const hasToken = (haystack: string, needle: string) =>
+  new RegExp(
+    `(?:^|[^a-z])${needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:$|[^a-z])`,
+  ).test(haystack);
+
+const SUGGEST_BUCKETS: {
+  id: string;
+  nameAliases: string[];
+  textKeywords: string[];
+}[] = [
+  {
+    id: 'sport',
+    nameAliases: [
+      'sport',
+      'sports',
+      'fitness',
+      'workout',
+      'workouts',
+      'gym',
+      'exercise',
+      'training',
+      'health',
+      'run',
+      'running',
+      'move',
+    ],
+    textKeywords: [
+      'gym',
+      'workout',
+      'work out',
+      'run',
+      'running',
+      'jog',
+      'jogging',
+      'walk',
+      'swim',
+      'swimming',
+      'yoga',
+      'train',
+      'training',
+      'exercise',
+      'stretch',
+      'stretching',
+      'bike',
+      'cycling',
+      'football',
+      'soccer',
+      'basketball',
+      'tennis',
+      'hike',
+      'hiking',
+      'pilates',
+      'lift',
+      'lifting',
+      'cardio',
+      'crossfit',
+    ],
+  },
+  {
+    id: 'work',
+    nameAliases: [
+      'work',
+      'productivity',
+      'job',
+      'office',
+      'career',
+      'business',
+      'study',
+      'school',
+    ],
+    textKeywords: [
+      'work',
+      'wfh',
+      'email',
+      'emails',
+      'meeting',
+      'report',
+      'deadline',
+      'presentation',
+      'project',
+      'client',
+      'standup',
+      'interview',
+      'resume',
+      'cv',
+      'slides',
+      'deploy',
+      'homework',
+      'study',
+      'studying',
+      'essay',
+      'exam',
+    ],
+  },
+  {
+    id: 'finance',
+    nameAliases: ['finance', 'finances', 'money', 'budget', 'bills', 'banking'],
+    textKeywords: [
+      'pay',
+      'bill',
+      'bills',
+      'budget',
+      'bank',
+      'taxes',
+      'tax',
+      'rent',
+      'invoice',
+      'insurance',
+      'savings',
+      'invest',
+      'salary',
+    ],
+  },
+  {
+    id: 'family',
+    nameAliases: [
+      'family',
+      'friends',
+      'relationship',
+      'relationships',
+      'social',
+      'kids',
+      'connect',
+    ],
+    textKeywords: [
+      'mom',
+      'dad',
+      'mother',
+      'father',
+      'grandma',
+      'grandpa',
+      'grandmother',
+      'grandfather',
+      'sister',
+      'brother',
+      'family',
+      'kids',
+      'son',
+      'daughter',
+      'wife',
+      'husband',
+      'partner',
+      'date night',
+      'playdate',
+    ],
+  },
+  {
+    id: 'mindfulness',
+    nameAliases: [
+      'mindfulness',
+      'mindful',
+      'self care',
+      'self-care',
+      'selfcare',
+      'meditation',
+      'wellness',
+      'journal',
+      'calm',
+      'reset',
+    ],
+    textKeywords: [
+      'meditate',
+      'meditation',
+      'journal',
+      'journaling',
+      'breathe',
+      'breathing',
+      'gratitude',
+      'reflect',
+      'reflection',
+      'mindful',
+      'mindfulness',
+      'self-care',
+      'self care',
+      'pray',
+      'prayer',
+    ],
+  },
+  {
+    id: 'house_chores',
+    nameAliases: ['chores', 'house', 'home', 'cleaning', 'household'],
+    textKeywords: [
+      'clean',
+      'cleaning',
+      'laundry',
+      'dishes',
+      'vacuum',
+      'tidy',
+      'organize',
+      'declutter',
+      'trash',
+      'garbage',
+      'groceries',
+      'grocery',
+      'mop',
+      'iron',
+      'ironing',
+      'fold clothes',
+      'kitchen',
+      'bathroom',
+    ],
+  },
+  {
+    id: 'sleep',
+    nameAliases: ['sleep', 'rest', 'night', 'recharge'],
+    textKeywords: [
+      'sleep',
+      'bed early',
+      'bedtime',
+      'wind down',
+      'wind-down',
+      'nap',
+      'night routine',
+      'no screens',
+      'melatonin',
+    ],
+  },
+];
+
+/** Semantic buckets the task text matches, e.g. "go for a run" → ['sport']. */
+export function matchSuggestionBuckets(text: string): string[] {
+  const lower = text.toLowerCase();
+  return SUGGEST_BUCKETS.filter((b) =>
+    b.textKeywords.some((kw) => hasToken(lower, kw)),
+  ).map((b) => b.id);
+}
+
+/** Does a tag or focus-area NAME read like it belongs to this bucket? */
+export function nameMatchesBucket(bucketId: string, name: string): boolean {
+  const bucket = SUGGEST_BUCKETS.find((b) => b.id === bucketId);
+  if (!bucket) return false;
+  const lower = name.toLowerCase();
+  return bucket.nameAliases.some((alias) => hasToken(lower, alias));
+}

@@ -351,7 +351,12 @@
       "WebFetch(domain:culturedcode.com)",
       "Bash(awk 'NR>=2640 && NR<=2900 && \\(/updateOne|deleteOne|orderOverrides|occursHere|dateForDay|weekDates\\\\[/\\)' /Users/snirazran/Fullstack/my-todos/src/app/api/tasks/route.ts)",
       "Bash(echo \"exit code: $?\")",
-      "Bash(echo \"done: $?\")"
+      "Bash(echo \"done: $?\")",
+      "Bash(git -C /Users/snirazran/Fullstack/my-todos diff src/components/ui/TaskList.tsx)",
+      "Bash(git -C /Users/snirazran/Fullstack/my-todos log --oneline -5)",
+      "Bash(git -C /Users/snirazran/Fullstack/my-todos diff HEAD --stat)",
+      "Bash(git -C /Users/snirazran/Fullstack/my-todos diff HEAD src/components/ui/TaskList.tsx)",
+      "Bash(git -C /Users/snirazran/Fullstack/my-todos diff HEAD src/components/ui/QuickAddSheet.tsx)"
     ]
   }
 }

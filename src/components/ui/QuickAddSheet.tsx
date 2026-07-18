@@ -40,6 +40,9 @@ import { useTagManager } from './quick-add/useTagManager';
 import { useCalendarMonth } from './quick-add/useCalendarMonth';
 import { useKeyboardInset } from './quick-add/useKeyboardInset';
 import {
+  matchSuggestionBuckets,
+  nameMatchesBucket,
+  parseNaturalInput,
   parseYmdLocal,
   repeatModeFor,
   ymdLocal,
@@ -305,6 +308,7 @@ export default function QuickAddSheet({
   sections = [],
 }: QuickAddSheetProps) {
   const [text, setText] = useState(initialText);
+  const [nlDismissed, setNlDismissed] = useState('');
   const [repeat, setRepeat] = useState<RepeatChoice>(defaultRepeat);
   const [tags, setTags] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -414,6 +418,7 @@ export default function QuickAddSheet({
   const { data: questContext } = useSWR<{
     isPremium?: boolean;
     activeFocusCategoryId?: string | null;
+    macroCategories?: { id: string; name: string }[];
     onboarding?: {
       selectedCategoryIds?: string[];
       categoryTagMap?: { categoryId: string; tagIds: string[] }[];
@@ -687,6 +692,85 @@ export default function QuickAddSheet({
               day: 'numeric',
             })
           : labelForDisplayDay(selectedDay as Exclude<DisplayDay, 7>, daysOrder);
+
+  // "call mom tomorrow at 3pm" → offer to schedule and strip the phrase.
+  // Suggestion only; typing is never rewritten until the chip is tapped.
+  const nlParsed = useMemo(() => parseNaturalInput(text), [text]);
+  const nlSuggestion =
+    !isLater &&
+    nlParsed &&
+    text !== nlDismissed &&
+    ((nlParsed.dateKey && nlParsed.dateKey !== selectedDateKey) ||
+      (nlParsed.startTime && nlParsed.startTime !== startTime))
+      ? nlParsed
+      : null;
+  const nlLabel = nlSuggestion
+    ? [
+        nlSuggestion.dateKey
+          ? nlSuggestion.dateKey === todayKey
+            ? 'Today'
+            : nlSuggestion.dateKey === tomorrowKey
+              ? 'Tomorrow'
+              : parseYmdLocal(nlSuggestion.dateKey).toLocaleDateString(
+                  'en-US',
+                  { weekday: 'short', month: 'short', day: 'numeric' },
+                )
+          : null,
+        nlSuggestion.startTime ?? null,
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    : '';
+  const applyNlSuggestion = () => {
+    if (!nlSuggestion) return;
+    if (nlSuggestion.dateKey)
+      selectCalendarDate(parseYmdLocal(nlSuggestion.dateKey));
+    if (nlSuggestion.startTime) {
+      setStartTime(nlSuggestion.startTime);
+      setNotifyEnabled(true);
+    }
+    setText(nlSuggestion.cleaned);
+  };
+
+  // Focus areas are user-defined docs with arbitrary ids, so matching goes
+  // through semantic buckets: task text → bucket, then a tag connected to an
+  // area whose NAME fits the bucket, else any tag whose own name fits.
+  const questTagSuggestion = useMemo(() => {
+    if (!hasTaskText) return null;
+    const buckets = matchSuggestionBuckets(text);
+    if (buckets.length === 0) return null;
+    const candidates = tagManager.savedTags.filter(
+      (t) => !t.disabled && !tags.includes(t.id),
+    );
+    if (candidates.length === 0) return null;
+    const resolvedTagMap =
+      categoryTagMap ?? questContext?.onboarding?.categoryTagMap;
+    const categoryName = (id: string) =>
+      questContext?.macroCategories?.find((c) => c.id === id)?.name ?? id;
+    for (const bucket of buckets) {
+      for (const entry of resolvedTagMap ?? []) {
+        if (!nameMatchesBucket(bucket, categoryName(entry.categoryId)))
+          continue;
+        const connected =
+          candidates.find(
+            (t) =>
+              entry.tagIds.includes(t.id) && nameMatchesBucket(bucket, t.name),
+          ) ?? candidates.find((t) => entry.tagIds.includes(t.id));
+        if (connected) return connected;
+      }
+      const byName = candidates.find((t) => nameMatchesBucket(bucket, t.name));
+      if (byName) return byName;
+    }
+    return null;
+  }, [
+    hasTaskText,
+    text,
+    categoryTagMap,
+    questContext,
+    tagManager.savedTags,
+    tags,
+  ]);
+  const showQuestTagSuggestion = !!questTagSuggestion && text !== nlDismissed;
 
   const repeatMode =
     repeat === 'custom'
@@ -1007,6 +1091,62 @@ export default function QuickAddSheet({
                           <Fly size={48} y={-3} />
                         </div>
                       </div>
+
+                      {(nlSuggestion || showQuestTagSuggestion) && (
+                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5 px-1">
+                          {nlSuggestion && (
+                            <button
+                              type="button"
+                              onPointerDown={(e) => e.preventDefault()}
+                              onClick={applyNlSuggestion}
+                              className="inline-flex h-9 min-w-0 items-center gap-1.5 rounded-xl border border-primary/20 bg-primary/10 px-3 text-[11px] font-black uppercase tracking-wider text-primary shadow-sm transition-all active:scale-95 [@media(hover:hover)]:hover:bg-primary/15"
+                            >
+                              {nlSuggestion.dateKey ? (
+                                <CalendarDays className="h-3.5 w-3.5 shrink-0" />
+                              ) : (
+                                <Bell className="h-3 w-3 shrink-0 text-amber-500" />
+                              )}
+                              <span className="truncate tabular-nums">
+                                {nlLabel}
+                              </span>
+                              <Plus className="h-3 w-3 shrink-0 stroke-[3]" />
+                            </button>
+                          )}
+                          {showQuestTagSuggestion && questTagSuggestion && (
+                            <button
+                              type="button"
+                              onPointerDown={(e) => e.preventDefault()}
+                              onClick={() =>
+                                setTags((prev) =>
+                                  prev.includes(questTagSuggestion.id)
+                                    ? prev
+                                    : [...prev, questTagSuggestion.id],
+                                )
+                              }
+                              className="inline-flex h-9 min-w-0 items-center gap-1.5 rounded-xl border px-3 text-[11px] font-black uppercase tracking-wider shadow-sm transition-all active:scale-95 [@media(hover:hover)]:hover:opacity-75"
+                              style={{
+                                backgroundColor: `${questTagSuggestion.color}20`,
+                                color: questTagSuggestion.color,
+                                borderColor: `${questTagSuggestion.color}40`,
+                              }}
+                            >
+                              <Plus className="h-3.5 w-3.5 shrink-0 stroke-[3]" />
+                              <span className="max-w-[128px] truncate">
+                                {questTagSuggestion.name}
+                              </span>
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            aria-label="Dismiss suggestions"
+                            onPointerDown={(e) => e.preventDefault()}
+                            onClick={() => setNlDismissed(text)}
+                            className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-muted-foreground/50 transition-colors [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      )}
 
                       <div className="mt-1.5 mb-2.5 h-px bg-border/60" />
 
