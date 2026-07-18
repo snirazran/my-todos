@@ -2297,17 +2297,6 @@ export default function TaskList({
   return (
     <>
       <div dir="ltr" className="w-full px-1.5 pt-0 pb-3 overflow-visible md:px-4">
-        <div className="relative mb-2 flex flex-row items-center justify-end gap-3 px-1.5 md:px-2">
-          {tasks.length > 0 && (
-            <span
-              aria-live="polite"
-              className="text-[11px] font-bold tabular-nums text-muted-foreground/70"
-            >
-              {tasks.filter((t) => t.completed).length} of {tasks.length} done
-            </span>
-          )}
-        </div>
-
         <div
           className="w-full rounded-[18px] bg-[hsl(150_12%_94%)] dark:bg-background border border-border/50 shadow-sm overflow-hidden"
           data-hint="task-list"

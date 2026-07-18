@@ -694,56 +694,6 @@ export default function Home() {
           >
             <div className="flex flex-col gap-2 w-full">
               <GuestAccountBanner />
-              <div className="flex items-center justify-between px-2 md:px-0">
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2 ml-3 cursor-pointer group md:gap-2.5">
-                    <Icon name="planner" className="w-7 h-7 md:w-8 md:h-8" />
-                    <span className="text-sm font-black tracking-tight lowercase text-foreground md:text-base">
-                      {data.length > 0 && openTaskCount === 0
-                        ? 'all done for today!'
-                        : `${openTaskCount} ${
-                            openTaskCount === 1 ? 'fly' : 'flies'
-                          } left for today!`}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    ref={headerMenuBtnRef}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setIsHeaderMenuOpen(!isHeaderMenuOpen);
-                    }}
-                    className={cn(
-                      'flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-bold transition-all md:text-[13px] md:px-4 md:py-2',
-                      isHeaderMenuOpen ||
-                        selectedTags.length > 0 ||
-                        showCompleted
-                        ? 'bg-primary/10 text-primary'
-                        : 'text-muted-foreground hover:text-foreground hover:bg-accent/50',
-                    )}
-                  >
-                    <Filter className="w-3.5 h-3.5 md:w-4 md:h-4" />
-                    <span>Filter</span>
-                    {(selectedTags.length > 0 || showCompleted) && (
-                      <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                    )}
-                  </button>
-                  <FilterDropdown
-                    isOpen={isHeaderMenuOpen}
-                    onClose={() => setIsHeaderMenuOpen(false)}
-                    triggerRef={headerMenuBtnRef}
-                    showTypeFilters={false}
-                    showCompleted={showCompleted}
-                    onShowCompletedChange={setShowCompleted}
-                    availableTags={tags || []}
-                    selectedTags={selectedTags}
-                    onTagsChange={setSelectedTags}
-                  />
-                </div>
-              </div>
-
               <div className="min-h-[360px] pb-16" ref={taskListRef}>
                 {renderGuestPrompt()}
                 {user && (
@@ -754,6 +704,53 @@ export default function Home() {
                     isPremium={isPremium}
                   />
                 )}
+                <div className="mb-2 flex items-center justify-between px-2 md:px-0">
+                  <div className="flex items-center gap-2 ml-3 cursor-pointer group md:gap-2.5">
+                    <Icon name="planner" className="w-7 h-7 md:w-8 md:h-8" />
+                    <span className="text-sm font-black tracking-tight lowercase text-foreground md:text-base">
+                      {data.length > 0 && openTaskCount === 0
+                        ? 'all done for today!'
+                        : `${openTaskCount} ${
+                            openTaskCount === 1 ? 'fly' : 'flies'
+                          } left for today!`}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      ref={headerMenuBtnRef}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsHeaderMenuOpen(!isHeaderMenuOpen);
+                      }}
+                      className={cn(
+                        'flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-bold transition-all md:text-[13px] md:px-4 md:py-2',
+                        isHeaderMenuOpen ||
+                          selectedTags.length > 0 ||
+                          showCompleted
+                          ? 'bg-primary/10 text-primary'
+                          : 'text-muted-foreground hover:text-foreground hover:bg-accent/50',
+                      )}
+                    >
+                      <Filter className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                      <span>Filter</span>
+                      {(selectedTags.length > 0 || showCompleted) && (
+                        <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                      )}
+                    </button>
+                    <FilterDropdown
+                      isOpen={isHeaderMenuOpen}
+                      onClose={() => setIsHeaderMenuOpen(false)}
+                      triggerRef={headerMenuBtnRef}
+                      showTypeFilters={false}
+                      showCompleted={showCompleted}
+                      onShowCompletedChange={setShowCompleted}
+                      availableTags={tags || []}
+                      selectedTags={selectedTags}
+                      onTagsChange={setSelectedTags}
+                    />
+                  </div>
+                </div>
                 {/* The visible Fly Catch card was replaced by the frog swipe gesture. */}
                 <TaskList
                   tasks={data}
