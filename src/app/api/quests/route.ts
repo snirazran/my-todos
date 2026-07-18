@@ -375,7 +375,7 @@ export async function GET(req: Request) {
                 : undefined,
             objectiveLabel: objectiveSummaryLabel(
               block,
-              questFocusTags(quest)[0]?.name,
+              categoryNameById.get(quest.categoryId ?? ''),
             ),
             tags:
               block.tagMode === 'focus_category_tags'
@@ -408,11 +408,11 @@ export async function GET(req: Request) {
               : undefined,
           objectiveLabel: objectiveSummaryLabel(
             block,
-            questFocusTags(quest)[0]?.name,
+            categoryNameById.get(quest.categoryId ?? ''),
           ),
           remainingLabel: objectiveRemainingLabel(
             block,
-            questFocusTags(quest)[0]?.name,
+            categoryNameById.get(quest.categoryId ?? ''),
           ),
           objectiveType: block.type,
           tags:

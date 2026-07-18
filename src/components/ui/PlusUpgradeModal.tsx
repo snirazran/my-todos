@@ -15,6 +15,8 @@ import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
 import { RARITY_CONFIG } from '@/components/ui/gift-box/constants';
 import { purchasePlus, restorePlusPurchases } from '@/lib/purchases';
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
+import { auth } from '@/lib/firebase';
+import { ShieldAlert } from 'lucide-react';
 
 type Step = 0 | 1 | 2 | 3;
 
@@ -56,6 +58,7 @@ export function PlusUpgradeModal({
   const [purchasing, setPurchasing] = useState(false);
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
   const [celebrating, setCelebrating] = useState(false);
+  const [needsAccount, setNeedsAccount] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -63,6 +66,7 @@ export function PlusUpgradeModal({
       setPlan('yearly');
       setPurchasing(false);
       setPurchaseError(null);
+      setNeedsAccount(false);
       trackAnalyticsEvent('paywall_viewed', { placement });
       trackAnalyticsEvent('paywall_step_viewed', { placement, step: 1 });
     }
@@ -73,6 +77,10 @@ export function PlusUpgradeModal({
 
   const startPurchase = async () => {
     if (purchasing) return;
+    if (auth?.currentUser?.isAnonymous) {
+      setNeedsAccount(true);
+      return;
+    }
     setPurchaseError(null);
     setPurchasing(true);
     try {
@@ -194,6 +202,54 @@ export function PlusUpgradeModal({
                       error={purchaseError}
                     />
                   </StepShell>
+                )}
+              </AnimatePresence>
+
+              <AnimatePresence>
+                {needsAccount && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="fixed inset-0 z-[10011] flex items-center justify-center bg-black/60 px-6 backdrop-blur-sm"
+                    onClick={() => setNeedsAccount(false)}
+                  >
+                    <motion.div
+                      initial={{ scale: 0.95, y: 10 }}
+                      animate={{ scale: 1, y: 0 }}
+                      exit={{ scale: 0.95, y: 10 }}
+                      transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="w-full max-w-sm rounded-[28px] bg-white p-6 text-center text-slate-900 shadow-2xl"
+                    >
+                      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-violet-100">
+                        <ShieldAlert className="h-7 w-7 text-violet-600" strokeWidth={2.5} />
+                      </div>
+                      <h3 className="mt-3 text-lg font-black tracking-tight">
+                        Save your frog first
+                      </h3>
+                      <p className="mt-2 text-sm font-medium text-slate-600">
+                        Plus is tied to your account. Create a free account so
+                        your subscription and progress are never lost.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          window.location.assign('/login?upgrade=1')
+                        }
+                        className="mt-5 h-12 w-full rounded-2xl bg-violet-600 text-sm font-black uppercase tracking-wider text-white transition-all hover:brightness-110 active:scale-[0.98]"
+                      >
+                        Create free account
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setNeedsAccount(false)}
+                        className="mt-2 h-11 w-full rounded-2xl text-sm font-bold text-slate-500 transition-colors hover:text-slate-700"
+                      >
+                        Not now
+                      </button>
+                    </motion.div>
+                  </motion.div>
                 )}
               </AnimatePresence>
             </div>

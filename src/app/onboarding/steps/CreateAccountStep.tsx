@@ -3,14 +3,17 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Loader2 } from 'lucide-react';
-import { sendSignInLinkToEmail } from 'firebase/auth';
+import { sendSignInLinkToEmail, type AuthCredential } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { establishSessionCookie } from '@/lib/authCookie';
 import {
+  GoogleAccountExistsError,
   getGoogleAuthErrorMessage,
   initNativeGoogleSignIn,
+  signInWithExistingGoogle,
   signInWithGoogle,
 } from '@/lib/googleAuth';
+import { AccountConflictDialog } from '@/components/auth/AccountConflictDialog';
 import { createEmailLinkSettings } from '@/lib/emailLinkSettings';
 import { Input } from '@/components/ui/input';
 import { GoogleIcon } from '@/components/ui/GoogleIcon';
@@ -33,6 +36,10 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [conflict, setConflict] = useState<{
+    credential: AuthCredential | null;
+  } | null>(null);
+  const [switching, setSwitching] = useState(false);
 
   useEffect(() => {
     void initNativeGoogleSignIn().catch(() => {
@@ -58,8 +65,42 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
       });
       onNext();
     } catch (signInError: any) {
-      setError(getGoogleAuthErrorMessage(signInError));
+      if (signInError instanceof GoogleAccountExistsError) {
+        setConflict({ credential: signInError.credential });
+      } else {
+        setError(getGoogleAuthErrorMessage(signInError));
+      }
       setLoading(false);
+    }
+  };
+
+  const handleSwitchToExisting = async () => {
+    if (!conflict || switching) return;
+    setSwitching(true);
+    try {
+      await signInWithExistingGoogle(conflict.credential);
+      const user = auth.currentUser;
+      if (!user) throw new Error('Sign-in did not complete');
+      await establishSessionCookie(user);
+      const res = await fetch('/api/user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (data?.isNewUser) {
+        setConflict(null);
+        setSwitching(false);
+        onNext();
+      } else {
+        window.location.replace('/');
+      }
+    } catch (switchError: any) {
+      setConflict(null);
+      setError(getGoogleAuthErrorMessage(switchError));
+      setSwitching(false);
     }
   };
 
@@ -183,6 +224,16 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
           </AnimatePresence>
         </div>
       </div>
+
+      <AccountConflictDialog
+        open={!!conflict}
+        busy={switching}
+        title="You already have a frog!"
+        message="That Google account is already connected to a Frogress account. Switch to it? Your progress from this session will be left behind."
+        confirmLabel="Switch to my account"
+        onConfirm={handleSwitchToExisting}
+        onCancel={() => setConflict(null)}
+      />
     </div>
   );
 }

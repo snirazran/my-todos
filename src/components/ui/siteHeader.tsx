@@ -392,6 +392,7 @@ import {
   HelpCircle,
   AlertTriangle,
   ChevronLeft,
+  ShieldAlert,
   Vibrate,
   Volume2,
 } from 'lucide-react';
@@ -815,6 +816,11 @@ function MobileSheet({
                     onSignOut();
                     onClose();
                   }}
+                  isGuest={!!user?.isAnonymous}
+                  onCreateAccount={() => {
+                    router.push('/login?upgrade=1');
+                    onClose();
+                  }}
                   flashSoon={flashSoon}
                   theme={theme}
                   setTheme={setTheme}
@@ -1019,6 +1025,8 @@ function MainView({
   onHelpCenter,
   onGoAdmin,
   onSignOut,
+  isGuest,
+  onCreateAccount,
   flashSoon,
   theme,
   setTheme,
@@ -1049,9 +1057,12 @@ function MainView({
   onHelpCenter: () => void;
   onGoAdmin: () => void;
   onSignOut: () => Promise<void> | void;
+  isGuest: boolean;
+  onCreateAccount: () => void;
   flashSoon: (label: string) => void;
 }) {
   const [plusInfoOpen, setPlusInfoOpen] = useState(false);
+  const [confirmGuestSignOut, setConfirmGuestSignOut] = useState(false);
   const { connections } = useCalendarConnections();
   const activeConnections = connections.filter((c) => c.status === 'active').length;
   const needsAttention = connections.some((c) => c.status !== 'active');
@@ -1073,6 +1084,17 @@ function MainView({
           <span>{frogName}</span>
         </p>
       </div>
+
+      {/* Guest mode promo */}
+      {isGuest && (
+        <PromoCard
+          icon={<ShieldAlert className="w-7 h-7 text-amber-300" strokeWidth={2.5} />}
+          title="Your frog isn't backed up"
+          subtitle="Create a free account so your progress is safe on any device."
+          actionLabel="Save it"
+          onAction={onCreateAccount}
+        />
+      )}
 
       {/* Enable notifications promo (mobile + web, when not enabled) */}
       {(isNative || isWeb) && canEnableNotifs && !notifsEnabled && (
@@ -1313,12 +1335,65 @@ function MainView({
       )}
 
       <button
-        onClick={onSignOut}
+        onClick={isGuest ? () => setConfirmGuestSignOut(true) : onSignOut}
         className="flex w-full items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 p-4 font-black text-rose-600 shadow-sm transition-all hover:bg-rose-100 active:scale-[0.99] dark:border-rose-400/35 dark:bg-rose-500/15 dark:text-rose-300 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_8px_24px_rgba(0,0,0,0.12)] dark:hover:border-rose-400/50 dark:hover:bg-rose-500/25"
       >
         <LogOut className="h-6 w-6" strokeWidth={2.5} />
         Sign Out
       </button>
+
+      {confirmGuestSignOut &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[1400] flex items-center justify-center bg-black/60 px-5 backdrop-blur-sm"
+            onClick={() => setConfirmGuestSignOut(false)}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-sm rounded-[28px] bg-card p-6 text-center shadow-2xl ring-1 ring-border/60"
+            >
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-rose-500/10 ring-1 ring-rose-500/20">
+                <ShieldAlert className="h-7 w-7 text-rose-500" strokeWidth={2.5} />
+              </div>
+              <h2 className="mt-3 text-lg font-black tracking-tight text-foreground">
+                Your frog will be lost forever
+              </h2>
+              <p className="mt-2 text-sm font-medium text-muted-foreground">
+                You&apos;re in Guest Mode — there&apos;s no way to sign back in.
+                Signing out permanently deletes your frog, streaks, and all
+                progress. Create a free account first to keep them.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmGuestSignOut(false);
+                  onCreateAccount();
+                }}
+                className="mt-5 h-12 w-full rounded-2xl bg-primary text-sm font-black uppercase tracking-wider text-primary-foreground transition-all hover:brightness-110 active:scale-[0.98]"
+              >
+                Create free account
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmGuestSignOut(false);
+                  onSignOut();
+                }}
+                className="mt-2 h-11 w-full rounded-2xl text-sm font-bold text-rose-500 transition-colors hover:bg-rose-500/10"
+              >
+                Sign out and lose progress
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmGuestSignOut(false)}
+                className="mt-1 h-11 w-full rounded-2xl text-sm font-bold text-muted-foreground transition-colors hover:text-foreground"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

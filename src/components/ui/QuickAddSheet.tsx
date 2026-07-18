@@ -748,36 +748,47 @@ export default function QuickAddSheet({
     );
   }, [categoryTagMap, focusCategoryIds, questContext]);
 
-  const questTagSuggestion = useMemo(() => {
-    if (!hasTaskText || suggestionEntries.length === 0) return null;
+  // Area-first: the task text resolves to a focus AREA (bucket → selected
+  // area), then ALL of that area's connected tags are offered (up to 3),
+  // name-matching tags first.
+  const questTagSuggestions = useMemo(() => {
+    if (!hasTaskText || suggestionEntries.length === 0) return [];
     const buckets = matchSuggestionBuckets(text);
-    if (buckets.length === 0) return null;
+    if (buckets.length === 0) return [];
     const candidates = tagManager.savedTags.filter(
       (t) => !t.disabled && !tags.includes(t.id),
     );
-    if (candidates.length === 0) return null;
+    if (candidates.length === 0) return [];
     const categoryName = (id: string) =>
       questContext?.macroCategories?.find((c) => c.id === id)?.name ?? id;
-    const connectedIds = new Set(
-      suggestionEntries.flatMap((entry) => entry.tagIds),
-    );
+    const picked: typeof candidates = [];
+    const pushAreaTags = (entry: (typeof suggestionEntries)[number], bucket: string) => {
+      const areaTags = candidates.filter((t) => entry.tagIds.includes(t.id));
+      const ordered = [
+        ...areaTags.filter((t) => nameMatchesBucket(bucket, t.name)),
+        ...areaTags.filter((t) => !nameMatchesBucket(bucket, t.name)),
+      ];
+      for (const tag of ordered) {
+        if (picked.length >= 3) return;
+        if (!picked.some((p) => p.id === tag.id)) picked.push(tag);
+      }
+    };
     for (const bucket of buckets) {
-      for (const entry of suggestionEntries) {
-        if (!nameMatchesBucket(bucket, categoryName(entry.categoryId)))
-          continue;
-        const connected =
-          candidates.find(
+      if (picked.length >= 3) break;
+      let entryMatch = suggestionEntries.find((entry) =>
+        nameMatchesBucket(bucket, categoryName(entry.categoryId)),
+      );
+      if (!entryMatch) {
+        entryMatch = suggestionEntries.find((entry) =>
+          candidates.some(
             (t) =>
               entry.tagIds.includes(t.id) && nameMatchesBucket(bucket, t.name),
-          ) ?? candidates.find((t) => entry.tagIds.includes(t.id));
-        if (connected) return connected;
+          ),
+        );
       }
-      const byName = candidates.find(
-        (t) => connectedIds.has(t.id) && nameMatchesBucket(bucket, t.name),
-      );
-      if (byName) return byName;
+      if (entryMatch) pushAreaTags(entryMatch, bucket);
     }
-    return null;
+    return picked;
   }, [
     hasTaskText,
     text,
@@ -792,18 +803,19 @@ export default function QuickAddSheet({
   // on change so a fast typist never fans out requests.
   const [aiSuggestion, setAiSuggestion] = useState<{
     key: string;
-    tagId: string | null;
+    tagIds: string[];
   } | null>(null);
-  const aiCacheRef = useRef<Map<string, string | null>>(new Map());
+  const aiCacheRef = useRef<Map<string, string[]>>(new Map());
 
   useEffect(() => {
-    if (!open || !hasTaskText || questTagSuggestion) return;
+    if (!open || !hasTaskText || questTagSuggestions.length > 0) return;
     if (suggestionEntries.length === 0) return;
     const key = text.trim().toLowerCase();
     if (key.length < 4) return;
     const cache = aiCacheRef.current;
-    if (cache.has(key)) {
-      setAiSuggestion({ key, tagId: cache.get(key) ?? null });
+    const cached = cache.get(key);
+    if (cached) {
+      setAiSuggestion({ key, tagIds: cached });
       return;
     }
     const controller = new AbortController();
@@ -817,10 +829,12 @@ export default function QuickAddSheet({
         });
         if (!res.ok) return;
         const data = await res.json();
-        const tagId = typeof data?.tagId === 'string' ? data.tagId : null;
+        const tagIds = Array.isArray(data?.tagIds)
+          ? data.tagIds.filter((id: unknown) => typeof id === 'string')
+          : [];
         if (cache.size > 200) cache.clear();
-        cache.set(key, tagId);
-        setAiSuggestion({ key, tagId });
+        cache.set(key, tagIds);
+        setAiSuggestion({ key, tagIds });
       } catch {
         // Aborted or offline — keyword matching already had its chance.
       }
@@ -829,19 +843,24 @@ export default function QuickAddSheet({
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [open, hasTaskText, text, questTagSuggestion, suggestionEntries]);
+  }, [open, hasTaskText, text, questTagSuggestions, suggestionEntries]);
 
-  const aiTagSuggestion = useMemo(() => {
-    if (!aiSuggestion?.tagId) return null;
-    if (aiSuggestion.key !== text.trim().toLowerCase()) return null;
-    const tag = tagManager.savedTags.find((t) => t.id === aiSuggestion.tagId);
-    if (!tag || tag.disabled || tags.includes(tag.id)) return null;
-    return tag;
+  const aiTagSuggestions = useMemo(() => {
+    if (!aiSuggestion || aiSuggestion.tagIds.length === 0) return [];
+    if (aiSuggestion.key !== text.trim().toLowerCase()) return [];
+    return aiSuggestion.tagIds
+      .map((id) => tagManager.savedTags.find((t) => t.id === id))
+      .filter(
+        (t): t is NonNullable<typeof t> =>
+          !!t && !t.disabled && !tags.includes(t.id),
+      )
+      .slice(0, 3);
   }, [aiSuggestion, text, tagManager.savedTags, tags]);
 
-  const questTagSuggestionResolved = questTagSuggestion ?? aiTagSuggestion;
+  const resolvedTagSuggestions =
+    questTagSuggestions.length > 0 ? questTagSuggestions : aiTagSuggestions;
   const showQuestTagSuggestion =
-    !!questTagSuggestionResolved && text !== nlDismissed;
+    resolvedTagSuggestions.length > 0 && text !== nlDismissed;
 
   const repeatMode =
     repeat === 'custom'
@@ -1164,7 +1183,7 @@ export default function QuickAddSheet({
                       </div>
 
                       {(nlSuggestion || showQuestTagSuggestion) && (
-                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5 px-1">
+                        <div className="mt-3 mb-1 flex flex-wrap items-center gap-x-2 gap-y-3.5 px-1.5">
                           {nlSuggestion && (
                             <button
                               type="button"
@@ -1183,44 +1202,46 @@ export default function QuickAddSheet({
                               <Plus className="h-3 w-3 shrink-0 stroke-[3]" />
                             </button>
                           )}
-                          {showQuestTagSuggestion && questTagSuggestionResolved && (
-                            <button
-                              type="button"
-                              onPointerDown={(e) => e.preventDefault()}
-                              onClick={() =>
-                                setTags((prev) =>
-                                  prev.includes(questTagSuggestionResolved.id)
-                                    ? prev
-                                    : [...prev, questTagSuggestionResolved.id],
-                                )
-                              }
-                              className={`relative inline-flex h-9 min-w-0 items-center gap-1.5 rounded-xl border pr-3 text-[11px] font-black uppercase tracking-wider shadow-sm transition-all active:scale-95 [@media(hover:hover)]:hover:opacity-75 ${
-                                questTagIds.has(questTagSuggestionResolved.id)
-                                  ? 'pl-[56px]'
-                                  : 'pl-3'
-                              }`}
-                              style={{
-                                backgroundColor: `${questTagSuggestionResolved.color}20`,
-                                color: questTagSuggestionResolved.color,
-                                borderColor: `${questTagSuggestionResolved.color}40`,
-                              }}
-                            >
-                              {questTagIds.has(questTagSuggestionResolved.id) && (
-                                <span
-                                  className="pointer-events-none absolute left-1 top-1/2 grid h-12 w-11 -translate-y-1/2 -rotate-3 place-items-center rounded-[10px] border bg-popover shadow-sm"
-                                  style={{
-                                    borderColor: `${questTagSuggestionResolved.color}40`,
-                                  }}
-                                >
-                                  <AppIcon name="quests" className="h-7 w-7" />
+                          {showQuestTagSuggestion &&
+                            resolvedTagSuggestions.map((suggestedTag) => (
+                              <button
+                                key={suggestedTag.id}
+                                type="button"
+                                onPointerDown={(e) => e.preventDefault()}
+                                onClick={() =>
+                                  setTags((prev) =>
+                                    prev.includes(suggestedTag.id)
+                                      ? prev
+                                      : [...prev, suggestedTag.id],
+                                  )
+                                }
+                                className={`relative inline-flex h-9 min-w-0 items-center gap-1.5 rounded-xl border pr-3 text-[11px] font-black uppercase tracking-wider shadow-sm transition-all active:scale-95 [@media(hover:hover)]:hover:opacity-75 ${
+                                  questTagIds.has(suggestedTag.id)
+                                    ? 'pl-[56px]'
+                                    : 'pl-3'
+                                }`}
+                                style={{
+                                  backgroundColor: `${suggestedTag.color}20`,
+                                  color: suggestedTag.color,
+                                  borderColor: `${suggestedTag.color}40`,
+                                }}
+                              >
+                                {questTagIds.has(suggestedTag.id) && (
+                                  <span
+                                    className="pointer-events-none absolute left-1 top-1/2 grid h-12 w-11 -translate-y-1/2 -rotate-3 place-items-center rounded-[10px] border bg-popover shadow-sm"
+                                    style={{
+                                      borderColor: `${suggestedTag.color}40`,
+                                    }}
+                                  >
+                                    <AppIcon name="quests" className="h-7 w-7" />
+                                  </span>
+                                )}
+                                <Plus className="h-3.5 w-3.5 shrink-0 stroke-[3]" />
+                                <span className="max-w-[128px] truncate">
+                                  {suggestedTag.name}
                                 </span>
-                              )}
-                              <Plus className="h-3.5 w-3.5 shrink-0 stroke-[3]" />
-                              <span className="max-w-[128px] truncate">
-                                {questTagSuggestionResolved.name}
-                              </span>
-                            </button>
-                          )}
+                              </button>
+                            ))}
                           <button
                             type="button"
                             aria-label="Dismiss suggestions"

@@ -23,7 +23,29 @@ export default function EmailCallbackPage() {
   const [error, setError] = useState<string | null>(null);
   const [needEmail, setNeedEmail] = useState(false);
   const [emailInput, setEmailInput] = useState('');
+  const [conflictEmail, setConflictEmail] = useState<string | null>(null);
+  const [switching, setSwitching] = useState(false);
   const ranRef = useRef(false);
+
+  const finishSignedIn = async () => {
+    window.localStorage.removeItem(EMAIL_LINK_STORAGE_KEY);
+    const user = auth.currentUser;
+    if (!user) throw new Error('No user after sign-in');
+    await establishSessionCookie(user);
+    const res = await fetch('/api/user', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    const storedRoute = window.localStorage.getItem(POST_LOGIN_ROUTE_KEY);
+    window.localStorage.removeItem(POST_LOGIN_ROUTE_KEY);
+    const safeRoute =
+      storedRoute?.startsWith('/') && !storedRoute.startsWith('//') ? storedRoute : '/';
+    router.replace(data?.isNewUser ? '/onboarding' : safeRoute);
+  };
 
   const complete = async (emailForLink: string) => {
     setError(null);
@@ -38,28 +60,23 @@ export default function EmailCallbackPage() {
       if (current && current.isAnonymous) {
         // Link the email credential to the existing anonymous user so progress carries over.
         const cred = EmailAuthProvider.credentialWithLink(emailForLink, href);
-        await linkWithCredential(current, cred);
+        try {
+          await linkWithCredential(current, cred);
+        } catch (linkErr: any) {
+          if (
+            linkErr?.code === 'auth/credential-already-in-use' ||
+            linkErr?.code === 'auth/email-already-in-use'
+          ) {
+            setConflictEmail(emailForLink);
+            return;
+          }
+          throw linkErr;
+        }
       } else {
         await signInWithEmailLink(auth, emailForLink, href);
       }
 
-      window.localStorage.removeItem(EMAIL_LINK_STORAGE_KEY);
-      const user = auth.currentUser;
-      if (!user) throw new Error('No user after sign-in');
-      await establishSessionCookie(user);
-      const res = await fetch('/api/user', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      const storedRoute = window.localStorage.getItem(POST_LOGIN_ROUTE_KEY);
-      window.localStorage.removeItem(POST_LOGIN_ROUTE_KEY);
-      const safeRoute =
-        storedRoute?.startsWith('/') && !storedRoute.startsWith('//') ? storedRoute : '/';
-      router.replace(data?.isNewUser ? '/onboarding' : safeRoute);
+      await finishSignedIn();
     } catch (err: any) {
       const map: Record<string, string> = {
         'auth/invalid-action-code':
@@ -70,6 +87,23 @@ export default function EmailCallbackPage() {
           'That email is linked to another account.',
       };
       setError(map[err?.code ?? ''] ?? err?.message ?? 'Sign-in failed');
+    }
+  };
+
+  const switchToExisting = async () => {
+    if (!conflictEmail || switching) return;
+    setSwitching(true);
+    try {
+      await signInWithEmailLink(auth, conflictEmail, window.location.href);
+      await finishSignedIn();
+    } catch (err: any) {
+      setConflictEmail(null);
+      setSwitching(false);
+      setError(
+        err?.code === 'auth/invalid-action-code'
+          ? 'This link has expired — request a new one from the login page.'
+          : err?.message ?? 'Sign-in failed',
+      );
     }
   };
 
@@ -96,7 +130,36 @@ export default function EmailCallbackPage() {
           />
         </div>
 
-        {error ? (
+        {conflictEmail ? (
+          <>
+            <h1 className="mt-2 text-2xl font-black text-center text-foreground">
+              You already have a frog!
+            </h1>
+            <p className="mt-3 text-sm text-center text-muted-foreground">
+              <span className="font-bold text-foreground">{conflictEmail}</span>{' '}
+              is already connected to a Frogress account. Sign in to it? Your
+              guest progress on this device will be left behind.
+            </p>
+            <button
+              onClick={switchToExisting}
+              disabled={switching}
+              className="mt-6 flex h-12 w-full items-center justify-center rounded-2xl bg-primary text-primary-foreground font-black uppercase tracking-wider text-sm disabled:opacity-60"
+            >
+              {switching ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                'Sign in to my account'
+              )}
+            </button>
+            <button
+              onClick={() => router.replace('/')}
+              disabled={switching}
+              className="mt-3 h-11 w-full text-sm font-bold text-muted-foreground transition-colors hover:text-foreground disabled:opacity-60"
+            >
+              Keep playing as guest
+            </button>
+          </>
+        ) : error ? (
           <>
             <h1 className="mt-2 text-2xl font-black text-center text-foreground">
               Couldn't sign you in

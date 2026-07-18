@@ -9,8 +9,6 @@ export const dynamic = 'force-dynamic';
 
 const MAX_TEXT_LENGTH = 200;
 
-type Candidate = { id: string; name: string; areaName: string };
-
 function normalizeTag(tag: any): { id: string; name: string } | null {
   if (typeof tag === 'string') {
     const name = tag.trim();
@@ -31,7 +29,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (!process.env.ANTHROPIC_API_KEY) {
-    return NextResponse.json({ tagId: null });
+    return NextResponse.json({ tagIds: [] });
   }
 
   let text = '';
@@ -42,7 +40,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid body' }, { status: 400 });
   }
   if (text.length < 3) {
-    return NextResponse.json({ tagId: null });
+    return NextResponse.json({ tagIds: [] });
   }
   text = text.slice(0, MAX_TEXT_LENGTH);
 
@@ -52,7 +50,7 @@ export async function POST(req: NextRequest) {
       .select('tags focusProfile')
       .lean();
     if (!user) {
-      return NextResponse.json({ tagId: null });
+      return NextResponse.json({ tagIds: [] });
     }
 
     const profile: any = (user as any).focusProfile ?? {};
@@ -65,7 +63,7 @@ export async function POST(req: NextRequest) {
       ? profile.categoryTagMap
       : [];
     if (selectedIds.length === 0 || tagMap.length === 0) {
-      return NextResponse.json({ tagId: null });
+      return NextResponse.json({ tagIds: [] });
     }
 
     const tagsById = new Map<string, { id: string; name: string }>();
@@ -81,37 +79,33 @@ export async function POST(req: NextRequest) {
       .lean();
     const areaNames = new Map(categories.map((c) => [c.categoryId, c.name]));
 
-    const candidates: Candidate[] = [];
-    const seen = new Set<string>();
+    const areas: { categoryId: string; name: string; tagIds: string[] }[] = [];
     for (const entry of tagMap) {
       if (!selectedIds.includes(entry.categoryId)) continue;
-      const areaName = areaNames.get(entry.categoryId) ?? entry.categoryId;
-      for (const tagId of entry.tagIds ?? []) {
-        if (seen.has(tagId)) continue;
-        const tag = tagsById.get(tagId);
-        if (!tag) continue;
-        seen.add(tagId);
-        candidates.push({ id: tag.id, name: tag.name, areaName });
-      }
+      const tagIds = (entry.tagIds ?? []).filter((id) => tagsById.has(id));
+      if (tagIds.length === 0) continue;
+      areas.push({
+        categoryId: entry.categoryId,
+        name: areaNames.get(entry.categoryId) ?? entry.categoryId,
+        tagIds,
+      });
     }
-    if (candidates.length === 0) {
-      return NextResponse.json({ tagId: null });
+    if (areas.length === 0) {
+      return NextResponse.json({ tagIds: [] });
     }
 
-    const list = candidates
-      .map((c, i) => `${i + 1}. ${c.name} (focus area: ${c.areaName})`)
-      .join('\n');
+    const list = areas.map((a, i) => `${i + 1}. ${a.name}`).join('\n');
 
     const anthropic = new Anthropic();
     const response = await anthropic.messages.create({
       model: 'claude-haiku-4-5',
       max_tokens: 8,
       system:
-        'You match a to-do task to the single most relevant tag. Reply with only the number of the best matching tag, or 0 if no tag clearly relates to the task. A tag must genuinely fit the activity described — when unsure, reply 0. Never explain.',
+        'You classify a to-do task into a life focus area. Reply with only the number of the single best matching focus area, or 0 if the task does not clearly belong to any of them. The task must genuinely be an activity of that area — when unsure, reply 0. Never explain.',
       messages: [
         {
           role: 'user',
-          content: `Task: "${text}"\n\nTags:\n${list}`,
+          content: `Task: "${text}"\n\nFocus areas:\n${list}`,
         },
       ],
     });
@@ -119,15 +113,15 @@ export async function POST(req: NextRequest) {
     const block = response.content[0];
     const raw = block?.type === 'text' ? block.text : '';
     const index = parseInt(raw.match(/\d+/)?.[0] ?? '0', 10);
-    const picked =
-      index >= 1 && index <= candidates.length ? candidates[index - 1] : null;
+    const area = index >= 1 && index <= areas.length ? areas[index - 1] : null;
+    const tagIds = (area?.tagIds ?? []).slice(0, 6);
 
     return NextResponse.json(
-      { tagId: picked?.id ?? null },
+      { tagIds },
       { headers: { 'Cache-Control': 'no-store' } },
     );
   } catch (error) {
     console.error('Tag suggest failed:', error);
-    return NextResponse.json({ tagId: null });
+    return NextResponse.json({ tagIds: [] });
   }
 }

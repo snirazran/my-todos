@@ -6,9 +6,28 @@ import {
   linkWithPopup,
   signInWithCredential,
   signInWithPopup,
+  type AuthCredential,
   type User,
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
+
+export class GoogleAccountExistsError extends Error {
+  credential: AuthCredential | null;
+
+  constructor(credential: AuthCredential | null) {
+    super('That Google account is already linked to another user.');
+    this.name = 'GoogleAccountExistsError';
+    this.credential = credential;
+  }
+}
+
+function isCredentialInUse(error: unknown): boolean {
+  const code =
+    error && typeof error === 'object'
+      ? (error as { code?: unknown }).code
+      : null;
+  return code === 'auth/credential-already-in-use';
+}
 
 const WEB_CLIENT_ID =
   '324868480648-mcnp29sgs2r9ip4nsbfs82phhiuv4tos.apps.googleusercontent.com';
@@ -64,17 +83,43 @@ export async function signInWithGoogle({
     if (!idToken) throw new Error('Failed to get Google token');
     const cred = GoogleAuthProvider.credential(idToken);
     if (linkTo) {
-      await linkWithCredential(linkTo, cred);
+      try {
+        await linkWithCredential(linkTo, cred);
+      } catch (error) {
+        if (isCredentialInUse(error)) {
+          throw new GoogleAccountExistsError(cred);
+        }
+        throw error;
+      }
     } else {
       await signInWithCredential(auth, cred);
     }
   } else {
     const provider = new GoogleAuthProvider();
     if (linkTo) {
-      await linkWithPopup(linkTo, provider);
+      try {
+        await linkWithPopup(linkTo, provider);
+      } catch (error) {
+        if (isCredentialInUse(error)) {
+          throw new GoogleAccountExistsError(
+            GoogleAuthProvider.credentialFromError(error as any),
+          );
+        }
+        throw error;
+      }
     } else {
       await signInWithPopup(auth, provider);
     }
+  }
+}
+
+export async function signInWithExistingGoogle(
+  credential: AuthCredential | null,
+) {
+  if (credential) {
+    await signInWithCredential(auth, credential);
+  } else {
+    await signInWithGoogle();
   }
 }
 

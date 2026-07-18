@@ -37,6 +37,7 @@ import {
 } from '@/components/ui/frog';
 import Fly from '@/components/ui/fly';
 import TaskList from '@/components/ui/TaskList';
+import { GuestAccountBanner } from '@/components/ui/GuestAccountBanner';
 import QuickAddSheet from '@/components/ui/QuickAddSheet';
 import FrogodoroSheet from '@/components/ui/FrogodoroSheet';
 import {
@@ -692,6 +693,7 @@ export default function Home() {
             style={{ pointerEvents: taskCinematic ? 'none' : 'auto' }}
           >
             <div className="flex flex-col gap-2 w-full">
+              <GuestAccountBanner />
               <div className="flex items-center justify-between px-2 md:px-0">
                 <div className="flex items-center gap-3">
                   <div className="flex items-center gap-2 ml-3 cursor-pointer group md:gap-2.5">

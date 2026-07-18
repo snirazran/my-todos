@@ -1,14 +1,17 @@
 'use client';
 
-import { sendSignInLinkToEmail } from 'firebase/auth';
+import { sendSignInLinkToEmail, type AuthCredential } from 'firebase/auth';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 import { auth } from '@/lib/firebase';
 import {
+  GoogleAccountExistsError,
   getGoogleAuthErrorMessage,
   initNativeGoogleSignIn,
+  signInWithExistingGoogle,
   signInWithGoogle,
 } from '@/lib/googleAuth';
+import { AccountConflictDialog } from '@/components/auth/AccountConflictDialog';
 import { GoogleIcon } from '@/components/ui/GoogleIcon';
 import { establishSessionCookie } from '@/lib/authCookie';
 import { createEmailLinkSettings } from '@/lib/emailLinkSettings';
@@ -102,6 +105,10 @@ function LoginPageInner() {
 
   const [loading, setLoading] = useState(false);
   const [resendIn, setResendIn] = useState(0);
+  const [conflict, setConflict] = useState<{
+    credential: AuthCredential | null;
+  } | null>(null);
+  const [switching, setSwitching] = useState(false);
 
   useEffect(() => {
     if (resendIn <= 0) return;
@@ -231,10 +238,30 @@ function LoginPageInner() {
       // pause around a native Google popup. Never gate authentication on it.
       navigateOnce(route);
     } catch (err: any) {
+      if (err instanceof GoogleAccountExistsError) {
+        setConflict({ credential: err.credential });
+      } else {
+        showNotification(getGoogleAuthErrorMessage(err), undefined, {
+          durationMs: 5000,
+        });
+      }
+      setLoading(false);
+    }
+  };
+
+  const handleSwitchToExisting = async () => {
+    if (!conflict || switching) return;
+    setSwitching(true);
+    try {
+      await signInWithExistingGoogle(conflict.credential);
+      const route = await prepareSignedInRoute(postLoginRoute);
+      navigateOnce(route);
+    } catch (err: any) {
+      setConflict(null);
+      setSwitching(false);
       showNotification(getGoogleAuthErrorMessage(err), undefined, {
         durationMs: 5000,
       });
-      setLoading(false);
     }
   };
 
@@ -505,6 +532,16 @@ function LoginPageInner() {
           </Link>
         </motion.p>
       </motion.div>
+
+      <AccountConflictDialog
+        open={!!conflict}
+        busy={switching}
+        title="You already have a frog!"
+        message="That Google account is already connected to a Frogress account. Switch to it? Your guest progress on this device will be left behind."
+        confirmLabel="Switch to my account"
+        onConfirm={handleSwitchToExisting}
+        onCancel={() => setConflict(null)}
+      />
 
       {/* Tongue overlay — driven directly by the RAF loop in useFrogTongue */}
       {grab && (
