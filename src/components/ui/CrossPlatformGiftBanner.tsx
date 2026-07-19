@@ -63,7 +63,8 @@ export function CrossPlatformGiftBanner() {
     !!status &&
     !status.claimed &&
     !status.claimable &&
-    !status.otherPlatformSeen;
+    !status.otherPlatformSeen &&
+    !(platform === 'native' && status.moveToWebQuest);
 
   useEffect(() => {
     if (!eligible) {

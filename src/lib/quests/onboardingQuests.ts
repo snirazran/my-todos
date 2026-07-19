@@ -63,7 +63,7 @@ export const FIRST_HOPS_QUEST: OnboardingQuestDef = {
       tagMode: 'ignore',
       metricKey: 'focus_tag_linked',
       helpText:
-        'On the Quests page, tap Start quest on a focus quest and pick a focus.',
+        'On the Quests page, tap Start quest on an area quest and pick a tag for it.',
       rewards: fixedFlies(15),
     },
   ],

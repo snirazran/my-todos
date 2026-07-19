@@ -243,13 +243,18 @@ const GUIDES: Record<string, HintGuide> = {
       },
     ],
   },
+  // Anchor lives on the hero card's Start button, the area chooser grid, or
+  // (still locked) the unlock teaser — whichever the quests page is showing.
   'start-focus-quest': {
     id: 'start-focus-quest',
     steps: [
       {
         href: '/quests',
         anchor: 'start-focus-quest',
+        selector:
+          '[data-hint="start-focus-quest"], [data-area-unlock-anchor]',
         label: 'Start an area quest — pick your life area',
+        timeoutMs: 30_000,
       },
     ],
   },

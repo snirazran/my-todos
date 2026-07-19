@@ -10,7 +10,7 @@ import {
   type CrossGiftPlatform,
   type CrossGiftStatus,
 } from '@/lib/crossGift';
-import { hasMoveToWebQuest } from '@/lib/quests/moveToWeb';
+import { hasMoveToWebQuest, loadMoveToWebConfig } from '@/lib/quests/moveToWeb';
 
 export async function POST(req: NextRequest) {
   let userId: string;
@@ -34,9 +34,12 @@ export async function POST(req: NextRequest) {
   try {
     await connectMongo();
 
-    const user = await UserModel.findById(userId)
-      .select('platformsSeen crossGiftBonus quests')
-      .lean();
+    const [user, moveToWebConfig] = await Promise.all([
+      UserModel.findById(userId)
+        .select('platformsSeen crossGiftBonus quests')
+        .lean(),
+      loadMoveToWebConfig(),
+    ]);
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
@@ -51,13 +54,20 @@ export async function POST(req: NextRequest) {
 
     const claimed = !!user.crossGiftBonus;
     const otherPlatformSeen = !!user.platformsSeen?.[otherPlatform(platform)];
+    const moveToWebQuest =
+      hasMoveToWebQuest(user) ||
+      (platform === 'native' &&
+        !!moveToWebConfig?.isActive &&
+        !!moveToWebConfig.reward &&
+        !user.platformsSeen?.web);
 
     const status: CrossGiftStatus = {
       platform,
       claimed,
       otherPlatformSeen,
       firstSeen,
-      claimable: !claimed && otherPlatformSeen && !hasMoveToWebQuest(user),
+      moveToWebQuest,
+      claimable: !claimed && otherPlatformSeen && !moveToWebQuest,
       flies: CROSS_GIFT_FLIES,
     };
     return NextResponse.json(status);

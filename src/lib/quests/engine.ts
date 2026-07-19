@@ -106,6 +106,7 @@ export function normalizeFocusProfile(user: UserDoc): FocusProfile {
 
 export const RENT_SLOT_ADS_REQUIRED = 1;
 export const RENT_SLOT_DURATION_MS = 24 * 60 * 60 * 1000;
+export const DAILY_QUESTS_UNLOCK_STEP_TARGET = 5;
 
 export function activeRentedFocusCategoryId(
   profile: FocusProfile,
@@ -1539,9 +1540,9 @@ export async function syncQuestState(args: {
     (quest) => quest.placement === 'onboarding',
   );
 
-  // New users see one goal at a time: daily quests stay hidden until the
-  // first TWO onboarding quests have all objectives complete, so onboarding
-  // objectives don't double-progress against a system nobody introduced yet.
+  // New users see one goal at a time: daily quests stay hidden until 5
+  // objectives are complete (or every early onboarding quest is done, so a
+  // short onboarding roster can't gate dailies forever).
   // Displayed quests carry fresh progress; finished ones fall back to their
   // stored doc (a candidate with no doc yet hasn't even been reached).
   const onboardingProgressComplete = (templateId: string) => {
@@ -1564,15 +1565,12 @@ export async function syncQuestState(args: {
   const firstOnboardingComplete = onboardingCandidates[0]
     ? onboardingProgressComplete(onboardingCandidates[0].templateId)
     : true;
-  const dailyQuestsGated = onboardingCandidates
-    .slice(0, 2)
-    .some((template) => !onboardingProgressComplete(template.templateId));
-  const visibleDailyQuests = dailyQuestsGated ? [] : dailyQuests;
 
   // Lifetime completed objectives across starter + daily quests — drives the
-  // "Your areas" unlock. Counted from the stored docs of PAST onboarding
-  // quests too (the display drops each one once fully claimed; without this
-  // the teaser's progress visibly reset when First Hops finished).
+  // daily-quest and "Your areas" unlocks. Counted from the stored docs of
+  // PAST onboarding quests too (the display drops each one once fully
+  // claimed; without this the teaser's progress visibly reset when First
+  // Hops finished).
   const displayedOnboardingIds = new Set(
     onboardingQuests.map((quest) => quest.templateId),
   );
@@ -1601,6 +1599,13 @@ export async function syncQuestState(args: {
         ).length,
       0,
     );
+
+  const dailyQuestsGated =
+    earlyObjectiveSteps < DAILY_QUESTS_UNLOCK_STEP_TARGET &&
+    onboardingCandidates
+      .slice(0, 2)
+      .some((template) => !onboardingProgressComplete(template.templateId));
+  const visibleDailyQuests = dailyQuestsGated ? [] : dailyQuests;
 
   const templatesWithCover = new Set(
     templates

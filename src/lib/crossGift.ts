@@ -9,6 +9,7 @@ export type CrossGiftStatus = {
   claimed: boolean;
   otherPlatformSeen: boolean;
   firstSeen?: boolean;
+  moveToWebQuest?: boolean;
   flies: number;
 };
 

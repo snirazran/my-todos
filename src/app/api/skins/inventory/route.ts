@@ -21,10 +21,11 @@ async function ensureWardrobe(uid: string) {
   const user = (await UserModel.findById(uid).lean()) as LeanUser | null;
   if (!user) return null;
 
-  const current: UserWardrobe = user.wardrobe ?? {
+  const current: UserWardrobe = {
     equipped: {},
     inventory: {},
     flies: 0,
+    ...(user.wardrobe ?? {}),
   };
 
   // If equipped item is not owned anymore, null it

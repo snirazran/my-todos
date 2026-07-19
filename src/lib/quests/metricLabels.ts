@@ -145,7 +145,7 @@ const METRIC_HINT_COPY: Record<string, string> = {
   task_saved_later: "Use a task's menu to move it to Saved Tasks.",
   skin_equipped: 'Equip a skin on your frog in the Wardrobe.',
   focus_tag_linked:
-    'On the Quests page, start an area quest and pick your focus.',
+    'On the Quests page, tap Start quest on an area quest and pick a tag for it.',
   focus_started:
     'Start the focus timer on any task — any length counts.',
   frog_fed_full:

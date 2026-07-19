@@ -427,7 +427,7 @@ function WardrobeManagerContent({
   const sellItem = async (item: ItemDef, qty: number = 1) => {
     if (!user || !data?.wardrobe) return;
 
-    const currentCount = data.wardrobe.inventory[item.id] ?? 0;
+    const currentCount = data.wardrobe.inventory?.[item.id] ?? 0;
     const refund = Math.floor((item.priceFlies ?? 0) / 2);
     // Refund for this batch
     const totalRefund = refund * qty;
@@ -448,7 +448,7 @@ function WardrobeManagerContent({
                   ...curr.wardrobe.inventory,
                   [item.id]: Math.max(
                     0,
-                    (curr.wardrobe.inventory[item.id] ?? 0) - qty,
+                    (curr.wardrobe.inventory?.[item.id] ?? 0) - qty,
                   ),
                 },
               },
@@ -776,7 +776,7 @@ function WardrobeManagerContent({
                   flies: (curr.wardrobe.flies ?? 0) - price,
                   inventory: {
                     ...curr.wardrobe.inventory,
-                    [item.id]: (curr.wardrobe.inventory[item.id] ?? 0) + 1,
+                    [item.id]: (curr.wardrobe.inventory?.[item.id] ?? 0) + 1,
                   },
                 },
               }

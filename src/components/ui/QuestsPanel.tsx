@@ -246,6 +246,10 @@ function getFocusQuestSortScore(quest: CategoryQuestProgressView) {
 }
 
 const AREA_UNLOCK_CELEBRATED_KEY = 'frog:areaQuestsUnlockCelebrated';
+// Must match AREA_UNLOCK_STEP_TARGET in api/quests/route.ts and
+// DAILY_QUESTS_UNLOCK_STEP_TARGET in lib/quests/engine.ts — the server
+// decides both unlocks, this only drives the cards' display.
+const EARLY_UNLOCK_STEP_TARGET = 5;
 
 function AreaQuestsTeaser({
   completedSteps,
@@ -350,18 +354,16 @@ function AreaQuestsTeaser({
 }
 
 // Mirrors the "Your areas" locked card: daily quests stay behind the first
-// onboarding quest so new users chase one goal at a time.
+// starter objectives so new users chase one goal at a time.
 function DailyQuestsLockedCard({
-  claimed,
-  total,
-  questName,
+  completedSteps,
+  targetSteps,
 }: {
-  claimed: number;
-  total: number;
-  questName?: string;
+  completedSteps: number;
+  targetSteps: number;
 }) {
-  const safeTotal = Math.max(1, total);
-  const shown = Math.max(0, Math.min(claimed, safeTotal));
+  const safeTotal = Math.max(1, targetSteps);
+  const shown = Math.max(0, Math.min(completedSteps, safeTotal));
   const pct = Math.min(100, (shown / safeTotal) * 100);
   const remaining = Math.max(0, safeTotal - shown);
   return (
@@ -379,7 +381,8 @@ function DailyQuestsLockedCard({
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-[15px] font-black leading-snug text-foreground">
-                Complete {remaining} more {remaining === 1 ? 'quest' : 'quests'}
+                Complete {remaining} more{' '}
+                {remaining === 1 ? 'objective' : 'objectives'}
               </p>
               <div className="relative mt-2 h-5 overflow-hidden rounded-full bg-muted">
                 <div className="absolute inset-[3px]">
@@ -409,8 +412,7 @@ function DailyQuestsLockedCard({
                 </span>
               </div>
               <p className="mt-2 text-[11px] font-bold leading-snug text-muted-foreground">
-                Finish {questName ?? 'your starter quest'} to unlock daily
-                quests
+                Finish quest objectives to unlock daily quests
               </p>
             </div>
           </div>
@@ -1071,10 +1073,6 @@ export function QuestsPanel({
                           // areaQuestsUnlocked once earned (it never re-locks);
                           // the local calc is a fallback for stale payloads and
                           // still drives the teaser's progress dots.
-                          // Must match AREA_UNLOCK_STEP_TARGET in
-                          // api/quests/route.ts — the server decides the
-                          // unlock, this only drives the card's display.
-                          const FOCUS_UNLOCK_TARGET = 6;
                           // Server-computed lifetime count (includes past
                           // onboarding quests the display has retired); the
                           // local sum is only a stale-payload fallback.
@@ -1104,7 +1102,7 @@ export function QuestsPanel({
                             (data.areaQuestsUnlocked ??
                               (hasFocusFootprint ||
                                 completedEarlyObjectives >=
-                                  FOCUS_UNLOCK_TARGET));
+                                  EARLY_UNLOCK_STEP_TARGET));
                           const renderOnboardingCard = (quest: QuestProgressView) => (
                             <div
                               key={quest.id}
@@ -1259,6 +1257,7 @@ export function QuestsPanel({
                                 </p>
                               </div>
                               <div
+                                data-hint="start-focus-quest"
                                 className={cn(
                                   'mt-0.5',
                                   compactChooser
@@ -1288,17 +1287,10 @@ export function QuestsPanel({
                               </div>
                             </div>
                           );
-                          const gateQuest = (data.onboardingQuests ?? [])[0];
-                          const gateBlocks = gateQuest?.logic ?? [];
-                          const gateDone = gateBlocks.filter(
-                            (block) =>
-                              block.progress >= Math.max(1, block.target),
-                          ).length;
                           const dailyGroup = data.dailyQuestsGated ? (
                             <DailyQuestsLockedCard
-                              claimed={gateDone}
-                              total={gateBlocks.length}
-                              questName={gateQuest?.title}
+                              completedSteps={completedEarlyObjectives}
+                              targetSteps={EARLY_UNLOCK_STEP_TARGET}
                             />
                           ) : dailyQuests.length === 0 ? (
                               <PanelCard>No active daily quests here.</PanelCard>
@@ -1489,13 +1481,13 @@ export function QuestsPanel({
                                 <AreaQuestsTeaser
                                   completedSteps={
                                     ceremonyActive
-                                      ? FOCUS_UNLOCK_TARGET
+                                      ? EARLY_UNLOCK_STEP_TARGET
                                       : Math.min(
                                           completedEarlyObjectives,
-                                          FOCUS_UNLOCK_TARGET,
+                                          EARLY_UNLOCK_STEP_TARGET,
                                         )
                                   }
-                                  targetSteps={FOCUS_UNLOCK_TARGET}
+                                  targetSteps={EARLY_UNLOCK_STEP_TARGET}
                                   unlocking={areaUnlockCeremony === 'playing'}
                                 />
                               </div>
@@ -1518,6 +1510,23 @@ export function QuestsPanel({
                             focusSlot = focusContent;
                           }
 
+                          // The areas section normally waits for the starter
+                          // quest, but an onboarding objective that asks the
+                          // user to start an area quest needs it on screen.
+                          const onboardingWantsAreas = onboardingQuests.some(
+                            (quest) =>
+                              quest.logic.some(
+                                (block) =>
+                                  block.metricKey === 'focus_tag_linked' &&
+                                  block.progress <
+                                    Math.max(1, block.target),
+                              ),
+                          );
+                          const showFocusSlot =
+                            (data.firstOnboardingComplete ??
+                              !data.dailyQuestsGated) ||
+                            onboardingWantsAreas;
+
                           return (
                             <>
                               {/* Mobile: onboarding, daily checklist, focus hero + up-next shelf */}
@@ -1528,8 +1537,7 @@ export function QuestsPanel({
                                   </div>
                                 )}
                                 <div>{dailySection}</div>
-                                {(data.firstOnboardingComplete ??
-                                  !data.dailyQuestsGated) && focusSlot}
+                                {showFocusSlot && focusSlot}
                               </div>
 
                               {/* Desktop: left column stacks starter + daily, hero fills
@@ -1540,8 +1548,7 @@ export function QuestsPanel({
                                     {onboardingQuests.map(renderOnboardingCard)}
                                     {dailySection}
                                   </div>
-                                  {(data.firstOnboardingComplete ??
-                                    !data.dailyQuestsGated) && focusSlot}
+                                  {showFocusSlot && focusSlot}
                                 </div>
                               </div>
                             </>

@@ -26,7 +26,7 @@ const categoryCoverRef = (categoryId: string) =>
   `/api/quests/cover?type=category&id=${encodeURIComponent(categoryId)}`;
 
 const FREE_TAG_LIMIT = 6;
-const AREA_UNLOCK_STEP_TARGET = 6;
+const AREA_UNLOCK_STEP_TARGET = 5;
 const AREA_UNLOCK_LIFETIME_TASKS = 10;
 
 async function resolveAreaQuestsUnlocked(
@@ -49,11 +49,24 @@ async function resolveAreaQuestsUnlocked(
       sum + (task.completedDates?.length ?? 0) + (task.completed ? 1 : 0),
     0,
   );
+  // Escape hatch: when the only objectives left on screen ask the user to
+  // start an area quest, keeping areas locked would deadlock progression.
+  const visibleBlocks = [
+    ...(dashboard.onboardingQuests ?? []),
+    ...dashboard.dailyQuests,
+  ].flatMap((quest) => quest.logic);
+  const unmetBlocks = visibleBlocks.filter(
+    (block) => block.progress < Math.max(1, block.target),
+  );
+  const stuckOnAreaStart =
+    unmetBlocks.length > 0 &&
+    unmetBlocks.every((block) => block.metricKey === 'focus_tag_linked');
 
   const unlocked =
     hasFocusFootprint ||
     earlySteps >= AREA_UNLOCK_STEP_TARGET ||
-    lifetimeTaskCompletions >= AREA_UNLOCK_LIFETIME_TASKS;
+    lifetimeTaskCompletions >= AREA_UNLOCK_LIFETIME_TASKS ||
+    stuckOnAreaStart;
   if (!unlocked) return null;
   const unlockedAt = new Date();
   await UserModel.updateOne(

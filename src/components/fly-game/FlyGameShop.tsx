@@ -52,10 +52,10 @@ export function FlyGameShop({ open, onClose }: { open: boolean; onClose: () => v
       background,
     }));
     const owned = (entry: GameShopEntry) => entry.kind === 'item'
-      ? (data?.wardrobe.inventory[entry.id] ?? 0) > 0
-      : (backgroundData?.inventory[entry.id] ?? 0) > 0;
+      ? (data?.wardrobe?.inventory?.[entry.id] ?? 0) > 0
+      : (backgroundData?.inventory?.[entry.id] ?? 0) > 0;
     return [...clothing, ...backgrounds].filter((entry) => tab === 'inventory' ? owned(entry) : !owned(entry));
-  }, [backgroundData?.catalog, backgroundData?.inventory, data?.catalog, data?.wardrobe.inventory, tab]);
+  }, [backgroundData?.catalog, backgroundData?.inventory, data?.catalog, data?.wardrobe?.inventory, tab]);
 
   const showNotice = (text: string, error = false) => {
     setNotice({ text, error });
