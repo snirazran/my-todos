@@ -232,7 +232,7 @@ export default function FriendsPage() {
                 Invite friends
               </span>
               <span className="block text-[11px] font-bold text-white/80">
-                Send a skin · unlock rewards
+                They get an outfit · you get rewards
               </span>
             </span>
           </button>
@@ -283,28 +283,6 @@ export default function FriendsPage() {
             />
           </div>
 
-          {/* Pond report — what friends did for you today */}
-          {hasRealFriends && (
-            <div className="mb-5 grid w-full grid-cols-3 gap-2">
-              <StatTile
-                value={friends.length}
-                label={friends.length === 1 ? 'Friend' : 'Friends'}
-              />
-              <StatTile
-                value={receivedToday}
-                label="Flies for you today"
-                compactLabel="Flies today"
-                highlight
-              />
-              <StatTile
-                value={topStreak}
-                label="Top friend streak"
-                compactLabel="Best streak"
-                flame={topStreak > 0}
-              />
-            </div>
-          )}
-
           {/* Leaderboard — visible competition plus each friend's contribution. */}
           <div className="w-full">
             <div className="mb-2.5 flex items-center justify-between gap-2 px-1.5 min-[360px]:gap-3">
@@ -312,9 +290,37 @@ export default function FriendsPage() {
                 <h2 className="text-lg font-black tracking-tight text-foreground">
                   Today&apos;s pond
                 </h2>
-                <p className="whitespace-nowrap text-[10px] font-bold uppercase tracking-[0.11em] text-muted-foreground min-[360px]:text-[11px] min-[360px]:tracking-[0.14em]">
-                  Catches · tap for looks
-                </p>
+                {hasRealFriends ? (
+                  <p className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] font-bold text-muted-foreground">
+                    <span className="whitespace-nowrap">
+                      {friends.length}{' '}
+                      {friends.length === 1 ? 'friend' : 'friends'}
+                    </span>
+                    <span aria-hidden>·</span>
+                    <span
+                      className={cn(
+                        'whitespace-nowrap',
+                        receivedToday > 0 &&
+                          'text-emerald-600 dark:text-emerald-400',
+                      )}
+                    >
+                      +{receivedToday} to you today
+                    </span>
+                    {topStreak > 0 && (
+                      <>
+                        <span aria-hidden>·</span>
+                        <span className="flex items-center gap-0.5 whitespace-nowrap">
+                          <Flame className="h-3 w-3 fill-orange-400 text-orange-500" />
+                          {topStreak}d best
+                        </span>
+                      </>
+                    )}
+                  </p>
+                ) : (
+                  <p className="text-[11px] font-bold text-muted-foreground">
+                    Tap a frog to see their look
+                  </p>
+                )}
               </div>
               <button
                 type="button"
@@ -367,7 +373,8 @@ export default function FriendsPage() {
                           Your frog needs a crew
                         </p>
                         <p className="text-xs font-semibold text-muted-foreground">
-                          Compare looks and collect half their daily catch.
+                          Compare looks · earn half of each friend&apos;s daily
+                          catch
                         </p>
                       </div>
                       <button
@@ -515,51 +522,6 @@ function RemoveFriendDialog({
   );
 }
 
-function StatTile({
-  value,
-  label,
-  compactLabel,
-  highlight = false,
-  flame = false,
-}: {
-  value: number;
-  label: string;
-  compactLabel?: string;
-  highlight?: boolean;
-  flame?: boolean;
-}) {
-  return (
-    <div
-      className={cn(
-        'flex flex-col items-center justify-center rounded-2xl border px-1 py-2.5 text-center min-[360px]:px-2',
-        highlight
-          ? 'border-primary/30 bg-primary/10'
-          : 'border-border/50 bg-card/60',
-      )}
-    >
-      <span
-        className={cn(
-          'flex items-center gap-1 text-xl font-black tabular-nums leading-none tracking-tight',
-          highlight
-            ? 'text-emerald-600 dark:text-emerald-400'
-            : 'text-foreground',
-        )}
-      >
-        {flame && <Flame className="h-4 w-4 fill-orange-400 text-orange-500" />}
-        {value}
-      </span>
-      <span className="mt-1 text-[9px] font-bold uppercase leading-tight tracking-[0.08em] text-muted-foreground min-[360px]:text-[10px] min-[360px]:tracking-[0.1em]">
-        <span className={cn(compactLabel && 'min-[360px]:hidden')}>
-          {compactLabel ?? label}
-        </span>
-        {compactLabel && (
-          <span className="hidden min-[360px]:inline">{label}</span>
-        )}
-      </span>
-    </div>
-  );
-}
-
 function ClaimHeroCard({
   claimable,
   claiming,
@@ -579,10 +541,10 @@ function ClaimHeroCard({
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-black tracking-tight text-foreground">
-            No flies to claim yet
+            No flies from friends yet
           </p>
           <p className="text-xs font-semibold text-muted-foreground">
-            Come back as your friends finish tasks
+            You earn half of every friend&apos;s daily catch
           </p>
         </div>
       </div>
@@ -978,12 +940,12 @@ function InviteRewardBanner({
       </span>
       <div className="min-w-0 flex-1">
         <p className="text-[9px] font-black uppercase tracking-[0.1em] text-[#4f9149] min-[360px]:text-[11px] min-[360px]:tracking-[0.14em]">
-          Invite · gift · unlock
+          Friend rewards
         </p>
         <p className="text-xs font-black leading-tight tracking-tight text-foreground min-[360px]:text-sm sm:text-base">
           {nextReward
-            ? `${needed} more ${needed === 1 ? 'friend' : 'friends'} unlocks ${item?.name ?? nextReward.label}`
-            : 'Keep growing your pond'}
+            ? `${needed} more ${needed === 1 ? 'friend' : 'friends'} unlocks ${item?.name ?? 'your next reward'}`
+            : 'All rewards unlocked · keep the pond growing'}
         </p>
         <div className="mt-2 flex items-center gap-2">
           <span
@@ -1005,7 +967,8 @@ function InviteRewardBanner({
         </div>
         {pending > 0 && (
           <p className="mt-1 text-[10px] font-bold text-amber-600 dark:text-amber-400">
-            {pending} {pending === 1 ? 'gift is' : 'gifts are'} waiting to be claimed
+            {pending} {pending === 1 ? 'gift' : 'gifts'} sent · waiting to be
+            opened
           </p>
         )}
       </div>

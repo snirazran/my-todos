@@ -16,7 +16,8 @@ export type PriorityDebugEntry = {
 const REASON_EXPLANATIONS: Record<string, string> = {
   expiring: 'resets within 48h and not done',
   neglected: 'no progress for 3+ days',
-  'almost-there': '60%+ done',
+  'almost-there': 'under ~0.7 days of work left',
+  'streak-at-risk': 'an active run is lost if today is skipped',
 };
 
 function formatPart(name: string, value: number, weight: number, detail?: string) {
@@ -65,7 +66,14 @@ export function QuestPriorityDebug({
                 </span>
               </div>
               <div>
-                {formatPart('progress', result.proximity, PRIORITY_WEIGHTS.proximity, `${input.progress}/${input.target}`)}
+                {formatPart(
+                  'near',
+                  result.proximity,
+                  PRIORITY_WEIGHTS.proximity,
+                  input.remainingEffortDays !== undefined
+                    ? `${input.progress}/${input.target}, ~${input.remainingEffortDays.toFixed(1)}d work left`
+                    : `${input.progress}/${input.target}`,
+                )}
                 {' · '}
                 {formatPart('stale', result.staleness, PRIORITY_WEIGHTS.staleness, `${result.staleDays}d`)}
                 {' · '}
@@ -83,8 +91,16 @@ export function QuestPriorityDebug({
                   ? `reason: ${result.reason} (${REASON_EXPLANATIONS[result.reason]})`
                   : 'reason: none'}
                 {input.tierIndex !== undefined
-                  ? ` · tie-break: tier ${input.tierIndex + 1}, then ${remaining} to go`
-                  : ` · tie-break: ${remaining} to go`}
+                  ? ` · tie-break: tier ${input.tierIndex + 1}, then ${
+                      input.remainingEffortDays !== undefined
+                        ? `~${input.remainingEffortDays.toFixed(1)}d left`
+                        : `${remaining} to go`
+                    }`
+                  : ` · tie-break: ${
+                      input.remainingEffortDays !== undefined
+                        ? `~${input.remainingEffortDays.toFixed(1)}d left`
+                        : `${remaining} to go`
+                    }`}
                 {flags.length > 0 ? ` · ${flags.join(' · ')}` : ''}
               </div>
             </li>

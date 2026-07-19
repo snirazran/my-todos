@@ -11,7 +11,12 @@ export const PRIORITY_WEIGHTS = {
   urgency: 0.2,
 } as const;
 
-export type PriorityReason = 'expiring' | 'neglected' | 'almost-there' | null;
+export type PriorityReason =
+  | 'expiring'
+  | 'neglected'
+  | 'almost-there'
+  | 'streak-at-risk'
+  | null;
 
 export type PriorityInput = {
   placement: 'daily' | 'category' | 'onboarding';
@@ -21,6 +26,8 @@ export type PriorityInput = {
   tierIndex?: number;
   lastProgressAt?: string;
   expiresAt?: string;
+  remainingEffortDays?: number;
+  effortAtRiskDays?: number;
 };
 
 export type PriorityOptions = {
@@ -43,7 +50,15 @@ export function scoreQuestPriority(
   options?: PriorityOptions,
 ): PriorityResult {
   const target = Math.max(1, input.target);
-  const proximity = Math.min(1, Math.max(0, input.progress) / target);
+  const effortDays =
+    typeof input.remainingEffortDays === 'number' &&
+    input.remainingEffortDays >= 0
+      ? input.remainingEffortDays
+      : null;
+  const proximity =
+    effortDays !== null
+      ? 1 / (1 + effortDays)
+      : Math.min(1, Math.max(0, input.progress) / target);
 
   let staleDays = 0;
   if (input.placement === 'category' && input.lastProgressAt) {
@@ -69,17 +84,23 @@ export function scoreQuestPriority(
     }
   }
 
+  const atRiskDays = Math.max(0, input.effortAtRiskDays ?? 0);
+  const streakRisk = atRiskDays > 0 ? atRiskDays / (atRiskDays + 1) : 0;
+  if (streakRisk > urgency) urgency = streakRisk;
+
   const score =
     PRIORITY_WEIGHTS.proximity * proximity +
     PRIORITY_WEIGHTS.staleness * staleness +
     PRIORITY_WEIGHTS.urgency * urgency;
 
   let reason: PriorityReason = null;
-  if (urgency > 0 && proximity < 1) {
+  if (streakRisk > 0 && proximity < 1) {
+    reason = 'streak-at-risk';
+  } else if (urgency > 0 && proximity < 1) {
     reason = 'expiring';
   } else if (staleDays >= STALE_AFTER_DAYS) {
     reason = 'neglected';
-  } else if (proximity >= 0.6) {
+  } else if (proximity >= 0.6 && input.progress > 0) {
     reason = 'almost-there';
   }
 
@@ -100,11 +121,17 @@ export function compareQuestPriority(
   a: { input: PriorityInput; result: PriorityResult },
   b: { input: PriorityInput; result: PriorityResult },
 ): number {
+  const effortDiff =
+    a.input.remainingEffortDays !== undefined &&
+    b.input.remainingEffortDays !== undefined
+      ? a.input.remainingEffortDays - b.input.remainingEffortDays
+      : 0;
   return (
     Number(a.input.needsFocusTags ?? false) -
       Number(b.input.needsFocusTags ?? false) ||
     quantizeScore(b.result.score) - quantizeScore(a.result.score) ||
     (a.input.tierIndex ?? 0) - (b.input.tierIndex ?? 0) ||
+    effortDiff ||
     Math.max(1, a.input.target) -
       a.input.progress -
       (Math.max(1, b.input.target) - b.input.progress) ||
@@ -148,6 +175,9 @@ export function resetCountdownLabel(
 }
 
 export function priorityReasonLabel(result: PriorityResult): string | null {
+  if (result.reason === 'streak-at-risk') {
+    return 'Streak at risk!';
+  }
   if (result.reason === 'expiring') {
     return resetCountdownLabel(result.hoursUntilReset);
   }

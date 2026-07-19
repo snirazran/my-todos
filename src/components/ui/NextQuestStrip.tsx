@@ -176,7 +176,7 @@ export function NextQuestStrip({
           ? `mb-2 gap-3 rounded-2xl border p-3 shadow-sm ${objectiveCardTone(
               true,
             )} hover:bg-lime-100 dark:hover:bg-lime-500/20`
-          : 'mb-1.5 gap-2 rounded-full px-1 py-0.5 hover:bg-muted/30'
+          : 'mb-1.5 gap-2.5 rounded-xl px-1 py-1 hover:bg-muted/30'
       }`}
     >
       {showClaimable && claimable ? (
@@ -246,30 +246,27 @@ export function NextQuestStrip({
               </span>
             </div>
           ) : (
-            <ObjectiveProgressBar
-              className="min-w-0 flex-1"
-              heightClassName="h-8"
-              progress={displayNextUp.progress}
-              target={displayNextUp.target}
-              inlineLabel={
-                <>
+            <div className="flex min-w-0 flex-1 flex-col gap-1">
+              <span className="flex min-w-0 items-center text-[12px] font-black leading-tight text-foreground">
+                <span className="flex min-w-0 items-center truncate">
                   <ObjectiveLabel
                     label={displayNextUp.remainingLabel}
                     tags={displayNextUp.tags}
                     maxTags={1}
                   />
-                  {!fillingTrackable && nextUpReasonLabel ? (
-                    <span className="ml-1 shrink-0 whitespace-nowrap">
-                      · {nextUpReasonLabel}
-                    </span>
-                  ) : !fillingTrackable && nextUpResetLabel ? (
-                    <span className="ml-1 shrink-0 whitespace-nowrap">
-                      · {nextUpResetLabel}
-                    </span>
-                  ) : null}
-                </>
-              }
-            />
+                </span>
+                {!fillingTrackable && (nextUpReasonLabel || nextUpResetLabel) ? (
+                  <span className="ml-1.5 hidden shrink-0 whitespace-nowrap text-[10px] font-bold text-muted-foreground min-[400px]:inline">
+                    {nextUpReasonLabel ?? nextUpResetLabel}
+                  </span>
+                ) : null}
+              </span>
+              <ObjectiveProgressBar
+                heightClassName="h-4"
+                progress={displayNextUp.progress}
+                target={displayNextUp.target}
+              />
+            </div>
           )}
           {displayNextUp.hint && !displayNextUp.needsFocusTags ? (
             <span className="shrink-0" onClick={(event) => event.stopPropagation()}>
@@ -306,9 +303,10 @@ export function NextQuestStrip({
           reason: 'later tier of a quest already listed',
         }))}
         notes={[
-          'order: needs-tag last → onboarding first → score (2 decimals) → lower tier → fewest remaining → sooner reset',
+          'order: needs-tag last → score (2 decimals) → lower tier → least work left → fewest remaining → sooner reset',
+          'near = 1/(1 + days of work left): streak units cost their day count minus the live run, tasks ~0.1d, focus min ~0.01d',
           'pool: best objective per quest (onboarding + daily + areas)',
-          'urgency counts only when resetting sooner than half the pool median',
+          'urgency: reset sooner than half the pool median, or a streak run at risk today',
         ]}
       />
     </div>

@@ -730,6 +730,8 @@ export function QuestsPanel({
             tierIndex,
             lastProgressAt: quest.lastProgressAt,
             expiresAt: quest.expiresAt,
+            remainingEffortDays: block.remainingEffortDays,
+            effortAtRiskDays: block.effortAtRiskDays,
             quest,
           },
         ];

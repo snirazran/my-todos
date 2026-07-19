@@ -72,6 +72,7 @@ import { EditTaskDialog } from '@/components/ui/EditTaskDialog';
 import { TimePopup } from '@/components/ui/TimePopup';
 import { BuddyBadge } from '@/components/ui/BuddyBadge';
 import { objectiveCardTone } from '@/lib/questClaims';
+import { useNotification } from '@/components/providers/NotificationProvider';
 import { useUIStore } from '@/lib/uiStore';
 import { guideById } from '@/lib/hints/guides';
 import { format } from 'date-fns';
@@ -1639,6 +1640,7 @@ export default function TaskList({
     id: string;
     text: string;
   } | null>(null);
+  const { stackHeight: notificationStackHeight } = useNotification();
   const undoTimerRef = useRef<number | null>(null);
   const prevCompletedRef = useRef<Map<string, boolean> | null>(null);
 
@@ -2516,7 +2518,7 @@ export default function TaskList({
         {/* Add Task footer at the end of the list */}
         {(exitAction ||
           (tasks.length > 0 && sortedVisibleTasks.length > 0)) && (
-          <div className="p-1.5 pt-0 bg-card/40 md:p-2 md:pt-0">
+          <div className="p-1.5 pt-2 bg-card/40 md:p-2 md:pt-2.5">
             <button
               onClick={() => onAddRequested('', null, { preselectToday: true })}
               disabled={quickAddOpen}
@@ -2839,7 +2841,22 @@ export default function TaskList({
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 16 }}
                 transition={{ type: 'spring', stiffness: 500, damping: 34 }}
-                className="pointer-events-none fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+84px)] z-[9980] flex justify-center px-4 md:bottom-6"
+                className="pointer-events-none fixed inset-x-0 z-[9980] flex justify-center px-4 bottom-[var(--undo-bottom)] md:bottom-[var(--undo-bottom-md)]"
+                style={
+                  {
+                    '--undo-bottom': `calc(env(safe-area-inset-bottom) + ${
+                      notificationStackHeight > 0
+                        ? 80 + notificationStackHeight
+                        : 84
+                    }px)`,
+                    '--undo-bottom-md': `${
+                      notificationStackHeight > 0
+                        ? 28 + notificationStackHeight
+                        : 24
+                    }px`,
+                    transition: 'bottom 200ms ease',
+                  } as React.CSSProperties
+                }
               >
                 <div className="pointer-events-auto flex w-full max-w-sm items-center gap-2.5 rounded-2xl border border-border/60 bg-popover py-1.5 pl-3 pr-1.5 shadow-lg">
                   <CheckCircle2 className="h-5 w-5 shrink-0 text-green-500" />

@@ -3,7 +3,8 @@ import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import UserModel from '@/lib/models/User';
 import { buildRewardCatalog, syncQuestState } from '@/lib/quests/engine';
-import { loadStreakConfig, syncDailyStreak } from '@/lib/quests/streak';
+import { loadStreakConfig, previousDayKey, syncDailyStreak } from '@/lib/quests/streak';
+import { parseTaskStreakDays } from '@/lib/quests/metrics';
 import { loadMoveToWebConfig, syncMoveToWeb } from '@/lib/quests/moveToWeb';
 import { getActiveQuestSeasonView } from '@/lib/quests/seasons';
 import { getZonedToday } from '@/lib/utils';
@@ -152,7 +153,85 @@ type TrackableEntry = {
   guideContext?: import('@/lib/hints/guides').HintGuideContext;
   lastProgressAt?: string;
   expiresAt?: string;
+  remainingEffortDays?: number;
+  effortAtRiskDays?: number;
 };
+
+const TASK_UNIT_EFFORT_DAYS = 0.1;
+const FOCUS_MINUTE_EFFORT_DAYS = 0.01;
+
+type EffortTask = {
+  type?: string;
+  tags?: string[];
+  completedDates?: string[];
+};
+
+function bestStreakRun(
+  tasks: EffortTask[],
+  todayKey: string,
+  tagIds?: string[],
+): { runDays: number; completedToday: boolean } {
+  const wanted = tagIds?.length ? new Set(tagIds) : null;
+  let best = { runDays: 0, completedToday: false };
+  for (const task of tasks) {
+    if (task.type !== 'weekly') continue;
+    if (wanted && !task.tags?.some((tagId) => wanted.has(tagId))) continue;
+    const dates = new Set(task.completedDates ?? []);
+    const completedToday = dates.has(todayKey);
+    let runDays = completedToday ? 1 : 0;
+    let day = previousDayKey(todayKey);
+    while (dates.has(day)) {
+      runDays += 1;
+      day = previousDayKey(day);
+    }
+    if (
+      runDays > best.runDays ||
+      (runDays === best.runDays && completedToday && !best.completedToday)
+    ) {
+      best = { runDays, completedToday };
+    }
+  }
+  return best;
+}
+
+// Rough "days of work left" per objective so priority ranking can compare a
+// two-tap task quest against a multi-day streak on the same scale. A streak
+// unit costs its full day count minus the user's live run; everything else is
+// a same-day action.
+function objectiveEffort(
+  block: {
+    type?: string;
+    metricKey?: string;
+    target?: number;
+    progress?: number;
+  },
+  tasks: EffortTask[],
+  todayKey: string,
+  tagIds?: string[],
+): { remainingEffortDays: number; effortAtRiskDays: number } {
+  const target = Math.max(1, block.target ?? 1);
+  const remainingUnits = Math.max(1, target - Math.max(0, block.progress ?? 0));
+  const streakDays = parseTaskStreakDays(block.metricKey);
+  if (block.type === 'metric_count' && streakDays !== null) {
+    const { runDays, completedToday } = bestStreakRun(tasks, todayKey, tagIds);
+    const credit = runDays >= streakDays ? 0 : runDays;
+    return {
+      remainingEffortDays:
+        streakDays - credit + (remainingUnits - 1) * streakDays,
+      effortAtRiskDays: completedToday ? 0 : credit,
+    };
+  }
+  if (block.type === 'focus_minutes') {
+    return {
+      remainingEffortDays: remainingUnits * FOCUS_MINUTE_EFFORT_DAYS,
+      effortAtRiskDays: 0,
+    };
+  }
+  return {
+    remainingEffortDays: remainingUnits * TASK_UNIT_EFFORT_DAYS,
+    effortAtRiskDays: 0,
+  };
+}
 
 function objectiveRemainingLabel(
   block: {
@@ -387,6 +466,25 @@ export async function GET(req: Request) {
       }
     }
     const trackables: TrackableEntry[] = [];
+    const effortTodayKey = getZonedToday(timezone);
+    const withBlockEffort = <
+      T extends { categoryId?: string; logic: any[] },
+    >(
+      quest: T,
+    ): T => ({
+      ...quest,
+      logic: quest.logic.map((block) => ({
+        ...block,
+        ...objectiveEffort(
+          block,
+          dashboard.tasks,
+          effortTodayKey,
+          block.tagMode === 'focus_category_tags'
+            ? questFocusTags(quest).map((tag) => tag.id)
+            : undefined,
+        ),
+      })),
+    });
     for (const quest of [...(dashboard.onboardingQuests ?? []), ...dashboard.dailyQuests, ...dashboard.categoryQuests]) {
       if (quest.claimed || quest.locked) continue;
       for (let tierIndex = 0; tierIndex < quest.logic.length; tierIndex++) {
@@ -425,6 +523,14 @@ export async function GET(req: Request) {
             questFocusTags(quest).length === 0,
           progress: Math.max(0, block.progress),
           target,
+          ...objectiveEffort(
+            block,
+            dashboard.tasks,
+            effortTodayKey,
+            block.tagMode === 'focus_category_tags'
+              ? questFocusTags(quest).map((tag) => tag.id)
+              : undefined,
+          ),
           reward: block.rewards?.[0],
           lastProgressAt: quest.lastProgressAt,
           expiresAt: quest.expiresAt,
@@ -553,16 +659,16 @@ export async function GET(req: Request) {
         macroCategories: lightMacroCategories,
         activeSeason,
         dailyQuests: dashboard.dailyQuests.map((q) =>
-          withTemplateCover(q, dashboard.templatesWithCover),
+          withBlockEffort(withTemplateCover(q, dashboard.templatesWithCover)),
         ),
         dailyQuestsGated: dashboard.dailyQuestsGated,
         firstOnboardingComplete: dashboard.firstOnboardingComplete,
         earlyObjectiveSteps: dashboard.earlyObjectiveSteps,
         categoryQuests: dashboard.categoryQuests.map((q) =>
-          withTemplateCover(q, dashboard.templatesWithCover),
+          withBlockEffort(withTemplateCover(q, dashboard.templatesWithCover)),
         ),
         onboardingQuests: (dashboard.onboardingQuests ?? []).map((q) =>
-          withTemplateCover(q, dashboard.templatesWithCover),
+          withBlockEffort(withTemplateCover(q, dashboard.templatesWithCover)),
         ),
         unlockedAnimationIds: dashboard.focusProfile.unlockedAnimationIds ?? [],
         rewardCatalog: {

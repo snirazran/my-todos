@@ -60,6 +60,8 @@ export type Trackable = {
   guideContext?: import('@/lib/hints/guides').HintGuideContext;
   lastProgressAt?: string;
   expiresAt?: string;
+  remainingEffortDays?: number;
+  effortAtRiskDays?: number;
 };
 
 type ShowNotification = (
@@ -535,7 +537,6 @@ export function ObjectiveProgressBar({
   className,
   haptics = true,
   heightClassName = 'h-5',
-  inlineLabel,
 }: {
   progress: number;
   target: number;
@@ -544,7 +545,6 @@ export function ObjectiveProgressBar({
   className?: string;
   haptics?: boolean;
   heightClassName?: string;
-  inlineLabel?: React.ReactNode;
 }) {
   const safeTarget = Math.max(1, target);
   const pct = Math.min(100, (Math.max(0, progress) / safeTarget) * 100);
@@ -562,17 +562,8 @@ export function ObjectiveProgressBar({
       {targetLabel ?? target}
     </>
   );
-  const overlayClass = inlineLabel
-    ? 'absolute inset-0 flex items-center justify-between gap-2 px-3 text-[11px] font-black tabular-nums'
-    : 'absolute inset-0 flex items-center justify-center text-[10px] font-black tabular-nums';
-  const overlayContent = inlineLabel ? (
-    <>
-      <span className="flex min-w-0 items-center truncate">{inlineLabel}</span>
-      <span className="shrink-0">{countLabel}</span>
-    </>
-  ) : (
-    countLabel
-  );
+  const overlayClass =
+    'absolute inset-0 flex items-center justify-center text-[10px] font-black tabular-nums';
   return (
     <div
       className={`relative ${heightClassName} overflow-hidden rounded-full bg-muted ${className ?? ''}`}
@@ -595,7 +586,7 @@ export function ObjectiveProgressBar({
         />
       )}
       <span className={`${overlayClass} text-foreground/70`}>
-        {overlayContent}
+        {countLabel}
       </span>
       {/* Same label clipped to the filled width, in a dark tone that reads
           on the lime/amber bar regardless of theme. */}
@@ -604,7 +595,7 @@ export function ObjectiveProgressBar({
         className={`${overlayClass} ${done ? 'text-lime-950' : 'text-amber-950'}`}
         style={{ clipPath: `inset(0 ${100 - pct}% 0 0)` }}
       >
-        {overlayContent}
+        {countLabel}
       </span>
     </div>
   );
