@@ -50,6 +50,7 @@
     "@revenuecat/purchases-js": "^1.47.0",
     "@rive-app/canvas-lite": "2.37.2",
     "@rive-app/react-canvas-lite": "^4.28.1",
+    "@sentry/nextjs": "^10.66.0",
     "@types/canvas-confetti": "^1.9.0",
     "array-move": "^4.0.0",
     "bcryptjs": "^3.0.2",

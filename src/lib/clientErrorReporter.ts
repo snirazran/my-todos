@@ -1,5 +1,7 @@
 'use client';
 
+import * as Sentry from '@sentry/nextjs';
+
 const STORAGE_KEY = 'frogress.diag';
 const MAX_REPORTS = 10;
 const HEARTBEAT_MS = 15_000;
@@ -31,10 +33,17 @@ function writeState(state: DiagState) {
 
 function send(type: string, data: Record<string, unknown>) {
   if (reportsSent >= MAX_REPORTS) return;
-  const key = `${type}:${data.message ?? data.src ?? ''}`;
+  const key = `${type}:${String(data.message ?? data.src ?? '')}`;
   if (seen.has(key)) return;
   seen.add(key);
   reportsSent += 1;
+
+  if (type === 'boot_failed' || type === 'abnormal_end' || type === 'resource_error') {
+    Sentry.captureMessage(`client-log:${type}`, {
+      level: 'error',
+      extra: data,
+    });
+  }
 
   const platform = (
     window as typeof window & {

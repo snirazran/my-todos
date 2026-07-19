@@ -370,7 +370,8 @@
       "WebFetch(domain:firebase.blog)",
       "Bash(awk 'NR>=1040 && NR<=1150' /Users/snirazran/Fullstack/my-todos/src/components/ui/siteHeader.tsx)",
       "Bash(awk 'NR>=985 && NR<=1000' /Users/snirazran/Fullstack/my-todos/src/components/ui/siteHeader.tsx)",
-      "Bash(awk 'NR>=1400 && NR<=1620 && \\(/return \\\\{/ || /^  \\\\};/ || /tasks,/ || /user,/ || /dailyQuests/ || /onboardingQuests/ || /categoryQuests/\\)' /Users/snirazran/Fullstack/my-todos/src/lib/quests/engine.ts)"
+      "Bash(awk 'NR>=1400 && NR<=1620 && \\(/return \\\\{/ || /^  \\\\};/ || /tasks,/ || /user,/ || /dailyQuests/ || /onboardingQuests/ || /categoryQuests/\\)' /Users/snirazran/Fullstack/my-todos/src/lib/quests/engine.ts)",
+      "WebFetch(domain:docs.sentry.io)"
     ]
   }
 }

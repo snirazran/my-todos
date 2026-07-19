@@ -1,5 +1,6 @@
 // next.config.mjs
 import { networkInterfaces } from 'node:os';
+import { withSentryConfig } from '@sentry/nextjs';
 
 // When the Capacitor app loads from this dev server over the LAN (CAP_DEV mode),
 // requests for HMR/_next resources arrive with the machine's LAN IP as origin.
@@ -163,4 +164,13 @@ const nextConfig = {
   },
 };
 
-export default nextConfig;
+export default withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  silent: true,
+  widenClientFileUpload: true,
+  tunnelRoute: '/monitoring',
+  webpack: { treeshake: { removeDebugLogging: true } },
+  telemetry: false,
+});
