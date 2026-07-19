@@ -24,6 +24,7 @@ import { QuestRewardRevealHost } from '@/components/ui/questRewardReveal';
 import { ButtonHaptics } from '@/components/providers/ButtonHaptics';
 import { FlyGameClaimer } from '@/components/providers/FlyGameClaimer';
 import { FocusTimerLauncher } from '@/components/providers/FocusTimerLauncher';
+import { ErrorReporter } from '@/components/providers/ErrorReporter';
 
 export default function Providers({ children }: { children: ReactNode }) {
   return (
@@ -42,6 +43,7 @@ export default function Providers({ children }: { children: ReactNode }) {
       >
         <TaskSyncProvider>
           <NotificationProvider>
+            <ErrorReporter />
             <ButtonHaptics />
             <AnalyticsProvider />
             <GlobalTimer />
