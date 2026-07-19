@@ -84,6 +84,11 @@ export default function RootLayout({
       className={`h-full ${poppins.variable} ${luckiestGuy.variable} ${heebo.variable}`}
     >
       <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){var errs=[];window.__bootErrs=errs;addEventListener('error',function(e){var t=e.target;if(t&&t!==window&&(t.src||t.href)){errs.push(String(t.src||t.href).slice(0,200))}else if(e.message){errs.push(String(e.message).slice(0,200))}},true);window.__bootPing=setTimeout(function(){try{navigator.sendBeacon('/api/client-log',JSON.stringify({type:'boot_stalled',readyState:document.readyState,errs:errs.slice(0,10),url:location.href,ua:navigator.userAgent,t:Date.now()}))}catch(e){}},10000)})();`,
+          }}
+        />
         {/* Preload the default page background so it paints without a flash.
             Responsive: only the matching breakpoint is fetched. */}
         <link

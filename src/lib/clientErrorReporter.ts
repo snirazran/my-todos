@@ -71,6 +71,9 @@ export function installClientErrorReporter() {
   if (installed || typeof window === 'undefined') return;
   installed = true;
 
+  const bootPing = (window as typeof window & { __bootPing?: number }).__bootPing;
+  if (bootPing) clearTimeout(bootPing);
+
   const prev = readState();
   if (prev.bootPending) {
     send('boot_failed', {

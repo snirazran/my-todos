@@ -7,6 +7,7 @@ const REPORT_TYPES = new Set([
   'resource_error',
   'boot_failed',
   'abnormal_end',
+  'boot_stalled',
 ]);
 
 export async function POST(req: NextRequest) {
