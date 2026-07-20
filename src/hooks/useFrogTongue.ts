@@ -52,6 +52,8 @@ export interface UseFrogTongueOptions {
   flyRefs: React.MutableRefObject<Record<string, HTMLElement | null>>;
   scrollContainerRef?: React.RefObject<HTMLElement | null>;
   trackMovingTarget?: boolean;
+  /** Allow the tongue animation to pan the page when frog/target is offscreen. */
+  allowCameraFollow?: boolean;
   durationMs?: number;
   originYOffset?: number;
   keepTargetHiddenUntilPersist?: boolean;
@@ -71,6 +73,7 @@ export function useFrogTongue({
   flyRefs,
   scrollContainerRef,
   trackMovingTarget = false,
+  allowCameraFollow = true,
   durationMs = TONGUE_MS,
   originYOffset = ORIGIN_Y_ADJ,
   keepTargetHiddenUntilPersist = false,
@@ -258,7 +261,7 @@ export function useFrogTongue({
           flyR.left < window.innerWidth && flyR.right > 0;
       }
 
-      const needCine = frogRatio < 0.75 || !flyVisible;
+      const needCine = allowCameraFollow && (frogRatio < 0.75 || !flyVisible);
       speedRef.current = 1;
       setCinematic(true);
 
@@ -306,7 +309,7 @@ export function useFrogTongue({
         onPersist,
       });
     },
-    [cinematic, grab, durationMs, flyRefs, frogBoxRef, getFlyDoc, getMouthDoc],
+    [allowCameraFollow, cinematic, grab, durationMs, flyRefs, frogBoxRef, getFlyDoc, getMouthDoc],
   );
 
   /* ================================================================= */

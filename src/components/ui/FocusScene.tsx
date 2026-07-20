@@ -40,6 +40,9 @@ export function FocusScene({
   onGainLand,
   suspended = false,
   onFrogReady,
+  scrollContainerRef,
+  trackMovingTarget = false,
+  allowCameraFollow = true,
 }: {
   indices?: Partial<Record<WardrobeSlot, number>>;
   running: boolean;
@@ -55,6 +58,10 @@ export function FocusScene({
   suspended?: boolean;
   /** Fires once the live frog canvas is visible (rive loaded + dressed). */
   onFrogReady?: () => void;
+  /** Keeps tongue geometry locked to a scrolling host while a catch is active. */
+  scrollContainerRef?: React.RefObject<HTMLElement | null>;
+  trackMovingTarget?: boolean;
+  allowCameraFollow?: boolean;
 }) {
   const frogRef = useRef<FrogHandle | null>(null);
   const frogBoxRef = useRef<HTMLDivElement | null>(null);
@@ -112,6 +119,9 @@ export function FocusScene({
       frogBoxRef,
       flyRefs,
       durationMs: 950,
+      scrollContainerRef,
+      trackMovingTarget,
+      allowCameraFollow,
     });
 
   const flyCount = sceneFlyCount(focusSeconds);

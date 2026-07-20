@@ -165,6 +165,7 @@ export default function SiteHeader() {
           </MobileHeaderActions>
         )}
       <header
+        data-app-site-header
         className={cn(
           'relative z-[90] hidden w-full h-16 bg-background/95 backdrop-blur-xl md:block',
           pathname !== '/planner' &&

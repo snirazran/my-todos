@@ -25,6 +25,7 @@ export default function DayColumn({
   showCompleted = true,
   onShowCompletedChange,
   onAddClick,
+  disableVerticalScroll = false,
 }: {
   title: string;
   count?: number;
@@ -45,6 +46,8 @@ export default function DayColumn({
   onShowCompletedChange?: (show: boolean) => void;
   /** When provided, renders a + button in the header that triggers add-task for this column. */
   onAddClick?: () => void;
+  /** Keep the task surface fully expanded instead of making it its own scroller. */
+  disableVerticalScroll?: boolean;
 }) {
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -180,8 +183,10 @@ export default function DayColumn({
         layoutScroll
         ref={listRef}
         className={[
-          'flex-1 px-0.5 pt-1 overflow-y-auto overflow-x-hidden transition-colors rounded-xl',
-          'no-scrollbar touch-auto overscroll-y-contain',
+          'flex-1 px-0.5 pt-1 overflow-x-hidden transition-colors rounded-xl',
+          disableVerticalScroll
+            ? 'overflow-y-visible touch-pan-x'
+            : 'overflow-y-auto no-scrollbar touch-auto overscroll-y-contain',
           'pb-[env(safe-area-inset-bottom)]',
         ].join(' ')}
       >

@@ -11,31 +11,20 @@ export async function middleware(req: NextRequest) {
     req.nextUrl.pathname.startsWith('/auth') ||
     req.nextUrl.pathname.startsWith('/api/auth');
 
-  // If user is not authenticated and tries to access protected route
-  // We'll let the client handle some redirects, but for critical paths we can redirect here.
-  // actually, let's keep the logic simple: if not auth and not on auth route, redirect to login.
-  // BUT we need to be careful about public assets or api routes that don't need auth.
-  // The config matcher handles specific paths.
-
   // Onboarding runs before any account exists (account creation is deferred to
   // the final step), so it must be reachable regardless of auth state.
   if (req.nextUrl.pathname.startsWith('/onboarding')) {
     return NextResponse.next();
   }
 
-  // Allow logged-out users to preview the home page via /?guest=1
-  const isGuestPreview =
-    req.nextUrl.pathname === '/' && req.nextUrl.searchParams.has('guest');
+  // The root route serves a public product homepage to signed-out visitors and
+  // the task dashboard to authenticated users. Keep it reachable so OAuth
+  // reviewers and prospective users can understand the app without an account.
+  const isPublicHomepage = req.nextUrl.pathname === '/';
 
-  if (!isAuth && !isAuthRoute && !isGuestPreview) {
+  if (!isAuth && !isAuthRoute && !isPublicHomepage) {
     // Check if it's a public path or asset not caught by matcher
     // For now, rely on config matcher to only run on protected routes.
-    // But wait, matcher includes '/' which is home.
-    // If home is protected, then redirect.
-    // If home is public, we shouldn't redirect.
-
-    // Original logic: if (!isAuth && !isAuthRoute) -> redirect login.
-    // This implies home '/' requires login.
     const welcomeUrl = new URL('/welcome', req.url);
     const ref = req.nextUrl.searchParams.get('ref');
     const friend = req.nextUrl.searchParams.get('friend');
@@ -59,11 +48,6 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  // Be specific to avoid blocking static assets or other open routes
+  // Be specific to avoid blocking static assets and public routes.
   matcher: ['/', '/manage-tasks/:path*', '/api/user/:path*', '/welcome', '/login', '/register', '/onboarding'],
-  // Exclude public api routes if any? /api/auth is in isAuthRoute check.
-  // Note: /api/skins usually requires auth but maybe we handle it in route?
-  // Let's protect /api/skins as well if possible, or leave it to route handler.
-  // Original matcher was ['/manage-tasks/:path*', '/api/:path*', '/']
-  // If '/' is protected, then yes, keep it.
 };

@@ -73,6 +73,17 @@
   }
 }
 
+/* The signed-out root is a standalone marketing page. App chrome is mounted in
+   the shared layout, so hide it whenever that server-rendered page is present. */
+body:has([data-public-home]) [data-app-site-header],
+body:has([data-public-home]) [data-app-bottom-nav] {
+  display: none;
+}
+
+body:has([data-public-home]) #main-scroll {
+  padding-bottom: 0;
+}
+
 @layer base {
   * {
     @apply border-border;
@@ -180,6 +191,7 @@
     transform: translateY(-7px);
   }
 }
+
 /* Ambient version: one sweep, then rest for most of the cycle. */
 @keyframes bar-shine-idle {
   0% {

@@ -23,7 +23,7 @@ export function LegalPage({
       <section className="mx-auto flex w-full max-w-4xl flex-col px-5 py-10 sm:px-8 md:py-14">
         <div className="mb-8">
           <Link
-            href="/welcome"
+            href="/"
             className="text-sm font-bold text-primary underline-offset-4 hover:underline"
           >
             Back to Frogress

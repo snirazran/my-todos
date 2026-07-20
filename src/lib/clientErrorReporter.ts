@@ -2,7 +2,8 @@
 
 import * as Sentry from '@sentry/nextjs';
 
-const STORAGE_KEY = 'frogress.diag';
+const STORAGE_KEY = 'frogress.diag.v2';
+const LEGACY_STORAGE_KEY = 'frogress.diag';
 const MAX_REPORTS = 10;
 const HEARTBEAT_MS = 15_000;
 
@@ -19,7 +20,7 @@ const seen = new Set<string>();
 
 function readState(): DiagState {
   try {
-    return JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}');
+    return JSON.parse(window.sessionStorage.getItem(STORAGE_KEY) ?? '{}');
   } catch {
     return {};
   }
@@ -27,7 +28,13 @@ function readState(): DiagState {
 
 function writeState(state: DiagState) {
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch {}
+}
+
+function clearLegacyState() {
+  try {
+    window.localStorage.removeItem(LEGACY_STORAGE_KEY);
   } catch {}
 }
 
@@ -75,7 +82,7 @@ export function installClientErrorReporter() {
   if (bootPing) clearTimeout(bootPing);
 
   const prev = readState();
-  if (prev.bootPending) {
+  if (prev.bootPending && !prev.endedClean) {
     send('boot_failed', {
       startedAt: prev.bootPending.t,
       startUrl: prev.bootPending.url,
@@ -91,6 +98,7 @@ export function installClientErrorReporter() {
     bootPending: { t: Date.now(), url: window.location.pathname },
   };
   writeState(state);
+  clearLegacyState();
 
   const heartbeat = () => {
     state.lastBeat = Date.now();
@@ -99,16 +107,30 @@ export function installClientErrorReporter() {
     writeState(state);
   };
 
-  requestAnimationFrame(() =>
-    requestAnimationFrame(() => {
-      delete state.bootPending;
-      heartbeat();
-    }),
-  );
+  const markBootComplete = () => {
+    delete state.bootPending;
+    heartbeat();
+  };
+
+  if (document.visibilityState === 'visible') {
+    requestAnimationFrame(() => requestAnimationFrame(markBootComplete));
+  } else {
+    // Animation frames are paused in background tabs and native webviews. The
+    // reporter mounting already proves React booted, so do not leave a marker
+    // that would turn a later process termination into a false boot failure.
+    markBootComplete();
+  }
 
   window.setInterval(heartbeat, HEARTBEAT_MS);
-  document.addEventListener('visibilitychange', heartbeat);
+  document.addEventListener('visibilitychange', () => {
+    if (state.bootPending && document.visibilityState !== 'visible') {
+      markBootComplete();
+      return;
+    }
+    heartbeat();
+  });
   window.addEventListener('pagehide', () => {
+    delete state.bootPending;
     state.lastBeat = Date.now();
     state.endedClean = true;
     writeState(state);
