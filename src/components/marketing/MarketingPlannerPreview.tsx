@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { GripVertical } from 'lucide-react';
 import DayColumn from '@/components/board/DayColumn';
 import TaskCard from '@/components/board/TaskCard';
@@ -114,6 +114,7 @@ function RealTaskPreview({
       }}
       hiddenWhileDragging={false}
       isRepeating={task.repeatMode !== undefined && task.repeatMode !== 'none'}
+      touchAction={task.completed ? 'auto' : 'none'}
       userTags={userTags}
       isAnyDragging={dragging}
       compact
@@ -212,18 +213,30 @@ export function MarketingPlannerPreview() {
     registerOverlayEl,
   } = useDragManager();
   const { panActive, startPanIfEligible, onPanMove, endPan } = usePan(scrollerRef);
+  const dragRef = useRef(drag);
+  const targetDayRef = useRef(targetDay);
+  const targetIndexRef = useRef(targetIndex);
+  const dropInFlightRef = useRef(false);
+  dragRef.current = drag;
+  targetDayRef.current = targetDay;
+  targetIndexRef.current = targetIndex;
 
   const finishDrop = useCallback(() => {
-    if (!drag) return;
-    const destinationDay = targetDay ?? drag.fromDay;
-    const destinationIndex = targetIndex ?? drag.fromIndex;
+    const currentDrag = dragRef.current;
+    if (!currentDrag || dropInFlightRef.current) return;
+    dropInFlightRef.current = true;
+    const destinationDay = targetDayRef.current ?? currentDrag.fromDay;
+    const destinationIndex = targetIndexRef.current ?? currentDrag.fromIndex;
     const slot = document.querySelector<HTMLElement>('[data-drop-placeholder]');
 
     settleAndEnd(slot?.getBoundingClientRect() ?? null, () => {
       setDays((current) => {
-        const movingTask = current[drag.fromDay]?.tasks.find((task) => task.id === drag.taskId);
+        const movingTask = current[currentDrag.fromDay]?.tasks.find((task) => task.id === currentDrag.taskId);
         if (!movingTask || !current[destinationDay]) return current;
-        const next = current.map((day) => ({ ...day, tasks: day.tasks.filter((task) => task.id !== drag.taskId) }));
+        const next = current.map((day) => ({
+          ...day,
+          tasks: day.tasks.filter((task) => task.id !== currentDrag.taskId),
+        }));
         const destination = [...next[destinationDay].tasks];
         destination.splice(Math.max(0, Math.min(destinationIndex, destination.length)), 0, movingTask);
         next[destinationDay] = {
@@ -233,17 +246,19 @@ export function MarketingPlannerPreview() {
         return next;
       });
       endDrag();
+      dropInFlightRef.current = false;
     });
-  }, [drag, endDrag, settleAndEnd, targetDay, targetIndex]);
+  }, [endDrag, settleAndEnd]);
 
   useEffect(() => {
-    if (!drag?.active) return;
+    if (!drag?.active) {
+      dropInFlightRef.current = false;
+      return;
+    }
     const handleUp = () => finishDrop();
     window.addEventListener('pointerup', handleUp, { passive: true });
-    window.addEventListener('touchend', handleUp, { passive: true });
     return () => {
       window.removeEventListener('pointerup', handleUp);
-      window.removeEventListener('touchend', handleUp);
     };
   }, [drag?.active, finishDrop]);
 
@@ -313,6 +328,26 @@ export function MarketingPlannerPreview() {
           frogodoroSession={drag.frogodoroSession}
         />
       ) : null}
+
+      <style jsx global>{`
+        html.dragging,
+        html.dragging body {
+          touch-action: none !important;
+          overscroll-behavior: none !important;
+          overflow: hidden !important;
+          user-select: none !important;
+          -webkit-user-select: none !important;
+        }
+        html.dragging [data-role='board-scroller'] {
+          touch-action: none !important;
+          overflow: hidden !important;
+          scroll-snap-type: none !important;
+          overscroll-behavior: none !important;
+        }
+        html.dragging [data-card-id] {
+          touch-action: none !important;
+        }
+      `}</style>
     </div>
   );
 }
