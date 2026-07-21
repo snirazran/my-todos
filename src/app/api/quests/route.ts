@@ -449,7 +449,21 @@ export async function GET(req: Request) {
     const claimables: ClaimableEntry[] = [];
     for (const quest of [...(dashboard.onboardingQuests ?? []), ...dashboard.dailyQuests, ...dashboard.categoryQuests]) {
       if (quest.claimed || quest.locked) continue;
+      const activeOnboardingObjectiveId =
+        quest.placement === 'onboarding'
+          ? quest.logic.find(
+              (block) =>
+                (block.rewards?.length ?? 0) > 0 &&
+                !quest.claimedObjectiveIds.includes(block.id),
+            )?.id
+          : null;
       for (const block of quest.logic) {
+        if (
+          quest.placement === 'onboarding' &&
+          block.id !== activeOnboardingObjectiveId
+        ) {
+          continue;
+        }
         if (
           (block.rewards?.length ?? 0) > 0 &&
           block.progress >= block.target &&
@@ -500,8 +514,22 @@ export async function GET(req: Request) {
     });
     for (const quest of [...(dashboard.onboardingQuests ?? []), ...dashboard.dailyQuests, ...dashboard.categoryQuests]) {
       if (quest.claimed || quest.locked) continue;
+      const activeOnboardingObjectiveId =
+        quest.placement === 'onboarding'
+          ? quest.logic.find(
+              (block) =>
+                (block.rewards?.length ?? 0) > 0 &&
+                !quest.claimedObjectiveIds.includes(block.id),
+            )?.id
+          : null;
       for (let tierIndex = 0; tierIndex < quest.logic.length; tierIndex++) {
         const block = quest.logic[tierIndex];
+        if (
+          quest.placement === 'onboarding' &&
+          block.id !== activeOnboardingObjectiveId
+        ) {
+          continue;
+        }
         const target = Math.max(1, block.target);
         if ((block.rewards?.length ?? 0) === 0) continue;
         if (block.progress >= target) continue;

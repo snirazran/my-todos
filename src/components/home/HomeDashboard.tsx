@@ -689,10 +689,10 @@ export default function HomeDashboard() {
 
           <div
             data-fly-sheet
-            className="relative z-20 -mx-3 mt-[14px] flex flex-col gap-2 rounded-t-[24px] bg-background px-1.5 pt-5 md:mx-auto md:mt-14 md:w-full md:max-w-2xl md:px-8 lg:gap-4"
+            className="relative z-20 -mx-3 mt-[14px] flex flex-col gap-2 rounded-t-[24px] bg-background px-1.5 pt-5 md:mx-auto md:mt-14 md:w-full md:max-w-3xl md:rounded-none md:bg-transparent md:px-8 md:pb-8 md:pt-7 xl:px-10"
             style={{ pointerEvents: taskCinematic ? 'none' : 'auto' }}
           >
-            <div className="flex flex-col gap-2 w-full">
+            <div className="flex w-full flex-col gap-2 md:gap-5">
               <GuestAccountBanner />
               {user && (
                 <NextQuestStrip
@@ -702,9 +702,9 @@ export default function HomeDashboard() {
                   isPremium={isPremium}
                 />
               )}
-              <div className="min-h-[360px] pb-16" ref={taskListRef}>
+              <div className="min-h-[360px] pb-16 md:pb-4" ref={taskListRef}>
                 {renderGuestPrompt()}
-                <div className="mb-2 flex items-center justify-between px-2 md:px-0">
+                <div className="mb-2 flex items-center justify-between px-2 md:mb-4 md:px-4">
                   <div className="flex items-center gap-2 ml-3 cursor-pointer group md:gap-2.5">
                     <Icon name="planner" className="w-7 h-7 md:w-8 md:h-8" />
                     <span className="text-sm font-black tracking-tight lowercase text-foreground md:text-base">

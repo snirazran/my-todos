@@ -88,60 +88,62 @@ export function StreakCelebration({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[1400] flex flex-col items-center justify-center overflow-hidden bg-gradient-to-b from-orange-500 via-amber-500 to-amber-600 px-6"
+          className="fixed inset-0 z-[1400] flex flex-col items-center overflow-x-hidden overflow-y-auto overscroll-contain bg-gradient-to-b from-orange-500 via-amber-500 to-amber-600"
         >
-          <div className="pointer-events-none absolute inset-0 opacity-40">
-            <RotatingRays colorClass="text-white" />
-          </div>
-
-          <motion.div
-            initial={{ scale: 0.6, y: 20 }}
-            animate={{ scale: 1, y: 0 }}
-            transition={{ type: 'spring', stiffness: 260, damping: 18 }}
-            className="relative flex flex-col items-center text-center"
-          >
-            <div className="grid h-24 w-24 place-items-center rounded-full bg-white/20 backdrop-blur">
-              {goal ? (
-                <Trophy className="h-12 w-12 text-yellow-200" />
-              ) : (
-                <Flame className="h-12 w-12 fill-yellow-200 text-yellow-100" />
-              )}
+          <div className="relative flex min-h-full w-full shrink-0 flex-col items-center justify-center px-6 py-8 short-screen:py-4">
+            <div className="pointer-events-none absolute inset-0 opacity-40">
+              <RotatingRays colorClass="text-white" />
             </div>
 
-            <h2 className="mt-5 text-3xl font-black tracking-tight text-white drop-shadow-sm">
-              {goal
-                ? `${goal.days}-day goal complete!`
-                : `${milestone?.days}-day streak!`}
-            </h2>
-            <p className="mt-2 max-w-xs text-sm font-bold text-white/90">
-              {goal
-                ? 'You kept your commitment. Your frog is beyond proud.'
-                : 'An incredible milestone. Keep the flame alive!'}
-            </p>
-
-            <div className="mt-6 space-y-3">
-              {goal && <RewardChips summary={goal.rewardSummary} />}
-              {!goal && milestone && (
-                <RewardChips summary={milestone.rewardSummary} />
-              )}
-              {goal && milestone && (
-                <div className="pt-1">
-                  <p className="pb-2 text-xs font-black uppercase tracking-widest text-white/70">
-                    + {milestone.days}-day milestone
-                  </p>
-                  <RewardChips summary={milestone.rewardSummary} />
-                </div>
-              )}
-            </div>
-
-            <button
-              type="button"
-              onClick={onClose}
-              className="mt-9 h-12 w-full max-w-[260px] rounded-2xl bg-white text-sm font-black text-amber-700 shadow-[0_4px_0_0_rgba(0,0,0,0.15)] transition-all active:translate-y-1 active:shadow-none"
+            <motion.div
+              initial={{ scale: 0.6, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              transition={{ type: 'spring', stiffness: 260, damping: 18 }}
+              className="relative flex shrink-0 flex-col items-center text-center"
             >
-              {goal ? 'Set your next goal' : 'Keep it going'}
-            </button>
-          </motion.div>
+              <div className="grid h-24 w-24 place-items-center rounded-full bg-white/20 backdrop-blur short-screen:h-20 short-screen:w-20">
+                {goal ? (
+                  <Trophy className="h-12 w-12 text-yellow-200 short-screen:h-10 short-screen:w-10" />
+                ) : (
+                  <Flame className="h-12 w-12 fill-yellow-200 text-yellow-100 short-screen:h-10 short-screen:w-10" />
+                )}
+              </div>
+
+              <h2 className="mt-5 text-3xl font-black tracking-tight text-white drop-shadow-sm short-screen:mt-3 short-screen:text-2xl">
+                {goal
+                  ? `${goal.days}-day goal complete!`
+                  : `${milestone?.days}-day streak!`}
+              </h2>
+              <p className="mt-2 max-w-xs text-sm font-bold text-white/90 short-screen:mt-1 short-screen:text-xs">
+                {goal
+                  ? 'You kept your commitment. Your frog is beyond proud.'
+                  : 'An incredible milestone. Keep the flame alive!'}
+              </p>
+
+              <div className="mt-6 space-y-3 short-screen:mt-3 short-screen:space-y-2">
+                {goal && <RewardChips summary={goal.rewardSummary} />}
+                {!goal && milestone && (
+                  <RewardChips summary={milestone.rewardSummary} />
+                )}
+                {goal && milestone && (
+                  <div className="pt-1">
+                    <p className="pb-2 text-xs font-black uppercase tracking-widest text-white/70">
+                      + {milestone.days}-day milestone
+                    </p>
+                    <RewardChips summary={milestone.rewardSummary} />
+                  </div>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={onClose}
+                className="mt-9 h-12 w-full max-w-[260px] rounded-2xl bg-white text-sm font-black text-amber-700 shadow-[0_4px_0_0_rgba(0,0,0,0.15)] transition-all active:translate-y-1 active:shadow-none short-screen:mt-4"
+              >
+                {goal ? 'Set your next goal' : 'Keep it going'}
+              </button>
+            </motion.div>
+          </div>
         </motion.div>
       )}
     </AnimatePresence>

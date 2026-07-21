@@ -16,7 +16,6 @@ import { DeepLinkHandler } from '@/components/providers/DeepLinkHandler';
 import { TaskSyncProvider } from '@/components/providers/TaskSyncProvider';
 import { StreakCheckInProvider } from '@/components/providers/StreakCheckInProvider';
 import { CrossGiftProvider } from '@/components/providers/CrossGiftProvider';
-import { CrossPlatformGiftBanner } from '@/components/ui/CrossPlatformGiftBanner';
 import { OnboardingGate } from '@/components/providers/OnboardingGate';
 import { AnalyticsProvider } from '@/components/providers/AnalyticsProvider';
 import { HintCoach } from '@/components/ui/HintCoach';
@@ -59,7 +58,6 @@ export default function Providers({ children }: { children: ReactNode }) {
             <DeepLinkHandler />
             <StreakCheckInProvider />
             <CrossGiftProvider />
-            <CrossPlatformGiftBanner />
             <OnboardingGate />
             <HintCoach />
             <QuestRewardRevealHost />

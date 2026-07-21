@@ -36,11 +36,11 @@ export function BuddyNudgeCard() {
     };
   }, []);
 
-  const frogW = tier === 'lg' ? 92 : tier === 'md' ? 72 : 60;
+  const frogW = tier === 'lg' ? 76 : tier === 'md' ? 72 : 60;
   const frogH = Math.round(frogW * 0.9);
   const overlap = Math.round(frogW * 0.42);
   const pairW = frogW * 2 - overlap;
-  const flySize = tier === 'lg' ? 26 : tier === 'md' ? 20 : 18;
+  const flySize = tier === 'lg' ? 22 : tier === 'md' ? 20 : 18;
   const flyTop = tier === 'lg' ? -2 : tier === 'md' ? 0 : -4;
 
   const { data } = useSWR<{ friends: FriendSummary[] }>(
@@ -55,11 +55,12 @@ export function BuddyNudgeCard() {
   return (
     <>
       {show && (
-        <div className="mx-1.5 mt-2 md:mx-4">
+        <div className="mx-1.5 mt-2 md:mx-4 md:mt-8">
+          <div className="relative">
             <button
               type="button"
               onClick={() => setFlowOpen(true)}
-              className="group relative flex w-full items-center gap-2 rounded-2xl border border-border/50 bg-card py-2.5 pl-1.5 pr-2 text-left shadow-sm transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f9149]/40 sm:gap-3 sm:py-3 sm:pl-2 sm:pr-2.5"
+              className="group relative flex w-full items-center gap-2 rounded-2xl border border-border/50 bg-card py-2.5 pl-1.5 pr-12 text-left shadow-sm transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f9149]/40 sm:gap-3 sm:py-3 sm:pl-2 md:rounded-none md:border-x-0 md:border-b-0 md:border-t md:border-border/50 md:bg-transparent md:py-4 md:shadow-none md:hover:bg-muted/30"
             >
               <span
                 className="relative flex shrink-0 items-end justify-center"
@@ -79,7 +80,7 @@ export function BuddyNudgeCard() {
                 </span>
               </span>
               <span className="relative min-w-0 flex-1">
-                <span className="block text-[13px] font-black leading-tight tracking-tight text-foreground">
+                <span className="block text-[13px] font-black leading-tight tracking-tight text-foreground md:font-bold">
                   Catch flies together!
                 </span>
                 <span className="mt-0.5 block text-[12px] font-semibold leading-snug text-muted-foreground">
@@ -87,25 +88,16 @@ export function BuddyNudgeCard() {
                 </span>
               </span>
               <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-              <span
-                role="button"
-                tabIndex={0}
-                aria-label="Dismiss"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  dismiss();
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.stopPropagation();
-                    dismiss();
-                  }
-                }}
-                className="relative flex h-7 w-6 shrink-0 items-center justify-center rounded-full text-muted-foreground/60 transition-colors hover:bg-foreground/5 hover:text-foreground sm:w-7"
-              >
-                <X className="h-4 w-4" strokeWidth={2.5} />
-              </span>
             </button>
+            <button
+              type="button"
+              aria-label="Dismiss buddy suggestion"
+              onClick={dismiss}
+              className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 touch-manipulation items-center justify-center rounded-full text-muted-foreground/60 transition-colors hover:bg-foreground/5 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f9149]/40"
+            >
+              <X aria-hidden="true" className="h-4 w-4" strokeWidth={2.5} />
+            </button>
+          </div>
         </div>
       )}
 

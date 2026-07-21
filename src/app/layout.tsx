@@ -15,6 +15,7 @@ import { RiveWarmup } from '@/components/providers/RiveWarmup';
 import { RIVE_WASM_VERSION } from '@/lib/riveWasmVersion';
 import { MainScroll } from '@/components/providers/MainScroll';
 import { FlyCatchOverlay } from '@/components/fly-game/FlyCatchOverlay';
+import { CrossPlatformGiftBanner } from '@/components/ui/CrossPlatformGiftBanner';
 
 const poppins = Poppins({
   subsets: ['latin'],
@@ -150,8 +151,9 @@ export default function RootLayout({
         <AuthContext>
           <Providers>
             <div className="flex flex-col h-full">
-              <SiteHeader />
               <MainScroll>
+                <SiteHeader />
+                <CrossPlatformGiftBanner />
                 <GlobalPageBackground />
                 {children}
               </MainScroll>

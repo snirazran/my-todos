@@ -1010,7 +1010,9 @@ const SortableTaskItem = React.forwardRef<
                 )}
             </div>
 
-            {isDesktop && !isDone && (onStartTimer || secondaryAction) && (
+            {isDesktop &&
+              !isDone &&
+              ((onStartTimer && !task.isStarter) || secondaryAction) && (
               <div
                 className={`relative z-10 hidden flex-shrink-0 items-center gap-0.5 md:flex transition-opacity duration-150 ${
                   isHovered && !isDragging
@@ -1018,7 +1020,7 @@ const SortableTaskItem = React.forwardRef<
                     : 'pointer-events-none opacity-0'
                 }`}
               >
-                {onStartTimer && (
+                {onStartTimer && !task.isStarter && (
                   <button
                     type="button"
                     title="Start focus timer"
@@ -2300,7 +2302,7 @@ export default function TaskList({
     <>
       <div dir="ltr" className="w-full px-1.5 pt-0 pb-3 overflow-visible md:px-4">
         <div
-          className="w-full rounded-[18px] bg-[hsl(150_12%_94%)] dark:bg-background border border-border/50 shadow-sm overflow-hidden"
+          className="w-full overflow-hidden rounded-[18px] border border-border/50 bg-[hsl(150_12%_94%)] shadow-sm dark:bg-background md:border-border/35 md:bg-muted/40 md:shadow-none"
           data-hint="task-list"
         >
         <div

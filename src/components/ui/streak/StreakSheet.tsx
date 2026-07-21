@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import { Flame, Snowflake, Trophy, X, ChevronRight } from 'lucide-react';
 import Frog, { type FrogHandle } from '@/components/ui/frog';
@@ -28,6 +28,19 @@ import type {
 } from '@/lib/streak/types';
 
 type Step = 'reveal' | 'rewards' | 'commit' | 'home';
+
+const STREAK_REVEAL_MESSAGES = [
+  'You showed up today. That’s how streaks are made.',
+  'You kept it going today. One more day, well earned.',
+  'Another check-in complete. Your streak is growing.',
+  'Small steps add up. Today’s step is complete.',
+  'You made time today. Keep that momentum going.',
+  'Today’s effort counts. Your streak is stronger.',
+  'One more day complete. Keep showing up.',
+  'You followed through today. That’s real progress.',
+  'Today is in the books. Keep the streak alive.',
+  'Consistency starts small. You added another day.',
+] as const;
 
 function rewardsLabel(rewards: LoginStreakReward[]) {
   const parts: string[] = [];
@@ -63,10 +76,16 @@ function RewardVisuals({ rewards }: { rewards: LoginStreakReward[] }) {
   }
 
   return (
-    <span className="inline-flex flex-wrap items-center gap-1.5">
+    <span className="inline-flex flex-wrap items-center gap-1.5 short-screen:gap-1">
       {flies > 0 && (
         <span className="inline-flex items-center gap-0.5 font-black text-primary">
-          <Fly size={24} y={-3} alwaysPlay interactive={false} />
+          <Fly
+            size={24}
+            y={-3}
+            alwaysPlay
+            interactive={false}
+            className="short-screen:!h-5 short-screen:!w-5"
+          />
           <span className="tabular-nums">{flies}</span>
         </span>
       )}
@@ -114,7 +133,7 @@ function WeekStrip({ view, light = false }: { view: LoginStreakView; light?: boo
   }, [view.count, view.lastDayKey, view.freezeUsedDayKeys]);
 
   return (
-    <div className="mt-6 grid w-full max-w-sm grid-cols-7 gap-1.5">
+    <div className="mt-6 grid w-full max-w-sm grid-cols-7 gap-1.5 short-screen:mt-3 short-screen:gap-1 roomy-screen:mt-8 tall-screen:mt-10">
       {days.map((dayKey, i) => {
         const frozen = view.freezeUsedDayKeys.includes(dayKey);
         const lit =
@@ -125,7 +144,7 @@ function WeekStrip({ view, light = false }: { view: LoginStreakView; light?: boo
           { weekday: 'narrow' },
         );
         return (
-          <div key={dayKey} className="flex flex-col items-center gap-1.5">
+          <div key={dayKey} className="flex flex-col items-center gap-1.5 short-screen:gap-1">
             <span
               className={cn(
                 'text-[10px] font-black uppercase',
@@ -139,7 +158,7 @@ function WeekStrip({ view, light = false }: { view: LoginStreakView; light?: boo
               animate={{ scale: 1, opacity: 1 }}
               transition={{ delay: 0.05 * i, type: 'spring', stiffness: 400, damping: 22 }}
               className={cn(
-                'grid h-10 w-10 place-items-center rounded-full',
+                'grid h-10 w-10 place-items-center rounded-full short-screen:h-8 short-screen:w-8',
                 frozen
                   ? light
                     ? 'bg-white/25 text-sky-100'
@@ -184,6 +203,10 @@ function RevealStep({
   const [count, setCount] = useState(celebration.previousCount);
   const [popped, setPopped] = useState(false);
   const [frogReady, setFrogReady] = useState(false);
+  const revealMessage =
+    STREAK_REVEAL_MESSAGES[
+      (Math.max(1, view.count) - 1) % STREAK_REVEAL_MESSAGES.length
+    ];
 
   useEffect(() => {
     const frogTimer = window.setTimeout(() => setFrogReady(true), 250);
@@ -208,16 +231,17 @@ function RevealStep({
   }, [view.count]);
 
   return (
-    <div className="relative flex h-full flex-col items-center justify-center overflow-hidden bg-gradient-to-b from-orange-500 via-amber-500 to-amber-600 px-6">
-      <div className="pointer-events-none absolute inset-0 opacity-30">
-        <RotatingRays colorClass="text-white" />
-      </div>
+    <div className="relative flex h-full flex-col items-center overflow-x-hidden overflow-y-auto overscroll-contain bg-gradient-to-b from-orange-500 via-amber-500 to-amber-600">
+      <div className="relative flex min-h-full w-full shrink-0 flex-col items-center justify-start px-6 pb-8 pt-[clamp(2rem,8vh,5rem)] short-screen:pb-3 short-screen:pt-[calc(env(safe-area-inset-top)+0.75rem)] roomy-screen:pt-[clamp(4rem,8vh,6rem)] tall-screen:pt-[clamp(6rem,10vh,8rem)]">
+        <div className="pointer-events-none absolute inset-0 opacity-30">
+          <RotatingRays colorClass="text-white" />
+        </div>
 
       <motion.div
         initial={{ y: 40, opacity: 0, scale: 0.8 }}
         animate={{ y: 0, opacity: 1, scale: 1 }}
         transition={{ type: 'spring', stiffness: 240, damping: 20 }}
-        className="relative"
+        className="relative mb-6 short-screen:mb-4 roomy-screen:mb-12 tall-screen:mb-14"
       >
         <motion.div
           animate={{ y: [0, -8, 0] }}
@@ -228,15 +252,21 @@ function RevealStep({
               ref={frogRef}
               width={190}
               height={190}
+              className="short-screen:!h-[140px] short-screen:!w-[140px]"
               indices={indices}
               emote="love"
             />
           )}
-          {!frogReady && <div style={{ width: 190, height: 190 }} />}
+          {!frogReady && (
+            <div
+              className="short-screen:!h-[140px] short-screen:!w-[140px]"
+              style={{ width: 190, height: 190 }}
+            />
+          )}
         </motion.div>
       </motion.div>
 
-      <div className="relative mt-2 flex items-center gap-3">
+      <div className="relative mt-2 flex items-center gap-3 short-screen:mt-0 short-screen:gap-2 roomy-screen:mt-3 tall-screen:mt-4">
         <motion.div
           initial={{ scale: 0, rotate: -30 }}
           animate={
@@ -260,7 +290,7 @@ function RevealStep({
             transition={{ duration: 0.7 }}
             className="absolute inset-0 rounded-full bg-yellow-200"
           />
-          <Flame className="relative h-16 w-16 fill-yellow-200 text-yellow-100 drop-shadow-[0_3px_10px_rgba(255,200,50,0.55)]" />
+          <Flame className="relative h-16 w-16 fill-yellow-200 text-yellow-100 drop-shadow-[0_3px_10px_rgba(255,200,50,0.55)] short-screen:h-12 short-screen:w-12" />
         </motion.div>
 
         <motion.span
@@ -268,7 +298,7 @@ function RevealStep({
           initial={popped ? { scale: 1.5, y: -6 } : false}
           animate={{ scale: 1, y: 0 }}
           transition={{ type: 'spring', stiffness: 320, damping: 14 }}
-          className="text-8xl font-black tabular-nums text-white drop-shadow-[0_3px_0_rgba(0,0,0,0.15)]"
+          className="text-8xl font-black tabular-nums text-white drop-shadow-[0_3px_0_rgba(0,0,0,0.15)] short-screen:text-6xl"
         >
           {count}
         </motion.span>
@@ -278,7 +308,7 @@ function RevealStep({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.5 }}
-        className="mt-2 text-lg font-black uppercase tracking-[0.2em] text-white/90"
+        className="mt-2 text-lg font-black uppercase tracking-[0.2em] text-white/90 short-screen:mt-1 short-screen:text-base roomy-screen:mt-4 tall-screen:mt-5"
       >
         day streak
       </motion.p>
@@ -287,11 +317,11 @@ function RevealStep({
         initial={{ opacity: 0, y: 8 }}
         animate={popped ? { opacity: 1, y: 0 } : {}}
         transition={{ delay: 0.35 }}
-        className="mt-4 max-w-xs text-center text-sm font-bold text-white/85"
+        className="mt-4 flex min-h-10 max-w-[34ch] items-center justify-center text-pretty text-center text-sm font-bold leading-snug text-white/85 short-screen:mt-2 short-screen:min-h-8 short-screen:text-xs roomy-screen:mt-6 tall-screen:mt-8"
       >
         {celebration.freezeConsumedDays.length > 0
           ? '❄️ A streak freeze covered your missed day. Welcome back!'
-          : 'You showed up today. That’s how streaks are made.'}
+          : revealMessage}
       </motion.p>
 
       <motion.div
@@ -307,16 +337,17 @@ function RevealStep({
         initial={{ opacity: 0, y: 16 }}
         animate={popped ? { opacity: 1, y: 0 } : {}}
         transition={{ delay: 0.7 }}
-        className="mt-10 flex w-full justify-center"
+        className="mt-10 flex w-full justify-center short-screen:mt-4 roomy-screen:mt-12 tall-screen:mt-16"
       >
         <button
           type="button"
           onClick={onContinue}
-          className="w-full max-w-[280px] rounded-2xl bg-white py-3.5 text-sm font-black uppercase tracking-wide text-amber-700 shadow-[0_5px_0_0_rgba(0,0,0,0.15)] transition-all active:translate-y-1 active:shadow-none"
+          className="w-full max-w-[280px] rounded-2xl bg-white py-3.5 text-sm font-black uppercase tracking-wide text-amber-700 shadow-[0_5px_0_0_rgba(0,0,0,0.15)] transition-[transform,box-shadow,background-color] hover:bg-white/95 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-amber-500 active:translate-y-1 active:shadow-none short-screen:py-3"
         >
           Continue
         </button>
       </motion.div>
+      </div>
     </div>
   );
 }
@@ -330,11 +361,15 @@ function CommitStep({
   onPicked: (view: LoginStreakView) => void;
   onSkip: () => void;
 }) {
+  const reduceMotion = useReducedMotion();
   const [busyDays, setBusyDays] = useState<number | null>(null);
+  const [selectedDays, setSelectedDays] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const pickGoal = async (days: number) => {
     if (busyDays !== null) return;
     setBusyDays(days);
+    setError(null);
     try {
       const res = await fetch('/api/streak/goal', {
         method: 'POST',
@@ -354,78 +389,163 @@ function CommitStep({
           return;
         }
       }
+      setError('Could not start this goal. Try again.');
+    } catch {
+      setError('Could not start this goal. Try again.');
     } finally {
       setBusyDays(null);
     }
   };
 
   return (
-    <div className="flex h-full flex-col items-center overflow-y-auto bg-background px-6 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-[calc(env(safe-area-inset-top)+3.5rem)]">
-      <motion.div
-        initial={{ scale: 0.7, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-        className="grid h-20 w-20 place-items-center rounded-full bg-amber-100 dark:bg-amber-500/15"
-      >
-        <Trophy className="h-10 w-10 text-amber-500" />
-      </motion.div>
+    <div className="h-full overflow-x-hidden overflow-y-auto overscroll-contain bg-background">
+      <div className="flex min-h-full w-full shrink-0 flex-col items-center justify-center px-3 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-[calc(env(safe-area-inset-top)+3.5rem)] sm:px-6 short-screen:justify-start short-screen:pb-[calc(0.75rem+env(safe-area-inset-bottom))] short-screen:pt-[calc(0.75rem+env(safe-area-inset-top))] tall-screen:justify-start tall-screen:pt-[clamp(5rem,8vh,7rem)]">
+        <motion.div
+          initial={reduceMotion ? false : { scale: 0.7, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+          className="grid h-20 w-20 shrink-0 place-items-center rounded-full bg-amber-100 dark:bg-amber-500/15 short-screen:h-14 short-screen:w-14"
+          aria-hidden="true"
+        >
+          <Trophy className="h-10 w-10 text-amber-500 short-screen:h-7 short-screen:w-7" />
+        </motion.div>
 
-      <h2 className="mt-5 text-center text-3xl font-black tracking-tight text-foreground">
-        Make a commitment
-      </h2>
-      <p className="mt-2 max-w-xs text-center text-sm font-medium text-muted-foreground">
-        Promise yourself a streak goal. Reach it and a reward is waiting at the
-        finish line.
-      </p>
+        <h2
+          id="streak-goal-heading"
+          className="mt-5 max-w-full text-balance text-center text-[clamp(1.5rem,7vw,1.875rem)] font-black tracking-tight text-foreground short-screen:mt-3"
+        >
+          Choose a streak goal
+        </h2>
+        <p
+          id="streak-goal-hint"
+          className="mt-2 max-w-[32ch] text-pretty text-center text-sm font-medium leading-snug text-muted-foreground short-screen:mt-1 short-screen:text-xs"
+        >
+          Check in each day to reach your goal and earn the reward
+        </p>
 
-      <div className="mt-8 w-full max-w-sm space-y-3">
-        {view.goalTiers.map((tier, i) => (
-          <motion.div
-            key={tier.days}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.08 * i, type: 'spring', stiffness: 300, damping: 24 }}
+        <fieldset
+          className="mt-7 w-full max-w-sm short-screen:mt-4"
+          aria-labelledby="streak-goal-heading"
+          aria-describedby={`streak-goal-hint${error ? ' streak-goal-error' : ''}`}
+          disabled={busyDays !== null}
+        >
+          <legend className="sr-only">Streak goal options</legend>
+          <div className="space-y-2.5 short-screen:space-y-2">
+            {view.goalTiers.map((tier, i) => {
+              const selected = selectedDays === tier.days;
+              const rewardId = `streak-goal-${tier.days}-reward`;
+              return (
+                <motion.div
+                  key={tier.days}
+                  initial={reduceMotion ? false : { opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{
+                    delay: 0.08 * i,
+                    type: 'spring',
+                    stiffness: 300,
+                    damping: 24,
+                  }}
+                >
+                  <label className="block cursor-pointer">
+                    <input
+                      type="radio"
+                      name="streak-goal"
+                      value={tier.days}
+                      checked={selected}
+                      onChange={() => {
+                        setSelectedDays(tier.days);
+                        setError(null);
+                      }}
+                      aria-describedby={rewardId}
+                      className="peer sr-only"
+                    />
+                    <span
+                      className={cn(
+                        'flex min-h-16 w-full items-center gap-3 rounded-2xl border bg-card p-3 text-left shadow-sm transition-[transform,border-color,background-color,box-shadow] hover:border-amber-400 active:scale-[0.99] peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-disabled:cursor-wait peer-disabled:opacity-60 sm:min-h-20 sm:gap-4 sm:p-4',
+                        selected
+                          ? 'border-amber-400 bg-amber-50/70 shadow-md dark:bg-amber-500/10'
+                          : 'border-border/60',
+                      )}
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={cn(
+                          'grid h-5 w-5 shrink-0 place-items-center rounded-full border-2 transition-[border-color,background-color]',
+                          selected
+                            ? 'border-amber-500 bg-amber-500'
+                            : 'border-muted-foreground/40 bg-background',
+                        )}
+                      >
+                        {selected && (
+                          <span className="h-2 w-2 rounded-full bg-white" />
+                        )}
+                      </span>
+
+                      <span className="min-w-0 flex-1">
+                        <span className="flex min-w-0 items-center gap-2">
+                          <Flame
+                            aria-hidden="true"
+                            className="h-5 w-5 shrink-0 fill-orange-400 text-orange-500"
+                          />
+                          <span className="min-w-0 text-sm font-black text-foreground sm:text-base">
+                            {tier.days}-day goal
+                          </span>
+                        </span>
+                        <span
+                          id={rewardId}
+                          className="mt-0.5 flex min-w-0 flex-wrap items-center gap-1 text-[11px] font-bold text-muted-foreground sm:text-xs"
+                        >
+                          <span>Reward</span>
+                          <RewardVisuals rewards={tier.rewards} />
+                        </span>
+                      </span>
+                    </span>
+                  </label>
+                </motion.div>
+              );
+            })}
+          </div>
+        </fieldset>
+
+        {error && (
+          <p
+            id="streak-goal-error"
+            role="alert"
+            className="mt-3 max-w-sm text-center text-xs font-bold text-destructive"
           >
-            <button
-              type="button"
-              disabled={busyDays !== null}
-              onClick={() => pickGoal(tier.days)}
-              className="flex w-full items-center gap-4 rounded-2xl border border-border/60 bg-card p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-amber-400 active:scale-[0.98]"
-            >
-              <span className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-2xl bg-orange-100 font-black text-orange-500 dark:bg-orange-500/15">
-                <Flame className="h-5 w-5 fill-current" />
-                <span className="text-sm leading-none tabular-nums">
-                  {tier.days}d
-                </span>
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-base font-black text-foreground">
-                  {tier.days} days in a row
-                </span>
-                {busyDays === tier.days ? (
-                  <span className="block text-xs font-bold text-muted-foreground">
-                    Committing…
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground">
-                    <span>Earn</span>
-                    <RewardVisuals rewards={tier.rewards} />
-                  </span>
-                )}
-              </span>
-              <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground/40" />
-            </button>
-          </motion.div>
-        ))}
-      </div>
+            {error}
+          </p>
+        )}
 
-      <button
-        type="button"
-        onClick={onSkip}
-        className="mt-6 text-sm font-bold text-muted-foreground underline-offset-4 hover:underline"
-      >
-        Not now
-      </button>
+        <button
+          type="button"
+          disabled={busyDays !== null}
+          onClick={() => {
+            if (selectedDays === null) {
+              setError('Select a streak goal.');
+              return;
+            }
+            void pickGoal(selectedDays);
+          }}
+          aria-live="polite"
+          className="mt-4 flex h-12 w-full max-w-sm items-center justify-center rounded-2xl bg-primary px-4 text-sm font-black text-primary-foreground shadow-[0_4px_0_0_hsl(var(--primary)/0.6)] transition-[transform,box-shadow,filter] hover:brightness-110 active:translate-y-1 active:shadow-none disabled:cursor-wait disabled:opacity-60 short-screen:mt-3"
+        >
+          {busyDays !== null
+            ? 'Starting…'
+            : selectedDays !== null
+              ? `Start ${selectedDays}-day goal`
+              : 'Start goal'}
+        </button>
+
+        <button
+          type="button"
+          onClick={onSkip}
+          disabled={busyDays !== null}
+          className="mt-4 min-h-11 px-4 text-sm font-bold text-muted-foreground underline-offset-4 hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait disabled:opacity-60 short-screen:mt-2 short-screen:text-xs"
+        >
+          Choose later
+        </button>
+      </div>
     </div>
   );
 }

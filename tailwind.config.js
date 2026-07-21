@@ -17,6 +17,9 @@ module.exports = {
     extend: {
       screens: {
         short: { raw: '(max-width: 767px) and (max-height: 700px)' },
+        'short-screen': { raw: '(max-height: 800px)' },
+        'roomy-screen': { raw: '(min-height: 700px)' },
+        'tall-screen': { raw: '(min-height: 1000px)' },
       },
       fontFamily: {
         // Heebo follows Poppins so Hebrew text (which Poppins lacks) renders in

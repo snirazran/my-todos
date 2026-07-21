@@ -1,32 +1,29 @@
 'use client';
 
-import { useEffect, useState, type CSSProperties } from 'react';
+import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { AnimatePresence, motion } from 'framer-motion';
-import { X, ArrowRight, QrCode, Link2, Check } from 'lucide-react';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { X, QrCode } from 'lucide-react';
 import useSWR from 'swr';
-import QRCode from 'qrcode';
 import { useAuth } from '@/components/auth/AuthContext';
-import { useNotification } from '@/components/providers/NotificationProvider';
 import {
   CROSS_GIFT_SWR_KEY,
   currentPlatform,
 } from '@/components/providers/CrossGiftProvider';
-import { GiftRive } from '@/components/ui/gift-box/GiftBox';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { trackGrowthEvent } from '@/lib/growthTrack';
-import { detectMobileOS, WEB_APP_URL } from '@/lib/appStores';
 import type { CrossGiftStatus } from '@/lib/crossGift';
 
-const DISMISS_KEY = 'frogress_xplat_banner';
-const SHOW_DELAY_MS = 6000;
+const DISMISS_KEY_PREFIX = 'frogress_xplat_banner';
+const SHOW_DELAY_MS = 8000;
 const COOLDOWNS_MS = [0, 24 * 60 * 60 * 1000, 7 * 24 * 60 * 60 * 1000];
 const MAX_DISMISSALS = 3;
 
 type DismissState = { count: number; lastAt: number };
 
-function readDismissState(): DismissState {
+function readDismissState(storageKey: string): DismissState {
   try {
-    const raw = localStorage.getItem(DISMISS_KEY);
+    const raw = localStorage.getItem(storageKey);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (typeof parsed?.count === 'number' && typeof parsed?.lastAt === 'number') {
@@ -46,44 +43,48 @@ function isSnoozed(state: DismissState): boolean {
 
 export function CrossPlatformGiftBanner() {
   const { user, loading } = useAuth();
-  const { stackHeight } = useNotification();
   const pathname = usePathname();
+  const reduceMotion = useReducedMotion();
+  const isDesktop = useMediaQuery('(min-width: 768px)');
   const { data: status } = useSWR<CrossGiftStatus>(CROSS_GIFT_SWR_KEY, null);
   const [visible, setVisible] = useState(false);
   const [qrUrl, setQrUrl] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
 
   const platform = currentPlatform();
-  const isMobileWeb = platform === 'web' && detectMobileOS() !== null;
+  const userId = user?.uid ?? null;
+  const dismissKey = userId ? `${DISMISS_KEY_PREFIX}:${userId}` : null;
 
   const eligible =
+    platform === 'web' &&
+    isDesktop &&
     !loading &&
     !!user &&
     pathname === '/' &&
     !!status &&
     !status.claimed &&
     !status.claimable &&
-    !status.otherPlatformSeen &&
-    !(platform === 'native' && status.moveToWebQuest);
+    !status.otherPlatformSeen;
 
   useEffect(() => {
-    if (!eligible) {
-      setVisible(false);
+    setVisible(false);
+    setQrUrl(null);
+    if (!eligible || !dismissKey) {
       return;
     }
-    if (isSnoozed(readDismissState())) return;
+    if (isSnoozed(readDismissState(dismissKey))) return;
     const timer = setTimeout(() => {
       setVisible(true);
       trackGrowthEvent('xplat_banner_shown', { platform });
     }, SHOW_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [eligible, platform]);
+  }, [dismissKey, eligible, platform]);
 
   const dismiss = () => {
-    const prev = readDismissState();
+    if (!dismissKey) return;
+    const prev = readDismissState(dismissKey);
     try {
       localStorage.setItem(
-        DISMISS_KEY,
+        dismissKey,
         JSON.stringify({ count: prev.count + 1, lastAt: Date.now() }),
       );
     } catch {}
@@ -98,6 +99,7 @@ export function CrossPlatformGiftBanner() {
   const showQr = async () => {
     trackGrowthEvent('xplat_banner_cta', { platform, action: 'qr' });
     try {
+      const { default: QRCode } = await import('qrcode');
       const url = await QRCode.toDataURL(`${window.location.origin}/get-app`, {
         width: 320,
         margin: 1,
@@ -106,132 +108,123 @@ export function CrossPlatformGiftBanner() {
     } catch {}
   };
 
-  const copyWebLink = async () => {
-    trackGrowthEvent('xplat_banner_cta', { platform, action: 'copy-link' });
-    try {
-      await navigator.clipboard.writeText(WEB_APP_URL);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {}
-  };
-
   return (
     <AnimatePresence>
       {visible && (
         <motion.div
-          initial={{ opacity: 0, y: 24 }}
+          initial={reduceMotion ? false : { opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: 24 }}
-          transition={{ type: 'spring', stiffness: 320, damping: 26 }}
-          className="fixed right-3 z-[1300] w-[min(100%-1.5rem,28rem)] bottom-[calc(env(safe-area-inset-bottom)+72px+var(--stack-off))] transition-[bottom] duration-300 ease-out md:right-4 md:w-[380px] md:bottom-[calc(env(safe-area-inset-bottom)+16px+var(--stack-off))]"
-          style={
-            {
-              '--stack-off': `${stackHeight > 0 ? stackHeight + 8 : 0}px`,
-            } as CSSProperties
+          exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -8 }}
+          transition={
+            reduceMotion
+              ? { duration: 0.15 }
+              : { type: 'spring', stiffness: 320, damping: 26 }
           }
+          className="absolute inset-x-0 top-16 z-20 hidden md:block"
         >
-          <div className="relative overflow-hidden rounded-2xl border border-primary/30 bg-popover text-popover-foreground shadow-xl dark:border-primary/40">
-            {qrUrl ? (
-              <div className="flex flex-col items-center gap-2 px-4 py-4">
-                <button
-                  type="button"
-                  onClick={dismiss}
-                  aria-label="Dismiss"
-                  className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-                >
-                  <X className="h-4 w-4" strokeWidth={3} />
-                </button>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={qrUrl}
-                  alt="QR code to download the Frogress app"
-                  className="h-40 w-40 rounded-xl border border-border"
+          <aside
+            aria-label="Get the Frogress app"
+            className="border-b border-primary/20 bg-background/90 text-foreground shadow-sm backdrop-blur-xl dark:border-primary/30"
+          >
+            <div className="mx-auto flex min-h-14 max-w-7xl items-center gap-2.5 px-6 py-1.5 md:px-10">
+              <span
+                aria-hidden="true"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-lg ring-1 ring-primary/10"
+              >
+                🎁
+              </span>
+
+              <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                <span className="shrink-0 text-[10px] font-bold uppercase tracking-[0.14em] text-primary">
+                  App gift
+                </span>
+                <span
+                  aria-hidden="true"
+                  className="h-4 w-px shrink-0 bg-border"
                 />
-                <p className="text-xs font-bold text-muted-foreground">
-                  Scan with your phone — your gift is waiting
+                <p className="truncate text-sm font-semibold tracking-tight">
+                  A gift is waiting in the Frogress app
+                </p>
+                <p className="hidden shrink-0 text-xs font-medium text-muted-foreground xl:block">
+                  Visit your frog on your phone to unwrap it.
                 </p>
               </div>
-            ) : (
-              <div className="flex items-center gap-3 px-3 py-3">
-                <span className="-my-2 inline-flex h-16 w-12 shrink-0 items-center justify-center">
-                  <GiftRive className="h-full w-full" color={0} />
-                </span>
-                <div className="min-w-0 flex-1">
-                  {platform === 'web' ? (
-                    <>
-                      <p className="text-sm font-black leading-tight text-foreground">
-                        A gift is waiting in the app
-                      </p>
-                      <p className="text-xs font-semibold text-muted-foreground">
-                        Get the app and unwrap it in your pond
-                      </p>
-                    </>
-                  ) : (
-                    <>
-                      <p className="text-sm font-black leading-tight text-foreground">
-                        Your pond works on computers too
-                      </p>
-                      <p className="text-xs font-semibold text-muted-foreground">
-                        Sign in at frogress.com — a gift will be waiting
-                      </p>
-                    </>
-                  )}
-                </div>
-                {platform === 'web' ? (
-                  isMobileWeb ? (
-                    <a
-                      href="/get-app"
-                      onClick={() =>
-                        trackGrowthEvent('xplat_banner_cta', {
-                          platform,
-                          action: 'store',
-                        })
-                      }
-                      className="flex shrink-0 items-center gap-1 rounded-xl bg-[#4f9149] px-3.5 py-2 text-xs font-black uppercase tracking-wide text-white shadow-[0_3px_0_0_#34631f] transition hover:brightness-105 active:translate-y-[2px] active:shadow-none"
-                    >
-                      Get app
-                      <ArrowRight className="h-3.5 w-3.5" strokeWidth={3} />
-                    </a>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => void showQr()}
-                      className="flex shrink-0 items-center gap-1.5 rounded-xl bg-[#4f9149] px-3.5 py-2 text-xs font-black uppercase tracking-wide text-white shadow-[0_3px_0_0_#34631f] transition hover:brightness-105 active:translate-y-[2px] active:shadow-none"
-                    >
-                      <QrCode className="h-3.5 w-3.5" strokeWidth={3} />
-                      Get app
-                    </button>
-                  )
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => void copyWebLink()}
-                    className="flex shrink-0 items-center gap-1.5 rounded-xl bg-[#4f9149] px-3.5 py-2 text-xs font-black uppercase tracking-wide text-white shadow-[0_3px_0_0_#34631f] transition hover:brightness-105 active:translate-y-[2px] active:shadow-none"
-                  >
-                    {copied ? (
-                      <>
-                        <Check className="h-3.5 w-3.5" strokeWidth={3} />
-                        Copied
-                      </>
-                    ) : (
-                      <>
-                        <Link2 className="h-3.5 w-3.5" strokeWidth={3} />
-                        Copy link
-                      </>
-                    )}
-                  </button>
-                )}
+
+              <div className="relative shrink-0">
                 <button
                   type="button"
-                  onClick={dismiss}
-                  aria-label="Dismiss"
-                  className="-mr-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                  onClick={() => void showQr()}
+                  aria-expanded={!!qrUrl}
+                  aria-controls="cross-gift-qr"
+                  className="flex min-h-9 items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-xs font-semibold text-primary-foreground shadow-sm transition-[background-color,transform] hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.98]"
                 >
-                  <X className="h-4 w-4" strokeWidth={3} />
+                  <QrCode
+                    aria-hidden="true"
+                    className="h-4 w-4"
+                    strokeWidth={3}
+                  />
+                  Get app
                 </button>
+
+                <AnimatePresence>
+                  {qrUrl && (
+                    <motion.div
+                      id="cross-gift-qr"
+                      role="dialog"
+                      aria-label="Scan to get the Frogress app"
+                      initial={
+                        reduceMotion
+                          ? false
+                          : { opacity: 0, y: -8, scale: 0.98 }
+                      }
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -6, scale: 0.98 }}
+                      transition={{ duration: reduceMotion ? 0.1 : 0.18 }}
+                      className="absolute right-0 top-full z-10 mt-2 w-72 rounded-2xl border border-primary/25 bg-popover p-4 text-popover-foreground shadow-2xl"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setQrUrl(null)}
+                        aria-label="Close QR code"
+                        className="absolute right-2 top-2 flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        <X
+                          aria-hidden="true"
+                          className="h-4 w-4"
+                          strokeWidth={3}
+                        />
+                      </button>
+                      <div className="flex flex-col items-center gap-2 pt-2">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={qrUrl}
+                          alt="QR code to download the Frogress app"
+                          width={160}
+                          height={160}
+                          className="h-40 w-40 rounded-xl border border-border"
+                        />
+                        <p className="text-center text-sm font-black">
+                          Scan with your phone
+                        </p>
+                        <p className="text-pretty text-center text-xs font-semibold text-muted-foreground">
+                          Sign in with the same account to find your gift.
+                        </p>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
-            )}
-          </div>
+
+              <button
+                type="button"
+                onClick={dismiss}
+                aria-label="Dismiss app gift banner"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <X aria-hidden="true" className="h-5 w-5" strokeWidth={2.5} />
+              </button>
+            </div>
+          </aside>
         </motion.div>
       )}
     </AnimatePresence>

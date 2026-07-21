@@ -320,12 +320,12 @@ function LoginPageInner() {
   };
 
   return (
-    <main className="fixed inset-0 flex flex-col items-center justify-center overflow-hidden bg-background px-6 py-10">
+    <main className="fixed inset-0 flex flex-col items-center overflow-x-hidden overflow-y-auto bg-background px-6 py-10">
       <motion.div
         variants={ENTER_CONTAINER}
         initial={reduceMotion ? false : 'hidden'}
         animate="show"
-        className="flex w-full max-w-sm origin-center flex-col items-center md:scale-110 xl:scale-125"
+        className="my-auto flex w-full max-w-sm shrink-0 origin-center flex-col items-center md:scale-110 xl:scale-125"
       >
         {/* Frogress wordmark — curved, matching the loading screen */}
         <motion.div variants={ENTER_ITEM}>

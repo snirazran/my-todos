@@ -171,12 +171,12 @@ export function NextQuestStrip({
           goToQuests();
         }
       }}
-      className={`group relative mx-1.5 flex w-[calc(100%-0.75rem)] cursor-pointer items-center text-left transition-colors duration-300 md:mx-4 md:w-[calc(100%-2rem)] ${
+      className={`group relative mx-1.5 flex w-[calc(100%-0.75rem)] cursor-pointer items-center text-left transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 md:mx-4 md:w-[calc(100%-2rem)] ${
         showClaimable
-          ? `mb-2 gap-3 rounded-2xl border p-3 shadow-sm ${objectiveCardTone(
+          ? `mb-2 gap-3 rounded-2xl border p-3 shadow-sm md:mb-3 md:p-3.5 ${objectiveCardTone(
               true,
             )} hover:bg-lime-100 dark:hover:bg-lime-500/20`
-          : 'mb-1.5 gap-2.5 rounded-xl px-1 py-1 hover:bg-muted/30'
+          : 'mb-1.5 gap-2.5 rounded-xl px-1 py-1 hover:bg-muted/30 md:mb-0 md:gap-3 md:rounded-xl md:border-0 md:bg-transparent md:px-4 md:py-1.5 md:shadow-none md:hover:bg-muted/30'
       }`}
     >
       {showClaimable && claimable ? (
@@ -220,9 +220,9 @@ export function NextQuestStrip({
                 type="button"
                 disabled={claiming}
                 onClick={() => void handleClaim(claimable)}
-                className="inline-flex h-9 items-center justify-center rounded-xl bg-amber-500 px-4 text-[13px] font-black text-white shadow-[0_3px_0_0_#b45309] transition-all hover:translate-y-[-1px] hover:shadow-[0_4px_0_0_#b45309] active:translate-y-[2px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-9 items-center justify-center rounded-xl bg-amber-500 px-4 text-[13px] font-black text-white shadow-[0_3px_0_0_#b45309] transition-[transform,box-shadow,opacity] hover:translate-y-[-1px] hover:shadow-[0_4px_0_0_#b45309] active:translate-y-[2px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {claiming ? 'Claiming...' : 'Claim'}
+                {claiming ? 'Claiming…' : 'Claim'}
               </button>
             </span>
           </span>
@@ -241,13 +241,20 @@ export function NextQuestStrip({
                 Pick a tag to start this quest
               </span>
               <span className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-dashed border-primary/50 bg-primary/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.14em] text-primary">
-                <Tags className="h-3 w-3" strokeWidth={2.75} />
+                <Tags aria-hidden="true" className="h-3 w-3" strokeWidth={2.75} />
                 Pick a tag
               </span>
             </div>
           ) : (
-            <div className="flex min-w-0 flex-1 flex-col gap-1">
-              <span className="flex min-w-0 items-center text-[12px] font-black leading-tight text-foreground">
+            <div className="flex min-w-0 flex-1 flex-col gap-1 md:gap-1.5">
+              <span className="hidden items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.14em] text-muted-foreground md:flex">
+                <span
+                  aria-hidden="true"
+                  className="h-1.5 w-1.5 rounded-full bg-primary"
+                />
+                Next Quest
+              </span>
+              <span className="flex min-w-0 items-center text-[12px] font-black leading-tight text-foreground md:text-[14px] md:font-bold">
                 <span className="flex min-w-0 items-center truncate">
                   <ObjectiveLabel
                     label={displayNextUp.remainingLabel}
@@ -262,7 +269,7 @@ export function NextQuestStrip({
                 ) : null}
               </span>
               <ObjectiveProgressBar
-                heightClassName="h-4"
+                heightClassName="h-4 md:h-3.5"
                 progress={displayNextUp.progress}
                 target={displayNextUp.target}
               />
@@ -285,12 +292,15 @@ export function NextQuestStrip({
               />
             </span>
           ) : (
-            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+            <ChevronRight
+              aria-hidden="true"
+              className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
+            />
           )}
         </>
       ) : null}
     </div>
-    <div className="mx-1.5 mb-2 w-[calc(100%-0.75rem)] md:mx-4 md:w-[calc(100%-2rem)] empty:hidden">
+    <div className="mx-1.5 mb-2 w-[calc(100%-0.75rem)] empty:hidden md:mx-4 md:w-[calc(100%-2rem)]">
       <QuestPriorityDebug
         title="home next-up"
         entries={ranked.map(({ item, result }) => ({
@@ -303,6 +313,7 @@ export function NextQuestStrip({
           reason: 'later tier of a quest already listed',
         }))}
         notes={[
+          'onboarding: active tier first, before the normal priority pool',
           'order: needs-tag last → score (2 decimals) → lower tier → least work left → fewest remaining → sooner reset',
           'near = 1/(1 + days of work left): streak units cost their day count minus the live run, tasks ~0.1d, focus min ~0.01d',
           'pool: best objective per quest (onboarding + daily + areas)',

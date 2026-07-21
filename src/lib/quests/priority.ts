@@ -121,6 +121,21 @@ export function compareQuestPriority(
   a: { input: PriorityInput; result: PriorityResult },
   b: { input: PriorityInput; result: PriorityResult },
 ): number {
+  const onboardingDiff =
+    Number(b.input.placement === 'onboarding') -
+    Number(a.input.placement === 'onboarding');
+  if (onboardingDiff !== 0) return onboardingDiff;
+
+  // Onboarding is a guided sequence, not a menu of interchangeable goals.
+  // Always surface the earliest unfinished tier before scoring later tiers.
+  if (
+    a.input.placement === 'onboarding' &&
+    b.input.placement === 'onboarding'
+  ) {
+    const tierDiff = (a.input.tierIndex ?? 0) - (b.input.tierIndex ?? 0);
+    if (tierDiff !== 0) return tierDiff;
+  }
+
   const effortDiff =
     a.input.remainingEffortDays !== undefined &&
     b.input.remainingEffortDays !== undefined

@@ -644,17 +644,15 @@ export function StarterQuestCard({
     const hasRewards = (block.rewards?.length ?? 0) > 0;
     return claimedObjectiveIds.includes(block.id) || (complete && !hasRewards);
   };
-  const isBlockClaimable = (block: QuestCardLogicBlock) =>
-    block.progress >= Math.max(1, block.target) &&
-    (block.rewards?.length ?? 0) > 0 &&
-    !claimedObjectiveIds.includes(block.id);
   const totalSteps = quest.logic.length;
   const doneSteps = quest.logic.filter(isBlockDone).length;
-  const shownBlocks = [...visibleLogic].sort(
-    (a, b) => Number(isBlockClaimable(b)) - Number(isBlockClaimable(a)),
-  );
+  const shownBlocks = visibleLogic
+    .filter(
+      (block) => (block.rewards?.length ?? 0) > 0 || !isBlockDone(block),
+    )
+    .slice(0, 1);
 
-  if (visibleLogic.length === 0) return null;
+  if (shownBlocks.length === 0) return null;
 
   return (
     <div>
