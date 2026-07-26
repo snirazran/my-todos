@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { LegalPage, type LegalSection } from '@/components/legal/LegalPage';
 
-const lastUpdated = 'July 10, 2026';
+const lastUpdated = 'July 26, 2026';
 
 const sections: LegalSection[] = [
   {
@@ -64,6 +64,7 @@ const sections: LegalSection[] = [
     body: [
       'We use information to create and secure accounts, sync tasks across devices, operate task boards and planners, run quests and rewards, save wardrobe and frog customization, support friend and buddy features, send reminders, process support requests, and maintain app reliability.',
       'We may also use information to prevent abuse, debug errors, analyze aggregate product performance, improve features, and comply with legal obligations.',
+      'To keep the rewards economy fair, we automatically check activity patterns on your account, such as how many tasks you complete in a day, how quickly tasks are created and completed, repeated or near-identical task titles, and whether tasks are opened or edited. Where these patterns indicate that rewards are being generated artificially rather than earned, we may automatically limit reward earning, gift drops, trade-ups, or friend rewards on the account. These limits are reversible and are removed once normal use resumes. We do this to protect the service and other users, and you can ask us to review a decision by contacting support@frogress.com.',
     ],
   },
   {

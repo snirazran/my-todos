@@ -9,7 +9,22 @@ export type ItemDef = {
   riveIndex: number;
   icon: string; // Keep for fallback or other UI
   priceFlies?: number;
+  sellFlies?: number | null;
+  availableFrom?: string | null;
+  availableUntil?: string | null;
 };
+
+export const DEFAULT_SELL_RATIO = 0.5;
+
+export function sellPriceOf(
+  item: Pick<ItemDef, 'priceFlies' | 'sellFlies'> | undefined | null,
+): number {
+  if (!item) return 0;
+  if (typeof item.sellFlies === 'number' && item.sellFlies >= 0) {
+    return Math.floor(item.sellFlies);
+  }
+  return Math.floor((item.priceFlies ?? 0) * DEFAULT_SELL_RATIO);
+}
 
 export const RARITY_ORDER = [
   'common',

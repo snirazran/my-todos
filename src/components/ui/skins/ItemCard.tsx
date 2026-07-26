@@ -7,6 +7,7 @@ import { Check, Info, Loader2, X } from 'lucide-react';
 import Fly from '@/components/ui/fly';
 import { cn } from '@/lib/utils';
 import type { ItemDef, Rarity } from '@/lib/skins/catalog';
+import { sellPriceOf } from '@/lib/skins/catalog';
 import { RarityCornerBadge } from './RarityCornerBadge';
 import Frog from '@/components/ui/frog';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
@@ -469,7 +470,7 @@ function ItemCardComponent({
             <div className="h-7 w-full flex items-center justify-center gap-1 text-xs md:text-sm font-black tracking-tight text-foreground">
               <Fly size={26} y={-2} paused={true} />
               <span className="tabular-nums leading-none">
-                +{Math.floor((item.priceFlies || 0) / 2)}
+                +{sellPriceOf(item)}
               </span>
             </div>
           )}
@@ -518,7 +519,7 @@ function ItemCardComponent({
                   Sell
                   <span className="mx-0.5 opacity-40">|</span>
                   <Fly size={14} className="opacity-80" y={-2} paused={true} />+
-                  {Math.floor((item.priceFlies || 0) / 2)}
+                  {sellPriceOf(item)}
                 </span>
               </Button>
             </div>

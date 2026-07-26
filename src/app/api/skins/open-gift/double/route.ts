@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import UserModel, { type UserDoc } from '@/lib/models/User';
-import { getGiftConfig, pickGiftDrop, getPrizePool } from '@/lib/skins/gifts';
+import { getGiftConfig, pickGiftDrop, getRewardPool } from '@/lib/skins/gifts';
 import { DOUBLE_CLAIM_WINDOW_MS } from '@/lib/rewards/adDouble';
 
 const json = (body: unknown, init = 200) =>
@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
 
     const giftConfig = await getGiftConfig(claim.giftBoxId);
     if (!giftConfig) return json({ error: 'Gift is not configured' }, 400);
-    const prizePool = await getPrizePool();
+    const prizePool = await getRewardPool();
     const prize = pickGiftDrop(giftConfig, prizePool);
     if (!prize) return json({ error: 'Gift has no available drops' }, 400);
 

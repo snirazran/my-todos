@@ -5,6 +5,7 @@ import CatalogItemModel, { type CatalogItemDoc } from '@/lib/models/CatalogItem'
 import UserModel from '@/lib/models/User';
 import { CATALOG } from '@/lib/skins/catalog';
 import { invalidateCatalogCache } from '@/lib/skins/getCatalog';
+import { parseAvailabilityDate } from '@/lib/skins/availability';
 
 const COSMETIC_SLOTS = ['skin', 'body', 'hat', 'hand_item'] as const;
 type CosmeticSlot = (typeof COSMETIC_SLOTS)[number];
@@ -86,6 +87,22 @@ function parseInteger(value: string, label: string, rowNumber: number) {
   return Number(trimmed);
 }
 
+function parseWindowDate(
+  value: string,
+  label: string,
+  edge: 'start' | 'end',
+  rowNumber: number,
+) {
+  if (!value.trim()) return null;
+  const parsed = parseAvailabilityDate(value, edge);
+  if (!parsed) {
+    throw new Error(
+      `Row ${rowNumber}: ${label} must be a date like 2026-08-01, or blank for always available`,
+    );
+  }
+  return parsed;
+}
+
 function csvToCatalogDocs(text: string) {
   const rows = parseCsv(text);
   if (rows.length < 2) {
@@ -118,6 +135,25 @@ function csvToCatalogDocs(text: string) {
       throw new Error(`Row ${rowNumber}: id can only contain letters, numbers, underscores, and hyphens`);
     }
 
+    const sellRaw = cell('sellprice');
+    const sellFlies = sellRaw
+      ? parseInteger(sellRaw, 'sellPrice', rowNumber)
+      : null;
+    if (sellFlies !== null && sellFlies < 0) {
+      throw new Error(`Row ${rowNumber}: sellPrice cannot be negative`);
+    }
+    if (sellFlies !== null && sellFlies > priceFlies) {
+      throw new Error(
+        `Row ${rowNumber}: sellPrice (${sellFlies}) cannot be higher than price (${priceFlies})`,
+      );
+    }
+
+    const availableFrom = parseWindowDate(cell('startdate'), 'startDate', 'start', rowNumber);
+    const availableUntil = parseWindowDate(cell('enddate'), 'endDate', 'end', rowNumber);
+    if (availableFrom && availableUntil && availableUntil <= availableFrom) {
+      throw new Error(`Row ${rowNumber}: endDate must be after startDate`);
+    }
+
     const activeInputs = SLOT_COLUMNS.map(({ key, slot }) => ({
       slot,
       riveIndex: parseInteger(cell(key), key, rowNumber),
@@ -145,6 +181,9 @@ function csvToCatalogDocs(text: string) {
       riveIndex: activeInput.riveIndex,
       icon: '',
       priceFlies,
+      sellFlies,
+      availableFrom,
+      availableUntil,
       hidden: false,
     });
   });
@@ -249,7 +288,21 @@ export async function POST(req: NextRequest) {
     await removeDeletedCosmeticsFromUsers(removedIds);
     invalidateCatalogCache();
 
-    return json({ ok: true, imported: docs.length, removed: removedIds.length });
+    const now = new Date();
+    const scheduled = docs.filter(
+      (doc) => doc.availableFrom && doc.availableFrom > now,
+    ).length;
+    const expired = docs.filter(
+      (doc) => doc.availableUntil && doc.availableUntil < now,
+    ).length;
+
+    return json({
+      ok: true,
+      imported: docs.length,
+      removed: removedIds.length,
+      scheduled,
+      expired,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Import failed';
     if (message.includes('Unauthorized') || message.includes('Forbidden')) {

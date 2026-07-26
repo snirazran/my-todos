@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import UserModel, { type UserDoc } from '@/lib/models/User';
-import { CATALOG, type WardrobeSlot } from '@/lib/skins/catalog';
+import { CATALOG, type ItemDef, type WardrobeSlot } from '@/lib/skins/catalog';
 import { getFullCatalog, buildById } from '@/lib/skins/getCatalog';
+import { isAvailableAt, filterAvailable } from '@/lib/skins/availability';
 import { getDailyDeals, isPremiumActive } from '@/lib/skins/dailyDeal';
 import { notifyUserChanged } from '@/lib/taskSync';
 import { bumpQuestMetric } from '@/lib/quests/metrics';
@@ -14,6 +15,25 @@ const json = (body: unknown, init = 200) =>
   NextResponse.json(body, { status: init });
 
 type LeanUser = UserDoc & { _id: string };
+
+/**
+ * Scheduled and expired items leave the shop, but anything the player already
+ * owns or has equipped stays in the catalog so their wardrobe keeps working.
+ */
+function visibleCatalog(
+  catalog: ItemDef[],
+  wardrobe: UserWardrobe,
+  now: Date,
+): ItemDef[] {
+  const kept = new Set<string>();
+  for (const [id, count] of Object.entries(wardrobe.inventory ?? {})) {
+    if ((count ?? 0) > 0) kept.add(id);
+  }
+  for (const id of Object.values(wardrobe.equipped ?? {})) {
+    if (id) kept.add(id);
+  }
+  return catalog.filter((item) => isAvailableAt(item, now) || kept.has(item.id));
+}
 
 /** Ensure user.wardrobe exists; sanitize equipped vs inventory */
 async function ensureWardrobe(uid: string) {
@@ -134,16 +154,18 @@ export async function GET(req: NextRequest) {
     const premiumUser = (await UserModel.findById(userId)
       .select('premiumUntil')
       .lean()) as { premiumUntil?: Date | null } | null;
+    const now = new Date();
     return json({
       wardrobe,
-      catalog: fullCatalog,
-      dailyDeals: getDailyDeals(fullCatalog, new Date(), timezone),
+      catalog: visibleCatalog(fullCatalog, wardrobe, now),
+      dailyDeals: getDailyDeals(fullCatalog, now, timezone),
       isPremium: isPremiumActive(premiumUser?.premiumUntil),
     });
   } catch {
     // Guest Mode or Unauthorized
     let guestCatalog;
     try { guestCatalog = await getFullCatalog(); } catch { guestCatalog = CATALOG; }
+    guestCatalog = filterAvailable([...guestCatalog]);
     return json({
       wardrobe: {
         equipped: {},

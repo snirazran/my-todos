@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { Button } from '@/components/ui/button';
-import { ItemDef } from '@/lib/skins/catalog';
+import { ItemDef, sellPriceOf } from '@/lib/skins/catalog';
 import Fly from '@/components/ui/fly';
 import Frog from '@/components/ui/frog';
 import { GiftRive } from '@/components/ui/gift-box/GiftBox';
@@ -97,7 +97,7 @@ export function SellConfirmationDialog({
 
   if (!item) return null;
 
-  const singleRefund = Math.floor((item.priceFlies ?? 0) / 2);
+  const singleRefund = sellPriceOf(item);
   const totalRefund = singleRefund * quantity;
   const rarityConfig = RARITY_CONFIG[item.rarity];
 

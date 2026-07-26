@@ -372,7 +372,14 @@
       "Bash(awk 'NR>=985 && NR<=1000' /Users/snirazran/Fullstack/my-todos/src/components/ui/siteHeader.tsx)",
       "Bash(awk 'NR>=1400 && NR<=1620 && \\(/return \\\\{/ || /^  \\\\};/ || /tasks,/ || /user,/ || /dailyQuests/ || /onboardingQuests/ || /categoryQuests/\\)' /Users/snirazran/Fullstack/my-todos/src/lib/quests/engine.ts)",
       "WebFetch(domain:docs.sentry.io)",
-      "Bash(perl -pi -e 's/FOCUS_UNLOCK_TARGET/EARLY_UNLOCK_STEP_TARGET/g' src/components/ui/QuestsPanel.tsx)"
+      "Bash(perl -pi -e 's/FOCUS_UNLOCK_TARGET/EARLY_UNLOCK_STEP_TARGET/g' src/components/ui/QuestsPanel.tsx)",
+      "WebFetch(domain:www.fluxdigitalpolicy.com)",
+      "Bash(perl -0pi -e ' *)",
+      "Bash(perl -pi -e \"s/const lastUpdated = 'July 10, 2026';/const lastUpdated = 'July 26, 2026';/\" src/app/terms/page.tsx src/app/privacy/page.tsx src/app/refund-policy/page.tsx)",
+      "Bash(perl -0pi -e \"s/import \\\\{ CATALOG, type ItemDef \\\\} from '\\\\.\\\\/catalog';/import { CATALOG, type ItemDef } from '.\\\\/catalog';\\\\nimport { filterAvailable } from '.\\\\/availability';/\" src/lib/skins/gifts.ts)",
+      "Bash(perl -0pi -e \"s/getPrizePool \\\\} from '\\\\@\\\\/lib\\\\/skins\\\\/gifts';/getRewardPool } from '\\\\@\\\\/lib\\\\/skins\\\\/gifts';/; s/await getPrizePool\\\\\\(\\\\\\)/await getRewardPool\\(\\)/g\" src/app/api/skins/open-gift/route.ts src/app/api/skins/open-gift/double/route.ts src/app/api/skins/gift-drops/route.ts src/app/api/skins/trade/reroll/route.ts)",
+      "Bash(perl -0pi -e \"s/import \\\\{ filterAvailable \\\\} from '\\\\.\\\\/availability';/import { filterAvailable, isAvailableAt } from '.\\\\/availability';/\" src/lib/skins/gifts.ts)",
+      "Bash(perl -pi -e \"s{'\\\\.\\\\./\\\\.\\\\./\\\\.\\\\./\\\\.\\\\./Users/snirazran/Fullstack/my-todos/src/lib/skins/availability'}{'/Users/snirazran/Fullstack/my-todos/src/lib/skins/availability'}\" \"/private/tmp/claude-501/-Users-snirazran-Fullstack-my-todos/102f3db0-c598-424c-8c08-9f2652d6f321/scratchpad/check-csv.ts\")"
     ]
   }
 }

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { LegalPage, type LegalSection } from '@/components/legal/LegalPage';
 
-const lastUpdated = 'July 10, 2026';
+const lastUpdated = 'July 26, 2026';
 
 const sections: LegalSection[] = [
   {
@@ -55,45 +55,72 @@ const sections: LegalSection[] = [
       'Subscriptions renew automatically at the end of each billing period until cancelled. You can cancel at any time, and cancellation takes effect at the end of the current billing period, so you keep Plus access until then. Deleting the app or your account does not by itself cancel a subscription.',
       'Purchases made on our website are processed by Paddle.com, acting as our merchant of record and reseller; Paddle\'s checkout terms apply to those purchases. Purchases made inside the mobile apps are processed by the Apple App Store or Google Play under their terms, and those subscriptions are managed and cancelled through your store account.',
       'We may change subscription prices or features. If a price change affects an active subscription, we will give notice as required by the applicable store or payment provider, and you can cancel before the change takes effect. Refunds are handled as described in our Refund Policy at frogress.com/refund-policy.',
-      'Frogress may also offer optional rewarded advertisements that let you earn in-app bonuses, such as doubling a reward, by choosing to watch an ad. Watching ads is always optional. Virtual items, currency (such as flies), and cosmetics have no real-world monetary value, cannot be exchanged for cash, and may be modified as part of changes to the service.',
+      'Fly packs are digital content delivered immediately. Where you have a statutory right of withdrawal or cancellation, such as the 14-day right in the EU, the UK, or under Israeli consumer protection law, you ask us to begin delivery as soon as you complete the purchase. You keep that right for flies you have not yet spent; once flies have been spent in the app, that portion of the purchase can no longer be withdrawn. Our Refund Policy explains how to make a request.',
+      'Frogress may also offer optional rewarded advertisements that let you earn in-app bonuses, such as doubling a reward, by choosing to watch an ad. Watching ads is always optional.',
     ],
   },
   {
-    title: '8. Service availability',
+    title: '8. Flies, cosmetics, and other virtual items',
+    body: [
+      'Frogress uses an in-app currency called flies, which you earn by using the app and may also buy in fly packs, and cosmetic items such as frog outfits and backgrounds. Flies and cosmetics are a personal, limited, non-transferable licence to use them inside Frogress. They are not your property, not money, not a stored-value or payment instrument, and not a deposit.',
+      'Flies and cosmetics have no real-world monetary value. They cannot be exchanged for cash, transferred or sold to other users, or used outside Frogress. The prices shown in the app are in flies; the real-money price of any purchase is always shown before you pay for it.',
+      'We may change how flies are earned, what they cost, the daily limits that apply, and which cosmetics are available, including adding, retiring, or rotating items. We will not remove flies or items you already hold except where they were obtained through error, a fault in the service, or a breach of these Terms, or where we are required to by law.',
+      'Some content, including seasons and limited-time items, is available only for a stated period. Rewards you have not claimed when that period ends, and premium-only rewards for periods during which you did not hold an active Frogress Plus subscription, are no longer available.',
+      'If your account is closed by you or by us, any remaining flies and cosmetics are lost and are not refunded or exchanged for money, except where refundable under our Refund Policy or required by applicable law.',
+    ],
+  },
+  {
+    title: '9. Randomized rewards',
+    body: [
+      'Some Frogress rewards are randomized. Gift boxes contain a cosmetic item selected at random from a stated set, and trade-ups exchange several cosmetics you own for one randomly selected item of a higher rarity.',
+      'The probability of receiving each rarity, and the number of openings after which a higher rarity is guaranteed, are published in the app and shown before you open a gift box or start a trade-up. Gift boxes can be obtained by playing and by spending flies, which can be bought.',
+      'Randomized rewards only ever produce cosmetic items for use inside Frogress. They are not a game of chance for money or money\'s worth, there is no cash prize, and nothing you receive can be cashed out, sold, or traded outside the app. Where the law in your country restricts randomized virtual items, these features may be limited or unavailable.',
+    ],
+  },
+  {
+    title: '10. Fair use of the rewards economy',
+    body: [
+      'Flies are meant to reward real use of Frogress. A daily limit applies to how many flies any account can earn from completing tasks, and similar limits may apply to other reward sources. Work you do beyond the limit still counts toward streaks, quests, and seasons; it just stops paying flies for that day.',
+      'You may not create tasks, checklists, accounts, or friend connections for the purpose of generating flies or rewards, use automation to complete tasks, or otherwise manipulate the rewards system. If we detect this, we may reduce or pause reward earning on the account, suspend gift drops, trade-ups, or friend rewards, and reverse flies and items obtained this way. These measures may be applied automatically and are lifted once normal use resumes.',
+      'If you believe a limit has been applied to your account in error, contact us at support@frogress.com and we will review it.',
+    ],
+  },
+  {
+    title: '11. Service availability',
     body: [
       'We work to keep Frogress available and reliable, but we do not guarantee that the service will be uninterrupted, error-free, or available on every device or in every location.',
       'Frogress is provided for personal productivity and habit support. It is not a medical, legal, financial, emergency, or professional advice service.',
     ],
   },
   {
-    title: '9. Termination',
+    title: '12. Termination',
     body: [
       'You may stop using Frogress at any time. We may suspend or terminate access if you violate these Terms, create risk for other users, or use the service in a way that may harm Frogress.',
       'Sections that by their nature should survive termination, including ownership, disclaimers, limitations of liability, and dispute-related provisions, will continue to apply.',
     ],
   },
   {
-    title: '10. Disclaimers and limitation of liability',
+    title: '13. Disclaimers and limitation of liability',
     body: [
       'Frogress is provided "as is" and "as available" to the fullest extent permitted by law. We disclaim warranties of merchantability, fitness for a particular purpose, and non-infringement where permitted.',
       'To the fullest extent permitted by law, Frogress and its operators will not be liable for indirect, incidental, special, consequential, exemplary, or punitive damages, or for lost profits, lost data, or service interruption.',
     ],
   },
   {
-    title: '11. Governing law',
+    title: '14. Governing law',
     body: [
       'These Terms are governed by the laws of the State of Israel, without regard to conflict-of-law rules, and disputes will be resolved in the competent courts of Israel, except where the mandatory consumer protection law of your country of residence gives you additional rights or a different forum.',
     ],
   },
   {
-    title: '12. Changes to these Terms',
+    title: '15. Changes to these Terms',
     body: [
       'We may update these Terms from time to time. When we make material changes, we will take reasonable steps to notify users, such as updating the date on this page or providing an in-app notice.',
       'Your continued use of Frogress after updated Terms become effective means you accept the updated Terms.',
     ],
   },
   {
-    title: '13. Contact',
+    title: '16. Contact',
     body: [
       'Frogress is operated by Snir Azran. Questions about these Terms can be sent to support@frogress.com.',
     ],

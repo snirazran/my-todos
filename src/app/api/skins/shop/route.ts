@@ -5,6 +5,7 @@ import UserModel, { type UserDoc } from '@/lib/models/User';
 import type { UserWardrobe } from '@/lib/types/UserDoc';
 import { getFullCatalog, buildById } from '@/lib/skins/getCatalog';
 import { getDailyDeals, isPremiumActive } from '@/lib/skins/dailyDeal';
+import { availabilityStateAt } from '@/lib/skins/availability';
 import { bumpQuestMetric } from '@/lib/quests/metrics';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
 
@@ -30,6 +31,18 @@ export async function POST(req: NextRequest) {
     const fullCatalog = await getFullCatalog();
     const byId = buildById(fullCatalog);
     if (!itemId || !byId[itemId]) return json({ error: 'Unknown itemId' }, 400);
+    const state = availabilityStateAt(byId[itemId]);
+    if (state !== 'active') {
+      return json(
+        {
+          error:
+            state === 'scheduled'
+              ? 'This item is not in the shop yet'
+              : 'This item has left the shop',
+        },
+        400,
+      );
+    }
     const user = (await UserModel.findById(userId).lean()) as LeanUser | null;
     if (!user) return json({ error: 'User not found' }, 404);
 

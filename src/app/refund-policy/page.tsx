@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { LegalPage, type LegalSection } from '@/components/legal/LegalPage';
 
-const lastUpdated = 'July 10, 2026';
+const lastUpdated = 'July 26, 2026';
 
 const sections: LegalSection[] = [
   {
@@ -34,21 +34,30 @@ const sections: LegalSection[] = [
     ],
   },
   {
-    title: '5. Free trials',
+    title: '5. Fly packs and other virtual items',
+    body: [
+      'Fly packs are one-time purchases of in-app currency, delivered to your account immediately. If you have a statutory right of withdrawal or cancellation — for example the 14-day right in the EU and the UK, or the cancellation right under Israeli consumer protection law — you can exercise it for flies you have not yet spent, and we will refund that part of the purchase. Flies you have already spent in the app cannot be withdrawn or refunded, because the content has been delivered and used.',
+      'Items received from gift boxes, trade-ups, and other randomized rewards are delivered as soon as they are opened and are not refundable, including when the item you receive is not the one you hoped for. The chances for each rarity are shown in the app before you open a gift box or start a trade-up.',
+      'Flies earned by using the app, rather than bought, have no monetary value and are not refundable. Refunds are made in real money for the amount you paid; we do not refund purchases in flies.',
+      'For fly packs bought inside the iOS or Android apps, the store refund processes in sections 3 and 4 apply. For fly packs bought on our website, contact support@frogress.com.',
+    ],
+  },
+  {
+    title: '6. Free trials',
     body: [
       'Frogress Plus plans may include a free trial, such as 7 days on the yearly plan or 3 days on the monthly plan. You will not be charged if you cancel before the trial ends.',
       'If you forget to cancel and are charged right after a trial ends, contact us within 14 days of the charge and we will refund web purchases in full. For App Store and Google Play charges, please use the store refund process described above.',
     ],
   },
   {
-    title: '6. Cancelling your subscription',
+    title: '7. Cancelling your subscription',
     body: [
       'Cancelling stops future charges and is different from a refund. When you cancel, your Plus access continues until the end of the period you already paid for.',
       'Web purchases can be cancelled from the subscription management link in your Paddle receipt email or by emailing support@frogress.com. App Store purchases are cancelled in your device\'s subscription settings, and Google Play purchases are cancelled in the Play Store\'s subscriptions section. Deleting the app does not cancel a subscription.',
     ],
   },
   {
-    title: '7. Contact',
+    title: '8. Contact',
     body: [
       'Questions about refunds or cancellations can be sent to support@frogress.com. Please include the email address you purchased with and, for web purchases, your Paddle order number so we can find your purchase quickly.',
     ],

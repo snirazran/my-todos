@@ -4,6 +4,7 @@ import connectMongo from '@/lib/mongoose';
 import CatalogItemModel from '@/lib/models/CatalogItem';
 import { CATALOG } from '@/lib/skins/catalog';
 import { invalidateCatalogCache } from '@/lib/skins/getCatalog';
+import { parseAvailabilityDate } from '@/lib/skins/availability';
 
 const json = (body: unknown, init = 200) =>
   NextResponse.json(body, { status: init });
@@ -92,7 +93,17 @@ export async function PUT(req: NextRequest) {
   try {
     await requireUserId();
 
-    let body: { id?: string; name?: string; riveIndex?: number; rarity?: string; priceFlies?: number; hidden?: boolean };
+    let body: {
+      id?: string;
+      name?: string;
+      riveIndex?: number;
+      rarity?: string;
+      priceFlies?: number;
+      sellFlies?: number | null;
+      availableFrom?: string | null;
+      availableUntil?: string | null;
+      hidden?: boolean;
+    };
     try {
       body = await req.json();
     } catch {
@@ -108,6 +119,25 @@ export async function PUT(req: NextRequest) {
     if (typeof body.riveIndex === 'number') update.riveIndex = body.riveIndex;
     if (body.rarity) update.rarity = body.rarity;
     if (typeof body.priceFlies === 'number') update.priceFlies = body.priceFlies;
+    if (body.sellFlies !== undefined) {
+      update.sellFlies =
+        typeof body.sellFlies === 'number' && body.sellFlies >= 0
+          ? Math.floor(body.sellFlies)
+          : null;
+    }
+    if (body.availableFrom !== undefined) {
+      update.availableFrom = parseAvailabilityDate(body.availableFrom ?? '', 'start');
+    }
+    if (body.availableUntil !== undefined) {
+      update.availableUntil = parseAvailabilityDate(body.availableUntil ?? '', 'end');
+    }
+    if (
+      update.availableFrom instanceof Date &&
+      update.availableUntil instanceof Date &&
+      update.availableUntil <= update.availableFrom
+    ) {
+      return json({ error: 'End date must be after start date' }, 400);
+    }
     if (typeof body.hidden === 'boolean') update.hidden = body.hidden;
 
     const result = await CatalogItemModel.findOneAndUpdate(

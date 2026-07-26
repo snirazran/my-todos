@@ -3,6 +3,7 @@ import GiftDropConfigModel from '@/lib/models/GiftDropConfig';
 import BackgroundModel from '@/lib/models/Background';
 import connectMongo from '@/lib/mongoose';
 import { CATALOG, type ItemDef } from './catalog';
+import { filterAvailable, isAvailableAt } from './availability';
 import { getFullCatalog } from './getCatalog';
 
 export type GiftDropMode = 'item' | 'rarity';
@@ -78,7 +79,15 @@ function itemToDef(item: {
   riveIndex: number;
   icon?: string;
   priceFlies?: number;
+  sellFlies?: number | null;
+  availableFrom?: Date | string | null;
+  availableUntil?: Date | string | null;
 }): ItemDef {
+  const iso = (value: Date | string | null | undefined) => {
+    if (!value) return null;
+    const date = value instanceof Date ? value : new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date.toISOString();
+  };
   return {
     id: item.id,
     name: item.name,
@@ -87,6 +96,9 @@ function itemToDef(item: {
     riveIndex: item.riveIndex,
     icon: item.icon || '',
     priceFlies: item.priceFlies ?? 0,
+    sellFlies: typeof item.sellFlies === 'number' ? item.sellFlies : null,
+    availableFrom: iso(item.availableFrom),
+    availableUntil: iso(item.availableUntil),
   };
 }
 
@@ -123,6 +135,15 @@ export async function getPrizePool(): Promise<GiftPrize[]> {
     .filter((item) => item.slot !== 'container')
     .map((item) => ({ ...item, kind: 'item' as const }));
   return [...items, ...backgrounds];
+}
+
+/**
+ * What a gift or trade-up may actually award right now: the prize pool minus
+ * anything outside its availability window. Use `getPrizePool` instead when
+ * resolving items a player already owns.
+ */
+export async function getRewardPool(now: Date = new Date()): Promise<GiftPrize[]> {
+  return filterAvailable(await getPrizePool(), now);
 }
 
 async function seedCatalogIfEmpty() {
@@ -194,6 +215,9 @@ export async function getGiftConfigs(includeHidden = false): Promise<GiftConfigV
       riveIndex: item.riveIndex,
       icon: item.icon,
       priceFlies: item.priceFlies,
+      sellFlies: item.sellFlies,
+      availableFrom: item.availableFrom,
+      availableUntil: item.availableUntil,
     }),
   );
   const backgrounds = await loadBackgroundPrizes();
@@ -276,7 +300,10 @@ export function pickGiftDrop(
 
   const validDrops = config.drops.filter(
     (drop): drop is GiftDropView & { item: GiftPrize } =>
-      !!drop.item && drop.chance > 0 && drop.item.slot !== 'container',
+      !!drop.item &&
+      drop.chance > 0 &&
+      drop.item.slot !== 'container' &&
+      isAvailableAt(drop.item),
   );
   return weightedPick(validDrops.map((drop) => ({ value: drop.item, weight: drop.chance })));
 }
@@ -290,7 +317,9 @@ export function expandGiftDrops(
   config: GiftConfigView,
   prizePool: GiftPrize[],
 ): GiftDropView[] {
-  if (config.dropMode !== 'rarity') return config.drops;
+  if (config.dropMode !== 'rarity') {
+    return config.drops.filter((drop) => !drop.item || isAvailableAt(drop.item));
+  }
 
   const pool = prizePool.filter((item) => item.slot !== 'container');
   const usable = config.rarityDrops.filter(

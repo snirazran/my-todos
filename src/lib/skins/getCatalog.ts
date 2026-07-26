@@ -1,6 +1,30 @@
 import { CATALOG, type ItemDef } from './catalog';
 import connectMongo from '@/lib/mongoose';
-import CatalogItemModel from '@/lib/models/CatalogItem';
+import CatalogItemModel, { type CatalogItemDoc } from '@/lib/models/CatalogItem';
+
+const iso = (value: Date | string | null | undefined): string | null => {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+};
+
+function toItemDef(doc: Pick<
+  CatalogItemDoc,
+  'id' | 'name' | 'slot' | 'rarity' | 'riveIndex' | 'icon' | 'priceFlies' | 'sellFlies' | 'availableFrom' | 'availableUntil'
+>): ItemDef {
+  return {
+    id: doc.id,
+    name: doc.name,
+    slot: doc.slot as ItemDef['slot'],
+    rarity: (doc.rarity as ItemDef['rarity']) || 'common',
+    riveIndex: doc.riveIndex,
+    icon: doc.icon || '',
+    priceFlies: doc.priceFlies ?? 0,
+    sellFlies: typeof doc.sellFlies === 'number' ? doc.sellFlies : null,
+    availableFrom: iso(doc.availableFrom),
+    availableUntil: iso(doc.availableUntil),
+  };
+}
 
 /** Returns the full catalog from DB (auto-seeds from static on first call) */
 export async function getFullCatalog(): Promise<ItemDef[]> {
@@ -27,26 +51,10 @@ export async function getFullCatalog(): Promise<ItemDef[]> {
 
     // Re-fetch after seeding
     const seeded = await CatalogItemModel.find({ hidden: { $ne: true } }).lean();
-    return seeded.map((d) => ({
-      id: d.id,
-      name: d.name,
-      slot: d.slot as ItemDef['slot'],
-      rarity: (d.rarity as ItemDef['rarity']) || 'common',
-      riveIndex: d.riveIndex,
-      icon: d.icon || '',
-      priceFlies: d.priceFlies ?? 0,
-    }));
+    return seeded.map(toItemDef);
   }
 
-  return dbItems.map((d) => ({
-    id: d.id,
-    name: d.name,
-    slot: d.slot as ItemDef['slot'],
-    rarity: (d.rarity as ItemDef['rarity']) || 'common',
-    riveIndex: d.riveIndex,
-    icon: d.icon || '',
-    priceFlies: d.priceFlies ?? 0,
-  }));
+  return dbItems.map(toItemDef);
 }
 
 let catalogCache: { at: number; items: ItemDef[] } | null = null;

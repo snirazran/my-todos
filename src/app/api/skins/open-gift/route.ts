@@ -4,7 +4,7 @@ import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import UserModel, { type UserDoc } from '@/lib/models/User';
 import { getFullCatalog, buildById } from '@/lib/skins/getCatalog';
-import { getGiftConfig, pickGiftDrop, getPrizePool } from '@/lib/skins/gifts';
+import { getGiftConfig, pickGiftDrop, getRewardPool } from '@/lib/skins/gifts';
 import type { UserWardrobe } from '@/lib/types/UserDoc';
 
 const json = (body: unknown, init = 200) =>
@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
     const giftConfig = await getGiftConfig(giftBoxId);
     if (!giftConfig) return json({ error: 'Gift is not configured' }, 400);
 
-    const prizePool = await getPrizePool();
+    const prizePool = await getRewardPool();
     const prize = pickGiftDrop(giftConfig, prizePool);
     if (!prize) return json({ error: 'Gift has no available drops' }, 400);
 

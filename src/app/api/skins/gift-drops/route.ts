@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getGiftConfig, expandGiftDrops, getPrizePool } from '@/lib/skins/gifts';
+import { getGiftConfig, expandGiftDrops, getRewardPool } from '@/lib/skins/gifts';
 
 const json = (body: unknown, init = 200) =>
   NextResponse.json(body, { status: init });
@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
   const config = await getGiftConfig(giftId);
   if (!config) return json({ error: 'Gift not found' }, 404);
 
-  const prizePool = await getPrizePool();
+  const prizePool = await getRewardPool();
   const drops = expandGiftDrops(config, prizePool).map((drop) => ({
     itemId: drop.itemId,
     chance: drop.chance,

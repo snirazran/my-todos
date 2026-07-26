@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireUserId } from '@/lib/auth';
 import dbConnect from '@/lib/mongoose';
 import User from '@/lib/models/User';
-import { getPrizePool } from '@/lib/skins/gifts';
+import { getRewardPool } from '@/lib/skins/gifts';
 import { DOUBLE_CLAIM_WINDOW_MS } from '@/lib/rewards/adDouble';
 
 export async function POST(req: NextRequest) {
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ granted: false });
     }
 
-    const pool = await getPrizePool();
+    const pool = await getRewardPool();
     let candidates = pool.filter(
       (p) =>
         p.rarity === claim.rarity &&

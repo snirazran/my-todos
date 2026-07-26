@@ -9,6 +9,9 @@ export type CatalogItemDoc = {
   riveIndex: number;
   icon: string;
   priceFlies: number;
+  sellFlies?: number | null;
+  availableFrom?: Date | null;
+  availableUntil?: Date | null;
   hidden: boolean;
 };
 
@@ -21,6 +24,9 @@ const CatalogItemSchema = new Schema<CatalogItemDoc>(
     riveIndex: { type: Number, required: true },
     icon: { type: String, default: '' },
     priceFlies: { type: Number, default: 100 },
+    sellFlies: { type: Number, default: null },
+    availableFrom: { type: Date, default: null },
+    availableUntil: { type: Date, default: null },
     hidden: { type: Boolean, default: false },
   },
   { collection: 'catalogItems' },

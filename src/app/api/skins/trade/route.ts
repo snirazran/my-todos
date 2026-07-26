@@ -5,6 +5,7 @@ import dbConnect from '@/lib/mongoose';
 import User from '@/lib/models/User';
 import { RARITY_ORDER, TRADE_ITEM_COUNT } from '@/lib/skins/catalog';
 import { getPrizePool, type GiftPrize } from '@/lib/skins/gifts';
+import { isAvailableAt } from '@/lib/skins/availability';
 import { bumpQuestMetric } from '@/lib/quests/metrics';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
 
@@ -87,9 +88,9 @@ export async function POST(req: NextRequest) {
     }
     const nextRarity = RARITY_ORDER[currentRankIndex + 1];
 
-    // 4. Reward — any prize (item or background) of the next rarity
+    // 4. Reward — any available prize (item or background) of the next rarity
     const possibleRewards = pool.filter(
-      (i) => i.rarity === nextRarity && i.slot !== 'container',
+      (i) => i.rarity === nextRarity && i.slot !== 'container' && isAvailableAt(i),
     );
     if (possibleRewards.length === 0) {
       return NextResponse.json({ error: `No prizes for rarity ${nextRarity}` }, { status: 500 });

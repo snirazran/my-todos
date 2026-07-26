@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { createPortal } from 'react-dom';
 import Frog from '@/components/ui/frog';
 import { cn } from '@/lib/utils';
+import { availabilityStateAt } from '@/lib/skins/availability';
 
 type CosmeticSlot = 'skin' | 'hat' | 'body' | 'hand_item';
 
@@ -27,8 +28,14 @@ type DbItem = {
   riveIndex: number;
   rarity: string;
   priceFlies: number;
+  sellFlies?: number | null;
+  availableFrom?: string | null;
+  availableUntil?: string | null;
   hidden?: boolean;
 };
+
+const toDateInput = (value?: string | null) =>
+  value ? new Date(value).toISOString().slice(0, 10) : '';
 
 export function AdminCosmeticsPopup({
   open,
@@ -47,7 +54,15 @@ export function AdminCosmeticsPopup({
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editValues, setEditValues] = useState<{ name: string; riveIndex: string; rarity: string; priceFlies: string }>({ name: '', riveIndex: '', rarity: 'common', priceFlies: '100' });
+  const [editValues, setEditValues] = useState<{
+    name: string;
+    riveIndex: string;
+    rarity: string;
+    priceFlies: string;
+    sellFlies: string;
+    availableFrom: string;
+    availableUntil: string;
+  }>({ name: '', riveIndex: '', rarity: 'common', priceFlies: '100', sellFlies: '', availableFrom: '', availableUntil: '' });
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvInputKey, setCsvInputKey] = useState(0);
   const [importing, setImporting] = useState(false);
@@ -149,6 +164,9 @@ export function AdminCosmeticsPopup({
       riveIndex: String(item.riveIndex),
       rarity: item.rarity,
       priceFlies: String(item.priceFlies),
+      sellFlies: typeof item.sellFlies === 'number' ? String(item.sellFlies) : '',
+      availableFrom: toDateInput(item.availableFrom),
+      availableUntil: toDateInput(item.availableUntil),
     });
     setResult(null);
   };
@@ -168,6 +186,9 @@ export function AdminCosmeticsPopup({
           riveIndex: Number(editValues.riveIndex),
           rarity: editValues.rarity,
           priceFlies: Number(editValues.priceFlies) || 0,
+          sellFlies: editValues.sellFlies.trim() === '' ? null : Number(editValues.sellFlies),
+          availableFrom: editValues.availableFrom || null,
+          availableUntil: editValues.availableUntil || null,
         }),
       });
       if (res.ok) {
@@ -203,7 +224,9 @@ export function AdminCosmeticsPopup({
       if (res.ok) {
         setResult({
           type: 'success',
-          message: `Imported ${data.imported ?? 0} cosmetics; removed ${data.removed ?? 0} old IDs`,
+          message: `Imported ${data.imported ?? 0} cosmetics; removed ${data.removed ?? 0} old IDs${
+            data.scheduled ? `; ${data.scheduled} scheduled for later` : ''
+          }${data.expired ? `; ${data.expired} already past their end date` : ''}`,
         });
         setCsvFile(null);
         setCsvInputKey((key) => key + 1);
@@ -342,6 +365,11 @@ export function AdminCosmeticsPopup({
               <p className="mt-2 text-[11px] font-medium text-muted-foreground">
                 Replaces all skins, body items, hats, and hand items. Use -1 in inactive columns.
               </p>
+              <p className="mt-1 text-[11px] font-medium text-muted-foreground">
+                Columns: id, name, rarity, price, skin, body, hat, handItem — plus optional
+                sellPrice (blank = half of price), startDate and endDate (YYYY-MM-DD, UTC,
+                blank = always in the shop).
+              </p>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -385,6 +413,34 @@ export function AdminCosmeticsPopup({
                       min={0}
                       className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/30"
                     />
+                    <input
+                      type="number"
+                      placeholder="Sell price (blank = half)"
+                      value={editValues.sellFlies}
+                      onChange={(e) => setEditValues((p) => ({ ...p, sellFlies: e.target.value }))}
+                      min={0}
+                      className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <label className="flex flex-col gap-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                        In shop from
+                        <input
+                          type="date"
+                          value={editValues.availableFrom}
+                          onChange={(e) => setEditValues((p) => ({ ...p, availableFrom: e.target.value }))}
+                          className="w-full px-2 py-2 rounded-xl border border-border bg-background text-sm font-normal normal-case tracking-normal text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                        Until
+                        <input
+                          type="date"
+                          value={editValues.availableUntil}
+                          onChange={(e) => setEditValues((p) => ({ ...p, availableUntil: e.target.value }))}
+                          className="w-full px-2 py-2 rounded-xl border border-border bg-background text-sm font-normal normal-case tracking-normal text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+                        />
+                      </label>
+                    </div>
                     <div className="flex gap-2">
                       <Button
                         onClick={handleSaveEdit}
@@ -542,6 +598,18 @@ function CosmeticCard({
   };
 
   const isHidden = !!item.hidden;
+  const windowState =
+    item.availableFrom || item.availableUntil
+      ? availabilityStateAt(item)
+      : null;
+  const windowLabel =
+    windowState === 'scheduled'
+      ? `From ${toDateInput(item.availableFrom)}`
+      : windowState === 'expired'
+        ? `Ended ${toDateInput(item.availableUntil)}`
+        : windowState === 'active' && item.availableUntil
+          ? `Until ${toDateInput(item.availableUntil)}`
+          : null;
   const border = RARITY_BORDER[item.rarity] || RARITY_BORDER.common;
   const bg = RARITY_BG[item.rarity] || RARITY_BG.common;
   const text = RARITY_TEXT[item.rarity] || RARITY_TEXT.common;
@@ -599,6 +667,26 @@ function CosmeticCard({
         {item.priceFlies ? (
           <span className="text-[10px] text-muted-foreground">
             {item.priceFlies} flies
+            <span className="opacity-60">
+              {' · sells '}
+              {typeof item.sellFlies === 'number'
+                ? item.sellFlies
+                : Math.floor(item.priceFlies / 2)}
+            </span>
+          </span>
+        ) : null}
+        {windowLabel ? (
+          <span
+            className={cn(
+              'text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md',
+              windowState === 'active'
+                ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10'
+                : windowState === 'scheduled'
+                  ? 'text-sky-600 dark:text-sky-400 bg-sky-500/10'
+                  : 'text-rose-600 dark:text-rose-400 bg-rose-500/10',
+            )}
+          >
+            {windowLabel}
           </span>
         ) : null}
       </div>

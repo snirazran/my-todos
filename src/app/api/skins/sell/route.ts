@@ -3,6 +3,7 @@ import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import UserModel, { type UserDoc } from '@/lib/models/User';
 import { getFullCatalog, buildById } from '@/lib/skins/getCatalog';
+import { sellPriceOf } from '@/lib/skins/catalog';
 import { bumpQuestMetric } from '@/lib/quests/metrics';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
 
@@ -41,9 +42,8 @@ export async function POST(req: NextRequest) {
       return json({ error: 'Not enough items' }, 400);
     }
 
-    // Calculate refund price (50% of original price) * amount
-    const originalPrice = byId[itemId].priceFlies ?? 0;
-    const singleRefund = Math.floor(originalPrice / 2);
+    // Catalog sell price, falling back to 50% of the shop price
+    const singleRefund = sellPriceOf(byId[itemId]);
     const totalRefund = singleRefund * amount;
 
     // Transaction: Atomic check-and-update to prevent race conditions

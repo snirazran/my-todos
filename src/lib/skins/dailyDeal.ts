@@ -1,4 +1,5 @@
 import { RARITY_ORDER, type ItemDef } from './catalog';
+import { isAvailableAt } from './availability';
 import { zonedToUtc } from '@/lib/calendar/time';
 import { getZonedYMD } from '@/lib/utils';
 
@@ -44,7 +45,10 @@ export function getDailyDeals(
   dealsPerRarity: number = DAILY_DEALS_PER_RARITY,
 ): DailyDeal[] {
   const eligible = catalog.filter(
-    (item) => item.slot !== 'container' && (item.priceFlies ?? 0) > 0,
+    (item) =>
+      item.slot !== 'container' &&
+      (item.priceFlies ?? 0) > 0 &&
+      isAvailableAt(item, now),
   );
   if (eligible.length === 0) return [];
 

@@ -26,7 +26,7 @@ import {
   Gift,
 } from 'lucide-react';
 import type { ItemDef, WardrobeSlot } from '@/lib/skins/catalog';
-import { rarityRank, byId as staticById } from '@/lib/skins/catalog';
+import { rarityRank, byId as staticById, sellPriceOf } from '@/lib/skins/catalog';
 import Fly from '@/components/ui/fly';
 import Frog from '@/components/ui/frog';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
@@ -428,7 +428,7 @@ function WardrobeManagerContent({
     if (!user || !data?.wardrobe) return;
 
     const currentCount = data.wardrobe.inventory?.[item.id] ?? 0;
-    const refund = Math.floor((item.priceFlies ?? 0) / 2);
+    const refund = sellPriceOf(item);
     // Refund for this batch
     const totalRefund = refund * qty;
 
