@@ -181,10 +181,11 @@ export function NextQuestStrip({
     >
       {showClaimable && claimable ? (
         <>
-          <div className="h-12 w-12 shrink-0 animate-[reward-pop_0.4s_ease-out_both] motion-reduce:animate-none">
-            <div className="h-full w-full animate-quest-pulse">
+          <div className="shrink-0 animate-[reward-pop_0.4s_ease-out_both] motion-reduce:animate-none">
+            <div className="animate-quest-pulse">
               <QuestRewardTileBadge
                 reward={claimable.reward}
+                rewards={claimable.rewards}
                 catalog={resolvedCatalog}
                 isPremium={!!isPremium}
               />
@@ -196,7 +197,7 @@ export function NextQuestStrip({
                 ? `${claimableCount} rewards ready`
                 : 'Reward ready'}
             </span>
-            <span className="mt-0.5 text-[13px] font-black text-foreground">
+            <span className="mt-0.5 block min-w-0 line-clamp-2 text-[13px] font-black text-foreground md:line-clamp-none md:truncate">
               {claimable.kind === 'season' ? (
                 <span className="truncate">
                   {claimable.seasonName
@@ -231,6 +232,7 @@ export function NextQuestStrip({
         <>
           <QuestRewardTileBadge
             reward={displayNextUp.reward}
+            rewards={displayNextUp.rewards}
             catalog={resolvedCatalog}
             isPremium={!!isPremium}
             small
@@ -255,7 +257,7 @@ export function NextQuestStrip({
                 Next Quest
               </span>
               <span className="flex min-w-0 items-center text-[12px] font-black leading-tight text-foreground md:text-[14px] md:font-bold">
-                <span className="flex min-w-0 items-center truncate">
+                <span className="min-w-0 flex-1 line-clamp-2 md:line-clamp-none md:truncate">
                   <ObjectiveLabel
                     label={displayNextUp.remainingLabel}
                     tags={displayNextUp.tags}

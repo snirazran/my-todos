@@ -38,6 +38,7 @@ export type Claimable = {
   seasonName?: string;
   day?: number;
   reward?: any;
+  rewards?: any[];
 };
 
 export type Trackable = {
@@ -55,6 +56,7 @@ export type Trackable = {
   target: number;
   tierIndex?: number;
   reward?: any;
+  rewards?: any[];
   hint?: string;
   guideId?: string;
   guideContext?: import('@/lib/hints/guides').HintGuideContext;
@@ -263,34 +265,90 @@ function rewardQuantityLabel(reward: any): string {
   return `x${base}`;
 }
 
+const REWARD_RARITY_RANK: Record<string, number> = {
+  legendary: 5,
+  epic: 4,
+  rare: 3,
+  uncommon: 2,
+  common: 1,
+};
+
+function sortRewardsByRarity(rewards: any[], catalog: Catalog): any[] {
+  const rank = (reward: any) => {
+    const lookupId = reward?.itemId ?? reward?.backgroundId;
+    const item = lookupId ? catalog[lookupId] : null;
+    return item ? REWARD_RARITY_RANK[item.rarity] ?? 0 : 0;
+  };
+  return [...rewards].sort((a, b) => rank(b) - rank(a));
+}
+
+const MAX_REWARD_TILES = 2;
+
 export function QuestRewardTileBadge({
   reward,
+  rewards,
   catalog,
   isPremium,
   small,
 }: {
-  reward: any;
+  reward?: any;
+  rewards?: any[];
   catalog: Catalog;
   isPremium: boolean;
   small?: boolean;
 }) {
-  if (!reward) return null;
+  const all = (rewards?.length ? rewards : reward ? [reward] : []).filter(
+    Boolean,
+  );
+  if (!all.length) return null;
+  const sorted = all.length > 1 ? sortRewardsByRarity(all, catalog) : all;
+  const shown = sorted.slice(0, MAX_REWARD_TILES);
+  const extraCount = sorted.length - shown.length;
+  const stacked = shown.length > 1;
   return (
-    <div className="relative shrink-0">
-      <RewardTile
-        reward={reward}
-        rewardCatalog={catalog}
-        isPremium={isPremium}
-        hideBadge
-        className={small ? 'h-9 w-9 rounded-lg' : 'h-12 w-12 rounded-xl'}
-        frogClassName="-translate-y-[18%]"
-        flySize={small ? 22 : 30}
-        flyOversample={1.25}
-        giftAnimation="box_shake"
-      />
-      <span className="absolute -right-0.5 -top-1 z-20 flex min-w-4 items-center justify-center rounded-sm border border-white/10 bg-black/50 px-1 py-0.5 text-[8px] font-bold uppercase tracking-wide text-white shadow-sm backdrop-blur-sm">
-        {rewardQuantityLabel(reward)}
-      </span>
+    <div className="relative flex shrink-0 items-center">
+      {shown.map((item, i) => {
+        const centerOffset = i - (shown.length - 1) / 2;
+        return (
+          <div
+            key={`${item.type}-${item.itemId ?? item.backgroundId ?? item.amount ?? i}`}
+            className="relative"
+            style={{
+              marginLeft: i === 0 ? 0 : small ? -10 : -12,
+              transform: stacked
+                ? `rotate(${centerOffset * 7}deg) translateY(${Math.abs(centerOffset) * 2}px)`
+                : undefined,
+              zIndex: shown.length - i,
+            }}
+          >
+            <RewardTile
+              reward={item}
+              rewardCatalog={catalog}
+              isPremium={isPremium}
+              hideBadge
+              className={
+                small
+                  ? 'h-9 w-9 rounded-lg'
+                  : 'h-11 w-11 rounded-xl min-[400px]:h-12 min-[400px]:w-12'
+              }
+              frogClassName="-translate-y-[18%]"
+              flySize={small ? 22 : 30}
+              flyOversample={1.25}
+              giftAnimation={i === 0 ? 'box_shake' : undefined}
+            />
+            <span className="absolute -right-0.5 -top-1 z-20 flex min-w-4 items-center justify-center rounded-sm border border-white/10 bg-black/50 px-1 py-0.5 text-[8px] font-bold uppercase tracking-wide text-white shadow-sm backdrop-blur-sm">
+              {rewardQuantityLabel(item)}
+            </span>
+          </div>
+        );
+      })}
+      {extraCount > 0 && (
+        <span
+          className="pointer-events-none absolute -bottom-0.5 -right-1.5 z-30 flex h-4 min-w-4 items-center justify-center rounded-md border border-white/10 bg-black/55 px-1 text-[8px] font-black uppercase tracking-wide text-white shadow-sm backdrop-blur-sm"
+        >
+          +{extraCount}
+        </span>
+      )}
     </div>
   );
 }
@@ -694,6 +752,7 @@ function ClaimRewardToast({
     >
       <QuestRewardTileBadge
         reward={claimable.reward}
+        rewards={claimable.rewards}
         catalog={catalog}
         isPremium={isPremium}
       />
@@ -754,6 +813,7 @@ function QuestProgressToast({
     >
       <QuestRewardTileBadge
         reward={trackable.reward}
+        rewards={trackable.rewards}
         catalog={catalog}
         isPremium={isPremium}
       />

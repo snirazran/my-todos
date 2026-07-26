@@ -144,6 +144,7 @@ type ClaimableEntry = {
   seasonName?: string;
   day?: number;
   reward?: any;
+  rewards?: any[];
 };
 
 type TrackableEntry = {
@@ -161,6 +162,7 @@ type TrackableEntry = {
   target: number;
   tierIndex?: number;
   reward?: any;
+  rewards?: any[];
   hint?: string;
   guideId?: string;
   guideContext?: import('@/lib/hints/guides').HintGuideContext;
@@ -488,6 +490,7 @@ export async function GET(req: Request) {
                 ? questFocusTags(quest)
                 : undefined,
             reward: block.rewards?.[0],
+            rewards: block.rewards ?? undefined,
           });
         }
       }
@@ -573,6 +576,7 @@ export async function GET(req: Request) {
               : undefined,
           ),
           reward: block.rewards?.[0],
+          rewards: block.rewards ?? undefined,
           lastProgressAt: quest.lastProgressAt,
           expiresAt: quest.expiresAt,
           hint: objectiveHintText(block, questFocusTags(quest)[0]?.name, {
@@ -600,20 +604,22 @@ export async function GET(req: Request) {
       const dayEntry = activeSeason.rewardsByDay.find(
         (e) => e.day === activeSeason.currentDay,
       );
-      const seasonReward = dashboard.isPremium
-        ? dayEntry?.premiumRewards?.[0] ?? dayEntry?.freeRewards?.[0]
-        : dayEntry?.freeRewards?.[0];
+      const seasonRewards = [
+        ...(dayEntry?.freeRewards ?? []),
+        ...(dashboard.isPremium ? dayEntry?.premiumRewards ?? [] : []),
+      ];
       claimables.push({
         id: `season:${activeSeason.id}:${activeSeason.currentDay}`,
         kind: 'season',
         seasonId: activeSeason.id,
         seasonName: activeSeason.name,
         day: activeSeason.currentDay,
-        reward: seasonReward,
+        reward: seasonRewards[0],
+        rewards: seasonRewards.length ? seasonRewards : undefined,
       });
     }
     const claimableRewards = [...claimables, ...trackables]
-      .map((c) => c.reward)
+      .flatMap((c) => (c.rewards?.length ? c.rewards : [c.reward]))
       .filter(Boolean) as import('@/lib/quests/types').QuestRewards;
     let claimablesRewardCatalog: Record<string, unknown> = {};
     if (isSummary && claimableRewards.some((r) => r?.itemId || r?.backgroundId)) {
