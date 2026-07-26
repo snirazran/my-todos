@@ -55,7 +55,7 @@ export type QuickAddSheetProps = Readonly<{
   focusCategoryIds?: MacroCategoryId[];
   categoryTagMap?: FocusCategoryTagMap[];
   /** Today-list sections the task can be filed under (chip hidden when empty). */
-  sections?: ReadonlyArray<{ id: string; name: string }>;
+  sections?: ReadonlyArray<{ id: string; name: string; tagIds?: string[] }>;
 }>;
 
 export type ActivePicker = 'tags' | 'date' | 'repeat' | null;

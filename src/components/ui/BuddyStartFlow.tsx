@@ -13,6 +13,7 @@ import QuickAddSheet from '@/components/ui/QuickAddSheet';
 import { BuddyUpFlow } from '@/components/ui/BuddyUpFlow';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
+import { useSections } from '@/hooks/useSections';
 import type { QuickAddSubmit } from '@/components/ui/quick-add/types';
 import type { BuddyCreateParams } from '@/lib/models/TaskBond';
 import type { FriendSummary } from '@/lib/friends/indices';
@@ -237,6 +238,7 @@ function BuddyInviteFlow({
   const [error, setError] = useState<string | null>(null);
   const sentBtnRef = useRef<HTMLButtonElement>(null);
   useRegisterOpenSheet(phase !== 'compose');
+  const sections = useSections();
 
   const { data: config } = useSWR<InviteConfig>('/api/invite/config', fetcher, {
     revalidateOnFocus: false,
@@ -273,6 +275,7 @@ function BuddyInviteFlow({
         body: JSON.stringify({
           giftOptionId: giftId,
           buddyTask: toBuddyTask(draft),
+          sectionId: draft.sectionId ?? undefined,
         }),
       });
       const data = await res.json();
@@ -305,6 +308,7 @@ function BuddyInviteFlow({
         defaultRepeat="weekly"
         defaultRepeatDaily
         submitLabel="Next"
+        sections={sections}
         onSubmit={(d) => {
           setDraft(d);
           goPhase('gift');

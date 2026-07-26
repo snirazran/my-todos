@@ -429,6 +429,7 @@ export default function ManageTasksPage() {
       reminder,
       repeatEndDate,
       repeatRule,
+      sectionId,
     }: {
       text: string;
       dates: string[];
@@ -439,6 +440,7 @@ export default function ManageTasksPage() {
       reminder?: string;
       repeatEndDate?: string | null;
       repeatRule?: import('@/components/ui/quick-add/utils').RepeatRule | null;
+      sectionId?: string | null;
     }) => {
       try {
         await fetch('/api/tasks?view=board', {
@@ -460,6 +462,7 @@ export default function ManageTasksPage() {
             reminder,
             repeatEndDate,
             repeatRule,
+            sectionId,
           }),
         });
       } catch (e) {

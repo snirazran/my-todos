@@ -5,6 +5,7 @@ import { useAuth } from '@/components/auth/AuthContext';
 import { useNotification } from '@/components/providers/NotificationProvider';
 import { useReminderScheduler } from '@/hooks/useReminderScheduler';
 import { INVENTORY_KEY, INVENTORY_SUMMARY_KEY } from '@/hooks/useInventory';
+import { SECTIONS_KEY } from '@/hooks/useSections';
 import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
 import { markFlyEarn } from '@/lib/flyEarn';
 import { notifyQuestClaims, seedQuestClaims } from '@/lib/questClaims';
@@ -65,6 +66,7 @@ export interface TaskSection {
   name: string;
   order: number;
   collapsed: boolean;
+  tagIds?: string[];
 }
 
 export type FlyStatus = {
@@ -920,7 +922,7 @@ export function useTaskData({
   );
 
   const createSection = useCallback(
-    async (name: string) => {
+    async (name: string, tagIds: string[] = []) => {
       const trimmed = name.trim();
       if (!trimmed) return;
       const id = crypto.randomUUID?.() ?? `sec_${Date.now()}`;
@@ -931,14 +933,16 @@ export function useTaskData({
           name: trimmed,
           order: (cur[cur.length - 1]?.order ?? 0) + 1,
           collapsed: false,
+          tagIds,
         },
       ]);
       try {
         await fetch('/api/sections', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id, name: trimmed }),
+          body: JSON.stringify({ id, name: trimmed, tagIds }),
         });
+        mutate(SECTIONS_KEY);
       } catch (e) {
         console.error('Create section failed', e);
         mutateToday();
@@ -947,21 +951,34 @@ export function useTaskData({
     [mutateSections, mutateToday],
   );
 
-  const renameSection = useCallback(
-    async (sectionId: string, name: string) => {
-      const trimmed = name.trim();
-      if (!trimmed) return;
+  const updateSection = useCallback(
+    async (sectionId: string, patch: { name?: string; tagIds?: string[] }) => {
+      const trimmed = patch.name?.trim();
+      if (patch.name !== undefined && !trimmed) return;
       mutateSections((cur) =>
-        cur.map((s) => (s.id === sectionId ? { ...s, name: trimmed } : s)),
+        cur.map((s) =>
+          s.id === sectionId
+            ? {
+                ...s,
+                ...(trimmed ? { name: trimmed } : {}),
+                ...(patch.tagIds ? { tagIds: patch.tagIds } : {}),
+              }
+            : s,
+        ),
       );
       try {
         await fetch('/api/sections', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sectionId, name: trimmed }),
+          body: JSON.stringify({
+            sectionId,
+            ...(trimmed ? { name: trimmed } : {}),
+            ...(patch.tagIds ? { tagIds: patch.tagIds } : {}),
+          }),
         });
+        mutate(SECTIONS_KEY);
       } catch (e) {
-        console.error('Rename section failed', e);
+        console.error('Update section failed', e);
         mutateToday();
       }
     },
@@ -1006,6 +1023,7 @@ export function useTaskData({
         await fetch(`/api/sections?sectionId=${encodeURIComponent(sectionId)}`, {
           method: 'DELETE',
         });
+        mutate(SECTIONS_KEY);
       } catch (e) {
         console.error('Delete section failed', e);
         mutateToday();
@@ -1401,7 +1419,7 @@ export function useTaskData({
     deleteTaskSeries,
     duplicateTask,
     createSection,
-    renameSection,
+    updateSection,
     setSectionCollapsed,
     deleteSection,
     reorderSections,

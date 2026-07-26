@@ -14,6 +14,7 @@ import type { QuickAddSubmit } from '@/components/ui/quick-add/types';
 import type { FriendSummary } from '@/lib/friends/indices';
 import { mutateFriendsCaches } from '@/hooks/useFriendsSync';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
+import { useSections } from '@/hooks/useSections';
 import { useAuth } from '@/components/auth/AuthContext';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
 
@@ -67,6 +68,8 @@ function inviteBody(d: QuickAddSubmit, friendId: string) {
     text: d.text,
     repeatEndDate: d.repeatEndDate ?? undefined,
     timezone,
+    // Personal to the inviter — never shared with the recipient's copy.
+    sectionId: d.sectionId ?? undefined,
   };
   if (d.repeat === 'monthly') return { ...base, repeat: 'monthly', dates: d.dates };
   if (d.repeat === 'custom')
@@ -92,6 +95,7 @@ export function BuddyUpFlow({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notifGranted, setNotifGranted] = useState(false);
+  const sections = useSections();
   const sentBtnRef = useRef<HTMLButtonElement>(null);
   useRegisterOpenSheet(open && phase !== 'compose');
 
@@ -170,6 +174,7 @@ export function BuddyUpFlow({
         defaultRepeat="weekly"
         defaultRepeatDaily
         submitLabel="Next"
+        sections={sections}
         onSubmit={(d) => {
           setDraft(d);
           goPhase('review');

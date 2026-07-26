@@ -9,6 +9,16 @@ import { notifyTaskChanged } from '@/lib/taskSync';
 const NAME_MAX = 60;
 const MAX_SECTIONS = 10;
 
+function parseTagIds(raw: unknown): string[] | null {
+  if (!Array.isArray(raw)) return null;
+  const out: string[] = [];
+  for (const v of raw) {
+    if (typeof v !== 'string' || !v) continue;
+    if (!out.includes(v)) out.push(v);
+  }
+  return out;
+}
+
 async function currentUserId() {
   try {
     return await requireUserId();
@@ -34,6 +44,7 @@ export async function GET() {
       name: s.name,
       order: s.order,
       collapsed: !!s.collapsed,
+      tagIds: s.tagIds ?? [],
     })),
   });
 }
@@ -62,6 +73,7 @@ export async function POST(req: NextRequest) {
     name,
     order: (last?.order ?? 0) + 1,
     collapsed: false,
+    tagIds: parseTagIds(body?.tagIds) ?? [],
   });
   await notifyTaskChanged(uid);
   return NextResponse.json({ ok: true, id });
@@ -99,6 +111,8 @@ export async function PUT(req: NextRequest) {
     set.name = name;
   }
   if (typeof body.collapsed === 'boolean') set.collapsed = body.collapsed;
+  const tagIds = parseTagIds(body?.tagIds);
+  if (tagIds) set.tagIds = tagIds;
   if (Object.keys(set).length === 0)
     return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
 

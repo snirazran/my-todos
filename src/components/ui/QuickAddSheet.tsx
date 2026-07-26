@@ -326,6 +326,7 @@ export default function QuickAddSheet({
   const [showPremiumLimit, setShowPremiumLimit] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
   const [pickedSectionId, setPickedSectionId] = useState<string | null>(null);
+  const [sectionPickedManually, setSectionPickedManually] = useState(false);
   const [showSectionPicker, setShowSectionPicker] = useState(false);
   const [pickedBacklogTaskId, setPickedBacklogTaskId] = useState<string | null>(null);
   const [pickedBacklogText, setPickedBacklogText] = useState<string | null>(null);
@@ -501,6 +502,10 @@ export default function QuickAddSheet({
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
       if (showPremiumLimit || showSavedConfirm) return;
+      if (showSectionPicker) {
+        closeSectionPicker();
+        return;
+      }
       if (managedTag) {
         setManagedTag(null);
         return;
@@ -520,6 +525,7 @@ export default function QuickAddSheet({
     showReminderPicker,
     showPremiumLimit,
     showSavedConfirm,
+    showSectionPicker,
     managedTag,
     onOpenChange,
   ]);
@@ -584,6 +590,7 @@ export default function QuickAddSheet({
     setHasSuggestionContent(false);
     setManagedTag(null);
     setPickedSectionId(null);
+    setSectionPickedManually(false);
     setShowSectionPicker(false);
 
     const initialDate = defaultDateKey ?? ymdLocal(new Date());
@@ -600,7 +607,18 @@ export default function QuickAddSheet({
     left: number;
     bottom: number;
   } | null>(null);
-  const openSectionPicker = () => {
+  // The backdrop closes the menu on pointerdown, so the chip's own click would
+  // otherwise re-open it immediately — swallow taps that land right after.
+  const sectionClosedAt = useRef(0);
+  const closeSectionPicker = () => {
+    sectionClosedAt.current = performance.now();
+    setShowSectionPicker(false);
+  };
+  const toggleSectionPicker = () => {
+    if (showSectionPicker || performance.now() - sectionClosedAt.current < 300) {
+      closeSectionPicker();
+      return;
+    }
     const r = sectionBtnRef.current?.getBoundingClientRect();
     if (!r) return;
     setSectionMenuPos({
@@ -609,6 +627,20 @@ export default function QuickAddSheet({
     });
     setShowSectionPicker(true);
   };
+  // A tag connected to a section files the task there on its own; an explicit
+  // pick from the menu wins and is never overwritten.
+  const sectionTagKey = sections
+    .map((s) => `${s.id}:${(s.tagIds ?? []).join('|')}`)
+    .join(',');
+  const selectedTagKey = tags.join(',');
+  useEffect(() => {
+    if (!open || sectionPickedManually) return;
+    const match = sections.find((s) =>
+      (s.tagIds ?? []).some((id) => tags.includes(id)),
+    );
+    setPickedSectionId(match?.id ?? null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, sectionPickedManually, sectionTagKey, selectedTagKey]);
   const todayKey = ymdLocal(new Date());
   const tomorrowDate = new Date();
   tomorrowDate.setDate(tomorrowDate.getDate() + 1);
@@ -1420,7 +1452,7 @@ export default function QuickAddSheet({
                           <button
                             ref={sectionBtnRef}
                             type="button"
-                            onClick={openSectionPicker}
+                            onClick={toggleSectionPicker}
                             className={`inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-bold transition-transform active:scale-95 ${
                               pickedSection
                                 ? 'bg-primary/10 text-primary'
@@ -1663,7 +1695,7 @@ export default function QuickAddSheet({
         <>
           <div
             className="fixed inset-0 z-[1499]"
-            onPointerDown={() => setShowSectionPicker(false)}
+            onPointerDown={closeSectionPicker}
           />
           <div
             className="fixed z-[1500] w-56 overflow-hidden rounded-2xl border border-border/70 bg-popover py-1 shadow-xl"
@@ -1674,7 +1706,8 @@ export default function QuickAddSheet({
                 type="button"
                 onClick={() => {
                   setPickedSectionId(null);
-                  setShowSectionPicker(false);
+                  setSectionPickedManually(true);
+                  closeSectionPicker();
                 }}
                 className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-[14px] font-bold text-foreground transition-colors [@media(hover:hover)]:hover:bg-muted/60"
               >
@@ -1691,7 +1724,8 @@ export default function QuickAddSheet({
                   type="button"
                   onClick={() => {
                     setPickedSectionId(s.id);
-                    setShowSectionPicker(false);
+                    setSectionPickedManually(true);
+                    closeSectionPicker();
                   }}
                   className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-[14px] font-bold text-foreground transition-colors [@media(hover:hover)]:hover:bg-muted/60"
                 >

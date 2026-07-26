@@ -763,11 +763,9 @@ function ClaimRewardToast({
         {claimable.kind === 'objective' ? (
           <span className="mt-0.5 flex items-center gap-1 text-[11px] font-bold text-muted-foreground">
             <Check className="h-3 w-3 shrink-0 stroke-[3.5] text-emerald-500" />
-            <ObjectiveLabel
-              label={claimable.objectiveLabel}
-              tags={claimable.tags}
-              strikeText
-            />
+            <span className="min-w-0 flex-1 truncate">
+              <ObjectiveLabel label={claimable.objectiveLabel} strikeText />
+            </span>
           </span>
         ) : (
           <span className="mt-0.5 truncate text-[11px] font-bold text-muted-foreground">
@@ -821,11 +819,8 @@ function QuestProgressToast({
         <span className="text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">
           {trackableEyebrow(trackable)}
         </span>
-        <span className="mt-0.5 text-[13px] font-black text-foreground">
-          <ObjectiveLabel
-            label={trackable.remainingLabel}
-            tags={trackable.tags}
-          />
+        <span className="mt-0.5 block min-w-0 truncate text-[13px] font-black text-foreground">
+          <ObjectiveLabel label={trackable.remainingLabel} />
         </span>
         <div className="mt-1.5 flex items-center gap-2">
           <QuestProgressBar

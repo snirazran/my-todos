@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
   try {
     const userId = await requireUserId();
 
-    let body: { giftOptionId?: string; buddyTask?: unknown };
+    let body: { giftOptionId?: string; buddyTask?: unknown; sectionId?: string };
     try {
       body = await req.json();
     } catch {
@@ -85,6 +85,10 @@ export async function POST(req: NextRequest) {
       giftItemId: option.itemId,
       giftOptionId: option.id,
       buddyTask,
+      buddyTaskSectionId:
+        buddyTask && typeof body.sectionId === 'string' && body.sectionId
+          ? body.sectionId
+          : null,
     });
     await recordAnalyticsEvent({
       userId,

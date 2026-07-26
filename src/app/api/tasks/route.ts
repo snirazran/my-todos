@@ -2108,6 +2108,7 @@ async function handleDailyGet(req: NextRequest, userId: string, tz: string) {
       name: s.name,
       order: s.order,
       collapsed: !!s.collapsed,
+      tagIds: s.tagIds ?? [],
     })),
     flyStatus,
     hungerStatus,

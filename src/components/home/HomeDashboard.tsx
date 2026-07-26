@@ -146,7 +146,7 @@ export default function HomeDashboard() {
     tags,
     sections,
     createSection,
-    renameSection,
+    updateSection,
     setSectionCollapsed,
     deleteSection,
     reorderSections,
@@ -843,7 +843,7 @@ export default function HomeDashboard() {
                           router.push('/login');
                         }
                   }
-                  onRenameSection={renameSection}
+                  onUpdateSection={updateSection}
                   onDeleteSection={deleteSection}
                   onSetSectionCollapsed={setSectionCollapsed}
                   onReorderSections={reorderSections}

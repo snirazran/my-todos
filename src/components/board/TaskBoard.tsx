@@ -41,6 +41,7 @@ import MonthCalendar from './MonthCalendar';
 import { useDragManager } from './hooks/useDragManager';
 import { usePan } from './hooks/usePan';
 import QuickAddSheet from '@/components/ui/QuickAddSheet';
+import { useSections } from '@/hooks/useSections';
 import FrogodoroSheet from '@/components/ui/FrogodoroSheet';
 import FrogodoroPill from '@/components/ui/FrogodoroPill';
 import BacklogBox from './BacklogBox';
@@ -127,6 +128,7 @@ export default function TaskBoard({
     reminder?: string;
     repeatEndDate?: string | null;
     repeatRule?: import('@/components/ui/quick-add/utils').RepeatRule | null;
+    sectionId?: string | null;
   }) => Promise<void> | void;
   todayKey: string;
   activeDateKey: string;
@@ -825,6 +827,7 @@ export default function TaskBoard({
 
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [quickText, setQuickText] = useState('');
+  const boardSections = useSections();
   const [showTimer, setShowTimer] = useState(false);
   const [timerTask, setTimerTask] = useState<Task | null>(null);
   const { stackHeight: notificationStackHeight } = useNotification();
@@ -1962,6 +1965,7 @@ export default function TaskBoard({
         }
         defaultDateKey={initialDateKey ?? activeDateKey}
         daysOrder={daysOrder}
+        sections={boardSections}
         onSubmit={async ({
           text,
           days,
@@ -1973,6 +1977,7 @@ export default function TaskBoard({
           reminder,
           repeatEndDate,
           repeatRule,
+          sectionId,
         }) => {
           if (!onQuickAdd) {
             onRequestAdd(
@@ -2019,6 +2024,7 @@ export default function TaskBoard({
             reminder,
             repeatEndDate,
             repeatRule,
+            sectionId,
           });
           setShowQuickAdd(false);
         }}

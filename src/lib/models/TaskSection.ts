@@ -7,6 +7,7 @@ export interface TaskSectionDoc {
   name: string;
   order: number;
   collapsed?: boolean;
+  tagIds?: string[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -18,6 +19,7 @@ const TaskSectionSchema = new Schema<TaskSectionDoc>(
     name: { type: String, required: true },
     order: { type: Number, required: true },
     collapsed: { type: Boolean, default: false },
+    tagIds: { type: [String], default: [] },
   },
   { timestamps: true },
 );

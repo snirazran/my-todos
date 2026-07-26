@@ -14,7 +14,6 @@ import {
   Pen,
   ListChecks,
   EyeOff,
-  Trash2,
 } from 'lucide-react';
 import Fly from '@/components/ui/fly';
 import { createPortal } from 'react-dom';
@@ -68,6 +67,7 @@ import TaskMenu from '../board/TaskMenu';
 import TaskDetailSheet from '../board/TaskDetailSheet';
 import { EditScopeDialog } from '../board/EditScopeDialog';
 import TagsPopup from '@/components/ui/TagsPopup';
+import { SectionEditorSheet } from '@/components/ui/SectionEditorSheet';
 import { EditTaskDialog } from '@/components/ui/EditTaskDialog';
 import { TimePopup } from '@/components/ui/TimePopup';
 import { BuddyBadge } from '@/components/ui/BuddyBadge';
@@ -119,6 +119,7 @@ export interface TaskListSection {
   name: string;
   order: number;
   collapsed: boolean;
+  tagIds?: string[];
 }
 
 const SECTION_PREFIX = 'section:';
@@ -1160,16 +1161,14 @@ function SortableSectionHeader({
   doneCount,
   isFirst,
   onToggleCollapsed,
-  onRename,
-  onDelete,
+  onEdit,
 }: {
   section: TaskListSection;
   count: number;
   doneCount: number;
   isFirst: boolean;
   onToggleCollapsed: () => void;
-  onRename: (name: string) => void;
-  onDelete: () => void;
+  onEdit: () => void;
 }) {
   const {
     attributes,
@@ -1182,38 +1181,6 @@ function SortableSectionHeader({
     id: sectionSortableId(section.id),
     animateLayoutChanges,
   });
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [menuPosition, setMenuPosition] = useState<{
-    top: number;
-    left: number;
-  } | null>(null);
-  const [renaming, setRenaming] = useState(false);
-  const renameRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (!menuOpen) return;
-    const closeMenu = () => setMenuOpen(false);
-    window.addEventListener('scroll', closeMenu, true);
-    window.addEventListener('resize', closeMenu);
-    return () => {
-      window.removeEventListener('scroll', closeMenu, true);
-      window.removeEventListener('resize', closeMenu);
-    };
-  }, [menuOpen]);
-
-  useEffect(() => {
-    if (renaming) {
-      renameRef.current?.focus();
-      renameRef.current?.select();
-    }
-  }, [renaming]);
-
-  const commitRename = () => {
-    const next = renameRef.current?.value.trim();
-    setRenaming(false);
-    if (next && next !== section.name) onRename(next);
-  };
-
   // dnd-kit's Mouse/Touch sensors listen on mousedown/touchstart (not
   // pointerdown), so interactive children must stop those to avoid the held
   // tap being captured as a drag that swallows their click.
@@ -1231,7 +1198,7 @@ function SortableSectionHeader({
       style={{
         transform: CSS.Translate.toString(transform),
         transition,
-        zIndex: isDragging ? 30 : menuOpen ? 40 : 1,
+        zIndex: isDragging ? 30 : 1,
       }}
       data-is-active="true"
       data-section-header="true"
@@ -1241,8 +1208,8 @@ function SortableSectionHeader({
     >
       <div
         {...attributes}
-        {...(renaming ? {} : listeners)}
-        onClick={renaming ? undefined : onToggleCollapsed}
+        {...listeners}
+        onClick={onToggleCollapsed}
         className={`group flex min-h-[40px] cursor-pointer items-center gap-1.5 rounded-xl px-1.5 py-1 transition-colors ${
           isDragging ? 'bg-popover shadow-md ring-1 ring-border/70' : ''
         }`}
@@ -1256,30 +1223,11 @@ function SortableSectionHeader({
           <ChevronDown className="h-4 w-4" strokeWidth={2.75} />
         </motion.span>
 
-        {renaming ? (
-          <input
-            ref={renameRef}
-            defaultValue={section.name}
-            maxLength={60}
-            {...stopDndActivation}
-            onBlur={commitRename}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                commitRename();
-              } else if (e.key === 'Escape') {
-                setRenaming(false);
-              }
-            }}
-            className="min-w-0 flex-1 bg-transparent text-[13px] font-black uppercase tracking-[0.12em] text-foreground focus:outline-none"
-          />
-        ) : (
-          <span className="min-w-0 flex-1 truncate text-[13px] font-black uppercase tracking-[0.12em] text-muted-foreground">
-            {section.name}
-          </span>
-        )}
+        <span className="min-w-0 flex-1 truncate text-[13px] font-black uppercase tracking-[0.12em] text-muted-foreground">
+          {section.name}
+        </span>
 
-        {count > 0 && !renaming && (
+        {count > 0 && (
           <span
             className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-black tabular-nums leading-none ${
               remaining === 0
@@ -1291,36 +1239,14 @@ function SortableSectionHeader({
           </span>
         )}
 
-        {!renaming && !section.collapsed && (
+        {!section.collapsed && (
           <button
             type="button"
-            aria-label={`Section options for ${section.name}`}
+            aria-label={`Edit section ${section.name}`}
             {...stopDndActivation}
             onClick={(e) => {
               e.stopPropagation();
-              if (menuOpen) {
-                setMenuOpen(false);
-                return;
-              }
-              const rect = e.currentTarget.getBoundingClientRect();
-              const menuWidth = 176;
-              const menuHeight = 96;
-              const viewportPadding = 8;
-              const left = Math.max(
-                viewportPadding,
-                Math.min(
-                  rect.right - menuWidth,
-                  window.innerWidth - menuWidth - viewportPadding,
-                ),
-              );
-              const opensDown =
-                rect.bottom + 4 + menuHeight <=
-                window.innerHeight - viewportPadding;
-              const top = opensDown
-                ? rect.bottom + 4
-                : Math.max(viewportPadding, rect.top - menuHeight - 4);
-              setMenuPosition({ top, left });
-              setMenuOpen(true);
+              onEdit();
             }}
             className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-muted-foreground/50 transition-colors [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground"
           >
@@ -1328,116 +1254,27 @@ function SortableSectionHeader({
           </button>
         )}
       </div>
-
-      {menuOpen &&
-        menuPosition &&
-        typeof document !== 'undefined' &&
-        createPortal(
-          <>
-            <div
-              className="fixed inset-0 z-[9998]"
-              onMouseDown={(e) => e.stopPropagation()}
-              onTouchStart={(e) => e.stopPropagation()}
-              onPointerDown={(e) => {
-                e.stopPropagation();
-                setMenuOpen(false);
-              }}
-            />
-            <div
-              className="fixed z-[9999] w-44 overflow-hidden rounded-2xl border border-border/70 bg-popover py-1 shadow-lg"
-              style={{ top: menuPosition.top, left: menuPosition.left }}
-            >
-              <button
-                type="button"
-                {...stopDndActivation}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setMenuOpen(false);
-                  setRenaming(true);
-                }}
-                className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-[14px] font-bold text-foreground transition-colors [@media(hover:hover)]:hover:bg-muted/60"
-              >
-                <Pencil className="h-4 w-4 text-muted-foreground" />
-                Rename
-              </button>
-              <button
-                type="button"
-                {...stopDndActivation}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setMenuOpen(false);
-                  onDelete();
-                }}
-                className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-[14px] font-bold text-rose-500 transition-colors [@media(hover:hover)]:hover:bg-rose-500/10"
-              >
-                <Trash2 className="h-4 w-4" />
-                Delete section
-              </button>
-            </div>
-          </>,
-          document.body,
-        )}
     </div>
   );
 }
 
 function AddSectionRow({
-  onCreate,
+  onOpen,
   disabled,
 }: {
-  onCreate: (name: string) => void;
+  onOpen: () => void;
   disabled?: boolean;
 }) {
-  const [editing, setEditing] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (editing) inputRef.current?.focus();
-  }, [editing]);
-
-  const commit = () => {
-    const name = inputRef.current?.value.trim();
-    setEditing(false);
-    if (name) onCreate(name);
-  };
-
-  if (!editing) {
-    return (
-      <button
-        type="button"
-        onClick={() => setEditing(true)}
-        disabled={disabled}
-        className="mt-1 flex w-full items-center justify-center gap-1.5 rounded-xl py-2 text-[13px] font-bold text-muted-foreground/60 transition-colors [@media(hover:hover)]:hover:text-foreground disabled:pointer-events-none"
-      >
-        <Plus className="h-3.5 w-3.5" strokeWidth={2.75} />
-        New section
-      </button>
-    );
-  }
-
   return (
-    <div className="mt-1 flex items-center gap-1.5 rounded-xl border border-dashed border-muted-foreground/25 bg-muted/10 px-2.5 py-1">
-      <span className="grid h-7 w-7 shrink-0 place-items-center text-muted-foreground/70">
-        <ChevronDown className="h-4 w-4" strokeWidth={2.75} />
-      </span>
-      <input
-        ref={inputRef}
-        maxLength={60}
-        placeholder="Section name"
-        enterKeyHint="done"
-        onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            commit();
-          } else if (e.key === 'Escape') {
-            if (inputRef.current) inputRef.current.value = '';
-            setEditing(false);
-          }
-        }}
-        className="min-w-0 flex-1 bg-transparent py-1.5 text-[16px] font-black uppercase tracking-[0.12em] text-foreground placeholder:font-bold placeholder:normal-case placeholder:tracking-normal placeholder:text-muted-foreground/50 focus:outline-none"
-      />
-    </div>
+    <button
+      type="button"
+      onClick={onOpen}
+      disabled={disabled}
+      className="mt-1 flex w-full items-center justify-center gap-1.5 rounded-xl py-2 text-[13px] font-bold text-muted-foreground/60 transition-colors [@media(hover:hover)]:hover:text-foreground disabled:pointer-events-none"
+    >
+      <Plus className="h-3.5 w-3.5" strokeWidth={2.75} />
+      New section
+    </button>
   );
 }
 
@@ -1508,7 +1345,7 @@ export default function TaskList({
   paused = false,
   sections = [],
   onCreateSection,
-  onRenameSection,
+  onUpdateSection,
   onDeleteSection,
   onSetSectionCollapsed,
   onReorderSections,
@@ -1577,8 +1414,11 @@ export default function TaskList({
   quickAddOpen?: boolean;
   paused?: boolean;
   sections?: TaskListSection[];
-  onCreateSection?: (name: string) => void;
-  onRenameSection?: (sectionId: string, name: string) => void;
+  onCreateSection?: (name: string, tagIds: string[]) => void;
+  onUpdateSection?: (
+    sectionId: string,
+    patch: { name?: string; tagIds?: string[] },
+  ) => void;
   onDeleteSection?: (sectionId: string) => void;
   onSetSectionCollapsed?: (sectionId: string, collapsed: boolean) => void;
   onReorderSections?: (orderedIds: string[]) => void;
@@ -1682,6 +1522,9 @@ export default function TaskList({
     toggle(id, false);
   };
   const [isAnyDragging, setIsAnyDragging] = useState(false);
+  const [sectionEditor, setSectionEditor] = useState<
+    { mode: 'create' } | { mode: 'edit'; sectionId: string } | null
+  >(null);
   const [draggingSectionId, setDraggingSectionId] = useState<string | null>(
     null,
   );
@@ -2447,8 +2290,12 @@ export default function TaskList({
                               hapticTick();
                               onSetSectionCollapsed?.(s.id, !s.collapsed);
                             }}
-                            onRename={(name) => onRenameSection?.(s.id, name)}
-                            onDelete={() => onDeleteSection?.(s.id)}
+                            onEdit={() =>
+                              setSectionEditor({
+                                mode: 'edit',
+                                sectionId: s.id,
+                              })
+                            }
                           />
                         );
                       }
@@ -2537,7 +2384,7 @@ export default function TaskList({
             </button>
             {onCreateSection && sections.length < 10 && (
               <AddSectionRow
-                onCreate={onCreateSection}
+                onOpen={() => setSectionEditor({ mode: 'create' })}
                 disabled={quickAddOpen}
               />
             )}
@@ -2658,6 +2505,30 @@ export default function TaskList({
             : undefined
         }
       />
+
+      {(() => {
+        const editing =
+          sectionEditor?.mode === 'edit'
+            ? sections.find((s) => s.id === sectionEditor.sectionId) ?? null
+            : null;
+        return (
+          <SectionEditorSheet
+            open={!!sectionEditor}
+            mode={sectionEditor?.mode === 'edit' ? 'edit' : 'create'}
+            initialName={editing?.name ?? ''}
+            initialTagIds={editing?.tagIds ?? []}
+            tags={userTags}
+            onClose={() => setSectionEditor(null)}
+            onSave={(name, tagIds) => {
+              if (editing) onUpdateSection?.(editing.id, { name, tagIds });
+              else onCreateSection?.(name, tagIds);
+            }}
+            onDelete={
+              editing ? () => onDeleteSection?.(editing.id) : undefined
+            }
+          />
+        );
+      })()}
 
       <TagsPopup
         open={tagPopup.open}

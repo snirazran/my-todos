@@ -205,10 +205,7 @@ export function NextQuestStrip({
                     : `Season day ${claimable.day}`}
                 </span>
               ) : (
-                <ObjectiveLabel
-                  label={claimable.objectiveLabel}
-                  tags={claimable.tags}
-                />
+                <ObjectiveLabel label={claimable.objectiveLabel} />
               )}
             </span>
           </div>

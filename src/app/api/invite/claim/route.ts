@@ -163,7 +163,9 @@ export async function POST(req: NextRequest) {
 
         const fromResult = await createTasksForUser(
           referral.inviterId,
-          acceptBody,
+          referral.buddyTaskSectionId
+            ? { ...acceptBody, sectionId: referral.buddyTaskSectionId }
+            : acceptBody,
           tz,
           { bondId, buddyUserId: userId },
         );
