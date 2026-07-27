@@ -804,7 +804,6 @@ export default function HomeDashboard() {
                             return <FlyValueBadge value={taskFlyValue({})} />;
                           const { budget, earned } = checklistPayout(
                             task.checklist,
-                            { completed: task.completed },
                           );
                           return (
                             <FlyValueBadge value={budget} caught={earned} />

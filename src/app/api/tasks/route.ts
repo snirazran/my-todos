@@ -266,9 +266,10 @@ type FlyValueTask = Pick<
 
 /**
  * Flies a task has earned on `date`. A plain task is worth 1 on completion; a
- * checklist task is worth its step-count budget instead — paid out marker by
- * marker as steps are checked, and in full once the task itself is done. The
- * streak tier adds its bonus on top, but only for an actual completion.
+ * checklist task is worth its step-count budget instead, paid out marker by
+ * marker as steps are checked — completing it never releases the markers it
+ * never reached. The streak tier adds its bonus on top, but only for an actual
+ * completion.
  */
 function taskFlyValue(
   task: FlyValueTask,
@@ -279,7 +280,7 @@ function taskFlyValue(
   const bonus = completed ? streakFlyBonus(streak) : 0;
   const steps = (task.checklist ?? []).length;
   if (steps === 0) return completed ? 1 + bonus : 0;
-  return checklistPayoutForDate(task, date, completed).earned + bonus;
+  return checklistPayoutForDate(task, date).earned + bonus;
 }
 
 /**
@@ -1672,16 +1673,12 @@ export async function PUT(req: NextRequest) {
     }
 
     // Checked steps pay their markers straight away and keep them, so an
-    // abandoned checklist still earns what it got through. A task already
-    // completed for this date has been paid its whole budget, so it is skipped.
+    // abandoned checklist still earns what it got through. Completing the task
+    // releases nothing extra, so steps still pay after it is marked done.
     let flyStatus: FlyStatus | undefined;
     let hungerStatus: HungerStatus | undefined;
     const occurrenceDate = doc.type === 'weekly' ? viewDate : doc.date;
-    const completedForDate =
-      doc.type === 'weekly'
-        ? (doc.completedDates ?? []).includes(viewDate)
-        : !!doc.completed;
-    if (items?.length && occurrenceDate && doc.type !== 'backlog' && !completedForDate) {
+    if (items?.length && occurrenceDate && doc.type !== 'backlog') {
       const value = taskFlyValue(nextDoc, occurrenceDate, 0, false);
       if (value > 0) {
         const res = await awardFlyForTask(

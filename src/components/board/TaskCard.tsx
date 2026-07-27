@@ -313,7 +313,7 @@ export default function TaskCard({
       ? (task.streak ?? 0) + (task.completed ? 0 : 1)
       : 0;
   const checklistFlies = task.checklist?.length
-    ? checklistPayout(task.checklist, { completed: task.completed })
+    ? checklistPayout(task.checklist)
     : null;
   const flyValue = checklistFlies
     ? checklistFlies.budget

@@ -126,9 +126,11 @@ export function FlyCatchSwipeLauncher({
     if (!draggingRef.current) {
       if (pull < DRAG_START_DISTANCE) return;
       draggingRef.current = true;
-      try {
-        event.currentTarget.setPointerCapture(event.pointerId);
-      } catch {}
+      if (event.pointerType === 'mouse') {
+        try {
+          event.currentTarget.setPointerCapture(event.pointerId);
+        } catch {}
+      }
       lockScroll();
     }
     if (pull > 10) suppressClickRef.current = true;
@@ -177,7 +179,10 @@ export function FlyCatchSwipeLauncher({
       onPointerMove={onPointerMove}
       onPointerUp={(event) => finishPointer(event)}
       onPointerCancel={(event) => finishPointer(event, true)}
-      onLostPointerCapture={(event) => finishPointer(event, true)}
+      onLostPointerCapture={(event) => {
+        if (event.target !== event.currentTarget) return;
+        finishPointer(event, true);
+      }}
       onClickCapture={(event) => {
         if (!suppressClickRef.current) return;
         event.preventDefault();

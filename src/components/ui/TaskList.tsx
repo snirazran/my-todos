@@ -73,7 +73,7 @@ import { TimePopup } from '@/components/ui/TimePopup';
 import { BuddyBadge } from '@/components/ui/BuddyBadge';
 import {
   ChecklistCheckbox,
-  ChecklistProgress,
+  ChecklistFlyLine,
 } from '../board/ChecklistEditor';
 import { checklistPayout, type ChecklistItem } from '@/lib/checklist';
 import { objectiveCardTone } from '@/lib/questClaims';
@@ -213,8 +213,8 @@ const SortableTaskItem = React.forwardRef<
   ) => {
     const checklist = task.checklist ?? [];
     const checklistPayoutState = React.useMemo(
-      () => checklistPayout(checklist, { completed: isDone }),
-      [checklist, isDone],
+      () => checklistPayout(checklist),
+      [checklist],
     );
 
     /* Swipe Logic */
@@ -1194,33 +1194,46 @@ const SortableTaskItem = React.forwardRef<
                   className="relative z-10 w-full overflow-hidden"
                 >
                   <div className="mt-1.5 border-t border-border/70 pl-3 pr-2 pt-2 md:pl-4">
-                    <ChecklistProgress
-                      items={checklist}
-                      completed={isDone}
-                      className="mb-1.5"
-                      flyPaused
-                    />
-                    {checklistPayoutState.items.map((item) => (
-                      <div
-                        key={item.id}
-                        className="flex min-h-[34px] items-center gap-2.5"
-                      >
-                        <ChecklistCheckbox
-                          size={19}
-                          checked={item.done}
-                          onToggle={() => onToggleChecklistItem?.(task, item.id)}
-                        />
-                        <span
-                          className={`min-w-0 flex-1 break-words text-[13px] font-semibold leading-snug transition-colors duration-200 md:text-[14px] ${
-                            item.done
-                              ? 'text-muted-foreground/70 line-through decoration-muted-foreground/50'
-                              : 'text-foreground/90'
-                          }`}
+                    {checklistPayoutState.items.map((item, i) => {
+                      const caught =
+                        item.reward && checklistPayoutState.doneCount >= i + 1;
+                      return (
+                        <React.Fragment key={item.id}>
+                        <button
+                          type="button"
+                          onPointerDown={(e) => e.preventDefault()}
+                          onClick={() => onToggleChecklistItem?.(task, item.id)}
+                          aria-pressed={item.done}
+                          className="-mx-2 flex min-h-[44px] w-[calc(100%+1rem)] touch-manipulation items-center gap-3 rounded-xl px-2 text-left transition-colors active:bg-muted/50 [@media(hover:hover)]:hover:bg-muted/40"
                         >
-                          {item.text || 'Untitled step'}
-                        </span>
-                      </div>
-                    ))}
+                          <ChecklistCheckbox
+                            size={23}
+                            checked={item.done}
+                            onToggle={() =>
+                              onToggleChecklistItem?.(task, item.id)
+                            }
+                            interactive={false}
+                          />
+                          <span
+                            className={`min-w-0 flex-1 break-words text-[13px] font-semibold leading-snug transition-colors duration-200 md:text-[14px] ${
+                              item.done
+                                ? 'text-muted-foreground/70 line-through decoration-muted-foreground/50'
+                                : 'text-foreground/90'
+                            }`}
+                          >
+                            {item.text || 'Untitled step'}
+                          </span>
+                        </button>
+                        {item.reward && (
+                          <ChecklistFlyLine
+                            caught={!!caught}
+                            at={i + 1}
+                            total={checklist.length}
+                          />
+                        )}
+                        </React.Fragment>
+                      );
+                    })}
                   </div>
                 </motion.div>
               )}

@@ -73,15 +73,16 @@ export type ChecklistPayout = {
 /**
  * What a checklist has paid out. A marker pays the moment that many steps are
  * checked and is never clawed back, so an abandoned checklist keeps its
- * partial credit; completing the task itself releases whatever is left.
+ * partial credit. Completing the task does NOT release the unticked markers —
+ * steps are the only way a checklist earns, so its progress is honest.
  * `budgetLock` is the budget snapshotted the first time this occurrence paid,
  * so padding a finished checklist with extra steps can't mint another fly.
  */
 export function checklistPayout(
   items: ChecklistItem[],
-  opts: { completed?: boolean; budgetLock?: number | null } = {},
+  opts: { budgetLock?: number | null } = {},
 ): ChecklistPayout {
-  const { completed = false, budgetLock } = opts;
+  const { budgetLock } = opts;
   const steps = items.length;
   const full = checklistBudget(steps);
   const normalized = normalizeChecklistRewards(items, full);
@@ -90,8 +91,6 @@ export function checklistPayout(
       ? Math.min(full, budgetLock)
       : full;
   const doneCount = normalized.filter((it) => it.done).length;
-  if (completed)
-    return { items: normalized, budget, earned: budget, doneCount };
   const passed = normalized.filter(
     (it, i) => it.reward && doneCount > 0 && i + 1 <= doneCount,
   ).length;
@@ -149,10 +148,8 @@ export function checklistDoneIdsForDate(
 export function checklistPayoutForDate(
   task: ChecklistCarrier & { checklistBudgetByDate?: Record<string, number> },
   date: string,
-  completed = false,
 ): ChecklistPayout {
   return checklistPayout(checklistForDate(task, date), {
-    completed,
     budgetLock: task.checklistBudgetByDate?.[date],
   });
 }

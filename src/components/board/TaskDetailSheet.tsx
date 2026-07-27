@@ -35,11 +35,7 @@ import { BuddyFrogFace } from '@/components/ui/BuddyBadge';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import { useKeyboardInset } from '@/components/ui/quick-add/useKeyboardInset';
 import { hapticSuccess, hapticTick } from '@/lib/haptics';
-import {
-  ChecklistCheckbox,
-  ChecklistEditor,
-  ChecklistProgress,
-} from './ChecklistEditor';
+import { ChecklistCheckbox, ChecklistEditor } from './ChecklistEditor';
 import { checklistPayout } from '@/lib/checklist';
 import { TaskRepeatPopup } from './TaskRepeatPopup';
 import RichNotesEditor from './RichNotesEditor';
@@ -286,10 +282,13 @@ export default function TaskDetailSheet({
   };
 
   const doneCount = checklist.filter((it) => it.done).length;
-  // What the task is worth, not what is left of it — the badge and the track
-  // already say which flies are caught, and a residual here just reads as a
-  // third, contradictory number.
-  const taskFlies = checklist.length ? checklistPayout(checklist).budget : 1;
+  // A checklist reads as caught-of-total, the same tally as the card badge; a
+  // plain task has nothing to count against and just states its worth.
+  const flyPayout = checklist.length ? checklistPayout(checklist) : null;
+  const taskFlies = flyPayout ? flyPayout.budget : 1;
+  const flyLabel = flyPayout
+    ? `${flyPayout.earned}/${flyPayout.budget}`
+    : `${taskFlies}`;
   // For weekly tasks use their stored weekday; otherwise anchor to the date the
   // task sits on (the column being edited), falling back to today.
   const repeatDay =
@@ -505,13 +504,6 @@ export default function TaskDetailSheet({
                                 </span>
                               </button>
                             )}
-                            {checklist.length > 0 && (
-                              <ChecklistProgress
-                                items={checklist}
-                                completed={isCompleted}
-                                className="mb-1 mt-0.5"
-                              />
-                            )}
                             {checklist.slice(0, PREVIEW_ITEMS).map((it) => (
                               <div
                                 key={it.id}
@@ -641,24 +633,12 @@ export default function TaskDetailSheet({
                             />
                           ) : (
                             <div className="flex min-h-0 flex-1 flex-col">
-                              {checklist.length > 0 ? (
-                                <div className="mb-2 shrink-0">
-                                  <ChecklistProgress
-                                    items={checklist}
-                                    completed={isCompleted}
-                                  />
-                                </div>
-                              ) : (
-                                <div className="mb-2 flex shrink-0 flex-col items-center gap-1 rounded-2xl bg-muted/30 px-6 py-3 text-center">
-                                  <Fly size={32} y={-2} interactive={false} />
-                                  <p className="text-[13px] font-black text-foreground">
-                                    Break it into steps
-                                  </p>
-                                  <p className="text-[12px] font-medium leading-snug text-muted-foreground">
-                                    The task&apos;s flies spread out across the
-                                    steps. Cross a{' '}
-                                    <span className="font-black text-primary">fly line</span>{' '}
-                                    and that fly is yours, finished or not.
+                              {checklist.length > 0 ? null : (
+                                <div className="mb-2 flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-muted/30 px-4 py-2.5 text-center">
+                                  <Fly size={22} y={-1} interactive={false} />
+                                  <p className="text-[12px] font-semibold leading-snug text-muted-foreground">
+                                    Break it into steps — tick them off to catch
+                                    this task&apos;s flies.
                                   </p>
                                 </div>
                               )}
@@ -802,10 +782,14 @@ export default function TaskDetailSheet({
                   <span>{onComplete ? 'Complete' : 'Upcoming'}</span>
                   {!!onComplete && taskFlies > 1 && (
                     <span
-                      title={`This task is worth ${taskFlies} flies`}
+                      title={
+                        flyPayout
+                          ? `${flyPayout.earned} of ${flyPayout.budget} flies caught`
+                          : `This task is worth ${taskFlies} flies`
+                      }
                       className="rounded-full bg-white/25 px-2 py-1 text-[13px] font-black leading-none tabular-nums"
                     >
-                      {taskFlies}
+                      {flyLabel}
                     </span>
                   )}
                 </span>

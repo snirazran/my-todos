@@ -14,7 +14,6 @@ import { hapticImpact, hapticSuccess, hapticTick } from '@/lib/haptics';
 import { randomUUID } from '@/lib/uuid';
 import {
   CHECKLIST_MAX_ITEMS,
-  checklistPayout,
   normalizeChecklistRewards,
   type ChecklistItem,
 } from '@/lib/checklist';
@@ -24,93 +23,51 @@ export { CHECKLIST_MAX_ITEMS };
 export const CHECKLIST_ITEM_MAX = 120;
 
 /**
- * One track carrying both readings: how far down the list you are, and where
- * the task's flies sit along the way. Notches mark the step counts that pay
- * out; the last fly is the end of the bar, so it needs no notch of its own.
+ * The line a checklist crosses to catch a fly. It sits between rows rather than
+ * on one because the payout counts steps done, not which ones.
  */
-export function ChecklistProgress({
-  items,
-  completed = false,
-  className = '',
-  flyPaused = false,
+export function ChecklistFlyLine({
+  caught,
+  at,
+  total,
 }: {
-  items: ChecklistItem[];
-  completed?: boolean;
-  className?: string;
-  /** Hold the fly still — the task list can show many of these at once. */
-  flyPaused?: boolean;
+  caught: boolean;
+  at: number;
+  total: number;
 }) {
-  const { doneCount: ticked, items: steps, budget } = checklistPayout(items, {
-    completed,
-  });
-  const total = steps.length;
-  if (total === 0) return null;
-  // Finishing the task settles the whole list, so the track must not still
-  // read half-empty.
-  const doneCount = completed ? total : ticked;
-
-  // One segment per fly, as wide as the run of steps that fly is waiting
-  // behind. A discrete reward needs a discrete bar: filling a whole segment is
-  // what catching a fly looks like.
-  const at = steps.map((it, i) => (it.reward ? i + 1 : 0)).filter(Boolean);
-  const segments = at.map((p, i) => {
-    const from = i === 0 ? 0 : at[i - 1];
-    const span = p - from;
-    return {
-      p,
-      span,
-      fill: Math.max(0, Math.min(1, (doneCount - from) / span)),
-    };
-  });
-  const caught = segments.filter((s) => s.fill >= 1).length;
-  const next = segments.find((s) => s.fill < 1);
-
+  const rule = `h-px flex-1 transition-colors duration-300 ${
+    caught ? 'bg-primary/60' : 'bg-primary/20'
+  }`;
   return (
-    <div className={`flex flex-col gap-1.5 ${className}`}>
-      <div className="flex h-3 items-stretch gap-1.5">
-        {segments.map((s) => {
-          const full = s.fill >= 1;
-          return (
-            <div
-              key={s.p}
-              style={{ flexGrow: s.span }}
-              className={`relative overflow-hidden rounded-full bg-muted ring-1 ring-inset transition-colors duration-300 ${
-                full ? 'ring-primary/45' : 'ring-border/70'
-              }`}
-            >
-              <motion.div
-                initial={false}
-                animate={{ width: `${s.fill * 100}%` }}
-                transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-                className="absolute inset-y-0 left-0 rounded-full bg-primary"
-              />
-            </div>
-          );
-        })}
-      </div>
-      <div className="flex items-center gap-1.5">
-        <Fly
-          size={20}
-          y={-1}
-          interactive={false}
-          paused={flyPaused || caught === 0}
-          oversample={1.5}
-        />
-        <span className="text-[11px] font-bold leading-none text-muted-foreground">
-          {next ? (
-            <>
-              <span className="font-black text-foreground">
-                {caught}/{budget}
-              </span>{' '}
-              caught · next at {next.p} of {total} steps
-            </>
-          ) : (
-            <span className="font-black text-primary">
-              All {budget} {budget === 1 ? 'fly' : 'flies'} caught
-            </span>
-          )}
+    <div
+      aria-label={`${caught ? 'Caught' : 'Catches'} a fly at ${at} of ${total} steps done`}
+      className="flex items-center gap-2 py-1.5"
+    >
+      <span className={rule} />
+      <span
+        className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 transition-colors duration-300 ${
+          caught
+            ? 'border-primary/40 bg-primary/15'
+            : 'border-primary/20 bg-primary/5'
+        }`}
+      >
+        <span
+          className={`grid place-items-center transition-all duration-300 ${
+            caught ? 'opacity-100' : 'opacity-40 grayscale'
+          }`}
+          style={{ width: 20, height: 20 }}
+        >
+          <Fly size={24} x={-2} y={-5} interactive={false} paused />
         </span>
-      </div>
+        <span
+          className={`text-[11px] font-black leading-none tabular-nums transition-colors duration-300 ${
+            caught ? 'text-primary' : 'text-primary/50'
+          }`}
+        >
+          +1
+        </span>
+      </span>
+      <span className={rule} />
     </div>
   );
 }
@@ -120,23 +77,18 @@ export function ChecklistCheckbox({
   onToggle,
   size = 24,
   className = '',
+  interactive = true,
 }: {
   checked: boolean;
   onToggle: () => void;
   size?: number;
   className?: string;
+  /** Render as plain art when an enclosing control owns the tap. */
+  interactive?: boolean;
 }) {
-  return (
-    <motion.button
-      type="button"
-      onPointerDown={(e) => e.preventDefault()}
-      onClick={onToggle}
-      whileTap={{ scale: 0.82 }}
-      aria-label={checked ? 'Mark not done' : 'Mark done'}
-      aria-pressed={checked}
-      className={`relative grid shrink-0 touch-manipulation place-items-center ${className}`}
-      style={{ width: size + 16, height: size + 16, margin: -8 }}
-    >
+  const boxClassName = `relative grid shrink-0 touch-manipulation place-items-center ${className}`;
+  const boxStyle = { width: size + 16, height: size + 16, margin: -8 };
+  const art = (
       <motion.span
         initial={false}
         animate={checked ? { scale: [1, 1.15, 1] } : { scale: 1 }}
@@ -168,6 +120,28 @@ export function ChecklistCheckbox({
           />
         </svg>
       </motion.span>
+  );
+
+  if (!interactive) {
+    return (
+      <span aria-hidden className={boxClassName} style={boxStyle}>
+        {art}
+      </span>
+    );
+  }
+
+  return (
+    <motion.button
+      type="button"
+      onPointerDown={(e) => e.preventDefault()}
+      onClick={onToggle}
+      whileTap={{ scale: 0.82 }}
+      aria-label={checked ? 'Mark not done' : 'Mark done'}
+      aria-pressed={checked}
+      className={boxClassName}
+      style={boxStyle}
+    >
+      {art}
     </motion.button>
   );
 }
@@ -286,6 +260,7 @@ export function ChecklistEditor({
   };
 
   const atCap = items.length >= CHECKLIST_MAX_ITEMS;
+  const doneCount = items.filter((it) => it.done).length;
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const autoScrollAt = (pointY: number) => {
@@ -315,6 +290,9 @@ export function ChecklistEditor({
             <ChecklistRow
               key={it.id}
               item={it}
+              at={index + 1}
+              total={items.length}
+              doneCount={doneCount}
               onToggle={() => toggle(it.id)}
               onTextChange={(text) => setText(it.id, text)}
               onCommit={commitText}
@@ -341,7 +319,7 @@ export function ChecklistEditor({
 
       {!atCap && (
         <div className="flex min-h-[44px] items-center gap-3 rounded-xl px-2 transition-colors focus-within:bg-muted/30">
-          <span className="grid h-[21px] w-[21px] shrink-0 place-items-center rounded-[30%] border-2 border-dashed border-muted-foreground/35 text-muted-foreground/60">
+          <span className="grid h-[23px] w-[23px] shrink-0 place-items-center rounded-[30%] border-2 border-dashed border-muted-foreground/35 text-muted-foreground/60">
             <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
           </span>
           <input
@@ -381,6 +359,9 @@ export function ChecklistEditor({
 
 function ChecklistRow({
   item,
+  at,
+  total,
+  doneCount,
   onToggle,
   onTextChange,
   onCommit,
@@ -392,6 +373,9 @@ function ChecklistRow({
   canDrag,
 }: {
   item: ChecklistItem;
+  at: number;
+  total: number;
+  doneCount: number;
   onToggle: () => void;
   onTextChange: (text: string) => void;
   onCommit: () => void;
@@ -435,7 +419,7 @@ function ChecklistRow({
             : 'focus-within:bg-muted/40 [@media(hover:hover)]:hover:bg-muted/25'
         }`}
       >
-        <ChecklistCheckbox checked={item.done} onToggle={onToggle} size={21} />
+        <ChecklistCheckbox checked={item.done} onToggle={onToggle} size={23} />
         <input
           ref={registerInput}
           value={item.text}
@@ -502,6 +486,9 @@ function ChecklistRow({
           </button>
         )}
       </div>
+      {item.reward && !dragging && (
+        <ChecklistFlyLine caught={doneCount >= at} at={at} total={total} />
+      )}
     </Reorder.Item>
   );
 }
