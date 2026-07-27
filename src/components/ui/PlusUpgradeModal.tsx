@@ -357,7 +357,7 @@ export function PlusWelcomeCelebration({ onDone }: { onDone: () => void }) {
               indices={wardrobeIndices}
               emote="love"
             />
-            <PremiumFrogAura show compact flySize={50} />
+            <PremiumFrogAura show compact flySize={50} alwaysPlay />
           </div>
         </div>
         <h2 className="text-[clamp(1.55rem,4dvh,1.875rem)] font-black leading-none tracking-tight text-white">
@@ -707,7 +707,7 @@ function Step2({
           transition={{ duration: 3.4, repeat: Infinity, ease: 'easeInOut' }}
         >
           <Frog width={240} height={240} indices={step2Indices} emote="love" />
-          <PremiumFrogAura show />
+          <PremiumFrogAura show alwaysPlay />
         </motion.div>
       </Reveal>
 

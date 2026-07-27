@@ -10,6 +10,7 @@ import {
   writeCachedBackground,
   type BackgroundImages,
 } from '@/hooks/useBackgrounds';
+import { backgroundFadeMaskStyle } from '@/lib/backgrounds/fadeMask';
 import { useUIStore } from '@/lib/uiStore';
 
 export function GlobalPageBackground() {
@@ -56,7 +57,8 @@ export function GlobalPageBackground() {
     <div
       aria-hidden
       data-fly-page-bg
-      className="pointer-events-none absolute left-0 right-0 top-0 -z-10 h-[calc(400px+env(safe-area-inset-top))] w-full overflow-hidden md:h-[440px]"
+      style={backgroundFadeMaskStyle}
+      className="pointer-events-none absolute left-0 right-0 top-0 -z-10 h-[calc(440px+env(safe-area-inset-top))] w-full overflow-hidden md:h-[480px]"
     >
       <AnimatePresence initial={false}>
         <motion.div
@@ -100,11 +102,7 @@ export function GlobalPageBackground() {
           <div className="absolute inset-0 animate-[background-glint_700ms_ease-out] bg-gradient-to-b from-white/10 via-transparent to-black/5 opacity-0" />
         </motion.div>
       </AnimatePresence>
-      <div className="absolute inset-0 shadow-[rgba(0,0,0,0.06)_0px_2px_4px_0px_inset,rgba(0,0,0,0.15)_0px_-2px_5px_0px_inset]" />
-      <div
-        data-fly-page-bg-fade
-        className="absolute inset-x-0 bottom-0 hidden h-14 bg-gradient-to-b from-transparent via-background/25 to-background md:block"
-      />
+      <div className="absolute inset-0 shadow-[rgba(0,0,0,0.06)_0px_2px_4px_0px_inset]" />
       <style jsx global>{`
         @keyframes background-glint {
           0% {

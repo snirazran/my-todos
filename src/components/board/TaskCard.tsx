@@ -18,6 +18,9 @@ import type { Task } from './helpers';
 import Fly from '@/components/ui/fly';
 import { useLeftTongue } from './LeftTongue';
 import { hapticImpact } from '@/lib/haptics';
+import { taskFlyValue } from '@/lib/flyValue';
+import { checklistPayout } from '@/lib/checklist';
+import { FlyValueBadge } from '@/components/ui/FlyValueBadge';
 import { useTaskTimerPhase } from '@/hooks/useTaskTimerPhase';
 
 type OnGrabParams = {
@@ -309,18 +312,12 @@ export default function TaskCard({
     isToday && isRepeating
       ? (task.streak ?? 0) + (task.completed ? 0 : 1)
       : 0;
-  const streakFlyBase =
-    projectedStreak >= 30
-      ? 5
-      : projectedStreak >= 14
-        ? 4
-        : projectedStreak >= 7
-          ? 3
-          : projectedStreak >= 3
-            ? 2
-            : 1;
-  const flyValue =
-    streakFlyBase + (task.checklist?.filter((c) => c.done).length ?? 0);
+  const checklistFlies = task.checklist?.length
+    ? checklistPayout(task.checklist, { completed: task.completed })
+    : null;
+  const flyValue = checklistFlies
+    ? checklistFlies.budget
+    : taskFlyValue({ streak: projectedStreak });
   const chipClass = compact
     ? 'inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-bold tracking-normal uppercase transition-colors border shadow-sm'
     : 'inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[9px] font-bold tracking-wider uppercase transition-colors border shadow-sm';
@@ -571,11 +568,10 @@ export default function TaskCard({
               }`}
             >
               <Fly size={36} paused={task.completed} y={-3} />
-              {flyValue > 1 && (
-                <span className="absolute -right-1 -top-1.5 sm:-top-1 flex min-w-[17px] items-center justify-center rounded-full border border-card bg-primary px-1 py-0.5 text-[10px] font-black leading-none text-primary-foreground shadow-sm">
-                  ×{flyValue}
-                </span>
-              )}
+              <FlyValueBadge
+                value={flyValue}
+                caught={checklistFlies?.earned}
+              />
             </span>
             <span
               className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${

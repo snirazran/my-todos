@@ -26,11 +26,15 @@ import { TaskSectionModel } from '@/lib/models/TaskSection';
 import { severBond, handleBuddyCompletion } from '@/lib/buddy/server';
 import { bumpQuestMetric, taskStreakMetric } from '@/lib/quests/metrics';
 import {
+  checklistBudget,
   checklistContent,
   checklistForDate,
-  checklistDoneIdsForDate,
+  checklistPayoutForDate,
+  normalizeChecklistRewards,
+  withChecklistBudget,
   withChecklistDone,
 } from '@/lib/checklist';
+import { streakFlyBonus } from '@/lib/flyValue';
 import {
   dowFromYMD,
   domFromYMD,
@@ -255,29 +259,52 @@ function normalizeDailyFly(
   return initDailyFly(today);
 }
 
-const STREAK_FLY_TIERS: ReadonlyArray<readonly [number, number]> = [
-  [30, 5],
-  [14, 4],
-  [7, 3],
-  [3, 2],
-];
+type FlyValueTask = Pick<
+  TaskDoc,
+  'type' | 'checklist' | 'checklistDoneByDate' | 'checklistBudgetByDate'
+>;
 
-/** Base flies for a completion at the given streak length (1 below the first tier). */
-function streakFlyBase(streak: number): number {
-  for (const [minDays, flies] of STREAK_FLY_TIERS) {
-    if (streak >= minDays) return flies;
-  }
-  return 1;
-}
-
-/** Flies a task is worth: a streak-tiered base plus one per completed checklist item. */
+/**
+ * Flies a task has earned on `date`. A plain task is worth 1 on completion; a
+ * checklist task is worth its step-count budget instead — paid out marker by
+ * marker as steps are checked, and in full once the task itself is done. The
+ * streak tier adds its bonus on top, but only for an actual completion.
+ */
 function taskFlyValue(
-  task: Pick<TaskDoc, 'type' | 'checklist' | 'checklistDoneByDate'>,
+  task: FlyValueTask,
   date: string,
   streak: number = 0,
+  completed: boolean = true,
 ): number {
-  const done = checklistDoneIdsForDate(task, date).length;
-  return streakFlyBase(streak) + done;
+  const bonus = completed ? streakFlyBonus(streak) : 0;
+  const steps = (task.checklist ?? []).length;
+  if (steps === 0) return completed ? 1 + bonus : 0;
+  return checklistPayoutForDate(task, date, completed).earned + bonus;
+}
+
+/**
+ * Pin the fly budget this occurrence pays out at, the first time it pays.
+ * Padding a checklist with extra steps afterwards can't raise it.
+ */
+async function lockChecklistBudget(
+  userId: string,
+  doc: Pick<TaskDoc, 'id' | 'checklist' | 'checklistBudgetByDate'>,
+  date: string,
+) {
+  const steps = (doc.checklist ?? []).length;
+  if (!steps || typeof doc.checklistBudgetByDate?.[date] === 'number') return;
+  await TaskModel.updateOne(
+    { userId, id: doc.id },
+    {
+      $set: {
+        checklistBudgetByDate: withChecklistBudget(
+          doc.checklistBudgetByDate,
+          date,
+          checklistBudget(steps),
+        ),
+      },
+    },
+  );
 }
 
 async function currentFlyStatus(
@@ -377,12 +404,15 @@ async function awardFlyForTask(
   tz: string,
   countTowardDaily: boolean = true,
   value: number = 1,
+  opts: { topUp?: boolean; countTask?: boolean } = {},
 ): Promise<{
   awarded: boolean;
   flyStatus: FlyStatus;
   hungerStatus: HungerStatus;
   dailyTasksCount: number;
 }> {
+  const topUp = opts.topUp ?? false;
+  const countTask = opts.countTask ?? countTowardDaily;
   const today = getZonedToday(tz);
   const user = (await UserModel.findById(userId, {
     wardrobe: 1,
@@ -419,6 +449,7 @@ async function awardFlyForTask(
     wardrobe.flyDaily as DailyFlyProgress | undefined,
   );
   const alreadyRewarded = (daily.taskIds ?? []).includes(taskId);
+  const alreadyGranted = daily.taskFlies?.[taskId] ?? 0;
   const atLimit = daily.earned >= limit;
   const limitNotified = daily.limitNotified ?? false;
   let currentBalance = hungerUpdates['wardrobe.flies'] ?? wardrobe.flies ?? 0;
@@ -438,7 +469,7 @@ async function awardFlyForTask(
   const statsUpdates: Record<string, any> = {};
 
   let nextDailyTasksCount = isNewDay ? 0 : currentStats.dailyTasksCount;
-  if (countTowardDaily) {
+  if (countTask) {
     nextDailyTasksCount = isNewDay ? 1 : currentStats.dailyTasksCount;
     if (!alreadyCountedInStats && !isNewDay) nextDailyTasksCount += 1;
 
@@ -458,7 +489,17 @@ async function awardFlyForTask(
     }
   }
 
-  if (alreadyRewarded) {
+  // A checklist tops its own grant up marker by marker, so the same task can
+  // be paid more than once in a day — never beyond the value it has earned.
+  const desired = Math.max(topUp ? 0 : 1, Math.floor(value));
+  let grant = topUp ? desired - alreadyGranted : desired;
+  if (countTowardDaily) {
+    grant = Math.min(grant, Math.max(0, limit - daily.earned));
+  }
+
+  // Nothing left to pay. A first-time completion still falls through even at
+  // the daily cap, so the frog is fed and the task is recorded either way.
+  if (alreadyRewarded && (!topUp || grant <= 0)) {
     // Merge stat updates
     const finalUpdates = { ...hungerUpdates };
 
@@ -467,7 +508,7 @@ async function awardFlyForTask(
     }
 
     const ops: any = { $set: finalUpdates };
-    if (countTowardDaily && !isNewDay && !alreadyCountedInStats) {
+    if (countTask && !isNewDay && !alreadyCountedInStats) {
       ops.$inc = { ...(ops.$inc || {}), 'statistics.daily.dailyTasksCount': 1 };
       ops.$push = { 'statistics.daily.completedTaskIds': taskId };
       delete finalUpdates['statistics.daily.dailyTasksCount'];
@@ -491,55 +532,47 @@ async function awardFlyForTask(
     };
   }
 
-  // Calculate new hunger
-  let newHunger = Math.min(
-    MAX_HUNGER_MS,
-    Math.max(0, currentHungerState.hunger) + TASK_HUNGER_REWARD_MS,
-  );
-  if (MAX_HUNGER_MS - newHunger <= HUNGER_FULL_SNAP_MS) {
-    newHunger = MAX_HUNGER_MS;
-  }
-  const finalHungerStatus = { ...currentHungerState, hunger: newHunger };
-  if (
-    newHunger >= MAX_HUNGER_MS &&
-    Math.max(0, currentHungerState.hunger) < MAX_HUNGER_MS
-  ) {
-    await bumpQuestMetric({ userId, metric: 'frog_fed_full', timezone: tz });
-  }
+  // The frog is fed once per task, not once per fly — a checklist paying out
+  // in instalments must not feed it again on every marker.
+  const setFields: Record<string, any> = { ...hungerUpdates };
+  let finalHungerStatus = currentHungerState;
 
-  const setFields: Record<string, any> = {
-    ...hungerUpdates,
-    'wardrobe.hunger': newHunger,
-    'wardrobe.lastHungerUpdate': new Date(),
-  };
+  if (!alreadyRewarded) {
+    let newHunger = Math.min(
+      MAX_HUNGER_MS,
+      Math.max(0, currentHungerState.hunger) + TASK_HUNGER_REWARD_MS,
+    );
+    if (MAX_HUNGER_MS - newHunger <= HUNGER_FULL_SNAP_MS) {
+      newHunger = MAX_HUNGER_MS;
+    }
+    finalHungerStatus = { ...currentHungerState, hunger: newHunger };
+    if (
+      newHunger >= MAX_HUNGER_MS &&
+      Math.max(0, currentHungerState.hunger) < MAX_HUNGER_MS
+    ) {
+      await bumpQuestMetric({ userId, metric: 'frog_fed_full', timezone: tz });
+    }
+    setFields['wardrobe.hunger'] = newHunger;
+    setFields['wardrobe.lastHungerUpdate'] = new Date();
+  }
 
   if (statsUpdates['statistics.daily']) {
     setFields['statistics.daily'] = statsUpdates['statistics.daily'];
   }
 
-  const desired = Math.max(1, Math.floor(value));
-  let grant = desired;
-  if (countTowardDaily) {
-    grant = Math.min(desired, Math.max(0, limit - daily.earned));
-  }
-
-  let nextEarned = daily.earned;
-  let nextBalance = currentBalance;
-  let awardedFly = false;
-
-  if (grant > 0) {
-    if (countTowardDaily) nextEarned += grant;
-    nextBalance += grant;
-    awardedFly = true;
-    setFields['wardrobe.flies'] = nextBalance;
-  }
+  const nextEarned = daily.earned + (countTowardDaily ? grant : 0);
+  const nextBalance = currentBalance + grant;
+  if (grant > 0) setFields['wardrobe.flies'] = nextBalance;
 
   const hitLimit = nextEarned >= limit;
   const nextDaily: DailyFlyProgress = {
     date: today,
     earned: nextEarned,
     taskIds: Array.from(new Set([...(daily.taskIds ?? []), taskId])),
-    taskFlies: { ...(daily.taskFlies ?? {}), [taskId]: grant },
+    taskFlies: {
+      ...(daily.taskFlies ?? {}),
+      [taskId]: alreadyGranted + grant,
+    },
     limitNotified: limitNotified || hitLimit,
   };
 
@@ -549,7 +582,7 @@ async function awardFlyForTask(
 
   const ops: any = { $set: setFields };
 
-  if (countTowardDaily && !isNewDay && !alreadyCountedInStats) {
+  if (countTask && !isNewDay && !alreadyCountedInStats) {
     ops.$inc = { ...(ops.$inc || {}), 'statistics.daily.dailyTasksCount': 1 };
     ops.$push = {
       ...(ops.$push || {}),
@@ -560,7 +593,7 @@ async function awardFlyForTask(
   await UserModel.updateOne({ _id: user._id }, ops);
 
   return {
-    awarded: awardedFly,
+    awarded: grant > 0,
     flyStatus: {
       balance: nextBalance,
       earnedToday: nextEarned,
@@ -813,18 +846,7 @@ export async function createTasksForUser(
   const reminder = body.reminder;
   // Carried over when restoring a saved (backlog) task so notes/checklist survive.
   const notes = typeof body?.notes === 'string' ? body.notes : undefined;
-  const checklist = Array.isArray(body?.checklist)
-    ? body.checklist
-        .filter(
-          (it: unknown): it is Record<string, unknown> =>
-            !!it && typeof it === 'object',
-        )
-        .map((it: Record<string, unknown>) => ({
-          id: String(it.id ?? ''),
-          text: String(it.text ?? ''),
-          done: Boolean(it.done),
-        }))
-    : undefined;
+  const checklist = sanitizeChecklistInput(body?.checklist);
 
   const repeat =
     body?.repeat === 'backlog'
@@ -1614,11 +1636,13 @@ export async function PUT(req: NextRequest) {
     const set: Record<string, unknown> = {};
     if (typeof body.details.notes === 'string') set.notes = body.details.notes;
     const items = sanitizeChecklistInput(body.details.checklist);
+    const viewDate =
+      typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)
+        ? date
+        : getZonedToday(tz);
+    const nextDoc: TaskDoc = { ...doc };
     if (doc.type === 'weekly') {
-      const targetDate =
-        typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)
-          ? date
-          : getZonedToday(tz);
+      const targetDate = viewDate;
       if (items) set.checklist = checklistContent(items);
       if (Object.keys(set).length) {
         const filter = doc.repeatGroupId
@@ -1628,26 +1652,53 @@ export async function PUT(req: NextRequest) {
       }
       if (items) {
         const doneIds = items.filter((it) => it.done).map((it) => it.id);
+        const doneByDate = withChecklistDone(
+          doc.checklistDoneByDate,
+          targetDate,
+          doneIds,
+        );
         await TaskModel.updateOne(
           { userId: uid, id: taskId },
-          {
-            $set: {
-              checklistDoneByDate: withChecklistDone(
-                doc.checklistDoneByDate,
-                targetDate,
-                doneIds,
-              ),
-            },
-          },
+          { $set: { checklistDoneByDate: doneByDate } },
         );
+        nextDoc.checklist = checklistContent(items);
+        nextDoc.checklistDoneByDate = doneByDate;
       }
     } else {
       if (items) set.checklist = items;
       if (Object.keys(set).length)
         await TaskModel.updateOne({ userId: uid, id: taskId }, { $set: set });
+      if (items) nextDoc.checklist = items;
+    }
+
+    // Checked steps pay their markers straight away and keep them, so an
+    // abandoned checklist still earns what it got through. A task already
+    // completed for this date has been paid its whole budget, so it is skipped.
+    let flyStatus: FlyStatus | undefined;
+    let hungerStatus: HungerStatus | undefined;
+    const occurrenceDate = doc.type === 'weekly' ? viewDate : doc.date;
+    const completedForDate =
+      doc.type === 'weekly'
+        ? (doc.completedDates ?? []).includes(viewDate)
+        : !!doc.completed;
+    if (items?.length && occurrenceDate && doc.type !== 'backlog' && !completedForDate) {
+      const value = taskFlyValue(nextDoc, occurrenceDate, 0, false);
+      if (value > 0) {
+        const res = await awardFlyForTask(
+          uid,
+          taskId,
+          tz,
+          occurrenceDate === getZonedToday(tz),
+          value,
+          { topUp: true, countTask: false },
+        );
+        flyStatus = res.flyStatus;
+        hungerStatus = res.hungerStatus;
+        if (res.awarded) void syncGamification(uid, tz);
+      }
     }
     await notifyTaskChanged(uid);
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, flyStatus, hungerStatus });
   }
 
   // Handle explicit repeat change from the task detail card, using the same
@@ -1800,8 +1851,10 @@ export async function PUT(req: NextRequest) {
       taskId,
       tz,
       isTodayCompletion,
-      taskFlyValue(doc, date, streakNow),
+      taskFlyValue(doc, date, streakNow, true),
+      { topUp: true },
     );
+    await lockChecklistBudget(uid, doc, date);
     flyStatus = res.flyStatus;
     hungerStatus = res.hungerStatus;
     dailyTasksCount = res.dailyTasksCount;
@@ -1825,7 +1878,6 @@ export async function PUT(req: NextRequest) {
       userId: uid,
       date,
       completed,
-      ownFlyValue: taskFlyValue(doc, date),
       tz,
     });
   }
@@ -2581,14 +2633,19 @@ async function handleDateRangeGet(req: NextRequest, uid: string, tz: string) {
   });
 }
 
-type ChecklistItemInput = { id: string; text: string; done: boolean };
+type ChecklistItemInput = {
+  id: string;
+  text: string;
+  done: boolean;
+  reward?: boolean;
+};
 
 /** Coerce a request-provided checklist into the stored shape, or undefined. */
 function sanitizeChecklistInput(
   value: unknown,
 ): ChecklistItemInput[] | undefined {
   if (!Array.isArray(value)) return undefined;
-  return value
+  const items = value
     .filter(
       (it: unknown): it is Record<string, unknown> =>
         !!it && typeof it === 'object',
@@ -2597,7 +2654,9 @@ function sanitizeChecklistInput(
       id: String(it.id ?? ''),
       text: String(it.text ?? ''),
       done: Boolean(it.done),
+      ...(it.reward ? { reward: true } : {}),
     }));
+  return normalizeChecklistRewards(items);
 }
 
 type BoardTaskInput = {
@@ -3195,3 +3254,4 @@ async function nextOrderBacklog(userId: string, weekStart: string) {
     .exec();
   return (doc?.order ?? 0) + 1;
 }
+

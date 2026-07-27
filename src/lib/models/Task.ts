@@ -15,8 +15,9 @@ export interface TaskDoc {
   suppressedDates?: string[]; // YYYY-MM-DD entries hidden for that date
   orderOverrides?: Record<string, number>; // YYYY-MM-DD -> per-date order for repeating instances
   notes?: string; // free-text notes shown in the task detail card
-  checklist?: { id: string; text: string; done: boolean }[]; // Trello-like sub-items
+  checklist?: { id: string; text: string; done: boolean; reward?: boolean }[]; // Trello-like sub-items
   checklistDoneByDate?: Record<string, string[]>; // YYYY-MM-DD -> checked item ids (repeating tasks only)
+  checklistBudgetByDate?: Record<string, number>; // YYYY-MM-DD -> fly budget locked in when that occurrence first paid
   repeatMode?:
     | 'none'
     | 'daily'
@@ -114,11 +115,13 @@ const TaskSchema = new Schema<TaskDoc>(
           id: { type: String, required: true },
           text: { type: String, default: '' },
           done: { type: Boolean, default: false },
+          reward: { type: Boolean, default: undefined },
         },
       ],
       default: undefined,
     },
     checklistDoneByDate: { type: Schema.Types.Mixed, default: undefined },
+    checklistBudgetByDate: { type: Schema.Types.Mixed, default: undefined },
     dayOfWeek: { type: Number, min: 0, max: 6 },
     date: { type: String },
     weekStart: { type: String },

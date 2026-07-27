@@ -20,6 +20,9 @@ import {
 import BacklogTray from '@/components/board/BacklogTray';
 import { TASK_SAVED_EVENT } from '@/lib/hints/guides';
 import { notifyQuestClaims } from '@/lib/questClaims';
+import { taskFlyValue } from '@/lib/flyValue';
+import { checklistPayout } from '@/lib/checklist';
+import { FlyValueBadge } from '@/components/ui/FlyValueBadge';
 import { useIntros } from '@/hooks/useIntros';
 import {
   BellyFullIntroSheet,
@@ -796,11 +799,17 @@ export default function HomeDashboard() {
                           x={0}
                           paused={isPaused}
                         />
-                        {1 + (task.checklist?.filter((c) => c.done).length ?? 0) > 1 && (
-                          <span className="absolute -right-1 -top-1.5 sm:-top-1 flex min-w-[17px] items-center justify-center rounded-full border border-card bg-primary px-1 py-0.5 text-[10px] font-black leading-none text-primary-foreground shadow-sm">
-                            ×{1 + (task.checklist?.filter((c) => c.done).length ?? 0)}
-                          </span>
-                        )}
+                        {(() => {
+                          if (!task.checklist?.length)
+                            return <FlyValueBadge value={taskFlyValue({})} />;
+                          const { budget, earned } = checklistPayout(
+                            task.checklist,
+                            { completed: task.completed },
+                          );
+                          return (
+                            <FlyValueBadge value={budget} caught={earned} />
+                          );
+                        })()}
                       </div>
                     );
                   }}

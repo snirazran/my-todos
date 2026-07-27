@@ -40,12 +40,33 @@ import {
   ChecklistEditor,
   ChecklistProgress,
 } from './ChecklistEditor';
+import { checklistPayout } from '@/lib/checklist';
 import { TaskRepeatPopup } from './TaskRepeatPopup';
 import RichNotesEditor from './RichNotesEditor';
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 const PREVIEW_ITEMS = 3;
+
+function AddDetailButton({
+  icon,
+  label,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex h-10 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl border border-dashed border-border bg-muted/30 text-[12px] font-bold text-muted-foreground transition-colors active:scale-[0.98] [@media(hover:hover)]:hover:bg-muted/60 [@media(hover:hover)]:hover:text-foreground"
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
 
 export interface TaskDetailTask {
   id: string;
@@ -265,6 +286,10 @@ export default function TaskDetailSheet({
   };
 
   const doneCount = checklist.filter((it) => it.done).length;
+  // What the task is worth, not what is left of it — the badge and the track
+  // already say which flies are caught, and a residual here just reads as a
+  // third, contradictory number.
+  const taskFlies = checklist.length ? checklistPayout(checklist).budget : 1;
   // For weekly tasks use their stored weekday; otherwise anchor to the date the
   // task sits on (the column being edited), falling back to today.
   const repeatDay =
@@ -480,6 +505,13 @@ export default function TaskDetailSheet({
                                 </span>
                               </button>
                             )}
+                            {checklist.length > 0 && (
+                              <ChecklistProgress
+                                items={checklist}
+                                completed={isCompleted}
+                                className="mb-1 mt-0.5"
+                              />
+                            )}
                             {checklist.slice(0, PREVIEW_ITEMS).map((it) => (
                               <div
                                 key={it.id}
@@ -513,23 +545,42 @@ export default function TaskDetailSheet({
                                 </span>
                               </button>
                             )}
+                            {/* Whichever half the task doesn't have yet stays
+                                offered — otherwise adding notes hides the only
+                                route to a checklist, and vice versa. */}
+                            {(!notesText || checklist.length === 0) && (
+                              <div className="mt-1.5 flex gap-2">
+                                {!notesText && (
+                                  <AddDetailButton
+                                    icon={<Pen className="h-3.5 w-3.5 shrink-0" />}
+                                    label="Add notes"
+                                    onClick={() => openEditor('notes')}
+                                  />
+                                )}
+                                {checklist.length === 0 && (
+                                  <AddDetailButton
+                                    icon={
+                                      <ListChecks className="h-4 w-4 shrink-0" />
+                                    }
+                                    label="Add checklist"
+                                    onClick={() => openEditor('checklist')}
+                                  />
+                                )}
+                              </div>
+                            )}
                           </>
                         ) : (
                           <div className="flex gap-2">
-                            <button
+                            <AddDetailButton
+                              icon={<Pen className="h-3.5 w-3.5 shrink-0" />}
+                              label="Add notes"
                               onClick={() => openEditor('notes')}
-                              className="flex h-10 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl border border-dashed border-border bg-muted/30 text-[12px] font-bold text-muted-foreground transition-colors active:scale-[0.98] [@media(hover:hover)]:hover:bg-muted/60 [@media(hover:hover)]:hover:text-foreground"
-                            >
-                              <Pen className="h-3.5 w-3.5 shrink-0" />
-                              Add notes
-                            </button>
-                            <button
+                            />
+                            <AddDetailButton
+                              icon={<ListChecks className="h-4 w-4 shrink-0" />}
+                              label="Add checklist"
                               onClick={() => openEditor('checklist')}
-                              className="flex h-10 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl border border-dashed border-border bg-muted/30 text-[12px] font-bold text-muted-foreground transition-colors active:scale-[0.98] [@media(hover:hover)]:hover:bg-muted/60 [@media(hover:hover)]:hover:text-foreground"
-                            >
-                              <ListChecks className="h-4 w-4 shrink-0" />
-                              Add checklist
-                            </button>
+                            />
                           </div>
                         )}
                       </div>
@@ -593,8 +644,8 @@ export default function TaskDetailSheet({
                               {checklist.length > 0 ? (
                                 <div className="mb-2 shrink-0">
                                   <ChecklistProgress
-                                    done={doneCount}
-                                    total={checklist.length}
+                                    items={checklist}
+                                    completed={isCompleted}
                                   />
                                 </div>
                               ) : (
@@ -604,9 +655,10 @@ export default function TaskDetailSheet({
                                     Break it into steps
                                   </p>
                                   <p className="text-[12px] font-medium leading-snug text-muted-foreground">
-                                    Each step you check off adds{' '}
-                                    <span className="font-black text-primary">+1 fly</span>{' '}
-                                    when you complete the task.
+                                    The task&apos;s flies spread out across the
+                                    steps. Cross a{' '}
+                                    <span className="font-black text-primary">fly line</span>{' '}
+                                    and that fly is yours, finished or not.
                                   </p>
                                 </div>
                               )}
@@ -748,12 +800,12 @@ export default function TaskDetailSheet({
                     <Fly size={30} y={-2} interactive={false} />
                   </span>
                   <span>{onComplete ? 'Complete' : 'Upcoming'}</span>
-                  {!!onComplete && doneCount > 0 && (
+                  {!!onComplete && taskFlies > 1 && (
                     <span
-                      title={`Worth ${doneCount + 1} flies — 1 + ${doneCount} checked steps`}
+                      title={`This task is worth ${taskFlies} flies`}
                       className="rounded-full bg-white/25 px-2 py-1 text-[13px] font-black leading-none tabular-nums"
                     >
-                      ×{doneCount + 1}
+                      {taskFlies}
                     </span>
                   )}
                 </span>

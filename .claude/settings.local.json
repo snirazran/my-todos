@@ -385,7 +385,11 @@
       "Bash(sed -i '143{/^[[:space:]]*$/d}' src/components/ui/streak/StreakCelebration.tsx)",
       "Bash(sed -i '104,144s/^/  /' src/components/ui/streak/StreakCelebration.tsx)",
       "WebFetch(domain:www.nngroup.com)",
-      "WebFetch(domain:framework.scaledagile.com)"
+      "WebFetch(domain:framework.scaledagile.com)",
+      "PowerShell(foreach \\($c in 'magick','convert','gs','gswin64c','mutool','pdftoppm','python','python3','py','soffice'\\) { $g = Get-Command $c -ErrorAction SilentlyContinue; if \\($g\\) { \"$c -> $\\($g.Source\\)\" } })",
+      "PowerShell(python -c \"import fitz; print\\('pymupdf', fitz.__doc__\\)\" 2>&1 | Select-Object -First 3; python -c \"import pypdfium2; print\\('pdfium ok'\\)\" 2>&1 | Select-Object -First 3)",
+      "PowerShell($sp = \"C:\\\\Users\\\\snira\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-snira-Desktop-Full-Stack-frog-task\\\\cc3ebb22-f524-400d-9f42-7b1e0748d1c7\\\\scratchpad\"; python -m pip install --quiet --target \"$sp\\\\pylibs\" pypdfium2 2>&1 | Select-Object -Last 5; \"exit=$LASTEXITCODE\")",
+      "PowerShell($sp = \"C:\\\\Users\\\\snira\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-snira-Desktop-Full-Stack-frog-task\\\\cc3ebb22-f524-400d-9f42-7b1e0748d1c7\\\\scratchpad\"; python -m pip install --quiet --target \"$sp\\\\pylibs\" pillow 2>&1 | Select-Object -Last 3; \"exit=$LASTEXITCODE\")"
     ]
   }
 }

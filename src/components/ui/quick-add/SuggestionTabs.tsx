@@ -12,6 +12,8 @@ import type {
 import type { ChecklistItem } from './types';
 import Fly from '@/components/ui/fly';
 import { cn } from '@/lib/utils';
+import { taskFlyValue } from '@/lib/flyValue';
+import { FlyValueBadge } from '@/components/ui/FlyValueBadge';
 import { fetcher } from './utils';
 
 type BacklogTask = {
@@ -200,11 +202,12 @@ export function SuggestionTabs({ open, className, onPick, onContentChange }: Pro
                 </div>
                 <span className="relative grid h-9 w-9 shrink-0 place-items-center rounded-full border border-muted-foreground/10 bg-muted">
                   <Fly size={28} y={-3} paused />
-                  {1 + (t.checklist?.filter((c) => c.done).length ?? 0) > 1 && (
-                    <span className="absolute -right-1 -top-1.5 sm:-top-1 flex min-w-[16px] items-center justify-center rounded-full border border-card bg-primary px-1 py-0.5 text-[9px] font-black leading-none text-primary-foreground shadow-sm">
-                      ×{1 + (t.checklist?.filter((c) => c.done).length ?? 0)}
-                    </span>
-                  )}
+                  <FlyValueBadge
+                    size="sm"
+                    value={taskFlyValue({
+                      checklistSteps: t.checklist?.length ?? 0,
+                    })}
+                  />
                 </span>
               </button>
             ))}

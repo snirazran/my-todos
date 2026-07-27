@@ -9,7 +9,6 @@ import {
   buddyPartnerFinishedMessage,
 } from '@/lib/notifications/frogVoice';
 import { bumpQuestMetric } from '@/lib/quests/metrics';
-import { checklistDoneIdsForDate } from '@/lib/checklist';
 
 function dowYMD(ymd: string): number {
   const [y, m, d] = ymd.split('-').map(Number);
@@ -72,42 +71,23 @@ export function computeStreak(
   return { count, lastDate };
 }
 
-async function partnerTaskFlyValue(
-  bondId: string,
-  partnerId: string,
-  date: string,
-): Promise<number> {
-  const docs = await TaskModel.find({ userId: partnerId, bondId })
-    .select('type checklist checklistDoneByDate')
-    .lean<
-      {
-        type?: string;
-        checklist?: { id: string; text: string; done: boolean }[];
-        checklistDoneByDate?: Record<string, string[]>;
-      }[]
-    >();
-  const done = docs.reduce(
-    (max, d) => Math.max(max, checklistDoneIdsForDate(d, date).length),
-    0,
-  );
-  return 1 + done;
-}
+/** Flat bonus each side gets for finishing the same day together. */
+const BUDDY_BONUS_FLIES = 1;
 
 /**
  * Mirror a bonded task completion to the bond. When BOTH sides have completed
- * the same occurrence date, grant the 2× bonus (an extra 1× of each side's own
- * value, bypassing the daily cap) to both; reverse on uncomplete. Recomputes
- * the shared streak and nudges the partner's client.
+ * the same occurrence date, grant the shared bonus (bypassing the daily cap) to
+ * both; reverse on uncomplete. Recomputes the shared streak and nudges the
+ * partner's client.
  */
 export async function handleBuddyCompletion(opts: {
   bondId: string;
   userId: string;
   date: string;
   completed: boolean;
-  ownFlyValue: number;
   tz: string;
 }) {
-  const { bondId, userId, date, completed, ownFlyValue, tz } = opts;
+  const { bondId, userId, date, completed, tz } = opts;
   const bond = await TaskBondModel.findOne({ bondId });
   if (!bond || bond.status !== 'active') return;
 
@@ -137,25 +117,19 @@ export async function handleBuddyCompletion(opts: {
     ]);
 
   if (completed && bothNow && !alreadyBonused) {
-    const [partnerValue, [myTask, partnerTask]] = await Promise.all([
-      partnerTaskFlyValue(bondId, partnerId, date),
-      loadBondTaskTags(),
-    ]);
+    const [myTask, partnerTask] = await loadBondTaskTags();
     await Promise.all([
-      UserModel.updateOne({ _id: userId }, { $inc: { 'wardrobe.flies': ownFlyValue } }),
-      UserModel.updateOne({ _id: partnerId }, { $inc: { 'wardrobe.flies': partnerValue } }),
+      UserModel.updateOne({ _id: userId }, { $inc: { 'wardrobe.flies': BUDDY_BONUS_FLIES } }),
+      UserModel.updateOne({ _id: partnerId }, { $inc: { 'wardrobe.flies': BUDDY_BONUS_FLIES } }),
       bumpQuestMetric({ userId, metric: 'buddy_task_completed', timezone: tz, tagIds: myTask?.tags ?? [] }),
       bumpQuestMetric({ userId: partnerId, metric: 'buddy_task_completed', timezone: tz, tagIds: partnerTask?.tags ?? [] }),
     ]);
     bond.bonusAwardedDates = [...bond.bonusAwardedDates, date];
   } else if (!bothNow && alreadyBonused) {
-    const [partnerValue, [myTask, partnerTask]] = await Promise.all([
-      partnerTaskFlyValue(bondId, partnerId, date),
-      loadBondTaskTags(),
-    ]);
+    const [myTask, partnerTask] = await loadBondTaskTags();
     await Promise.all([
-      UserModel.updateOne({ _id: userId }, { $inc: { 'wardrobe.flies': -ownFlyValue } }),
-      UserModel.updateOne({ _id: partnerId }, { $inc: { 'wardrobe.flies': -partnerValue } }),
+      UserModel.updateOne({ _id: userId }, { $inc: { 'wardrobe.flies': -BUDDY_BONUS_FLIES } }),
+      UserModel.updateOne({ _id: partnerId }, { $inc: { 'wardrobe.flies': -BUDDY_BONUS_FLIES } }),
       bumpQuestMetric({ userId, metric: 'buddy_task_completed', amount: -1, timezone: tz, tagIds: myTask?.tags ?? [] }),
       bumpQuestMetric({ userId: partnerId, metric: 'buddy_task_completed', amount: -1, timezone: tz, tagIds: partnerTask?.tags ?? [] }),
     ]);

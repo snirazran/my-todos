@@ -1249,18 +1249,56 @@ export function useTaskData({
       }
 
       try {
-        await fetch('/api/tasks', {
+        const res = await fetch('/api/tasks', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ taskId, details, date: dateStr, timezone: tz }),
         });
+        // Passing a checklist reward pays out on the spot, so the header's fly
+        // counter has to move without waiting for the next task fetch.
+        const json = await res.json().catch(() => null);
+        const newFlyStatus = json?.flyStatus as FlyStatus | undefined;
+        if (newFlyStatus) {
+          markFlyEarn();
+          void notifyQuestClaims(showNotification);
+          const nextBalance = newFlyStatus.balance;
+          const patch = (curr: any) => {
+            if (!curr?.wardrobe) return curr;
+            if (curr.wardrobe.flies === nextBalance) return curr;
+            return {
+              ...curr,
+              wardrobe: { ...curr.wardrobe, flies: nextBalance },
+            };
+          };
+          mutate(INVENTORY_KEY, patch, { revalidate: false });
+          mutate(INVENTORY_SUMMARY_KEY, patch, { revalidate: false });
+          mutateToday(
+            (curr) =>
+              curr
+                ? {
+                    ...curr,
+                    flyStatus: newFlyStatus,
+                    hungerStatus: json.hungerStatus || curr.hungerStatus,
+                  }
+                : curr,
+            { revalidate: false },
+          );
+        }
       } catch (e) {
         console.error('Update task details failed', e);
         if (prevToday) mutateToday(prevToday, { revalidate: false });
         if (prevBacklog) mutateBacklog(prevBacklog, { revalidate: false });
       }
     },
-    [todayData, backlogData, mutateToday, mutateBacklog, tz, dateStr],
+    [
+      todayData,
+      backlogData,
+      mutateToday,
+      mutateBacklog,
+      tz,
+      dateStr,
+      showNotification,
+    ],
   );
 
   /**

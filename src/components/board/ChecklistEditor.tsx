@@ -12,11 +12,108 @@ import { GripVertical, Plus, X } from 'lucide-react';
 import Fly from '@/components/ui/fly';
 import { hapticImpact, hapticSuccess, hapticTick } from '@/lib/haptics';
 import { randomUUID } from '@/lib/uuid';
+import {
+  CHECKLIST_MAX_ITEMS,
+  checklistPayout,
+  normalizeChecklistRewards,
+  type ChecklistItem,
+} from '@/lib/checklist';
 
-export type ChecklistItem = { id: string; text: string; done: boolean };
-
-export const CHECKLIST_MAX_ITEMS = 20;
+export type { ChecklistItem };
+export { CHECKLIST_MAX_ITEMS };
 export const CHECKLIST_ITEM_MAX = 120;
+
+/**
+ * One track carrying both readings: how far down the list you are, and where
+ * the task's flies sit along the way. Notches mark the step counts that pay
+ * out; the last fly is the end of the bar, so it needs no notch of its own.
+ */
+export function ChecklistProgress({
+  items,
+  completed = false,
+  className = '',
+  flyPaused = false,
+}: {
+  items: ChecklistItem[];
+  completed?: boolean;
+  className?: string;
+  /** Hold the fly still — the task list can show many of these at once. */
+  flyPaused?: boolean;
+}) {
+  const { doneCount: ticked, items: steps, budget } = checklistPayout(items, {
+    completed,
+  });
+  const total = steps.length;
+  if (total === 0) return null;
+  // Finishing the task settles the whole list, so the track must not still
+  // read half-empty.
+  const doneCount = completed ? total : ticked;
+
+  // One segment per fly, as wide as the run of steps that fly is waiting
+  // behind. A discrete reward needs a discrete bar: filling a whole segment is
+  // what catching a fly looks like.
+  const at = steps.map((it, i) => (it.reward ? i + 1 : 0)).filter(Boolean);
+  const segments = at.map((p, i) => {
+    const from = i === 0 ? 0 : at[i - 1];
+    const span = p - from;
+    return {
+      p,
+      span,
+      fill: Math.max(0, Math.min(1, (doneCount - from) / span)),
+    };
+  });
+  const caught = segments.filter((s) => s.fill >= 1).length;
+  const next = segments.find((s) => s.fill < 1);
+
+  return (
+    <div className={`flex flex-col gap-1.5 ${className}`}>
+      <div className="flex h-3 items-stretch gap-1.5">
+        {segments.map((s) => {
+          const full = s.fill >= 1;
+          return (
+            <div
+              key={s.p}
+              style={{ flexGrow: s.span }}
+              className={`relative overflow-hidden rounded-full bg-muted ring-1 ring-inset transition-colors duration-300 ${
+                full ? 'ring-primary/45' : 'ring-border/70'
+              }`}
+            >
+              <motion.div
+                initial={false}
+                animate={{ width: `${s.fill * 100}%` }}
+                transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                className="absolute inset-y-0 left-0 rounded-full bg-primary"
+              />
+            </div>
+          );
+        })}
+      </div>
+      <div className="flex items-center gap-1.5">
+        <Fly
+          size={20}
+          y={-1}
+          interactive={false}
+          paused={flyPaused || caught === 0}
+          oversample={1.5}
+        />
+        <span className="text-[11px] font-bold leading-none text-muted-foreground">
+          {next ? (
+            <>
+              <span className="font-black text-foreground">
+                {caught}/{budget}
+              </span>{' '}
+              caught · next at {next.p} of {total} steps
+            </>
+          ) : (
+            <span className="font-black text-primary">
+              All {budget} {budget === 1 ? 'fly' : 'flies'} caught
+            </span>
+          )}
+        </span>
+      </div>
+    </div>
+  );
+}
 
 export function ChecklistCheckbox({
   checked,
@@ -122,7 +219,7 @@ export function ChecklistEditor({
     updater: (cur: ChecklistItem[]) => ChecklistItem[],
     persist: boolean,
   ) => {
-    const next = updater(latestRef.current);
+    const next = normalizeChecklistRewards(updater(latestRef.current));
     latestRef.current = next;
     onChange(next, { persist });
   };
@@ -214,7 +311,7 @@ export function ChecklistEditor({
         className="flex flex-col"
       >
         <AnimatePresence initial={false}>
-          {items.map((it) => (
+          {items.map((it, index) => (
             <ChecklistRow
               key={it.id}
               item={it}
@@ -243,9 +340,9 @@ export function ChecklistEditor({
       </Reorder.Group>
 
       {!atCap && (
-        <div className="flex min-h-[46px] items-center gap-3 rounded-xl px-2 transition-colors focus-within:bg-muted/30">
-          <span className="grid h-6 w-6 shrink-0 place-items-center rounded-[30%] border-2 border-dashed border-muted-foreground/35 text-muted-foreground/60">
-            <Plus className="h-4 w-4" strokeWidth={2.5} />
+        <div className="flex min-h-[44px] items-center gap-3 rounded-xl px-2 transition-colors focus-within:bg-muted/30">
+          <span className="grid h-[21px] w-[21px] shrink-0 place-items-center rounded-[30%] border-2 border-dashed border-muted-foreground/35 text-muted-foreground/60">
+            <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
           </span>
           <input
             ref={addRef}
@@ -332,13 +429,13 @@ function ChecklistRow({
       className={`${dragging ? 'z-10' : 'overflow-hidden'}`}
     >
       <div
-        className={`group flex min-h-[46px] items-center gap-3 rounded-xl px-2 transition-colors ${
+        className={`group flex min-h-[44px] items-center gap-3 rounded-xl px-2 transition-colors ${
           dragging
             ? 'bg-popover shadow-lg ring-1 ring-border/80'
             : 'focus-within:bg-muted/40 [@media(hover:hover)]:hover:bg-muted/25'
         }`}
       >
-        <ChecklistCheckbox checked={item.done} onToggle={onToggle} />
+        <ChecklistCheckbox checked={item.done} onToggle={onToggle} size={21} />
         <input
           ref={registerInput}
           value={item.text}
@@ -376,20 +473,6 @@ function ChecklistRow({
               : 'text-foreground'
           }`}
         />
-        <AnimatePresence initial={false}>
-          {item.done && (
-            <motion.span
-              key="fly"
-              initial={{ scale: 0.4, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.4, opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 500, damping: 22 }}
-              className="shrink-0"
-            >
-              <Fly size={24} y={-1} interactive={false} />
-            </motion.span>
-          )}
-        </AnimatePresence>
         <button
           type="button"
           tabIndex={-1}
@@ -420,43 +503,5 @@ function ChecklistRow({
         )}
       </div>
     </Reorder.Item>
-  );
-}
-
-export function ChecklistProgress({
-  done,
-  total,
-}: {
-  done: number;
-  total: number;
-}) {
-  const pct = total > 0 ? (done / total) * 100 : 0;
-  const complete = total > 0 && done === total;
-  return (
-    <div className="flex items-center gap-2.5">
-      <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
-        <motion.div
-          initial={false}
-          animate={{ width: `${pct}%` }}
-          transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-          className={`h-full rounded-full ${
-            complete ? 'bg-primary' : 'bg-primary/90'
-          }`}
-        />
-      </div>
-      <span className="shrink-0 text-[12px] font-bold tabular-nums text-muted-foreground">
-        {done}/{total}
-      </span>
-      <motion.span
-        initial={false}
-        animate={complete ? { scale: [1, 1.15, 1] } : { scale: 1 }}
-        transition={{ duration: 0.3, ease: 'easeOut' }}
-        title="Each checked step adds a bonus fly when you complete the task"
-        className="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-[12px] font-black tabular-nums leading-none text-primary"
-      >
-        <Fly size={16} y={-1} interactive={false} paused={done === 0} />
-        +{done}
-      </motion.span>
-    </div>
   );
 }

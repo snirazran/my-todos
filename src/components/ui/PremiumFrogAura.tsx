@@ -20,10 +20,13 @@ const COMPACT_VARS = {
 // The companion fly freezes with the global slide/sheet Rive pause: while a
 // sheet covers it there's nothing to see, and one always-animating canvas
 // keeps the whole 60fps render pipeline (and the phone's thermals) alive.
+// Auras rendered INSIDE a sheet are the exception — they pass `alwaysPlay`,
+// since the sheet is what the user is looking at.
 export function PremiumFrogAura({
   show,
   compact = false,
   flySize,
+  alwaysPlay = false,
   className,
 }: {
   /** Overrides the self premium check (e.g. viewing a friend's frog). */
@@ -32,6 +35,9 @@ export function PremiumFrogAura({
   compact?: boolean;
   /** Fly canvas size in px; defaults to 26 (compact) / 46. */
   flySize?: number;
+  /** Keep animating while a sheet/scroll holds the global Rive pause (for
+   *  auras rendered inside an open sheet). The idle pause still applies. */
+  alwaysPlay?: boolean;
   className?: string;
 }) {
   const isSelf = show === undefined;
@@ -45,7 +51,7 @@ export function PremiumFrogAura({
   const active = isSelf ? !!data?.isPremium : show;
   const pauseHeld = useRiveInteractionPause((s) => s.count > 0);
   const idle = useRiveIdlePause((s) => s.idle);
-  const frozen = pauseHeld || idle;
+  const frozen = (pauseHeld && !alwaysPlay) || idle;
 
   const phase = React.useMemo(() => {
     const t = Date.now() / 1000;
@@ -78,6 +84,7 @@ export function PremiumFrogAura({
                 <Fly
                   size={flySize ?? (compact ? 26 : 46)}
                   interactive={false}
+                  alwaysPlay={alwaysPlay}
                 />
               </div>
             </div>

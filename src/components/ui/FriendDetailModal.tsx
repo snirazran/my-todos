@@ -323,7 +323,7 @@ export function FriendDetailModal({
                       indices={entry.indices}
                       mouthOpen={friendMouthOpen}
                     />
-                    <PremiumFrogAura show={!!entry.premium} />
+                    <PremiumFrogAura show={!!entry.premium} alwaysPlay />
                   </div>
                 </div>
               </div>

@@ -71,6 +71,11 @@ import { SectionEditorSheet } from '@/components/ui/SectionEditorSheet';
 import { EditTaskDialog } from '@/components/ui/EditTaskDialog';
 import { TimePopup } from '@/components/ui/TimePopup';
 import { BuddyBadge } from '@/components/ui/BuddyBadge';
+import {
+  ChecklistCheckbox,
+  ChecklistProgress,
+} from '../board/ChecklistEditor';
+import { checklistPayout, type ChecklistItem } from '@/lib/checklist';
 import { objectiveCardTone } from '@/lib/questClaims';
 import { useNotification } from '@/components/providers/NotificationProvider';
 import { useUIStore } from '@/lib/uiStore';
@@ -87,7 +92,7 @@ interface Task {
   kind?: 'regular' | 'weekly' | 'backlog';
   tags?: string[];
   notes?: string;
-  checklist?: { id: string; text: string; done: boolean }[];
+  checklist?: ChecklistItem[];
   repeatMode?:
     | 'none'
     | 'daily'
@@ -166,6 +171,9 @@ interface SortableTaskItemProps {
   isSortDragging?: boolean;
   onStartTimer?: (task: Task, opts?: { autoStart?: boolean }) => void;
   onOpenDetail?: (task: Task) => void;
+  onToggleChecklistItem?: (task: Task, itemId: string) => void;
+  stepsOpen?: boolean;
+  onToggleSteps?: () => void;
   paused?: boolean;
   hintPeekPrimary?: boolean;
   isDesktop?: boolean;
@@ -194,12 +202,21 @@ const SortableTaskItem = React.forwardRef<
       isSortDragging,
       onStartTimer,
       onOpenDetail,
+      onToggleChecklistItem,
+      stepsOpen = false,
+      onToggleSteps,
       paused = false,
       hintPeekPrimary = false,
       isDesktop = false,
     },
     ref,
   ) => {
+    const checklist = task.checklist ?? [];
+    const checklistPayoutState = React.useMemo(
+      () => checklistPayout(checklist, { completed: isDone }),
+      [checklist, isDone],
+    );
+
     /* Swipe Logic */
     const [openSide, setOpenSide] = useState<'timer' | 'secondary' | null>(null);
     const isOpen = openSide !== null;
@@ -800,7 +817,7 @@ const SortableTaskItem = React.forwardRef<
                 : { type: 'spring', stiffness: 600, damping: 28, mass: 1 }
             }
             className={`
-              relative flex w-full items-center gap-1 px-2.5 py-2.5 md:gap-1 md:px-3.5 md:py-3.5
+              relative flex w-full flex-col px-2.5 py-2.5 md:px-3.5 md:py-3.5
               transition-colors duration-200 rounded-xl
               bg-card dark:bg-muted
               border shadow-none
@@ -836,6 +853,7 @@ const SortableTaskItem = React.forwardRef<
               />
             )}
 
+            <div className="relative z-10 flex w-full items-center gap-1">
             {/* Visual grab affordance. The full row remains the sortable
                 activator so vertical movement is measured correctly. */}
             <div
@@ -965,28 +983,41 @@ const SortableTaskItem = React.forwardRef<
                           className="h-4 w-4 text-muted-foreground/70"
                         />
                       )}
-                      {task.checklist &&
-                        task.checklist.length > 0 &&
-                        (() => {
-                          const done = task.checklist.filter(
-                            (c) => c.done,
-                          ).length;
-                          const total = task.checklist.length;
-                          return (
-                            <span
-                              className={`inline-flex items-center gap-1 ${
-                                done === total
-                                  ? 'text-primary'
-                                  : 'text-muted-foreground/70'
-                              }`}
-                            >
-                              <ListChecks className="h-4 w-4" />
-                              <span className="text-[11px] font-bold tabular-nums no-underline">
-                                {done}/{total}
-                              </span>
-                            </span>
-                          );
-                        })()}
+                      {checklist.length > 0 && (
+                        <button
+                          type="button"
+                          aria-expanded={stepsOpen}
+                          aria-label={
+                            stepsOpen
+                              ? `Hide steps for ${task.text}`
+                              : `Show steps for ${task.text}`
+                          }
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onMouseDown={(e) => e.stopPropagation()}
+                          onTouchStart={(e) => e.stopPropagation()}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            hapticTick();
+                            onToggleSteps?.();
+                          }}
+                          className={`-my-1 inline-flex items-center gap-1 rounded-md py-1 pl-1 pr-0.5 transition-colors ${
+                            checklistPayoutState.doneCount === checklist.length
+                              ? 'text-primary'
+                              : 'text-muted-foreground/70'
+                          } [@media(hover:hover)]:hover:text-primary`}
+                        >
+                          <ListChecks className="h-4 w-4" />
+                          <span className="text-[11px] font-bold tabular-nums no-underline">
+                            {checklistPayoutState.doneCount}/{checklist.length}
+                          </span>
+                          <ChevronDown
+                            className={`h-3.5 w-3.5 transition-transform duration-200 ${
+                              stepsOpen ? 'rotate-180' : ''
+                            }`}
+                            strokeWidth={3}
+                          />
+                        </button>
+                      )}
                     </span>
                   )}
                 </span>
@@ -1148,6 +1179,52 @@ const SortableTaskItem = React.forwardRef<
                 )}
               </AnimatePresence>
             </div>
+            </div>
+
+            <AnimatePresence initial={false}>
+              {stepsOpen && checklist.length > 0 && (
+                <motion.div
+                  key="steps"
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.24, ease: [0.32, 0.72, 0, 1] }}
+                  onClick={(e) => e.stopPropagation()}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  className="relative z-10 w-full overflow-hidden"
+                >
+                  <div className="mt-1.5 border-t border-border/70 pl-3 pr-2 pt-2 md:pl-4">
+                    <ChecklistProgress
+                      items={checklist}
+                      completed={isDone}
+                      className="mb-1.5"
+                      flyPaused
+                    />
+                    {checklistPayoutState.items.map((item) => (
+                      <div
+                        key={item.id}
+                        className="flex min-h-[34px] items-center gap-2.5"
+                      >
+                        <ChecklistCheckbox
+                          size={19}
+                          checked={item.done}
+                          onToggle={() => onToggleChecklistItem?.(task, item.id)}
+                        />
+                        <span
+                          className={`min-w-0 flex-1 break-words text-[13px] font-semibold leading-snug transition-colors duration-200 md:text-[14px] ${
+                            item.done
+                              ? 'text-muted-foreground/70 line-through decoration-muted-foreground/50'
+                              : 'text-foreground/90'
+                          }`}
+                        >
+                          {item.text || 'Untitled step'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </motion.div>
         </motion.div>
       </motion.div>
@@ -1380,7 +1457,7 @@ export default function TaskList({
   onStartTimer?: (task: { id: string; text: string; completed: boolean; tags?: string[]; frogodoroSession?: Task['frogodoroSession']; frogodoroSettings?: Record<string, unknown> }, opts?: { autoStart?: boolean }) => void;
   onUpdateDetails?: (
     taskId: string,
-    details: { notes?: string; checklist?: { id: string; text: string; done: boolean }[] },
+    details: { notes?: string; checklist?: ChecklistItem[] },
   ) => void;
   onSetRepeat?: (
     taskId: string,
@@ -1435,6 +1512,39 @@ export default function TaskList({
   };
 
   const vSet = visuallyCompleted ?? new Set<string>();
+
+  // Which rows have their steps showing. Held here rather than per-row so a
+  // sort drag can collapse them: verticalListSortingStrategy translates rows by
+  // measured neighbours, and a row that is several times taller than the rest
+  // makes drops land short or overlap.
+  const [openSteps, setOpenSteps] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  const [collapsedForDrag, setCollapsedForDrag] = useState(false);
+  const toggleSteps = React.useCallback((taskId: string) => {
+    setOpenSteps((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(taskId)) next.add(taskId);
+      return next;
+    });
+  }, []);
+
+  // Checking a step straight from the list persists through the same details
+  // endpoint the detail sheet uses, so a passed reward pays out immediately.
+  const toggleChecklistItem = React.useCallback(
+    (task: Task, itemId: string) => {
+      if (!onUpdateDetails || !task.checklist) return;
+      const next = task.checklist.map((it) =>
+        it.id === itemId ? { ...it, done: !it.done } : it,
+      );
+      const wasComplete = task.checklist.every((it) => it.done);
+      const isComplete = next.every((it) => it.done);
+      if (isComplete && !wasComplete) hapticSuccess();
+      else hapticTick();
+      onUpdateDetails(task.id, { checklist: next });
+    },
+    [onUpdateDetails],
+  );
 
   const [busy, setBusy] = useState(false);
   const [menu, setMenu] = useState<{
@@ -1894,6 +2004,10 @@ export default function TaskList({
     hapticImpact();
     lastDragOverIdRef.current = null;
     setIsAnyDragging(true);
+    if (openSteps.size) {
+      setOpenSteps(new Set());
+      setCollapsedForDrag(true);
+    }
     // Grabbing a header tucks every section down to its bare header row so
     // sections reorder as whole blocks; they re-expand on drop.
     const grabbedSectionId = sectionIdFromSortable(event.active.id);
@@ -1956,8 +2070,29 @@ export default function TaskList({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draggingSectionId]);
 
+  // Same story as the section tuck-in above: the steps panel closes on the
+  // render *after* drag start, so the corridor measured at drag start still
+  // spans the expanded row and lets the drag run far past the list.
+  useEffect(() => {
+    if (!collapsedForDrag) return;
+    const remeasure = () =>
+      computeActiveAreaLimits(draggingSectionId !== null);
+    let raf2 = 0;
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(remeasure);
+    });
+    const settle = window.setTimeout(remeasure, 300);
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+      window.clearTimeout(settle);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [collapsedForDrag]);
+
   const handleDragCancel = () => {
     setIsAnyDragging(false);
+    setCollapsedForDrag(false);
     clearDraggingSection();
     activeAreaLimitsRef.current = null;
   };
@@ -1977,6 +2112,7 @@ export default function TaskList({
 
   const handleDragEnd = (event: DragEndEvent) => {
     setIsAnyDragging(false);
+    setCollapsedForDrag(false);
     activeAreaLimitsRef.current = null;
     const { active, over } = event;
 
@@ -2349,6 +2485,11 @@ export default function TaskList({
                               : undefined
                           }
                           onOpenDetail={(t) => setActionSheetId(t.id)}
+                          onToggleChecklistItem={
+                            isCompleted ? undefined : toggleChecklistItem
+                          }
+                          stepsOpen={!isAnyDragging && openSteps.has(task.id)}
+                          onToggleSteps={() => toggleSteps(task.id)}
                           paused={paused}
                           hintPeekPrimary={isHintPeekPrimary}
                           isDesktop={!usesSwipeTrays}
