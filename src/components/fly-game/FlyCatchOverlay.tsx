@@ -11,6 +11,9 @@ import FlyCatchGame from './FlyCatchGame';
 const NAV_SHIFT = 130;
 const MAIN_Z_RAISED = '120';
 const LAUNCHER_Z_RAISED = '60';
+const NAV_Z_RAISED = '125';
+const BANNER_DISSOLVE_END = 0.28;
+const BANNER_DISSOLVE_SCALE = 0.05;
 
 const smooth = (p: number, from: number, to: number) => {
   const t = Math.min(1, Math.max(0, (p - from) / (to - from)));
@@ -25,11 +28,16 @@ type Scene = {
   sheetTop: number;
   sheetShift: number;
   hero: HTMLElement | null;
+  heroBaseTransform: string;
   heroCard: HTMLElement | null;
+  heroCardRect: DOMRect | null;
   heroFrogRect: DOMRect | null;
   heroRect: DOMRect | null;
   fades: HTMLElement[];
   pageBg: HTMLElement | null;
+  pageBgFade: HTMLElement | null;
+  curtainTop: number;
+  curtainShift: number;
   gameBg: HTMLElement | null;
   gameHuds: HTMLElement[];
   gameCard: HTMLElement | null;
@@ -45,11 +53,16 @@ const emptyScene = (): Scene => ({
   sheetTop: 0,
   sheetShift: 480,
   hero: null,
+  heroBaseTransform: '',
   heroCard: null,
+  heroCardRect: null,
   heroFrogRect: null,
   heroRect: null,
   fades: [],
   pageBg: null,
+  pageBgFade: null,
+  curtainTop: 0,
+  curtainShift: 480,
   gameBg: null,
   gameHuds: [],
   gameCard: null,
@@ -64,6 +77,7 @@ export function FlyCatchOverlay() {
   const setController = useFlyCatchOverlay((state) => state.setController);
 
   const chipRef = useRef<HTMLDivElement>(null);
+  const curtainRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<Scene>(emptyScene());
   const progressRef = useRef(0);
   const gestureRef = useRef(false);
@@ -84,6 +98,9 @@ export function FlyCatchOverlay() {
     scene.hero = document.querySelector<HTMLElement>('[data-fly-hero]');
     scene.heroCard = document.querySelector<HTMLElement>('[data-fly-hero-card]');
     scene.pageBg = document.querySelector<HTMLElement>('[data-fly-page-bg]');
+    scene.pageBgFade =
+      scene.pageBg?.querySelector<HTMLElement>('[data-fly-page-bg-fade]') ??
+      null;
     scene.fades = Array.from(
       document.querySelectorAll<HTMLElement>('[data-fly-fade]'),
     );
@@ -92,7 +109,36 @@ export function FlyCatchOverlay() {
       scene.sheetTop = rect.top;
       scene.sheetShift = Math.max(240, window.innerHeight - rect.top + 24);
     }
+    scene.curtainTop = Math.max(
+      0,
+      scene.pageBg?.getBoundingClientRect().bottom ?? 0,
+    );
+    scene.curtainShift = Math.max(
+      240,
+      window.innerHeight - scene.curtainTop + 24,
+    );
+    if (curtainRef.current) {
+      curtainRef.current.style.top = `${scene.curtainTop}px`;
+      curtainRef.current.style.transform = 'translate3d(0, 0, 0)';
+      curtainRef.current.style.willChange = 'transform';
+      curtainRef.current.style.display = 'block';
+    }
+    if (scene.pageBg) {
+      scene.pageBg.style.transformOrigin = '50% 100%';
+      scene.pageBg.style.willChange = 'opacity, transform';
+    }
+    if (scene.sheet) scene.sheet.style.willChange = 'transform';
+    if (scene.hero) scene.hero.style.willChange = 'transform';
+    if (scene.nav) {
+      scene.nav.style.zIndex = NAV_Z_RAISED;
+      scene.nav.style.willChange = 'transform';
+    }
+    if (scene.heroCard) {
+      scene.heroCardRect = scene.heroCard.getBoundingClientRect();
+    }
     if (scene.hero) {
+      const base = getComputedStyle(scene.hero).transform;
+      scene.heroBaseTransform = base && base !== 'none' ? `${base} ` : '';
       scene.heroRect = scene.hero.getBoundingClientRect();
       const frog = scene.hero.querySelector<HTMLElement>('[data-fly-hero-frog]');
       scene.heroFrogRect = (frog ?? scene.hero).getBoundingClientRect();
@@ -148,18 +194,26 @@ export function FlyCatchOverlay() {
       }
       if (scene.hero && scene.heroMotion) {
         const { dx, dy, scale } = scene.heroMotion;
-        scene.hero.style.transform = `translate3d(${(dx * p).toFixed(2)}px, ${(dy * p).toFixed(2)}px, 0) scale(${(1 + (scale - 1) * p).toFixed(4)})`;
+        scene.hero.style.transform = `${scene.heroBaseTransform}translate3d(${(dx * p).toFixed(2)}px, ${(dy * p).toFixed(2)}px, 0) scale(${(1 + (scale - 1) * p).toFixed(4)})`;
       }
       if (scene.heroCard) {
-        scene.heroCard.style.opacity = Math.max(0, 1 - p * 2.2).toFixed(3);
+        scene.heroCard.style.opacity = Math.max(0, 1 - p * 3.5).toFixed(3);
       }
       for (const el of scene.fades) {
         el.style.opacity = Math.max(0, 1 - p * 2.5).toFixed(3);
       }
+      if (curtainRef.current) {
+        curtainRef.current.style.transform = `translate3d(0, ${(p * scene.curtainShift).toFixed(2)}px, 0)`;
+      }
       if (scene.pageBg) {
+        const dissolve = smooth(p, 0, BANNER_DISSOLVE_END);
         scene.pageBg.style.opacity = scene.gameBg
-          ? (1 - smooth(p, 0.45, 0.95)).toFixed(3)
+          ? (1 - dissolve).toFixed(3)
           : '1';
+        scene.pageBg.style.transform = `scale(${(1 + BANNER_DISSOLVE_SCALE * dissolve).toFixed(4)})`;
+      }
+      if (scene.pageBgFade) {
+        scene.pageBgFade.style.opacity = (1 - smooth(p, 0, 0.06)).toFixed(3);
       }
       if (scene.nav) {
         scene.nav.style.transform =
@@ -167,7 +221,7 @@ export function FlyCatchOverlay() {
       }
 
       if (scene.gameBg) {
-        scene.gameBg.style.opacity = smooth(p, 0.05, 0.55).toFixed(3);
+        scene.gameBg.style.opacity = '1';
       }
       const hudP = smooth(p, 0.1, 0.8);
       for (const el of scene.gameHuds) {
@@ -181,9 +235,17 @@ export function FlyCatchOverlay() {
       }
 
       if (chipRef.current) {
-        chipRef.current.style.opacity =
-          openRef.current || p < 0.02 ? '0' : Math.min(1, p * 6).toFixed(3);
-        chipRef.current.style.transform = `translate3d(0, ${(scene.sheetTop + p * scene.sheetShift - 54).toFixed(2)}px, 0)`;
+        const slot = scene.heroCardRect;
+        chipRef.current.style.opacity = openRef.current
+          ? '0'
+          : smooth(p, 0.08, 0.32).toFixed(3);
+        if (slot) {
+          chipRef.current.style.width = `${slot.width.toFixed(2)}px`;
+          chipRef.current.style.height = `${slot.height.toFixed(2)}px`;
+          chipRef.current.style.transform = `translate3d(${slot.left.toFixed(2)}px, ${slot.top.toFixed(2)}px, 0)`;
+        } else {
+          chipRef.current.style.transform = `translate3d(0, ${(scene.sheetTop + p * scene.sheetShift - 54).toFixed(2)}px, 0)`;
+        }
       }
     },
     [ensureGameRefs],
@@ -199,11 +261,33 @@ export function FlyCatchOverlay() {
     }
     if (scene.heroCard) scene.heroCard.style.opacity = '';
     for (const el of scene.fades) el.style.opacity = '';
-    if (scene.pageBg) scene.pageBg.style.opacity = '';
-    if (scene.nav) scene.nav.style.transform = '';
+    if (scene.pageBg) {
+      scene.pageBg.style.opacity = '';
+      scene.pageBg.style.transform = '';
+      scene.pageBg.style.transformOrigin = '';
+      scene.pageBg.style.willChange = '';
+    }
+    if (scene.pageBgFade) scene.pageBgFade.style.opacity = '';
+    if (scene.sheet) scene.sheet.style.willChange = '';
+    if (scene.hero) scene.hero.style.willChange = '';
+    if (scene.nav) {
+      scene.nav.style.transform = '';
+      scene.nav.style.zIndex = '';
+      scene.nav.style.willChange = '';
+    }
     if (scene.shell) scene.shell.style.zIndex = '';
     if (scene.launcher) scene.launcher.style.zIndex = '';
-    if (chipRef.current) chipRef.current.style.opacity = '0';
+    if (curtainRef.current) {
+      curtainRef.current.style.display = '';
+      curtainRef.current.style.transform = '';
+      curtainRef.current.style.willChange = '';
+    }
+    if (chipRef.current) {
+      chipRef.current.style.opacity = '0';
+      chipRef.current.style.width = '';
+      chipRef.current.style.height = '';
+      chipRef.current.style.transform = '';
+    }
     sceneRef.current = emptyScene();
     progressRef.current = 0;
     openRef.current = false;
@@ -230,6 +314,10 @@ export function FlyCatchOverlay() {
       if (scene.hero) scene.hero.style.visibility = 'hidden';
       if (scene.shell) scene.shell.style.zIndex = '';
       if (scene.launcher) scene.launcher.style.zIndex = '';
+      if (curtainRef.current) {
+        curtainRef.current.style.display = '';
+        curtainRef.current.style.willChange = '';
+      }
     };
     reveal();
   }, [apply]);
@@ -240,6 +328,11 @@ export function FlyCatchOverlay() {
     cancelAnimationFrame(revealRafRef.current);
     const scene = sceneRef.current;
     scene.nav = document.querySelector<HTMLElement>('[data-app-bottom-nav]');
+    if (scene.nav) scene.nav.style.zIndex = NAV_Z_RAISED;
+    if (curtainRef.current) {
+      curtainRef.current.style.willChange = 'transform';
+      curtainRef.current.style.display = 'block';
+    }
     if (scene.shell) scene.shell.style.zIndex = MAIN_Z_RAISED;
     if (scene.launcher) scene.launcher.style.zIndex = LAUNCHER_Z_RAISED;
     if (scene.hero) scene.hero.style.visibility = '';
@@ -339,6 +432,11 @@ export function FlyCatchOverlay() {
   return (
     <>
       <div
+        ref={curtainRef}
+        aria-hidden
+        className="pointer-events-none fixed inset-x-0 top-0 z-[115] hidden h-[100dvh] bg-background"
+      />
+      <div
         className={cn(
           'fixed inset-0 z-[110]',
           open ? 'pointer-events-auto' : 'pointer-events-none',
@@ -355,12 +453,12 @@ export function FlyCatchOverlay() {
       </div>
       <div
         ref={chipRef}
-        className="pointer-events-none fixed inset-x-0 top-0 z-[130] flex justify-center opacity-0"
+        className="pointer-events-none fixed left-0 top-0 z-[118] flex items-center justify-center opacity-0"
         aria-hidden
       >
-        <div className="flex items-center gap-1 rounded-full border border-white/50 bg-card/90 px-3 py-1 text-[9px] font-black uppercase tracking-[0.12em] text-primary shadow-md backdrop-blur-md">
+        <div className="flex h-full w-full items-center justify-center gap-1.5 rounded-[18px] border border-border/50 bg-card/80 px-4 text-[11px] font-black uppercase tracking-[0.12em] text-primary shadow-sm backdrop-blur-2xl">
           <ChevronDown
-            className={cn('h-3.5 w-3.5', armed && 'animate-bounce')}
+            className={cn('h-4 w-4', armed && 'animate-bounce')}
             strokeWidth={3}
           />
           {armed ? 'Release the swarm' : 'Pull down to play'}

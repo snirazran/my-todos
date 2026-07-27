@@ -62,7 +62,7 @@ import {
   refreshQuestHomeView,
   takeQuestScrollTarget,
 } from '@/lib/questClaims';
-import { rankByQuestPriority } from '@/lib/quests/priority';
+import { rankByQuestPriority, rewardWorth } from '@/lib/quests/priority';
 import { QuestPriorityDebug } from '@/components/ui/QuestPriorityDebug';
 import { PlusUpgradeModal } from './PlusUpgradeModal';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
@@ -732,8 +732,10 @@ export function QuestsPanel({
             tierIndex,
             lastProgressAt: quest.lastProgressAt,
             expiresAt: quest.expiresAt,
-            remainingEffortDays: block.remainingEffortDays,
+            effortToActNow: block.effortToActNow,
+            effortToComplete: block.effortToComplete,
             effortAtRiskDays: block.effortAtRiskDays,
+            rewardValue: rewardWorth(block.rewards),
             quest,
           },
         ];

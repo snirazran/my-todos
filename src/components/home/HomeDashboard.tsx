@@ -637,7 +637,11 @@ export default function HomeDashboard() {
         <Header router={router} />
 
         <div className="relative flex flex-col items-stretch gap-2">
-          <FlyCatchSwipeLauncher source="home" className="relative z-10">
+          <FlyCatchSwipeLauncher
+            source="home"
+            className="relative z-10"
+            shouldStart={(x, y) => frogRef.current?.hitTest(x, y) !== false}
+          >
             <div className="flex flex-col gap-2 lg:gap-4">
             {user &&
               (() => {

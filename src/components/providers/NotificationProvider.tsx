@@ -321,7 +321,7 @@ export function NotificationProvider({
                   </span>
                 )}
                 <div
-                  className={`flex-1 text-sm ${
+                  className={`min-w-0 flex-1 text-sm ${
                     isMoveToast ? 'font-semibold' : 'font-medium'
                   }`}
                 >

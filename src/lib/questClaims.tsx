@@ -62,8 +62,10 @@ export type Trackable = {
   guideContext?: import('@/lib/hints/guides').HintGuideContext;
   lastProgressAt?: string;
   expiresAt?: string;
-  remainingEffortDays?: number;
+  effortToActNow?: number;
+  effortToComplete?: number;
   effortAtRiskDays?: number;
+  rewardValue?: number;
 };
 
 type ShowNotification = (
@@ -356,14 +358,14 @@ export function QuestRewardTileBadge({
 export function QuestTagPillInline({ tag }: { tag: ObjectiveTagChip }) {
   return (
     <span
-      className="relative inline-flex max-w-[8rem] items-center justify-center rounded-xl border px-2 py-0.5 text-[10px] font-black uppercase tracking-wider shadow-sm md:max-w-[10rem] md:px-3 md:py-1 md:text-[11px]"
+      className="relative inline-block max-w-[8rem] truncate rounded-xl border px-2 py-0.5 align-middle text-[10px] font-black uppercase tracking-wider shadow-sm md:max-w-[10rem] md:px-3 md:py-1 md:text-[11px]"
       style={{
         backgroundColor: `${tag.color}20`,
         borderColor: `${tag.color}40`,
         color: tag.color,
       }}
     >
-      <span className="truncate">{tag.name}</span>
+      {tag.name}
     </span>
   );
 }
@@ -381,40 +383,34 @@ export function ObjectiveLabel({
 }) {
   const textClass = strikeText ? 'line-through' : undefined;
   if (!tags?.length) {
-    return <span className={`truncate ${textClass ?? ''}`}>{label}</span>;
+    return <span className={textClass}>{label}</span>;
   }
   const shownTags = maxTags ? tags.slice(0, maxTags) : tags;
   const hiddenCount = tags.length - shownTags.length;
-  // Tags flow inline after the text; the last word is glued to the first tag
-  // so a wrap can never strand the tag alone on its own line.
   const words = (label ?? '').trim().split(/\s+/);
   const lastWord = words.pop() ?? '';
   const lead = words.join(' ');
   const [firstTag, ...restTags] = shownTags;
   return (
-    <span className="min-w-0">
-      {lead && (
-        <>
-          <span className={textClass}>{lead}</span>{' '}
-        </>
+    <>
+      {lead && <span className={textClass}>{lead} </span>}
+      {lastWord && (
+        <span className={textClass}>
+          {`${lastWord} `}
+        </span>
       )}
-      <span className="inline-flex max-w-full items-center gap-1.5 whitespace-nowrap align-middle">
-        {lastWord && (
-          <span className={`truncate ${textClass ?? ''}`}>{lastWord}</span>
-        )}
-        <QuestTagPillInline tag={firstTag} />
-      </span>
+      <QuestTagPillInline tag={firstTag} />
       {restTags.map((tag) => (
-        <span key={tag.id} className="ml-1.5 inline-flex align-middle">
+        <span key={tag.id} className="ml-1.5">
           <QuestTagPillInline tag={tag} />
         </span>
       ))}
       {hiddenCount > 0 && (
-        <span className="ml-1 inline-flex shrink-0 items-center rounded-full bg-foreground/10 px-1.5 py-0.5 text-[9px] font-black tabular-nums align-middle">
+        <span className="ml-1 inline-block rounded-full bg-foreground/10 px-1.5 py-0.5 align-middle text-[9px] font-black tabular-nums">
           +{hiddenCount}
         </span>
       )}
-    </span>
+    </>
   );
 }
 
@@ -747,7 +743,7 @@ function ClaimRewardToast({
   };
   return (
     <div
-      className="flex w-full cursor-pointer items-center gap-3"
+      className="flex w-full min-w-0 cursor-pointer items-center gap-3"
       onClick={goToQuest}
     >
       <QuestRewardTileBadge
@@ -807,7 +803,7 @@ function QuestProgressToast({
         if (trackable.questId) setQuestScrollTarget(trackable.questId);
         router.push('/quests');
       }}
-      className="flex w-full items-center gap-3 text-left"
+      className="flex w-full min-w-0 items-center gap-3 text-left"
     >
       <QuestRewardTileBadge
         reward={trackable.reward}

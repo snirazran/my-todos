@@ -1,7 +1,8 @@
 'use client';
 
 import {
-  PRIORITY_WEIGHTS,
+  VALUE_BASE,
+  VALUE_WEIGHTS,
   type PriorityInput,
   type PriorityResult,
 } from '@/lib/quests/priority';
@@ -14,9 +15,9 @@ export type PriorityDebugEntry = {
 };
 
 const REASON_EXPLANATIONS: Record<string, string> = {
-  expiring: 'resets within 48h and not done',
+  expiring: 'resets within 12h and not done',
   neglected: 'no progress for 3+ days',
-  'almost-there': 'under ~0.7 days of work left',
+  'almost-there': '60%+ of the target already done',
   'streak-at-risk': 'an active run is lost if today is skipped',
 };
 
@@ -66,25 +67,35 @@ export function QuestPriorityDebug({
                 </span>
               </div>
               <div>
+                {`value ${result.value.toFixed(3)} ÷ cost ${result.cost.toFixed(3)}`}
+                {input.effortToActNow !== undefined
+                  ? ` (~${input.effortToActNow.toFixed(2)}d to act now`
+                  : ' ('}
+                {input.effortToComplete !== undefined
+                  ? `, ~${input.effortToComplete.toFixed(2)}d to finish)`
+                  : ')'}
+              </div>
+              <div>
+                {`base ${VALUE_BASE.toFixed(2)} · `}
                 {formatPart(
-                  'near',
+                  'done',
                   result.proximity,
-                  PRIORITY_WEIGHTS.proximity,
-                  input.remainingEffortDays !== undefined
-                    ? `${input.progress}/${input.target}, ~${input.remainingEffortDays.toFixed(1)}d work left`
-                    : `${input.progress}/${input.target}`,
+                  VALUE_WEIGHTS.gradient,
+                  `${input.progress}/${input.target}`,
                 )}
                 {' · '}
-                {formatPart('stale', result.staleness, PRIORITY_WEIGHTS.staleness, `${result.staleDays}d`)}
+                {formatPart('stale', result.staleness, VALUE_WEIGHTS.neglect, `${result.staleDays}d`)}
                 {' · '}
                 {formatPart(
                   'urgent',
                   result.urgency,
-                  PRIORITY_WEIGHTS.urgency,
+                  VALUE_WEIGHTS.timeCriticality,
                   result.hoursUntilReset === null
                     ? 'no reset'
                     : `${Math.round(result.hoursUntilReset)}h left`,
                 )}
+                {' · '}
+                {formatPart('reward', result.reward, VALUE_WEIGHTS.reward)}
               </div>
               <div>
                 {result.reason
@@ -92,13 +103,13 @@ export function QuestPriorityDebug({
                   : 'reason: none'}
                 {input.tierIndex !== undefined
                   ? ` · tie-break: tier ${input.tierIndex + 1}, then ${
-                      input.remainingEffortDays !== undefined
-                        ? `~${input.remainingEffortDays.toFixed(1)}d left`
+                      input.effortToComplete !== undefined
+                        ? `~${input.effortToComplete.toFixed(2)}d to finish`
                         : `${remaining} to go`
                     }`
                   : ` · tie-break: ${
-                      input.remainingEffortDays !== undefined
-                        ? `~${input.remainingEffortDays.toFixed(1)}d left`
+                      input.effortToComplete !== undefined
+                        ? `~${input.effortToComplete.toFixed(2)}d to finish`
                         : `${remaining} to go`
                     }`}
                 {flags.length > 0 ? ` · ${flags.join(' · ')}` : ''}

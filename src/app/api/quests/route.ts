@@ -5,6 +5,7 @@ import UserModel from '@/lib/models/User';
 import { buildRewardCatalog, syncQuestState } from '@/lib/quests/engine';
 import { loadStreakConfig, previousDayKey, syncDailyStreak } from '@/lib/quests/streak';
 import { parseTaskStreakDays } from '@/lib/quests/metrics';
+import { rewardWorth } from '@/lib/quests/priority';
 import { loadMoveToWebConfig, syncMoveToWeb } from '@/lib/quests/moveToWeb';
 import { getActiveQuestSeasonView } from '@/lib/quests/seasons';
 import { getZonedToday } from '@/lib/utils';
@@ -168,10 +169,15 @@ type TrackableEntry = {
   guideContext?: import('@/lib/hints/guides').HintGuideContext;
   lastProgressAt?: string;
   expiresAt?: string;
-  remainingEffortDays?: number;
+  effortToActNow?: number;
+  effortToComplete?: number;
   effortAtRiskDays?: number;
+  rewardValue?: number;
 };
 
+// Exchange rates between objective units and "days of work". These are the
+// single place ranking decides a focus minute is worth a tenth of a task, and
+// the only inputs that need calibrating against real completion telemetry.
 const TASK_UNIT_EFFORT_DAYS = 0.1;
 const FOCUS_MINUTE_EFFORT_DAYS = 0.01;
 
@@ -209,10 +215,10 @@ function bestStreakRun(
   return best;
 }
 
-// Rough "days of work left" per objective so priority ranking can compare a
-// two-tap task quest against a multi-day streak on the same scale. A streak
-// unit costs its full day count minus the user's live run; everything else is
-// a same-day action.
+// Two different effort questions, and ranking needs them apart. `actNow` is
+// what it takes to move this objective today — the WSJF denominator. `complete`
+// is what it takes to finish outright, which for a streak is calendar days no
+// amount of effort today can compress.
 function objectiveEffort(
   block: {
     type?: string;
@@ -223,30 +229,39 @@ function objectiveEffort(
   tasks: EffortTask[],
   todayKey: string,
   tagIds?: string[],
-): { remainingEffortDays: number; effortAtRiskDays: number } {
+): {
+  effortToActNow: number;
+  effortToComplete: number;
+  effortAtRiskDays: number;
+} {
   const target = Math.max(1, block.target ?? 1);
   const remainingUnits = Math.max(1, target - Math.max(0, block.progress ?? 0));
   const streakDays = parseTaskStreakDays(block.metricKey);
   if (block.type === 'metric_count' && streakDays !== null) {
     const { runDays, completedToday } = bestStreakRun(tasks, todayKey, tagIds);
     const credit = runDays >= streakDays ? 0 : runDays;
+    const effortToComplete =
+      streakDays - credit + (remainingUnits - 1) * streakDays;
     return {
-      remainingEffortDays:
-        streakDays - credit + (remainingUnits - 1) * streakDays,
+      // Today's link in the chain is one task. Once it is done there is no
+      // action left to surface, so it costs the wait until tomorrow.
+      effortToActNow: completedToday ? effortToComplete : TASK_UNIT_EFFORT_DAYS,
+      effortToComplete,
       effortAtRiskDays: completedToday ? 0 : credit,
     };
   }
-  if (block.type === 'focus_minutes') {
-    return {
-      remainingEffortDays: remainingUnits * FOCUS_MINUTE_EFFORT_DAYS,
-      effortAtRiskDays: 0,
-    };
-  }
+  const unitDays =
+    block.type === 'focus_minutes'
+      ? FOCUS_MINUTE_EFFORT_DAYS
+      : TASK_UNIT_EFFORT_DAYS;
+  const days = remainingUnits * unitDays;
   return {
-    remainingEffortDays: remainingUnits * TASK_UNIT_EFFORT_DAYS,
+    effortToActNow: days,
+    effortToComplete: days,
     effortAtRiskDays: 0,
   };
 }
+
 
 function objectiveRemainingLabel(
   block: {
@@ -577,6 +592,7 @@ export async function GET(req: Request) {
           ),
           reward: block.rewards?.[0],
           rewards: block.rewards ?? undefined,
+          rewardValue: rewardWorth(block.rewards),
           lastProgressAt: quest.lastProgressAt,
           expiresAt: quest.expiresAt,
           hint: objectiveHintText(block, questFocusTags(quest)[0]?.name, {

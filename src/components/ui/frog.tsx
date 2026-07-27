@@ -86,6 +86,8 @@ const DEFAULT_FROG_HEIGHT = Math.round(
 );
 const MOUTH_TARGET_X = 75;
 const MOUTH_TARGET_Y = 75;
+const HIT_TEST_TOLERANCE_PX = 10;
+const HIT_TEST_MIN_ALPHA = 8;
 export const FROG_TONGUE_MOUTH_OFFSET = { x: -18, y: 12 } as const;
 export const FROG_TONGUE_MOUTH_OFFSET_TABLET = { x: -19, y: 18 } as const;
 export const FROG_TONGUE_MOUTH_OFFSET_DESKTOP = { x: -21, y: 26 } as const;
@@ -94,6 +96,9 @@ export const FROG_TONGUE_MOUTH_OFFSET_DESKTOP = { x: -21, y: 26 } as const;
 export interface FrogHandle {
   getMouthPoint: () => { x: number; y: number };
   getBoxRect: () => DOMRect;
+  /** True when the viewport point lands on painted frog pixels, not the
+   *  transparent rest of the canvas. */
+  hitTest: (clientX: number, clientY: number) => boolean;
   /** Imperatively set a slot to a numeric index (Rive input value) */
   setSlotIndex: (slot: WardrobeSlot, index: number) => void;
   /** Fire a one-shot emote trigger (plays exactly one run in Rive) */
@@ -468,6 +473,34 @@ const Frog = memo(
         return (
           wrapperRef.current?.getBoundingClientRect() ?? new DOMRect(0, 0, 0, 0)
         );
+      },
+      hitTest(clientX, clientY) {
+        const canvas = wrapperRef.current?.querySelector('canvas');
+        if (!canvas) return false;
+        const rect = canvas.getBoundingClientRect();
+        if (!rect.width || !rect.height) return false;
+        const sx = canvas.width / rect.width;
+        const sy = canvas.height / rect.height;
+        const cx = Math.round((clientX - rect.left) * sx);
+        const cy = Math.round((clientY - rect.top) * sy);
+        const rx = Math.max(1, Math.round(HIT_TEST_TOLERANCE_PX * sx));
+        const ry = Math.max(1, Math.round(HIT_TEST_TOLERANCE_PX * sy));
+        const x0 = Math.max(0, cx - rx);
+        const y0 = Math.max(0, cy - ry);
+        const x1 = Math.min(canvas.width, cx + rx + 1);
+        const y1 = Math.min(canvas.height, cy + ry + 1);
+        if (x1 <= x0 || y1 <= y0) return false;
+        try {
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return true;
+          const { data } = ctx.getImageData(x0, y0, x1 - x0, y1 - y0);
+          for (let i = 3; i < data.length; i += 4) {
+            if (data[i] > HIT_TEST_MIN_ALPHA) return true;
+          }
+          return false;
+        } catch {
+          return true;
+        }
       },
       setSlotIndex(slot, index) {
         setBoundSlotIndex(slot, index);

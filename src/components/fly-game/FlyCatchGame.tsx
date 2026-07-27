@@ -793,7 +793,7 @@ export default function FlyCatchGame({
               </div>
 
               {phase === 'countdown' ? (
-                <div className="absolute inset-0 z-30 grid place-items-center bg-background/30 backdrop-blur-[2px]" data-game-control>
+                <div className="absolute inset-0 z-30 grid place-items-center" data-game-control>
                   <div key={countdown} className={cn(styles.countdown, 'font-display text-[130px] text-primary')}>{countdown}</div>
                 </div>
               ) : null}

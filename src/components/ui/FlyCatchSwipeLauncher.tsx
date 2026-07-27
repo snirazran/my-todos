@@ -19,6 +19,7 @@ type Props = {
   source: FlyCatchSource;
   className?: string;
   disabled?: boolean;
+  shouldStart?: (clientX: number, clientY: number) => boolean;
 };
 
 export function FlyCatchSwipeLauncher({
@@ -26,6 +27,7 @@ export function FlyCatchSwipeLauncher({
   source,
   className,
   disabled = false,
+  shouldStart,
 }: Props) {
   const pointerRef = useRef<number | null>(null);
   const startYRef = useRef(0);
@@ -90,6 +92,7 @@ export function FlyCatchSwipeLauncher({
 
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (disabled || event.button !== 0) return;
+    if (shouldStart && !shouldStart(event.clientX, event.clientY)) return;
     const overlay = useFlyCatchOverlay.getState();
     if (overlay.open || overlay.active) return;
     pointerRef.current = event.pointerId;
@@ -106,9 +109,6 @@ export function FlyCatchSwipeLauncher({
     // mounted at the threshold-crossing move, which made mobile WebViews flash
     // and drop frames while the finger was already moving.
     overlay.activate(source);
-    try {
-      event.currentTarget.setPointerCapture(event.pointerId);
-    } catch {}
   };
 
   const onPointerMove = (event: PointerEvent<HTMLDivElement>) => {
@@ -126,6 +126,9 @@ export function FlyCatchSwipeLauncher({
     if (!draggingRef.current) {
       if (pull < DRAG_START_DISTANCE) return;
       draggingRef.current = true;
+      try {
+        event.currentTarget.setPointerCapture(event.pointerId);
+      } catch {}
       lockScroll();
     }
     if (pull > 10) suppressClickRef.current = true;

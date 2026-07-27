@@ -64,7 +64,8 @@ export type ResolvedQuestLogicBlock = QuestLogicBlock & {
   resolvedTagIds?: string[];
   resolvedTagName?: string;
   resolvedTagNames?: string[];
-  remainingEffortDays?: number;
+  effortToActNow?: number;
+  effortToComplete?: number;
   effortAtRiskDays?: number;
 };
 

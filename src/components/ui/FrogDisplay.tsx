@@ -85,6 +85,39 @@ export function FrogDisplay({
   const [clickedAt, setClickedAt] = React.useState(0);
   const timerLive = useFrogodoroStore((s) => s.timerActive && s.isRunning);
 
+  const tapAreaRef = React.useRef<HTMLDivElement | null>(null);
+  const hoverRafRef = React.useRef(0);
+  const hoverPointRef = React.useRef({ x: -1, y: -1 });
+
+  const trackHover = React.useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      if (event.pointerType !== 'mouse' || hoverRafRef.current) return;
+      const { clientX, clientY } = event;
+      const last = hoverPointRef.current;
+      if (Math.abs(clientX - last.x) < 4 && Math.abs(clientY - last.y) < 4) {
+        return;
+      }
+      hoverRafRef.current = requestAnimationFrame(() => {
+        hoverRafRef.current = 0;
+        hoverPointRef.current = { x: clientX, y: clientY };
+        const el = tapAreaRef.current;
+        if (!el) return;
+        el.style.cursor =
+          frogRef.current?.hitTest(clientX, clientY) === false
+            ? 'default'
+            : 'pointer';
+      });
+    },
+    [frogRef],
+  );
+
+  React.useEffect(
+    () => () => {
+      if (hoverRafRef.current) cancelAnimationFrame(hoverRafRef.current);
+    },
+    [],
+  );
+
   const speechEnabled = showSpeechBubble && !isGuest;
   const { view: streakView } = useLoginStreak(speechEnabled);
   const { data: profile } = useSWR<{
@@ -201,9 +234,18 @@ export function FrogDisplay({
         className="relative z-50 -mb-6 transition-transform duration-500 origin-top scale-100 pointer-events-none -translate-y-9 md:mb-6 md:scale-100 md:translate-y-3"
       >
         <div
+          ref={tapAreaRef}
           data-fly-hero-frog
-          className="cursor-pointer pointer-events-auto"
-          onClick={() => setClickedAt(Date.now())}
+          className="pointer-events-auto"
+          onPointerMove={trackHover}
+          onPointerLeave={() => {
+            hoverPointRef.current = { x: -1, y: -1 };
+            if (tapAreaRef.current) tapAreaRef.current.style.cursor = '';
+          }}
+          onClick={(e) => {
+            if (frogRef.current?.hitTest(e.clientX, e.clientY) === false) return;
+            setClickedAt(Date.now());
+          }}
         >
           <Frog
             ref={frogRef}
