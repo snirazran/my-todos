@@ -379,7 +379,11 @@
       "Bash(perl -0pi -e \"s/import \\\\{ CATALOG, type ItemDef \\\\} from '\\\\.\\\\/catalog';/import { CATALOG, type ItemDef } from '.\\\\/catalog';\\\\nimport { filterAvailable } from '.\\\\/availability';/\" src/lib/skins/gifts.ts)",
       "Bash(perl -0pi -e \"s/getPrizePool \\\\} from '\\\\@\\\\/lib\\\\/skins\\\\/gifts';/getRewardPool } from '\\\\@\\\\/lib\\\\/skins\\\\/gifts';/; s/await getPrizePool\\\\\\(\\\\\\)/await getRewardPool\\(\\)/g\" src/app/api/skins/open-gift/route.ts src/app/api/skins/open-gift/double/route.ts src/app/api/skins/gift-drops/route.ts src/app/api/skins/trade/reroll/route.ts)",
       "Bash(perl -0pi -e \"s/import \\\\{ filterAvailable \\\\} from '\\\\.\\\\/availability';/import { filterAvailable, isAvailableAt } from '.\\\\/availability';/\" src/lib/skins/gifts.ts)",
-      "Bash(perl -pi -e \"s{'\\\\.\\\\./\\\\.\\\\./\\\\.\\\\./\\\\.\\\\./Users/snirazran/Fullstack/my-todos/src/lib/skins/availability'}{'/Users/snirazran/Fullstack/my-todos/src/lib/skins/availability'}\" \"/private/tmp/claude-501/-Users-snirazran-Fullstack-my-todos/102f3db0-c598-424c-8c08-9f2652d6f321/scratchpad/check-csv.ts\")"
+      "Bash(perl -pi -e \"s{'\\\\.\\\\./\\\\.\\\\./\\\\.\\\\./\\\\.\\\\./Users/snirazran/Fullstack/my-todos/src/lib/skins/availability'}{'/Users/snirazran/Fullstack/my-todos/src/lib/skins/availability'}\" \"/private/tmp/claude-501/-Users-snirazran-Fullstack-my-todos/102f3db0-c598-424c-8c08-9f2652d6f321/scratchpad/check-csv.ts\")",
+      "Bash(npx prettier *)",
+      "Bash(git diff *)",
+      "Bash(sed -i '143{/^[[:space:]]*$/d}' src/components/ui/streak/StreakCelebration.tsx)",
+      "Bash(sed -i '104,144s/^/  /' src/components/ui/streak/StreakCelebration.tsx)"
     ]
   }
 }
