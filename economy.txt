@@ -1,0 +1,484 @@
+PAGES 7
+===== PAGE 1 =====
+Frog	To-Do	—	Game	Economy
+Simplified	reference.	One	currency:	flies.
+1	completed	task	=	1	fly.	This	number	never	changes.
+1.	Rarity	tiers
+Catalog	of	100	skins.	Generous	at	the	bottom,	hard	at	the	top.
+Rarity
+Skins
+Shop	price
+Sell	(dupes)
+How	long	it	feels
+Common
+40
+15
+3
+Day	1
+Uncommon
+30
+110
+20
+A	few	days
+Rare
+15
+650
+120
+~1	week
+Epic
+10
+3,500
+650
+Weeks
+Legendary
+5
+18,000
+3,000
+Months
+Trade-up:
+	5	of	one	rarity	→	1	random	unowned	of	the	next	tier.	Always	~30–45%	cheaper	than	buying	—	but	random.	Buying	costs	more	and
+gets	you	the	exact	skin.
+2.	Where	flies	come	from
+Source
+Reward
+Complete	a	task
+1	fly
+Complete	a	checklist	task
+1–3	flies	depending	on	step	count	—	see	below
+Task	done	with	a	friend
++1	fly
+Streak	bonus	
+(daily,	recurring)
++1/day	on	days	3–10	·	+2/day	after	day	10	·	+3/day	after	day	15
+Friends	(passive)
+1	fly	for	every	2	a	friend	earns
+Watch	an	ad
+Doubles	one	task's	fly	·	max	3/day
+Daily	quest
+~10	flies	(see	below)
+Focus	quest
+23	flies	+	1	gift	per	3-day	cycle
+Season	track
+~135	flies	+	6	gifts	per	month
+Persistence	pledge
+20–250	flies	+	gift
+Checklist	tasks
+A	checklist	is	one	task	broken	into	steps.	
+The	fly	budget	belongs	to	the	task,	not	to	the	steps
+	—	the	player	distributes	a	fixed	pot
+across	the	checklist,	they	don't	mint	flies	by	adding	checkboxes.
+Steps	in	the	checklist
+Total	fly	budget
+Premium	(×2)
+1–2
+1
+2
+3–6
+2
+4
+7	or	more
+3	
+(hard	cap)
+6
+The	curve	is	deliberately	sub-linear.
+	A	checklist	is	always	worth	less	per	checkbox	than	the	same	number	of	separate	tasks.	You	use	a
+checklist	because	it's	the	honest	way	to	organise	one	piece	of	work	—	never	because	it	pays	better.	If	checklists	ever	paid	more	per	box,	every
+user	would	convert	everything	and	the	economy	would	be	set	by	whoever	nests	deepest.
+Checklist	rules
+Rule
+Why
+The	final	fly	is	always	pinned	to	the	last	step
+Otherwise	the	player	stacks	every	reward	marker	on	step	1	and	takes	the	full	budget	for	one
+checkbox.	Intermediate	markers	are	freely	placeable.
+Partial	credit	is	kept
+Pass	a	marker,	keep	the	fly,	even	if	the	checklist	is	abandoned.	Losing	everything	for	not
+finishing	is	punishing	and	wrong	for	a	habit	app.
+Adding	steps	after	a	completion	doesn't	raise
+the	budget
+Blocks	completing	a	4-step	list	for	2	flies,	then	padding	it	to	7	steps	to	claim	a	third.
+===== PAGE 2 =====
+A	checklist	counts	as	
+one
+	task	for	quests,
+season	tiles	and	the	daily	cap
+Otherwise	a	3-step	checklist	instantly	clears	"Complete	3	tasks"	and	every	quest	in	the	game
+becomes	free.
+Recurring	checklists	reset	and	pay	again	daily
+Correct	behaviour	for	habits,	and	already	bounded	by	the	daily	cap.
+The	streak	bonus	is	now	the	most	valuable	thing	a	long-term	player	owns.
+	Past	day	15	it	pays	+3	flies	every	day,	forever	—	roughly	a
+tenth	of	a	free	player's	income,	and	it	vanishes	entirely	on	one	missed	day.	That	is	what	makes	Streak	Freeze	worth	buying.
+3.	Quests
+Daily	quest	—	3	objectives,	resets	daily
+Objective
+Free
+Premium	or	ad	(×2)
+1	—	Easy
+2	flies
+4
+2	—	Medium
+3	flies
+6
+3	—	Hard	(capstone)
+5	flies	+	15%	chance	of	Simple	Gift
+10	+	gift	chance
+Total
+~10	flies
+~20	flies
+Focus	quest	—	6	objectives	per	3-day	cycle
+Objective
+Free
+Premium	(×2)
+1–2	—	Easy
+2	flies	each
+4	each
+3–4	—	Medium
+3	flies	each
+6	each
+5	—	Hard
+5	flies
+10
+6	—	Capstone
+8	flies	+	1	Gift
+16	+	Gift
+Total	per	cycle
+23	flies	+	1	Gift
+46	flies	+	1	Gift
+Free	players	get	1	focus	quest	at	a	time.	Premium	gets	up	to	9	in	parallel.
+	This	is	premium's	single	biggest	advantage	—	and	the	one
+thing	free	players	cannot	grind	past.
+Capstone	gifts:	Simple	normally,	Fancy	every	3rd	cycle.
+===== PAGE 3 =====
+4.	Season	—	30	tiles,	30	days
+1	tile	per	3	tasks.	Average	user	(6	tasks/day)	finishes	in	~15–18	days,	so	missing	days	is	fine.
+Tile
+Free	lane
+Premium	lane
+Regular	tiles
+2–5	flies
+4–10	flies	+	occasional	item
+5
+Simple	Gift
+Fancy	Gift
+10
+Simple	Gift	+	20	flies
+Fancy	Gift	+	40	flies
+15
+Fancy	Gift
+Amazing	Gift
+20
+Fancy	Gift	+	30	flies
+Amazing	Gift	+	60	flies
+25
+Fancy	Gift
+Amazing	Gift
+30	—	Finale
+Amazing	Gift
+Amazing	Gift	+	exclusive	skin
+Season	totals:
+	Free	~135	flies	+	6	gifts	·	Premium	~270	flies	+	6	richer	gifts	+	the	exclusive	skin.
+The	three	things	that	make	the	season	work:
+Exclusive	skin,	premium	only,	time-limited.
+	Free	players	grind	all	30	tiles	and	still	watch	the	finale	stay	locked.	Fires	every	30	days.
+Retroactive	unlock.
+	Buy	premium	at	tile	20	and	instantly	claim	all	20	premium	rewards	you	passed.	Show	the	waiting	pile	
+before
+	they
+buy.
+Monthly	reset.
+	Always	a	fresh	track	and	a	new	skin	to	want.
+To	decide:
+	is	the	finale	skin	Epic	or	Legendary?	Recommendation	—	Epic	for	seasons	1–2,	save	a	Legendary	finale	for	an	anniversary	season.
+5.	Persistence	pledges
+Player	commits	to	a	length	on	login.	Pays	out	on	completion.
+Pledge
+Reward
+7	days
+20	flies	+	Simple	Gift
+14	days
+50	flies	+	Fancy	Gift
+30	days
+120	flies	+	Amazing	Gift
+50	days
+250	flies	+	Amazing	Gift	+	guaranteed	Epic
+Streak	Freeze:
+	10	flies,	must	be	bought	in	advance,	protects	one	missed	day.	Premium	gets	1	free	per	week.
+6.	Gift	boxes
+Box
+Common
+Uncommon
+Rare
+Epic
+Legendary
+Pity
+Simple	·	15	flies
+70%
+25%
+5%
+—
+—
+—
+Fancy	·	110	flies
+—
+70%
+25%
+5%
+—
+Epic	by	12th
+Amazing	·	300	flies
+—
+—
+70%
+25%
+5%
+Legendary	by	15th
+Three	rules	we	don't	break
+	(Apple	and	Google	require	the	first	one	anyway):
+Publish	the	odds	in-app.
+Show	the	pity	counter.	People	accept	randomness	when	they	can	see	the	guarantee	approaching.
+No	duplicates	until	a	tier	is	exhausted.	After	that,	dupes	go	to	inventory	to	sell	or	bank	for	trade-up.
+When	gifts	drop	instead	of	flies:
+	every	7th	streak	day,	focus	quest	capstones,	15%	of	daily	capstones,	season	tiles
+5/10/15/20/25/30,	pledge	payouts,	and	a	welcome-back	gift	after	a	rebuilt	streak.
+Free	player	should	feel:	2–3	Simple	gifts	a	week,	a	Fancy	every	1–2	weeks,	an	Amazing	about	monthly.
+===== PAGE 4 =====
+7.	Premium	—	about	$4.99/month
+Benefit
+Detail
+Parallel	focus	quests
+Up	to	9	at	once	vs	1	free	—	the	biggest	lever
+Doubled	quest	rewards
+Daily	+	focus,	automatic,	no	ads
+No	ads
+Forced	ads	removed
+Premium	season	lane
+Richer	every	tile	+	exclusive	skin
+Friend	synergy
+Two	premium	friends	=	double	on	joint	tasks
+Streak	Freeze
+1	free	per	week
+Badge
+Subscriber	flair	on	the	frog
+8.	What	the	four	player	types	actually	experience
+Profile
+Flies/day
+1st	Rare
+1st	Epic
+1st	Legendary
+Full	100
+Free,	average
+~37
+4	days
+~3	weeks
+~4.2	months
+~14.5	mo
+Free,	hardcore
+~49
+4	days
+~3	weeks
+~3.7	months
+~13.5	mo
+Premium,	average
+~89
+2	days
+~10	days
+~7	weeks
+~7	mo
+Premium,	hardcore
+~160
+2	days
+~1	week
+~6	weeks
+~4.5	mo
+Three	takeaways:
+The	gap	sits	exactly	where	it	should.	Common	through	Rare	is	nearly	identical	for	everyone.	The	gap	opens	at	Epic	and	yawns	at	Legendary.
+Playing	more	can't	beat	premium.	Free	hardcore	plays	twice	as	much	as	free	average	and	only	reaches	Legendary	2	weeks	sooner.
+Premium	average	plays	
+less
+	than	free	hardcore	and	gets	there	a	month	faster.	That's	the	honest	pitch:	
+you	can't	grind	past	the	ceiling,
+premium	removes	it.
+Nobody	feels	hopeless.	Even	the	most	casual	free	user	gets	a	Legendary	in	~4	months	with	Epics	dripping	in	before	it.
+To	decide:
+	free	average	hitting	Legendary	in	4.2	months	is	generous	by	industry	standards.	Keep	5%	/	pity	15	for	a	friendlier	reputation,	or
+tighten	to	3%	/	pity	20	to	push	it	to	~6	months	and	convert	harder.	One	dial,	no	price	changes	either	way.
+9.	The	hooks
+Near-miss	gift	animations.
+	Let	the	rarity	glow	build	before	it	settles.	Fine	to	use	here	because	gifts	are	earned,	not	bought.
+Always-visible	premium	lane.
+	Next	to	every	free	reward,	show	the	greyed-out	premium	number:	"You	earned	5	flies	—	Premium:
+10."	Free	users	see	"1	of	9	focus	slots."
+Streak	urgency.
+	"Frog	is	hungry!	1	task	saves	your	streak"	+	Streak	Freeze	for	10	flies.	Turns	anxiety	into	either	engagement	or	a
+sale	—	and	helps	the	habit	either	way.
+Escalating	capstones.
+	Daily,	focus,	season,	and	pledges	all	end	on	the	best	reward.
+Retroactive	premium	unlock.
+	The	highest-converting	moment	in	the	whole	system.
+10.	Guardrails
+Never	sell:
+	task	completions,	quest	skips,	retroactive	streak	repair,	or	anything	that	replaces	doing	the	work.	Money	buys	cosmetics,
+convenience,	and	
+speed	toward
+	cosmetics.	The	moment	paying	replaces	doing,	the	app's	promise	breaks.
+Ads:
+	always	rewarded	and	opt-in.	The	"double	this	fly"	slot	after	completing	a	task	is	the	flagship.	Never	interrupt	task	creation,
+completion,	or	the	frog	eating.	No	interstitials	in	the	first	7	days.
+Metric
+Target
+If	it	drifts
+Free	average
+income
+30–40
+flies/day
+>50	→	tighten	friend/quest	caps,	never	the	1-fly	anchor.	
+Watch	this:	recurring	streak	bonus	puts	free	hardcore
+at	~49,	and	checklist	adoption	adds	roughly	+2/day	on	top.
+1st	Legendary
+(free	avg)
+4–6	months
+Adjust	gift	odds	and	pity,	not	shop	prices
+Trade-up
+usage
+>40%	of
+dupes	traded
+Lower	→	sell	prices	are	too	high
+Flies	spent	vs
+earned
+75–90%
+<60%	→	shop	isn't	tempting,	refresh	catalog
+Paying	users
+4–8%
+Subscription-led
+D7	retention
+>25%
+Outranks	every	revenue	metric
+===== PAGE 5 =====
+Content	cadence	is	mandatory:	6–10	new	skins	per	month.
+	Premium	hardcore	players	finish	the	100-skin	catalog	in	~4.5	months.
+Without	new	skins	they	hit	an	empty	shop	and	leave.	Never	raise	the	1-fly	anchor;	add	earning	only	through	capped	or	time-limited	sources.
+===== PAGE 6 =====
+12.	Anti-abuse	—	earn-rate	integrity	
+(draft,	needs	review)
+The	exploit	is	simple:	create	junk	tasks,	tick	them	instantly,	print	flies.	It	costs	us	gift-box	value,	corrupts	the	season	economy,	and	—
+because	friends	earn	1	fly	for	every	2	you	earn	—	
+it	prints	flies	for	everyone	connected	to	the	abuser	too.
+	Any	response	has	to
+stop	the	spread,	not	just	the	source.
+Layer	1	—	Daily	task	cap	(always	on,	applies	to	everyone,	no	flag)
+Flies	from	task	completions	stop	after	
+30	tasks	in	a	day
+.	No	fractional	flies	anywhere	—	a	task	either	pays	or	it	doesn't.
+Tasks	completed
+today
+Free
+Premium
+Behaviour
+1–30
+1	fly
+each
+2	flies
+each
+Full	value
+31+
+0
+0
+Task	still	completes	and	still	counts	for	streak,	quests	and	season	tiles	—	it	just	stops	paying
+flies
+Daily	ceiling	from	tasks:	30	flies	free,	60	premium.
+	With	checklists	at	maximum	budget	the	theoretical	ceiling	is	90	free	/	180
+premium,	though	reaching	it	requires	every	one	of	30	tasks	to	be	a	7-step	checklist.
+No	simulated	player	comes	close	to	this	cap.
+	Free	average	completes	6	tasks	a	day,	free	hardcore	and	premium	hardcore	12.	The	cap	sits
+2.5×	above	our	heaviest	realistic	player	—	a	ceiling	nobody	legitimate	ever	touches,	which	is	exactly	what	a	cap	should	be.	It	removes	the
+payoff	from	spamming	without	any	detection	logic	at	all.	Build	this	first;	everything	below	is	only	for	players	who	keep	going	after	a	cap	has
+already	stopped	paying	them.
+Present	the	cap	as	the	frog	being	full,	never	as	the	app	cutting	you	off.
+	A	task	completing	in	silence	is	the	worst	possible	moment	in	a
+productivity	app	—	the	user	did	the	work	and	got	nothing.	Use	the	existing	food	meter:	
+"Your	frog	is	stuffed!	Come	back	tomorrow."
+	Keep
+showing	streak,	quest	and	season	progress	ticking	up	on	tasks	31+	so	the	work	visibly	still	counts.
+Why	a	checklist	is	a	bad	way	to	cheat:
+	3	flies	costs	roughly	10	interactions	through	a	7-step	checklist,	versus	3	interactions	through	3
+separate	tasks.	The	sub-linear	budget	means	step-spamming	is	always	the	slower	path.
+Layer	2	—	Detection	signals
+Raw	task	count	is	a	bad	signal	—	someone	clearing	a	week-old	backlog	can	legitimately	tick	30	in	an	afternoon.	What	actually	separates
+a	human	from	a	spammer:
+Detection	counts	tasks	only.	Checklist	steps	are	invisible	to	every	signal	below.
+	This	is	safe	precisely	because	the	checklist	budget	is
+capped	—	there	is	nothing	to	gain	from	step-spamming,	so	there	is	nothing	to	police.	It	also	has	to	work	this	way:	four	steps	all	named	"Drink
+Water"	is	textbook	low-entropy	titling,	and	someone	ticking	a	15-step	packing	list	in	four	minutes	blows	straight	through	the	burst	rule.
+Legitimate	checklists	look	exactly	like	abuse	if	you	measure	at	the	step	level.
+Signal
+Trips	when
+Instant	completions
+Task	created	and	completed	within	60s,	never	opened,	no	timer	—	more	than	20	in	a	day
+Burst	rate
+More	than	25	completions	inside	any	15-minute	window
+Low-entropy	titles
+10+	tasks	with	identical	or	trivially	incremented	names	("a",	"task1",	"task2")
+Zero	engagement
+Never	opens	a	task,	never	uses	focus	timer,	never	edits	—	across	the	whole	account	lifetime
+Escalate	only	on	2+	signals	across	2	separate	days.
+	A	single	bad	afternoon	is	a	backlog	cleanup,	not	an	abuser.	Requiring	repetition
+across	days	is	what	keeps	false	positives	near	zero	—	and	in	a	productivity	app	a	false	positive	doesn't	just	cost	a	player,	it	breaks	someone's
+habit	and	they	delete	the	app.
+Layer	3	—	Restricted	state
+Silent.	No	badge,	no	"abuser"	label,	no	notification.	The	player	sees	a	quieter	economy,	not	an	accusation.
+Restriction
+Detail
+Fly	earning
+Daily	cap	drops	from	30	tasks	to	5.	Checklists	pay	a	flat	1	fly	regardless	of	steps.
+Gift	drops
+Suspended	entirely	—	no	capstone	gifts,	no	streak	gifts,	no	season	gifts
+Friend
+transmission
+Cut	both	directions.
+	They	earn	nothing	from	friends	and	generate	nothing	for	friends.	This	is	the	one	that	stops	the	exploit
+spreading.
+Trade-up
+Locked,	so	banked	dupes	can't	be	laundered	into	higher	tiers
+Shop
+Still	open	at	full	price.	Selling	access	is	fine;	giving	away	free	currency	is	not.
+Ads	(free	users)
+Rewarded	ad	slots	stay,	but	no	longer	double	anything
+Ads	(premium
+users)
+Never	re-enable	ads	for	a	paying	subscriber.
+	They	bought	ad	removal	—	taking	it	back	is	a	refund	trigger	and	an	App
+Store	complaint.	Restrict	their	earning	instead.
+===== PAGE 7 =====
+Layer	4	—	Automatic	recovery
+7	consecutive	clean	days	clears	the	flag	automatically.
+	No	support	ticket,	no	appeal	form,	no	human	in	the	loop.	A	wrongly-
+flagged	user	simply	keeps	using	the	app	normally	and	the	restriction	dissolves.	This	is	the	cheapest	possible	insurance	against	our	own
+false	positives.
+Considered	and	not	recommended:
+	a	separate	"abuser	shop"	or	parallel	season	with	worse	rewards.	It	means	building	and	maintaining
+duplicate	content	for	our	least	valuable	users,	and	if	anyone	discovers	it	the	story	becomes	"app	secretly	punishes	players."	Capping	the	earn
+rate	gets	nearly	all	the	same	benefit	for	none	of	the	build	cost	or	reputational	risk.
+Open	questions	before	build:
+Friend	income	is	now	the	largest	uncapped	faucet.
+	A	capped	friend	still	transmits	up	to	15	flies	to	you,	so	20	friends	is	300/day
+passive	no	matter	how	well-behaved	everyone	is.	Either	cap	how	many	friends	generate	passive	income,	or	cap	the	daily	passive	total.
+Does	the	daily	cap	reset	at	local	midnight	or	on	a	rolling	24h	window?	Rolling	is	harder	to	game	across	timezones.
+Do	we	log	flagged	accounts	for	manual	review	in	month	1	to	sanity-check	the	false-positive	rate	before	letting	it	run	unsupervised?
+Does	an	ad-double	apply	to	a	checklist's	whole	budget	or	only	one	marker?
+11.	Launch	checklist
+Core:
+	1	fly/task,	checklist	budgets,	30-task	daily	cap,	friend	bonus,	streak	bonuses,	3	gift	boxes	with	published	odds	and	visible	pity,
+shop	rotation,	sell,	5:1	trade-up.
+Quests:
+	daily	(3	objectives),	focus	(6	objectives,	1	slot	free),	ad-doubling.
+Long-form:
+	30-tile	season	with	both	lanes	+	retroactive	unlock,	pledges,	streak	freezes.
+Premium:
+	parallel	focus	quests,	auto-doubling,	premium	lane,	friend	synergy,	no	ads.
+Monetization:
+	fly	packs,	starter	pack	(days	1–7),	seasonal	exclusives,	cosmetic	bundles.
+Anti-abuse:
+	30-task	daily	cap	at	launch,	presented	as	the	frog	being	full.	Detection	and	restricted	state	can	follow	in	v1.1.
+Ongoing:
+	6–10	new	skins/month,	new	season	every	30	days.
+Frog	To-Do	—	economy	reference.	Numbers	from	Monte	Carlo	simulation	(700	runs	per	profile),	benchmarked	against	standard	gacha	drop	curves.

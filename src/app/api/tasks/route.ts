@@ -241,6 +241,7 @@ const initDailyFly = (date: string): DailyFlyProgress => ({
   earned: 0,
   taskIds: [],
   taskFlies: {},
+  taskHunger: {},
   limitNotified: false,
 });
 
@@ -253,6 +254,7 @@ function normalizeDailyFly(
       ...flyDaily,
       taskIds: flyDaily.taskIds ?? [],
       taskFlies: flyDaily.taskFlies ?? {},
+      taskHunger: flyDaily.taskHunger ?? {},
       limitNotified: flyDaily.limitNotified ?? false,
     };
   }
@@ -537,20 +539,20 @@ async function awardFlyForTask(
   // in instalments must not feed it again on every marker.
   const setFields: Record<string, any> = { ...hungerUpdates };
   let finalHungerStatus = currentHungerState;
+  let hungerFed = 0;
 
   if (!alreadyRewarded) {
+    const hungerBefore = Math.max(0, currentHungerState.hunger);
     let newHunger = Math.min(
       MAX_HUNGER_MS,
-      Math.max(0, currentHungerState.hunger) + TASK_HUNGER_REWARD_MS,
+      hungerBefore + TASK_HUNGER_REWARD_MS,
     );
     if (MAX_HUNGER_MS - newHunger <= HUNGER_FULL_SNAP_MS) {
       newHunger = MAX_HUNGER_MS;
     }
+    hungerFed = Math.max(0, newHunger - hungerBefore);
     finalHungerStatus = { ...currentHungerState, hunger: newHunger };
-    if (
-      newHunger >= MAX_HUNGER_MS &&
-      Math.max(0, currentHungerState.hunger) < MAX_HUNGER_MS
-    ) {
+    if (newHunger >= MAX_HUNGER_MS && hungerBefore < MAX_HUNGER_MS) {
       await bumpQuestMetric({ userId, metric: 'frog_fed_full', timezone: tz });
     }
     setFields['wardrobe.hunger'] = newHunger;
@@ -573,6 +575,12 @@ async function awardFlyForTask(
     taskFlies: {
       ...(daily.taskFlies ?? {}),
       [taskId]: alreadyGranted + grant,
+    },
+    taskHunger: {
+      ...(daily.taskHunger ?? {}),
+      [taskId]: alreadyRewarded
+        ? daily.taskHunger?.[taskId] ?? TASK_HUNGER_REWARD_MS
+        : hungerFed,
     },
     limitNotified: limitNotified || hitLimit,
   };
@@ -667,9 +675,12 @@ async function unawardFlyForTask(
 
   if (wasRewarded) {
     const hungerBefore = nextHunger;
-    nextHunger = Math.max(0, hungerBefore - TASK_HUNGER_REWARD_MS);
-    setFields['wardrobe.hunger'] = nextHunger;
-    setFields['wardrobe.lastHungerUpdate'] = new Date();
+    const fed = daily.taskHunger?.[taskId] ?? TASK_HUNGER_REWARD_MS;
+    nextHunger = Math.max(0, hungerBefore - fed);
+    if (nextHunger !== hungerBefore) {
+      setFields['wardrobe.hunger'] = nextHunger;
+      setFields['wardrobe.lastHungerUpdate'] = new Date();
+    }
     if (hungerBefore >= MAX_HUNGER_MS && nextHunger < MAX_HUNGER_MS) {
       await bumpQuestMetric({
         userId,
@@ -683,11 +694,14 @@ async function unawardFlyForTask(
     nextBalance = Math.max(0, balance - granted);
     const nextTaskFlies = { ...(daily.taskFlies ?? {}) };
     delete nextTaskFlies[taskId];
+    const nextTaskHunger = { ...(daily.taskHunger ?? {}) };
+    delete nextTaskHunger[taskId];
     const nextDaily: DailyFlyProgress = {
       date: today,
       earned: nextEarned,
       taskIds: (daily.taskIds ?? []).filter((id) => id !== taskId),
       taskFlies: nextTaskFlies,
+      taskHunger: nextTaskHunger,
       limitNotified: nextEarned >= limit ? daily.limitNotified : false,
     };
     setFields['wardrobe.flies'] = nextBalance;

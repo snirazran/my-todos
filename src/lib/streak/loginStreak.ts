@@ -4,7 +4,6 @@ import UserModel from '@/lib/models/User';
 import LoginStreakConfigModel, {
   LOGIN_STREAK_CONFIG_ID,
   DEFAULT_GOAL_TIERS,
-  DEFAULT_MILESTONES,
   FREEZE_CAP_MIN,
   FREEZE_CAP_MAX,
   type LoginStreakConfigDoc,
@@ -78,10 +77,6 @@ export async function loadLoginStreakConfig(): Promise<LoginStreakConfigDoc> {
       doc?.goalTiers && doc.goalTiers.length > 0
         ? doc.goalTiers
         : DEFAULT_GOAL_TIERS,
-    milestones:
-      doc?.milestones && doc.milestones.length > 0
-        ? doc.milestones
-        : DEFAULT_MILESTONES,
     createdAt: doc?.createdAt ?? new Date(),
     updatedAt: doc?.updatedAt ?? new Date(),
   };
@@ -111,9 +106,6 @@ export function readLoginStreakState(user: any): LoginStreakState {
       ? raw.goalsCompleted.filter(
           (g: any) => typeof g?.days === 'number' && typeof g?.dayKey === 'string',
         )
-      : [],
-    milestonesReached: Array.isArray(raw?.milestonesReached)
-      ? raw.milestonesReached.filter((d: unknown) => typeof d === 'number')
       : [],
     rescue: readRescue(raw?.rescue),
     lastRescueDayKey:
@@ -228,10 +220,6 @@ export function buildLoginStreakView(
         }
       : null,
     goalTiers: config.goalTiers,
-    milestones: config.milestones.map((m) => ({
-      days: m.days,
-      reached: state.milestonesReached.includes(m.days),
-    })),
   };
 }
 
@@ -307,43 +295,24 @@ function applyStreakRewardGrants(args: {
   next: LoginStreakState;
   config: LoginStreakConfigDoc;
   todayKey: string;
-  newMilestones: LoginStreakConfigDoc['milestones'];
   goalCompleted: LoginStreakGoal | null;
-}): {
-  milestoneEvents: LoginStreakRewardEvent[];
-  goalEvent: LoginStreakRewardEvent | null;
-} {
-  const { user, next, config, todayKey, newMilestones, goalCompleted } = args;
+}): LoginStreakRewardEvent | null {
+  const { user, next, config, todayKey, goalCompleted } = args;
+  if (!goalCompleted) return null;
+
   const multiplier = isPremiumUser(user.toObject()) ? 2 : 1;
-  let grantedFreezes = 0;
-  const milestoneEvents: LoginStreakRewardEvent[] = [];
-  let goalEvent: LoginStreakRewardEvent | null = null;
+  const tier = config.goalTiers.find((t) => t.days === goalCompleted.days);
+  const { questRewards, freezes } = splitRewards(tier?.rewards ?? []);
+  const summary = grantQuestRewards(user, questRewards, multiplier);
+  summary.freezesGranted = freezes;
+  next.goalsCompleted = [
+    ...next.goalsCompleted,
+    { days: goalCompleted.days, dayKey: todayKey },
+  ];
+  next.goal = null;
+  next.freezes = Math.min(config.freezeCap, next.freezes + freezes);
 
-  for (const milestone of newMilestones) {
-    const { questRewards, freezes } = splitRewards(milestone.rewards ?? []);
-    const summary = grantQuestRewards(user, questRewards, multiplier);
-    grantedFreezes += freezes;
-    summary.freezesGranted = freezes;
-    next.milestonesReached = [...next.milestonesReached, milestone.days];
-    milestoneEvents.push({ days: milestone.days, rewardSummary: summary });
-  }
-
-  if (goalCompleted) {
-    const tier = config.goalTiers.find((t) => t.days === goalCompleted.days);
-    const { questRewards, freezes } = splitRewards(tier?.rewards ?? []);
-    const summary = grantQuestRewards(user, questRewards, multiplier);
-    grantedFreezes += freezes;
-    summary.freezesGranted = freezes;
-    next.goalsCompleted = [
-      ...next.goalsCompleted,
-      { days: goalCompleted.days, dayKey: todayKey },
-    ];
-    next.goal = null;
-    goalEvent = { days: goalCompleted.days, rewardSummary: summary };
-  }
-
-  next.freezes = Math.min(config.freezeCap, next.freezes + grantedFreezes);
-  return { milestoneEvents, goalEvent };
+  return { days: goalCompleted.days, rewardSummary: summary };
 }
 
 function activeRescueForDay(
@@ -376,7 +345,6 @@ export async function performCheckIn(args: {
       previousCount: state.count,
       view: null,
       freezeConsumedDays: [],
-      milestoneEvents: [],
       goalEvent: null,
       rescue: null,
     };
@@ -389,7 +357,6 @@ export async function performCheckIn(args: {
       previousCount: state.count,
       view: buildLoginStreakView(state, config, todayKey),
       freezeConsumedDays: [],
-      milestoneEvents: [],
       goalEvent: null,
       rescue: activeRescueForDay(state.rescue, todayKey),
     };
@@ -429,28 +396,21 @@ export async function performCheckIn(args: {
     };
   }
 
-  const newMilestones = config.milestones.filter(
-    (m) => newCount >= m.days && !next.milestonesReached.includes(m.days),
-  );
   const goalCompleted =
     next.goal && newCount - next.goal.startCount >= next.goal.days
       ? next.goal
       : null;
 
-  let milestoneEvents: LoginStreakRewardEvent[] = [];
   let goalEvent: LoginStreakRewardEvent | null = null;
 
-  if (newMilestones.length > 0 || goalCompleted) {
-    const granted = applyStreakRewardGrants({
+  if (goalCompleted) {
+    goalEvent = applyStreakRewardGrants({
       user,
       next,
       config,
       todayKey,
-      newMilestones,
       goalCompleted,
     });
-    milestoneEvents = granted.milestoneEvents;
-    goalEvent = granted.goalEvent;
 
     const currentQuests =
       typeof (user as any).quests === 'object' && (user as any).quests
@@ -480,7 +440,6 @@ export async function performCheckIn(args: {
         previousCount,
         view: buildLoginStreakView(currentState, config, todayKey),
         freezeConsumedDays: [],
-        milestoneEvents: [],
         goalEvent: null,
         rescue: activeRescueForDay(currentState.rescue, todayKey),
       };
@@ -493,7 +452,6 @@ export async function performCheckIn(args: {
     previousCount,
     view: buildLoginStreakView(next, config, todayKey),
     freezeConsumedDays: coverage?.consumed ?? [],
-    milestoneEvents,
     goalEvent,
     rescue: next.rescue,
   };
@@ -531,7 +489,6 @@ export async function performRescue(args: {
       view: config.isActive
         ? buildLoginStreakView(state, config, todayKey)
         : null,
-      milestoneEvents: [],
       goalEvent: null,
     };
   }
@@ -552,7 +509,6 @@ export async function performRescue(args: {
         config,
         todayKey,
       ),
-      milestoneEvents: [],
       goalEvent: null,
     };
   }
@@ -566,19 +522,15 @@ export async function performRescue(args: {
     lastRescueDayKey: todayKey,
   };
 
-  const newMilestones = config.milestones.filter(
-    (m) => newCount >= m.days && !next.milestonesReached.includes(m.days),
-  );
   const goalCompleted =
     next.goal && newCount - next.goal.startCount >= next.goal.days
       ? next.goal
       : null;
-  const { milestoneEvents, goalEvent } = applyStreakRewardGrants({
+  const goalEvent = applyStreakRewardGrants({
     user,
     next,
     config,
     todayKey,
-    newMilestones,
     goalCompleted,
   });
 
@@ -596,7 +548,6 @@ export async function performRescue(args: {
     completed: true,
     rescue: null,
     view: buildLoginStreakView(next, config, todayKey),
-    milestoneEvents,
     goalEvent,
   };
 }

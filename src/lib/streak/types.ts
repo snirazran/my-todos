@@ -35,7 +35,6 @@ export type LoginStreakState = {
   freezeUsedDayKeys: string[];
   goal: LoginStreakGoal | null;
   goalsCompleted: { days: number; dayKey: string }[];
-  milestonesReached: number[];
   rescue: LoginStreakRescue | null;
   lastRescueDayKey: string;
   notif: LoginStreakNotifState;
@@ -58,7 +57,6 @@ export type LoginStreakView = {
   freezeUsedDayKeys: string[];
   goal: (LoginStreakGoal & { progress: number }) | null;
   goalTiers: LoginStreakGoalTierView[];
-  milestones: { days: number; reached: boolean }[];
 };
 
 export type LoginStreakRewardSummary = {
@@ -81,7 +79,6 @@ export type CheckInResult = {
   previousCount: number;
   view: LoginStreakView | null;
   freezeConsumedDays: string[];
-  milestoneEvents: LoginStreakRewardEvent[];
   goalEvent: LoginStreakRewardEvent | null;
   rescue: LoginStreakRescue | null;
 };
@@ -91,6 +88,5 @@ export type RescueResult = {
   completed: boolean;
   rescue: LoginStreakRescue | null;
   view: LoginStreakView | null;
-  milestoneEvents: LoginStreakRewardEvent[];
   goalEvent: LoginStreakRewardEvent | null;
 };

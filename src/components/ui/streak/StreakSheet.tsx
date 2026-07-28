@@ -763,9 +763,7 @@ export function StreakSheet({
   const { indices } = useWardrobeIndices(open);
 
   const view = liveView ?? celebration?.view ?? null;
-  const hasRewardEvents =
-    !!celebration &&
-    ((celebration.milestoneEvents?.length ?? 0) > 0 || !!celebration.goalEvent);
+  const hasRewardEvents = !!celebration?.goalEvent;
 
   const [step, setStep] = useState<Step>('home');
   const [buyOpen, setBuyOpen] = useState(false);

@@ -1,6 +1,12 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import {
   AnimatePresence,
   motion,
@@ -148,6 +154,33 @@ export function ChecklistCheckbox({
 
 const rowTransition = { duration: 0.22, ease: [0.32, 0.72, 0, 1] as const };
 
+const TEXT_CLASS =
+  'min-w-0 flex-1 resize-none overflow-hidden break-words bg-transparent py-[11px] text-[16px] leading-[22px] focus:outline-none sm:text-[15px]';
+
+function autoSize(el: HTMLTextAreaElement | null) {
+  if (!el) return;
+  el.style.height = 'auto';
+  el.style.height = `${el.scrollHeight}px`;
+}
+
+function useAutoSize() {
+  const ref = useRef<HTMLTextAreaElement | null>(null);
+  const resize = useCallback(() => autoSize(ref.current), []);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    let width = el.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (el.clientWidth === width) return;
+      width = el.clientWidth;
+      resize();
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [resize]);
+  return { ref, resize };
+}
+
 interface ChecklistEditorProps {
   items: ChecklistItem[];
   onChange: (next: ChecklistItem[], opts: { persist: boolean }) => void;
@@ -170,8 +203,8 @@ export function ChecklistEditor({
     latestRef.current = items;
   }, [items]);
 
-  const inputRefs = useRef(new Map<string, HTMLInputElement>());
-  const addRef = useRef<HTMLInputElement>(null);
+  const inputRefs = useRef(new Map<string, HTMLTextAreaElement>());
+  const addRef = useRef<HTMLTextAreaElement>(null);
   const pendingFocusRef = useRef<string | null>(autoFocus);
 
   useEffect(() => {
@@ -255,7 +288,10 @@ export function ChecklistEditor({
       (cur) => [...cur, { id: randomUUID(), text, done: false }],
       true,
     );
-    if (el) el.value = '';
+    if (el) {
+      el.value = '';
+      autoSize(el);
+    }
     return true;
   };
 
@@ -318,13 +354,15 @@ export function ChecklistEditor({
       </Reorder.Group>
 
       {!atCap && (
-        <div className="flex min-h-[44px] items-center gap-3 rounded-xl px-2 transition-colors focus-within:bg-muted/30">
-          <span className="grid h-[23px] w-[23px] shrink-0 place-items-center rounded-[30%] border-2 border-dashed border-muted-foreground/35 text-muted-foreground/60">
+        <div className="flex min-h-[44px] items-start gap-3 rounded-xl px-2 transition-colors focus-within:bg-muted/30">
+          <span className="mt-[10px] grid h-[23px] w-[23px] shrink-0 place-items-center rounded-[30%] border-2 border-dashed border-muted-foreground/35 text-muted-foreground/60">
             <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
           </span>
-          <input
+          <textarea
             ref={addRef}
+            rows={1}
             defaultValue=""
+            onInput={(e) => autoSize(e.currentTarget)}
             maxLength={CHECKLIST_ITEM_MAX}
             enterKeyHint="next"
             autoComplete="off"
@@ -343,7 +381,7 @@ export function ChecklistEditor({
             }}
             onBlur={addFromDraft}
             placeholder="Add a step…"
-            className="min-w-0 flex-1 bg-transparent py-2 text-[16px] text-foreground placeholder:text-muted-foreground/50 focus:outline-none sm:text-[15px]"
+            className={`${TEXT_CLASS} text-foreground placeholder:text-muted-foreground/50`}
           />
         </div>
       )}
@@ -381,7 +419,7 @@ function ChecklistRow({
   onCommit: () => void;
   onRemove: (refocus: boolean) => void;
   onEnter: () => void;
-  registerInput: (el: HTMLInputElement | null) => void;
+  registerInput: (el: HTMLTextAreaElement | null) => void;
   onDragAt: (pointY: number) => void;
   onDrop: () => void;
   canDrag: boolean;
@@ -389,6 +427,9 @@ function ChecklistRow({
   const focusTextRef = useRef<string | null>(null);
   const dragControls = useDragControls();
   const [dragging, setDragging] = useState(false);
+  const { ref: textRef, resize } = useAutoSize();
+
+  useLayoutEffect(resize, [item.text, resize]);
 
   return (
     <Reorder.Item
@@ -413,15 +454,21 @@ function ChecklistRow({
       className={`${dragging ? 'z-10' : 'overflow-hidden'}`}
     >
       <div
-        className={`group flex min-h-[44px] items-center gap-3 rounded-xl px-2 transition-colors ${
+        className={`group flex min-h-[44px] items-start gap-3 rounded-xl px-2 transition-colors ${
           dragging
             ? 'bg-popover shadow-lg ring-1 ring-border/80'
             : 'focus-within:bg-muted/40 [@media(hover:hover)]:hover:bg-muted/25'
         }`}
       >
-        <ChecklistCheckbox checked={item.done} onToggle={onToggle} size={23} />
-        <input
-          ref={registerInput}
+        <span className="grid h-11 shrink-0 place-items-center">
+          <ChecklistCheckbox checked={item.done} onToggle={onToggle} size={23} />
+        </span>
+        <textarea
+          ref={(el) => {
+            textRef.current = el;
+            registerInput(el);
+          }}
+          rows={1}
           value={item.text}
           maxLength={CHECKLIST_ITEM_MAX}
           enterKeyHint="next"
@@ -451,7 +498,7 @@ function ChecklistRow({
               e.currentTarget.blur();
             }
           }}
-          className={`min-w-0 flex-1 bg-transparent py-2 text-[16px] transition-colors duration-200 focus:outline-none sm:text-[15px] ${
+          className={`${TEXT_CLASS} transition-colors duration-200 ${
             item.done
               ? 'text-muted-foreground/70 line-through decoration-muted-foreground/50'
               : 'text-foreground'
@@ -463,7 +510,7 @@ function ChecklistRow({
           onPointerDown={(e) => e.preventDefault()}
           onClick={() => onRemove(false)}
           aria-label="Remove step"
-          className="shrink-0 rounded-lg p-1.5 text-muted-foreground/40 transition-all hover:text-rose-500 sm:opacity-0 sm:focus-visible:opacity-100 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100"
+          className="mt-2 shrink-0 rounded-lg p-1.5 text-muted-foreground/40 transition-all hover:text-rose-500 sm:opacity-0 sm:focus-visible:opacity-100 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100"
         >
           <X className="h-4 w-4" />
         </button>
@@ -476,7 +523,7 @@ function ChecklistRow({
               e.preventDefault();
               dragControls.start(e);
             }}
-            className={`shrink-0 touch-none rounded-lg p-1.5 transition-colors cursor-grab active:cursor-grabbing ${
+            className={`mt-2 shrink-0 touch-none rounded-lg p-1.5 transition-colors cursor-grab active:cursor-grabbing ${
               dragging
                 ? 'text-foreground'
                 : 'text-muted-foreground/35 [@media(hover:hover)]:hover:text-muted-foreground'

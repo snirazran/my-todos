@@ -8,6 +8,8 @@ export type DailyFlyProgress = {
   earned: number;
   taskIds?: string[];
   taskFlies?: Record<string, number>;
+  /** Belly time (ms) each task actually added, so undo refunds exactly that. */
+  taskHunger?: Record<string, number>;
   limitNotified?: boolean;
 };
 

@@ -6,11 +6,6 @@ export interface LoginStreakGoalTier {
   rewards: LoginStreakReward[];
 }
 
-export interface LoginStreakMilestone {
-  days: number;
-  rewards: LoginStreakReward[];
-}
-
 export interface LoginStreakConfigDoc {
   _id?: mongoose.Types.ObjectId;
   configId: string;
@@ -19,7 +14,6 @@ export interface LoginStreakConfigDoc {
   freezeCap: number;
   saverMinStreak: number;
   goalTiers: LoginStreakGoalTier[];
-  milestones: LoginStreakMilestone[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -47,19 +41,6 @@ export const DEFAULT_GOAL_TIERS: LoginStreakGoalTier[] = [
   },
 ];
 
-export const DEFAULT_MILESTONES: LoginStreakMilestone[] = [
-  { days: 7, rewards: [{ type: 'STREAK_FREEZE', amount: 1 }] },
-  {
-    days: 30,
-    rewards: [
-      { type: 'FLIES', amountMode: 'fixed', amount: 100 },
-      { type: 'STREAK_FREEZE', amount: 1 },
-    ],
-  },
-  { days: 100, rewards: [{ type: 'FLIES', amountMode: 'fixed', amount: 400 }] },
-  { days: 365, rewards: [{ type: 'FLIES', amountMode: 'fixed', amount: 1500 }] },
-];
-
 const LoginStreakConfigSchema = new Schema<LoginStreakConfigDoc>(
   {
     configId: { type: String, required: true, unique: true, index: true },
@@ -68,7 +49,6 @@ const LoginStreakConfigSchema = new Schema<LoginStreakConfigDoc>(
     freezeCap: { type: Number, default: 2 },
     saverMinStreak: { type: Number, default: 2 },
     goalTiers: { type: [Schema.Types.Mixed], default: [] } as any,
-    milestones: { type: [Schema.Types.Mixed], default: [] } as any,
   },
   {
     collection: 'loginStreakConfigs',

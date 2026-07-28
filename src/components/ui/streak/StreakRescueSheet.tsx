@@ -27,7 +27,6 @@ function toCelebrationResult(result: RescueResult): CheckInResult {
     previousCount: result.view?.count ?? 0,
     view: result.view,
     freezeConsumedDays: [],
-    milestoneEvents: result.milestoneEvents,
     goalEvent: result.goalEvent,
     rescue: null,
   };
@@ -113,7 +112,7 @@ export function StreakRescueSheet({
   };
 
   const finish = () => {
-    if (saved && (saved.milestoneEvents.length > 0 || saved.goalEvent)) {
+    if (saved?.goalEvent) {
       setShowRewards(true);
       return;
     }

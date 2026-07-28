@@ -119,7 +119,6 @@ type AdminLoginStreakConfig = {
   freezeCap: number;
   saverMinStreak: number;
   goalTiers: AdminLoginStreakTier[];
-  milestones: AdminLoginStreakTier[];
   limits: { freezeCapMin: number; freezeCapMax: number };
 };
 type QuickAddSuggestionDraft = {
@@ -580,7 +579,7 @@ export function AdminQuestManagerPage() {
     useState<AdminLoginStreakConfig | null>(null);
   const [savingLoginStreak, setSavingLoginStreak] = useState(false);
   const [loginRewardTarget, setLoginRewardTarget] = useState<{
-    list: 'goalTiers' | 'milestones';
+    list: 'goalTiers';
     days: number;
   } | null>(null);
 
@@ -1177,7 +1176,7 @@ export function AdminQuestManagerPage() {
           <ChevronRight className="h-5 w-5 text-muted-foreground/30 transition group-hover:translate-x-0.5 group-hover:text-muted-foreground" />
         </div>
         <p className="mt-5 text-lg font-black text-foreground">Streak Manager</p>
-        <p className="mt-1 text-sm text-muted-foreground">Login streak goals, milestones, and freezes.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Login streak commitments and freezes.</p>
         <p className="mt-4 text-3xl font-black text-foreground">
           {loginStreakConfig ? (loginStreakConfig.isActive ? 'On' : 'Off') : '–'}
         </p>
@@ -2150,7 +2149,6 @@ export function AdminQuestManagerPage() {
           freezeCap: loginStreakConfig.freezeCap,
           saverMinStreak: loginStreakConfig.saverMinStreak,
           goalTiers: loginStreakConfig.goalTiers,
-          milestones: loginStreakConfig.milestones,
         }),
       });
       const data = await res.json();
@@ -2176,7 +2174,7 @@ export function AdminQuestManagerPage() {
       0,
     );
   const setLoginTier = (
-    list: 'goalTiers' | 'milestones',
+    list: 'goalTiers',
     days: number,
     updater: (tier: AdminLoginStreakTier) => AdminLoginStreakTier | null,
   ) => {
@@ -2196,7 +2194,7 @@ export function AdminQuestManagerPage() {
   ];
 
   const renderLoginTierList = (
-    list: 'goalTiers' | 'milestones',
+    list: 'goalTiers',
     tiers: AdminLoginStreakTier[],
   ) => (
     <div className="mt-2 space-y-2">
@@ -2271,8 +2269,8 @@ export function AdminQuestManagerPage() {
               Login streak (app entry)
             </p>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Opening the app daily grows the streak. Goals and milestones grant
-              the prizes below; freezes auto-protect missed days.
+              Opening the app daily grows the streak. Commitments grant the
+              prizes below; freezes auto-protect missed days.
             </p>
           </div>
           <button
@@ -2393,12 +2391,6 @@ export function AdminQuestManagerPage() {
             Commitment goals
           </span>
           {renderLoginTierList('goalTiers', loginStreakConfig.goalTiers)}
-        </div>
-        <div className="mt-4">
-          <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-            Milestones
-          </span>
-          {renderLoginTierList('milestones', loginStreakConfig.milestones)}
         </div>
 
         {loginRewardTarget && targetTier && (

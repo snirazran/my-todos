@@ -15,10 +15,7 @@ export async function POST(req: NextRequest) {
 
     await connectMongo();
     const result = await performCheckIn({ userId, timezone });
-    const flyAmount = [
-      ...result.milestoneEvents.map((event) => event.rewardSummary.fliesGranted ?? 0),
-      result.goalEvent?.rewardSummary.fliesGranted ?? 0,
-    ].reduce((sum, amount) => sum + amount, 0);
+    const flyAmount = result.goalEvent?.rewardSummary.fliesGranted ?? 0;
     if (flyAmount > 0) {
       const user = await UserModel.findById(userId).select('premiumUntil').lean();
       await recordAnalyticsEvent({

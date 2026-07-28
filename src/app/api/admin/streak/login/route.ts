@@ -6,7 +6,6 @@ import LoginStreakConfigModel, {
   FREEZE_CAP_MIN,
   FREEZE_CAP_MAX,
   DEFAULT_GOAL_TIERS,
-  DEFAULT_MILESTONES,
 } from '@/lib/models/LoginStreakConfig';
 import { loadLoginStreakConfig } from '@/lib/streak/loginStreak';
 import type {
@@ -111,7 +110,6 @@ export async function GET() {
         freezeCap: config.freezeCap,
         saverMinStreak: config.saverMinStreak,
         goalTiers: config.goalTiers,
-        milestones: config.milestones,
         limits: { freezeCapMin: FREEZE_CAP_MIN, freezeCapMax: FREEZE_CAP_MAX },
       },
     });
@@ -148,7 +146,6 @@ export async function PUT(req: NextRequest) {
       Math.max(1, Math.floor(Number(body?.saverMinStreak) || 2)),
     );
     const goalTiers = sanitizeTiers(body?.goalTiers);
-    const milestones = sanitizeTiers(body?.milestones);
 
     await connectMongo();
     await LoginStreakConfigModel.findOneAndUpdate(
@@ -160,8 +157,8 @@ export async function PUT(req: NextRequest) {
           freezeCap,
           saverMinStreak,
           goalTiers: goalTiers.length > 0 ? goalTiers : DEFAULT_GOAL_TIERS,
-          milestones: milestones.length > 0 ? milestones : DEFAULT_MILESTONES,
         },
+        $unset: { milestones: '' },
       },
       { new: true, upsert: true },
     ).lean();
@@ -174,7 +171,6 @@ export async function PUT(req: NextRequest) {
         freezeCap: config.freezeCap,
         saverMinStreak: config.saverMinStreak,
         goalTiers: config.goalTiers,
-        milestones: config.milestones,
         limits: { freezeCapMin: FREEZE_CAP_MIN, freezeCapMax: FREEZE_CAP_MAX },
       },
     });
