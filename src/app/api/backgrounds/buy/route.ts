@@ -4,6 +4,7 @@ import connectMongo from '@/lib/mongoose';
 import BackgroundModel from '@/lib/models/Background';
 import UserModel, { type UserDoc } from '@/lib/models/User';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
+import { DEFAULT_BACKGROUND_ID } from '@/lib/backgrounds/constants';
 
 const json = (body: unknown, init = 200) =>
   NextResponse.json(body, { status: init });
@@ -23,6 +24,8 @@ export async function POST(req: NextRequest) {
 
     const id = body.id;
     if (!id) return json({ error: 'Missing background id' }, 400);
+    if (id === DEFAULT_BACKGROUND_ID)
+      return json({ error: 'You already have this one' }, 400);
 
     await connectMongo();
     const bg = await BackgroundModel.findOne({ id, hidden: { $ne: true } }).lean();
@@ -47,6 +50,13 @@ export async function POST(req: NextRequest) {
 
     if (result.modifiedCount === 0) {
       return json({ error: 'Not enough flies' }, 400);
+    }
+
+    if (user.wardrobe?.wishlist?.itemId === id) {
+      await UserModel.updateOne(
+        { _id: user._id },
+        { $unset: { 'wardrobe.wishlist': '' } },
+      );
     }
 
     const isPremium = !!user.premiumUntil && new Date(user.premiumUntil) > new Date();

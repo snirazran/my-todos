@@ -1,5 +1,8 @@
 import type { WardrobeSlot } from '@/lib/skins/catalog';
 import type { RotationInterval } from '@/lib/skins/styleShuffle';
+import type { WishlistPin } from '@/lib/skins/wishlist';
+import type { DealReroll } from '@/lib/skins/dailyDeal';
+import type { SavedLook } from '@/lib/skins/looks';
 import type { FocusProfile } from '@/lib/quests/types';
 import type { FrogodoroSettings, PomodoroPhase, SessionStats } from '@/lib/frogodoroStore';
 
@@ -16,6 +19,11 @@ export type DailyFlyProgress = {
 export type FocusFlyDaily = {
   date: string;
   focusSeconds: number;
+  earned: number;
+};
+
+export type DeepFocusDaily = {
+  date: string;
   earned: number;
 };
 
@@ -58,11 +66,19 @@ export type UserWardrobe = {
   unseenItems?: string[];
   flies: number;
   flyDaily?: DailyFlyProgress;
-  /** Flies earned from focus time (1 per 5 focused minutes, daily-capped). */
+  /** Flies earned from focus time (1 per 15 focused minutes, daily-capped). */
   focusFlyDaily?: FocusFlyDaily;
+  /** Deep-focus pledge bonus flies awarded today (daily-capped). */
+  deepFocusDaily?: DeepFocusDaily;
   friendFlyDaily?: FriendFlyDaily;
   /** Lifetime flies each friend has contributed to you (by friend userId). */
   friendFlyTotals?: Record<string, number>;
+  /** The one shop item this user is saving toward. */
+  wishlist?: WishlistPin | null;
+  /** Daily-deal rerolls spent today (Plus perk). */
+  dealReroll?: DealReroll | null;
+  /** Outfits the user saved so a good combination isn't lost to a shuffle. */
+  looks?: SavedLook[];
 
   // Hunger System
   hunger?: number; // Time remaining in ms (max defined by MAX_HUNGER_MS)
@@ -75,6 +91,10 @@ export type UserWardrobe = {
 export type StyleShufflePrefs = {
   interval: RotationInterval;
   lastAutoAt?: Date | string | null;
+  /** Last time a shuffle offered an unowned item as a try-on. */
+  lastTryOnAt?: Date | string | null;
+  /** Slots the shuffle must leave alone. */
+  lockedSlots?: WardrobeSlot[];
 };
 
 export type UserSkins = {

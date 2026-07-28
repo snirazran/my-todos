@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, Loader2 } from 'lucide-react';
+import { Bookmark, BookmarkCheck, Check, Loader2 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import Fly from '@/components/ui/fly';
@@ -10,6 +10,8 @@ import { AnimatedNumber } from '@/components/ui/AnimatedNumber';
 import { cn } from '@/lib/utils';
 import { useUIStore } from '@/lib/uiStore';
 import { hapticSuccess } from '@/lib/haptics';
+import { useWishlist } from '@/hooks/useWishlist';
+import type { WishlistKind } from '@/lib/skins/wishlist';
 import type { Rarity } from '@/lib/skins/catalog';
 
 const RARITY: Record<
@@ -73,6 +75,7 @@ export type PurchaseTarget = {
   price: number;
   originalPrice?: number;
   slotLabel?: string;
+  kind?: WishlistKind;
 };
 
 function fireConfetti(el: HTMLElement | null, colors: string[]) {
@@ -115,6 +118,16 @@ export function PurchaseSheet({
   const [busy, setBusy] = useState(false);
   const primaryRef = useRef<HTMLButtonElement>(null);
   const openFlyShop = useUIStore((s) => s.openFlyShop);
+  const {
+    wishlist,
+    pin,
+    clear: clearWishlist,
+    busy: wishlistBusy,
+  } = useWishlist(open && !isGuest);
+  const isPinned = !!target && wishlist?.itemId === target.id;
+  const pinThis = () => {
+    if (target) void pin(target.id, target.kind ?? 'item');
+  };
 
   useEffect(() => {
     if (open) {
@@ -155,13 +168,19 @@ export function PurchaseSheet({
       onOpenChange={(v) => {
         if (!v) onClose();
       }}
-      className="select-none sm:max-w-[420px]"
+      className="max-h-[92dvh] select-none sm:max-h-[88dvh] sm:max-w-[420px]"
       zIndex={1200}
       closeAriaLabel="Close purchase"
     >
-      {({ entered }) =>
+      {({ entered, bindScroll }) =>
         target ? (
-          <div className="flex flex-col px-5 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-3 sm:px-6 sm:pb-6 sm:pt-7">
+          // Capped height + internal scroll: on short screens the preview and
+          // the cost breakdown together outrun the viewport, and the panel's
+          // overflow-hidden would silently clip the buy button.
+          <div
+            ref={bindScroll}
+            className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-5 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-3 sm:px-6 sm:pb-6 sm:pt-7"
+          >
             {/* Eyebrow */}
             <div className="flex items-center gap-2 pr-12 sm:pr-14">
               <span
@@ -187,10 +206,12 @@ export function PurchaseSheet({
             {/* Preview */}
             <div
               className={cn(
-                'relative mx-auto mt-4 flex items-center justify-center overflow-hidden rounded-[28px] bg-gradient-to-br ring-1',
+                'relative mx-auto mt-4 flex shrink-0 items-center justify-center overflow-hidden rounded-[28px] bg-gradient-to-br ring-1',
+                // Sized off the viewport height so the preview yields first on
+                // a short screen instead of pushing the actions off-sheet.
                 previewWide
                   ? 'aspect-[16/10] w-full'
-                  : 'aspect-square w-full max-w-[260px]',
+                  : 'aspect-square w-[min(260px,28dvh)]',
                 rarity.gradient,
                 rarity.ring,
                 phase === 'success' && rarity.glow,
@@ -279,7 +300,7 @@ export function PurchaseSheet({
             )}
 
             {/* Actions */}
-            <div className="mt-5 flex flex-col gap-2.5">
+            <div className="mt-5 flex shrink-0 flex-col gap-2.5">
               {phase === 'success' ? (
                 <>
                   <PrimaryButton ref={primaryRef} onClick={handleEquip} busy={busy}>
@@ -332,17 +353,38 @@ export function PurchaseSheet({
                 </button>
               ) : (
                 <>
-                  <PrimaryButton ref={primaryRef} onClick={openFlyShop}>
-                    <span className="inline-flex items-center gap-2">
-                      Get
-                      <Fly size={30} y={-5} alwaysPlay />
-                      <span className="tabular-nums">{shortBy.toLocaleString()}</span>
-                      more flies
-                    </span>
+                  <PrimaryButton
+                    ref={primaryRef}
+                    onClick={isPinned ? clearWishlist : pinThis}
+                    busy={wishlistBusy}
+                  >
+                    {isPinned ? (
+                      <span className="inline-flex items-center gap-2">
+                        <BookmarkCheck className="h-5 w-5" strokeWidth={2.75} />
+                        Saving for this
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-2">
+                        <Bookmark className="h-5 w-5" strokeWidth={2.75} />
+                        Save for this
+                      </span>
+                    )}
                   </PrimaryButton>
                   <p className="text-center text-xs font-bold text-muted-foreground">
-                    You&apos;re {shortBy.toLocaleString()} flies short
+                    {isPinned
+                      ? `Every fly you catch counts down the last ${shortBy.toLocaleString()}.`
+                      : `You're ${shortBy.toLocaleString()} flies short — pin it and watch your counter fill.`}
                   </p>
+                  <GhostButton onClick={openFlyShop}>
+                    <span className="inline-flex items-center gap-1.5">
+                      Or get
+                      <Fly size={24} paused y={-2} />
+                      <span className="tabular-nums">
+                        {shortBy.toLocaleString()}
+                      </span>
+                      now
+                    </span>
+                  </GhostButton>
                 </>
               )}
             </div>

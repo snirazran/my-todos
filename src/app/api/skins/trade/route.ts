@@ -6,6 +6,7 @@ import User from '@/lib/models/User';
 import { RARITY_ORDER, TRADE_ITEM_COUNT } from '@/lib/skins/catalog';
 import { getPrizePool, type GiftPrize } from '@/lib/skins/gifts';
 import { isAvailableAt } from '@/lib/skins/availability';
+import { DEFAULT_BACKGROUND_ID } from '@/lib/backgrounds/constants';
 import { bumpQuestMetric } from '@/lib/quests/metrics';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
 
@@ -29,6 +30,16 @@ export async function POST(req: NextRequest) {
     if (picks.length !== TRADE_ITEM_COUNT || picks.some((p) => !p.id)) {
       return NextResponse.json(
         { error: `Must provide exactly ${TRADE_ITEM_COUNT} items to trade.` },
+        { status: 400 },
+      );
+    }
+
+    // The default scene is granted, not earned — it can't be spent. It's
+    // already absent from the prize pool, so this only exists to return a
+    // sentence that makes sense instead of "Invalid item: bg_default".
+    if (picks.some((p) => p.kind === 'background' && p.id === DEFAULT_BACKGROUND_ID)) {
+      return NextResponse.json(
+        { error: 'The default background cannot be traded.' },
         { status: 400 },
       );
     }

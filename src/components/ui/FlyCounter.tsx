@@ -8,6 +8,7 @@ import { AnimatedNumber } from '@/components/ui/AnimatedNumber';
 import { useSheetStore } from '@/lib/sheetStore';
 import { isFlyEarnActive } from '@/lib/flyEarn';
 import { hapticTick } from '@/lib/haptics';
+import { useWishlist } from '@/hooks/useWishlist';
 
 type Variant = 'mobile' | 'desktop';
 
@@ -22,6 +23,11 @@ interface Props {
    * cache revalidations update the number silently.
    */
   alwaysCelebrate?: boolean;
+  /**
+   * Fill the pill toward the pinned wishlist item. Off by default so demo and
+   * toast counters stay presentational (and skip the summary subscription).
+   */
+  showGoal?: boolean;
 }
 
 export function FlyCounter({
@@ -29,7 +35,11 @@ export function FlyCounter({
   variant = 'desktop',
   onClick,
   alwaysCelebrate = false,
+  showGoal = false,
 }: Props) {
+  const { wishlist, progress } = useWishlist(showGoal);
+  const goalRatio = progress?.ratio ?? 0;
+  const goalReached = !!progress?.reached;
   // Held gains celebrate once the screen is clear again (read here, in the
   // leaf, rather than in the layout-level header — subscribing in the header
   // trips Next's dev HMR/PPR refresh loop).
@@ -110,14 +120,41 @@ export function FlyCounter({
   return (
     <motion.div
       onClick={onClick}
-      className={`relative flex items-center gap-1.5 rounded-full border border-border/50 bg-card/80 shadow-sm backdrop-blur-xl ${
+      aria-label={
+        wishlist
+          ? `${balance} flies — saving for ${wishlist.name}, ${progress?.remaining ?? 0} to go`
+          : undefined
+      }
+      className={`relative flex items-center gap-1.5 rounded-full border shadow-sm backdrop-blur-xl ${
+        goalReached ? 'border-emerald-500/50' : 'border-border/50'
+      } bg-card/80 ${
         isMobile ? 'px-3 py-1.5' : 'h-10 px-3'
       } ${onClick ? 'cursor-pointer transition-colors active:scale-95' : ''} shrink-0`}
       animate={pillControls}
     >
+      {/* Goal gradient: the pill fills left-to-right toward the pinned item, so
+          the balance reads as progress instead of a standalone number. Clipping
+          lives on this inner layer — the pill itself must not clip, or the "+"
+          affordance and the floating "+N" badge get cut off. */}
+      {wishlist && (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-0 overflow-hidden rounded-full"
+        >
+          <motion.span
+            className={`absolute inset-y-0 left-0 block ${
+              goalReached ? 'bg-emerald-500/20' : 'bg-primary/15'
+            }`}
+            initial={false}
+            animate={{ width: `${Math.round(goalRatio * 100)}%` }}
+            transition={{ duration: 0.6, ease: [0.32, 0.72, 0, 1] }}
+          />
+        </span>
+      )}
+
       <motion.div
         animate={flyControls}
-        className="flex items-center"
+        className="relative flex items-center"
       >
         {/* Static frame — a wallet icon doesn't earn a permanent 60fps render
             loop; the celebrate shimmy on the wrapper still sells the gain. */}
@@ -127,7 +164,7 @@ export function FlyCounter({
       <AnimatedNumber
         value={balance}
         haptics
-        className="text-xs font-black tabular-nums text-foreground"
+        className="relative text-xs font-black tabular-nums text-foreground"
       />
 
       {/* "+" affordance — perched on the top-right corner, half in/half out, to

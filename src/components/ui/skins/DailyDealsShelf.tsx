@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { ChevronRight, Clock, Sparkles } from 'lucide-react';
+import { ChevronRight, Clock, RefreshCw, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Icon } from '@/components/ui/Icon';
 import Fly from '@/components/ui/fly';
@@ -67,13 +67,19 @@ export function DailyDealsShelf({
   deals,
   catalog,
   isPremium,
+  rerollsLeft = 0,
+  rerolling = false,
   onBuy,
+  onReroll,
   onUpgrade,
 }: {
   deals: DailyDeal[];
   catalog: ItemDef[];
   isPremium: boolean;
+  rerollsLeft?: number;
+  rerolling?: boolean;
   onBuy: (item: ItemDef, dealPrice: number) => void;
+  onReroll: () => void;
   onUpgrade: () => void;
 }) {
   const countdown = useCountdown(deals[0]?.endsAt);
@@ -87,17 +93,50 @@ export function DailyDealsShelf({
 
   if (!entries.length) return null;
 
+  const canReroll = isPremium && rerollsLeft > 0 && !rerolling;
+
   return (
     <div className="mb-3">
       <div className="mb-2 flex items-center justify-between gap-2 px-1">
         <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">
           <Sparkles className="h-3.5 w-3.5 text-amber-500" />
           Daily deals
-          <Icon name="frogPlus" label="Plus deals" className="h-7 w-7" />
         </span>
-        <span className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-card px-2.5 py-1 text-[11px] font-black tabular-nums text-foreground shadow-sm">
-          <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-          {countdown}
+        <span className="inline-flex items-center gap-1.5">
+          {/* Plus perk: swap the whole shelf. Non-members see the same control
+              as the upgrade pitch, so the value is concrete rather than
+              abstract — it's the thing they just watched they can't do. */}
+          <button
+            type="button"
+            onClick={isPremium ? (canReroll ? onReroll : undefined) : onUpgrade}
+            disabled={isPremium && !canReroll}
+            className={cn(
+              'inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-black shadow-sm transition-colors',
+              isPremium && !canReroll
+                ? 'border-border/50 bg-muted/50 text-muted-foreground'
+                : 'border-amber-400/60 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-950/30 dark:text-amber-400',
+            )}
+          >
+            <RefreshCw
+              className={cn('h-3.5 w-3.5', rerolling && 'animate-spin')}
+            />
+            {isPremium ? (
+              rerollsLeft > 0 ? (
+                <span className="tabular-nums">{rerollsLeft} left</span>
+              ) : (
+                'No rerolls'
+              )
+            ) : (
+              <>
+                Reroll
+                <Icon name="frogPlus" label="Plus" className="h-5 w-5" />
+              </>
+            )}
+          </button>
+          <span className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-card px-2.5 py-1 text-[11px] font-black tabular-nums text-foreground shadow-sm">
+            <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+            {countdown}
+          </span>
         </span>
       </div>
 
@@ -108,9 +147,7 @@ export function DailyDealsShelf({
             <button
               key={item.id}
               type="button"
-              onClick={() =>
-                isPremium ? onBuy(item, deal.dealPrice) : onUpgrade()
-              }
+              onClick={() => onBuy(item, deal.dealPrice)}
               className={cn(
                 'relative flex w-[148px] shrink-0 flex-col items-stretch overflow-hidden rounded-xl border-2 bg-gradient-to-br p-2 text-left shadow-sm transition-transform active:scale-[0.97]',
                 config.border,
@@ -146,12 +183,9 @@ export function DailyDealsShelf({
                   {deal.dealPrice.toLocaleString()}
                 </span>
               </div>
-              {!isPremium && (
-                <span className="mt-0.5 inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-muted-foreground">
-                  <Icon name="frogPlus" label="" className="h-5 w-5" />
-                  with Plus
-                </span>
-              )}
+              <span className="mt-0.5 text-center text-[10px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                {deal.discountPercent}% off today
+              </span>
             </button>
           );
         })}

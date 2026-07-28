@@ -4,7 +4,12 @@ import connectMongo from '@/lib/mongoose';
 import UserModel, { type UserDoc } from '@/lib/models/User';
 import type { UserWardrobe } from '@/lib/types/UserDoc';
 import { getFullCatalog, buildById } from '@/lib/skins/getCatalog';
-import { getDailyDeals, isPremiumActive } from '@/lib/skins/dailyDeal';
+import {
+  getDailyDeals,
+  isPremiumActive,
+  rerollsUsed,
+} from '@/lib/skins/dailyDeal';
+import { getZonedToday } from '@/lib/utils';
 import { availabilityStateAt } from '@/lib/skins/availability';
 import { bumpQuestMetric } from '@/lib/quests/metrics';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
@@ -63,12 +68,16 @@ export async function POST(req: NextRequest) {
       return json({ ok: true });
     }
 
-    // Check balance
+    // Check balance. Daily deals apply to everyone — Plus buys rerolls of the
+    // shelf, not a cheaper price on it.
     let price = byId[itemId].priceFlies ?? 0;
-    const deal = getDailyDeals(fullCatalog, new Date(), timezone).find(
-      (d) => d.itemId === itemId,
-    );
-    if (deal && isPremiumActive(user.premiumUntil)) {
+    const deal = getDailyDeals(
+      fullCatalog,
+      new Date(),
+      timezone,
+      rerollsUsed(user.wardrobe?.dealReroll ?? undefined, getZonedToday(timezone)),
+    ).find((d) => d.itemId === itemId);
+    if (deal) {
       price = deal.dealPrice;
     }
 
@@ -103,6 +112,13 @@ export async function POST(req: NextRequest) {
 
     await bumpQuestMetric({ userId, metric: 'skin_acquired' });
 
+    if (user.wardrobe.wishlist?.itemId === itemId) {
+      await UserModel.updateOne(
+        { _id: user._id },
+        { $unset: { 'wardrobe.wishlist': '' } },
+      );
+    }
+
     await recordAnalyticsEvent({
       userId,
       name: 'skin_purchased',
@@ -110,7 +126,7 @@ export async function POST(req: NextRequest) {
         rarity: byId[itemId].rarity,
         slot: byId[itemId].slot,
         flies_spent: price,
-        discounted: !!deal && isPremiumActive(user.premiumUntil),
+        discounted: !!deal,
         is_premium: isPremiumActive(user.premiumUntil),
       },
     });

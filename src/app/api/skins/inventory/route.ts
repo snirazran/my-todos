@@ -5,11 +5,18 @@ import UserModel, { type UserDoc } from '@/lib/models/User';
 import { CATALOG, type ItemDef, type WardrobeSlot } from '@/lib/skins/catalog';
 import { getFullCatalog, buildById } from '@/lib/skins/getCatalog';
 import { isAvailableAt, filterAvailable } from '@/lib/skins/availability';
-import { getDailyDeals, isPremiumActive } from '@/lib/skins/dailyDeal';
+import {
+  DAILY_DEAL_REROLLS,
+  getDailyDeals,
+  isPremiumActive,
+  rerollsUsed,
+} from '@/lib/skins/dailyDeal';
+import { loadWishlistView } from '@/lib/skins/wishlistServer';
 import { notifyUserChanged } from '@/lib/taskSync';
 import { bumpQuestMetric } from '@/lib/quests/metrics';
 import type { UserWardrobe } from '@/lib/types/UserDoc';
 import { MAX_HUNGER_MS } from '@/lib/hungerLogic';
+import { getZonedToday } from '@/lib/utils';
 
 const json = (body: unknown, init = 200) =>
   NextResponse.json(body, { status: init });
@@ -134,6 +141,18 @@ export async function GET(req: NextRequest) {
           (id): id is string => typeof id === 'string' && id.length > 0,
         ),
       );
+      const today = getZonedToday(timezone);
+      const dealRerolls = rerollsUsed(wardrobe.dealReroll ?? undefined, today);
+      const dailyDeals = getDailyDeals(
+        fullCatalog,
+        new Date(),
+        timezone,
+        dealRerolls,
+      );
+      // The home shop rail renders straight off this summary, so the deal items
+      // ride along with the equipped ones — no second catalog request.
+      const summaryIds = new Set(equippedIds);
+      for (const deal of dailyDeals) summaryIds.add(deal.itemId);
 
       return json({
         wardrobe: {
@@ -143,9 +162,14 @@ export async function GET(req: NextRequest) {
           flies: wardrobe.flies ?? 0,
           hunger: wardrobe.hunger,
           lastHungerUpdate: wardrobe.lastHungerUpdate,
+          focusFlyDaily:
+            wardrobe.focusFlyDaily?.date === today
+              ? wardrobe.focusFlyDaily
+              : { date: today, focusSeconds: 0, earned: 0 },
         },
-        catalog: fullCatalog.filter((item) => equippedIds.has(item.id)),
-        dailyDeals: getDailyDeals(fullCatalog, new Date(), timezone),
+        wishlist: await loadWishlistView(wardrobe, fullCatalog),
+        catalog: fullCatalog.filter((item) => summaryIds.has(item.id)),
+        dailyDeals,
         unseenCount: unseenIds.filter((id) => !containerIds.has(id)).length,
         unseenContainerCount: unseenIds.filter((id) => containerIds.has(id))
           .length,
@@ -155,10 +179,14 @@ export async function GET(req: NextRequest) {
       .select('premiumUntil')
       .lean()) as { premiumUntil?: Date | null } | null;
     const now = new Date();
+    const dayKey = getZonedToday(timezone);
+    const usedRerolls = rerollsUsed(wardrobe.dealReroll ?? undefined, dayKey);
     return json({
       wardrobe,
+      wishlist: await loadWishlistView(wardrobe, fullCatalog),
       catalog: visibleCatalog(fullCatalog, wardrobe, now),
-      dailyDeals: getDailyDeals(fullCatalog, now, timezone),
+      dailyDeals: getDailyDeals(fullCatalog, now, timezone, usedRerolls),
+      dealRerollsLeft: DAILY_DEAL_REROLLS - usedRerolls,
       isPremium: isPremiumActive(premiumUser?.premiumUntil),
     });
   } catch {
@@ -173,6 +201,7 @@ export async function GET(req: NextRequest) {
         flies: 5, // Match intro scene
         unseenItems: [],
       },
+      wishlist: null,
       catalog: guestCatalog,
       dailyDeals: getDailyDeals([...guestCatalog], new Date(), timezone),
       isPremium: false,

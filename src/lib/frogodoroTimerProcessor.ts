@@ -7,7 +7,11 @@ import {
 import { sendTimerControlPush, sendTimerFinishedPush } from '@/lib/notifications/timer';
 import { buildLiveActivityData } from '@/lib/liveActivityData';
 import { scheduleFrogodoroTimerProcessing } from '@/lib/frogodoroDelayedTimer';
-import { timerHuntExtras, clearTimerAndFanOut } from '@/lib/frogodoroSync';
+import {
+  timerHuntExtras,
+  clearTimerAndFanOut,
+  priorFocusSecondsFor,
+} from '@/lib/frogodoroSync';
 import { iosAlarmFile } from '@/lib/timerSoundFiles';
 import { publishTimerEvent } from '@/lib/frogodoroEvents';
 import { syncQuestState } from '@/lib/quests/engine';
@@ -21,6 +25,7 @@ import { recordAnalyticsEvent } from '@/lib/analytics/server';
 import {
   DEEP_FOCUS_MIN_SECONDS,
   DEEP_FOCUS_BONUS_FLIES,
+  DEEP_FOCUS_DAILY_CAP,
 } from '@/lib/focusFlies';
 import TaskModel from '@/lib/models/Task';
 import { taskAnalyticsProperties } from '@/lib/analytics/engagement';
@@ -271,10 +276,42 @@ async function processOneDueTimer(
     timer.deepFocusBroken !== true &&
     next.completedDuration >= DEEP_FOCUS_MIN_SECONDS;
   if (deepFocusEarned) {
-    await UserModel.updateOne(
-      { _id: userId },
-      { $inc: { 'wardrobe.flies': DEEP_FOCUS_BONUS_FLIES } },
-    );
+    const deepDate = getZonedToday(timezone);
+    await UserModel.updateOne({ _id: userId }, [
+      {
+        $set: {
+          _deepPrev: {
+            $cond: [
+              { $eq: ['$wardrobe.deepFocusDaily.date', deepDate] },
+              { $ifNull: ['$wardrobe.deepFocusDaily.earned', 0] },
+              0,
+            ],
+          },
+        },
+      },
+      {
+        $set: {
+          _deepGained: {
+            $min: [
+              DEEP_FOCUS_BONUS_FLIES,
+              { $max: [0, { $subtract: [DEEP_FOCUS_DAILY_CAP, '$_deepPrev'] }] },
+            ],
+          },
+        },
+      },
+      {
+        $set: {
+          'wardrobe.deepFocusDaily': {
+            date: deepDate,
+            earned: { $add: ['$_deepPrev', '$_deepGained'] },
+          },
+          'wardrobe.flies': {
+            $add: [{ $ifNull: ['$wardrobe.flies', 0] }, '$_deepGained'],
+          },
+        },
+      },
+      { $unset: ['_deepPrev', '_deepGained'] },
+    ], { updatePipeline: true });
   }
 
   if (next.completedPhase === 'focus') {
@@ -294,6 +331,10 @@ async function processOneDueTimer(
   }
 
   const live = (user as any).liveActivity as LiveActivityRef | null | undefined;
+  const priorFocus = await priorFocusSecondsFor(userId, nextTimer, timezone).catch(
+    () => 0,
+  );
+
   if (live?.id && live.pushToken) {
     const breakEndsAt = nextTimer.endsAt ? new Date(nextTimer.endsAt).getTime() : 0;
     if (next.autoStartBreak && breakEndsAt > now.getTime()) {
@@ -308,7 +349,7 @@ async function processOneDueTimer(
           timeLeft: total,
           totalSeconds: total,
           taskName: '',
-          ...timerHuntExtras(nextTimer, now.getTime()),
+          ...timerHuntExtras(nextTimer, now.getTime(), priorFocus),
         },
         now.getTime(),
       );
@@ -323,7 +364,7 @@ async function processOneDueTimer(
       // (shows "Time's up" + a Done button) rather than ending it. The completed
       // phase drives the label/color; the Done action clears it later.
       const total = getPhaseDuration(next.completedPhase, nextTimer.settings);
-      const extras = timerHuntExtras(nextTimer, now.getTime());
+      const extras = timerHuntExtras(nextTimer, now.getTime(), priorFocus);
       const data = buildLiveActivityData(
         {
           active: true,
@@ -369,7 +410,7 @@ async function processOneDueTimer(
         timeLeft: nextTimer.timeLeft,
         taskName: '',
         rev: nextTimer.rev,
-        ...timerHuntExtras(nextTimer, now.getTime()),
+        ...timerHuntExtras(nextTimer, now.getTime(), priorFocus),
       });
     } else if (!suppressAlarm) {
       await sendTimerFinishedPush({

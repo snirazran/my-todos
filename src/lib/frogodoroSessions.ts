@@ -6,7 +6,7 @@ import {
 } from '@/lib/focusFlies';
 import { FLY_HUNGER_REWARD_MS, MAX_HUNGER_MS } from '@/lib/hungerLogic';
 
-// Credits flies for focused time: 1 fly per 5 focused minutes, capped per day.
+// Credits flies for focused time: 1 fly per 15 focused minutes, capped per day.
 // Runs as a single aggregation-pipeline update so concurrent flushes (live
 // ticks, pause saves, the completion processor) can never double-award.
 async function awardFocusFlies(

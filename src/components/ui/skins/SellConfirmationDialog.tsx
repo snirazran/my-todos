@@ -118,12 +118,15 @@ export function SellConfirmationDialog({
     <BaseSheet
       open={open && !!item}
       onOpenChange={(val) => !val && onClose()}
-      className="select-none sm:max-w-[400px]"
+      className="max-h-[92dvh] select-none sm:max-h-[88dvh] sm:max-w-[400px]"
       zIndex={1300}
       closeAriaLabel="Close"
     >
-      {() => (
-        <div className="flex flex-col px-5 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-3 sm:px-6 sm:pb-6 sm:pt-7">
+      {({ bindScroll }) => (
+        <div
+          ref={bindScroll}
+          className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-5 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-3 sm:px-6 sm:pb-6 sm:pt-7"
+        >
         <div className="flex flex-col items-center gap-1 text-center px-8">
           <h2 className="text-2xl font-black tracking-tight text-foreground">
             Sell Item?
@@ -230,7 +233,7 @@ export function SellConfirmationDialog({
           </div>
         </div>
 
-        <div className="flex flex-col gap-2">
+        <div className="flex shrink-0 flex-col gap-2">
            <Button
             size="lg"
             variant="destructive"

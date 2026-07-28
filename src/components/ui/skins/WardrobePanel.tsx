@@ -48,6 +48,8 @@ import { SellConfirmationDialog } from './SellConfirmationDialog';
 import { StreakFreezeShopCard } from '@/components/ui/streak/StreakFreezeShopCard';
 import { DailyDealsShelf, DailyDealsTeaser } from './DailyDealsShelf';
 import { SeenOnFriendsRow } from './SeenOnFriendsRow';
+import { LooksRow } from './LooksRow';
+import { WardrobeEmptyState } from './WardrobeEmptyState';
 import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
 import { WardrobeGridSkeleton } from '@/components/ui/Skeleton';
 import { DragScrollRow } from '@/components/ui/DragScrollRow';
@@ -250,9 +252,13 @@ export function WardrobePanel({
 
 export function WardrobePageContent({
   defaultTab = 'inventory',
+  focusItemId = null,
+  focusItemKind = 'item',
   onClose,
 }: {
   defaultTab?: 'inventory' | 'shop' | 'trade';
+  focusItemId?: string | null;
+  focusItemKind?: 'item' | 'background';
   onClose: () => void;
 }) {
   return (
@@ -260,6 +266,8 @@ export function WardrobePageContent({
       <WardrobeManagerContent
         open={true}
         defaultTab={defaultTab}
+        focusItemId={focusItemId}
+        focusItemKind={focusItemKind}
         embedded={true}
         onClose={onClose}
         isDesktop={true}
@@ -273,6 +281,8 @@ function WardrobeManagerContent({
   open,
   onClose,
   defaultTab,
+  focusItemId = null,
+  focusItemKind = 'item',
   embedded,
   isDesktop,
   isDragging,
@@ -282,6 +292,8 @@ function WardrobeManagerContent({
   open: boolean;
   onClose: () => void;
   defaultTab: 'inventory' | 'shop' | 'trade';
+  focusItemId?: string | null;
+  focusItemKind?: 'item' | 'background';
   embedded: boolean;
   isDesktop: boolean;
   isDragging: boolean;
@@ -512,6 +524,47 @@ function WardrobeManagerContent({
     mutate();
     mutateInventoryCaches();
     mutateBackgrounds();
+  };
+
+  const [rerolling, setRerolling] = useState(false);
+  const rerollDeals = async () => {
+    if (rerolling) return;
+    setRerolling(true);
+    hapticImpact();
+    try {
+      const res = await fetch('/api/skins/deals/reroll', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        }),
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setNotif({
+          msg: payload?.error ?? 'Could not reroll deals.',
+          type: 'error',
+        });
+        refreshInventory();
+        return;
+      }
+      mutate(
+        (curr) =>
+          curr
+            ? {
+                ...curr,
+                dailyDeals: payload.dailyDeals,
+                dealRerollsLeft: payload.rerollsLeft,
+              }
+            : curr,
+        { revalidate: false },
+      );
+      mutateInventoryCaches();
+    } catch {
+      setNotif({ msg: 'Could not reroll deals.', type: 'error' });
+    } finally {
+      setRerolling(false);
+    }
   };
 
   const scrollPageToTop = () => {
@@ -897,6 +950,7 @@ function WardrobeManagerContent({
         originalPrice:
           purchaseDealPrice != null ? (purchaseItem.priceFlies ?? 0) : undefined,
         slotLabel: SLOT_LABEL[purchaseItem.slot],
+        kind: 'item',
       }
     : purchaseBg
       ? {
@@ -905,6 +959,7 @@ function WardrobeManagerContent({
           rarity: purchaseBg.rarity,
           price: purchaseBg.priceFlies ?? 0,
           slotLabel: 'Background',
+          kind: 'background',
         }
       : null;
   const purchasePreview = purchaseItem ? (
@@ -940,12 +995,19 @@ function WardrobeManagerContent({
 
   const openItemPurchase = (item: ItemDef, dealPrice: number | null = null) => {
     hapticTick();
-    setPurchaseDealPrice(dealPrice);
+    // Deals apply everywhere, not just on the deals shelf — resolve today's
+    // price here so a card opened from the main grid quotes what the server
+    // will actually charge.
+    const resolved =
+      dealPrice ??
+      data?.dailyDeals?.find((d) => d.itemId === item.id)?.dealPrice ??
+      null;
+    setPurchaseDealPrice(resolved);
     setPurchaseCard({
       kind: 'item',
       id: item.id,
       rarity: item.rarity,
-      price: dealPrice ?? item.priceFlies ?? 0,
+      price: resolved ?? item.priceFlies ?? 0,
       item,
     });
   };
@@ -961,6 +1023,32 @@ function WardrobeManagerContent({
       bg: bgItem,
     });
   };
+
+  // Deep link (?item=…): open that item's purchase sheet once its catalog has
+  // loaded. Fires once per id so closing the sheet doesn't immediately reopen.
+  const focusHandledRef = React.useRef<string | null>(null);
+  useEffect(() => {
+    if (!focusItemId || focusHandledRef.current === focusItemId) return;
+    if (focusItemKind === 'background') {
+      const bgItem = bg.catalog.find((entry) => entry.id === focusItemId);
+      if (!bgItem) return;
+      focusHandledRef.current = focusItemId;
+      openBgPurchase(bgItem);
+      return;
+    }
+    const item = data?.catalog?.find((entry) => entry.id === focusItemId);
+    if (!item) return;
+    focusHandledRef.current = focusItemId;
+    const deal = data?.dailyDeals?.find((d) => d.itemId === focusItemId);
+    openItemPurchase(item, data?.isPremium && deal ? deal.dealPrice : null);
+  }, [
+    focusItemId,
+    focusItemKind,
+    data?.catalog,
+    data?.dailyDeals,
+    data?.isPremium,
+    bg.catalog,
+  ]);
 
   const renderInventoryCard = (card: WardrobeCard, index: number) =>
     card.kind === 'item' ? (
@@ -1387,7 +1475,10 @@ function WardrobeManagerContent({
           <div
             className={cn(
               embedded
-                ? 'relative flex-1 -mx-4 px-4 md:-mx-6 md:px-6 bg-background pt-5 pb-2 rounded-t-[24px] md:pt-3 md:rounded-t-none'
+                ? // No rounded top here: the filter-bar strip above is already
+                  // the sheet's rounded edge, and a second one reads as a notch
+                  // cut under the category chips on every tab.
+                  'relative flex-1 -mx-4 px-4 md:-mx-6 md:px-6 bg-background pt-5 pb-2 md:pt-3'
                 : 'relative mt-4 flex-1 overflow-hidden rounded-t-[24px] border-t border-border/40',
               embedded &&
                 activeTab === 'trade' &&
@@ -1443,14 +1534,34 @@ function WardrobeManagerContent({
               ) : activeTab === 'inventory' &&
                 inventoryItems.length === 0 &&
                 inventoryBackgrounds.length === 0 ? (
-                <div className="flex flex-col items-center justify-center min-h-[40vh] opacity-50">
-                  <div className="flex items-center justify-center w-16 h-16 mb-4 rounded-full md:w-24 md:h-24 bg-secondary">
-                    <Shirt className="w-8 h-8 md:w-10 md:h-10 text-muted-foreground" />
-                  </div>
-                  <p className="text-lg font-black text-muted-foreground">
-                    Empty
-                  </p>
-                </div>
+                <WardrobeEmptyState
+                  icon={<Shirt className="h-8 w-8" />}
+                  title={
+                    activeFilter === 'all'
+                      ? 'Nothing in here yet'
+                      : 'Nothing of this kind yet'
+                  }
+                  description="Your flies are worth something — go pick out a look."
+                  action={{
+                    label: 'Browse the shop',
+                    icon: <ShoppingBag className="h-4 w-4" />,
+                    onClick: () => {
+                      hapticTick();
+                      setActiveTab('shop');
+                      scrollPageToTop();
+                    },
+                  }}
+                  footer={
+                    <span className="inline-flex items-center gap-1.5 text-xs font-bold text-muted-foreground">
+                      You have
+                      <Fly size={22} paused y={-4} />
+                      <span className="tabular-nums">
+                        {balance.toLocaleString()}
+                      </span>
+                      to spend
+                    </span>
+                  }
+                />
               ) : activeTab === 'inventory' ? (
                 <>
                   {activeFilter === 'all' && !!data?.dailyDeals?.length && (
@@ -1575,6 +1686,15 @@ function WardrobeManagerContent({
                     );
                     return (
                       <>
+                        {activeFilter === 'all' && (
+                          <LooksRow
+                            enabled={!isGuest}
+                            equipped={data?.wardrobe?.equipped}
+                            equippedBackgroundId={bg.equipped}
+                            onNotify={setNotif}
+                            onUpgrade={() => setPlusOpen(true)}
+                          />
+                        )}
                         {rowSection(
                           'worn',
                           'Currently wearing',
@@ -1649,9 +1769,12 @@ function WardrobeManagerContent({
                       deals={data.dailyDeals}
                       catalog={data?.catalog ?? []}
                       isPremium={!!data.isPremium}
+                      rerollsLeft={data.dealRerollsLeft ?? 0}
+                      rerolling={rerolling}
                       onBuy={(item, dealPrice) =>
                         openItemPurchase(item, dealPrice)
                       }
+                      onReroll={rerollDeals}
                       onUpgrade={() => setPlusOpen(true)}
                     />
                   )}
@@ -1768,6 +1891,10 @@ function WardrobeManagerContent({
                   paused={isDragging}
                   pageScroll={embedded}
                   isPremium={!!data.isPremium}
+                  onGoToShop={() => {
+                    setActiveTab('shop');
+                    scrollPageToTop();
+                  }}
                 />
               ) : null}
             </TabsContent>

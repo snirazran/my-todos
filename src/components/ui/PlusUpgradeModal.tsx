@@ -8,6 +8,7 @@ import { Capacitor } from '@capacitor/core';
 import { Icon } from '@/components/ui/Icon';
 import { AppImage } from '@/components/ui/AppImage';
 import { BadgePercent, Check, Heart, Sparkle, Unlock, X } from 'lucide-react';
+import { SAVED_LOOKS_PLUS } from '@/lib/skins/looks';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import Frog from '@/components/ui/frog';
 import { PremiumFrogAura } from '@/components/ui/PremiumFrogAura';
@@ -535,8 +536,8 @@ function Step0({
         <Reveal delay={0.24}>
           <FeatureRow
             icon={<BadgePercent className="h-5 w-5 text-amber-300" />}
-            title="Daily Plus-only discounts"
-            subtitle="Fresh discounts in the shop, daily."
+            title="Reroll the daily deals"
+            subtitle="Don't like today's shelf? Swap it for a fresh one, twice a day."
           />
         </Reveal>
         <Reveal delay={0.3}>
@@ -600,7 +601,8 @@ const COMPARISON_ROWS: { label: string; free: boolean }[] = [
   { label: 'Golden fly companion', free: false },
   { label: 'Weekly streak rescue', free: false },
   { label: 'Free trade rerolls', free: false },
-  { label: 'Daily outfit deals', free: false },
+  { label: 'Reroll the daily deals', free: false },
+  { label: `${SAVED_LOOKS_PLUS} saved looks`, free: false },
   { label: 'Season Plus rewards', free: false },
 ];
 
@@ -661,7 +663,13 @@ function Step1({ onContinue }: { onContinue: () => void }) {
         </div>
       </Reveal>
 
-      <Reveal delay={0.3} className="mt-auto pt-8">
+      {/* Pinned to the bottom of the scroll area — the comparison list grows as
+          Plus gains perks, and the CTA must never scroll out of reach.
+          -mx-6/px-6 lets the fade span the full panel width. */}
+      <Reveal
+        delay={0.3}
+        className="sticky bottom-0 z-10 -mx-6 mt-auto bg-gradient-to-t from-[#6c6fce] via-[#6c6fce] to-transparent px-6 pb-[max(0.25rem,env(safe-area-inset-bottom))] pt-8"
+      >
         <PrimaryButton onClick={onContinue}>Try 7 days free!</PrimaryButton>
       </Reveal>
     </div>

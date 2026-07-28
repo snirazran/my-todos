@@ -11,6 +11,8 @@ import {
   ChevronDown,
   Dices,
   Play,
+  Repeat,
+  ShoppingBag,
 } from 'lucide-react';
 import { hapticTick, hapticImpact, hapticCelebrate } from '@/lib/haptics';
 import {
@@ -115,6 +117,8 @@ import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { BackgroundCard } from './BackgroundCard';
 import { backgroundPreview } from '@/hooks/useBackgroundActions';
+import { DEFAULT_BACKGROUND_ID } from '@/lib/backgrounds/constants';
+import { WardrobeEmptyState } from './WardrobeEmptyState';
 import type { BackgroundItem } from '@/hooks/useBackgrounds';
 
 
@@ -140,6 +144,7 @@ type TradePanelProps = {
   paused?: boolean;
   pageScroll?: boolean;
   isPremium?: boolean;
+  onGoToShop?: () => void;
 };
 
 export function TradePanel({
@@ -154,6 +159,7 @@ export function TradePanel({
   paused = false,
   pageScroll = false,
   isPremium = false,
+  onGoToShop,
 }: TradePanelProps) {
   // --- State ---
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -201,6 +207,9 @@ export function TradePanel({
       const owned = backgroundInventory[bgItem.id] ?? 0;
       if (owned <= 0) return;
       if (bgItem.rarity === 'legendary') return;
+      // Granted to everyone, so there's nothing to spend — the server rejects
+      // it too.
+      if (bgItem.id === DEFAULT_BACKGROUND_ID) return;
       const uid = `background:${bgItem.id}`;
       map.set(uid, {
         uid,
@@ -213,6 +222,10 @@ export function TradePanel({
     });
     return map;
   }, [catalog, inventory, backgrounds, backgroundInventory]);
+
+  // Unfiltered, so the empty state can tell "a filter is hiding them" apart
+  // from "you own none".
+  const hasAnySpares = entryMap.size > 0;
 
   const targetRarity = useMemo(() => {
     if (selectedIds.length === 0) return null;
@@ -788,13 +801,6 @@ export function TradePanel({
             : 'lg:min-h-0 lg:overflow-y-auto lg:overscroll-none',
         )}
       >
-        {!availableItems.length && (
-          <div className="flex items-center justify-end px-4 py-3 lg:px-6 lg:py-4 shrink-0">
-            <span className="text-xs text-muted-foreground/60">
-              No tradeable items found
-            </span>
-          </div>
-        )}
 
         <div
           className={cn(
@@ -804,9 +810,27 @@ export function TradePanel({
           )}
         >
           {availableItems.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-40 md:h-64 text-sm border-2 border-dashed text-muted-foreground border-border rounded-xl bg-muted/30">
-              <p>Your wardrobe is empty (or filtered out).</p>
-            </div>
+            // Two different causes, two different answers: a filter is hiding
+            // the spares, or there are no spares to begin with. Saying
+            // "empty (or filtered out)" made the player guess which.
+            <WardrobeEmptyState
+              icon={<Repeat className="h-8 w-8" strokeWidth={2.25} />}
+              title={hasAnySpares ? 'Nothing in this filter' : 'No spares yet'}
+              description={
+                hasAnySpares
+                  ? undefined
+                  : `Collect ${TRADE_ITEM_COUNT} of one rarity to trade up.`
+              }
+              action={
+                hasAnySpares || !onGoToShop
+                  ? undefined
+                  : {
+                      label: 'Browse the shop',
+                      icon: <ShoppingBag className="h-4 w-4" />,
+                      onClick: onGoToShop,
+                    }
+              }
+            />
           ) : (
             <>
               {(() => {

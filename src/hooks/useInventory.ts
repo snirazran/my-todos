@@ -2,6 +2,8 @@ import { useMemo } from 'react';
 import useSWR, { mutate as mutateGlobal } from 'swr';
 import type { ItemDef, WardrobeSlot } from '@/lib/skins/catalog';
 import type { DailyDeal } from '@/lib/skins/dailyDeal';
+import type { WishlistView } from '@/lib/skins/wishlist';
+import type { FocusFlyDaily } from '@/lib/types/UserDoc';
 import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
 import { markFlyEarn } from '@/lib/flyEarn';
 
@@ -52,13 +54,22 @@ type ApiData = {
     unseenItems?: string[];
     inventoryHistory?: Record<string, string>;
     flies: number;
+    focusFlyDaily?: FocusFlyDaily;
   };
   catalog: ItemDef[];
+  wishlist?: WishlistView | null;
   unseenCount?: number;
   unseenContainerCount?: number;
   dailyDeals?: DailyDeal[];
+  dealRerollsLeft?: number;
   isPremium?: boolean;
 };
+
+export function patchInventoryWishlist(wishlist: WishlistView | null) {
+  const patch = (curr: any) => (curr ? { ...curr, wishlist } : curr);
+  mutateGlobal(INVENTORY_KEY, patch, { revalidate: false });
+  mutateGlobal(INVENTORY_SUMMARY_KEY, patch, { revalidate: false });
+}
 
 const fetcher = bootstrapFetcher;
 

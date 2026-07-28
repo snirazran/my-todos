@@ -121,7 +121,7 @@ export function MarketingFocusPreview() {
         </div>
 
         <p className="mx-auto mt-3 max-w-sm text-center text-[11px] font-bold leading-5 text-muted-foreground">
-          1 fly every 5 focused minutes · time saved to this task
+          1 fly every 15 focused minutes · time saved to this task
         </p>
       </div>
     </div>

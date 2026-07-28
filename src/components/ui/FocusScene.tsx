@@ -26,7 +26,7 @@ export function entrySideFor(drift: (typeof FOCUS_DRIFTS)[number]): number {
  * flies drift around the card. The swarm grows with focused minutes. The frog
  * hunts with its real tongue: on a loose rhythm it lunges, aims just past a
  * fly, and comes back empty — the miss. Only when `caught` increments (one
- * per 5 focused minutes, mirroring the fly the server credited) does the
+ * per 15 focused minutes, mirroring the fly the server credited) does the
  * tongue actually land: fly snatched, love emote, "+1" pop.
  */
 export function FocusScene({

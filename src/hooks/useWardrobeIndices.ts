@@ -5,6 +5,7 @@ import useSWR from 'swr';
 import { byId as staticById } from '@/lib/skins/catalog';
 import type { ItemDef } from '@/lib/skins/catalog';
 import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
+import { useTryOnStore } from '@/lib/tryOnStore';
 
 const CACHE_KEY = 'frog-wardrobe-indices';
 
@@ -24,6 +25,7 @@ function getCachedIndices(): Indices | null {
 }
 
 export function useWardrobeIndices(enabled: boolean) {
+  const tryOn = useTryOnStore((s) => s.offer);
   const { data } = useSWR<{
     wardrobe?: { equipped?: Partial<Record<keyof Indices, string | null>> };
     catalog?: ItemDef[];
@@ -60,7 +62,9 @@ export function useWardrobeIndices(enabled: boolean) {
       }
     : getCachedIndices() ?? { skin: 0, hat: 0, body: 0, hand_item: 0 };
 
-  // Persist to localStorage when fresh data arrives
+  // Persist to localStorage when fresh data arrives. The try-on overlay is
+  // deliberately applied AFTER this — a previewed item the user does not own
+  // must never be cached as their look.
   useEffect(() => {
     if (loaded) {
       try {
@@ -69,8 +73,15 @@ export function useWardrobeIndices(enabled: boolean) {
     }
   }, [loaded, indices.skin, indices.hat, indices.body, indices.hand_item]);
 
+  const displayIndices: Indices =
+    tryOn && tryOn.slot !== 'container'
+      ? { ...indices, [tryOn.slot]: tryOn.riveIndex }
+      : indices;
+
   return {
-    indices,
+    indices: displayIndices,
+    ownedIndices: indices,
+    tryOn,
     wardrobeData: data,
   };
 }

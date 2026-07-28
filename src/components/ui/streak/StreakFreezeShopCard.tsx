@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Snowflake } from 'lucide-react';
 import Fly from '@/components/ui/fly';
+import { DragScrollRow } from '@/components/ui/DragScrollRow';
 import { useLoginStreak, patchStreakView } from '@/hooks/useLoginStreak';
 import { patchInventoryFlies, useInventory } from '@/hooks/useInventory';
 import { FreezePurchaseSheet } from './FreezePurchaseSheet';
@@ -24,26 +25,27 @@ export function StreakFreezeShopCard() {
       <p className="mb-2 px-1 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">
         Boosts
       </p>
-      <button
-        type="button"
-        onClick={() => setBuyOpen(true)}
-        className="flex w-full items-center gap-3 rounded-[20px] border border-sky-300/50 bg-gradient-to-r from-sky-50 to-sky-100 p-3.5 text-left transition-all hover:-translate-y-0.5 active:scale-[0.99] dark:from-sky-500/10 dark:to-sky-500/20 md:p-4"
-      >
-        <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-sky-500/15">
-          <Snowflake className="h-7 w-7 text-sky-500" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-black text-foreground">Streak Freeze</p>
-          <p className="truncate text-xs font-medium text-muted-foreground">
-            Protects your daily streak for one missed day · {view.freezes}/
-            {view.freezeCap} held
-          </p>
-        </div>
-        <span className="flex h-9 shrink-0 items-center justify-center gap-1 rounded-xl px-3 text-xs font-black bg-sky-500 text-white shadow-[0_3px_0_0_#0369a1]">
-          <Fly size={16} paused y={-1} />
-          {view.freezePriceFlies}
-        </span>
-      </button>
+      <DragScrollRow>
+        <button
+          type="button"
+          onClick={() => setBuyOpen(true)}
+          className="relative flex w-[148px] shrink-0 flex-col items-stretch overflow-hidden rounded-xl border-2 border-sky-300/60 bg-gradient-to-br from-sky-50 to-sky-100 p-2 text-left shadow-sm transition-transform active:scale-[0.97] dark:from-sky-500/10 dark:to-sky-500/20"
+        >
+          <span className="flex h-24 items-center justify-center rounded-lg bg-background/50">
+            <Snowflake className="h-11 w-11 text-sky-500" />
+          </span>
+          <span className="mt-1.5 truncate text-center text-xs font-black text-foreground">
+            Streak Freeze
+          </span>
+          <span className="truncate text-center text-[10px] font-bold text-muted-foreground">
+            {view.freezes}/{view.freezeCap} held
+          </span>
+          <span className="mt-1 inline-flex items-center justify-center gap-1 text-sm font-black tabular-nums text-foreground">
+            <Fly size={26} paused y={-2} />
+            {view.freezePriceFlies.toLocaleString()}
+          </span>
+        </button>
+      </DragScrollRow>
 
       <FreezePurchaseSheet
         open={buyOpen}

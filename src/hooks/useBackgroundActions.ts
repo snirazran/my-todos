@@ -14,6 +14,7 @@ import {
   mutateInventoryCaches,
 } from '@/hooks/useInventory';
 import { markFlyEarn } from '@/lib/flyEarn';
+import { DEFAULT_BACKGROUND_ID } from '@/lib/backgrounds/constants';
 
 type Notif = { msg: string; type: 'success' | 'error' };
 
@@ -74,10 +75,16 @@ export function useBackgroundActions({
     mode: 'inventory' | 'shop',
     sortBy: BackgroundSortOrder,
   ) => {
+    // The default background is granted to everyone as the baseline scene, not
+    // as something they collected — it doesn't belong in the wardrobe grid or
+    // the shop.
+    const collectible = catalog.filter(
+      (b) => b.id !== DEFAULT_BACKGROUND_ID,
+    );
     const list =
       mode === 'inventory'
-        ? catalog.filter((b) => (inventory[b.id] ?? 0) > 0)
-        : catalog;
+        ? collectible.filter((b) => (inventory[b.id] ?? 0) > 0)
+        : collectible;
     return [...list].sort((a, b) => {
       switch (sortBy) {
         case 'rarity_asc':

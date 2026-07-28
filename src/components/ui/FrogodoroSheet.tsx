@@ -44,7 +44,12 @@ import { FocusCelebration, questHomeKey } from '@/components/ui/FocusCelebration
 import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
 import type { Trackable } from '@/lib/questClaims';
 import { FocusScene } from '@/components/ui/FocusScene';
-import { fliesCaughtFor, deepFocusPledgeLive } from '@/lib/focusFlies';
+import {
+  fliesCaughtFor,
+  deepFocusPledgeLive,
+  priorDayFocusSeconds,
+} from '@/lib/focusFlies';
+import { useInventory } from '@/hooks/useInventory';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
 import { requestFrogStamp } from '@/lib/frogStampEngine';
 import Frog from '@/components/ui/frog';
@@ -334,6 +339,8 @@ export default function FrogodoroSheet({
     })),
   );
   const { indices: frogIndices } = useWardrobeIndices(open);
+  const { data: inventorySummary } = useInventory(open, true);
+  const focusFlyDaily = inventorySummary?.wardrobe?.focusFlyDaily;
 
   const { data: pondData } = useSWR<{
     today: string;
@@ -865,20 +872,25 @@ export default function FrogodoroSheet({
     celebrateFocus && deepFocus && !lastPhasePaused && lastFocusElapsed >= 15 * 60;
 
   // Focused seconds this session (same store-derived formula the home hero
-  // uses, so every surface shows the same swarm/caught count). 1 fly per 5
+  // uses, so every surface shows the same swarm/caught count). 1 fly per 15
   // focused minutes — drives the live catch animation and the caught chip.
   // Number-returning selectors: the parent only re-renders when a count
-  // actually changes (every 5 focused minutes), not on every tick.
-  const fliesCaught = useFrogodoroStore((s) =>
-    fliesCaughtFor(sessionFocusLiveSeconds(s)),
-  );
+  // actually changes (every 15 focused minutes), not on every tick.
+  const fliesCaught = useFrogodoroStore((s) => {
+    const sessionFocus = sessionFocusLiveSeconds(s);
+    return fliesCaughtFor(
+      sessionFocus,
+      priorDayFocusSeconds(focusFlyDaily, sessionFocus),
+    );
+  });
   // What this session can reach if it runs to the end — the visible goal.
-  const fliesPotential = useFrogodoroStore((s) =>
-    fliesCaughtFor(
-      sessionFocusLiveSeconds(s) +
-        (s.phase === 'focus' ? Math.max(0, s.timeLeft) : 0),
-    ),
-  );
+  const fliesPotential = useFrogodoroStore((s) => {
+    const sessionFocus = sessionFocusLiveSeconds(s);
+    return fliesCaughtFor(
+      sessionFocus + (s.phase === 'focus' ? Math.max(0, s.timeLeft) : 0),
+      priorDayFocusSeconds(focusFlyDaily, sessionFocus),
+    );
+  });
 
   if (!mounted) return null;
 
@@ -1544,7 +1556,7 @@ export default function FrogodoroSheet({
                         {/* The frog perches on the START/PAUSE button from the
                             moment the sheet opens; when a focus session starts
                             the flies slide in from the sides, the frog lunges
-                            and misses, and truly catches one per 5 focused
+                            and misses, and truly catches one per 15 focused
                             minutes. */}
                         {!awaitingDone && (
                           <div className="relative z-30">

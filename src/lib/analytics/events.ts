@@ -72,6 +72,19 @@ export const ANALYTICS_EVENTS = [
   'fly_pack_purchase_completed',
   'fly_pack_purchase_cancelled',
   'fly_pack_purchase_failed',
+  'wishlist_pinned',
+  'wishlist_cleared',
+  'wishlist_reached',
+  'home_shop_rail_viewed',
+  'home_shop_rail_tapped',
+  'tryon_shown',
+  'tryon_kept',
+  'tryon_dismissed',
+  'look_reaction_sent',
+  'look_reaction_seen',
+  'daily_deals_rerolled',
+  'look_saved',
+  'look_applied',
 ] as const;
 
 export type AnalyticsEventName = (typeof ANALYTICS_EVENTS)[number];
@@ -154,6 +167,19 @@ const EVENT_CATEGORIES: Record<AnalyticsEventName, string> = {
   fly_pack_purchase_completed: 'monetization',
   fly_pack_purchase_cancelled: 'monetization',
   fly_pack_purchase_failed: 'monetization',
+  wishlist_pinned: 'economy',
+  wishlist_cleared: 'economy',
+  wishlist_reached: 'economy',
+  home_shop_rail_viewed: 'economy',
+  home_shop_rail_tapped: 'economy',
+  tryon_shown: 'economy',
+  tryon_kept: 'economy',
+  tryon_dismissed: 'economy',
+  look_reaction_sent: 'social',
+  look_reaction_seen: 'social',
+  daily_deals_rerolled: 'economy',
+  look_saved: 'economy',
+  look_applied: 'economy',
 };
 
 export function analyticsCategory(name: AnalyticsEventName) {

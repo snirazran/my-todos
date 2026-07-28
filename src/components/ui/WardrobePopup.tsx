@@ -3,14 +3,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronRight, Clock } from 'lucide-react';
+import { Clock, Repeat, Shirt, ShoppingBag } from 'lucide-react';
 import { useCountdown } from '@/components/ui/skins/DailyDealsShelf';
-import { Icon } from '@/components/ui/Icon';
+import Fly from '@/components/ui/fly';
+import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
 import { useAuth } from '@/components/auth/AuthContext';
 import { useInventory } from '@/hooks/useInventory';
+import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
 import { byId as staticById, TRADE_ITEM_COUNT } from '@/lib/skins/catalog';
 import { hapticTick } from '@/lib/haptics';
+import { cn } from '@/lib/utils';
 
 export type WardrobeTab = 'inventory' | 'shop' | 'trade';
 
@@ -24,21 +27,23 @@ export function useWardrobeBadges() {
   const flyBalance = data?.wardrobe?.flies;
   const dealEndsAt = data?.dailyDeals?.[0]?.endsAt ?? null;
 
-  const tradeSpares = useMemo(() => {
+  const { tradeSpares, ownedCount } = useMemo(() => {
     const inv = data?.wardrobe?.inventory ?? {};
     const catalogById: Record<string, { slot?: string }> = {};
     for (const item of data?.catalog ?? []) catalogById[item.id] = item;
     let spares = 0;
+    let owned = 0;
     for (const [id, count] of Object.entries(inv)) {
-      if ((count ?? 0) <= 1) continue;
+      if ((count ?? 0) <= 0) continue;
       const def = catalogById[id] ?? staticById[id];
       if (def?.slot === 'container') continue;
-      spares += count - 1;
+      owned += 1;
+      if ((count ?? 0) > 1) spares += count - 1;
     }
-    return spares;
+    return { tradeSpares: spares, ownedCount: owned };
   }, [data]);
 
-  return { inventoryBadge, flyBalance, tradeSpares, dealEndsAt };
+  return { inventoryBadge, flyBalance, tradeSpares, ownedCount, dealEndsAt };
 }
 
 const SHEET_ENTER = {
@@ -52,6 +57,68 @@ const SHEET_EXIT = {
   ease: [0.4, 0, 1, 1] as [number, number, number, number],
 };
 
+/**
+ * One card shape for all three destinations — they're peers, and the old
+ * wide-row-plus-two-tiles layout implied a hierarchy that doesn't exist.
+ * Colour is reserved for live state (a running deal, spares ready to trade),
+ * so it reads as information rather than decoration.
+ */
+function DestinationCard({
+  icon,
+  label,
+  detail,
+  detailTone = 'muted',
+  detailIcon,
+  badge = 0,
+  badgeTone = 'rose',
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  detail: string;
+  detailTone?: 'muted' | 'amber';
+  detailIcon?: React.ReactNode;
+  badge?: number;
+  badgeTone?: 'rose' | 'amber';
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="relative flex flex-col items-center gap-2 overflow-hidden rounded-2xl border border-border/50 bg-card px-1.5 pb-2.5 pt-3.5 shadow-sm transition-transform active:scale-[0.97]"
+    >
+      {badge > 0 && (
+        <span
+          className={cn(
+            'absolute right-1.5 top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-black text-white shadow-sm',
+            badgeTone === 'rose' ? 'bg-rose-500' : 'bg-amber-500',
+          )}
+        >
+          {badge > 9 ? '9+' : badge}
+        </span>
+      )}
+      <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+        {icon}
+      </span>
+      <span className="w-full truncate text-center text-[13px] font-black leading-none text-foreground">
+        {label}
+      </span>
+      <span
+        className={cn(
+          'flex w-full items-center justify-center gap-0.5 truncate text-[10px] font-bold leading-none tabular-nums',
+          detailTone === 'amber'
+            ? 'text-amber-600 dark:text-amber-400'
+            : 'text-muted-foreground',
+        )}
+      >
+        {detailIcon}
+        {detail}
+      </span>
+    </button>
+  );
+}
+
 export function WardrobePopup({
   open,
   onClose,
@@ -63,7 +130,9 @@ export function WardrobePopup({
 }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
-  const { inventoryBadge, flyBalance, tradeSpares, dealEndsAt } =
+  const { user } = useAuth();
+  const { indices } = useWardrobeIndices(!!user);
+  const { inventoryBadge, flyBalance, tradeSpares, ownedCount, dealEndsAt } =
     useWardrobeBadges();
   const dealCountdown = useCountdown(
     open && dealEndsAt ? dealEndsAt : undefined,
@@ -105,106 +174,76 @@ export function WardrobePopup({
             className="fixed left-0 right-0 z-[99] md:hidden"
             style={{ bottom: 'calc(4rem + env(safe-area-inset-bottom))' }}
           >
-            <div className="rounded-t-[28px] border-t border-border/60 bg-background pb-5 shadow-[0_-12px_40px_rgba(0,0,0,0.35)]">
-              <div className="flex justify-center pb-1 pt-3">
+            <div className="rounded-t-[28px] border-t border-border/60 bg-background pb-4 shadow-[0_-12px_40px_rgba(0,0,0,0.35)]">
+              <div className="flex justify-center pb-2 pt-3">
                 <div className="h-1 w-10 rounded-full bg-border" />
               </div>
-              <div className="relative px-5 pb-3 pt-1 text-center">
-                <p className="text-[10px] font-black uppercase leading-none tracking-widest text-muted-foreground">
-                  Dress your frog
-                </p>
-                <h2 className="mt-1 text-xl font-black leading-none text-foreground">
-                  Wardrobe
-                </h2>
+
+              {/* Your actual frog leads — this is the one thing that makes it
+                  this app's wardrobe rather than a generic action sheet. */}
+              <div className="flex items-center gap-3 px-5 pb-4">
+                <div className="flex h-12 w-12 shrink-0 items-end justify-center overflow-hidden rounded-2xl bg-primary/10">
+                  <span className="shrink-0">
+                    <FrogSnapshot
+                      indices={indices}
+                      width={60}
+                      height={60}
+                      visualOffsetY={0}
+                    />
+                  </span>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] font-black uppercase leading-none tracking-[0.18em] text-muted-foreground">
+                    Dress your frog
+                  </p>
+                  <h2 className="mt-1 text-xl font-black leading-none text-foreground">
+                    Wardrobe
+                  </h2>
+                </div>
                 {typeof flyBalance === 'number' && (
-                  <div className="absolute right-4 top-1 flex items-center gap-1.5 rounded-full border border-border/60 bg-card px-2.5 py-1 shadow-sm">
-                    <img src="/fly.svg" alt="" className="h-4 w-4" />
-                    <span className="text-[12px] font-black tabular-nums text-foreground">
+                  <div className="flex shrink-0 items-center gap-1 rounded-full border border-border/60 bg-card py-1 pl-1.5 pr-2.5 shadow-sm">
+                    <Fly size={24} paused y={-4} />
+                    <span className="text-[13px] font-black tabular-nums text-foreground">
                       {flyBalance.toLocaleString()}
                     </span>
                   </div>
                 )}
               </div>
 
-              <div className="space-y-3 px-4">
-                <button
-                  type="button"
+              {/* Three peers, one shape. Icons match the tabs they open, so the
+                  glyph you tap is the glyph you land on. */}
+              <div className="grid grid-cols-3 gap-2.5 px-4">
+                <DestinationCard
+                  icon={<Shirt className="h-6 w-6" strokeWidth={2.25} />}
+                  label="Inventory"
+                  detail={ownedCount > 0 ? `${ownedCount} owned` : 'Empty'}
+                  badge={inventoryBadge}
+                  badgeTone="rose"
                   onClick={() => pick('inventory')}
-                  className="relative flex w-full items-center gap-3.5 rounded-2xl border border-border/50 bg-card p-3.5 text-left shadow-sm transition-transform active:scale-[0.98]"
-                >
-                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary/10">
-                    <Icon
-                      name="wardrobe"
-                      label="Inventory"
-                      className="h-9 w-9"
-                    />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[15px] font-black leading-tight text-foreground">
-                      Inventory
-                    </p>
-                    <p className="mt-0.5 text-xs font-semibold leading-snug text-muted-foreground">
-                      Outfits, backgrounds & gifts you own
-                    </p>
-                  </div>
-                  {inventoryBadge > 0 && (
-                    <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[11px] font-black text-white shadow-sm">
-                      {inventoryBadge > 9 ? '9+' : inventoryBadge}
-                    </span>
-                  )}
-                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/60" />
-                </button>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => pick('shop')}
-                    className="relative flex flex-col items-center gap-2 rounded-2xl border border-border/50 bg-card p-4 shadow-sm transition-transform active:scale-[0.97]"
-                  >
-                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-500/10 p-2.5">
-                      <img src="/fly.svg" alt="" className="h-8 w-8" />
-                    </div>
-                    <div className="text-center">
-                      <p className="text-sm font-black leading-tight text-foreground">
-                        Shop
-                      </p>
-                      {dealCountdown ? (
-                        <p className="mt-0.5 flex items-center justify-center gap-1 text-[11px] font-black text-amber-600 dark:text-amber-400">
-                          <Clock className="h-3 w-3" />
-                          Deal ends
-                          <span className="tabular-nums">{dealCountdown}</span>
-                        </p>
-                      ) : (
-                        <p className="mt-0.5 text-[11px] font-semibold text-muted-foreground">
-                          Fresh looks daily
-                        </p>
-                      )}
-                    </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => pick('trade')}
-                    className="relative flex flex-col items-center gap-2 rounded-2xl border border-border/50 bg-card p-4 shadow-sm transition-transform active:scale-[0.97]"
-                  >
-                    {tradeReady && (
-                      <span className="absolute -right-1.5 -top-1.5 flex h-6 min-w-6 items-center justify-center rounded-full border-2 border-background bg-amber-500 px-1.5 text-[11px] font-black text-white shadow-sm">
-                        {tradeSpares > 9 ? '9+' : tradeSpares}
-                      </span>
-                    )}
-                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500/10 p-2">
-                      <Icon name="repeat" label="Trade" className="h-8 w-8" />
-                    </div>
-                    <div className="text-center">
-                      <p className="text-sm font-black leading-tight text-foreground">
-                        Trade
-                      </p>
-                      <p className="mt-0.5 text-[11px] font-semibold text-muted-foreground">
-                        {TRADE_ITEM_COUNT} spares → upgrade
-                      </p>
-                    </div>
-                  </button>
-                </div>
+                />
+                <DestinationCard
+                  icon={<ShoppingBag className="h-6 w-6" strokeWidth={2.25} />}
+                  label="Shop"
+                  detail={dealCountdown || 'New daily'}
+                  detailTone={dealCountdown ? 'amber' : 'muted'}
+                  detailIcon={
+                    dealCountdown ? <Clock className="h-3 w-3" /> : null
+                  }
+                  onClick={() => pick('shop')}
+                />
+                <DestinationCard
+                  icon={<Repeat className="h-6 w-6" strokeWidth={2.25} />}
+                  label="Trade"
+                  detail={
+                    tradeReady
+                      ? `${tradeSpares} ready`
+                      : `${TRADE_ITEM_COUNT} to swap`
+                  }
+                  detailTone={tradeReady ? 'amber' : 'muted'}
+                  badge={tradeReady ? tradeSpares : 0}
+                  badgeTone="amber"
+                  onClick={() => pick('trade')}
+                />
               </div>
             </div>
           </motion.div>

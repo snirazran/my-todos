@@ -8,7 +8,12 @@ import { useFrogTongue, TONGUE_STROKE } from '@/hooks/useFrogTongue';
 import { DriftFly, FOCUS_DRIFTS } from '@/components/ui/FocusFlyLayer';
 import { entrySideFor } from '@/components/ui/FocusScene';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
-import { fliesCaughtFor, sceneFlyCount } from '@/lib/focusFlies';
+import {
+  fliesCaughtFor,
+  sceneFlyCount,
+  priorDayFocusSeconds,
+} from '@/lib/focusFlies';
+import { useInventory } from '@/hooks/useInventory';
 
 export const HOME_FOCUS_FLY_PREFIX = 'home-focus-fly-';
 const MISS_KEY = 'home-focus-miss';
@@ -92,6 +97,9 @@ export function HomeFocusFlies({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ownGrabActive, usingOwnTongue]);
 
+  const { data: inventorySummary } = useInventory(timerActive, true);
+  const focusFlyDaily = inventorySummary?.wardrobe?.focusFlyDaily;
+
   const sessionOnFocus = timerActive && phase === 'focus';
   const running = sessionOnFocus && isRunning;
   const phaseFull = Math.max(1, Math.round(settings.focusDuration * 60));
@@ -99,7 +107,10 @@ export function HomeFocusFlies({
   const focusLive =
     sessionStats.focusTime +
     (phase === 'focus' ? Math.max(0, liveElapsed - phaseElapsed) : 0);
-  const caught = fliesCaughtFor(focusLive);
+  const caught = fliesCaughtFor(
+    focusLive,
+    priorDayFocusSeconds(focusFlyDaily, focusLive),
+  );
   const flyCount = sceneFlyCount(phaseFull);
   const suppressed = hidden || sheetOpen;
 

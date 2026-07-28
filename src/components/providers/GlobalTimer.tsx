@@ -21,7 +21,7 @@ import { getCurrentLiveActivityState } from '@/lib/liveTimer';
 import { notifyQuestClaims } from '@/lib/questClaims';
 import { useNotification } from '@/components/providers/NotificationProvider';
 import { useAuth } from '@/components/auth/AuthContext';
-import { fliesCaughtFor } from '@/lib/focusFlies';
+import { fliesCaughtFor, priorDayFocusSeconds } from '@/lib/focusFlies';
 import { hapticCelebrate, hapticImpact } from '@/lib/haptics';
 import { markFlyEarn } from '@/lib/flyEarn';
 import {
@@ -74,7 +74,7 @@ export function GlobalTimer() {
 
   const { showNotification } = useNotification();
 
-  // Focus-fly economy, app-wide: each 5-minute catch optimistically bumps the
+  // Focus-fly economy, app-wide: each catch optimistically bumps the
   // wallet (the counter animates like a task-grab gain on whatever page shows
   // it) and opens the earn window; the server credit lands on the next
   // progress flush and the delayed revalidations reconcile to truth.
@@ -84,19 +84,23 @@ export function GlobalTimer() {
   );
   const walletFliesRef = useRef<number | undefined>(undefined);
   walletFliesRef.current = inventorySummary?.wardrobe?.flies;
+  const focusFlyDaily = inventorySummary?.wardrobe?.focusFlyDaily;
   // Selected as the derived count, not the raw seconds, so the per-second tick
   // doesn't re-render this provider — it only wakes when a fly is actually caught.
-  const fliesCaughtLive = useFrogodoroStore((s) =>
-    fliesCaughtFor(
+  const fliesCaughtLive = useFrogodoroStore((s) => {
+    const sessionFocus =
       s.sessionStats.focusTime +
-        (s.phase === 'focus' && s.timerActive
-          ? Math.max(
-              0,
-              getPhaseDuration('focus', s.settings) - s.timeLeft - s.phaseElapsed,
-            )
-          : 0),
-    ),
-  );
+      (s.phase === 'focus' && s.timerActive
+        ? Math.max(
+            0,
+            getPhaseDuration('focus', s.settings) - s.timeLeft - s.phaseElapsed,
+          )
+        : 0);
+    return fliesCaughtFor(
+      sessionFocus,
+      priorDayFocusSeconds(focusFlyDaily, sessionFocus),
+    );
+  });
   const prevCaughtRef = useRef(fliesCaughtLive);
   useEffect(() => {
     if (fliesCaughtLive > prevCaughtRef.current && timerActive) {

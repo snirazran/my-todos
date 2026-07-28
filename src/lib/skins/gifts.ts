@@ -2,6 +2,7 @@ import CatalogItemModel from '@/lib/models/CatalogItem';
 import GiftDropConfigModel from '@/lib/models/GiftDropConfig';
 import BackgroundModel from '@/lib/models/Background';
 import connectMongo from '@/lib/mongoose';
+import { DEFAULT_BACKGROUND_ID } from '@/lib/backgrounds/constants';
 import { CATALOG, type ItemDef } from './catalog';
 import { filterAvailable, isAvailableAt } from './availability';
 import { getFullCatalog } from './getCatalog';
@@ -103,7 +104,13 @@ function itemToDef(item: {
 }
 
 export async function loadBackgroundPrizes(): Promise<GiftPrize[]> {
-  const bgs = await BackgroundModel.find({ hidden: { $ne: true } }).lean();
+  // The default scene is granted to everyone, so it must never be a prize —
+  // winning something you already own by definition is a dud drop. This also
+  // keeps it out of trade-up rewards, which draw from the same pool.
+  const bgs = await BackgroundModel.find({
+    hidden: { $ne: true },
+    id: { $ne: DEFAULT_BACKGROUND_ID },
+  }).lean();
   return bgs.map((bg) => ({
     id: bg.id,
     name: bg.name,

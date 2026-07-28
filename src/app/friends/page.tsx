@@ -50,6 +50,7 @@ import {
 } from '@/hooks/useInventory';
 import { markFlyEarn } from '@/lib/flyEarn';
 import { FlyCounter } from '@/components/ui/FlyCounter';
+import { LookNoticeCard, ReactButton } from '@/components/ui/LookReactions';
 import { MobileHeaderActions } from '@/components/ui/MobileHeaderActions';
 import { MobileMenuCluster } from '@/components/ui/siteHeader';
 import { FlyCatchSwipeLauncher } from '@/components/ui/FlyCatchSwipeLauncher';
@@ -205,6 +206,7 @@ export default function FriendsPage() {
                 balance={flyBalance}
                 variant="mobile"
                 onClick={openFlyShop}
+                showGoal
               />
             </div>
           )}
@@ -332,6 +334,8 @@ export default function FriendsPage() {
                 <span className="hidden min-[360px]:inline">Add</span>
               </button>
             </div>
+
+            {!!user && <LookNoticeCard />}
 
             <div
               className="w-full overflow-hidden rounded-[18px] border border-border/50 bg-card/40 p-1.5 shadow-sm"
@@ -725,7 +729,7 @@ function LeaderboardRow({
       : null;
 
   return (
-    <li>
+    <li className="relative">
       <button
         type="button"
         onClick={() => {
@@ -863,6 +867,12 @@ function LeaderboardRow({
           <ChevronRight className="hidden h-5 w-5 text-muted-foreground/60 min-[380px]:block" />
         </div>
       </button>
+      {!entry.isYou && (
+        <ReactButton
+          toUserId={entry.userId}
+          className="absolute bottom-1 left-1 z-20"
+        />
+      )}
     </li>
   );
 }

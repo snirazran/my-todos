@@ -3,7 +3,12 @@
 import { useEffect, useState } from 'react';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import { reconcileLiveTimer } from '@/lib/liveTimer';
-import { fliesCaughtFor, deepFocusPledgeLive } from '@/lib/focusFlies';
+import {
+  fliesCaughtFor,
+  deepFocusPledgeLive,
+  priorDayFocusSeconds,
+} from '@/lib/focusFlies';
+import { useInventory } from '@/hooks/useInventory';
 
 export function LiveTimerController() {
   const [foregroundTick, setForegroundTick] = useState(0);
@@ -20,6 +25,8 @@ export function LiveTimerController() {
   const phaseElapsed = useFrogodoroStore((s) => s.phaseElapsed);
   const deepFocus = useFrogodoroStore((s) => s.deepFocus);
   const pausedThisPhase = useFrogodoroStore((s) => s.pausedThisPhase);
+  const { data: inventorySummary } = useInventory(timerActive, true);
+  const focusFlyDaily = inventorySummary?.wardrobe?.focusFlyDaily;
 
   // While the alarm is ringing (awaitingDone) keep the activity alive in its
   // finished state — show the phase that just ended, not the queued next one.
@@ -57,10 +64,14 @@ export function LiveTimerController() {
     (phase === 'focus' && !awaitingDone
       ? Math.max(0, liveElapsed - phaseElapsed)
       : 0);
-  const fliesCaught = fliesCaughtFor(sessionFocusLive);
+  const priorFocus = priorDayFocusSeconds(focusFlyDaily, sessionFocusLive);
+  const fliesCaught = fliesCaughtFor(sessionFocusLive, priorFocus);
   const fliesPotential =
     displayPhase === 'focus'
-      ? fliesCaughtFor(sessionFocusLive + (awaitingDone ? 0 : Math.max(0, timeLeft)))
+      ? fliesCaughtFor(
+          sessionFocusLive + (awaitingDone ? 0 : Math.max(0, timeLeft)),
+          priorFocus,
+        )
       : fliesCaught;
   const pledgeLive = deepFocusPledgeLive({
     deepFocus,

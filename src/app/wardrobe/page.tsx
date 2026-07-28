@@ -31,6 +31,9 @@ function WardrobePageInner() {
   const wardrobeTab = useUIStore((s) => s.wardrobeTab);
   const defaultTab =
     (searchParams.get('tab') as 'inventory' | 'shop' | 'trade') || 'inventory';
+  const focusItemId = searchParams.get('item') || null;
+  const focusItemKind =
+    searchParams.get('kind') === 'background' ? 'background' : 'item';
 
   const equippedBgImage = useMemo(() => {
     const equippedId = bgData?.equipped;
@@ -114,6 +117,8 @@ function WardrobePageInner() {
         <section data-fly-sheet className="relative z-10 flex flex-col flex-1 px-4 -mx-4 md:-mx-6 md:px-6">
           <WardrobePageContent
             defaultTab={defaultTab}
+            focusItemId={focusItemId}
+            focusItemKind={focusItemKind}
             onClose={() => router.push('/')}
           />
         </section>

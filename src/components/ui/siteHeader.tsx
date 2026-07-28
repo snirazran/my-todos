@@ -161,6 +161,7 @@ export default function SiteHeader() {
               balance={flyBalance}
               variant="mobile"
               onClick={openFlyShop}
+              showGoal
             />
           </MobileHeaderActions>
         )}
@@ -350,6 +351,7 @@ export default function SiteHeader() {
                 balance={flyBalance}
                 variant="desktop"
                 onClick={openFlyShop}
+                showGoal
               />
             </>
           )}

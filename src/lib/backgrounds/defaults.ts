@@ -1,15 +1,11 @@
 import BackgroundModel from '@/lib/models/Background';
+import {
+  DEFAULT_BACKGROUND_ID,
+  DEFAULT_BACKGROUND_IMAGES,
+  DEFAULT_BACKGROUND_NAME,
+} from './constants';
 
-export const DEFAULT_BACKGROUND_ID = 'bg_default';
-
-export const DEFAULT_BACKGROUND_NAME = 'Swamp';
-
-const DEFAULT_BACKGROUND_IMAGES = {
-  mobile: '/bg-mobile.webp',
-  tablet: '/bg-tablet.webp',
-  web: '/bg-web.webp',
-  webLarge: '/bg-web-large.webp',
-};
+export { DEFAULT_BACKGROUND_ID, DEFAULT_BACKGROUND_NAME };
 
 export async function ensureDefaultBackground() {
   const existing = await BackgroundModel.findOne({ id: DEFAULT_BACKGROUND_ID });

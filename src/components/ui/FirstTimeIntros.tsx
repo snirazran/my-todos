@@ -248,7 +248,7 @@ export function FrogodoroIntroSheet({
       icon: <Fly size={30} interactive={false} alwaysPlay oversample={1.5} />,
       text: (
         <>
-          Your frog hunts while you work — <b>1 fly caught every 5 focused
+          Your frog hunts while you work — <b>1 fly caught every 15 focused
           minutes</b>
         </>
       ),

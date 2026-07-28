@@ -9,11 +9,17 @@ import {
 } from '@/lib/notifications/liveActivity';
 import { buildLiveActivityData } from '@/lib/liveActivityData';
 import { sendTimerControlPush } from '@/lib/notifications/timer';
-import { fliesCaughtFor, deepFocusPledgeLive } from '@/lib/focusFlies';
+import {
+  fliesCaughtFor,
+  deepFocusPledgeLive,
+  priorDayFocusSeconds,
+} from '@/lib/focusFlies';
+import { getZonedToday } from '@/lib/utils';
 import type {
   ActiveFrogodoroTimer,
   LiveActivityRef,
   NotificationPrefs,
+  FocusFlyDaily,
 } from '@/lib/types/UserDoc';
 
 export function phaseTotalSeconds(timer: ActiveFrogodoroTimer): number {
@@ -31,6 +37,7 @@ export function phaseTotalSeconds(timer: ActiveFrogodoroTimer): number {
 export function timerHuntExtras(
   timer: ActiveFrogodoroTimer,
   now = Date.now(),
+  priorFocusSeconds = 0,
 ): {
   fliesCaught: number;
   fliesPotential: number;
@@ -47,10 +54,11 @@ export function timerHuntExtras(
   const sessionFocus =
     (timer.sessionStats?.focusTime ?? 0) +
     (timer.phase === 'focus' ? Math.max(0, phaseElapsed - flushed) : 0);
-  const fliesCaught = fliesCaughtFor(sessionFocus);
+  const prior = Math.max(0, priorFocusSeconds);
+  const fliesCaught = fliesCaughtFor(sessionFocus, prior);
   const fliesPotential =
     timer.phase === 'focus'
-      ? fliesCaughtFor(sessionFocus + remaining)
+      ? fliesCaughtFor(sessionFocus + remaining, prior)
       : fliesCaught;
   return {
     fliesCaught,
@@ -63,6 +71,22 @@ export function timerHuntExtras(
     }),
     sound: timer.settings.timerSound ?? '',
   };
+}
+
+// Focused seconds banked earlier today, outside the running session — the
+// baseline the native hunt chip counts up from, so it stops promising flies
+// once the daily cap is reached.
+export async function priorFocusSecondsFor(
+  userId: string,
+  timer: ActiveFrogodoroTimer,
+  timezone: string,
+): Promise<number> {
+  const doc = (await UserModel.findById(userId)
+    .select('wardrobe.focusFlyDaily')
+    .lean()) as { wardrobe?: { focusFlyDaily?: FocusFlyDaily } } | null;
+  const daily = doc?.wardrobe?.focusFlyDaily;
+  if (!daily || daily.date !== getZonedToday(timezone)) return 0;
+  return priorDayFocusSeconds(daily, timer.sessionStats?.focusTime ?? 0);
 }
 
 function tokenLabel(token: string | null | undefined): string {
@@ -142,6 +166,11 @@ export async function fanOutTimerState(
   const clearStartToken = () =>
     UserModel.updateOne({ _id: userId }, { $set: { liveActivityStartToken: null } });
   const livePushConfigured = isLiveActivityPushConfigured();
+  const priorFocus = await priorFocusSecondsFor(
+    userId,
+    timer,
+    prefs?.timezone || 'UTC',
+  ).catch(() => 0);
 
   console.log(
     `Frogodoro fan-out: status=${timer.status} phase=${timer.phase} finished=${timer.finished === true} live=${live?.id ? 'yes' : 'no'} liveToken=${tokenLabel(live?.pushToken)} startToken=${tokenLabel(startToken)} apns=${livePushConfigured ? 'yes' : 'no'}`,
@@ -166,7 +195,7 @@ export async function fanOutTimerState(
       timeLeft: finished ? 0 : timer.timeLeft,
       totalSeconds: phaseTotalSeconds(timer),
       taskName: '',
-      ...timerHuntExtras(timer),
+      ...timerHuntExtras(timer, Date.now(), priorFocus),
     });
 
     if (live?.id && live.pushToken) {
@@ -232,7 +261,7 @@ export async function fanOutTimerState(
         timeLeft: timer.timeLeft,
         taskName: '',
         rev: timer.rev,
-        ...timerHuntExtras(timer),
+        ...timerHuntExtras(timer, Date.now(), priorFocus),
       }),
     );
   }

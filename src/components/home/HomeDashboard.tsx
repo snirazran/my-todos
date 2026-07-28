@@ -79,6 +79,8 @@ import { FlyCatchSwipeLauncher } from '@/components/ui/FlyCatchSwipeLauncher';
 import { NextQuestStrip } from '@/components/ui/NextQuestStrip';
 import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
 import { BuddyNudgeCard } from '@/components/ui/BuddyNudgeCard';
+import { HomeShopRail } from '@/components/home/HomeShopRail';
+import { TryOnPill } from '@/components/ui/TryOnPill';
 import type {
   FocusCategoryTagMap,
   MacroCategoryDefinition,
@@ -633,6 +635,7 @@ export default function HomeDashboard() {
             balance={flyBalance}
             variant="mobile"
             onClick={openFlyShop}
+            showGoal={!!user}
           />
         </MobileHeaderActions>
       )}
@@ -693,6 +696,12 @@ export default function HomeDashboard() {
             />
             </div>
           </FlyCatchSwipeLauncher>
+
+          {user && !isAnyPanelOpen && !cinematic && !taskCinematic && (
+            <div className="pointer-events-none relative z-30 -mt-1 flex justify-center">
+              <TryOnPill />
+            </div>
+          )}
 
           <div
             data-fly-sheet
@@ -928,6 +937,7 @@ export default function HomeDashboard() {
                   quickAddOpen={showQuickAdd}
                   paused={isAnyPanelOpen}
                 />
+                <HomeShopRail />
                 <BuddyNudgeCard />
               </div>
             </div>

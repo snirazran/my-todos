@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { MoreVertical, X, UserMinus, Users, Check, Loader2, Clock } from 'lucide-react';
 import useSWR from 'swr';
 import Frog, { type FrogHandle } from '@/components/ui/frog';
+import { LookReactionRow } from '@/components/ui/LookReactions';
 import { FriendFocusScene } from '@/components/ui/FriendFocusScene';
 import { hapticImpact } from '@/lib/haptics';
 import Fly from '@/components/ui/fly';
@@ -352,6 +353,8 @@ export function FriendDetailModal({
                     )}
                 </div>
 
+                <LookReactionRow toUserId={entry.userId} />
+
                 {/* Live focus presence — indicator only for now */}
                 {entry.focusing && (
                   <div className="flex items-center justify-center gap-2 rounded-2xl bg-primary/10 px-4 py-3">
@@ -623,13 +626,16 @@ function ItemPeekSheet({
       onOpenChange={(v) => {
         if (!v) onClose();
       }}
-      className="select-none sm:max-w-[400px]"
+      className="max-h-[92dvh] select-none sm:max-h-[88dvh] sm:max-w-[400px]"
       zIndex={1600}
       closeAriaLabel="Close item details"
     >
-      {() =>
+      {({ bindScroll }) =>
         target ? (
-          <div className="flex flex-col px-5 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-3 sm:px-6 sm:pb-6 sm:pt-7">
+          <div
+            ref={bindScroll}
+            className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-5 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-3 sm:px-6 sm:pb-6 sm:pt-7"
+          >
             <div className="flex items-center gap-2 pr-12">
               <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                 {target.kind === 'bg' ? 'Background' : 'Wardrobe item'}
@@ -638,7 +644,7 @@ function ItemPeekSheet({
 
             <div
               className={cn(
-                'relative mx-auto mt-4 flex aspect-square w-full max-w-[260px] items-end justify-center overflow-hidden rounded-[28px] border-2 bg-gradient-to-br',
+                'relative mx-auto mt-4 flex aspect-square w-[min(260px,28dvh)] shrink-0 items-end justify-center overflow-hidden rounded-[28px] border-2 bg-gradient-to-br',
                 config.border,
                 config.gradient,
               )}
@@ -715,7 +721,11 @@ function ItemPeekSheet({
                 {shortfall === 0 ? (
                   <button
                     type="button"
-                    onClick={() => router.push('/wardrobe?tab=shop')}
+                    onClick={() =>
+                      router.push(
+                        `/wardrobe?tab=shop&item=${encodeURIComponent(target.id)}&kind=${target.kind === 'bg' ? 'background' : 'item'}`,
+                      )
+                    }
                     className="mt-3.5 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#4f9149] text-base font-black tracking-tight text-white shadow-[0_4px_0_#34631f] transition-all hover:bg-[#457f40] active:translate-y-0.5 active:shadow-none"
                   >
                     Get it in your shop

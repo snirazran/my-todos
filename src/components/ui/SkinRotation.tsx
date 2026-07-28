@@ -3,11 +3,21 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, ChevronRight, Shuffle, X } from 'lucide-react';
+import {
+  Bookmark,
+  BookmarkCheck,
+  Check,
+  ChevronRight,
+  Lock,
+  LockOpen,
+  Shuffle,
+  X,
+} from 'lucide-react';
 import useSWR from 'swr';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/auth/AuthContext';
 import { cn } from '@/lib/utils';
-import { hapticImpact } from '@/lib/haptics';
+import { hapticImpact, hapticTick } from '@/lib/haptics';
 import { Icon } from '@/components/ui/Icon';
 import {
   beginEquipMutation,
@@ -15,6 +25,11 @@ import {
   mutateInventoryCaches,
 } from '@/hooks/useInventory';
 import { mutateBackgrounds } from '@/hooks/useBackgrounds';
+import { useLooks } from '@/hooks/useLooks';
+import { useTryOnStore, type TryOnOffer } from '@/lib/tryOnStore';
+import { useUIStore } from '@/lib/uiStore';
+import { useSheetStore } from '@/lib/sheetStore';
+import { trackAnalyticsEvent } from '@/lib/analytics/client';
 import {
   ROTATION_INTERVAL_MS,
   isRotationInterval,
@@ -26,44 +41,64 @@ const LEGACY_STORAGE_KEY = 'skinRotationInterval';
 
 export type { RotationInterval };
 
+export type ShuffleSlot = 'skin' | 'hat' | 'body' | 'hand_item';
+
+const SLOT_LABELS: { slot: ShuffleSlot; label: string }[] = [
+  { slot: 'skin', label: 'Skin' },
+  { slot: 'hat', label: 'Hat' },
+  { slot: 'body', label: 'Body' },
+  { slot: 'hand_item', label: 'Held' },
+];
+
+// Minute-scale rotation is deliberately gone: at that speed the outfit stops
+// being a choice the player made and becomes wallpaper, which is exactly what
+// stops people visiting the wardrobe at all.
 const OPTIONS: {
   value: RotationInterval;
   label: string;
   hint: string;
 }[] = [
-  { value: '1m', label: 'Every minute', hint: 'Blink and it changes' },
-  { value: '5m', label: 'Every 5 minutes', hint: 'Party mode' },
-  { value: '10m', label: 'Every 10 minutes', hint: 'Keep it lively' },
   { value: '1h', label: 'Every hour', hint: 'A surprise each session' },
   { value: '1d', label: 'Every day', hint: 'Fresh fit every morning' },
   { value: 'disabled', label: 'Off', hint: 'Keep your current look' },
 ];
 
+type ShuffleState = {
+  interval: RotationInterval;
+  lockedSlots?: ShuffleSlot[];
+  eligible?: boolean;
+  shuffleableSlots?: ShuffleSlot[];
+  ownedCount?: number;
+};
+
 const shuffleFetcher = async (url: string) => {
   const res = await fetch(url);
   if (!res.ok) throw new Error('Failed to load shuffle setting');
-  return (await res.json()) as { interval: RotationInterval };
+  return (await res.json()) as ShuffleState;
 };
 
 export function useShuffleInterval() {
   const { user } = useAuth();
   const { data, mutate } = useSWR(user ? SHUFFLE_API : null, shuffleFetcher);
 
-  const setValue = useCallback(
-    async (interval: RotationInterval) => {
+  const patch = useCallback(
+    async (body: Partial<Pick<ShuffleState, 'interval' | 'lockedSlots'>>) => {
       try {
         await mutate(
-          async () => {
+          async (curr) => {
             const res = await fetch(SHUFFLE_API, {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ interval }),
+              body: JSON.stringify(body),
             });
             if (!res.ok) throw new Error('Failed to save shuffle setting');
-            return { interval };
+            return { ...(curr ?? { interval: 'disabled' }), ...body };
           },
           {
-            optimisticData: { interval },
+            optimisticData: (curr?: ShuffleState) => ({
+              ...(curr ?? { interval: 'disabled' as RotationInterval }),
+              ...body,
+            }),
             rollbackOnError: true,
             revalidate: false,
           },
@@ -76,13 +111,38 @@ export function useShuffleInterval() {
     [mutate],
   );
 
-  const value: RotationInterval =
-    data && isRotationInterval(data.interval) ? data.interval : 'disabled';
-  return { value, setValue };
+  const setValue = useCallback(
+    (interval: RotationInterval) => patch({ interval }),
+    [patch],
+  );
+  const setLockedSlots = useCallback(
+    (lockedSlots: ShuffleSlot[]) => patch({ lockedSlots }),
+    [patch],
+  );
+
+  const value = normalizeInterval(data?.interval);
+  return {
+    value,
+    setValue,
+    setLockedSlots,
+    lockedSlots: data?.lockedSlots ?? [],
+    eligible: data?.eligible ?? false,
+    shuffleableSlots: data?.shuffleableSlots ?? [],
+    ownedCount: data?.ownedCount ?? 0,
+    loaded: !!data,
+    refresh: mutate,
+  };
+}
+
+/** Accounts saved under the retired minute-scale options land on hourly. */
+function normalizeInterval(raw: unknown): RotationInterval {
+  if (!isRotationInterval(raw)) return 'disabled';
+  if (raw === '1m' || raw === '5m' || raw === '10m') return '1h';
+  return raw;
 }
 
 export function labelForInterval(v: RotationInterval): string {
-  return OPTIONS.find((o) => o.value === v)?.label ?? 'Disabled';
+  return OPTIONS.find((o) => o.value === normalizeInterval(v))?.label ?? 'Off';
 }
 
 export function SkinRotationRow() {
@@ -128,18 +188,64 @@ export function SkinRotationDialog({
   onClose: () => void;
   onSelect: (value: RotationInterval) => void;
 }) {
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [shuffling, setShuffling] = useState(false);
+  const [savedLook, setSavedLook] = useState(false);
+  const [lookError, setLookError] = useState<string | null>(null);
+  const {
+    save: saveLook,
+    isFull: looksFull,
+    busy: savingLook,
+  } = useLooks(open);
+  const {
+    eligible,
+    shuffleableSlots,
+    lockedSlots,
+    setLockedSlots,
+    ownedCount,
+    loaded,
+    refresh,
+  } = useShuffleInterval();
   useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    if (open) void refresh();
+  }, [open, refresh]);
   if (!mounted) return null;
 
+  const locked = new Set(lockedSlots);
+  const toggleLock = (slot: ShuffleSlot) => {
+    hapticTick();
+    const next = new Set(locked);
+    if (next.has(slot)) next.delete(slot);
+    else next.add(slot);
+    void setLockedSlots(Array.from(next));
+  };
+
+  // Every shuffleable slot pinned means the button can't do anything either.
+  const allLocked =
+    shuffleableSlots.length > 0 &&
+    shuffleableSlots.every((slot) => locked.has(slot));
+  const canShuffle = eligible && !allLocked;
+
   const shuffleNow = async () => {
-    if (shuffling) return;
+    if (shuffling || !canShuffle) return;
     setShuffling(true);
+    setSavedLook(false);
+    setLookError(null);
     hapticImpact();
     await rotateOnce();
+    void refresh();
     setShuffling(false);
+    // Close so the result is actually visible — the dialog sits over the frog.
     onClose();
+  };
+
+  const handleSaveLook = async () => {
+    setLookError(null);
+    const result = await saveLook();
+    if (result.ok) setSavedLook(true);
+    else if (result.error) setLookError(result.error);
   };
 
   return createPortal(
@@ -169,27 +275,120 @@ export function SkinRotationDialog({
               >
                 <X className="h-4 w-4" />
               </button>
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-fuchsia-500 to-violet-500 shadow-lg shadow-fuchsia-500/30">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#4f9149] shadow-lg shadow-[#4f9149]/25">
                 <Shuffle className="h-7 w-7 text-white" />
               </div>
               <h3 className="mt-3 text-center text-xl font-black tracking-tight text-foreground">
                 Style Shuffle
               </h3>
               <p className="mx-auto mt-1 max-w-[290px] text-center text-xs font-medium text-muted-foreground">
-                Let your frog surprise you — a fresh outfit and background from
-                your own wardrobe, automatically.
+                Let your frog surprise you — a fresh outfit pulled from your own
+                wardrobe.
               </p>
-              <button
-                type="button"
-                onClick={shuffleNow}
-                disabled={shuffling}
-                className="mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-fuchsia-500 to-violet-500 text-sm font-black uppercase tracking-wide text-white shadow-md shadow-fuchsia-500/25 transition-transform active:scale-[0.98] disabled:opacity-60"
-              >
-                <Shuffle
-                  className={cn('h-4 w-4', shuffling && 'animate-spin')}
-                />
-                {shuffling ? 'Shuffling…' : 'Shuffle now'}
-              </button>
+
+              {loaded && !eligible ? (
+                // Nothing owned that isn't already on: shuffling would be a
+                // no-op, so point at the shop instead of a dead button.
+                <div className="mt-4 rounded-2xl border border-dashed border-border/70 bg-muted/40 p-4 text-center">
+                  <p className="text-sm font-black text-foreground">
+                    {ownedCount > 0
+                      ? 'Only one outfit so far'
+                      : 'Your wardrobe is empty'}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      router.push('/wardrobe?tab=shop');
+                    }}
+                    className="mt-3 inline-flex h-10 items-center justify-center rounded-xl bg-[#4f9149] px-4 text-xs font-black uppercase tracking-wide text-white shadow-[0_3px_0_0_#34631f] transition-transform active:translate-y-0.5 active:shadow-none"
+                  >
+                    Browse the shop
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="mt-4 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={shuffleNow}
+                      disabled={shuffling || !canShuffle}
+                      className="flex h-11 flex-1 items-center justify-center gap-2 rounded-2xl bg-[#4f9149] text-sm font-black uppercase tracking-wide text-white shadow-[0_4px_0_0_#34631f] transition-all active:translate-y-0.5 active:shadow-none disabled:opacity-50 disabled:shadow-none"
+                    >
+                      <Shuffle
+                        className={cn('h-4 w-4', shuffling && 'animate-spin')}
+                      />
+                      {shuffling ? 'Shuffling…' : 'Shuffle now'}
+                    </button>
+                    {/* The whole point of saving: a shuffle that lands well is
+                        otherwise lost the next time the timer fires. */}
+                    <button
+                      type="button"
+                      onClick={handleSaveLook}
+                      disabled={savingLook || looksFull}
+                      title={
+                        looksFull
+                          ? 'All look slots are full'
+                          : 'Keep this outfit'
+                      }
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border-2 border-border/60 text-muted-foreground transition-colors hover:border-[#4f9149] hover:text-[#4f9149] disabled:opacity-40"
+                      aria-label="Save this look"
+                    >
+                      {savedLook ? (
+                        <BookmarkCheck className="h-5 w-5 text-[#4f9149]" />
+                      ) : (
+                        <Bookmark className="h-5 w-5" />
+                      )}
+                    </button>
+                  </div>
+                  {lookError && (
+                    <p className="mt-2 px-1 text-[11px] font-bold text-amber-600 dark:text-amber-400">
+                      {lookError}
+                    </p>
+                  )}
+
+                  {/* Lock what you like, shuffle the rest — the difference
+                      between a slot machine and a styling tool. */}
+                  <p className="mb-2 mt-5 px-1 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">
+                    Keep these
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {SLOT_LABELS.map(({ slot, label }) => {
+                      const isLocked = locked.has(slot);
+                      const usable = shuffleableSlots.includes(slot);
+                      return (
+                        <button
+                          key={slot}
+                          type="button"
+                          disabled={!usable}
+                          onClick={() => toggleLock(slot)}
+                          className={cn(
+                            'inline-flex items-center gap-1.5 rounded-xl border-2 px-3 py-2 text-xs font-black transition-all active:scale-[0.97]',
+                            !usable
+                              ? 'border-border/30 text-muted-foreground/40'
+                              : isLocked
+                                ? 'border-[#4f9149] bg-[#4f9149]/10 text-[#4f9149]'
+                                : 'border-border/40 text-muted-foreground hover:border-border',
+                          )}
+                        >
+                          {isLocked ? (
+                            <Lock className="h-3.5 w-3.5" />
+                          ) : (
+                            <LockOpen className="h-3.5 w-3.5" />
+                          )}
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {allLocked && (
+                    <p className="mt-2 px-1 text-[11px] font-bold text-amber-600 dark:text-amber-400">
+                      Everything is locked — unlock a piece to shuffle.
+                    </p>
+                  )}
+                </>
+              )}
+
               <p className="mb-2 mt-5 px-1 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">
                 Auto-shuffle
               </p>
@@ -204,7 +403,7 @@ export function SkinRotationDialog({
                       className={cn(
                         'flex w-full items-center gap-3 rounded-2xl border-2 px-4 py-2.5 text-left transition-all active:scale-[0.98]',
                         isSelected
-                          ? 'border-fuchsia-400 bg-fuchsia-50 dark:bg-fuchsia-950/30'
+                          ? 'border-[#4f9149] bg-[#4f9149]/10'
                           : 'border-border/40 bg-card hover:border-border',
                       )}
                     >
@@ -224,7 +423,7 @@ export function SkinRotationDialog({
                         </span>
                       </span>
                       {isSelected && (
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-fuchsia-400 text-white">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#4f9149] text-white">
                           <Check className="h-3.5 w-3.5 stroke-[3]" />
                         </span>
                       )}
@@ -251,7 +450,10 @@ async function rotateOnce(auto = false) {
       body: JSON.stringify({ auto }),
     });
     if (!res.ok) return;
-    const data = (await res.json()) as { shuffled?: boolean };
+    const data = (await res.json()) as {
+      shuffled?: boolean;
+      tryOn?: TryOnOffer | null;
+    };
     if (!data.shuffled) return;
 
     mutateInventoryCaches();
@@ -259,6 +461,23 @@ async function rotateOnce(auto = false) {
     window.dispatchEvent(new Event('wardrobe-refresh'));
     window.dispatchEvent(new Event('background-refresh'));
     window.dispatchEvent(new Event('style-shuffle-swap'));
+
+    if (data.tryOn) {
+      // Let the real shuffle land first, so the try-on reads as the last thing
+      // the frog put on rather than part of the same swap. If the user is
+      // mid-task (tongue cinematic, open sheet) the offer is dropped outright
+      // rather than queued — an interrupted completion is never worth a sale.
+      window.setTimeout(() => {
+        const ui = useUIStore.getState();
+        if (ui.isCinematicActive || useSheetStore.getState().count > 0) return;
+        useTryOnStore.getState().show(data.tryOn as TryOnOffer);
+        trackAnalyticsEvent('tryon_shown', {
+          item_id: data.tryOn!.itemId,
+          price: data.tryOn!.price,
+          can_afford: data.tryOn!.canAfford,
+        });
+      }, 900);
+    }
   } catch {
     // silent
   } finally {
@@ -269,7 +488,7 @@ async function rotateOnce(auto = false) {
 
 export function StyleShuffleHeaderButton({ className }: { className?: string }) {
   const [open, setOpen] = useState(false);
-  const { value, setValue } = useShuffleInterval();
+  const { value, setValue, eligible, loaded } = useShuffleInterval();
   const [spinning, setSpinning] = useState(false);
   const [ring, setRing] = useState(false);
   const [ringKey, setRingKey] = useState(0);
@@ -302,6 +521,10 @@ export function StyleShuffleHeaderButton({ className }: { className?: string }) 
     };
   }, []);
 
+  // Nothing to shuffle between yet — don't spend a header slot on a control
+  // that can't do anything. It appears on its own once a 2nd piece is owned.
+  if (loaded && !eligible) return null;
+
   return (
     <>
       <button
@@ -317,7 +540,7 @@ export function StyleShuffleHeaderButton({ className }: { className?: string }) 
           <span
             key={ringKey}
             onAnimationEnd={() => setRing(false)}
-            className="pointer-events-none absolute inset-0 rounded-full border-2 border-fuchsia-400 [animation:shuffle-ping_0.9s_cubic-bezier(0,0,0.2,1)_both]"
+            className="pointer-events-none absolute inset-0 rounded-full border-2 border-[#4f9149] [animation:shuffle-ping_0.9s_cubic-bezier(0,0,0.2,1)_both]"
           />
         )}
         <span
