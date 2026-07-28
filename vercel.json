@@ -15,10 +15,6 @@
     {
       "path": "/api/cron/login-streak",
       "schedule": "*/30 * * * *"
-    },
-    {
-      "path": "/api/cron/wishlist-deals",
-      "schedule": "0 * * * *"
     }
   ]
 }

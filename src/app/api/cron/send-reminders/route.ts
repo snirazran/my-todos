@@ -21,6 +21,7 @@ import {
   hungerMessage,
   morningMessage,
 } from '@/lib/notifications/frogVoice';
+import { runWishlistDealAlerts } from '@/lib/skins/wishlistAlerts';
 
 const CRON_SECRET = process.env.CRON_SECRET;
 
@@ -205,6 +206,15 @@ export async function GET(req: NextRequest) {
 
   await connectMongo();
 
+  // Wishlist deal alerts ride this cron rather than owning one. They have
+  // their own per-day dedupe and local-hour window, so the only coupling
+  // needed is skipping anyone alerted this run — see below.
+  const dealAlerts = await runWishlistDealAlerts().catch(() => ({
+    scanned: 0,
+    sent: 0,
+    notifiedUserIds: new Set<string>(),
+  }));
+
   // Find all users with notifications enabled and at least one FCM token
   const users = await UserModel.find({
     'notificationPrefs.enabled': true,
@@ -230,6 +240,11 @@ export async function GET(req: NextRequest) {
 
     if (!prefs?.fcmTokens?.length) {
       results.push({ userId, sent: false, reason: 'no_tokens' });
+      continue;
+    }
+
+    if (dealAlerts.notifiedUserIds.has(userId)) {
+      results.push({ userId, sent: false, reason: 'wishlist_deal_sent' });
       continue;
     }
 

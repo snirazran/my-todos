@@ -52,8 +52,11 @@ type Candidate = {
 export async function runWishlistDealAlerts(): Promise<{
   scanned: number;
   sent: number;
+  /** Users alerted this run — the caller skips them so nobody gets two pushes. */
+  notifiedUserIds: Set<string>;
 }> {
   await connectMongo();
+  const notifiedUserIds = new Set<string>();
 
   const users = (await UserModel.find(
     {
@@ -69,7 +72,7 @@ export async function runWishlistDealAlerts(): Promise<{
     },
   ).lean()) as unknown as Candidate[];
 
-  if (users.length === 0) return { scanned: 0, sent: 0 };
+  if (users.length === 0) return { scanned: 0, sent: 0, notifiedUserIds };
 
   const catalog = await getCachedCatalog();
   const byId = buildById(catalog);
@@ -124,6 +127,13 @@ export async function runWishlistDealAlerts(): Promise<{
 
     if (ok) {
       sent += 1;
+      notifiedUserIds.add(user._id);
+      // Share the reminder cron's throttle clock so the routine nudge won't
+      // land on top of this within its minimum gap.
+      await UserModel.updateOne(
+        { _id: user._id },
+        { $set: { 'notificationPrefs.lastNotifiedAt': new Date() } },
+      );
       await recordAnalyticsEvent({
         userId: user._id,
         name: 'wishlist_deal_notified',
@@ -136,5 +146,5 @@ export async function runWishlistDealAlerts(): Promise<{
     }
   }
 
-  return { scanned: users.length, sent };
+  return { scanned: users.length, sent, notifiedUserIds };
 }
