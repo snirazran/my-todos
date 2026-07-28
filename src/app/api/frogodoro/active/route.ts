@@ -7,13 +7,18 @@ import {
   scheduleFrogodoroTimerProcessing,
 } from '@/lib/frogodoroDelayedTimer';
 import { publishTimerEvent } from '@/lib/frogodoroEvents';
-import { fanOutTimerState, clearTimerAndFanOut } from '@/lib/frogodoroSync';
+import {
+  fanOutTimerState,
+  clearTimerAndFanOut,
+  normalizeClockSkewMs,
+} from '@/lib/frogodoroSync';
 import type { PomodoroPhase } from '@/lib/frogodoroStore';
 import type {
   ActiveFrogodoroTimer,
   LiveActivityRef,
   NotificationPrefs,
 } from '@/lib/types/UserDoc';
+import { advanceUserTimer } from '@/lib/frogodoroTimerProcessor';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
 import TaskModel from '@/lib/models/Task';
 import { taskAnalyticsProperties } from '@/lib/analytics/engagement';
@@ -38,7 +43,23 @@ function unauth() {
   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 }
 
-function normalizeTimer(input: unknown): ActiveFrogodoroTimer | null {
+// A running timer whose end has already passed is a session that died while its
+// device wasn't watching (a tab restored from storage, an old build). Storing it
+// makes the due-processor treat it as a phase finishing right now and ring every
+// surface. Small overruns are just latency, so only clearly-dead ones are cut.
+const DEAD_TIMER_TOLERANCE_MS = 10_000;
+
+export function isDeadRunningTimer(
+  timer: ActiveFrogodoroTimer,
+  now = Date.now(),
+): boolean {
+  if (timer.status !== 'running') return false;
+  if (!timer.endsAt) return true;
+  const endsAt = Date.parse(timer.endsAt);
+  return !Number.isFinite(endsAt) || endsAt <= now - DEAD_TIMER_TOLERANCE_MS;
+}
+
+function normalizeTimer(input: unknown, serverNow: number): ActiveFrogodoroTimer | null {
   if (!input || typeof input !== 'object') return null;
 
   const timer = input as Partial<ActiveFrogodoroTimer>;
@@ -54,6 +75,20 @@ function normalizeTimer(input: unknown): ActiveFrogodoroTimer | null {
   const phase = timer.phase as PomodoroPhase;
   const status = timer.status as 'running' | 'paused';
 
+  // endsAt arrives on the publishing device's wall clock, but every consumer
+  // (due-processor, alarm pushes, other devices) reads it as server time. Shift
+  // it by that device's clock offset, or a phone running a few minutes fast
+  // makes the server ring everyone else early.
+  const clientSkewMs =
+    typeof timer.clientStamp === 'number'
+      ? normalizeClockSkewMs(serverNow - timer.clientStamp)
+      : 0;
+  const rawEndsAt =
+    typeof timer.endsAt === 'string' ? Date.parse(timer.endsAt) : NaN;
+  const endsAt = Number.isFinite(rawEndsAt)
+    ? new Date(rawEndsAt + clientSkewMs).toISOString()
+    : null;
+
   return {
     taskId: timer.taskId,
     clientId: typeof timer.clientId === 'string' ? timer.clientId : undefined,
@@ -61,7 +96,7 @@ function normalizeTimer(input: unknown): ActiveFrogodoroTimer | null {
     phase,
     status,
     timeLeft: Math.max(0, Math.floor(timer.timeLeft)),
-    endsAt: typeof timer.endsAt === 'string' ? timer.endsAt : null,
+    endsAt,
     finished: timer.finished === true,
     settings: {
       ...defaultSettings,
@@ -83,6 +118,12 @@ export async function GET() {
     const userId = await requireUserId();
     await connectMongo();
 
+    // Every resync is a chance to settle a phase that already ran out, rather
+    // than leaving the completion to the next cron minute. Idempotent: the
+    // processor claims the transition on endsAt, so concurrent readers can't
+    // advance the same phase twice.
+    await advanceUserTimer(userId).catch(() => null);
+
     const user = await UserModel.findById(userId, {
       activeFrogodoroTimer: 1,
       frogodoroSeq: 1,
@@ -102,7 +143,7 @@ export async function PUT(req: NextRequest) {
   try {
     const userId = await requireUserId();
     const body = await req.json();
-    const timer = normalizeTimer(body?.timer);
+    const timer = normalizeTimer(body?.timer, Date.now());
     const localLiveActivity = body?.localLiveActivity === true;
 
     if (!timer) {
@@ -110,6 +151,24 @@ export async function PUT(req: NextRequest) {
     }
 
     await connectMongo();
+
+    if (isDeadRunningTimer(timer)) {
+      console.log(
+        `Frogodoro PUT /active REJECTED dead running timer clientId=${timer.clientId} endsAt=${timer.endsAt}`,
+      );
+      const current = await UserModel.findById(userId, {
+        activeFrogodoroTimer: 1,
+        frogodoroSeq: 1,
+      }).lean();
+      return NextResponse.json({
+        stale: true,
+        reason: 'dead_timer',
+        timer: current?.activeFrogodoroTimer ?? null,
+        serverNow: Date.now(),
+        seq: (current as { frogodoroSeq?: number } | null)?.frogodoroSeq ?? 0,
+      });
+    }
+
     const existing = await UserModel.findById(userId, {
       activeFrogodoroTimer: 1,
       liveActivity: 1,

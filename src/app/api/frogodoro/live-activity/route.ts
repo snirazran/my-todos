@@ -151,7 +151,7 @@ export async function PUT(req: NextRequest) {
     // (pause/resume within the first seconds of a push-to-start) was dropped —
     // reconcile the just-registered activity with the current timer state.
     if (liveActivity && refChanged && timer) {
-      await fanOutTimerState(userId, timer, liveActivity, null, null, null, true);
+      await fanOutTimerState(userId, timer, liveActivity, null, null, null, true, false, 5);
     }
 
     return NextResponse.json({ ok: true });

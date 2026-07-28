@@ -123,6 +123,41 @@ function getPhaseDuration(phase: PomodoroPhase, settings: FrogodoroSettings) {
   return Math.max(1, Math.round(minutes * 60));
 }
 
+// A persisted "running" timer whose endTime has already passed is a corpse: the
+// tab/app was closed through the phase and the session was finished (or dropped)
+// on some other surface. Restoring it as live makes the first server reconcile
+// adopt it and re-publish a long-dead phase, which the server then processes as
+// a completion and rings. Restore it as a clean idle timer instead; if the
+// server really does still have a live timer, hydration puts it back.
+function restoreTimerState(state: FrogodoroState): FrogodoroState {
+  if (!state.isRunning) return state;
+  if (state.endTime && state.endTime > Date.now()) return state;
+
+  const settings =
+    state.overtimePrevFocusDuration != null
+      ? { ...state.settings, focusDuration: state.overtimePrevFocusDuration }
+      : state.settings;
+
+  return {
+    ...state,
+    settings,
+    overtimePrevFocusDuration: null,
+    timerActive: false,
+    isRunning: false,
+    endTime: null,
+    timeLeft: getPhaseDuration(state.phase, settings),
+    phaseElapsed: 0,
+    awaitingDone: false,
+    pausedThisPhase: false,
+    activeTimerRev: null,
+    startedByPhase: { focus: false, break: false },
+    remainingByPhase: {
+      focus: getPhaseDuration('focus', settings),
+      break: getPhaseDuration('break', settings),
+    },
+  };
+}
+
 export const useFrogodoroStore = create<FrogodoroState>()(
   persist(
     (set, get) => ({
@@ -606,6 +641,11 @@ export const useFrogodoroStore = create<FrogodoroState>()(
     {
       name: 'frogodoro-storage',
       storage: createJSONStorage(() => localStorage),
+      merge: (persisted, current) =>
+        restoreTimerState({
+          ...current,
+          ...((persisted as Partial<FrogodoroState>) ?? {}),
+        }),
     },
   ),
 );

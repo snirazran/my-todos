@@ -2,6 +2,7 @@
 
 import * as Sentry from '@sentry/nextjs';
 import { useEffect } from 'react';
+import { ErrorScene } from '@/components/ui/ErrorScene';
 
 export default function ErrorPage({
   error,
@@ -15,18 +16,15 @@ export default function ErrorPage({
   }, [error]);
 
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8 text-center">
-      <p className="text-lg font-semibold">Something went wrong</p>
-      <p className="text-sm text-muted-foreground">
-        The error was reported automatically. Try again — if it keeps
-        happening, restart the app.
-      </p>
-      <button
-        onClick={() => reset()}
-        className="rounded-full bg-emerald-600 px-6 py-2.5 font-semibold text-white active:scale-95"
-      >
-        Try again
-      </button>
-    </div>
+    <ErrorScene
+      code="OOPS"
+      title="The pond glitched."
+      message="This page tripped on its way in. Nothing you saved was lost, and the crash was reported automatically — one more try usually clears it."
+      primaryLabel="Try again"
+      onPrimary={() => reset()}
+      secondaryLabel="Take me home"
+      secondaryHref="/"
+      detail={error.digest}
+    />
   );
 }

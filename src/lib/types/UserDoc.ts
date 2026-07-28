@@ -220,7 +220,9 @@ export type ActiveFrogodoroTimer = {
 
 export type NotificationPrefs = {
   fcmTokens: string[]; // Device FCM tokens (one per device)
-  androidFcmTokens?: string[]; // Subset of fcmTokens that are Android (timer control/alarm pushes are Android-only)
+  androidFcmTokens?: string[]; // Subset of fcmTokens that are Android
+  iosFcmTokens?: string[]; // Subset of fcmTokens that are iOS
+  webFcmTokens?: string[]; // Subset of fcmTokens that are browsers
   enabled: boolean; // User opt-in for push notifications
   activityHours: number[]; // Rolling log of active hours (last 50)
   lastNotifiedAt?: Date; // Prevent duplicate sends

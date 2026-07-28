@@ -197,12 +197,16 @@ async function sendWithEnvFallback(
 
 // content-state is the flat LiveActivityData, matching the native
 // FrogTimerAttributes.ContentState (ios/App/FrogTimerShared/FrogTimerAttributes.swift).
+// priority 10 counts against the device's ActivityKit push budget; 5 does not
+// but may be delayed/coalesced. Use 10 for anything the user is waiting to see
+// (their own start/pause, the finish alert) and 5 for catch-up reconciles.
 export async function sendLiveActivityUpdate(opts: {
   pushToken: string;
   activityId: string;
   data: LiveActivityData;
   staleDate?: number | null;
   alert?: { title: string; body: string; sound?: string };
+  priority?: number;
 }): Promise<LiveActivityPushResult> {
   const aps: Record<string, unknown> = {
     timestamp: Math.floor(Date.now() / 1000),
@@ -216,7 +220,7 @@ export async function sendLiveActivityUpdate(opts: {
     aps.alert = { title: opts.alert.title, body: opts.alert.body };
     aps.sound = opts.alert.sound ?? 'default';
   }
-  return sendWithEnvFallback('update', { aps }, opts.pushToken);
+  return sendWithEnvFallback('update', { aps }, opts.pushToken, opts.priority ?? 10);
 }
 
 export async function sendLiveActivityEnd(opts: {

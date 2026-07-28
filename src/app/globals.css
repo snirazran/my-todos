@@ -192,6 +192,54 @@ body:has([data-public-home]) #main-scroll {
   }
 }
 
+/* 404 / crash scene: marching flight path, drifting catchable flies, catch pop. */
+@keyframes error-route-draw {
+  to {
+    stroke-dashoffset: -120;
+  }
+}
+@keyframes error-fly-drift {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  25% {
+    transform: translate3d(26px, -16px, 0);
+  }
+  50% {
+    transform: translate3d(-8px, -30px, 0);
+  }
+  75% {
+    transform: translate3d(-26px, -6px, 0);
+  }
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+}
+.error-pop {
+  transform: translate(-50%, -18px);
+}
+@keyframes error-pop-rise {
+  0% {
+    transform: translate(-50%, 0) scale(0.7);
+    opacity: 0;
+  }
+  25% {
+    transform: translate(-50%, -12px) scale(1.12);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -48px) scale(1);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .error-scene *,
+  .error-scene *::before,
+  .error-scene *::after {
+    animation: none !important;
+  }
+}
+
 /* Ambient version: one sweep, then rest for most of the cycle. */
 @keyframes bar-shine-idle {
   0% {

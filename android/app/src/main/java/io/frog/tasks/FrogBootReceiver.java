@@ -10,6 +10,13 @@ import android.content.Intent;
  * persisted state so a restart mid-session doesn't silently lose the ring.
  */
 public class FrogBootReceiver extends BroadcastReceiver {
+    /**
+     * How long after a phase ended a boot-time nudge is still worth showing.
+     * Past this the session is history — and it may well have been stopped from
+     * another device while this phone was off, so ringing would be a phantom.
+     */
+    private static final long RING_GRACE_MS = 2 * 60 * 1000L;
+
     @Override
     public void onReceive(Context context, Intent intent) {
         if (!Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())) return;
@@ -22,11 +29,15 @@ public class FrogBootReceiver extends BroadcastReceiver {
             FrogTimerNotification.show(ctx, state, false);
             FrogTimerAlarm.sync(ctx, state.endTime);
         } else if (state.isRunning && state.endTime > 0) {
-            // Finished while the phone was off — ring now (no loop; the
-            // moment has passed, a nudge is enough).
             state.isRunning = false;
             state.save(ctx);
-            FrogTimerNotification.showAlarm(ctx, state);
+            if (now - state.endTime <= RING_GRACE_MS) {
+                // Just finished while the phone was off — a nudge, no loop.
+                FrogTimerNotification.showAlarm(ctx, state);
+            } else {
+                FrogTimerState.clear(ctx);
+                FrogTimerNotification.cancel(ctx);
+            }
         } else {
             FrogTimerNotification.show(ctx, state, false);
         }

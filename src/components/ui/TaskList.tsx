@@ -19,7 +19,12 @@ import Fly from '@/components/ui/fly';
 import { createPortal } from 'react-dom';
 import { TimeTag } from '@/components/ui/TimeTag';
 import { Icon } from '@/components/ui/Icon';
-import { hapticImpact, hapticSuccess, hapticTick } from '@/lib/haptics';
+import {
+  hapticGrab,
+  hapticImpact,
+  hapticSuccess,
+  hapticTick,
+} from '@/lib/haptics';
 import { useTaskTimerPhase } from '@/hooks/useTaskTimerPhase';
 import {
   AnimatePresence,
@@ -35,7 +40,6 @@ import useSWR from 'swr';
 import {
   DndContext,
   closestCenter,
-  closestCorners,
   KeyboardSensor,
   MouseSensor,
   useSensor,
@@ -46,6 +50,7 @@ import {
   TouchSensor,
   Modifier,
   MeasuringStrategy,
+  type CollisionDetection,
 } from '@dnd-kit/core';
 import {
   restrictToVerticalAxis,
@@ -140,6 +145,25 @@ type ListRow =
 
 const animateLayoutChanges: AnimateLayoutChanges = (args) =>
   args.isSorting || args.wasDragging ? defaultAnimateLayoutChanges(args) : true;
+
+const pointerMidpointCollision: CollisionDetection = (args) => {
+  const { droppableContainers, droppableRects, pointerCoordinates } = args;
+  if (!pointerCoordinates) return closestCenter(args);
+
+  const rows = droppableContainers
+    .filter((c) => !c.disabled && droppableRects.get(c.id))
+    .map((c) => ({ container: c, rect: droppableRects.get(c.id)! }))
+    .sort((a, b) => a.rect.top - b.rect.top);
+
+  if (rows.length === 0) return [];
+
+  const hit =
+    rows.find(
+      (r) => pointerCoordinates.y < r.rect.top + r.rect.height / 2,
+    ) ?? rows[rows.length - 1];
+
+  return [{ id: hit.container.id, data: { droppableContainer: hit.container } }];
+};
 
 const SWIPE_ACTION_WIDTH = 88;
 const SWIPE_SNAP_THRESHOLD = 32;
@@ -1739,13 +1763,13 @@ export default function TaskList({
   const mouseOptions = useMemo(
     () => ({
       activationConstraint: usesSwipeTrays
-        ? { delay: 250, tolerance: 8 }
+        ? { delay: 150, tolerance: 8 }
         : { distance: 5 },
     }),
     [usesSwipeTrays],
   );
   const touchOptions = useMemo(
-    () => ({ activationConstraint: { delay: 250, tolerance: 8 } }),
+    () => ({ activationConstraint: { delay: 120, tolerance: 8 } }),
     [],
   );
   // Space picks up / drops a row for keyboard sorting; Enter stays free so a
@@ -2014,7 +2038,7 @@ export default function TaskList({
   ).length;
 
   const handleDragStart = (event: DragStartEvent) => {
-    hapticImpact();
+    hapticGrab();
     lastDragOverIdRef.current = null;
     setIsAnyDragging(true);
     if (openSteps.size) {
@@ -2384,7 +2408,9 @@ export default function TaskList({
             <DndContext
               sensors={sensors}
               collisionDetection={
-                draggingSectionId !== null ? closestCenter : closestCorners
+                draggingSectionId !== null
+                  ? closestCenter
+                  : pointerMidpointCollision
               }
               onDragStart={handleDragStart}
               onDragOver={handleDragOver}

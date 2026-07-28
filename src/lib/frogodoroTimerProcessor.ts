@@ -7,7 +7,7 @@ import {
 import { sendTimerControlPush, sendTimerFinishedPush } from '@/lib/notifications/timer';
 import { buildLiveActivityData } from '@/lib/liveActivityData';
 import { scheduleFrogodoroTimerProcessing } from '@/lib/frogodoroDelayedTimer';
-import { timerHuntExtras } from '@/lib/frogodoroSync';
+import { timerHuntExtras, clearTimerAndFanOut } from '@/lib/frogodoroSync';
 import { iosAlarmFile } from '@/lib/timerSoundFiles';
 import { publishTimerEvent } from '@/lib/frogodoroEvents';
 import { syncQuestState } from '@/lib/quests/engine';
@@ -190,6 +190,15 @@ type ProcessResult = {
   reason?: string;
 };
 
+// An alarm is a signal that the moment arrived, so a late one is worse than
+// none: past this much overdue the phase is still completed and credited, but
+// silently — nobody wants a session ringing long after it ended.
+const ALARM_GRACE_MS = 2 * 60_000;
+// Beyond this, no server-side gap explains the delay: the record is a corpse
+// (a stale client republished a dead session, a write went missing). Clearing it
+// without crediting keeps phantom focus time out of the user's stats.
+const ABANDON_OVERDUE_MS = 30 * 60_000;
+
 async function processOneDueTimer(
   user: unknown,
   now: Date,
@@ -201,6 +210,22 @@ async function processOneDueTimer(
   if (!timer?.taskId || !timer.endsAt) {
     return { processed: false, result: { userId, processed: false, reason: 'invalid_timer' } };
   }
+
+  const overdueMs = now.getTime() - new Date(timer.endsAt).getTime();
+
+  if (overdueMs > ABANDON_OVERDUE_MS) {
+    console.log(
+      `Frogodoro processor: abandoning timer overdue by ${Math.round(overdueMs / 60_000)}m for user ${userId}`,
+    );
+    await clearTimerAndFanOut(
+      userId,
+      (user as any).liveActivity as LiveActivityRef | null | undefined,
+      prefs,
+    );
+    return { processed: true, result: { userId, processed: true, reason: 'abandoned' } };
+  }
+
+  const suppressAlarm = overdueMs > ALARM_GRACE_MS;
 
   const next = getNextTimer(timer, now);
   const nextTimer: ActiveFrogodoroTimer = {
@@ -317,14 +342,17 @@ async function processOneDueTimer(
         pushToken: live.pushToken,
         activityId: live.id,
         data,
-        alert: {
-          title: "Time's up",
-          body:
-            next.completedPhase === 'focus' && extras.fliesCaught > 0
-              ? `${extras.fliesCaught} ${extras.fliesCaught === 1 ? 'fly' : 'flies'} caught — tap Done to collect.`
-              : 'Your session finished.',
-          sound: iosAlarmFile(timer.settings.timerSound),
-        },
+        priority: suppressAlarm ? 5 : 10,
+        alert: suppressAlarm
+          ? undefined
+          : {
+              title: "Time's up",
+              body:
+                next.completedPhase === 'focus' && extras.fliesCaught > 0
+                  ? `${extras.fliesCaught} ${extras.fliesCaught === 1 ? 'fly' : 'flies'} caught — tap Done to collect.`
+                  : 'Your session finished.',
+              sound: iosAlarmFile(timer.settings.timerSound),
+            },
       });
     }
   }
@@ -343,7 +371,7 @@ async function processOneDueTimer(
         rev: nextTimer.rev,
         ...timerHuntExtras(nextTimer, now.getTime()),
       });
-    } else {
+    } else if (!suppressAlarm) {
       await sendTimerFinishedPush({
         userId,
         tokens,

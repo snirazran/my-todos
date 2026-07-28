@@ -17,6 +17,7 @@ import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
  * Semantic API — call by intent, not by milliseconds:
  *   hapticTick()      subtle selection tick — counter bumps, toggles, detents
  *   hapticImpact()    medium thump — drag pickup, equip, meaningful taps
+ *   hapticGrab()      doubled medium thump — picking a card up to reorder
  *   hapticHeavy()     strong thump — landing a big moment inside a sequence
  *   hapticSuccess()   completion — task done, purchase confirmed
  *   hapticWarning()   caution — destructive confirms, streak at risk
@@ -95,6 +96,12 @@ export function hapticTick() {
 
 export function hapticImpact() {
   lastTickAt = Date.now();
+  fire(() => Haptics.impact({ style: ImpactStyle.Medium }), 15);
+}
+
+export function hapticGrab() {
+  lastTickAt = Date.now();
+  fire(() => Haptics.impact({ style: ImpactStyle.Medium }), 15);
   fire(() => Haptics.impact({ style: ImpactStyle.Medium }), 15);
 }
 

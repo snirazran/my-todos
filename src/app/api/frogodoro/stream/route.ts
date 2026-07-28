@@ -5,7 +5,14 @@ import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import UserModel from '@/lib/models/User';
 import { subscribeTimer, type TimerEvent } from '@/lib/frogodoroEvents';
+import { advanceUserTimer } from '@/lib/frogodoroTimerProcessor';
 import type { ActiveFrogodoroTimer } from '@/lib/types/UserDoc';
+
+// The in-process bus only reaches subscribers that happen to live in the same
+// instance as the write. Serverless spreads them across instances, so the bus
+// alone can leave a device deaf until a slow client-side backstop poll. A cheap
+// projected read of the one document closes that gap with bounded latency.
+const DB_POLL_MS = 3000;
 
 export async function GET() {
   let userId: string;
@@ -16,6 +23,10 @@ export async function GET() {
   }
 
   await connectMongo();
+  // A connecting client is a chance to notice a phase that ran out while nobody
+  // was processing it, instead of leaving it for the next cron minute.
+  await advanceUserTimer(userId).catch(() => null);
+
   const user = await UserModel.findById(userId, {
     activeFrogodoroTimer: 1,
     frogodoroSeq: 1,
@@ -31,13 +42,19 @@ export async function GET() {
 
   const stream = new ReadableStream({
     start(controller) {
+      let closed = false;
+      let lastSeq = -1;
+
       const send = (event: TimerEvent) => {
+        if (closed) return;
+        if (event.seq <= lastSeq) return;
+        lastSeq = event.seq;
         try {
           controller.enqueue(
             encoder.encode(`data: ${JSON.stringify(event)}\n\n`),
           );
         } catch {
-          void 0;
+          closed = true;
         }
       };
 
@@ -45,15 +62,39 @@ export async function GET() {
 
       const unsubscribe = subscribeTimer(userId, send);
 
+      const poll = setInterval(() => {
+        if (closed) return;
+        void UserModel.findById(userId, {
+          activeFrogodoroTimer: 1,
+          frogodoroSeq: 1,
+        })
+          .lean()
+          .then((doc) => {
+            const seq = (doc as { frogodoroSeq?: number } | null)?.frogodoroSeq ?? 0;
+            if (seq <= lastSeq) return;
+            send({
+              timer:
+                (doc as { activeFrogodoroTimer?: ActiveFrogodoroTimer | null } | null)
+                  ?.activeFrogodoroTimer ?? null,
+              serverNow: Date.now(),
+              seq,
+            });
+          })
+          .catch(() => undefined);
+      }, DB_POLL_MS);
+
       const heartbeat = setInterval(() => {
+        if (closed) return;
         try {
           controller.enqueue(encoder.encode(`: ping\n\n`));
         } catch {
-          void 0;
+          closed = true;
         }
       }, 25000);
 
       cleanup = () => {
+        closed = true;
+        clearInterval(poll);
         clearInterval(heartbeat);
         unsubscribe();
         try {

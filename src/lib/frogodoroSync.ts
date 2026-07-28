@@ -69,6 +69,16 @@ function tokenLabel(token: string | null | undefined): string {
   return token ? `${token.slice(0, 8)}...${token.slice(-6)}` : 'none';
 }
 
+// Devices that need to hear about a timer change natively, with no JS running.
+// Android rebuilds its notification + setAlarmClock from these; iOS uses them to
+// re-arm or CANCEL the local notification and AlarmKit alarm it scheduled when
+// the phase started. Without the iOS half, stopping a timer from another device
+// while the phone app is killed leaves that alarm armed and it rings anyway.
+function nativeControlTokens(prefs: NotificationPrefs | null | undefined): string[] {
+  if (!prefs?.enabled) return [];
+  return [...(prefs.androidFcmTokens ?? []), ...(prefs.iosFcmTokens ?? [])];
+}
+
 export function normalizeClockSkewMs(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) && Math.abs(value) < 10 * 60_000
     ? Math.round(value)
@@ -124,6 +134,7 @@ export async function fanOutTimerState(
   // would flash a banner on the device that just started the timer).
   suppressPushToStart = false,
   suppressLiveActivityPush = false,
+  liveActivityPriority = 10,
 ): Promise<void> {
   const tasks: Promise<unknown>[] = [];
   const clearRef = () =>
@@ -166,6 +177,7 @@ export async function fanOutTimerState(
           activityId: live.id,
           data,
           staleDate: running ? deviceEndTime : null,
+          priority: liveActivityPriority,
         }).then((res) =>
           res.gone || res.reason === 'BadDeviceToken' ? clearRef() : undefined,
         ),
@@ -201,13 +213,20 @@ export async function fanOutTimerState(
     }
   }
 
-  const tokens = prefs?.enabled ? prefs.androidFcmTokens ?? [] : [];
+  const tokens = nativeControlTokens(prefs);
   if (tokens.length > 0) {
     tasks.push(
       sendTimerControlPush({
         userId,
         tokens,
-        action: timer.status === 'running' ? 'start' : 'pause',
+        // A finished phase must not read as "resume the next one" on a device
+        // that only sees this push — it has to cancel its armed alarm too.
+        action:
+          timer.finished === true
+            ? 'pause'
+            : timer.status === 'running'
+              ? 'start'
+              : 'pause',
         phase: timer.phase,
         endTime: timer.endsAt ? new Date(timer.endsAt).getTime() : 0,
         timeLeft: timer.timeLeft,
@@ -246,7 +265,7 @@ export async function fanOutTimerStop(
     );
   }
 
-  const tokens = prefs?.enabled ? prefs.androidFcmTokens ?? [] : [];
+  const tokens = nativeControlTokens(prefs);
   if (tokens.length > 0) {
     tasks.push(
       sendTimerControlPush({

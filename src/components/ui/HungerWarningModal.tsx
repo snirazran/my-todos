@@ -64,7 +64,7 @@ export function HungerWarningModal({
         <DialogTitle className="sr-only">I was Starving!</DialogTitle>
         <div className="relative flex flex-col items-center bg-card/95 backdrop-blur-2xl border border-border/60 rounded-[32px] p-6 shadow-2xl overflow-hidden ring-1 ring-black/5">
           {/* Header: Frog + Icon */}
-          <div className="relative mb-4 mt-2 scale-110">
+          <div className="relative -mt-2 mb-8 scale-110">
             <Frog
               width={200}
               height={150}

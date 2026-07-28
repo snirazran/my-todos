@@ -34,6 +34,15 @@ function getPhaseDuration(phase: PomodoroPhase, settings: FrogodoroSettings): nu
   return phase === 'focus' ? settings.focusDuration * 60 : settings.breakDuration * 60;
 }
 
+const BASE_TITLE = 'Frogress';
+
+function mmss(totalSeconds: number): string {
+  const s = Math.max(0, totalSeconds);
+  return `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60)
+    .toString()
+    .padStart(2, '0')}`;
+}
+
 function getClientId() {
   const key = 'frogodoro-client-id';
   const existing = window.localStorage.getItem(key);
@@ -47,26 +56,21 @@ function getClientId() {
 export function GlobalTimer() {
   const { user, loading: authLoading } = useAuth();
   const authUserId = authLoading ? null : user?.uid ?? null;
-  const {
-    isRunning,
-    timerActive,
-    endTime,
-    timeLeft,
-    phase,
-    selectedTaskId,
-    settings,
-    sessionStats,
-    phaseElapsed,
-    awaitingDone,
-    pendingSync,
-    tickTimer,
-    completePhase,
-    registerCompletion,
-    setAwaitingDone,
-    setPhaseElapsed,
-    lastCompletionId,
-    lastCompletedPhase,
-  } = useFrogodoroStore();
+  const isRunning = useFrogodoroStore((s) => s.isRunning);
+  const timerActive = useFrogodoroStore((s) => s.timerActive);
+  const endTime = useFrogodoroStore((s) => s.endTime);
+  const phase = useFrogodoroStore((s) => s.phase);
+  const selectedTaskId = useFrogodoroStore((s) => s.selectedTaskId);
+  const settings = useFrogodoroStore((s) => s.settings);
+  const awaitingDone = useFrogodoroStore((s) => s.awaitingDone);
+  const pendingSync = useFrogodoroStore((s) => s.pendingSync);
+  const lastCompletionId = useFrogodoroStore((s) => s.lastCompletionId);
+  const lastCompletedPhase = useFrogodoroStore((s) => s.lastCompletedPhase);
+  const tickTimer = useFrogodoroStore((s) => s.tickTimer);
+  const completePhase = useFrogodoroStore((s) => s.completePhase);
+  const registerCompletion = useFrogodoroStore((s) => s.registerCompletion);
+  const setAwaitingDone = useFrogodoroStore((s) => s.setAwaitingDone);
+  const setPhaseElapsed = useFrogodoroStore((s) => s.setPhaseElapsed);
 
   const { showNotification } = useNotification();
 
@@ -80,15 +84,19 @@ export function GlobalTimer() {
   );
   const walletFliesRef = useRef<number | undefined>(undefined);
   walletFliesRef.current = inventorySummary?.wardrobe?.flies;
-  const sessionFocusLive =
-    sessionStats.focusTime +
-    (phase === 'focus' && timerActive
-      ? Math.max(
-          0,
-          getPhaseDuration('focus', settings) - timeLeft - phaseElapsed,
-        )
-      : 0);
-  const fliesCaughtLive = fliesCaughtFor(sessionFocusLive);
+  // Selected as the derived count, not the raw seconds, so the per-second tick
+  // doesn't re-render this provider — it only wakes when a fly is actually caught.
+  const fliesCaughtLive = useFrogodoroStore((s) =>
+    fliesCaughtFor(
+      s.sessionStats.focusTime +
+        (s.phase === 'focus' && s.timerActive
+          ? Math.max(
+              0,
+              getPhaseDuration('focus', s.settings) - s.timeLeft - s.phaseElapsed,
+            )
+          : 0),
+    ),
+  );
   const prevCaughtRef = useRef(fliesCaughtLive);
   useEffect(() => {
     if (fliesCaughtLive > prevCaughtRef.current && timerActive) {
@@ -143,6 +151,39 @@ export function GlobalTimer() {
   // local countdown (the "timer jumps back" on tab-switch), so we skip applying
   // remote reads until our write settles and its seq is recorded.
   const publishInFlightRef = useRef(false);
+  // A remote event dropped because a write was in flight. Nothing re-delivers
+  // it, so the write's completion re-reads instead of leaving this device stale
+  // until the next slow backstop poll.
+  const missedRemoteRef = useRef(false);
+  const requestResyncRef = useRef<(() => void) | null>(null);
+
+  const drainMissedRemote = () => {
+    if (!missedRemoteRef.current) return;
+    missedRemoteRef.current = false;
+    requestResyncRef.current?.();
+  };
+
+  // Derived from endTime rather than the ticked timeLeft, so it is correct even
+  // when called after the tab was throttled and timeLeft is minutes stale.
+  const writeDocumentTitle = useCallback(() => {
+    if (typeof document === 'undefined') return;
+    const s = useFrogodoroStore.getState();
+    if (s.awaitingDone) {
+      document.title = `Time's up - ${BASE_TITLE}`;
+      return;
+    }
+    if (!s.timerActive) {
+      document.title = BASE_TITLE;
+      return;
+    }
+    const remaining =
+      s.isRunning && s.endTime
+        ? Math.max(0, Math.ceil((s.endTime - Date.now()) / 1000))
+        : Math.max(0, s.timeLeft);
+    document.title = s.isRunning
+      ? `${mmss(remaining)} - ${BASE_TITLE}`
+      : `⏸ ${mmss(remaining)} - ${BASE_TITLE}`;
+  }, []);
 
   useEffect(() => { isRunningRef.current = isRunning; }, [isRunning]);
 
@@ -220,18 +261,28 @@ export function GlobalTimer() {
     }
   };
 
-  // Refs for values needed inside the stable interval closure
-  const phaseRef = useRef(phase);
-  const selectedTaskIdRef = useRef(selectedTaskId);
-  const settingsRef = useRef(settings);
-  const timeLeftRef = useRef(timeLeft);
-  const phaseElapsedRef = useRef(phaseElapsed);
+  // Refs for values needed inside the stable interval closure. Fed by a direct
+  // store subscription rather than render values, so per-second state changes
+  // keep them fresh without re-rendering this provider.
+  const phaseRef = useRef<PomodoroPhase>(useFrogodoroStore.getState().phase);
+  const selectedTaskIdRef = useRef('');
+  const settingsRef = useRef<FrogodoroSettings>(
+    useFrogodoroStore.getState().settings,
+  );
+  const timeLeftRef = useRef(0);
+  const phaseElapsedRef = useRef(0);
 
-  useEffect(() => { phaseRef.current = phase; }, [phase]);
-  useEffect(() => { selectedTaskIdRef.current = selectedTaskId; }, [selectedTaskId]);
-  useEffect(() => { settingsRef.current = settings; }, [settings]);
-  useEffect(() => { timeLeftRef.current = timeLeft; }, [timeLeft]);
-  useEffect(() => { phaseElapsedRef.current = phaseElapsed; }, [phaseElapsed]);
+  useEffect(() => {
+    const apply = (s: ReturnType<typeof useFrogodoroStore.getState>) => {
+      phaseRef.current = s.phase;
+      selectedTaskIdRef.current = s.selectedTaskId;
+      settingsRef.current = s.settings;
+      timeLeftRef.current = s.timeLeft;
+      phaseElapsedRef.current = s.phaseElapsed;
+    };
+    apply(useFrogodoroStore.getState());
+    return useFrogodoroStore.subscribe(apply);
+  }, []);
 
   const publishActiveTimer = async (timer: Omit<ActiveFrogodoroTimer, 'updatedAt'>) => {
     publishInFlightRef.current = true;
@@ -258,11 +309,25 @@ export function GlobalTimer() {
       if (typeof data?.timer?.rev === 'number') {
         useFrogodoroStore.getState().setActiveTimerRev(data.timer.rev);
       }
-      if (data?.stale === true && data?.timer) {
-        useFrogodoroStore.getState().hydrateActiveTimer(
-          data.timer as ActiveFrogodoroTimer,
-          typeof data.serverNow === 'number' ? data.serverNow : Date.now(),
-        );
+      if (data?.stale === true) {
+        const store = useFrogodoroStore.getState();
+        if (data.timer) {
+          store.hydrateActiveTimer(
+            data.timer as ActiveFrogodoroTimer,
+            typeof data.serverNow === 'number' ? data.serverNow : Date.now(),
+          );
+        } else if (
+          data.reason === 'dead_timer' &&
+          (store.timerActive || store.awaitingDone)
+        ) {
+          // The server refused this write as an expired session and holds no
+          // timer of its own, so what we're carrying is the stale copy. Drop it
+          // rather than re-publishing it forever. Only for that reason: the
+          // other stale case is a harmless duplicate write from this device.
+          store.setAwaitingDone(false);
+          store.stopTimer();
+          lastSyncedPendingRef.current = useFrogodoroStore.getState().pendingSync;
+        }
       }
       // Our own write is the newest state; record its seq so the echo (SSE/GET)
       // is ignored as not-newer, breaking the publish→echo→hydrate loop.
@@ -273,6 +338,7 @@ export function GlobalTimer() {
       // Cross-device timer sync is best-effort.
     } finally {
       publishInFlightRef.current = false;
+      drainMissedRemote();
     }
   };
 
@@ -298,6 +364,7 @@ export function GlobalTimer() {
       // Cross-device timer sync is best-effort.
     } finally {
       publishInFlightRef.current = false;
+      drainMissedRemote();
     }
   };
 
@@ -330,6 +397,18 @@ export function GlobalTimer() {
     };
   }, []);
 
+  // A running payload whose end has already passed describes a phase that
+  // finished while this device wasn't watching. Publishing it makes the server
+  // treat it as a live timer that is due right now — it advances the phase and
+  // rings every surface, long after the session actually ended.
+  const isLivePayload = (
+    payload: Omit<ActiveFrogodoroTimer, 'updatedAt'>,
+  ): boolean => {
+    if (payload.status !== 'running') return true;
+    if (!payload.endsAt) return false;
+    return new Date(payload.endsAt).getTime() > Date.now();
+  };
+
   // Single entry point for applying server-authoritative timer state, whether
   // it arrives via SSE, the initial GET, a resync, or the advance response.
   const applyRemoteTimer = useCallback(
@@ -341,7 +420,10 @@ export function GlobalTimer() {
       // the new seq, clobbering the optimistic start (timer "stops" or jumps).
       // Once the write settles, lastSeqRef holds its seq and the normal seq
       // guard below filters anything stale.
-      if (publishInFlightRef.current) return;
+      if (publishInFlightRef.current) {
+        missedRemoteRef.current = true;
+        return;
+      }
       // The server stamps every state write with a monotonic seq. Ignore any
       // event whose seq isn't strictly newer than the last we applied — this
       // deterministically drops stale/out-of-order events (including a null GET
@@ -361,10 +443,18 @@ export function GlobalTimer() {
 
         // First reconcile after mount: if the server has no timer but this device
         // does (a fresh start in the load window, or the server lost it), the
-        // local timer wins — publish it rather than wiping it.
+        // local timer wins — publish it rather than wiping it. Unless what we're
+        // holding is an expired session restored from storage, in which case the
+        // server's "no timer" is the truth and adopting would resurrect a corpse.
         if (firstLoad && (store.timerActive || store.awaitingDone)) {
           const payload = buildTimerPayload();
-          if (payload) void publishActiveTimer(payload);
+          if (payload && isLivePayload(payload)) {
+            void publishActiveTimer(payload);
+            return;
+          }
+          store.setAwaitingDone(false);
+          store.stopTimer();
+          lastSyncedPendingRef.current = useFrogodoroStore.getState().pendingSync;
           return;
         }
 
@@ -516,6 +606,21 @@ export function GlobalTimer() {
     if (!authUserId) return;
     let cancelled = false;
     let es: EventSource | null = null;
+    let retries = 0;
+    let retryTimer = 0;
+
+    // The stream is cut regularly (serverless max duration, iOS suspending the
+    // app), and waiting for the slow poll to notice leaves this device deaf for
+    // up to 30s. Reconnect right away, backing off only if it keeps failing.
+    const scheduleReconnect = () => {
+      if (cancelled || retryTimer) return;
+      const delay = Math.min(30000, 1000 * 2 ** retries);
+      retries += 1;
+      retryTimer = window.setTimeout(() => {
+        retryTimer = 0;
+        if (!cancelled && !es) connect();
+      }, delay);
+    };
 
     const connect = () => {
       if (es || cancelled) return;
@@ -524,6 +629,7 @@ export function GlobalTimer() {
           withCredentials: true,
         });
         source.onmessage = (e) => {
+          retries = 0;
           try {
             const data = JSON.parse(e.data) as {
               timer: ActiveFrogodoroTimer | null;
@@ -542,10 +648,12 @@ export function GlobalTimer() {
         source.onerror = () => {
           source.close();
           if (es === source) es = null;
+          scheduleReconnect();
         };
         es = source;
       } catch {
         es = null;
+        scheduleReconnect();
       }
     };
 
@@ -588,6 +696,8 @@ export function GlobalTimer() {
       void applyNativeLiveActivityState().finally(() => void resync());
     };
 
+    requestResyncRef.current = () => void resync();
+
     void resync();
     // SSE is the live channel. Only poll to re-establish it when it's actually
     // dropped (cheap reconnect), plus a slow full resync as a catch-all for a
@@ -623,8 +733,10 @@ export function GlobalTimer() {
 
     return () => {
       cancelled = true;
+      requestResyncRef.current = null;
       window.clearInterval(reconnectPoll);
       window.clearInterval(safetyResync);
+      window.clearTimeout(retryTimer);
       document.removeEventListener('visibilitychange', onVisible);
       appStateHandle?.remove();
       es?.close();
@@ -640,28 +752,29 @@ export function GlobalTimer() {
         return;
       }
 
-      if (selectedTaskId) {
-        const phaseDuration = getPhaseDuration(phase, settings);
-        const elapsed = phaseDuration - timeLeft;
-        const unsavedElapsed = elapsed - phaseElapsed;
+      const store = useFrogodoroStore.getState();
+      const pausedPhase = store.phase;
+      if (store.selectedTaskId) {
+        const phaseDuration = getPhaseDuration(pausedPhase, store.settings);
+        const elapsed = phaseDuration - store.timeLeft;
+        const unsavedElapsed = elapsed - store.phaseElapsed;
         if (unsavedElapsed > 0) {
-          saveProgress(selectedTaskId, phase, unsavedElapsed, elapsed);
+          saveProgress(store.selectedTaskId, pausedPhase, unsavedElapsed, elapsed);
           setPhaseElapsed(elapsed);
           // Fold the just-elapsed time into sessionStats synchronously so the
           // stats display doesn't momentarily drop to 0 between resetting
           // phaseElapsed and the async DB write landing (the first-pause
           // flicker on a freshly opened task).
-          const store = useFrogodoroStore.getState();
-          const stats = store.sessionStats;
+          const stats = useFrogodoroStore.getState().sessionStats;
           store.updateSessionStats({
-            focusTime: stats.focusTime + (phase === 'focus' ? unsavedElapsed : 0),
-            breakTime: stats.breakTime + (phase === 'break' ? unsavedElapsed : 0),
+            focusTime: stats.focusTime + (pausedPhase === 'focus' ? unsavedElapsed : 0),
+            breakTime: stats.breakTime + (pausedPhase === 'break' ? unsavedElapsed : 0),
           });
         }
       }
     }
     prevIsRunning.current = isRunning;
-  }, [isRunning, phase, phaseElapsed, selectedTaskId, setPhaseElapsed, settings, timeLeft]);
+  }, [isRunning, setPhaseElapsed]);
 
   // Live progress: while a focus phase runs on the owning device, persist
   // each full unsaved minute so focus quests advance during the session
@@ -702,100 +815,115 @@ export function GlobalTimer() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isRunning, endTime, setPhaseElapsed, showNotification]);
 
-  // The Main Loop
+  // The Main Loop. A self-correcting timeout aligned to the next whole second of
+  // the countdown, not a fixed 1000ms interval: interval drift eventually lands
+  // two ticks inside the same second, which shows a repeated then skipped
+  // second even in a foreground tab.
   useEffect(() => {
     if (!isRunning || !endTime) return;
 
     let lastTick = Date.now();
+    let handle = 0;
+    let stopped = false;
 
-    const interval = setInterval(() => {
+    const stop = () => {
+      stopped = true;
+      window.clearTimeout(handle);
+    };
+
+    const tick = () => {
       const now = Date.now();
       const gap = now - lastTick;
       lastTick = now;
-      const remaining = Math.max(0, Math.round((endTime - now) / 1000));
+      const remaining = Math.max(0, Math.ceil((endTime - now) / 1000));
 
       // Set title synchronously before tickTimer so it lands before React renders
-      const m = Math.floor(remaining / 60).toString().padStart(2, '0');
-      const s = (remaining % 60).toString().padStart(2, '0');
-      document.title = `${m}:${s} - Frogress`;
+      writeDocumentTitle();
 
       tickTimer(remaining);
 
-      if (now >= endTime) {
-        clearInterval(interval);
-
-        // A large gap between ticks means the webview was suspended (backgrounded
-        // app) and this 0 reflects time that elapsed off-screen, not a real-time
-        // countdown. The server already processed this completion (its scheduler/
-        // ticker) and the resume resync delivers the authoritative result — so
-        // don't fire a duplicate alarm/advance here (which re-rang a session the
-        // user had already Done'd from the Dynamic Island).
-        if (gap > 2500) return;
-
-        // The non-owning device never drives the transition; it waits for the
-        // server's authoritative next phase to arrive over SSE.
-        if (!ownsTimerRef.current) return;
-
-        const completedPhase = phaseRef.current;
-        const willAutoStart =
-          completedPhase === 'focus' && settingsRef.current.autoStartBreaks;
-
-        // The server is the single authority for the phase transition (and for
-        // recording the completed phase's progress). Ask it to advance and apply
-        // the result — applyRemoteTimer detects the completion and drives the
-        // alarm + Done prompt. Fall back to a local transition only if the
-        // request fails (e.g. offline), handling the alarm here in that case.
-        void (async () => {
-          try {
-            const res = await fetch('/api/frogodoro/advance', {
-              method: 'POST',
-              credentials: 'include',
-            });
-            if (res.ok) {
-              const data = await res.json();
-              if (data?.timer) {
-                applyRemoteTimer(
-                  data.timer as ActiveFrogodoroTimer,
-                  typeof data.serverNow === 'number' ? data.serverNow : Date.now(),
-                  typeof data.seq === 'number' ? data.seq : -1,
-                );
-                return;
-              }
-            }
-            throw new Error('advance failed');
-          } catch {
-            if (selectedTaskIdRef.current) {
-              const phaseDuration = getPhaseDuration(
-                phaseRef.current,
-                settingsRef.current,
-              );
-              const unsavedElapsed = Math.max(
-                0,
-                phaseDuration - phaseElapsedRef.current,
-              );
-              if (unsavedElapsed > 0) {
-                saveProgress(
-                  selectedTaskIdRef.current,
-                  phaseRef.current,
-                  unsavedElapsed,
-                );
-              }
-            }
-            // Offline: applyRemoteTimer never ran, so own the alarm here.
-            // completePhase sets awaitingDone (paused case) → the awaitingDone
-            // effect plays the looping alarm; an auto-started break just beeps.
-            if (willAutoStart) {
-              playTransitionBeep();
-              hapticImpact();
-            }
-            completePhase(willAutoStart);
-          }
-        })();
+      if (now < endTime) {
+        if (stopped) return;
+        const untilNextSecond = (endTime - now) % 1000 || 1000;
+        handle = window.setTimeout(tick, Math.max(50, untilNextSecond));
+        return;
       }
-    }, 1000);
 
-    return () => clearInterval(interval);
-  }, [isRunning, endTime, completePhase, tickTimer, applyRemoteTimer]);
+      stop();
+
+      // A large gap between ticks means the webview was suspended (backgrounded
+      // app) and this 0 reflects time that elapsed off-screen, not a real-time
+      // countdown. The server already processed this completion (its scheduler/
+      // ticker) and the resume resync delivers the authoritative result — so
+      // don't fire a duplicate alarm/advance here (which re-rang a session the
+      // user had already Done'd from the Dynamic Island).
+      if (gap > 2500) return;
+
+      // The non-owning device never drives the transition; it waits for the
+      // server's authoritative next phase to arrive over SSE.
+      if (!ownsTimerRef.current) return;
+
+      const completedPhase = phaseRef.current;
+      const willAutoStart =
+        completedPhase === 'focus' && settingsRef.current.autoStartBreaks;
+
+      // The server is the single authority for the phase transition (and for
+      // recording the completed phase's progress). Ask it to advance and apply
+      // the result — applyRemoteTimer detects the completion and drives the
+      // alarm + Done prompt. Fall back to a local transition only if the
+      // request fails (e.g. offline), handling the alarm here in that case.
+      void (async () => {
+        try {
+          const res = await fetch('/api/frogodoro/advance', {
+            method: 'POST',
+            credentials: 'include',
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data?.timer) {
+              applyRemoteTimer(
+                data.timer as ActiveFrogodoroTimer,
+                typeof data.serverNow === 'number' ? data.serverNow : Date.now(),
+                typeof data.seq === 'number' ? data.seq : -1,
+              );
+              return;
+            }
+          }
+          throw new Error('advance failed');
+        } catch {
+          if (selectedTaskIdRef.current) {
+            const phaseDuration = getPhaseDuration(
+              phaseRef.current,
+              settingsRef.current,
+            );
+            const unsavedElapsed = Math.max(
+              0,
+              phaseDuration - phaseElapsedRef.current,
+            );
+            if (unsavedElapsed > 0) {
+              saveProgress(
+                selectedTaskIdRef.current,
+                phaseRef.current,
+                unsavedElapsed,
+              );
+            }
+          }
+          // Offline: applyRemoteTimer never ran, so own the alarm here.
+          // completePhase sets awaitingDone (paused case) → the awaitingDone
+          // effect plays the looping alarm; an auto-started break just beeps.
+          if (willAutoStart) {
+            playTransitionBeep();
+            hapticImpact();
+          }
+          completePhase(willAutoStart);
+        }
+      })();
+    };
+
+    tick();
+
+    return stop;
+  }, [isRunning, endTime, completePhase, tickTimer, applyRemoteTimer, writeDocumentTitle]);
 
   // Schedule the OS-level completion notification whenever a phase is running,
   // so it lands on time regardless of whether the app is open. Only the device
@@ -812,14 +940,30 @@ export function GlobalTimer() {
     } else {
       void cancelTimerNotifications();
     }
-  }, [isRunning, endTime, phase, settings.autoStartBreaks, settings.breakDuration]);
+  }, [
+    isRunning,
+    endTime,
+    phase,
+    settings.autoStartBreaks,
+    settings.breakDuration,
+    settings.timerSound,
+  ]);
 
-  // Reset tab title when timer stops
+  // A hidden tab's timers are throttled to once a minute by the browser, so the
+  // title freezes mid-countdown and then jumps. Rewrite it the moment the tab is
+  // looked at again (and on every state change), rather than waiting for a tick.
   useEffect(() => {
-    if (!isRunning) {
-      document.title = 'Frogress';
-    }
-  }, [isRunning]);
+    writeDocumentTitle();
+    const onWake = () => {
+      if (document.visibilityState === 'visible') writeDocumentTitle();
+    };
+    document.addEventListener('visibilitychange', onWake);
+    window.addEventListener('focus', onWake);
+    return () => {
+      document.removeEventListener('visibilitychange', onWake);
+      window.removeEventListener('focus', onWake);
+    };
+  }, [writeDocumentTitle, isRunning, timerActive, awaitingDone, endTime]);
 
   return null;
 }
