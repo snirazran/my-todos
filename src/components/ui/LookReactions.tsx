@@ -1,90 +1,9 @@
 'use client';
 
 import React from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { LOOK_REACTIONS, REACTION_EMOJI } from '@/lib/friends/lookReactions';
 import { useLookReactions } from '@/hooks/useLookReactions';
-
-/**
- * The react control on a friend's row. Tapping opens a small emoji tray;
- * picking one sends it. Once sent today the chosen emoji stays as the state,
- * so the row shows what you already said rather than re-prompting.
- */
-export function ReactButton({
-  toUserId,
-  className,
-}: {
-  toUserId: string;
-  className?: string;
-}) {
-  const { sentToday, react } = useLookReactions();
-  const [open, setOpen] = React.useState(false);
-  const sent = sentToday[toUserId];
-  const rootRef = React.useRef<HTMLDivElement | null>(null);
-
-  React.useEffect(() => {
-    if (!open) return;
-    const onDown = (event: MouseEvent | TouchEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('touchstart', onDown);
-    return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('touchstart', onDown);
-    };
-  }, [open]);
-
-  return (
-    <div ref={rootRef} className={cn('relative', className)}>
-      <button
-        type="button"
-        aria-label={sent ? 'You reacted to this look' : 'React to this look'}
-        onClick={(event) => {
-          event.stopPropagation();
-          if (sent) return;
-          setOpen((v) => !v);
-        }}
-        className={cn(
-          'flex h-9 w-9 items-center justify-center rounded-full border text-base transition-colors',
-          sent
-            ? 'border-emerald-400/60 bg-emerald-50 dark:bg-emerald-950/40'
-            : 'border-border/60 bg-card hover:bg-accent/60',
-        )}
-      >
-        {sent ? REACTION_EMOJI[sent] : '＋'}
-      </button>
-
-      <AnimatePresence>
-        {open && !sent && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9, y: 4 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.9, y: 4 }}
-            transition={{ type: 'spring', stiffness: 420, damping: 26 }}
-            className="absolute bottom-full right-0 z-30 mb-1.5 flex gap-1 rounded-2xl border border-border/60 bg-card p-1.5 shadow-lg"
-          >
-            {LOOK_REACTIONS.map((kind) => (
-              <button
-                key={kind}
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setOpen(false);
-                  void react(toUserId, kind);
-                }}
-                className="flex h-9 w-9 items-center justify-center rounded-xl text-lg transition-transform hover:scale-110 active:scale-95"
-              >
-                {REACTION_EMOJI[kind]}
-              </button>
-            ))}
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
 
 /**
  * The full reaction row, for surfaces with room to show every option at once

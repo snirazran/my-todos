@@ -8,11 +8,21 @@ import {
   patchInventoryWishlist,
 } from '@/hooks/useInventory';
 import { hapticImpact, hapticTick } from '@/lib/haptics';
-import { wishlistProgress, type WishlistKind, type WishlistView } from '@/lib/skins/wishlist';
+import {
+  resolveWishlistPricing,
+  wishlistProgress,
+  type WishlistKind,
+  type WishlistView,
+} from '@/lib/skins/wishlist';
 
 type SummaryShape = {
   wishlist?: WishlistView | null;
   wardrobe?: { flies?: number };
+  dailyDeals?: {
+    itemId: string;
+    dealPrice: number;
+    discountPercent: number;
+  }[];
 };
 
 /**
@@ -30,8 +40,9 @@ export function useWishlist(enabled: boolean = true) {
 
   const wishlist = data?.wishlist ?? null;
   const balance = data?.wardrobe?.flies ?? 0;
-  const progress = wishlist
-    ? wishlistProgress(wishlist.price, balance)
+  const pricing = resolveWishlistPricing(wishlist, data?.dailyDeals);
+  const progress = pricing
+    ? wishlistProgress(pricing.price, balance)
     : null;
 
   const pin = useCallback(
@@ -73,5 +84,5 @@ export function useWishlist(enabled: boolean = true) {
     }
   }, [busy]);
 
-  return { wishlist, balance, progress, pin, clear, busy };
+  return { wishlist, balance, pricing, progress, pin, clear, busy };
 }

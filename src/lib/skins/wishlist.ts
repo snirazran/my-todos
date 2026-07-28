@@ -6,6 +6,11 @@ export type WishlistPin = {
   itemId: string;
   kind: WishlistKind;
   pinnedAt: string;
+  /**
+   * `${dayKey}:${itemId}` of the last deal we alerted on. One notification per
+   * appearance — re-pinning or rerolling must never re-fire the same alert.
+   */
+  notifiedDealKey?: string | null;
 };
 
 export type WishlistView = WishlistPin & {
@@ -68,6 +73,30 @@ export function catalogToWishlistSource(item: ItemDef): WishlistSource {
     priceFlies: item.priceFlies,
     slot: item.slot,
     riveIndex: item.riveIndex,
+  };
+}
+
+/**
+ * What the pinned item actually costs right now. When it lands on the daily
+ * shelf the goal has to move with it — otherwise the counter keeps saving
+ * toward a price nobody is charging today.
+ */
+export function resolveWishlistPricing(
+  wishlist: WishlistView | null | undefined,
+  deals:
+    | { itemId: string; dealPrice: number; discountPercent: number }[]
+    | undefined,
+) {
+  if (!wishlist) return null;
+  const deal =
+    wishlist.kind === 'item'
+      ? deals?.find((entry) => entry.itemId === wishlist.itemId)
+      : undefined;
+  return {
+    price: deal ? deal.dealPrice : wishlist.price,
+    fullPrice: wishlist.price,
+    discountPercent: deal?.discountPercent ?? 0,
+    onDeal: !!deal,
   };
 }
 

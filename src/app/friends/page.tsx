@@ -50,7 +50,7 @@ import {
 } from '@/hooks/useInventory';
 import { markFlyEarn } from '@/lib/flyEarn';
 import { FlyCounter } from '@/components/ui/FlyCounter';
-import { LookNoticeCard, ReactButton } from '@/components/ui/LookReactions';
+import { LookNoticeCard } from '@/components/ui/LookReactions';
 import { MobileHeaderActions } from '@/components/ui/MobileHeaderActions';
 import { MobileMenuCluster } from '@/components/ui/siteHeader';
 import { FlyCatchSwipeLauncher } from '@/components/ui/FlyCatchSwipeLauncher';
@@ -867,12 +867,6 @@ function LeaderboardRow({
           <ChevronRight className="hidden h-5 w-5 text-muted-foreground/60 min-[380px]:block" />
         </div>
       </button>
-      {!entry.isYou && (
-        <ReactButton
-          toUserId={entry.userId}
-          className="absolute bottom-1 left-1 z-20"
-        />
-      )}
     </li>
   );
 }

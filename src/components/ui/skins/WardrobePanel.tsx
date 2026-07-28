@@ -870,7 +870,21 @@ function WardrobeManagerContent({
 
   const shopItems = useMemo(() => {
     if (!data?.catalog) return [];
-    return getFilteredItems(data.catalog.filter((i) => i.slot !== 'container'));
+    // Anything on today's shelf is excluded from the main grid — showing the
+    // same item twice, once discounted and once at full price, makes the deal
+    // look like a trick and the grid price look wrong. Only when the shelf is
+    // actually on screen, though: under a category filter it's hidden, and
+    // dropping the items there would make them disappear from the shop.
+    const dealsVisible =
+      activeFilter === 'all' && !!data.dailyDeals?.length;
+    const onDeal = dealsVisible
+      ? new Set(data.dailyDeals!.map((deal) => deal.itemId))
+      : null;
+    return getFilteredItems(
+      data.catalog.filter(
+        (i) => i.slot !== 'container' && !onDeal?.has(i.id),
+      ),
+    );
   }, [data, activeFilter, sortBy]);
 
   const inventoryGrid = useInfiniteScroll(inventoryItems, {
@@ -1026,21 +1040,37 @@ function WardrobeManagerContent({
 
   // Deep link (?item=…): open that item's purchase sheet once its catalog has
   // loaded. Fires once per id so closing the sheet doesn't immediately reopen.
+  //
+  // Deliberately waits for the grid behind it to lay out and paint first. The
+  // sheet locks body scroll while it's open, and opening it in the same frame
+  // the shop first mounts left the grid behind it blank until a scroll forced
+  // a repaint (mobile only).
   const focusHandledRef = React.useRef<string | null>(null);
   useEffect(() => {
     if (!focusItemId || focusHandledRef.current === focusItemId) return;
+
+    let open: (() => void) | null = null;
     if (focusItemKind === 'background') {
       const bgItem = bg.catalog.find((entry) => entry.id === focusItemId);
       if (!bgItem) return;
-      focusHandledRef.current = focusItemId;
-      openBgPurchase(bgItem);
-      return;
+      open = () => openBgPurchase(bgItem);
+    } else {
+      const item = data?.catalog?.find((entry) => entry.id === focusItemId);
+      if (!item) return;
+      const deal = data?.dailyDeals?.find((d) => d.itemId === focusItemId);
+      open = () =>
+        openItemPurchase(item, data?.isPremium && deal ? deal.dealPrice : null);
     }
-    const item = data?.catalog?.find((entry) => entry.id === focusItemId);
-    if (!item) return;
+
     focusHandledRef.current = focusItemId;
-    const deal = data?.dailyDeals?.find((d) => d.itemId === focusItemId);
-    openItemPurchase(item, data?.isPremium && deal ? deal.dealPrice : null);
+    let inner = 0;
+    const outer = requestAnimationFrame(() => {
+      inner = requestAnimationFrame(() => open?.());
+    });
+    return () => {
+      cancelAnimationFrame(outer);
+      cancelAnimationFrame(inner);
+    };
   }, [
     focusItemId,
     focusItemKind,

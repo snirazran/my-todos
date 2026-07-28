@@ -12,7 +12,10 @@ import { RARITY_CONFIG } from '@/components/ui/gift-box/constants';
 import { useCountdown } from '@/components/ui/skins/DailyDealsShelf';
 import { useInventory } from '@/hooks/useInventory';
 import { useAuth } from '@/components/auth/AuthContext';
-import { wishlistProgress } from '@/lib/skins/wishlist';
+import {
+  resolveWishlistPricing,
+  wishlistProgress,
+} from '@/lib/skins/wishlist';
 import { rarityRank, type ItemDef } from '@/lib/skins/catalog';
 import { hapticTick } from '@/lib/haptics';
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
@@ -86,7 +89,8 @@ export function HomeShopRail() {
   const deals = data?.dailyDeals ?? [];
   const countdown = useCountdown(deals[0]?.endsAt);
   const wishlist = data?.wishlist ?? null;
-  const goal = wishlist ? wishlistProgress(wishlist.price, balance) : null;
+  const pricing = resolveWishlistPricing(wishlist, deals);
+  const goal = pricing ? wishlistProgress(pricing.price, balance) : null;
 
   const picks = React.useMemo<ShopPick[]>(() => {
     const byId = new Map((data?.catalog ?? []).map((i) => [i.id, i]));
@@ -154,8 +158,6 @@ export function HomeShopRail() {
     );
   };
 
-  const affordableCount = picks.filter((p) => p.price <= balance).length;
-
   return (
     <div ref={rootRef} className="mx-1.5 mt-4 md:mx-4 md:mt-8">
       {goal && wishlist && !goal.reached && (
@@ -177,10 +179,29 @@ export function HomeShopRail() {
             </span>
             <span className="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-muted">
               <span
-                className="block h-full rounded-full bg-primary transition-[width] duration-700 ease-out"
+                className={cn(
+                  'block h-full rounded-full transition-[width] duration-700 ease-out',
+                  pricing?.onDeal ? 'bg-amber-500' : 'bg-primary',
+                )}
                 style={{ width: `${Math.round(goal.ratio * 100)}%` }}
               />
             </span>
+            {/* On the shelf today: the goal moved, so show the price that's
+                actually being charged and what it was. */}
+            {pricing?.onDeal && (
+              <span className="mt-1.5 flex items-center gap-1.5">
+                <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-amber-700 dark:text-amber-400">
+                  {pricing.discountPercent}% off today
+                </span>
+                <span className="text-[10px] font-bold tabular-nums text-muted-foreground line-through decoration-2 opacity-70">
+                  {pricing.fullPrice.toLocaleString()}
+                </span>
+                <span className="inline-flex items-center gap-0.5 text-[11px] font-black tabular-nums text-foreground">
+                  <Fly size={16} paused y={-2} />
+                  {pricing.price.toLocaleString()}
+                </span>
+              </span>
+            )}
           </span>
         </button>
       )}
@@ -274,11 +295,6 @@ export function HomeShopRail() {
         })}
       </DragScrollRow>
 
-      {affordableCount > 0 && (
-        <p className="mt-2 px-1 text-[11px] font-semibold text-muted-foreground">
-          You can afford {affordableCount} of {picks.length} right now.
-        </p>
-      )}
     </div>
   );
 }

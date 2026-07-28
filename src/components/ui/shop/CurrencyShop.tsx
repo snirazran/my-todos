@@ -16,6 +16,7 @@ import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
 import { getFlyPackPrices, purchaseFlyPack } from '@/lib/purchases';
 import type { FlyPackId } from '@/lib/flyPacks';
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
+import { WishlistGoalCard } from './WishlistGoalCard';
 
 type Pack = {
   id: string;
@@ -97,9 +98,17 @@ export function CurrencyShop() {
             ref={bindScroll}
             className="min-h-0 flex-1 overflow-y-auto overscroll-none px-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]"
           >
+            <WishlistGoalCard open={open} onNavigate={() => setOpen(false)} />
+
+            <p className="mb-2 mt-5 px-1 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">
+              Free flies
+            </p>
             <FreeFliesCard open={open} />
 
-            <div className="mt-4 grid grid-cols-3 gap-2.5 sm:gap-4">
+            <p className="mb-2 mt-5 px-1 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">
+              Top up
+            </p>
+            <div className="grid grid-cols-3 gap-2.5 sm:gap-4">
               {PACKS.map((pack) => (
                 <PackCard key={pack.id} pack={{ ...pack, price: storePrices[pack.id as FlyPackId] ?? pack.price }} onPurchased={() => {
                   window.setTimeout(() => void mutateInventory(), 1200);

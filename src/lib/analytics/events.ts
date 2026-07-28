@@ -85,6 +85,7 @@ export const ANALYTICS_EVENTS = [
   'daily_deals_rerolled',
   'look_saved',
   'look_applied',
+  'wishlist_deal_notified',
 ] as const;
 
 export type AnalyticsEventName = (typeof ANALYTICS_EVENTS)[number];
@@ -180,6 +181,7 @@ const EVENT_CATEGORIES: Record<AnalyticsEventName, string> = {
   daily_deals_rerolled: 'economy',
   look_saved: 'economy',
   look_applied: 'economy',
+  wishlist_deal_notified: 'economy',
 };
 
 export function analyticsCategory(name: AnalyticsEventName) {
