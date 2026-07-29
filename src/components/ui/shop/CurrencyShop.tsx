@@ -17,6 +17,7 @@ import { getFlyPackPrices, purchaseFlyPack } from '@/lib/purchases';
 import type { FlyPackId } from '@/lib/flyPacks';
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
 import { WishlistGoalCard } from './WishlistGoalCard';
+import { BundleArt } from './BundleArt';
 
 type Pack = {
   id: string;
@@ -109,8 +110,8 @@ export function CurrencyShop() {
               Top up
             </p>
             <div className="grid grid-cols-3 gap-2.5 sm:gap-4">
-              {PACKS.map((pack) => (
-                <PackCard key={pack.id} pack={{ ...pack, price: storePrices[pack.id as FlyPackId] ?? pack.price }} onPurchased={() => {
+              {PACKS.map((pack, index) => (
+                <PackCard key={pack.id} bundle={index + 1} pack={{ ...pack, price: storePrices[pack.id as FlyPackId] ?? pack.price }} onPurchased={() => {
                   window.setTimeout(() => void mutateInventory(), 1200);
                   window.setTimeout(() => void mutateInventory(), 5000);
                   window.setTimeout(() => void mutateInventory(), 15000);
@@ -130,7 +131,7 @@ export function CurrencyShop() {
   );
 }
 
-function PackCard({ pack, onPurchased }: { pack: Pack; onPurchased: () => void }) {
+function PackCard({ pack, bundle, onPurchased }: { pack: Pack; bundle: number; onPurchased: () => void }) {
   const popular = pack.badge === 'popular';
   const best = pack.badge === 'best';
   const [busy, setBusy] = useState(false);
@@ -153,6 +154,19 @@ function PackCard({ pack, onPurchased }: { pack: Pack; onPurchased: () => void }
       setBusy(false);
     }
   };
+  const flyCluster = (
+    <div className="flex h-full items-end justify-center">
+      {pack.flies.map((size, i) => (
+        <span
+          key={i}
+          className={cn(i > 0 && '-ml-2 sm:-ml-1.5')}
+          style={{ transform: `translateY(${i % 2 === 1 ? -8 : 0}px)` }}
+        >
+          <Fly size={size} y={-2} alwaysPlay />
+        </span>
+      ))}
+    </div>
+  );
   return (
     <button
       type="button"
@@ -180,16 +194,16 @@ function PackCard({ pack, onPurchased }: { pack: Pack; onPurchased: () => void }
         </span>
       )}
 
-      <div className="flex h-12 items-end justify-center sm:h-14">
-        {pack.flies.map((size, i) => (
-          <span
-            key={i}
-            className={cn(i > 0 && '-ml-2 sm:-ml-1.5')}
-            style={{ transform: `translateY(${i % 2 === 1 ? -8 : 0}px)` }}
-          >
-            <Fly size={size} y={-2} paused />
-          </span>
-        ))}
+      <div className="flex h-16 w-full items-end justify-center sm:h-20">
+        {bundle === 1 ? (
+          flyCluster
+        ) : (
+          <BundleArt
+            bundle={bundle}
+            className="h-full w-full"
+            fallback={flyCluster}
+          />
+        )}
       </div>
 
       <p className="mt-1.5 text-xl font-black leading-none tabular-nums text-foreground sm:text-2xl">

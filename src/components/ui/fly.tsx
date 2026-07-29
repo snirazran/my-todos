@@ -33,6 +33,10 @@ type FlyProps = {
    * transforms (pulse/pop animations) — without it the compositor stretches
    * the bitmap past its pixel density and the fly blurs. */
   oversample?: number;
+  /** Renders the asset's premium artwork (isPremium) instead of the plain fly.
+   * Premium flies share their own master instance, so mixing both variants on
+   * one screen costs a second Rive instance. */
+  premium?: boolean;
 };
 
 const Fly = memo(forwardRef<HTMLSpanElement, FlyProps>(
@@ -49,6 +53,7 @@ const Fly = memo(forwardRef<HTMLSpanElement, FlyProps>(
       onLoad,
       interactive = true,
       oversample = 1,
+      premium = false,
     },
     ref,
   ) => {
@@ -69,6 +74,7 @@ const Fly = memo(forwardRef<HTMLSpanElement, FlyProps>(
       const handle = attachFlyCanvas(canvas, {
         ignoreInteractionPause: alwaysPlay,
         ignoreIdlePause,
+        variant: premium ? 'premium' : 'default',
       });
       handleRef.current = handle;
       onLoadRef.current?.();
@@ -76,7 +82,7 @@ const Fly = memo(forwardRef<HTMLSpanElement, FlyProps>(
         handle?.detach();
         handleRef.current = null;
       };
-    }, [alwaysPlay, ignoreIdlePause]);
+    }, [alwaysPlay, ignoreIdlePause, premium]);
 
     useEffect(() => {
       const canvas = canvasRef.current;

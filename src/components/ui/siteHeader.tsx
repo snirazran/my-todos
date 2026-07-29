@@ -45,9 +45,24 @@ import { HelpCenterPanel, ContactPanel } from '@/components/ui/HelpCenter';
 import { cn } from '@/lib/utils';
 
 const wardrobeItems = [
-  { tab: 'inventory' as const, label: 'Inventory', color: 'bg-primary/10' },
-  { tab: 'shop' as const, label: 'Shop', color: 'bg-sky-500/10' },
-  { tab: 'trade' as const, label: 'Trade', color: 'bg-amber-500/10' },
+  {
+    tab: 'inventory' as const,
+    label: 'Inventory',
+    color: 'bg-primary/10',
+    icon: 'wardrobe' as const,
+  },
+  {
+    tab: 'shop' as const,
+    label: 'Shop',
+    color: 'bg-sky-500/10',
+    icon: 'store' as const,
+  },
+  {
+    tab: 'trade' as const,
+    label: 'Trade',
+    color: 'bg-amber-500/10',
+    icon: 'trade' as const,
+  },
 ];
 
 export default function SiteHeader() {
@@ -268,15 +283,11 @@ export default function SiteHeader() {
                                     </span>
                                   )}
                                   <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${wItem.color}`}>
-                                    {wItem.tab === 'shop' ? (
-                                      <img src="/fly.svg" alt="" className="h-6 w-6" />
-                                    ) : (
-                                      <Icon
-                                        name={wItem.tab === 'inventory' ? 'wardrobe' : 'repeat'}
-                                        label={wItem.label}
-                                        className="w-6 h-6"
-                                      />
-                                    )}
+                                    <Icon
+                                      name={wItem.icon}
+                                      label={wItem.label}
+                                      className="w-7 h-7"
+                                    />
                                   </div>
                                   <span className="text-xs font-bold text-foreground">{wItem.label}</span>
                                 </button>

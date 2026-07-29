@@ -15,7 +15,6 @@ import {
   Lock,
   Shirt,
   ShoppingBag,
-  Repeat,
   Check,
   ChevronDown,
   Sparkles,
@@ -29,6 +28,7 @@ import type { ItemDef, WardrobeSlot } from '@/lib/skins/catalog';
 import { rarityRank, byId as staticById, sellPriceOf } from '@/lib/skins/catalog';
 import Fly from '@/components/ui/fly';
 import Frog from '@/components/ui/frog';
+import { Icon as AppIcon } from '@/components/ui/Icon';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
 import { GiftRive } from '@/components/ui/gift-box/GiftBox';
 import { ItemCard } from './ItemCard';
@@ -1350,7 +1350,7 @@ function WardrobeManagerContent({
                   onClick={scrollPageToTop}
                   data-hint="wardrobe-inventory-tab"
                 >
-                  <Shirt className="w-4 h-4" />
+                  <AppIcon name="wardrobe" className="w-5 h-5" />
                   <span className="hidden xs:inline">Wardrobe</span>
                   <span className="xs:hidden">INV</span>
                 </TabsTrigger>
@@ -1360,7 +1360,7 @@ function WardrobeManagerContent({
                   onClick={scrollPageToTop}
                   data-hint="wardrobe-shop-tab"
                 >
-                  <ShoppingBag className="w-4 h-4" />
+                  <AppIcon name="store" className="w-5 h-5" />
                   <span>Shop</span>
                 </TabsTrigger>
                 <TabsTrigger
@@ -1369,7 +1369,7 @@ function WardrobeManagerContent({
                   onClick={scrollPageToTop}
                   data-hint="wardrobe-trade-tab"
                 >
-                  <Repeat className="w-4 h-4" />
+                  <AppIcon name="trade" className="w-5 h-5" />
                   <span>Trade</span>
                 </TabsTrigger>
               </TabsList>

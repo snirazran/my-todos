@@ -16,7 +16,11 @@ export const urlCache = new Map<string, string>();
 // Bump when fly_idle.riv is re-exported. Rive assets are converted to Blob
 // URLs and retained in memory, so a content version prevents an older export
 // from surviving browser/CDN caches.
-export const FLY_RIVE_ASSET_URL = '/fly_idle.riv?v=60715001';
+export const FLY_RIVE_ASSET_URL = '/fly_idle.riv?v=60715002';
+// Each fly pack ships as its own export (store_bundle-2 … store_bundle-6);
+// pack 1 uses the shared fly_idle artwork instead.
+export const storeBundleRiveUrl = (bundle: number) =>
+  `/store_bundle-${bundle}.riv?v=60729001`;
 
 export const riveDevicePixelRatio = (cap = 2) => {
   if (typeof window === 'undefined') return 1;

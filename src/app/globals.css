@@ -379,39 +379,10 @@ body:has([data-public-home]) #main-scroll {
 .premium-fly-tilt {
   animation: premium-fly-bank 14.8s ease-in-out infinite;
 }
-.premium-fly-gold {
-  position: relative;
-}
-
-/* Apply the color grade to the rendered leaf canvas. Keeping the filter off
-   the transformed orbit wrappers prevents Android WebView and WKWebView from
-   separating the canvas from its filtered ancestor layer. The glow lives on a
-   static sibling (.premium-fly-glow) instead of drop-shadow filters — the
-   canvas repaints every frame, so per-frame Gaussian blurs are a real
-   GPU/thermal cost. */
-.premium-fly-gold canvas {
-  position: relative;
-  -webkit-filter: sepia(1) saturate(2.4) hue-rotate(-12deg) brightness(1.2);
-  filter: sepia(1) saturate(2.4) hue-rotate(-12deg) brightness(1.2);
-}
-
-.premium-fly-glow {
-  position: absolute;
-  inset: -22%;
-  border-radius: 9999px;
-  background: radial-gradient(
-    circle,
-    rgba(251, 191, 36, 0.42) 0%,
-    rgba(251, 191, 36, 0.16) 45%,
-    transparent 70%
-  );
-}
-
 @media (prefers-reduced-motion: reduce) {
   .premium-fly-orbit,
   .premium-fly-bob,
-  .premium-fly-tilt,
-  .premium-fly-gold {
+  .premium-fly-tilt {
     animation: none;
   }
 }

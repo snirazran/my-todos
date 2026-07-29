@@ -3,9 +3,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Clock, Repeat, Shirt, ShoppingBag } from 'lucide-react';
+import { Clock } from 'lucide-react';
 import { useCountdown } from '@/components/ui/skins/DailyDealsShelf';
 import Fly from '@/components/ui/fly';
+import { Icon } from '@/components/ui/Icon';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
 import { useAuth } from '@/components/auth/AuthContext';
 import { useInventory } from '@/hooks/useInventory';
@@ -214,7 +215,7 @@ export function WardrobePopup({
                   glyph you tap is the glyph you land on. */}
               <div className="grid grid-cols-3 gap-2.5 px-4">
                 <DestinationCard
-                  icon={<Shirt className="h-6 w-6" strokeWidth={2.25} />}
+                  icon={<Icon name="wardrobe" className="h-8 w-8" />}
                   label="Inventory"
                   detail={ownedCount > 0 ? `${ownedCount} owned` : 'Empty'}
                   badge={inventoryBadge}
@@ -222,7 +223,7 @@ export function WardrobePopup({
                   onClick={() => pick('inventory')}
                 />
                 <DestinationCard
-                  icon={<ShoppingBag className="h-6 w-6" strokeWidth={2.25} />}
+                  icon={<Icon name="store" className="h-8 w-8" />}
                   label="Shop"
                   detail={dealCountdown || 'New daily'}
                   detailTone={dealCountdown ? 'amber' : 'muted'}
@@ -232,7 +233,7 @@ export function WardrobePopup({
                   onClick={() => pick('shop')}
                 />
                 <DestinationCard
-                  icon={<Repeat className="h-6 w-6" strokeWidth={2.25} />}
+                  icon={<Icon name="trade" className="h-8 w-8" />}
                   label="Trade"
                   detail={
                     tradeReady

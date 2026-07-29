@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronRight, Sparkles } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Fly from '@/components/ui/fly';
 import Frog from '@/components/ui/frog';
@@ -35,28 +35,7 @@ export function WishlistGoalCard({
     router.push(path);
   };
 
-  if (!wishlist || !pricing || !progress) {
-    return (
-      <button
-        type="button"
-        onClick={() => go('/wardrobe?tab=shop')}
-        className="mt-1 flex w-full items-center gap-3 rounded-[20px] border border-dashed border-border bg-muted/30 p-3.5 text-left transition-colors hover:bg-muted/50"
-      >
-        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-background text-muted-foreground">
-          <Sparkles className="h-5 w-5" />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block text-sm font-black text-foreground">
-            Pick something to save for
-          </span>
-          <span className="block text-xs font-semibold text-muted-foreground">
-            Your counter fills as you catch.
-          </span>
-        </span>
-        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-      </button>
-    );
-  }
+  if (!wishlist || !pricing || !progress) return null;
 
   const config = RARITY_CONFIG[wishlist.rarity];
   const itemPath = `/wardrobe?tab=shop&item=${encodeURIComponent(wishlist.itemId)}&kind=${wishlist.kind}`;

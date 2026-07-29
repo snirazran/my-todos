@@ -79,14 +79,12 @@ export function PremiumFrogAura({
         <div className="premium-fly-orbit" style={{ ...phase.orbit, ...playState }}>
           <div className="premium-fly-bob" style={{ ...phase.bob, ...playState }}>
             <div className="premium-fly-tilt" style={{ ...phase.tilt, ...playState }}>
-              <div className="premium-fly-gold">
-                <span className="premium-fly-glow" aria-hidden />
-                <Fly
-                  size={flySize ?? (compact ? 26 : 46)}
-                  interactive={false}
-                  alwaysPlay={alwaysPlay}
-                />
-              </div>
+              <Fly
+                size={flySize ?? (compact ? 26 : 46)}
+                interactive={false}
+                alwaysPlay={alwaysPlay}
+                premium
+              />
             </div>
           </div>
         </div>

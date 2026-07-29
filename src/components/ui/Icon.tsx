@@ -19,6 +19,8 @@ import Quests from '../../../public/icons/Quests.svg';
 import Repeat from '../../../public/icons/Repeat.svg';
 import Saved from '../../../public/icons/saved.svg';
 import Shuffle from '../../../public/icons/Shuffle.svg';
+import Store from '../../../public/icons/Store.svg';
+import Trade from '../../../public/icons/Trade.svg';
 import Wardrobe from '../../../public/icons/Wardrobe.svg';
 
 const ICONS = {
@@ -38,6 +40,8 @@ const ICONS = {
   repeat: Repeat,
   saved: Saved,
   shuffle: Shuffle,
+  store: Store,
+  trade: Trade,
   wardrobe: Wardrobe,
 } satisfies Record<string, FC<SVGProps<SVGSVGElement>>>;
 

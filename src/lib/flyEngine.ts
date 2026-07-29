@@ -17,19 +17,34 @@ import { useRiveIdlePause } from './riveIdlePause';
  * fly, a single hidden "master" instance advances and rasterizes the artwork
  * once per frame, and each visible fly canvas receives a cheap `drawImage`
  * bitmap copy. The master pauses itself whenever no subscriber needs frames.
+ *
+ * One master exists per artwork variant (plain / premium), created lazily and
+ * torn down once its last canvas detaches, so the premium companion fly gets
+ * its own binding without every other fly on the page inheriting it — and
+ * without costing anything on screens that show no premium fly.
  */
 
 const MASTER_SIZE = 288;
+// The premium companion fly renders at 26–46px and never appears at the sizes
+// the catch/reward flies use, so its master rasterizes a quarter of the pixels.
+const PREMIUM_MASTER_SIZE = 144;
+// Grace period before a variant with no canvases left is destroyed, so a
+// route change that unmounts and immediately remounts flies doesn't reload.
+const TEARDOWN_DELAY_MS = 6000;
 const FLY_STATE_MACHINE = 'State Machine 1';
 const FLY_VIEW_MODEL = 'ViewModel1';
 const FLY_VIEW_MODEL_INSTANCE = 'Instance';
 const FLY_LIGHT_MODE_PROPERTY = 'light_mode';
+const FLY_PREMIUM_PROPERTY = 'isPremium';
 const FLY_WINGS_TRIGGER = 'wings';
 const FLY_WINGS_IDLE_STATE = 'Wings_idle';
 // Halving mip levels: blits pick the smallest level that still covers the
 // target canvas, so no single drawImage downscales by more than ~2x (a big
 // one-step downscale bypasses filtering and looks pixelated).
 const MIP_SIZES = [144, 72, 36];
+const PREMIUM_MIP_SIZES = [72, 36];
+
+export type FlyVariant = 'default' | 'premium';
 
 export interface FlyCanvasHandle {
   setPlaying: (playing: boolean) => void;
@@ -52,59 +67,102 @@ interface Mip {
   size: number;
 }
 
-const entries = new Map<HTMLCanvasElement, Entry>();
-let master: Rive | null = null;
-let masterCanvas: HTMLCanvasElement | null = null;
-let mips: Mip[] = [];
-let masterReady = false;
-let mipsValid = false;
-let creating = false;
+interface Master {
+  variant: FlyVariant;
+  size: number;
+  mipSizes: number[];
+  entries: Map<HTMLCanvasElement, Entry>;
+  rive: Rive | null;
+  canvas: HTMLCanvasElement | null;
+  mips: Mip[];
+  ready: boolean;
+  mipsValid: boolean;
+  creating: boolean;
+  lightMode: { value: number } | null;
+  wings: { trigger: () => void } | null;
+  teardownTimer: ReturnType<typeof setTimeout> | null;
+}
+
+function createMaster(variant: FlyVariant): Master {
+  const premium = variant === 'premium';
+  return {
+    variant,
+    size: premium ? PREMIUM_MASTER_SIZE : MASTER_SIZE,
+    mipSizes: premium ? PREMIUM_MIP_SIZES : MIP_SIZES,
+    entries: new Map(),
+    rive: null,
+    canvas: null,
+    mips: [],
+    ready: false,
+    mipsValid: false,
+    creating: false,
+    lightMode: null,
+    wings: null,
+    teardownTimer: null,
+  };
+}
+
+const masters: Record<FlyVariant, Master> = {
+  default: createMaster('default'),
+  premium: createMaster('premium'),
+};
+
+function forEachMaster(fn: (master: Master) => void) {
+  fn(masters.default);
+  fn(masters.premium);
+}
+
 let interactionPaused = false;
 let themeObserver: MutationObserver | null = null;
-let flyLightMode: { value: number } | null = null;
-let flyWings: { trigger: () => void } | null = null;
 
-function syncFlyTheme() {
-  if (!flyLightMode || typeof document === 'undefined') return;
+function syncFlyTheme(master: Master) {
+  if (!master.lightMode || typeof document === 'undefined') return;
   // The fly asset intentionally maps light_mode=1 to its dark-theme artwork.
   const value = document.documentElement.classList.contains('dark') ? 1 : 0;
-  flyLightMode.value = value;
-  masterCanvas?.setAttribute('data-light-mode', String(value));
+  master.lightMode.value = value;
+  master.canvas?.setAttribute('data-light-mode', String(value));
 
   // Theme changes can happen while an open sheet globally pauses Rive. Mark
   // every copy stale and advance the master once so the new binding paints
   // immediately; onAdvance will pause it again when no continuous frames are
   // needed.
-  mipsValid = false;
-  entries.forEach((entry) => {
+  master.mipsValid = false;
+  master.entries.forEach((entry) => {
     entry.hasFrame = false;
   });
-  if (master && !master.isPlaying) master.play();
+  if (master.rive && !master.rive.isPlaying) master.rive.play();
 }
 
-function bindFlyTheme() {
-  if (!master) return;
-  const viewModel = master.viewModelByName(FLY_VIEW_MODEL);
+function syncAllThemes() {
+  forEachMaster(syncFlyTheme);
+}
+
+function bindFlyViewModel(master: Master) {
+  const rive = master.rive;
+  if (!rive) return;
+  const viewModel = rive.viewModelByName(FLY_VIEW_MODEL);
   const instance = viewModel?.instanceByName(FLY_VIEW_MODEL_INSTANCE);
   if (!instance) return;
-  master.bindViewModelInstance(instance);
-  flyLightMode = instance.number(FLY_LIGHT_MODE_PROPERTY);
-  flyWings = instance.trigger(FLY_WINGS_TRIGGER);
-  syncFlyTheme();
-  flyWings?.trigger();
+  rive.bindViewModelInstance(instance);
+  master.lightMode = instance.number(FLY_LIGHT_MODE_PROPERTY);
+  master.wings = instance.trigger(FLY_WINGS_TRIGGER);
+  const premium = instance.boolean(FLY_PREMIUM_PROPERTY);
+  if (premium) premium.value = master.variant === 'premium';
+  syncFlyTheme(master);
+  master.wings?.trigger();
 }
 
 // The wings timeline is a one-shot: the state machine settles back on
 // Wings_idle when it ends, so re-fire the trigger every time that state is
 // re-entered to chain flaps into a continuous flying effect.
-function onStateChange(event: { data?: unknown }) {
+function onStateChange(master: Master, event: { data?: unknown }) {
   if (!Array.isArray(event.data)) return;
-  if (event.data.includes(FLY_WINGS_IDLE_STATE)) flyWings?.trigger();
+  if (event.data.includes(FLY_WINGS_IDLE_STATE)) master.wings?.trigger();
 }
 
 function observeTheme() {
   if (themeObserver || typeof document === 'undefined') return;
-  themeObserver = new MutationObserver(syncFlyTheme);
+  themeObserver = new MutationObserver(syncAllThemes);
   themeObserver.observe(document.documentElement, {
     attributes: true,
     attributeFilter: ['class'],
@@ -115,7 +173,7 @@ useRiveInteractionPause.subscribe((state) => {
   const paused = state.count > 0;
   if (paused === interactionPaused) return;
   interactionPaused = paused;
-  syncMasterPlayback();
+  forEachMaster(syncMasterPlayback);
 });
 
 // The idle pause is a separate axis from ignoreInteractionPause: alwaysPlay
@@ -126,7 +184,7 @@ let idlePaused = false;
 useRiveIdlePause.subscribe((state) => {
   if (state.idle === idlePaused) return;
   idlePaused = state.idle;
-  syncMasterPlayback();
+  forEachMaster(syncMasterPlayback);
 });
 
 function entryNeedsFrames(e: Entry) {
@@ -138,49 +196,50 @@ function entryNeedsFrames(e: Entry) {
   );
 }
 
-function syncMasterPlayback() {
-  if (!master || !masterReady) return;
+function syncMasterPlayback(master: Master) {
+  const rive = master.rive;
+  if (!rive || !master.ready) return;
   let needed = false;
-  entries.forEach((e) => {
+  master.entries.forEach((e) => {
     if (entryNeedsFrames(e)) needed = true;
   });
   if (needed) {
-    if (!master.isPlaying) {
-      master.play();
-      flyWings?.trigger();
+    if (!rive.isPlaying) {
+      rive.play();
+      master.wings?.trigger();
     }
-  } else if (master.isPlaying) {
-    master.pause();
+  } else if (rive.isPlaying) {
+    rive.pause();
   }
 }
 
-function updateMips() {
-  if (!masterCanvas) return;
-  let src: HTMLCanvasElement = masterCanvas;
-  for (const mip of mips) {
+function updateMips(master: Master) {
+  if (!master.canvas) return;
+  let src: HTMLCanvasElement = master.canvas;
+  for (const mip of master.mips) {
     mip.ctx.clearRect(0, 0, mip.size, mip.size);
     mip.ctx.drawImage(src, 0, 0, mip.size, mip.size);
     src = mip.canvas;
   }
 }
 
-function sourceFor(target: number): HTMLCanvasElement | null {
-  if (!masterCanvas) return null;
-  let src: HTMLCanvasElement = masterCanvas;
-  for (const mip of mips) {
+function sourceFor(master: Master, target: number): HTMLCanvasElement | null {
+  if (!master.canvas) return null;
+  let src: HTMLCanvasElement = master.canvas;
+  for (const mip of master.mips) {
     if (mip.size < target) break;
     src = mip.canvas;
   }
   return src;
 }
 
-function blit(e: Entry) {
-  if (!mipsValid) {
-    if (!masterReady) return;
-    updateMips();
-    mipsValid = true;
+function blit(master: Master, e: Entry) {
+  if (!master.mipsValid) {
+    if (!master.ready) return;
+    updateMips(master);
+    master.mipsValid = true;
   }
-  const src = sourceFor(Math.max(e.canvas.width, e.canvas.height));
+  const src = sourceFor(master, Math.max(e.canvas.width, e.canvas.height));
   if (!src) return;
   e.ctx.clearRect(0, 0, e.canvas.width, e.canvas.height);
   e.ctx.imageSmoothingEnabled = true;
@@ -189,72 +248,113 @@ function blit(e: Entry) {
   e.hasFrame = true;
 }
 
-function onAdvance() {
-  updateMips();
-  mipsValid = true;
-  entries.forEach((e) => {
-    if (entryNeedsFrames(e)) blit(e);
+function onAdvance(master: Master) {
+  updateMips(master);
+  master.mipsValid = true;
+  master.entries.forEach((e) => {
+    if (entryNeedsFrames(e)) blit(master, e);
   });
-  syncMasterPlayback();
+  syncMasterPlayback(master);
 }
 
-function ensureMaster() {
-  if (master || creating || typeof document === 'undefined') return;
-  creating = true;
-  masterCanvas = document.createElement('canvas');
-  masterCanvas.width = MASTER_SIZE;
-  masterCanvas.height = MASTER_SIZE;
+function ensureMaster(master: Master) {
+  if (master.teardownTimer) {
+    clearTimeout(master.teardownTimer);
+    master.teardownTimer = null;
+  }
+  if (master.rive || master.creating || typeof document === 'undefined') return;
+  master.creating = true;
+  const canvas = document.createElement('canvas');
+  master.canvas = canvas;
+  canvas.width = master.size;
+  canvas.height = master.size;
   // Rive's internal ResizeObserver treats a canvas without a layout box as
   // 0x0 and skips every draw (while still emitting Advance), so the master
   // must live in the DOM with real dimensions — just visually hidden.
-  masterCanvas.setAttribute('aria-hidden', 'true');
-  Object.assign(masterCanvas.style, {
+  canvas.setAttribute('aria-hidden', 'true');
+  canvas.setAttribute('data-fly-variant', master.variant);
+  Object.assign(canvas.style, {
     position: 'fixed',
     top: '0',
     left: '0',
-    width: `${MASTER_SIZE}px`,
-    height: `${MASTER_SIZE}px`,
+    width: `${master.size}px`,
+    height: `${master.size}px`,
     visibility: 'hidden',
     pointerEvents: 'none',
     zIndex: '-1',
   });
-  document.body.appendChild(masterCanvas);
-  mips = MIP_SIZES.map((size) => {
-    const canvas = document.createElement('canvas');
-    canvas.width = size;
-    canvas.height = size;
-    const ctx = canvas.getContext('2d')!;
+  document.body.appendChild(canvas);
+  master.mips = master.mipSizes.map((size) => {
+    const mipCanvas = document.createElement('canvas');
+    mipCanvas.width = size;
+    mipCanvas.height = size;
+    const ctx = mipCanvas.getContext('2d')!;
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
-    return { canvas, ctx, size };
+    return { canvas: mipCanvas, ctx, size };
   });
   preloadRiveAsset(FLY_RIVE_ASSET_URL).then((url) => {
-    master = new Rive({
+    if (master.canvas !== canvas) return;
+    master.rive = new Rive({
       src: url,
-      canvas: masterCanvas!,
+      canvas,
       stateMachines: FLY_STATE_MACHINE,
       autoplay: true,
       autoBind: false,
       shouldDisableRiveListeners: true,
       layout: new Layout({ fit: Fit.Contain, alignment: Alignment.Center }),
       onLoad: () => {
-        masterReady = true;
-        bindFlyTheme();
+        master.ready = true;
+        bindFlyViewModel(master);
         observeTheme();
-        master!.on(EventType.Advance, onAdvance);
-        master!.on(EventType.StateChange, onStateChange);
-        syncMasterPlayback();
+        master.rive!.on(EventType.Advance, () => onAdvance(master));
+        master.rive!.on(EventType.StateChange, (event) =>
+          onStateChange(master, event),
+        );
+        syncMasterPlayback(master);
       },
     });
   });
 }
 
+function destroyMaster(master: Master) {
+  master.teardownTimer = null;
+  if (master.entries.size > 0) return;
+  master.rive?.cleanup();
+  master.canvas?.remove();
+  master.rive = null;
+  master.canvas = null;
+  master.mips = [];
+  master.ready = false;
+  master.mipsValid = false;
+  master.creating = false;
+  master.lightMode = null;
+  master.wings = null;
+}
+
+// A variant with no canvases left holds an artboard, a state machine and a
+// backing bitmap for nothing. Dropping it after a grace period keeps the
+// premium master's cost scoped to screens that actually show a Plus frog,
+// while surviving the unmount/remount churn of a route change.
+function scheduleTeardown(master: Master) {
+  if (master.entries.size > 0 || master.teardownTimer) return;
+  master.teardownTimer = setTimeout(
+    () => destroyMaster(master),
+    TEARDOWN_DELAY_MS,
+  );
+}
+
 export function attachFlyCanvas(
   canvas: HTMLCanvasElement,
-  opts?: { ignoreInteractionPause?: boolean; ignoreIdlePause?: boolean },
+  opts?: {
+    ignoreInteractionPause?: boolean;
+    ignoreIdlePause?: boolean;
+    variant?: FlyVariant;
+  },
 ): FlyCanvasHandle | null {
   const ctx = canvas.getContext('2d');
   if (!ctx) return null;
+  const master = masters[opts?.variant ?? 'default'];
   const entry: Entry = {
     canvas,
     ctx,
@@ -263,24 +363,25 @@ export function attachFlyCanvas(
     ignoreInteractionPause: opts?.ignoreInteractionPause ?? false,
     ignoreIdlePause: opts?.ignoreIdlePause ?? false,
   };
-  entries.set(canvas, entry);
-  ensureMaster();
-  if (masterReady) blit(entry);
-  syncMasterPlayback();
+  master.entries.set(canvas, entry);
+  ensureMaster(master);
+  if (master.ready) blit(master, entry);
+  syncMasterPlayback(master);
   return {
     setPlaying(playing) {
       if (entry.playing === playing) return;
       entry.playing = playing;
-      syncMasterPlayback();
+      syncMasterPlayback(master);
     },
     redraw() {
       entry.hasFrame = false;
-      if (masterReady) blit(entry);
-      syncMasterPlayback();
+      if (master.ready) blit(master, entry);
+      syncMasterPlayback(master);
     },
     detach() {
-      entries.delete(canvas);
-      syncMasterPlayback();
+      master.entries.delete(canvas);
+      syncMasterPlayback(master);
+      scheduleTeardown(master);
     },
   };
 }
