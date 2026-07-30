@@ -256,11 +256,18 @@ export async function PUT(req: NextRequest) {
         timer.deepFocusBroken === true ||
         pausedMidFocus
       : timer.deepFocusBroken === true;
+    // Stamped once, when the phase first reports finished. Carried on every
+    // later republish so a client that keeps syncing the ringing state can't
+    // push its expiry out forever.
+    const finishedAt = timer.finished
+      ? (existingTimer?.finishedAt ?? new Date().toISOString())
+      : null;
     const stored: ActiveFrogodoroTimer = {
       ...timer,
       rev: prevRev + 1,
       savedElapsed,
       deepFocusBroken,
+      finishedAt,
     };
     console.log(
       `Frogodoro PUT /active clientId=${stored.clientId} status=${stored.status} finished=${stored.finished === true}`,

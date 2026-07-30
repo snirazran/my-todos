@@ -13,6 +13,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // Initialize Firebase so @capacitor-firebase/messaging can mint FCM tokens.
         FirebaseApp.configure()
         FrogLiveActivityPlugin.startActivityObservation()
+        FrogAlarmKit.startObservation()
         installAlarmSounds()
         clearAppBadge(application)
         // Override point for customization after application launch.
@@ -135,6 +136,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         }
         content.userInfo = ["type": phase == "break" ? "break_complete" : "timer_complete",
                             "path": "/timer"]
+        // Same category the JS-scheduled one uses, so swiping this away is also
+        // reported as an explicit dismissal and acknowledges the session.
+        content.categoryIdentifier = "FROG_TIMER_END"
 
         let interval = max(1, endTimeMs / 1000 - Date().timeIntervalSince1970)
         let request = UNNotificationRequest(

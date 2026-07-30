@@ -407,7 +407,9 @@
       "Bash(echo \"=== exit:$? ===\")",
       "Bash(npx --yes tsx /private/tmp/claude-501/-Users-snirazran-Fullstack-my-todos/27029e36-3256-48b3-ad0b-32247623e11a/scratchpad/verify-streak.ts)",
       "Bash(perl -pi -e 's/\\\\[habit\\\\\\(/habit\\(/g; s/\\\\}\\\\\\)\\\\], TODAY/}\\)], TODAY/g' verify-streak.ts)",
-      "Bash(perl -pi -e 's/computeGroupStreak\\\\\\(\\\\s*habit\\\\\\(\\(.*\\)\\\\\\)\\\\s*\\\\]/computeGroupStreak\\(habit\\($1\\)/g' verify-streak.ts)"
+      "Bash(perl -pi -e 's/computeGroupStreak\\\\\\(\\\\s*habit\\\\\\(\\(.*\\)\\\\\\)\\\\s*\\\\]/computeGroupStreak\\(habit\\($1\\)/g' verify-streak.ts)",
+      "Bash(xcodebuild -version)",
+      "Read(//Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/**)"
     ]
   }
 }

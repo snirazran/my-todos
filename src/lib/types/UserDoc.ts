@@ -230,6 +230,10 @@ export type ActiveFrogodoroTimer = {
   // A phase just ended into a non-auto-start state and is awaiting Done — the
   // alarm is ringing across devices. Cleared when any surface acknowledges Done.
   finished?: boolean;
+  // When `finished` flipped true. Its own field rather than a read of
+  // `updatedAt`, which any republish refreshes — this must keep ticking so the
+  // ringing state can expire on schedule even if a client keeps syncing it.
+  finishedAt?: string | null;
   // Deep-focus mode: the user pledged to finish this focus phase without
   // pausing. Set at start; `deepFocusBroken` flips true on any mid-phase pause
   // (from any surface). An unbroken deep focus of ≥15 min earns a bonus fly at

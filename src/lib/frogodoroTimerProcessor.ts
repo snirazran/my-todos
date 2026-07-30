@@ -14,6 +14,7 @@ import {
 } from '@/lib/frogodoroSync';
 import { iosAlarmFile } from '@/lib/timerSoundFiles';
 import { publishTimerEvent } from '@/lib/frogodoroEvents';
+import { unattendedOverdueMs } from '@/lib/serverHeartbeat';
 import { syncQuestState } from '@/lib/quests/engine';
 import { getZonedToday } from '@/lib/utils';
 import type {
@@ -73,6 +74,7 @@ function getNextTimer(timer: ActiveFrogodoroTimer, now: Date) {
           ? new Date(boundary + nextDuration * 1000).toISOString()
           : null,
         finished: !autoStart,
+        finishedAt: autoStart ? null : now.toISOString(),
         deepFocusBroken: false,
         settings,
         sessionStats: {
@@ -97,6 +99,7 @@ function getNextTimer(timer: ActiveFrogodoroTimer, now: Date) {
       timeLeft: nextDuration,
       endsAt: null,
       finished: true,
+      finishedAt: now.toISOString(),
       deepFocusBroken: false,
       settings,
       sessionStats: {
@@ -136,6 +139,21 @@ async function saveTimerProgress({
   });
 }
 
+// How long a finished phase stays pinned waiting for Done before it expires on
+// its own. Matches the iPhone Clock app, which rings for at most ~15 minutes and
+// then gives up rather than waiting forever for someone who isn't there.
+//
+// Nothing is lost when it fires: the completed phase was already credited the
+// moment it finished, so Done is pure acknowledgement. All that expires is the
+// "+5 more" offer, which is stale by then anyway.
+const RINGING_EXPIRY_MS = 15 * 60_000;
+
+// activeFrogodoroTimer has no index, so the sweep is a collection scan. At a
+// 15-minute deadline it gains nothing from running on all six ticks a minute.
+const EXPIRY_SWEEP_INTERVAL_MS = 60_000;
+
+type GlobalWithSweep = typeof globalThis & { frogodoroLastExpirySweep?: number };
+
 export async function processDueFrogodoroTimers() {
   const results: Array<{
     userId: string;
@@ -152,11 +170,80 @@ export async function processDueFrogodoroTimers() {
     if (passProcessed === 0) break;
   }
 
+  const expired = await expireStaleFinishedTimers(results);
+
   return {
     ok: true,
     processed: processedTotal,
+    expired,
     results,
   };
+}
+
+// Clear finished-but-unacknowledged sessions. Without this a phase that nobody
+// pressed Done on stays in the database indefinitely — the due-processor only
+// ever looks at running timers — and follows the user onto every device they
+// open.
+async function expireStaleFinishedTimers(
+  results: Array<{
+    userId: string;
+    processed: boolean;
+    sent?: number;
+    reason?: string;
+  }>,
+): Promise<number> {
+  const now = Date.now();
+  const g = globalThis as GlobalWithSweep;
+  if (now - (g.frogodoroLastExpirySweep ?? 0) < EXPIRY_SWEEP_INTERVAL_MS) return 0;
+  g.frogodoroLastExpirySweep = now;
+
+  const cutoff = new Date(now - RINGING_EXPIRY_MS).toISOString();
+
+  const users = await UserModel.find({
+    'activeFrogodoroTimer.finished': true,
+    $or: [
+      { 'activeFrogodoroTimer.finishedAt': { $lte: cutoff } },
+      // Sessions already stuck when this shipped carry no finishedAt. A missing
+      // field matches null in Mongo, so they fall back to updatedAt and get
+      // swept once rather than sitting there forever.
+      {
+        'activeFrogodoroTimer.finishedAt': null,
+        'activeFrogodoroTimer.updatedAt': { $lte: cutoff },
+      },
+    ],
+  })
+    .select('_id activeFrogodoroTimer notificationPrefs liveActivity')
+    .limit(100)
+    .lean()
+    .exec();
+
+  let expired = 0;
+
+  for (const user of users) {
+    const userId = String((user as any)._id);
+    const timer = (user as any).activeFrogodoroTimer as ActiveFrogodoroTimer;
+    const ringingSince = timer.finishedAt ?? timer.updatedAt;
+    // The lateness the user actually saw — downtime we caused doesn't count, so
+    // a deploy can't expire a session that only just started ringing.
+    const ringingMs = unattendedOverdueMs(
+      ringingSince ? new Date(ringingSince).getTime() : now,
+      now,
+    );
+    if (ringingMs <= RINGING_EXPIRY_MS) continue;
+
+    console.log(
+      `Frogodoro processor: expiring unacknowledged finished session after ${Math.round(ringingMs / 60_000)}m for user ${userId}`,
+    );
+    await clearTimerAndFanOut(
+      userId,
+      (user as any).liveActivity as LiveActivityRef | null | undefined,
+      (user as any).notificationPrefs as NotificationPrefs | undefined,
+    );
+    results.push({ userId, processed: true, reason: 'ringing_expired' });
+    expired += 1;
+  }
+
+  return expired;
 }
 
 async function processDuePass(
@@ -202,6 +289,8 @@ const ALARM_GRACE_MS = 2 * 60_000;
 // Beyond this, no server-side gap explains the delay: the record is a corpse
 // (a stale client republished a dead session, a write went missing). Clearing it
 // without crediting keeps phantom focus time out of the user's stats.
+// Measured against time the server was actually up — a deploy or crash must
+// never be the reason someone's focus time disappears.
 const ABANDON_OVERDUE_MS = 30 * 60_000;
 
 async function processOneDueTimer(
@@ -217,8 +306,12 @@ async function processOneDueTimer(
   }
 
   const overdueMs = now.getTime() - new Date(timer.endsAt).getTime();
+  const unattendedMs = unattendedOverdueMs(
+    new Date(timer.endsAt).getTime(),
+    now.getTime(),
+  );
 
-  if (overdueMs > ABANDON_OVERDUE_MS) {
+  if (unattendedMs > ABANDON_OVERDUE_MS) {
     console.log(
       `Frogodoro processor: abandoning timer overdue by ${Math.round(overdueMs / 60_000)}m for user ${userId}`,
     );

@@ -11,7 +11,11 @@ import {
 import {
   scheduleTimerNotifications,
   cancelTimerNotifications,
+  ensureTimerActionTypes,
+  TIMER_END_ACTION_TYPE,
 } from '@/lib/timerNotifications';
+import { LocalNotifications } from '@capacitor/local-notifications';
+import type { PluginListenerHandle } from '@capacitor/core';
 import { format } from 'date-fns';
 import { Capacitor } from '@capacitor/core';
 import { App } from '@capacitor/app';
@@ -930,10 +934,17 @@ export function GlobalTimer() {
   }, [isRunning, endTime, completePhase, tickTimer, applyRemoteTimer, writeDocumentTitle]);
 
   // Schedule the OS-level completion notification whenever a phase is running,
-  // so it lands on time regardless of whether the app is open. Only the device
-  // that owns the timer schedules, to avoid cross-device duplicates.
+  // so it lands on time regardless of whether the app is open.
+  //
+  // Every device that knows about the timer arms its own, not just the one that
+  // pressed Start: a local notification needs no network once scheduled, while
+  // waiting for the server's push to arrive on time is the single most fragile
+  // link in the chain. The IDs are fixed and the helper cancels before
+  // scheduling, so a device can never stack duplicates on itself, and stopping
+  // anywhere cancels here too — over SSE while the app is up, via the silent
+  // timer_control push while it is backgrounded or killed.
   useEffect(() => {
-    if (isRunning && endTime && ownsTimerRef.current) {
+    if (isRunning && endTime) {
       void scheduleTimerNotifications({
         phase,
         endTime,
@@ -952,6 +963,39 @@ export function GlobalTimer() {
     settings.breakDuration,
     settings.timerSound,
   ]);
+
+  // Swiping the finished-phase notification away is the user acknowledging it,
+  // so end the session exactly as Done would. Gated on awaitingDone: a stale
+  // banner dismissed later must never stop a session that has since moved on.
+  // If the app wasn't alive to hear the dismissal, the server's ringing expiry
+  // clears it instead.
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    void ensureTimerActionTypes();
+
+    let handle: PluginListenerHandle | undefined;
+    let cancelled = false;
+
+    void LocalNotifications.addListener(
+      'localNotificationActionPerformed',
+      (event) => {
+        if (event?.actionId !== 'dismiss') return;
+        if (event.notification?.actionTypeId !== TIMER_END_ACTION_TYPE) return;
+        const store = useFrogodoroStore.getState();
+        if (!store.awaitingDone) return;
+        store.setAwaitingDone(false);
+        store.stopTimer();
+      },
+    ).then((listener) => {
+      if (cancelled) void listener.remove();
+      else handle = listener;
+    });
+
+    return () => {
+      cancelled = true;
+      void handle?.remove();
+    };
+  }, []);
 
   // A hidden tab's timers are throttled to once a minute by the browser, so the
   // title freezes mid-countdown and then jumps. Rewrite it the moment the tab is

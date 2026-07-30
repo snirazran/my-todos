@@ -162,6 +162,7 @@ export async function POST(req: NextRequest) {
         timeLeft: timer.status === 'running' ? timeLeft : timer.timeLeft,
         endsAt: null,
         finished: false,
+        finishedAt: null,
         deepFocusBroken:
           timer.deepFocusBroken === true ||
           (timer.phase === 'focus' && timer.status === 'running'),
@@ -179,6 +180,7 @@ export async function POST(req: NextRequest) {
         timeLeft,
         endsAt: new Date(now + timeLeft * 1000).toISOString(),
         finished: false,
+        finishedAt: null,
         rev: (timer.rev ?? 0) + 1,
         updatedAt: new Date(now).toISOString(),
       };
@@ -195,6 +197,7 @@ export async function POST(req: NextRequest) {
         timeLeft: extendSec,
         endsAt: new Date(now + extendSec * 1000).toISOString(),
         finished: false,
+        finishedAt: null,
         deepFocusBroken: false,
         savedElapsed: 0,
         settings: { ...timer.settings, focusDuration: 5 },
