@@ -124,8 +124,8 @@ export function FreezePurchaseSheet({
           </h2>
           <p className="mt-1 text-center text-sm font-medium text-muted-foreground">
             {phase === 'success'
-              ? 'Your streak is protected for one missed day.'
-              : 'Steps in automatically if you miss a day, so your streak survives.'}
+              ? 'One missed day is covered — your daily streak and every habit streak on it.'
+              : 'Covers a whole missed day: your daily streak and every habit streak scheduled on it.'}
           </p>
 
           <div className="mt-3 flex items-center justify-center gap-1.5 text-sm font-bold text-muted-foreground">

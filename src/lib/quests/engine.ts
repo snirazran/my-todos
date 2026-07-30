@@ -1050,6 +1050,7 @@ export async function syncQuestState(args: {
         type: 1,
         completed: 1,
         completedDates: 1,
+        lateCompletedDates: 1,
         date: 1,
         createdAt: 1,
         tags: 1,

@@ -419,6 +419,16 @@ export function useTaskData({
               queuePlusIntroOnce();
             }
 
+            if (json.lateForStreak) {
+              showNotification(
+                <span>
+                  Logged for that day — too late to count toward the streak.
+                </span>,
+                undefined,
+                { durationMs: 6000 },
+              );
+            }
+
             mutateToday(
               (curr) => {
                 if (!curr) return curr;

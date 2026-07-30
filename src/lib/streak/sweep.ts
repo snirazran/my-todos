@@ -5,11 +5,15 @@ import {
   applyFreezeCoverage,
   loadLoginStreakConfig,
   readLoginStreakState,
+  RESCUE_MIN_TASK_STREAK,
   SAVER_MUTE_THRESHOLD,
 } from '@/lib/streak/loginStreak';
+import { findTaskStreaksAtRisk } from '@/lib/streak/taskStreaks';
 import { sendStreakPush } from '@/lib/streak/push';
+import type { TaskStreakAtRisk } from '@/lib/streak/types';
 
 const MIN_HOURS_BETWEEN_NOTIFICATIONS = 4;
+const SAVER_NAMED_HABITS = 3;
 
 function getCurrentHourInTz(tz: string): number {
   try {
@@ -44,6 +48,53 @@ function getTodayInTz(tz: string): string {
 function hoursSince(date: Date | string | undefined | null): number {
   if (!date) return Infinity;
   return (Date.now() - new Date(date).getTime()) / (1000 * 60 * 60);
+}
+
+/**
+ * One evening message for everything expiring tonight. Names what is actually
+ * at stake rather than saying "your streak" — specific, countable copy is what
+ * makes a loss-framed reminder land instead of reading as nagging.
+ */
+function buildSaverMessage(args: {
+  loginCount: number;
+  habits: TaskStreakAtRisk[];
+  freezes: number;
+}): { title: string; body: string } {
+  const { loginCount, habits, freezes } = args;
+  const total = habits.length + (loginCount > 0 ? 1 : 0);
+  const named = habits
+    .slice(0, SAVER_NAMED_HABITS)
+    .map((h) => `${h.text} (${h.count})`)
+    .join(', ');
+  const rest = habits.length - Math.min(habits.length, SAVER_NAMED_HABITS);
+  // Freezes are not spent from a push — they apply on their own the next
+  // morning. So the freeze angle is "don't waste one", not "buy your way out".
+  const freezeNote =
+    freezes > 0
+      ? ` Otherwise it costs you one of your ${freezes} freezes.`
+      : ' You have no freezes left to catch it.';
+
+  if (total > 1) {
+    return {
+      title: `${total} streaks end at midnight`,
+      body: named
+        ? `${named}${rest > 0 ? ` and ${rest} more` : ''}.${freezeNote}`
+        : `Check in to keep them all.${freezeNote}`,
+    };
+  }
+
+  if (habits.length === 1) {
+    const h = habits[0];
+    return {
+      title: `${h.text} — ${h.count}-day streak ends at midnight`,
+      body: `Ticking it off saves it.${freezeNote}`,
+    };
+  }
+
+  return {
+    title: `Your ${loginCount}-day streak ends at midnight`,
+    body: `A 30-second check-in saves it.${freezeNote}`,
+  };
 }
 
 export async function runLoginStreakSweep() {
@@ -130,40 +181,50 @@ export async function runLoginStreakSweep() {
       }
     }
 
+    // One evening slot covers every kind of streak loss. Cheap gates first so
+    // the habit lookup only runs for users actually eligible for a send.
     if (
       hour === eveningSlot &&
-      state.lastDayKey === yesterdayKey &&
-      state.count >= config.saverMinStreak &&
       state.notif.saverIgnoredCount < SAVER_MUTE_THRESHOLD &&
       state.notif.lastSaverSentDayKey !== todayKey &&
       hoursSince(prefs?.lastNotifiedAt) >= MIN_HOURS_BETWEEN_NOTIFICATIONS
     ) {
-      const claim = await UserModel.updateOne(
-        {
-          _id: userId,
-          'quests.loginStreak.notif.lastSaverSentDayKey': { $ne: todayKey },
-        },
-        {
-          $set: {
-            'quests.loginStreak.notif.lastSaverSentDayKey': todayKey,
-            'notificationPrefs.lastNotifiedAt': new Date(),
+      const loginAtRisk =
+        state.lastDayKey === yesterdayKey && state.count >= config.saverMinStreak
+          ? state.count
+          : 0;
+      const habitsAtRisk = await findTaskStreaksAtRisk({
+        userId,
+        missedDayKey: todayKey,
+        timezone: tz,
+        protectedDays: new Set(state.protectedDayKeys),
+        minStreak: RESCUE_MIN_TASK_STREAK,
+      });
+
+      if (loginAtRisk > 0 || habitsAtRisk.length > 0) {
+        const claim = await UserModel.updateOne(
+          {
+            _id: userId,
+            'quests.loginStreak.notif.lastSaverSentDayKey': { $ne: todayKey },
           },
-          $inc: { 'quests.loginStreak.notif.saverIgnoredCount': 1 },
-        },
-      );
-      if (claim.modifiedCount === 1) {
-        await sendStreakPush(userId, {
-          title:
-            state.freezes > 0
-              ? "Don't spend a freeze tonight"
-              : `Your ${state.count}-day streak ends at midnight`,
-          body:
-            state.freezes > 0
-              ? `A 30-second check-in keeps your ${state.count}-day streak growing for free.`
-              : 'A 30-second check-in saves it.',
-          type: 'streak_saver',
-        });
-        results.saverPush += 1;
+          {
+            $set: {
+              'quests.loginStreak.notif.lastSaverSentDayKey': todayKey,
+              'notificationPrefs.lastNotifiedAt': new Date(),
+            },
+          },
+        );
+        if (claim.modifiedCount === 1) {
+          await sendStreakPush(userId, {
+            ...buildSaverMessage({
+              loginCount: loginAtRisk,
+              habits: habitsAtRisk,
+              freezes: state.freezes,
+            }),
+            type: 'streak_saver',
+          });
+          results.saverPush += 1;
+        }
       }
     }
   }

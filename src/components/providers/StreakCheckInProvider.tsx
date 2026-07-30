@@ -62,12 +62,15 @@ export function StreakCheckInProvider() {
           </span>,
         );
       }
-      if (
-        result.rescue &&
-        result.rescue.adsWatched < Math.max(1, result.rescue.adsRequired) &&
-        (result.rescue.adsRequired === 0 || rewardedAdsAvailable())
-      ) {
-        openStreakSheet({ rescue: result.rescue });
+      const offer = result.rescue;
+      const canFreeze = !!offer && offer.freezesAvailable > 0;
+      const canAd =
+        !!offer &&
+        offer.adEligible &&
+        offer.adsWatched < Math.max(1, offer.adsRequired) &&
+        (offer.adsRequired === 0 || rewardedAdsAvailable());
+      if (offer && (canFreeze || canAd)) {
+        openStreakSheet({ rescue: offer });
       } else if (result.extended) {
         openStreakSheet({ celebration: result });
       }

@@ -404,7 +404,10 @@
       "Bash(sips -c 160 2000 --cropOffset 980 0 /Users/snirazran/.claude/image-cache/e1e5ffa6-b6b4-46ff-bcd4-a6b4c1ac7606/11.png --out bottom.png)",
       "Bash(sips -g pixelWidth -g pixelHeight bottom.png)",
       "Bash(pkill -f \"http.server 8899\")",
-      "Bash(echo \"=== exit:$? ===\")"
+      "Bash(echo \"=== exit:$? ===\")",
+      "Bash(npx --yes tsx /private/tmp/claude-501/-Users-snirazran-Fullstack-my-todos/27029e36-3256-48b3-ad0b-32247623e11a/scratchpad/verify-streak.ts)",
+      "Bash(perl -pi -e 's/\\\\[habit\\\\\\(/habit\\(/g; s/\\\\}\\\\\\)\\\\], TODAY/}\\)], TODAY/g' verify-streak.ts)",
+      "Bash(perl -pi -e 's/computeGroupStreak\\\\\\(\\\\s*habit\\\\\\(\\(.*\\)\\\\\\)\\\\s*\\\\]/computeGroupStreak\\(habit\\($1\\)/g' verify-streak.ts)"
     ]
   }
 }

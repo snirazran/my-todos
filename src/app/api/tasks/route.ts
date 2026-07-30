@@ -49,6 +49,11 @@ import {
 } from '@/lib/taskOccurrence';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
 import { taskAnalyticsProperties } from '@/lib/analytics/engagement';
+import {
+  computeGroupStreak,
+  isWithinStreakCreditWindow,
+} from '@/lib/streak/taskStreaks';
+import { loadProtectedDays } from '@/lib/streak/loginStreak';
 
 type Origin = 'weekly' | 'regular';
 type BoardItem = { id: string; text: string; order: number; type: TaskType };
@@ -113,56 +118,6 @@ function getRollingWeekDatesZoned(tz: string) {
 }
 
 /**
- * Consecutive-completion streak for a repeating habit, as of `today`. A
- * daily/weekdays/weekend habit is stored as several sibling docs (one per
- * weekday, linked by repeatGroupId), each holding its own completedDates — so
- * the streak is computed across the WHOLE group: the habit is "scheduled" on a
- * date if any sibling is, and "done" if any sibling recorded it. Walks backward
- * from today until the first missed scheduled date. Today not being done yet
- * doesn't break the streak (the day isn't over); suppressed/skipped dates are
- * ignored, but more than MAX_CONSECUTIVE_SKIPS suppressed occurrences in a row
- * break the streak.
- */
-const MAX_CONSECUTIVE_SKIPS = 2;
-
-function computeGroupStreak(sibs: TaskDoc[], today: string, tz: string) {
-  if (sibs.length === 0) return 0;
-  const completed = new Set<string>();
-  const suppressed = new Set<string>();
-  let earliestStart: string | undefined;
-  for (const s of sibs) {
-    for (const d of s.completedDates ?? []) completed.add(d);
-    for (const d of s.suppressedDates ?? []) suppressed.add(d);
-    const rs = repeatStartForDoc(s, tz);
-    if (rs && (!earliestStart || rs < earliestStart)) earliestStart = rs;
-  }
-  let streak = 0;
-  let skipRun = 0;
-  let d = today;
-  for (let guard = 0; guard < 2000; guard++) {
-    if (earliestStart && d < earliestStart) break;
-    if (sibs.some((s) => siblingOccursOn(s, d))) {
-      if (suppressed.has(d)) {
-        skipRun++;
-        if (skipRun > MAX_CONSECUTIVE_SKIPS) break;
-      } else {
-        skipRun = 0;
-        const done = completed.has(d);
-        if (d === today && !done) {
-          // Today's occurrence isn't done yet — neither count nor break.
-        } else if (done) {
-          streak++;
-        } else {
-          break;
-        }
-      }
-    }
-    d = addDaysYMD(d, -1);
-  }
-  return streak;
-}
-
-/**
  * Build a map of taskId -> streak for the given weekly docs, resolving each
  * doc's full repeat group (fetching siblings not present in `weeklyDocs`) so
  * grouped habits share one streak across weekdays.
@@ -175,6 +130,8 @@ async function streakMapForWeeklyDocs(
 ) {
   const map = new Map<string, number>();
   if (weeklyDocs.length === 0) return map;
+
+  const protectedDays = await loadProtectedDays(uid);
 
   const groupIds = Array.from(
     new Set(
@@ -193,6 +150,7 @@ async function streakMapForWeeklyDocs(
         type: 1,
         dayOfWeek: 1,
         completedDates: 1,
+        lateCompletedDates: 1,
         suppressedDates: 1,
         repeatGroupId: 1,
         repeatRule: 1,
@@ -217,7 +175,7 @@ async function streakMapForWeeklyDocs(
       d.repeatGroupId && byGroup.has(d.repeatGroupId)
         ? byGroup.get(d.repeatGroupId)!
         : [d];
-    map.set(d.id, computeGroupStreak(sibs, today, tz));
+    map.set(d.id, computeGroupStreak(sibs, today, tz, { protectedDays }));
   }
   return map;
 }
@@ -1824,10 +1782,17 @@ export async function PUT(req: NextRequest) {
   const alreadyCompletedForDate =
     (doc.completedDates ?? []).includes(date) ||
     (!!doc.completed && doc.type === 'regular');
+  const lateForStreak =
+    completed === true && !isWithinStreakCreditWindow(date, getZonedToday(tz));
   const update =
     completed === true
-      ? { $addToSet: { completedDates: date } }
-      : { $pull: { completedDates: date } };
+      ? lateForStreak
+        ? { $addToSet: { completedDates: date, lateCompletedDates: date } }
+        : {
+            $addToSet: { completedDates: date },
+            $pull: { lateCompletedDates: date },
+          }
+      : { $pull: { completedDates: date, lateCompletedDates: date } };
   if (doc.type === 'regular')
     (update as any).$set = { ...(update as any).$set, completed };
 
@@ -1944,6 +1909,7 @@ export async function PUT(req: NextRequest) {
     flyStatus,
     hungerStatus,
     dailyTasksCount,
+    lateForStreak: lateForStreak && doc.type === 'weekly' ? true : undefined,
   });
 }
 

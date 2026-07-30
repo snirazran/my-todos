@@ -5,6 +5,7 @@ import type {
   CheckInResult,
   LoginStreakRescue,
   LoginStreakView,
+  RescueMethod,
   RescueResult,
 } from '@/lib/streak/types';
 
@@ -77,13 +78,14 @@ export function takePrewarmedCheckIn(): Promise<CheckInResult | null> | null {
 
 export async function rescueStreak(
   rescueId: string,
+  method: RescueMethod = 'ad',
 ): Promise<RescueResult | null> {
   try {
     const res = await fetch('/api/streak/rescue', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ rescueId, timezone: clientTimezone() }),
+      body: JSON.stringify({ rescueId, method, timezone: clientTimezone() }),
     });
     if (!res.ok) return null;
     const result = (await res.json()) as RescueResult;

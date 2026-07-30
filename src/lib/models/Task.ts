@@ -12,6 +12,7 @@ export interface TaskDoc {
   order: number;
   completed?: boolean;
   completedDates?: string[]; // YYYY-MM-DD entries where the task was completed
+  lateCompletedDates?: string[]; // subset of completedDates ticked after the streak-credit window closed
   suppressedDates?: string[]; // YYYY-MM-DD entries hidden for that date
   orderOverrides?: Record<string, number>; // YYYY-MM-DD -> per-date order for repeating instances
   notes?: string; // free-text notes shown in the task detail card
@@ -79,6 +80,7 @@ const TaskSchema = new Schema<TaskDoc>(
     order: { type: Number, required: true },
     completed: { type: Boolean, default: false },
     completedDates: { type: [String], default: [] },
+    lateCompletedDates: { type: [String], default: [] },
     suppressedDates: { type: [String], default: [] },
     orderOverrides: { type: Schema.Types.Mixed, default: undefined },
     notes: { type: String },

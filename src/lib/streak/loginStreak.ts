@@ -12,21 +12,26 @@ import { previousDayKey } from '@/lib/quests/streak';
 import { isPremiumUser } from '@/lib/quests/engine';
 import { getZonedToday } from '@/lib/utils';
 import type { QuestReward } from '@/lib/quests/types';
+import { findTaskStreaksAtRisk } from './taskStreaks';
 import type {
   CheckInResult,
   LoginStreakGoal,
-  LoginStreakRescue,
   LoginStreakReward,
   LoginStreakRewardEvent,
   LoginStreakRewardSummary,
   LoginStreakState,
   LoginStreakView,
+  RescueMethod,
   RescueResult,
+  StreakRescue,
+  TaskStreakAtRisk,
 } from './types';
 
 const FREEZE_HISTORY_LIMIT = 14;
+const PROTECTED_HISTORY_LIMIT = 60;
 export const SAVER_MUTE_THRESHOLD = 7;
 export const RESCUE_MIN_STREAK = 3;
+export const RESCUE_MIN_TASK_STREAK = 3;
 export const RESCUE_COOLDOWN_DAYS = 7;
 
 export function rescueAdsRequired(previousCount: number): number {
@@ -42,7 +47,7 @@ function dayKeyDiff(fromKey: string, toKey: string): number {
   );
 }
 
-function readRescue(raw: any): LoginStreakRescue | null {
+function readRescue(raw: any): StreakRescue | null {
   if (
     !raw ||
     typeof raw.id !== 'string' ||
@@ -54,10 +59,46 @@ function readRescue(raw: any): LoginStreakRescue | null {
   return {
     id: raw.id,
     previousCount: Math.max(0, Math.floor(raw.previousCount)),
+    taskStreaks: Array.isArray(raw.taskStreaks)
+      ? raw.taskStreaks
+          .filter(
+            (t: any) =>
+              typeof t?.taskId === 'string' && typeof t?.count === 'number',
+          )
+          .map((t: any) => ({
+            taskId: t.taskId,
+            text: typeof t.text === 'string' ? t.text : '',
+            count: Math.max(0, Math.floor(t.count)),
+          }))
+      : [],
+    missedDayKey:
+      typeof raw.missedDayKey === 'string'
+        ? raw.missedDayKey
+        : previousDayKey(raw.offeredDayKey),
     offeredDayKey: raw.offeredDayKey,
     adsRequired: Math.max(0, Math.floor(raw.adsRequired ?? 0)),
     adsWatched: Math.max(0, Math.floor(raw.adsWatched ?? 0)),
+    adEligible: raw.adEligible !== false,
+    freezesAvailable: Math.max(0, Math.floor(raw.freezesAvailable ?? 0)),
   };
+}
+
+/**
+ * Days shielded by a Streak Freeze or an ad rescue. A shield is day-scoped, not
+ * habit-scoped: one protected day bridges the login streak AND every habit
+ * streak scheduled that day.
+ */
+export async function loadProtectedDays(
+  userId: string,
+): Promise<Set<string>> {
+  await connectMongo();
+  const doc = await UserModel.findById(userId, {
+    'quests.loginStreak.protectedDayKeys': 1,
+  }).lean<any>();
+  const raw = doc?.quests?.loginStreak?.protectedDayKeys;
+  return new Set<string>(
+    Array.isArray(raw) ? raw.filter((k: unknown) => typeof k === 'string') : [],
+  );
 }
 
 export async function loadLoginStreakConfig(): Promise<LoginStreakConfigDoc> {
@@ -100,6 +141,9 @@ export function readLoginStreakState(user: any): LoginStreakState {
     freezes: Math.max(0, Math.floor(raw?.freezes ?? 0)),
     freezeUsedDayKeys: Array.isArray(raw?.freezeUsedDayKeys)
       ? raw.freezeUsedDayKeys.filter((k: unknown) => typeof k === 'string')
+      : [],
+    protectedDayKeys: Array.isArray(raw?.protectedDayKeys)
+      ? raw.protectedDayKeys.filter((k: unknown) => typeof k === 'string')
       : [],
     goal,
     goalsCompleted: Array.isArray(raw?.goalsCompleted)
@@ -173,6 +217,10 @@ export async function applyFreezeCoverage(args: {
           $each: coveredDays,
           $slice: -FREEZE_HISTORY_LIMIT,
         },
+        'quests.loginStreak.protectedDayKeys': {
+          $each: coveredDays,
+          $slice: -PROTECTED_HISTORY_LIMIT,
+        },
       },
     },
   );
@@ -185,6 +233,9 @@ export async function applyFreezeCoverage(args: {
       freezes: state.freezes - gap,
       freezeUsedDayKeys: [...state.freezeUsedDayKeys, ...coveredDays].slice(
         -FREEZE_HISTORY_LIMIT,
+      ),
+      protectedDayKeys: [...state.protectedDayKeys, ...coveredDays].slice(
+        -PROTECTED_HISTORY_LIMIT,
       ),
     },
     consumed: coveredDays,
@@ -210,6 +261,7 @@ export function buildLoginStreakView(
     freezeCap: config.freezeCap,
     freezePriceFlies: config.freezePriceFlies,
     freezeUsedDayKeys: state.freezeUsedDayKeys,
+    protectedDayKeys: state.protectedDayKeys,
     goal: state.goal
       ? {
           ...state.goal,
@@ -316,10 +368,59 @@ function applyStreakRewardGrants(args: {
 }
 
 function activeRescueForDay(
-  rescue: LoginStreakRescue | null,
+  rescue: StreakRescue | null,
   todayKey: string,
-): LoginStreakRescue | null {
+): StreakRescue | null {
   return rescue && rescue.offeredDayKey === todayKey ? rescue : null;
+}
+
+/**
+ * Builds the day-scoped rescue offer for `missedDayKey`. Returns null when
+ * nothing broke, or when nothing the user owns could save it (ad cooldown still
+ * running and no freeze in inventory) — an offer with no action is just a
+ * funeral notice.
+ */
+function buildRescueOffer(args: {
+  user: any;
+  state: LoginStreakState;
+  todayKey: string;
+  missedDayKey: string;
+  loginCountAtRisk: number;
+  taskStreaks: TaskStreakAtRisk[];
+}): StreakRescue | null {
+  const {
+    user,
+    state,
+    todayKey,
+    missedDayKey,
+    loginCountAtRisk,
+    taskStreaks,
+  } = args;
+
+  if (loginCountAtRisk <= 0 && taskStreaks.length === 0) return null;
+
+  const adEligible =
+    !state.lastRescueDayKey ||
+    dayKeyDiff(state.lastRescueDayKey, todayKey) >= RESCUE_COOLDOWN_DAYS;
+  if (!adEligible && state.freezes <= 0) return null;
+
+  const largest = Math.max(
+    loginCountAtRisk,
+    ...taskStreaks.map((t) => t.count),
+    0,
+  );
+
+  return {
+    id: randomUUID(),
+    previousCount: loginCountAtRisk,
+    taskStreaks,
+    missedDayKey,
+    offeredDayKey: todayKey,
+    adsRequired: isPremiumUser(user.toObject()) ? 0 : rescueAdsRequired(largest),
+    adsWatched: 0,
+    adEligible,
+    freezesAvailable: state.freezes,
+  };
 }
 
 export async function performCheckIn(args: {
@@ -375,26 +476,45 @@ export async function performCheckIn(args: {
     lastDayKey: todayKey,
     longestStreak: Math.max(freshState.longestStreak, newCount),
     rescue: activeRescueForDay(freshState.rescue, todayKey),
-    notif: { ...freshState.notif, saverIgnoredCount: 0 },
   };
 
-  const rescueEligible =
+  const loginBroke =
     newCount === 1 &&
     previousCount >= RESCUE_MIN_STREAK &&
-    computeGap(freshState.lastDayKey, todayKey) === 1 &&
-    (!freshState.lastRescueDayKey ||
-      dayKeyDiff(freshState.lastRescueDayKey, todayKey) >= RESCUE_COOLDOWN_DAYS);
-  if (rescueEligible) {
-    next.rescue = {
-      id: randomUUID(),
-      previousCount,
-      offeredDayKey: todayKey,
-      adsRequired: isPremiumUser(user.toObject())
-        ? 0
-        : rescueAdsRequired(previousCount),
-      adsWatched: 0,
-    };
-  }
+    computeGap(freshState.lastDayKey, todayKey) === 1;
+
+  const taskStreaksAtRisk = await findTaskStreaksAtRisk({
+    userId,
+    missedDayKey: yesterdayKey,
+    timezone,
+    protectedDays: new Set(freshState.protectedDayKeys),
+    minStreak: RESCUE_MIN_TASK_STREAK,
+  });
+
+  // Saver mute accounting. The counter tracks warnings that DIDN'T work, not
+  // app opens: opening the app saves a login streak but does nothing for a
+  // habit, so resetting on check-in let an abandoned habit nag forever. A day
+  // where nothing broke forgives the counter (and un-mutes a returning user).
+  const somethingBroke = loginBroke || taskStreaksAtRisk.length > 0;
+  const warnedYesterday = freshState.notif.lastSaverSentDayKey === yesterdayKey;
+  next.notif = {
+    ...freshState.notif,
+    saverIgnoredCount: !somethingBroke
+      ? 0
+      : warnedYesterday
+        ? freshState.notif.saverIgnoredCount + 1
+        : freshState.notif.saverIgnoredCount,
+  };
+
+  next.rescue =
+    buildRescueOffer({
+      user,
+      state: freshState,
+      todayKey,
+      missedDayKey: yesterdayKey,
+      loginCountAtRisk: loginBroke ? previousCount : 0,
+      taskStreaks: taskStreaksAtRisk,
+    }) ?? next.rescue;
 
   const goalCompleted =
     next.goal && newCount - next.goal.startCount >= next.goal.days
@@ -461,8 +581,9 @@ export async function performRescue(args: {
   userId: string;
   timezone: string;
   rescueId: string;
+  method: RescueMethod;
 }): Promise<RescueResult> {
-  const { userId, timezone, rescueId } = args;
+  const { userId, timezone, rescueId, method } = args;
   await connectMongo();
 
   const [user, config] = await Promise.all([
@@ -480,7 +601,8 @@ export async function performRescue(args: {
     !rescue ||
     rescue.id !== rescueId ||
     rescue.offeredDayKey !== todayKey ||
-    state.lastDayKey !== todayKey
+    state.lastDayKey !== todayKey ||
+    (method === 'ad' && !rescue.adEligible)
   ) {
     return {
       granted: false,
@@ -490,40 +612,72 @@ export async function performRescue(args: {
         ? buildLoginStreakView(state, config, todayKey)
         : null,
       goalEvent: null,
+      error: 'expired',
     };
   }
 
-  const adsWatched = rescue.adsWatched + 1;
-  if (adsWatched < rescue.adsRequired) {
-    const updated: LoginStreakRescue = { ...rescue, adsWatched };
-    await UserModel.updateOne(
-      { _id: userId, 'quests.loginStreak.rescue.id': rescue.id },
-      { $set: { 'quests.loginStreak.rescue': updated } },
+  // A freeze bought in advance redeems in one tap; ads pay the tiered price.
+  if (method === 'freeze') {
+    const spent = await UserModel.updateOne(
+      {
+        _id: userId,
+        'quests.loginStreak.rescue.id': rescue.id,
+        'quests.loginStreak.freezes': { $gte: 1 },
+      },
+      { $inc: { 'quests.loginStreak.freezes': -1 } },
     );
-    return {
-      granted: true,
-      completed: false,
-      rescue: updated,
-      view: buildLoginStreakView(
-        { ...state, rescue: updated },
-        config,
-        todayKey,
-      ),
-      goalEvent: null,
-    };
+    if (spent.modifiedCount === 0) {
+      return {
+        granted: false,
+        completed: false,
+        rescue,
+        view: buildLoginStreakView(state, config, todayKey),
+        goalEvent: null,
+        error: 'no-freeze',
+      };
+    }
+    state.freezes = Math.max(0, state.freezes - 1);
+    state.freezeUsedDayKeys = [
+      ...state.freezeUsedDayKeys,
+      rescue.missedDayKey,
+    ].slice(-FREEZE_HISTORY_LIMIT);
+  } else {
+    const adsWatched = rescue.adsWatched + 1;
+    if (adsWatched < rescue.adsRequired) {
+      const updated: StreakRescue = { ...rescue, adsWatched };
+      await UserModel.updateOne(
+        { _id: userId, 'quests.loginStreak.rescue.id': rescue.id },
+        { $set: { 'quests.loginStreak.rescue': updated } },
+      );
+      return {
+        granted: true,
+        completed: false,
+        rescue: updated,
+        view: buildLoginStreakView(
+          { ...state, rescue: updated },
+          config,
+          todayKey,
+        ),
+        goalEvent: null,
+      };
+    }
   }
 
-  const newCount = rescue.previousCount + 1;
+  const loginRestored = rescue.previousCount > 0;
+  const newCount = loginRestored ? rescue.previousCount + 1 : state.count;
   const next: LoginStreakState = {
     ...state,
     count: newCount,
     longestStreak: Math.max(state.longestStreak, newCount),
+    protectedDayKeys: [...state.protectedDayKeys, rescue.missedDayKey].slice(
+      -PROTECTED_HISTORY_LIMIT,
+    ),
     rescue: null,
-    lastRescueDayKey: todayKey,
+    lastRescueDayKey: method === 'ad' ? todayKey : state.lastRescueDayKey,
   };
 
   const goalCompleted =
-    next.goal && newCount - next.goal.startCount >= next.goal.days
+    loginRestored && next.goal && newCount - next.goal.startCount >= next.goal.days
       ? next.goal
       : null;
   const goalEvent = applyStreakRewardGrants({

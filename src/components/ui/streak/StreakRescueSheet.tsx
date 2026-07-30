@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import confetti from 'canvas-confetti';
-import { Flame, Play, ShieldCheck } from 'lucide-react';
+import { Flame, Play, Shield, ShieldCheck } from 'lucide-react';
 import Frog, { type FrogHandle } from '@/components/ui/frog';
 import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
 import { cn } from '@/lib/utils';
@@ -16,9 +16,14 @@ import { hapticCelebrate } from '@/lib/haptics';
 import { StreakCelebration } from './StreakCelebration';
 import type {
   CheckInResult,
-  LoginStreakRescue,
+  RescueMethod,
   RescueResult,
+  StreakRescue,
 } from '@/lib/streak/types';
+
+const VISIBLE_ROWS = 5;
+
+type RiskRow = { key: string; label: string; count: number };
 
 function toCelebrationResult(result: RescueResult): CheckInResult {
   return {
@@ -32,6 +37,22 @@ function toCelebrationResult(result: RescueResult): CheckInResult {
   };
 }
 
+function StreakRow({ label, count }: { label: string; count: number }) {
+  return (
+    <div className="flex items-center justify-between gap-3 py-2">
+      <div className="flex min-w-0 items-center gap-2.5">
+        <Flame className="h-4 w-4 shrink-0 text-slate-500" />
+        <span className="truncate text-sm font-bold text-white/80">
+          {label}
+        </span>
+      </div>
+      <span className="shrink-0 text-sm font-black tabular-nums text-white/50 line-through decoration-red-400/80 decoration-2">
+        {count}
+      </span>
+    </div>
+  );
+}
+
 export function StreakRescueSheet({
   open,
   onOpenChange,
@@ -39,12 +60,13 @@ export function StreakRescueSheet({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  offer: LoginStreakRescue | null;
+  offer: StreakRescue | null;
 }) {
   const { indices } = useWardrobeIndices(open);
   const frogRef = useRef<FrogHandle>(null);
   const [adsWatched, setAdsWatched] = useState(0);
-  const [busy, setBusy] = useState(false);
+  const [freezes, setFreezes] = useState(0);
+  const [busy, setBusy] = useState<RescueMethod | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<RescueResult | null>(null);
   const [showRewards, setShowRewards] = useState(false);
@@ -55,7 +77,8 @@ export function StreakRescueSheet({
   useEffect(() => {
     if (!open) return;
     setAdsWatched(offer?.adsWatched ?? 0);
-    setBusy(false);
+    setFreezes(offer?.freezesAvailable ?? 0);
+    setBusy(null);
     setError(null);
     setSaved(null);
     setShowRewards(false);
@@ -68,16 +91,37 @@ export function StreakRescueSheet({
     };
   }, [open, offer]);
 
+  const rows = useMemo<RiskRow[]>(() => {
+    if (!offer) return [];
+    const list: RiskRow[] = [];
+    if (offer.previousCount > 0) {
+      list.push({
+        key: 'login',
+        label: 'Daily streak',
+        count: offer.previousCount,
+      });
+    }
+    for (const t of offer.taskStreaks) {
+      list.push({ key: t.taskId, label: t.text || 'Habit', count: t.count });
+    }
+    return list;
+  }, [offer]);
+
   if (typeof document === 'undefined' || !offer) return null;
 
-  const isPremiumRescue = offer.adsRequired === 0;
+  const isFreeSave = offer.adsRequired === 0;
+  const canUseFreeze = freezes > 0;
+  const canWatchAd = offer.adEligible;
+  const adsLeft = Math.max(0, offer.adsRequired - adsWatched);
+  const largest = rows.reduce((max, r) => Math.max(max, r.count), 0);
+  const multi = rows.length > 1;
 
-  const handleSave = async () => {
+  const handleSave = async (method: RescueMethod) => {
     if (busy || saved) return;
-    setBusy(true);
+    setBusy(method);
     setError(null);
     try {
-      if (!isPremiumRescue) {
+      if (method === 'ad' && !isFreeSave) {
         const adResult = await showRewardedAd('streak_rescue');
         if (adResult !== 'rewarded') {
           if (adResult === 'failed') {
@@ -86,13 +130,19 @@ export function StreakRescueSheet({
           return;
         }
       }
-      const result = await rescueStreak(offer.id);
+      const result = await rescueStreak(offer.id, method);
       if (!result || !result.granted) {
-        setError('Could not save your streak — try again.');
+        setError(
+          result?.error === 'no-freeze'
+            ? "You don't have a Streak Freeze left."
+            : 'Could not save your streaks — try again.',
+        );
+        if (result?.error === 'no-freeze') setFreezes(0);
         return;
       }
       if (result.completed) {
         setSaved(result);
+        if (method === 'freeze') setFreezes((f) => Math.max(0, f - 1));
         frogRef.current?.fireEmote('love');
         confetti({
           particleCount: 120,
@@ -107,7 +157,7 @@ export function StreakRescueSheet({
         setAdsWatched(result.rescue?.adsWatched ?? adsWatched + 1);
       }
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   };
 
@@ -118,8 +168,6 @@ export function StreakRescueSheet({
     }
     onOpenChange(false);
   };
-
-  const adsLeft = Math.max(0, offer.adsRequired - adsWatched);
 
   return createPortal(
     <AnimatePresence>
@@ -166,14 +214,15 @@ export function StreakRescueSheet({
                       transition={{ type: 'spring', stiffness: 320, damping: 14 }}
                       className="text-8xl font-black tabular-nums text-white drop-shadow-[0_3px_0_rgba(0,0,0,0.15)]"
                     >
-                      {saved.view.count}
+                      {offer.previousCount > 0 ? saved.view.count : largest}
                     </motion.span>
                   </div>
                   <p className="mt-2 text-lg font-black uppercase tracking-[0.2em] text-white/90">
-                    streak saved
+                    {multi ? `${rows.length} streaks saved` : 'streak saved'}
                   </p>
                   <p className="mt-4 max-w-xs text-center text-sm font-bold text-white/85">
-                    Phew! Your streak lives on — and today already counts.
+                    Phew! Yesterday is covered — everything picks up where it
+                    left off.
                   </p>
                   <button
                     type="button"
@@ -184,45 +233,48 @@ export function StreakRescueSheet({
                   </button>
                 </div>
               ) : (
-                <div className="relative flex h-full flex-col items-center justify-center overflow-hidden bg-gradient-to-b from-slate-700 via-slate-800 to-slate-900 px-6">
+                <div className="relative flex h-full flex-col items-center justify-center overflow-y-auto bg-gradient-to-b from-slate-700 via-slate-800 to-slate-900 px-6 py-8">
                   <motion.div
                     initial={{ y: 40, opacity: 0, scale: 0.8 }}
                     animate={{ y: 0, opacity: 1, scale: 1 }}
                     transition={{ type: 'spring', stiffness: 240, damping: 20 }}
+                    className="shrink-0"
                   >
                     {frogReady ? (
                       <Frog
                         ref={frogRef}
-                        width={170}
-                        height={170}
+                        width={150}
+                        height={150}
                         indices={indices}
                         emote="question"
                       />
                     ) : (
-                      <div style={{ width: 170, height: 170 }} />
+                      <div style={{ width: 150, height: 150 }} />
                     )}
                   </motion.div>
 
-                  <div className="relative mt-2 flex items-center gap-3">
-                    <Flame className="h-14 w-14 text-slate-500" />
-                    <span className="text-7xl font-black tabular-nums text-white/60 line-through decoration-red-400 decoration-4">
-                      {offer.previousCount}
-                    </span>
-                  </div>
-
-                  <h2 className="mt-4 text-center text-2xl font-black tracking-tight text-white">
-                    Your {offer.previousCount}-day streak is about to break
+                  <h2 className="mt-3 text-center text-2xl font-black tracking-tight text-white">
+                    {multi
+                      ? `${rows.length} streaks are about to break`
+                      : `Your ${largest}-day streak is about to break`}
                   </h2>
-                  <p className="mt-2 max-w-xs text-center text-sm font-bold text-white/70">
-                    {isPremiumRescue
-                      ? 'As a Plus member, you can save it — free, once a week.'
-                      : offer.adsRequired === 1
-                        ? 'Watch one ad to save it and keep your progress.'
-                        : `Watch ${offer.adsRequired} ads to save it and keep your progress.`}
+                  <p className="mt-2 max-w-xs text-center text-sm font-bold text-white/60">
+                    Yesterday went unmarked. One shield covers the whole day.
                   </p>
 
-                  {!isPremiumRescue && offer.adsRequired > 1 && (
-                    <div className="mt-5 flex items-center gap-2">
+                  <div className="mt-5 w-full max-w-[320px] divide-y divide-white/10 rounded-2xl bg-white/[0.06] px-4 py-1">
+                    {rows.slice(0, VISIBLE_ROWS).map((r) => (
+                      <StreakRow key={r.key} label={r.label} count={r.count} />
+                    ))}
+                    {rows.length > VISIBLE_ROWS && (
+                      <div className="py-2 text-center text-xs font-bold text-white/40">
+                        +{rows.length - VISIBLE_ROWS} more
+                      </div>
+                    )}
+                  </div>
+
+                  {!isFreeSave && canWatchAd && offer.adsRequired > 1 && (
+                    <div className="mt-4 flex items-center gap-2">
                       {Array.from({ length: offer.adsRequired }, (_, i) => (
                         <div
                           key={i}
@@ -245,36 +297,67 @@ export function StreakRescueSheet({
                     </p>
                   )}
 
-                  <button
-                    type="button"
-                    onClick={handleSave}
-                    disabled={busy}
-                    className={cn(
-                      'mt-8 flex w-full max-w-[300px] items-center justify-center gap-2 rounded-2xl bg-amber-400 py-3.5 text-sm font-black uppercase tracking-wide text-slate-900 shadow-[0_5px_0_0_rgba(0,0,0,0.3)] transition-all active:translate-y-1 active:shadow-none',
-                      busy && 'opacity-70',
-                    )}
-                  >
-                    {isPremiumRescue ? (
-                      <>
-                        <ShieldCheck className="h-4 w-4" />
-                        {busy ? 'Saving…' : 'Save my streak'}
-                      </>
-                    ) : (
-                      <>
-                        <Play className="h-4 w-4 fill-current" />
-                        {busy
-                          ? 'Loading ad…'
-                          : adsLeft < offer.adsRequired
-                            ? `Watch next ad (${adsLeft} left)`
-                            : 'Watch ad · save streak'}
-                      </>
-                    )}
-                  </button>
+                  {isFreeSave ? (
+                    <button
+                      type="button"
+                      onClick={() => handleSave('ad')}
+                      disabled={!!busy}
+                      className={cn(
+                        'mt-6 flex w-full max-w-[300px] items-center justify-center gap-2 rounded-2xl bg-amber-400 py-3.5 text-sm font-black uppercase tracking-wide text-slate-900 shadow-[0_5px_0_0_rgba(0,0,0,0.3)] transition-all active:translate-y-1 active:shadow-none',
+                        busy && 'opacity-70',
+                      )}
+                    >
+                      <ShieldCheck className="h-4 w-4" />
+                      {busy ? 'Saving…' : 'Save my streaks'}
+                    </button>
+                  ) : (
+                    <div className="mt-6 flex w-full max-w-[300px] flex-col gap-3">
+                      {canUseFreeze && (
+                        <button
+                          type="button"
+                          onClick={() => handleSave('freeze')}
+                          disabled={!!busy}
+                          className={cn(
+                            'flex w-full items-center justify-center gap-2 rounded-2xl bg-sky-400 py-3.5 text-sm font-black uppercase tracking-wide text-slate-900 shadow-[0_5px_0_0_rgba(0,0,0,0.3)] transition-all active:translate-y-1 active:shadow-none',
+                            busy && 'opacity-70',
+                          )}
+                        >
+                          <Shield className="h-4 w-4 fill-current" />
+                          {busy === 'freeze'
+                            ? 'Saving…'
+                            : `Use 1 Streak Freeze (${freezes})`}
+                        </button>
+                      )}
+                      {canWatchAd && (
+                        <button
+                          type="button"
+                          onClick={() => handleSave('ad')}
+                          disabled={!!busy}
+                          className={cn(
+                            'flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-black uppercase tracking-wide transition-all active:translate-y-1 active:shadow-none',
+                            canUseFreeze
+                              ? 'bg-white/10 text-white shadow-[0_4px_0_0_rgba(0,0,0,0.25)]'
+                              : 'bg-amber-400 text-slate-900 shadow-[0_5px_0_0_rgba(0,0,0,0.3)]',
+                            busy && 'opacity-70',
+                          )}
+                        >
+                          <Play className="h-4 w-4 fill-current" />
+                          {busy === 'ad'
+                            ? 'Loading ad…'
+                            : adsWatched > 0
+                              ? `Watch next ad (${adsLeft} left)`
+                              : offer.adsRequired === 1
+                                ? 'Watch ad · save streaks'
+                                : `Watch ${offer.adsRequired} ads · save streaks`}
+                        </button>
+                      )}
+                    </div>
+                  )}
 
                   <button
                     type="button"
                     onClick={() => onOpenChange(false)}
-                    className="mt-5 text-sm font-bold text-white/50 underline-offset-4 hover:underline"
+                    className="mt-5 shrink-0 text-sm font-bold text-white/50 underline-offset-4 hover:underline"
                   >
                     Let it go
                   </button>

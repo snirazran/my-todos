@@ -185,6 +185,7 @@ type EffortTask = {
   type?: string;
   tags?: string[];
   completedDates?: string[];
+  lateCompletedDates?: string[];
 };
 
 function bestStreakRun(
@@ -198,6 +199,7 @@ function bestStreakRun(
     if (task.type !== 'weekly') continue;
     if (wanted && !task.tags?.some((tagId) => wanted.has(tagId))) continue;
     const dates = new Set(task.completedDates ?? []);
+    for (const d of task.lateCompletedDates ?? []) dates.delete(d);
     const completedToday = dates.has(todayKey);
     let runDays = completedToday ? 1 : 0;
     let day = previousDayKey(todayKey);
