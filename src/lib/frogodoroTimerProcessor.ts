@@ -14,7 +14,6 @@ import {
 } from '@/lib/frogodoroSync';
 import { iosAlarmFile } from '@/lib/timerSoundFiles';
 import { publishTimerEvent } from '@/lib/frogodoroEvents';
-import { unattendedOverdueMs } from '@/lib/serverHeartbeat';
 import { syncQuestState } from '@/lib/quests/engine';
 import { getZonedToday } from '@/lib/utils';
 import type {
@@ -182,8 +181,7 @@ export async function processDueFrogodoroTimers() {
 
 // Clear finished-but-unacknowledged sessions. Without this a phase that nobody
 // pressed Done on stays in the database indefinitely — the due-processor only
-// ever looks at running timers — and follows the user onto every device they
-// open.
+// ever looks at running timers — and follows the user onto every device.
 async function expireStaleFinishedTimers(
   results: Array<{
     userId: string;
@@ -201,6 +199,9 @@ async function expireStaleFinishedTimers(
 
   const users = await UserModel.find({
     'activeFrogodoroTimer.finished': true,
+    // A finished phase is always paused. This guard keeps the sweep away from a
+    // live countdown even if some client publishes finished alongside one.
+    'activeFrogodoroTimer.status': { $ne: 'running' },
     $or: [
       { 'activeFrogodoroTimer.finishedAt': { $lte: cutoff } },
       // Sessions already stuck when this shipped carry no finishedAt. A missing
@@ -221,18 +222,8 @@ async function expireStaleFinishedTimers(
 
   for (const user of users) {
     const userId = String((user as any)._id);
-    const timer = (user as any).activeFrogodoroTimer as ActiveFrogodoroTimer;
-    const ringingSince = timer.finishedAt ?? timer.updatedAt;
-    // The lateness the user actually saw — downtime we caused doesn't count, so
-    // a deploy can't expire a session that only just started ringing.
-    const ringingMs = unattendedOverdueMs(
-      ringingSince ? new Date(ringingSince).getTime() : now,
-      now,
-    );
-    if (ringingMs <= RINGING_EXPIRY_MS) continue;
-
     console.log(
-      `Frogodoro processor: expiring unacknowledged finished session after ${Math.round(ringingMs / 60_000)}m for user ${userId}`,
+      `Frogodoro processor: expiring unacknowledged finished session for user ${userId}`,
     );
     await clearTimerAndFanOut(
       userId,
@@ -289,8 +280,6 @@ const ALARM_GRACE_MS = 2 * 60_000;
 // Beyond this, no server-side gap explains the delay: the record is a corpse
 // (a stale client republished a dead session, a write went missing). Clearing it
 // without crediting keeps phantom focus time out of the user's stats.
-// Measured against time the server was actually up — a deploy or crash must
-// never be the reason someone's focus time disappears.
 const ABANDON_OVERDUE_MS = 30 * 60_000;
 
 async function processOneDueTimer(
@@ -306,12 +295,8 @@ async function processOneDueTimer(
   }
 
   const overdueMs = now.getTime() - new Date(timer.endsAt).getTime();
-  const unattendedMs = unattendedOverdueMs(
-    new Date(timer.endsAt).getTime(),
-    now.getTime(),
-  );
 
-  if (unattendedMs > ABANDON_OVERDUE_MS) {
+  if (overdueMs > ABANDON_OVERDUE_MS) {
     console.log(
       `Frogodoro processor: abandoning timer overdue by ${Math.round(overdueMs / 60_000)}m for user ${userId}`,
     );

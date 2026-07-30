@@ -120,13 +120,6 @@ public class FrogAlarmSoundService extends Service {
     public void onDestroy() {
         handler.removeCallbacks(timeout);
         stopPlayer();
-        // Detach rather than let the notification die with the service. The
-        // sound gives up after 2 minutes but the session is still unacknowledged
-        // — taking Done / +5 more away with it would strand it. It also keeps
-        // the notification's delete intent meaningful: the only thing that
-        // removes it now is the user or an explicit cancel, never our own
-        // teardown.
-        stopForeground(Service.STOP_FOREGROUND_DETACH);
         super.onDestroy();
     }
 

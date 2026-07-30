@@ -214,11 +214,6 @@ public final class FrogTimerNotification {
             b.addAction(0, "+5 more", actionIntent(ctx, "more5", 15));
         }
         b.addAction(0, "Done", actionIntent(ctx, "done", 14));
-        // Swiping the ringing alarm away is the user acknowledging it, so treat
-        // it exactly like Done — otherwise the session stays pinned open on
-        // every other device. Only fires on a user dismissal; an app-side
-        // NotificationManager.cancel() does not trigger it.
-        b.setDeleteIntent(actionIntent(ctx, "done", 16));
         return b.build();
     }
 

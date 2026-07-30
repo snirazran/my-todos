@@ -18,27 +18,6 @@ import { iosAlarmFile } from '@/lib/timerSoundFiles';
 const PHASE_END_ID = 880001;
 const CHAINED_BREAK_END_ID = 880002;
 
-// Notifications carrying this category report an explicit user dismissal back
-// to JS (iOS only delivers UNNotificationDismissActionIdentifier for categories
-// registered with customDismissAction). Swiping the alarm away is the user
-// acknowledging it, so GlobalTimer treats that as Done.
-export const TIMER_END_ACTION_TYPE = 'FROG_TIMER_END';
-
-let actionTypesRegistered = false;
-
-export async function ensureTimerActionTypes(): Promise<void> {
-  if (!Capacitor.isNativePlatform()) return;
-  if (actionTypesRegistered) return;
-  actionTypesRegistered = true;
-  try {
-    await LocalNotifications.registerActionTypes({
-      types: [{ id: TIMER_END_ACTION_TYPE, iosCustomDismissAction: true, actions: [] }],
-    });
-  } catch {
-    actionTypesRegistered = false;
-  }
-}
-
 function phaseEndContent(phase: PomodoroPhase, autoStartBreak: boolean) {
   if (phase === 'focus' && autoStartBreak) {
     return {
@@ -92,8 +71,6 @@ export async function scheduleTimerNotifications(opts: {
       if (req.display !== 'granted') return;
     }
 
-    await ensureTimerActionTypes();
-
     // Always start from a clean slate so we never stack duplicates.
     await cancelTimerNotifications();
     if (endTime <= Date.now()) return;
@@ -113,7 +90,6 @@ export async function scheduleTimerNotifications(opts: {
         sound: notifSound,
         smallIcon: 'ic_notification',
         iconColor: '#4CAF50',
-        actionTypeId: TIMER_END_ACTION_TYPE,
         extra: { type: first.type, path: '/timer' },
       },
     ];
@@ -133,7 +109,6 @@ export async function scheduleTimerNotifications(opts: {
         sound: notifSound,
         smallIcon: 'ic_notification',
         iconColor: '#4CAF50',
-        actionTypeId: TIMER_END_ACTION_TYPE,
         extra: { type: 'break_complete', path: '/timer' },
       });
     }
