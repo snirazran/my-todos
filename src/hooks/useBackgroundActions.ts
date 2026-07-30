@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState } from 'react';
 import confetti from 'canvas-confetti';
-import { hapticImpact } from '@/lib/haptics';
+import { hapticSelect } from '@/lib/haptics';
 import {
   mutateBackgrounds,
   useBackgrounds,
@@ -105,7 +105,7 @@ export function useBackgroundActions({
       return;
     }
     if (equipped === item.id) return;
-    hapticImpact();
+    hapticSelect();
     if (data) {
       const nextData = { ...data, equipped: item.id };
       void mutate(nextData, { revalidate: false });

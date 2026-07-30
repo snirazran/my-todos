@@ -31,7 +31,7 @@ import {
 import Fly from '@/components/ui/fly';
 import { Icon as AppIcon } from '@/components/ui/Icon';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
-import { hapticSuccess } from '@/lib/haptics';
+import { hapticTick } from '@/lib/haptics';
 import { PlusUpgradeModal } from './PlusUpgradeModal';
 import { PickerSheet } from './quick-add/PickerSheet';
 import { TagManagerSheet } from './quick-add/TagManagerSheet';
@@ -995,7 +995,7 @@ export default function QuickAddSheet({
   };
 
   const handleSubmit = async () => {
-    hapticSuccess();
+    hapticTick();
     if (!pickedBacklogTaskId) {
       return doSubmit(false);
     }

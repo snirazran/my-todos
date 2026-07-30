@@ -493,7 +493,7 @@ function RemoveFriendDialog({
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.94, y: 12 }}
               transition={{ type: 'spring', damping: 26, stiffness: 300 }}
-              className="pointer-events-auto relative w-full max-w-sm rounded-[28px] border border-border bg-popover px-6 pb-6 pt-7 text-center text-popover-foreground shadow-2xl"
+              className="pointer-events-auto relative max-h-full w-full max-w-sm overflow-y-auto overscroll-contain rounded-[28px] border border-border bg-popover px-6 pb-6 pt-7 text-center text-popover-foreground shadow-2xl"
             >
               <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-500/10 text-rose-500">
                 <UserMinus className="h-7 w-7" />

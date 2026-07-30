@@ -15,6 +15,7 @@ import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
  *    texture, not a rattle.
  *
  * Semantic API — call by intent, not by milliseconds:
+ *   hapticSelect()    softest feedback — picking items out of a grid
  *   hapticTick()      subtle selection tick — counter bumps, toggles, detents
  *   hapticImpact()    medium thump — drag pickup, equip, meaningful taps
  *   hapticGrab()      doubled medium thump — picking a card up to reorder
@@ -87,6 +88,14 @@ function fire(native: () => Promise<void>, webPattern: number | number[]) {
   } else {
     webVibrate(webPattern);
   }
+}
+
+// Lighter than a Light impact: iOS's selection generator (the picker-wheel
+// feel), so browsing a grid of items never thumps. Every item tap across
+// inventory, shop and trade uses this one so they all feel identical.
+export function hapticSelect() {
+  if (!canTick()) return;
+  fire(() => Haptics.selectionChanged(), 5);
 }
 
 export function hapticTick() {

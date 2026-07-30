@@ -29,9 +29,12 @@ export function AddFriendsSheet({
         closeAriaLabel="Close add friends"
         hideHandle
       >
-        {() => (
-          <div className="flex flex-col">
-            <div className="relative">
+        {({ bindScroll }) => (
+          <div
+            ref={bindScroll}
+            className="flex max-h-[100dvh] flex-col overflow-y-auto overscroll-contain sm:max-h-[calc(100dvh-3rem)]"
+          >
+            <div className="relative shrink-0">
               <img
                 src="/friend-share.png"
                 alt="Friends sending the flies they catch into your basket"

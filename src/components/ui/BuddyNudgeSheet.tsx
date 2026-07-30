@@ -60,8 +60,11 @@ export function BuddyNudgeSheet({
         closeAriaLabel="Not now"
         className="sm:max-w-md"
       >
-        {({ entered }) => (
-          <div className="flex flex-col px-6 pb-[calc(env(safe-area-inset-bottom)+1.75rem)] pt-9 text-center">
+        {({ entered, bindScroll }) => (
+          <div
+            ref={bindScroll}
+            className="flex max-h-[100dvh] flex-col overflow-y-auto overscroll-contain px-6 pb-[calc(env(safe-area-inset-bottom)+1.75rem)] pt-9 text-center sm:max-h-[calc(100dvh-3rem)]"
+          >
             <div
               aria-hidden
               className="pointer-events-none absolute inset-x-0 top-0 h-36"

@@ -14,7 +14,7 @@ import {
   Repeat,
   ShoppingBag,
 } from 'lucide-react';
-import { hapticTick, hapticImpact, hapticCelebrate } from '@/lib/haptics';
+import { hapticTick, hapticSelect, hapticCelebrate } from '@/lib/haptics';
 import {
   rewardedAdsAvailable,
   showRewardedAd,
@@ -350,14 +350,14 @@ export function TradePanel({
     if (targetRarity && entry.rarity !== targetRarity) return;
     const currentlySelected = selectedCounts[entry.uid] || 0;
     if (currentlySelected < entry.owned) {
-      if (selectedIds.length + 1 === TRADE_ITEM_COUNT) hapticImpact();
-      else hapticTick();
+      if (selectedIds.length + 1 === TRADE_ITEM_COUNT) hapticTick();
+      else hapticSelect();
       setSelectedIds((prev) => [...prev, entry.uid]);
     }
   };
 
   const handleRemove = (index: number) => {
-    hapticTick();
+    hapticSelect();
     setSelectedIds((prev) => prev.filter((_, i) => i !== index));
   };
 

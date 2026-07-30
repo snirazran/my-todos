@@ -6,7 +6,7 @@ import {
   useInventory,
 } from '@/hooks/useInventory';
 import { markFlyEarn } from '@/lib/flyEarn';
-import { hapticTick, hapticImpact } from '@/lib/haptics';
+import { hapticTick, hapticImpact, hapticSelect } from '@/lib/haptics';
 import { useMemo, useState, useEffect } from 'react';
 import React from 'react';
 import { useAuth } from '@/components/auth/AuthContext';
@@ -756,15 +756,14 @@ function WardrobeManagerContent({
   const toggleEquip = (slot: WardrobeSlot, itemId: string) => {
     if (!data?.wardrobe?.equipped) return;
     const isEquipped = data.wardrobe.equipped[slot] === itemId;
-    if (isEquipped) hapticTick();
-    else hapticImpact();
+    hapticSelect();
     applyEquip(slot, isEquipped ? null : itemId);
   };
 
   const equipItemDirect = async (item: ItemDef) => {
     if (!data?.wardrobe?.equipped) return;
     if (data.wardrobe.equipped[item.slot] === item.id) return;
-    hapticImpact();
+    hapticSelect();
     applyEquip(item.slot, item.id);
   };
 
@@ -1008,7 +1007,7 @@ function WardrobeManagerContent({
       : 0;
 
   const openItemPurchase = (item: ItemDef, dealPrice: number | null = null) => {
-    hapticTick();
+    hapticSelect();
     // Deals apply everywhere, not just on the deals shelf — resolve today's
     // price here so a card opened from the main grid quotes what the server
     // will actually charge.
@@ -1027,7 +1026,7 @@ function WardrobeManagerContent({
   };
 
   const openBgPurchase = (bgItem: BackgroundItem) => {
-    hapticTick();
+    hapticSelect();
     setPurchaseDealPrice(null);
     setPurchaseCard({
       kind: 'bg',
