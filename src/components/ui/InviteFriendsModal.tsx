@@ -107,11 +107,26 @@ export function InviteFriendsModal({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [closeInvite, open]);
 
+  const totalTiers = config?.rewards?.length ?? 0;
+  const claimedCount = status?.claimedCount ?? 0;
+  const allRewardsClaimed = totalTiers > 0 && claimedCount >= totalTiers;
+  const autoSkippedRef = React.useRef(false);
+
   useEffect(() => {
     if (!open) return;
     setStep('overview');
     setSelectedGiftId(null);
+    autoSkippedRef.current = false;
   }, [open]);
+
+  // With every tier already earned the reward track has nothing left to
+  // promise, so it's a page you tap straight through — open on the gift
+  // picker instead. Latched per-open so Back still works from there.
+  useEffect(() => {
+    if (!open || !allRewardsClaimed || autoSkippedRef.current) return;
+    autoSkippedRef.current = true;
+    setStep('pick');
+  }, [open, allRewardsClaimed]);
 
   const shareInviteUrl = React.useCallback(
     async (url: string) => {
@@ -190,8 +205,8 @@ export function InviteFriendsModal({
                   <StepShell key="overview">
                     <OverviewStep
                       config={config}
-                      claimedCount={status?.claimedCount ?? 0}
-                      totalTiers={config?.rewards?.length ?? 0}
+                      claimedCount={claimedCount}
+                      totalTiers={totalTiers}
                       onClose={closeInvite}
                       onInviteFriends={() => setStep('pick')}
                     />
@@ -205,7 +220,9 @@ export function InviteFriendsModal({
                       selectedGiftId={selectedGiftId}
                       onSelect={setSelectedGiftId}
                       onClose={closeInvite}
-                      onBack={() => setStep('overview')}
+                      onBack={
+                        allRewardsClaimed ? closeInvite : () => setStep('overview')
+                      }
                       onSend={handleSendInvite}
                       creating={creatingInvite}
                     />
@@ -374,11 +391,17 @@ function RewardProgressTrack({
   const railEnd = 92;
   const railSpan = railEnd - railStart;
   const initialProgressPct = 6;
+  // The last milestone sits inset from the rail's end, so tracking it exactly
+  // left a dead grey tail after the final friend joined. Once every tier is
+  // claimed the fill runs the whole rail — the track reads as completed
+  // rather than stuck one step short.
   const progressEnd =
     claimedCount <= 0
       ? initialProgressPct
-      : ((firstPos - railStart) / railSpan) * 100 +
-        progressPct * ((lastPos - firstPos) / railSpan);
+      : claimedCount >= totalTiers
+        ? 100
+        : ((firstPos - railStart) / railSpan) * 100 +
+          progressPct * ((lastPos - firstPos) / railSpan);
 
   const nextReward =
     rewards.find((r) => r.tier > claimedCount) ?? rewards[rewards.length - 1] ?? null;
