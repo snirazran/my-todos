@@ -197,7 +197,7 @@ export function NextQuestStrip({
                 ? `${claimableCount} rewards ready`
                 : 'Reward ready'}
             </span>
-            <span className="mt-0.5 block min-w-0 line-clamp-2 text-[13px] font-black text-foreground md:line-clamp-none md:truncate">
+            <span className="mt-0.5 block min-w-0 text-[13px] font-black text-foreground md:truncate">
               {claimable.kind === 'season' ? (
                 <span className="truncate">
                   {claimable.seasonName
@@ -254,7 +254,7 @@ export function NextQuestStrip({
                 Next Quest
               </span>
               <span className="flex min-w-0 items-center text-[12px] font-black leading-tight text-foreground md:text-[14px] md:font-bold">
-                <span className="min-w-0 flex-1 line-clamp-2 md:line-clamp-none md:truncate">
+                <span className="min-w-0 flex-1 md:truncate">
                   <ObjectiveLabel
                     label={displayNextUp.remainingLabel}
                     tags={displayNextUp.tags}
