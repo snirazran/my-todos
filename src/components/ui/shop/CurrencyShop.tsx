@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import useSWR from 'swr';
 import { Clapperboard, Loader2 } from 'lucide-react';
 import confetti from 'canvas-confetti';
@@ -17,6 +17,7 @@ import { getFlyPackPrices, purchaseFlyPack } from '@/lib/purchases';
 import type { FlyPackId } from '@/lib/flyPacks';
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
 import { prefetchStoreBundleBytes } from '@/lib/riveLoader';
+import { emitCampaignTrigger } from '@/lib/campaigns/orchestrator';
 import { WishlistGoalCard } from './WishlistGoalCard';
 import { BundleArt } from './BundleArt';
 
@@ -54,9 +55,12 @@ export function CurrencyShop() {
   const open = useUIStore((s) => s.isFlyShopOpen);
   const setOpen = useUIStore((s) => s.setFlyShopOpen);
   const need = useUIStore((s) => s.flyShopNeed);
+  const focusPackId = useUIStore((s) => s.flyShopFocusPackId);
   const { data: inventoryData, mutate: mutateInventory } = useInventory(open, true);
   const balance = inventoryData?.wardrobe?.flies ?? 0;
   const [artReady, setArtReady] = useState(false);
+  const openedRef = useRef(false);
+  const boughtRef = useRef(false);
   const packs = PACKS.map((pack) => ({
     ...pack,
     price: storePrices[pack.id as FlyPackId] ?? pack.price,
@@ -64,16 +68,30 @@ export function CurrencyShop() {
   // Arriving from a purchase they couldn't afford: point at the cheapest pack
   // that actually closes the gap, so the shop answers the question they came
   // with instead of restating the whole price ladder.
-  const coversId = need
-    ? (packs.find((pack) => pack.amount >= need) ?? packs[packs.length - 1]).id
-    : null;
+  const coversId =
+    focusPackId ||
+    (need
+      ? (packs.find((pack) => pack.amount >= need) ?? packs[packs.length - 1]).id
+      : null);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
   useEffect(() => {
-    if (open) trackAnalyticsEvent('fly_shop_viewed');
+    if (open) {
+      trackAnalyticsEvent('fly_shop_viewed');
+      emitCampaignTrigger('shop_opened');
+      boughtRef.current = false;
+      openedRef.current = true;
+      return;
+    }
+    // Left empty-handed: the one moment we know they considered spending and
+    // didn't. Fires on close so it can't collide with the sheet itself.
+    if (openedRef.current && !boughtRef.current) {
+      emitCampaignTrigger('shop_abandoned');
+    }
+    openedRef.current = false;
   }, [open]);
 
   useEffect(() => {
@@ -153,6 +171,8 @@ export function CurrencyShop() {
                   covers={pack.id === coversId}
                   showArt={artReady}
                   onPurchased={() => {
+                    boughtRef.current = true;
+                    emitCampaignTrigger('purchase_completed');
                     window.setTimeout(() => void mutateInventory(), 1200);
                     window.setTimeout(() => void mutateInventory(), 5000);
                     window.setTimeout(() => void mutateInventory(), 15000);

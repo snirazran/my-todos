@@ -85,7 +85,6 @@ export function HomeShopRail() {
   const seenRef = React.useRef(false);
 
   const balance = data?.wardrobe?.flies ?? 0;
-  const inventory = data?.wardrobe?.inventory ?? {};
   const deals = data?.dailyDeals ?? [];
   const countdown = useCountdown(deals[0]?.endsAt);
   const wishlist = data?.wishlist ?? null;
@@ -94,17 +93,17 @@ export function HomeShopRail() {
 
   const picks = React.useMemo<ShopPick[]>(() => {
     const byId = new Map((data?.catalog ?? []).map((i) => [i.id, i]));
+    // Same membership rule as the shop's daily-deals shelf: every deal whose
+    // item resolves in the catalog. Filtering owned items out here made the
+    // two shelves disagree on how many deals the day has.
     const candidates: ShopPick[] = [];
     for (const deal of deals) {
       const item = byId.get(deal.itemId);
-      if (!item || item.slot === 'container') continue;
-      if ((inventory[item.id] ?? 0) > 0) continue;
-      const full = deal.priceFlies || (item.priceFlies ?? 0);
-      if (full <= 0) continue;
+      if (!item) continue;
       candidates.push({
         item,
         price: deal.dealPrice,
-        wasPrice: full,
+        wasPrice: deal.priceFlies,
         discountPercent: deal.discountPercent,
       });
     }
@@ -119,7 +118,7 @@ export function HomeShopRail() {
       .filter((c) => c.price > balance)
       .sort((a, b) => rarityRank[b.item.rarity] - rarityRank[a.item.rarity]);
     return [...affordable, ...rest];
-  }, [data?.catalog, deals, inventory, balance]);
+  }, [data?.catalog, deals, balance]);
 
   React.useEffect(() => {
     if (!picks.length || seenRef.current) return;

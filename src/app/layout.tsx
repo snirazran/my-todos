@@ -12,6 +12,7 @@ import { RiveIdlePause } from '@/components/ui/RiveIdlePause';
 import { AuthContext } from '@/components/auth/AuthContext';
 import { GlobalPageBackground } from '@/components/ui/GlobalPageBackground';
 import { RiveWarmup } from '@/components/providers/RiveWarmup';
+import { CampaignHost } from '@/components/campaigns/CampaignHost';
 import { RIVE_WASM_VERSION } from '@/lib/riveWasmVersion';
 import { MainScroll } from '@/components/providers/MainScroll';
 import { FlyCatchOverlay } from '@/components/fly-game/FlyCatchOverlay';
@@ -164,6 +165,7 @@ export default function RootLayout({
               <SheetRivePause />
               <RiveIdlePause />
               <RiveWarmup />
+              <CampaignHost />
             </div>
           </Providers>
         </AuthContext>

@@ -9,6 +9,7 @@ import Fly from '@/components/ui/fly';
 import { AnimatedNumber } from '@/components/ui/AnimatedNumber';
 import { cn } from '@/lib/utils';
 import { useUIStore } from '@/lib/uiStore';
+import { emitCampaignTrigger } from '@/lib/campaigns/orchestrator';
 import { hapticSuccess } from '@/lib/haptics';
 import { useWishlist } from '@/hooks/useWishlist';
 import type { WishlistKind } from '@/lib/skins/wishlist';
@@ -126,7 +127,9 @@ export function PurchaseSheet({
   } = useWishlist(open && !isGuest);
   const isPinned = !!target && wishlist?.itemId === target.id;
   const pinThis = () => {
-    if (target) void pin(target.id, target.kind ?? 'item');
+    if (!target) return;
+    void pin(target.id, target.kind ?? 'item');
+    emitCampaignTrigger('wishlist_pinned');
   };
 
   useEffect(() => {
@@ -141,6 +144,12 @@ export function PurchaseSheet({
   const owned = ownedCount > 0;
   const canAfford = !isGuest && balance >= price;
   const shortBy = Math.max(0, price - balance);
+
+  // The gap is the strongest signal this app produces about intent to spend.
+  useEffect(() => {
+    if (!open || !target || isGuest || canAfford || owned) return;
+    emitCampaignTrigger('insufficient_flies', { gap: shortBy });
+  }, [open, target?.id, isGuest, canAfford, owned, shortBy]);
 
   const handleBuy = async () => {
     if (busy) return;
@@ -309,7 +318,7 @@ export function PurchaseSheet({
             {(phase === 'success' || owned) && (
               <div className="mt-4 flex items-center justify-center gap-1.5 text-sm font-bold text-muted-foreground">
                 <span>Balance</span>
-                <Fly size={24} paused y={-6} />
+                <Fly size={30} paused y={-4} />
                 <AnimatedNumber value={balance} haptics className="tabular-nums text-foreground" />
               </div>
             )}
@@ -346,7 +355,7 @@ export function PurchaseSheet({
                     ) : (
                       <span className="inline-flex items-center gap-1.5">
                         Get
-                        <Fly size={24} paused y={-6} />
+                        <Fly size={30} paused y={-4} />
                         <span className="tabular-nums">{shortBy.toLocaleString()}</span>
                         flies
                       </span>

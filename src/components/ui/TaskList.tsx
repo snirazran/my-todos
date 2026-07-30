@@ -26,6 +26,7 @@ import {
   hapticTick,
 } from '@/lib/haptics';
 import { useTaskTimerPhase } from '@/hooks/useTaskTimerPhase';
+import { emitCampaignTrigger } from '@/lib/campaigns/orchestrator';
 import {
   AnimatePresence,
   motion,
@@ -1643,6 +1644,7 @@ export default function TaskList({
       (t) => t.completed && prev.get(t.id) === false,
     );
     if (!flipped) return;
+    emitCampaignTrigger('task_completed');
     setUndoToast({ id: flipped.id, text: flipped.text });
     if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
     undoTimerRef.current = window.setTimeout(() => setUndoToast(null), 4000);
