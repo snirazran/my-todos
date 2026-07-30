@@ -11,6 +11,7 @@ import {
   timerHuntExtras,
   clearTimerAndFanOut,
   priorFocusSecondsFor,
+  nativeControlTokens,
 } from '@/lib/frogodoroSync';
 import { iosAlarmFile } from '@/lib/timerSoundFiles';
 import { publishTimerEvent } from '@/lib/frogodoroEvents';
@@ -476,12 +477,20 @@ async function processOneDueTimer(
     }
   }
 
-  const tokens = prefs?.enabled ? prefs.androidFcmTokens ?? [] : [];
-  if (tokens.length > 0) {
-    if (next.autoStartBreak && nextTimer.status === 'running' && nextTimer.endsAt) {
+  // An auto-started break has to reach iOS as well as Android. The iPhone armed
+  // a local alarm for the FOCUS end when that phase started, and nothing else
+  // moves it: with no JS running, this push is the only thing that re-arms it to
+  // the break's end. Without it the old alarm rings for a phase that already
+  // handed off. The finished push stays Android-only — it drives that platform's
+  // ring, while iOS rings from the Live Activity alert and its own local alarm.
+  const androidTokens = prefs?.enabled ? prefs.androidFcmTokens ?? [] : [];
+  const controlTokens = nativeControlTokens(prefs);
+
+  if (next.autoStartBreak && nextTimer.status === 'running' && nextTimer.endsAt) {
+    if (controlTokens.length > 0) {
       await sendTimerControlPush({
         userId,
-        tokens,
+        tokens: controlTokens,
         action: 'start',
         phase: nextTimer.phase,
         endTime: new Date(nextTimer.endsAt).getTime(),
@@ -490,14 +499,14 @@ async function processOneDueTimer(
         rev: nextTimer.rev,
         ...timerHuntExtras(nextTimer, now.getTime(), priorFocus),
       });
-    } else if (!suppressAlarm) {
-      await sendTimerFinishedPush({
-        userId,
-        tokens,
-        phase: next.completedPhase,
-        sound: timer.settings.timerSound,
-      });
     }
+  } else if (!suppressAlarm && androidTokens.length > 0) {
+    await sendTimerFinishedPush({
+      userId,
+      tokens: androidTokens,
+      phase: next.completedPhase,
+      sound: timer.settings.timerSound,
+    });
   }
 
   if (nextTimer.status === 'running' && nextTimer.endsAt) {

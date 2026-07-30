@@ -29,8 +29,25 @@ struct FrogTimerControlIntent: LiveActivityIntent {
     func perform() async throws -> some IntentResult {
         NSLog("FrogControl: perform start action=%@", action)
 
+        var effective = action
+
+        // The AlarmKit alarm's stop button. The alarm is armed for one phase's
+        // end, but by the time it rings the session may have moved on — with
+        // auto-start breaks the break is already counting down, and ending the
+        // session there would destroy a phase the user never finished. Only a
+        // phase actually waiting for Done gets acknowledged; otherwise the
+        // slide just silences the alarm.
+        if action == "alarmStop" {
+            FrogAlarmKit.cancel()
+            guard Self.currentActivity()?.content.state.finished == true else {
+                NSLog("FrogControl: alarmStop — nothing awaiting Done, alarm silenced only")
+                return .result()
+            }
+            effective = "done"
+        }
+
         // Deep-focus two-tap arm: swallow the first pause tap.
-        if action == "pause", let activity = Self.currentActivity() {
+        if effective == "pause", let activity = Self.currentActivity() {
             let s = activity.content.state
             if s.deepFocus == true && s.confirmPause != true && !s.paused {
                 var armed = s
@@ -45,10 +62,10 @@ struct FrogTimerControlIntent: LiveActivityIntent {
             }
         }
 
-        await applyLocally()
+        await applyLocally(effective)
         let activityId = Self.currentActivity()?.id
         let controlSeq = Self.nextControlSeq()
-        Self.postToServer(action: action, controlSeq: controlSeq, activityId: activityId)
+        Self.postToServer(action: effective, controlSeq: controlSeq, activityId: activityId)
         return .result()
     }
 
@@ -83,22 +100,22 @@ struct FrogTimerControlIntent: LiveActivityIntent {
         }
     }
 
-    private func applyLocally() async {
-        if action == "pause" || action == "stop" || action == "done" {
+    private func applyLocally(_ effective: String) async {
+        if effective == "pause" || effective == "stop" || effective == "done" {
             UNUserNotificationCenter.current().removePendingNotificationRequests(
                 withIdentifiers: ["880001", "880002"]
             )
         }
         guard let activity = Self.currentActivity() else {
             NSLog("FrogControl: applyLocally no activity (count=%d) action=%@",
-                  Activity<FrogTimerAttributes>.activities.count, action)
+                  Activity<FrogTimerAttributes>.activities.count, effective)
             return
         }
-        NSLog("FrogControl: applyLocally found activity=%@ action=%@", activity.id, action)
+        NSLog("FrogControl: applyLocally found activity=%@ action=%@", activity.id, effective)
         let s = activity.content.state
         let nowMs = Date().timeIntervalSince1970 * 1000
 
-        switch action {
+        switch effective {
         case "pause":
             FrogAlarmKit.cancel()
             var ns = s

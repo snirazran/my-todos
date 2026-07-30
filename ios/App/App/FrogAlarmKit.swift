@@ -32,7 +32,7 @@ enum FrogAlarmKit {
     static func sync(endTimeMs: Double, phase: String, soundId: String?) {
         #if canImport(AlarmKit)
         guard #available(iOS 26.0, *) else { return }
-        Task {
+        enqueue {
             await cancelExisting()
             guard endTimeMs > Date().timeIntervalSince1970 * 1000 + 1000 else { return }
 
@@ -57,11 +57,11 @@ enum FrogAlarmKit {
                 )
                 let date = Date(timeIntervalSince1970: endTimeMs / 1000)
                 let configuration: AlarmManager.AlarmConfiguration<FrogAlarmMetadata>
-                // Stopping the alarm IS finishing the session. Without this the
-                // slide-to-stop is AlarmKit-local: the ringing ends but the
-                // server still holds the phase open, so the island keeps asking
-                // for Done and the web keeps showing "Focus logged".
-                let stopIntent = FrogTimerControlIntent(action: "done")
+                // Stopping the alarm acknowledges the session. Not "done"
+                // outright: this alarm is armed for one phase's end and the
+                // session may have moved on by the time it rings, so the intent
+                // decides whether there is anything to acknowledge.
+                let stopIntent = FrogTimerControlIntent(action: "alarmStop")
                 if let soundId, !soundId.isEmpty, soundId != "none" {
                     configuration = AlarmManager.AlarmConfiguration(
                         schedule: .fixed(date),
@@ -91,23 +91,49 @@ enum FrogAlarmKit {
     static func cancel() {
         #if canImport(AlarmKit)
         guard #available(iOS 26.0, *) else { return }
-        Task { await cancelExisting() }
+        enqueue { await cancelExisting() }
         #endif
     }
 
     #if canImport(AlarmKit)
+    // Every alarm operation runs through this serial chain. Unserialised, a
+    // cancel could overtake a sync that was still parked on requestAuthorization
+    // and then schedule its alarm *after* the cancel had already run — leaving a
+    // live alarm for a session that had been stopped. Two syncs racing did the
+    // same thing to each other, the loser's id being overwritten in the shared
+    // defaults. Either way the alarm outlived every reference to it and fired
+    // later with nothing behind it.
+    private static var opChain: Task<Void, Never>?
+
+    private static func enqueue(_ work: @escaping () async -> Void) {
+        let previous = opChain
+        opChain = Task {
+            await previous?.value
+            await work()
+        }
+    }
+
     @available(iOS 26.0, *)
     private static func cancelExisting() async {
-        let suite = UserDefaults(suiteName: suiteName)
-        guard
-            let raw = suite?.string(forKey: alarmIdKey),
-            let id = UUID(uuidString: raw)
-        else { return }
-        suite?.removeObject(forKey: alarmIdKey)
+        UserDefaults(suiteName: suiteName)?.removeObject(forKey: alarmIdKey)
+        // Cancel every alarm this app owns, not just the tracked id. AlarmKit
+        // alarms outlive the app process and there is no cancel-all, so one we
+        // lost track of could never be reached again. Only ever one is wanted at
+        // a time, which makes sweeping both safe and self-healing for strays
+        // already armed on the device.
         do {
-            try AlarmManager.shared.cancel(id: id)
+            for alarm in try AlarmManager.shared.alarms {
+                // Per-alarm catch: one failure must not abandon the rest of the
+                // sweep, or a single stuck alarm keeps every other stray armed.
+                do {
+                    try AlarmManager.shared.cancel(id: alarm.id)
+                } catch {
+                    NSLog("FrogAlarmKit: cancel %@ failed: %@",
+                          alarm.id.uuidString, error.localizedDescription)
+                }
+            }
         } catch {
-            NSLog("FrogAlarmKit: cancel failed: %@", error.localizedDescription)
+            NSLog("FrogAlarmKit: listing alarms failed: %@", error.localizedDescription)
         }
     }
     #endif

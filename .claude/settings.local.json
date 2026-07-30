@@ -409,7 +409,8 @@
       "Bash(perl -pi -e 's/\\\\[habit\\\\\\(/habit\\(/g; s/\\\\}\\\\\\)\\\\], TODAY/}\\)], TODAY/g' verify-streak.ts)",
       "Bash(perl -pi -e 's/computeGroupStreak\\\\\\(\\\\s*habit\\\\\\(\\(.*\\)\\\\\\)\\\\s*\\\\]/computeGroupStreak\\(habit\\($1\\)/g' verify-streak.ts)",
       "Bash(xcodebuild -version)",
-      "Read(//Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/**)"
+      "Read(//Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/**)",
+      "Bash(echo \"ts exit=$?\")"
     ]
   }
 }

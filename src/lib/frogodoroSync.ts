@@ -98,7 +98,7 @@ function tokenLabel(token: string | null | undefined): string {
 // re-arm or CANCEL the local notification and AlarmKit alarm it scheduled when
 // the phase started. Without the iOS half, stopping a timer from another device
 // while the phone app is killed leaves that alarm armed and it rings anyway.
-function nativeControlTokens(prefs: NotificationPrefs | null | undefined): string[] {
+export function nativeControlTokens(prefs: NotificationPrefs | null | undefined): string[] {
   if (!prefs?.enabled) return [];
   return [...(prefs.androidFcmTokens ?? []), ...(prefs.iosFcmTokens ?? [])];
 }
