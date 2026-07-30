@@ -1004,13 +1004,13 @@ export function useTaskData({
         await fetch('/api/sections', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sectionId, collapsed }),
+          body: JSON.stringify({ sectionId, collapsed, timezone: tz }),
         });
       } catch (e) {
         console.error('Collapse section failed', e);
       }
     },
-    [mutateSections],
+    [mutateSections, tz],
   );
 
   const deleteSection = useCallback(

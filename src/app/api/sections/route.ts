@@ -3,8 +3,12 @@ import { v4 as uuid } from 'uuid';
 import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import TaskModel from '@/lib/models/Task';
-import { TaskSectionModel } from '@/lib/models/TaskSection';
+import {
+  TaskSectionModel,
+  isSectionCollapsedOn,
+} from '@/lib/models/TaskSection';
 import { notifyTaskChanged } from '@/lib/taskSync';
+import { getZonedToday } from '@/lib/utils';
 
 const NAME_MAX = 60;
 const MAX_SECTIONS = 10;
@@ -31,10 +35,12 @@ function unauth() {
   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const uid = await currentUserId();
   if (!uid) return unauth();
   await connectMongo();
+  const tz = req.nextUrl.searchParams.get('timezone') || 'UTC';
+  const todayKey = getZonedToday(tz);
   const sections = await TaskSectionModel.find({ userId: uid })
     .sort({ order: 1 })
     .lean();
@@ -43,7 +49,7 @@ export async function GET() {
       id: s.id,
       name: s.name,
       order: s.order,
-      collapsed: !!s.collapsed,
+      collapsed: isSectionCollapsedOn(s, todayKey),
       tagIds: s.tagIds ?? [],
     })),
   });
@@ -110,7 +116,12 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Name required' }, { status: 400 });
     set.name = name;
   }
-  if (typeof body.collapsed === 'boolean') set.collapsed = body.collapsed;
+  if (typeof body.collapsed === 'boolean') {
+    set.collapsed = body.collapsed;
+    set.collapsedDayKey = body.collapsed
+      ? getZonedToday(typeof body.timezone === 'string' ? body.timezone : 'UTC')
+      : '';
+  }
   const tagIds = parseTagIds(body?.tagIds);
   if (tagIds) set.tagIds = tagIds;
   if (Object.keys(set).length === 0)

@@ -7,6 +7,7 @@ export interface TaskSectionDoc {
   name: string;
   order: number;
   collapsed?: boolean;
+  collapsedDayKey?: string;
   tagIds?: string[];
   createdAt: Date;
   updatedAt: Date;
@@ -19,6 +20,7 @@ const TaskSectionSchema = new Schema<TaskSectionDoc>(
     name: { type: String, required: true },
     order: { type: Number, required: true },
     collapsed: { type: Boolean, default: false },
+    collapsedDayKey: { type: String, default: '' },
     tagIds: { type: [String], default: [] },
   },
   { timestamps: true },
@@ -26,6 +28,13 @@ const TaskSectionSchema = new Schema<TaskSectionDoc>(
 
 TaskSectionSchema.index({ userId: 1, id: 1 }, { unique: true });
 TaskSectionSchema.index({ userId: 1, order: 1 });
+
+export function isSectionCollapsedOn(
+  section: Pick<TaskSectionDoc, 'collapsed' | 'collapsedDayKey'>,
+  todayKey: string,
+) {
+  return !!section.collapsed && section.collapsedDayKey === todayKey;
+}
 
 export const TaskSectionModel: Model<TaskSectionDoc> =
   mongoose.models.TaskSection ||

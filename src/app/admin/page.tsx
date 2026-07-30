@@ -200,33 +200,16 @@ function AdminPageContent() {
     }
   };
 
-  const handleRefreshQuests = async (scope: 'daily' | 'focus') => {
-    const loadingKey = scope === 'focus' ? 'refresh-focus-quests' : 'refresh-daily-quests';
-    setLoading(loadingKey);
-    try {
-      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      const res = await fetch('/api/quests/refresh', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          timezone,
-          ...(scope === 'focus' ? { scope: 'focus' } : {}),
-        }),
-      });
-      if (res.ok) {
+  const handleRefreshQuests = () =>
+    runConfirmed(
+      'refresh-quests',
+      '/api/admin/reset-quests',
+      { method: 'POST', credentials: 'include' },
+      () => {
         mutate((key) => typeof key === 'string' && key.startsWith('/api/quests'));
-        flash('success', scope === 'focus' ? 'Focus quests refreshed' : 'Daily quests refreshed');
-      } else {
-        const data = await res.json().catch(() => ({}));
-        flash('error', data.error || 'Failed to refresh quests');
-      }
-    } catch {
-      flash('error', 'Network error');
-    } finally {
-      setLoading(null);
-    }
-  };
+        window.location.reload();
+      },
+    );
 
   return (
     <div className="min-h-screen bg-background pb-16">
@@ -340,22 +323,6 @@ function AdminPageContent() {
               filled
             />
             <ActionButton
-              icon={<RefreshCw className="w-5 h-5" />}
-              accent="bg-amber-500/10 text-amber-600 dark:text-amber-400"
-              title="Refresh Daily Quests"
-              description="Reroll today's daily quest selection"
-              loading={loading === 'refresh-daily-quests'}
-              onClick={() => handleRefreshQuests('daily')}
-            />
-            <ActionButton
-              icon={<RefreshCw className="w-5 h-5" />}
-              accent="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-              title="Refresh Focus Quests"
-              description="Rebuild quests for the selected focus areas"
-              loading={loading === 'refresh-focus-quests'}
-              onClick={() => handleRefreshQuests('focus')}
-            />
-            <ActionButton
               icon={<Wind className="w-5 h-5" />}
               accent="bg-cyan-500/10 text-cyan-600 dark:text-cyan-400"
               title="Reset Flies"
@@ -382,6 +349,17 @@ function AdminPageContent() {
               loading={loading === 'reset-tasks'}
               warningText="Warning: This permanently deletes all your tasks and progress. Click again to confirm."
               onClick={handleResetTasks}
+            />
+            <ConfirmActionRow
+              icon={<RefreshCw className="w-5 h-5" />}
+              accent="bg-amber-500/10 text-amber-600 dark:text-amber-400"
+              warningAccent="bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900 text-amber-600 dark:text-amber-400"
+              title="Refresh Quests"
+              description="Wipe every quest, counter, and focus area — onboarding starts over"
+              isConfirming={confirmAction === 'refresh-quests'}
+              loading={loading === 'refresh-quests'}
+              warningText="Warning: This deletes all onboarding, daily and area quest progress, every quest counter, your focus areas and their tag links. Click again to confirm."
+              onClick={handleRefreshQuests}
             />
             <ConfirmActionRow
               icon={<DollarSign className="w-5 h-5" />}

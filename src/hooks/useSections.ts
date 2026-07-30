@@ -4,6 +4,11 @@ import useSWR from 'swr';
 
 export const SECTIONS_KEY = '/api/sections';
 
+const sectionsUrl = () =>
+  `${SECTIONS_KEY}?timezone=${encodeURIComponent(
+    Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+  )}`;
+
 export interface SectionSummary {
   id: string;
   name: string;
@@ -12,8 +17,8 @@ export interface SectionSummary {
   tagIds: string[];
 }
 
-const fetcher = (url: string) =>
-  fetch(url).then((res) => (res.ok ? res.json() : { sections: [] }));
+const fetcher = () =>
+  fetch(sectionsUrl()).then((res) => (res.ok ? res.json() : { sections: [] }));
 
 /**
  * Standalone sections list for surfaces that don't load the today view

@@ -22,7 +22,10 @@ import {
 import { syncQuestState, isPremiumUser } from '@/lib/quests/engine';
 import { getZonedToday, getZonedYMD } from '@/lib/utils';
 import { notifyTaskChanged } from '@/lib/taskSync';
-import { TaskSectionModel } from '@/lib/models/TaskSection';
+import {
+  TaskSectionModel,
+  isSectionCollapsedOn,
+} from '@/lib/models/TaskSection';
 import { severBond, handleBuddyCompletion } from '@/lib/buddy/server';
 import { bumpQuestMetric, taskStreakMetric } from '@/lib/quests/metrics';
 import {
@@ -2138,7 +2141,7 @@ async function handleDailyGet(req: NextRequest, userId: string, tz: string) {
       id: s.id,
       name: s.name,
       order: s.order,
-      collapsed: !!s.collapsed,
+      collapsed: isSectionCollapsedOn(s, getZonedToday(tz)),
       tagIds: s.tagIds ?? [],
     })),
     flyStatus,
