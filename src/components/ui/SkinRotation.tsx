@@ -19,6 +19,7 @@ import { useAuth } from '@/components/auth/AuthContext';
 import { cn } from '@/lib/utils';
 import { hapticImpact, hapticTick } from '@/lib/haptics';
 import { Icon } from '@/components/ui/Icon';
+import { HEADER_CONTROL_ICON_BUTTON } from '@/components/ui/MobileHeaderActions';
 import {
   beginEquipMutation,
   endEquipMutation,
@@ -532,7 +533,8 @@ export function StyleShuffleHeaderButton({ className }: { className?: string }) 
         onClick={() => setOpen(true)}
         aria-label="Style Shuffle"
         className={cn(
-          'relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border/50 bg-card/80 shadow-sm backdrop-blur-xl transition-colors hover:bg-accent/50 active:scale-95 max-[379px]:h-9 max-[379px]:w-9 max-[359px]:h-8 max-[359px]:w-8',
+          HEADER_CONTROL_ICON_BUTTON,
+          'relative hover:bg-accent/50',
           className,
         )}
       >
@@ -558,7 +560,7 @@ export function StyleShuffleHeaderButton({ className }: { className?: string }) 
           <Icon
             name="shuffle"
             label="Style Shuffle"
-            className="h-7 w-7 max-[379px]:h-6 max-[379px]:w-6 max-[359px]:h-5 max-[359px]:w-5 dark:[&_path:first-child]:fill-slate-300 dark:[&_path:not(:first-child)]:fill-emerald-400"
+            className="h-7 w-7 dark:[&_path:first-child]:fill-slate-300 dark:[&_path:not(:first-child)]:fill-emerald-400"
           />
         </span>
       </button>

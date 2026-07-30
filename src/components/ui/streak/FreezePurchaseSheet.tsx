@@ -166,7 +166,7 @@ export function FreezePurchaseSheet({
               ref={buttonRef}
               type="button"
               disabled={busy || atCap}
-              onClick={canAfford ? handleBuy : openFlyShop}
+              onClick={canAfford ? handleBuy : () => openFlyShop(Math.max(0, price - balance))}
               className={cn(
                 'mt-5 flex h-12 w-full items-center justify-center gap-1.5 rounded-2xl text-sm font-black text-white transition-all',
                 atCap

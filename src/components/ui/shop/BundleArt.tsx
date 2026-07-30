@@ -6,14 +6,16 @@ import {
   EventType,
   Fit,
   Layout,
+  type RiveFile,
   useRive,
   useViewModel,
   useViewModelInstance,
   useViewModelInstanceTrigger,
 } from '@rive-app/react-canvas-lite';
 import {
-  storeBundleRiveUrl,
-  preloadRiveAsset,
+  storeBundleArtboard,
+  getStoreBundleFile,
+  preloadStoreBundleFile,
   riveDevicePixelRatio,
 } from '@/lib/riveLoader';
 import { useRiveIdlePause } from '@/lib/riveIdlePause';
@@ -23,24 +25,35 @@ const VIEW_MODEL = 'ViewModel1';
 const VIEW_MODEL_INSTANCE = 'Instance';
 const WINGS_TRIGGER = 'wings';
 const WINGS_IDLE_STATE = 'Wings_idle';
-const FLAP_MIN_MS = 1000;
-const FLAP_MAX_MS = 3000;
+const FLAP_PERIOD_MS = 2600;
 
-const flapDelay = () => FLAP_MIN_MS + Math.random() * (FLAP_MAX_MS - FLAP_MIN_MS);
+const flapListeners = new Set<() => void>();
+let flapTimer: ReturnType<typeof setInterval> | null = null;
+
+function onSharedFlap(listener: () => void) {
+  flapListeners.add(listener);
+  flapTimer ??= setInterval(() => {
+    flapListeners.forEach((fn) => fn());
+  }, FLAP_PERIOD_MS);
+  return () => {
+    flapListeners.delete(listener);
+    if (flapListeners.size === 0 && flapTimer) {
+      clearInterval(flapTimer);
+      flapTimer = null;
+    }
+  };
+}
 
 /**
- * One fly-pack illustration, loaded from that pack's own .riv export.
+ * One fly-pack illustration, drawn from the Bundle1…Bundle6 artboards of the
+ * shared store_bundle.riv export (pack 1 is the smallest, pack 6 the largest).
  *
  * The wings are a one-shot data-bound trigger rather than a loop, so JS owns
- * the cadence: each pack flaps on its own randomized 1–3s timer (a shared
- * interval would make them all beat in lockstep, which reads as one animation
- * rather than five jars of flies). Between flaps the state machine settles on
- * Wings_idle and the instance pauses itself — five always-advancing artboards
- * in one sheet is exactly the kind of render-loop burn the rest of the app
- * goes out of its way to avoid.
- *
- * No artboard is named explicitly: each file's default artboard is the one it
- * was exported for, so this survives whatever the artboards end up called.
+ * the cadence: one shared interval drives every mounted pack, so the whole
+ * shelf flaps and shines on the same beat instead of drifting apart. Between
+ * flaps the state machine settles on Wings_idle and the instance pauses
+ * itself — six always-advancing artboards in one sheet is exactly the kind of
+ * render-loop burn the rest of the app goes out of its way to avoid.
  */
 export function BundleArt({
   bundle,
@@ -53,26 +66,28 @@ export function BundleArt({
   /** Rendered instead when the artboard is missing from the export. */
   fallback?: React.ReactNode;
 }) {
-  const [src, setSrc] = useState<string | null>(null);
+  const [file, setFile] = useState<RiveFile | null>(() => getStoreBundleFile());
   const [failed, setFailed] = useState(false);
   const idle = useRiveIdlePause((s) => s.idle);
 
   useEffect(() => {
+    if (file) return;
     let alive = true;
-    setSrc(null);
-    setFailed(false);
-    preloadRiveAsset(storeBundleRiveUrl(bundle)).then((url) => {
-      if (alive) setSrc(url);
+    preloadStoreBundleFile().then((loaded) => {
+      if (!alive) return;
+      if (loaded) setFile(loaded);
+      else setFailed(true);
     });
     return () => {
       alive = false;
     };
-  }, [bundle]);
+  }, [file]);
 
   const { rive, RiveComponent } = useRive(
-    src && !failed
+    file && !failed
       ? {
-          src,
+          riveFile: file,
+          artboard: storeBundleArtboard(bundle),
           stateMachines: STATE_MACHINE,
           autoplay: true,
           autoBind: false,
@@ -113,15 +128,10 @@ export function BundleArt({
 
   useEffect(() => {
     if (!rive || idle) return;
-    let timer: ReturnType<typeof setTimeout>;
-    const tick = () => {
+    return onSharedFlap(() => {
       if (!rive.isPlaying) rive.play();
       flapRef.current?.();
-      timer = setTimeout(tick, flapDelay());
-    };
-    // Stagger the first flap so cards don't sync up on mount.
-    timer = setTimeout(tick, Math.random() * FLAP_MAX_MS);
-    return () => clearTimeout(timer);
+    });
   }, [rive, idle]);
 
   if (failed) return <>{fallback}</>;

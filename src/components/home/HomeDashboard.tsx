@@ -634,7 +634,7 @@ export default function HomeDashboard() {
           <FlyCounter
             balance={flyBalance}
             variant="mobile"
-            onClick={openFlyShop}
+            onClick={() => openFlyShop()}
             showGoal={!!user}
           />
         </MobileHeaderActions>

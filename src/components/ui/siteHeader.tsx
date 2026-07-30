@@ -36,7 +36,10 @@ import { motion, AnimatePresence, useAnimationControls } from 'framer-motion';
 import { ChevronRight } from 'lucide-react';
 import Fly from '@/components/ui/fly';
 import { FlyCounter } from '@/components/ui/FlyCounter';
-import { MobileHeaderActions } from '@/components/ui/MobileHeaderActions';
+import {
+  MobileHeaderActions,
+  HEADER_CONTROL_ICON_BUTTON,
+} from '@/components/ui/MobileHeaderActions';
 import { StreakChip } from '@/components/ui/streak/StreakChip';
 import { PremiumBadge } from '@/components/ui/PremiumBadge';
 import { PremiumFrogAura } from '@/components/ui/PremiumFrogAura';
@@ -175,7 +178,7 @@ export default function SiteHeader() {
             <FlyCounter
               balance={flyBalance}
               variant="mobile"
-              onClick={openFlyShop}
+              onClick={() => openFlyShop()}
               showGoal
             />
           </MobileHeaderActions>
@@ -361,7 +364,7 @@ export default function SiteHeader() {
               <FlyCounter
                 balance={flyBalance}
                 variant="desktop"
-                onClick={openFlyShop}
+                onClick={() => openFlyShop()}
                 showGoal
               />
             </>
@@ -446,7 +449,7 @@ export function MobileMenuCluster({
     <div
       data-fly-fade
       className={cn(
-        'left-3 top-[calc(env(safe-area-inset-top)+0.5rem)] z-[90] flex items-center px-2 py-1 md:hidden',
+        'left-4 top-[calc(env(safe-area-inset-top)+0.5rem)] z-[90] flex items-center md:hidden',
         position === 'absolute' ? 'absolute' : 'fixed',
         isLoadingScreenVisible && 'pointer-events-none',
       )}
@@ -542,7 +545,7 @@ function RightActions({
     return (
       <>
         {signOutOverlay}
-        <div className="w-8 h-8 rounded-full bg-muted animate-pulse" />
+        <div className="w-10 h-10 rounded-full bg-muted animate-pulse" />
       </>
     );
 
@@ -630,7 +633,11 @@ function MobileMenuButton({
   return (
     <button
       onClick={() => setIsOpen(!isOpen)}
-      className="p-2 rounded-full bg-card/80 border border-border/50 shadow-sm backdrop-blur-xl text-muted-foreground hover:text-foreground transition-colors"
+      aria-label={isOpen ? 'Close menu' : 'Open menu'}
+      className={cn(
+        HEADER_CONTROL_ICON_BUTTON,
+        'text-muted-foreground hover:text-foreground',
+      )}
     >
       {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
     </button>

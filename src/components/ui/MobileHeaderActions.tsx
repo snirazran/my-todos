@@ -1,6 +1,15 @@
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
+export const HEADER_CONTROL_HEIGHT = 'h-10';
+export const HEADER_CONTROL_SURFACE =
+  'rounded-full border border-border/50 bg-card/85 shadow-sm backdrop-blur-xl';
+export const HEADER_CONTROL_ICON_BUTTON = cn(
+  'flex w-10 shrink-0 items-center justify-center transition-colors active:scale-95',
+  HEADER_CONTROL_HEIGHT,
+  HEADER_CONTROL_SURFACE,
+);
+
 type MobileHeaderActionsProps = {
   children: ReactNode;
   className?: string;

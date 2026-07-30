@@ -396,7 +396,9 @@
       "PowerShell(python \"C:\\\\Users\\\\snira\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-snira-Desktop-Full-Stack-frog-task\\\\b1a476e5-6582-4659-9689-024435f73802\\\\scratchpad\\\\extract.py\")",
       "PowerShell($env:PYTHONIOENCODING = \"utf-8\"; python \"C:\\\\Users\\\\snira\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-snira-Desktop-Full-Stack-frog-task\\\\b1a476e5-6582-4659-9689-024435f73802\\\\scratchpad\\\\extract.py\")",
       "PowerShell(npx tsc --noEmit -p tsconfig.json 2>&1 | Select-Object -First 30)",
-      "Bash(md5 public/store_bundle*.riv)"
+      "Bash(md5 public/store_bundle*.riv)",
+      "WebFetch(domain:www.gamedeveloper.com)",
+      "Bash(command -v playwright)"
     ]
   }
 }

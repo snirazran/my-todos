@@ -28,7 +28,10 @@ interface UIState {
   setPremiumModalOpen: (open: boolean, placement?: string) => void;
 
   isFlyShopOpen: boolean;
-  openFlyShop: () => void;
+  /** Flies the user is short by, when the shop is opened from a blocked
+   *  purchase — lets the shop point at the pack that actually covers it. */
+  flyShopNeed: number | null;
+  openFlyShop: (need?: number) => void;
   closeFlyShop: () => void;
   setFlyShopOpen: (open: boolean) => void;
 
@@ -79,9 +82,12 @@ export const useUIStore = create<UIState>()(
         set({ isPremiumModalOpen: open, ...(open ? { premiumModalPlacement: placement } : {}) }),
 
       isFlyShopOpen: false,
-      openFlyShop: () => set({ isFlyShopOpen: true }),
-      closeFlyShop: () => set({ isFlyShopOpen: false }),
-      setFlyShopOpen: (open: boolean) => set({ isFlyShopOpen: open }),
+      flyShopNeed: null,
+      openFlyShop: (need?: number) =>
+        set({ isFlyShopOpen: true, flyShopNeed: need && need > 0 ? need : null }),
+      closeFlyShop: () => set({ isFlyShopOpen: false, flyShopNeed: null }),
+      setFlyShopOpen: (open: boolean) =>
+        set(open ? { isFlyShopOpen: true } : { isFlyShopOpen: false, flyShopNeed: null }),
 
       isWardrobeStuck: false,
       setWardrobeStuck: (stuck: boolean) => set({ isWardrobeStuck: stuck }),

@@ -9,6 +9,8 @@ import { useSheetStore } from '@/lib/sheetStore';
 import { isFlyEarnActive } from '@/lib/flyEarn';
 import { hapticTick } from '@/lib/haptics';
 import { useWishlist } from '@/hooks/useWishlist';
+import { HEADER_CONTROL_SURFACE } from '@/components/ui/MobileHeaderActions';
+import { cn } from '@/lib/utils';
 
 type Variant = 'mobile' | 'desktop';
 
@@ -125,11 +127,12 @@ export function FlyCounter({
           ? `${balance} flies — saving for ${wishlist.name}, ${progress?.remaining ?? 0} to go`
           : undefined
       }
-      className={`relative flex items-center gap-1.5 rounded-full border shadow-sm backdrop-blur-xl ${
-        goalReached ? 'border-emerald-500/50' : 'border-border/50'
-      } bg-card/80 ${
-        isMobile ? 'px-3 py-1.5' : 'h-10 px-3'
-      } ${onClick ? 'cursor-pointer transition-colors active:scale-95' : ''} shrink-0`}
+      className={cn(
+        'relative flex h-10 shrink-0 items-center gap-1.5 px-3',
+        HEADER_CONTROL_SURFACE,
+        goalReached && 'border-emerald-500/50',
+        onClick && 'cursor-pointer transition-colors active:scale-95',
+      )}
       animate={pillControls}
     >
       {/* Goal gradient: the pill fills left-to-right toward the pinned item, so

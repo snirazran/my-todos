@@ -38,6 +38,8 @@ const FLY_LIGHT_MODE_PROPERTY = 'light_mode';
 const FLY_PREMIUM_PROPERTY = 'isPremium';
 const FLY_WINGS_TRIGGER = 'wings';
 const FLY_WINGS_IDLE_STATE = 'Wings_idle';
+// ~2s at 60fps before we stop waiting for the master to rasterize real pixels.
+const MAX_PAINT_PROBE_FRAMES = 120;
 // Halving mip levels: blits pick the smallest level that still covers the
 // target canvas, so no single drawImage downscales by more than ~2x (a big
 // one-step downscale bypasses filtering and looks pixelated).
@@ -76,6 +78,8 @@ interface Master {
   canvas: HTMLCanvasElement | null;
   mips: Mip[];
   ready: boolean;
+  painted: boolean;
+  probeFrames: number;
   mipsValid: boolean;
   creating: boolean;
   lightMode: { value: number } | null;
@@ -94,6 +98,8 @@ function createMaster(variant: FlyVariant): Master {
     canvas: null,
     mips: [],
     ready: false,
+    painted: false,
+    probeFrames: 0,
     mipsValid: false,
     creating: false,
     lightMode: null,
@@ -115,26 +121,51 @@ function forEachMaster(fn: (master: Master) => void) {
 let interactionPaused = false;
 let themeObserver: MutationObserver | null = null;
 
+// Marks every rasterized copy stale and advances the master once so a fresh
+// frame is pushed to each canvas, even while a sheet/idle pause is holding
+// playback. onAdvance pauses the master again once nobody needs frames.
+function invalidateMaster(master: Master) {
+  master.mipsValid = false;
+  master.painted = false;
+  master.probeFrames = 0;
+  master.entries.forEach((entry) => {
+    entry.hasFrame = false;
+  });
+  if (master.ready && master.rive) {
+    // Forces the artboard dirty so Rive actually redraws the master bitmap
+    // rather than short-circuiting on "nothing changed".
+    master.wings?.trigger();
+    if (!master.rive.isPlaying) master.rive.play();
+  }
+  syncMasterPlayback(master);
+}
+
+// Backgrounding the app (or memory pressure on iOS/WKWebView) drops canvas
+// backing stores. Paused flies — the wallet counter in the header above all —
+// only ever receive one blit, so without this they come back permanently
+// blank until a reload.
+function refreshAllFlies() {
+  forEachMaster(invalidateMaster);
+}
+
 function syncFlyTheme(master: Master) {
   if (!master.lightMode || typeof document === 'undefined') return;
   // The fly asset intentionally maps light_mode=1 to its dark-theme artwork.
   const value = document.documentElement.classList.contains('dark') ? 1 : 0;
   master.lightMode.value = value;
   master.canvas?.setAttribute('data-light-mode', String(value));
-
-  // Theme changes can happen while an open sheet globally pauses Rive. Mark
-  // every copy stale and advance the master once so the new binding paints
-  // immediately; onAdvance will pause it again when no continuous frames are
-  // needed.
-  master.mipsValid = false;
-  master.entries.forEach((entry) => {
-    entry.hasFrame = false;
-  });
-  if (master.rive && !master.rive.isPlaying) master.rive.play();
+  invalidateMaster(master);
 }
 
 function syncAllThemes() {
   forEachMaster(syncFlyTheme);
+}
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) refreshAllFlies();
+  });
+  window.addEventListener('pageshow', refreshAllFlies);
 }
 
 function bindFlyViewModel(master: Master) {
@@ -233,12 +264,41 @@ function sourceFor(master: Master, target: number): HTMLCanvasElement | null {
   return src;
 }
 
+// Rive fires Advance even on frames it skipped drawing (its ResizeObserver
+// hasn't reported a layout box yet, or the artboard reported no dirt), so the
+// master bitmap can still be empty right after load. Copying that blank frame
+// would mark a paused fly "has a frame" and it would never ask for another —
+// the wallet counter in the header stayed empty until a remount. Probing the
+// smallest mip once tells us when real artwork exists; until then nobody
+// latches, so the master keeps advancing.
+function masterHasPaint(master: Master) {
+  if (master.painted) return true;
+  const probe = master.mips[master.mips.length - 1];
+  if (!probe) return false;
+  const { data } = probe.ctx.getImageData(0, 0, probe.size, probe.size);
+  for (let i = 3; i < data.length; i += 4) {
+    if (data[i] !== 0) {
+      master.painted = true;
+      master.probeFrames = 0;
+      return true;
+    }
+  }
+  // Bail out rather than spin the master forever if the artwork never lands
+  // (broken export, wasm failure) — a blank fly beats a permanent 60fps loop.
+  if (++master.probeFrames > MAX_PAINT_PROBE_FRAMES) {
+    master.painted = true;
+    return true;
+  }
+  return false;
+}
+
 function blit(master: Master, e: Entry) {
   if (!master.mipsValid) {
     if (!master.ready) return;
     updateMips(master);
     master.mipsValid = true;
   }
+  if (!masterHasPaint(master)) return;
   const src = sourceFor(master, Math.max(e.canvas.width, e.canvas.height));
   if (!src) return;
   e.ctx.clearRect(0, 0, e.canvas.width, e.canvas.height);
@@ -273,6 +333,10 @@ function ensureMaster(master: Master) {
   // must live in the DOM with real dimensions — just visually hidden.
   canvas.setAttribute('aria-hidden', 'true');
   canvas.setAttribute('data-fly-variant', master.variant);
+  canvas.addEventListener('contextlost', (event) => event.preventDefault());
+  canvas.addEventListener('contextrestored', () => {
+    if (master.canvas === canvas) invalidateMaster(master);
+  });
   Object.assign(canvas.style, {
     position: 'fixed',
     top: '0',
@@ -326,6 +390,8 @@ function destroyMaster(master: Master) {
   master.canvas = null;
   master.mips = [];
   master.ready = false;
+  master.painted = false;
+  master.probeFrames = 0;
   master.mipsValid = false;
   master.creating = false;
   master.lightMode = null;
@@ -363,6 +429,13 @@ export function attachFlyCanvas(
     ignoreInteractionPause: opts?.ignoreInteractionPause ?? false,
     ignoreIdlePause: opts?.ignoreIdlePause ?? false,
   };
+  const onContextLost = (event: Event) => {
+    event.preventDefault();
+    entry.hasFrame = false;
+  };
+  const onContextRestored = () => invalidateMaster(master);
+  canvas.addEventListener('contextlost', onContextLost);
+  canvas.addEventListener('contextrestored', onContextRestored);
   master.entries.set(canvas, entry);
   ensureMaster(master);
   if (master.ready) blit(master, entry);
@@ -379,6 +452,8 @@ export function attachFlyCanvas(
       syncMasterPlayback(master);
     },
     detach() {
+      canvas.removeEventListener('contextlost', onContextLost);
+      canvas.removeEventListener('contextrestored', onContextRestored);
       master.entries.delete(canvas);
       syncMasterPlayback(master);
       scheduleTeardown(master);

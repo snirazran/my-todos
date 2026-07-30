@@ -734,7 +734,7 @@ function ItemPeekSheet({
                   <>
                     <button
                       type="button"
-                      onClick={openFlyShop}
+                      onClick={() => openFlyShop(shortfall)}
                       className="mt-3.5 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#4f9149] text-base font-black tracking-tight text-white shadow-[0_4px_0_#34631f] transition-all hover:bg-[#457f40] active:translate-y-0.5 active:shadow-none"
                     >
                       Get

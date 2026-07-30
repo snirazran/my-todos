@@ -272,29 +272,44 @@ export function PurchaseSheet({
                         {target.originalPrice.toLocaleString()}
                       </span>
                     )}
-                  <Fly size={24} paused y={-2} />
+                  <Fly size={24} paused y={-6} />
                   <span className="tabular-nums">{price.toLocaleString()}</span>
                 </Row>
                 <Row label="Your balance">
-                  <Fly size={24} paused y={-2} />
+                  <Fly size={24} paused y={-6} />
                   <AnimatedNumber value={balance} haptics className="tabular-nums" />
                 </Row>
                 <div className="my-2.5 border-t border-dashed border-border/70" />
-                <Row label="Balance after" strong>
-                  <Fly size={24} paused y={-2} />
+                <Row label={canAfford ? 'Balance after' : 'Still need'} strong>
+                  <Fly size={24} paused y={-6} />
                   <span
-                    className={cn('tabular-nums', !canAfford && 'text-red-500')}
+                    className={cn('tabular-nums', !canAfford && 'text-amber-600 dark:text-amber-400')}
                   >
-                    {Math.max(0, balance - price).toLocaleString()}
+                    {(canAfford ? balance - price : shortBy).toLocaleString()}
                   </span>
                 </Row>
+                {!canAfford && !isGuest && (
+                  <div className="mt-3">
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-border/70">
+                      <div
+                        className="h-full rounded-full bg-green-500 transition-[width] duration-500"
+                        style={{
+                          width: `${Math.min(100, Math.max(3, (balance / price) * 100))}%`,
+                        }}
+                      />
+                    </div>
+                    <p className="mt-1.5 text-center text-[11px] font-bold text-muted-foreground">
+                      {Math.floor((balance / price) * 100)}% of the way there
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 
             {(phase === 'success' || owned) && (
               <div className="mt-4 flex items-center justify-center gap-1.5 text-sm font-bold text-muted-foreground">
                 <span>Balance</span>
-                <Fly size={24} paused y={-2} />
+                <Fly size={24} paused y={-6} />
                 <AnimatedNumber value={balance} haptics className="tabular-nums text-foreground" />
               </div>
             )}
@@ -316,20 +331,25 @@ export function PurchaseSheet({
                     {equipLabel}
                   </PrimaryButton>
                   <GhostButton
-                    onClick={canAfford ? handleBuy : openFlyShop}
+                    onClick={canAfford ? handleBuy : () => openFlyShop(shortBy)}
                     disabled={busy || (isGuest && !canAfford)}
                   >
                     {canAfford ? (
                       <span className="inline-flex items-center gap-1.5">
                         Buy another
                         <span className="opacity-40">·</span>
-                        <Fly size={28} paused y={-2} />
+                        <Fly size={28} paused y={-6} />
                         <span className="tabular-nums">{price.toLocaleString()}</span>
                       </span>
                     ) : isGuest ? (
                       'Not enough flies'
                     ) : (
-                      'Not enough flies — get more'
+                      <span className="inline-flex items-center gap-1.5">
+                        Get
+                        <Fly size={24} paused y={-6} />
+                        <span className="tabular-nums">{shortBy.toLocaleString()}</span>
+                        flies
+                      </span>
                     )}
                   </GhostButton>
                 </>
@@ -338,7 +358,7 @@ export function PurchaseSheet({
                   <span className="inline-flex items-center gap-2">
                     Buy
                     <span className="opacity-50">·</span>
-                    <Fly size={28} paused y={-2} />
+                    <Fly size={28} paused y={-6} />
                     <span className="tabular-nums">{price.toLocaleString()}</span>
                   </span>
                 </PrimaryButton>
@@ -355,36 +375,45 @@ export function PurchaseSheet({
                 <>
                   <PrimaryButton
                     ref={primaryRef}
-                    onClick={isPinned ? clearWishlist : pinThis}
-                    busy={wishlistBusy}
+                    onClick={() => openFlyShop(shortBy)}
                   >
-                    {isPinned ? (
-                      <span className="inline-flex items-center gap-2">
-                        <BookmarkCheck className="h-5 w-5" strokeWidth={2.75} />
-                        Saving for this
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-2">
-                        <Bookmark className="h-5 w-5" strokeWidth={2.75} />
-                        Save for this
-                      </span>
-                    )}
-                  </PrimaryButton>
-                  <p className="text-center text-xs font-bold text-muted-foreground">
-                    {isPinned
-                      ? `Every fly you catch counts down the last ${shortBy.toLocaleString()}.`
-                      : `You're ${shortBy.toLocaleString()} flies short — pin it and watch your counter fill.`}
-                  </p>
-                  <GhostButton onClick={openFlyShop}>
-                    <span className="inline-flex items-center gap-1.5">
-                      Or get
-                      <Fly size={24} paused y={-2} />
+                    <span className="inline-flex items-center gap-2">
+                      Get
+                      <Fly size={36} paused y={-7} />
                       <span className="tabular-nums">
                         {shortBy.toLocaleString()}
                       </span>
-                      now
+                      flies
                     </span>
-                  </GhostButton>
+                  </PrimaryButton>
+                  <button
+                    type="button"
+                    onClick={isPinned ? clearWishlist : pinThis}
+                    disabled={wishlistBusy}
+                    className={cn(
+                      'flex h-12 w-full items-center justify-center gap-2 rounded-2xl text-sm font-black transition-colors disabled:opacity-60',
+                      isPinned
+                        ? 'bg-green-500/10 text-green-700 dark:text-green-400'
+                        : 'bg-muted/70 text-foreground hover:bg-muted',
+                    )}
+                  >
+                    {isPinned ? (
+                      <>
+                        <BookmarkCheck className="h-5 w-5" strokeWidth={2.75} />
+                        Tracking this goal
+                      </>
+                    ) : (
+                      <>
+                        <Bookmark className="h-5 w-5" strokeWidth={2.75} />
+                        Make it my goal
+                      </>
+                    )}
+                  </button>
+                  <p className="text-center text-xs font-bold text-muted-foreground">
+                    {isPinned
+                      ? `${shortBy.toLocaleString()} flies to go — we're counting it down for you.`
+                      : 'We’ll track your progress until you can afford it.'}
+                  </p>
                 </>
               )}
             </div>

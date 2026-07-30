@@ -16,6 +16,7 @@ import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
 import { getFlyPackPrices, purchaseFlyPack } from '@/lib/purchases';
 import type { FlyPackId } from '@/lib/flyPacks';
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
+import { prefetchStoreBundleBytes } from '@/lib/riveLoader';
 import { WishlistGoalCard } from './WishlistGoalCard';
 import { BundleArt } from './BundleArt';
 
@@ -37,19 +38,35 @@ const PACKS: Pack[] = [
   { id: 'legendary-vault', amount: 22000, price: '$99.99', bonus: '+120%', badge: 'best', flies: [44, 34, 26, 20] },
 ];
 
+
 type AdFlyStatus = {
   reward: number;
   cap: number;
   remaining: number;
 };
 
+/** BaseSheet's mobile slide-in runs 400ms; give it a frame of headroom. */
+const SHEET_SETTLE_MS = 440;
+
 export function CurrencyShop() {
   const [mounted, setMounted] = useState(false);
   const [storePrices, setStorePrices] = useState<Partial<Record<FlyPackId, string>>>({});
   const open = useUIStore((s) => s.isFlyShopOpen);
   const setOpen = useUIStore((s) => s.setFlyShopOpen);
+  const need = useUIStore((s) => s.flyShopNeed);
   const { data: inventoryData, mutate: mutateInventory } = useInventory(open, true);
   const balance = inventoryData?.wardrobe?.flies ?? 0;
+  const [artReady, setArtReady] = useState(false);
+  const packs = PACKS.map((pack) => ({
+    ...pack,
+    price: storePrices[pack.id as FlyPackId] ?? pack.price,
+  }));
+  // Arriving from a purchase they couldn't afford: point at the cheapest pack
+  // that actually closes the gap, so the shop answers the question they came
+  // with instead of restating the whole price ladder.
+  const coversId = need
+    ? (packs.find((pack) => pack.amount >= need) ?? packs[packs.length - 1]).id
+    : null;
 
   useEffect(() => {
     setMounted(true);
@@ -64,6 +81,20 @@ export function CurrencyShop() {
     void getFlyPackPrices().then(setStorePrices).catch(() => {});
   }, [open]);
 
+  // The pack artwork is one shared Rive file, and parsing it blocks the main
+  // thread — enough to visibly chew through the sheet's slide-in. So the bytes
+  // start downloading on open (network only, off-thread) while the canvases
+  // stay unmounted until the sheet has landed, then fade in.
+  useEffect(() => {
+    if (!open) {
+      setArtReady(false);
+      return;
+    }
+    void prefetchStoreBundleBytes().catch(() => {});
+    const timer = window.setTimeout(() => setArtReady(true), SHEET_SETTLE_MS);
+    return () => window.clearTimeout(timer);
+  }, [open]);
+
   if (!mounted) return null;
 
   return (
@@ -72,57 +103,68 @@ export function CurrencyShop() {
       onOpenChange={setOpen}
       zIndex={1700}
       backdropClassName="bg-black/70 backdrop-blur-sm"
-      className="max-h-[90vh] bg-popover sm:max-h-[85vh] sm:max-w-2xl"
+      className="max-h-[90vh] bg-popover sm:max-h-[85vh] sm:max-w-md"
     >
       {({ bindScroll }) => (
         <>
-          <div className="flex shrink-0 items-center justify-between gap-4 px-6 pb-4 pt-2 sm:pt-7">
-            <div>
-              <h2 className="text-2xl font-black tracking-tight text-foreground sm:text-3xl">
-                Fly Shop
-              </h2>
-              <div className="mt-1 flex items-center gap-1.5">
-                <Fly size={22} y={-1} alwaysPlay />
-                <AnimatedNumber
-                  value={balance}
-                  haptics
-                  className="text-[13px] font-extrabold tabular-nums text-muted-foreground"
-                />
-                <span className="text-[13px] font-extrabold text-muted-foreground">
-                  flies
-                </span>
-              </div>
+          <div className="flex shrink-0 items-center justify-between gap-4 px-5 pb-3 pt-2 sm:px-6 sm:pt-6">
+            <h2 className="text-2xl font-black tracking-tight text-foreground sm:text-[28px]">
+              Fly Shop
+            </h2>
+            <div className="mr-9 flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 sm:mr-10">
+              <Fly size={26} y={-4} paused />
+              <AnimatedNumber
+                value={balance}
+                haptics
+                className="text-[13px] font-black tabular-nums text-foreground"
+              />
             </div>
           </div>
 
           <div
             ref={bindScroll}
-            className="min-h-0 flex-1 overflow-y-auto overscroll-none px-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]"
+            className="min-h-0 flex-1 overflow-y-auto overscroll-none px-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:px-6"
           >
-            <WishlistGoalCard open={open} onNavigate={() => setOpen(false)} />
+            {need ? (
+              <div className="mt-1 flex items-center justify-center gap-2 rounded-2xl bg-primary/10 px-4 py-3 ring-1 ring-primary/25">
+                <span className="text-[13px] font-black text-foreground">
+                  You need
+                </span>
+                <Fly size={22} y={-3} paused />
+                <span className="text-[13px] font-black tabular-nums text-foreground">
+                  {need.toLocaleString()}
+                </span>
+                <span className="text-[13px] font-black text-foreground">
+                  more flies
+                </span>
+              </div>
+            ) : (
+              <WishlistGoalCard open={open} onNavigate={() => setOpen(false)} />
+            )}
 
-            <p className="mb-2 mt-5 px-1 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">
-              Free flies
-            </p>
             <FreeFliesCard open={open} />
 
-            <p className="mb-2 mt-5 px-1 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">
-              Top up
-            </p>
-            <div className="grid grid-cols-3 gap-2.5 sm:gap-4">
-              {PACKS.map((pack, index) => (
-                <PackCard key={pack.id} bundle={index + 1} pack={{ ...pack, price: storePrices[pack.id as FlyPackId] ?? pack.price }} onPurchased={() => {
-                  window.setTimeout(() => void mutateInventory(), 1200);
-                  window.setTimeout(() => void mutateInventory(), 5000);
-                  window.setTimeout(() => void mutateInventory(), 15000);
-                  window.setTimeout(() => void mutateInventory(), 45000);
-                }} />
+            <div className="mt-4 flex flex-col gap-2">
+              {packs.map((pack, index) => (
+                <PackRow
+                  key={pack.id}
+                  bundle={index + 1}
+                  pack={pack}
+                  covers={pack.id === coversId}
+                  showArt={artReady}
+                  onPurchased={() => {
+                    window.setTimeout(() => void mutateInventory(), 1200);
+                    window.setTimeout(() => void mutateInventory(), 5000);
+                    window.setTimeout(() => void mutateInventory(), 15000);
+                    window.setTimeout(() => void mutateInventory(), 45000);
+                  }}
+                />
               ))}
             </div>
 
-            <p className="mx-auto mt-7 max-w-xs text-center text-[11px] font-medium leading-relaxed text-muted-foreground/70">
-              Made with love by a tiny team — every purchase keeps Frogress
-              hopping. 🐸💚
+            <p className="mx-auto mt-6 max-w-[17rem] text-center text-[11px] font-medium leading-relaxed text-muted-foreground/70">
+              Built by a tiny team and one very hungry frog. Every pack keeps
+              Frogress hopping. 💚
             </p>
           </div>
         </>
@@ -131,8 +173,20 @@ export function CurrencyShop() {
   );
 }
 
-function PackCard({ pack, bundle, onPurchased }: { pack: Pack; bundle: number; onPurchased: () => void }) {
-  const popular = pack.badge === 'popular';
+function PackRow({
+  pack,
+  bundle,
+  covers,
+  showArt,
+  onPurchased,
+}: {
+  pack: Pack;
+  bundle: number;
+  covers: boolean;
+  showArt: boolean;
+  onPurchased: () => void;
+}) {
+  const popular = !covers && pack.badge === 'popular';
   const best = pack.badge === 'best';
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
@@ -155,7 +209,7 @@ function PackCard({ pack, bundle, onPurchased }: { pack: Pack; bundle: number; o
     }
   };
   const flyCluster = (
-    <div className="flex h-full items-end justify-center">
+    <div className="flex h-full items-center justify-center">
       {pack.flies.map((size, i) => (
         <span
           key={i}
@@ -173,58 +227,68 @@ function PackCard({ pack, bundle, onPurchased }: { pack: Pack; bundle: number; o
       onClick={buy}
       disabled={busy}
       className={cn(
-        'group relative flex flex-col items-center overflow-hidden rounded-[20px] px-2.5 pb-2.5 pt-7 text-center transition-all hover:-translate-y-0.5 active:scale-[0.98] sm:rounded-[24px] sm:px-4 sm:pb-4 sm:pt-8',
-        popular
-          ? 'bg-gradient-to-b from-primary/10 to-card ring-2 ring-primary'
+        'group relative flex w-full items-center gap-3 rounded-[20px] p-2.5 pr-3 text-left transition-all hover:-translate-y-0.5 active:scale-[0.99]',
+        covers || popular
+          ? 'bg-gradient-to-r from-primary/10 to-card ring-2 ring-primary'
           : best
-            ? 'bg-gradient-to-b from-amber-400/15 to-card ring-2 ring-amber-400'
+            ? 'bg-gradient-to-r from-amber-400/20 to-card ring-2 ring-amber-400'
             : 'bg-card ring-1 ring-border/70 hover:ring-border',
       )}
     >
-      {pack.badge && (
-        <span
-          className={cn(
-            'absolute inset-x-0 top-0 flex h-5 items-center justify-center whitespace-nowrap text-[8px] font-black uppercase tracking-widest sm:h-6 sm:text-[9px]',
-            popular
-              ? 'bg-primary text-primary-foreground'
-              : 'bg-gradient-to-r from-amber-400 to-amber-500 text-amber-950',
-          )}
-        >
-          {popular ? '★ Popular' : '👑 Best Value'}
-        </span>
-      )}
-
-      <div className="flex h-16 w-full items-end justify-center sm:h-20">
-        {bundle === 1 ? (
-          flyCluster
-        ) : (
+      <span
+        className={cn(
+          'flex shrink-0 items-center justify-center transition-opacity duration-300',
+          best ? 'h-20 w-20' : 'h-16 w-16',
+          showArt ? 'opacity-100' : 'opacity-0',
+        )}
+      >
+        {showArt && (
           <BundleArt
             bundle={bundle}
             className="h-full w-full"
             fallback={flyCluster}
           />
         )}
-      </div>
+      </span>
 
-      <p className="mt-1.5 text-xl font-black leading-none tabular-nums text-foreground sm:text-2xl">
-        {pack.amount.toLocaleString()}
-      </p>
-      <p className="mt-1 text-[9px] font-black uppercase tracking-widest text-muted-foreground sm:text-[10px]">
-        Flies
-      </p>
-
-      <span className="mt-1.5 flex h-4 items-center">
-        {pack.bonus && (
-          <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[9px] font-black leading-none text-emerald-600 dark:text-emerald-400">
-            {pack.bonus} bonus
+      <span className="flex min-w-0 flex-1 flex-col items-start">
+        {(covers || pack.badge) && (
+          <span
+            className={cn(
+              'mb-1 inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-widest',
+              covers || popular
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-gradient-to-r from-amber-400 to-amber-500 text-amber-950',
+            )}
+          >
+            {covers ? '✓ Covers it' : popular ? '★ Popular' : '👑 Best value'}
           </span>
         )}
+        <span className="flex items-baseline gap-1.5">
+          <span className="text-2xl font-black leading-none tabular-nums text-foreground">
+            {pack.amount.toLocaleString()}
+          </span>
+          <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+            Flies
+          </span>
+        </span>
+        <span className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          {pack.bonus && (
+            <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-black leading-none text-emerald-600 dark:text-emerald-400">
+              {pack.bonus} bonus
+            </span>
+          )}
+          {status && (
+            <span className="text-[10px] font-bold leading-none text-muted-foreground">
+              {status}
+            </span>
+          )}
+        </span>
       </span>
 
-      <span className="mt-2 flex h-9 w-full items-center justify-center rounded-xl bg-[#4f9149] text-xs font-black tracking-wide text-white shadow-[0_4px_0_0_#34631f] transition-all group-hover:-translate-y-0.5 group-hover:shadow-[0_5px_0_0_#34631f] group-active:translate-y-1 group-active:shadow-none sm:h-11 sm:rounded-2xl sm:text-sm">
+      <span className="flex h-11 min-w-[86px] shrink-0 items-center justify-center rounded-2xl bg-[#4f9149] px-3 text-sm font-black tracking-wide text-white shadow-[0_4px_0_0_#34631f] transition-all group-hover:-translate-y-0.5 group-hover:shadow-[0_5px_0_0_#34631f] group-active:translate-y-1 group-active:shadow-none">
         {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : pack.price}
       </span>
-      {status ? <span className="mt-2 text-[9px] font-bold text-muted-foreground">{status}</span> : null}
     </button>
   );
 }
@@ -291,7 +355,10 @@ function FreeFliesCard({ open }: { open: boolean }) {
   };
 
   return (
-    <div className="pt-2">
+    <div>
+      <p className="mb-2 mt-5 px-1 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">
+        Free flies
+      </p>
       <button
         type="button"
         onClick={handleWatch}

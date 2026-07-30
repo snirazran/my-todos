@@ -51,7 +51,10 @@ import {
 import { markFlyEarn } from '@/lib/flyEarn';
 import { FlyCounter } from '@/components/ui/FlyCounter';
 import { LookNoticeCard } from '@/components/ui/LookReactions';
-import { MobileHeaderActions } from '@/components/ui/MobileHeaderActions';
+import {
+  MobileHeaderActions,
+  HEADER_CONTROL_ICON_BUTTON,
+} from '@/components/ui/MobileHeaderActions';
 import { MobileMenuCluster } from '@/components/ui/siteHeader';
 import { FlyCatchSwipeLauncher } from '@/components/ui/FlyCatchSwipeLauncher';
 import { useUIStore } from '@/lib/uiStore';
@@ -186,12 +189,15 @@ export default function FriendsPage() {
           visibleOnDesktop
           className="md:top-[calc(env(safe-area-inset-top)+0.75rem)]"
         >
-          <StyleShuffleHeaderButton className="border-0 bg-card/90 shadow-md ring-1 ring-border/60 md:hidden" />
+          <StyleShuffleHeaderButton className="md:hidden" />
           <button
             type="button"
             onClick={() => setInboxOpen(true)}
             aria-label="Friend invites"
-            className="relative flex h-11 w-11 touch-manipulation items-center justify-center rounded-full bg-card/90 text-primary shadow-md ring-1 ring-border/60 backdrop-blur-sm transition-transform active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+            className={cn(
+              HEADER_CONTROL_ICON_BUTTON,
+              'relative touch-manipulation text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
+            )}
           >
             <Bell className="h-6 w-6" />
             {alertsCount > 0 && (
@@ -205,7 +211,7 @@ export default function FriendsPage() {
               <FlyCounter
                 balance={flyBalance}
                 variant="mobile"
-                onClick={openFlyShop}
+                onClick={() => openFlyShop()}
                 showGoal
               />
             </div>

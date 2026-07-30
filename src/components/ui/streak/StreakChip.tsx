@@ -6,6 +6,7 @@ import { AnimatedNumber } from '@/components/ui/AnimatedNumber';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/components/auth/AuthContext';
 import { useLoginStreak, openStreakSheet } from '@/hooks/useLoginStreak';
+import { HEADER_CONTROL_SURFACE } from '@/components/ui/MobileHeaderActions';
 
 export function StreakChip({ variant = 'desktop' }: { variant?: 'mobile' | 'desktop' }) {
   const { user } = useAuth();
@@ -21,8 +22,9 @@ export function StreakChip({ variant = 'desktop' }: { variant?: 'mobile' | 'desk
       onClick={() => openStreakSheet()}
       aria-label={`Daily streak: ${view.count} days`}
       className={cn(
-        'relative flex shrink-0 cursor-pointer items-center gap-1 rounded-full border border-border/50 bg-card/80 shadow-sm backdrop-blur-xl transition-colors active:scale-95',
-        isMobile ? 'h-[41px] px-3' : 'h-10 px-2.5',
+        'relative flex h-10 shrink-0 cursor-pointer items-center gap-1 transition-colors active:scale-95',
+        HEADER_CONTROL_SURFACE,
+        isMobile ? 'px-3' : 'px-2.5',
       )}
     >
       <Flame
