@@ -42,7 +42,7 @@ export function MarketingFocusPreview() {
         </h2>
         <p className="mt-5 max-w-[65ch] text-pretty text-sm font-medium leading-7 text-muted-foreground sm:text-base">
           Choose a task, set the time, and give it your full attention. Every
-          five focused minutes earns your frog another fly, while every minute
+          fifteen focused minutes earns your frog another fly, while every minute
           moves the matching Area Quest closer to its next reward. Your session
           stays in sync across web and mobile, even if you close the tab.
         </p>

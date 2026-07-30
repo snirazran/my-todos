@@ -41,7 +41,6 @@ import {
   HEADER_CONTROL_ICON_BUTTON,
 } from '@/components/ui/MobileHeaderActions';
 import { StreakChip } from '@/components/ui/streak/StreakChip';
-import { PremiumBadge } from '@/components/ui/PremiumBadge';
 import { PremiumFrogAura } from '@/components/ui/PremiumFrogAura';
 import { CurrencyShop } from './shop/CurrencyShop';
 import { HelpCenterPanel, ContactPanel } from '@/components/ui/HelpCenter';
@@ -189,6 +188,7 @@ export default function SiteHeader() {
           'absolute inset-x-0 top-0 z-[90] hidden w-full h-16 bg-background/95 backdrop-blur-xl md:block',
           pathname !== '/planner' &&
             pathname !== '/insights' &&
+            !pathname?.startsWith('/admin') &&
             !(pathname === '/wardrobe' && isWardrobeStuck) &&
             'shadow-lg shadow-black/5 dark:shadow-black/20',
         )}
@@ -360,7 +360,6 @@ export default function SiteHeader() {
 
           {user && flyBalance !== undefined && (
             <>
-              <PremiumBadge />
               <StreakChip variant="desktop" />
               <FlyCounter
                 balance={flyBalance}
@@ -687,6 +686,7 @@ function MobileSheet({
   const [toast, setToast] = useState<string | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [plusOpen, setPlusOpen] = useState(false);
+  const [railGuestSignOut, setRailGuestSignOut] = useState(false);
   const openFocusLauncher = useFrogodoroUiStore((state) => state.openFocusLauncher);
   const { canEnable: canEnableNotifs, isEnabled: notifsEnabled, isNative, isWeb, enableOrConfigure, disable: disableNotifs, loading: notifLoading } = useNotificationStatus();
   const { data: userInfo, mutate: refreshUserInfo } = useSWR<UserInfo>(
@@ -694,6 +694,9 @@ function MobileSheet({
     userInfoFetcher,
     { revalidateOnFocus: false },
   );
+  const { connections } = useCalendarConnections();
+  const activeConnections = connections.filter((c) => c.status === 'active').length;
+  const calendarNeedsAttention = connections.some((c) => c.status !== 'active');
 
   useEffect(() => setMounted(true), []);
 
@@ -711,6 +714,15 @@ function MobileSheet({
   useEffect(() => {
     if (isOpen) setView('main');
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || isMobile) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isOpen, isMobile, onClose]);
 
   const sheetControls = useAnimationControls();
   const subviewControls = useAnimationControls();
@@ -752,6 +764,426 @@ function MobileSheet({
   const frogName = userInfo?.frogName || 'Frog';
   const goBack = () => setView(view === 'contact' ? contactBack : 'main');
 
+  const viewTitles: Record<string, string> = {
+    main: 'Settings',
+    preferences: 'Preferences',
+    notifications: 'Notifications',
+    community: 'Join our frog community',
+    profile: 'Profile',
+    helpCenter: 'Help center',
+    contact: 'Contact us',
+    integrations: 'Integrations',
+  };
+
+  const mainContent =
+    showAuth && user ? (
+      <MainView
+        displayName={displayName}
+        frogName={frogName}
+        isPremium={!!userInfo?.isPremium}
+        premiumUntil={userInfo?.premiumUntil ?? null}
+        isAdmin={!!isAdmin}
+        canEnableNotifs={canEnableNotifs}
+        notifsEnabled={notifsEnabled}
+        isNative={isNative}
+        isWeb={isWeb}
+        notifLoading={notifLoading}
+        layout={isMobile ? 'mobile' : 'desktop'}
+        onEnableNotifs={handleEnableNotifs}
+        onOpenNotifications={() => setView('notifications')}
+        onOpenPreferences={() => setView('preferences')}
+        onOpenIntegrations={() => setView('integrations')}
+        onOpenFocusTimer={() => {
+          onClose();
+          window.setTimeout(openFocusLauncher, 240);
+        }}
+        onOpenQuestFocus={() => {
+          onOpenQuestOnboarding();
+          onClose();
+        }}
+        onInviteFriends={() => setInviteOpen(true)}
+        onOpenCommunity={() => setView('community')}
+        onOpenProfile={() => setView('profile')}
+        onOpenPlus={() => setPlusOpen(true)}
+        onReportIssue={() => {
+          setContactTopic('bug');
+          setContactBack('main');
+          setView('contact');
+        }}
+        onHelpCenter={() => setView('helpCenter')}
+        onGoAdmin={() => {
+          router.push('/admin');
+          onClose();
+        }}
+        onSignOut={() => {
+          onSignOut();
+          onClose();
+        }}
+        isGuest={!!user?.isAnonymous}
+        onCreateAccount={() => {
+          router.push('/login?upgrade=1');
+          onClose();
+        }}
+        flashSoon={flashSoon}
+        theme={theme}
+        setTheme={setTheme}
+      />
+    ) : (
+      <SignedOutView onSignIn={onSignIn} onClose={onClose} />
+    );
+
+  const subviewContent =
+    view === 'preferences' ? (
+      <PreferencesView
+        theme={theme}
+        setTheme={setTheme}
+        onOpenQuestOnboarding={() => {
+          onOpenQuestOnboarding();
+          onClose();
+        }}
+      />
+    ) : view === 'notifications' ? (
+      <NotificationsView
+        notifsEnabled={notifsEnabled}
+        notifLoading={notifLoading}
+        isWeb={isWeb}
+        onEnableNotifs={handleEnableNotifs}
+        onDisableNotifs={handleDisableNotifs}
+        onManageEmail={() => flashSoon('Email notifications')}
+      />
+    ) : view === 'integrations' ? (
+      <IntegrationsPanel />
+    ) : view === 'community' ? (
+      <CommunityPanel />
+    ) : view === 'helpCenter' ? (
+      <HelpCenterPanel
+        onContact={() => {
+          setContactTopic('question');
+          setContactBack('helpCenter');
+          setView('contact');
+        }}
+        onNavigate={onClose}
+      />
+    ) : view === 'contact' ? (
+      <ContactPanel
+        uid={user?.uid ?? 'guest'}
+        isPremium={!!userInfo?.isPremium}
+        defaultTopic={contactTopic}
+      />
+    ) : (
+      <ProfilePanel
+        data={{
+          petName: userInfo?.frogName ?? null,
+          yourName: userInfo?.name ?? user?.displayName ?? null,
+          birthday: userInfo?.birthday ?? null,
+          isGuest: !user || !!user?.isAnonymous,
+        }}
+        onCreateAccount={() => {
+          router.push('/login?upgrade=1');
+          onClose();
+        }}
+        onDeleteData={async () => {
+          try {
+            const res = await fetch('/api/user', { method: 'DELETE' });
+            if (!res.ok) throw new Error('Failed to delete account');
+            onSignOut();
+            onClose();
+          } catch (err) {
+            console.error(err);
+            flashSoon('Could not delete account');
+          }
+        }}
+        onSave={async (field, value) => {
+          const fieldMap: Record<string, string> = {
+            petName: 'frogName',
+            yourName: 'name',
+            birthday: 'birthday',
+          };
+          const apiField = fieldMap[field];
+          if (!apiField) return;
+          try {
+            await fetch('/api/user', {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ [apiField]: value }),
+            });
+            await refreshUserInfo();
+          } catch (err) {
+            console.error('Failed to save profile field', err);
+          }
+        }}
+      />
+    );
+
+  const overlayExtras = (
+    <>
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            className="fixed left-1/2 top-16 z-[1350] -translate-x-1/2 rounded-full bg-foreground text-background px-4 py-2 text-xs font-bold shadow-lg"
+          >
+            {toast}
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <InviteFriendsModal open={inviteOpen} onClose={() => setInviteOpen(false)} />
+      <PlusUpgradeModal open={plusOpen} placement="settings_menu" onClose={() => setPlusOpen(false)} />
+      {railGuestSignOut && (
+        <GuestSignOutConfirm
+          onCancel={() => setRailGuestSignOut(false)}
+          onCreateAccount={() => {
+            setRailGuestSignOut(false);
+            router.push('/login?upgrade=1');
+            onClose();
+          }}
+          onConfirm={() => {
+            setRailGuestSignOut(false);
+            onSignOut();
+            onClose();
+          }}
+        />
+      )}
+    </>
+  );
+
+  if (!isMobile) {
+    const railGroups: {
+      heading: string;
+      items: {
+        id: typeof view;
+        label: string;
+        icon: React.ReactNode;
+        trailing?: React.ReactNode;
+      }[];
+    }[] = [
+      {
+        heading: 'General',
+        items: [
+          {
+            id: 'main',
+            label: 'Overview',
+            icon: <Settings className="h-[18px] w-[18px] text-emerald-500" />,
+          },
+          {
+            id: 'preferences',
+            label: 'Preferences',
+            icon: <SlidersHorizontal className="h-[18px] w-[18px] text-emerald-500" />,
+          },
+          ...((isNative || isWeb)
+            ? [
+                {
+                  id: 'notifications' as typeof view,
+                  label: 'Notifications',
+                  icon: <Bell className="h-[18px] w-[18px] text-amber-500" />,
+                  trailing: (
+                    <span className="text-[11px] font-bold text-muted-foreground">
+                      {notifsEnabled ? 'On' : 'Off'}
+                    </span>
+                  ),
+                },
+              ]
+            : []),
+          {
+            id: 'integrations',
+            label: 'Integrations',
+            icon: <Icon name="googleCalendar" className="h-[18px] w-[18px]" />,
+            trailing: calendarNeedsAttention ? (
+              <span className="text-[11px] font-bold text-amber-600">!</span>
+            ) : (
+              <span className="text-[11px] font-bold text-muted-foreground">
+                {activeConnections > 0 ? activeConnections : 'Off'}
+              </span>
+            ),
+          },
+        ],
+      },
+      {
+        heading: 'Account',
+        items: [
+          {
+            id: 'profile',
+            label: 'Profile',
+            icon: <User className="h-[18px] w-[18px] text-sky-500" />,
+          },
+          {
+            id: 'community',
+            label: 'Community',
+            icon: <Icon name="community" className="h-[18px] w-[18px]" />,
+          },
+        ],
+      },
+      {
+        heading: 'Support',
+        items: [
+          {
+            id: 'helpCenter',
+            label: 'Help center',
+            icon: <HelpCircle className="h-[18px] w-[18px] text-sky-500" />,
+          },
+          {
+            id: 'contact',
+            label: 'Report an issue',
+            icon: <AlertTriangle className="h-[18px] w-[18px] text-red-500" />,
+          },
+        ],
+      },
+    ];
+
+    return createPortal(
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            key="settings-desktop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.16 }}
+            className="fixed inset-0 z-[1340] flex items-center justify-center bg-slate-900/50 p-6 backdrop-blur-sm"
+            onMouseDown={(e) => {
+              if (e.target === e.currentTarget) onClose();
+            }}
+          >
+            <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Settings"
+              initial={{ opacity: 0, scale: 0.98, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.98, y: 10 }}
+              transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+              style={{ height: 'min(86vh, 760px)' }}
+              className="flex w-full max-w-5xl max-h-full overflow-hidden rounded-3xl bg-card shadow-2xl ring-1 ring-border/60"
+            >
+              {/* Section rail */}
+              <aside className="flex w-60 shrink-0 flex-col border-r border-border/60 bg-muted/30">
+                <div className="px-5 pb-4 pt-5">
+                  <p className="truncate text-base font-black tracking-tight">
+                    <span>{displayName}</span>
+                    <span className="mx-1.5 text-muted-foreground">&amp;</span>
+                    <span>{frogName}</span>
+                  </p>
+                  {userInfo?.isPremium && (
+                    <span className="mt-1.5 inline-flex items-center rounded-md bg-gradient-to-b from-emerald-600 to-emerald-800 px-1.5 py-0.5 text-[10px] font-black uppercase leading-none tracking-[0.18em] text-amber-100 ring-1 ring-emerald-900/40">
+                      Plus
+                    </span>
+                  )}
+                </div>
+
+                <nav className="min-h-0 flex-1 space-y-4 overflow-y-auto px-3 pb-3">
+                  {railGroups.map((group) => (
+                    <div key={group.heading}>
+                      <p className="px-2 pb-1 text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground/70">
+                        {group.heading}
+                      </p>
+                      <div className="space-y-0.5">
+                        {group.items.map((item) => {
+                          const isActive =
+                            view === item.id ||
+                            (item.id === 'helpCenter' &&
+                              view === 'contact' &&
+                              contactBack === 'helpCenter');
+                          return (
+                            <button
+                              key={item.id}
+                              type="button"
+                              onClick={() => {
+                                if (item.id === 'contact') {
+                                  setContactTopic('bug');
+                                  setContactBack('main');
+                                }
+                                setView(item.id);
+                              }}
+                              aria-current={isActive ? 'page' : undefined}
+                              className={cn(
+                                'flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm font-bold transition-colors',
+                                isActive
+                                  ? 'bg-card text-foreground shadow-sm ring-1 ring-border/60'
+                                  : 'text-muted-foreground hover:bg-card/60 hover:text-foreground',
+                              )}
+                            >
+                              <span className="shrink-0">{item.icon}</span>
+                              <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                              {item.trailing}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+
+                  {isAdmin && (
+                    <div>
+                      <p className="px-2 pb-1 text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground/70">
+                        Admin
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          router.push('/admin');
+                          onClose();
+                        }}
+                        className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm font-bold text-muted-foreground transition-colors hover:bg-card/60 hover:text-foreground"
+                      >
+                        <Settings className="h-[18px] w-[18px] shrink-0 text-amber-500" />
+                        <span className="min-w-0 flex-1 truncate">Admin settings</span>
+                      </button>
+                    </div>
+                  )}
+                </nav>
+
+                {showAuth && user && (
+                  <div className="border-t border-border/60 p-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (user?.isAnonymous) {
+                          setRailGuestSignOut(true);
+                          return;
+                        }
+                        onSignOut();
+                        onClose();
+                      }}
+                      className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm font-bold text-rose-500 transition-colors hover:bg-rose-500/10"
+                    >
+                      <LogOut className="h-[18px] w-[18px] shrink-0" strokeWidth={2.5} />
+                      Sign out
+                    </button>
+                  </div>
+                )}
+              </aside>
+
+              {/* Detail pane */}
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+                <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border/60 px-6 py-4">
+                  <h2 className="min-w-0 truncate text-lg font-black tracking-tight">
+                    {viewTitles[view]}
+                  </h2>
+                  <button
+                    onClick={onClose}
+                    className="-mr-2 rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    aria-label="Close"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-6">
+                  <div className="mx-auto w-full max-w-2xl">
+                    {view === 'main' ? mainContent : subviewContent}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+            {overlayExtras}
+          </motion.div>
+        )}
+      </AnimatePresence>,
+      document.body,
+    );
+  }
+
   return createPortal(
     <AnimatePresence>
       {isOpen && (
@@ -774,10 +1206,10 @@ function MobileSheet({
             }
           }}
           style={{ touchAction: 'pan-y' }}
-          className="fixed z-[1340] inset-0 h-[100dvh] w-full overflow-hidden bg-slate-100 dark:bg-background md:bg-white dark:md:bg-background will-change-transform"
+          className="fixed z-[1340] inset-0 h-[100dvh] w-full overflow-hidden bg-slate-100 dark:bg-background will-change-transform"
         >
         <div className="absolute inset-0 overflow-y-auto">
-        <div className="mx-auto w-full md:max-w-xl md:min-h-full md:bg-slate-100 md:border-x md:border-border/60 md:shadow-[0_0_0_6px_rgba(15,23,42,0.10)] dark:md:bg-background">
+        <div className="w-full">
           {/* Top bar */}
           <div
             className="sticky top-0 z-10 bg-slate-100/80 backdrop-blur-xl dark:bg-background/80"
@@ -795,62 +1227,7 @@ function MobileSheet({
             </div>
           </div>
 
-          <div className="px-5 pb-10 space-y-5">
-            {showAuth && user ? (
-                <MainView
-                  displayName={displayName}
-                  frogName={frogName}
-                  isPremium={!!userInfo?.isPremium}
-                  premiumUntil={userInfo?.premiumUntil ?? null}
-                  isAdmin={!!isAdmin}
-                  canEnableNotifs={canEnableNotifs}
-                  notifsEnabled={notifsEnabled}
-                  isNative={isNative}
-                  isWeb={isWeb}
-                  notifLoading={notifLoading}
-                  onEnableNotifs={handleEnableNotifs}
-                  onOpenNotifications={() => setView('notifications')}
-                  onOpenPreferences={() => setView('preferences')}
-                  onOpenIntegrations={() => setView('integrations')}
-                  onOpenFocusTimer={() => {
-                    onClose();
-                    window.setTimeout(openFocusLauncher, 240);
-                  }}
-                  onOpenQuestFocus={() => {
-                    onOpenQuestOnboarding();
-                    onClose();
-                  }}
-                  onInviteFriends={() => setInviteOpen(true)}
-                  onOpenCommunity={() => setView('community')}
-                  onOpenProfile={() => setView('profile')}
-                  onOpenPlus={() => setPlusOpen(true)}
-                  onReportIssue={() => {
-                    setContactTopic('bug');
-                    setContactBack('main');
-                    setView('contact');
-                  }}
-                  onHelpCenter={() => setView('helpCenter')}
-                  onGoAdmin={() => {
-                    router.push('/admin');
-                    onClose();
-                  }}
-                  onSignOut={() => {
-                    onSignOut();
-                    onClose();
-                  }}
-                  isGuest={!!user?.isAnonymous}
-                  onCreateAccount={() => {
-                    router.push('/login?upgrade=1');
-                    onClose();
-                  }}
-                  flashSoon={flashSoon}
-                  theme={theme}
-                  setTheme={setTheme}
-                />
-            ) : (
-              <SignedOutView onSignIn={onSignIn} onClose={onClose} />
-            )}
-          </div>
+          <div className="px-5 pb-10 space-y-5">{mainContent}</div>
         </div>
         </div>
 
@@ -881,9 +1258,9 @@ function MobileSheet({
             }
           }}
           style={{ touchAction: 'pan-y' }}
-          className="absolute inset-0 overflow-y-auto bg-slate-100 dark:bg-background md:bg-white dark:md:bg-background will-change-transform"
+          className="absolute inset-0 overflow-y-auto bg-slate-100 dark:bg-background will-change-transform"
         >
-        <div className="mx-auto w-full md:max-w-xl md:min-h-full md:bg-slate-100 md:border-x md:border-border/60 md:shadow-[0_0_0_6px_rgba(15,23,42,0.10)] dark:md:bg-background">
+        <div className="w-full">
           <div
             className="sticky top-0 z-10 bg-slate-100/80 backdrop-blur-xl dark:bg-background/80"
             style={{ paddingTop: 'env(safe-area-inset-top)' }}
@@ -913,108 +1290,13 @@ function MobileSheet({
             </div>
           </div>
 
-          <div className="px-5 pb-10 space-y-5">
-            {view === 'preferences' ? (
-              <PreferencesView
-                theme={theme}
-                setTheme={setTheme}
-                onOpenQuestOnboarding={() => {
-                  onOpenQuestOnboarding();
-                  onClose();
-                }}
-              />
-            ) : view === 'notifications' ? (
-              <NotificationsView
-                notifsEnabled={notifsEnabled}
-                notifLoading={notifLoading}
-                isWeb={isWeb}
-                onEnableNotifs={handleEnableNotifs}
-                onDisableNotifs={handleDisableNotifs}
-                onManageEmail={() => flashSoon('Email notifications')}
-              />
-            ) : view === 'integrations' ? (
-              <IntegrationsPanel />
-            ) : view === 'community' ? (
-              <CommunityPanel />
-            ) : view === 'helpCenter' ? (
-              <HelpCenterPanel
-                onContact={() => {
-                  setContactTopic('question');
-                  setContactBack('helpCenter');
-                  setView('contact');
-                }}
-                onNavigate={onClose}
-              />
-            ) : view === 'contact' ? (
-              <ContactPanel
-                uid={user?.uid ?? 'guest'}
-                isPremium={!!userInfo?.isPremium}
-                defaultTopic={contactTopic}
-              />
-            ) : (
-              <ProfilePanel
-                data={{
-                  petName: userInfo?.frogName ?? null,
-                  yourName: userInfo?.name ?? user?.displayName ?? null,
-                  birthday: userInfo?.birthday ?? null,
-                  isGuest: !user || !!user?.isAnonymous,
-                }}
-                onCreateAccount={() => {
-                  router.push('/login?upgrade=1');
-                  onClose();
-                }}
-                onDeleteData={async () => {
-                  try {
-                    const res = await fetch('/api/user', { method: 'DELETE' });
-                    if (!res.ok) throw new Error('Failed to delete account');
-                    onSignOut();
-                    onClose();
-                  } catch (err) {
-                    console.error(err);
-                    flashSoon('Could not delete account');
-                  }
-                }}
-                onSave={async (field, value) => {
-                  const fieldMap: Record<string, string> = {
-                    petName: 'frogName',
-                    yourName: 'name',
-                    birthday: 'birthday',
-                  };
-                  const apiField = fieldMap[field];
-                  if (!apiField) return;
-                  try {
-                    await fetch('/api/user', {
-                      method: 'PATCH',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ [apiField]: value }),
-                    });
-                    await refreshUserInfo();
-                  } catch (err) {
-                    console.error('Failed to save profile field', err);
-                  }
-                }}
-              />
-            )}
-          </div>
+          <div className="px-5 pb-10 space-y-5">{subviewContent}</div>
         </div>
         </motion.div>
           )}
         </AnimatePresence>
 
-          <AnimatePresence>
-            {toast && (
-              <motion.div
-                initial={{ opacity: 0, y: -6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -6 }}
-                className="fixed left-1/2 top-16 z-[200] -translate-x-1/2 rounded-full bg-foreground text-background px-4 py-2 text-xs font-bold shadow-lg"
-              >
-                {toast}
-              </motion.div>
-            )}
-          </AnimatePresence>
-          <InviteFriendsModal open={inviteOpen} onClose={() => setInviteOpen(false)} />
-          <PlusUpgradeModal open={plusOpen} placement="settings_menu" onClose={() => setPlusOpen(false)} />
+          {overlayExtras}
         </motion.div>
       )}
     </AnimatePresence>,
@@ -1052,7 +1334,9 @@ function MainView({
   flashSoon,
   theme,
   setTheme,
+  layout = 'mobile',
 }: {
+  layout?: 'mobile' | 'desktop';
   displayName: string;
   frogName: string;
   isPremium: boolean;
@@ -1096,16 +1380,19 @@ function MainView({
         day: 'numeric',
       })
     : null;
+  const isDesktop = layout === 'desktop';
   return (
     <div className="space-y-5">
       {/* User card */}
-      <div className="rounded-2xl bg-card border border-border/50 px-5 py-4 shadow-sm">
-        <p className="text-xl font-black tracking-tight truncate">
-          <span>{displayName}</span>
-          <span className="text-muted-foreground mx-1.5">&amp;</span>
-          <span>{frogName}</span>
-        </p>
-      </div>
+      {!isDesktop && (
+        <div className="rounded-2xl bg-card border border-border/50 px-5 py-4 shadow-sm">
+          <p className="text-xl font-black tracking-tight truncate">
+            <span>{displayName}</span>
+            <span className="text-muted-foreground mx-1.5">&amp;</span>
+            <span>{frogName}</span>
+          </p>
+        </div>
+      )}
 
       {/* Guest mode promo */}
       {isGuest && (
@@ -1191,14 +1478,17 @@ function MainView({
           label="Invite friends"
           onClick={onInviteFriends}
         />
-        <MenuRow
-          icon={<Icon name="community" label="Community" className="w-10 h-10" />}
-          label="Join our frog community"
-          onClick={onOpenCommunity}
-        />
+        {!isDesktop && (
+          <MenuRow
+            icon={<Icon name="community" label="Community" className="w-10 h-10" />}
+            label="Join our frog community"
+            onClick={onOpenCommunity}
+          />
+        )}
       </MenuSection>
 
       {/* Account */}
+      {!isDesktop && (
       <MenuSection title="Account">
         {(isNative || isWeb) && (
           <MenuRow
@@ -1237,6 +1527,7 @@ function MainView({
           onClick={onOpenPreferences}
         />
       </MenuSection>
+      )}
 
       {/* Subscriptions */}
       <MenuSection title="Subscriptions">
@@ -1320,18 +1611,20 @@ function MainView({
       )}
 
       {/* Support */}
-      <MenuSection title="Support">
-        <MenuRow
-          icon={<HelpCircle className="w-7 h-7 text-sky-500" />}
-          label="Help center"
-          onClick={onHelpCenter}
-        />
-        <MenuRow
-          icon={<AlertTriangle className="w-7 h-7 text-red-500" />}
-          label="Report an issue"
-          onClick={onReportIssue}
-        />
-      </MenuSection>
+      {!isDesktop && (
+        <MenuSection title="Support">
+          <MenuRow
+            icon={<HelpCircle className="w-7 h-7 text-sky-500" />}
+            label="Help center"
+            onClick={onHelpCenter}
+          />
+          <MenuRow
+            icon={<AlertTriangle className="w-7 h-7 text-red-500" />}
+            label="Report an issue"
+            onClick={onReportIssue}
+          />
+        </MenuSection>
+      )}
 
       <div className="overflow-hidden rounded-2xl border border-border/50 bg-card">
         <MenuRow
@@ -1346,7 +1639,7 @@ function MainView({
       </div>
 
       {/* Admin */}
-      {isAdmin && (
+      {isAdmin && !isDesktop && (
         <MenuSection title="Admin">
           <MenuRow
             icon={<Settings className="w-7 h-7 text-amber-500" />}
@@ -1356,6 +1649,7 @@ function MainView({
         </MenuSection>
       )}
 
+      {!isDesktop && (
       <button
         onClick={isGuest ? () => setConfirmGuestSignOut(true) : onSignOut}
         className="flex w-full items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-rose-50 p-4 font-black text-rose-600 shadow-sm transition-all hover:bg-rose-100 active:scale-[0.99] dark:border-rose-400/35 dark:bg-rose-500/15 dark:text-rose-300 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_8px_24px_rgba(0,0,0,0.12)] dark:hover:border-rose-400/50 dark:hover:bg-rose-500/25"
@@ -1363,60 +1657,78 @@ function MainView({
         <LogOut className="h-6 w-6" strokeWidth={2.5} />
         Sign Out
       </button>
+      )}
 
-      {confirmGuestSignOut &&
-        createPortal(
-          <div
-            className="fixed inset-0 z-[1400] flex items-center justify-center bg-black/60 px-5 backdrop-blur-sm"
-            onClick={() => setConfirmGuestSignOut(false)}
-          >
-            <div
-              onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-sm rounded-[28px] bg-card p-6 text-center shadow-2xl ring-1 ring-border/60"
-            >
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-rose-500/10 ring-1 ring-rose-500/20">
-                <ShieldAlert className="h-7 w-7 text-rose-500" strokeWidth={2.5} />
-              </div>
-              <h2 className="mt-3 text-lg font-black tracking-tight text-foreground">
-                Your frog will be lost forever
-              </h2>
-              <p className="mt-2 text-sm font-medium text-muted-foreground">
-                You&apos;re in Guest Mode — there&apos;s no way to sign back in.
-                Signing out permanently deletes your frog, streaks, and all
-                progress. Create a free account first to keep them.
-              </p>
-              <button
-                type="button"
-                onClick={() => {
-                  setConfirmGuestSignOut(false);
-                  onCreateAccount();
-                }}
-                className="mt-5 h-12 w-full rounded-2xl bg-primary text-sm font-black uppercase tracking-wider text-primary-foreground transition-all hover:brightness-110 active:scale-[0.98]"
-              >
-                Create free account
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setConfirmGuestSignOut(false);
-                  onSignOut();
-                }}
-                className="mt-2 h-11 w-full rounded-2xl text-sm font-bold text-rose-500 transition-colors hover:bg-rose-500/10"
-              >
-                Sign out and lose progress
-              </button>
-              <button
-                type="button"
-                onClick={() => setConfirmGuestSignOut(false)}
-                className="mt-1 h-11 w-full rounded-2xl text-sm font-bold text-muted-foreground transition-colors hover:text-foreground"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>,
-          document.body,
-        )}
+      {confirmGuestSignOut && (
+        <GuestSignOutConfirm
+          onCancel={() => setConfirmGuestSignOut(false)}
+          onCreateAccount={() => {
+            setConfirmGuestSignOut(false);
+            onCreateAccount();
+          }}
+          onConfirm={() => {
+            setConfirmGuestSignOut(false);
+            onSignOut();
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+function GuestSignOutConfirm({
+  onCancel,
+  onCreateAccount,
+  onConfirm,
+}: {
+  onCancel: () => void;
+  onCreateAccount: () => void;
+  onConfirm: () => void;
+}) {
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[1400] flex items-center justify-center bg-black/60 px-5 backdrop-blur-sm"
+      onClick={onCancel}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-sm rounded-[28px] bg-card p-6 text-center shadow-2xl ring-1 ring-border/60"
+      >
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-rose-500/10 ring-1 ring-rose-500/20">
+          <ShieldAlert className="h-7 w-7 text-rose-500" strokeWidth={2.5} />
+        </div>
+        <h2 className="mt-3 text-lg font-black tracking-tight text-foreground">
+          Your frog will be lost forever
+        </h2>
+        <p className="mt-2 text-sm font-medium text-muted-foreground">
+          You&apos;re in Guest Mode — there&apos;s no way to sign back in. Signing
+          out permanently deletes your frog, streaks, and all progress. Create a
+          free account first to keep them.
+        </p>
+        <button
+          type="button"
+          onClick={onCreateAccount}
+          className="mt-5 h-12 w-full rounded-2xl bg-primary text-sm font-black uppercase tracking-wider text-primary-foreground transition-all hover:brightness-110 active:scale-[0.98]"
+        >
+          Create free account
+        </button>
+        <button
+          type="button"
+          onClick={onConfirm}
+          className="mt-2 h-11 w-full rounded-2xl text-sm font-bold text-rose-500 transition-colors hover:bg-rose-500/10"
+        >
+          Sign out and lose progress
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="mt-1 h-11 w-full rounded-2xl text-sm font-bold text-muted-foreground transition-colors hover:text-foreground"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>,
+    document.body,
   );
 }
 

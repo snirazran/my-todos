@@ -47,6 +47,10 @@ import {
   fliesCaughtFor,
   deepFocusPledgeLive,
   priorDayFocusSeconds,
+  focusFliesEarnedForDay,
+  FOCUS_FLY_RATE_SECONDS,
+  FOCUS_FLY_DAILY_CAP,
+  DEEP_FOCUS_BONUS_FLIES,
 } from '@/lib/focusFlies';
 import { useInventory } from '@/hooks/useInventory';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
@@ -971,7 +975,7 @@ export default function FrogodoroSheet({
                       {(() => {
                         const days = pondData?.days ?? [];
                         const fliesOf = (focusTime: number) =>
-                          Math.min(12, Math.floor(focusTime / 300));
+                          focusFliesEarnedForDay(focusTime);
                         const weekFlies = days.reduce(
                           (sum, d) => sum + fliesOf(d.focusTime),
                           0,
@@ -987,7 +991,18 @@ export default function FrogodoroSheet({
                           <>
                             <p className="mb-3 text-sm text-muted-foreground">
                               Your frog catches a fly for every{' '}
-                              <span className="font-bold text-foreground">5 focused minutes</span>.
+                              <span className="font-bold text-foreground">
+                                {FOCUS_FLY_RATE_SECONDS / 60} focused minutes
+                              </span>
+                              , up to{' '}
+                              <span className="font-bold text-foreground">
+                                {FOCUS_FLY_DAILY_CAP} a day
+                              </span>
+                              . Finish a focus without pausing for{' '}
+                              <span className="font-bold text-foreground">
+                                +{DEEP_FOCUS_BONUS_FLIES} deep focus fly
+                              </span>
+                              .
                             </p>
                             <div className="rounded-2xl border border-border/50 bg-primary/5 px-3 pb-3 pt-4">
                               <div className="flex items-end justify-between gap-1">
