@@ -152,6 +152,7 @@ export async function handleBuddyCompletion(opts: {
           .select('text')
           .lean<{ text?: string } | null>(),
       ]);
+      if (!partnerTask) return;
       const copy = bothNow
         ? buddyBothFinishedMessage(name, partnerTask?.text)
         : buddyPartnerFinishedMessage(name, partnerTask?.text);
@@ -174,9 +175,10 @@ export async function severBond(bondId: string, deleterId: string) {
   const partnerId =
     bond.fromUserId === deleterId ? bond.toUserId : bond.fromUserId;
   bond.status = 'severed';
+  bond.pendingRepeatChange = null;
   await bond.save();
   await TaskModel.updateMany(
-    { userId: partnerId, bondId },
+    { bondId },
     { $unset: { bondId: '', buddyUserId: '' } },
   );
   void notifyFriendUpdate(partnerId);

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import confetti from 'canvas-confetti';
@@ -820,6 +820,26 @@ export function QuestsPanel({
     [filteredCategoryQuests, heroQuest?.id],
   );
 
+  const wantsHeroScrollRef = useRef(false);
+  const requestHeroScroll = useCallback(() => {
+    wantsHeroScrollRef.current = true;
+  }, []);
+  useEffect(() => {
+    if (!wantsHeroScrollRef.current || !heroQuest) return;
+    wantsHeroScrollRef.current = false;
+    const frame = window.requestAnimationFrame(() => {
+      const targets = Array.from(
+        document.querySelectorAll<HTMLElement>('[data-focus-hero]'),
+      );
+      const visible = targets.find((node) => node.offsetParent !== null);
+      (visible ?? targets[0])?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [heroQuest]);
+
   const pendingSwitchCategory = pendingSwitchCategoryId
     ? categoryMap[pendingSwitchCategoryId]
     : null;
@@ -912,6 +932,8 @@ export function QuestsPanel({
         ) && linkedTags.length === 0;
       if (needsTag) {
         setStartQuestCategoryId(categoryId);
+      } else {
+        requestHeroScroll();
       }
     } catch (err: any) {
       setClaimMessage(err.message || 'Could not switch focus');
@@ -1008,7 +1030,7 @@ export function QuestsPanel({
   const renderContent = () => {
     return (
       <>
-              <div className="relative z-10 flex-1 overflow-hidden">
+              <div className="relative z-10 flex-1 overflow-hidden md:flex-none md:overflow-visible">
                 {isGuest ? (
                   <EmptyState
                     title="Sign in to unlock quests"
@@ -1022,7 +1044,7 @@ export function QuestsPanel({
                     description="Try reopening the popup."
                   />
                 ) : (
-                  <div className="flex flex-col h-full">
+                  <div className="flex flex-col h-full md:h-auto">
                     {claimMessage && (
                       <div className="px-4 pt-4 md:px-6">
                         <div className="px-4 py-3 text-sm font-medium border rounded-2xl border-primary/20 bg-primary/10 text-foreground">
@@ -1036,6 +1058,7 @@ export function QuestsPanel({
                       }}
                       className={cn(
                         'no-scrollbar flex-1 min-h-0 overflow-y-auto overscroll-none [overflow-anchor:none]',
+                        'md:flex-none md:min-h-[100dvh] md:overflow-visible',
                         'bg-muted dark:bg-muted/25',
                         data.activeSeason
                           ? 'px-0 pt-0 md:px-0 md:pt-0 md:pb-8'
@@ -1127,7 +1150,8 @@ export function QuestsPanel({
                             <div
                               key={quest.id}
                               data-quest-anchor={quest.id}
-                              className="rounded-[24px]"
+                              data-focus-hero
+                              className="scroll-mt-4 rounded-[24px] md:scroll-mt-20"
                             >
                             <CategoryQuestPresentationCard
                               quest={quest}
@@ -1329,7 +1353,79 @@ export function QuestsPanel({
                           // rows (their progress bars carry real info).
                           const benchGrid =
                             !data.isPremium && benchQuests.length > 4;
-                          const areaRows = benchQuests.length > 0 && (
+                          const benchItems = benchQuests.map((quest) => {
+                            const linkedTags = (
+                              categoryTagMap.get(quest.categoryId) ?? []
+                            )
+                              .map((tagId) => tagCatalog.get(tagId))
+                              .filter(Boolean) as QuestTagChip[];
+                            const needsTag =
+                              quest.logic.some(
+                                (block) =>
+                                  block.tagMode === 'focus_category_tags',
+                              ) && linkedTags.length === 0;
+                            const rowState: AreaRowState = data.isPremium
+                              ? needsTag
+                                ? 'start'
+                                : 'running'
+                              : quest.locked
+                                ? 'paused'
+                                : needsTag
+                                  ? 'start'
+                                  : 'running';
+                            const handlePress = () => {
+                              if (needsTag && !quest.locked) {
+                                setStartQuestCategoryId(quest.categoryId);
+                              } else if (data.isPremium) {
+                                setPinnedCategoryId(quest.categoryId);
+                                requestHeroScroll();
+                              } else if (quest.locked) {
+                                setPendingSwitchCategoryId(
+                                  quest.categoryId,
+                                );
+                              }
+                            };
+                            return (
+                              <div
+                                key={quest.id}
+                                data-quest-anchor={quest.id}
+                              >
+                                {benchGrid ? (
+                                  <AreaStartCard
+                                    quest={quest}
+                                    category={
+                                      categoryMap[quest.categoryId]
+                                    }
+                                    compact
+                                    rewardCatalog={data.rewardCatalog}
+                                    isPremium={data.isPremium}
+                                    onPress={handlePress}
+                                  />
+                                ) : (
+                                  <AreaRow
+                                    quest={quest}
+                                    category={
+                                      categoryMap[quest.categoryId]
+                                    }
+                                    state={rowState}
+                                    finished={isQuestRetired(quest)}
+                                    linkedTags={linkedTags}
+                                    rewardCatalog={data.rewardCatalog}
+                                    isPremium={data.isPremium}
+                                    onPress={handlePress}
+                                    rentedUntil={
+                                      data.rentedFocus?.categoryId ===
+                                      quest.categoryId
+                                        ? data.rentedFocus?.expiresAt ??
+                                          null
+                                        : null
+                                    }
+                                  />
+                                )}
+                              </div>
+                            );
+                          });
+                          const areaRows = benchItems.length > 0 && (
                             <div
                               className={cn(
                                 'mt-0.5',
@@ -1338,81 +1434,30 @@ export function QuestsPanel({
                                   : 'flex flex-col gap-2.5',
                               )}
                             >
-                              {benchQuests.map((quest) => {
-                                const linkedTags = (
-                                  categoryTagMap.get(quest.categoryId) ?? []
-                                )
-                                  .map((tagId) => tagCatalog.get(tagId))
-                                  .filter(Boolean) as QuestTagChip[];
-                                const needsTag =
-                                  quest.logic.some(
-                                    (block) =>
-                                      block.tagMode === 'focus_category_tags',
-                                  ) && linkedTags.length === 0;
-                                const rowState: AreaRowState = data.isPremium
-                                  ? needsTag
-                                    ? 'start'
-                                    : 'running'
-                                  : quest.locked
-                                    ? 'paused'
-                                    : needsTag
-                                      ? 'start'
-                                      : 'running';
-                                const handlePress = () => {
-                                  if (needsTag && !quest.locked) {
-                                    setStartQuestCategoryId(quest.categoryId);
-                                  } else if (data.isPremium) {
-                                    setPinnedCategoryId(quest.categoryId);
-                                  } else if (quest.locked) {
-                                    setPendingSwitchCategoryId(
-                                      quest.categoryId,
-                                    );
-                                  }
-                                };
-                                return (
-                                  <div
-                                    key={quest.id}
-                                    data-quest-anchor={quest.id}
-                                  >
-                                    {benchGrid ? (
-                                      <AreaStartCard
-                                        quest={quest}
-                                        category={
-                                          categoryMap[quest.categoryId]
-                                        }
-                                        compact
-                                        rewardCatalog={data.rewardCatalog}
-                                        isPremium={data.isPremium}
-                                        onPress={handlePress}
-                                      />
-                                    ) : (
-                                      <AreaRow
-                                        quest={quest}
-                                        category={
-                                          categoryMap[quest.categoryId]
-                                        }
-                                        state={rowState}
-                                        finished={isQuestRetired(quest)}
-                                        linkedTags={linkedTags}
-                                        rewardCatalog={data.rewardCatalog}
-                                        isPremium={data.isPremium}
-                                        onPress={handlePress}
-                                        rentedUntil={
-                                          data.rentedFocus?.categoryId ===
-                                          quest.categoryId
-                                            ? data.rentedFocus?.expiresAt ??
-                                              null
-                                            : null
-                                        }
-                                      />
-                                    )}
-                                  </div>
-                                );
-                              })}
+                              {benchItems}
+                            </div>
+                          );
+                          const areaShelf = benchItems.length > 0 && (
+                            <div className="flex flex-col gap-2">
+                              <p className="px-1 text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+                                More areas
+                              </p>
+                              <div
+                                className={cn(
+                                  'grid gap-3',
+                                  benchGrid
+                                    ? 'grid-cols-3 xl:grid-cols-4'
+                                    : 'grid-cols-2 xl:grid-cols-3',
+                                )}
+                              >
+                                {benchItems}
+                              </div>
                             </div>
                           );
 
-                          const focusSection = (
+                          const renderFocusSection = (
+                            includeAreaRows: boolean,
+                          ) => (
                             <div className="flex flex-col gap-2">
                               <div className="px-1">
                                 <p className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
@@ -1457,60 +1502,75 @@ export function QuestsPanel({
                               </div>
                               {focusEmptyStates}
                               {heroQuest && renderFocusCard(heroQuest)}
-                              {areaRows}
+                              {includeAreaRows && areaRows}
                             </div>
                           );
 
-                          const focusContent = chooserMode
-                            ? areaChooser
-                            : focusSection;
                           const ceremonyActive =
                             areaUnlockCeremony === 'pending' ||
                             areaUnlockCeremony === 'playing';
-                          let focusSlot: React.ReactNode;
-                          if (!focusUnlocked || ceremonyActive) {
-                            focusSlot = (
-                              <div className="flex flex-col gap-2 pb-6">
-                                <div className="px-1">
-                                  <p className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
-                                    <Compass
-                                      className="h-3.5 w-3.5 text-primary"
-                                      strokeWidth={2.75}
-                                    />
-                                    Your areas
-                                  </p>
+                          const buildFocusSlot = (
+                            content: React.ReactNode,
+                          ): React.ReactNode => {
+                            if (!focusUnlocked || ceremonyActive) {
+                              return (
+                                <div className="flex flex-col gap-2 pb-6">
+                                  <div className="px-1">
+                                    <p className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+                                      <Compass
+                                        className="h-3.5 w-3.5 text-primary"
+                                        strokeWidth={2.75}
+                                      />
+                                      Your areas
+                                    </p>
+                                  </div>
+                                  <AreaQuestsTeaser
+                                    completedSteps={
+                                      ceremonyActive
+                                        ? EARLY_UNLOCK_STEP_TARGET
+                                        : Math.min(
+                                            completedEarlyObjectives,
+                                            EARLY_UNLOCK_STEP_TARGET,
+                                          )
+                                    }
+                                    targetSteps={EARLY_UNLOCK_STEP_TARGET}
+                                    unlocking={areaUnlockCeremony === 'playing'}
+                                  />
                                 </div>
-                                <AreaQuestsTeaser
-                                  completedSteps={
-                                    ceremonyActive
-                                      ? EARLY_UNLOCK_STEP_TARGET
-                                      : Math.min(
-                                          completedEarlyObjectives,
-                                          EARLY_UNLOCK_STEP_TARGET,
-                                        )
-                                  }
-                                  targetSteps={EARLY_UNLOCK_STEP_TARGET}
-                                  unlocking={areaUnlockCeremony === 'playing'}
-                                />
-                              </div>
-                            );
-                          } else if (areaUnlockCeremony === 'done') {
-                            focusSlot = (
-                              <motion.div
-                                initial={{ opacity: 0, y: 24, scale: 0.97 }}
-                                animate={{ opacity: 1, y: 0, scale: 1 }}
-                                transition={{
-                                  type: 'spring',
-                                  stiffness: 240,
-                                  damping: 24,
-                                }}
-                              >
-                                {focusContent}
-                              </motion.div>
-                            );
-                          } else {
-                            focusSlot = focusContent;
-                          }
+                              );
+                            }
+                            if (areaUnlockCeremony === 'done') {
+                              return (
+                                <motion.div
+                                  initial={{ opacity: 0, y: 24, scale: 0.97 }}
+                                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                                  transition={{
+                                    type: 'spring',
+                                    stiffness: 240,
+                                    damping: 24,
+                                  }}
+                                >
+                                  {content}
+                                </motion.div>
+                              );
+                            }
+                            return content;
+                          };
+                          const focusSlot = buildFocusSlot(
+                            chooserMode
+                              ? areaChooser
+                              : renderFocusSection(true),
+                          );
+                          const focusSlotDesktop = buildFocusSlot(
+                            chooserMode
+                              ? areaChooser
+                              : renderFocusSection(false),
+                          );
+                          const showDesktopShelf =
+                            !chooserMode &&
+                            focusUnlocked &&
+                            !ceremonyActive &&
+                            !!areaShelf;
 
                           // The areas section normally waits for the starter
                           // quest, but an onboarding objective that asks the
@@ -1550,8 +1610,9 @@ export function QuestsPanel({
                                     {onboardingQuests.map(renderOnboardingCard)}
                                     {dailySection}
                                   </div>
-                                  {showFocusSlot && focusSlot}
+                                  {showFocusSlot && focusSlotDesktop}
                                 </div>
+                                {showFocusSlot && showDesktopShelf && areaShelf}
                               </div>
                             </>
                           );
@@ -1611,7 +1672,7 @@ export function QuestsPanel({
 
   return (
     <>
-      <div className="relative flex h-full w-full flex-col overflow-hidden bg-background">
+      <div className="relative flex h-full w-full flex-col overflow-hidden bg-background md:h-auto md:overflow-visible">
         {renderContent()}
       </div>
 

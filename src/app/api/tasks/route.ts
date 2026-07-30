@@ -2035,12 +2035,13 @@ export async function DELETE(req: NextRequest) {
       );
     const doc = await TaskModel.findOne(
       { userId: uid, id: taskId },
-      { type: 1 },
+      { type: 1, bondId: 1 },
     )
       .lean<TaskDoc>()
       .exec();
     if (doc?.type === 'regular') {
       await TaskModel.deleteOne({ userId: uid, type: 'regular', id: taskId });
+      if (doc.bondId) await severBond(doc.bondId, uid);
     } else if (doc?.type === 'weekly') {
       await TaskModel.updateOne(
         { userId: uid, type: doc.type, id: taskId },
@@ -2074,6 +2075,7 @@ export async function DELETE(req: NextRequest) {
   }
   if (doc.type === 'regular') {
     await TaskModel.deleteOne({ userId: uid, id: taskId, date });
+    if (doc.bondId) await severBond(doc.bondId, uid);
     await syncGamification(uid, tz);
     await notifyTaskChanged(uid);
     return NextResponse.json({ ok: true });
@@ -3199,21 +3201,32 @@ async function handleBoardDelete(
     );
   if (day === -1) {
     const { weekStart } = getRollingWeekDatesZoned(tz);
+    const backlogDoc = await TaskModel.findOne(
+      { userId: uid, type: 'backlog', weekStart, id: taskId },
+      { bondId: 1 },
+    )
+      .lean<TaskDoc>()
+      .exec();
     await TaskModel.deleteOne({
       userId: uid,
       type: 'backlog',
       weekStart,
       id: taskId,
     });
+    if (backlogDoc?.bondId) await severBond(backlogDoc.bondId, uid);
     await syncGamification(uid, tz);
     await notifyTaskChanged(uid);
     return NextResponse.json({ ok: true });
   }
-  const doc = await TaskModel.findOne({ userId: uid, id: taskId }, { type: 1 })
+  const doc = await TaskModel.findOne(
+    { userId: uid, id: taskId },
+    { type: 1, bondId: 1 },
+  )
     .lean<TaskDoc>()
     .exec();
   if (doc?.type === 'regular') {
     await TaskModel.deleteOne({ userId: uid, type: 'regular', id: taskId });
+    if (doc.bondId) await severBond(doc.bondId, uid);
     await syncGamification(uid, tz);
     await notifyTaskChanged(uid);
     return NextResponse.json({ ok: true });
@@ -3231,6 +3244,7 @@ async function handleBoardDelete(
     id: taskId,
     date: { $gte: today },
   });
+  if (doc?.bondId) await severBond(doc.bondId, uid);
   await syncGamification(uid, tz);
   await notifyTaskChanged(uid);
   return NextResponse.json({ ok: true });

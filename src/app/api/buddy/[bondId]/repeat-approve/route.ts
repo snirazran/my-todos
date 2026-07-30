@@ -39,6 +39,8 @@ export async function POST(
     await connectMongo();
     const bond = await TaskBondModel.findOne({ bondId });
     if (!bond) return NextResponse.json({ error: 'Bond not found' }, { status: 404 });
+    if (bond.status !== 'active')
+      return NextResponse.json({ error: 'Bond is not active' }, { status: 409 });
     if (bond.fromUserId !== userId && bond.toUserId !== userId)
       return NextResponse.json({ error: 'Not your bond' }, { status: 403 });
     const change = bond.pendingRepeatChange;
