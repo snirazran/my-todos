@@ -2217,7 +2217,7 @@ function QuestSeasonEventOverlay({
                 <span className="-my-8 -ml-2 -translate-y-2 inline-flex shrink-0">
                   <Icon
                     name="frogPlus"
-                    className="h-16 w-16 drop-shadow-[0_4px_0_rgba(31,98,28,0.35)] animate-wiggle [animation-duration:1.6s] [@media(min-width:400px)]:h-20 [@media(min-width:400px)]:w-20"
+                    className="h-16 w-16 drop-shadow-[0_4px_0_rgba(31,98,28,0.35)] animate-wiggle [@media(min-width:400px)]:h-20 [@media(min-width:400px)]:w-20"
                   />
                 </span>
                 <span className="hidden text-[12px] font-black uppercase tracking-[0.14em] text-emerald-900 drop-shadow-[0_1px_0_rgba(255,255,255,0.5)] [@media(min-width:360px)]:inline [@media(min-width:400px)]:tracking-[0.22em]">

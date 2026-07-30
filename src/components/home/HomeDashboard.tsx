@@ -77,7 +77,6 @@ import { MobileHeaderActions } from '@/components/ui/MobileHeaderActions';
 import { MobileMenuCluster } from '@/components/ui/siteHeader';
 import { FlyCatchSwipeLauncher } from '@/components/ui/FlyCatchSwipeLauncher';
 import { NextQuestStrip } from '@/components/ui/NextQuestStrip';
-import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
 import { BuddyNudgeCard } from '@/components/ui/BuddyNudgeCard';
 import { HomeShopRail } from '@/components/home/HomeShopRail';
 import { TryOnPill } from '@/components/ui/TryOnPill';
@@ -116,8 +115,6 @@ export default function HomeDashboard() {
     isWardrobeOpen,
     setWardrobeOpen,
     setIsCinematicActive,
-    isPremiumModalOpen,
-    premiumModalPlacement,
     setPremiumModalOpen,
     openFlyShop,
   } = useUIStore();
@@ -1195,12 +1192,6 @@ export default function HomeDashboard() {
           mutateQuests();
           mutateToday();
         }}
-      />
-
-      <PlusUpgradeModal
-        open={isPremiumModalOpen}
-        placement={premiumModalPlacement}
-        onClose={() => setPremiumModalOpen(false)}
       />
 
       {/* Floating Add Task FAB */}

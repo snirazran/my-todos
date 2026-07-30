@@ -126,11 +126,16 @@ export async function GET(req: NextRequest) {
     const rawDays = Number(req.nextUrl.searchParams.get('days'));
     const rangeDays = rawDays === 30 || rawDays === 90 ? rawDays : 7;
     const today = getZonedToday(timezone);
-    const currentStart = shiftDay(today, -(rangeDays - 1));
+    // Today is still in progress: its tasks are mostly unfinished simply
+    // because the day isn't over, which drags every rate down and makes the
+    // comparison to the previous period meaningless. Every window ends on the
+    // last *complete* day instead.
+    const lastFullDay = shiftDay(today, -1);
+    const currentStart = shiftDay(lastFullDay, -(rangeDays - 1));
     const previousEnd = shiftDay(currentStart, -1);
     const previousStart = shiftDay(previousEnd, -(rangeDays - 1));
     const patternDays = Math.max(56, rangeDays);
-    const patternStart = shiftDay(today, -(patternDays - 1));
+    const patternStart = shiftDay(lastFullDay, -(patternDays - 1));
     const historyStart = [previousStart, patternStart].sort()[0];
     const eventStart = new Date(`${patternStart}T00:00:00Z`);
 
@@ -141,8 +146,8 @@ export async function GET(req: NextRequest) {
           type: { $ne: 'backlog' },
           $or: [
             { type: 'weekly' },
-            { date: { $gte: historyStart, $lte: today } },
-            { frogodoroSessions: { $elemMatch: { date: { $gte: historyStart, $lte: today } } } },
+            { date: { $gte: historyStart, $lte: lastFullDay } },
+            { frogodoroSessions: { $elemMatch: { date: { $gte: historyStart, $lte: lastFullDay } } } },
           ],
         },
         {
@@ -188,12 +193,12 @@ export async function GET(req: NextRequest) {
         weeklyByDay.set(task.dayOfWeek, matches);
       }
       for (const session of task.frogodoroSessions ?? []) {
-        if (session.date < historyStart || session.date > today) continue;
+        if (session.date < historyStart || session.date > lastFullDay) continue;
         focusByDate.set(session.date, (focusByDate.get(session.date) ?? 0) + Math.max(0, session.focusTime ?? 0));
       }
     }
 
-    const allDates = daysBetween(historyStart, today);
+    const allDates = daysBetween(historyStart, lastFullDay);
     const instances: Instance[] = [];
     for (const date of allDates) {
       const candidates = [...(regularByDate.get(date) ?? []), ...(weeklyByDay.get(weekday(date)) ?? [])];
@@ -344,7 +349,10 @@ export async function GET(req: NextRequest) {
       ['Night', 0],
     ]);
     const hourFormatter = new Intl.DateTimeFormat('en-US', { timeZone: timezone, hour: 'numeric', hour12: false });
-    for (const event of completionEvents) {
+    const finishedEvents = completionEvents.filter(
+      (event) => getZonedYMD(event.occurredAt, timezone) <= lastFullDay,
+    );
+    for (const event of finishedEvents) {
       const parsedHour = Number(hourFormatter.format(new Date(event.occurredAt))) % 24;
       const label = parsedHour >= 5 && parsedHour < 12
         ? 'Morning'
@@ -356,8 +364,8 @@ export async function GET(req: NextRequest) {
       timeBuckets.set(label, (timeBuckets.get(label) ?? 0) + 1);
     }
     const topTime = Array.from(timeBuckets.entries()).sort((a, b) => b[1] - a[1])[0];
-    const timePattern = completionEvents.length >= 3 && topTime?.[1]
-      ? { label: topTime[0], count: topTime[1], share: percent(topTime[1], completionEvents.length) }
+    const timePattern = finishedEvents.length >= 3 && topTime?.[1]
+      ? { label: topTime[0], count: topTime[1], share: percent(topTime[1], finishedEvents.length) }
       : null;
 
     const signals: Array<{ tone: 'positive' | 'watch' | 'neutral'; eyebrow: string; title: string; body: string }> = [];
@@ -453,7 +461,7 @@ export async function GET(req: NextRequest) {
       : `You completed ${current.completed} of ${current.planned} planned tasks${bestDay ? `, with your best rhythm on ${bestDay.name}s` : ''}.`;
 
     return NextResponse.json({
-      range: { days: rangeDays, from: currentStart, to: today, previousFrom: previousStart, previousTo: previousEnd },
+      range: { days: rangeDays, from: currentStart, to: lastFullDay, previousFrom: previousStart, previousTo: previousEnd },
       profile: { name: user?.name ?? null, frogName: user?.frogName ?? null },
       summary: {
         ...current,

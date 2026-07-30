@@ -188,6 +188,7 @@ export default function SiteHeader() {
         className={cn(
           'absolute inset-x-0 top-0 z-[90] hidden w-full h-16 bg-background/95 backdrop-blur-xl md:block',
           pathname !== '/planner' &&
+            pathname !== '/insights' &&
             !(pathname === '/wardrobe' && isWardrobeStuck) &&
             'shadow-lg shadow-black/5 dark:shadow-black/20',
         )}
@@ -1162,7 +1163,7 @@ function MainView({
           <span className="-my-4 -ml-1 shrink-0 inline-flex">
             <Icon
               name="frogPlus"
-              className="w-16 h-16 drop-shadow-[0_3px_0_rgba(31,98,28,0.35)] animate-wiggle [animation-duration:1.8s]"
+              className="w-16 h-16 drop-shadow-[0_3px_0_rgba(31,98,28,0.35)] animate-wiggle"
             />
           </span>
           <div className="flex-1 min-w-0">

@@ -23,6 +23,7 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { useAuth } from '@/components/auth/AuthContext';
+import { WeeklyCoachCard, type WeeklyFacts } from '@/components/insights/WeeklyCoachCard';
 import { cn } from '@/lib/utils';
 
 type DailyPoint = { date: string; planned: number; completed: number; focusSeconds: number };
@@ -63,6 +64,14 @@ type InsightData = {
     streak: number;
     recent: Array<{ date: string; completed: boolean }>;
   }>;
+  loadPattern?: {
+    typicalTasks: number;
+    lighterRate: number;
+    heavierRate: number;
+    lighterDays: number;
+    heavierDays: number;
+  };
+  timePattern?: { label: string; count: number; share: number } | null;
   signals: Array<{
     tone: 'positive' | 'watch' | 'neutral';
     eyebrow: string;
@@ -92,6 +101,46 @@ function formatDate(dayKey: string, options: Intl.DateTimeFormatOptions) {
   return new Intl.DateTimeFormat(undefined, options).format(new Date(`${dayKey}T12:00:00`));
 }
 
+/** Numbers only — the coach never sees task titles beyond the recurring ones
+ *  the user already sees on this page, and never sees notes or checklists. */
+function weeklyFacts(data: InsightData): WeeklyFacts {
+  const ranked = [...data.weekdayPatterns].filter((day) => day.planned >= 2);
+  const best = [...ranked].sort((a, b) => b.rate - a.rate)[0] ?? null;
+  const hardest = [...ranked].sort((a, b) => a.rate - b.rate)[0] ?? null;
+  return {
+    thisWeek: {
+      completionRate: data.summary.completionRate,
+      completionDelta: data.summary.completionDelta,
+      planned: data.summary.planned,
+      completed: data.summary.completed,
+      focusMinutes: Math.round(data.summary.focusSeconds / 60),
+      activeDays: data.summary.activeDays,
+      bestRun: data.summary.bestRun,
+    },
+    // Weekday rhythm, areas, habits and load are all computed over the longer
+    // pattern window — sending them alongside the weekly numbers unlabelled is
+    // what produced "0 completed" and "57% completion" in the same note.
+    longerTerm: {
+      windowDays: data.patternDays,
+      bestDay: best?.name ?? null,
+      hardestDay: hardest && best && hardest.day !== best.day ? hardest.name : null,
+      topAreas: data.tags.slice(0, 4).map((tag) => ({
+        name: tag.name,
+        rate: tag.rate,
+        planned: tag.planned,
+      })),
+      slippingHabits: data.habits
+        .filter((habit) => habit.rate < 70)
+        .slice(0, 3)
+        .map((habit) => ({ title: habit.title, rate: habit.rate })),
+      finishWindow: data.timePattern?.label ?? null,
+      typicalTasks: data.loadPattern?.typicalTasks ?? 0,
+      lighterRate: data.loadPattern?.lighterRate ?? 0,
+      heavierRate: data.loadPattern?.heavierRate ?? 0,
+    },
+  };
+}
+
 export function InsightsView({ days }: { days: 7 | 30 | 90 }) {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -111,24 +160,22 @@ export function InsightsView({ days }: { days: 7 | 30 | 90 }) {
   if (error || !data) return <InsightsError onRetry={() => mutate()} />;
 
   return (
-    <div className="relative isolate min-h-[100dvh] overflow-x-hidden bg-[#f3f6f1] pb-10 dark:bg-[#0d1711] md:pb-14">
-      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[34rem] overflow-hidden" aria-hidden="true">
-        <div className="absolute -left-24 -top-28 h-80 w-80 rounded-full bg-emerald-300/20 blur-3xl dark:bg-emerald-500/10" />
-        <div className="absolute -right-28 top-16 h-96 w-96 rounded-full bg-sky-200/25 blur-3xl dark:bg-sky-500/[0.07]" />
-      </div>
-      <div className="mx-auto w-full max-w-6xl px-4 pt-[calc(env(safe-area-inset-top)+0.75rem)] md:px-8 md:pt-8">
-        <header className="relative overflow-hidden rounded-[28px] border border-white/50 bg-white/[0.88] px-5 pb-5 pt-4 shadow-[0_18px_60px_rgba(25,61,35,0.14)] backdrop-blur-xl dark:border-white/10 dark:bg-[#13201a]/[0.92] md:flex md:items-center md:justify-between md:gap-8 md:px-8 md:py-7">
-          <div className="pointer-events-none absolute -right-12 -top-16 h-44 w-44 rounded-full bg-emerald-300/20 blur-2xl" aria-hidden="true" />
+    <div className="relative isolate min-h-[100dvh] overflow-x-hidden bg-background pb-10 md:pb-14">
+      {/* The desktop site header is absolutely positioned at the top of the
+          scroll container, so every page owes it h-16 of clearance. */}
+      <div aria-hidden="true" className="hidden h-16 md:block" />
+      <div className="mx-auto w-full max-w-6xl px-4 pt-[calc(env(safe-area-inset-top)+0.75rem)] md:px-8 md:pt-6">
+        <header className="relative rounded-[24px] bg-card px-5 pb-5 pt-4 ring-1 ring-border md:flex md:items-center md:justify-between md:gap-8 md:px-8 md:py-7">
           <div className="relative flex min-w-0 flex-1 items-start gap-3">
             <Link
               href="/"
               aria-label="Back to Today"
-              className="mt-0.5 grid h-10 w-10 shrink-0 place-items-center rounded-full bg-emerald-950/5 text-foreground transition-[background-color,transform] hover:bg-emerald-950/10 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:bg-white/10 dark:hover:bg-white/15"
+              className="mt-0.5 grid h-10 w-10 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-muted hover:text-foreground active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
               <ArrowLeft className="h-5 w-5" aria-hidden="true" />
             </Link>
             <div className="min-w-0 flex-1">
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#4f9149] dark:text-emerald-400">Your Patterns</p>
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-primary">Your Patterns</p>
               <h1 className="mt-0.5 text-balance text-2xl font-black tracking-[-0.035em] text-foreground md:text-4xl">
                 See what’s working
               </h1>
@@ -137,7 +184,7 @@ export function InsightsView({ days }: { days: 7 | 30 | 90 }) {
               </p>
             </div>
           </div>
-          <nav className="relative mt-5 grid grid-cols-3 rounded-2xl bg-emerald-950/[0.055] p-1 dark:bg-white/[0.06] md:ml-auto md:mt-0 md:w-72" aria-label="Insights time range">
+          <nav className="relative mt-5 grid grid-cols-3 rounded-2xl bg-muted p-1 md:ml-auto md:mt-0 md:w-72" aria-label="Insights time range">
             {([7, 30, 90] as const).map((range) => (
               <Link
                 key={range}
@@ -146,7 +193,7 @@ export function InsightsView({ days }: { days: 7 | 30 | 90 }) {
                 className={cn(
                   'rounded-xl px-3 py-2 text-center text-xs font-black transition-[background-color,color,box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
                   days === range
-                    ? 'bg-card text-foreground shadow-sm ring-1 ring-black/5 dark:ring-white/10'
+                    ? 'bg-card text-foreground shadow-sm ring-1 ring-border'
                     : 'text-muted-foreground hover:text-foreground',
                 )}
               >
@@ -161,6 +208,7 @@ export function InsightsView({ days }: { days: 7 | 30 | 90 }) {
         ) : (
           <div className="mt-5 space-y-5 md:mt-7 md:space-y-7">
             <SummaryHero data={data} />
+            <WeeklyCoachCard facts={weeklyFacts(data)} />
             <div className="grid gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(300px,0.65fr)]">
               <ProgressChart data={data} days={days} />
               <MetricStack data={data} />
@@ -184,7 +232,7 @@ function SummaryHero({ data }: { data: InsightData }) {
   const rate = data.summary.completionRate;
   const rangeLabel = data.range.days === 7 ? 'this week' : `in the last ${data.range.days} days`;
   return (
-    <section className="relative overflow-hidden rounded-[28px] bg-[#163f2c] px-5 py-6 text-white shadow-[0_16px_40px_rgba(18,65,42,0.22)] md:px-8 md:py-8" aria-labelledby="summary-heading">
+    <section className="relative overflow-hidden rounded-[24px] bg-[#4f9149] px-5 py-6 text-white md:px-8 md:py-8" aria-labelledby="summary-heading">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_85%_10%,rgba(134,239,172,0.24),transparent_35%),linear-gradient(135deg,transparent,rgba(255,255,255,0.04))]" aria-hidden="true" />
       <div className="relative grid items-center gap-6 md:grid-cols-[1fr_auto]">
         <div>
@@ -208,7 +256,7 @@ function SummaryHero({ data }: { data: InsightData }) {
           className="relative mx-auto grid h-36 w-36 shrink-0 place-items-center rounded-full md:h-40 md:w-40"
           style={{ background: `conic-gradient(#86efac ${rate * 3.6}deg, rgba(255,255,255,0.13) 0deg)` }}
         >
-          <div className="grid h-[116px] w-[116px] place-items-center rounded-full bg-[#163f2c] text-center md:h-[132px] md:w-[132px]">
+          <div className="grid h-[116px] w-[116px] place-items-center rounded-full bg-[#4f9149] text-center md:h-[132px] md:w-[132px]">
             <div>
               <span className="block text-4xl font-black tabular-nums tracking-[-0.05em]">{rate}%</span>
               <span className="mt-0.5 block text-[10px] font-black uppercase tracking-[0.16em] text-emerald-100/70">Completed</span>
@@ -272,7 +320,7 @@ function MetricCard({
     amber: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
   }[tone];
   return (
-    <div className="min-w-0 rounded-2xl border border-border/[0.55] bg-card/[0.92] p-3 shadow-sm backdrop-blur-md md:p-4 lg:flex lg:items-center lg:gap-4">
+    <div className="min-w-0 rounded-[20px] bg-card p-3 ring-1 ring-border md:p-4 lg:flex lg:items-center lg:gap-4">
       <div className={cn('grid h-9 w-9 place-items-center rounded-xl lg:h-11 lg:w-11', toneClass)}>{icon}</div>
       <div className="mt-2 min-w-0 lg:mt-0">
         <p className="text-xl font-black tabular-nums tracking-[-0.04em] text-foreground md:text-2xl">{value}</p>
@@ -287,7 +335,7 @@ function ProgressChart({ data, days }: { data: InsightData; days: 7 | 30 | 90 })
   const maxPlanned = Math.max(1, ...data.timeline.map((point) => point.planned));
   const label = days === 7 ? 'Daily follow-through' : 'Weekly follow-through';
   return (
-    <section className="rounded-[24px] border border-border/[0.55] bg-card/[0.92] p-5 shadow-sm backdrop-blur-md md:p-6" aria-labelledby="progress-heading">
+    <section className="rounded-[24px] bg-card p-5 ring-1 ring-border md:p-6" aria-labelledby="progress-heading">
       <SectionHeading
         icon={<BarChart3 className="h-5 w-5" aria-hidden="true" />}
         eyebrow={days === 7 ? 'This Week' : days === 30 ? 'Last 30 Days' : 'Last 3 Months'}
@@ -309,7 +357,7 @@ function ProgressChart({ data, days }: { data: InsightData; days: 7 | 30 | 90 })
             <div key={point.from} className="flex min-w-0 flex-1 flex-col items-center justify-end self-stretch" title={`${fullLabel}: ${point.completed} of ${point.planned} completed`}>
               <span className="mb-1 text-[10px] font-black tabular-nums text-muted-foreground">{point.completed || ''}</span>
               <div className="relative w-full max-w-9 overflow-hidden rounded-t-lg bg-muted" style={{ height: plannedHeight }}>
-                <div className="absolute inset-x-0 bottom-0 rounded-t-lg bg-gradient-to-t from-[#3f7f46] to-[#70b567]" style={{ height: completedHeight }} />
+                <div className="absolute inset-x-0 bottom-0 rounded-t-lg bg-gradient-to-t from-[#4f9149] to-[#7cc06f]" style={{ height: completedHeight }} />
               </div>
               <span className="mt-2 max-w-full truncate text-[9px] font-black text-muted-foreground md:text-[10px]">{dateLabel}</span>
             </div>
@@ -326,7 +374,7 @@ function SignalsSection({ signals, patternDays }: { signals: InsightData['signal
     <section aria-labelledby="signals-heading">
       <div className="flex items-end justify-between gap-4 px-1">
         <div>
-          <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#4f9149] dark:text-emerald-400">Plain-English Insights</p>
+          <p className="text-[11px] font-black uppercase tracking-[0.16em] text-primary">Plain-English Insights</p>
           <h2 id="signals-heading" className="mt-0.5 text-xl font-black tracking-[-0.025em] text-foreground md:text-2xl">Things worth knowing</h2>
         </div>
         <p className="hidden text-xs font-semibold text-muted-foreground sm:block">Last {patternDays} days</p>
@@ -356,7 +404,7 @@ function SignalsSection({ signals, patternDays }: { signals: InsightData['signal
 
 function WeekdayRhythm({ data }: { data: InsightData }) {
   return (
-    <section className="rounded-[24px] border border-border/[0.55] bg-card/[0.92] p-5 shadow-sm md:p-6" aria-labelledby="rhythm-heading">
+    <section className="rounded-[24px] bg-card p-5 ring-1 ring-border md:p-6" aria-labelledby="rhythm-heading">
       <SectionHeading
         icon={<CalendarDays className="h-5 w-5" aria-hidden="true" />}
         eyebrow={`Last ${data.patternDays} Days`}
@@ -383,7 +431,7 @@ function WeekdayRhythm({ data }: { data: InsightData }) {
 
 function HabitSection({ habits, patternDays }: { habits: InsightData['habits']; patternDays: number }) {
   return (
-    <section className="rounded-[24px] border border-border/[0.55] bg-card/[0.92] p-5 shadow-sm md:p-6" aria-labelledby="habits-heading">
+    <section className="rounded-[24px] bg-card p-5 ring-1 ring-border md:p-6" aria-labelledby="habits-heading">
       <SectionHeading
         icon={<Leaf className="h-5 w-5" aria-hidden="true" />}
         eyebrow={`Last ${patternDays} Days`}
@@ -439,7 +487,7 @@ function HabitSection({ habits, patternDays }: { habits: InsightData['habits']; 
 
 function TagSection({ tags, patternDays }: { tags: InsightData['tags']; patternDays: number }) {
   return (
-    <section className="rounded-[24px] border border-border/[0.55] bg-card/[0.92] p-5 shadow-sm md:p-6" aria-labelledby="areas-heading">
+    <section className="rounded-[24px] bg-card p-5 ring-1 ring-border md:p-6" aria-labelledby="areas-heading">
       <SectionHeading
         icon={<Target className="h-5 w-5" aria-hidden="true" />}
         eyebrow={`Last ${patternDays} Days`}
@@ -470,17 +518,17 @@ function TagSection({ tags, patternDays }: { tags: InsightData['tags']; patternD
 function NextStepCard({ nextStep }: { nextStep: InsightData['nextStep'] }) {
   return (
     <section className="relative overflow-hidden rounded-[26px] border border-emerald-200 bg-[linear-gradient(120deg,#effdf1,#e6f8e8)] p-5 shadow-sm dark:border-emerald-400/20 dark:bg-[linear-gradient(120deg,rgba(34,197,94,0.13),rgba(16,185,129,0.06))] md:flex md:items-center md:gap-6 md:p-7" aria-labelledby="next-step-heading">
-      <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#4f9149] text-white shadow-[0_6px_18px_rgba(79,145,73,0.28)]">
+      <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#4f9149] text-white">
         <Lightbulb className="h-6 w-6" aria-hidden="true" />
       </div>
       <div className="mt-4 min-w-0 flex-1 md:mt-0">
-        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#4f9149] dark:text-emerald-400">Your Next Small Win</p>
+        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-primary">Your Next Small Win</p>
         <h2 id="next-step-heading" className="mt-1 text-balance text-xl font-black tracking-[-0.025em] text-foreground">{nextStep.title}</h2>
         <p className="mt-1 max-w-2xl text-pretty text-sm font-medium leading-relaxed text-muted-foreground">{nextStep.body}</p>
       </div>
       <Link
         href={nextStep.href}
-        className="mt-5 inline-flex h-11 w-full shrink-0 items-center justify-center gap-2 rounded-2xl bg-[#3f7f46] px-5 text-sm font-black text-white shadow-[0_4px_0_#2f6135] transition-[transform,box-shadow,background-color] hover:bg-[#397540] active:translate-y-1 active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 md:mt-0 md:w-auto"
+        className="mt-5 inline-flex h-11 w-full shrink-0 items-center justify-center gap-2 rounded-2xl bg-[#4f9149] px-5 text-sm font-black text-white shadow-[0_4px_0_0_#34631f] transition-[transform,box-shadow,background-color] hover:bg-[#478442] active:translate-y-1 active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 md:mt-0 md:w-auto"
       >
         {nextStep.action}
         <ArrowRight className="h-4 w-4" aria-hidden="true" />
@@ -492,7 +540,7 @@ function NextStepCard({ nextStep }: { nextStep: InsightData['nextStep'] }) {
 function DailyHistory({ daily }: { daily: DailyPoint[] }) {
   const recent = [...daily].reverse().slice(0, 14);
   return (
-    <details className="group rounded-[24px] border border-border/[0.55] bg-card/[0.92] shadow-sm">
+    <details className="group rounded-[24px] bg-card ring-1 ring-border">
       <summary className="flex cursor-pointer list-none items-center gap-3 rounded-[24px] px-5 py-4 transition-colors hover:bg-muted/[0.35] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary [&::-webkit-details-marker]:hidden">
         <div className="grid h-9 w-9 place-items-center rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-400">
           <Clock3 className="h-5 w-5" aria-hidden="true" />
@@ -529,9 +577,9 @@ function DailyHistory({ daily }: { daily: DailyPoint[] }) {
 function SectionHeading({ icon, eyebrow, title, description, id }: { icon: React.ReactNode; eyebrow: string; title: string; description: string; id: string }) {
   return (
     <div className="flex items-start gap-3">
-      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[#4f9149]/10 text-[#4f9149] dark:text-emerald-400">{icon}</div>
+      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[#4f9149]/10 text-primary">{icon}</div>
       <div className="min-w-0">
-        <p className="text-[10px] font-black uppercase tracking-[0.15em] text-[#4f9149] dark:text-emerald-400">{eyebrow}</p>
+        <p className="text-[10px] font-black uppercase tracking-[0.15em] text-primary">{eyebrow}</p>
         <h2 id={id} className="mt-0.5 text-lg font-black tracking-[-0.025em] text-foreground">{title}</h2>
         <p className="mt-0.5 text-pretty text-xs font-medium leading-relaxed text-muted-foreground">{description}</p>
       </div>
@@ -541,7 +589,7 @@ function SectionHeading({ icon, eyebrow, title, description, id }: { icon: React
 
 function EmptyInsights() {
   return (
-    <section className="mt-5 rounded-[28px] border border-border/[0.55] bg-card/[0.94] px-6 py-12 text-center shadow-sm md:mt-7 md:py-16">
+    <section className="mt-5 rounded-[24px] bg-card px-6 py-12 text-center ring-1 ring-border md:mt-7 md:py-16">
       <div className="relative mx-auto grid h-20 w-20 place-items-center rounded-[26px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
         <Leaf className="h-9 w-9" aria-hidden="true" />
         <Sparkles className="absolute -right-2 -top-2 h-6 w-6 text-amber-400" aria-hidden="true" />
@@ -550,7 +598,7 @@ function EmptyInsights() {
       <p className="mx-auto mt-2 max-w-md text-pretty text-sm font-medium leading-relaxed text-muted-foreground">
         Add a few tasks and check them off as you go. This page will turn that history into gentle, useful patterns.
       </p>
-      <Link href="/" className="mt-6 inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-[#3f7f46] px-5 text-sm font-black text-white shadow-[0_4px_0_#2f6135] transition-[transform,box-shadow,background-color] hover:bg-[#397540] active:translate-y-1 active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">
+      <Link href="/" className="mt-6 inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-[#4f9149] px-5 text-sm font-black text-white shadow-[0_4px_0_0_#34631f] transition-[transform,box-shadow,background-color] hover:bg-[#478442] active:translate-y-1 active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">
         Plan My First Win
         <ArrowRight className="h-4 w-4" aria-hidden="true" />
       </Link>
@@ -560,13 +608,14 @@ function EmptyInsights() {
 
 function InsightsSkeleton() {
   return (
-    <div className="min-h-[100dvh] bg-[#f3f6f1] dark:bg-[#0d1711]">
-      <div className="mx-auto w-full max-w-6xl px-4 pt-[calc(env(safe-area-inset-top)+0.75rem)] md:px-8 md:pt-8" aria-label="Loading your patterns">
-        <div className="h-44 rounded-[28px] bg-card/80 shadow-sm motion-safe:animate-pulse" />
-        <div className="mt-5 h-64 rounded-[28px] bg-emerald-950/20 motion-safe:animate-pulse" />
+    <div className="min-h-[100dvh] bg-background">
+      <div aria-hidden="true" className="hidden h-16 md:block" />
+      <div className="mx-auto w-full max-w-6xl px-4 pt-[calc(env(safe-area-inset-top)+0.75rem)] md:px-8 md:pt-6" aria-label="Loading your patterns">
+        <div className="h-44 rounded-[24px] bg-card ring-1 ring-border motion-safe:animate-pulse" />
+        <div className="mt-5 h-64 rounded-[24px] bg-muted motion-safe:animate-pulse" />
         <div className="mt-5 grid gap-5 md:grid-cols-2">
-          <div className="h-72 rounded-[24px] bg-card/80 motion-safe:animate-pulse" />
-          <div className="h-72 rounded-[24px] bg-card/80 motion-safe:animate-pulse" />
+          <div className="h-72 rounded-[24px] bg-card ring-1 ring-border motion-safe:animate-pulse" />
+          <div className="h-72 rounded-[24px] bg-card ring-1 ring-border motion-safe:animate-pulse" />
         </div>
         <p className="sr-only" aria-live="polite">Loading your patterns…</p>
       </div>
@@ -576,7 +625,7 @@ function InsightsSkeleton() {
 
 function InsightsError({ onRetry }: { onRetry: () => void }) {
   return (
-    <div className="mx-auto grid min-h-[100dvh] max-w-none place-items-center bg-[#f3f6f1] px-5 text-center dark:bg-[#0d1711]">
+    <div className="mx-auto grid min-h-[100dvh] max-w-none place-items-center bg-background px-5 text-center">
       <div>
         <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
           <CircleAlert className="h-7 w-7" aria-hidden="true" />
