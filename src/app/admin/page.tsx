@@ -26,6 +26,7 @@ import {
   RefreshCcw,
   UserPlus,
   BarChart3,
+  MessageSquare,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -293,6 +294,13 @@ function AdminPageContent() {
               accent="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
               title="Quest Manager"
               description="Macro-categories, tag mappings, daily and category quests."
+            />
+            <ManagerLinkCard
+              href="/admin/popups"
+              icon={<MessageSquare className="w-5 h-5" />}
+              accent="bg-amber-500/10 text-amber-600 dark:text-amber-400"
+              title="Popups & Offers"
+              description="Design popups, pick when they fire, and see who they reached."
             />
             <ManagerLinkCard
               href="/admin/invites"

@@ -31,7 +31,9 @@ interface UIState {
   /** Flies the user is short by, when the shop is opened from a blocked
    *  purchase — lets the shop point at the pack that actually covers it. */
   flyShopNeed: number | null;
-  openFlyShop: (need?: number) => void;
+  /** Pack a campaign wants highlighted when the shop opens. */
+  flyShopFocusPackId: string | null;
+  openFlyShop: (need?: number, focusPackId?: string) => void;
   closeFlyShop: () => void;
   setFlyShopOpen: (open: boolean) => void;
 
@@ -83,11 +85,21 @@ export const useUIStore = create<UIState>()(
 
       isFlyShopOpen: false,
       flyShopNeed: null,
-      openFlyShop: (need?: number) =>
-        set({ isFlyShopOpen: true, flyShopNeed: need && need > 0 ? need : null }),
-      closeFlyShop: () => set({ isFlyShopOpen: false, flyShopNeed: null }),
+      flyShopFocusPackId: null,
+      openFlyShop: (need?: number, focusPackId?: string) =>
+        set({
+          isFlyShopOpen: true,
+          flyShopNeed: need && need > 0 ? need : null,
+          flyShopFocusPackId: focusPackId ?? null,
+        }),
+      closeFlyShop: () =>
+        set({ isFlyShopOpen: false, flyShopNeed: null, flyShopFocusPackId: null }),
       setFlyShopOpen: (open: boolean) =>
-        set(open ? { isFlyShopOpen: true } : { isFlyShopOpen: false, flyShopNeed: null }),
+        set(
+          open
+            ? { isFlyShopOpen: true }
+            : { isFlyShopOpen: false, flyShopNeed: null, flyShopFocusPackId: null },
+        ),
 
       isWardrobeStuck: false,
       setWardrobeStuck: (stuck: boolean) => set({ isWardrobeStuck: stuck }),
