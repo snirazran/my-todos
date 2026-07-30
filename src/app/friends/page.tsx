@@ -196,7 +196,7 @@ export default function FriendsPage() {
             aria-label="Friend invites"
             className={cn(
               HEADER_CONTROL_ICON_BUTTON,
-              'relative touch-manipulation text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
+              'relative touch-manipulation text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
             )}
           >
             <Bell className="h-6 w-6" />
@@ -885,7 +885,8 @@ type RewardItem = {
   icon?: string;
 };
 type RewardTier = { tier: number; label: string; item?: RewardItem | null };
-type InviteConfig = { rewards: RewardTier[] };
+type GiftOption = { id: string; item?: RewardItem | null };
+type InviteConfig = { rewards: RewardTier[]; giftOptions?: GiftOption[] };
 type InviteStatus = { claimedCount: number; pendingCount: number };
 
 function rewardItemToIndices(
@@ -914,12 +915,30 @@ function InviteRewardBanner({
 
   const rewards = config?.rewards ?? [];
   const claimed = status?.claimedCount ?? 0;
-  const pending = status?.pendingCount ?? 0;
   const nextReward = rewards.find((r) => r.tier > claimed) ?? null;
   const previewReward = nextReward ?? rewards[rewards.length - 1] ?? null;
-  const item = previewReward?.item ?? null;
-  const isOutfit = !!item && item.slot !== 'container';
   const completedAllRewards = rewards.length > 0 && !nextReward;
+
+  // Nothing left to earn, so the card stops advertising a reward and starts
+  // advertising the gift — a different sendable outfit each visit.
+  const giftItems = React.useMemo(
+    () =>
+      (config?.giftOptions ?? [])
+        .map((g) => g.item)
+        .filter((i): i is RewardItem => !!i && i.slot !== 'container'),
+    [config?.giftOptions],
+  );
+  const randomGift = React.useMemo(
+    () =>
+      giftItems.length
+        ? giftItems[Math.floor(Math.random() * giftItems.length)]
+        : null,
+    [giftItems],
+  );
+
+  const item =
+    (completedAllRewards ? randomGift : null) ?? previewReward?.item ?? null;
+  const isOutfit = !!item && item.slot !== 'container';
   const target =
     nextReward?.tier ?? previewReward?.tier ?? Math.max(1, claimed);
   const needed = Math.max(0, target - claimed);
@@ -950,36 +969,34 @@ function InviteRewardBanner({
       </span>
       <div className="min-w-0 flex-1">
         <p className="text-[9px] font-black uppercase tracking-[0.1em] text-[#4f9149] min-[360px]:text-[11px] min-[360px]:tracking-[0.14em]">
-          Friend rewards
+          {completedAllRewards ? 'Gift a friend' : 'Friend rewards'}
         </p>
         <p className="text-xs font-black leading-tight tracking-tight text-foreground min-[360px]:text-sm sm:text-base">
           {nextReward
             ? `${needed} more ${needed === 1 ? 'friend' : 'friends'} unlocks ${item?.name ?? 'your next reward'}`
-            : 'All rewards unlocked · keep the pond growing'}
+            : 'Invite a friend and gift them a free outfit'}
         </p>
-        <div className="mt-2 flex items-center gap-2">
-          <span
-            role="progressbar"
-            aria-label="Invite reward progress"
-            aria-valuemin={0}
-            aria-valuemax={target}
-            aria-valuenow={Math.min(claimed, target)}
-            className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-[#4f9149]/15"
-          >
+        {/* A rail that can never move again is dead weight — once every tier
+            is earned the card drops it and leads with the gift instead. */}
+        {!completedAllRewards && (
+          <div className="mt-2 flex items-center gap-2">
             <span
-              className="block h-full w-full origin-left rounded-full bg-[#4f9149] transition-transform duration-300"
-              style={{ transform: `scaleX(${progress / 100})` }}
-            />
-          </span>
-          <span className="shrink-0 text-[10px] font-black tabular-nums text-muted-foreground">
-            {completedAllRewards ? `${claimed} joined` : `${claimed}/${target} joined`}
-          </span>
-        </div>
-        {pending > 0 && (
-          <p className="mt-1 text-[10px] font-bold text-amber-600 dark:text-amber-400">
-            {pending} {pending === 1 ? 'gift' : 'gifts'} sent · waiting to be
-            opened
-          </p>
+              role="progressbar"
+              aria-label="Invite reward progress"
+              aria-valuemin={0}
+              aria-valuemax={target}
+              aria-valuenow={Math.min(claimed, target)}
+              className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-[#4f9149]/15"
+            >
+              <span
+                className="block h-full w-full origin-left rounded-full bg-[#4f9149] transition-transform duration-300"
+                style={{ transform: `scaleX(${progress / 100})` }}
+              />
+            </span>
+            <span className="shrink-0 text-[10px] font-black tabular-nums text-muted-foreground">
+              {claimed}/{target} joined
+            </span>
+          </div>
         )}
       </div>
       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#4f9149] text-white shadow-sm transition-transform group-hover:translate-x-0.5 min-[360px]:h-9 min-[360px]:w-9">
