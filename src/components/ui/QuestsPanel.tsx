@@ -1353,7 +1353,9 @@ export function QuestsPanel({
                           // rows (their progress bars carry real info).
                           const benchGrid =
                             !data.isPremium && benchQuests.length > 4;
-                          const benchItems = benchQuests.map((quest) => {
+                          const renderBenchItems = (
+                            rowVariant: 'row' | 'tile',
+                          ) => benchQuests.map((quest) => {
                             const linkedTags = (
                               categoryTagMap.get(quest.categoryId) ?? []
                             )
@@ -1413,6 +1415,7 @@ export function QuestsPanel({
                                     rewardCatalog={data.rewardCatalog}
                                     isPremium={data.isPremium}
                                     onPress={handlePress}
+                                    variant={rowVariant}
                                     rentedUntil={
                                       data.rentedFocus?.categoryId ===
                                       quest.categoryId
@@ -1425,7 +1428,7 @@ export function QuestsPanel({
                               </div>
                             );
                           });
-                          const areaRows = benchItems.length > 0 && (
+                          const areaRows = benchQuests.length > 0 && (
                             <div
                               className={cn(
                                 'mt-0.5',
@@ -1434,10 +1437,10 @@ export function QuestsPanel({
                                   : 'flex flex-col gap-2.5',
                               )}
                             >
-                              {benchItems}
+                              {renderBenchItems('row')}
                             </div>
                           );
-                          const areaShelf = benchItems.length > 0 && (
+                          const areaShelf = benchQuests.length > 0 && (
                             <div className="flex flex-col gap-2">
                               <p className="px-1 text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
                                 More areas
@@ -1450,7 +1453,7 @@ export function QuestsPanel({
                                     : 'grid-cols-2 xl:grid-cols-3',
                                 )}
                               >
-                                {benchItems}
+                                {renderBenchItems('tile')}
                               </div>
                             </div>
                           );

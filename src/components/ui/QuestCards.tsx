@@ -2026,6 +2026,7 @@ export function AreaRow({
   isPremium,
   onPress,
   rentedUntil,
+  variant = 'row',
 }: {
   quest: QuestCardData & {
     placement: 'category';
@@ -2039,6 +2040,8 @@ export function AreaRow({
   isPremium: boolean;
   onPress?: () => void;
   rentedUntil?: string | null;
+  /** Art-forward card for the desktop "More areas" shelf. */
+  variant?: 'row' | 'tile';
 }) {
   const rentedTimeLeft = useCountdownLabel(rentedUntil ?? undefined);
   const atLeast380 = useMediaQuery('(min-width: 380px)');
@@ -2080,6 +2083,192 @@ export function AreaRow({
     state === 'running' && !finished
       ? resetCountdownLabel(priority.hoursUntilReset)
       : null;
+
+  const nextLine = nextBlock ? (
+    <p className="flex items-center gap-1.5 text-[11px] font-bold text-muted-foreground">
+      <span className="min-w-0 flex-1 truncate">
+        Next: {shortObjectiveLabel(nextBlock)} ·{' '}
+        <span className="tabular-nums">
+          {Math.min(nextBlock.progress, Math.max(1, nextBlock.target))}/
+          {nextBlock.targetLabel ?? nextBlock.target}
+        </span>
+      </span>
+      {nextBlock.rewards?.[0] ? (
+        nextBlock.rewards[0].type === 'FLIES' ? (
+          <FlyWorth
+            amount={Math.max(
+              0,
+              nextBlock.rewards[0].amount ??
+                nextBlock.rewards[0].maxAmount ??
+                nextBlock.rewards[0].minAmount ??
+                0,
+            )}
+            flySize={20}
+          />
+        ) : (
+          <BareRewardIcon
+            reward={nextBlock.rewards[0]}
+            rewardCatalog={rewardCatalog}
+            isPremium={isPremium}
+          />
+        )
+      ) : null}
+    </p>
+  ) : null;
+
+  if (variant === 'tile') {
+    const running = state === 'running' && !finished;
+    return (
+      <button
+        type="button"
+        onClick={onPress}
+        className={cn(
+          'flex h-full w-full flex-col overflow-hidden rounded-[20px] border bg-card text-left shadow-sm transition active:scale-[0.98] [@media(hover:hover)]:hover:shadow-md',
+          quest.claimable && !finished
+            ? 'border-amber-400 ring-1 ring-amber-400/40'
+            : 'border-border/50',
+          finished && 'opacity-70',
+        )}
+      >
+        <div className="relative h-[112px] w-full shrink-0 overflow-hidden">
+          {imageUrl ? (
+            <img
+              src={imageUrl}
+              alt={category?.name ?? quest.title}
+              loading="lazy"
+              decoding="async"
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <div
+              className="h-full w-full"
+              style={{
+                background: `linear-gradient(135deg, ${category?.backgroundFrom ?? '#0f172a'}, ${category?.backgroundTo ?? '#1e293b'})`,
+              }}
+            />
+          )}
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-12 bg-gradient-to-b from-black/45 to-transparent" />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/70 via-black/25 to-transparent" />
+          {finished && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/45">
+              <Check className="h-7 w-7 text-emerald-300" strokeWidth={3.5} />
+            </div>
+          )}
+          <div className="absolute inset-x-2.5 top-2 flex items-start justify-between gap-2">
+            {quiet ? (
+              <span
+                title={`No progress for ${priority.staleDays} days`}
+                className="inline-flex shrink-0 items-center gap-1 rounded-full bg-black/45 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-amber-300 backdrop-blur-[2px]"
+              >
+                <Moon className="h-2.5 w-2.5" strokeWidth={3} />
+                {priority.staleDays}d
+              </span>
+            ) : (
+              <span />
+            )}
+            {quest.claimable && !finished ? (
+              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-400 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-slate-900 shadow-[0_2px_0_rgba(15,23,42,0.25)]">
+                <Gift className="h-3 w-3" strokeWidth={3} />
+                Ready
+              </span>
+            ) : rentedTimeLeft && !finished ? (
+              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-black/45 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-white backdrop-blur-[2px]">
+                <Clock className="h-2.5 w-2.5" strokeWidth={3} />
+                {rentedTimeLeft}
+              </span>
+            ) : resetLabel ? (
+              <span
+                className={cn(
+                  'inline-flex shrink-0 items-center gap-1 rounded-full bg-black/45 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide backdrop-blur-[2px]',
+                  priority.hoursUntilReset !== null &&
+                    priority.hoursUntilReset < 6
+                    ? 'text-amber-300'
+                    : 'text-white',
+                )}
+              >
+                <Clock className="h-2.5 w-2.5" strokeWidth={3} />
+                {resetLabel}
+              </span>
+            ) : null}
+          </div>
+          <span
+            className="absolute inset-x-3 bottom-2 truncate text-[16px] uppercase leading-none tracking-wide text-white"
+            style={{
+              fontFamily: 'var(--font-display), "Luckiest Guy", cursive',
+              WebkitTextStroke: '1.4px rgba(15, 23, 42, 0.95)',
+              paintOrder: 'stroke fill',
+            }}
+          >
+            {category?.name ?? quest.title}
+          </span>
+        </div>
+
+        <div className="flex flex-1 flex-col gap-1.5 px-3 py-2.5">
+          {running ? (
+            <>
+              {linkedTags.length > 0 ? (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {linkedTags.slice(0, 2).map((tag) => (
+                    <QuestTagPill key={tag.id} tag={tag} compact />
+                  ))}
+                </div>
+              ) : null}
+              <div className="flex items-center gap-2">
+                <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className={cn(
+                      'absolute inset-y-[1.5px] left-[1.5px] rounded-full',
+                      quest.claimable ? 'bg-lime-500' : 'bg-amber-400',
+                    )}
+                    style={{ width: `${Math.max(pct, 4)}%` }}
+                  />
+                </div>
+                <span className="shrink-0 text-[10px] font-bold tabular-nums text-muted-foreground">
+                  {pct}%
+                </span>
+              </div>
+              {nextLine}
+            </>
+          ) : finished ? (
+            <p className="text-[11px] font-bold text-muted-foreground">
+              Done — refreshes soon
+            </p>
+          ) : (
+            <>
+              {loot.flies > 0 || lootTiles.length > 0 ? (
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground/80">
+                    worth
+                  </span>
+                  {loot.flies > 0 && (
+                    <FlyWorth amount={loot.flies} flySize={20} />
+                  )}
+                  {lootTiles.map((reward, index) => (
+                    <BareRewardIcon
+                      key={`${reward.type}-${reward.itemId ?? reward.backgroundId ?? index}`}
+                      reward={reward}
+                      rewardCatalog={rewardCatalog}
+                      isPremium={isPremium}
+                      compact
+                    />
+                  ))}
+                  {lootExtra > 0 && (
+                    <span className="text-[10px] font-black text-muted-foreground">
+                      +{lootExtra}
+                    </span>
+                  )}
+                </span>
+              ) : null}
+              <span className="mt-auto inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-xl bg-amber-500 px-3 text-[13px] font-black text-white shadow-[0_3px_0_0_#b45309] transition-all active:translate-y-[2px] active:shadow-none">
+                <Play className="h-3.5 w-3.5 fill-current" />
+                Start
+              </span>
+            </>
+          )}
+        </div>
+      </button>
+    );
+  }
 
   return (
     <button
@@ -2174,40 +2363,7 @@ export function AreaRow({
                 {pct}%
               </span>
             </div>
-            {nextBlock ? (
-              <p className="mt-1 flex items-center gap-1.5 text-[11px] font-bold text-muted-foreground">
-                <span className="min-w-0 flex-1 truncate">
-                  Next: {shortObjectiveLabel(nextBlock)} ·{' '}
-                  <span className="tabular-nums">
-                    {Math.min(
-                      nextBlock.progress,
-                      Math.max(1, nextBlock.target),
-                    )}
-                    /{nextBlock.targetLabel ?? nextBlock.target}
-                  </span>
-                </span>
-                {nextBlock.rewards?.[0] ? (
-                  nextBlock.rewards[0].type === 'FLIES' ? (
-                    <FlyWorth
-                      amount={Math.max(
-                        0,
-                        nextBlock.rewards[0].amount ??
-                          nextBlock.rewards[0].maxAmount ??
-                          nextBlock.rewards[0].minAmount ??
-                          0,
-                      )}
-                      flySize={20}
-                    />
-                  ) : (
-                    <BareRewardIcon
-                      reward={nextBlock.rewards[0]}
-                      rewardCatalog={rewardCatalog}
-                      isPremium={isPremium}
-                    />
-                  )
-                ) : null}
-              </p>
-            ) : null}
+            {nextLine ? <div className="mt-1">{nextLine}</div> : null}
           </>
         ) : !finished && (loot.flies > 0 || lootTiles.length > 0) ? (
           <span className="mt-1 flex min-w-0 items-center gap-1.5">
