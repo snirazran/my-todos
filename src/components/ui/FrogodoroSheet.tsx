@@ -7,14 +7,13 @@ import {
   Play,
   Pause,
   SkipForward,
-  Settings2,
   X,
   Plus,
   Minus,
   Square,
   Check,
   ChevronRight,
-  Lock,
+  Repeat,
   Scroll,
 } from 'lucide-react';
 import { motion, AnimatePresence, useDragControls } from 'framer-motion';
@@ -37,7 +36,7 @@ import {
 } from '@/lib/timerSounds';
 import { useNotificationStatus } from '@/hooks/useNotificationStatus';
 import { hapticImpact, hapticTick } from '@/lib/haptics';
-import { Bell, Volume2, Zap } from 'lucide-react';
+import { Bell, Volume2, VolumeX, Zap } from 'lucide-react';
 import { useIntros } from '@/hooks/useIntros';
 import { FrogodoroIntroSheet } from '@/components/ui/FirstTimeIntros';
 import { FocusCelebration, questHomeKey } from '@/components/ui/FocusCelebration';
@@ -249,7 +248,7 @@ export default function FrogodoroSheet({
     }, 1200);
     return () => window.clearTimeout(t);
   }, []);
-  const [showSettings, setShowSettings] = useState(false);
+  const [showSounds, setShowSounds] = useState(false);
   const [showPond, setShowPond] = useState(false);
   const [confirmStop, setConfirmStop] = useState(false);
   const [confirmPause, setConfirmPause] = useState(false);
@@ -385,7 +384,6 @@ export default function FrogodoroSheet({
     return { matchedNames };
   }, [questHomeData?.trackables, task?.tags]);
 
-  const [localSettings, setLocalSettings] = useState(settings);
   const [previewingId, setPreviewingId] = useState<TimerSound | null>(null);
   const {
     canEnable: canEnableNotifs,
@@ -442,11 +440,6 @@ export default function FrogodoroSheet({
       document.removeEventListener('click', handler);
     };
   }, []);
-
-  // Sync local settings form
-  useEffect(() => {
-    setLocalSettings(settings);
-  }, [settings]);
 
   // When opened with a task, select it in the store. Binding a different task
   // resets the store's session, so while another task's timer is mid-session
@@ -538,7 +531,7 @@ export default function FrogodoroSheet({
     const wasOpen = prevOpenRef.current;
     prevOpenRef.current = open;
     if (wasOpen && !open) {
-      setShowSettings(false);
+      setShowSounds(false);
       setShowPond(false);
       setConfirmStop(false);
       setConfirmPause(false);
@@ -555,18 +548,18 @@ export default function FrogodoroSheet({
     }
   }, [open, awaitingDone, setAwaitingDone, stopTimer]);
 
-  // Stop any sound preview when leaving the settings view
+  // Stop any sound preview when the picker closes
   useEffect(() => {
-    if (!showSettings) {
+    if (!showSounds) {
       stopTimerSound();
       setPreviewingId(null);
     }
-  }, [showSettings]);
+  }, [showSounds]);
 
-  // Toggle a sound preview: select it and play it, or stop it if it's the
-  // one already previewing.
+  // Picking a sound applies it immediately (no Save) and previews it, or stops
+  // the preview if it's the one already playing.
   const handleSoundSelect = (id: TimerSound) => {
-    setLocalSettings((prev) => ({ ...prev, timerSound: id }));
+    setSettings({ ...useFrogodoroStore.getState().settings, timerSound: id });
     if (previewingId === id) {
       stopTimerSound();
       setPreviewingId(null);
@@ -728,6 +721,21 @@ export default function FrogodoroSheet({
     extendFocus(5 * 60);
   };
 
+  // Straight from the finished-focus screen into the break: acknowledging the
+  // alarm and starting the break is one tap, the same continuous session
+  // auto-start breaks would have produced.
+  const handleStartBreak = () => {
+    hapticImpact();
+    setAwaitingDone(false);
+    if (useFrogodoroStore.getState().phase !== 'break') switchPhase('break');
+    startTimer();
+  };
+
+  const toggleAutoStartBreaks = () => {
+    hapticTick();
+    setSettings({ ...settings, autoStartBreaks: !settings.autoStartBreaks });
+  };
+
   // Fast-forward: end the current phase now and switch to the other tab. No
   // Done/alarm — it's a deliberate skip. The next phase only auto-starts if the
   // matching auto-start setting is on (focus → break uses auto-start breaks).
@@ -789,12 +797,6 @@ export default function FrogodoroSheet({
     }
   };
 
-  const saveSettings = async () => {
-    setSettings(localSettings);
-    setShowSettings(false);
-    await persistTaskSettings(localSettings);
-  };
-
   const formatDurationSetting = (minutes: number) => {
     if (minutes < 1) return `${Math.round(minutes * 60)}s`;
     return `${minutes}m`;
@@ -833,7 +835,6 @@ export default function FrogodoroSheet({
     if (nextValue === currentValue) return;
 
     const nextSettings = { ...settings, [control.key]: nextValue };
-    setLocalSettings(nextSettings);
     setSettings(nextSettings);
     void persistTaskSettings(nextSettings);
   };
@@ -866,6 +867,8 @@ export default function FrogodoroSheet({
   const splitDone = awaitingDone && settings.autoStartBreaks;
   const focusSeconds = lastFocusElapsed;
   const breakSeconds = lastBreakElapsed;
+
+  const soundIsSilent = normalizeTimerSound(settings.timerSound) === 'none';
 
   const celebrateFocus = awaitingDone && displayPhase === 'focus' && !splitDone;
   const deepFocusBonusEarned =
@@ -1069,179 +1072,6 @@ export default function FrogodoroSheet({
                         Back to timer
                       </button>
                     </motion.div>
-                  ) : showSettings ? (
-                    <motion.div
-                      key="settings"
-                      initial={{ opacity: 0, x: 40 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: 40 }}
-                      transition={{ duration: 0.2 }}
-                      className="flex max-h-[calc(100dvh-2rem-env(safe-area-inset-bottom))] flex-col overflow-hidden"
-                    >
-                      <div className="flex shrink-0 items-center justify-between px-5 pb-4 pt-5">
-                        <h3 className="text-lg font-bold text-foreground">Settings</h3>
-                        <button
-                          onClick={() => setShowSettings(false)}
-                          className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-
-                      <div
-                        ref={overscroll.bind}
-                        className="no-scrollbar min-h-0 flex-1 space-y-7 overflow-y-auto overscroll-none px-5 pb-5"
-                      >
-                        {/* Durations — locked while a session is active, since
-                            you can't change a running/paused timer's length. */}
-                        <section className="space-y-2.5">
-                          <div className="flex items-baseline justify-between gap-2">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Durations</p>
-                            {timerActive && (
-                              <span className="flex items-center gap-1 text-[11px] font-medium text-amber-600 dark:text-amber-400">
-                                <Lock className="h-3 w-3" />
-                                Durations locked during a session
-                              </span>
-                            )}
-                          </div>
-                          <div className={`divide-y divide-border/60 rounded-2xl border border-border/60 ${timerActive ? 'opacity-50' : ''}`}>
-                            {/* Focus */}
-                            <div className="flex items-center justify-between px-4 py-3.5">
-                              <div className="flex items-center gap-2.5">
-                                <span className="h-2.5 w-2.5 rounded-full bg-primary" />
-                                <span className="text-sm font-medium text-foreground">Focus</span>
-                              </div>
-                              <div className="flex items-center gap-3">
-                                <button
-                                  type="button"
-                                  aria-label="Decrease focus"
-                                  disabled={timerActive}
-                                  onClick={() => setLocalSettings({ ...localSettings, focusDuration: decreaseDuration(localSettings.focusDuration) })}
-                                  className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-muted/70 active:scale-90 disabled:cursor-not-allowed disabled:hover:bg-muted disabled:active:scale-100"
-                                >
-                                  −
-                                </button>
-                                <span className="w-12 text-center text-sm font-semibold text-foreground tabular-nums">{formatDurationSetting(localSettings.focusDuration)}</span>
-                                <button
-                                  type="button"
-                                  aria-label="Increase focus"
-                                  disabled={timerActive}
-                                  onClick={() => setLocalSettings({ ...localSettings, focusDuration: increaseDuration(localSettings.focusDuration) })}
-                                  className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary transition-colors hover:bg-primary/15 active:scale-90 disabled:cursor-not-allowed disabled:hover:bg-primary/10 disabled:active:scale-100"
-                                >
-                                  +
-                                </button>
-                              </div>
-                            </div>
-                            {/* Break */}
-                            <div className="flex items-center justify-between px-4 py-3.5">
-                              <div className="flex items-center gap-2.5">
-                                <span className="h-2.5 w-2.5 rounded-full bg-sky-400" />
-                                <span className="text-sm font-medium text-foreground">Break</span>
-                              </div>
-                              <div className="flex items-center gap-3">
-                                <button
-                                  type="button"
-                                  aria-label="Decrease break"
-                                  disabled={timerActive}
-                                  onClick={() => setLocalSettings({ ...localSettings, breakDuration: decreaseDuration(localSettings.breakDuration) })}
-                                  className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-muted/70 active:scale-90 disabled:cursor-not-allowed disabled:hover:bg-muted disabled:active:scale-100"
-                                >
-                                  −
-                                </button>
-                                <span className="w-12 text-center text-sm font-semibold text-foreground tabular-nums">{formatDurationSetting(localSettings.breakDuration)}</span>
-                                <button
-                                  type="button"
-                                  aria-label="Increase break"
-                                  disabled={timerActive}
-                                  onClick={() => setLocalSettings({ ...localSettings, breakDuration: increaseDuration(localSettings.breakDuration) })}
-                                  className="flex h-7 w-7 items-center justify-center rounded-full bg-sky-500/10 text-sky-500 transition-colors hover:bg-sky-500/15 active:scale-90 disabled:cursor-not-allowed disabled:hover:bg-sky-500/10 disabled:active:scale-100"
-                                >
-                                  +
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        </section>
-
-                        {/* Behavior */}
-                        <section className="space-y-2.5">
-                          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Behavior</p>
-                          <div className="divide-y divide-border/60 rounded-2xl border border-border/60">
-                            <button
-                              type="button"
-                              onClick={() => setLocalSettings({ ...localSettings, autoStartBreaks: !localSettings.autoStartBreaks })}
-                              className="flex w-full items-center justify-between px-4 py-3.5 text-left transition-colors hover:bg-muted/30"
-                            >
-                              <div>
-                                <p className="text-sm font-medium text-foreground">Auto-start breaks</p>
-                                <p className="text-xs text-muted-foreground">Breaks begin automatically</p>
-                              </div>
-                              <span className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${localSettings.autoStartBreaks ? 'bg-primary' : 'bg-muted-foreground/25'}`}>
-                                <span className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${localSettings.autoStartBreaks ? 'translate-x-5' : 'translate-x-0'}`} />
-                              </span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setDeepFocus(!deepFocus)}
-                              className="flex w-full items-center justify-between px-4 py-3.5 text-left transition-colors hover:bg-muted/30"
-                            >
-                              <div>
-                                <p className="flex items-center gap-1 text-sm font-medium text-foreground">
-                                  <Zap className="h-3.5 w-3.5 fill-amber-500 text-amber-500" />
-                                  Deep focus
-                                </p>
-                                <p className="text-xs text-muted-foreground">Finish a 15m+ focus without pausing → +1 fly</p>
-                              </div>
-                              <span className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${deepFocus ? 'bg-primary' : 'bg-muted-foreground/25'}`}>
-                                <span className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${deepFocus ? 'translate-x-5' : 'translate-x-0'}`} />
-                              </span>
-                            </button>
-                          </div>
-                        </section>
-
-                        {/* Sound */}
-                        <section className="space-y-2.5">
-                          <div className="flex items-baseline justify-between">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Finish sound</p>
-                            <p className="text-xs text-muted-foreground/70">Tap to preview</p>
-                          </div>
-                          <div className="grid grid-cols-2 gap-2">
-                            {TIMER_SOUNDS.map(({ id, label }) => {
-                              const isSelected = normalizeTimerSound(localSettings.timerSound) === id;
-                              const isPreviewing = previewingId === id;
-                              return (
-                                <button
-                                  key={id}
-                                  type="button"
-                                  onClick={() => handleSoundSelect(id)}
-                                  className={`relative flex h-11 items-center justify-center gap-1.5 rounded-xl border px-3 text-sm font-medium transition-colors ${
-                                    isSelected
-                                      ? 'border-primary bg-primary/10 text-primary'
-                                      : 'border-border/60 text-muted-foreground hover:bg-muted/30'
-                                  }`}
-                                >
-                                  {isPreviewing && (
-                                    <Volume2 className="h-3.5 w-3.5 shrink-0 animate-pulse" />
-                                  )}
-                                  <span className="truncate">{label}</span>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </section>
-                      </div>
-
-                      <div className="shrink-0 border-t border-border/60 bg-popover/95 p-5 backdrop-blur-2xl">
-                        <button
-                          onClick={saveSettings}
-                          className="w-full rounded-2xl bg-primary py-3.5 text-base font-bold text-primary-foreground transition-colors hover:bg-primary/90 active:scale-[0.99]"
-                        >
-                          Save
-                        </button>
-                      </div>
-                    </motion.div>
-
                   ) : (
                     /* Main Timer View */
                     <motion.div
@@ -1335,20 +1165,82 @@ export default function FrogodoroSheet({
                             </div>
                           )}
 
-                        <div className="absolute top-3 right-3 z-10 flex items-center gap-2.5">
-                          {!awaitingDone && (
+                        <div className="absolute top-3 right-3 z-50 flex items-center gap-2.5">
+                          <div className="relative">
                             <button
                               onClick={() => {
                                 hapticTick();
-                                setShowSettings(true);
+                                setShowSounds((v) => !v);
                               }}
-                              aria-label="Settings"
-                              className="flex h-8 items-center gap-1.5 rounded-full bg-white/95 px-3 text-[12px] font-black uppercase tracking-wide text-emerald-900 shadow-[0_2px_0_rgba(0,0,0,0.18)] transition-all hover:bg-white active:translate-y-[1px] active:shadow-none"
+                              aria-label="Finish sound"
+                              aria-expanded={showSounds}
+                              className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors ${
+                                showSounds
+                                  ? 'bg-white text-emerald-900'
+                                  : 'bg-white/20 text-white hover:bg-white/30'
+                              }`}
                             >
-                              <Settings2 className="h-4 w-4" />
-                              <span className="hidden min-[360px]:inline">Settings</span>
+                              {soundIsSilent ? (
+                                <VolumeX className="h-4 w-4" />
+                              ) : (
+                                <Volume2 className="h-4 w-4" />
+                              )}
                             </button>
-                          )}
+
+                            {showSounds && (
+                              <div
+                                className="fixed inset-0 z-40"
+                                onClick={() => setShowSounds(false)}
+                              />
+                            )}
+                            <AnimatePresence>
+                              {showSounds && (
+                                  <motion.div
+                                    key="sounds"
+                                    initial={{ opacity: 0, y: -6, scale: 0.96 }}
+                                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                                    exit={{ opacity: 0, y: -6, scale: 0.96 }}
+                                    transition={{ duration: 0.16 }}
+                                    className="absolute right-0 top-full z-50 mt-2 w-[212px] origin-top-right overflow-hidden rounded-2xl bg-popover shadow-xl ring-1 ring-black/10"
+                                  >
+                                    <div className="flex items-baseline justify-between px-3.5 pb-1.5 pt-3">
+                                      <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+                                        Finish sound
+                                      </p>
+                                      <p className="text-[10px] text-muted-foreground/70">
+                                        Tap to hear
+                                      </p>
+                                    </div>
+                                    <div className="pb-2">
+                                      {TIMER_SOUNDS.map(({ id, label }) => {
+                                        const isSelected =
+                                          normalizeTimerSound(settings.timerSound) === id;
+                                        const isPreviewing = previewingId === id;
+                                        return (
+                                          <button
+                                            key={id}
+                                            type="button"
+                                            onClick={() => handleSoundSelect(id)}
+                                            className={`flex w-full items-center justify-between gap-2 px-3.5 py-2 text-left text-sm transition-colors ${
+                                              isSelected
+                                                ? 'font-bold text-primary'
+                                                : 'font-medium text-foreground hover:bg-muted/50'
+                                            }`}
+                                          >
+                                            <span className="truncate">{label}</span>
+                                            {isPreviewing ? (
+                                              <Volume2 className="h-4 w-4 shrink-0 animate-pulse text-primary" />
+                                            ) : isSelected ? (
+                                              <Check className="h-4 w-4 shrink-0" />
+                                            ) : null}
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </div>
                           <button
                             onClick={() => onOpenChange(false)}
                             aria-label="Close"
@@ -1496,9 +1388,9 @@ export default function FrogodoroSheet({
                         </div>
                         )}
 
-                        {/* Deep-focus pledge lives with the session config —
-                            phase, duration, pledge, then START. A real switch
-                            so it reads as a control, not a caption. */}
+                        {/* Session config lives with the session, not behind a
+                            gear: phase, duration, pledge, auto-start, then
+                            START. Real switches so they read as controls. */}
                         <AnimatePresence initial={false}>
                           {!awaitingDone && !timerActive && phase === 'focus' && (
                             <motion.div
@@ -1508,47 +1400,83 @@ export default function FrogodoroSheet({
                               transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
                               className="overflow-hidden"
                             >
-                              <button
-                                type="button"
-                                role="switch"
-                                aria-checked={deepFocus}
-                                onClick={() => {
-                                  hapticTick();
-                                  setDeepFocus(!deepFocus);
-                                }}
-                                className="mx-auto mb-2 flex w-full max-w-[300px] items-center justify-between gap-3 rounded-2xl bg-black/20 px-4 py-2.5 text-left shadow-inner transition-colors hover:bg-black/30 active:scale-[0.99]"
-                              >
-                                <span className="flex min-w-0 items-center gap-2.5">
-                                  <Zap
-                                    className={`h-4 w-4 shrink-0 transition-colors ${
-                                      deepFocus
-                                        ? 'fill-amber-300 text-amber-300'
-                                        : 'text-white/60'
-                                    }`}
-                                  />
-                                  <span className="min-w-0">
-                                    <span className="block text-[12px] font-black leading-tight text-white">
-                                      Deep focus
-                                    </span>
-                                    <span className="block text-[11px] font-semibold leading-tight text-white/70">
-                                      Finish without pausing · +1 fly
+                              <div className="mx-auto mb-2 w-full max-w-[300px] divide-y divide-white/10 overflow-hidden rounded-2xl bg-black/20 shadow-inner">
+                                <button
+                                  type="button"
+                                  role="switch"
+                                  aria-checked={deepFocus}
+                                  onClick={() => {
+                                    hapticTick();
+                                    setDeepFocus(!deepFocus);
+                                  }}
+                                  className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left transition-colors hover:bg-white/5"
+                                >
+                                  <span className="flex min-w-0 items-center gap-2.5">
+                                    <Zap
+                                      className={`h-4 w-4 shrink-0 transition-colors ${
+                                        deepFocus
+                                          ? 'fill-amber-300 text-amber-300'
+                                          : 'text-white/60'
+                                      }`}
+                                    />
+                                    <span className="min-w-0">
+                                      <span className="block text-[12px] font-black leading-tight text-white">
+                                        Deep focus
+                                      </span>
+                                      <span className="block text-[11px] font-semibold leading-tight text-white/70">
+                                        Finish without pausing · +1 fly
+                                      </span>
                                     </span>
                                   </span>
-                                </span>
-                                <span
-                                  className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
-                                    deepFocus ? 'bg-white' : 'bg-white/25'
-                                  }`}
-                                >
                                   <span
-                                    className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full shadow-sm transition-all ${
-                                      deepFocus
-                                        ? 'translate-x-5 bg-primary'
-                                        : 'translate-x-0 bg-white'
+                                    className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+                                      deepFocus ? 'bg-white' : 'bg-white/25'
                                     }`}
-                                  />
-                                </span>
-                              </button>
+                                  >
+                                    <span
+                                      className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full shadow-sm transition-all ${
+                                        deepFocus
+                                          ? 'translate-x-5 bg-primary'
+                                          : 'translate-x-0 bg-white'
+                                      }`}
+                                    />
+                                  </span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  role="switch"
+                                  aria-checked={settings.autoStartBreaks}
+                                  onClick={toggleAutoStartBreaks}
+                                  className="flex w-full items-center justify-between gap-3 px-4 py-2 text-left transition-colors hover:bg-white/5"
+                                >
+                                  <span className="flex min-w-0 items-center gap-2.5">
+                                    <Repeat
+                                      className={`h-4 w-4 shrink-0 transition-colors ${
+                                        settings.autoStartBreaks
+                                          ? 'text-sky-200'
+                                          : 'text-white/60'
+                                      }`}
+                                    />
+                                    <span className="truncate text-[12px] font-black leading-tight text-white">
+                                      Auto-start break
+                                    </span>
+                                  </span>
+                                  <span
+                                    className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${
+                                      settings.autoStartBreaks ? 'bg-white' : 'bg-white/25'
+                                    }`}
+                                  >
+                                    <span
+                                      className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full shadow-sm transition-all ${
+                                        settings.autoStartBreaks
+                                          ? 'translate-x-4 bg-primary'
+                                          : 'translate-x-0 bg-white'
+                                      }`}
+                                    />
+                                  </span>
+                                </button>
+                              </div>
                             </motion.div>
                           )}
                         </AnimatePresence>
@@ -1601,19 +1529,12 @@ export default function FrogodoroSheet({
                           </div>
                         )}
 
-                        {/* Controls — when the session is over, the only action
-                            is Done (which silences the alarm and closes). */}
+                        {/* Controls — a finished focus offers the break as the
+                            primary action (the natural next step), with +5 more
+                            and Done beside it. Any other completion just needs
+                            Done, which silences the alarm and ends the session. */}
                         {awaitingDone ? (
-                          <div className="mt-20 flex items-end justify-center gap-2.5">
-                            {celebrateFocus && (
-                              <button
-                                onClick={handleKeepGoing}
-                                className="relative flex items-center justify-center rounded-2xl bg-white/20 px-3 py-3 text-[13px] font-black uppercase tracking-widest text-white shadow-[0_6px_0_rgba(0,0,0,0.15)] transition-all hover:bg-white/30 active:translate-y-1.5 active:shadow-[0_0_0_rgba(0,0,0,0.15)] min-[380px]:px-4"
-                              >
-                                <Zap className="mr-1 h-4 w-4 fill-current" />
-                                +5 MORE
-                              </button>
-                            )}
+                          <div className="mt-20 flex flex-col items-center gap-3">
                             <div className="relative">
                               {/* Same perch as the START screen: the frog sits on
                                   the DONE button instead of floating mid-card. */}
@@ -1647,16 +1568,45 @@ export default function FrogodoroSheet({
                                   </div>
                                 )}
                               </div>
-                              <button
-                                onClick={handleDone}
-                                className={`relative flex items-center justify-center px-7 min-[380px]:px-10 py-3 bg-white dark:bg-slate-50 text-[16px]
-                                  font-black uppercase tracking-widest rounded-2xl shadow-[0_6px_0_rgba(0,0,0,0.15)]
-                                  active:shadow-[0_0_0_rgba(0,0,0,0.15)] active:translate-y-1.5 transition-all ${getPhaseAccent()}`}
-                              >
-                                <Check className="w-5 h-5 mr-1.5" />
-                                DONE
-                              </button>
+                              {celebrateFocus ? (
+                                <button
+                                  onClick={handleStartBreak}
+                                  className="relative flex items-center justify-center rounded-2xl bg-white px-7 py-3 text-[16px] font-black uppercase tracking-widest text-sky-500 shadow-[0_6px_0_rgba(0,0,0,0.15)] transition-all active:translate-y-1.5 active:shadow-[0_0_0_rgba(0,0,0,0.15)] dark:bg-slate-50 dark:text-sky-700 min-[380px]:px-10"
+                                >
+                                  <Play className="mr-1.5 h-5 w-5 fill-current" />
+                                  BREAK {formatDurationSetting(settings.breakDuration)}
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={handleDone}
+                                  className={`relative flex items-center justify-center px-7 min-[380px]:px-10 py-3 bg-white dark:bg-slate-50 text-[16px]
+                                    font-black uppercase tracking-widest rounded-2xl shadow-[0_6px_0_rgba(0,0,0,0.15)]
+                                    active:shadow-[0_0_0_rgba(0,0,0,0.15)] active:translate-y-1.5 transition-all ${getPhaseAccent()}`}
+                                >
+                                  <Check className="w-5 h-5 mr-1.5" />
+                                  DONE
+                                </button>
+                              )}
                             </div>
+
+                            {celebrateFocus && (
+                              <div className="flex items-center justify-center gap-2.5">
+                                <button
+                                  onClick={handleKeepGoing}
+                                  className="flex items-center justify-center rounded-xl bg-white/20 px-3.5 py-2 text-[12px] font-black uppercase tracking-widest text-white transition-all hover:bg-white/30 active:scale-95"
+                                >
+                                  <Zap className="mr-1 h-3.5 w-3.5 fill-current" />
+                                  +5 MORE
+                                </button>
+                                <button
+                                  onClick={handleDone}
+                                  className="flex items-center justify-center rounded-xl bg-white/20 px-3.5 py-2 text-[12px] font-black uppercase tracking-widest text-white transition-all hover:bg-white/30 active:scale-95"
+                                >
+                                  <Check className="mr-1 h-3.5 w-3.5" />
+                                  DONE
+                                </button>
+                              </div>
+                            )}
                           </div>
                         ) : (
                         <div className="relative z-10 flex items-center justify-center gap-3">
