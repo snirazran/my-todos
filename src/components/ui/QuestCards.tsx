@@ -2047,7 +2047,11 @@ export function AreaRow({
   const atLeast380 = useMediaQuery('(min-width: 380px)');
   const atLeast640 = useMediaQuery('(min-width: 640px)');
   const atLeast820 = useMediaQuery('(min-width: 820px)');
-  const thumbWidthClass = atLeast640 ? 'w-[88px]' : atLeast380 ? 'w-[72px]' : 'w-14';
+  const thumbWidthClass = atLeast640
+    ? 'w-[112px]'
+    : atLeast380
+      ? 'w-[96px]'
+      : 'w-[76px]';
   const claimedObjectiveIds = quest.claimedObjectiveIds ?? [];
   const imageUrl = category?.coverImageUrl ?? quest.coverImageUrl;
   const totalTarget = quest.logic.reduce(
@@ -2275,7 +2279,7 @@ export function AreaRow({
       type="button"
       onClick={onPress}
       className={cn(
-        'flex w-full items-center gap-2.5 rounded-[20px] border bg-card p-3 text-left shadow-sm transition active:scale-[0.98] sm:gap-3',
+        'flex min-h-[92px] w-full items-stretch gap-3 overflow-hidden rounded-[20px] border bg-card py-3 pr-3 text-left shadow-sm transition active:scale-[0.98]',
         quest.claimable && !finished
           ? 'border-amber-400 ring-1 ring-amber-400/40'
           : 'border-border/50',
@@ -2284,7 +2288,7 @@ export function AreaRow({
     >
       <div
         className={cn(
-          'relative h-14 shrink-0 overflow-hidden rounded-xl',
+          'relative -my-3 shrink-0 self-stretch overflow-hidden',
           thumbWidthClass,
         )}
       >
@@ -2311,7 +2315,7 @@ export function AreaRow({
         )}
       </div>
 
-      <div className="min-w-0 flex-1">
+      <div className="flex min-w-0 flex-1 flex-col justify-center">
         <p className="flex min-w-0 items-center gap-1.5">
           <span className="truncate text-[14px] font-black text-foreground">
             {category?.name ?? quest.title}
@@ -2395,7 +2399,7 @@ export function AreaRow({
         ) : null}
       </div>
 
-      <div className="shrink-0">
+      <div className="flex shrink-0 items-center">
         {finished ? (
           <span className="text-[10px] font-black uppercase tracking-[0.12em] text-muted-foreground">
             Done
