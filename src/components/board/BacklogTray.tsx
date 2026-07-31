@@ -1,6 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Filter } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Icon } from '@/components/ui/Icon';
 import { Task, draggableIdFor } from './helpers';
 import TaskCard from './TaskCard';
@@ -8,7 +8,11 @@ import TaskMenu from './TaskMenu';
 import { EditTaskDialog } from '@/components/ui/EditTaskDialog';
 import { DeleteDialog } from '@/components/ui/DeleteDialog';
 import TagsPopup from '@/components/ui/TagsPopup';
-import { FilterDropdown, FilterType } from '@/components/ui/FilterDropdown';
+import {
+  FilteredEmptyState,
+  FilterTriggerButton,
+} from '@/components/ui/TaskFilterBar';
+import { matchesTaskFilters, sortTasks, type TaskFilters } from '@/lib/taskFilters';
 import { SideOpenTray } from '@/components/ui/SideOpenTray';
 import { TimePopup } from '@/components/ui/TimePopup';
 
@@ -45,12 +49,12 @@ interface Props {
   onDoToday?: (id: string) => void;
   onScheduleTask?: (taskId: string, data: { startTime: string; endTime: string; reminder: string }) => Promise<void> | void;
   userTags?: { id: string; name: string; color: string }[];
-  filter?: FilterType;
-  onFilterChange?: (filter: FilterType) => void;
-  selectedTags?: string[];
-  onTagsChange?: (tags: string[]) => void;
-  showCompleted?: boolean;
-  onShowCompletedChange?: (show: boolean) => void;
+  /** The board-wide filter — the tray narrows with the columns. */
+  filters: TaskFilters;
+  filtersActive?: boolean;
+  activeFilterCount?: number;
+  onOpenFilters?: () => void;
+  onClearFilters?: () => void;
   hideDoTodayButton?: boolean;
   backlogDayIndex?: number;
 }
@@ -69,12 +73,11 @@ export default React.memo(function BacklogTray({
   onDoToday,
   onScheduleTask,
   userTags = [],
-  filter = 'all',
-  onFilterChange,
-  selectedTags = [],
-  onTagsChange,
-  showCompleted = true,
-  onShowCompletedChange,
+  filters,
+  filtersActive = false,
+  activeFilterCount = 0,
+  onOpenFilters,
+  onClearFilters,
   hideDoTodayButton = false,
   backlogDayIndex = 7,
 }: Props) {
@@ -95,8 +98,6 @@ export default React.memo(function BacklogTray({
 
   const [scheduleDialog, setScheduleDialog] = useState<{ task: Task } | null>(null);
 
-  const [showFilterMenu, setShowFilterMenu] = useState(false);
-  const filterMenuRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [page, setPage] = useState(0);
 
@@ -138,16 +139,10 @@ export default React.memo(function BacklogTray({
   // Auto-hide when dragging FROM the tray
   const isDraggingAny = !!activeDragId;
 
-  const isFiltered = filter !== 'all' || selectedTags.length > 0 || !showCompleted;
-
-  const filteredTasks = tasks.filter((t) => {
-    if (!showCompleted && t.completed) return false;
-    if (selectedTags && selectedTags.length > 0) {
-      const hasTag = t.tags?.some((tagId) => selectedTags.includes(tagId));
-      if (!hasTag) return false;
-    }
-    return true;
-  });
+  const filteredTasks = sortTasks(
+    tasks.filter((t) => matchesTaskFilters(t, filters)),
+    filters.sort,
+  );
   const mobilePageSize = 4;
   const pageCount = Math.max(1, Math.ceil(filteredTasks.length / mobilePageSize));
   const visibleTasks = isMobile
@@ -184,39 +179,11 @@ export default React.memo(function BacklogTray({
         isDraggingAny={isDraggingAny}
         closeProgress={closeProgress}
         rightActions={
-          <div className="relative" ref={filterMenuRef}>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowFilterMenu(!showFilterMenu);
-              }}
-              className={`flex items-center justify-center w-9 h-9 rounded-full transition-all active:scale-90 ${
-                showFilterMenu || isFiltered
-                  ? 'bg-primary/10 text-primary'
-                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-              }`}
-            >
-              <Filter size={16} />
-              {isFiltered && (
-                <div className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-500 border-2 border-card shadow-sm" />
-              )}
-            </button>
-
-            <FilterDropdown
-                  isOpen={showFilterMenu}
-                  onClose={() => setShowFilterMenu(false)}
-                  triggerRef={filterMenuRef}
-                  align="left"
-                  filter={filter}
-                  onFilterChange={onFilterChange}
-                  showTypeFilters={false}
-                  availableTags={userTags}
-                  selectedTags={selectedTags}
-                  onTagsChange={(tags) => onTagsChange?.(tags)}
-                  showCompleted={showCompleted}
-                  onShowCompletedChange={(show) => onShowCompletedChange?.(show)}
-                />
-          </div>
+          <FilterTriggerButton
+            compact
+            onClick={() => onOpenFilters?.()}
+            activeCount={activeFilterCount}
+          />
         }
       >
         {isMobile && pageCount > 1 ? (
@@ -264,7 +231,14 @@ export default React.memo(function BacklogTray({
           <div className="h-3 shrink-0" aria-hidden />
         )}
         <AnimatePresence mode="popLayout" initial={false}>
-          {filteredTasks.length === 0 ? (
+          {filteredTasks.length === 0 && filtersActive && tasks.length > 0 ? (
+            <div className="px-1 py-6">
+              <FilteredEmptyState
+                hidden={tasks.length}
+                onClearAll={() => onClearFilters?.()}
+              />
+            </div>
+          ) : filteredTasks.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center gap-4 opacity-30 min-h-[300px]">
               <Icon name="saved" className="h-16 w-16" />
               <p className="text-sm font-bold uppercase tracking-widest">

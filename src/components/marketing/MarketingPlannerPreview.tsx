@@ -168,7 +168,6 @@ function RealDayPreview({
         listRef={setListRef(dayIndex)}
         maxHeightClass="max-h-none"
         isToday={day.isToday}
-        availableTags={userTags}
         disableVerticalScroll
       >
         <div className="min-h-[260px]">

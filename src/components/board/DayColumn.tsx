@@ -1,9 +1,8 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Filter, CalendarCheck } from 'lucide-react';
-import { FilterDropdown, FilterType } from '../ui/FilterDropdown';
+import { Plus, CalendarCheck } from 'lucide-react';
 
 export default function DayColumn({
   title,
@@ -17,13 +16,6 @@ export default function DayColumn({
   compact = false,
   isToday = false,
   isPast = false,
-  filter = 'all',
-  onFilterChange,
-  availableTags = [],
-  selectedTags = [],
-  onTagsChange,
-  showCompleted = true,
-  onShowCompletedChange,
   onAddClick,
   disableVerticalScroll = false,
 }: {
@@ -37,26 +29,14 @@ export default function DayColumn({
   compact?: boolean;
   isToday?: boolean;
   isPast?: boolean;
-  filter?: FilterType;
-  onFilterChange?: (filter: FilterType) => void;
-  availableTags?: { id: string; name: string; color: string }[];
-  selectedTags?: string[];
-  onTagsChange?: (tags: string[]) => void;
-  showCompleted?: boolean;
-  onShowCompletedChange?: (show: boolean) => void;
   /** When provided, renders a + button in the header that triggers add-task for this column. */
   onAddClick?: () => void;
   /** Keep the task surface fully expanded instead of making it its own scroller. */
   disableVerticalScroll?: boolean;
 }) {
-  const [showMenu, setShowMenu] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-
   const appliedMax = compact
     ? 'max-h-[60svh] md:max-h-[70svh]'
     : maxHeightClass;
-
-  const isFiltered = filter !== 'all' || selectedTags.length > 0 || !showCompleted;
 
   // Split "Sunday 7/12" into name and date
   const match = title.match(/^(.*) (\d+\/\d+)$/);
@@ -126,40 +106,6 @@ export default function DayColumn({
               </button>
             )}
 
-            <div className="relative" ref={menuRef}>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowMenu(!showMenu);
-                }}
-                aria-label="Filter"
-                title="Filter"
-                className={`flex items-center justify-center w-7 h-7 rounded-lg transition-all active:scale-90 ${
-                  showMenu || isFiltered
-                    ? 'bg-primary/10 text-primary'
-                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                }`}
-              >
-                <Filter size={16} />
-                {isFiltered && (
-                  <div className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-500 border-2 border-card shadow-sm" />
-                )}
-              </button>
-
-              <FilterDropdown
-                isOpen={showMenu}
-                onClose={() => setShowMenu(false)}
-                triggerRef={menuRef}
-                filter={filter}
-                onFilterChange={onFilterChange}
-                showTypeFilters={false}
-                availableTags={availableTags}
-                selectedTags={selectedTags}
-                onTagsChange={(tags) => onTagsChange?.(tags)}
-                showCompleted={showCompleted}
-                onShowCompletedChange={(show) => onShowCompletedChange?.(show)}
-              />
-            </div>
           </div>
         </div>
 

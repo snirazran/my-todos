@@ -15,7 +15,6 @@ import {
   Plus,
   Sparkles,
   ChevronRight,
-  Filter,
 } from 'lucide-react';
 import BacklogTray from '@/components/board/BacklogTray';
 import { TASK_SAVED_EVENT } from '@/lib/hints/guides';
@@ -48,7 +47,12 @@ import {
 } from '@/components/ui/HomeFocusFlies';
 import FrogodoroPill from '@/components/ui/FrogodoroPill';
 import { useFrogodoroUiStore } from '@/lib/frogodoroUiStore';
-import { FilterDropdown } from '@/components/ui/FilterDropdown';
+import { TaskFilterSheet } from '@/components/ui/TaskFilterSheet';
+import {
+  AppliedFilterChips,
+  FilterTriggerButton,
+} from '@/components/ui/TaskFilterBar';
+import { useTaskFilters } from '@/hooks/useTaskFilters';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { FrogDisplay } from '@/components/ui/FrogDisplay';
 import { getQuestsUrl } from '@/components/ui/QuestsPanel';
@@ -103,6 +107,8 @@ const demoTasks: Task[] = [
   { id: 'g4', text: 'Drink 2 liters of water', completed: true, order: 5 },
   { id: 'g5', text: 'Eat a healthy meal', completed: true, order: 6 },
 ];
+
+const HOME_FILTER_BASE = { showCompleted: false };
 
 export default function HomeDashboard() {
   const { user, loading } = useAuth();
@@ -178,8 +184,17 @@ export default function HomeDashboard() {
   const [bellyIntroOpen, setBellyIntroOpen] = useState(false);
   const scheduledBellyIntroRef = useRef(false);
   const [savedIntroOpen, setSavedIntroOpen] = useState(false);
-  const [showCompleted, setShowCompleted] = useState(false);
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const {
+    filters,
+    setFilters,
+    baseFilters,
+    reset: resetFilters,
+    presets,
+    savePreset,
+    deletePreset,
+    isActive: filtersActive,
+    activeCount: activeFilterCount,
+  } = useTaskFilters('home', HOME_FILTER_BASE);
   const [isHeaderMenuOpen, setIsHeaderMenuOpen] = useState(false);
   const headerMenuBtnRef = useRef<HTMLButtonElement>(null);
   const headerMenuRef = useRef<HTMLDivElement>(null);
@@ -729,40 +744,34 @@ export default function HomeDashboard() {
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <button
-                      ref={headerMenuBtnRef}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setIsHeaderMenuOpen(!isHeaderMenuOpen);
-                      }}
-                      className={cn(
-                        'flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-bold transition-all md:text-[13px] md:px-4 md:py-2',
-                        isHeaderMenuOpen ||
-                          selectedTags.length > 0 ||
-                          showCompleted
-                          ? 'bg-primary/10 text-primary'
-                          : 'text-muted-foreground hover:text-foreground hover:bg-accent/50',
-                      )}
-                    >
-                      <Filter className="w-3.5 h-3.5 md:w-4 md:h-4" />
-                      <span>Filter</span>
-                      {(selectedTags.length > 0 || showCompleted) && (
-                        <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                      )}
-                    </button>
-                    <FilterDropdown
-                      isOpen={isHeaderMenuOpen}
-                      onClose={() => setIsHeaderMenuOpen(false)}
+                    <FilterTriggerButton
                       triggerRef={headerMenuBtnRef}
-                      showTypeFilters={false}
-                      showCompleted={showCompleted}
-                      onShowCompletedChange={setShowCompleted}
-                      availableTags={tags || []}
-                      selectedTags={selectedTags}
-                      onTagsChange={setSelectedTags}
+                      onClick={() => setIsHeaderMenuOpen(true)}
+                      activeCount={activeFilterCount}
+                      open={isHeaderMenuOpen}
+                    />
+                    <TaskFilterSheet
+                      open={isHeaderMenuOpen}
+                      onOpenChange={setIsHeaderMenuOpen}
+                      filters={filters}
+                      onChange={setFilters}
+                      onReset={resetFilters}
+                      tags={tags || []}
+                      tasks={data}
+                      presets={presets}
+                      onSavePreset={savePreset}
+                      onDeletePreset={deletePreset}
                     />
                   </div>
                 </div>
+                <AppliedFilterChips
+                  filters={filters}
+                  base={baseFilters}
+                  tags={tags || []}
+                  onChange={setFilters}
+                  onClearAll={resetFilters}
+                  className="mb-2 px-2 md:mb-3 md:px-4"
+                />
                 {/* The visible Fly Catch card was replaced by the frog swipe gesture. */}
                 <TaskList
                   tasks={data}
@@ -918,9 +927,9 @@ export default function HomeDashboard() {
                   }}
                   isGuest={!user}
                   tags={tags}
-                  showCompleted={showCompleted}
-                  selectedTags={selectedTags}
-                  onSetSelectedTags={setSelectedTags}
+                  filters={filters}
+                  onClearFilters={resetFilters}
+                  filtersActive={filtersActive}
                   isGlowActive={isTaskGlow}
                   isFrozen={cinematic}
                   quickAddOpen={showQuickAdd}
@@ -1228,6 +1237,11 @@ export default function HomeDashboard() {
       <BacklogTray
         isOpen={isBacklogOpen}
         onClose={() => setIsBacklogOpen(false)}
+        filters={filters}
+        filtersActive={filtersActive}
+        activeFilterCount={activeFilterCount}
+        onOpenFilters={() => setIsHeaderMenuOpen(true)}
+        onClearFilters={resetFilters}
         tasks={laterThisWeek.map((t) => ({ ...t, order: t.order || 0 }))}
         onGrab={() => {}}
         setCardRef={() => {}}

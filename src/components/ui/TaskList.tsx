@@ -82,6 +82,12 @@ import {
   ChecklistFlyLine,
 } from '../board/ChecklistEditor';
 import { checklistPayout, type ChecklistItem } from '@/lib/checklist';
+import {
+  matchesTaskFilters,
+  sortTasks,
+  type TaskFilters,
+} from '@/lib/taskFilters';
+import { FilteredEmptyState } from '@/components/ui/TaskFilterBar';
 import { objectiveCardTone } from '@/lib/questClaims';
 import { useNotification } from '@/components/providers/NotificationProvider';
 import { useUIStore } from '@/lib/uiStore';
@@ -1450,9 +1456,9 @@ export default function TaskList({
   onDuplicate,
   pendingToToday,
   tags,
-  showCompleted,
-  selectedTags,
-  onSetSelectedTags,
+  filters,
+  onClearFilters,
+  filtersActive,
   isGuest,
   isGlowActive,
   isFrozen = false,
@@ -1519,9 +1525,9 @@ export default function TaskList({
   onDuplicate?: (taskId: string, when: 'today' | 'tomorrow') => void;
   pendingToToday?: number;
   tags?: { id: string; name: string; color: string }[];
-  showCompleted: boolean;
-  selectedTags: string[];
-  onSetSelectedTags: (tags: string[]) => void;
+  filters: TaskFilters;
+  onClearFilters: () => void;
+  filtersActive: boolean;
   isGuest?: boolean;
   isGlowActive?: boolean;
   /** When true the current sort order is frozen (prevents layout shifts during tongue animation) */
@@ -1921,21 +1927,7 @@ export default function TaskList({
     const isTemporarilyVisible = delayedCompleted.has(t.id);
     const isActuallyCompleted =
       t.completed && !vSet.has(t.id) && !isTemporarilyVisible;
-
-    // 1. Completion Filter
-    if (isActuallyCompleted && !showCompleted) return false;
-
-    // 2. Tag Filter
-    if (selectedTags.length > 0) {
-      const tTags = t.tags || [];
-      // If task has NO tags, but we selected some, hide it? Or show if partial match?
-      // Usually filtering by tags means "Show tasks that have at least one of these tags" OR "All of these tags".
-      // Let's assume "Has ANY of the selected tags".
-      const hasMatch = tTags.some((tagId) => selectedTags.includes(tagId));
-      if (!hasMatch) return false;
-    }
-
-    return true;
+    return matchesTaskFilters(t, filters, isActuallyCompleted);
   });
 
   // Helper: is this task truly completed (not in grace period, not visually uncompleted)
@@ -1943,13 +1935,19 @@ export default function TaskList({
     t.completed && !vSet.has(t.id) && !delayedCompleted.has(t.id);
 
   // Split into two groups: active (including grace-period tasks) and completed
-  const activeTasks = visibleTasks
-    .filter((t) => !isTaskSettledCompleted(t))
-    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  const activeTasks = sortTasks(
+    visibleTasks
+      .filter((t) => !isTaskSettledCompleted(t))
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
+    filters.sort,
+  );
 
-  const completedTasks = visibleTasks
-    .filter((t) => isTaskSettledCompleted(t))
-    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  const completedTasks = sortTasks(
+    visibleTasks
+      .filter((t) => isTaskSettledCompleted(t))
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
+    filters.sort,
+  );
 
   // ---- Freeze sort order during tongue animation to prevent layout shifts ----
   const frozenOrderRef = useRef<string[]>([]);
@@ -2338,7 +2336,7 @@ export default function TaskList({
             sortedVisibleTasks.length === 0 &&
             !exitAction ? (
             /* Empty State: Tasks exist but all filtered/completed */
-            allTasksCompleted && selectedTags.length === 0 ? (
+            allTasksCompleted && !filtersActive ? (
               <div
                 className={`fly-caught-enter relative mb-2 rounded-2xl border p-3 shadow-sm ${objectiveCardTone(
                   true,
@@ -2392,13 +2390,14 @@ export default function TaskList({
                   </button>
                 </div>
               </div>
+            ) : filtersActive ? (
+              <FilteredEmptyState
+                hidden={tasks.length}
+                onClearAll={onClearFilters}
+              />
             ) : (
               <EmptyAddRow
-                label={
-                  selectedTags.length > 0
-                    ? 'No tasks match your filters'
-                    : 'Add another task'
-                }
+                label="Add another task"
                 quickAddOpen={quickAddOpen}
                 onClick={() =>
                   onAddRequested('', null, { preselectToday: true })
@@ -2499,7 +2498,7 @@ export default function TaskList({
                           handleTaskToggle={handleTaskToggle}
                           onMenuOpen={openMenu}
                           getTagDetails={getTagDetails}
-                          isDragDisabled={isCompleted}
+                          isDragDisabled={isCompleted || filters.sort !== 'manual'}
                           isWeekly={taskKind(task) === 'weekly'}
                           isGlowActive={isCompleted ? false : isGlowActive}
                           disableLayout={isCompleted ? true : isAnyDragging}

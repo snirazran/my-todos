@@ -34,6 +34,12 @@ import {
 } from './helpers';
 import DayColumn from './DayColumn';
 import TaskList from './TaskList';
+import { TaskFilterSheet } from '@/components/ui/TaskFilterSheet';
+import {
+  AppliedFilterChips,
+  FilterTriggerButton,
+} from '@/components/ui/TaskFilterBar';
+import { useTaskFilters } from '@/hooks/useTaskFilters';
 import PaginationDots from './PaginationDots';
 import DragOverlay from './DragOverlay';
 import PlannerHeader from './PlannerHeader';
@@ -323,37 +329,23 @@ export default function TaskBoard({
     [BACKLOG_IDX, saveBacklog, saveDate, windowDates],
   );
 
-  // Column filters per-index (transient; cleared if window shifts a lot)
-  const [columnFilters, setColumnFilters] = useState<
-    Record<number, 'all' | 'tasks'>
-  >({});
-  const [columnTags, setColumnTags] = useState<Record<number, string[]>>({});
-  const [columnShowCompleted, setColumnShowCompleted] = useState<
-    Record<number, boolean>
-  >({});
-
-  const getFilter = useCallback(
-    (i: number) => columnFilters[i] || 'all',
-    [columnFilters],
+  // One board-wide filter: every day column and the saved tray read from it.
+  const {
+    filters,
+    setFilters,
+    baseFilters,
+    reset: resetFilters,
+    presets,
+    savePreset,
+    deletePreset,
+    isActive: filtersActive,
+    activeCount: activeFilterCount,
+  } = useTaskFilters('planner');
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
+  const filterPool = useMemo(
+    () => [...windowDates.flatMap((d) => tasksByDate[d] ?? []), ...backlog],
+    [windowDates, tasksByDate, backlog],
   );
-  const setFilter = useCallback((i: number, f: 'all' | 'tasks') => {
-    setColumnFilters((prev) => ({ ...prev, [i]: f }));
-  }, []);
-  const getSelectedTags = useCallback(
-    (i: number) => columnTags[i] || [],
-    [columnTags],
-  );
-  const setSelectedTags = useCallback((i: number, tags: string[]) => {
-    setColumnTags((prev) => ({ ...prev, [i]: tags }));
-  }, []);
-  const getShowCompleted = useCallback(
-    (i: number) =>
-      columnShowCompleted[i] === undefined ? true : columnShowCompleted[i],
-    [columnShowCompleted],
-  );
-  const setShowCompleted = useCallback((i: number, show: boolean) => {
-    setColumnShowCompleted((prev) => ({ ...prev, [i]: show }));
-  }, []);
 
   const { data: tagsData } = useSWR('/api/tags', (url) =>
     fetch(url).then((r) => r.json()),
@@ -1540,7 +1532,7 @@ export default function TaskBoard({
           scrollBehavior: snapSuppressed ? 'auto' : undefined,
         }}
       >
-        <div className="flex mx-auto gap-3 px-4 pt-[calc(9rem+env(safe-area-inset-top))] md:pt-16 pb-[calc(100px+env(safe-area-inset-bottom))]">
+        <div className="flex mx-auto gap-3 px-4 pt-[calc(9rem+env(safe-area-inset-top))] md:pt-[108px] pb-[calc(100px+env(safe-area-inset-bottom))] md:pb-[calc(40px+env(safe-area-inset-bottom))]">
           {renderEdge('past')}
           {windowDates.map((dk, i) => (
             <div
@@ -1555,16 +1547,9 @@ export default function TaskBoard({
                 count={activeTaskCount(tasksByDate[dk] ?? [])}
                 totalCount={(tasksByDate[dk] ?? []).length}
                 listRef={setListRef(i)}
-                maxHeightClass="max-h-[calc(100svh-315px-var(--safe-bottom)-env(safe-area-inset-top))] md:max-h-[calc(100svh-340px-var(--safe-bottom))]"
+                maxHeightClass="max-h-[calc(100svh-315px-var(--safe-bottom)-env(safe-area-inset-top))] md:max-h-[calc(100svh-224px-var(--safe-bottom))]"
                 isToday={dk === todayKey}
                 isPast={cmpYmd(dk, todayKey) < 0}
-                filter={getFilter(i)}
-                onFilterChange={(f) => setFilter(i, f)}
-                availableTags={tagsData?.tags || []}
-                selectedTags={getSelectedTags(i)}
-                onTagsChange={(tags) => setSelectedTags(i, tags)}
-                showCompleted={getShowCompleted(i)}
-                onShowCompletedChange={(show) => setShowCompleted(i, show)}
                 onAddClick={
                   cmpYmd(dk, todayKey) < 0
                     ? undefined
@@ -1614,9 +1599,9 @@ export default function TaskBoard({
                   dateKey={dk}
                   isAnyDragging={!!drag?.active}
                   isToday={dk === todayKey}
-                  filter={getFilter(i)}
-                  selectedTags={getSelectedTags(i)}
-                  showCompleted={getShowCompleted(i)}
+                  filters={filters}
+                  filtersActive={filtersActive}
+                  onClearFilters={resetFilters}
                   daysOrder={daysOrder}
                   emptyMode={cmpYmd(dk, todayKey) < 0 ? 'none' : 'add'}
                   disableDrag={false}
@@ -1643,13 +1628,25 @@ export default function TaskBoard({
           calendarOpen ? 'z-[97]' : 'z-[60]'
         } ${moveCalendarOpen ? 'hidden' : ''}`}
       >
-        <div className="md:hidden">
+        {/* The date stays optically centred; the filter rides beside it. */}
+        <div className="md:hidden pointer-events-auto grid w-full grid-cols-[1fr_auto_1fr] items-center">
+          <span aria-hidden />
           <PlannerHeader
             dateKey={activeDateKey}
             expanded={calendarOpen}
             onToggle={() => setCalendarOpen((v) => !v)}
             variant="mobile"
           />
+          {!calendarOpen && (
+            <div className="justify-self-start pl-1.5">
+              <FilterTriggerButton
+                compact
+                onClick={() => setFilterSheetOpen(true)}
+                activeCount={activeFilterCount}
+                open={filterSheetOpen}
+              />
+            </div>
+          )}
         </div>
         <div className="hidden md:flex items-center gap-2 pointer-events-auto">
           <PlannerHeader
@@ -1686,7 +1683,54 @@ export default function TaskBoard({
             />
           </div>
         )}
+        {!calendarOpen && filtersActive && (
+          <div className="md:hidden pointer-events-auto w-full max-w-[560px] rounded-2xl bg-card/70 px-2 py-1.5 backdrop-blur-xl">
+            <AppliedFilterChips
+              filters={filters}
+              base={baseFilters}
+              tags={tagsData?.tags || []}
+              onChange={setFilters}
+              onClearAll={resetFilters}
+            />
+          </div>
+        )}
       </div>
+
+      {/* Desktop filter bar — clear of the 64px site header, above the columns. */}
+      <div className="pointer-events-none fixed inset-x-0 top-[68px] z-[61] hidden items-center gap-2 px-4 md:flex">
+        <div className="pointer-events-auto">
+          <FilterTriggerButton
+            onClick={() => setFilterSheetOpen(true)}
+            activeCount={activeFilterCount}
+            open={filterSheetOpen}
+          />
+        </div>
+        {filtersActive && (
+          <div className="pointer-events-auto min-w-0 flex-1">
+            <AppliedFilterChips
+              filters={filters}
+              base={baseFilters}
+              tags={tagsData?.tags || []}
+              onChange={setFilters}
+              onClearAll={resetFilters}
+            />
+          </div>
+        )}
+      </div>
+
+      <TaskFilterSheet
+        open={filterSheetOpen}
+        onOpenChange={setFilterSheetOpen}
+        filters={filters}
+        onChange={setFilters}
+        onReset={resetFilters}
+        tags={tagsData?.tags || []}
+        tasks={filterPool}
+        presets={presets}
+        onSavePreset={savePreset}
+        onDeletePreset={deletePreset}
+        title="Filter planner"
+      />
 
       {/* Month calendar overlay */}
       <MonthCalendar
@@ -1759,7 +1803,7 @@ export default function TaskBoard({
           ['--stack' as string]: `${notificationStackHeight}px`,
           transition: 'padding 200ms ease',
         }}
-        className={`fixed bottom-0 left-0 right-0 px-3 md:px-4 pb-[calc(env(safe-area-inset-bottom)+84px+var(--stack))] md:pb-[calc(env(safe-area-inset-bottom)+92px+var(--stack))] pointer-events-none transition-opacity duration-150 ${
+        className={`fixed bottom-0 left-0 right-0 px-3 md:px-4 pb-[calc(env(safe-area-inset-bottom)+84px+var(--stack))] md:pb-[calc(env(safe-area-inset-bottom)+32px+var(--stack))] pointer-events-none transition-opacity duration-150 ${
           // Above the drag ghost (z-[100]) while dragging so the drop-zone
           // label isn't hidden under the card that's hovering over it.
           drag?.active ? 'z-[105]' : 'z-[40]'
@@ -1921,12 +1965,11 @@ export default function TaskBoard({
           }
         }}
         hideDoTodayButton={true}
-        filter={getFilter(BACKLOG_IDX)}
-        onFilterChange={(f) => setFilter(BACKLOG_IDX, f)}
-        selectedTags={getSelectedTags(BACKLOG_IDX)}
-        onTagsChange={(tags) => setSelectedTags(BACKLOG_IDX, tags)}
-        showCompleted={getShowCompleted(BACKLOG_IDX)}
-        onShowCompletedChange={(show) => setShowCompleted(BACKLOG_IDX, show)}
+        filters={filters}
+        filtersActive={filtersActive}
+        activeFilterCount={activeFilterCount}
+        onOpenFilters={() => setFilterSheetOpen(true)}
+        onClearFilters={resetFilters}
       />
 
       <FrogodoroSheet

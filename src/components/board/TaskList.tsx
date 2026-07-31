@@ -31,6 +31,12 @@ import { notifyQuestClaims } from '@/lib/questClaims';
 import { queuePlusIntroOnce } from '@/lib/plusIntro';
 import { useLeftTongue } from './LeftTongue';
 import { hapticSuccess, hapticTick } from '@/lib/haptics';
+import {
+  matchesTaskFilters,
+  sortTasks,
+  type TaskFilters,
+} from '@/lib/taskFilters';
+import { FilteredEmptyState } from '@/components/ui/TaskFilterBar';
 
 // Hoisted so the motion wrapper gets a stable transition reference (a new
 // object each render would make framer reconfigure the animation every time).
@@ -62,9 +68,9 @@ export default React.memo(function TaskList({
   onPatchTask,
   dateKey,
   isToday = false,
-  filter = 'all',
-  selectedTags = [],
-  showCompleted = true,
+  filters,
+  filtersActive = false,
+  onClearFilters,
   daysOrder,
   emptyMode = 'add',
   disableDrag = false,
@@ -133,9 +139,10 @@ export default React.memo(function TaskList({
   ) => void;
   dateKey?: string;
   isToday?: boolean;
-  filter?: 'all' | 'tasks';
-  selectedTags?: string[];
-  showCompleted?: boolean;
+  filters: TaskFilters;
+  /** True when the board filter is narrowing anything, for the empty state. */
+  filtersActive?: boolean;
+  onClearFilters?: () => void;
   daysOrder?: ReadonlyArray<Exclude<ApiDay, -1>>;
   /** Controls what to render when there are no items. 'add' = show add-task button (default), 'none' = show "No activities for this day" placeholder. */
   emptyMode?: 'add' | 'none';
@@ -533,18 +540,22 @@ export default React.memo(function TaskList({
 
   const inGrace = (id: string) => !!gracePeriodIds?.has(id);
 
-  const filteredItems = items.filter((t) => {
-    if (!showCompleted && t.completed && !inGrace(t.id)) return false;
-    if (selectedTags && selectedTags.length > 0) {
-      const hasTag = t.tags?.some((tagId) => selectedTags.includes(tagId));
-      if (!hasTag) return false;
-    }
-    return true;
-  });
+  const keep = (t: Task) =>
+    matchesTaskFilters(t, filters, t.completed && !inGrace(t.id));
+  const filteredItems = sortTasks(items.filter(keep), filters.sort);
   // ---- Empty list: render a single placeholder (if targeting index 0) OR themed empty state
   if (filteredItems.length === 0) {
     if (placeholderAt === 0) {
       rows.push(renderPlaceholder(`ph-empty-${day}`));
+    } else if (filtersActive && items.length > 0) {
+      rows.push(
+        <FilteredEmptyState
+          key={`empty-filtered-${day}`}
+          hidden={items.length}
+          onClearAll={() => onClearFilters?.()}
+          compact
+        />,
+      );
     } else if (emptyMode === 'none') {
       rows.push(
         <div
@@ -584,17 +595,9 @@ export default React.memo(function TaskList({
 
   let visibleIndex = 0;
 
-  for (let i = 0; i < items.length; i++) {
-    const t = items[i];
-
-    // Filter Logic
-    if (!showCompleted && t.completed && !inGrace(t.id)) continue;
-    if (selectedTags && selectedTags.length > 0) {
-      const hasTag = t.tags?.some((tagId) => selectedTags.includes(tagId));
-      if (!hasTag) continue;
-    }
-
-    const isDraggedHere = isSelfDrag && sourceIndex === i;
+  for (const t of filteredItems) {
+    const sourceIdx = items.indexOf(t);
+    const isDraggedHere = isSelfDrag && sourceIndex === sourceIdx;
 
     if (!isDraggedHere) {
       const cardKey = `card-${day}-${t.id}`;
@@ -666,7 +669,7 @@ export default React.memo(function TaskList({
 
               onGrab({
                 day,
-                index: i, // original array index
+                index: sourceIdx, // original array index
                 taskId: t.id,
                 taskText: t.text,
                 taskType: t.type,
