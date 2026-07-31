@@ -29,7 +29,7 @@ import {
 import { severBond, handleBuddyCompletion } from '@/lib/buddy/server';
 import { bumpQuestMetric, taskStreakMetric } from '@/lib/quests/metrics';
 import {
-  checklistBudget,
+  checklistBonus,
   checklistContent,
   checklistForDate,
   checklistPayoutForDate,
@@ -228,11 +228,11 @@ type FlyValueTask = Pick<
 >;
 
 /**
- * Flies a task has earned on `date`. A plain task is worth 1 on completion; a
- * checklist task is worth its step-count budget instead, paid out marker by
- * marker as steps are checked — completing it never releases the markers it
- * never reached. The streak tier adds its bonus on top, but only for an actual
- * completion.
+ * Flies a task has earned on `date`. Every task is worth 1 on completion,
+ * checklist or not; a checklist adds its step-count bonus on top, paid out
+ * marker by marker as steps are checked — completing the task never releases
+ * the markers it never reached. The streak tier adds its bonus on top too, but
+ * only for an actual completion.
  */
 function taskFlyValue(
   task: FlyValueTask,
@@ -240,10 +240,8 @@ function taskFlyValue(
   streak: number = 0,
   completed: boolean = true,
 ): number {
-  const bonus = completed ? streakFlyBonus(streak) : 0;
-  const steps = (task.checklist ?? []).length;
-  if (steps === 0) return completed ? 1 + bonus : 0;
-  return checklistPayoutForDate(task, date).earned + bonus;
+  const base = completed ? 1 + streakFlyBonus(streak) : 0;
+  return base + checklistPayoutForDate(task, date).earned;
 }
 
 /**
@@ -264,7 +262,7 @@ async function lockChecklistBudget(
         checklistBudgetByDate: withChecklistBudget(
           doc.checklistBudgetByDate,
           date,
-          checklistBudget(steps),
+          checklistBonus(steps),
         ),
       },
     },

@@ -18,8 +18,7 @@ import type { Task } from './helpers';
 import Fly from '@/components/ui/fly';
 import { useLeftTongue } from './LeftTongue';
 import { hapticImpact } from '@/lib/haptics';
-import { taskFlyValue } from '@/lib/flyValue';
-import { checklistPayout } from '@/lib/checklist';
+import { taskFlyWorthNow } from '@/lib/flyValue';
 import { FlyValueBadge } from '@/components/ui/FlyValueBadge';
 import { useTaskTimerPhase } from '@/hooks/useTaskTimerPhase';
 
@@ -312,12 +311,10 @@ export default function TaskCard({
     isToday && isRepeating
       ? (task.streak ?? 0) + (task.completed ? 0 : 1)
       : 0;
-  const checklistFlies = task.checklist?.length
-    ? checklistPayout(task.checklist)
-    : null;
-  const flyValue = checklistFlies
-    ? checklistFlies.budget
-    : taskFlyValue({ streak: projectedStreak });
+  const flyValue = taskFlyWorthNow({
+    checklist: task.checklist,
+    streak: projectedStreak,
+  });
   const chipClass = compact
     ? 'inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-bold tracking-normal uppercase transition-colors border shadow-sm'
     : 'inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[9px] font-bold tracking-wider uppercase transition-colors border shadow-sm';
@@ -568,10 +565,7 @@ export default function TaskCard({
               }`}
             >
               <Fly size={36} paused={task.completed} y={-3} />
-              <FlyValueBadge
-                value={flyValue}
-                caught={checklistFlies?.earned}
-              />
+              <FlyValueBadge value={flyValue} />
             </span>
             <span
               className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${

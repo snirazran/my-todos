@@ -20,8 +20,7 @@ import {
 import BacklogTray from '@/components/board/BacklogTray';
 import { TASK_SAVED_EVENT } from '@/lib/hints/guides';
 import { notifyQuestClaims } from '@/lib/questClaims';
-import { taskFlyValue } from '@/lib/flyValue';
-import { checklistPayout } from '@/lib/checklist';
+import { taskFlyWorthNow } from '@/lib/flyValue';
 import { FlyValueBadge } from '@/components/ui/FlyValueBadge';
 import { useIntros } from '@/hooks/useIntros';
 import {
@@ -805,16 +804,9 @@ export default function HomeDashboard() {
                           x={0}
                           paused={isPaused}
                         />
-                        {(() => {
-                          if (!task.checklist?.length)
-                            return <FlyValueBadge value={taskFlyValue({})} />;
-                          const { budget, earned } = checklistPayout(
-                            task.checklist,
-                          );
-                          return (
-                            <FlyValueBadge value={budget} caught={earned} />
-                          );
-                        })()}
+                        <FlyValueBadge
+                          value={taskFlyWorthNow({ checklist: task.checklist })}
+                        />
                       </div>
                     );
                   }}

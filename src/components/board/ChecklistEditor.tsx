@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -297,6 +298,10 @@ export function ChecklistEditor({
 
   const atCap = items.length >= CHECKLIST_MAX_ITEMS;
   const doneCount = items.filter((it) => it.done).length;
+  const rewards = useMemo(
+    () => normalizeChecklistRewards(items).map((it) => !!it.reward),
+    [items],
+  );
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const autoScrollAt = (pointY: number) => {
@@ -326,6 +331,7 @@ export function ChecklistEditor({
             <ChecklistRow
               key={it.id}
               item={it}
+              reward={rewards[index]}
               at={index + 1}
               total={items.length}
               doneCount={doneCount}
@@ -397,6 +403,7 @@ export function ChecklistEditor({
 
 function ChecklistRow({
   item,
+  reward,
   at,
   total,
   doneCount,
@@ -411,6 +418,7 @@ function ChecklistRow({
   canDrag,
 }: {
   item: ChecklistItem;
+  reward: boolean;
   at: number;
   total: number;
   doneCount: number;
@@ -533,7 +541,7 @@ function ChecklistRow({
           </button>
         )}
       </div>
-      {item.reward && !dragging && (
+      {reward && !dragging && (
         <ChecklistFlyLine caught={doneCount >= at} at={at} total={total} />
       )}
     </Reorder.Item>

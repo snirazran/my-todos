@@ -12,7 +12,7 @@ import type {
 import type { ChecklistItem } from './types';
 import Fly from '@/components/ui/fly';
 import { cn } from '@/lib/utils';
-import { taskFlyValue } from '@/lib/flyValue';
+import { taskFlyWorthNow } from '@/lib/flyValue';
 import { FlyValueBadge } from '@/components/ui/FlyValueBadge';
 import { fetcher } from './utils';
 
@@ -204,9 +204,7 @@ export function SuggestionTabs({ open, className, onPick, onContentChange }: Pro
                   <Fly size={28} y={-3} paused />
                   <FlyValueBadge
                     size="sm"
-                    value={taskFlyValue({
-                      checklistSteps: t.checklist?.length ?? 0,
-                    })}
+                    value={taskFlyWorthNow({ checklist: t.checklist })}
                   />
                 </span>
               </button>

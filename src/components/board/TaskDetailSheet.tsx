@@ -36,7 +36,7 @@ import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import { useKeyboardInset } from '@/components/ui/quick-add/useKeyboardInset';
 import { hapticSuccess, hapticTick } from '@/lib/haptics';
 import { ChecklistCheckbox, ChecklistEditor } from './ChecklistEditor';
-import { checklistPayout } from '@/lib/checklist';
+import { taskFlyWorthNow } from '@/lib/flyValue';
 import { TaskRepeatPopup } from './TaskRepeatPopup';
 import RichNotesEditor from './RichNotesEditor';
 
@@ -282,13 +282,7 @@ export default function TaskDetailSheet({
   };
 
   const doneCount = checklist.filter((it) => it.done).length;
-  // A checklist reads as caught-of-total, the same tally as the card badge; a
-  // plain task has nothing to count against and just states its worth.
-  const flyPayout = checklist.length ? checklistPayout(checklist) : null;
-  const taskFlies = flyPayout ? flyPayout.budget : 1;
-  const flyLabel = flyPayout
-    ? `${flyPayout.earned}/${flyPayout.budget}`
-    : `${taskFlies}`;
+  const taskFlies = taskFlyWorthNow({ checklist });
   // For weekly tasks use their stored weekday; otherwise anchor to the date the
   // task sits on (the column being edited), falling back to today.
   const repeatDay =
@@ -782,14 +776,10 @@ export default function TaskDetailSheet({
                   <span>{onComplete ? 'Complete' : 'Upcoming'}</span>
                   {!!onComplete && taskFlies > 1 && (
                     <span
-                      title={
-                        flyPayout
-                          ? `${flyPayout.earned} of ${flyPayout.budget} flies caught`
-                          : `This task is worth ${taskFlies} flies`
-                      }
+                      title={`Completing this now catches ${taskFlies} flies`}
                       className="rounded-full bg-white/25 px-2 py-1 text-[13px] font-black leading-none tabular-nums"
                     >
-                      {flyLabel}
+                      {taskFlies}
                     </span>
                   )}
                 </span>

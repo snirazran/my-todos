@@ -1,4 +1,4 @@
-import { checklistBudget } from './checklist';
+import { checklistPayout, type ChecklistItem } from './checklist';
 
 /** [minimum streak, base flies] — days 3–10 pay +1, 11–15 pay +2, 16+ pay +3. */
 export const STREAK_FLY_TIERS: ReadonlyArray<readonly [number, number]> = [
@@ -21,15 +21,18 @@ export function streakFlyBonus(streak: number): number {
 }
 
 /**
- * What a task pays for a completion: 1 fly, or the checklist's step-count
- * budget when it has one, plus the streak bonus.
+ * What the task pays if it is completed right now: its own fly and the streak
+ * bonus, plus only the checklist markers already passed. It climbs as steps are
+ * ticked, so it never promises flies that haven't been secured.
  */
-export function taskFlyValue(opts: {
-  checklistSteps?: number;
+export function taskFlyWorthNow(opts: {
+  checklist?: ChecklistItem[] | null;
   streak?: number;
+  budgetLock?: number | null;
 }): number {
-  const steps = opts.checklistSteps ?? 0;
-  return (
-    (steps > 0 ? checklistBudget(steps) : 1) + streakFlyBonus(opts.streak ?? 0)
-  );
+  const items = opts.checklist ?? [];
+  const earned = items.length
+    ? checklistPayout(items, { budgetLock: opts.budgetLock }).earned
+    : 0;
+  return 1 + earned + streakFlyBonus(opts.streak ?? 0);
 }

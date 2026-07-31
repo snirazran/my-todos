@@ -15,15 +15,16 @@ type ChecklistCarrier = {
 export const CHECKLIST_MAX_ITEMS = 20;
 
 /**
- * The fly budget a checklist task is worth. Deliberately sub-linear: a
- * checklist is always worth less per box than the same number of separate
- * tasks, so nesting deeper never pays better.
+ * Bonus flies a checklist pays on TOP of the task's own fly. The first two
+ * steps pay nothing, so a short checklist never takes the completion fly away
+ * from the task. Deliberately sub-linear beyond that: a checklist is always
+ * worth less per box than the same number of separate tasks, so nesting deeper
+ * never pays better.
  */
-export function checklistBudget(steps: number): number {
-  if (steps <= 0) return 0;
-  if (steps <= 2) return 1;
-  if (steps <= 6) return 2;
-  return 3;
+export function checklistBonus(steps: number): number {
+  if (steps <= 2) return 0;
+  if (steps <= 6) return 1;
+  return 2;
 }
 
 /** Evenly spread `count` marker slots over `steps`, never on the last step. */
@@ -44,17 +45,21 @@ function defaultMarkerIndexes(count: number, steps: number): number[] {
 /**
  * The same items with their reward markers set. Positions are derived purely
  * from the step count — evenly spread, with the last always on the final step
- * so the budget can never be stacked onto one early checkbox. Because nothing
- * is remembered per item, reordering steps leaves the flies where they are.
+ * so the budget can never be stacked onto one early checkbox. A checklist too
+ * short to earn a bonus carries no markers at all. Because nothing is
+ * remembered per item, reordering steps leaves the flies where they are.
  */
 export function normalizeChecklistRewards(
   items: ChecklistItem[],
-  budget: number = checklistBudget(items.length),
+  budget: number = checklistBonus(items.length),
 ): ChecklistItem[] {
   const steps = items.length;
   if (steps === 0) return items;
   const free = Math.max(0, Math.min(budget - 1, steps - 1));
-  const marked = new Set([...defaultMarkerIndexes(free, steps), steps - 1]);
+  const marked =
+    budget > 0
+      ? new Set([...defaultMarkerIndexes(free, steps), steps - 1])
+      : new Set<number>();
   return items.map((it, i) =>
     !!it.reward === marked.has(i) ? it : { ...it, reward: marked.has(i) },
   );
@@ -63,20 +68,21 @@ export function normalizeChecklistRewards(
 export type ChecklistPayout = {
   /** Items with normalized reward markers. */
   items: ChecklistItem[];
-  /** Flies this checklist can pay in total, after any locked-in cap. */
+  /** Bonus flies this checklist can pay, after any locked-in cap. */
   budget: number;
-  /** Flies earned so far. */
+  /** Bonus flies earned so far. */
   earned: number;
   doneCount: number;
 };
 
 /**
- * What a checklist has paid out. A marker pays the moment that many steps are
- * checked and is never clawed back, so an abandoned checklist keeps its
- * partial credit. Completing the task does NOT release the unticked markers —
- * steps are the only way a checklist earns, so its progress is honest.
- * `budgetLock` is the budget snapshotted the first time this occurrence paid,
- * so padding a finished checklist with extra steps can't mint another fly.
+ * What a checklist has paid out on top of the task's own fly. A marker pays the
+ * moment that many steps are checked and is never clawed back, so an abandoned
+ * checklist keeps its partial credit. Completing the task does NOT release the
+ * unticked markers — steps are the only way the bonus is earned, so its
+ * progress is honest. `budgetLock` is the budget snapshotted the first time this
+ * occurrence paid, so padding a finished checklist with extra steps can't mint
+ * another fly.
  */
 export function checklistPayout(
   items: ChecklistItem[],
@@ -84,7 +90,7 @@ export function checklistPayout(
 ): ChecklistPayout {
   const { budgetLock } = opts;
   const steps = items.length;
-  const full = checklistBudget(steps);
+  const full = checklistBonus(steps);
   const normalized = normalizeChecklistRewards(items, full);
   const budget =
     typeof budgetLock === 'number' && budgetLock >= 0
