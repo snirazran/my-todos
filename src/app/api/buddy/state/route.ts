@@ -11,6 +11,12 @@ import { equippedToIndices, type FrogIndices } from '@/lib/friends/indices';
 
 export type BuddyTaskState = {
   bondId: string;
+  /** 'pending' = invite sent, waiting on the partner; 'active' = shared. */
+  status: 'pending' | 'active';
+  /** True when this user sent the invite (so they can cancel it). */
+  invitedByMe: boolean;
+  /** When a pending invite expires (ISO), if it has a deadline. */
+  expiresAt: string | null;
   partnerName: string;
   partnerInitial: string;
   partnerIndices: FrogIndices;
@@ -44,7 +50,10 @@ export async function GET() {
     );
 
     const [bonds, partners, catalog] = await Promise.all([
-      TaskBondModel.find({ bondId: { $in: bondIds }, status: 'active' }).lean(),
+      TaskBondModel.find({
+        bondId: { $in: bondIds },
+        status: { $in: ['active', 'pending'] },
+      }).lean(),
       UserModel.find({ _id: { $in: partnerIds } })
         .select('name frogName wardrobe.equipped')
         .lean<
@@ -69,8 +78,14 @@ export async function GET() {
       const partner = t.buddyUserId ? partnerById.get(t.buddyUserId) : undefined;
       const name = partner?.name || partner?.frogName || 'Friend';
       const iAmFrom = bond.fromUserId === userId;
+      const pending = bond.status === 'pending';
+      if (pending && bond.expiresAt && new Date(bond.expiresAt) <= new Date())
+        continue;
       byTaskId[t.id] = {
         bondId: bond.bondId,
+        status: pending ? 'pending' : 'active',
+        invitedByMe: bond.invitedBy === userId,
+        expiresAt: bond.expiresAt ? new Date(bond.expiresAt).toISOString() : null,
         partnerName: name,
         partnerInitial: name.charAt(0).toUpperCase() || '?',
         partnerIndices: equippedToIndices(partner?.wardrobe?.equipped, byId),

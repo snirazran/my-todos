@@ -44,8 +44,10 @@ export type FriendSummary = {
   focusing?: boolean;
   /** Catalog details of this friend's equipped wardrobe items. */
   equippedItems?: FriendEquippedItem[];
-  /** Highest rarity among this friend's equipped items. */
+  /** Highest rarity among this friend's equipped items and background. */
   flexRarity?: Rarity | null;
+  /** Rarity of this friend's equipped background. */
+  backgroundRarity?: Rarity | null;
 };
 
 export type FriendEquippedItem = {
@@ -82,10 +84,17 @@ export function equippedToItems(
 
 export function highestRarity(
   items: FriendEquippedItem[],
+  backgroundRarity?: Rarity | null,
 ): Rarity | null {
   let top: Rarity | null = null;
   for (const item of items) {
     if (!top || rarityRank[item.rarity] > rarityRank[top]) top = item.rarity;
+  }
+  if (
+    backgroundRarity &&
+    (!top || rarityRank[backgroundRarity] > rarityRank[top])
+  ) {
+    top = backgroundRarity;
   }
   return top;
 }

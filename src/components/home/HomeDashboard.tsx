@@ -470,6 +470,7 @@ export default function HomeDashboard() {
   const rate = data.length > 0 ? (doneCount / data.length) * 100 : 0;
 
   const openTaskCount = data.filter((t) => !t.completed).length;
+  const dayCleared = data.length > 0 && openTaskCount === 0;
   const giftDone = doneCount;
   const giftTotal = data.length;
   const flyBalance = user ? flyStatus.balance : 5;
@@ -731,39 +732,42 @@ export default function HomeDashboard() {
               )}
               <div className="min-h-[360px] pb-16 md:pb-4" ref={taskListRef}>
                 {renderGuestPrompt()}
-                <div className="mb-2 flex items-center justify-between px-2 md:mb-4 md:px-4">
-                  <div className="flex items-center gap-2 ml-3 cursor-pointer group md:gap-2.5">
-                    <Icon name="planner" className="w-7 h-7 md:w-8 md:h-8" />
-                    <span className="text-sm font-black tracking-tight lowercase text-foreground md:text-base">
-                      {data.length > 0 && openTaskCount === 0
-                        ? 'all done for today!'
-                        : `${openTaskCount} ${
-                            openTaskCount === 1 ? 'fly' : 'flies'
-                          } left for today!`}
-                    </span>
-                  </div>
+                {/* A cleared day says it better on the card, and an empty day
+                    has nothing to count or filter — either way the header
+                    steps aside, unless filters are on and must stay reachable. */}
+                {!((dayCleared || data.length === 0) && !filtersActive) && (
+                  <div className="mb-2 flex items-center justify-between px-2 md:mb-4 md:px-4">
+                    <div className="flex items-center gap-2 ml-3 cursor-pointer group md:gap-2.5">
+                      <Icon name="planner" className="w-7 h-7 md:w-8 md:h-8" />
+                      <span className="text-sm font-black tracking-tight lowercase text-foreground md:text-base">
+                        {dayCleared
+                          ? 'all done for today!'
+                          : `${openTaskCount} ${
+                              openTaskCount === 1 ? 'fly' : 'flies'
+                            } left for today!`}
+                      </span>
+                    </div>
 
-                  <div className="flex items-center gap-2">
                     <FilterTriggerButton
                       triggerRef={headerMenuBtnRef}
                       onClick={() => setIsHeaderMenuOpen(true)}
                       activeCount={activeFilterCount}
                       open={isHeaderMenuOpen}
                     />
-                    <TaskFilterSheet
-                      open={isHeaderMenuOpen}
-                      onOpenChange={setIsHeaderMenuOpen}
-                      filters={filters}
-                      onChange={setFilters}
-                      onReset={resetFilters}
-                      tags={tags || []}
-                      tasks={data}
-                      presets={presets}
-                      onSavePreset={savePreset}
-                      onDeletePreset={deletePreset}
-                    />
                   </div>
-                </div>
+                )}
+                <TaskFilterSheet
+                  open={isHeaderMenuOpen}
+                  onOpenChange={setIsHeaderMenuOpen}
+                  filters={filters}
+                  onChange={setFilters}
+                  onReset={resetFilters}
+                  tags={tags || []}
+                  tasks={data}
+                  presets={presets}
+                  onSavePreset={savePreset}
+                  onDeletePreset={deletePreset}
+                />
                 <AppliedFilterChips
                   filters={filters}
                   base={baseFilters}
@@ -930,13 +934,18 @@ export default function HomeDashboard() {
                   filters={filters}
                   onClearFilters={resetFilters}
                   filtersActive={filtersActive}
+                  onShowCompleted={
+                    filters.showCompleted
+                      ? undefined
+                      : () => setFilters({ ...filters, showCompleted: true })
+                  }
                   isGlowActive={isTaskGlow}
                   isFrozen={cinematic}
                   quickAddOpen={showQuickAdd}
                   paused={isAnyPanelOpen}
                 />
-                <HomeShopRail />
                 <BuddyNudgeCard />
+                <HomeShopRail />
               </div>
             </div>
           </div>

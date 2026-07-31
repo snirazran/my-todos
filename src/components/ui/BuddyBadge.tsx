@@ -1,6 +1,6 @@
 'use client';
 
-import { Check } from 'lucide-react';
+import { Check, Clock } from 'lucide-react';
 import { useBuddyState } from '@/hooks/useBuddyState';
 import type { FrogIndices } from '@/lib/friends/indices';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
@@ -66,6 +66,31 @@ export function BuddyBadge({
   const byTaskId = useBuddyState();
   const state = byTaskId[taskId];
   if (!state) return null;
+
+  if (state.status === 'pending') {
+    return (
+      <span
+        title={`Waiting for ${state.partnerName} to accept`}
+        className={cn('relative inline-flex shrink-0', className)}
+        style={{ width: size, height: size }}
+      >
+        <BuddyFrogFace
+          indices={state.partnerIndices}
+          size={size}
+          className="opacity-70 ring-2 ring-inset ring-amber-500/50"
+        />
+        <span
+          className="absolute -bottom-1 -right-1 grid place-items-center rounded-full border border-background bg-amber-500 text-white"
+          style={{ width: size * 0.55, height: size * 0.55 }}
+        >
+          <Clock
+            style={{ width: size * 0.36, height: size * 0.36 }}
+            strokeWidth={3}
+          />
+        </span>
+      </span>
+    );
+  }
 
   const partnerDone = !!date && state.partnerCompletedDates.includes(date);
 

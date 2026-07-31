@@ -6,9 +6,11 @@ import connectMongo from '@/lib/mongoose';
 import FriendshipModel from '@/lib/models/Friendship';
 import FriendRequestModel from '@/lib/models/FriendRequest';
 import UserModel from '@/lib/models/User';
+import BackgroundModel from '@/lib/models/Background';
 import { friendshipKey } from '@/lib/friends/code';
 import { notifyFriendUpdate } from '@/lib/taskSync';
 import { getCachedCatalog, buildById } from '@/lib/skins/getCatalog';
+import type { Rarity } from '@/lib/skins/catalog';
 import {
   equippedToIndices,
   equippedToItems,
@@ -65,6 +67,22 @@ export async function GET(req: NextRequest) {
     ]);
     const byId = buildById(catalog);
 
+    const backgroundIds = Array.from(
+      new Set(
+        [...users, me]
+          .map((u) => u?.wardrobe?.backgrounds?.equipped)
+          .filter((id): id is string => !!id),
+      ),
+    );
+    const backgroundDocs = backgroundIds.length
+      ? await BackgroundModel.find({ id: { $in: backgroundIds } })
+          .select('id rarity')
+          .lean()
+      : [];
+    const backgroundRarityById = new Map<string, Rarity>(
+      backgroundDocs.map((b) => [b.id, b.rarity as Rarity]),
+    );
+
     const aliveStreakOf = (u: unknown): number => {
       const state = readLoginStreakState(u);
       if (state.count <= 0 || !state.lastDayKey) return 0;
@@ -97,6 +115,10 @@ export async function GET(req: NextRequest) {
     }): FriendSummary => {
       const fliesToday = fliesEarnedOn(u.wardrobe?.flyDaily, today);
       const equippedItems = equippedToItems(u.wardrobe?.equipped, byId);
+      const backgroundId = u.wardrobe?.backgrounds?.equipped ?? null;
+      const backgroundRarity = backgroundId
+        ? backgroundRarityById.get(backgroundId) ?? null
+        : null;
       const timer = u.activeFrogodoroTimer;
       const focusing =
         timer?.status === 'running' &&
@@ -110,10 +132,11 @@ export async function GET(req: NextRequest) {
         frogName: u.frogName ?? 'Frog',
         indices: equippedToIndices(u.wardrobe?.equipped, byId),
         equippedItems,
-        flexRarity: highestRarity(equippedItems),
+        flexRarity: highestRarity(equippedItems, backgroundRarity),
+        backgroundRarity,
         fliesToday,
         givesYou: contributionFrom(fliesToday),
-        backgroundId: u.wardrobe?.backgrounds?.equipped ?? null,
+        backgroundId,
         streak: aliveStreakOf(u),
         premium: u.premiumUntil ? new Date(u.premiumUntil) > new Date() : false,
       };

@@ -20,6 +20,7 @@ import { useRegisterOpenSheet } from '@/lib/sheetStore';
 import type { QuestReward } from '@/lib/quests/types';
 import type { ItemDef, WardrobeSlot } from '@/lib/skins/catalog';
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
+import { shareLink } from '@/lib/share';
 
 type CatalogItem = {
   id: string;
@@ -128,30 +129,21 @@ export function InviteFriendsModal({
     setStep('pick');
   }, [open, allRewardsClaimed]);
 
-  const shareInviteUrl = React.useCallback(
-    async (url: string) => {
-      const shareData = {
-        title: 'Come join me on Frogress!',
-        text: 'I have a gift for you on Frogress. Tap the link to claim it!',
-        url,
-      };
-      try {
-        if (typeof navigator !== 'undefined' && (navigator as any).share) {
-          await (navigator as any).share(shareData);
-          trackAnalyticsEvent('referral_invite_shared', { method: 'native_share', share_surface: 'invite_rewards' });
-          return;
-        }
-      } catch {
-        return;
-      }
-
-      try {
-        await navigator.clipboard.writeText(url);
-        trackAnalyticsEvent('referral_invite_shared', { method: 'copy_link', share_surface: 'invite_rewards' });
-      } catch {}
-    },
-    [],
-  );
+  const shareInviteUrl = React.useCallback(async (url: string) => {
+    const result = await shareLink({
+      title: 'Come join me on Frogress!',
+      text: 'I have a gift for you on Frogress. Tap the link to claim it!',
+      url,
+      dialogTitle: 'Invite a friend',
+    });
+    if (result === 'shared' || result === 'copied') {
+      trackAnalyticsEvent('referral_invite_shared', {
+        method: result === 'shared' ? 'native_share' : 'copy_link',
+        share_surface: 'invite_rewards',
+      });
+    }
+    return result;
+  }, []);
 
   const handleSendInvite = async () => {
     if (!selectedGiftId) return;

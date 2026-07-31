@@ -81,10 +81,10 @@ export function BuddyNudgeCard() {
               </span>
               <span className="relative min-w-0 flex-1">
                 <span className="block text-[13px] font-black leading-tight tracking-tight text-foreground md:font-bold">
-                  Catch flies together!
+                  Share a goal with a friend
                 </span>
                 <span className="mt-0.5 block text-[12px] font-semibold leading-snug text-muted-foreground">
-                  Team up — earn extra flies!
+                  Both finish it → you both catch double flies.
                 </span>
               </span>
               <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
@@ -106,6 +106,7 @@ export function BuddyNudgeCard() {
         onClose={() => setFlowOpen(false)}
         friends={friends}
         indices={indices}
+        source="home_card"
       />
     </>
   );

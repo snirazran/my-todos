@@ -6,6 +6,7 @@ import ReferralModel from '@/lib/models/Referral';
 import UserModel from '@/lib/models/User';
 import InviteConfigModel from '@/lib/models/InviteConfig';
 import TaskBondModel from '@/lib/models/TaskBond';
+import TaskModel from '@/lib/models/Task';
 import { ensureInviteConfig } from '@/lib/inviteConfig/defaults';
 import { getFullCatalog, buildById } from '@/lib/skins/getCatalog';
 import { createFriendship } from '@/lib/friends/code';
@@ -161,14 +162,33 @@ export async function POST(req: NextRequest) {
         const bondId = uuid();
         const acceptBody = buildAcceptBody(params, tz);
 
-        const fromResult = await createTasksForUser(
-          referral.inviterId,
-          referral.buddyTaskSectionId
-            ? { ...acceptBody, sectionId: referral.buddyTaskSectionId }
-            : acceptBody,
-          tz,
-          { bondId, buddyUserId: userId },
-        );
+        // The inviter shared a task they already had — bond it in place.
+        let fromTaskId: string | null = null;
+        if (referral.buddyTaskFromId) {
+          const stamped = await TaskModel.updateMany(
+            {
+              userId: referral.inviterId,
+              bondId: null,
+              $or: [
+                { repeatGroupId: referral.buddyTaskFromId },
+                { id: referral.buddyTaskFromId },
+              ],
+            },
+            { $set: { bondId, buddyUserId: userId } },
+          );
+          if (stamped.modifiedCount > 0) fromTaskId = referral.buddyTaskFromId;
+        }
+
+        const fromResult = fromTaskId
+          ? { ok: true as const, ids: [] as string[], repeatGroupId: undefined }
+          : await createTasksForUser(
+              referral.inviterId,
+              referral.buddyTaskSectionId
+                ? { ...acceptBody, sectionId: referral.buddyTaskSectionId }
+                : acceptBody,
+              tz,
+              { bondId, buddyUserId: userId },
+            );
         const toResult = await createTasksForUser(userId, acceptBody, tz, {
           bondId,
           buddyUserId: referral.inviterId,
@@ -184,7 +204,7 @@ export async function POST(req: NextRequest) {
             initialText: params.text,
             createParams: params,
             repeatLabel: repeatLabelFor(params),
-            taskFromId: fromResult.repeatGroupId ?? fromResult.ids[0],
+            taskFromId: fromTaskId ?? fromResult.repeatGroupId ?? fromResult.ids[0],
             taskToId: toResult.repeatGroupId ?? toResult.ids[0],
             activeSince: getZonedToday(tz),
           });

@@ -8,7 +8,11 @@ import UserModel from '@/lib/models/User';
 import TaskBondModel, { type BuddyCreateParams } from '@/lib/models/TaskBond';
 import { areFriends } from '@/lib/friends/code';
 import { createTasksForUser } from '@/app/api/tasks/route';
-import { repeatLabelFor } from '@/lib/buddy/bond';
+import {
+  repeatLabelFor,
+  paramsFromTask,
+  type ExistingBuddyTask,
+} from '@/lib/buddy/bond';
 import { sendBuddyPush, buddyDisplayName } from '@/lib/buddy/push';
 import { notifyFriendUpdate } from '@/lib/taskSync';
 import TaskModel from '@/lib/models/Task';
@@ -23,6 +27,7 @@ function isRepeating(params: BuddyCreateParams): boolean {
   if (params.repeat === 'weekly' && (params.days?.length ?? 0) > 0) return true;
   return false;
 }
+
 
 export async function POST(req: NextRequest) {
   let userId: string;
@@ -41,6 +46,7 @@ export async function POST(req: NextRequest) {
 
   const friendId = String(body?.friendId || '').trim();
   const tz = body?.timezone || 'UTC';
+  const fromTaskId = String(body?.fromTaskId || '').trim();
   const params: BuddyCreateParams = {
     text: String(body?.text ?? '').trim(),
     repeat: body?.repeat,
@@ -51,14 +57,17 @@ export async function POST(req: NextRequest) {
   };
 
   if (!friendId) return NextResponse.json({ error: 'Missing friendId' }, { status: 400 });
-  if (!params.text) return NextResponse.json({ error: 'text is required' }, { status: 400 });
   if (friendId === userId)
     return NextResponse.json({ error: "You can't buddy with yourself" }, { status: 400 });
-  if (!isRepeating(params))
-    return NextResponse.json(
-      { error: 'Buddy tasks must repeat — pick a repeat option' },
-      { status: 400 },
-    );
+  if (!fromTaskId) {
+    if (!params.text)
+      return NextResponse.json({ error: 'text is required' }, { status: 400 });
+    if (!isRepeating(params))
+      return NextResponse.json(
+        { error: 'Buddy tasks must repeat — pick a repeat option' },
+        { status: 400 },
+      );
+  }
 
   try {
     await connectMongo();
@@ -66,29 +75,63 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Not friends' }, { status: 403 });
 
     const bondId = uuid();
+    let bondParams = params;
+    let taskFromId: string;
 
-    // Create the inviter's own copy now, stamped with the bond.
-    const result = await createTasksForUser(userId, body, tz, {
-      bondId,
-      buddyUserId: friendId,
-    });
-    if (!result.ok)
-      return NextResponse.json({ error: result.error }, { status: result.status });
+    if (fromTaskId) {
+      // Bond the user's existing repeat group instead of creating a copy.
+      const task = await TaskModel.findOne({ userId, id: fromTaskId })
+        .lean<ExistingBuddyTask | null>();
+      if (!task)
+        return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+      if (task.bondId)
+        return NextResponse.json(
+          { error: 'This task is already shared' },
+          { status: 409 },
+        );
 
-    const [createdTask, analyticsUser] = await Promise.all([
-      TaskModel.findOne({ userId, id: { $in: result.ids } }).lean(),
-      UserModel.findById(userId).select('focusProfile').lean(),
-    ]);
-    await recordAnalyticsEvent({
-      userId,
-      name: 'task_created',
-      properties: taskAnalyticsProperties(createdTask ?? {}, analyticsUser?.focusProfile, {
-        count: result.ids.length,
-        buddy: true,
-      }),
-    });
+      const siblings = task.repeatGroupId
+        ? await TaskModel.find({ userId, repeatGroupId: task.repeatGroupId })
+            .lean<ExistingBuddyTask[]>()
+        : [task];
+      bondParams = paramsFromTask(task, siblings);
+      if (!isRepeating(bondParams))
+        return NextResponse.json(
+          { error: 'Only repeating tasks can be shared with a buddy' },
+          { status: 400 },
+        );
 
-    const taskFromId = result.repeatGroupId ?? result.ids[0];
+      const filter = task.repeatGroupId
+        ? { userId, repeatGroupId: task.repeatGroupId }
+        : { userId, id: task.id };
+      await TaskModel.updateMany(filter, {
+        $set: { bondId, buddyUserId: friendId },
+      });
+      taskFromId = task.repeatGroupId ?? task.id;
+    } else {
+      // Create the inviter's own copy now, stamped with the bond.
+      const result = await createTasksForUser(userId, body, tz, {
+        bondId,
+        buddyUserId: friendId,
+      });
+      if (!result.ok)
+        return NextResponse.json({ error: result.error }, { status: result.status });
+
+      const [createdTask, analyticsUser] = await Promise.all([
+        TaskModel.findOne({ userId, id: { $in: result.ids } }).lean(),
+        UserModel.findById(userId).select('focusProfile').lean(),
+      ]);
+      await recordAnalyticsEvent({
+        userId,
+        name: 'task_created',
+        properties: taskAnalyticsProperties(createdTask ?? {}, analyticsUser?.focusProfile, {
+          count: result.ids.length,
+          buddy: true,
+        }),
+      });
+
+      taskFromId = result.repeatGroupId ?? result.ids[0];
+    }
 
     await TaskBondModel.create({
       bondId,
@@ -96,9 +139,9 @@ export async function POST(req: NextRequest) {
       fromUserId: userId,
       toUserId: friendId,
       status: 'pending',
-      initialText: params.text,
-      createParams: params,
-      repeatLabel: repeatLabelFor(params),
+      initialText: bondParams.text,
+      createParams: bondParams,
+      repeatLabel: repeatLabelFor(bondParams),
       taskFromId,
       expiresAt: new Date(Date.now() + INVITE_TTL_MS),
     });
@@ -106,8 +149,8 @@ export async function POST(req: NextRequest) {
       userId,
       name: 'buddy_invite_sent',
       properties: {
-        source: 'existing_friend',
-        repeat_mode: repeatLabelFor(params),
+        source: fromTaskId ? 'existing_task' : 'existing_friend',
+        repeat_mode: repeatLabelFor(bondParams),
       },
     });
 
@@ -115,13 +158,13 @@ export async function POST(req: NextRequest) {
     void buddyDisplayName(userId).then((name) =>
       sendBuddyPush(friendId, {
         title: `${name} wants to be your goal buddy`,
-        body: `Team up on "${params.text}" — you'll see each other's progress every day.`,
+        body: `Team up on "${bondParams.text}" — you'll see each other's progress every day.`,
         path: '/friends',
         type: 'buddy_invite',
       }),
     );
 
-    return NextResponse.json({ ok: true, bondId, tasks: result.tasks });
+    return NextResponse.json({ ok: true, bondId });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'Failed to send buddy invite' },

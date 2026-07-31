@@ -55,6 +55,9 @@ importers:
       '@capacitor/local-notifications':
         specifier: ^8.0.2
         version: 8.0.2(@capacitor/core@8.0.2)
+      '@capacitor/share':
+        specifier: ^8
+        version: 8.0.1(@capacitor/core@8.0.2)
       '@capgo/capacitor-social-login':
         specifier: ^8.3.20
         version: 8.3.20(@capacitor/core@8.0.2)
@@ -894,6 +897,11 @@ packages:
 
   '@capacitor/local-notifications@8.0.2':
     resolution: {integrity: sha512-X7KE/I4ZutMTGVHNUyTjIugYcQEcHJRLks+TsPnOriuS+lo0geSTuaRln6zAZlJSSXSoVMSSzHexdSbIjR/8iw==}
+    peerDependencies:
+      '@capacitor/core': '>=8.0.0'
+
+  '@capacitor/share@8.0.1':
+    resolution: {integrity: sha512-3cSBKBCJVon54rKDROP2rqGyeGks4pBh9TbaEk9S375Kbek/ZHe72N50zIa0Vn9Eac/SuhwgehO/mmA4CsUOiw==}
     peerDependencies:
       '@capacitor/core': '>=8.0.0'
 
@@ -6607,6 +6615,10 @@ snapshots:
       '@capacitor/core': 8.0.2
 
   '@capacitor/local-notifications@8.0.2(@capacitor/core@8.0.2)':
+    dependencies:
+      '@capacitor/core': 8.0.2
+
+  '@capacitor/share@8.0.1(@capacitor/core@8.0.2)':
     dependencies:
       '@capacitor/core': 8.0.2
 

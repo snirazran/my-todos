@@ -36,6 +36,8 @@ PODS:
     - GoogleMLKit/BarcodeScanning (~> 8.0.0)
   - CapacitorNativeSettings (8.1.0):
     - Capacitor
+  - CapacitorShare (8.0.1):
+    - Capacitor
   - CapgoCapacitorSocialLogin (8.3.20):
     - Capacitor
     - GoogleSignIn (~> 9.0.0)
@@ -152,6 +154,7 @@ DEPENDENCIES:
   - "CapacitorLocalNotifications (from `../../node_modules/.pnpm/@capacitor+local-notifications@8.0.2_@capacitor+core@8.0.2/node_modules/@capacitor/local-notifications`)"
   - "CapacitorMlkitBarcodeScanning (from `../../node_modules/.pnpm/@capacitor-mlkit+barcode-scanning@8.1.0_@capacitor+core@8.0.2/node_modules/@capacitor-mlkit/barcode-scanning`)"
   - "CapacitorNativeSettings (from `../../node_modules/.pnpm/capacitor-native-settings@8.1.0_@capacitor+core@8.0.2/node_modules/capacitor-native-settings`)"
+  - "CapacitorShare (from `../../node_modules/.pnpm/@capacitor+share@8.0.1_@capacitor+core@8.0.2/node_modules/@capacitor/share`)"
   - "CapgoCapacitorSocialLogin (from `../../node_modules/.pnpm/@capgo+capacitor-social-login@8.3.20_@capacitor+core@8.0.2/node_modules/@capgo/capacitor-social-login`)"
   - LiveActivitiesKit (from `../../node_modules/capacitor-live-activities`)
   - "RevenuecatPurchasesCapacitor (from `../../node_modules/.pnpm/@revenuecat+purchases-capacitor@13.2.1_@capacitor+core@8.0.2/node_modules/@revenuecat/purchases-capacitor`)"
@@ -207,6 +210,8 @@ EXTERNAL SOURCES:
     :path: "../../node_modules/.pnpm/@capacitor-mlkit+barcode-scanning@8.1.0_@capacitor+core@8.0.2/node_modules/@capacitor-mlkit/barcode-scanning"
   CapacitorNativeSettings:
     :path: "../../node_modules/.pnpm/capacitor-native-settings@8.1.0_@capacitor+core@8.0.2/node_modules/capacitor-native-settings"
+  CapacitorShare:
+    :path: "../../node_modules/.pnpm/@capacitor+share@8.0.1_@capacitor+core@8.0.2/node_modules/@capacitor/share"
   CapgoCapacitorSocialLogin:
     :path: "../../node_modules/.pnpm/@capgo+capacitor-social-login@8.3.20_@capacitor+core@8.0.2/node_modules/@capgo/capacitor-social-login"
   LiveActivitiesKit:
@@ -229,6 +234,7 @@ SPEC CHECKSUMS:
   CapacitorLocalNotifications: 4db83a7f6bdd2f30dcedf5c6f92c415065467a24
   CapacitorMlkitBarcodeScanning: 31c6af9f39873ff69e16ed5b39ebe2e1915f16fe
   CapacitorNativeSettings: d512b84fdcc04948c32f267621079a0d7c0d452f
+  CapacitorShare: 0c58305114538568059bfc07111f22dcb9cb2a82
   CapgoCapacitorSocialLogin: bb85ca430d4bc6f5482a63a924242f5042d3b077
   FirebaseCore: c7b57863ce0859281a66d16ca36d665c45d332b5
   FirebaseCoreInternal: 571a2dd8c975410966199623351db3a3265c874d
@@ -254,6 +260,6 @@ SPEC CHECKSUMS:
   RevenueCat: f4427b8a1daa7a04a26cb20d60807aa818d9420b
   RevenuecatPurchasesCapacitor: c31daadc8c3b89ff31686b6ea07ff99bc21c96b7
 
-PODFILE CHECKSUM: 5f24c0e133ca57629d43ca4b2b23ee62fe574680
+PODFILE CHECKSUM: 017e926af7dfd388d3ce656b772f8ea37ed533d5
 
 COCOAPODS: 1.16.2

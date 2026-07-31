@@ -14,6 +14,7 @@ import {
   Pen,
   ListChecks,
   EyeOff,
+  Eye,
 } from 'lucide-react';
 import Fly from '@/components/ui/fly';
 import { createPortal } from 'react-dom';
@@ -88,11 +89,26 @@ import {
   type TaskFilters,
 } from '@/lib/taskFilters';
 import { FilteredEmptyState } from '@/components/ui/TaskFilterBar';
-import { objectiveCardTone } from '@/lib/questClaims';
 import { useNotification } from '@/components/providers/NotificationProvider';
 import { useUIStore } from '@/lib/uiStore';
 import { guideById } from '@/lib/hints/guides';
 import { format } from 'date-fns';
+import { useFrogFullness } from '@/hooks/useFrogHunger';
+import { HUNGRY_MOOD_THRESHOLD } from '@/lib/hungerLogic';
+import { BellyMeter } from '@/components/ui/BellyMeter';
+
+/**
+ * The frog reports on its own belly, in its own voice — and only brags about
+ * being full when it actually is. One task is a single belly notch, so a half
+ * belly asks for one more fly instead of promising a top-up.
+ */
+function bellyLine(fullness: number | null): string {
+  if (fullness === null) return 'Plate clean. My compliments to the chef.';
+  if (fullness >= 0.9) return "Clean plate, full frog. I'm going to lie down.";
+  if (fullness > HUNGRY_MOOD_THRESHOLD)
+    return 'Still room for one more fly. Just saying.';
+  return '*stomach growls* Room for one more fly?';
+}
 
 interface Task {
   id: string;
@@ -1459,6 +1475,7 @@ export default function TaskList({
   filters,
   onClearFilters,
   filtersActive,
+  onShowCompleted,
   isGuest,
   isGlowActive,
   isFrozen = false,
@@ -1528,6 +1545,8 @@ export default function TaskList({
   filters: TaskFilters;
   onClearFilters: () => void;
   filtersActive: boolean;
+  /** Reveals the day's finished tasks from the all-done card. */
+  onShowCompleted?: () => void;
   isGuest?: boolean;
   isGlowActive?: boolean;
   /** When true the current sort order is frozen (prevents layout shifts during tongue animation) */
@@ -1556,6 +1575,8 @@ export default function TaskList({
   };
 
   const vSet = visuallyCompleted ?? new Set<string>();
+
+  const fullness = useFrogFullness(!isGuest);
 
   // Which rows have their steps showing. Held here rather than per-row so a
   // sort drag can collapse them: verticalListSortingStrategy translates rows by
@@ -2337,45 +2358,39 @@ export default function TaskList({
             !exitAction ? (
             /* Empty State: Tasks exist but all filtered/completed */
             allTasksCompleted && !filtersActive ? (
-              <div
-                className={`fly-caught-enter relative mb-2 rounded-2xl border p-3 shadow-sm ${objectiveCardTone(
-                  true,
-                )} ${
-                  quickAddOpen
-                    ? 'opacity-0'
-                    : 'opacity-100 transition-opacity duration-300'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-background shadow-sm ring-1 ring-primary/20">
+              <div className="fly-caught-enter relative mb-2 overflow-hidden rounded-2xl border border-border/60 bg-card p-3 shadow-sm">
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/[0.07] via-transparent to-transparent"
+                />
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute inset-x-4 top-0 h-px bg-gradient-to-r from-transparent via-white/60 to-transparent opacity-50"
+                />
+                <div className="relative flex items-center gap-3">
+                  <div className="belly-dot flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-background shadow-sm ring-1 ring-primary/20">
                     <Fly size={30} y={-2} paused={paused} />
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-[14px] font-black leading-tight tracking-tight text-foreground">
                       Every fly caught!
                     </p>
-                    <div
-                      className="mt-1.5 flex items-center gap-[5px]"
-                      aria-label={`${tasks.length} of ${tasks.length} tasks done`}
-                    >
-                      {Array.from({
-                        length: Math.min(tasks.length, 12),
-                      }).map((_, i) => (
-                        <span
-                          key={i}
-                          className="belly-dot h-[7px] w-[7px] rounded-full bg-primary shadow-[0_0_6px_rgba(74,222,128,0.35)]"
-                          style={{ animationDelay: `${120 + i * 50}ms` }}
-                        />
-                      ))}
-                      {tasks.length > 12 && (
-                        <span className="text-[10px] font-black leading-none text-primary">
-                          +{tasks.length - 12}
-                        </span>
-                      )}
-                    </div>
-                    <p className="mt-1.5 text-[12px] font-semibold leading-snug text-muted-foreground">
-                      Your frog is full and happy.
-                    </p>
+                    {onShowCompleted ? (
+                      <button
+                        type="button"
+                        onClick={onShowCompleted}
+                        className="mt-1 inline-flex items-center gap-1 rounded-lg bg-primary/10 px-1.5 py-1 text-[11px] font-bold leading-none text-primary transition-colors [@media(hover:hover)]:hover:bg-primary/20"
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                        Show {tasks.length}{' '}
+                        {tasks.length === 1 ? 'task' : 'tasks'} done
+                      </button>
+                    ) : (
+                      <p className="mt-0.5 text-[11px] font-bold leading-none text-primary">
+                        {tasks.length} {tasks.length === 1 ? 'task' : 'tasks'}{' '}
+                        done today
+                      </p>
+                    )}
                   </div>
                   <button
                     type="button"
@@ -2388,6 +2403,14 @@ export default function TaskList({
                     <Plus className="h-4 w-4" strokeWidth={3.5} />
                     Add
                   </button>
+                </div>
+                <div className="relative mt-2.5 border-t border-border/60 pt-2.5">
+                  {fullness !== null && (
+                    <BellyMeter percent={fullness * 100} className="mb-1.5" />
+                  )}
+                  <p className="text-[12px] font-semibold leading-snug text-muted-foreground">
+                    {bellyLine(fullness)}
+                  </p>
                 </div>
               </div>
             ) : filtersActive ? (

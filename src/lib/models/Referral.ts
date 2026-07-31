@@ -10,6 +10,8 @@ export type ReferralDoc = {
   buddyTask?: BuddyCreateParams | null;
   /** Section the inviter filed their own copy under (personal, not shared). */
   buddyTaskSectionId?: string | null;
+  /** Inviter's existing task (repeatGroupId or task id) to bond on claim. */
+  buddyTaskFromId?: string | null;
   createdAt: Date;
   claimedByUserId?: string | null;
   claimedAt?: Date | null;
@@ -23,6 +25,7 @@ const ReferralSchema = new Schema<ReferralDoc>(
     giftOptionId: { type: String, default: '' },
     buddyTask: { type: Schema.Types.Mixed, default: null },
     buddyTaskSectionId: { type: String, default: null },
+    buddyTaskFromId: { type: String, default: null },
     createdAt: { type: Date, default: Date.now },
     claimedByUserId: { type: String, default: null, index: true },
     claimedAt: { type: Date, default: null },

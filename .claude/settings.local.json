@@ -411,7 +411,9 @@
       "Bash(xcodebuild -version)",
       "Read(//Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/**)",
       "Bash(echo \"ts exit=$?\")",
-      "WebFetch(domain:www.pencilandpaper.io)"
+      "WebFetch(domain:www.pencilandpaper.io)",
+      "WebFetch(domain:www.eleken.co)",
+      "Bash(perl -pi -e 's/ExistingTask/ExistingBuddyTask/g' src/app/api/buddy/invite/route.ts)"
     ]
   }
 }

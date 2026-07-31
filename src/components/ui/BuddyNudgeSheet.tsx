@@ -94,11 +94,11 @@ export function BuddyNudgeSheet({
             </div>
 
             <h2 className="text-2xl font-black tracking-tight text-foreground">
-              Catch flies together!
+              Share a goal with a friend
             </h2>
             <p className="mx-auto mt-1.5 max-w-xs text-[15px] font-medium text-muted-foreground">
-              Share a repeating task with a friend. Every day you both finish it,
-              you both catch extra flies.
+              Pick one thing you both repeat. Every day you both finish it, you
+              both catch double flies — and your shared streak grows.
             </p>
 
             <button
@@ -127,6 +127,7 @@ export function BuddyNudgeSheet({
         }}
         friends={friends}
         indices={indices}
+        source="friends_sheet"
       />
     </>
   );

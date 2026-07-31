@@ -4,6 +4,9 @@ import type { FrogIndices } from '@/lib/friends/indices';
 
 export type BuddyTaskState = {
   bondId: string;
+  status: 'pending' | 'active';
+  invitedByMe: boolean;
+  expiresAt: string | null;
   partnerName: string;
   partnerInitial: string;
   partnerIndices?: FrogIndices;

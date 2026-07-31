@@ -74,6 +74,64 @@ export function buildAcceptBody(
   return { ...base, repeat: 'weekly', days: params.days ?? [], dates: [today] };
 }
 
+export type ExistingBuddyTask = {
+  id: string;
+  text: string;
+  bondId?: string;
+  repeatMode?: string;
+  repeatGroupId?: string;
+  repeatEndDate?: string;
+  repeatDayOfMonth?: number;
+  repeatRule?: unknown;
+  dayOfWeek?: number;
+  date?: string;
+};
+
+/** Rebuild bond createParams from a task the user already has on their list. */
+export function paramsFromTask(
+  task: ExistingBuddyTask,
+  siblings: ExistingBuddyTask[],
+): BuddyCreateParams {
+  const base = { text: task.text, repeatEndDate: task.repeatEndDate };
+  if (task.repeatRule)
+    return {
+      ...base,
+      repeatRule: task.repeatRule,
+      dates: task.date ? [task.date] : undefined,
+    };
+  if (task.repeatMode === 'monthly') {
+    const dom = task.repeatDayOfMonth ?? Number((task.date ?? '').slice(8, 10));
+    const month = (task.date ?? new Date().toISOString().slice(0, 10)).slice(0, 7);
+    return {
+      ...base,
+      repeat: 'monthly',
+      dates: dom ? [`${month}-${String(dom).padStart(2, '0')}`] : undefined,
+    };
+  }
+  const days =
+    task.repeatMode === 'daily'
+      ? WEEKDAY_SETS.daily
+      : task.repeatMode === 'weekdays'
+        ? WEEKDAY_SETS.weekdays
+        : task.repeatMode === 'weekend'
+          ? WEEKDAY_SETS.weekend
+          : Array.from(
+              new Set(
+                siblings
+                  .map((s) => s.dayOfWeek)
+                  .filter((d): d is number => Number.isInteger(d)),
+              ),
+            );
+  return { ...base, repeat: 'weekly', days };
+}
+
+export function isRepeatingParams(params: BuddyCreateParams): boolean {
+  if (params.repeatRule) return true;
+  if (params.repeat === 'monthly') return true;
+  if (params.repeat === 'weekly' && (params.days?.length ?? 0) > 0) return true;
+  return false;
+}
+
 /** Convert a setRepeat payload (from the repeat picker) into bond createParams. */
 export function createParamsFromSetRepeat(
   setRepeat: any,

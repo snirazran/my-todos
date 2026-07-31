@@ -10,6 +10,7 @@ import Frog from '@/components/ui/frog';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
 import { isNativeScan, parseFriendValue } from '@/lib/friends/scan';
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
+import { shareLink } from '@/lib/share';
 
 type Tab = 'scan' | 'mycode';
 
@@ -168,24 +169,18 @@ function MyCodeView({
 
   const handleShare = useCallback(async () => {
     if (!shareUrl) return;
-    const shareData = {
+    const result = await shareLink({
       title: 'Add me on Frogress!',
       text: `Add me as a friend on Frogress — my code is ${data?.code ?? ''}`,
       url: shareUrl,
-    };
-    try {
-      if (typeof navigator !== 'undefined' && (navigator as any).share) {
-        await (navigator as any).share(shareData);
-        trackAnalyticsEvent('friend_link_shared', { method: 'native_share', share_surface: 'friend_qr' });
-        return;
-      }
-    } catch {
-      return;
+      dialogTitle: 'Add me on Frogress',
+    });
+    if (result === 'shared' || result === 'copied') {
+      trackAnalyticsEvent('friend_link_shared', {
+        method: result === 'shared' ? 'native_share' : 'copy_link',
+        share_surface: 'friend_qr',
+      });
     }
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      trackAnalyticsEvent('friend_link_shared', { method: 'copy_link', share_surface: 'friend_qr' });
-    } catch {}
   }, [shareUrl, data?.code]);
 
   const handleCopy = useCallback(async () => {

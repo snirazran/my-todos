@@ -7,6 +7,7 @@ import {
   CalendarPlus,
   CheckCircle2,
   ChevronUp,
+  Clock,
   EyeOff,
   Flame,
   ListChecks,
@@ -16,6 +17,7 @@ import {
   RotateCcw,
   Tag,
   Trash2,
+  Users,
   X,
 } from 'lucide-react';
 import { Icon as AppIcon } from '@/components/ui/Icon';
@@ -32,6 +34,8 @@ import {
 import { parseYmd, todayYmd } from '@/components/board/helpers';
 import { useBuddyState } from '@/hooks/useBuddyState';
 import { BuddyFrogFace } from '@/components/ui/BuddyBadge';
+import { BuddyTaskInvite } from '@/components/ui/buddy/BuddyTaskInvite';
+import { mutateFriendsCaches } from '@/hooks/useFriendsSync';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import { useKeyboardInset } from '@/components/ui/quick-add/useKeyboardInset';
 import { hapticSuccess, hapticTick } from '@/lib/haptics';
@@ -220,6 +224,8 @@ export default function TaskDetailSheet({
 
   const buddyByTaskId = useBuddyState(open);
   const buddy = displayTask ? buddyByTaskId[displayTask.id] : undefined;
+  const [showBuddyInvite, setShowBuddyInvite] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
   const notesText = useMemo(() => {
     if (!notes) return '';
@@ -446,7 +452,21 @@ export default function TaskDetailSheet({
                         {repeatLabel}
                       </span>
                     )}
-                    {buddy && (
+                    {buddy && buddy.status === 'pending' ? (
+                      <span
+                        className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 py-0.5 pl-0.5 pr-2"
+                        title={`Waiting for ${buddy.partnerName} to accept`}
+                      >
+                        <BuddyFrogFace
+                          indices={buddy.partnerIndices}
+                          size={20}
+                          className="opacity-75 ring-2 ring-inset ring-amber-500/40"
+                        />
+                        <span className="text-[11px] font-black leading-none text-amber-600 dark:text-amber-500">
+                          Waiting for {buddy.partnerName}
+                        </span>
+                      </span>
+                    ) : buddy ? (
                       <span
                         className="inline-flex items-center gap-1 rounded-full bg-[#4f9149]/10 py-0.5 pl-0.5 pr-2"
                         title={`Shared with ${buddy.partnerName}`}
@@ -456,7 +476,7 @@ export default function TaskDetailSheet({
                           With {buddy.partnerName}
                         </span>
                       </span>
-                    )}
+                    ) : null}
                     {taskTags.map((tagId) => {
                       const t = tagDetails(tagId);
                       if (!t) return null;
@@ -709,6 +729,42 @@ export default function TaskDetailSheet({
                       </div>
                     </div>
                     )}
+
+                    {/* Goal buddy */}
+                    {!keyboardActive && isRepeating && !buddy && (
+                      <button
+                        type="button"
+                        onClick={() => setShowBuddyInvite(true)}
+                        className="mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-[#4f9149]/45 bg-[#4f9149]/[0.07] text-[13px] font-black tracking-tight text-[#4f9149] transition-transform active:scale-[0.99]"
+                      >
+                        <Users className="h-4 w-4" strokeWidth={2.5} />
+                        Do this with a friend
+                      </button>
+                    )}
+                    {!keyboardActive &&
+                      buddy?.status === 'pending' &&
+                      buddy.invitedByMe && (
+                        <button
+                          type="button"
+                          disabled={cancelling}
+                          onClick={async () => {
+                            if (cancelling) return;
+                            setCancelling(true);
+                            try {
+                              await fetch(`/api/buddy/${buddy.bondId}/cancel`, {
+                                method: 'POST',
+                              });
+                              mutateFriendsCaches();
+                            } finally {
+                              setCancelling(false);
+                            }
+                          }}
+                          className="mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-border/60 bg-muted/40 text-[13px] font-black tracking-tight text-muted-foreground transition-transform active:scale-[0.99] disabled:opacity-60"
+                        >
+                          <Clock className="h-4 w-4" strokeWidth={2.5} />
+                          Cancel invite to {buddy.partnerName}
+                        </button>
+                      )}
                   </>
                 )}
               </div>
@@ -819,9 +875,19 @@ export default function TaskDetailSheet({
                   ) : null}
                 </div>
               )}
+
           </div>
         )}
       </BaseSheet>
+
+      {displayTask && (
+        <BuddyTaskInvite
+          open={showBuddyInvite}
+          taskId={displayTask.id}
+          taskText={displayTask.text}
+          onClose={() => setShowBuddyInvite(false)}
+        />
+      )}
 
       <TaskRepeatPopup
         open={showRepeat}

@@ -814,18 +814,20 @@ function LeaderboardRow({
                 {entry.streak}d
               </span>
             )}
-            {look && (entry.equippedItems?.length ?? 0) > 0 && (
-              <span
-                className={cn(
-                  'max-w-full truncate whitespace-nowrap rounded-full px-1.5 py-0.5 text-[10px] font-black',
-                  look.bg,
-                  look.text,
-                )}
-              >
-                {look.label}
-                <span className="hidden min-[360px]:inline"> look</span>
-              </span>
-            )}
+            {look &&
+              ((entry.equippedItems?.length ?? 0) > 0 ||
+                !!entry.backgroundRarity) && (
+                <span
+                  className={cn(
+                    'max-w-full truncate whitespace-nowrap rounded-full px-1.5 py-0.5 text-[10px] font-black',
+                    look.bg,
+                    look.text,
+                  )}
+                >
+                  {look.label}
+                  <span className="hidden min-[360px]:inline"> look</span>
+                </span>
+              )}
           </div>
           {entry.focusing && (
             <p className="mt-0.5 flex items-center gap-1.5 text-xs font-black text-primary">

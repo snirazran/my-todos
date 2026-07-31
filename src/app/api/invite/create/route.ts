@@ -5,6 +5,8 @@ import ReferralModel from '@/lib/models/Referral';
 import InviteConfigModel from '@/lib/models/InviteConfig';
 import { ensureInviteConfig } from '@/lib/inviteConfig/defaults';
 import type { BuddyCreateParams } from '@/lib/models/TaskBond';
+import TaskModel from '@/lib/models/Task';
+import { paramsFromTask, type ExistingBuddyTask } from '@/lib/buddy/bond';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
 
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -43,7 +45,12 @@ export async function POST(req: NextRequest) {
   try {
     const userId = await requireUserId();
 
-    let body: { giftOptionId?: string; buddyTask?: unknown; sectionId?: string };
+    let body: {
+      giftOptionId?: string;
+      buddyTask?: unknown;
+      sectionId?: string;
+      buddyTaskFromId?: string;
+    };
     try {
       body = await req.json();
     } catch {
@@ -55,7 +62,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing giftOptionId' }, { status: 400 });
     }
 
-    const buddyTask = parseBuddyTask(body.buddyTask);
+    let buddyTask = parseBuddyTask(body.buddyTask);
     if (body.buddyTask && !buddyTask) {
       return NextResponse.json(
         { error: 'Buddy tasks must repeat — pick a repeat option' },
@@ -64,6 +71,33 @@ export async function POST(req: NextRequest) {
     }
 
     await connectMongo();
+
+    const fromTaskId = String(body.buddyTaskFromId || '').trim();
+    let buddyTaskFromId: string | null = null;
+    if (fromTaskId) {
+      const task = await TaskModel.findOne({ userId, id: fromTaskId })
+        .lean<ExistingBuddyTask | null>();
+      if (!task)
+        return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+      if (task.bondId)
+        return NextResponse.json(
+          { error: 'This task is already shared' },
+          { status: 409 },
+        );
+
+      const siblings = task.repeatGroupId
+        ? await TaskModel.find({ userId, repeatGroupId: task.repeatGroupId })
+            .lean<ExistingBuddyTask[]>()
+        : [task];
+      const derived = paramsFromTask(task, siblings);
+      if (!isRepeating(derived))
+        return NextResponse.json(
+          { error: 'Only repeating tasks can be shared with a buddy' },
+          { status: 400 },
+        );
+      buddyTask = derived;
+      buddyTaskFromId = task.repeatGroupId ?? task.id;
+    }
     await ensureInviteConfig();
     const config = await InviteConfigModel.findOne({ key: 'singleton' }).lean();
     const option = config?.giftOptions.find((g) => g.id === giftOptionId);
@@ -89,6 +123,7 @@ export async function POST(req: NextRequest) {
         buddyTask && typeof body.sectionId === 'string' && body.sectionId
           ? body.sectionId
           : null,
+      buddyTaskFromId,
     });
     await recordAnalyticsEvent({
       userId,

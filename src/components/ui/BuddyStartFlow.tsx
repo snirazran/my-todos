@@ -3,21 +3,22 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Loader2, UserPlus, Check, Gift } from 'lucide-react';
+import { ChevronRight, UserPlus, Check, Share2 } from 'lucide-react';
 import useSWR from 'swr';
 import confetti from 'canvas-confetti';
 import Frog from '@/components/ui/frog';
 import Fly from '@/components/ui/fly';
-import { GiftRive } from '@/components/ui/gift-box/GiftBox';
-import QuickAddSheet from '@/components/ui/QuickAddSheet';
 import { BuddyUpFlow } from '@/components/ui/BuddyUpFlow';
+import {
+  BuddyGoalSheet,
+  type BuddyGoalDraft,
+  type BuddyGiftOption,
+} from '@/components/ui/buddy/BuddyGoalSheet';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
-import { useSections } from '@/hooks/useSections';
-import type { QuickAddSubmit } from '@/components/ui/quick-add/types';
-import type { BuddyCreateParams } from '@/lib/models/TaskBond';
 import type { FriendSummary } from '@/lib/friends/indices';
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
+import { shareLink, type ShareResult } from '@/lib/share';
 
 const BUDDY = '#4f9149';
 
@@ -25,50 +26,24 @@ type WardrobeIndices = Partial<
   Record<'skin' | 'hat' | 'body' | 'hand_item', number>
 >;
 
-type GiftOption = {
-  id: string;
-  name: string;
-  itemId: string;
-  item?: {
-    slot: 'skin' | 'hat' | 'body' | 'hand_item' | 'container';
-    riveIndex: number;
-    icon?: string;
-  } | null;
-  imageUrl?: string;
-};
-type InviteConfig = { giftOptions: GiftOption[] };
+type InviteConfig = { giftOptions: BuddyGiftOption[] };
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
-function toBuddyTask(d: QuickAddSubmit): BuddyCreateParams {
-  const base = { text: d.text, repeatEndDate: d.repeatEndDate ?? undefined };
-  if (d.repeat === 'monthly') return { ...base, repeat: 'monthly', dates: d.dates };
-  if (d.repeat === 'custom')
-    return { ...base, repeatRule: d.repeatRule, dates: d.dates };
-  const days = (d.days ?? []).filter((x) => x !== -1);
-  return { ...base, repeat: 'weekly', days };
-}
-
-async function shareInviteUrl(url: string) {
-  try {
-    if (typeof navigator !== 'undefined' && (navigator as any).share) {
-      await (navigator as any).share({
-        title: "Let's chase a goal together on Frogress!",
-        text: 'I set up a shared goal for us — tap to join me and grab a gift.',
-        url,
-      });
-      trackAnalyticsEvent('referral_invite_shared', { method: 'native_share', share_surface: 'buddy_invite' });
-      return;
-    }
-  } catch {
-    return;
+async function shareInviteUrl(url: string, goal: string): Promise<ShareResult> {
+  const result = await shareLink({
+    title: "Let's chase a goal together on Frogress!",
+    text: `I set up "${goal}" as a shared goal for us — tap to join me and grab a gift.`,
+    url,
+    dialogTitle: 'Invite your goal buddy',
+  });
+  if (result === 'shared' || result === 'copied') {
+    trackAnalyticsEvent('referral_invite_shared', {
+      method: result === 'shared' ? 'native_share' : 'copy_link',
+      share_surface: 'buddy_invite',
+    });
   }
-  try {
-    await navigator.clipboard.writeText(url);
-    trackAnalyticsEvent('referral_invite_shared', { method: 'copy_link', share_surface: 'buddy_invite' });
-  } catch {
-    /* ignore */
-  }
+  return result;
 }
 
 export function BuddyStartFlow({
@@ -76,23 +51,33 @@ export function BuddyStartFlow({
   onClose,
   friends,
   indices,
+  source = 'nudge',
 }: {
   open: boolean;
   onClose: () => void;
   friends: FriendSummary[];
   indices?: WardrobeIndices;
+  source?: string;
 }) {
   const [mode, setMode] = useState<'choose' | 'picked' | 'invite'>('choose');
   const [picked, setPicked] = useState<FriendSummary | null>(null);
+  const [visitedInvite, setVisitedInvite] = useState(false);
 
   useEffect(() => {
     if (open) {
       setMode(friends.length === 0 ? 'invite' : 'choose');
+      setVisitedInvite(friends.length === 0);
       setPicked(null);
+      trackAnalyticsEvent('buddy_flow_opened', {
+        source,
+        friend_count: friends.length,
+      });
     }
-  }, [open, friends.length]);
+  }, [open, friends.length, source]);
 
   if (!open) return null;
+
+  const backToChoose = friends.length > 0 ? () => setMode('choose') : null;
 
   return (
     <>
@@ -101,21 +86,39 @@ export function BuddyStartFlow({
         friends={friends}
         onClose={onClose}
         onPick={(f) => {
+          trackAnalyticsEvent('buddy_friend_picked', {
+            source,
+            method: 'existing_friend',
+          });
           setPicked(f);
           setMode('picked');
         }}
-        onInvite={() => setMode('invite')}
+        onInvite={() => {
+          trackAnalyticsEvent('buddy_friend_picked', {
+            source,
+            method: 'invite_link',
+          });
+          setVisitedInvite(true);
+          setMode('invite');
+        }}
       />
 
-      {mode === 'picked' && (
-        <BuddyUpFlow open friend={picked} onClose={onClose} />
+      {picked && (
+        <BuddyUpFlow
+          open={mode === 'picked'}
+          friend={picked}
+          onClose={onClose}
+          onBack={backToChoose}
+        />
       )}
 
-      {mode === 'invite' && (
+      {visitedInvite && (
         <BuddyInviteFlow
+          open={mode === 'invite'}
           indices={indices}
           onClose={onClose}
-          onBack={friends.length > 0 ? () => setMode('choose') : null}
+          onBack={backToChoose}
+          source={source}
         />
       )}
     </>
@@ -154,17 +157,20 @@ function ChooseSheet({
                 background: `radial-gradient(120% 100% at 50% 0%, ${BUDDY}22 0%, transparent 72%)`,
               }}
             />
-            <h2 className="relative text-xl font-black tracking-tight text-foreground">
-              Pick your goal buddy
+            <p className="relative text-[10px] font-black uppercase tracking-[0.18em] text-[#4f9149]">
+              Goal buddy · Step 1 of 2
+            </p>
+            <h2 className="relative mt-1 text-xl font-black tracking-tight text-foreground">
+              Who are you doing it with?
             </h2>
             <p className="relative mt-1 text-sm font-medium text-muted-foreground">
-              Share a repeating task — you both earn flies for it.
+              Next you&apos;ll pick the goal you both repeat.
             </p>
           </div>
 
           <div
             ref={bindScroll}
-            className="flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-2"
+            className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-2"
           >
             <ul className="space-y-2">
               {friends.map((f) => (
@@ -185,8 +191,15 @@ function ChooseSheet({
                         />
                       )}
                     </span>
-                    <span className="min-w-0 flex-1 truncate text-sm font-black tracking-tight text-foreground">
-                      {f.name || f.frogName}
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-black tracking-tight text-foreground">
+                        {f.name || f.frogName}
+                      </span>
+                      {!!f.frogName && f.frogName !== f.name && (
+                        <span className="block truncate text-xs font-semibold text-muted-foreground">
+                          {f.frogName}
+                        </span>
+                      )}
                     </span>
                     <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
                   </button>
@@ -204,7 +217,7 @@ function ChooseSheet({
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block text-sm font-black tracking-tight text-foreground">
-                  Invite a friend instead
+                  Someone not on Frogress
                 </span>
                 <span className="block text-xs font-semibold text-muted-foreground">
                   Send a link with a gift skin
@@ -219,38 +232,33 @@ function ChooseSheet({
   );
 }
 
-type InvitePhase = 'compose' | 'gift' | 'sent';
-
 function BuddyInviteFlow({
+  open,
   indices,
   onClose,
   onBack,
+  source,
 }: {
+  open: boolean;
   indices?: WardrobeIndices;
   onClose: () => void;
   onBack: (() => void) | null;
+  source: string;
 }) {
-  const [phase, setPhase] = useState<InvitePhase>('compose');
-  const phaseRef = useRef<InvitePhase>('compose');
-  const [draft, setDraft] = useState<QuickAddSubmit | null>(null);
-  const [giftId, setGiftId] = useState<string | null>(null);
+  const [sent, setSent] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [invite, setInvite] = useState<{ url: string; goal: string } | null>(null);
+  const [copiedOnly, setCopiedOnly] = useState(false);
   const sentBtnRef = useRef<HTMLButtonElement>(null);
-  useRegisterOpenSheet(phase !== 'compose');
-  const sections = useSections();
+  useRegisterOpenSheet(open && sent);
 
   const { data: config } = useSWR<InviteConfig>('/api/invite/config', fetcher, {
     revalidateOnFocus: false,
   });
 
-  const goPhase = (p: InvitePhase) => {
-    phaseRef.current = p;
-    setPhase(p);
-  };
-
   useEffect(() => {
-    if (phase !== 'sent') return;
+    if (!sent) return;
     const rect = sentBtnRef.current?.getBoundingClientRect();
     confetti({
       particleCount: 90,
@@ -262,20 +270,24 @@ function BuddyInviteFlow({
       zIndex: 99999,
       colors: ['#4f9149', '#8fc36d', '#ffd166', '#ffffff'],
     });
-  }, [phase]);
+  }, [sent]);
 
-  const handleSend = async () => {
-    if (!draft || !giftId || sending) return;
+  const handleSend = async (draft: BuddyGoalDraft) => {
+    if (sending || !draft.giftOptionId) return;
     setSending(true);
     setError(null);
+    trackAnalyticsEvent('buddy_goal_composed', {
+      source,
+      method: 'invite_link',
+      day_count: draft.days.length,
+    });
     try {
       const res = await fetch('/api/invite/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          giftOptionId: giftId,
-          buddyTask: toBuddyTask(draft),
-          sectionId: draft.sectionId ?? undefined,
+          giftOptionId: draft.giftOptionId,
+          buddyTask: { text: draft.text, repeat: 'weekly', days: draft.days },
         }),
       });
       const data = await res.json();
@@ -284,8 +296,10 @@ function BuddyInviteFlow({
         return;
       }
       const url = `${window.location.origin}/?ref=${encodeURIComponent(data.code)}`;
-      await shareInviteUrl(url);
-      goPhase('sent');
+      setInvite({ url, goal: draft.text });
+      const result = await shareInviteUrl(url, draft.text);
+      setCopiedOnly(result === 'copied');
+      setSent(true);
     } catch {
       setError('Something went wrong. Try again.');
     } finally {
@@ -297,120 +311,21 @@ function BuddyInviteFlow({
 
   return (
     <>
-      <QuickAddSheet
-        open={phase === 'compose'}
-        onOpenChange={(v) => {
-          if (!v && phaseRef.current === 'compose') {
-            if (onBack) onBack();
-            else onClose();
-          }
-        }}
-        defaultRepeat="weekly"
-        defaultRepeatDaily
-        submitLabel="Next"
-        sections={sections}
-        onSubmit={(d) => {
-          setDraft(d);
-          goPhase('gift');
-        }}
+      <BuddyGoalSheet
+        open={open && !sent}
+        onClose={onClose}
+        onBack={onBack}
+        onSubmit={handleSend}
+        sending={sending}
+        error={error}
+        giftOptions={config?.giftOptions}
+        giftLoading={!config}
+        submitLabel="Share invite link"
       />
 
       {createPortal(
         <AnimatePresence>
-          {phase === 'gift' && (
-            <motion.div
-              key="buddy-invite-gift"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={onClose}
-              className="fixed inset-0 z-[1600] flex items-stretch justify-center bg-black/50 md:items-center md:p-4"
-            >
-              <motion.div
-                initial={{ opacity: 0, scale: 0.98, y: 12 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.98, y: 12 }}
-                transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-                onClick={(e) => e.stopPropagation()}
-                className="relative flex w-full flex-col overflow-hidden bg-[#4f9149] text-white md:h-auto md:max-h-[calc(100dvh-2rem)] md:w-[min(100vw-2rem,30rem)] md:rounded-[28px] md:shadow-2xl"
-              >
-                <button
-                  type="button"
-                  onClick={() => goPhase('compose')}
-                  aria-label="Back"
-                  className="absolute left-4 top-[calc(env(safe-area-inset-top)+0.75rem)] z-10 flex h-11 w-11 items-center justify-center rounded-full bg-white/20 text-white backdrop-blur-sm transition-colors hover:bg-white/30 md:top-4"
-                >
-                  <ChevronLeft className="h-6 w-6" />
-                </button>
-
-                <div className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-6 pb-4 pt-[calc(env(safe-area-inset-top)+3.5rem)] text-center md:pt-14">
-                  <div className="relative mb-1">
-                    <Frog width={150} height={135} indices={indices} paused={!!giftId} />
-                    <div className="absolute -right-24 top-2 z-20 max-w-[190px] rotate-[6deg] rounded-2xl bg-white px-3.5 py-2 text-left text-[13px] font-black leading-snug tracking-tight text-[#4f9149] shadow-[0_3px_0_rgba(25,60,25,0.25)]">
-                      Send them a gift so they say yes!
-                      <span className="absolute -bottom-1.5 left-4 h-3 w-3 rotate-45 bg-white" />
-                    </div>
-                  </div>
-
-                  <h2 className="mt-2 text-xl font-black tracking-tight">
-                    Pick a gift skin
-                  </h2>
-                  <p className="mt-1 max-w-xs text-sm font-medium text-white/75">
-                    They&apos;ll unlock it when they join and start{' '}
-                    <span className="font-bold text-white">{draft?.text}</span> with
-                    you.
-                  </p>
-
-                  <div className="mt-5 grid w-full max-w-sm grid-cols-3 gap-2.5">
-                    {(config?.giftOptions ?? []).map((g) => {
-                      const selected = giftId === g.id;
-                      return (
-                        <button
-                          key={g.id}
-                          type="button"
-                          onClick={() => setGiftId(g.id)}
-                          className={`aspect-square overflow-hidden rounded-[18px] border-4 bg-black/10 p-1 transition-all active:scale-95 ${
-                            selected
-                              ? 'border-white ring-4 ring-inset ring-white/25'
-                              : 'border-white/15 hover:border-white/60'
-                          }`}
-                        >
-                          <GiftPreview item={g.item ?? null} active={selected} />
-                        </button>
-                      );
-                    })}
-                    {!config && (
-                      <div className="col-span-3 flex justify-center py-8">
-                        <Loader2 className="h-6 w-6 animate-spin text-white/70" />
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div
-                  className="shrink-0 px-6 pt-3"
-                  style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1.75rem)' }}
-                >
-                  {error && (
-                    <p className="mb-2 text-center text-sm font-bold text-rose-200">
-                      {error}
-                    </p>
-                  )}
-                  <button
-                    type="button"
-                    onClick={handleSend}
-                    disabled={!giftId || sending}
-                    className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-white text-lg font-black tracking-tight text-[#4f9149] shadow-[0_5px_0_rgba(0,0,0,0.15)] transition-all active:translate-y-0.5 disabled:opacity-60"
-                  >
-                    {sending && <Loader2 className="h-5 w-5 animate-spin" />}
-                    Create invite link
-                  </button>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-
-          {phase === 'sent' && (
+          {open && sent && (
             <motion.div
               key="buddy-invite-sent"
               initial={{ opacity: 0 }}
@@ -427,29 +342,49 @@ function BuddyInviteFlow({
                 onClick={(e) => e.stopPropagation()}
                 className="w-full max-w-none rounded-t-[28px] bg-background px-6 pb-[calc(env(safe-area-inset-bottom)+1.75rem)] pt-8 text-center sm:max-w-md sm:rounded-[28px]"
               >
-                <div className="mx-auto mb-3 flex h-20 w-32 items-end justify-center">
+                <div className="relative mx-auto mb-3 flex h-20 w-32 items-end justify-center">
                   <div className="relative z-10 translate-x-3">
                     <Frog width={112} height={100} indices={indices} paused />
                   </div>
                   <div className="relative z-0 -ml-8 -translate-x-2 scale-90">
                     <Frog width={112} height={100} paused />
                   </div>
+                  <span className="absolute -top-1 left-1/2 z-20 -translate-x-1/2">
+                    <Fly size={26} y={-2} paused />
+                  </span>
                 </div>
                 <h2 className="text-xl font-black tracking-tight text-foreground">
                   Invite link ready!
                 </h2>
                 <p className="mt-1.5 text-[15px] font-medium text-muted-foreground">
-                  We copied it for you. Send it to a friend — once they join, the
-                  goal is shared and you both start earning together.
+                  {copiedOnly
+                    ? 'We copied it for you — paste it anywhere. '
+                    : 'Send it to whoever you want to team up with. '}
+                  Once they join, the goal is shared and you both start earning
+                  together.
                 </p>
                 <button
                   ref={sentBtnRef}
                   type="button"
-                  onClick={onClose}
+                  onClick={async () => {
+                    if (!invite) return;
+                    const result = await shareInviteUrl(invite.url, invite.goal);
+                    setCopiedOnly(result === 'copied');
+                  }}
                   className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-[#4f9149] py-3.5 text-base font-black tracking-tight text-white shadow-[0_4px_0_#34631f] transition-all active:translate-y-0.5 active:shadow-none"
                 >
-                  <Check className="h-5 w-5" strokeWidth={3} />
-                  Done
+                  <Share2 className="h-5 w-5" strokeWidth={2.5} />
+                  Share the link
+                </button>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="mt-2 h-12 w-full rounded-2xl text-base font-black tracking-tight text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <Check className="h-5 w-5" strokeWidth={3} />
+                    Done
+                  </span>
                 </button>
               </motion.div>
             </motion.div>
@@ -458,49 +393,5 @@ function BuddyInviteFlow({
         document.body,
       )}
     </>
-  );
-}
-
-function GiftPreview({
-  item,
-  active = false,
-}: {
-  item: GiftOption['item'];
-  active?: boolean;
-}) {
-  if (!item) {
-    return (
-      <div className="flex h-full w-full items-center justify-center text-white/70">
-        <Gift className="h-7 w-7" />
-      </div>
-    );
-  }
-  if (item.slot === 'container') {
-    return (
-      <div className="flex h-full w-full items-center justify-center overflow-visible">
-        <div className="h-[170%] w-[170%]">
-          <GiftRive color={item.riveIndex} isMilestone={false} paused={!active} />
-        </div>
-      </div>
-    );
-  }
-  const indices: WardrobeIndices =
-    item.slot === 'skin'
-      ? { skin: item.riveIndex }
-      : item.slot === 'hat'
-        ? { hat: item.riveIndex }
-        : item.slot === 'body'
-          ? { body: item.riveIndex }
-          : { hand_item: item.riveIndex };
-  return (
-    <div className="flex h-full w-full items-center justify-center overflow-hidden">
-      <Frog
-        className="-translate-y-12"
-        width={300}
-        height={338}
-        indices={indices}
-        paused={!active}
-      />
-    </div>
   );
 }

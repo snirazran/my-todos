@@ -19,6 +19,7 @@ def capacitor_pods
   pod 'CapacitorBrowser', :path => '../../node_modules/.pnpm/@capacitor+browser@8.0.3_@capacitor+core@8.0.2/node_modules/@capacitor/browser'
   pod 'CapacitorHaptics', :path => '../../node_modules/.pnpm/@capacitor+haptics@8.0.2_@capacitor+core@8.0.2/node_modules/@capacitor/haptics'
   pod 'CapacitorLocalNotifications', :path => '../../node_modules/.pnpm/@capacitor+local-notifications@8.0.2_@capacitor+core@8.0.2/node_modules/@capacitor/local-notifications'
+  pod 'CapacitorShare', :path => '../../node_modules/.pnpm/@capacitor+share@8.0.1_@capacitor+core@8.0.2/node_modules/@capacitor/share'
   pod 'CapgoCapacitorSocialLogin', :path => '../../node_modules/.pnpm/@capgo+capacitor-social-login@8.3.20_@capacitor+core@8.0.2/node_modules/@capgo/capacitor-social-login'
   pod 'RevenuecatPurchasesCapacitor', :path => '../../node_modules/.pnpm/@revenuecat+purchases-capacitor@13.2.1_@capacitor+core@8.0.2/node_modules/@revenuecat/purchases-capacitor'
   pod 'CapacitorLiveActivities', :path => '../../node_modules/.pnpm/capacitor-live-activities@8.0.0_patch_hash=2k5dzarcuu653ce4cc6mygid7m_@capacitor+core@8.0.2/node_modules/capacitor-live-activities'

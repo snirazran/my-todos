@@ -36,6 +36,7 @@ import {
 } from '@/lib/flyGame';
 import { cn } from '@/lib/utils';
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
+import { shareLink } from '@/lib/share';
 import {
   DEFAULT_BACKGROUND_IMAGES,
   useBackgrounds,
@@ -665,9 +666,19 @@ export default function FlyCatchGame({
         setShareState('shared');
         trackAnalyticsEvent('fly_game_shared', { score: result.score, method: 'native_share' });
       } else {
-        await navigator.clipboard.writeText(`${text} ${url}`);
-        setShareState('copied');
-        trackAnalyticsEvent('fly_game_shared', { score: result.score, method: 'clipboard' });
+        const outcome = await shareLink({
+          title: 'Frogress High Score',
+          text,
+          url,
+          dialogTitle: 'Share your score',
+        });
+        if (outcome === 'shared' || outcome === 'copied') {
+          setShareState(outcome === 'shared' ? 'shared' : 'copied');
+          trackAnalyticsEvent('fly_game_shared', {
+            score: result.score,
+            method: outcome === 'shared' ? 'native_share' : 'clipboard',
+          });
+        }
       }
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return;

@@ -17,8 +17,11 @@ import type { FrogSpeechContext } from '@/lib/frogSpeech';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import { cn } from '@/lib/utils';
 import { prefetchQuests } from './QuestsPanel';
-
-const HUNGER_SEGMENTS = 6;
+import {
+  HUNGER_SEGMENTS,
+  getHungerState,
+  segmentFill,
+} from '@/lib/hungerDisplay';
 
 type Props = {
   frogRef: React.RefObject<FrogHandle | null>;
@@ -196,26 +199,6 @@ export function FrogDisplay({
       ? Math.max(0, Math.min(100, (displayedHunger / maxHunger) * 100))
       : 100;
 
-  const getHungerState = (p: number) => {
-    if (p > 80)
-      return {
-        bg: 'bg-emerald-500',
-        text: 'text-emerald-600',
-        label: 'Full',
-      };
-    if (p > 60)
-      return { bg: 'bg-lime-500', text: 'text-lime-600', label: 'Content' };
-    if (p > 40)
-      return {
-        bg: 'bg-yellow-500',
-        text: 'text-yellow-600',
-        label: 'Peckish',
-      };
-    if (p > 20)
-      return { bg: 'bg-amber-500', text: 'text-amber-600', label: 'Hungry' };
-    return { bg: 'bg-rose-500', text: 'text-rose-600', label: 'Starving' };
-  };
-
   const {
     bg: hungerColor,
     text: hungerTextColor,
@@ -337,10 +320,7 @@ export function FrogDisplay({
                 )}
               >
                 {Array.from({ length: HUNGER_SEGMENTS }).map((_, i) => {
-                  const fill = Math.max(
-                    0,
-                    Math.min(1, (hungerPercent / 100) * HUNGER_SEGMENTS - i),
-                  );
+                  const fill = segmentFill(hungerPercent, i);
                   return (
                     <div
                       key={i}
