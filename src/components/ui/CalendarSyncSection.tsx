@@ -8,6 +8,7 @@ import { Icon } from '@/components/ui/Icon';
 import { Switch } from '@/components/ui/switch';
 import { useAuth } from '@/components/auth/AuthContext';
 import AppleCalendarSheet from '@/components/ui/AppleCalendarSheet';
+import AiConnectionsSection from '@/components/ui/AiConnectionsSection';
 
 export type CalendarConnectionInfo = {
   provider: 'google' | 'apple';
@@ -465,6 +466,8 @@ export default function IntegrationsPanel() {
         Sync runs automatically in the background. If a task and an event are
         edited at the same time, your changes in Frogress always win.
       </p>
+
+      <AiConnectionsSection />
 
       <AppleCalendarSheet
         open={appleSheetOpen}

@@ -17,6 +17,9 @@ export function isAdminEmail(email?: string | null) {
 
 export async function requireAdmin() {
   const decoded = await requireAuth();
+  if (decoded.authMethod !== 'cookie') {
+    throw new Error('Forbidden - Admin requires an interactive session');
+  }
   if (!isAdminEmail(decoded.email)) {
     throw new Error('Forbidden - Not an admin');
   }
