@@ -54,6 +54,7 @@ export type AccessClaims = {
   sub: string;
   scopes: string[];
   clientId: string;
+  issuedAt: number;
 };
 
 export async function signAccessJwt(params: {
@@ -99,6 +100,7 @@ export async function verifyAccessJwt(
       scopes: scope.split(' ').filter(Boolean),
       clientId:
         typeof payload.client_id === 'string' ? payload.client_id : 'unknown',
+      issuedAt: typeof payload.iat === 'number' ? payload.iat : 0,
     };
   } catch {
     return null;

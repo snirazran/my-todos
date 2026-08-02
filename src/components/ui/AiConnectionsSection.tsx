@@ -21,7 +21,25 @@ type ApiTokenInfo = {
   lastUsedAt: string | null;
 };
 
+type ConnectionInfo = {
+  clientId: string;
+  name: string;
+  scopes: string[];
+  connectedAt: string;
+  lastUsedAt: string | null;
+};
+
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
+
+export function useAiConnections() {
+  const { user } = useAuth();
+  const { data } = useSWR<{ connections: ConnectionInfo[] }>(
+    user ? '/api/tokens' : null,
+    fetcher,
+    { revalidateOnFocus: true },
+  );
+  return { aiConnections: data?.connections?.length ?? 0 };
+}
 
 function timeAgo(value?: string | null) {
   if (!value) return null;
@@ -192,20 +210,92 @@ function TokenRow({
   );
 }
 
+function ConnectionRow({
+  connection,
+  onRevoked,
+}: {
+  connection: ConnectionInfo;
+  onRevoked: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+
+  const disconnect = useCallback(async () => {
+    setBusy(true);
+    try {
+      await fetch(
+        `/api/tokens?clientId=${encodeURIComponent(connection.clientId)}`,
+        { method: 'DELETE' },
+      );
+      onRevoked();
+    } finally {
+      setBusy(false);
+      setConfirming(false);
+    }
+  }, [connection.clientId, onRevoked]);
+
+  const used = timeAgo(connection.lastUsedAt);
+
+  return (
+    <div className="flex items-center gap-3 px-4 py-3">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-500/15">
+        <Check className="h-4 w-4 text-emerald-500" strokeWidth={3} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-bold leading-tight text-foreground">
+          {connection.name}
+        </p>
+        <p className="mt-0.5 text-[11px] font-semibold text-muted-foreground">
+          Connected · {used ? `active ${used}` : 'not used yet'}
+        </p>
+      </div>
+      {confirming ? (
+        <div className="flex shrink-0 items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setConfirming(false)}
+            className="rounded-lg px-2 py-1 text-[11px] font-bold text-muted-foreground"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void disconnect()}
+            className="flex items-center gap-1 rounded-lg bg-red-500 px-2.5 py-1 text-[11px] font-black text-white disabled:opacity-60"
+          >
+            {busy && <Loader2 className="h-3 w-3 animate-spin" />}
+            Disconnect
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setConfirming(true)}
+          className="shrink-0 rounded-lg px-2.5 py-1 text-[11px] font-bold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        >
+          Disconnect
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function AiConnectionsSection() {
   const { user } = useAuth();
-  const { data, mutate, isLoading } = useSWR<{ tokens: ApiTokenInfo[] }>(
-    user ? '/api/tokens' : null,
-    fetcher,
-    { revalidateOnFocus: false },
-  );
+  const { data, mutate, isLoading } = useSWR<{
+    tokens: ApiTokenInfo[];
+    connections: ConnectionInfo[];
+  }>(user ? '/api/tokens' : null, fetcher, {
+    // A connection lands while the user is away in Claude, so re-check on return.
+    revalidateOnFocus: true,
+  });
 
   const [creating, setCreating] = useState(false);
   const [newToken, setNewToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [serverUrl, setServerUrl] = useState('');
   const [claudeInstallUrl, setClaudeInstallUrl] = useState('');
-  const [cursorInstallUrl, setCursorInstallUrl] = useState('');
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -214,14 +304,10 @@ export default function AiConnectionsSection() {
     setClaudeInstallUrl(
       `https://claude.ai/customize/connectors?modal=add-custom-connector&connectorName=${encodeURIComponent('Frogress')}&connectorUrl=${encodeURIComponent(url)}`,
     );
-    setCursorInstallUrl(
-      `cursor://anysphere.cursor-deeplink/mcp/install?name=frogress&config=${encodeURIComponent(
-        btoa(JSON.stringify({ url })),
-      )}`,
-    );
   }, []);
 
   const tokens = data?.tokens ?? [];
+  const connections = data?.connections ?? [];
 
   const createToken = useCallback(async () => {
     setError(null);
@@ -260,6 +346,18 @@ export default function AiConnectionsSection() {
         </div>
       </div>
 
+      {connections.length > 0 && (
+        <div className="divide-y divide-border/50 border-t border-border/50">
+          {connections.map((connection) => (
+            <ConnectionRow
+              key={connection.clientId}
+              connection={connection}
+              onRevoked={() => void mutate()}
+            />
+          ))}
+        </div>
+      )}
+
       <div className="space-y-2 border-t border-border/50 px-4 py-4">
         <a
           href={claudeInstallUrl}
@@ -267,32 +365,26 @@ export default function AiConnectionsSection() {
           rel="noreferrer noopener"
           className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500 py-3 text-sm font-black text-white transition-colors hover:bg-emerald-600"
         >
-          Connect to Claude
+          {connections.length > 0 ? 'Connect another' : 'Connect to Claude'}
           <ExternalLink className="h-4 w-4" />
-        </a>
-
-        <a
-          href={cursorInstallUrl}
-          className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-border bg-card py-3 text-sm font-black text-foreground transition-colors hover:bg-accent/50"
-        >
-          Add to Cursor
         </a>
 
         <p className="px-1 pt-1 text-[11px] font-semibold leading-relaxed text-muted-foreground">
           You&apos;ll be asked to review and approve before anything connects.
-          No key needed.
+          No key needed. Connections appear here once approved.
         </p>
       </div>
 
       <details className="group border-t border-border/50">
         <summary className="cursor-pointer list-none px-4 py-3 text-xs font-black tracking-tight text-foreground transition-colors hover:bg-accent/40">
-          Another assistant?
+          ChatGPT or another assistant?
         </summary>
         <div className="px-4 pb-4">
           <CopyField label="Server URL" value={serverUrl} />
           <p className="mt-2 px-1 text-[11px] font-semibold leading-relaxed text-muted-foreground">
             Paste this wherever your assistant asks for an MCP server. In
-            ChatGPT this lives under Developer Mode and needs a paid plan.
+            ChatGPT, go to Settings &gt; Connectors &gt; Advanced and turn on
+            Developer Mode first, then Create. It needs a paid ChatGPT plan.
           </p>
         </div>
       </details>

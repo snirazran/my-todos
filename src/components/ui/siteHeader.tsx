@@ -22,6 +22,7 @@ import { useInventory } from '@/hooks/useInventory';
 import IntegrationsPanel, {
   useCalendarConnections,
 } from '@/components/ui/CalendarSyncSection';
+import { useAiConnections } from '@/components/ui/AiConnectionsSection';
 import {
   SkinRotationRow,
   SkinRotationDialog,
@@ -412,6 +413,7 @@ import {
   ShieldAlert,
   Vibrate,
   Volume2,
+  Blocks,
 } from 'lucide-react';
 import {
   useHapticsEnabled,
@@ -695,7 +697,9 @@ function MobileSheet({
     { revalidateOnFocus: false },
   );
   const { connections } = useCalendarConnections();
-  const activeConnections = connections.filter((c) => c.status === 'active').length;
+  const { aiConnections } = useAiConnections();
+  const activeConnections =
+    connections.filter((c) => c.status === 'active').length + aiConnections;
   const calendarNeedsAttention = connections.some((c) => c.status !== 'active');
 
   useEffect(() => setMounted(true), []);
@@ -989,7 +993,7 @@ function MobileSheet({
           {
             id: 'integrations',
             label: 'Integrations',
-            icon: <Icon name="googleCalendar" className="h-[18px] w-[18px]" />,
+            icon: <Blocks className="h-[18px] w-[18px] text-emerald-500" />,
             trailing: calendarNeedsAttention ? (
               <span className="text-[11px] font-bold text-amber-600">!</span>
             ) : (
@@ -1370,7 +1374,9 @@ function MainView({
   const [plusInfoOpen, setPlusInfoOpen] = useState(false);
   const [confirmGuestSignOut, setConfirmGuestSignOut] = useState(false);
   const { connections } = useCalendarConnections();
-  const activeConnections = connections.filter((c) => c.status === 'active').length;
+  const { aiConnections } = useAiConnections();
+  const activeCalendars = connections.filter((c) => c.status === 'active').length;
+  const activeConnections = activeCalendars + aiConnections;
   const needsAttention = connections.some((c) => c.status !== 'active');
   const premiumUntilDate = premiumUntil ? new Date(premiumUntil) : null;
   const premiumUntilLabel = premiumUntilDate
@@ -1429,8 +1435,13 @@ function MainView({
           needsAttention
             ? 'Action needed'
             : activeConnections > 0
-              ? 'Connected'
-              : 'Sync your events'
+              ? [
+                  activeCalendars > 0 ? 'Calendar' : null,
+                  aiConnections > 0 ? 'AI assistant' : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')
+              : 'Calendar and AI'
         }
       />
 
@@ -1508,7 +1519,7 @@ function MainView({
           onClick={onOpenProfile}
         />
         <MenuRow
-          icon={<Icon name="googleCalendar" label="Integrations" className="w-7 h-7" />}
+          icon={<Blocks className="w-7 h-7 text-emerald-500" />}
           label="Integrations"
           trailing={
             needsAttention ? (
@@ -2172,8 +2183,8 @@ function QuickTilesGrid({
         onClick={onOpenFocusTimer}
       />
       <QuickTile
-        icon={<Icon name="googleCalendar" label="Calendar sync" className="h-8 w-8" />}
-        title="Calendar sync"
+        icon={<Blocks className="h-[30px] w-[30px] text-emerald-500" />}
+        title="Integrations"
         subtitle={calendarSubtitle}
         onClick={onOpenIntegrations}
       />

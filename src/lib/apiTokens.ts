@@ -1,6 +1,7 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import connectMongo from '@/lib/mongoose';
 import ApiTokenModel from '@/lib/models/ApiToken';
+import OAuthRevocationModel from '@/lib/models/OAuthRevocation';
 import { verifyAccessJwt } from '@/lib/oauth/keys';
 
 export const SCOPES = ['tasks:read', 'tasks:write', 'progress:read'] as const;
@@ -98,6 +99,20 @@ export async function verifyBearerToken(
 
   const claims = await verifyAccessJwt(token);
   if (!claims) return null;
+
+  // Access tokens are self-contained, so a disconnect only takes effect
+  // immediately if we check it here.
+  await connectMongo();
+  const revocation = await OAuthRevocationModel.findOne({
+    userId: claims.sub,
+    clientId: claims.clientId,
+  })
+    .select('revokedAt')
+    .lean();
+  if (revocation && revocation.revokedAt.getTime() > claims.issuedAt * 1000) {
+    return null;
+  }
+
   return {
     userId: claims.sub,
     scopes: claims.scopes,

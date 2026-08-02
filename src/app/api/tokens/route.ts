@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireSessionAuth } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import ApiTokenModel from '@/lib/models/ApiToken';
+import OAuthClientModel from '@/lib/models/OAuthClient';
+import OAuthRevocationModel from '@/lib/models/OAuthRevocation';
 import {
   DEFAULT_SCOPES,
   generatePat,
@@ -27,19 +29,54 @@ function unauth() {
   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 }
 
+/** CIMD client ids are URLs; fall back to the hostname when we have no name. */
+function displayNameFor(clientId: string) {
+  try {
+    return new URL(clientId).host;
+  } catch {
+    return 'Connected app';
+  }
+}
+
 export async function GET() {
   const uid = await currentUserId();
   if (!uid) return unauth();
   await connectMongo();
 
-  const tokens = await ApiTokenModel.find({
-    userId: uid,
-    kind: 'pat',
-    revokedAt: { $exists: false },
-  })
-    .sort({ createdAt: -1 })
-    .select('prefix name scopes createdAt lastUsedAt')
-    .lean();
+  const [tokens, grants] = await Promise.all([
+    ApiTokenModel.find({
+      userId: uid,
+      kind: 'pat',
+      revokedAt: { $exists: false },
+    })
+      .sort({ createdAt: -1 })
+      .select('prefix name scopes createdAt lastUsedAt')
+      .lean(),
+    ApiTokenModel.find({
+      userId: uid,
+      kind: 'refresh',
+      revokedAt: { $exists: false },
+      expiresAt: { $gt: new Date() },
+    })
+      .sort({ createdAt: -1 })
+      .select('clientId scopes createdAt lastUsedAt')
+      .lean(),
+  ]);
+
+  // Refresh tokens rotate on every use, so one app can have several live rows.
+  // Collapse them into a single connection per client.
+  const byClient = new Map<string, (typeof grants)[number]>();
+  for (const grant of grants) {
+    if (!grant.clientId) continue;
+    if (!byClient.has(grant.clientId)) byClient.set(grant.clientId, grant);
+  }
+
+  const clients = byClient.size
+    ? await OAuthClientModel.find({ clientId: { $in: Array.from(byClient.keys()) } })
+        .select('clientId clientName')
+        .lean()
+    : [];
+  const nameById = new Map(clients.map((c) => [c.clientId, c.clientName]));
 
   return NextResponse.json({
     tokens: tokens.map((t) => ({
@@ -49,6 +86,13 @@ export async function GET() {
       scopes: t.scopes ?? [],
       createdAt: t.createdAt,
       lastUsedAt: t.lastUsedAt ?? null,
+    })),
+    connections: Array.from(byClient.entries()).map(([clientId, grant]) => ({
+      clientId,
+      name: nameById.get(clientId) || displayNameFor(clientId),
+      scopes: grant.scopes ?? [],
+      connectedAt: grant.createdAt,
+      lastUsedAt: grant.lastUsedAt ?? null,
     })),
   });
 }
@@ -102,9 +146,27 @@ export async function DELETE(req: NextRequest) {
   if (!uid) return unauth();
   await connectMongo();
 
+  const clientId = req.nextUrl.searchParams.get('clientId');
+  if (clientId) {
+    const now = new Date();
+    await Promise.all([
+      ApiTokenModel.updateMany(
+        { userId: uid, kind: 'refresh', clientId, revokedAt: { $exists: false } },
+        { $set: { revokedAt: now } },
+      ),
+      // Access tokens already issued are JWTs, so record the cut-off too.
+      OAuthRevocationModel.updateOne(
+        { userId: uid, clientId },
+        { $set: { revokedAt: now } },
+        { upsert: true },
+      ),
+    ]);
+    return NextResponse.json({ ok: true });
+  }
+
   const id = req.nextUrl.searchParams.get('id');
   if (!id) {
-    return NextResponse.json({ error: 'id is required' }, { status: 400 });
+    return NextResponse.json({ error: 'id or clientId is required' }, { status: 400 });
   }
 
   const result = await ApiTokenModel.updateOne(
