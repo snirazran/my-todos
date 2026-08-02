@@ -413,7 +413,9 @@
       "Bash(echo \"ts exit=$?\")",
       "WebFetch(domain:www.pencilandpaper.io)",
       "WebFetch(domain:www.eleken.co)",
-      "Bash(perl -pi -e 's/ExistingTask/ExistingBuddyTask/g' src/app/api/buddy/invite/route.ts)"
+      "Bash(perl -pi -e 's/ExistingTask/ExistingBuddyTask/g' src/app/api/buddy/invite/route.ts)",
+      "Bash(claude mcp *)",
+      "mcp__plugin_paddle_paddle-live__execute"
     ]
   }
 }
