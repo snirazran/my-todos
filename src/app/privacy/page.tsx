@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { LegalPage, type LegalSection } from '@/components/legal/LegalPage';
 
-const lastUpdated = 'July 26, 2026';
+const lastUpdated = 'August 2, 2026';
 
 const sections: LegalSection[] = [
   {
@@ -44,7 +44,17 @@ const sections: LegalSection[] = [
     ],
   },
   {
-    title: '6. Payments and subscriptions',
+    title: '6. AI assistant connections',
+    body: [
+      'Frogress lets you connect third-party AI assistants — such as Claude, ChatGPT, Cursor, or Dia — so they can work with your tasks on your behalf. This is off by default. No assistant can access your account unless you explicitly connect one and approve the permissions shown on the consent screen.',
+      'When you connect an assistant, it can, depending on the permissions you approve: read your tasks, task notes, checklists, tags, sections, dates, and completion status; create tasks and mark them complete; and read your streak, fly count, and current date. Connected assistants cannot access your password, payment details, purchases, friends, wardrobe, or account settings, and cannot delete your account.',
+      'Information an assistant reads is sent to that provider and is then handled under their privacy policy, not ours. We do not control how they store, process, retain, or use it, including whether they use it to improve their models. Review the provider’s policy before connecting. Frogress does not read your conversations with an assistant and receives only the requests it makes to us.',
+      'To operate these connections we store a hashed access key or authorization token, the permissions you granted, the identity of the connected application, and the time it was last used. We store a hash, never the key itself. We do not use these connections for advertising and do not sell this information.',
+      'You can disconnect an assistant at any time in Frogress under Menu > Integrations, or by revoking access from the assistant. Disconnecting stops all future access immediately. Tasks an assistant already created remain in your account as ordinary tasks.',
+    ],
+  },
+  {
+    title: '7. Payments and subscriptions',
     body: [
       'If you subscribe to Frogress Plus or buy a consumable fly pack, your payment is processed by a payment provider, not by us: Paddle.com for purchases made on our website (acting as merchant of record), Apple for purchases in the iOS app, and Google Play for purchases in the Android app. We never receive or store your full card details.',
       'These providers share limited information with us and our purchase platform, RevenueCat, such as a purchase identifier, product, price, currency, country, subscription status, and renewal or expiration dates. We use this to activate and manage Plus access, grant purchased fly packs, prevent duplicate grants, prevent fraud and abuse, provide support, and understand aggregate revenue.',
@@ -52,7 +62,7 @@ const sections: LegalSection[] = [
     ],
   },
   {
-    title: '7. Advertising',
+    title: '8. Advertising',
     body: [
       'The Frogress mobile apps show optional rewarded video ads through Google AdMob, for example when you choose to watch an ad to double a reward. Ads are never shown without you choosing to watch one.',
       "To deliver and measure ads, Google may collect device information such as your device advertising identifier, IP address, general location, and ad interaction data, under Google's privacy policy. On iOS, ads use the advertising identifier only if you allow tracking in the App Tracking Transparency prompt; if you decline, ads are still available but are not personalized using that identifier.",
@@ -60,7 +70,7 @@ const sections: LegalSection[] = [
     ],
   },
   {
-    title: '8. How we use information',
+    title: '9. How we use information',
     body: [
       'We use information to create and secure accounts, sync tasks across devices, operate task boards and planners, run quests and rewards, save wardrobe and frog customization, support friend and buddy features, send reminders, process support requests, and maintain app reliability.',
       'We may also use information to prevent abuse, debug errors, analyze aggregate product performance, improve features, and comply with legal obligations.',
@@ -68,15 +78,15 @@ const sections: LegalSection[] = [
     ],
   },
   {
-    title: '9. How we share information',
+    title: '10. How we share information',
     body: [
       'We share information with service providers that help operate Frogress, such as hosting, database, authentication, notification, analytics or diagnostics, email, app-store, payment, subscription-management, and advertising providers as described in this policy.',
-      'We share information with connected services when you choose to use them, such as Google sign-in or Google Calendar. We may also share information if required by law, to protect rights and safety, or as part of a merger, acquisition, financing, or sale of assets.',
+      'We share information with connected services when you choose to use them, such as Google sign-in or Google Calendar, or an AI assistant you connect as described in Section 6. We may also share information if required by law, to protect rights and safety, or as part of a merger, acquisition, financing, or sale of assets.',
       'We do not publish your private tasks, notes, calendar details, or account content for other users unless you choose to share through a feature such as friends, buddy tasks, invites, or support.',
     ],
   },
   {
-    title: '10. Retention',
+    title: '11. Retention',
     body: [
       'We keep information for as long as needed to provide Frogress, maintain your account, resolve disputes, enforce our terms, comply with legal obligations, and maintain security.',
       'First-party product analytics events are automatically deleted after approximately 400 days. The admin statistics dashboard presents aggregate metrics rather than individual user activity. Analytics events linked to your account are deleted when your Frogress account is deleted, subject to limited backup, fraud-prevention, financial, or legal records we may need to retain.',
@@ -84,39 +94,39 @@ const sections: LegalSection[] = [
     ],
   },
   {
-    title: '11. Your choices',
+    title: '12. Your choices',
     body: [
-      'You can update many account and app preferences in Frogress. You can disable notifications in app settings, browser settings, or device settings. You can disconnect Google Calendar through Frogress or your Google account settings.',
+      'You can update many account and app preferences in Frogress. You can disable notifications in app settings, browser settings, or device settings. You can disconnect Google Calendar through Frogress or your Google account settings. You can disconnect any AI assistant, and revoke its access key, in Frogress under Menu > Integrations.',
       'You may request access, correction, deletion, or export of your personal information by contacting support@frogress.com. We may need to verify your identity before completing certain requests.',
     ],
   },
   {
-    title: '12. Security',
+    title: '13. Security',
     body: [
       'We use reasonable technical and organizational safeguards designed to protect information. No system is perfectly secure, and we cannot guarantee absolute security.',
       'You can help protect your account by using secure sign-in methods, keeping your devices safe, and contacting us if you suspect unauthorized access.',
     ],
   },
   {
-    title: '13. Children',
+    title: '14. Children',
     body: [
       'Frogress is not intended for children under 13, and we do not knowingly collect personal information from children under 13. If you believe a child under 13 has provided personal information, contact us so we can take appropriate action.',
     ],
   },
   {
-    title: '14. International use',
+    title: '15. International use',
     body: [
       'Frogress may be operated and processed in countries other than where you live. By using Frogress, you understand that your information may be transferred to and processed in those locations, subject to applicable law.',
     ],
   },
   {
-    title: '15. Changes to this Policy',
+    title: '16. Changes to this Policy',
     body: [
       'We may update this Privacy Policy from time to time. When we make material changes, we will take reasonable steps to notify users, such as updating the date on this page or providing an in-app notice.',
     ],
   },
   {
-    title: '16. Contact',
+    title: '17. Contact',
     body: [
       'Questions or requests about privacy can be sent to support@frogress.com.',
     ],

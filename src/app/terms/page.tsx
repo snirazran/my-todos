@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { LegalPage, type LegalSection } from '@/components/legal/LegalPage';
 
-const lastUpdated = 'July 26, 2026';
+const lastUpdated = 'August 2, 2026';
 
 const sections: LegalSection[] = [
   {
@@ -29,7 +29,7 @@ const sections: LegalSection[] = [
     title: '4. Your content and data',
     body: [
       'You keep ownership of the tasks, notes, checklists, tags, names, profile details, calendar-derived tasks, and other content you add to Frogress.',
-      'You grant Frogress a limited permission to host, store, process, display, and transmit your content only as needed to provide, maintain, protect, and improve the service.',
+      'You grant Frogress a limited permission to host, store, process, display, and transmit your content only as needed to provide, maintain, protect, and improve the service, and to transmit it to any third-party application you choose to connect.',
       'Do not upload or share content that is unlawful, harmful, infringing, abusive, or that violates someone else\'s privacy or rights.',
     ],
   },
@@ -38,12 +38,14 @@ const sections: LegalSection[] = [
     body: [
       'You may not misuse Frogress, interfere with the service, attempt to access accounts or systems without authorization, reverse engineer protected parts of the service, bypass limits or security controls, or use Frogress to break the law.',
       'You may not use automated scraping, excessive requests, or abusive behavior that harms the service or other users.',
+      'Access keys and assistant connections are for your own account. Do not share, publish, sell, or resell them, or use them to give another person access to your account. We may rate-limit, suspend, or revoke a connection that generates excessive requests, degrades the service, or is used to create or complete tasks automatically in order to farm rewards.',
     ],
   },
   {
     title: '6. Third-party services',
     body: [
       'Some features depend on third-party services, such as Firebase authentication and messaging, Google sign-in, Google Calendar, Apple or Google device services, hosting providers, email clients, and payment or app-store providers if paid features are offered.',
+      'If you connect an AI assistant to Frogress, that assistant is a third-party service governed by its own terms and privacy practices. You are responsible for the applications you authorize and for what they do with your task data.',
       'Third-party services are governed by their own terms and privacy practices. Frogress is not responsible for third-party services that we do not control.',
     ],
   },
