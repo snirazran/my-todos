@@ -2005,6 +2005,13 @@ export default function TaskBoard({
                 maxHeightClass="max-h-[calc(100svh-315px-var(--safe-bottom)-env(safe-area-inset-top))] md:max-h-[calc(100svh-224px-var(--safe-bottom))]"
                 isToday={dk === todayKey}
                 isPast={cmpYmd(dk, todayKey) < 0}
+                selectActive={selection.active}
+                onSelectClick={
+                  (tasksByDate[dk] ?? []).length === 0 && !selection.active
+                    ? undefined
+                    : () =>
+                        selection.active ? selection.exit() : selection.enter()
+                }
                 onAddClick={
                   cmpYmd(dk, todayKey) < 0
                     ? undefined

@@ -27,6 +27,9 @@ export function useTaskSelection() {
     () => new Map(),
   );
   const anchorRef = useRef<{ dateKey: string; taskId: string } | null>(null);
+  // Mode can be entered empty (from a column header), so "nothing selected"
+  // only means "leave" once the user has actually picked something.
+  const pickedSomethingRef = useRef(false);
 
   const clear = useCallback(() => {
     anchorRef.current = null;
@@ -35,13 +38,17 @@ export function useTaskSelection() {
 
   const exit = useCallback(() => {
     anchorRef.current = null;
+    pickedSomethingRef.current = false;
     setActive(false);
     setSelected((prev) => (prev.size === 0 ? prev : new Map()));
   }, []);
 
   const enter = useCallback((seed?: SelectionRef) => {
     setActive(true);
-    if (!seed) return;
+    if (!seed) {
+      pickedSomethingRef.current = false;
+      return;
+    }
     anchorRef.current = { dateKey: seed.dateKey, taskId: seed.taskId };
     setSelected(() => new Map([[selectionKeyFor(seed.dateKey, seed.taskId), seed]]));
   }, []);
@@ -68,7 +75,12 @@ export function useTaskSelection() {
   // effect rather than inside the toggle's updater so it stays a plain
   // post-commit reaction (updaters must be side-effect free).
   useEffect(() => {
-    if (active && selected.size === 0) setActive(false);
+    if (!active) return;
+    if (selected.size > 0) {
+      pickedSomethingRef.current = true;
+      return;
+    }
+    if (pickedSomethingRef.current) setActive(false);
   }, [active, selected.size]);
 
   /**

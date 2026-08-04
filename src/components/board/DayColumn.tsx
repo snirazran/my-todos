@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Plus, CalendarCheck } from 'lucide-react';
+import { Plus, CalendarCheck, ListChecks } from 'lucide-react';
 
 export default function DayColumn({
   title,
@@ -17,6 +17,8 @@ export default function DayColumn({
   isToday = false,
   isPast = false,
   onAddClick,
+  onSelectClick,
+  selectActive = false,
   disableVerticalScroll = false,
 }: {
   title: string;
@@ -31,6 +33,13 @@ export default function DayColumn({
   isPast?: boolean;
   /** When provided, renders a + button in the header that triggers add-task for this column. */
   onAddClick?: () => void;
+  /**
+   * When provided, renders the multi-select toggle beside +. This is the only
+   * touch entry into bulk mode — long-press is the drag gesture and cards have
+   * no visible ⋯ trigger, so the column header carries it.
+   */
+  onSelectClick?: () => void;
+  selectActive?: boolean;
   /** Keep the task surface fully expanded instead of making it its own scroller. */
   disableVerticalScroll?: boolean;
 }) {
@@ -91,7 +100,26 @@ export default function DayColumn({
             )}
           </h2>
 
-          <div className="flex items-center gap-2 relative">
+          <div className="flex items-center gap-2.5 relative">
+            {onSelectClick && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSelectClick();
+                }}
+                title={selectActive ? 'Done selecting' : 'Select tasks'}
+                aria-label={selectActive ? 'Done selecting' : 'Select tasks'}
+                aria-pressed={selectActive}
+                className={`flex h-6 w-6 items-center justify-center rounded-full transition-all active:scale-90 ${
+                  selectActive
+                    ? 'bg-primary/15 text-primary'
+                    : 'text-muted-foreground/70 [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground'
+                }`}
+              >
+                <ListChecks size={15} strokeWidth={2.75} />
+              </button>
+            )}
+
             {onAddClick && (
               <button
                 onClick={(e) => {
