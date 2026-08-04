@@ -182,12 +182,27 @@ function hasAnyTag(task: TaskDoc, tagIds?: string[]) {
   return tagIds.some((tagId) => taskTags.includes(tagId));
 }
 
-function taskCompletionDates(task: TaskDoc) {
-  const dates = new Set(task.completedDates ?? []);
-  if (task.type === 'regular' && task.completed && task.date) {
-    dates.add(task.date);
+// The day a completion counts for is the day it was ticked, not the day the
+// occurrence was scheduled for — a task moved between days, or ticked ahead of
+// time, must not move or duplicate the work it represents. Rows written before
+// completedAtByDate existed fall back to the occurrence date.
+function taskCompletionDates(task: TaskDoc, timezone: string) {
+  const occurrences = new Set(task.completedDates ?? []);
+  if (
+    occurrences.size === 0 &&
+    task.type === 'regular' &&
+    task.completed &&
+    task.date
+  ) {
+    occurrences.add(task.date);
   }
-  return Array.from(dates);
+  const stamps = task.completedAtByDate ?? {};
+  return Array.from(occurrences, (occurrence) => {
+    const at = stamps[occurrence];
+    if (!at) return occurrence;
+    const parsed = at instanceof Date ? at : new Date(at);
+    return isNaN(parsed.getTime()) ? occurrence : getZonedYMD(parsed, timezone);
+  });
 }
 
 function matchesSubject(task: TaskDoc, subject: QuestSubject) {
@@ -239,6 +254,7 @@ function countAddedTasks(
 
 function countCompletedEvents(
   tasks: TaskDoc[],
+  timezone: string,
   startDate: string,
   endDate: string,
   predicate: (task: TaskDoc) => boolean,
@@ -247,7 +263,7 @@ function countCompletedEvents(
     if (!predicate(task)) return sum;
     return (
       sum +
-      taskCompletionDates(task).filter(
+      taskCompletionDates(task, timezone).filter(
         (dateStr) => dateStr >= startDate && dateStr <= endDate,
       ).length
     );
@@ -369,7 +385,7 @@ function progressForLogicBlock(args: {
     );
   }
 
-  return countCompletedEvents(tasks, startDate, endDate, (task) =>
+  return countCompletedEvents(tasks, timezone, startDate, endDate, (task) =>
     matchesLogicBlock(task, block),
   );
 }
@@ -1050,6 +1066,7 @@ export async function syncQuestState(args: {
         type: 1,
         completed: 1,
         completedDates: 1,
+        completedAtByDate: 1,
         lateCompletedDates: 1,
         date: 1,
         createdAt: 1,

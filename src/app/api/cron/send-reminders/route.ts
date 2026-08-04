@@ -31,6 +31,10 @@ const MIN_HOURS_BETWEEN_NOTIFICATIONS = 4;
 // Consecutive routine nudges ignored (no app open in between) before muting them
 const REMINDER_MUTE_THRESHOLD = 5;
 
+// A scheduled task may only be named as "start with this" once it is within
+// this window of its start time (or already overdue)
+const SOON_WINDOW_MINUTES = 120;
+
 type PushMessage = {
   title: string;
   body: string;
@@ -74,13 +78,46 @@ function getTodayInTz(tz: string): string {
 }
 
 /**
+ * Minutes since local midnight in a given IANA timezone.
+ */
+function getCurrentMinutesInTz(tz: string): number {
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz,
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: false,
+    }).formatToParts(new Date());
+    const h = Number(parts.find((p) => p.type === 'hour')?.value ?? '0');
+    const m = Number(parts.find((p) => p.type === 'minute')?.value ?? '0');
+    return (h % 24) * 60 + m;
+  } catch {
+    const now = new Date();
+    return now.getUTCHours() * 60 + now.getUTCMinutes();
+  }
+}
+
+function parseHHMM(value: unknown): number | null {
+  if (typeof value !== 'string') return null;
+  const match = value.match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return null;
+  const h = Number(match[1]);
+  const m = Number(match[2]);
+  if (h > 23 || m > 59) return null;
+  return h * 60 + m;
+}
+
+/**
  * Count uncompleted tasks for a user on a given date, and pick one concrete
- * task to name in the nudge: the next scheduled one, else the shortest-titled
- * (a stand-in for "smallest").
+ * task to name in the nudge. A task scheduled for later in the day is never
+ * named — it gets its own reminder at its start time — so the candidates are
+ * scheduled tasks that are due now or soon, then unscheduled ones (shortest
+ * title as a stand-in for "smallest").
  */
 async function getUncompletedTasks(
   userId: string,
   dateYMD: string,
+  nowMinutes: number,
 ): Promise<{ count: number; exampleText: string | null }> {
   const dow = new Date(`${dateYMD}T12:00:00Z`).getUTCDay();
 
@@ -104,15 +141,23 @@ async function getUncompletedTasks(
     return !t.completed;
   });
 
-  const scheduled = uncompleted
-    .filter((t: any) => typeof t.startTime === 'string' && t.startTime)
-    .sort((a: any, b: any) => String(a.startTime).localeCompare(String(b.startTime)));
-  const example =
-    scheduled[0] ??
-    [...uncompleted].sort(
+  const dueSoon = uncompleted
+    .map((t: any) => ({ task: t, startMinutes: parseHHMM(t.startTime) }))
+    .filter(
+      (entry) =>
+        entry.startMinutes !== null &&
+        entry.startMinutes <= nowMinutes + SOON_WINDOW_MINUTES,
+    )
+    .sort((a, b) => (a.startMinutes as number) - (b.startMinutes as number));
+
+  const unscheduled = uncompleted
+    .filter((t: any) => parseHHMM(t.startTime) === null)
+    .sort(
       (a: any, b: any) =>
         String(a.text ?? '').length - String(b.text ?? '').length,
-    )[0];
+    );
+
+  const example = dueSoon[0]?.task ?? unscheduled[0] ?? null;
 
   return {
     count: uncompleted.length,
@@ -276,6 +321,7 @@ export async function GET(req: NextRequest) {
     const { count: uncompletedCount, exampleText } = await getUncompletedTasks(
       userId,
       todayYMD,
+      getCurrentMinutesInTz(tz),
     );
     const ignoredCount = prefs.reminderIgnoredCount ?? 0;
 

@@ -1,4 +1,4 @@
-import TaskModel from '@/lib/models/Task';
+import TaskModel, { type TaskDoc } from '@/lib/models/Task';
 import UserModel from '@/lib/models/User';
 import {
   FOCUS_FLY_RATE_SECONDS,
@@ -92,6 +92,32 @@ async function awardFocusFlies(
     },
     { $unset: ['_focusFlyPrev', '_focusFlyNext', '_focusFlyGained'] },
   ], { updatePipeline: true });
+}
+
+type FrogodoroSession = { date: string; focusTime: number; breakTime: number };
+
+// Sessions are stamped with the day the work happened and never re-dated, so a
+// one-off that has been moved between days keeps its log on the original day.
+// Its row still owns all of that time — a one-off is a single piece of work —
+// so the row reports the total. A repeat occurrence owns only its own day.
+export function sessionForRow(
+  task: Pick<TaskDoc, 'type' | 'frogodoroSessions'>,
+  date: string,
+): FrogodoroSession | null {
+  const sessions = task.frogodoroSessions ?? [];
+  if (sessions.length === 0) return null;
+  if (task.type === 'weekly') {
+    return sessions.find((session) => session.date === date) ?? null;
+  }
+  const total = sessions.reduce(
+    (sum, session) => ({
+      focusTime: sum.focusTime + (session.focusTime ?? 0),
+      breakTime: sum.breakTime + (session.breakTime ?? 0),
+    }),
+    { focusTime: 0, breakTime: 0 },
+  );
+  if (total.focusTime === 0 && total.breakTime === 0) return null;
+  return { date, ...total };
 }
 
 export async function addFrogodoroSession(

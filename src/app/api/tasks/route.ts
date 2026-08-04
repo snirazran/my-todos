@@ -57,6 +57,7 @@ import {
   isWithinStreakCreditWindow,
 } from '@/lib/streak/taskStreaks';
 import { loadProtectedDays } from '@/lib/streak/loginStreak';
+import { sessionForRow } from '@/lib/frogodoroSessions';
 
 type Origin = 'weekly' | 'regular';
 type BoardItem = { id: string; text: string; order: number; type: TaskType };
@@ -1485,9 +1486,6 @@ async function handleBulkPut(uid: string, bulk: BulkBody, tz: string) {
           { userId: uid, id: doc.id },
           { $addToSet: { suppressedDates: item.fromDate } },
         );
-        const movedSession = doc.frogodoroSessions?.find(
-          (s) => s.date === item.fromDate,
-        );
         await TaskModel.create({
           userId: uid,
           type: 'regular',
@@ -1496,7 +1494,9 @@ async function handleBulkPut(uid: string, bulk: BulkBody, tz: string) {
           date: target,
           order: await nextOrderForDay(uid, dowFromYMD(target), target),
           completed: false,
-          createdAt: now,
+          // Detaching an occurrence is a move, not a new task: keep the series'
+          // createdAt so it can't read as a task added today.
+          createdAt: doc.createdAt ?? now,
           updatedAt: now,
           tags: doc.tags ?? [],
           notes: doc.notes ?? '',
@@ -1504,17 +1504,6 @@ async function handleBulkPut(uid: string, bulk: BulkBody, tz: string) {
           startTime: doc.startTime,
           endTime: doc.endTime,
           reminder: doc.reminder,
-          ...(movedSession
-            ? {
-                frogodoroSessions: [
-                  {
-                    date: target,
-                    focusTime: movedSession.focusTime ?? 0,
-                    breakTime: movedSession.breakTime ?? 0,
-                  },
-                ],
-              }
-            : {}),
         });
         affected++;
         continue;
@@ -1523,25 +1512,15 @@ async function handleBulkPut(uid: string, bulk: BulkBody, tz: string) {
       if (doc.date === target) continue;
       await TaskModel.updateOne(
         { userId: uid, id: doc.id },
-        [
-          {
-            $set: {
-              type: 'regular',
-              date: target,
-              order: await nextOrderForDay(uid, dowFromYMD(target), target),
-              updatedAt: now,
-              frogodoroSessions: {
-                $map: {
-                  input: { $ifNull: ['$frogodoroSessions', []] },
-                  as: 's',
-                  in: { $mergeObjects: ['$$s', { date: target }] },
-                },
-              },
-            },
+        {
+          $set: {
+            type: 'regular',
+            date: target,
+            order: await nextOrderForDay(uid, dowFromYMD(target), target),
+            updatedAt: now,
           },
-          { $unset: ['weekStart', 'dayOfWeek', 'suppressedDates'] },
-        ],
-        { updatePipeline: true } as never,
+          $unset: { weekStart: 1, dayOfWeek: 1, suppressedDates: 1 },
+        },
       );
       affected++;
     }
@@ -1702,9 +1681,6 @@ export async function PUT(req: NextRequest) {
       typeof order === 'number'
         ? order
         : await nextOrderForDay(uid, weekday, toDate);
-    // Carry the focus/break logged on the original occurrence's day onto the
-    // new one-off, re-stamped to the destination date (sessions are date-keyed).
-    const movedSession = doc.frogodoroSessions?.find((s) => s.date === fromDate);
     await TaskModel.updateOne(
       { userId: uid, type: 'regular', id: newId },
       {
@@ -1718,24 +1694,14 @@ export async function PUT(req: NextRequest) {
           startTime: doc.startTime,
           endTime: doc.endTime,
           reminder: doc.reminder,
-          ...(movedSession
-            ? {
-                frogodoroSessions: [
-                  {
-                    date: toDate,
-                    focusTime: movedSession.focusTime ?? 0,
-                    breakTime: movedSession.breakTime ?? 0,
-                  },
-                ],
-              }
-            : {}),
           updatedAt: now,
         },
         $setOnInsert: {
           userId: uid,
           type: 'regular',
           id: newId,
-          createdAt: now,
+          // A detached occurrence is the same task on a new day, not a new one.
+          createdAt: doc.createdAt ?? now,
           completed: false,
         },
       },
@@ -1804,30 +1770,17 @@ export async function PUT(req: NextRequest) {
       const weekday = dowFromYMD(moveDate); // 0..6
       const newOrder = await nextOrderForDay(uid, weekday, moveDate);
 
-      // Pipeline update so we can re-stamp the date-keyed frogodoro sessions
-      // onto the new day in the same write — a regular task lives on one date,
-      // so all its sessions belong to moveDate after the move.
       await TaskModel.updateOne(
         { userId: uid, id: taskId },
-        [
-          {
-            $set: {
-              type: 'regular',
-              date: moveDate,
-              order: newOrder,
-              updatedAt: now,
-              frogodoroSessions: {
-                $map: {
-                  input: { $ifNull: ['$frogodoroSessions', []] },
-                  as: 's',
-                  in: { $mergeObjects: ['$$s', { date: moveDate }] },
-                },
-              },
-            },
+        {
+          $set: {
+            type: 'regular',
+            date: moveDate,
+            order: newOrder,
+            updatedAt: now,
           },
-          { $unset: ['weekStart', 'dayOfWeek', 'suppressedDates'] },
-        ],
-        { updatePipeline: true } as never,
+          $unset: { weekStart: 1, dayOfWeek: 1, suppressedDates: 1 },
+        },
       );
       await syncGamification(uid, tz);
       await notifyTaskChanged(uid);
@@ -2076,6 +2029,16 @@ export async function PUT(req: NextRequest) {
             $pull: { lateCompletedDates: date },
           }
       : { $pull: { completedDates: date, lateCompletedDates: date } };
+  if (completed === true)
+    (update as any).$set = {
+      ...(update as any).$set,
+      [`completedAtByDate.${date}`]: new Date(),
+    };
+  else
+    (update as any).$unset = {
+      ...(update as any).$unset,
+      [`completedAtByDate.${date}`]: 1,
+    };
   if (doc.type === 'regular')
     (update as any).$set = { ...(update as any).$set, completed };
 
@@ -2241,6 +2204,9 @@ export async function DELETE(req: NextRequest) {
           order: s.orderOverrides?.[d] ?? s.order ?? 0,
           completed: completed.has(d),
           completedDates: completed.has(d) ? [d] : [],
+          completedAtByDate: s.completedAtByDate?.[d]
+            ? { [d]: s.completedAtByDate[d] }
+            : undefined,
           tags: s.tags ?? [],
           notes: s.notes ?? '',
           checklist: checklistForDate(s, d),
@@ -2249,7 +2215,8 @@ export async function DELETE(req: NextRequest) {
           reminder: s.reminder,
           frogodoroSettings: isOriginal ? s.frogodoroSettings : undefined,
           frogodoroSessions: session ? [session] : [],
-          createdAt: now,
+          // Preserving past occurrences of a deleted series adds no new tasks.
+          createdAt: s.createdAt ?? now,
           updatedAt: now,
         });
       }
@@ -2399,7 +2366,7 @@ async function handleDailyGet(req: NextRequest, userId: string, tz: string) {
       completedDates: t.completedDates ?? [],
       streak: t.type === 'weekly' ? streakMap.get(t.id) ?? 0 : 0,
       frogodoroSettings: t.frogodoroSettings,
-      frogodoroSession: t.frogodoroSessions?.find((s) => s.date === date) ?? null,
+      frogodoroSession: sessionForRow(t, date),
       calendarEventId: t.calendarEventId,
       startTime: t.startTime,
       endTime: t.endTime,
@@ -2505,7 +2472,7 @@ async function handleBoardGet(req: NextRequest, uid: string, tz: string) {
           (t.completedDates ?? []).includes(weekDates[dayNum]) ||
           (!!t.completed && t.type === 'regular'),
         tags: t.tags ?? [],
-        frogodoroSession: t.frogodoroSessions?.find((s) => s.date === weekDates[dayNum]) ?? null,
+        frogodoroSession: sessionForRow(t, weekDates[dayNum]),
         calendarEventId: t.calendarEventId,
         startTime: t.startTime,
         endTime: t.endTime,
@@ -2597,9 +2564,7 @@ async function handleBoardGet(req: NextRequest, uid: string, tz: string) {
           repeatEndDate: doc.repeatEndDate,
           repeatMode: doc.repeatMode,
           repeatRule: doc.repeatRule,
-          frogodoroSession:
-            doc.frogodoroSessions?.find((session) => session.date === date) ??
-            null,
+          frogodoroSession: sessionForRow(doc, date),
           calendarEventId: doc.calendarEventId,
           startTime: doc.startTime,
           endTime: doc.endTime,
@@ -2640,9 +2605,7 @@ async function handleBoardGet(req: NextRequest, uid: string, tz: string) {
       repeatEndDate: doc.repeatEndDate,
       repeatMode: doc.repeatMode,
       repeatDayOfMonth: doc.repeatDayOfMonth,
-      frogodoroSession:
-        doc.frogodoroSessions?.find((session) => session.date === date) ??
-        null,
+      frogodoroSession: sessionForRow(doc, date),
       calendarEventId: doc.calendarEventId,
       startTime: doc.startTime,
       endTime: doc.endTime,
@@ -2755,8 +2718,7 @@ async function handleDateRangeGet(req: NextRequest, uid: string, tz: string) {
         repeatMode: doc.repeatMode,
         repeatGroupId: doc.repeatGroupId,
         dayOfWeek: doc.dayOfWeek,
-        frogodoroSession:
-          doc.frogodoroSessions?.find((s) => s.date === doc.date) ?? null,
+        frogodoroSession: sessionForRow(doc, doc.date!),
         calendarEventId: doc.calendarEventId,
         startTime: doc.startTime,
         endTime: doc.endTime,
@@ -2791,8 +2753,7 @@ async function handleDateRangeGet(req: NextRequest, uid: string, tz: string) {
           repeatEndDate: doc.repeatEndDate,
           repeatRule: doc.repeatRule,
           dayOfWeek: dowFromYMD(d),
-          frogodoroSession:
-            doc.frogodoroSessions?.find((s) => s.date === d) ?? null,
+          frogodoroSession: sessionForRow(doc, d),
           calendarEventId: doc.calendarEventId,
           startTime: doc.startTime,
           endTime: doc.endTime,
@@ -2821,8 +2782,7 @@ async function handleDateRangeGet(req: NextRequest, uid: string, tz: string) {
           repeatEndDate: doc.repeatEndDate,
           repeatDayOfMonth: doc.repeatDayOfMonth,
           dayOfWeek: dowFromYMD(d),
-          frogodoroSession:
-            doc.frogodoroSessions?.find((s) => s.date === d) ?? null,
+          frogodoroSession: sessionForRow(doc, d),
           calendarEventId: doc.calendarEventId,
           startTime: doc.startTime,
           endTime: doc.endTime,
@@ -2851,8 +2811,7 @@ async function handleDateRangeGet(req: NextRequest, uid: string, tz: string) {
           repeatStartDate: repeatStart,
           repeatEndDate: doc.repeatEndDate,
           dayOfWeek: doc.dayOfWeek,
-          frogodoroSession:
-            doc.frogodoroSessions?.find((s) => s.date === d) ?? null,
+          frogodoroSession: sessionForRow(doc, d),
           calendarEventId: doc.calendarEventId,
           startTime: doc.startTime,
           endTime: doc.endTime,
@@ -3252,6 +3211,7 @@ async function handleBoardPutByDate(
       repeatDayOfMonth: 1,
       repeatRule: 1,
       repeatStartDate: 1,
+      frogodoroSessions: 1,
     },
   )
     .lean<TaskDoc[]>()
@@ -3287,25 +3247,12 @@ async function handleBoardPutByDate(
         ...(reminder !== undefined ? { reminder } : {}),
         ...(calendarEventId !== undefined ? { calendarEventId } : {}),
       };
-      // The frogodoro session is stored in an array keyed by date; a moved
-      // regular task must carry its focus/break onto the new day, so re-stamp
-      // the request's session to this column's date. (Regular tasks live on one
-      // day, so collapsing to the single current-date entry is correct.)
-      const fsess = t.frogodoroSession;
-      const frogodoroFields =
-        fsess &&
-        (typeof fsess.focusTime === 'number' ||
-          typeof fsess.breakTime === 'number')
-          ? {
-              frogodoroSessions: [
-                {
-                  date: dateKey,
-                  focusTime: fsess.focusTime ?? 0,
-                  breakTime: fsess.breakTime ?? 0,
-                },
-              ],
-            }
-          : {};
+      // Sessions record the day the work happened, so they are never rewritten
+      // from the client's view of a column. The backlog path replaces the doc,
+      // so its log is carried over from the source doc untouched.
+      const frogodoroFields = srcDoc?.frogodoroSessions?.length
+        ? { frogodoroSessions: srcDoc.frogodoroSessions }
+        : {};
       if (ttype === 'weekly') {
         // `type: 'weekly'` covers every repeat kind (weekly / monthly / custom).
         // When the task is being reordered within a column that is a *natural*
@@ -3405,7 +3352,6 @@ async function handleBoardPutByDate(
             notes,
             checklist,
             ...scheduleFields,
-            ...frogodoroFields,
             date: dateKey,
             order: i + 1,
             updatedAt: now,
