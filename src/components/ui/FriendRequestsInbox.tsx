@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
-import useSWR from 'swr';
+import React, { useEffect, useState } from 'react';
+import useSWR, { mutate as globalMutate } from 'swr';
 import { Check, X, Loader2, UserPlus, Users } from 'lucide-react';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { mutateFriendsCaches } from '@/hooks/useFriendsSync';
+import { FriendSuggestionsRow } from '@/components/ui/FriendSuggestionsRow';
 
 type IncomingRequest = {
   id: string;
@@ -41,6 +42,13 @@ export function FriendRequestsInbox({
   }>(open ? '/api/buddy/invite' : null, fetcher, { revalidateOnFocus: false });
 
   const [busyId, setBusyId] = useState<string | null>(null);
+  // Accepting just widened the graph — the friends of the person you accepted
+  // are suggestible from this second on, so ask for them right here.
+  const [justAccepted, setJustAccepted] = useState(false);
+
+  useEffect(() => {
+    if (!open) setJustAccepted(false);
+  }, [open]);
 
   const respond = async (requestId: string, action: 'accept' | 'decline') => {
     setBusyId(requestId);
@@ -53,6 +61,10 @@ export function FriendRequestsInbox({
       if (res.ok) {
         await mutate();
         mutateFriendsCaches();
+        if (action === 'accept') {
+          setJustAccepted(true);
+          globalMutate('/api/friends/suggestions');
+        }
       }
     } catch {
       /* ignore */
@@ -206,6 +218,16 @@ export function FriendRequestsInbox({
                   </div>
                 ))}
               </div>
+            )}
+
+            {justAccepted && (
+              <FriendSuggestionsRow
+                enabled={open}
+                variant="embedded"
+                className="mt-4"
+                title="Keep going"
+                subtitle="People you may know now that your pond grew"
+              />
             )}
           </div>
         </div>

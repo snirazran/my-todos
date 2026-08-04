@@ -117,7 +117,9 @@ export type UserDoc = {
   phoneNumber?: string;
   isGuest?: boolean;
   friendCode?: string;
+  /** Legacy permanent dismissals — still honoured, no longer written to. */
   suggestionsDismissed?: string[];
+  suggestionSnoozes?: { userId: string; until: Date }[];
   createdAt: Date;
   wardrobe?: UserWardrobe;
   skins?: UserSkins;

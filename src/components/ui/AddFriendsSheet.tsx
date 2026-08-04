@@ -1,11 +1,16 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Search, QrCode, ChevronRight } from 'lucide-react';
+import useSWR from 'swr';
+import { Search, QrCode, Gift } from 'lucide-react';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { InviteFriendsModal } from '@/components/ui/InviteFriendsModal';
 import { EnterFriendCodeModal } from '@/components/ui/EnterFriendCodeModal';
 import { QRFriendModal } from '@/components/ui/QRFriendModal';
+import { FriendSuggestionsRow } from '@/components/ui/FriendSuggestionsRow';
+import Fly from '@/components/ui/fly';
+
+const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 export function AddFriendsSheet({
   open,
@@ -20,12 +25,34 @@ export function AddFriendsSheet({
   const [codeOpen, setCodeOpen] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
 
+  // "Show progress and what comes next" is the one thing referral screens are
+  // consistently faulted for missing — the ladder already exists, so the sheet
+  // states where you are on it instead of asking blind.
+  const { data: inviteConfig } = useSWR<{
+    rewards?: { tier: number; item?: { name?: string } }[];
+  }>(open ? '/api/invite/config' : null, fetcher, { revalidateOnFocus: false });
+  const { data: inviteStatus } = useSWR<{ claimedCount?: number }>(
+    open ? '/api/invite/status' : null,
+    fetcher,
+    { revalidateOnFocus: false },
+  );
+
+  const joined = inviteStatus?.claimedCount ?? 0;
+  const nextReward =
+    (inviteConfig?.rewards ?? [])
+      .slice()
+      .sort((a, b) => a.tier - b.tier)
+      .find((r) => r.tier > joined) ?? null;
+  const progressPct = nextReward
+    ? Math.min(100, Math.round((joined / Math.max(1, nextReward.tier)) * 100))
+    : 0;
+
   return (
     <>
       <BaseSheet
         open={open}
         onOpenChange={(v) => !v && onClose()}
-        className="border-0 sm:max-w-2xl"
+        className="border-0 sm:max-w-lg"
         closeAriaLabel="Close add friends"
         hideHandle
       >
@@ -34,66 +61,118 @@ export function AddFriendsSheet({
             ref={bindScroll}
             className="flex max-h-[100dvh] flex-col overflow-y-auto overscroll-contain sm:max-h-[calc(100dvh-3rem)]"
           >
+            {/* The art carries no copy: text baked over an image gets cropped,
+                fights the illustration and can't be sized per screen. It sets
+                the mood, the words live on the surface below where they're
+                fully legible. */}
             <div className="relative shrink-0">
               <img
                 src="/friend-share.png"
-                alt="Friends sending the flies they catch into your basket"
-                className="h-[44dvh] w-full object-cover object-center sm:h-auto sm:max-h-none"
+                alt="Frogs passing the flies they catch to each other across a pond"
+                className="h-[24dvh] max-h-[230px] w-full object-cover object-center sm:h-[210px] sm:max-h-none"
               />
-              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent px-5 pb-4 pt-20 text-center sm:pb-5 sm:pt-10">
-                <h2 className="text-2xl font-black tracking-tight text-white drop-shadow-[0_2px_5px_rgba(0,0,0,0.55)] sm:text-4xl">
-                  Earn together!
-                </h2>
-                <p className="mx-auto mt-1 max-w-[24rem] text-[13px] font-semibold leading-snug text-white/90 drop-shadow-[0_1px_4px_rgba(0,0,0,0.6)] min-[360px]:text-sm min-[400px]:text-[15px] sm:text-base">
-                  They catch 2 flies, you get 1 — and your catch pays them back
-                  the same way.
-                </p>
-              </div>
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-background to-transparent"
+              />
             </div>
 
-            <div className="flex flex-col gap-3 px-5 pb-[calc(env(safe-area-inset-bottom)+1.75rem)] pt-4 sm:gap-4 sm:px-6 sm:pt-5">
+            <div className="flex flex-col px-5 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] sm:px-6">
+              <h2 className="text-center text-[25px] font-black leading-[1.1] tracking-tight text-foreground min-[400px]:text-[28px]">
+                Your friends catch flies for you
+              </h2>
+              <p className="mx-auto mt-2 max-w-[21rem] text-center text-[13px] font-semibold leading-snug text-muted-foreground min-[400px]:text-sm">
+                Add a friend and you each keep half of what the other catches,
+                every single day.
+              </p>
+
+              {/* Both sides of the trade, stated plainly — the practice every
+                  referral teardown lands on. */}
+              <div className="mt-4 grid grid-cols-2 gap-2.5">
+                <div className="flex flex-col items-center gap-1.5 rounded-2xl border border-border/60 bg-muted/40 px-3 py-3.5 text-center">
+                  <span className="text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+                    They get
+                  </span>
+                  <Gift className="h-6 w-6 text-[#4f9149]" strokeWidth={2.25} />
+                  <span className="text-[13px] font-black leading-tight tracking-tight text-foreground">
+                    A free outfit
+                  </span>
+                </div>
+                <div className="flex flex-col items-center gap-1.5 rounded-2xl border border-border/60 bg-muted/40 px-3 py-3.5 text-center">
+                  <span className="text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+                    You get
+                  </span>
+                  <Fly size={26} interactive={false} paused />
+                  <span className="text-[13px] font-black leading-tight tracking-tight text-foreground">
+                    Half their catch
+                  </span>
+                </div>
+              </div>
+
+              {/* One primary action, sized and coloured so nothing competes. */}
               <button
                 type="button"
                 onClick={() => setInviteOpen(true)}
-                className="flex items-center gap-3 rounded-2xl bg-[#4f9149] px-4 py-3.5 text-left text-white ring-1 ring-[#34631f]/40 shadow-[0_4px_0_0_#34631f] transition-all [@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:shadow-[0_5px_0_0_#34631f] active:translate-y-1 active:shadow-none sm:py-4"
+                className="mt-4 flex h-14 w-full touch-manipulation items-center justify-center gap-2 rounded-2xl bg-[#4f9149] text-[17px] font-black tracking-tight text-white ring-1 ring-[#34631f]/40 shadow-[0_4px_0_0_#34631f] transition-all [@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:shadow-[0_5px_0_0_#34631f] active:translate-y-1 active:shadow-none sm:h-[60px] sm:text-lg"
               >
-                <span className="text-2xl leading-none sm:text-3xl">🎁</span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-base font-black tracking-tight sm:text-lg">
-                    Invite friends
-                  </span>
-                  <span className="block text-xs font-semibold text-white/80 sm:text-[13px]">
-                    They join with a gift — you unlock outfits
-                  </span>
-                </span>
-                <ChevronRight className="h-5 w-5 shrink-0 text-white/80" />
+                <Gift className="h-5 w-5" strokeWidth={2.5} />
+                Invite friends
               </button>
 
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setCodeOpen(true)}
-                  className="flex flex-col items-center gap-2.5 rounded-2xl border border-border/60 bg-muted/40 px-4 py-5 transition-transform active:scale-[0.98] sm:py-6"
-                >
-                  <span className="flex h-11 w-11 items-center justify-center rounded-full bg-sky-500/10 sm:h-12 sm:w-12">
-                    <Search className="h-6 w-6 text-sky-500" strokeWidth={2.5} />
+              {nextReward && (
+                <div className="mt-2.5 flex items-center gap-2.5 px-1">
+                  <span
+                    role="progressbar"
+                    aria-label="Invite reward progress"
+                    aria-valuemin={0}
+                    aria-valuemax={nextReward.tier}
+                    aria-valuenow={Math.min(joined, nextReward.tier)}
+                    className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-[#4f9149]/15"
+                  >
+                    <span
+                      className="block h-full w-full origin-left rounded-full bg-[#4f9149] transition-transform duration-300"
+                      style={{ transform: `scaleX(${progressPct / 100})` }}
+                    />
                   </span>
-                  <span className="text-sm font-black tracking-tight text-foreground sm:text-base">
+                  <span className="shrink-0 text-[11px] font-black text-muted-foreground">
+                    {joined}/{nextReward.tier} joined
+                    {nextReward.item?.name ? ` · ${nextReward.item.name}` : ''}
+                  </span>
+                </div>
+              )}
+
+              <FriendSuggestionsRow
+                enabled={open}
+                variant="embedded"
+                className="mt-5"
+                title="Already on Frogress"
+                subtitle="People you may know — add them in one tap"
+              />
+
+              {/* Entry methods, not offers: quiet row, equal weight, out of the
+                  way of the action above. */}
+              <div className="mt-5 border-t border-border/60 pt-3">
+                <p className="mb-2 text-center text-[11px] font-bold text-muted-foreground">
+                  Got a friend&apos;s code?
+                </p>
+                <div className="grid grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setCodeOpen(true)}
+                    className="flex items-center justify-center gap-2 rounded-xl border border-border/60 bg-card px-3 py-2.5 text-[13px] font-black tracking-tight text-foreground transition-transform active:scale-[0.98] [@media(hover:hover)]:hover:bg-muted/60"
+                  >
+                    <Search className="h-4 w-4 text-muted-foreground" strokeWidth={2.5} />
                     Enter code
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setQrOpen(true)}
-                  className="flex flex-col items-center gap-2.5 rounded-2xl border border-border/60 bg-muted/40 px-4 py-5 transition-transform active:scale-[0.98] sm:py-6"
-                >
-                  <span className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-500/10 sm:h-12 sm:w-12">
-                    <QrCode className="h-6 w-6 text-emerald-600" strokeWidth={2.5} />
-                  </span>
-                  <span className="text-sm font-black tracking-tight text-foreground sm:text-base">
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setQrOpen(true)}
+                    className="flex items-center justify-center gap-2 rounded-xl border border-border/60 bg-card px-3 py-2.5 text-[13px] font-black tracking-tight text-foreground transition-transform active:scale-[0.98] [@media(hover:hover)]:hover:bg-muted/60"
+                  >
+                    <QrCode className="h-4 w-4 text-muted-foreground" strokeWidth={2.5} />
                     QR code
-                  </span>
-                </button>
+                  </button>
+                </div>
               </div>
             </div>
           </div>

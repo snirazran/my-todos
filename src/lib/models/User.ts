@@ -24,6 +24,16 @@ const UserSchema = new Schema<UserDoc>(
     isGuest: { type: Boolean, default: false },
     friendCode: { type: String, required: false, unique: true, index: true, sparse: true },
     suggestionsDismissed: { type: [String], default: [] },
+    suggestionSnoozes: {
+      type: [
+        {
+          _id: false,
+          userId: { type: String, required: true },
+          until: { type: Date, required: true },
+        },
+      ],
+      default: [],
+    },
     createdAt: { type: Date, default: Date.now },
     wardrobe: {
       type: Schema.Types.Mixed,

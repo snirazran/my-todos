@@ -120,8 +120,17 @@ export function LooksRow({
                 )}
               >
                 <span className="relative flex h-16 items-end justify-center overflow-hidden rounded-lg bg-muted/40">
+                  {look.backgroundImage && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={look.backgroundImage}
+                      alt=""
+                      aria-hidden="true"
+                      className="absolute inset-0 h-full w-full object-cover"
+                    />
+                  )}
                   <FrogSnapshot
-                    className="h-[125%] w-[125%] object-contain"
+                    className="relative h-[125%] w-[125%] object-contain"
                     indices={look.indices}
                     width={110}
                     height={110}
@@ -133,18 +142,14 @@ export function LooksRow({
                   )}
                 </span>
                 <span
+                  title={look.name}
                   className={cn(
-                    'mt-1 truncate text-[10px] font-black leading-tight',
+                    'mt-1 line-clamp-2 text-[10px] font-black leading-[1.15]',
                     isWearing ? 'text-[#4f9149]' : 'text-foreground',
                   )}
                 >
                   {look.name}
                 </span>
-                {!look.complete && (
-                  <span className="truncate text-[9px] font-bold text-amber-600 dark:text-amber-400">
-                    Missing a piece
-                  </span>
-                )}
               </button>
 
               {removing && (

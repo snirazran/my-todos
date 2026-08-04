@@ -2147,17 +2147,6 @@ export default function TaskBoard({
             />
           </div>
         )}
-        {!calendarOpen && filtersActive && (
-          <div className="md:hidden pointer-events-auto w-full max-w-[560px] rounded-2xl bg-card/70 px-2 py-1.5 backdrop-blur-xl">
-            <AppliedFilterChips
-              filters={filters}
-              base={baseFilters}
-              tags={tagsData?.tags || []}
-              onChange={setFilters}
-              onClearAll={resetFilters}
-            />
-          </div>
-        )}
       </div>
 
       {/* Desktop filter bar — clear of the 64px site header, above the columns. */}

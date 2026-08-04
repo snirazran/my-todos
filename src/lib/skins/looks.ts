@@ -26,8 +26,10 @@ export type SavedLook = {
 export type SavedLookView = SavedLook & {
   /** Rive indices for previewing without a second catalog lookup. */
   indices: Record<'skin' | 'hat' | 'body' | 'hand_item', number>;
-  /** False when a piece was sold since saving — the look still applies, minus that slot. */
+  /** False when a piece was sold since saving — such looks are dropped on read. */
   complete: boolean;
+  /** Saved background art, so the card previews the whole scene. */
+  backgroundImage?: string | null;
 };
 
 export function isSavedLook(value: unknown): value is SavedLook {
@@ -60,22 +62,31 @@ export function isEmptyLook(
 
 /**
  * Name a look after the piece that defines it — the rarest thing worn — so the
- * saved row reads as "Wizard fit", not "Look 3".
+ * saved row reads as "Wizard fit", not "Look 3". Outfits sharing that piece are
+ * told apart by the next-rarest one ("Wizard + Sun Hat"), which says what
+ * actually differs; numbering is only the last resort.
  */
 export function autoNameLook(
   equipped: Partial<Record<WardrobeSlot, string | null>>,
   byId: Record<string, ItemDef>,
   taken: string[] = [],
 ): string {
-  let best: ItemDef | null = null;
+  const worn: ItemDef[] = [];
   for (const slot of LOOK_SLOTS) {
     const id = equipped[slot];
     const def = id ? byId[id] : null;
-    if (!def) continue;
-    if (!best || rarityRank[def.rarity] > rarityRank[best.rarity]) best = def;
+    if (def) worn.push(def);
   }
+  worn.sort((a, b) => rarityRank[b.rarity] - rarityRank[a.rarity]);
+
+  const [best, ...rest] = worn;
   const base = best ? `${best.name} fit` : 'Plain fit';
   if (!taken.includes(base)) return base;
+
+  for (const def of rest) {
+    const candidate = `${best.name} + ${def.name}`;
+    if (!taken.includes(candidate)) return candidate;
+  }
   for (let i = 2; i < 50; i++) {
     const candidate = `${base} ${i}`;
     if (!taken.includes(candidate)) return candidate;

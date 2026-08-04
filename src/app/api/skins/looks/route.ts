@@ -40,8 +40,40 @@ export async function GET() {
     const byId = buildById(catalog);
     const inventory = user?.wardrobe?.inventory ?? {};
     const isPremium = isPremiumActive(user?.premiumUntil);
+
+    // A look you can't fully wear isn't worth a slot — once a piece is gone the
+    // outfit is gone with it, so it's dropped here rather than kept as a card
+    // that quietly applies something else.
+    const stored = storedLooks(user);
+    const views = stored.map((look) => toLookView(look, byId, inventory));
+    const broken = views.filter((view) => !view.complete);
+    if (broken.length > 0) {
+      await UserModel.updateOne(
+        { _id: userId },
+        { $pull: { 'wardrobe.looks': { id: { $in: broken.map((b) => b.id) } } } },
+      );
+    }
+    const kept = views.filter((view) => view.complete);
+
+    const backgroundIds = Array.from(
+      new Set(kept.map((look) => look.backgroundId).filter((id): id is string => !!id)),
+    );
+    const backgrounds = backgroundIds.length
+      ? await BackgroundModel.find({ id: { $in: backgroundIds } })
+          .select('id images')
+          .lean()
+      : [];
+    const bgImageById = new Map(
+      backgrounds.map((bg) => [bg.id, bg.images?.mobile || bg.images?.web || null]),
+    );
+
     return json({
-      looks: storedLooks(user).map((look) => toLookView(look, byId, inventory)),
+      looks: kept.map((look) => ({
+        ...look,
+        backgroundImage: look.backgroundId
+          ? (bgImageById.get(look.backgroundId) ?? null)
+          : null,
+      })),
       max: maxSavedLooks(isPremium),
       isPremium,
     });

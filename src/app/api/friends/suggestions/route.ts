@@ -5,11 +5,16 @@ import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import FriendshipModel from '@/lib/models/Friendship';
 import FriendRequestModel from '@/lib/models/FriendRequest';
+import ReferralModel from '@/lib/models/Referral';
 import UserModel from '@/lib/models/User';
 import { getCachedCatalog, buildById } from '@/lib/skins/getCatalog';
 import { equippedToIndices, type FrogIndices } from '@/lib/friends/indices';
 
 const MAX_SUGGESTIONS = 5;
+/** How long a dismissed suggestion stays out of the pool. */
+const SNOOZE_DAYS = 45;
+
+export type SuggestionReason = 'mutual' | 'inviter' | 'invitee' | 'sibling';
 
 export type FriendSuggestion = {
   userId: string;
@@ -17,8 +22,11 @@ export type FriendSuggestion = {
   frogName: string;
   indices: FrogIndices;
   premium: boolean;
+  reason: SuggestionReason;
   mutualCount: number;
   mutualNames: string[];
+  /** Whose invite links you two together, for the non-mutual reasons. */
+  viaName?: string;
 };
 
 export async function GET() {
@@ -38,29 +46,34 @@ export async function GET() {
     const friendIds = myEdges.map((e) =>
       e.userA === userId ? e.userB : e.userA,
     );
-    if (friendIds.length === 0) {
-      return NextResponse.json({ suggestions: [] });
-    }
 
     const [friendEdges, pendingRequests, me] = await Promise.all([
-      FriendshipModel.find({
-        $or: [{ userA: { $in: friendIds } }, { userB: { $in: friendIds } }],
-      }).lean(),
+      friendIds.length > 0
+        ? FriendshipModel.find({
+            $or: [{ userA: { $in: friendIds } }, { userB: { $in: friendIds } }],
+          }).lean()
+        : Promise.resolve([]),
       FriendRequestModel.find({
         $or: [{ fromUserId: userId }, { toUserId: userId }],
         status: 'pending',
       })
         .select('fromUserId toUserId')
         .lean(),
-      UserModel.findById(userId).select('suggestionsDismissed').lean(),
+      UserModel.findById(userId)
+        .select('suggestionsDismissed suggestionSnoozes')
+        .lean(),
     ]);
 
+    const now = new Date();
     const excluded = new Set<string>([userId, ...friendIds]);
     for (const r of pendingRequests) {
       excluded.add(r.fromUserId);
       excluded.add(r.toUserId);
     }
     for (const id of me?.suggestionsDismissed ?? []) excluded.add(id);
+    for (const snooze of me?.suggestionSnoozes ?? []) {
+      if (new Date(snooze.until) > now) excluded.add(snooze.userId);
+    }
 
     const friendIdSet = new Set(friendIds);
     const mutualsByCandidate = new Map<string, Set<string>>();
@@ -78,39 +91,95 @@ export async function GET() {
       }
     }
 
-    const ranked = Array.from(mutualsByCandidate.entries())
+    type Picked = {
+      userId: string;
+      reason: SuggestionReason;
+      mutuals: Set<string>;
+      viaId?: string;
+    };
+    const picked: Picked[] = Array.from(mutualsByCandidate.entries())
       .sort((a, b) => b[1].size - a[1].size)
-      .slice(0, MAX_SUGGESTIONS);
-    if (ranked.length === 0) {
+      .slice(0, MAX_SUGGESTIONS)
+      .map(([id, mutuals]) => ({ userId: id, reason: 'mutual', mutuals }));
+
+    // Nobody reaches the mutual-friend pool on day one, which is exactly when
+    // the graph needs to grow — so top up from the invite chain: whoever
+    // invited you, whoever you invited, and everyone else who joined from the
+    // same invite.
+    if (picked.length < MAX_SUGGESTIONS) {
+      const pickedIds = new Set(picked.map((p) => p.userId));
+      const takeable = (id: string | null | undefined): id is string =>
+        !!id && !excluded.has(id) && !pickedIds.has(id);
+
+      const [claimedByMe, invitedByMe] = await Promise.all([
+        ReferralModel.findOne({ claimedByUserId: userId })
+          .select('inviterId')
+          .lean(),
+        ReferralModel.find({
+          inviterId: userId,
+          claimedByUserId: { $ne: null },
+        })
+          .select('claimedByUserId')
+          .limit(MAX_SUGGESTIONS * 2)
+          .lean(),
+      ]);
+      const inviterId = claimedByMe?.inviterId ?? null;
+
+      const add = (id: string, reason: SuggestionReason, viaId?: string) => {
+        if (picked.length >= MAX_SUGGESTIONS || !takeable(id)) return;
+        pickedIds.add(id);
+        picked.push({ userId: id, reason, mutuals: new Set(), viaId });
+      };
+
+      if (inviterId) add(inviterId, 'inviter');
+      for (const ref of invitedByMe) add(ref.claimedByUserId!, 'invitee');
+
+      if (inviterId && picked.length < MAX_SUGGESTIONS) {
+        const siblings = await ReferralModel.find({
+          inviterId,
+          claimedByUserId: { $nin: [null, userId] },
+        })
+          .select('claimedByUserId')
+          .limit(MAX_SUGGESTIONS * 3)
+          .lean();
+        for (const ref of siblings)
+          add(ref.claimedByUserId!, 'sibling', inviterId);
+      }
+    }
+
+    if (picked.length === 0) {
       return NextResponse.json({ suggestions: [] });
     }
 
-    const candidateIds = ranked.map(([id]) => id);
-    const mutualFriendIds = new Set<string>();
-    for (const [, mutuals] of ranked)
-      mutuals.forEach((id) => mutualFriendIds.add(id));
+    const lookupIds = new Set<string>();
+    for (const p of picked) {
+      p.mutuals.forEach((id) => lookupIds.add(id));
+      if (p.viaId) lookupIds.add(p.viaId);
+    }
 
-    const [candidates, mutualUsers, catalog] = await Promise.all([
-      UserModel.find({ _id: { $in: candidateIds } })
+    const [candidates, contextUsers, catalog] = await Promise.all([
+      UserModel.find({ _id: { $in: picked.map((p) => p.userId) } })
         .select('name frogName premiumUntil wardrobe.equipped')
         .lean(),
-      UserModel.find({ _id: { $in: Array.from(mutualFriendIds) } })
-        .select('name frogName')
-        .lean(),
+      lookupIds.size > 0
+        ? UserModel.find({ _id: { $in: Array.from(lookupIds) } })
+            .select('name frogName')
+            .lean()
+        : Promise.resolve([]),
       getCachedCatalog(),
     ]);
     const byId = buildById(catalog);
     const candidateById = new Map(candidates.map((c) => [c._id, c]));
-    const mutualNameById = new Map(
-      mutualUsers.map((u) => [u._id, u.name || u.frogName || 'Frog']),
+    const contextNameById = new Map(
+      contextUsers.map((u) => [u._id, u.name || u.frogName || 'Frog']),
     );
 
     const suggestions: FriendSuggestion[] = [];
-    for (const [candidateId, mutuals] of ranked) {
-      const user = candidateById.get(candidateId);
+    for (const entry of picked) {
+      const user = candidateById.get(entry.userId);
       if (!user) continue;
       suggestions.push({
-        userId: candidateId,
+        userId: entry.userId,
         name: user.name ?? '',
         frogName: user.frogName ?? 'Frog',
         indices: equippedToIndices(
@@ -121,16 +190,19 @@ export async function GET() {
         premium: user.premiumUntil
           ? new Date(user.premiumUntil) > new Date()
           : false,
-        mutualCount: mutuals.size,
-        mutualNames: Array.from(mutuals)
-          .map((id) => mutualNameById.get(id))
+        reason: entry.reason,
+        mutualCount: entry.mutuals.size,
+        mutualNames: Array.from(entry.mutuals)
+          .map((id) => contextNameById.get(id))
           .filter((n): n is string => !!n)
           .slice(0, 2),
+        viaName: entry.viaId ? contextNameById.get(entry.viaId) : undefined,
       });
     }
 
     return NextResponse.json({ suggestions });
   } catch (err) {
+    console.error('[friends/suggestions] failed', err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'Failed to load suggestions' },
       { status: 500 },
@@ -158,12 +230,18 @@ export async function POST(req: NextRequest) {
 
   try {
     await connectMongo();
+    const until = new Date(Date.now() + SNOOZE_DAYS * 24 * 60 * 60 * 1000);
     await UserModel.updateOne(
       { _id: userId },
-      { $addToSet: { suggestionsDismissed: body.dismissUserId } },
+      { $pull: { suggestionSnoozes: { userId: body.dismissUserId } } },
     );
-    return NextResponse.json({ ok: true });
+    await UserModel.updateOne(
+      { _id: userId },
+      { $push: { suggestionSnoozes: { userId: body.dismissUserId, until } } },
+    );
+    return NextResponse.json({ ok: true, until });
   } catch (err) {
+    console.error('[friends/suggestions] dismiss failed', err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'Failed to dismiss' },
       { status: 500 },

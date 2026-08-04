@@ -229,7 +229,7 @@ export default function FriendsPage() {
           <button
             type="button"
             data-fly-fade
-            onClick={() => setInviteOpen(true)}
+            onClick={() => setAddOpen(true)}
             className="relative z-20 -mt-3 flex min-h-14 w-[min(21rem,84vw)] touch-manipulation items-center justify-center gap-3 rounded-[20px] bg-[#4f9149] px-6 py-3 text-left text-white shadow-[0_5px_0_#34631f] transition-[transform,filter,box-shadow] hover:brightness-105 active:translate-y-0.5 active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#4f9149]"
           >
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/15">
@@ -291,6 +291,10 @@ export default function FriendsPage() {
               />
             </div>
           </div>
+
+          {/* Above the leaderboard on purpose: the list grows without limit, and
+              anything under it stops being seen once you have a real pond. */}
+          <FriendSuggestionsRow enabled={!!user} />
 
           {/* Leaderboard — visible competition plus each friend's contribution. */}
           <div className="w-full">
@@ -401,8 +405,6 @@ export default function FriendsPage() {
               )}
             </div>
           </div>
-
-          <FriendSuggestionsRow enabled={!!user} />
         </div>
       </div>
 

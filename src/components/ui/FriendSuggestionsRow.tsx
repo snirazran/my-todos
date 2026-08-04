@@ -8,19 +8,64 @@ import { Icon } from '@/components/ui/Icon';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
 import type { FriendSuggestion } from '@/app/api/friends/suggestions/route';
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json());
+const fetcher = async (url: string) => {
+  const res = await fetch(url);
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body?.error || `Request failed (${res.status})`);
+  return body;
+};
 
-export function FriendSuggestionsRow({ enabled }: { enabled: boolean }) {
-  const { data, mutate } = useSWR<{ suggestions: FriendSuggestion[] }>(
-    enabled ? '/api/friends/suggestions' : null,
-    fetcher,
-    { revalidateOnFocus: false },
-  );
+export function FriendSuggestionsRow({
+  enabled,
+  variant = 'page',
+  title = 'People you may know',
+  subtitle = 'Add them and you each earn half of the other’s daily catch',
+  className,
+}: {
+  enabled: boolean;
+  /** `embedded` drops the outer spacing so it can sit inside a sheet. */
+  variant?: 'page' | 'embedded';
+  title?: string;
+  subtitle?: string;
+  className?: string;
+}) {
+  const { data, error, isLoading, mutate } = useSWR<{
+    suggestions: FriendSuggestion[];
+  }>(enabled ? '/api/friends/suggestions' : null, fetcher, {
+    revalidateOnFocus: false,
+  });
   const [sentTo, setSentTo] = useState<Set<string>>(new Set());
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const suggestions = data?.suggestions ?? [];
-  if (!suggestions.length) return null;
+
+  // A blank space taught nobody anything — when the fetch fails, say so and
+  // offer the retry instead of rendering nothing.
+  if (error) {
+    return (
+      <div
+        className={cn(
+          variant === 'page' ? 'mt-5 w-full' : 'w-full',
+          className,
+        )}
+      >
+        <div className="flex items-center justify-between gap-3 rounded-[18px] border border-border/50 bg-card/40 px-4 py-3">
+          <p className="text-xs font-semibold text-muted-foreground">
+            Couldn&apos;t load suggestions.
+          </p>
+          <button
+            type="button"
+            onClick={() => mutate()}
+            className="shrink-0 rounded-lg px-2 py-1 text-xs font-black text-[#4f9149] transition-colors hover:bg-[#4f9149]/10"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!suggestions.length || isLoading) return null;
 
   const dismiss = async (userId: string) => {
     mutate(
@@ -58,22 +103,34 @@ export function FriendSuggestionsRow({ enabled }: { enabled: boolean }) {
     }
   };
 
-  const mutualLabel = (s: FriendSuggestion) => {
+  const reasonLabel = (s: FriendSuggestion) => {
+    if (s.reason === 'inviter') return 'They invited you to Frogress';
+    if (s.reason === 'invitee') return 'They joined from your invite';
+    if (s.reason === 'sibling')
+      return s.viaName
+        ? `Also joined from ${s.viaName}’s invite`
+        : 'Joined from the same invite';
     const names = s.mutualNames.join(', ');
-    if (s.mutualCount === 1) return `Friends with ${names}`;
     if (s.mutualCount > s.mutualNames.length)
       return `Friends with ${names} +${s.mutualCount - s.mutualNames.length}`;
     return `Friends with ${names}`;
   };
 
   return (
-    <div className="mt-5 w-full">
+    <div
+      className={cn(variant === 'page' ? 'mt-5 w-full' : 'w-full', className)}
+    >
       <div className="mb-2.5 px-1.5">
-        <h2 className="text-lg font-black tracking-tight text-foreground">
-          People you may know
+        <h2
+          className={cn(
+            'font-black tracking-tight text-foreground',
+            variant === 'page' ? 'text-lg' : 'text-base',
+          )}
+        >
+          {title}
         </h2>
-        <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
-          Friends of your friends
+        <p className="text-[11px] font-bold text-muted-foreground">
+          {subtitle}
         </p>
       </div>
       <div className="w-full overflow-hidden rounded-[18px] border border-border/50 bg-card/40 p-1.5 shadow-sm">
@@ -112,7 +169,10 @@ export function FriendSuggestionsRow({ enabled }: { enabled: boolean }) {
                     )}
                   </p>
                   <p className="truncate text-xs font-semibold text-muted-foreground">
-                    {mutualLabel(s)}
+                    {reasonLabel(s)}
+                  </p>
+                  <p className="truncate text-[11px] font-black text-[#4f9149]">
+                    +½ of their daily catch
                   </p>
                 </div>
                 <button
@@ -143,7 +203,8 @@ export function FriendSuggestionsRow({ enabled }: { enabled: boolean }) {
                 <button
                   type="button"
                   onClick={() => dismiss(s.userId)}
-                  aria-label={`Dismiss ${s.name || s.frogName}`}
+                  aria-label={`Hide ${s.name || s.frogName} for now`}
+                  title="Hide for now"
                   className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground"
                 >
                   <X className="h-4 w-4" />
