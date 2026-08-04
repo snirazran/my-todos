@@ -559,7 +559,11 @@ export default React.memo(function TaskList({
   const keep = (t: Task) =>
     !hiddenIds?.has(t.id) &&
     matchesTaskFilters(t, filters, t.completed && !inGrace(t.id));
-  const filteredItems = sortTasks(items.filter(keep), filters.sort);
+  const filteredItems = sortTasks(
+    items.filter(keep),
+    filters.sort,
+    (userTags ?? []).map((t) => t.id),
+  );
   // ---- Empty list: render a single placeholder (if targeting index 0) OR themed empty state
   if (filteredItems.length === 0) {
     if (placeholderAt === 0) {

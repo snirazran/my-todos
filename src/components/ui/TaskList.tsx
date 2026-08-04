@@ -1956,11 +1956,14 @@ export default function TaskList({
     t.completed && !vSet.has(t.id) && !delayedCompleted.has(t.id);
 
   // Split into two groups: active (including grace-period tasks) and completed
+  const tagSortOrder = userTags.map((t) => t.id);
+
   const activeTasks = sortTasks(
     visibleTasks
       .filter((t) => !isTaskSettledCompleted(t))
       .sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
     filters.sort,
+    tagSortOrder,
   );
 
   const completedTasks = sortTasks(
@@ -1968,6 +1971,7 @@ export default function TaskList({
       .filter((t) => isTaskSettledCompleted(t))
       .sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
     filters.sort,
+    tagSortOrder,
   );
 
   // ---- Freeze sort order during tongue animation to prevent layout shifts ----

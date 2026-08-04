@@ -353,7 +353,8 @@ export default function QuickAddSheet({
     startTime: string;
     notify: boolean;
     reminder: string;
-  }>({ startTime: '', notify: false, reminder: 'at_time' });
+    tags: SavedTag[];
+  }>({ startTime: '', notify: false, reminder: 'at_time', tags: [] });
 
   const tagManager = useTagManager({
     open,
@@ -460,6 +461,13 @@ export default function QuickAddSheet({
       ...tagManager.savedTags.filter((t) => !questTagIds.has(t.id)),
     ];
   }, [tagManager.savedTags, questTagIds]);
+
+  // The quest badge is taller than the chip it sits on, so rows only need the
+  // extra clearance when one is actually in the strip.
+  const stripHasQuestBadge = useMemo(
+    () => stripTags.some((t) => questTagIds.has(t.id) && !t.disabled),
+    [stripTags, questTagIds],
+  );
 
   useEffect(() => {
     updateTagFade();
@@ -662,7 +670,14 @@ export default function QuickAddSheet({
     sheetBaseHeight ?? viewportHeight ?? 900,
   );
   const showSuggestions = suggestionsReady && !hasTaskText && hasSuggestionContent;
-  const hasChips = notifyEnabled;
+  const selectedTagChips = useMemo(
+    () =>
+      tags
+        .map((id) => tagManager.savedTags.find((t) => t.id === id))
+        .filter((t): t is SavedTag => !!t),
+    [tags, tagManager.savedTags],
+  );
+  const hasChips = notifyEnabled || selectedTagChips.length > 0;
   const isShortScreen = availableSheetHeight < 700;
   // The sheet hugs its content and sits at the bottom; this is just the cap so a
   // long saved list can't grow past the screen (it scrolls internally instead).
@@ -691,15 +706,26 @@ export default function QuickAddSheet({
   // Keep the last chip rendered while the row collapses.
   useEffect(() => {
     if (hasChips) {
-      setChipView({ startTime, notify: notifyEnabled, reminder });
+      setChipView({
+        startTime,
+        notify: notifyEnabled,
+        reminder,
+        tags: selectedTagChips,
+      });
       return;
     }
     const t = window.setTimeout(
-      () => setChipView({ startTime: '', notify: false, reminder: 'at_time' }),
+      () =>
+        setChipView({
+          startTime: '',
+          notify: false,
+          reminder: 'at_time',
+          tags: [],
+        }),
       320,
     );
     return () => window.clearTimeout(t);
-  }, [hasChips, startTime, notifyEnabled, reminder]);
+  }, [hasChips, startTime, notifyEnabled, reminder, selectedTagChips]);
 
   useEffect(() => {
     if (!open) {
@@ -1170,6 +1196,30 @@ export default function QuickAddSheet({
                                 )}
                               </span>
                             )}
+                            {chipView.tags.map((tag) => (
+                              <button
+                                key={tag.id}
+                                type="button"
+                                aria-label={`Remove ${tag.name}`}
+                                onPointerDown={(e) => e.preventDefault()}
+                                onClick={() =>
+                                  setTags((prev) =>
+                                    prev.filter((id) => id !== tag.id),
+                                  )
+                                }
+                                className="shrink-0 inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-[11px] font-black uppercase tracking-wider shadow-sm transition-all active:scale-95 [@media(hover:hover)]:hover:opacity-75"
+                                style={{
+                                  backgroundColor: `${tag.color}20`,
+                                  color: tag.color,
+                                  borderColor: `${tag.color}40`,
+                                }}
+                              >
+                                <span className="max-w-[180px] truncate">
+                                  {tag.name}
+                                </span>
+                                <X className="h-3 w-3 shrink-0 stroke-[3]" />
+                              </button>
+                            ))}
                           </div>
                         </div>
                       </div>
@@ -1190,7 +1240,7 @@ export default function QuickAddSheet({
                             spellCheck={false}
                             autoComplete="off"
                             maxLength={100}
-                            className="block w-full min-h-[76px] max-h-[136px] resize-none overflow-y-auto rounded-xl bg-transparent px-1 pt-3 pb-1 text-[22px] font-semibold leading-[30px] tracking-tight text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50 text-left sm:text-2xl"
+                            className="block w-full min-h-[60px] max-h-[136px] resize-none overflow-y-auto rounded-xl bg-transparent px-1 pt-3 pb-1 text-[22px] font-semibold leading-[30px] tracking-tight text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50 text-left sm:text-2xl"
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') {
                                 e.preventDefault();
@@ -1286,7 +1336,7 @@ export default function QuickAddSheet({
                         </div>
                       )}
 
-                      <div className="mt-1.5 mb-2.5 h-px bg-border/60" />
+                      <div className="mt-1.5 mb-3 h-px bg-border/60" />
 
                       <div
                         className={`relative -mx-2 ${
@@ -1307,7 +1357,9 @@ export default function QuickAddSheet({
                           onMouseMove={tagScroll.handlers.onMouseMove}
                           className={`grid auto-cols-max grid-flow-col ${
                             stripTags.length > 5 ? 'grid-rows-2' : 'grid-rows-1'
-                          } cursor-grab select-none items-center gap-x-2 gap-y-4 overflow-x-auto overscroll-x-none no-scrollbar px-2 pt-2 pb-2 touch-pan-x active:cursor-grabbing ${
+                          } ${
+                            stripHasQuestBadge ? 'gap-y-5' : 'gap-y-3'
+                          } cursor-grab select-none items-center gap-x-3 overflow-x-auto overscroll-x-none no-scrollbar px-2 pt-2 pb-2 touch-pan-x active:cursor-grabbing ${
                             tagFadeRight ? 'mask-fade-right' : ''
                           }`}
                           style={{ overscrollBehaviorX: 'none' }}

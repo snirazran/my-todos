@@ -8,7 +8,7 @@ export type QuickViewId =
   | 'checklist'
   | 'rich';
 
-export type TaskSort = 'manual' | 'time' | 'flies' | 'alpha';
+export type TaskSort = 'manual' | 'time' | 'flies' | 'alpha' | 'tag';
 
 export type TaskFilters = {
   search: string;
@@ -118,10 +118,34 @@ const startMinutes = (task: FilterableTask): number => {
   return Number.isFinite(mins) ? mins : Number.MAX_SAFE_INTEGER;
 };
 
-/** Reordered copy for display. `manual` keeps whatever order it was handed. */
+/**
+ * Rank of the task's own first tag within `tagOrder` — a multi-tag task lands in
+ * its earliest tag's group, untagged tasks sink to the bottom. Without an order
+ * to go by, tags still group together, just in id order.
+ */
+const tagRank = (task: FilterableTask, tagOrder?: string[]): number => {
+  const ids = task.tags ?? [];
+  if (ids.length === 0) return Number.MAX_SAFE_INTEGER;
+  if (!tagOrder) return Number.MAX_SAFE_INTEGER - 1;
+  let best = Number.MAX_SAFE_INTEGER;
+  for (const id of ids) {
+    const rank = tagOrder.indexOf(id);
+    if (rank >= 0 && rank < best) best = rank;
+  }
+  return best;
+};
+
+const firstTagId = (task: FilterableTask): string =>
+  (task.tags ?? [])[0] ?? '￿';
+
+/**
+ * Reordered copy for display. `manual` keeps whatever order it was handed.
+ * `tagOrder` (tag ids as the user sees them) drives the `tag` sort's grouping.
+ */
 export function sortTasks<T extends FilterableTask>(
   tasks: T[],
   sort: TaskSort,
+  tagOrder?: string[],
 ): T[] {
   if (sort === 'manual') return tasks;
   const keyed = tasks.map((task, index) => ({ task, index }));
@@ -132,6 +156,9 @@ export function sortTasks<T extends FilterableTask>(
     time: (a, b) => startMinutes(a) - startMinutes(b),
     flies: (a, b) => taskPotentialFlies(b) - taskPotentialFlies(a),
     alpha: (a, b) => (a.text ?? '').localeCompare(b.text ?? ''),
+    tag: (a, b) =>
+      tagRank(a, tagOrder) - tagRank(b, tagOrder) ||
+      firstTagId(a).localeCompare(firstTagId(b)),
   };
   const cmp = compare[sort];
   keyed.sort((a, b) => cmp(a.task, b.task) || a.index - b.index);
@@ -169,6 +196,7 @@ export const SORT_LABELS: Record<TaskSort, string> = {
   time: 'Time',
   flies: 'Flies',
   alpha: 'A–Z',
+  tag: 'Tag',
 };
 
 export type FilterChip = {

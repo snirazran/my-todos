@@ -142,6 +142,7 @@ export default React.memo(function BacklogTray({
   const filteredTasks = sortTasks(
     tasks.filter((t) => matchesTaskFilters(t, filters)),
     filters.sort,
+    userTags.map((t) => t.id),
   );
   const mobilePageSize = 4;
   const pageCount = Math.max(1, Math.ceil(filteredTasks.length / mobilePageSize));

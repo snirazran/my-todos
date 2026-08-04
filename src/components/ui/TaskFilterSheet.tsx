@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Check, Search, Star, Trash2, X } from 'lucide-react';
+import { Check, ChevronDown, Search, Star, Trash2, X } from 'lucide-react';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { useKeyboardInset } from '@/components/ui/quick-add/useKeyboardInset';
 import {
@@ -16,7 +16,7 @@ import type { FilterPreset } from '@/hooks/useTaskFilters';
 
 export type FilterTag = { id: string; name: string; color: string };
 
-const SORTS: TaskSort[] = ['manual', 'time', 'flies', 'alpha'];
+const SORTS: TaskSort[] = ['manual', 'time', 'flies', 'alpha', 'tag'];
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -68,6 +68,7 @@ export function TaskFilterSheet({
 }) {
   const [inputFocused, setInputFocused] = useState(false);
   const [savingPreset, setSavingPreset] = useState(false);
+  const [showPresets, setShowPresets] = useState(false);
   const [presetName, setPresetName] = useState('');
   const presetInputRef = useRef<HTMLInputElement>(null);
   const { inset: keyboardInset } = useKeyboardInset(open);
@@ -75,6 +76,7 @@ export function TaskFilterSheet({
   useEffect(() => {
     if (!open) {
       setSavingPreset(false);
+      setShowPresets(false);
       setPresetName('');
     }
   }, [open]);
@@ -111,9 +113,33 @@ export function TaskFilterSheet({
   // plus any already picked, so a chip can never strand itself.
   const usedTagIds = new Set<string>();
   for (const task of tasks) for (const id of task.tags ?? []) usedTagIds.add(id);
-  const visibleTags = tags.filter(
-    (t) => usedTagIds.has(t.id) || filters.tags.includes(t.id),
-  );
+
+  // A control that would match nothing is noise, so it isn't rendered at all —
+  // only what's already on stays, so a selection can always be undone.
+  const quickViewOptions = QUICK_VIEWS.map((view) => {
+    const on = filters.views.includes(view.id);
+    return {
+      view,
+      on,
+      n: previewMatchCount(tasks, filters, {
+        views: on ? filters.views : [...filters.views, view.id],
+      }),
+    };
+  }).filter((o) => o.on || o.n > 0);
+
+  const tagOptions = tags
+    .filter((t) => usedTagIds.has(t.id) || filters.tags.includes(t.id))
+    .map((tag) => {
+      const on = filters.tags.includes(tag.id);
+      return {
+        tag,
+        on,
+        n: previewMatchCount(tasks, filters, {
+          tags: on ? filters.tags : [...filters.tags, tag.id],
+        }),
+      };
+    })
+    .filter((o) => o.on || o.n > 0);
 
   return (
     <BaseSheet
@@ -156,23 +182,16 @@ export function TaskFilterSheet({
           </div>
 
           <div className="sm:grid sm:grid-cols-2 sm:gap-x-6">
-          <div className="mb-5">
-            <SectionLabel>Quick views</SectionLabel>
-            <div className="flex flex-wrap gap-2">
-              {QUICK_VIEWS.map((view) => {
-                const on = filters.views.includes(view.id);
-                const n = previewMatchCount(tasks, filters, {
-                  views: on
-                    ? filters.views
-                    : [...filters.views, view.id],
-                });
-                return (
+          {quickViewOptions.length > 0 && (
+            <div className="mb-5">
+              <SectionLabel>Quick views</SectionLabel>
+              <div className="flex flex-wrap gap-2">
+                {quickViewOptions.map(({ view, on, n }) => (
                   <button
                     key={view.id}
                     onClick={() => toggleView(view.id)}
                     aria-pressed={on}
-                    disabled={!on && n === 0}
-                    className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-[12px] font-black transition-all active:scale-95 disabled:opacity-40 ${
+                    className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-[12px] font-black transition-all active:scale-95 ${
                       on
                         ? 'border-primary bg-primary text-primary-foreground shadow-sm'
                         : 'border-border bg-background text-muted-foreground [@media(hover:hover)]:hover:border-foreground/30 [@media(hover:hover)]:hover:text-foreground'
@@ -182,12 +201,12 @@ export function TaskFilterSheet({
                     {view.label}
                     <Count n={n} on={on} />
                   </button>
-                );
-              })}
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
-          {visibleTags.length > 0 && (
+          {tagOptions.length > 0 && (
             <div className="mb-5">
               <div className="flex items-center justify-between">
                 <SectionLabel>Tags</SectionLabel>
@@ -201,37 +220,30 @@ export function TaskFilterSheet({
                 )}
               </div>
               <div className="flex flex-wrap gap-2">
-                {visibleTags.map((tag) => {
-                  const on = filters.tags.includes(tag.id);
-                  const n = previewMatchCount(tasks, filters, {
-                    tags: on ? filters.tags : [...filters.tags, tag.id],
-                  });
-                  return (
-                    <button
-                      key={tag.id}
-                      onClick={() => toggleTag(tag.id)}
-                      aria-pressed={on}
-                      disabled={!on && n === 0}
-                      className={`inline-flex max-w-full items-center gap-1.5 rounded-xl border px-3 py-2 text-[12px] font-black transition-all active:scale-95 disabled:opacity-40 ${
-                        on ? 'ring-2 ring-offset-1 ring-offset-background' : ''
-                      }`}
-                      style={{
-                        backgroundColor: `${tag.color}20`,
-                        color: tag.color,
-                        borderColor: `${tag.color}40`,
-                        ...(on
-                          ? ({
-                              ['--tw-ring-color' as string]: tag.color,
-                            } as React.CSSProperties)
-                          : {}),
-                      }}
-                    >
-                      {on && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
-                      <span className="truncate">{tag.name}</span>
-                      <Count n={n} on={on} />
-                    </button>
-                  );
-                })}
+                {tagOptions.map(({ tag, on, n }) => (
+                  <button
+                    key={tag.id}
+                    onClick={() => toggleTag(tag.id)}
+                    aria-pressed={on}
+                    className={`inline-flex max-w-full items-center gap-1.5 rounded-xl border px-3 py-2 text-[12px] font-black transition-all active:scale-95 ${
+                      on ? 'ring-2 ring-offset-1 ring-offset-background' : ''
+                    }`}
+                    style={{
+                      backgroundColor: `${tag.color}20`,
+                      color: tag.color,
+                      borderColor: `${tag.color}40`,
+                      ...(on
+                        ? ({
+                            ['--tw-ring-color' as string]: tag.color,
+                          } as React.CSSProperties)
+                        : {}),
+                    }}
+                  >
+                    {on && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
+                    <span className="truncate">{tag.name}</span>
+                    <Count n={n} on={on} />
+                  </button>
+                ))}
               </div>
             </div>
           )}
@@ -263,13 +275,13 @@ export function TaskFilterSheet({
           {showSort && (
             <div className="mb-5">
               <SectionLabel>Sort</SectionLabel>
-              <div className="grid grid-cols-4 gap-1.5 rounded-2xl bg-muted/50 p-1.5">
+              <div className="grid grid-cols-5 gap-1 rounded-2xl bg-muted/50 p-1.5">
                 {SORTS.map((sort) => (
                   <button
                     key={sort}
                     onClick={() => onChange({ ...filters, sort })}
                     aria-pressed={filters.sort === sort}
-                    className={`rounded-xl py-2 text-[12px] font-black transition-all ${
+                    className={`rounded-xl py-2 text-[11px] font-black transition-all ${
                       filters.sort === sort
                         ? 'bg-background text-foreground shadow-sm ring-1 ring-border/60'
                         : 'text-muted-foreground [@media(hover:hover)]:hover:text-foreground'
@@ -281,15 +293,35 @@ export function TaskFilterSheet({
               </div>
               {filters.sort !== 'manual' && (
                 <p className="mt-2 px-1 text-[11px] font-semibold text-muted-foreground">
-                  Drag to reorder is off while sorted.
+                  {filters.sort === 'tag'
+                    ? 'Tasks group by tag, untagged last. Drag to reorder is off.'
+                    : 'Drag to reorder is off while sorted.'}
                 </p>
               )}
             </div>
           )}
 
           <div className="mb-6">
-            <SectionLabel>Presets</SectionLabel>
-            <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setShowPresets((v) => !v)}
+              aria-expanded={showPresets}
+              className="flex w-full items-center gap-1.5 px-1 py-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground transition-colors [@media(hover:hover)]:hover:text-foreground"
+            >
+              Presets
+              {presets.length > 0 && (
+                <span className="tabular-nums opacity-60">
+                  {presets.length}
+                </span>
+              )}
+              <ChevronDown
+                className={`h-3.5 w-3.5 transition-transform ${
+                  showPresets ? 'rotate-180' : ''
+                }`}
+              />
+            </button>
+            <div
+              className={`flex flex-wrap gap-2 ${showPresets ? 'mt-2' : 'hidden'}`}
+            >
               {presets.map((preset) => (
                 <span
                   key={preset.id}
