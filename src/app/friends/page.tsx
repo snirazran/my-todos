@@ -181,7 +181,7 @@ export default function FriendsPage() {
   return (
     <main className="relative min-h-[100dvh] overflow-x-hidden pb-24 md:pb-12">
       <h1 className="sr-only">Friends</h1>
-      <div className="relative z-10 mx-auto flex w-full flex-col items-center px-4 pt-[calc(env(safe-area-inset-top)+0.5rem)] md:max-w-2xl md:pt-11">
+      <div className="relative z-10 mx-auto flex w-full flex-col items-center px-4 pt-[calc(env(safe-area-inset-top)+0.5rem)] md:max-w-2xl md:pt-11 lg:max-w-5xl">
         <MobileMenuCluster position="absolute" />
         {/* Friend invites — persistent, over the winter scene */}
         <MobileHeaderActions
@@ -247,17 +247,7 @@ export default function FriendsPage() {
         </FlyCatchSwipeLauncher>
 
         {/* Rising sheet */}
-        <div data-fly-sheet className="relative z-10 -mx-4 mt-8 flex w-[calc(100%+2rem)] flex-col self-stretch rounded-t-[24px] bg-background px-4 pb-12 pt-5 md:mt-24 md:px-8">
-          {/* Claim flies — the page's main action */}
-          {hasRealFriends && (
-            <ClaimHeroCard
-              claimable={claimable}
-              claiming={claiming}
-              onClaim={handleClaim}
-              paused={isAnyPanelOpen}
-            />
-          )}
-
+        <div data-fly-sheet className="relative z-10 -mx-4 mt-8 flex w-[calc(100%+2rem)] flex-col self-stretch rounded-t-[24px] bg-background px-4 pb-12 pt-5 md:mt-28 md:px-8">
           {/* Friend requests — surfaced inline only when there's something to act on */}
           {pendingCount > 0 && (
             <button
@@ -283,12 +273,23 @@ export default function FriendsPage() {
             </button>
           )}
 
-          {/* Invite & earn */}
-          <div className="mb-5 w-full" data-hint="invite-friend">
-            <InviteRewardBanner
-              onClick={() => setInviteOpen(true)}
-              paused={isAnyPanelOpen}
-            />
+          {/* Claim flies (the page's main action) and Invite & earn — stacked on
+              phones, side by side once there's desk-width to fill. */}
+          <div className="w-full lg:grid lg:grid-cols-2 lg:items-start lg:gap-4">
+            {hasRealFriends && (
+              <ClaimHeroCard
+                claimable={claimable}
+                claiming={claiming}
+                onClaim={handleClaim}
+                paused={isAnyPanelOpen}
+              />
+            )}
+            <div className="mb-5 w-full" data-hint="invite-friend">
+              <InviteRewardBanner
+                onClick={() => setInviteOpen(true)}
+                paused={isAnyPanelOpen}
+              />
+            </div>
           </div>
 
           {/* Leaderboard — visible competition plus each friend's contribution. */}
@@ -352,7 +353,7 @@ export default function FriendsPage() {
               ) : (
                 <>
                   {leaderboard.length > 0 && (
-                    <ul className="flex flex-col gap-1.5">
+                    <ul className="flex flex-col gap-1.5 lg:grid lg:grid-cols-2 lg:gap-2">
                       {leaderboard.map((entry, i) => (
                         <LeaderboardRow
                           key={entry.userId}
@@ -766,7 +767,7 @@ function LeaderboardRow({
         )}
         <div
           ref={frogBoxRef}
-          className="relative flex aspect-[6/5] w-[34%] min-w-[82px] max-w-[150px] shrink-0 items-end justify-center self-center overflow-hidden min-[360px]:w-[37%] min-[360px]:min-w-[94px] sm:w-[40%] sm:min-w-[110px] sm:max-w-[224px]"
+          className="relative flex aspect-[6/5] w-[34%] min-w-[82px] max-w-[150px] shrink-0 items-end justify-center self-center overflow-hidden min-[360px]:w-[37%] min-[360px]:min-w-[94px] sm:w-[40%] sm:min-w-[110px] sm:max-w-[224px] lg:w-[32%] lg:max-w-[128px]"
         >
           <Frog
             className="translate-y-[15%]"

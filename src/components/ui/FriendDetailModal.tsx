@@ -246,10 +246,10 @@ export function FriendDetailModal({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: '100%' }}
               transition={{ type: 'spring', damping: 32, stiffness: 320 }}
-              className="pointer-events-auto relative flex h-[100dvh] w-full flex-col overflow-hidden bg-background md:h-auto md:max-h-[calc(100dvh-3rem)] md:w-[min(100vw-3rem,26rem)] md:rounded-[28px] md:shadow-2xl"
+              className="pointer-events-auto relative flex h-[100dvh] w-full flex-col overflow-hidden bg-background md:h-auto md:max-h-[calc(100dvh-3rem)] md:w-[min(100vw-3rem,26rem)] md:rounded-[28px] md:shadow-2xl lg:max-h-[calc(100dvh-4rem)] lg:w-[min(100vw-4rem,40rem)]"
             >
               {/* Banner: friend's background with the frog sitting on it */}
-              <div className="relative h-[300px] shrink-0 md:h-[280px]">
+              <div className="relative h-[300px] shrink-0 md:h-[280px] lg:h-[340px]">
                 <div className="absolute inset-0 z-0 overflow-hidden">
                   <BackgroundPicture images={images} />
                   <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/10" />
@@ -316,7 +316,10 @@ export function FriendDetailModal({
 
                 {/* Frog — sits above the white sheet below it */}
                 <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-center">
-                  <div ref={friendFrogBoxRef} className="relative -translate-y-[26px]">
+                  <div
+                    ref={friendFrogBoxRef}
+                    className="relative -translate-y-[26px] lg:origin-bottom lg:scale-110"
+                  >
                     <Frog
                       ref={friendFrogRef}
                       width={230}
@@ -330,7 +333,7 @@ export function FriendDetailModal({
               </div>
 
               {/* White content sheet overlapping the banner */}
-              <div className="relative z-10 -mt-5 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto rounded-t-[24px] bg-background px-5 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-5">
+              <div className="relative z-10 -mt-5 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto rounded-t-[24px] bg-background px-5 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-5 lg:gap-5 lg:px-8 lg:pb-8 lg:pt-12">
                 <div className="text-center">
                   <h2 className="flex items-center justify-center gap-1.5 text-xl font-black tracking-tight text-foreground">
                     <span className={cn(entry.premium && 'plus-name-shimmer')}>

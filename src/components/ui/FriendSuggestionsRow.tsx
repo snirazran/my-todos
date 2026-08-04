@@ -77,7 +77,7 @@ export function FriendSuggestionsRow({ enabled }: { enabled: boolean }) {
         </p>
       </div>
       <div className="w-full overflow-hidden rounded-[18px] border border-border/50 bg-card/40 p-1.5 shadow-sm">
-        <ul className="flex flex-col gap-1.5">
+        <ul className="flex flex-col gap-1.5 lg:grid lg:grid-cols-2 lg:gap-2">
           {suggestions.map((s) => {
             const sent = sentTo.has(s.userId);
             return (

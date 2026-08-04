@@ -400,6 +400,30 @@ export default function QuickAddSheet({
   const kbTagTapRef = useRef(false);
   const swallowTagClickUntil = useRef(0);
 
+  // Same deal for the chips above the input (parsed date/time, suggested tags):
+  // handlers that commit on pointerup when the tap came from a touch with the
+  // keyboard up, and ignore the click that may follow.
+  const keyboardSafeTap = (run: () => void) => ({
+    onPointerDown: (e: React.PointerEvent) => {
+      kbTagTapRef.current =
+        e.pointerType !== 'mouse' && document.activeElement === inputRef.current;
+      e.preventDefault();
+    },
+    onPointerUp: () => {
+      if (!kbTagTapRef.current) return;
+      kbTagTapRef.current = false;
+      swallowTagClickUntil.current = performance.now() + 400;
+      run();
+    },
+    onPointerCancel: () => {
+      kbTagTapRef.current = false;
+    },
+    onClick: () => {
+      if (performance.now() < swallowTagClickUntil.current) return;
+      run();
+    },
+  });
+
   const [pickedDays, setPickedDays] = useState<DisplayDay[]>([]);
   const [activePicker, setActivePicker] = useState<ActivePicker>(null);
   const [selectedDateKey, setSelectedDateKey] = useState('');
@@ -1269,8 +1293,7 @@ export default function QuickAddSheet({
                           {nlSuggestion && (
                             <button
                               type="button"
-                              onPointerDown={(e) => e.preventDefault()}
-                              onClick={applyNlSuggestion}
+                              {...keyboardSafeTap(applyNlSuggestion)}
                               className="inline-flex h-9 min-w-0 items-center gap-1.5 rounded-xl border border-primary/20 bg-primary/10 px-3 text-[11px] font-black uppercase tracking-wider text-primary shadow-sm transition-all active:scale-95 [@media(hover:hover)]:hover:bg-primary/15"
                             >
                               {nlSuggestion.dateKey ? (
@@ -1289,14 +1312,13 @@ export default function QuickAddSheet({
                               <button
                                 key={suggestedTag.id}
                                 type="button"
-                                onPointerDown={(e) => e.preventDefault()}
-                                onClick={() =>
+                                {...keyboardSafeTap(() =>
                                   setTags((prev) =>
                                     prev.includes(suggestedTag.id)
                                       ? prev
                                       : [...prev, suggestedTag.id],
-                                  )
-                                }
+                                  ),
+                                )}
                                 className={`relative inline-flex h-9 min-w-0 items-center gap-1.5 rounded-xl border pr-3 text-[11px] font-black uppercase tracking-wider shadow-sm transition-all active:scale-95 [@media(hover:hover)]:hover:opacity-75 ${
                                   questTagIds.has(suggestedTag.id)
                                     ? 'pl-[56px]'
@@ -1327,8 +1349,7 @@ export default function QuickAddSheet({
                           <button
                             type="button"
                             aria-label="Dismiss suggestions"
-                            onPointerDown={(e) => e.preventDefault()}
-                            onClick={() => setNlDismissed(text)}
+                            {...keyboardSafeTap(() => setNlDismissed(text))}
                             className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-muted-foreground/50 transition-colors [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground"
                           >
                             <X className="h-3.5 w-3.5" />

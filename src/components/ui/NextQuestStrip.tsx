@@ -218,7 +218,7 @@ export function NextQuestStrip({
                 type="button"
                 disabled={claiming}
                 onClick={() => void handleClaim(claimable)}
-                className="inline-flex h-9 items-center justify-center rounded-xl bg-amber-500 px-4 text-[13px] font-black text-white shadow-[0_3px_0_0_#b45309] transition-[transform,box-shadow,opacity] hover:translate-y-[-1px] hover:shadow-[0_4px_0_0_#b45309] active:translate-y-[2px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-9 min-w-[7rem] items-center justify-center rounded-xl bg-amber-500 px-4 text-[13px] font-black text-white shadow-[0_3px_0_0_#b45309] transition-[transform,box-shadow,opacity] hover:translate-y-[-1px] hover:shadow-[0_4px_0_0_#b45309] active:translate-y-[2px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {claiming ? 'Claiming…' : 'Claim'}
               </button>
