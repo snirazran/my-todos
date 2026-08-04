@@ -3,7 +3,7 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Trash2, Pencil, CalendarCheck, Check, Bell } from 'lucide-react';
+import { Trash2, Pencil, CalendarCheck, Check, Bell, ListChecks } from 'lucide-react';
 import { Icon } from '@/components/ui/Icon';
 
 interface TaskMenuProps {
@@ -11,6 +11,8 @@ interface TaskMenuProps {
   onClose: () => void;
   onDelete?: () => void;
   onDoLater?: () => void;
+  /** Enters board-wide multi-select with this task already picked. */
+  onSelectTasks?: () => void;
   addTagsPosition?: 'first' | 'second';
   onToggleRepeat?: () => void;
   isWeekly?: boolean;
@@ -29,7 +31,7 @@ const itemBase =
 const itemDefault = `${itemBase} text-foreground hover:bg-accent`;
 const iconCls = 'h-4 w-4 shrink-0 sm:h-[22px] sm:w-[22px]';
 
-export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, onAddTags, addTagsPosition = 'second', onToggleRepeat, isWeekly, onEdit, onDoToday, onSchedule }: TaskMenuProps) {
+export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, onAddTags, addTagsPosition = 'second', onToggleRepeat, isWeekly, onEdit, onDoToday, onSchedule, onSelectTasks }: TaskMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   // Clamped position so the menu always stays fully within the viewport.
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
@@ -108,6 +110,19 @@ export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, o
             style={{ top: pos?.top ?? menu.top, left: pos?.left ?? menu.left, maxHeight: 'calc(100vh - 16px)', overflowY: 'auto' }}
             onClick={(e) => e.stopPropagation()}
           >
+
+          {onSelectTasks && (
+            <button
+              onClick={() => {
+                onSelectTasks();
+                onClose();
+              }}
+              className={itemDefault}
+            >
+              <ListChecks className={`${iconCls} text-muted-foreground group-hover:text-primary transition-colors`} />
+              Select tasks
+            </button>
+          )}
 
           {onEdit && (
             <button

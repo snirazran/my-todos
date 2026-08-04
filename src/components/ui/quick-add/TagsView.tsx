@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import useSWR from 'swr';
 import { Icon } from '@/components/ui/Icon';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Check, Lock, Pencil, Plus, Sparkles } from 'lucide-react';
+import { Check, Lock, Minus, Pencil, Plus, Sparkles } from 'lucide-react';
 import { TAG_COLORS, TAG_MAX_LENGTH } from './constants';
 import { fetcher } from './utils';
 import type { SavedTag } from './types';
@@ -45,6 +45,14 @@ type Props = {
   questTagIds?: ReadonlySet<string>;
   /** Show the "connect to focus area" chips when creating a new tag. */
   showFocusConnect?: boolean;
+  /**
+   * Multi-task editing: tags carried by only *some* of the tasks. They render
+   * selected-but-dashed instead of checked, so "on all of them" and "on a few
+   * of them" never look the same.
+   */
+  partialTagIds?: ReadonlySet<string>;
+  /** Replaces the Done button's default " (N tags)" suffix. */
+  doneCountLabel?: string;
 };
 
 export function TagsView({
@@ -61,6 +69,8 @@ export function TagsView({
   suggestedTagName,
   questTagIds,
   showFocusConnect = true,
+  partialTagIds,
+  doneCountLabel,
 }: Props) {
   const {
     savedTags,
@@ -331,9 +341,19 @@ export function TagsView({
                       <Icon name="quests" className="h-7 w-7" />
                     </span>
                   )}
-                  {isSelected && !manageTagsMode && (
-                    <Check className="h-3.5 w-3.5 shrink-0" strokeWidth={3.5} />
-                  )}
+                  {isSelected &&
+                    !manageTagsMode &&
+                    (partialTagIds?.has(st.id) ? (
+                      <Minus
+                        className="h-3.5 w-3.5 shrink-0"
+                        strokeWidth={3.5}
+                      />
+                    ) : (
+                      <Check
+                        className="h-3.5 w-3.5 shrink-0"
+                        strokeWidth={3.5}
+                      />
+                    ))}
                   <span className="truncate">{st.name}</span>
                   {manageTagsMode && (
                     <Pencil
@@ -590,9 +610,11 @@ export function TagsView({
           : isCreatingNewTag
             ? `Create “${tagInput.trim()}”`
             : `${doneLabel}${
-                selectedTagIds.length > 0
-                  ? ` (${selectedTagIds.length} tag${selectedTagIds.length === 1 ? '' : 's'})`
-                  : ''
+                doneCountLabel !== undefined
+                  ? doneCountLabel
+                  : selectedTagIds.length > 0
+                    ? ` (${selectedTagIds.length} tag${selectedTagIds.length === 1 ? '' : 's'})`
+                    : ''
               }`}
       </button>
 

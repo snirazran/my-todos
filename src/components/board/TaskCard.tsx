@@ -9,6 +9,7 @@ import {
   Pen,
   ListChecks,
   Flame,
+  Check,
 } from 'lucide-react';
 import { Icon } from '@/components/ui/Icon';
 import { TimeTag } from '@/components/ui/TimeTag';
@@ -27,6 +28,8 @@ type OnGrabParams = {
   clientY: number;
   pointerType: 'mouse' | 'touch';
 };
+
+export type SelectModifiers = { shift: boolean; meta: boolean };
 
 export default function TaskCard({
   dragId,
@@ -51,6 +54,10 @@ export default function TaskCard({
   showStreak = false,
   isToday = false,
   occurrenceDate,
+  selectionMode = false,
+  selected = false,
+  selectable = true,
+  onSelectToggle,
 }: {
   dragId: string;
   task: Task;
@@ -81,6 +88,12 @@ export default function TaskCard({
   showStreak?: boolean;
   /** True on the today column — streak fly bonus only applies to today completions. */
   isToday?: boolean;
+  /** Board-wide multi-select is on: taps pick cards instead of opening them. */
+  selectionMode?: boolean;
+  selected?: boolean;
+  /** False for cards that can't take part in bulk actions (past columns). */
+  selectable?: boolean;
+  onSelectToggle?: (mods: SelectModifiers) => void;
 }) {
   const cardRef = useRef<HTMLDivElement | null>(null);
   const longPressTimer = useRef<number | null>(null);
@@ -110,6 +123,13 @@ export default function TaskCard({
   onToggleMenuRef.current = onToggleMenu;
   const onTapRef = useRef(onTap);
   onTapRef.current = onTap;
+  const onSelectToggleRef = useRef(onSelectToggle);
+  onSelectToggleRef.current = onSelectToggle;
+  // A modifier-click (⌘/Ctrl/Shift) picks the card instead of opening it, and a
+  // tap in selection mode does the same — both resolve on pointerup, so the
+  // press path needs to know which one this gesture is before it releases.
+  const suppressTapRef = useRef(false);
+  const selectTapRef = useRef(false);
 
   const MOVE_TOLERANCE = 8;
   // Mouse drags start on movement (Trello-style) — the threshold only exists
@@ -184,8 +204,12 @@ export default function TaskCard({
   const handlePointerUp = useCallback(() => {
     // If LP never fired and pointer didn't move enough, treat as tap.
     const wasTap = !longPressFiredRef.current && !movedOutRef.current;
+    const suppressed = suppressTapRef.current;
+    const asSelect = selectTapRef.current;
     cleanupLP();
-    if (wasTap) onTapRef.current?.();
+    if (!wasTap || suppressed) return;
+    if (asSelect) onSelectToggleRef.current?.({ shift: false, meta: false });
+    else onTapRef.current?.();
   }, [cleanupLP]);
 
   const handlePointerCancel = useCallback(() => cleanupLP(), [cleanupLP]);
@@ -197,9 +221,26 @@ export default function TaskCard({
       const target = e.target as HTMLElement;
       if (target.closest('button, a, input, textarea, [role="button"]')) return;
 
+      suppressTapRef.current = false;
+      selectTapRef.current = false;
+
+      // Desktop modifier-click picks the card up into the selection instead of
+      // opening it — resolved here rather than on release so the press never
+      // arms a drag or a text selection.
+      const modifierSelect =
+        e.pointerType === 'mouse' &&
+        selectable &&
+        !!onSelectToggleRef.current &&
+        (e.shiftKey || e.metaKey || e.ctrlKey);
+
       // Completed cards can still be tapped (to open the detail card) but
-      // never dragged.
-      const canDrag = !task.completed && !disableDrag;
+      // never dragged. In selection mode only already-selected cards drag —
+      // that drag carries the whole selection.
+      const canDrag =
+        !task.completed &&
+        !disableDrag &&
+        !modifierSelect &&
+        (!selectionMode || (selected && selectable));
 
       // Suppress text selection from the very start of the press — the
       // pointerdown is passive (can't preventDefault) and the drag only begins
@@ -229,6 +270,18 @@ export default function TaskCard({
         el.addEventListener('pointercancel', handlePointerCancel as any, {
           passive: true,
         });
+      }
+
+      if (modifierSelect) {
+        suppressTapRef.current = true;
+        onSelectToggleRef.current?.({
+          shift: e.shiftKey,
+          meta: e.metaKey || e.ctrlKey,
+        });
+      } else if (selectionMode && selectable) {
+        selectTapRef.current = true;
+      } else if (selectionMode) {
+        suppressTapRef.current = true;
       }
 
       // If drag is disabled (past dates) or the task is completed, skip the
@@ -282,7 +335,16 @@ export default function TaskCard({
         beginGrab(e.clientX, e.clientY);
       }, delay);
     },
-    [handlePointerMove, handlePointerUp, handlePointerCancel, task.completed, disableDrag],
+    [
+      handlePointerMove,
+      handlePointerUp,
+      handlePointerCancel,
+      task.completed,
+      disableDrag,
+      selectionMode,
+      selected,
+      selectable,
+    ],
   );
 
   useEffect(() => {
@@ -365,19 +427,61 @@ export default function TaskCard({
           : 'md:hover:border-primary/40 active:border-primary/40',
         compact ? 'mb-1' : 'mb-2.5',
         menuOpen ? 'z-50 border-primary/30' : '',
+        // Inset ring, not an offset one: the column clips horizontally
+        // (overflow-x-hidden), so an outward ring gets sliced at both edges.
+        selected
+          ? 'ring-2 ring-inset ring-primary !border-primary/60 bg-primary/[0.06] dark:bg-primary/[0.12]'
+          : '',
+        selectionMode && !selectable ? 'opacity-40' : '',
         hiddenWhileDragging ? 'opacity-0' : '',
       ].join(' ')}
+      aria-selected={selectionMode ? selected : undefined}
       role="listitem"
       aria-grabbed={false}
     >
       <motion.div className="flex w-full items-center gap-1.5">
-        {/* Grab handle (left) — 3-dot drag hint */}
-        <div
-          aria-hidden
-          className="-ml-0.5 flex shrink-0 items-center justify-center self-stretch text-muted-foreground/30"
-        >
-          <EllipsisVertical className="h-4 w-4" />
-        </div>
+        {/* Left gutter: the 3-dot drag hint at rest, the selection checkbox
+            once multi-select is on. On pointers that hover, the checkbox also
+            fades in over the hint so a selection can start without a menu. */}
+        {selectionMode ? (
+          <div
+            aria-hidden
+            className="-ml-0.5 flex shrink-0 items-center justify-center self-stretch"
+          >
+            <span
+              className={`grid h-[18px] w-[18px] place-items-center rounded-md border-2 transition-colors ${
+                selected
+                  ? 'border-primary bg-primary text-primary-foreground'
+                  : 'border-muted-foreground/35 bg-transparent'
+              }`}
+            >
+              {selected && <Check className="h-3 w-3" strokeWidth={4} />}
+            </span>
+          </div>
+        ) : (
+          <div className="-ml-0.5 relative flex shrink-0 items-center justify-center self-stretch text-muted-foreground/30">
+            <EllipsisVertical
+              className={`h-4 w-4 ${
+                selectable && onSelectToggle
+                  ? '[@media(hover:hover)]:group-hover:opacity-0 transition-opacity'
+                  : ''
+              }`}
+            />
+            {selectable && onSelectToggle && (
+              <button
+                type="button"
+                aria-label="Select task"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSelectToggle({ shift: false, meta: false });
+                }}
+                className="absolute inset-y-0 -inset-x-1 hidden place-items-center opacity-0 transition-opacity [@media(hover:hover)]:grid [@media(hover:hover)]:group-hover:opacity-100"
+              >
+                <span className="grid h-[18px] w-[18px] place-items-center rounded-md border-2 border-muted-foreground/40 bg-card" />
+              </button>
+            )}
+          </div>
+        )}
 
         <div
           className={`flex-1 min-w-0 flex flex-col ${task.completed ? 'opacity-60' : ''}`}
@@ -528,8 +632,12 @@ export default function TaskCard({
           )}
         </div>
 
-        <div className="shrink-0 flex items-center gap-1.5">
-          {onDoToday && !hideDoTodayButton && (
+        <div
+          className={`shrink-0 flex items-center gap-1.5 ${
+            selectionMode ? 'pointer-events-none' : ''
+          }`}
+        >
+          {onDoToday && !hideDoTodayButton && !selectionMode && (
             <button
               onClick={(e) => {
                 e.stopPropagation();

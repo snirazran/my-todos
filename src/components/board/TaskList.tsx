@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
-import TaskCard from './TaskCard';
+import TaskCard, { type SelectModifiers } from './TaskCard';
 import TaskMenu from './TaskMenu';
 import TaskDetailSheet from './TaskDetailSheet';
 import { EditScopeDialog } from './EditScopeDialog';
@@ -76,6 +76,8 @@ export default React.memo(function TaskList({
   disableDrag = false,
   isFuture = false,
   onPickDuplicateDate,
+  selection,
+  hiddenIds,
 }: {
   day: DisplayDay;
   items: Task[];
@@ -152,6 +154,20 @@ export default React.memo(function TaskList({
   isFuture?: boolean;
   /** Open the board-level calendar to duplicate a task onto a specific picked date. */
   onPickDuplicateDate?: (taskId: string) => void;
+  /** Board-wide multi-select, owned by TaskBoard so a selection can span days. */
+  selection?: {
+    active: boolean;
+    isSelected: (taskId: string) => boolean;
+    /** `visible` is this column's rendered order, for shift-click ranges. */
+    toggle: (task: Task, mods: SelectModifiers, visible: Task[]) => void;
+    enter: (task: Task) => void;
+  };
+  /**
+   * Task ids to leave out of this column entirely — the other cards travelling
+   * inside an in-flight multi-card drag, so the whole bundle visibly lifts off
+   * the board instead of just the one under the finger.
+   */
+  hiddenIds?: ReadonlySet<string>;
 }) {
   const [menu, setMenu] = useState<{
     id: string;
@@ -541,12 +557,17 @@ export default React.memo(function TaskList({
   const inGrace = (id: string) => !!gracePeriodIds?.has(id);
 
   const keep = (t: Task) =>
+    !hiddenIds?.has(t.id) &&
     matchesTaskFilters(t, filters, t.completed && !inGrace(t.id));
   const filteredItems = sortTasks(items.filter(keep), filters.sort);
   // ---- Empty list: render a single placeholder (if targeting index 0) OR themed empty state
   if (filteredItems.length === 0) {
     if (placeholderAt === 0) {
       rows.push(renderPlaceholder(`ph-empty-${day}`));
+    } else if (hiddenIds?.size && items.length > 0) {
+      // Every card here is currently in the air as part of a multi-card drag —
+      // show nothing rather than flashing the "Add a task" empty state.
+      return null;
     } else if (filtersActive && items.length > 0) {
       rows.push(
         <FilteredEmptyState
@@ -707,6 +728,14 @@ export default React.memo(function TaskList({
             isPast={!!dateKey && !isToday && !isFuture}
             showStreak
             isToday={isToday}
+            selectionMode={!!selection?.active}
+            selected={!!selection?.isSelected(t.id)}
+            selectable={!!selection}
+            onSelectToggle={
+              selection
+                ? (mods) => selection.toggle(t, mods, filteredItems)
+                : undefined
+            }
           />
         </motion.div>,
       );
@@ -725,6 +754,14 @@ export default React.memo(function TaskList({
       <TaskMenu
         menu={menu}
         onClose={() => setMenu(null)}
+        onSelectTasks={
+          selection
+            ? () => {
+                const t = items.find((it) => it.id === menu?.id);
+                if (t) selection.enter(t);
+              }
+            : undefined
+        }
         onAddTags={(id) => setTagPopup({ open: true, taskId: id })}
         addTagsPosition="second"
         onToggleRepeat={

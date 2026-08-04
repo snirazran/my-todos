@@ -28,6 +28,12 @@ export type DragState = {
     focusTime: number;
     breakTime: number;
   } | null;
+  /**
+   * How many cards this drag is carrying. >1 when the grabbed card was part of
+   * a multi-selection — the ghost then renders as a stack and the drop applies
+   * to every selected task, not just the one under the finger.
+   */
+  bundleCount?: number;
 };
 
 export function useDragManager() {
@@ -189,7 +195,8 @@ export function useDragManager() {
       reminder?: string,
       frogodoroSession?: { date: string; focusTime: number; breakTime: number } | null,
       notes?: string,
-      checklist?: { id: string; text: string; done: boolean }[]
+      checklist?: { id: string; text: string; done: boolean }[],
+      bundleCount?: number
     ) => {
       document.body.style.userSelect = 'none';
       document.body.style.touchAction = 'none'; // block body scroll
@@ -236,6 +243,7 @@ export function useDragManager() {
         frogodoroSession,
         notes,
         checklist,
+        bundleCount,
       });
       setTargetDay(day);
       setTargetIndex(index);
@@ -261,12 +269,13 @@ export function useDragManager() {
       frogodoroSession?: { date: string; focusTime: number; breakTime: number } | null;
       notes?: string;
       checklist?: { id: string; text: string; done: boolean }[];
+      bundleCount?: number;
     }) => {
       const {
         day, index, taskId, taskText, taskType,
         clientX, clientY, rectGetter, tags,
         calendarEventId, startTime, endTime, reminder, frogodoroSession,
-        notes, checklist
+        notes, checklist, bundleCount
       } = params;
 
       const rect = rectGetter();
@@ -274,7 +283,7 @@ export function useDragManager() {
         day, index, taskId, taskText, taskType,
         clientX, clientY, rect, tags,
         calendarEventId, startTime, endTime, reminder, frogodoroSession,
-        notes, checklist
+        notes, checklist, bundleCount
       );
     },
     [beginDragFromCard]

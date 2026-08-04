@@ -30,10 +30,23 @@ import {
   parseYmd,
   cmpYmd,
   addDays,
+  relativeDayLabel,
   WEEK_ORDER,
 } from './helpers';
 import DayColumn from './DayColumn';
 import TaskList from './TaskList';
+import BulkActionBar, { type BulkAction } from './BulkActionBar';
+import BulkTagsSheet from './BulkTagsSheet';
+import BulkConfirmDialog from './BulkConfirmDialog';
+import { EditScopeDialog } from './EditScopeDialog';
+import { TaskRepeatPopup } from './TaskRepeatPopup';
+import {
+  useTaskSelection,
+  BACKLOG_KEY,
+  type SelectionRef,
+} from './hooks/useTaskSelection';
+import { monthlyRepeatLabel } from '@/components/ui/quick-add/utils';
+import type { RepeatMode, RepeatRule } from '@/components/ui/quick-add/utils';
 import { TaskFilterSheet } from '@/components/ui/TaskFilterSheet';
 import {
   AppliedFilterChips,
@@ -822,7 +835,8 @@ export default function TaskBoard({
   const boardSections = useSections();
   const [showTimer, setShowTimer] = useState(false);
   const [timerTask, setTimerTask] = useState<Task | null>(null);
-  const { stackHeight: notificationStackHeight } = useNotification();
+  const { stackHeight: notificationStackHeight, showNotification } =
+    useNotification();
   const frogTaskId = useFrogodoroStore((s) => s.selectedTaskId);
   const lastCompletionId = useFrogodoroStore((s) => s.lastCompletionId);
   const lastCompletedTaskId = useFrogodoroStore((s) => s.lastCompletedTaskId);
@@ -919,6 +933,420 @@ export default function TaskBoard({
     undefined,
   );
 
+  // ---------------------------------------------------------------- selection
+  // Multi-select lives here rather than in TaskList so a selection can span day
+  // columns — "sweep up what's left across Mon/Wed/Fri and move it to Saturday"
+  // is the whole point, and each TaskList only ever sees its own column.
+  const selection = useTaskSelection();
+  const tz =
+    typeof window !== 'undefined'
+      ? Intl.DateTimeFormat().resolvedOptions().timeZone
+      : 'UTC';
+
+  const [bulkTagsOpen, setBulkTagsOpen] = useState(false);
+  const [bulkRepeatOpen, setBulkRepeatOpen] = useState(false);
+  // Snapshotted when the sheet opens: a background refetch mid-edit would
+  // otherwise hand the picker fresh props and wipe the choice in progress.
+  const [repeatSeed, setRepeatSeed] = useState<{
+    mode: RepeatMode;
+    endDate: string | null;
+    rule: RepeatRule | null;
+    anchor: string;
+    count: number;
+  }>({ mode: 'none', endDate: null, rule: null, anchor: '', count: 0 });
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkDateMode, setBulkDateMode] = useState<'move' | 'duplicate' | null>(
+    null,
+  );
+  // Set while a bulk edit is waiting on the "this task only / all repeats"
+  // answer — asked once for the whole selection, never once per task.
+  const [pendingBulkScope, setPendingBulkScope] = useState<{
+    run: (scope: 'one' | 'all') => void;
+  } | null>(null);
+
+  const refFor = useCallback(
+    (t: Task, dateKey: string, dayIndex: number): SelectionRef => ({
+      taskId: t.id,
+      dateKey,
+      dayIndex,
+      isRepeating: t.type === 'weekly',
+      repeatGroupId: t.repeatGroupId,
+      completed: !!t.completed,
+    }),
+    [],
+  );
+
+  const selectionFor = useCallback(
+    (dk: string, dayIndex: number) => ({
+      active: selection.active,
+      isSelected: (taskId: string) => selection.isSelected(dk, taskId),
+      toggle: (t: Task, mods: { shift: boolean }, visible: Task[]) => {
+        if (mods.shift) {
+          selection.selectRange(
+            refFor(t, dk, dayIndex),
+            visible.map((v) => refFor(v, dk, dayIndex)),
+          );
+        } else {
+          selection.toggle(refFor(t, dk, dayIndex));
+        }
+      },
+      enter: (t: Task) => selection.enter(refFor(t, dk, dayIndex)),
+    }),
+    [selection, refFor],
+  );
+
+  /** The picked tasks, resolved back to live Task objects. */
+  const selectedTasks = useMemo(() => {
+    const out: { ref: SelectionRef; task: Task }[] = [];
+    for (const ref of selection.refs) {
+      const list =
+        ref.dateKey === BACKLOG_KEY ? backlog : (tasksByDate[ref.dateKey] ?? []);
+      const task = list.find((t) => t.id === ref.taskId);
+      if (task) out.push({ ref, task });
+    }
+    return out;
+  }, [selection.refs, tasksByDate, backlog]);
+
+  const bulkItems = useMemo(
+    () =>
+      selection.refs.map((r) => ({
+        taskId: r.taskId,
+        fromDate: r.dateKey === BACKLOG_KEY ? undefined : r.dateKey,
+      })),
+    [selection.refs],
+  );
+
+  /**
+   * Seeds the bulk repeat sheet. When every picked task already shares one
+   * repeat setting the sheet opens on it, so "these 3 dailies" doesn't read as
+   * "Does not repeat"; a mixed selection has no honest shared answer and starts
+   * blank.
+   */
+  const sharedRepeat = useMemo(() => {
+    const blank = {
+      mode: 'none' as RepeatMode,
+      endDate: null as string | null,
+      rule: null as RepeatRule | null,
+    };
+    if (selectedTasks.length === 0) return blank;
+    const keyOf = (t: Task) =>
+      JSON.stringify([
+        t.repeatMode ?? (t.type === 'weekly' ? 'weekly' : 'none'),
+        t.repeatEndDate ?? null,
+        t.repeatRule ?? null,
+      ]);
+    const first = keyOf(selectedTasks[0].task);
+    if (selectedTasks.some(({ task }) => keyOf(task) !== first)) return blank;
+    const t = selectedTasks[0].task;
+    return {
+      mode: (t.repeatMode ??
+        (t.type === 'weekly' ? 'weekly' : 'none')) as RepeatMode,
+      endDate: t.repeatEndDate ?? null,
+      rule: (t.repeatRule ?? null) as RepeatRule | null,
+    };
+  }, [selectedTasks]);
+
+  const bulkTagCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const { task } of selectedTasks) {
+      for (const tag of task.tags ?? []) counts[tag] = (counts[tag] ?? 0) + 1;
+    }
+    return counts;
+  }, [selectedTasks]);
+
+  const runBulk = useCallback(
+    async (
+      payload: Record<string, unknown>,
+      items: { taskId: string; fromDate?: string }[] = bulkItems,
+    ) => {
+      if (items.length === 0) return null;
+      try {
+        const res = await fetch('/api/tasks', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            bulk: { ...payload, items },
+            timezone: tz,
+          }),
+        });
+        const json = await res.json().catch(() => ({}));
+        window.dispatchEvent(new Event('board-refresh'));
+        return json;
+      } catch (e) {
+        console.error('bulk action failed', e);
+        window.dispatchEvent(new Event('board-refresh'));
+        return null;
+      }
+    },
+    [bulkItems, tz],
+  );
+
+  /**
+   * Bulk move with an Undo toast. Undo replays the move per original column, so
+   * it's only offered when nothing repeating is involved: moving one occurrence
+   * of a repeat detaches it into a fresh one-off, and putting that back would
+   * not restore the series.
+   */
+  const bulkMoveToDate = useCallback(
+    async (target: string) => {
+      const snapshot = selection.refs.slice();
+      const undoable = snapshot.every((r) => !r.isRepeating);
+      const count = snapshot.length;
+      selection.exit();
+      await runBulk(
+        { op: 'move', date: target },
+        snapshot.map((r) => ({
+          taskId: r.taskId,
+          fromDate: r.dateKey === BACKLOG_KEY ? undefined : r.dateKey,
+        })),
+      );
+      showNotification(
+        `Moved ${count} ${count === 1 ? 'task' : 'tasks'} to ${relativeDayLabel(target)}`,
+        undoable
+          ? async () => {
+              const byDate = new Map<string, string[]>();
+              for (const r of snapshot) {
+                const list = byDate.get(r.dateKey) ?? [];
+                list.push(r.taskId);
+                byDate.set(r.dateKey, list);
+              }
+              for (const [dateKey, taskIds] of Array.from(byDate)) {
+                await runBulk(
+                  dateKey === BACKLOG_KEY
+                    ? { op: 'backlog' }
+                    : { op: 'move', date: dateKey },
+                  taskIds.map((taskId) => ({ taskId, fromDate: target })),
+                );
+              }
+            }
+          : undefined,
+        { durationMs: 6000 },
+      );
+    },
+    [selection, runBulk, showNotification],
+  );
+
+  const applyScoped = useCallback(
+    (run: (scope: 'one' | 'all') => void) => {
+      if (selection.stats.hasRepeating) setPendingBulkScope({ run });
+      else run('one');
+    },
+    [selection.stats.hasRepeating],
+  );
+
+  const onBulkAction = useCallback(
+    (action: BulkAction) => {
+      switch (action) {
+        case 'move':
+          setBulkDateMode('move');
+          setMoveCalendarOpen(true);
+          break;
+        case 'duplicate':
+          setBulkDateMode('duplicate');
+          setMoveCalendarOpen(true);
+          break;
+        case 'tags':
+          setBulkTagsOpen(true);
+          break;
+        case 'repeat': {
+          // Anchor on the picked tasks' own day when they share one, so the
+          // "Every week on …" and "Every month on the …" labels name the day
+          // the change will actually key off.
+          const keys = new Set(
+            selection.refs
+              .map((r) => r.dateKey)
+              .filter((k) => k !== BACKLOG_KEY),
+          );
+          const anchor =
+            keys.size === 1
+              ? Array.from(keys)[0]
+              : (windowDates[pageIndexRef.current] ?? activeDateKey);
+          setRepeatSeed({
+            ...sharedRepeat,
+            anchor,
+            count: selection.stats.count,
+          });
+          setBulkRepeatOpen(true);
+          break;
+        }
+        case 'delete':
+          setBulkDeleteOpen(true);
+          break;
+        case 'backlog': {
+          const count = selection.stats.count;
+          selection.exit();
+          void runBulk({ op: 'backlog' }).then(() => {
+            showNotification(
+              `Saved ${count} ${count === 1 ? 'task' : 'tasks'} for later`,
+            );
+          });
+          break;
+        }
+        case 'selectAll': {
+          const dk = windowDates[pageIndexRef.current];
+          if (!dk) break;
+          selection.selectAll(
+            (sortedTasksByDate[dk] ?? []).map((t) =>
+              refFor(t, dk, pageIndexRef.current),
+            ),
+          );
+          break;
+        }
+      }
+    },
+    [
+      selection,
+      runBulk,
+      showNotification,
+      windowDates,
+      activeDateKey,
+      sharedRepeat,
+      sortedTasksByDate,
+      refFor,
+    ],
+  );
+
+  /**
+   * While a multi-card drag is in flight, every card it carries is pulled out
+   * of its column so the whole bundle reads as lifted — otherwise only the card
+   * under the finger disappears and the rest look left behind.
+   */
+  const draggingBundleIds = useMemo(() => {
+    if (!drag?.active || (drag.bundleCount ?? 1) <= 1) return null;
+    const byDate = new Map<string, Set<string>>();
+    for (const r of selection.refs) {
+      const set = byDate.get(r.dateKey) ?? new Set<string>();
+      set.add(r.taskId);
+      byDate.set(r.dateKey, set);
+    }
+    return byDate;
+  }, [drag?.active, drag?.bundleCount, selection.refs]);
+
+  // Dragging a card that's part of the selection carries the whole selection.
+  const onGrabMaybeBundled = useCallback(
+    (p: any) => {
+      const dk = p.day === BACKLOG_IDX ? BACKLOG_KEY : windowDates[p.day];
+      const bundled =
+        !!dk && selection.isSelected(dk, p.taskId) && selection.stats.count > 1;
+      onGrab({
+        ...p,
+        bundleCount: bundled ? selection.stats.count : undefined,
+      });
+    },
+    [onGrab, selection, windowDates, BACKLOG_IDX],
+  );
+
+  /**
+   * Drop for a multi-card drag. A same-column drop is a pure reorder handled
+   * locally; anything crossing columns goes through the single bulk move so the
+   * board settles once instead of once per card.
+   */
+  const commitBundleDrop = useCallback(
+    (toDay: number, toIndex: number) => {
+      const refs = selection.refs;
+      if (refs.length === 0) return;
+
+      // Compared by date, never by column index — loading more days re-indexes
+      // every column, and a selection can outlive that.
+      const sourceKeys = new Set(refs.map((r) => r.dateKey));
+      const toKey = toDay === BACKLOG_IDX ? BACKLOG_KEY : windowDates[toDay];
+      if (
+        toDay !== BACKLOG_IDX &&
+        sourceKeys.size === 1 &&
+        sourceKeys.has(toKey)
+      ) {
+        const list = colAt(toDay);
+        const picked = new Set(refs.map((r) => r.taskId));
+        const moved = list.filter((t) => picked.has(t.id));
+        const rest = list.filter((t) => !picked.has(t.id));
+        // The picked cards are unmounted during the drag, so the drop index the
+        // manager measured already counts only the cards that stayed.
+        const at = Math.max(0, Math.min(toIndex, rest.length));
+        const next = [...rest.slice(0, at), ...moved, ...rest.slice(at)];
+        setColAt(toDay, next);
+        saveCol(toDay, next).catch(() => {});
+        selection.exit();
+        return;
+      }
+
+      const picked = new Set(refs.map((r) => `${r.dateKey}::${r.taskId}`));
+      const movedTasks: Task[] = [];
+      for (const { ref, task } of selectedTasks) {
+        if (!ref.isRepeating) movedTasks.push(task);
+      }
+
+      // Optimistically empty the source columns so the drop reads as instant;
+      // repeating occurrences are left to the refetch, since the server mints a
+      // fresh one-off id for each and the client can't predict it.
+      setTasksByDate((prev) => {
+        const next: Record<string, Task[]> = {};
+        let changed = false;
+        for (const k in prev) {
+          const filtered = prev[k].filter((t) => !picked.has(`${k}::${t.id}`));
+          if (filtered.length !== prev[k].length) changed = true;
+          next[k] = filtered;
+        }
+        if (!changed) return prev;
+        const targetKey = toDay === BACKLOG_IDX ? null : windowDates[toDay];
+        if (targetKey && movedTasks.length) {
+          const dest = (next[targetKey] ?? []).slice();
+          const at = Math.max(0, Math.min(toIndex, dest.length));
+          dest.splice(at, 0, ...movedTasks.filter((m) => !dest.some((d) => d.id === m.id)));
+          next[targetKey] = dest;
+        }
+        return next;
+      });
+      setBacklog((prev) =>
+        prev.filter((t) => !picked.has(`${BACKLOG_KEY}::${t.id}`)),
+      );
+
+      if (toDay === BACKLOG_IDX) {
+        const count = refs.length;
+        selection.exit();
+        void runBulk(
+          { op: 'backlog' },
+          refs.map((r) => ({
+            taskId: r.taskId,
+            fromDate: r.dateKey === BACKLOG_KEY ? undefined : r.dateKey,
+          })),
+        ).then(() =>
+          showNotification(
+            `Saved ${count} ${count === 1 ? 'task' : 'tasks'} for later`,
+          ),
+        );
+        return;
+      }
+
+      const targetKey = windowDates[toDay];
+      if (targetKey) void bulkMoveToDate(targetKey);
+    },
+    [
+      selection,
+      selectedTasks,
+      BACKLOG_IDX,
+      colAt,
+      setColAt,
+      saveCol,
+      windowDates,
+      setTasksByDate,
+      setBacklog,
+      runBulk,
+      showNotification,
+      bulkMoveToDate,
+    ],
+  );
+
+  // Escape leaves multi-select the way it leaves every other transient mode on
+  // this board (the drag manager already owns Escape while dragging).
+  useEffect(() => {
+    if (!selection.active) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !drag?.active) selection.exit();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selection, drag?.active]);
+
   // Past tasks can be picked up, but they can only move to today/future — so
   // while hovering a past column we hide the drop placeholder entirely (the
   // drop itself is also blocked in onDrop).
@@ -1012,6 +1440,10 @@ export default function TaskBoard({
   const commitDragReorder = useCallback(
     (toDay: number, toIndex: number) => {
       if (!drag) return;
+      if ((drag.bundleCount ?? 1) > 1) {
+        commitBundleDrop(toDay, toIndex);
+        return;
+      }
       const sameSpot = drag.fromDay === toDay && drag.fromIndex === toIndex;
       if (sameSpot) return;
 
@@ -1098,6 +1530,7 @@ export default function TaskBoard({
       saveCol,
       windowDates,
       onMoveRepeatInstance,
+      commitBundleDrop,
     ],
   );
 
@@ -1179,15 +1612,30 @@ export default function TaskBoard({
     const overDateZone = dateZoneActiveRef.current;
     const overBacklog = isDragOverBacklogRef.current;
 
+    const bundled = (drag.bundleCount ?? 1) > 1;
+    // Dragging a picked card *is* the bulk move — once it lands, the selection
+    // has served its purpose, so multi-select gets out of the way rather than
+    // leaving the board in a mode the user has to dismiss.
+    const fromKeyOfDrag =
+      drag.fromDay === BACKLOG_IDX ? BACKLOG_KEY : windowDates[drag.fromDay];
+    const draggedWasSelected =
+      !!fromKeyOfDrag && selection.isSelected(fromKeyOfDrag, drag.taskId);
+
     // Dropped on a "Move to a specific date" edge zone: defer to the calendar.
     if (overDateZone && !overBacklog) {
-      const fromKey =
-        drag.fromDay !== BACKLOG_IDX ? windowDates[drag.fromDay] : '';
-      setPendingMove({
-        taskId: drag.taskId,
-        fromDateKey: fromKey ?? '',
-        mode: 'move',
-      });
+      if (bundled) {
+        setBulkDateMode('move');
+      } else {
+        const fromKey =
+          drag.fromDay !== BACKLOG_IDX ? windowDates[drag.fromDay] : '';
+        setPendingMove({
+          taskId: drag.taskId,
+          fromDateKey: fromKey ?? '',
+          mode: 'move',
+        });
+        // The calendar carries the task on its own from here.
+        if (draggedWasSelected) selection.exit();
+      }
       setMoveCalendarOpen(true);
       endDrag();
       setDateZoneActive(false);
@@ -1196,9 +1644,10 @@ export default function TaskBoard({
       return;
     }
 
-    if (overBacklog && draggingRepeating) {
+    if (overBacklog && draggingRepeating && !bundled) {
       const fromKey = windowDates[drag.fromDay];
       if (fromKey) removeOnDate(fromKey, drag.taskId).catch(console.error);
+      if (draggedWasSelected) selection.exit();
       endDrag();
       setIsDragOverBacklog(false);
       setTrayCloseProgress(0);
@@ -1277,6 +1726,11 @@ export default function TaskBoard({
         );
       }
       commitDragReorder(finalToDay, finalToIndex);
+      // A drop back into the exact same slot changed nothing, so it shouldn't
+      // cost the user their selection either.
+      const landedSomewhereNew =
+        finalToDay !== drag.fromDay || finalToIndex !== drag.fromIndex;
+      if (draggedWasSelected && landedSomewhereNew) selection.exit();
 
       endDrag();
       setIsDragOverBacklog(false);
@@ -1308,6 +1762,7 @@ export default function TaskBoard({
     settleAndEnd,
     draggingRepeating,
     removeOnDate,
+    selection,
   ]);
 
   useEffect(() => {
@@ -1572,8 +2027,10 @@ export default function TaskBoard({
                   targetIndex={clampedTargetIndex}
                   dragHeight={drag?.height}
                   removeTask={async (_d, id) => removeOnDate(dk, id)}
-                  onGrab={onGrab as any}
+                  onGrab={onGrabMaybeBundled as any}
                   setCardRef={setCardRef}
+                  selection={selectionFor(dk, i)}
+                  hiddenIds={draggingBundleIds?.get(dk)}
                   onAddRequested={(text) => {
                     setQuickText(text);
                     setInitialDateKey(dk);
@@ -1763,6 +2220,13 @@ export default function TaskBoard({
         selectedDate={todayKey}
         minDate={todayKey}
         heading={(() => {
+          if (bulkDateMode) {
+            const n = selection.stats.count;
+            const what = `${n} ${n === 1 ? 'task' : 'tasks'}`;
+            return bulkDateMode === 'duplicate'
+              ? `Duplicate ${what} to which day?`
+              : `Pick a day to move ${what}`;
+          }
           const t = pendingMove ? findTaskById(pendingMove.taskId)?.text : '';
           if (pendingMove?.mode === 'duplicate') {
             return t ? `Duplicate “${t}” to which day?` : 'Duplicate to which day?';
@@ -1770,7 +2234,7 @@ export default function TaskBoard({
           return t ? `Pick a day to move “${t}”` : 'Pick a day to move this task';
         })()}
         todayLabel={
-          pendingMove?.mode === 'duplicate'
+          (bulkDateMode ?? pendingMove?.mode) === 'duplicate'
             ? 'Duplicate to today'
             : 'Jump back to today'
         }
@@ -1782,15 +2246,27 @@ export default function TaskBoard({
           )
         }
         onSelect={(d) => {
-          if (pendingMove?.mode === 'duplicate') {
+          if (bulkDateMode === 'duplicate') {
+            const count = selection.stats.count;
+            selection.exit();
+            void runBulk({ op: 'duplicate', date: d }).then(() =>
+              showNotification(
+                `Duplicated ${count} ${count === 1 ? 'task' : 'tasks'} to ${relativeDayLabel(d)}`,
+              ),
+            );
+          } else if (bulkDateMode === 'move') {
+            void bulkMoveToDate(d);
+          } else if (pendingMove?.mode === 'duplicate') {
             onDuplicateTaskToDate?.(pendingMove.taskId, d);
           } else if (pendingMove) {
             onMoveTaskToDate?.(pendingMove.taskId, pendingMove.fromDateKey, d);
           }
+          setBulkDateMode(null);
           setPendingMove(null);
           setMoveCalendarOpen(false);
         }}
         onClose={() => {
+          setBulkDateMode(null);
           setPendingMove(null);
           setMoveCalendarOpen(false);
         }}
@@ -1807,7 +2283,11 @@ export default function TaskBoard({
           // Above the drag ghost (z-[100]) while dragging so the drop-zone
           // label isn't hidden under the card that's hovering over it.
           drag?.active ? 'z-[105]' : 'z-[40]'
-        } ${scrollLocked ? 'invisible opacity-0' : ''}`}
+        } ${
+          scrollLocked || (selection.active && !drag?.active)
+            ? 'invisible opacity-0'
+            : ''
+        }`}
       >
         <div className="pointer-events-auto mx-auto flex w-[88vw] max-w-none flex-col items-center justify-center md:w-full md:max-w-[480px]">
           {isMobile ? (
@@ -2073,6 +2553,117 @@ export default function TaskBoard({
         }}
       />
 
+      <AnimatePresence>
+        {selection.active && !drag?.active && !scrollLocked && (
+          <BulkActionBar
+            key="bulk-bar"
+            count={selection.stats.count}
+            bottomOffset={notificationStackHeight}
+            onAction={onBulkAction}
+            onClear={selection.exit}
+          />
+        )}
+      </AnimatePresence>
+
+      <BulkTagsSheet
+        open={bulkTagsOpen}
+        onClose={() => setBulkTagsOpen(false)}
+        taskCount={selection.stats.count}
+        counts={bulkTagCounts}
+        onSave={(delta) => {
+          const count = selection.stats.count;
+          const snapshot = bulkItems.slice();
+          applyScoped((scope) => {
+            selection.exit();
+            void runBulk({ op: 'tags', ...delta, scope }, snapshot).then(() => {
+              window.dispatchEvent(new Event('tags-updated'));
+              showNotification(
+                `Updated tags on ${count} ${count === 1 ? 'task' : 'tasks'}`,
+              );
+            });
+          });
+        }}
+      />
+
+      <TaskRepeatPopup
+        open={bulkRepeatOpen}
+        onClose={() => setBulkRepeatOpen(false)}
+        currentMode={repeatSeed.mode}
+        repeatDayLabel={parseYmd(
+          repeatSeed.anchor || activeDateKey,
+        ).toLocaleString('en-US', { weekday: 'long' })}
+        monthlyLabel={monthlyRepeatLabel(repeatSeed.anchor || activeDateKey)}
+        currentEndDate={repeatSeed.endDate}
+        currentRule={repeatSeed.rule}
+        anchorYmd={repeatSeed.anchor || activeDateKey}
+        description={`Editing ${repeatSeed.count} ${
+          repeatSeed.count === 1 ? 'task' : 'tasks'
+        }. This replaces whatever they repeat on now.`}
+        doneLabel={`Apply to ${repeatSeed.count} ${
+          repeatSeed.count === 1 ? 'task' : 'tasks'
+        }`}
+        onChange={(mode: RepeatMode, endDate: string | null, rule: RepeatRule | null) => {
+          const count = selection.stats.count;
+          const snapshot = selection.refs.map((r) => ({
+            taskId: r.taskId,
+            fromDate: r.dateKey === BACKLOG_KEY ? undefined : r.dateKey,
+          }));
+          setBulkRepeatOpen(false);
+          selection.exit();
+          // No "this / all repeats" question here: a repeat rule *is* the
+          // series, so changing it always applies to the whole thing. The
+          // per-task anchor day is resolved server-side from each task's date.
+          void runBulk(
+            {
+              op: 'repeat',
+              setRepeat: {
+                mode,
+                endDate: endDate ?? null,
+                rule: rule ?? null,
+              },
+            },
+            snapshot,
+          ).then(() =>
+            showNotification(
+              `Repeat updated on ${count} ${count === 1 ? 'task' : 'tasks'}`,
+            ),
+          );
+        }}
+      />
+
+      <BulkConfirmDialog
+        open={bulkDeleteOpen}
+        title={`Delete ${selection.stats.count} ${
+          selection.stats.count === 1 ? 'task' : 'tasks'
+        }?`}
+        description={
+          selection.stats.hasRepeating
+            ? 'One-off tasks are removed for good. Repeating ones just skip the day you picked them on — the series keeps going.'
+            : 'This removes them for good and can’t be undone.'
+        }
+        confirmLabel="Delete"
+        onClose={() => setBulkDeleteOpen(false)}
+        onConfirm={() => {
+          const count = selection.stats.count;
+          const snapshot = bulkItems.slice();
+          selection.exit();
+          void runBulk({ op: 'delete' }, snapshot).then(() =>
+            showNotification(
+              `Deleted ${count} ${count === 1 ? 'task' : 'tasks'}`,
+            ),
+          );
+        }}
+      />
+
+      <EditScopeDialog
+        open={!!pendingBulkScope}
+        onClose={() => setPendingBulkScope(null)}
+        onChoose={(scope) => {
+          pendingBulkScope?.run(scope);
+          setPendingBulkScope(null);
+        }}
+      />
+
       {drag?.active && (
         <DragOverlay
           x={drag.x}
@@ -2092,6 +2683,7 @@ export default function TaskBoard({
           notes={drag.notes}
           checklist={drag.checklist}
           frogodoroSession={drag.frogodoroSession}
+          bundleCount={drag.bundleCount}
         />
       )}
 

@@ -21,6 +21,10 @@ interface TaskRepeatPopupProps {
   currentRule?: RepeatRule | null;
   /** Date the task sits on — seeds custom defaults & monthly anchor. */
   anchorYmd: string;
+  /** Overrides the subtitle — used to name how many tasks a bulk edit hits. */
+  description?: string;
+  /** Overrides the commit button label (e.g. "Apply to 4 tasks"). */
+  doneLabel?: string;
   onChange: (
     mode: RepeatMode,
     endDate: string | null,
@@ -37,6 +41,8 @@ export function TaskRepeatPopup({
   currentEndDate,
   currentRule,
   anchorYmd,
+  description = 'Choose when this task comes back.',
+  doneLabel = 'Done',
   onChange,
 }: TaskRepeatPopupProps) {
   // Stage the mode + end date + rule locally; commit on "Done".
@@ -87,7 +93,7 @@ export function TaskRepeatPopup({
                 Repeat
               </h3>
               <p className="mb-4 text-center text-[12px] font-medium text-muted-foreground">
-                Choose when this task comes back.
+                {description}
               </p>
 
               <RepeatView
@@ -108,7 +114,7 @@ export function TaskRepeatPopup({
                 onClick={commit}
                 className="h-11 w-full rounded-xl bg-primary text-[14px] font-extrabold text-primary-foreground transition-all hover:brightness-105 active:scale-[0.985]"
               >
-                Done
+                {doneLabel}
               </button>
             </div>
           </div>

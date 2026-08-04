@@ -1376,12 +1376,294 @@ export async function applySetRepeat(
   return { ok: true };
 }
 
+type BulkItem = { taskId: string; fromDate?: string };
+
+type BulkBody = {
+  op: 'move' | 'backlog' | 'tags' | 'repeat' | 'delete' | 'duplicate';
+  items: BulkItem[];
+  date?: string;
+  add?: string[];
+  remove?: string[];
+  setRepeat?: unknown;
+  scope?: 'one' | 'all';
+};
+
+const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * One request for a whole multi-select action. The planner used to fire N
+ * single-task writes for this, which raced its own refetch guards and made the
+ * board flicker through intermediate states; here the per-task work runs
+ * server-side and the expensive tail (gamification sync + the realtime task
+ * notification) fires exactly once, so the client gets a single settled state
+ * to refetch.
+ */
+async function handleBulkPut(uid: string, bulk: BulkBody, tz: string) {
+  const items = Array.isArray(bulk.items) ? bulk.items.slice(0, 200) : [];
+  if (items.length === 0)
+    return NextResponse.json({ error: 'items required' }, { status: 400 });
+
+  const ids = Array.from(new Set(items.map((i) => i.taskId).filter(Boolean)));
+  if (ids.length === 0)
+    return NextResponse.json({ error: 'items required' }, { status: 400 });
+
+  const docs = await TaskModel.find({ userId: uid, id: { $in: ids } })
+    .lean<TaskDoc[]>()
+    .exec();
+  const byId = new Map(docs.map((d) => [d.id, d]));
+
+  // Touched date columns, so the client knows what to re-read.
+  const dates = new Set<string>();
+  const noteDate = (d?: string) => {
+    if (d && YMD_RE.test(d)) dates.add(d);
+  };
+  let affected = 0;
+
+  /** Expand to whole repeat groups when the caller asked for scope:'all'. */
+  const scopedIds = async (): Promise<string[]> => {
+    if (bulk.scope !== 'all') return ids;
+    const groupIds = Array.from(
+      new Set(docs.map((d) => d.repeatGroupId).filter(Boolean) as string[]),
+    );
+    if (groupIds.length === 0) return ids;
+    const siblings = await TaskModel.find(
+      { userId: uid, repeatGroupId: { $in: groupIds } },
+      { id: 1 },
+    )
+      .lean<{ id: string }[]>()
+      .exec();
+    return Array.from(new Set([...ids, ...siblings.map((s) => s.id)]));
+  };
+
+  const now = new Date();
+
+  if (bulk.op === 'move' || bulk.op === 'backlog') {
+    const toBacklog = bulk.op === 'backlog';
+    const target = String(bulk.date ?? '');
+    if (!toBacklog && !YMD_RE.test(target))
+      return NextResponse.json({ error: 'date required' }, { status: 400 });
+
+    const { weekStart } = getRollingWeekDatesZoned(tz);
+
+    for (const item of items) {
+      const doc = byId.get(item.taskId);
+      if (!doc) continue;
+      noteDate(item.fromDate);
+
+      if (toBacklog) {
+        const order = await nextOrderBacklog(uid, weekStart);
+        await TaskModel.updateOne(
+          { userId: uid, id: doc.id },
+          {
+            $set: {
+              type: 'backlog',
+              weekStart,
+              order,
+              updatedAt: now,
+              completed: false,
+            },
+            $unset: {
+              date: 1,
+              dayOfWeek: 1,
+              completedDates: 1,
+              suppressedDates: 1,
+            },
+          },
+        );
+        affected++;
+        continue;
+      }
+
+      noteDate(target);
+
+      // A repeating task moves one occurrence only: the series keeps its rule,
+      // the source date is suppressed, and the moved copy lands as a one-off.
+      if (doc.type === 'weekly' && item.fromDate && YMD_RE.test(item.fromDate)) {
+        if (item.fromDate === target) continue;
+        const newId = uuid();
+        await TaskModel.updateOne(
+          { userId: uid, id: doc.id },
+          { $addToSet: { suppressedDates: item.fromDate } },
+        );
+        const movedSession = doc.frogodoroSessions?.find(
+          (s) => s.date === item.fromDate,
+        );
+        await TaskModel.create({
+          userId: uid,
+          type: 'regular',
+          id: newId,
+          text: doc.text,
+          date: target,
+          order: await nextOrderForDay(uid, dowFromYMD(target), target),
+          completed: false,
+          createdAt: now,
+          updatedAt: now,
+          tags: doc.tags ?? [],
+          notes: doc.notes ?? '',
+          checklist: checklistForDate(doc, item.fromDate),
+          startTime: doc.startTime,
+          endTime: doc.endTime,
+          reminder: doc.reminder,
+          ...(movedSession
+            ? {
+                frogodoroSessions: [
+                  {
+                    date: target,
+                    focusTime: movedSession.focusTime ?? 0,
+                    breakTime: movedSession.breakTime ?? 0,
+                  },
+                ],
+              }
+            : {}),
+        });
+        affected++;
+        continue;
+      }
+
+      if (doc.date === target) continue;
+      await TaskModel.updateOne(
+        { userId: uid, id: doc.id },
+        [
+          {
+            $set: {
+              type: 'regular',
+              date: target,
+              order: await nextOrderForDay(uid, dowFromYMD(target), target),
+              updatedAt: now,
+              frogodoroSessions: {
+                $map: {
+                  input: { $ifNull: ['$frogodoroSessions', []] },
+                  as: 's',
+                  in: { $mergeObjects: ['$$s', { date: target }] },
+                },
+              },
+            },
+          },
+          { $unset: ['weekStart', 'dayOfWeek', 'suppressedDates'] },
+        ],
+        { updatePipeline: true } as never,
+      );
+      affected++;
+    }
+  } else if (bulk.op === 'tags') {
+    const add = (Array.isArray(bulk.add) ? bulk.add : []).filter(
+      (t) => typeof t === 'string',
+    );
+    const remove = (Array.isArray(bulk.remove) ? bulk.remove : []).filter(
+      (t) => typeof t === 'string',
+    );
+    if (add.length === 0 && remove.length === 0)
+      return NextResponse.json({ ok: true, affected: 0, dates: [] });
+
+    const targetIds = await scopedIds();
+    // $addToSet and $pull can't touch the same array in one update, so the
+    // delta is applied as two passes. Tags the user never toggled are left
+    // alone by construction — this is never a whole-array replace.
+    if (add.length > 0) {
+      const res = await TaskModel.updateMany(
+        { userId: uid, id: { $in: targetIds } },
+        { $addToSet: { tags: { $each: add } } },
+      );
+      affected = Math.max(affected, res.modifiedCount ?? 0);
+    }
+    if (remove.length > 0) {
+      const res = await TaskModel.updateMany(
+        { userId: uid, id: { $in: targetIds } },
+        { $pull: { tags: { $in: remove } } },
+      );
+      affected = Math.max(affected, res.modifiedCount ?? 0);
+    }
+    for (const i of items) noteDate(i.fromDate);
+  } else if (bulk.op === 'repeat') {
+    for (const item of items) {
+      const doc = byId.get(item.taskId);
+      if (!doc) continue;
+      // A shared buddy task's schedule needs mutual approval — skip it here
+      // rather than forcing the change through the bulk path.
+      if (doc.bondId) continue;
+      noteDate(item.fromDate);
+      // Each task repeats from the day it currently sits on. Without a per-task
+      // dayOfWeek, applySetRepeat falls back to *today's* weekday, which would
+      // silently re-anchor every picked task to the same day.
+      const anchor =
+        item.fromDate && YMD_RE.test(item.fromDate) ? item.fromDate : doc.date;
+      const res = await applySetRepeat(
+        uid,
+        item.taskId,
+        {
+          ...(bulk.setRepeat as Record<string, unknown>),
+          dayOfWeek: anchor ? dowFromYMD(anchor) : undefined,
+        },
+        anchor,
+        tz,
+      );
+      if (res.ok) affected++;
+    }
+  } else if (bulk.op === 'delete') {
+    for (const item of items) {
+      const doc = byId.get(item.taskId);
+      if (!doc) continue;
+      noteDate(item.fromDate);
+      if (doc.type === 'weekly' && item.fromDate && YMD_RE.test(item.fromDate)) {
+        // Match the single-task planner delete: hide this occurrence, keep the
+        // series. Deleting the whole series stays an explicit, separate choice.
+        await TaskModel.updateOne(
+          { userId: uid, id: doc.id },
+          { $addToSet: { suppressedDates: item.fromDate } },
+        );
+      } else {
+        await TaskModel.deleteOne({ userId: uid, id: doc.id });
+        if (doc.bondId) await severBond(doc.bondId, uid);
+      }
+      affected++;
+    }
+  } else if (bulk.op === 'duplicate') {
+    const target = String(bulk.date ?? '');
+    if (!YMD_RE.test(target))
+      return NextResponse.json({ error: 'date required' }, { status: 400 });
+    noteDate(target);
+    for (const item of items) {
+      const doc = byId.get(item.taskId);
+      if (!doc) continue;
+      await TaskModel.create({
+        userId: uid,
+        type: 'regular',
+        id: uuid(),
+        text: doc.text,
+        order: await nextOrderForDay(uid, dowFromYMD(target), target),
+        date: target,
+        completed: false,
+        createdAt: now,
+        updatedAt: now,
+        tags: doc.tags ?? [],
+        notes: doc.notes,
+        checklist: checklistContent(doc.checklist),
+        startTime: doc.startTime,
+        endTime: doc.endTime,
+        reminder: doc.reminder,
+      });
+      affected++;
+    }
+  } else {
+    return NextResponse.json({ error: 'unknown bulk op' }, { status: 400 });
+  }
+
+  await syncGamification(uid, tz);
+  await notifyTaskChanged(uid);
+  return NextResponse.json({
+    ok: true,
+    affected,
+    dates: Array.from(dates),
+  });
+}
+
 export async function PUT(req: NextRequest) {
   const uid = await currentUserId();
   if (!uid) return unauth();
   await connectMongo();
   const body = await req.json();
   const tz = body.timezone || 'UTC';
+  if (body?.bulk) return handleBulkPut(uid, body.bulk as BulkBody, tz);
   if (body && Object.prototype.hasOwnProperty.call(body, 'day'))
     return handleBoardPut(uid, body, tz);
   if (

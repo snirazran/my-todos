@@ -28,6 +28,7 @@ export default function DragOverlay({
   notes,
   checklist,
   frogodoroSession,
+  bundleCount = 1,
 }: {
   x: number;
   y: number;
@@ -47,7 +48,10 @@ export default function DragOverlay({
   notes?: string;
   checklist?: { id: string; text: string; done: boolean }[];
   frogodoroSession?: { date: string; focusTime: number; breakTime: number } | null;
+  /** Cards travelling together — >1 fans a stack out behind the lead card. */
+  bundleCount?: number;
 }) {
+  const stacked = Math.min(Math.max(bundleCount - 1, 0), 3);
   return (
     <div
       ref={innerRef}
@@ -58,6 +62,35 @@ export default function DragOverlay({
         willChange: 'transform',
       }}
     >
+      {/* Cards behind the lead one — the iOS "flock" read: the pile you're
+          carrying is visible before you drop it. */}
+      {Array.from({ length: stacked }, (_, i) => stacked - i).map((depth) => (
+        <motion.div
+          key={depth}
+          initial={{ opacity: 0, y: 0, rotate: 0 }}
+          animate={{
+            opacity: 1,
+            y: -depth * 5,
+            x: depth * 3,
+            rotate: -2 + depth * 2.5,
+          }}
+          transition={{ type: 'spring', stiffness: 420, damping: 28 }}
+          className="absolute inset-x-0 top-0 rounded-xl border border-border/50 bg-card shadow-[0_2px_6px_rgba(0,0,0,0.18)] dark:bg-muted"
+          style={{ height: height, zIndex: -depth }}
+        />
+      ))}
+
+      {bundleCount > 1 && (
+        <motion.span
+          initial={{ scale: 0.6, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: 'spring', stiffness: 500, damping: 24 }}
+          className="absolute -right-2 -top-2 z-10 grid h-7 min-w-7 place-items-center rounded-full bg-primary px-1.5 text-[13px] font-black tabular-nums text-primary-foreground shadow-md ring-2 ring-card"
+        >
+          {bundleCount}
+        </motion.span>
+      )}
+
       <motion.div
         initial={{ scale: 0.98, rotate: 0 }}
         animate={{ scale: 1.04, rotate: -2 }}
