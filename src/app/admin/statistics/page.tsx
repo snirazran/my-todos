@@ -599,6 +599,8 @@ function readableDetailValue(key: string, value: string) {
       focus_minutes: 'Focus for a number of minutes',
       count: 'Create or complete tasks',
       metric_count: 'Reach an in-app milestone',
+      distinct_days: 'Show up on separate days',
+      deep_session: 'Focus without a break',
     },
     objective_subject: { task: 'Tasks', any: 'Any eligible activity' },
     objective_action: { complete: 'Complete tasks', add: 'Create tasks' },
@@ -644,6 +646,8 @@ function readableAverage(key: string, value: number, objectiveType?: string) {
   if (key === 'objective_target') {
     if (objectiveType === 'focus_minutes') return { label: labels[key], value: `${number} min` };
     if (objectiveType === 'count') return { label: labels[key], value: `${number} tasks` };
+    if (objectiveType === 'distinct_days') return { label: labels[key], value: `${number} days` };
+    if (objectiveType === 'deep_session') return { label: labels[key], value: `${number} sessions` };
     return { label: labels[key], value: number };
   }
   return { label: labels[key] ?? humanize(key), value: number };
@@ -729,6 +733,8 @@ function QuestObjectivePerformance({ rows }: { rows: StatisticsData['engagement'
     const target = row.averageTarget.toLocaleString(undefined, { maximumFractionDigits: 2 });
     if (row.objectiveType === 'focus_minutes') return `${target} min`;
     if (row.objectiveType === 'count') return `${target} tasks`;
+    if (row.objectiveType === 'distinct_days') return `${target} days`;
+    if (row.objectiveType === 'deep_session') return `${target} sessions`;
     return target;
   };
   const rewardLabel = (row: (typeof rows)[number]) => {

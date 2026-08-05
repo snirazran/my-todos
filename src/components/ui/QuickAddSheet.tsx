@@ -33,6 +33,7 @@ import { Icon as AppIcon } from '@/components/ui/Icon';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
 import { hapticTick } from '@/lib/haptics';
 import { PlusUpgradeModal } from './PlusUpgradeModal';
+import { QuestTaskChip, useTaskQuestChipLookup } from './QuestTaskChip';
 import { PickerSheet } from './quick-add/PickerSheet';
 import { TagManagerSheet } from './quick-add/TagManagerSheet';
 import { SuggestionTabs } from './quick-add/SuggestionTabs';
@@ -665,6 +666,12 @@ export default function QuickAddSheet({
     .map((s) => `${s.id}:${(s.tagIds ?? []).join('|')}`)
     .join(',');
   const selectedTagKey = tags.join(',');
+  const questChipLookup = useTaskQuestChipLookup();
+  const questChip = useMemo(
+    () => questChipLookup(tags),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [questChipLookup, selectedTagKey],
+  );
   useEffect(() => {
     if (!open || sectionPickedManually) return;
     const match = sections.find((s) =>
@@ -1244,6 +1251,12 @@ export default function QuickAddSheet({
                                 <X className="h-3 w-3 shrink-0 stroke-[3]" />
                               </button>
                             ))}
+                            {questChip && (
+                              <QuestTaskChip
+                                chip={questChip}
+                                className="shrink-0 px-3 py-1.5 text-[11px] uppercase tracking-wider"
+                              />
+                            )}
                           </div>
                         </div>
                       </div>

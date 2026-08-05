@@ -536,8 +536,11 @@ export function guideIdForBlock(block: {
   const tagScoped =
     block.tagMode === 'focus_category_tags' ||
     block.tagMode === 'random_user_tag';
-  if (block.type === 'focus_minutes') {
+  if (block.type === 'focus_minutes' || block.type === 'deep_session') {
     return tagScoped ? 'focus-tagged' : 'focus';
+  }
+  if (block.type === 'distinct_days') {
+    return tagScoped ? 'complete-tagged-task' : 'complete-task';
   }
   if (block.type === 'metric_count') {
     if (TASK_STREAK_GUIDE_PATTERN.test(block.metricKey ?? '')) return 'streak';

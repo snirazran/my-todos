@@ -416,7 +416,11 @@
       "Bash(perl -pi -e 's/ExistingTask/ExistingBuddyTask/g' src/app/api/buddy/invite/route.ts)",
       "Bash(claude mcp *)",
       "mcp__plugin_paddle_paddle-live__execute",
-      "WebFetch(domain:www.todoist.com)"
+      "WebFetch(domain:www.todoist.com)",
+      "Bash(git --no-pager diff --stat)",
+      "Bash(git --no-pager diff src/components/ui/BaseSheet.tsx)",
+      "Bash(awk 'NR>=1380 && NR<=1560 && \\(/^export function/ || /^function/ || /onClaimObjective\\\\?:/ || /rerollsLeft/\\)' src/components/ui/QuestCards.tsx)",
+      "Bash(awk -F: '$1>1240 && $1<1620')"
     ]
   }
 }

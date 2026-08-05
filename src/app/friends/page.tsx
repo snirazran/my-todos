@@ -50,7 +50,7 @@ import {
 } from '@/hooks/useInventory';
 import { markFlyEarn } from '@/lib/flyEarn';
 import { FlyCounter } from '@/components/ui/FlyCounter';
-import { LookNoticeCard } from '@/components/ui/LookReactions';
+import { LookLovedChip, LookNoticeCard } from '@/components/ui/LookReactions';
 import {
   MobileHeaderActions,
   HEADER_CONTROL_ICON_BUTTON,
@@ -296,6 +296,12 @@ export default function FriendsPage() {
               anything under it stops being seen once you have a real pond. */}
           <FriendSuggestionsRow enabled={!!user} />
 
+          {!!user && (
+            <div className="w-full">
+              <LookNoticeCard />
+            </div>
+          )}
+
           {/* Leaderboard — visible competition plus each friend's contribution. */}
           <div className="w-full">
             <div className="mb-2.5 flex items-center justify-between gap-2 px-1.5 min-[360px]:gap-3">
@@ -345,8 +351,6 @@ export default function FriendsPage() {
                 <span className="hidden min-[360px]:inline">Add</span>
               </button>
             </div>
-
-            {!!user && <LookNoticeCard />}
 
             <div
               className="w-full overflow-hidden rounded-[18px] border border-border/50 bg-card/40 p-1.5 shadow-sm"
@@ -811,6 +815,7 @@ function LeaderboardRow({
             </p>
           )}
           <div className="mt-1 flex flex-col items-start gap-1 min-[360px]:flex-row min-[360px]:flex-wrap min-[360px]:items-center">
+            {entry.isYou && <LookLovedChip />}
             {(entry.streak ?? 0) > 0 && (
               <span className="flex items-center gap-0.5 rounded-full bg-orange-500/10 px-1.5 py-0.5 text-[10px] font-black text-orange-500">
                 <Flame className="h-3 w-3 fill-orange-400" />

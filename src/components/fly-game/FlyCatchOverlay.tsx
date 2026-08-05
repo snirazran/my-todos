@@ -20,6 +20,17 @@ const smooth = (p: number, from: number, to: number) => {
   return t * t * (3 - 2 * t);
 };
 
+type ChipSlot = {
+  left: number;
+  width: number;
+  height: number;
+  /** Fixed viewport top, or null to track the sheet as it slides. */
+  top: number | null;
+};
+
+const CHIP_FALLBACK_WIDTH = 340;
+const CHIP_FALLBACK_HEIGHT = 50;
+
 type Scene = {
   shell: HTMLElement | null;
   launcher: HTMLElement | null;
@@ -30,7 +41,7 @@ type Scene = {
   hero: HTMLElement | null;
   heroBaseTransform: string;
   heroCard: HTMLElement | null;
-  heroCardRect: DOMRect | null;
+  chipSlot: ChipSlot | null;
   heroFrogRect: DOMRect | null;
   heroRect: DOMRect | null;
   fades: HTMLElement[];
@@ -55,7 +66,7 @@ const emptyScene = (): Scene => ({
   hero: null,
   heroBaseTransform: '',
   heroCard: null,
-  heroCardRect: null,
+  chipSlot: null,
   heroFrogRect: null,
   heroRect: null,
   fades: [],
@@ -134,7 +145,21 @@ export function FlyCatchOverlay() {
       scene.nav.style.willChange = 'transform';
     }
     if (scene.heroCard) {
-      scene.heroCardRect = scene.heroCard.getBoundingClientRect();
+      const rect = scene.heroCard.getBoundingClientRect();
+      scene.chipSlot = {
+        left: rect.left,
+        top: rect.top,
+        width: rect.width,
+        height: rect.height,
+      };
+    } else {
+      const width = Math.min(CHIP_FALLBACK_WIDTH, window.innerWidth * 0.94);
+      scene.chipSlot = {
+        left: (window.innerWidth - width) / 2,
+        top: null,
+        width,
+        height: CHIP_FALLBACK_HEIGHT,
+      };
     }
     if (scene.hero) {
       const base = getComputedStyle(scene.hero).transform;
@@ -235,16 +260,16 @@ export function FlyCatchOverlay() {
       }
 
       if (chipRef.current) {
-        const slot = scene.heroCardRect;
+        const slot = scene.chipSlot;
         chipRef.current.style.opacity = openRef.current
           ? '0'
           : smooth(p, 0.08, 0.32).toFixed(3);
         if (slot) {
+          const top =
+            slot.top ?? scene.sheetTop + p * scene.sheetShift - 54;
           chipRef.current.style.width = `${slot.width.toFixed(2)}px`;
           chipRef.current.style.height = `${slot.height.toFixed(2)}px`;
-          chipRef.current.style.transform = `translate3d(${slot.left.toFixed(2)}px, ${slot.top.toFixed(2)}px, 0)`;
-        } else {
-          chipRef.current.style.transform = `translate3d(0, ${(scene.sheetTop + p * scene.sheetShift - 54).toFixed(2)}px, 0)`;
+          chipRef.current.style.transform = `translate3d(${slot.left.toFixed(2)}px, ${top.toFixed(2)}px, 0)`;
         }
       }
     },

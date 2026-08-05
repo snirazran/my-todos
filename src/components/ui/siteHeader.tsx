@@ -401,7 +401,6 @@ import {
   Settings,
   Bell,
   BellRing,
-  BarChart3,
   Mail,
   SlidersHorizontal,
   Database,
@@ -719,6 +718,11 @@ function MobileSheet({
     if (isOpen) setView('main');
   }, [isOpen]);
 
+  const timerSheetOpen = useFrogodoroUiStore((state) => state.openSheets > 0);
+  useEffect(() => {
+    if (isOpen && timerSheetOpen) onClose();
+  }, [isOpen, timerSheetOpen, onClose]);
+
   useEffect(() => {
     if (!isOpen || isMobile) return;
     const onKey = (e: KeyboardEvent) => {
@@ -797,10 +801,7 @@ function MobileSheet({
         onOpenNotifications={() => setView('notifications')}
         onOpenPreferences={() => setView('preferences')}
         onOpenIntegrations={() => setView('integrations')}
-        onOpenFocusTimer={() => {
-          onClose();
-          window.setTimeout(openFocusLauncher, 240);
-        }}
+        onOpenFocusTimer={openFocusLauncher}
         onOpenQuestFocus={() => {
           onOpenQuestOnboarding();
           onClose();
@@ -1262,7 +1263,7 @@ function MobileSheet({
             }
           }}
           style={{ touchAction: 'pan-y' }}
-          className="absolute inset-0 overflow-y-auto bg-slate-100 dark:bg-background will-change-transform"
+          className="absolute inset-0 z-20 overflow-y-auto bg-slate-100 dark:bg-background will-change-transform"
         >
         <div className="w-full">
           <div
@@ -2167,11 +2168,7 @@ function QuickTilesGrid({
         onClick={() => setRotationOpen(true)}
       />
       <QuickTile
-        icon={
-          <span className="grid h-11 w-11 place-items-center rounded-2xl bg-violet-500/10 text-violet-500 ring-1 ring-violet-500/20">
-            <BarChart3 className="h-6 w-6" aria-hidden="true" />
-          </span>
-        }
+        icon={<Icon name="patterns" label="Your patterns" className="h-[52px] w-[52px]" />}
         title="Your patterns"
         subtitle="See what’s working"
         onClick={() => window.location.assign('/insights')}

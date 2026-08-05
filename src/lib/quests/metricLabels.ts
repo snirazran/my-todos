@@ -91,11 +91,13 @@ export const QUEST_METRIC_COPY: Record<string, MetricCopy> = {
   frog_fed_full: {
     adminLabel: 'Frog fed to full',
     label: (n) =>
-      n === 1 ? 'Fill your frog’s belly' : `Fill your frog’s belly ${n} times`,
+      n === 1
+        ? 'Fill your frog’s belly to the top'
+        : `Fill your frog’s belly to the top ${n} times`,
     remaining: (n) =>
       n === 1
-        ? 'Fill your frog’s belly 1 more time'
-        : `Fill your frog’s belly ${n} more times`,
+        ? 'Fill your frog’s belly to the top 1 more time'
+        : `Fill your frog’s belly to the top ${n} more times`,
   },
 };
 
@@ -149,7 +151,7 @@ const METRIC_HINT_COPY: Record<string, string> = {
   focus_started:
     'Start the focus timer on any task — any length counts.',
   frog_fed_full:
-    'Feed your frog flies on the home screen until its belly is full.',
+    'Finish tasks on the home screen to feed your frog — this counts once the belly bar is filled all the way to the top.',
 };
 
 export function objectiveHintText(
@@ -162,6 +164,9 @@ export function objectiveHintText(
     resolvedTagName?: string;
     resolvedTagNames?: string[];
     previewTagLabel?: string;
+    sessionMinutes?: number;
+    requiresFollowThrough?: boolean;
+    beforeHour?: number;
   },
   focusTagName?: string,
   options?: { omitTagScope?: boolean },
@@ -188,6 +193,13 @@ export function objectiveHintText(
   if (block.type === 'focus_minutes') {
     return `Start a focus timer on a task — every focused minute counts.${scopeSuffix}`;
   }
+  if (block.type === 'distinct_days') {
+    return `Finish at least one task on separate days — a single busy day only counts once.${scopeSuffix}`;
+  }
+  if (block.type === 'deep_session') {
+    const minutes = block.sessionMinutes ?? 25;
+    return `Run the focus timer for ${minutes} minutes in one sitting — stopping early resets it.${scopeSuffix}`;
+  }
   if (block.type === 'metric_count') {
     const streakMatch = block.metricKey
       ? TASK_STREAK_LABEL_PATTERN.exec(block.metricKey)
@@ -199,7 +211,18 @@ export function objectiveHintText(
     return `${base}${scopeSuffix}`;
   }
   if (block.action === 'add') {
-    return `Tap the + button to add a new task.${scopeSuffix}`;
+    return block.requiresFollowThrough
+      ? `Tap the + button to plan the tasks, then check them off — this one pays out once they are done.${scopeSuffix}`
+      : `Tap the + button to add a new task.${scopeSuffix}`;
+  }
+  if (typeof block.beforeHour === 'number') {
+    const hour =
+      block.beforeHour === 12
+        ? 'noon'
+        : block.beforeHour < 12
+          ? `${block.beforeHour}am`
+          : `${block.beforeHour - 12}pm`;
+    return `Check off a task before ${hour} — only completions earlier in the day count.${scopeSuffix}`;
   }
   return `Check off a task on your list — your frog snacks on the fly.${scopeSuffix}`;
 }

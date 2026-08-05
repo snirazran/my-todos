@@ -817,6 +817,9 @@ export default function FlyCatchGame({
 
       {phase === 'lobby' && !embedded ? (
         <div className="absolute inset-0 z-30 grid place-items-center overflow-y-auto bg-background/25 p-3 backdrop-blur-md sm:p-5" data-game-control>
+          <Link href={user ? '/' : '/welcome'} aria-label="Back to Frogress" className="absolute left-3 top-[calc(max(12px,env(safe-area-inset-top))+10px)] z-20 grid h-9 w-9 place-items-center rounded-full border border-border bg-card/85 text-foreground shadow-sm backdrop-blur-md transition hover:bg-accent">
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
           <div className="w-full max-w-md rounded-[28px] border border-border bg-card/95 p-5 text-center shadow-2xl sm:p-6">
             {challengeScore ? <div className="mx-auto mb-3 inline-flex items-center gap-2 rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1.5 text-xs font-black text-amber-700 dark:text-amber-300"><Zap className="h-3.5 w-3.5" /> You were challenged to beat {challengeScore}</div> : null}
             <p className="font-display text-4xl leading-[0.95] text-foreground sm:text-5xl">FROGRESS<br /><span className="text-primary">ONE MORE FLY.</span></p>

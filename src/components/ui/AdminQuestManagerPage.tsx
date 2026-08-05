@@ -157,9 +157,17 @@ type AdminRecipePoolEntryStreak = {
 
 type AdminRecipePoolEntry = AdminRecipePoolEntryStreak & {
   id: string;
-  type: 'count' | 'focus_minutes' | 'metric_count';
+  type:
+    | 'count'
+    | 'focus_minutes'
+    | 'metric_count'
+    | 'distinct_days'
+    | 'deep_session';
   action?: 'complete' | 'add';
   metricKey?: string;
+  sessionMinutes?: number;
+  requiresFollowThrough?: boolean;
+  beforeHour?: number;
   minTarget: number;
   maxTarget: number;
   weight: number;
@@ -1622,7 +1630,11 @@ export function AdminQuestManagerPage() {
                 </div>
 
                 <div className="space-y-2">
-                  {slot.pool.map((entry) => (
+                  {slot.pool.map((entry) => {
+                    const isStreakEntry =
+                      entry.type === 'metric_count' &&
+                      !!entry.metricKey?.startsWith('task_streak');
+                    return (
                     <div key={entry.id} className="flex flex-wrap items-center gap-x-1.5 gap-y-2 leading-[30px]">
                       <InlinePillSelect
                         value={entry.type}
@@ -1631,18 +1643,76 @@ export function AdminQuestManagerPage() {
                             type: v as AdminRecipePoolEntry['type'],
                             action: v === 'count' ? entry.action ?? 'complete' : undefined,
                             metricKey: v === 'metric_count' ? entry.metricKey ?? 'trade_completed' : undefined,
+                            sessionMinutes: v === 'deep_session' ? entry.sessionMinutes ?? 25 : undefined,
+                            requiresFollowThrough: v === 'count' ? entry.requiresFollowThrough : undefined,
+                            beforeHour: v === 'count' ? entry.beforeHour : undefined,
                           })
                         }
                       >
                         <option value="count">{isDaily ? 'Tasks' : 'Tagged tasks'}</option>
                         <option value="focus_minutes">Focus minutes</option>
+                        <option value="distinct_days">Days shown up</option>
+                        <option value="deep_session">Unbroken sessions</option>
                         <option value="metric_count">App action</option>
                       </InlinePillSelect>
                       {entry.type === 'count' && (
-                        <InlinePillSelect value={entry.action ?? 'complete'} onChange={(v) => updateRecipePoolEntry(r.recipeId, slot.id, entry.id, { action: v as 'complete' | 'add' })}>
+                        <InlinePillSelect
+                          value={entry.action ?? 'complete'}
+                          onChange={(v) =>
+                            updateRecipePoolEntry(r.recipeId, slot.id, entry.id, {
+                              action: v as 'complete' | 'add',
+                              requiresFollowThrough: v === 'add' ? entry.requiresFollowThrough : undefined,
+                              beforeHour: v === 'complete' ? entry.beforeHour : undefined,
+                            })
+                          }
+                        >
                           <option value="complete">complete</option>
                           <option value="add">add</option>
                         </InlinePillSelect>
+                      )}
+                      {entry.type === 'count' && entry.action === 'add' && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            updateRecipePoolEntry(r.recipeId, slot.id, entry.id, {
+                              requiresFollowThrough: !entry.requiresFollowThrough,
+                            })
+                          }
+                          className={cn(
+                            'rounded-full border px-2 py-0.5 text-[11px] font-bold transition',
+                            entry.requiresFollowThrough
+                              ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                              : 'border-border/50 bg-background text-muted-foreground hover:text-foreground',
+                          )}
+                        >
+                          {entry.requiresFollowThrough ? '+ finish them' : 'add only'}
+                        </button>
+                      )}
+                      {entry.type === 'count' && (entry.action ?? 'complete') === 'complete' && (
+                        <>
+                          <span className="text-sm font-medium text-muted-foreground">· before hour</span>
+                          <InlinePillNumber
+                            value={entry.beforeHour ?? 0}
+                            onChange={(v) =>
+                              updateRecipePoolEntry(r.recipeId, slot.id, entry.id, {
+                                beforeHour: v >= 1 && v <= 23 ? v : undefined,
+                              })
+                            }
+                          />
+                          <span className="text-sm font-medium text-muted-foreground">
+                            {entry.beforeHour ? '' : '(0 = any time)'}
+                          </span>
+                        </>
+                      )}
+                      {entry.type === 'deep_session' && (
+                        <>
+                          <span className="text-sm font-medium text-muted-foreground">· of</span>
+                          <InlinePillNumber
+                            value={entry.sessionMinutes ?? 25}
+                            onChange={(v) => updateRecipePoolEntry(r.recipeId, slot.id, entry.id, { sessionMinutes: v })}
+                          />
+                          <span className="text-sm font-medium text-muted-foreground">min each,</span>
+                        </>
                       )}
                       {entry.type === 'metric_count' && (
                         <InlinePillSelect
@@ -1664,18 +1734,21 @@ export function AdminQuestManagerPage() {
                           ))}
                         </InlinePillSelect>
                       )}
-                      {entry.type === 'metric_count' && entry.metricKey?.startsWith('task_streak') && (
+                      {isStreakEntry && (
                         <>
-                          <span className="text-sm font-medium text-muted-foreground">of</span>
+                          <span className="text-sm font-medium text-muted-foreground">· streak length</span>
                           <InlinePillNumber value={entry.streakDaysMin ?? 3} onChange={(v) => updateRecipePoolEntry(r.recipeId, slot.id, entry.id, { streakDaysMin: v })} />
                           <span className="text-sm font-medium text-muted-foreground">to</span>
                           <InlinePillNumber value={entry.streakDaysMax ?? entry.streakDaysMin ?? 3} onChange={(v) => updateRecipePoolEntry(r.recipeId, slot.id, entry.id, { streakDaysMax: v })} />
-                          <span className="text-sm font-medium text-muted-foreground">days ·</span>
+                          <span className="text-sm font-medium text-muted-foreground">days, on</span>
                         </>
                       )}
                       <InlinePillNumber value={entry.minTarget} onChange={(v) => updateRecipePoolEntry(r.recipeId, slot.id, entry.id, { minTarget: v })} />
                       <span className="text-sm font-medium text-muted-foreground">to</span>
                       <InlinePillNumber value={entry.maxTarget} onChange={(v) => updateRecipePoolEntry(r.recipeId, slot.id, entry.id, { maxTarget: v })} />
+                      {isStreakEntry && (
+                        <span className="text-sm font-medium text-muted-foreground">repeating tasks</span>
+                      )}
                       <span className="text-sm font-medium text-muted-foreground">· weight</span>
                       <InlinePillNumber value={entry.weight} onChange={(v) => updateRecipePoolEntry(r.recipeId, slot.id, entry.id, { weight: v })} />
                       {!isDaily &&
@@ -1691,7 +1764,8 @@ export function AdminQuestManagerPage() {
                         </button>
                       )}
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-border/30 pt-2.5">

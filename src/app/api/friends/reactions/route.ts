@@ -7,14 +7,15 @@ import UserModel from '@/lib/models/User';
 import LookReactionModel from '@/lib/models/LookReaction';
 import {
   LOOK_REACTIONS,
+  lookKeyOf,
   type LookReactionKind,
 } from '@/lib/friends/lookReactions';
 import { areFriends } from '@/lib/friends/code';
 import { getCachedCatalog, buildById } from '@/lib/skins/getCatalog';
+import { equippedToIndices, equippedToItems } from '@/lib/friends/indices';
 import { getZonedToday } from '@/lib/utils';
 import { notifyFriendUpdate } from '@/lib/taskSync';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
-import type { WardrobeSlot } from '@/lib/skins/catalog';
 
 const json = (body: unknown, init = 200) =>
   NextResponse.json(body, { status: init });
@@ -31,7 +32,7 @@ export async function GET(req: NextRequest) {
     const tz = req.nextUrl.searchParams.get('tz') || 'UTC';
     const today = getZonedToday(tz);
 
-    const [received, sentToday] = await Promise.all([
+    const [received, sentToday, me] = await Promise.all([
       LookReactionModel.find({ toUserId: userId })
         .sort({ createdAt: -1 })
         .limit(30)
@@ -39,11 +40,12 @@ export async function GET(req: NextRequest) {
       LookReactionModel.find({ fromUserId: userId, dayKey: today })
         .select('toUserId kind')
         .lean(),
+      UserModel.findById(userId).select('wardrobe.equipped').lean(),
     ]);
 
-    const senderIds = Array.from(
-      new Set(received.map((r) => r.fromUserId)),
-    );
+    const currentKey = lookKeyOf(me?.wardrobe?.equipped ?? {});
+
+    const senderIds = Array.from(new Set(received.map((r) => r.fromUserId)));
     const senders = await UserModel.find({ _id: { $in: senderIds } })
       .select('name frogName')
       .lean();
@@ -57,8 +59,14 @@ export async function GET(req: NextRequest) {
         fromUserId: r.fromUserId,
         fromName: nameById.get(r.fromUserId) ?? 'A friend',
         kind: r.kind,
-        itemId: r.itemId ?? null,
-        itemName: r.itemName ?? null,
+        look: r.lookIndices
+          ? {
+              key: r.lookKey ?? '',
+              indices: r.lookIndices,
+              items: r.lookItems ?? [],
+            }
+          : null,
+        isCurrentLook: !!r.lookKey && r.lookKey === currentKey,
         seen: !!r.seen,
         createdAt:
           r.createdAt instanceof Date
@@ -75,7 +83,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-/** React to a friend's current look. Idempotent per friend per day. */
+/** React to a friend's whole look. One per friend per day, changeable. */
 export async function POST(req: NextRequest) {
   try {
     const userId = await requireUserId();
@@ -98,23 +106,17 @@ export async function POST(req: NextRequest) {
     if (!(await areFriends(userId, toUserId)))
       return json({ error: 'Not friends' }, 403);
 
-    // Snapshot the highest-rarity worn item so the notice can name it later,
-    // even after they change outfits.
     const [target, catalog] = await Promise.all([
       UserModel.findById(toUserId).select('wardrobe.equipped').lean(),
       getCachedCatalog(),
     ]);
     const byId = buildById(catalog);
     const equipped = target?.wardrobe?.equipped ?? {};
-    let best: { id: string; name: string; rank: number } | null = null;
-    const order = ['common', 'uncommon', 'rare', 'epic', 'legendary'];
-    for (const slot of ['skin', 'hat', 'body', 'hand_item'] as WardrobeSlot[]) {
-      const id = equipped[slot];
-      const def = id ? byId[id] : null;
-      if (!def) continue;
-      const rank = order.indexOf(def.rarity);
-      if (!best || rank > best.rank) best = { id: def.id, name: def.name, rank };
-    }
+    const lookItems = equippedToItems(equipped, byId).map((i) => ({
+      id: i.id,
+      name: i.name,
+      rarity: i.rarity,
+    }));
 
     const dayKey = getZonedToday(tz);
     await LookReactionModel.updateOne(
@@ -122,10 +124,12 @@ export async function POST(req: NextRequest) {
       {
         $set: {
           kind,
-          itemId: best?.id ?? null,
-          itemName: best?.name ?? null,
+          lookKey: lookKeyOf(equipped),
+          lookIndices: equippedToIndices(equipped, byId),
+          lookItems,
+          createdAt: new Date(),
         },
-        $setOnInsert: { seen: false, createdAt: new Date() },
+        $setOnInsert: { seen: false },
       },
       { upsert: true },
     );
@@ -134,7 +138,7 @@ export async function POST(req: NextRequest) {
     await recordAnalyticsEvent({
       userId,
       name: 'look_reaction_sent',
-      properties: { kind, item_id: best?.id ?? null },
+      properties: { kind, item_count: lookItems.length },
     });
 
     return json({ ok: true, kind });

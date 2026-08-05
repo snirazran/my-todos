@@ -16,6 +16,7 @@ import {
   Moon,
   Pencil,
   Play,
+  RefreshCw,
   Repeat,
   Sprout,
   TriangleAlert,
@@ -84,6 +85,9 @@ export type QuestCardLogicBlock = Pick<
   | 'resolvedTagName'
   | 'resolvedTagNames'
   | 'rewards'
+  | 'sessionMinutes'
+  | 'requiresFollowThrough'
+  | 'beforeHour'
 > & {
   targetLabel?: string;
   previewTagLabel?: string;
@@ -105,6 +109,8 @@ type QuestCardData = {
   claimable: boolean;
   claimed: boolean;
   claimedObjectiveIds?: string[];
+  carriedTiers?: number;
+  rerollsLeft?: number;
 };
 
 type BaseCardProps = {
@@ -200,6 +206,13 @@ function shortObjectiveLabel(block: QuestCardLogicBlock) {
   const target = Math.max(1, block.target ?? 1);
   const targetLabel = block.targetLabel ?? String(target);
   if (block.type === 'focus_minutes') return `Focus ${targetLabel} min`;
+  if (block.type === 'distinct_days') {
+    return `Show up ${targetLabel} ${target === 1 ? 'day' : 'days'}`;
+  }
+  if (block.type === 'deep_session') {
+    const minutes = block.sessionMinutes ?? 25;
+    return target === 1 ? `${minutes} min unbroken` : `${minutes} min unbroken ×${target}`;
+  }
   if (block.type === 'metric_count') {
     const streakMatch = block.metricKey
       ? TASK_STREAK_METRIC_PATTERN.exec(block.metricKey)
@@ -212,9 +225,16 @@ function shortObjectiveLabel(block: QuestCardLogicBlock) {
     }
     return metricObjectiveLabel(block.metricKey, target);
   }
-  return `${block.action === 'add' ? 'Add' : 'Complete'} ${targetLabel} task${
-    target > 1 || targetLabel.includes('-') ? 's' : ''
-  }`;
+  const plural = target > 1 || targetLabel.includes('-') ? 's' : '';
+  if (block.action === 'add') {
+    return block.requiresFollowThrough
+      ? `Plan + finish ${targetLabel} task${plural}`
+      : `Add ${targetLabel} task${plural}`;
+  }
+  if (typeof block.beforeHour === 'number') {
+    return `${targetLabel} task${plural} ${questHourCutoffLabel(block.beforeHour)}`;
+  }
+  return `Complete ${targetLabel} task${plural}`;
 }
 
 // A reward drawn bare (no tile/badge chrome), matching how flies render in
@@ -334,6 +354,23 @@ export function formatQuestObjective(block: QuestCardLogicBlock) {
       : `Focus for ${targetLabel} minutes on tasks`;
   }
 
+  if (block.type === 'distinct_days') {
+    const scoped = block.tagMode === 'focus_category_tags';
+    const days = Math.max(1, block.target ?? 1) === 1 ? 'day' : 'different days';
+    return scoped
+      ? `Show up on quest tasks ${targetLabel} ${days}`
+      : `Show up ${targetLabel} ${days}`;
+  }
+
+  if (block.type === 'deep_session') {
+    const minutes = block.sessionMinutes ?? 25;
+    const scoped = block.tagMode === 'focus_category_tags';
+    const where = scoped ? ' on a quest task' : '';
+    return Math.max(1, block.target ?? 1) === 1
+      ? `Focus ${minutes} min without a break${where}`
+      : `Focus ${minutes} min without a break${where}, ${targetLabel} times`;
+  }
+
   const numericTarget = Math.max(0, block.target ?? 0);
   const subjectLabel =
     block.subject === 'any'
@@ -342,12 +379,25 @@ export function formatQuestObjective(block: QuestCardLogicBlock) {
         ? 'task'
         : 'tasks';
 
-  const actionLabel = block.action === 'add' ? 'Add' : 'Complete';
   const scopeLabel =
     block.tagMode === 'focus_category_tags'
       ? `quest ${subjectLabel}`
       : subjectLabel;
-  return `${actionLabel} ${targetLabel} ${scopeLabel}`;
+  if (block.action === 'add') {
+    return block.requiresFollowThrough
+      ? `Plan ${targetLabel} ${scopeLabel} and finish them`
+      : `Add ${targetLabel} ${scopeLabel}`;
+  }
+  if (typeof block.beforeHour === 'number') {
+    return `Finish ${targetLabel} ${scopeLabel} ${questHourCutoffLabel(block.beforeHour)}`;
+  }
+  return `Complete ${targetLabel} ${scopeLabel}`;
+}
+
+export function questHourCutoffLabel(hour: number): string {
+  if (hour === 12) return 'before noon';
+  if (hour < 12) return `before ${hour}am`;
+  return `before ${hour - 12}pm`;
 }
 
 function renderFocusScopedMetricObjective(block: QuestCardLogicBlock) {
@@ -398,7 +448,14 @@ function renderObjectiveLabel(
     return renderFocusScopedMetricObjective(block);
   }
 
-  if (block.type === 'metric_count' || block.tagMode !== 'focus_category_tags') {
+  if (
+    block.type === 'metric_count' ||
+    block.type === 'distinct_days' ||
+    block.type === 'deep_session' ||
+    block.requiresFollowThrough ||
+    typeof block.beforeHour === 'number' ||
+    block.tagMode !== 'focus_category_tags'
+  ) {
     return formatQuestObjective(block);
   }
 
@@ -1193,6 +1250,8 @@ export function CategoryQuestPresentationCard({
   onEditTags,
   onStartQuest,
   onClaimObjective,
+  onRerollObjective,
+  rerollingObjectiveId,
   locked = false,
   switchingFocus = false,
   activeFocusName,
@@ -1211,6 +1270,8 @@ export function CategoryQuestPresentationCard({
   linkedTags: QuestTagChip[];
   onEditTags?: () => void;
   onStartQuest?: () => void;
+  onRerollObjective?: (objectiveId: string) => void;
+  rerollingObjectiveId?: string | null;
   locked?: boolean;
   switchingFocus?: boolean;
   activeFocusName?: string;
@@ -1541,6 +1602,16 @@ export function CategoryQuestPresentationCard({
                   ? undefined
                   : () => onClaimObjective(block.id)
               }
+              onRerollObjective={
+                locked ||
+                !onRerollObjective ||
+                (quest.rerollsLeft ?? 0) <= 0 ||
+                claimedObjectiveIds.includes(block.id) ||
+                block.progress >= Math.max(1, block.target)
+                  ? undefined
+                  : () => onRerollObjective(block.id)
+              }
+              rerollingObjective={rerollingObjectiveId === block.id}
               isLast
               isFirst
               linkedTags={linkedTags}
@@ -2566,6 +2637,8 @@ function ObjectiveRow({
   rewardCatalog,
   onOpenRewards,
   onClaimObjective,
+  onRerollObjective,
+  rerollingObjective,
   isLast,
   isFirst,
   paused = false,
@@ -2583,6 +2656,8 @@ function ObjectiveRow({
   rewardCatalog: Record<string, QuestRewardCatalogItem>;
   onOpenRewards?: (rewards: QuestReward[]) => void;
   onClaimObjective?: () => void;
+  onRerollObjective?: () => void;
+  rerollingObjective?: boolean;
   isLast?: boolean;
   isFirst?: boolean;
   paused?: boolean;
@@ -2639,37 +2714,53 @@ function ObjectiveRow({
       );
     }
     return (
-      <HintButton
-        text={objectiveHintText(block, linkedTags?.[0]?.name, {
-          omitTagScope: block.tagMode === 'focus_category_tags',
-        })}
-        tags={
-          block.tagMode === 'focus_category_tags' ? linkedTags : undefined
-        }
-        onShowMe={
-          guideId && !needsTag
-            ? () => {
-                const context = guideContextForBlock(block);
-                const tagNames =
-                  context?.tagNames ??
-                  (linkedTags?.length
-                    ? linkedTags.map((tag) => tag.name)
-                    : undefined);
-                const chipSource = linkedTags?.length
-                  ? linkedTags
-                  : undefined;
-                startHintGuide(guideId, {
-                  ...context,
-                  tagNames,
-                  tags:
-                    chipSource?.filter((tag) =>
-                      tagNames ? tagNames.includes(tag.name) : true,
-                    ) ?? undefined,
-                });
-              }
-            : undefined
-        }
-      />
+      <div className="flex items-center gap-1">
+        {onRerollObjective && !needsTag && (
+          <button
+            type="button"
+            onClick={onRerollObjective}
+            disabled={rerollingObjective}
+            aria-label="Swap this objective"
+            title="Swap this objective"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-border/50 text-muted-foreground transition-colors hover:border-primary/30 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <RefreshCw
+              className={cn('h-3.5 w-3.5', rerollingObjective && 'animate-spin')}
+            />
+          </button>
+        )}
+        <HintButton
+          text={objectiveHintText(block, linkedTags?.[0]?.name, {
+            omitTagScope: block.tagMode === 'focus_category_tags',
+          })}
+          tags={
+            block.tagMode === 'focus_category_tags' ? linkedTags : undefined
+          }
+          onShowMe={
+            guideId && !needsTag
+              ? () => {
+                  const context = guideContextForBlock(block);
+                  const tagNames =
+                    context?.tagNames ??
+                    (linkedTags?.length
+                      ? linkedTags.map((tag) => tag.name)
+                      : undefined);
+                  const chipSource = linkedTags?.length
+                    ? linkedTags
+                    : undefined;
+                  startHintGuide(guideId, {
+                    ...context,
+                    tagNames,
+                    tags:
+                      chipSource?.filter((tag) =>
+                        tagNames ? tagNames.includes(tag.name) : true,
+                      ) ?? undefined,
+                  });
+                }
+              : undefined
+          }
+        />
+      </div>
     );
   };
 

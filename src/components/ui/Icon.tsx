@@ -14,6 +14,7 @@ import FrogPlus from '../../../public/frogPlus.svg';
 import GoogleCalendar from '../../../public/icons/GoogleCalendar.svg';
 import Home from '../../../public/icons/Home.svg';
 import InviteFriends from '../../../public/icons/InviteFriends.svg';
+import Patterns from '../../../public/icons/Patterns.svg';
 import Planner from '../../../public/icons/Planner.svg';
 import Quests from '../../../public/icons/Quests.svg';
 import Repeat from '../../../public/icons/Repeat.svg';
@@ -35,6 +36,7 @@ const ICONS = {
   googleCalendar: GoogleCalendar,
   home: Home,
   inviteFriends: InviteFriends,
+  patterns: Patterns,
   planner: Planner,
   quests: Quests,
   repeat: Repeat,

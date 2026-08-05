@@ -17,7 +17,13 @@ import {
   uploadCoverFromDataUrl,
 } from '@/lib/quests/coverStorage';
 
-const VALID_POOL_TYPES = new Set(['count', 'focus_minutes', 'metric_count']);
+const VALID_POOL_TYPES = new Set([
+  'count',
+  'focus_minutes',
+  'metric_count',
+  'distinct_days',
+  'deep_session',
+]);
 
 function sanitizePoolEntry(input: any): RecipePoolEntry | null {
   if (!input || !VALID_POOL_TYPES.has(input.type)) return null;
@@ -37,6 +43,22 @@ function sanitizePoolEntry(input: any): RecipePoolEntry | null {
   };
   if (entry.type === 'count') {
     entry.action = input.action === 'add' ? 'add' : 'complete';
+    if (entry.action === 'add' && input.requiresFollowThrough === true) {
+      entry.requiresFollowThrough = true;
+    }
+    if (entry.action === 'complete') {
+      const rawHour = Math.floor(Number(input.beforeHour));
+      if (Number.isFinite(rawHour) && rawHour >= 1 && rawHour <= 23) {
+        entry.beforeHour = rawHour;
+      }
+    }
+  }
+  if (entry.type === 'deep_session') {
+    const rawMinutes = Math.floor(Number(input.sessionMinutes));
+    entry.sessionMinutes =
+      Number.isFinite(rawMinutes) && rawMinutes >= 5
+        ? Math.min(240, rawMinutes)
+        : 25;
   }
   if (entry.type === 'metric_count') {
     if (!isValidQuestMetricKey(input.metricKey)) return null;

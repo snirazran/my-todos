@@ -23,7 +23,12 @@ export type QuestPlacement = 'daily' | 'category' | 'onboarding';
 export type QuestSubject = 'task' | 'any';
 export type QuestCountAction = 'complete' | 'add';
 export type QuestAmountMode = 'fixed' | 'random';
-export type QuestLogicType = 'count' | 'focus_minutes' | 'metric_count';
+export type QuestLogicType =
+  | 'count'
+  | 'focus_minutes'
+  | 'metric_count'
+  | 'distinct_days'
+  | 'deep_session';
 export type QuestVisibilityMetric =
   | 'daily_tasks_count'
   | 'tags_count';
@@ -41,8 +46,17 @@ export type QuestLogicBlock = {
   tagMode?: 'ignore' | 'random_user_tag' | 'focus_category_tags';
   // For type 'metric_count': which QuestCounter metric this block tracks.
   metricKey?: string;
+  // For type 'deep_session': minutes one unbroken session must reach.
+  sessionMinutes?: number;
+  // For action 'add': the added tasks must also be completed to credit.
+  requiresFollowThrough?: boolean;
+  // For action 'complete': the completion must land before this local hour.
+  beforeHour?: number;
   // Shown behind a small "?" on the objective row (onboarding quests).
   helpText?: string;
+  // Granted complete the moment the quest rolls: the head start a ladder
+  // carries over from a previous roll that got far enough to earn one.
+  preCredited?: boolean;
   rewards?: QuestRewards;
 };
 
@@ -134,6 +148,10 @@ export type QuestProgressView = {
   locked?: boolean;
   logic: ResolvedQuestLogicBlock[];
   claimedObjectiveIds: string[];
+  // Tiers granted complete at roll time as a head start from the last ladder.
+  carriedTiers?: number;
+  // Objective rerolls still available on this roll; 0 for authored quests.
+  rerollsLeft?: number;
 };
 
 export type DailyQuestProgressView = QuestProgressView & {

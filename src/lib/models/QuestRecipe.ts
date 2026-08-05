@@ -4,9 +4,20 @@ import type { QuestCoverImageFile } from './QuestTemplate';
 
 export type RecipePoolEntry = {
   id: string;
-  type: 'count' | 'focus_minutes' | 'metric_count';
+  type:
+    | 'count'
+    | 'focus_minutes'
+    | 'metric_count'
+    | 'distinct_days'
+    | 'deep_session';
   action?: 'complete' | 'add';
   metricKey?: string;
+  // deep_session only: minutes the single unbroken session must reach.
+  sessionMinutes?: number;
+  // count only: credit the objective only once the added tasks are completed.
+  requiresFollowThrough?: boolean;
+  // count only: the completion must land before this local hour.
+  beforeHour?: number;
   // Streak metrics only: the rolled quest requires a streak of N days, with N
   // picked from this inclusive range.
   streakDaysMin?: number;

@@ -31,6 +31,11 @@ export interface QuestDoc {
   // Generated (recipe-rolled) quests: local day the quest finished; a new roll
   // is generated once the user's local date moves past it.
   regenAfterDay?: string;
+  // Objective rerolls spent on this roll, against REROLLS_PER_LADDER.
+  rerollsUsed?: number;
+  // Tiers granted at roll time because the previous ladder got far enough to
+  // earn a head start. Kept for reporting; the grant itself rides on the block.
+  carriedTiers?: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -65,6 +70,8 @@ const QuestSchema = new Schema<QuestDoc>(
     claimedAt: { type: Date, default: null },
     lastProgressAt: { type: Date, default: null },
     regenAfterDay: { type: String, default: undefined },
+    rerollsUsed: { type: Number, default: 0 },
+    carriedTiers: { type: Number, default: 0 },
   },
   {
     collection: 'quests',

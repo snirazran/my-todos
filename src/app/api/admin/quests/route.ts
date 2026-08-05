@@ -38,6 +38,8 @@ const VALID_LOGIC_TYPES = new Set<QuestLogicType>([
   'count',
   'focus_minutes',
   'metric_count',
+  'distinct_days',
+  'deep_session',
 ]);
 const VALID_SUBJECTS = new Set<QuestSubject>(['task', 'any']);
 const VALID_ACTIONS = new Set<QuestCountAction>(['complete', 'add']);

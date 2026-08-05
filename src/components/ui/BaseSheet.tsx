@@ -95,6 +95,24 @@ interface DragExitInfo {
   offset: number;
 }
 
+const GHOST_CLICK_WINDOW_MS = 400;
+
+function swallowGhostClick() {
+  if (typeof document === 'undefined') return;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const stop = () => {
+    document.removeEventListener('click', swallow, true);
+    if (timer) clearTimeout(timer);
+  };
+  const swallow = (event: MouseEvent) => {
+    event.stopPropagation();
+    event.preventDefault();
+    stop();
+  };
+  document.addEventListener('click', swallow, true);
+  timer = setTimeout(stop, GHOST_CLICK_WINDOW_MS);
+}
+
 export function BaseSheet({
   open,
   onOpenChange,
@@ -194,7 +212,9 @@ export function BaseSheet({
             onPointerDown={(e) => {
               // Belt-and-suspenders: close on press-down too, in case the
               // synthetic click never fires (mobile, animation overlap, etc).
-              if (e.target === e.currentTarget) onOpenChange(false);
+              if (e.target !== e.currentTarget) return;
+              swallowGhostClick();
+              onOpenChange(false);
             }}
             className={cn(
               'fixed inset-0 bg-black/80 will-change-[opacity]',

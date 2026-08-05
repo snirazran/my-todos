@@ -92,15 +92,21 @@ function lightenCategory<T extends { id?: string; coverImageUrl?: string }>(
   return { ...category, coverImageUrl: categoryCoverRef(category.id) };
 }
 
+type ObjectiveLabelBlock = {
+  type?: string;
+  subject?: string;
+  action?: string;
+  tagMode?: string;
+  metricKey?: string;
+  target?: number;
+  progress?: number;
+  sessionMinutes?: number;
+  requiresFollowThrough?: boolean;
+  beforeHour?: number;
+};
+
 function objectiveSummaryLabel(
-  block: {
-    type?: string;
-    subject?: string;
-    action?: string;
-    tagMode?: string;
-    metricKey?: string;
-    target?: number;
-  },
+  block: ObjectiveLabelBlock,
   tagName?: string,
 ): string {
   const target = Math.max(0, block.target ?? 0);
@@ -116,14 +122,47 @@ function objectiveSummaryLabel(
       ? `Focus for ${target} minutes on ${tagName}`
       : `Focus for ${target} minutes on quest tasks`;
   }
+  if (block.type === 'distinct_days') {
+    const days = target === 1 ? 'day' : 'different days';
+    const scope = usesFocusTags
+      ? tagName
+        ? ` on ${tagName}`
+        : ' on quest tasks'
+      : '';
+    return `Show up${scope} ${target} ${days}`;
+  }
+  if (block.type === 'deep_session') {
+    const minutes = block.sessionMinutes ?? 25;
+    const scope = usesFocusTags
+      ? tagName
+        ? ` on ${tagName}`
+        : ' on a quest task'
+      : '';
+    return target === 1
+      ? `Focus ${minutes} min without a break${scope}`
+      : `Focus ${minutes} min without a break${scope}, ${target} times`;
+  }
   const subject = block.subject === 'any' || target !== 1 ? 'tasks' : 'task';
-  const action = block.action === 'add' ? 'Add' : 'Complete';
   const scope = usesFocusTags
     ? tagName
       ? `${tagName} ${subject}`
       : `quest ${subject}`
     : subject;
-  return `${action} ${target} ${scope}`;
+  if (block.action === 'add') {
+    return block.requiresFollowThrough
+      ? `Plan ${target} ${scope} and finish them`
+      : `Add ${target} ${scope}`;
+  }
+  if (typeof block.beforeHour === 'number') {
+    return `Finish ${target} ${scope} ${hourCutoffLabel(block.beforeHour)}`;
+  }
+  return `Complete ${target} ${scope}`;
+}
+
+function hourCutoffLabel(hour: number): string {
+  if (hour === 12) return 'before noon';
+  if (hour < 12) return `before ${hour}am`;
+  return `before ${hour - 12}pm`;
 }
 
 type ObjectiveTagChip = {
@@ -180,6 +219,12 @@ type TrackableEntry = {
 // the only inputs that need calibrating against real completion telemetry.
 const TASK_UNIT_EFFORT_DAYS = 0.1;
 const FOCUS_MINUTE_EFFORT_DAYS = 0.01;
+// Typing a title is not the work; only the follow-through is. A bare add is
+// priced near zero so it reads as the on-ramp it is.
+const ADD_UNIT_EFFORT_DAYS = 0.01;
+// A day you have to show up on cannot be compressed by working harder today,
+// so each one costs most of a calendar day.
+const DISTINCT_DAY_EFFORT_DAYS = 0.8;
 
 type EffortTask = {
   type?: string;
@@ -227,6 +272,9 @@ function objectiveEffort(
     metricKey?: string;
     target?: number;
     progress?: number;
+    action?: string;
+    sessionMinutes?: number;
+    requiresFollowThrough?: boolean;
   },
   tasks: EffortTask[],
   todayKey: string,
@@ -252,10 +300,28 @@ function objectiveEffort(
       effortAtRiskDays: completedToday ? 0 : credit,
     };
   }
+  if (block.type === 'distinct_days') {
+    // Today's link is one task; the rest is calendar time you cannot buy back.
+    return {
+      effortToActNow: TASK_UNIT_EFFORT_DAYS,
+      effortToComplete: remainingUnits * DISTINCT_DAY_EFFORT_DAYS,
+      effortAtRiskDays: 0,
+    };
+  }
+  if (block.type === 'deep_session') {
+    const days = remainingUnits * (block.sessionMinutes ?? 25) * FOCUS_MINUTE_EFFORT_DAYS;
+    return {
+      effortToActNow: days,
+      effortToComplete: days,
+      effortAtRiskDays: 0,
+    };
+  }
   const unitDays =
     block.type === 'focus_minutes'
       ? FOCUS_MINUTE_EFFORT_DAYS
-      : TASK_UNIT_EFFORT_DAYS;
+      : block.action === 'add' && !block.requiresFollowThrough
+        ? ADD_UNIT_EFFORT_DAYS
+        : TASK_UNIT_EFFORT_DAYS;
   const days = remainingUnits * unitDays;
   return {
     effortToActNow: days,
@@ -266,19 +332,13 @@ function objectiveEffort(
 
 
 function objectiveRemainingLabel(
-  block: {
-    type?: string;
-    subject?: string;
-    action?: string;
-    tagMode?: string;
-    metricKey?: string;
-    target?: number;
-    progress?: number;
-  },
+  block: ObjectiveLabelBlock,
   tagName?: string,
 ): string {
   const target = Math.max(1, block.target ?? 1);
-  const remaining = Math.max(1, target - Math.max(0, block.progress ?? 0));
+  const progress = Math.max(0, block.progress ?? 0);
+  if (progress <= 0) return objectiveSummaryLabel(block, tagName);
+  const remaining = Math.max(1, target - progress);
   const usesFocusTags = block.tagMode === 'focus_category_tags';
   if (block.type === 'metric_count') {
     return metricRemainingLabel(block.metricKey, remaining, {
@@ -291,14 +351,32 @@ function objectiveRemainingLabel(
       ? `Focus ${remaining} more min on ${tagName}`
       : `Focus ${remaining} more min on quest tasks`;
   }
+  if (block.type === 'distinct_days') {
+    return remaining === 1
+      ? 'Show up on 1 more day'
+      : `Show up on ${remaining} more days`;
+  }
+  if (block.type === 'deep_session') {
+    const minutes = block.sessionMinutes ?? 25;
+    return remaining === 1
+      ? `One more ${minutes}-min unbroken session`
+      : `${remaining} more ${minutes}-min unbroken sessions`;
+  }
   const subject = remaining === 1 ? 'task' : 'tasks';
-  const action = block.action === 'add' ? 'Add' : 'Complete';
   const scope = usesFocusTags
     ? tagName
       ? `${tagName} ${subject}`
       : `quest ${subject}`
     : subject;
-  return `${action} ${remaining} more ${scope}`;
+  if (block.action === 'add') {
+    return block.requiresFollowThrough
+      ? `Finish ${remaining} more planned ${scope}`
+      : `Add ${remaining} more ${scope}`;
+  }
+  if (typeof block.beforeHour === 'number') {
+    return `Finish ${remaining} more ${scope} ${hourCutoffLabel(block.beforeHour)}`;
+  }
+  return `Complete ${remaining} more ${scope}`;
 }
 
 function normalizeQuestTag(tag: any, index: number, isPremium: boolean) {

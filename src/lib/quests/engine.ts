@@ -13,6 +13,7 @@ import { getFullCatalog } from '@/lib/skins/getCatalog';
 import { loadBackgroundPrizes } from '@/lib/skins/gifts';
 import { getZonedToday, getZonedYMD } from '@/lib/utils';
 import { recordDoubleableClaim } from '@/lib/rewards/adDouble';
+import { recordAnalyticsEvent } from '@/lib/analytics/server';
 import {
   isTagScopedQuestMetric,
   loadQuestCounters,
@@ -290,6 +291,109 @@ function sumFocusSeconds(
   }, 0);
 }
 
+// Distinct local days in the window carrying at least one matching completion.
+// Volume targets reward one heroic afternoon; this rewards showing up.
+function countDistinctActiveDays(
+  tasks: TaskDoc[],
+  timezone: string,
+  startDate: string,
+  endDate: string,
+  predicate: (task: TaskDoc) => boolean,
+) {
+  const days = new Set<string>();
+  for (const task of tasks) {
+    if (!predicate(task)) continue;
+    for (const dateStr of taskCompletionDates(task, timezone)) {
+      if (dateStr >= startDate && dateStr <= endDate) days.add(dateStr);
+    }
+  }
+  return days.size;
+}
+
+// One unbroken sitting, which sumFocusSeconds cannot express: it adds every
+// session in the window together, so six five-minute stints read the same as
+// half an hour of actual depth.
+function countDeepSessions(
+  tasks: TaskDoc[],
+  startDate: string,
+  endDate: string,
+  minimumMinutes: number,
+  predicate: (task: TaskDoc) => boolean,
+) {
+  const threshold = Math.max(1, minimumMinutes) * 60;
+  let count = 0;
+  for (const task of tasks) {
+    if (!predicate(task)) continue;
+    for (const session of task.frogodoroSessions ?? []) {
+      if (session.date < startDate || session.date > endDate) continue;
+      if ((session.focusTime ?? 0) >= threshold) count += 1;
+    }
+  }
+  return count;
+}
+
+function getZonedHour(at: Date, timezone: string): number | null {
+  try {
+    const hour = new Intl.DateTimeFormat('en-GB', {
+      timeZone: timezone,
+      hour: '2-digit',
+      hour12: false,
+    }).format(at);
+    const parsed = Number(hour);
+    return Number.isFinite(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+// Completions with a timestamp that lands before the cutoff hour. Rows written
+// before completedAtByDate existed have no stamp and cannot qualify.
+function countEarlyCompletions(
+  tasks: TaskDoc[],
+  timezone: string,
+  startDate: string,
+  endDate: string,
+  beforeHour: number,
+  predicate: (task: TaskDoc) => boolean,
+) {
+  let count = 0;
+  for (const task of tasks) {
+    if (!predicate(task)) continue;
+    const stamps = task.completedAtByDate ?? {};
+    for (const occurrence of task.completedDates ?? []) {
+      const at = stamps[occurrence];
+      if (!at) continue;
+      const parsed = at instanceof Date ? at : new Date(at);
+      if (isNaN(parsed.getTime())) continue;
+      const dateStr = getZonedYMD(parsed, timezone);
+      if (dateStr < startDate || dateStr > endDate) continue;
+      const hour = getZonedHour(parsed, timezone);
+      if (hour !== null && hour < beforeHour) count += 1;
+    }
+  }
+  return count;
+}
+
+// An add credits only when the task it created is finished. Counting the
+// completion rather than the creation is what stops "add" being a free reward
+// for typing a title and never doing it.
+function countFollowedThroughAdds(
+  tasks: TaskDoc[],
+  timezone: string,
+  startDate: string,
+  endDate: string,
+  predicate: (task: TaskDoc) => boolean,
+) {
+  return tasks.filter((task) => {
+    if (!predicate(task) || !task.createdAt) return false;
+    const createdDate = getZonedYMD(new Date(task.createdAt), timezone);
+    if (createdDate < startDate || createdDate > endDate) return false;
+    return taskCompletionDates(task, timezone).some(
+      (dateStr) => dateStr >= startDate && dateStr <= endDate,
+    );
+  }).length;
+}
+
 // Rolled fly amounts and focus-minute targets land on multiples of 5 (10, 15,
 // 20…) so rewards never read as odd values like 49. Falls back to the raw roll
 // when the admin range contains no multiple of 5.
@@ -301,9 +405,115 @@ function snapToFiveInRange(value: number, min: number, max: number): number {
   return Math.min(hi, Math.max(lo, snapped));
 }
 
+const BASELINE_LOOKBACK_DAYS = 14;
+const BASELINE_MIN_OBSERVED_DAYS = 3;
+const BASELINE_MIN_SCALE = 0.35;
+const BASELINE_MAX_SCALE = 1.6;
+
+// Recipe ladders are authored for a user doing roughly this much in the tagged
+// area each day. A user's own trailing rate is divided by these to get the
+// scale their targets roll at, so the admin's ladder shape survives while the
+// numbers land where that user can actually reach them.
+const BASELINE_REFERENCE = {
+  completionsPerDay: 4,
+  focusMinutesPerDay: 35,
+  activeDayFraction: 0.8,
+} as const;
+
+export type QuestBaseline = {
+  completionsPerDay: number;
+  focusMinutesPerDay: number;
+  activeDayFraction: number;
+};
+
+const NEUTRAL_BASELINE: QuestBaseline = {
+  completionsPerDay: BASELINE_REFERENCE.completionsPerDay,
+  focusMinutesPerDay: BASELINE_REFERENCE.focusMinutesPerDay,
+  activeDayFraction: BASELINE_REFERENCE.activeDayFraction,
+};
+
+// Trailing tagged rate, measured over closed days only so a target cannot
+// shift under the user partway through the day it was rolled on.
+function computeQuestBaseline(args: {
+  tasks: TaskDoc[];
+  timezone: string;
+  todayKey: string;
+  tagIds?: string[];
+  focusCategoryId?: string;
+  accountCreatedAt?: Date | null;
+}): QuestBaseline {
+  const { tasks, timezone, todayKey, tagIds, focusCategoryId } = args;
+  const startKey = shiftDateKey(todayKey, -BASELINE_LOOKBACK_DAYS);
+  const endKey = shiftDateKey(todayKey, -1);
+
+  let observedDays = BASELINE_LOOKBACK_DAYS;
+  const createdAt = args.accountCreatedAt;
+  if (createdAt) {
+    const createdKey = getZonedYMD(new Date(createdAt), timezone);
+    if (createdKey > startKey) {
+      let days = 0;
+      let cursor = endKey;
+      while (cursor >= createdKey && days < BASELINE_LOOKBACK_DAYS) {
+        days += 1;
+        cursor = shiftDateKey(cursor, -1);
+      }
+      observedDays = days;
+    }
+  }
+  observedDays = Math.max(BASELINE_MIN_OBSERVED_DAYS, observedDays);
+
+  const matches = (task: TaskDoc) => {
+    if (task.type === 'focus-area') {
+      return focusCategoryId ? task.focusAreaId === focusCategoryId : true;
+    }
+    return hasAnyTag(task, tagIds);
+  };
+
+  const activeDays = new Set<string>();
+  let completions = 0;
+  for (const task of tasks) {
+    if (!matches(task)) continue;
+    for (const dateKey of taskCompletionDates(task, timezone)) {
+      if (dateKey < startKey || dateKey > endKey) continue;
+      completions += 1;
+      activeDays.add(dateKey);
+    }
+  }
+
+  const focusMinutes =
+    sumFocusSeconds(tasks, startKey, endKey, matches) / 60;
+
+  return {
+    completionsPerDay: completions / observedDays,
+    focusMinutesPerDay: focusMinutes / observedDays,
+    activeDayFraction: activeDays.size / observedDays,
+  };
+}
+
+function baselineScaleForBlock(
+  block: QuestLogicBlock,
+  baseline: QuestBaseline,
+): number {
+  // Streak lengths and one-shot app actions are calendar facts, not volume —
+  // scaling them would change what the objective means. A deep session's whole
+  // point is its length, so only its count could scale, and a count of one is
+  // already the floor.
+  if (block.type === 'metric_count' || block.type === 'deep_session') return 1;
+  const ratio =
+    block.type === 'focus_minutes'
+      ? baseline.focusMinutesPerDay / BASELINE_REFERENCE.focusMinutesPerDay
+      : block.type === 'distinct_days'
+        ? baseline.activeDayFraction / BASELINE_REFERENCE.activeDayFraction
+        : baseline.completionsPerDay / BASELINE_REFERENCE.completionsPerDay;
+  if (!Number.isFinite(ratio)) return 1;
+  return Math.min(BASELINE_MAX_SCALE, Math.max(BASELINE_MIN_SCALE, ratio));
+}
+
 function resolveLogicTarget(
   block: QuestLogicBlock,
   seed: string,
+  baseline: QuestBaseline = NEUTRAL_BASELINE,
+  windowDays?: number,
 ) {
   if (block.amountMode === 'fixed') {
     return Math.max(1, block.amount ?? 1);
@@ -313,9 +523,16 @@ function resolveLogicTarget(
   const max = Math.max(min, block.maxAmount ?? min);
   const rng = createSeededRandom(seed);
   const rolled = Math.floor(rng() * (max - min + 1)) + min;
-  return block.type === 'focus_minutes'
-    ? snapToFiveInRange(rolled, min, max)
-    : rolled;
+  const scale = baselineScaleForBlock(block, baseline);
+  const scaled = Math.max(1, Math.round(rolled * scale));
+  if (block.type === 'focus_minutes') {
+    return Math.max(5, Math.round(scaled / 5) * 5);
+  }
+  // You cannot show up on more days than the window has.
+  if (block.type === 'distinct_days' && windowDays) {
+    return Math.min(Math.max(1, Math.floor(windowDays)), scaled);
+  }
+  return scaled;
 }
 
 function resolveRewardAmount(reward: QuestReward, seed: string) {
@@ -375,13 +592,44 @@ function progressForLogicBlock(args: {
     );
   }
 
+  if (block.type === 'distinct_days') {
+    return countDistinctActiveDays(tasks, timezone, startDate, endDate, (task) =>
+      matchesLogicBlock(task, block),
+    );
+  }
+
+  if (block.type === 'deep_session') {
+    return countDeepSessions(
+      tasks,
+      startDate,
+      endDate,
+      block.sessionMinutes ?? 25,
+      (task) => {
+        if (task.type !== 'focus-area') return matchesLogicBlock(task, block);
+        if (focusCategoryId) return task.focusAreaId === focusCategoryId;
+        return block.tagMode === 'focus_category_tags'
+          ? hasAnyTag(task, block.resolvedTagIds)
+          : true;
+      },
+    );
+  }
+
   if (block.action === 'add') {
-    return countAddedTasks(
+    const predicate = (task: TaskDoc) =>
+      !task.isStarter && matchesLogicBlock(task, block);
+    return block.requiresFollowThrough
+      ? countFollowedThroughAdds(tasks, timezone, startDate, endDate, predicate)
+      : countAddedTasks(tasks, timezone, startDate, endDate, predicate);
+  }
+
+  if (typeof block.beforeHour === 'number') {
+    return countEarlyCompletions(
       tasks,
       timezone,
       startDate,
       endDate,
-      (task) => !task.isStarter && matchesLogicBlock(task, block),
+      block.beforeHour,
+      (task) => matchesLogicBlock(task, block),
     );
   }
 
@@ -561,6 +809,10 @@ function questDocToView(doc: QuestDoc): QuestProgressView {
     claimed,
     logic: doc.logic,
     claimedObjectiveIds: doc.claimedObjectiveIds ?? [],
+    carriedTiers: doc.carriedTiers ?? 0,
+    rerollsLeft: doc.templateId.startsWith('gen:')
+      ? Math.max(0, REROLLS_PER_LADDER - (doc.rerollsUsed ?? 0))
+      : 0,
   };
 }
 
@@ -607,10 +859,117 @@ function resolveRecipeMetricKey(
   return taskStreakMetric(days);
 }
 
+// Tiers a ladder must reach before the next roll starts with a head start,
+// and how many it gets. Nunes & Drèze: a card with the first stamps already
+// filled gets finished far more often than an equivalent empty one.
+const CARRYOVER_EARNED_AFTER_TIERS = 3;
+const CARRYOVER_TIERS_GRANTED = 1;
+
+export const REROLLS_PER_LADDER = 1;
+
+function tiersReached(quest: {
+  logic?: ResolvedQuestLogicBlock[];
+}): number {
+  return (quest.logic ?? []).filter(
+    (block) => (block.progress ?? 0) >= Math.max(1, block.target ?? 1),
+  ).length;
+}
+
+function carryOverTiersFor(quest: { logic?: ResolvedQuestLogicBlock[] }): number {
+  return tiersReached(quest) >= CARRYOVER_EARNED_AFTER_TIERS
+    ? CARRYOVER_TIERS_GRANTED
+    : 0;
+}
+
+// Where a ladder stopped, recorded once as it is replaced. Without this the
+// stall points are invisible and target calibration is guesswork.
+async function recordLadderOutcome(args: {
+  userId: string;
+  quest: QuestDoc;
+  reason: 'expired' | 'completed';
+  carriedTiers: number;
+}): Promise<void> {
+  const { quest } = args;
+  const total = (quest.logic ?? []).length;
+  if (total === 0) return;
+  const reached = tiersReached(quest);
+  try {
+    await recordAnalyticsEvent({
+      userId: args.userId,
+      name: 'quest_ladder_finished',
+      properties: {
+        placement: quest.placement,
+        category_id: quest.categoryId ?? 'uncategorized',
+        template_id: quest.templateId,
+        reason: args.reason,
+        tiers_total: total,
+        tiers_reached: reached,
+        tiers_claimed: (quest.claimedObjectiveIds ?? []).length,
+        stalled_at_tier: reached >= total ? null : reached + 1,
+        stalled_objective_type:
+          reached >= total ? null : quest.logic?.[reached]?.type ?? null,
+        rerolls_used: quest.rerollsUsed ?? 0,
+        carried_in: quest.carriedTiers ?? 0,
+        carried_out: args.carriedTiers,
+      },
+    });
+  } catch (err) {
+    console.error('recordLadderOutcome failed', err);
+  }
+}
+
+// Pool-entry fields that shape what a rolled block asks for, rather than how
+// much of it. Omitted entirely when unset so a block never carries a key the
+// admin did not author.
+function recipePickModifiers(pick: RecipePoolEntry): Partial<QuestLogicBlock> {
+  const modifiers: Partial<QuestLogicBlock> = {};
+  if (pick.type === 'deep_session') {
+    modifiers.sessionMinutes = Math.max(1, Math.floor(pick.sessionMinutes ?? 25));
+  }
+  if (pick.type === 'count' && pick.action === 'add' && pick.requiresFollowThrough) {
+    modifiers.requiresFollowThrough = true;
+  }
+  if (
+    pick.type === 'count' &&
+    (pick.action ?? 'complete') === 'complete' &&
+    typeof pick.beforeHour === 'number'
+  ) {
+    modifiers.beforeHour = Math.min(23, Math.max(1, Math.floor(pick.beforeHour)));
+  }
+  return modifiers;
+}
+
 function shiftDateKey(dateKey: string, deltaDays: number) {
   const base = new Date(`${dateKey}T00:00:00Z`);
   base.setUTCDate(base.getUTCDate() + deltaDays);
   return base.toISOString().slice(0, 10);
+}
+
+// Longest run a weekly task can still extend today: counts back from today
+// when it is already ticked, otherwise from yesterday. Only weekly tasks are
+// considered because only they bump the task_streak_N metric. Null means the
+// user owns no task that could ever carry the streak.
+function longestExtendableStreakRun(
+  tasks: TaskDoc[],
+  todayKey: string,
+  tagIds?: string[],
+): number | null {
+  const wanted = tagIds?.length ? new Set(tagIds) : null;
+  let best: number | null = null;
+  for (const task of tasks) {
+    if (task.type !== 'weekly') continue;
+    if (wanted && !task.tags?.some((tagId) => wanted.has(tagId))) continue;
+    const dates = new Set(task.completedDates ?? []);
+    for (const late of task.lateCompletedDates ?? []) dates.delete(late);
+    let day = dates.has(todayKey) ? todayKey : shiftDateKey(todayKey, -1);
+    let run = 0;
+    while (dates.has(day)) {
+      run += 1;
+      day = shiftDateKey(day, -1);
+    }
+    if (best === null || run > best) best = run;
+  }
+  return best;
 }
 
 // "Close enough" margin for shop-dependent objectives: a normal day's free
@@ -620,9 +979,9 @@ const NEARLY_AFFORDABLE_FLIES = 10;
 // Whether the user can act on a rolled pool entry right now: trading needs a
 // full set of same-rarity skins (owned, or buyable with current flies plus a
 // day's earnings), selling needs a duplicate, acquiring needs spending power
-// or an unopened gift, and a task streak inside a one-day window needs the
-// run to already be one completion away. Filtering these at roll time keeps
-// dead objectives out of a user's quest.
+// or an unopened gift, and a task streak needs a weekly task whose run can
+// still reach the required length before the window closes. Filtering these at
+// roll time keeps dead objectives out of a user's quest.
 function isPoolEntryEligible(args: {
   entry: RecipePoolEntry;
   placement: 'daily' | 'category';
@@ -631,8 +990,10 @@ function isPoolEntryEligible(args: {
   tasks: TaskDoc[];
   todayKey: string;
   hasFriends: boolean;
+  windowDays: number;
+  tagIds?: string[];
 }): boolean {
-  const { entry, placement, user, catalog, tasks, todayKey } = args;
+  const { entry, user, catalog, tasks, todayKey } = args;
   if (entry.type !== 'metric_count' || !entry.metricKey) return true;
   const metricKey = entry.metricKey;
   const inventory = user.wardrobe?.inventory ?? {};
@@ -706,21 +1067,15 @@ function isPoolEntryEligible(args: {
     );
   }
 
-  if (placement === 'daily') {
-    const fallbackDays = parseTaskStreakDays(metricKey);
-    if (fallbackDays !== null) {
-      const days = Math.max(
-        2,
-        Math.floor(entry.streakDaysMax ?? entry.streakDaysMin ?? fallbackDays),
-      );
-      return tasks.some((task) => {
-        const dates = new Set(task.completedDates ?? []);
-        for (let i = 1; i < days; i += 1) {
-          if (!dates.has(shiftDateKey(todayKey, -i))) return false;
-        }
-        return true;
-      });
-    }
+  const fallbackDays = parseTaskStreakDays(metricKey);
+  if (fallbackDays !== null) {
+    const days = Math.max(
+      2,
+      Math.floor(entry.streakDaysMax ?? entry.streakDaysMin ?? fallbackDays),
+    );
+    const run = longestExtendableStreakRun(tasks, todayKey, args.tagIds);
+    if (run === null) return false;
+    return run + Math.max(1, args.windowDays) >= days;
   }
 
   return true;
@@ -736,6 +1091,8 @@ function buildEligiblePool(args: {
   tasks: TaskDoc[];
   todayKey: string;
   hasFriends: boolean;
+  windowDays: number;
+  tagIds?: string[];
 }): RecipePoolEntry[] {
   const base = (args.slot.pool ?? []).filter(
     (entry) => entry && Math.floor(entry.minTarget) > 0,
@@ -912,6 +1269,23 @@ async function syncQuestForTemplate(args: {
         )
       : template.logic;
 
+  // Onboarding targets are a hand-authored sequence; only rolled placements
+  // scale to the user. Anchored to the window's start, not today, so a target
+  // cannot drift under the user as they make progress against it.
+  const baseline =
+    template.placement === 'onboarding'
+      ? NEUTRAL_BASELINE
+      : computeQuestBaseline({
+          tasks,
+          timezone,
+          todayKey: startDate,
+          tagIds:
+            template.placement === 'category' ? categoryTagIds : undefined,
+          focusCategoryId:
+            template.placement === 'category' ? template.categoryId : undefined,
+          accountCreatedAt: user.createdAt ?? null,
+        });
+
   const unlockedFocusIds = resolveUnlockedFocusCategoryIds(
     profile,
     isPremiumUser(user),
@@ -939,6 +1313,10 @@ async function syncQuestForTemplate(args: {
     const target = resolveLogicTarget(
       block,
       `${userId}:${template.templateId}:${windowKey}:${doc.rollKey}:${block.id}`,
+      baseline,
+      templateDurationMinutes
+        ? Math.max(1, Math.round(templateDurationMinutes / (24 * 60)))
+        : 1,
     );
       const resolvedBlock: ResolvedQuestLogicBlock = {
         ...block,
@@ -975,7 +1353,9 @@ async function syncQuestForTemplate(args: {
     const progressOffset = lockedForFreeUser
       ? Math.max(0, rawProgress - prevProgress)
       : prevOffset;
-    const progress = Math.max(0, rawProgress - progressOffset);
+    const progress = block.preCredited
+      ? target
+      : Math.max(0, rawProgress - progressOffset);
     const resolvedRewards = (block.rewards ?? [])
       .filter((r): r is QuestReward => isSupportedReward(r as { type?: string }))
       .map((r, ri) =>
@@ -1016,6 +1396,12 @@ async function syncQuestForTemplate(args: {
   changed = setQuestField(doc, 'startedAt', nextStartedAt) || changed;
   changed = setQuestField(doc, 'expiresAt', nextExpiresAt) || changed;
   changed = setQuestField(doc, 'logic', resolvedLogic) || changed;
+  changed =
+    setQuestField(
+      doc,
+      'carriedTiers',
+      resolvedLogic.filter((block) => block.preCredited).length,
+    ) || changed;
   changed = setQuestField(doc, 'target', target) || changed;
   changed = setQuestField(doc, 'progress', progress) || changed;
   changed = setQuestField(doc, 'completedAt', nextCompletedAt) || changed;
@@ -1198,6 +1584,7 @@ export async function syncQuestState(args: {
           tasks,
           todayKey,
           hasFriends,
+          windowDays: 1,
         });
         const pick = pickWeighted(
           pool,
@@ -1219,6 +1606,7 @@ export async function syncQuestState(args: {
           metricKey: isMetric
             ? resolveRecipeMetricKey(pick, `${userId}:${templateId}:slot:${index}:streak`)
             : undefined,
+          ...recipePickModifiers(pick),
           rewards: [
             ...pickSlotReward(
               slot.rewards,
@@ -1338,6 +1726,7 @@ export async function syncQuestState(args: {
             doc.templateId.startsWith('gen:'),
         ) ?? null;
 
+      let carriedTiers = 0;
       if (existing) {
         const rewardBlocks = (existing.logic ?? []).filter(
           (block) => (block.rewards?.length ?? 0) > 0,
@@ -1361,6 +1750,13 @@ export async function syncQuestState(args: {
           !!existing.expiresAt &&
           existing.expiresAt.getTime() <= nowMs;
         if (cooldownOver || expired) {
+          carriedTiers = carryOverTiersFor(existing);
+          await recordLadderOutcome({
+            userId,
+            quest: existing,
+            reason: expired ? 'expired' : 'completed',
+            carriedTiers,
+          });
           existing = null;
         } else {
           categoryDocIdsToKeep.add(String(existing._id));
@@ -1369,6 +1765,13 @@ export async function syncQuestState(args: {
 
       const rollKey = existing?.rollKey ?? crypto.randomUUID();
       const templateId = existing?.templateId ?? `gen:${categoryId}:${rollKey}`;
+      const recipeTagIds =
+        profile.categoryTagMap.find((entry) => entry.categoryId === categoryId)
+          ?.tagIds ?? [];
+      const recipeWindowDays = Math.max(
+        1,
+        Math.round((recipe.durationMinutes ?? 3 * 24 * 60) / (24 * 60)),
+      );
       // Same freeze as the daily roll: a live doc keeps its rolled logic so
       // pool eligibility changes can't swap objectives mid-roll.
       const logic = existing?.logic?.length
@@ -1383,6 +1786,8 @@ export async function syncQuestState(args: {
             tasks,
             todayKey,
             hasFriends,
+            windowDays: recipeWindowDays,
+            tagIds: recipeTagIds,
           });
           const pick = pickWeighted(
             pool,
@@ -1398,6 +1803,7 @@ export async function syncQuestState(args: {
             id: `slot-${index + 1}`,
             type: pick.type,
             subject: 'task',
+            ...(index < carriedTiers ? { preCredited: true } : {}),
             action: pick.type === 'count' ? pick.action ?? 'complete' : undefined,
             amountMode: 'random',
             minAmount,
@@ -1407,6 +1813,7 @@ export async function syncQuestState(args: {
                 ? 'focus_category_tags'
                 : 'ignore',
             metricKey,
+            ...recipePickModifiers(pick),
             rewards: [
               ...pickSlotReward(
                 slot.rewards,
@@ -2071,4 +2478,169 @@ export async function claimObjectiveReward(args: {
   // Save quest and user in parallel
   await Promise.all([quest.save(), user.save()]);
   return summary;
+}
+
+// Re-rolls one unfinished, unclaimed objective from its recipe slot. The pool
+// pick is reseeded off the spend count so the same slot cannot hand back the
+// objective the user was trying to get rid of.
+export async function rerollQuestObjective(args: {
+  userId: string;
+  questId: string;
+  objectiveId: string;
+  timezone: string;
+}) {
+  const { userId, questId, objectiveId, timezone } = args;
+  await connectMongo();
+
+  const [user, quest] = await Promise.all([
+    UserModel.findById(userId).lean<UserDoc | null>(),
+    QuestModel.findOne({ userId, questId }),
+  ]);
+  if (!user) throw new Error('User not found');
+  if (!quest) throw new Error('Quest not found');
+  if (!quest.templateId.startsWith('gen:')) {
+    throw new Error('This quest cannot be rerolled');
+  }
+  const spent = quest.rerollsUsed ?? 0;
+  if (spent >= REROLLS_PER_LADDER) {
+    throw new Error('No rerolls left on this quest');
+  }
+
+  const blockIndex = (quest.logic ?? []).findIndex(
+    (block) => block.id === objectiveId,
+  );
+  if (blockIndex < 0) throw new Error('Objective not found');
+  const block = quest.logic[blockIndex];
+  if ((quest.claimedObjectiveIds ?? []).includes(objectiveId)) {
+    throw new Error('Objective is already claimed');
+  }
+  if ((block.progress ?? 0) >= Math.max(1, block.target ?? 1)) {
+    throw new Error('Objective is already finished');
+  }
+  if (block.preCredited) {
+    throw new Error('Objective is already finished');
+  }
+
+  const recipes = await QuestRecipeModel.find({
+    placement: { $ne: 'daily' },
+    isActive: true,
+  }).lean<QuestRecipeDoc[]>();
+  const recipe =
+    recipes.find((r) =>
+      (r.categoryIds ?? []).includes(quest.categoryId ?? ''),
+    ) ?? recipes.find((r) => (r.categoryIds ?? []).length === 0);
+  const slot = recipe?.slots?.[blockIndex];
+  if (!recipe || !slot) throw new Error('Recipe slot not found');
+
+  const [tasks, catalog, hasFriends] = await Promise.all([
+    TaskModel.find(
+      { userId, deletedAt: { $exists: false } },
+      {
+        type: 1,
+        completed: 1,
+        completedDates: 1,
+        completedAtByDate: 1,
+        lateCompletedDates: 1,
+        date: 1,
+        createdAt: 1,
+        tags: 1,
+        focusAreaId: 1,
+        frogodoroSessions: 1,
+        isStarter: 1,
+      },
+    ).lean<TaskDoc[]>(),
+    getFullCatalog(),
+    FriendshipModel.exists({
+      status: 'accepted',
+      $or: [{ requesterId: userId }, { addresseeId: userId }],
+    }).then((doc) => !!doc),
+  ]);
+
+  const profile = normalizeFocusProfile(user);
+  const tagIds =
+    profile.categoryTagMap.find(
+      (entry) => entry.categoryId === quest.categoryId,
+    )?.tagIds ?? [];
+  const todayKey = getZonedToday(timezone);
+  const windowDays = Math.max(
+    1,
+    Math.round((recipe.durationMinutes ?? 3 * 24 * 60) / (24 * 60)),
+  );
+
+  const pool = buildEligiblePool({
+    slot,
+    placement: 'category',
+    user,
+    catalog,
+    tasks,
+    todayKey,
+    hasFriends,
+    windowDays,
+    tagIds,
+  });
+  // Anything but what they already have, unless the slot has nothing else to
+  // offer — a reroll that returns the same objective is worse than refusing.
+  const alternatives = pool.filter(
+    (entry) =>
+      !(
+        entry.type === block.type &&
+        (entry.action ?? undefined) === (block.action ?? undefined) &&
+        (entry.metricKey ?? undefined) === (block.metricKey ?? undefined)
+      ),
+  );
+  const candidates = alternatives.length > 0 ? alternatives : pool;
+  const seed = `${userId}:${quest.templateId}:slot:${blockIndex}:reroll:${spent + 1}`;
+  const pick = pickWeighted(candidates, createSeededRandom(seed));
+  if (!pick) throw new Error('Nothing to reroll into');
+
+  const isMetric = pick.type === 'metric_count';
+  const minAmount = Math.max(1, Math.floor(pick.minTarget));
+  const metricKey = isMetric
+    ? resolveRecipeMetricKey(pick, `${seed}:streak`)
+    : undefined;
+  const nextBlock: ResolvedQuestLogicBlock = {
+    ...block,
+    type: pick.type,
+    subject: 'task',
+    action: pick.type === 'count' ? pick.action ?? 'complete' : undefined,
+    amountMode: 'random',
+    minAmount,
+    maxAmount: Math.max(minAmount, Math.floor(pick.maxTarget)),
+    tagMode:
+      !isMetric || isTagScopedQuestMetric(metricKey)
+        ? 'focus_category_tags'
+        : 'ignore',
+    metricKey,
+    sessionMinutes: undefined,
+    requiresFollowThrough: undefined,
+    beforeHour: undefined,
+    ...recipePickModifiers(pick),
+    target: 1,
+    progress: 0,
+    progressOffset: 0,
+  };
+
+  quest.logic[blockIndex] = nextBlock;
+  quest.rerollsUsed = spent + 1;
+  quest.markModified('logic');
+  await quest.save();
+
+  await recordAnalyticsEvent({
+    userId,
+    name: 'quest_objective_rerolled',
+    properties: {
+      category_id: quest.categoryId ?? 'uncategorized',
+      template_id: quest.templateId,
+      tier: blockIndex + 1,
+      from_type: block.type,
+      to_type: nextBlock.type,
+      rerolls_used: quest.rerollsUsed,
+    },
+  }).catch(() => {});
+
+  // The rolled block carries min/max, not a target; the next sync resolves it
+  // against the user's baseline exactly as it would a fresh roll.
+  await syncQuestState({ userId, timezone, includeCatalog: false });
+
+  return { ok: true, rerollsLeft: REROLLS_PER_LADDER - quest.rerollsUsed };
 }

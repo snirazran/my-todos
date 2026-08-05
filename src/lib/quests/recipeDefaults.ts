@@ -6,11 +6,19 @@ import QuestRecipeModel, {
 
 function slot(
   pool: Array<{
-    type: 'count' | 'focus_minutes' | 'metric_count';
+    type:
+      | 'count'
+      | 'focus_minutes'
+      | 'metric_count'
+      | 'distinct_days'
+      | 'deep_session';
     action?: 'complete' | 'add';
     metricKey?: string;
     streakDaysMin?: number;
     streakDaysMax?: number;
+    sessionMinutes?: number;
+    requiresFollowThrough?: boolean;
+    beforeHour?: number;
     minTarget: number;
     maxTarget: number;
     weight?: number;
@@ -27,6 +35,9 @@ function slot(
       metricKey: entry.metricKey,
       streakDaysMin: entry.streakDaysMin,
       streakDaysMax: entry.streakDaysMax,
+      sessionMinutes: entry.sessionMinutes,
+      requiresFollowThrough: entry.requiresFollowThrough,
+      beforeHour: entry.beforeHour,
       minTarget: entry.minTarget,
       maxTarget: entry.maxTarget,
       weight: Math.max(1, entry.weight ?? 1),
@@ -52,9 +63,13 @@ const giftBonus = (chance: number) => [
 ];
 
 // Focus ladder: 6 objectives over 3 days, tag-scoped to the focus category.
-// Targets are cumulative thresholds calibrated to ~3-5 tagged completions or
-// ~30-40 tagged focus minutes per day. Free payout: 2+2+3+3+5+8 = 23 flies
-// plus a guaranteed gift on the capstone; premium doubles at claim time.
+// Each tier is a different verb — plan, do, repeat, deepen, sustain, exceed —
+// so the ladder asks for something instead of watching one counter pass six
+// marks. The roll lives inside a tier, between variants of that tier's verb.
+// Targets are authored for ~4 tagged completions or ~35 tagged focus minutes a
+// day and scale to the user's own trailing rate at roll time. Free payout:
+// 2+2+3+3+5+8 = 23 flies plus a guaranteed gift on the capstone; premium
+// doubles at claim time.
 export async function ensureDefaultQuestRecipe(): Promise<QuestRecipeDoc | null> {
   await ensureDefaultDailyRecipe();
   const existing = await QuestRecipeModel.findOne({
@@ -69,14 +84,23 @@ export async function ensureDefaultQuestRecipe(): Promise<QuestRecipeDoc | null>
     durationMinutes: 3 * 24 * 60,
     categoryIds: [],
     slots: [
+      // Plan — the on-ramp. Credited on the add, paid on the finish, so it
+      // recruits the planning a user already does instead of paying for typing.
       slot(
         [
-          { type: 'count', action: 'complete', minTarget: 2, maxTarget: 3, weight: 3 },
-          { type: 'count', action: 'add', minTarget: 2, maxTarget: 3, weight: 2 },
-          { type: 'focus_minutes', minTarget: 10, maxTarget: 15, weight: 2 },
+          {
+            type: 'count',
+            action: 'add',
+            requiresFollowThrough: true,
+            minTarget: 2,
+            maxTarget: 3,
+            weight: 3,
+          },
+          { type: 'count', action: 'complete', minTarget: 2, maxTarget: 3, weight: 2 },
         ],
         flies(2),
       ),
+      // Do — plain volume, the one tier that should be easy to read.
       slot(
         [
           { type: 'count', action: 'complete', minTarget: 3, maxTarget: 4, weight: 3 },
@@ -84,36 +108,42 @@ export async function ensureDefaultQuestRecipe(): Promise<QuestRecipeDoc | null>
         ],
         flies(2),
       ),
+      // Repeat — two separate days beats one heroic afternoon, and volume
+      // cannot tick this one.
       slot(
         [
-          { type: 'count', action: 'complete', minTarget: 5, maxTarget: 6, weight: 3 },
-          { type: 'focus_minutes', minTarget: 30, maxTarget: 40, weight: 2 },
+          { type: 'distinct_days', minTarget: 2, maxTarget: 2, weight: 3 },
+          { type: 'count', action: 'complete', beforeHour: 12, minTarget: 1, maxTarget: 2, weight: 2 },
         ],
         flies(3),
       ),
+      // Deepen — one unbroken sitting, which accumulated focus minutes cannot
+      // express.
       slot(
         [
-          { type: 'count', action: 'complete', minTarget: 7, maxTarget: 8, weight: 3 },
+          { type: 'deep_session', sessionMinutes: 25, minTarget: 1, maxTarget: 1, weight: 3 },
           { type: 'focus_minutes', minTarget: 45, maxTarget: 60, weight: 2 },
         ],
         flies(3),
       ),
+      // Sustain — the habit itself. Screened at roll time so it only appears
+      // for someone holding a repeating task that can carry it.
       slot(
         [
-          { type: 'count', action: 'complete', minTarget: 9, maxTarget: 11, weight: 3 },
-          { type: 'focus_minutes', minTarget: 70, maxTarget: 90, weight: 2 },
           {
             type: 'metric_count',
-            metricKey: 'task_streak_2',
-            streakDaysMin: 2,
-            streakDaysMax: 2,
+            metricKey: 'task_streak_3',
+            streakDaysMin: 3,
+            streakDaysMax: 3,
             minTarget: 1,
             maxTarget: 1,
-            weight: 1,
+            weight: 3,
           },
+          { type: 'distinct_days', minTarget: 3, maxTarget: 3, weight: 2 },
         ],
         flies(5),
       ),
+      // Exceed — the capstone, and the only tier that asks for real volume.
       slot(
         [
           { type: 'count', action: 'complete', minTarget: 12, maxTarget: 15, weight: 3 },
@@ -158,6 +188,8 @@ export async function ensureDefaultDailyRecipe(): Promise<void> {
         [
           { type: 'count', action: 'complete', minTarget: 4, maxTarget: 6, weight: 3 },
           { type: 'focus_minutes', minTarget: 15, maxTarget: 25, weight: 3 },
+          { type: 'deep_session', sessionMinutes: 25, minTarget: 1, maxTarget: 1, weight: 2 },
+          { type: 'count', action: 'complete', beforeHour: 12, minTarget: 2, maxTarget: 3, weight: 2 },
           { type: 'metric_count', metricKey: 'skin_acquired', minTarget: 1, maxTarget: 1, weight: 1 },
           { type: 'metric_count', metricKey: 'skin_sold', minTarget: 1, maxTarget: 1, weight: 1 },
         ],

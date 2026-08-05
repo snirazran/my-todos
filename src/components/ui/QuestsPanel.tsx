@@ -907,6 +907,32 @@ export function QuestsPanel({
     }
   };
 
+  const [rerollingObjectiveId, setRerollingObjectiveId] = useState<
+    string | null
+  >(null);
+  const handleRerollObjective = async (
+    questId: string,
+    objectiveId: string,
+  ) => {
+    if (rerollingObjectiveId) return;
+    setRerollingObjectiveId(objectiveId);
+    setClaimMessage(null);
+    try {
+      const res = await fetch('/api/quests/reroll', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ questId, objectiveId, timezone }),
+      });
+      const payload = await res.json();
+      if (!res.ok) throw new Error(payload.error || 'Swap failed');
+      await refreshQuestData();
+    } catch (err: any) {
+      setClaimMessage(err.message || 'Swap failed');
+    } finally {
+      setRerollingObjectiveId(null);
+    }
+  };
+
   const [switchingFocusId, setSwitchingFocusId] = useState<string | null>(null);
   const handleSetActiveFocus = async (categoryId: string) => {
     if (switchingFocusId) return;
@@ -1173,6 +1199,10 @@ export function QuestsPanel({
                               onClaimObjective={(objectiveId) =>
                                 handleClaimObjective(quest.id, objectiveId)
                               }
+                              onRerollObjective={(objectiveId) =>
+                                handleRerollObjective(quest.id, objectiveId)
+                              }
+                              rerollingObjectiveId={rerollingObjectiveId}
                               locked={quest.locked ?? false}
                               switchingFocus={switchingFocusId === quest.categoryId}
                               activeFocusName={
