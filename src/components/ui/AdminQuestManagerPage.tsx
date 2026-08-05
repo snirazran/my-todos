@@ -18,6 +18,7 @@ import {
   Monitor,
   Pencil,
   Plus,
+  RotateCcw,
   ScrollText,
   Sparkles,
   Trash2,
@@ -595,6 +596,12 @@ export function AdminQuestManagerPage() {
   const [adminRecipes, setAdminRecipes] = useState<AdminRecipe[]>([]);
   const [openRecipeId, setOpenRecipeId] = useState<string | null>(null);
   const [savingRecipeId, setSavingRecipeId] = useState<string | null>(null);
+  const [resettingRecipeId, setResettingRecipeId] = useState<string | null>(
+    null,
+  );
+  const [confirmResetRecipeId, setConfirmResetRecipeId] = useState<
+    string | null
+  >(null);
   const [recipeRewardTarget, setRecipeRewardTarget] = useState<{
     recipeId: string;
     slotId: string;
@@ -1476,6 +1483,43 @@ export function AdminQuestManagerPage() {
     }));
   };
 
+  // Deletes the stored recipe; the reload that follows re-seeds it from
+  // recipeDefaults.ts, which is what makes this a reset rather than a delete.
+  const resetRecipeToDefault = async (recipeId: string) => {
+    setResettingRecipeId(recipeId);
+    try {
+      const res = await fetch('/api/admin/quest-recipes', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ recipeId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not reset recipe');
+      const reloaded = await fetch('/api/admin/quest-recipes', {
+        credentials: 'include',
+      });
+      const reloadedData = await reloaded.json();
+      if (!reloaded.ok) {
+        throw new Error(reloadedData.error || 'Could not reload recipes');
+      }
+      setAdminRecipes((reloadedData.recipes ?? []) as AdminRecipe[]);
+      setResult({
+        type: 'success',
+        message: 'Recipe reset to the built-in default',
+      });
+    } catch (error) {
+      setResult({
+        type: 'error',
+        message:
+          error instanceof Error ? error.message : 'Could not reset recipe',
+      });
+    } finally {
+      setResettingRecipeId(null);
+      setConfirmResetRecipeId(null);
+    }
+  };
+
   const saveRecipe = async (recipeId: string) => {
     const target = adminRecipes.find((r) => r.recipeId === recipeId);
     if (!target) return;
@@ -1846,9 +1890,44 @@ export function AdminQuestManagerPage() {
                 <Plus className="h-3.5 w-3.5" />
                 {isDaily ? 'Add objective' : 'Add tier'}
               </button>
-              <Button size="sm" className="rounded-xl font-black" onClick={() => void saveRecipe(r.recipeId)} disabled={savingRecipeId === r.recipeId}>
-                {savingRecipeId === r.recipeId ? 'Saving…' : 'Save recipe'}
-              </Button>
+              <div className="flex items-center gap-2">
+                {confirmResetRecipeId === r.recipeId ? (
+                  <>
+                    <span className="text-xs font-bold text-red-500">
+                      Discard these {isDaily ? 'objectives' : 'tiers'}?
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmResetRecipeId(null)}
+                      className="rounded-xl border border-border/50 bg-background px-3 py-1.5 text-xs font-bold text-muted-foreground transition hover:text-foreground"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void resetRecipeToDefault(r.recipeId)}
+                      disabled={resettingRecipeId === r.recipeId}
+                      className="rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-1.5 text-xs font-black text-red-500 transition hover:bg-red-500/20 disabled:opacity-60"
+                    >
+                      {resettingRecipeId === r.recipeId
+                        ? 'Resetting…'
+                        : 'Reset to default'}
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmResetRecipeId(r.recipeId)}
+                    className="inline-flex items-center gap-1 rounded-xl border border-border/50 bg-background px-3 py-1.5 text-xs font-bold text-muted-foreground transition hover:border-red-500/30 hover:text-red-500"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    Reset to default
+                  </button>
+                )}
+                <Button size="sm" className="rounded-xl font-black" onClick={() => void saveRecipe(r.recipeId)} disabled={savingRecipeId === r.recipeId}>
+                  {savingRecipeId === r.recipeId ? 'Saving…' : 'Save recipe'}
+                </Button>
+              </div>
             </div>
           </div>
         )}
