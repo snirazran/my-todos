@@ -17,7 +17,7 @@ import { getFlyPackPrices, purchaseFlyPack } from '@/lib/purchases';
 import type { FlyPackId } from '@/lib/flyPacks';
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
 import { prefetchStoreBundleBytes } from '@/lib/riveLoader';
-import { emitCampaignTrigger } from '@/lib/campaigns/orchestrator';
+import { emitCampaignTrigger, markCampaignConverted } from '@/lib/campaigns/orchestrator';
 import { WishlistGoalCard } from './WishlistGoalCard';
 import { BundleArt } from './BundleArt';
 
@@ -172,6 +172,7 @@ export function CurrencyShop() {
                   showArt={artReady}
                   onPurchased={() => {
                     boughtRef.current = true;
+                    markCampaignConverted();
                     emitCampaignTrigger('purchase_completed');
                     window.setTimeout(() => void mutateInventory(), 1200);
                     window.setTimeout(() => void mutateInventory(), 5000);

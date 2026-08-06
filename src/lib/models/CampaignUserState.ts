@@ -9,6 +9,8 @@ export type CampaignUserStateDoc = {
   clicks: number;
   dismissals: number;
   converted: boolean;
+  /** Clicks per canvas element id, for the admin's per-element breakdown. */
+  elementClicks?: Record<string, number>;
   lastShownAt?: Date | null;
   convertedAt?: Date | null;
   createdAt: Date;
@@ -23,6 +25,7 @@ const CampaignUserStateSchema = new Schema<CampaignUserStateDoc>(
     clicks: { type: Number, default: 0 },
     dismissals: { type: Number, default: 0 },
     converted: { type: Boolean, default: false },
+    elementClicks: { type: Schema.Types.Mixed, default: {} },
     lastShownAt: { type: Date, default: null },
     convertedAt: { type: Date, default: null },
   },

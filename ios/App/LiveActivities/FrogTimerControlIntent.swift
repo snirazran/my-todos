@@ -34,13 +34,14 @@ struct FrogTimerControlIntent: LiveActivityIntent {
         // The AlarmKit alarm's stop button. The alarm is armed for one phase's
         // end, but by the time it rings the session may have moved on — with
         // auto-start breaks the break is already counting down, and ending the
-        // session there would destroy a phase the user never finished. Only a
-        // phase actually waiting for Done gets acknowledged; otherwise the
-        // slide just silences the alarm.
+        // session there would destroy a phase the user never finished. So the
+        // slide acknowledges the session unless something is still counting
+        // down; only then is it silence-only.
         if action == "alarmStop" {
+            let armedEndMs = FrogAlarmKit.armedEndTimeMs
             FrogAlarmKit.cancel()
-            guard Self.currentActivity()?.content.state.finished == true else {
-                NSLog("FrogControl: alarmStop — nothing awaiting Done, alarm silenced only")
+            guard Self.alarmStopAcknowledges(armedEndMs: armedEndMs) else {
+                NSLog("FrogControl: alarmStop — a phase is still running, alarm silenced only")
                 return .result()
             }
             effective = "done"
@@ -67,6 +68,24 @@ struct FrogTimerControlIntent: LiveActivityIntent {
         let controlSeq = Self.nextControlSeq()
         Self.postToServer(action: effective, controlSeq: controlSeq, activityId: activityId)
         return .result()
+    }
+
+    // Whether stopping the alarm should acknowledge the session (Done) or only
+    // silence it. `finished` is the island's answer, but it only becomes true
+    // once the finish push lands — at the instant the alarm rings the island can
+    // still be carrying the running state of the phase that just expired, which
+    // is why this can't test `finished` alone. What must be protected is a phase
+    // that is genuinely still counting down (the auto-started break inheriting
+    // the focus alarm), so that — an unexpired endTime — is what blocks Done.
+    private static func alarmStopAcknowledges(armedEndMs: Double) -> Bool {
+        let nowMs = Date().timeIntervalSince1970 * 1000
+        guard let state = currentActivity()?.content.state else {
+            // No island to read. A newer alarm armed for a future time means the
+            // session moved on to another phase; otherwise nothing is running.
+            return armedEndMs <= nowMs + 1500
+        }
+        if state.finished == true { return true }
+        return state.paused || state.endTime <= nowMs + 1500
     }
 
     // The set of live activities can contain a doomed duplicate mid-reconcile;

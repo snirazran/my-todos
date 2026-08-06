@@ -21,6 +21,7 @@ import { hapticCelebrate, hapticTick } from '@/lib/haptics';
 import { showRewardedAd } from '@/lib/ads';
 import { maybeRequestAppRating } from '@/lib/rateApp';
 import { useRiveInteractionPause } from '@/lib/riveInteractionPause';
+import { emitCampaignTrigger, setCampaignBusy } from '@/lib/campaigns/orchestrator';
 
 export type QuestRewardSummary = {
   fliesGranted?: number;
@@ -350,10 +351,15 @@ export function QuestRewardRevealHost() {
     return release;
   }, [revealActive]);
 
+  useEffect(() => {
+    setCampaignBusy('quest-reveal', revealActive);
+  }, [revealActive]);
+
   const prevRevealCountRef = useRef(0);
   useEffect(() => {
     if (prevRevealCountRef.current > 0 && queue.length === 0) {
       maybeRequestAppRating();
+      emitCampaignTrigger('quest_claimed');
     }
     prevRevealCountRef.current = queue.length;
   }, [queue.length]);

@@ -186,14 +186,24 @@ export async function fanOutTimerState(
         : running
           ? liveActivityEndTimeForDevice(endTime, startTokenClockSkewMs)
           : 0;
+    // A finished timer already carries the NEXT phase (the completion advanced
+    // it), but the ringing island describes the phase that just ended — mirrors
+    // the processor, which builds this state from its own completedPhase.
+    const ringingPhase = finished
+      ? timer.phase === 'focus'
+        ? ('break' as const)
+        : ('focus' as const)
+      : timer.phase;
     const data = buildLiveActivityData({
       active: true,
       isRunning: running,
       finished,
-      phase: timer.phase,
+      phase: ringingPhase,
       endTime: deviceEndTime,
       timeLeft: finished ? 0 : timer.timeLeft,
-      totalSeconds: phaseTotalSeconds(timer),
+      totalSeconds: finished
+        ? phaseTotalSeconds({ ...timer, phase: ringingPhase })
+        : phaseTotalSeconds(timer),
       taskName: '',
       ...timerHuntExtras(timer, Date.now(), priorFocus),
     });

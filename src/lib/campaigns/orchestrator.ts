@@ -20,6 +20,9 @@ const SHOW_DELAY_MS = 650;
 
 type CampaignEvent = 'impression' | 'click' | 'dismiss' | 'convert';
 
+/** How long a click stays creditable for a purchase that follows it. */
+const CONVERSION_WINDOW_MS = 30 * 60_000;
+
 type Store = {
   campaigns: CampaignPayload[];
   active: CampaignPayload | null;
@@ -29,11 +32,14 @@ type Store = {
   shownIds: string[];
   /** Set by surfaces that must not be interrupted (sheets, focus, onboarding). */
   busyReasons: string[];
+  /** Last campaign whose button was pressed, for conversion attribution. */
+  lastClick: { id: string; at: number } | null;
   setCampaigns: (campaigns: CampaignPayload[]) => void;
   setBusy: (reason: string, busy: boolean) => void;
   emit: (trigger: CampaignTrigger, context?: TriggerContext) => void;
   show: (campaign: CampaignPayload) => void;
-  close: (outcome: 'click' | 'dismiss') => void;
+  schedule: (campaign: CampaignPayload) => void;
+  close: (outcome: 'click' | 'dismiss', elementId?: string) => void;
   flushPending: () => void;
 };
 
@@ -53,13 +59,13 @@ const writeLastBlockingAt = (at: number) => {
   }
 };
 
-function reportEvent(campaignId: string, event: CampaignEvent) {
+function reportEvent(campaignId: string, event: CampaignEvent, elementId?: string) {
   void fetch('/api/campaigns/event', {
     method: 'POST',
     credentials: 'include',
     keepalive: true,
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ campaignId, event }),
+    body: JSON.stringify({ campaignId, event, elementId }),
   }).catch(() => {});
 }
 
@@ -72,6 +78,8 @@ const matchesTrigger = (
     if (rule.event !== trigger) return false;
     if (rule.minGap != null && (context.gap ?? 0) < rule.minGap) return false;
     if (rule.minDays != null && (context.days ?? 0) < rule.minDays) return false;
+    if (rule.minMinutes != null && (context.minutes ?? 0) < rule.minMinutes) return false;
+    if (rule.minStreak != null && (context.streak ?? 0) < rule.minStreak) return false;
     return true;
   });
 
@@ -87,6 +95,7 @@ export const useCampaignStore = create<Store>((set, get) => ({
   blockingShown: 0,
   shownIds: [],
   busyReasons: [],
+  lastClick: null,
 
   setCampaigns: (campaigns) => set({ campaigns }),
 
@@ -102,7 +111,7 @@ export const useCampaignStore = create<Store>((set, get) => ({
 
   emit: (trigger, context = {}) => {
     const state = get();
-    if (state.active) return;
+    if (state.active || state.pending) return;
 
     const candidates = state.campaigns
       .filter((campaign) => !state.shownIds.includes(campaign.id))
@@ -112,7 +121,7 @@ export const useCampaignStore = create<Store>((set, get) => ({
     for (const campaign of candidates) {
       const blocking = isBlockingTemplate(campaign.template);
       if (!blocking) {
-        get().show(campaign);
+        get().schedule(campaign);
         return;
       }
       if (state.blockingShown >= MAX_BLOCKING_PER_SESSION) return;
@@ -123,9 +132,24 @@ export const useCampaignStore = create<Store>((set, get) => ({
         set({ pending: campaign });
         return;
       }
-      get().show(campaign);
+      get().schedule(campaign);
       return;
     }
+  },
+
+  /** Landing in the same frame as the trigger reads as a glitch, so every
+   *  campaign waits out its own beat and re-checks the room before appearing.
+   *  Holding it as pending in the meantime keeps a second trigger from queuing
+   *  a second popup behind it. */
+  schedule: (campaign) => {
+    set({ pending: campaign });
+    const delay = Math.max(0, campaign.delayMs ?? SHOW_DELAY_MS);
+    window.setTimeout(() => {
+      const now = get();
+      if (now.active || now.pending?.id !== campaign.id) return;
+      if (isBlockingTemplate(campaign.template) && now.busyReasons.length > 0) return;
+      now.show(campaign);
+    }, delay);
   },
 
   show: (campaign) => {
@@ -142,11 +166,14 @@ export const useCampaignStore = create<Store>((set, get) => ({
     reportEvent(campaign.id, 'impression');
   },
 
-  close: (outcome) => {
+  close: (outcome, elementId) => {
     const campaign = get().active;
     if (!campaign) return;
-    reportEvent(campaign.id, outcome === 'click' ? 'click' : 'dismiss');
-    set({ active: null });
+    reportEvent(campaign.id, outcome === 'click' ? 'click' : 'dismiss', elementId);
+    set({
+      active: null,
+      lastClick: outcome === 'click' ? { id: campaign.id, at: Date.now() } : get().lastClick,
+    });
   },
 
   flushPending: () => {
@@ -156,8 +183,9 @@ export const useCampaignStore = create<Store>((set, get) => ({
     window.setTimeout(() => {
       const now = get();
       if (now.active || now.busyReasons.length > 0) return;
+      if (now.pending?.id !== campaign.id) return;
       now.show(campaign);
-    }, SHOW_DELAY_MS);
+    }, campaign.delayMs ?? SHOW_DELAY_MS);
   },
 }));
 
@@ -175,8 +203,20 @@ export const setCampaignBusy = (reason: string, busy: boolean) => {
   useCampaignStore.getState().setBusy(reason, busy);
 };
 
-export const markCampaignConverted = (campaignId: string) => {
-  reportEvent(campaignId, 'convert');
+/**
+ * Credits a purchase to the popup that sent the user there. Without an id it
+ * uses the last campaign whose button was pressed, as long as that click is
+ * recent enough to plausibly be the reason.
+ */
+export const markCampaignConverted = (campaignId?: string) => {
+  if (campaignId) {
+    reportEvent(campaignId, 'convert');
+    return;
+  }
+  const { lastClick } = useCampaignStore.getState();
+  if (!lastClick || Date.now() - lastClick.at > CONVERSION_WINDOW_MS) return;
+  reportEvent(lastClick.id, 'convert');
+  useCampaignStore.setState({ lastClick: null });
 };
 
 export { SHOW_DELAY_MS };
