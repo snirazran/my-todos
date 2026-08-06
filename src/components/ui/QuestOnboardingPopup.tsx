@@ -201,7 +201,7 @@ export function QuestOnboardingPopup({
 
               {categories.length === 0 && (
                 <div className="rounded-2xl border border-dashed border-border/60 px-5 py-10 text-center text-sm text-muted-foreground">
-                  No focus areas are available yet.
+                  No areas are available yet.
                 </div>
               )}
 

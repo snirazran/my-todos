@@ -661,7 +661,7 @@ export function QuestsPanel({
       for (const tagId of entry.tagIds) {
         assignments[tagId] = {
           categoryId: entry.categoryId,
-          categoryName: category?.shortLabel || category?.name || 'another focus area',
+          categoryName: category?.shortLabel || category?.name || 'another area',
         };
       }
     }
@@ -1233,13 +1233,13 @@ export function QuestsPanel({
                               {!data.onboarding?.complete && (
                                 <PanelCard>
                                   Finish your onboarding on the home page to unlock
-                                  quests for your focus areas.
+                                  quests for your areas.
                                 </PanelCard>
                               )}
                               {data.onboarding?.complete &&
                                 selectedCategories.length === 0 && (
                                   <PanelCard>
-                                    Select at least one focus area to receive quests
+                                    Select at least one area to receive quests
                                     here.
                                   </PanelCard>
                                 )}
@@ -1527,7 +1527,7 @@ export function QuestsPanel({
                                         ? pinnedCategoryId
                                           ? 'your tapped pick (this visit only)'
                                           : 'claimable first, then top priority'
-                                        : 'your active focus area'
+                                        : 'your active area'
                                     }`,
                                     'rows below follow the same order',
                                   ]}

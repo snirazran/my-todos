@@ -11,6 +11,8 @@ import { useFrogodoroUiStore } from '@/lib/frogodoroUiStore';
 import { useSheetStore } from '@/lib/sheetStore';
 import { useUIStore } from '@/lib/uiStore';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
+import { useInventory } from '@/hooks/useInventory';
+import { fliesCaughtFor, priorDayFocusSeconds } from '@/lib/focusFlies';
 import Frog from '@/components/ui/frog';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
 import CircularTimer from '@/components/ui/CircularTimer';
@@ -86,6 +88,8 @@ export default function GlobalFrogodoroMini() {
   const showDone =
     awaitingDone && openSheets === 0 && !hostWillHandle && !loadingScreenVisible;
   const { indices: frogIndices } = useWardrobeIndices(showDone);
+  const { data: inventorySummary } = useInventory(showDone, true);
+  const focusFlyDaily = inventorySummary?.wardrobe?.focusFlyDaily;
   // Live frog mounts only after the card's pop-in settles (static stamp until
   // then) so the entrance never competes with Rive canvas setup.
   const [cardEntered, setCardEntered] = useState(false);
@@ -118,6 +122,12 @@ export default function GlobalFrogodoroMini() {
   const celebrateFocus = displayPhase === 'focus' && !splitDone;
   const bonusFly =
     celebrateFocus && deepFocus && !lastPhasePaused && lastFocusElapsed >= 15 * 60;
+
+  const sessionFocus = sessionStats.focusTime;
+  const fliesCaught = fliesCaughtFor(
+    sessionFocus,
+    priorDayFocusSeconds(focusFlyDaily, sessionFocus),
+  );
 
   return (
     <>
@@ -173,7 +183,7 @@ export default function GlobalFrogodoroMini() {
                             <FocusCelebration
                               seconds={lastFocusElapsed}
                               bonusFly={bonusFly}
-                              fliesCaught={Math.floor(lastFocusElapsed / 300)}
+                              fliesCaught={fliesCaught}
                               compact
                               showFrog={false}
                             />

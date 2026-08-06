@@ -3,7 +3,7 @@ export const FOCUS_FLY_DAILY_CAP = 5;
 export const DEEP_FOCUS_MIN_SECONDS = 15 * 60;
 export const DEEP_FOCUS_BONUS_FLIES = 1;
 export const DEEP_FOCUS_DAILY_CAP = 1;
-export const SCENE_FLY_RATE_SECONDS = 5 * 60;
+export const SCENE_FLY_MAX = 3;
 
 // The deep-focus pledge is "live" while an unbroken focus phase long enough
 // to qualify is selected/running — every surface uses this to show/hide the
@@ -55,13 +55,14 @@ export function priorDayFocusSeconds(
   return Math.max(0, (daily.focusSeconds ?? 0) - Math.max(0, sessionFocusSeconds));
 }
 
-// The ambient swarm every surface renders for a focus session, sized by the
-// session's PLANNED length: 5-min sessions get 1 fly, 10-min get 2, 15-min
-// and up get 3. Decorative only — payout uses FOCUS_FLY_RATE_SECONDS. Both the
-// timer sheet and the home hero derive their count from here so they always agree.
-export function sceneFlyCount(plannedFocusSeconds: number, max = 3): number {
-  return Math.min(
-    Math.min(3, max),
-    Math.max(1, Math.floor(plannedFocusSeconds / SCENE_FLY_RATE_SECONDS)),
+// The ambient swarm every surface renders for a focus session: exactly the
+// flies this session can still catch, capped at SCENE_FLY_MAX so a long
+// session doesn't crowd the card. A session that earns nothing shows nothing,
+// and each catch removes one unless there are more still owed. Both the timer
+// sheet and the home hero derive their count from here so they always agree.
+export function sceneFlyCount(fliesRemaining: number, max = SCENE_FLY_MAX): number {
+  return Math.max(
+    0,
+    Math.min(Math.min(SCENE_FLY_MAX, max), Math.floor(fliesRemaining)),
   );
 }

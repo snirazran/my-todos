@@ -15,6 +15,7 @@ import {
   ChevronRight,
   Repeat,
   Scroll,
+  Coffee,
 } from 'lucide-react';
 import { motion, AnimatePresence, useDragControls } from 'framer-motion';
 import { useShallow } from 'zustand/react/shallow';
@@ -38,7 +39,6 @@ import { useNotificationStatus } from '@/hooks/useNotificationStatus';
 import { hapticImpact, hapticTick } from '@/lib/haptics';
 import { Bell, Volume2, VolumeX, Zap } from 'lucide-react';
 import { useIntros } from '@/hooks/useIntros';
-import { FrogodoroIntroSheet } from '@/components/ui/FirstTimeIntros';
 import { FocusCelebration, questHomeKey } from '@/components/ui/FocusCelebration';
 import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
 import type { Trackable } from '@/lib/questClaims';
@@ -59,6 +59,8 @@ import Frog from '@/components/ui/frog';
 import Fly from '@/components/ui/fly';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import useSWR from 'swr';
+
+const OPTIONS_OPEN_KEY = 'frogodoro:options-open';
 
 interface Task {
   id: string;
@@ -257,24 +259,35 @@ export default function FrogodoroSheet({
   const [confirmStop, setConfirmStop] = useState(false);
   const [confirmPause, setConfirmPause] = useState(false);
   const [confirmTaskSwitch, setConfirmTaskSwitch] = useState(false);
+  // Nothing renders until `mounted`, so reading storage during init can't
+  // desync hydration.
+  const [optionsOpen, setOptionsOpen] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return window.localStorage.getItem(OPTIONS_OPEN_KEY) === '1';
+  });
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(OPTIONS_OPEN_KEY, optionsOpen ? '1' : '0');
+    } catch {}
+  }, [optionsOpen]);
   const catchChipRef = useRef<HTMLElement | null>(null);
   const [chipPulse, setChipPulse] = useState(0);
   const { seenIntros, markIntroSeen } = useIntros(open);
-  const [introOpen, setIntroOpen] = useState(false);
+  const isFirstEverOpen = !!seenIntros && !seenIntros.frogodoro;
 
-  // First open ever (per account): explain the timer once — sprints, sync,
-  // and that it survives closing the app. First-timers also get a shorter
-  // 15-minute default focus: an easier first win than the classic 25.
+  // First open ever (per account): 15 minutes, not the classic 25. It's the
+  // shortest session that still pays out (FOCUS_FLY_RATE_SECONDS) and the
+  // shortest that qualifies for the deep-focus bonus (DEEP_FOCUS_MIN_SECONDS),
+  // so a first-timer who just presses START lands two flies instead of zero.
   useEffect(() => {
-    if (!open || !seenIntros || seenIntros.frogodoro) return;
+    if (!open || !isFirstEverOpen) return;
     markIntroSeen('frogodoro');
     const store = useFrogodoroStore.getState();
     if (!task?.frogodoroSettings && !store.timerActive) {
       store.setSettings({ ...store.settings, focusDuration: 15 });
     }
-    setIntroOpen(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, seenIntros?.frogodoro]);
+  }, [open, isFirstEverOpen]);
   const dragControls = useDragControls();
   const overscroll = useSheetOverscrollDrag();
 
@@ -579,8 +592,6 @@ export default function FrogodoroSheet({
   };
 
   // Derived
-  const phaseDuration =
-    Math.max(1, Math.round((phase === 'focus' ? settings.focusDuration : settings.breakDuration) * 60));
   const phaseHasElapsed = useFrogodoroStore((s) => liveElapsedSeconds(s) > 0);
   const focusedMinutes = useFrogodoroStore((s) =>
     Math.max(1, Math.floor(liveElapsedSeconds(s) / 60)),
@@ -828,19 +839,24 @@ export default function FrogodoroSheet({
     return { key: 'breakDuration' as const, min: TEN_SECONDS, max: DURATION_MAX };
   };
 
-  const adjustCurrentDuration = (direction: -1 | 1) => {
-    if (isRunning) return;
-
-    const control = getDurationControl();
-    const currentValue = settings[control.key];
+  const adjustDuration = (
+    key: 'focusDuration' | 'breakDuration',
+    direction: -1 | 1,
+  ) => {
+    const currentValue = settings[key];
     const nextValue =
       direction === -1 ? decreaseDuration(currentValue) : increaseDuration(currentValue);
 
     if (nextValue === currentValue) return;
 
-    const nextSettings = { ...settings, [control.key]: nextValue };
+    const nextSettings = { ...settings, [key]: nextValue };
     setSettings(nextSettings);
     void persistTaskSettings(nextSettings);
+  };
+
+  const adjustCurrentDuration = (direction: -1 | 1) => {
+    if (isRunning) return;
+    adjustDuration(getDurationControl().key, direction);
   };
 
   // While awaiting Done the phase has already advanced to the next one, but the
@@ -897,6 +913,21 @@ export default function FrogodoroSheet({
       sessionFocus + (s.phase === 'focus' ? Math.max(0, s.timeLeft) : 0),
       priorDayFocusSeconds(focusFlyDaily, sessionFocus),
     );
+  });
+
+  // Names what's inside and its current value, so the collapsed row says both
+  // what tapping it changes and what the break is set to right now.
+  const optionsSummary = settings.autoStartBreaks
+    ? `${formatDurationSetting(settings.breakDuration)} break, starts itself`
+    : `${formatDurationSetting(settings.breakDuration)} break after focus`;
+
+  const focusFlyCapReached = useFrogodoroStore((s) => {
+    const sessionFocus = sessionFocusLiveSeconds(s);
+    const dayTotal =
+      priorDayFocusSeconds(focusFlyDaily, sessionFocus) +
+      sessionFocus +
+      (s.phase === 'focus' ? Math.max(0, s.timeLeft) : 0);
+    return focusFliesEarnedForDay(dayTotal) >= FOCUS_FLY_DAILY_CAP;
   });
 
   if (!mounted) return null;
@@ -1345,7 +1376,7 @@ export default function FrogodoroSheet({
                             <FocusCelebration
                               seconds={lastFocusElapsed}
                               bonusFly={deepFocusBonusEarned}
-                              fliesCaught={Math.floor(lastFocusElapsed / 300)}
+                              fliesCaught={fliesCaught}
                               showFrog={false}
                             />
                           </div>
@@ -1403,9 +1434,9 @@ export default function FrogodoroSheet({
                         </div>
                         )}
 
-                        {/* Session config lives with the session, not behind a
-                            gear: phase, duration, pledge, auto-start, then
-                            START. Real switches so they read as controls. */}
+                        {/* One line of why, then everything else folded away:
+                            a first session needs the number and START, not
+                            three decisions. */}
                         <AnimatePresence initial={false}>
                           {!awaitingDone && !timerActive && phase === 'focus' && (
                             <motion.div
@@ -1413,9 +1444,28 @@ export default function FrogodoroSheet({
                               animate={{ height: 'auto', opacity: 1 }}
                               exit={{ height: 0, opacity: 0 }}
                               transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
-                              className="overflow-hidden"
+                              className="overflow-hidden pt-1.5"
                             >
-                              <div className="mx-auto mb-2 w-full max-w-[300px] divide-y divide-white/10 overflow-hidden rounded-2xl bg-black/20 shadow-inner">
+                              <div className="mx-auto mb-2 flex min-h-9 w-full max-w-[300px] items-center justify-center">
+                                <span className="relative text-[13px] font-black leading-tight text-white/90">
+                                  <span className="absolute right-full top-1/2 mr-1.5 flex -translate-y-1/2 items-center">
+                                    <Fly
+                                      size={34}
+                                      y={-6}
+                                      interactive={false}
+                                      alwaysPlay
+                                      oversample={1.5}
+                                    />
+                                  </span>
+                                  {focusFlyCapReached
+                                    ? 'Frog’s full — minutes still count'
+                                    : fliesPotential > 0
+                                      ? `${settings.focusDuration} min catches ${fliesPotential} ${fliesPotential === 1 ? 'fly' : 'flies'}`
+                                      : `Focus ${FOCUS_FLY_RATE_SECONDS / 60} min to catch a fly`}
+                                </span>
+                              </div>
+
+                              <div className="mx-auto mb-2 w-full max-w-[300px] overflow-hidden rounded-2xl bg-black/20 shadow-inner">
                                 <button
                                   type="button"
                                   role="switch"
@@ -1457,7 +1507,35 @@ export default function FrogodoroSheet({
                                     />
                                   </span>
                                 </button>
+                              </div>
 
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  hapticTick();
+                                  setOptionsOpen((v) => !v);
+                                }}
+                                aria-expanded={optionsOpen}
+                                className="mx-auto mb-2 flex w-fit items-center gap-1 rounded-full px-3 py-1.5 text-[11px] font-bold text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+                              >
+                                <span>{optionsSummary}</span>
+                                <ChevronRight
+                                  className={`h-3.5 w-3.5 transition-transform ${
+                                    optionsOpen ? 'rotate-90' : ''
+                                  }`}
+                                />
+                              </button>
+
+                              <AnimatePresence initial={false}>
+                                {optionsOpen && (
+                                  <motion.div
+                                    initial={{ height: 0, opacity: 0 }}
+                                    animate={{ height: 'auto', opacity: 1 }}
+                                    exit={{ height: 0, opacity: 0 }}
+                                    transition={{ duration: 0.24, ease: [0.32, 0.72, 0, 1] }}
+                                    className="overflow-hidden"
+                                  >
+                              <div className="mx-auto mb-2 w-full max-w-[300px] divide-y divide-white/10 overflow-hidden rounded-2xl bg-black/20 shadow-inner">
                                 <button
                                   type="button"
                                   role="switch"
@@ -1491,7 +1569,42 @@ export default function FrogodoroSheet({
                                     />
                                   </span>
                                 </button>
+
+                                <div className="flex w-full items-center justify-between gap-3 px-4 py-2">
+                                  <span className="flex min-w-0 items-center gap-2.5">
+                                    <Coffee className="h-4 w-4 shrink-0 text-white/60" />
+                                    <span className="truncate text-[12px] font-black leading-tight text-white">
+                                      Break length
+                                    </span>
+                                  </span>
+                                  <span className="flex shrink-0 items-center gap-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => adjustDuration('breakDuration', -1)}
+                                      disabled={settings.breakDuration <= TEN_SECONDS}
+                                      aria-label="Decrease break length"
+                                      className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/20 text-white transition-all hover:bg-white/30 active:scale-95 disabled:cursor-not-allowed disabled:opacity-35"
+                                    >
+                                      <Minus className="h-3.5 w-3.5" />
+                                    </button>
+                                    <span className="min-w-[38px] text-center text-[12px] font-black tabular-nums text-white">
+                                      {formatDurationSetting(settings.breakDuration)}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => adjustDuration('breakDuration', 1)}
+                                      disabled={settings.breakDuration >= DURATION_MAX}
+                                      aria-label="Increase break length"
+                                      className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/20 text-white transition-all hover:bg-white/30 active:scale-95 disabled:cursor-not-allowed disabled:opacity-35"
+                                    >
+                                      <Plus className="h-3.5 w-3.5" />
+                                    </button>
+                                  </span>
+                                </div>
                               </div>
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
                             </motion.div>
                           )}
                         </AnimatePresence>
@@ -1509,7 +1622,7 @@ export default function FrogodoroSheet({
                                 running={isRunning}
                                 showFlies={timerActive && phase === 'focus'}
                                 caught={fliesCaught}
-                                focusSeconds={phaseDuration}
+                                fliesPotential={fliesPotential}
                                 counterRef={catchChipRef}
                                 onGainLand={() => setChipPulse((p) => p + 1)}
                                 onFrogReady={handleFrogReady}
@@ -1874,15 +1987,5 @@ export default function FrogodoroSheet({
     document.body,
   );
 
-  return (
-    <>
-      {sheetPortal}
-      <FrogodoroIntroSheet
-        open={introOpen}
-        onClose={() => setIntroOpen(false)}
-        focusMinutes={settings.focusDuration}
-        breakMinutes={settings.breakDuration}
-      />
-    </>
-  );
+  return sheetPortal;
 }

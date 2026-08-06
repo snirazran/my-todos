@@ -41,7 +41,7 @@ export default function TagsPopup({
   currentFocusCategoryId,
   tagAssignments,
   focusTagLimitTitle = 'Tag limit reached',
-  focusTagLimitDescription = 'You can connect only one tag per focus area.',
+  focusTagLimitDescription = 'You can connect only one tag per area.',
   suggestedTagName,
 }: Props) {
   const [mounted, setMounted] = useState(false);
@@ -365,7 +365,7 @@ function SwitchTagFocusDialog({
             <span className="font-bold text-foreground">{tag.name}</span> is
             already associated with{' '}
             <span className="font-bold text-foreground">
-              {fromCategoryName ?? 'another focus area'}
+              {fromCategoryName ?? 'another area'}
             </span>
             .
           </p>

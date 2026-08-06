@@ -51,7 +51,7 @@ export const FIRST_HOPS_QUEST: OnboardingQuestDef = {
       amount: 5,
       tagMode: 'ignore',
       helpText:
-        'Open a task and start a Frogodoro focus session for a few minutes.',
+        'Open a task, hit Focus timer, and work on just that until it ends.',
       rewards: fixedFlies(10),
     },
     {
