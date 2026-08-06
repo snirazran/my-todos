@@ -150,7 +150,7 @@ function objectiveSummaryLabel(
     : subject;
   if (block.action === 'add') {
     return block.requiresFollowThrough
-      ? `Plan ${target} ${scope} and finish them`
+      ? `Plan ${target} ${scope} and finish ${target === 1 ? 'it' : 'them'}`
       : `Add ${target} ${scope}`;
   }
   if (typeof block.beforeHour === 'number') {
@@ -196,6 +196,7 @@ type TrackableEntry = {
   objectiveLabel: string;
   remainingLabel: string;
   objectiveType?: string;
+  actionKey?: string;
   tags?: ObjectiveTagChip[];
   needsFocusTags?: boolean;
   progress: number;
@@ -301,10 +302,17 @@ function objectiveEffort(
     };
   }
   if (block.type === 'distinct_days') {
-    // Today's link is one task; the rest is calendar time you cannot buy back.
+    // Today's link is one task, but only while today is still unclaimed —
+    // once it counts, no amount of work today buys the next day.
+    const wanted = tagIds?.length ? new Set(tagIds) : null;
+    const showedUpToday = tasks.some((task) => {
+      if (wanted && !task.tags?.some((tagId) => wanted.has(tagId))) return false;
+      return (task.completedDates ?? []).includes(todayKey);
+    });
+    const effortToComplete = remainingUnits * DISTINCT_DAY_EFFORT_DAYS;
     return {
-      effortToActNow: TASK_UNIT_EFFORT_DAYS,
-      effortToComplete: remainingUnits * DISTINCT_DAY_EFFORT_DAYS,
+      effortToActNow: showedUpToday ? effortToComplete : TASK_UNIT_EFFORT_DAYS,
+      effortToComplete,
       effortAtRiskDays: 0,
     };
   }
@@ -652,6 +660,17 @@ export async function GET(req: Request) {
             categoryNameById.get(quest.categoryId ?? ''),
           ),
           objectiveType: block.type,
+          // Objectives that the same act advances. Two tiers sharing this key
+          // are not two things to do — the nearer one is on the way to the
+          // further one, so only the nearer belongs on the "next up" card.
+          actionKey: [
+            block.type,
+            block.action ?? '',
+            block.metricKey ?? '',
+            block.sessionMinutes ?? '',
+            block.beforeHour ?? '',
+            block.requiresFollowThrough ? 'follow' : '',
+          ].join('|'),
           tags:
             block.tagMode === 'focus_category_tags'
               ? questFocusTags(quest)

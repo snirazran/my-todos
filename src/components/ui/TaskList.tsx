@@ -19,10 +19,6 @@ import {
 import Fly from '@/components/ui/fly';
 import { createPortal } from 'react-dom';
 import { TimeTag } from '@/components/ui/TimeTag';
-import {
-  QuestTaskChip,
-  useTaskQuestChipLookup,
-} from '@/components/ui/QuestTaskChip';
 import { Icon } from '@/components/ui/Icon';
 import {
   hapticGrab,
@@ -385,12 +381,6 @@ const SortableTaskItem = React.forwardRef<
     });
     const showSwipeActions =
       (isOpen || isSwiping) && !isDragging && !isSortDragging;
-
-    const questChipLookup = useTaskQuestChipLookup();
-    const questChip = useMemo(
-      () => questChipLookup(task.tags),
-      [questChipLookup, task.tags],
-    );
 
     const activeHint = useUIStore((s) => s.activeHint);
     const hintStep = activeHint
@@ -927,17 +917,6 @@ const SortableTaskItem = React.forwardRef<
                 {( (task.tags && task.tags.length > 0) || task.startTime ) && (
                   <div className="flex flex-wrap gap-1 mb-1">
                     <AnimatePresence mode="popLayout">
-                      {questChip && !isDone && (
-                        <motion.span
-                          initial={false}
-                          exit={{ opacity: 0, scale: 0 }}
-                          transition={{ duration: 0.2 }}
-                          key="task-quest-chip"
-                          className="inline-flex min-w-0"
-                        >
-                          <QuestTaskChip chip={questChip} />
-                        </motion.span>
-                      )}
                       {task.startTime && (
                         <motion.span
                           initial={false}

@@ -50,6 +50,7 @@ export type Trackable = {
   objectiveLabel: string;
   remainingLabel: string;
   objectiveType?: string;
+  actionKey?: string;
   tags?: ObjectiveTagChip[];
   needsFocusTags?: boolean;
   progress: number;

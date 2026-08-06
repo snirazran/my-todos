@@ -49,8 +49,26 @@ export function NextQuestStrip({
   const claimableCount = claimables?.length ?? 0;
 
   const { ranked, laterTiers } = useMemo(() => {
-    const rankedAll = trackables?.length
-      ? rankByQuestPriority(trackables)
+    // A tier the same act already advances is not a separate thing to do.
+    // Keep the nearest of each such group so "next up" names the objective
+    // that closes first, not the biggest one sharing its action.
+    const nearestByAction = new Map<string, Trackable>();
+    for (const t of trackables ?? []) {
+      if (!t.actionKey) continue;
+      const key = `${t.questId ?? t.id}:${t.actionKey}`;
+      const held = nearestByAction.get(key);
+      if (!held || t.target - t.progress < held.target - held.progress) {
+        nearestByAction.set(key, t);
+      }
+    }
+    const undominated = (trackables ?? []).filter((t) => {
+      if (!t.actionKey) return true;
+      const key = `${t.questId ?? t.id}:${t.actionKey}`;
+      return nearestByAction.get(key)?.id === t.id;
+    });
+
+    const rankedAll = undominated.length
+      ? rankByQuestPriority(undominated)
       : [];
     const seenQuests = new Set<string>();
     const ranked: typeof rankedAll = [];

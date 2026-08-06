@@ -385,7 +385,9 @@ export function formatQuestObjective(block: QuestCardLogicBlock) {
       : subjectLabel;
   if (block.action === 'add') {
     return block.requiresFollowThrough
-      ? `Plan ${targetLabel} ${scopeLabel} and finish them`
+      ? `Plan ${targetLabel} ${scopeLabel} and finish ${
+          numericTarget === 1 && !targetLabel.includes('-') ? 'it' : 'them'
+        }`
       : `Add ${targetLabel} ${scopeLabel}`;
   }
   if (typeof block.beforeHour === 'number') {
@@ -1288,6 +1290,14 @@ export function CategoryQuestPresentationCard({
   const [rewardPopup, setRewardPopup] = useState<RewardPopupState | null>(null);
   const [showSwitch, setShowSwitch] = useState(false);
   const [showAllObjectives, setShowAllObjectives] = useState(false);
+  // The swap affordance lives once on the header row; the per-objective
+  // buttons only appear while the user has explicitly asked to swap.
+  const [swapMode, setSwapMode] = useState(false);
+  const canSwap =
+    !locked && !!onRerollObjective && (quest.rerollsLeft ?? 0) > 0;
+  useEffect(() => {
+    if (!canSwap) setSwapMode(false);
+  }, [canSwap]);
   // Close the confirm once a switch finishes (switchingFocus flips back off).
   useEffect(() => {
     if (!switchingFocus) setShowSwitch(false);
@@ -1560,7 +1570,28 @@ export function CategoryQuestPresentationCard({
               <span className="ml-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-muted-foreground">
                 {doneSteps} / {totalSteps} done
               </span>
+              {canSwap && (
+                <button
+                  type="button"
+                  onClick={() => setSwapMode((on) => !on)}
+                  aria-pressed={swapMode}
+                  className={cn(
+                    'ml-auto inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[10px] font-black uppercase tracking-[0.12em] transition',
+                    swapMode
+                      ? 'border-primary/40 bg-primary/10 text-primary'
+                      : 'border-border/50 bg-background text-muted-foreground [@media(hover:hover)]:hover:text-foreground',
+                  )}
+                >
+                  <RefreshCw className="h-3 w-3" />
+                  {swapMode ? 'Cancel' : `${quest.rerollsLeft} swap`}
+                </button>
+              )}
             </div>
+          )}
+          {swapMode && (
+            <p className="mt-1.5 text-[11px] font-bold text-muted-foreground">
+              Pick the objective you want to trade for a different one.
+            </p>
           )}
         </div>
       )}
@@ -1603,13 +1634,16 @@ export function CategoryQuestPresentationCard({
                   : () => onClaimObjective(block.id)
               }
               onRerollObjective={
-                locked ||
+                !swapMode ||
+                !canSwap ||
                 !onRerollObjective ||
-                (quest.rerollsLeft ?? 0) <= 0 ||
                 claimedObjectiveIds.includes(block.id) ||
                 block.progress >= Math.max(1, block.target)
                   ? undefined
-                  : () => onRerollObjective(block.id)
+                  : () => {
+                      setSwapMode(false);
+                      onRerollObjective(block.id);
+                    }
               }
               rerollingObjective={rerollingObjectiveId === block.id}
               isLast

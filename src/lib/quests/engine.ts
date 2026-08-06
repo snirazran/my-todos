@@ -38,6 +38,7 @@ import type {
   MacroCategoryDefinition,
   MacroCategoryId,
   QuestLogicBlock,
+  QuestLogicType,
   QuestPlacement,
   QuestProgressView,
   QuestReward,
@@ -407,8 +408,20 @@ function snapToFiveInRange(value: number, min: number, max: number): number {
 
 const BASELINE_LOOKBACK_DAYS = 14;
 const BASELINE_MIN_OBSERVED_DAYS = 3;
-const BASELINE_MIN_SCALE = 0.35;
+// A scale low enough to flatten the ladder defeats the point of having tiers,
+// so the floor stays well above zero and the cold-start case opts out entirely
+// rather than bottoming out.
+const BASELINE_MIN_SCALE = 0.6;
 const BASELINE_MAX_SCALE = 1.6;
+const BASELINE_MIN_COMPLETIONS = 4;
+const BASELINE_MIN_FOCUS_MINUTES = 20;
+
+// Below these an objective stops meaning what its name says: "show up on 1
+// day" is just "complete a task", and a one-minute focus target is noise.
+const TYPE_MIN_TARGET: Partial<Record<QuestLogicType, number>> = {
+  distinct_days: 2,
+  focus_minutes: 10,
+};
 
 // Recipe ladders are authored for a user doing roughly this much in the tagged
 // area each day. A user's own trailing rate is divided by these to get the
@@ -483,6 +496,16 @@ function computeQuestBaseline(args: {
   const focusMinutes =
     sumFocusSeconds(tasks, startKey, endKey, matches) / 60;
 
+  // Too thin a sample to personalise from. A brand-new focus area has no
+  // tagged history, and scaling off that would floor every tier of the ladder
+  // at once — the author's numbers are the better guess until there is signal.
+  if (
+    completions < BASELINE_MIN_COMPLETIONS &&
+    focusMinutes < BASELINE_MIN_FOCUS_MINUTES
+  ) {
+    return NEUTRAL_BASELINE;
+  }
+
   return {
     completionsPerDay: completions / observedDays,
     focusMinutesPerDay: focusMinutes / observedDays,
@@ -506,7 +529,11 @@ function baselineScaleForBlock(
         ? baseline.activeDayFraction / BASELINE_REFERENCE.activeDayFraction
         : baseline.completionsPerDay / BASELINE_REFERENCE.completionsPerDay;
   if (!Number.isFinite(ratio)) return 1;
-  return Math.min(BASELINE_MAX_SCALE, Math.max(BASELINE_MIN_SCALE, ratio));
+  // A day count is capped by the window, so scaling it up only ever collides
+  // with the ceiling and makes two tiers ask the same thing.
+  const ceiling =
+    block.type === 'distinct_days' ? 1 : BASELINE_MAX_SCALE;
+  return Math.min(ceiling, Math.max(BASELINE_MIN_SCALE, ratio));
 }
 
 function resolveLogicTarget(
@@ -524,15 +551,63 @@ function resolveLogicTarget(
   const rng = createSeededRandom(seed);
   const rolled = Math.floor(rng() * (max - min + 1)) + min;
   const scale = baselineScaleForBlock(block, baseline);
-  const scaled = Math.max(1, Math.round(rolled * scale));
+  const floor = TYPE_MIN_TARGET[block.type] ?? 1;
+  const scaled = Math.max(floor, Math.round(rolled * scale));
   if (block.type === 'focus_minutes') {
-    return Math.max(5, Math.round(scaled / 5) * 5);
+    return Math.max(floor, Math.round(scaled / 5) * 5);
   }
   // You cannot show up on more days than the window has.
   if (block.type === 'distinct_days' && windowDays) {
     return Math.min(Math.max(1, Math.floor(windowDays)), scaled);
   }
   return scaled;
+}
+
+// Scaling each tier independently can collapse a ladder: two tiers of the same
+// kind that were authored 2 and 3 both land on 1, and the board shows the same
+// objective twice at different rewards. This restores the authored ordering
+// after scaling, without undoing the scale itself.
+function enforceLadderShape(
+  blocks: ResolvedQuestLogicBlock[],
+  windowDays: number,
+): void {
+  const signature = (block: ResolvedQuestLogicBlock) =>
+    [
+      block.type,
+      block.action ?? '',
+      block.metricKey ?? '',
+      block.sessionMinutes ?? '',
+      block.beforeHour ?? '',
+      block.requiresFollowThrough ? 'follow' : '',
+    ].join('|');
+
+  const groups = new Map<string, ResolvedQuestLogicBlock[]>();
+  for (const block of blocks) {
+    if (block.amountMode !== 'random') continue;
+    const key = signature(block);
+    const group = groups.get(key);
+    if (group) group.push(block);
+    else groups.set(key, [block]);
+  }
+
+  for (const group of Array.from(groups.values())) {
+    if (group.length < 2) continue;
+    const ceiling =
+      group[0].type === 'distinct_days'
+        ? Math.max(1, Math.floor(windowDays))
+        : Number.MAX_SAFE_INTEGER;
+    for (let i = 1; i < group.length; i += 1) {
+      const previous = group[i - 1];
+      const current = group[i];
+      // Only tiers the author meant to escalate are pushed apart.
+      const authoredHigher =
+        (current.minAmount ?? 0) > (previous.minAmount ?? 0);
+      if (!authoredHigher) continue;
+      if (current.target <= previous.target) {
+        current.target = Math.min(ceiling, previous.target + 1);
+      }
+    }
+  }
 }
 
 function resolveRewardAmount(reward: QuestReward, seed: string) {
@@ -1371,6 +1446,16 @@ async function syncQuestForTemplate(args: {
       rewards: resolvedRewards.length > 0 ? resolvedRewards : undefined,
     };
   });
+
+  enforceLadderShape(
+    resolvedLogic,
+    templateDurationMinutes
+      ? Math.max(1, Math.round(templateDurationMinutes / (24 * 60)))
+      : 1,
+  );
+  for (const block of resolvedLogic) {
+    if (block.preCredited) block.progress = block.target;
+  }
 
   const target = resolvedLogic.reduce((sum, block) => sum + block.target, 0);
   const progress = resolvedLogic.reduce(

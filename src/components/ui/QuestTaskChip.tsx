@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import useSWR from 'swr';
 import { Target } from 'lucide-react';
+import Fly from '@/components/ui/fly';
 import { cn } from '@/lib/utils';
 import type { Trackable } from '@/lib/questClaims';
 import {
@@ -45,19 +46,26 @@ export function QuestTaskChip({
   return (
     <Tag
       {...(onClick ? { type: 'button' as const, onClick } : {})}
+      title={`${chip.categoryName} quest — ${chip.label}`}
       className={cn(
-        'inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] font-bold tracking-normal shadow-sm transition-colors',
-        onClick && 'hover:brightness-110',
+        'inline-flex items-center gap-1 rounded-md border border-dashed border-muted-foreground/30 bg-transparent px-1.5 py-0.5 text-[11px] font-semibold normal-case tracking-normal text-muted-foreground',
+        onClick && 'transition-colors hover:text-foreground',
         className,
       )}
-      style={{
-        backgroundColor: `${chip.color}18`,
-        borderColor: `${chip.color}40`,
-        color: chip.color,
-      }}
     >
-      <Target className="h-3 w-3 shrink-0" aria-hidden />
+      <Target className="h-3 w-3 shrink-0 opacity-70" aria-hidden />
       <span className="truncate">{chip.label}</span>
+      {chip.flies > 0 && (
+        <>
+          <span aria-hidden className="opacity-40">
+            ·
+          </span>
+          <span className="inline-flex items-center gap-0.5 tabular-nums">
+            <Fly className="h-3 w-3 shrink-0" />
+            {chip.flies}
+          </span>
+        </>
+      )}
     </Tag>
   );
 }
