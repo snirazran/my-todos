@@ -60,6 +60,7 @@ import { HomePageSkeleton } from '@/components/ui/Skeleton';
 import { HungerWarningModal } from '@/components/ui/HungerWarningModal';
 import { useFrogTongue, TONGUE_STROKE } from '@/hooks/useFrogTongue';
 import { useNotification } from '@/components/providers/NotificationProvider';
+import { buildTaskQuestChipLookup } from '@/lib/quests/taskQuestChip';
 import useSWR, { mutate as swrMutate } from 'swr';
 import { cn } from '@/lib/utils';
 import {
@@ -501,6 +502,10 @@ export default function HomeDashboard() {
   );
   const isPremium = !!questsData?.isPremium;
   const questOnboarding = questsData?.onboarding;
+  const questChipLookup = useMemo(
+    () => buildTaskQuestChipLookup(questsData?.trackables),
+    [questsData?.trackables],
+  );
 
   useEffect(() => {
     if (questOnboarding?.complete) {
@@ -1123,7 +1128,18 @@ export default function HomeDashboard() {
                 { id: randomUUID(), text, completed: false, tags },
               ]);
             }
-            if (user) void notifyQuestClaims(showNotification);
+            if (user) {
+              // "Yes, that counted" — the quest connection lands after the
+              // task exists, where it confirms something, rather than as a
+              // chip competing with the input while they are still typing.
+              const chip = questChipLookup(tags);
+              if (chip) {
+                showNotification(
+                  `Counts toward ${chip.categoryName} — ${chip.label}`,
+                );
+              }
+              void notifyQuestClaims(showNotification);
+            }
           } catch (e) {
             console.error('Failed to add task or refresh state:', e);
           }

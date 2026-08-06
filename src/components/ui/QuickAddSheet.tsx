@@ -33,7 +33,6 @@ import { Icon as AppIcon } from '@/components/ui/Icon';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
 import { hapticTick } from '@/lib/haptics';
 import { PlusUpgradeModal } from './PlusUpgradeModal';
-import { QuestTaskChip, useTaskQuestChipLookup } from './QuestTaskChip';
 import { PickerSheet } from './quick-add/PickerSheet';
 import { TagManagerSheet } from './quick-add/TagManagerSheet';
 import { SuggestionTabs } from './quick-add/SuggestionTabs';
@@ -254,24 +253,25 @@ function ToolbarPill({
   );
 }
 
-function ToolbarIcon({
-  icon,
-  label,
-  active = false,
-  onClick,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  active?: boolean;
-  onClick: () => void;
-}) {
+// 44px square keeps every toolbar action inside the platform touch minimum
+// now that the section picker is an icon sitting beside the other two.
+const ToolbarIcon = React.forwardRef<
+  HTMLButtonElement,
+  {
+    icon: React.ReactNode;
+    label: string;
+    active?: boolean;
+    onClick: () => void;
+  }
+>(function ToolbarIcon({ icon, label, active = false, onClick }, ref) {
   return (
     <button
+      ref={ref}
       type="button"
       aria-label={label}
       title={label}
       onClick={onClick}
-      className={`grid h-10 w-10 shrink-0 place-items-center rounded-full transition-colors active:scale-95 ${
+      className={`grid h-11 w-11 shrink-0 place-items-center rounded-full transition-colors active:scale-95 ${
         active
           ? 'bg-primary/10 text-primary'
           : 'text-muted-foreground [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground'
@@ -280,7 +280,7 @@ function ToolbarIcon({
       {icon}
     </button>
   );
-}
+});
 import type {
   ActivePicker,
   ChecklistItem,
@@ -666,12 +666,6 @@ export default function QuickAddSheet({
     .map((s) => `${s.id}:${(s.tagIds ?? []).join('|')}`)
     .join(',');
   const selectedTagKey = tags.join(',');
-  const questChipLookup = useTaskQuestChipLookup();
-  const questChip = useMemo(
-    () => questChipLookup(tags),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [questChipLookup, selectedTagKey],
-  );
   useEffect(() => {
     if (!open || sectionPickedManually) return;
     const match = sections.find((s) =>
@@ -1251,12 +1245,6 @@ export default function QuickAddSheet({
                                 <X className="h-3 w-3 shrink-0 stroke-[3]" />
                               </button>
                             ))}
-                            {questChip && (
-                              <QuestTaskChip
-                                chip={questChip}
-                                className="shrink-0 px-3 py-1.5 text-[11px] uppercase tracking-wider"
-                              />
-                            )}
                           </div>
                         </div>
                       </div>
@@ -1534,24 +1522,16 @@ export default function QuickAddSheet({
                             onClick={() => setActivePicker('repeat')}
                           />
                         )}
-                        {sections.length > 0 && !isLater && (
-                          <button
-                            ref={sectionBtnRef}
-                            type="button"
-                            onClick={toggleSectionPicker}
-                            className={`inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-bold transition-transform active:scale-95 ${
-                              pickedSection
-                                ? 'bg-primary/10 text-primary'
-                                : 'bg-muted/70 text-muted-foreground'
-                            }`}
-                          >
-                            <Rows3 className="h-4 w-4 shrink-0" />
-                            <span className="max-w-[110px] truncate whitespace-nowrap">
-                              {pickedSection?.name ?? 'Section'}
-                            </span>
-                          </button>
-                        )}
                         <div className="ml-auto flex items-center gap-1">
+                          {sections.length > 0 && !isLater && (
+                            <ToolbarIcon
+                              ref={sectionBtnRef}
+                              icon={<Rows3 className="h-5 w-5" />}
+                              label={pickedSection?.name ?? 'Section'}
+                              active={!!pickedSection}
+                              onClick={toggleSectionPicker}
+                            />
+                          )}
                           <ToolbarIcon
                             icon={<Bell className="h-5 w-5" />}
                             label="Reminder"
