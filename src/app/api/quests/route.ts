@@ -197,6 +197,8 @@ type TrackableEntry = {
   remainingLabel: string;
   objectiveType?: string;
   actionKey?: string;
+  questDone?: number;
+  questTotal?: number;
   tags?: ObjectiveTagChip[];
   needsFocusTags?: boolean;
   progress: number;
@@ -660,6 +662,16 @@ export async function GET(req: Request) {
             categoryNameById.get(quest.categoryId ?? ''),
           ),
           objectiveType: block.type,
+          // Where this objective sits in its ladder, so a surface can show the
+          // whole arc without re-deriving it from a list that omits finished
+          // tiers by design.
+          questDone: quest.logic.filter(
+            (b) =>
+              (b.rewards?.length ?? 0) > 0 &&
+              b.progress >= Math.max(1, b.target),
+          ).length,
+          questTotal: quest.logic.filter((b) => (b.rewards?.length ?? 0) > 0)
+            .length,
           // Objectives that the same act advances. Two tiers sharing this key
           // are not two things to do — the nearer one is on the way to the
           // further one, so only the nearer belongs on the "next up" card.

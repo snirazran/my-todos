@@ -51,6 +51,8 @@ export type Trackable = {
   remainingLabel: string;
   objectiveType?: string;
   actionKey?: string;
+  questDone?: number;
+  questTotal?: number;
   tags?: ObjectiveTagChip[];
   needsFocusTags?: boolean;
   progress: number;

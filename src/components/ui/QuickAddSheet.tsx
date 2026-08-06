@@ -33,6 +33,8 @@ import { Icon as AppIcon } from '@/components/ui/Icon';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
 import { hapticTick } from '@/lib/haptics';
 import { PlusUpgradeModal } from './PlusUpgradeModal';
+import { QuestProgressStrip } from './quick-add/QuestProgressStrip';
+import { useTaskQuestChipLookup } from '@/hooks/useTaskQuestChipLookup';
 import { PickerSheet } from './quick-add/PickerSheet';
 import { TagManagerSheet } from './quick-add/TagManagerSheet';
 import { SuggestionTabs } from './quick-add/SuggestionTabs';
@@ -666,6 +668,22 @@ export default function QuickAddSheet({
     .map((s) => `${s.id}:${(s.tagIds ?? []).join('|')}`)
     .join(',');
   const selectedTagKey = tags.join(',');
+  const questChipLookup = useTaskQuestChipLookup();
+  const questChip = useMemo(
+    () => questChipLookup(tags),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [questChipLookup, selectedTagKey],
+  );
+  // Borrow the selected quest tag's colour so the strip reads as belonging to
+  // the tag above it rather than as a second, unrelated accent.
+  const questChipColor = useMemo(
+    () =>
+      tagManager.savedTags.find(
+        (t) => tags.includes(t.id) && questTagIds.has(t.id),
+      )?.color,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [tagManager.savedTags, selectedTagKey, questTagIds],
+  );
   useEffect(() => {
     if (!open || sectionPickedManually) return;
     const match = sections.find((s) =>
@@ -1288,6 +1306,17 @@ export default function QuickAddSheet({
                           <Fly size={48} y={-3} />
                         </div>
                       </div>
+
+                      <AnimatePresence initial={false}>
+                        {questChip && (
+                          <QuestProgressStrip
+                            key="quest-progress"
+                            chip={questChip}
+                            color={questChipColor}
+                            className="mt-2"
+                          />
+                        )}
+                      </AnimatePresence>
 
                       {(nlSuggestion || showQuestTagSuggestion) && (
                         <div className="mt-3 mb-1 flex flex-wrap items-center gap-x-2 gap-y-3.5 px-1.5">

@@ -7,6 +7,9 @@ export type TaskQuestChip = {
   remaining: number;
   label: string;
   flies: number;
+  /** Tiers finished / total in this ladder, for the whole-arc read. */
+  done: number;
+  total: number;
 };
 
 // The objective's own remaining copy, minus the scope words the adjacent tag
@@ -73,6 +76,8 @@ export function buildTaskQuestChipLookup(
       remaining,
       label: condenseRemaining(match.remainingLabel, categoryName),
       flies: fliesFromRewards(match.rewards ?? (match.reward ? [match.reward] : [])),
+      done: match.questDone ?? 0,
+      total: match.questTotal ?? 0,
     };
   };
 }
