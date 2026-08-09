@@ -8,6 +8,7 @@ import {
   scheduleFrogodoroTimerProcessing,
 } from '@/lib/frogodoroDelayedTimer';
 import { fanOutTimerState, clearTimerAndFanOut } from '@/lib/frogodoroSync';
+import { advanceUserTimer } from '@/lib/frogodoroTimerProcessor';
 import type {
   ActiveFrogodoroTimer,
   LiveActivityRef,
@@ -16,8 +17,15 @@ import type {
 
 export const dynamic = 'force-dynamic';
 
-type Action = 'pause' | 'resume' | 'stop' | 'done' | 'more5';
-const actions = new Set<Action>(['pause', 'resume', 'stop', 'done', 'more5']);
+type Action = 'pause' | 'resume' | 'stop' | 'done' | 'more5' | 'alarmStop';
+const actions = new Set<Action>([
+  'pause',
+  'resume',
+  'stop',
+  'done',
+  'more5',
+  'alarmStop',
+]);
 
 type UserFields = {
   _id: unknown;
@@ -124,7 +132,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, stale: true });
     }
 
-    if (action === 'stop' || action === 'done') {
+    if (action === 'stop' || action === 'done' || action === 'alarmStop') {
       if (controlSeq !== null) {
         const accepted = await UserModel.updateOne(controlSeqFilter(userId, controlSeq), {
           $set: { frogodoroControlSeq: controlSeq },
@@ -133,6 +141,32 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ ok: true, stale: true });
         }
       }
+
+      // Acknowledging a phase can beat the processor that credits it (the alarm
+      // rings on the phase's own end, the finished state lands a tick later), and
+      // clearing the timer first would drop the focus time, flies and deep-focus
+      // bonus it earned. Stop is an abandon, so it credits nothing.
+      if (action !== 'stop') {
+        const advanced = await advanceUserTimer(userId, { silent: true }).catch(
+          () => null,
+        );
+        // alarmStop is the AlarmKit slide, which can't tell whether the alarm
+        // outlived its phase. A phase still running is an auto-started break the
+        // user never finished: the slide silenced the alarm, nothing more.
+        if (action === 'alarmStop' && advanced?.status === 'running') {
+          console.log(
+            `Frogodoro control: alarmStop — ${advanced.phase} still running, alarm silenced only`,
+          );
+          if (controlSeq !== null) {
+            await UserModel.updateOne(
+              { _id: userId },
+              { $max: { frogodoroControlSeq: controlSeq } },
+            );
+          }
+          return NextResponse.json({ ok: true, running: true });
+        }
+      }
+
       await clearTimerAndFanOut(userId, live, prefs);
       if (controlSeq !== null) {
         await UserModel.updateOne({ _id: userId }, { $max: { frogodoroControlSeq: controlSeq } });

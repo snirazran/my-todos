@@ -105,6 +105,7 @@ export default function TaskBoard({
   setBacklog,
   saveDate,
   saveBacklog,
+  trackWrite,
   removeOnDate,
   removeFromBacklog,
   onRequestAdd,
@@ -129,6 +130,9 @@ export default function TaskBoard({
   setBacklog: React.Dispatch<React.SetStateAction<Task[]>>;
   saveDate: (dateKey: string, tasks: Task[]) => Promise<void>;
   saveBacklog: (tasks: Task[]) => Promise<void>;
+  /** Marks a write in flight so reconciliation refetches can't land mid-commit
+   *  and read back pre-commit state. Every optimistic write must go through it. */
+  trackWrite: <T>(run: () => Promise<T>) => Promise<T>;
   removeOnDate: (dateKey: string, id: string) => Promise<void>;
   removeFromBacklog: (id: string) => Promise<void>;
   onRequestAdd: (
@@ -1060,25 +1064,31 @@ export default function TaskBoard({
       items: { taskId: string; fromDate?: string }[] = bulkItems,
     ) => {
       if (items.length === 0) return null;
-      try {
-        const res = await fetch('/api/tasks', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            bulk: { ...payload, items },
-            timezone: tz,
-          }),
-        });
-        const json = await res.json().catch(() => ({}));
-        window.dispatchEvent(new Event('board-refresh'));
-        return json;
-      } catch (e) {
-        console.error('bulk action failed', e);
-        window.dispatchEvent(new Event('board-refresh'));
-        return null;
-      }
+      // Tracked like every single-task write: while a bulk PUT is in flight the
+      // planner suppresses reconciliation refetches, so a GET fired by some
+      // other mutation can't read the not-yet-committed server state and snap
+      // the cards back to their old column before settling.
+      return trackWrite(async () => {
+        try {
+          const res = await fetch('/api/tasks', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              bulk: { ...payload, items },
+              timezone: tz,
+            }),
+          });
+          const json = await res.json().catch(() => ({}));
+          window.dispatchEvent(new Event('board-refresh'));
+          return json;
+        } catch (e) {
+          console.error('bulk action failed', e);
+          window.dispatchEvent(new Event('board-refresh'));
+          return null;
+        }
+      });
     },
-    [bulkItems, tz],
+    [bulkItems, tz, trackWrite],
   );
 
   /**
@@ -1088,13 +1098,20 @@ export default function TaskBoard({
    * not restore the series.
    */
   const bulkMoveToDate = useCallback(
-    async (target: string) => {
-      const snapshot = selection.refs.slice();
+    async (
+      target: string,
+      placement?: { atIndex: number; refs: SelectionRef[] },
+    ) => {
+      const snapshot = (placement?.refs ?? selection.refs).slice();
       const undoable = snapshot.every((r) => !r.isRepeating);
       const count = snapshot.length;
       selection.exit();
       await runBulk(
-        { op: 'move', date: target },
+        {
+          op: 'move',
+          date: target,
+          ...(placement ? { atIndex: placement.atIndex } : {}),
+        },
         snapshot.map((r) => ({
           taskId: r.taskId,
           fromDate: r.dateKey === BACKLOG_KEY ? undefined : r.dateKey,
@@ -1270,9 +1287,38 @@ export default function TaskBoard({
       }
 
       const picked = new Set(refs.map((r) => `${r.dateKey}::${r.taskId}`));
+
+      // The bundle keeps its on-screen order, not the order the cards happened
+      // to be tapped in — and the optimistic insert below, the request, and the
+      // server's renumber all have to agree on it or the refetch reshuffles.
+      const colRank = (dateKey: string) => {
+        if (dateKey === BACKLOG_KEY) return Number.MAX_SAFE_INTEGER;
+        const i = windowDates.indexOf(dateKey);
+        return i === -1 ? Number.MAX_SAFE_INTEGER - 1 : i;
+      };
+      const rowRank = (dateKey: string, taskId: string) => {
+        const list =
+          dateKey === BACKLOG_KEY ? backlog : (sortedTasksByDate[dateKey] ?? []);
+        const i = list.findIndex((t) => t.id === taskId);
+        return i === -1 ? Number.MAX_SAFE_INTEGER : i;
+      };
+      const orderedRefs = refs.slice().sort((a, b) => {
+        const c = colRank(a.dateKey) - colRank(b.dateKey);
+        if (c !== 0) return c;
+        return rowRank(a.dateKey, a.taskId) - rowRank(b.dateKey, b.taskId);
+      });
+
+      const taskFor = new Map(
+        selectedTasks.map(({ ref, task }) => [
+          `${ref.dateKey}::${ref.taskId}`,
+          task,
+        ]),
+      );
       const movedTasks: Task[] = [];
-      for (const { ref, task } of selectedTasks) {
-        if (!ref.isRepeating) movedTasks.push(task);
+      for (const ref of orderedRefs) {
+        if (ref.isRepeating) continue;
+        const task = taskFor.get(`${ref.dateKey}::${ref.taskId}`);
+        if (task) movedTasks.push(task);
       }
 
       // Optimistically empty the source columns so the drop reads as instant;
@@ -1318,12 +1364,18 @@ export default function TaskBoard({
       }
 
       const targetKey = windowDates[toDay];
-      if (targetKey) void bulkMoveToDate(targetKey);
+      if (targetKey)
+        void bulkMoveToDate(targetKey, {
+          atIndex: Math.max(0, toIndex),
+          refs: orderedRefs,
+        });
     },
     [
       selection,
       selectedTasks,
       BACKLOG_IDX,
+      backlog,
+      sortedTasksByDate,
       colAt,
       setColAt,
       saveCol,

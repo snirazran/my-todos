@@ -86,6 +86,8 @@ const DEFAULT_FROG_HEIGHT = Math.round(
 );
 const MOUTH_TARGET_X = 75;
 const MOUTH_TARGET_Y = 75;
+const HUNGRY_MOOD_INDEX = 1;
+const MOUTH_HUNGRY_Y_ADJ = 5;
 const HIT_TEST_TOLERANCE_PX = 10;
 const HIT_TEST_MIN_ALPHA = 8;
 export const FROG_TONGUE_MOUTH_OFFSET = { x: -18, y: 12 } as const;
@@ -349,6 +351,8 @@ const Frog = memo(
       triggerCloseMouth,
     ]);
 
+    const moodIndexRef = useRef(0);
+
     const setBoundSlotIndex = React.useCallback(
       (slot: WardrobeSlot, index: number) => {
         try {
@@ -357,6 +361,7 @@ const Frog = memo(
             if (skinInput) skinInput.value = index;
           }
           if (slot === 'mood') {
+            moodIndexRef.current = index;
             if (moodBinding.value !== null) moodBinding.setValue(index);
             if (moodInput) moodInput.value = index;
           }
@@ -467,7 +472,9 @@ const Frog = memo(
         const cy = drawTop + MOUTH_TARGET_Y * scale + resolvedVisualOffsetY;
         const ox = mouthOffset?.x ?? 0;
         const oy = mouthOffset?.y ?? 0;
-        return { x: Math.round(cx + ox), y: Math.round(cy + oy) };
+        const moodAdj =
+          moodIndexRef.current === HUNGRY_MOOD_INDEX ? MOUTH_HUNGRY_Y_ADJ : 0;
+        return { x: Math.round(cx + ox), y: Math.round(cy + oy + moodAdj) };
       },
       getBoxRect() {
         return (

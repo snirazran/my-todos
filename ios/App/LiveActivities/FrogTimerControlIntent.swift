@@ -34,13 +34,38 @@ struct FrogTimerControlIntent: LiveActivityIntent {
         // The AlarmKit alarm's stop button. The alarm is armed for one phase's
         // end, but by the time it rings the session may have moved on — with
         // auto-start breaks the break is already counting down, and ending the
-        // session there would destroy a phase the user never finished. Only a
-        // phase actually waiting for Done gets acknowledged; otherwise the
-        // slide just silences the alarm.
+        // session there would destroy a phase the user never finished. So the
+        // slide is read three ways:
+        //   • already finished  → acknowledge it here, exactly like Done.
+        //   • elapsed, not yet finished → the phase's own end has arrived but
+        //     the server's finished state hasn't landed (the widget is only
+        //     showing its stale rescue, so the island merely looks
+        //     acknowledged). Whether a break is about to auto-start is state
+        //     only the server has, so it decides: the island ends from its
+        //     reply rather than locally.
+        //   • time still on the clock → a phase took over; silence only.
         if action == "alarmStop" {
             FrogAlarmKit.cancel()
-            guard Self.currentActivity()?.content.state.finished == true else {
-                NSLog("FrogControl: alarmStop — nothing awaiting Done, alarm silenced only")
+            guard let activity = Self.currentActivity() else {
+                NSLog("FrogControl: alarmStop — no activity, alarm silenced only")
+                return .result()
+            }
+            let state = activity.content.state
+            if state.finished != true {
+                let nowMs = Date().timeIntervalSince1970 * 1000
+                guard state.endTime > 0 && state.endTime <= nowMs + 1500 else {
+                    NSLog("FrogControl: alarmStop — nothing awaiting Done, alarm silenced only")
+                    return .result()
+                }
+                NSLog("FrogControl: alarmStop — phase elapsed, deferring to server")
+                UNUserNotificationCenter.current().removePendingNotificationRequests(
+                    withIdentifiers: ["880001", "880002"]
+                )
+                Self.postToServer(
+                    action: "alarmStop",
+                    controlSeq: Self.nextControlSeq(),
+                    activityId: activity.id
+                )
                 return .result()
             }
             effective = "done"

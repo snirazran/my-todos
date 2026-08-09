@@ -1387,6 +1387,12 @@ type BulkBody = {
   remove?: string[];
   setRepeat?: unknown;
   scope?: 'one' | 'all';
+  /**
+   * Zero-based slot in the target day's column, counted among the tasks that
+   * are *not* part of this move. Omitted means "append", which is what every
+   * caller but a drag-and-drop bulk move wants.
+   */
+  atIndex?: number;
 };
 
 const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -1445,6 +1451,28 @@ async function handleBulkPut(uid: string, bulk: BulkBody, tz: string) {
       return NextResponse.json({ error: 'date required' }, { status: 400 });
 
     const { weekStart } = getRollingWeekDatesZoned(tz);
+    const atIndex =
+      !toBacklog &&
+      typeof bulk.atIndex === 'number' &&
+      Number.isFinite(bulk.atIndex)
+        ? Math.max(0, Math.trunc(bulk.atIndex))
+        : null;
+    const landedIds: string[] = [];
+
+    // Placing the bundle renumbers the whole target column at the end, so the
+    // per-task append order is throwaway — take the base once and count up
+    // instead of paying a sequential max-order query per task. Without a
+    // placement we keep the original per-task query, which is what every other
+    // caller of this op relies on.
+    let appendOrder: number | null = null;
+    const orderForTarget = async (): Promise<number> => {
+      if (atIndex === null)
+        return nextOrderForDay(uid, dowFromYMD(target), target);
+      const base =
+        appendOrder ?? (await nextOrderForDay(uid, dowFromYMD(target), target));
+      appendOrder = base + 1;
+      return base;
+    };
 
     for (const item of items) {
       const doc = byId.get(item.taskId);
@@ -1480,7 +1508,10 @@ async function handleBulkPut(uid: string, bulk: BulkBody, tz: string) {
       // A repeating task moves one occurrence only: the series keeps its rule,
       // the source date is suppressed, and the moved copy lands as a one-off.
       if (doc.type === 'weekly' && item.fromDate && YMD_RE.test(item.fromDate)) {
-        if (item.fromDate === target) continue;
+        if (item.fromDate === target) {
+          landedIds.push(doc.id);
+          continue;
+        }
         const newId = uuid();
         await TaskModel.updateOne(
           { userId: uid, id: doc.id },
@@ -1492,7 +1523,7 @@ async function handleBulkPut(uid: string, bulk: BulkBody, tz: string) {
           id: newId,
           text: doc.text,
           date: target,
-          order: await nextOrderForDay(uid, dowFromYMD(target), target),
+          order: await orderForTarget(),
           completed: false,
           // Detaching an occurrence is a move, not a new task: keep the series'
           // createdAt so it can't read as a task added today.
@@ -1505,24 +1536,33 @@ async function handleBulkPut(uid: string, bulk: BulkBody, tz: string) {
           endTime: doc.endTime,
           reminder: doc.reminder,
         });
+        landedIds.push(newId);
         affected++;
         continue;
       }
 
-      if (doc.date === target) continue;
+      if (doc.date === target) {
+        landedIds.push(doc.id);
+        continue;
+      }
       await TaskModel.updateOne(
         { userId: uid, id: doc.id },
         {
           $set: {
             type: 'regular',
             date: target,
-            order: await nextOrderForDay(uid, dowFromYMD(target), target),
+            order: await orderForTarget(),
             updatedAt: now,
           },
           $unset: { weekStart: 1, dayOfWeek: 1, suppressedDates: 1 },
         },
       );
+      landedIds.push(doc.id);
       affected++;
+    }
+
+    if (atIndex !== null && landedIds.length > 0) {
+      await placeTasksInDay(uid, target, landedIds, atIndex, now, tz);
     }
   } else if (bulk.op === 'tags') {
     const add = (Array.isArray(bulk.add) ? bulk.add : []).filter(
@@ -3462,6 +3502,79 @@ async function nextOrderForDay(userId: string, weekday: Weekday, date: string) {
     .lean<TaskDoc>()
     .exec();
   return (last?.order ?? 0) + 1;
+}
+
+/**
+ * Renumbers a day column so `movedIds` sit at slot `atIndex` among the tasks
+ * that stayed. A bulk move otherwise appends every task with nextOrderForDay,
+ * which is why dropping a multi-selection between two cards used to land it at
+ * the bottom once the board refetched — a single-card drag persists the whole
+ * column's order (handleBoardPutByDate) and so kept its slot.
+ *
+ * Repeating occurrences carry a per-date order (`orderOverrides`), one-offs
+ * carry a plain `order`; both read back through the same
+ * `orderOverrides[date] ?? order` in every GET.
+ */
+async function placeTasksInDay(
+  userId: string,
+  date: string,
+  movedIds: string[],
+  atIndex: number,
+  now: Date,
+  tz: string,
+) {
+  const dow = dowFromYMD(date);
+  const docs = await TaskModel.find({
+    userId,
+    $or: [
+      { type: 'weekly', deletedAt: { $exists: false }, dayOfWeek: dow },
+      { type: 'weekly', deletedAt: { $exists: false }, repeatMode: 'monthly' },
+      {
+        type: 'weekly',
+        deletedAt: { $exists: false },
+        repeatRule: { $exists: true },
+      },
+      { type: 'regular', deletedAt: { $exists: false }, date },
+    ],
+  })
+    .lean<TaskDoc[]>()
+    .exec();
+
+  const onThisDay = docs.filter((d) => {
+    if ((d.suppressedDates ?? []).includes(date)) return false;
+    if (d.type === 'regular') return d.date === date;
+    const start = repeatStartForDoc(d, tz);
+    if (start && date < start) return false;
+    return siblingOccursOn(d, date);
+  });
+
+  const orderOf = (d: TaskDoc) => d.orderOverrides?.[date] ?? d.order ?? 0;
+  const moved = new Set(movedIds);
+  const stayed = onThisDay
+    .filter((d) => !moved.has(d.id))
+    .sort((a, b) => orderOf(a) - orderOf(b));
+  const byId = new Map(onThisDay.map((d) => [d.id, d]));
+  const incoming = Array.from(new Set(movedIds))
+    .map((id) => byId.get(id))
+    .filter((d): d is TaskDoc => !!d);
+  if (incoming.length === 0) return;
+
+  const at = Math.max(0, Math.min(atIndex, stayed.length));
+  const final = [...stayed.slice(0, at), ...incoming, ...stayed.slice(at)];
+
+  await TaskModel.bulkWrite(
+    final.map((d, i) => ({
+      updateOne: {
+        filter: { userId, id: d.id },
+        update: {
+          $set:
+            d.type === 'weekly'
+              ? { [`orderOverrides.${date}`]: i + 1, updatedAt: now }
+              : { order: i + 1, updatedAt: now },
+        },
+      },
+    })),
+  );
 }
 
 async function nextOrderBacklog(userId: string, weekStart: string) {

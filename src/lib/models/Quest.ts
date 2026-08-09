@@ -20,6 +20,7 @@ export interface QuestDoc {
   durationMinutes?: number;
   startedAt?: Date | null;
   expiresAt?: Date | null;
+  lockedRemainingMs?: number | null;
   target: number;
   progress: number;
   logic: ResolvedQuestLogicBlock[];
@@ -62,6 +63,7 @@ const QuestSchema = new Schema<QuestDoc>(
     durationMinutes: { type: Number, default: undefined },
     startedAt: { type: Date, default: null },
     expiresAt: { type: Date, default: null, index: true },
+    lockedRemainingMs: { type: Number, default: null },
     target: { type: Number, required: true },
     progress: { type: Number, default: 0 },
     logic: { type: [Schema.Types.Mixed], default: [] } as any,

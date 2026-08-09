@@ -50,6 +50,7 @@ import {
 import { QuestStartSheet } from './QuestStartSheet';
 import { SingleRewardCard } from './daily-reward/RewardCard';
 import { RARITY_CONFIG as GIFT_RARITY_CONFIG } from './gift-box/constants';
+import { GiftRive } from './gift-box/GiftBox';
 import Fly from './fly';
 import { useInventory } from '@/hooks/useInventory';
 import {
@@ -1967,6 +1968,7 @@ function SeasonRewardPreview({
   const item = reward.itemId ? rewardCatalog[reward.itemId] : null;
   const rarity = item?.rarity ?? (reward.type === 'FLIES' ? 'uncommon' : 'rare');
   const raysClass = GIFT_RARITY_CONFIG[rarity]?.rays ?? GIFT_RARITY_CONFIG.rare.rays;
+  const isGift = item?.slot === 'container';
 
   return (
     <div
@@ -1978,21 +1980,33 @@ function SeasonRewardPreview({
       <div className="absolute inset-0 overflow-hidden rounded-2xl">
         <SeasonPrizeRays colorClass={raysClass} />
       </div>
-      <div
-        className="relative z-10 flex items-center justify-center"
-        style={{ transform: reward.type === 'FLIES' ? undefined : 'scale(1.6)' }}
-      >
-        <RewardTile
-          reward={reward}
-          rewardCatalog={rewardCatalog}
-          isPremium={isPremium}
-          compact
-          flySize={48}
-          paused={paused}
-          hideBadge
-          className="rounded-2xl border-0 bg-transparent shadow-none"
-        />
-      </div>
+      {isGift ? (
+        <div className="relative z-10 h-[86%] w-[86%]">
+          <GiftRive
+            className="h-full w-full"
+            color={item.riveIndex}
+            paused={false}
+          />
+        </div>
+      ) : (
+        <div
+          className="relative z-10 flex items-center justify-center"
+          style={{
+            transform: reward.type === 'FLIES' ? undefined : 'scale(1.6)',
+          }}
+        >
+          <RewardTile
+            reward={reward}
+            rewardCatalog={rewardCatalog}
+            isPremium={isPremium}
+            compact
+            flySize={48}
+            paused={paused}
+            hideBadge
+            className="rounded-2xl border-0 bg-transparent shadow-none"
+          />
+        </div>
+      )}
       <div className="pointer-events-none absolute right-1 top-1 z-20">
         <span className="flex min-w-5 items-center justify-center rounded-md border border-white/10 bg-black/55 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white shadow-sm backdrop-blur-sm">
           {getRewardQuantityLabel(reward, isPremium)}

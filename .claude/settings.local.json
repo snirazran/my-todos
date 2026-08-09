@@ -421,7 +421,12 @@
       "Bash(git --no-pager diff src/components/ui/BaseSheet.tsx)",
       "Bash(awk 'NR>=1380 && NR<=1560 && \\(/^export function/ || /^function/ || /onClaimObjective\\\\?:/ || /rerollsLeft/\\)' src/components/ui/QuestCards.tsx)",
       "Bash(awk -F: '$1>1240 && $1<1620')",
-      "Bash(awk -F: '$1>1090 && $1<1200')"
+      "Bash(awk -F: '$1>1090 && $1<1200')",
+      "Bash(git --no-pager diff -- src/components/ui/BaseSheet.tsx)",
+      "Bash(git --no-pager diff -- src/components/ui/frog.tsx)",
+      "Bash(git --no-pager log --oneline -5)",
+      "Bash(git --no-pager diff HEAD -- src/lib/quests/engine.ts src/lib/models/Quest.ts)",
+      "Bash(git --no-pager diff HEAD -- src/components/ui/QuestsPanel.tsx)"
     ]
   }
 }

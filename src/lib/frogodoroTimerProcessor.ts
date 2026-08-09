@@ -283,9 +283,14 @@ const ALARM_GRACE_MS = 2 * 60_000;
 // without crediting keeps phantom focus time out of the user's stats.
 const ABANDON_OVERDUE_MS = 30 * 60_000;
 
+// `silent` credits the phase without ringing for it — the caller is a user
+// action that already acknowledged the alarm (the AlarmKit slide, Done), so a
+// fresh "Time's up" alert a moment later would be a second ring for a session
+// the user has just dismissed.
 async function processOneDueTimer(
   user: unknown,
   now: Date,
+  opts: { silent?: boolean } = {},
 ): Promise<{ processed: boolean; result: ProcessResult; timer?: ActiveFrogodoroTimer }> {
   const userId = String((user as any)._id);
   const timer = (user as any).activeFrogodoroTimer as ActiveFrogodoroTimer;
@@ -309,7 +314,7 @@ async function processOneDueTimer(
     return { processed: true, result: { userId, processed: true, reason: 'abandoned' } };
   }
 
-  const suppressAlarm = overdueMs > ALARM_GRACE_MS;
+  const suppressAlarm = opts.silent === true || overdueMs > ALARM_GRACE_MS;
 
   const next = getNextTimer(timer, now);
   const nextTimer: ActiveFrogodoroTimer = {
@@ -524,6 +529,7 @@ const ADVANCE_TOLERANCE_MS = 1500;
 
 export async function advanceUserTimer(
   userId: string,
+  opts: { silent?: boolean } = {},
 ): Promise<ActiveFrogodoroTimer | null> {
   const now = new Date();
   const user = await UserModel.findById(userId)
@@ -542,6 +548,6 @@ export async function advanceUserTimer(
     timer.status === 'running' && endsAtMs > 0 && endsAtMs <= now.getTime() + ADVANCE_TOLERANCE_MS;
   if (!isDue) return timer;
 
-  const outcome = await processOneDueTimer(user, now);
+  const outcome = await processOneDueTimer(user, now, opts);
   return outcome.timer ?? timer;
 }

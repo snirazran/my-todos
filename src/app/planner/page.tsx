@@ -588,6 +588,7 @@ export default function ManageTasksPage() {
           setBacklog={setBacklog}
           saveDate={saveDate}
           saveBacklog={saveBacklog}
+          trackWrite={trackWrite}
           removeOnDate={removeOnDate}
           removeFromBacklog={removeFromBacklog}
           onRequestAdd={() => {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   AnimatePresence,
@@ -95,23 +95,7 @@ interface DragExitInfo {
   offset: number;
 }
 
-const GHOST_CLICK_WINDOW_MS = 400;
-
-function swallowGhostClick() {
-  if (typeof document === 'undefined') return;
-  let timer: ReturnType<typeof setTimeout> | null = null;
-  const stop = () => {
-    document.removeEventListener('click', swallow, true);
-    if (timer) clearTimeout(timer);
-  };
-  const swallow = (event: MouseEvent) => {
-    event.stopPropagation();
-    event.preventDefault();
-    stop();
-  };
-  document.addEventListener('click', swallow, true);
-  timer = setTimeout(stop, GHOST_CLICK_WINDOW_MS);
-}
+const CLOSE_SHIELD_MS = 450;
 
 export function BaseSheet({
   open,
@@ -142,10 +126,47 @@ export function BaseSheet({
   const sheetHeightRef = useRef(0);
   const dragExitRef = useRef<DragExitInfo>({ velocity: 0, offset: 0 });
 
+  const [shielded, setShielded] = useState(false);
+  const shieldTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearShieldTimer = useCallback(() => {
+    if (shieldTimerRef.current) {
+      clearTimeout(shieldTimerRef.current);
+      shieldTimerRef.current = null;
+    }
+  }, []);
+
+  const raiseShield = useCallback(() => {
+    clearShieldTimer();
+    setShielded(true);
+    shieldTimerRef.current = setTimeout(() => {
+      shieldTimerRef.current = null;
+      setShielded(false);
+    }, CLOSE_SHIELD_MS);
+  }, [clearShieldTimer]);
+
+  const lowerShield = useCallback(() => {
+    clearShieldTimer();
+    setShielded(false);
+  }, [clearShieldTimer]);
+
+  useEffect(() => clearShieldTimer, [clearShieldTimer]);
+
+  const absorb = useCallback(
+    (e: React.SyntheticEvent) => {
+      e.stopPropagation();
+      e.preventDefault();
+      if (e.type === 'click') lowerShield();
+    },
+    [lowerShield],
+  );
+
   useEffect(() => {
-    if (open) dragExitRef.current = { velocity: 0, offset: 0 };
-    else setEntered(false);
-  }, [open]);
+    if (open) {
+      dragExitRef.current = { velocity: 0, offset: 0 };
+      lowerShield();
+    } else setEntered(false);
+  }, [open, lowerShield]);
 
   useEffect(() => {
     setMounted(true);
@@ -200,6 +221,7 @@ export function BaseSheet({
   };
 
   return createPortal(
+    <>
     <AnimatePresence custom={dragExitRef.current}>
       {open && (
         <>
@@ -208,12 +230,17 @@ export function BaseSheet({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1, transition: { duration: 0.2 } }}
             exit={{ opacity: 0, transition: { duration: 0.2 } }}
-            onClick={() => onOpenChange(false)}
+            onClick={(e) => {
+              e.stopPropagation();
+              raiseShield();
+              onOpenChange(false);
+            }}
             onPointerDown={(e) => {
               // Belt-and-suspenders: close on press-down too, in case the
               // synthetic click never fires (mobile, animation overlap, etc).
               if (e.target !== e.currentTarget) return;
-              swallowGhostClick();
+              e.stopPropagation();
+              raiseShield();
               onOpenChange(false);
             }}
             className={cn(
@@ -272,6 +299,7 @@ export function BaseSheet({
                     velocity: Math.max(velocity.y, 0),
                     offset: Math.max(offset.y, 0),
                   };
+                  raiseShield();
                   onOpenChange(false);
                 } else {
                   dragExitRef.current = { velocity: 0, offset: 0 };
@@ -312,7 +340,22 @@ export function BaseSheet({
           </div>
         </>
       )}
-    </AnimatePresence>,
+    </AnimatePresence>
+
+    {shielded && (
+      <div
+        aria-hidden
+        className="fixed inset-0"
+        style={{ zIndex: zIndex + 2 }}
+        onClick={absorb}
+        onPointerDown={absorb}
+        onPointerUp={absorb}
+        onMouseDown={absorb}
+        onMouseUp={absorb}
+        onTouchEnd={absorb}
+      />
+    )}
+    </>,
     document.body,
   );
 }

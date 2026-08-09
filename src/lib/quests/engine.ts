@@ -956,18 +956,33 @@ function carryOverTiersFor(quest: { logic?: ResolvedQuestLogicBlock[] }): number
     : 0;
 }
 
+function ladderEngaged(quest: QuestDoc): boolean {
+  if ((quest.claimedObjectiveIds ?? []).length > 0) return true;
+  if ((quest.rerollsUsed ?? 0) > 0) return true;
+  return (quest.logic ?? []).some(
+    (block) => !block.preCredited && (block.progress ?? 0) > 0,
+  );
+}
+
+type LadderOutcome =
+  | 'completed'
+  | 'expired_attempted'
+  | 'expired_untouched'
+  | 'expired_locked';
+
 // Where a ladder stopped, recorded once as it is replaced. Without this the
 // stall points are invisible and target calibration is guesswork.
 async function recordLadderOutcome(args: {
   userId: string;
   quest: QuestDoc;
-  reason: 'expired' | 'completed';
+  outcome: LadderOutcome;
   carriedTiers: number;
 }): Promise<void> {
-  const { quest } = args;
+  const { quest, outcome } = args;
   const total = (quest.logic ?? []).length;
   if (total === 0) return;
   const reached = tiersReached(quest);
+  const attempted = outcome === 'completed' || outcome === 'expired_attempted';
   try {
     await recordAnalyticsEvent({
       userId: args.userId,
@@ -976,13 +991,17 @@ async function recordLadderOutcome(args: {
         placement: quest.placement,
         category_id: quest.categoryId ?? 'uncategorized',
         template_id: quest.templateId,
-        reason: args.reason,
+        reason: outcome === 'completed' ? 'completed' : 'expired',
+        outcome,
+        attempted,
         tiers_total: total,
         tiers_reached: reached,
         tiers_claimed: (quest.claimedObjectiveIds ?? []).length,
-        stalled_at_tier: reached >= total ? null : reached + 1,
+        stalled_at_tier: !attempted || reached >= total ? null : reached + 1,
         stalled_objective_type:
-          reached >= total ? null : quest.logic?.[reached]?.type ?? null,
+          !attempted || reached >= total
+            ? null
+            : quest.logic?.[reached]?.type ?? null,
         rerolls_used: quest.rerollsUsed ?? 0,
         carried_in: quest.carriedTiers ?? 0,
         carried_out: args.carriedTiers,
@@ -1300,21 +1319,6 @@ async function syncQuestForTemplate(args: {
       ? Math.floor(template.durationMinutes)
       : undefined;
 
-  let nextDurationMinutes: number | undefined;
-  let nextStartedAt: Date | null;
-  let nextExpiresAt: Date | null;
-  if (templateDurationMinutes) {
-    nextStartedAt = doc.startedAt ?? new Date();
-    nextDurationMinutes = doc.durationMinutes ?? templateDurationMinutes;
-    nextExpiresAt =
-      doc.expiresAt ??
-      new Date(nextStartedAt.getTime() + templateDurationMinutes * 60_000);
-  } else {
-    nextDurationMinutes = undefined;
-    nextStartedAt = null;
-    nextExpiresAt = null;
-  }
-
   const startDate =
     template.placement === 'daily'
       ? windowKey
@@ -1344,11 +1348,21 @@ async function syncQuestForTemplate(args: {
         )
       : template.logic;
 
+  const unlockedFocusIds = resolveUnlockedFocusCategoryIds(
+    profile,
+    isPremiumUser(user),
+  );
+  const lockedForFreeUser =
+    template.placement === 'category' &&
+    unlockedFocusIds !== null &&
+    unlockedFocusIds.length > 0 &&
+    !unlockedFocusIds.includes(template.categoryId ?? '');
+
   // Onboarding targets are a hand-authored sequence; only rolled placements
   // scale to the user. Anchored to the window's start, not today, so a target
   // cannot drift under the user as they make progress against it.
   const baseline =
-    template.placement === 'onboarding'
+    template.placement === 'onboarding' || lockedForFreeUser
       ? NEUTRAL_BASELINE
       : computeQuestBaseline({
           tasks,
@@ -1361,15 +1375,40 @@ async function syncQuestForTemplate(args: {
           accountCreatedAt: user.createdAt ?? null,
         });
 
-  const unlockedFocusIds = resolveUnlockedFocusCategoryIds(
-    profile,
-    isPremiumUser(user),
-  );
-  const lockedForFreeUser =
-    template.placement === 'category' &&
-    unlockedFocusIds !== null &&
-    unlockedFocusIds.length > 0 &&
-    !unlockedFocusIds.includes(template.categoryId ?? '');
+  let nextDurationMinutes: number | undefined;
+  let nextStartedAt: Date | null;
+  let nextExpiresAt: Date | null;
+  let nextLockedRemainingMs: number | null;
+  if (templateDurationMinutes) {
+    const nowMs = Date.now();
+    const windowMs = templateDurationMinutes * 60_000;
+    nextDurationMinutes = doc.durationMinutes ?? templateDurationMinutes;
+    if (lockedForFreeUser) {
+      const carried =
+        doc.lockedRemainingMs ??
+        (doc.expiresAt ? doc.expiresAt.getTime() - nowMs : windowMs);
+      nextLockedRemainingMs = carried > 0 ? carried : windowMs;
+      nextStartedAt = null;
+      nextExpiresAt = null;
+    } else if (typeof doc.lockedRemainingMs === 'number') {
+      nextStartedAt = new Date(nowMs);
+      nextExpiresAt = new Date(
+        nowMs + (doc.lockedRemainingMs > 0 ? doc.lockedRemainingMs : windowMs),
+      );
+      nextLockedRemainingMs = null;
+    } else {
+      nextStartedAt = doc.startedAt ?? new Date(nowMs);
+      nextExpiresAt =
+        doc.expiresAt ?? new Date(nextStartedAt.getTime() + windowMs);
+      nextLockedRemainingMs = null;
+    }
+  } else {
+    nextDurationMinutes = undefined;
+    nextStartedAt = null;
+    nextExpiresAt = null;
+    nextLockedRemainingMs = null;
+  }
+
   const prevBlocksById = new Map(
     (doc.logic ?? []).map((block) => [block.id, block]),
   );
@@ -1480,6 +1519,8 @@ async function syncQuestForTemplate(args: {
   changed = setQuestField(doc, 'durationMinutes', nextDurationMinutes) || changed;
   changed = setQuestField(doc, 'startedAt', nextStartedAt) || changed;
   changed = setQuestField(doc, 'expiresAt', nextExpiresAt) || changed;
+  changed =
+    setQuestField(doc, 'lockedRemainingMs', nextLockedRemainingMs) || changed;
   changed = setQuestField(doc, 'logic', resolvedLogic) || changed;
   changed =
     setQuestField(
@@ -1791,6 +1832,10 @@ export async function syncQuestState(args: {
     (categoryId) => questModeByCategoryId.get(categoryId) === 'generated',
   );
   const generatedTemplates: QuestTemplateDoc[] = [];
+  const generatedUnlockedFocusIds = resolveUnlockedFocusCategoryIds(
+    profile,
+    isPremiumUser(user),
+  );
   if (generatedCategoryIds.length > 0) {
     let activeRecipes = recipes.filter((r) => (r.placement ?? 'category') !== 'daily');
     if (activeRecipes.length === 0) {
@@ -1835,11 +1880,26 @@ export async function syncQuestState(args: {
           !!existing.expiresAt &&
           existing.expiresAt.getTime() <= nowMs;
         if (cooldownOver || expired) {
-          carriedTiers = carryOverTiersFor(existing);
+          const lockedNow =
+            generatedUnlockedFocusIds !== null &&
+            generatedUnlockedFocusIds.length > 0 &&
+            !generatedUnlockedFocusIds.includes(categoryId);
+          const engaged = ladderEngaged(existing);
+          const outcome: LadderOutcome = !expired
+            ? 'completed'
+            : lockedNow
+              ? 'expired_locked'
+              : engaged
+                ? 'expired_attempted'
+                : 'expired_untouched';
+          carriedTiers =
+            expired && !engaged
+              ? Math.max(existing.carriedTiers ?? 0, carryOverTiersFor(existing))
+              : carryOverTiersFor(existing);
           await recordLadderOutcome({
             userId,
             quest: existing,
-            reason: expired ? 'expired' : 'completed',
+            outcome,
             carriedTiers,
           });
           existing = null;
