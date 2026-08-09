@@ -867,7 +867,7 @@ export default function TaskDetailSheet({
                         <AppIcon
                           name="saved"
                           label="Save for later"
-                          className="h-5 w-5"
+                          className="h-8 w-8"
                         />
                       }
                       dataHint="save-later-button"
@@ -960,7 +960,7 @@ function SecondaryButton({
             : 'bg-popover text-foreground ring-border/80 shadow-[0_3px_0_0_rgba(0,0,0,0.18)] [@media(hover:hover)]:hover:shadow-[0_4px_0_0_rgba(0,0,0,0.18)]'
       }`}
     >
-      {icon}
+      <span className="flex shrink-0 items-center">{icon}</span>
       <span className="truncate">{label}</span>
     </button>
   );
@@ -1006,7 +1006,7 @@ function TaskFocusButton({
             </span>
           </span>
         ) : (
-          'Focus'
+          'Focus timer'
         )
       }
       onClick={onClick}
@@ -1014,10 +1014,10 @@ function TaskFocusButton({
         isFocusing ? (
           <TimerClockIcon
             running={isRunning}
-            className="h-6 w-6 max-[360px]:hidden"
+            className="h-8 w-8 max-[360px]:hidden"
           />
         ) : (
-          <AppIcon name="clock" label="Focus" className="h-6 w-6" />
+          <AppIcon name="clock" label="Focus timer" className="h-8 w-8" />
         )
       }
       dataHint="focus-button"

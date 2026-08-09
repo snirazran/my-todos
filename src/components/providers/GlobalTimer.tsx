@@ -19,6 +19,7 @@ import { randomUUID } from '@/lib/uuid';
 import type { ActiveFrogodoroTimer } from '@/lib/types/UserDoc';
 import { getCurrentLiveActivityState } from '@/lib/liveTimer';
 import { notifyQuestClaims } from '@/lib/questClaims';
+import { emitCampaignTrigger } from '@/lib/campaigns/orchestrator';
 import { useNotification } from '@/components/providers/NotificationProvider';
 import { useAuth } from '@/components/auth/AuthContext';
 import { fliesCaughtFor, priorDayFocusSeconds } from '@/lib/focusFlies';
@@ -124,6 +125,11 @@ export function GlobalTimer() {
     if (lastCompletionId === prevCompletionIdRef.current) return;
     prevCompletionIdRef.current = lastCompletionId;
     if (lastCompletedPhase !== 'focus') return;
+    emitCampaignTrigger('focus_completed', {
+      minutes: Math.round(
+        (useFrogodoroStore.getState().lastFocusElapsed ?? 0) / 60,
+      ),
+    });
     const t = window.setTimeout(
       () => void notifyQuestClaims(showNotification),
       1500,

@@ -2156,8 +2156,8 @@ function QuickTilesGrid({
         />
       */}
       <QuickTile
-        icon={<Icon name="compass" label="Focus areas" className="h-[52px] w-[52px]" />}
-        title="Focus areas"
+        icon={<Icon name="compass" label="Areas" className="h-[52px] w-[52px]" />}
+        title="Areas"
         subtitle="Tailor your quests"
         onClick={onOpenQuestFocus}
       />
@@ -2176,7 +2176,7 @@ function QuickTilesGrid({
       <QuickTile
         icon={<Icon name="clock" label="Focus timer" className="h-[52px] w-[52px]" />}
         title="Focus timer"
-        subtitle="Task or focus area"
+        subtitle="Work in protected stretches"
         onClick={onOpenFocusTimer}
       />
       <QuickTile

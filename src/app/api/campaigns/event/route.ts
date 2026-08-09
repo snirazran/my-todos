@@ -20,6 +20,7 @@ export async function POST(req: NextRequest) {
     const body = (await req.json().catch(() => ({}))) as {
       campaignId?: string;
       event?: CampaignEvent;
+      elementId?: string;
     };
     const campaignId = body.campaignId?.trim();
     const event = body.event;
@@ -34,7 +35,15 @@ export async function POST(req: NextRequest) {
       inc.impressions = 1;
       set.lastShownAt = now;
     }
-    if (event === 'click') inc.clicks = 1;
+    if (event === 'click') {
+      inc.clicks = 1;
+      // Which button on the artwork was pressed, so a canvas popup can be read
+      // element by element instead of as one undifferentiated click.
+      const elementId = body.elementId?.trim().slice(0, 40);
+      if (elementId && /^[\w-]+$/.test(elementId)) {
+        inc[`elementClicks.${elementId}`] = 1;
+      }
+    }
     if (event === 'dismiss') inc.dismissals = 1;
     if (event === 'convert') {
       set.converted = true;
@@ -55,7 +64,7 @@ export async function POST(req: NextRequest) {
     void recordAnalyticsEvent({
       name: ANALYTICS_NAME[event],
       userId: decoded.uid,
-      properties: { campaignId },
+      properties: { campaignId, elementId: body.elementId ?? null },
     });
 
     return NextResponse.json({ ok: true });

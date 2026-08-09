@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
     const categoryId = typeof body.categoryId === 'string' ? body.categoryId.trim() : '';
     const timezone = typeof body.timezone === 'string' ? body.timezone : 'UTC';
     if (!categoryId) {
-      return NextResponse.json({ error: 'Choose a focus area' }, { status: 400 });
+      return NextResponse.json({ error: 'Choose an area' }, { status: 400 });
     }
 
     await connectMongo();
@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
       };
     }>();
     if (!user?.focusProfile?.selectedCategoryIds?.includes(categoryId)) {
-      return NextResponse.json({ error: 'This focus area is not active' }, { status: 403 });
+      return NextResponse.json({ error: 'This area is not active' }, { status: 403 });
     }
 
     const storedCategory = await QuestCategoryModel.findOne(
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
       { name: 1, accent: 1 },
     ).lean<{ name?: string; accent?: string }>();
     const builtIn = getMacroCategory(categoryId);
-    const name = storedCategory?.name || builtIn?.name || 'Focus area';
+    const name = storedCategory?.name || builtIn?.name || 'Area';
     const accent = storedCategory?.accent || builtIn?.accent || '#22c55e';
     const tags = user.focusProfile.categoryTagMap?.find(
       (entry) => entry.categoryId === categoryId,

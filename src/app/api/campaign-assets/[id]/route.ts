@@ -4,14 +4,24 @@ import CampaignModel from '@/lib/models/Campaign';
 import { getAdminStorage } from '@/lib/firebaseAdmin';
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
+  const assetId = req.nextUrl.searchParams.get('asset');
+  const kind = req.nextUrl.searchParams.get('kind');
 
   await connectMongo();
-  const campaign = await CampaignModel.findOne({ id }).select('imageFile').lean();
-  const file = campaign?.imageFile;
+  const campaign = await CampaignModel.findOne({ id })
+    .select('imageFile riveFile assets')
+    .lean();
+
+  const file = assetId
+    ? campaign?.assets?.find((asset) => asset.id === assetId)
+    : kind === 'rive'
+      ? campaign?.riveFile
+      : campaign?.imageFile;
+
   if (!file?.storagePath) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }

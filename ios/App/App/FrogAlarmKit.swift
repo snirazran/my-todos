@@ -25,7 +25,15 @@ private struct FrogAlarmMetadata: AlarmMetadata {}
 // Info.plist.
 enum FrogAlarmKit {
     private static let alarmIdKey = "frogAlarmKitId"
+    private static let armedEndKey = "frogAlarmKitEndTime"
     private static let suiteName = "group.io.frog.tasks.liveactivities"
+
+    // Epoch-ms end time of the alarm currently armed, 0 when none. The stop
+    // intent reads it to tell "this alarm's phase just ended" from "the session
+    // already moved on and armed a new alarm" when there is no island to consult.
+    static var armedEndTimeMs: Double {
+        UserDefaults(suiteName: suiteName)?.double(forKey: armedEndKey) ?? 0
+    }
 
     /// Schedule (or move) the finish alarm to `endTime` (epoch ms). Passing a
     /// past/zero time cancels instead.
@@ -79,7 +87,9 @@ enum FrogAlarmKit {
 
                 let id = UUID()
                 _ = try await manager.schedule(id: id, configuration: configuration)
-                UserDefaults(suiteName: suiteName)?.set(id.uuidString, forKey: alarmIdKey)
+                let defaults = UserDefaults(suiteName: suiteName)
+                defaults?.set(id.uuidString, forKey: alarmIdKey)
+                defaults?.set(endTimeMs, forKey: armedEndKey)
                 NSLog("FrogAlarmKit: scheduled %@ at %@", id.uuidString, "\(date)")
             } catch {
                 NSLog("FrogAlarmKit: schedule failed: %@", error.localizedDescription)
@@ -115,7 +125,9 @@ enum FrogAlarmKit {
 
     @available(iOS 26.0, *)
     private static func cancelExisting() async {
-        UserDefaults(suiteName: suiteName)?.removeObject(forKey: alarmIdKey)
+        let defaults = UserDefaults(suiteName: suiteName)
+        defaults?.removeObject(forKey: alarmIdKey)
+        defaults?.removeObject(forKey: armedEndKey)
         // Cancel every alarm this app owns, not just the tracked id. AlarmKit
         // alarms outlive the app process and there is no cancel-all, so one we
         // lost track of could never be reached again. Only ever one is wanted at

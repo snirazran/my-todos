@@ -19,6 +19,7 @@ import { StreakSheet } from '@/components/ui/streak/StreakSheet';
 import { StreakRescueSheet } from '@/components/ui/streak/StreakRescueSheet';
 import { rewardedAdsAvailable } from '@/lib/ads';
 import { recordAppUsageDay } from '@/lib/rateApp';
+import { emitCampaignTrigger } from '@/lib/campaigns/orchestrator';
 import type { CheckInResult, LoginStreakRescue } from '@/lib/streak/types';
 
 // Keyed per user so a fresh account created in the same session (after another
@@ -73,6 +74,11 @@ export function StreakCheckInProvider() {
         openStreakSheet({ rescue: offer });
       } else if (result.extended) {
         openStreakSheet({ celebration: result });
+      }
+      if (result.extended) {
+        emitCampaignTrigger('streak_milestone', {
+          streak: result.view?.count ?? 0,
+        });
       }
     };
 

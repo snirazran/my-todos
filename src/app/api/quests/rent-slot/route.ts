@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
     const profile = normalizeFocusProfile(userObj);
     if (!(profile.selectedCategoryIds ?? []).includes(categoryId)) {
       return NextResponse.json(
-        { error: 'Category is not one of your focus areas' },
+        { error: 'Category is not one of your areas' },
         { status: 400 },
       );
     }

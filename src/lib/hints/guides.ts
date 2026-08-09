@@ -144,7 +144,7 @@ const GUIDES: Record<string, HintGuide> = {
       },
       {
         anchor: 'task-list',
-        label: 'Open any task and hit Focus',
+        label: 'Open any task and hit Focus timer',
         labelCoarse: 'Swipe any task right to focus — or tap to open it',
         rowPeek: 'first',
         requirePresent: '[data-hint="task-row"]',
@@ -415,7 +415,7 @@ const GUIDES: Record<string, HintGuide> = {
       },
       {
         anchor: 'task-list',
-        label: 'Open a task tagged {tags} and hit Focus',
+        label: 'Open a task tagged {tags} and hit Focus timer',
         labelCoarse: 'Swipe a task tagged {tags} right — or tap to open it',
         rowPeek: 'tagged',
         hideRing: true,

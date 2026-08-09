@@ -107,11 +107,13 @@ export function HomeFocusFlies({
   const focusLive =
     sessionStats.focusTime +
     (phase === 'focus' ? Math.max(0, liveElapsed - phaseElapsed) : 0);
-  const caught = fliesCaughtFor(
-    focusLive,
-    priorDayFocusSeconds(focusFlyDaily, focusLive),
+  const prior = priorDayFocusSeconds(focusFlyDaily, focusLive);
+  const caught = fliesCaughtFor(focusLive, prior);
+  const fliesPotential = fliesCaughtFor(
+    focusLive + (phase === 'focus' ? Math.max(0, timeLeft) : 0),
+    prior,
   );
-  const flyCount = sceneFlyCount(phaseFull);
+  const flyCount = sceneFlyCount(fliesPotential - caught);
   const suppressed = hidden || sheetOpen;
 
   // Positioned inside the frog container, measured against the frog's live

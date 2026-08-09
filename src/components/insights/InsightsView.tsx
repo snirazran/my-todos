@@ -271,6 +271,13 @@ function SummaryHero({ data }: { data: InsightData }) {
 function MetricStack({ data }: { data: InsightData }) {
   const delta = data.summary.completionDelta;
   const DeltaIcon = delta > 0 ? TrendingUp : delta < 0 ? TrendingDown : Target;
+  const focusDelta = data.summary.focusDelta;
+  const focusDetail =
+    data.summary.focusSeconds === 0
+      ? 'Start a focus timer on any task'
+      : focusDelta === null || focusDelta === 0
+        ? 'Time spent in focus sessions'
+        : `${Math.abs(focusDelta)}% ${focusDelta > 0 ? 'more' : 'less'} than before`;
   return (
     <section className="grid grid-cols-3 gap-2 lg:grid-cols-1" aria-label="At a glance">
       <MetricCard
@@ -286,7 +293,8 @@ function MetricStack({ data }: { data: InsightData }) {
         tone="violet"
         value={formatDuration(data.summary.focusSeconds)}
         label="Focus Time"
-        detail="Time spent in focus sessions"
+        detail={focusDetail}
+        compactDetail={focusDelta !== null && focusDelta !== 0}
       />
       <MetricCard
         icon={<DeltaIcon className="h-5 w-5" aria-hidden="true" />}

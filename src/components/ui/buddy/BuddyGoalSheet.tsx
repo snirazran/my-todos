@@ -1,6 +1,12 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { ChevronLeft, Loader2, Gift } from 'lucide-react';
 import Frog from '@/components/ui/frog';
 import Fly from '@/components/ui/fly';
@@ -75,8 +81,46 @@ export function BuddyGoalSheet({
   const [presetId, setPresetId] = useState<string | null>(null);
   const [inputFocused, setInputFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const presetRowRef = useRef<HTMLDivElement | null>(null);
+  const dragRef = useRef<{
+    id: number;
+    x: number;
+    left: number;
+    moved: boolean;
+  } | null>(null);
+  const draggedRef = useRef(false);
   const { inset } = useKeyboardInset(open);
   const keyboardInset = inputFocused ? inset : 0;
+
+  const handleRowWheel = useCallback((e: WheelEvent) => {
+    const el = presetRowRef.current;
+    if (!el || Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+    const max = el.scrollWidth - el.clientWidth;
+    if (max <= 0) return;
+    const next = Math.min(max, Math.max(0, el.scrollLeft + e.deltaY));
+    if (next === el.scrollLeft) return;
+    e.preventDefault();
+    el.scrollLeft = next;
+  }, []);
+
+  const bindPresetRow = useCallback(
+    (el: HTMLDivElement | null) => {
+      presetRowRef.current?.removeEventListener('wheel', handleRowWheel);
+      presetRowRef.current = el;
+      el?.addEventListener('wheel', handleRowWheel, { passive: false });
+    },
+    [handleRowWheel],
+  );
+
+  const endRowDrag = (e: React.PointerEvent<HTMLDivElement>) => {
+    const drag = dragRef.current;
+    if (!drag || drag.id !== e.pointerId) return;
+    if (drag.moved) {
+      draggedRef.current = true;
+      presetRowRef.current?.releasePointerCapture(e.pointerId);
+    }
+    dragRef.current = null;
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -198,7 +242,41 @@ export function BuddyGoalSheet({
               className="w-full rounded-2xl border border-border/60 bg-muted/40 px-4 py-3.5 text-[17px] font-bold tracking-tight text-foreground placeholder:font-semibold placeholder:text-muted-foreground/60 focus:border-[#4f9149]/50 focus:outline-none focus:ring-2 focus:ring-[#4f9149]/20"
             />
 
-            <div className="-mx-4 mt-2.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div
+              ref={bindPresetRow}
+              onPointerDown={(e) => {
+                if (e.pointerType !== 'mouse' || e.button !== 0) return;
+                const el = presetRowRef.current;
+                if (!el || el.scrollWidth <= el.clientWidth) return;
+                dragRef.current = {
+                  id: e.pointerId,
+                  x: e.clientX,
+                  left: el.scrollLeft,
+                  moved: false,
+                };
+              }}
+              onPointerMove={(e) => {
+                const drag = dragRef.current;
+                const el = presetRowRef.current;
+                if (!drag || !el || drag.id !== e.pointerId) return;
+                const dx = e.clientX - drag.x;
+                if (!drag.moved) {
+                  if (Math.abs(dx) < 4) return;
+                  drag.moved = true;
+                  el.setPointerCapture(e.pointerId);
+                }
+                el.scrollLeft = drag.left - dx;
+              }}
+              onPointerUp={endRowDrag}
+              onPointerCancel={endRowDrag}
+              onClickCapture={(e) => {
+                if (!draggedRef.current) return;
+                draggedRef.current = false;
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              className="-mx-4 mt-2.5 select-none overflow-x-auto overscroll-x-contain px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            >
               <div className="flex w-max gap-1.5">
                 {BUDDY_PRESETS.map((p) => (
                   <button

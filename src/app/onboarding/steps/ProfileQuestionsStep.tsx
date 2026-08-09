@@ -98,7 +98,7 @@ export default function ProfileQuestionsStep({
     () => ({
       id: FOCUS_AREAS_QUESTION_ID,
       title: 'What areas would you like support with?',
-      sectionLabel: 'Focus Areas',
+      sectionLabel: 'Areas',
       multiSelect: true,
       options: focusAreaCategories.map((c) => ({
         id: c.id,

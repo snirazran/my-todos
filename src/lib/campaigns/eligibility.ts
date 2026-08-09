@@ -1,6 +1,13 @@
 import type { CampaignDoc } from '@/lib/models/Campaign';
 import type { CampaignUserStateDoc } from '@/lib/models/CampaignUserState';
-import type { CampaignPayload, PlatformTarget } from '@/lib/campaigns/types';
+import {
+  DEFAULT_CANVAS,
+  DEFAULT_CAPS,
+  DEFAULT_RIVE,
+  rolloutBucket,
+  type CampaignPayload,
+  type PlatformTarget,
+} from '@/lib/campaigns/types';
 
 export type CampaignAudience = {
   userId: string;
@@ -86,6 +93,13 @@ export function evaluateCampaign(
   if (t.balanceAbove != null && audience.balance <= t.balanceAbove) {
     return verdict(false, `Balance ${audience.balance} is not above ${t.balanceAbove}`);
   }
+  const rollout = t.rollout ?? 100;
+  if (rollout < 100) {
+    const bucket = rolloutBucket(audience.userId, campaign.id);
+    if (bucket >= rollout) {
+      return verdict(false, `Held out — bucket ${bucket} of ${rollout}% rollout`);
+    }
+  }
 
   if (state) {
     if (state.converted) return verdict(false, 'Already converted on this campaign');
@@ -111,7 +125,24 @@ export function evaluateCampaign(
   return verdict(true, 'Eligible');
 }
 
+export const campaignAssetUrl = (
+  campaign: Pick<CampaignDoc, 'id' | 'imageFile' | 'imageVersion' | 'riveFile' | 'riveVersion'>,
+  kind: 'image' | 'rive',
+) => {
+  const file = kind === 'rive' ? campaign.riveFile : campaign.imageFile;
+  if (!file?.storagePath) return '';
+  const version = kind === 'rive' ? campaign.riveVersion : campaign.imageVersion;
+  const suffix = kind === 'rive' ? '&kind=rive' : '';
+  return `/api/campaign-assets/${encodeURIComponent(campaign.id)}?v=${version ?? 0}${suffix}`;
+};
+
 export function toCampaignPayload(campaign: CampaignDoc): CampaignPayload {
+  const rive = { ...DEFAULT_RIVE, ...(campaign.rive ?? {}) };
+  const canvas = {
+    aspect: campaign.canvas?.aspect || DEFAULT_CANVAS.aspect,
+    maxWidth: campaign.canvas?.maxWidth || DEFAULT_CANVAS.maxWidth,
+    elements: campaign.canvas?.elements ?? [],
+  };
   return {
     id: campaign.id,
     name: campaign.name,
@@ -119,9 +150,29 @@ export function toCampaignPayload(campaign: CampaignDoc): CampaignPayload {
     tier: campaign.tier,
     priority: campaign.priority,
     status: campaign.status,
-    imageUrl: campaign.imageFile
-      ? `/api/campaign-assets/${encodeURIComponent(campaign.id)}?v=${campaign.imageVersion}`
-      : '',
+    art: campaign.art ?? 'image',
+    imageUrl: campaignAssetUrl(campaign, 'image'),
+    riveUrl: rive.libraryPath || campaignAssetUrl(campaign, 'rive'),
+    rive: {
+      ...rive,
+      buttons: (rive.buttons ?? []).map((button) => ({
+        signal: button.signal,
+        source: button.source ?? 'event',
+        action: button.action ?? 'cta',
+        path: button.path ?? '',
+        packId: button.packId ?? '',
+        closes: button.closes !== false,
+      })),
+    },
+    canvas,
+    assets: (campaign.assets ?? []).map((asset) => ({
+      id: asset.id,
+      kind: asset.kind,
+      name: asset.name,
+      url: `/api/campaign-assets/${encodeURIComponent(campaign.id)}?asset=${encodeURIComponent(asset.id)}&v=${asset.version ?? 1}`,
+    })),
+    endAt: campaign.endAt ? new Date(campaign.endAt).toISOString() : null,
+    delayMs: campaign.caps?.delayMs ?? DEFAULT_CAPS.delayMs,
     copy: {
       eyebrow: campaign.copy?.eyebrow ?? '',
       headline: campaign.copy?.headline ?? '',
@@ -141,6 +192,8 @@ export function toCampaignPayload(campaign: CampaignDoc): CampaignPayload {
       event: rule.event,
       minGap: rule.minGap,
       minDays: rule.minDays,
+      minMinutes: rule.minMinutes,
+      minStreak: rule.minStreak,
     })),
   };
 }

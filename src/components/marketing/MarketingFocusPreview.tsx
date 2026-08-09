@@ -89,7 +89,7 @@ export function MarketingFocusPreview() {
               running={running}
               showFlies
               caught={2}
-              focusSeconds={680}
+              fliesPotential={5}
               frogWidth={132}
               onFrogReady={() => setFrogReady(true)}
               scrollContainerRef={mainScrollRef}

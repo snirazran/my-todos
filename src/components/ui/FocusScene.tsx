@@ -23,7 +23,7 @@ export function entrySideFor(drift: (typeof FOCUS_DRIFTS)[number]): number {
 
 /**
  * The live session scene: the user's frog perched on the PAUSE button while
- * flies drift around the card. The swarm grows with focused minutes. The frog
+ * flies drift around the card. The swarm is the flies still owed. The frog
  * hunts with its real tongue: on a loose rhythm it lunges, aims just past a
  * fly, and comes back empty — the miss. Only when `caught` increments (one
  * per 15 focused minutes, mirroring the fly the server credited) does the
@@ -34,7 +34,7 @@ export function FocusScene({
   running,
   showFlies,
   caught,
-  focusSeconds = 0,
+  fliesPotential = 0,
   frogWidth = 144,
   counterRef,
   onGainLand,
@@ -48,7 +48,8 @@ export function FocusScene({
   running: boolean;
   showFlies: boolean;
   caught: number;
-  focusSeconds?: number;
+  /** Flies this session yields end-to-end, already-caught ones included. */
+  fliesPotential?: number;
   frogWidth?: number;
   /** The caught-count chip a snatched fly flies into (currency-gain style). */
   counterRef?: React.RefObject<HTMLElement | null>;
@@ -124,7 +125,7 @@ export function FocusScene({
       allowCameraFollow,
     });
 
-  const flyCount = sceneFlyCount(focusSeconds);
+  const flyCount = sceneFlyCount(fliesPotential - caught);
 
   const pickLiveIndex = useCallback(() => {
     const live: number[] = [];

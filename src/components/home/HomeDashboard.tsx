@@ -71,6 +71,7 @@ import {
 import { HUNGRY_MOOD_THRESHOLD } from '@/lib/hungerLogic';
 import { patchInventoryFlies } from '@/hooks/useInventory';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
+import { TimerClockIcon } from '@/components/ui/TimerClockIcon';
 import { randomUUID } from '@/lib/uuid';
 import { QuestOnboardingPopup } from '@/components/ui/QuestOnboardingPopup';
 import { StyleShuffleHeaderButton } from '@/components/ui/SkinRotation';
@@ -349,6 +350,7 @@ export default function HomeDashboard() {
   // mini overlay while it's mounted.
   const addFullTimerHost = useFrogodoroUiStore((s) => s.addFullTimerHost);
   const removeFullTimerHost = useFrogodoroUiStore((s) => s.removeFullTimerHost);
+  const openFocusLauncher = useFrogodoroUiStore((s) => s.openFocusLauncher);
   useEffect(() => {
     addFullTimerHost();
     return () => removeFullTimerHost();
@@ -748,12 +750,15 @@ export default function HomeDashboard() {
                       </span>
                     </div>
 
-                    <FilterTriggerButton
-                      triggerRef={headerMenuBtnRef}
-                      onClick={() => setIsHeaderMenuOpen(true)}
-                      activeCount={activeFilterCount}
-                      open={isHeaderMenuOpen}
-                    />
+                    <div className="flex items-center gap-1">
+                      <HomeFocusTimerButton onClick={openFocusLauncher} />
+                      <FilterTriggerButton
+                        triggerRef={headerMenuBtnRef}
+                        onClick={() => setIsHeaderMenuOpen(true)}
+                        activeCount={activeFilterCount}
+                        open={isHeaderMenuOpen}
+                      />
+                    </div>
                   </div>
                 )}
                 <TaskFilterSheet
@@ -1360,6 +1365,33 @@ function Header({ router }: { router: any }) {
     <div className="flex flex-col gap-1 mb-1 md:mb-2 md:flex-row md:items-center md:justify-between">
       {/* Date removed as per request */}
     </div>
+  );
+}
+
+function HomeFocusTimerButton({ onClick }: { onClick: () => void }) {
+  const timerActive = useFrogodoroStore((s) => s.timerActive);
+  const isRunning = useFrogodoroStore((s) => s.isRunning);
+  const phase = useFrogodoroStore((s) => s.phase);
+  const onBreak = timerActive && phase === 'break';
+
+  return (
+    <button
+      onClick={onClick}
+      aria-label={timerActive ? 'Open running focus timer' : 'Start a focus timer'}
+      className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-bold transition-all md:px-4 md:py-2 md:text-[13px] ${
+        onBreak
+          ? 'bg-sky-500/10 text-sky-600 dark:text-sky-400'
+          : timerActive
+            ? 'bg-primary/10 text-primary'
+            : 'text-muted-foreground [@media(hover:hover)]:hover:bg-accent/50 [@media(hover:hover)]:hover:text-foreground'
+      }`}
+    >
+      <TimerClockIcon
+        running={isRunning}
+        className="h-3.5 w-3.5 md:h-4 md:w-4"
+      />
+      <span>{onBreak ? 'On break' : timerActive ? 'Focusing' : 'Focus'}</span>
+    </button>
   );
 }
 

@@ -1456,7 +1456,7 @@ export function CategoryQuestPresentationCard({
           >
             <Compass className="h-3.5 w-3.5 shrink-0" strokeWidth={3} />
             <span className="truncate leading-none">
-              {category?.shortLabel || category?.name || 'Focus'}
+              {category?.shortLabel || category?.name || 'Area'}
             </span>
           </span>
           {rentedTimeLeft && !isCompleted ? (
@@ -1986,7 +1986,7 @@ export function SwitchFocusConfirm({
                 <p className="mx-auto mt-1.5 max-w-[19rem] text-center text-[14px] leading-snug text-muted-foreground">
                   Switching to{' '}
                   <span className="font-bold text-foreground">
-                    {categoryName ?? 'this focus'}
+                    {categoryName ?? 'this area'}
                   </span>{' '}
                   quest resets your{' '}
                   <span className="font-bold text-foreground">

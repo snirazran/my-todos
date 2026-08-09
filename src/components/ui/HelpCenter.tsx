@@ -70,7 +70,11 @@ const HELP_CATEGORIES: HelpCategory[] = [
       },
       {
         q: 'What is the focus timer?',
-        a: 'You can start a focus session on a task to track focused minutes. Some quests reward you for time spent focusing, not just for finishing tasks.',
+        a: 'Pick one task, set a length, and work on just that until the timer ends — then take the break it offers. Working in short protected stretches beats grinding for hours. Your frog hunts while you focus: you catch a fly every 15 focused minutes (up to 5 a day), plus a bonus fly for finishing a 15-minute session without pausing. Every focused minute also counts toward quests.',
+      },
+      {
+        q: 'How long should a focus session be?',
+        a: 'Start with 15 minutes — long enough to earn a fly, short enough that starting is easy. Once that feels natural, work up to 25 or more. The best session length is the one you\'ll actually start.',
       },
       {
         q: 'What is the backlog?',
@@ -92,12 +96,12 @@ const HELP_CATEGORIES: HelpCategory[] = [
         a: 'Quests are daily and seasonal goals — like completing a number of tasks or focusing for a set number of minutes. Finishing objectives earns flies and gift rewards.',
       },
       {
-        q: 'What is a focus (category)?',
-        a: 'Quests are grouped into focus areas like Home or Productivite & Work. For free, you work on one focus at a time.',
+        q: 'What is an area?',
+        a: 'Quests are grouped into areas of your life, like Home or Productivity & Work. For free, you work on one area at a time.',
       },
       {
-        q: 'What happens when I switch focus?',
-        a: 'Switching to a different focus resets your current focus\'s quest progress for that period. You\'ll always get a confirmation before anything resets.',
+        q: 'What happens when I switch areas?',
+        a: 'Switching to a different area resets your current area\'s quest progress for that period. You\'ll always get a confirmation before anything resets.',
       },
       {
         q: 'How do I claim rewards?',
@@ -105,7 +109,7 @@ const HELP_CATEGORIES: HelpCategory[] = [
       },
       {
         q: 'Can I progress every quest at once?',
-        a: 'Yes — with Frogress Plus you can advance every quest at the same time, so you never have to switch focus.',
+        a: 'Yes — with Frogress Plus you can advance every quest at the same time, so you never have to switch areas.',
       },
     ],
   },
