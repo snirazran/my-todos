@@ -117,18 +117,40 @@ export function liveActivityEndTimeForDevice(
   return serverEndTime - normalizeClockSkewMs(clockSkewMs);
 }
 
+/**
+ * At most ONE push-to-start per timer state, permanently — this is an
+ * idempotency record, not a retry lock.
+ *
+ * APNs has no dedupe of its own: "when the system receives the ActivityKit
+ * push notification on a device, it starts a new Live Activity", every time.
+ * So a second push for a state that already has an island is a second island
+ * on the user's lock screen, and nothing server-side can end the extra (we
+ * only ever hold one activity token).
+ *
+ * The server also cannot tell that an island already exists. A terminated app
+ * never delivers `pushTokenUpdates`, so `liveActivity.pushToken` stays null
+ * and every later fan-out takes the push-to-start branch again — and the
+ * push-to-start token rotates after each use, so the repeat would succeed.
+ * This record is the only thing standing between that and a duplicate.
+ *
+ * It therefore must NOT expire on a timer. It used to lapse after 30s, which
+ * turned a successful start into a repeatable one for the rest of the session.
+ * Nothing is lost: the key carries the timer state (task + phase + endsAt), so
+ * a real new activity — next phase, resume, new session — gets a new key and
+ * is allowed, and a push that FAILS releases the record explicitly (see
+ * fanOutTimerState), which is the only case a timed expiry could have rescued.
+ */
 export async function reserveLiveActivityRemoteStart(
   userId: string,
   key: string,
 ): Promise<boolean> {
-  const cutoff = new Date(Date.now() - 30_000).toISOString();
   const reserved = await UserModel.findOneAndUpdate(
     {
       _id: userId,
       $or: [
-        { 'liveActivityRemoteStart.key': { $ne: key } },
-        { 'liveActivityRemoteStart.attemptedAt': { $lt: cutoff } },
+        { liveActivityRemoteStart: null },
         { liveActivityRemoteStart: { $exists: false } },
+        { 'liveActivityRemoteStart.key': { $ne: key } },
       ],
     },
     {
@@ -333,7 +355,17 @@ export async function clearTimerAndFanOut(
 ): Promise<number> {
   const doc = await UserModel.findOneAndUpdate(
     { _id: userId },
-    { $set: { activeFrogodoroTimer: null, liveActivity: null }, $inc: { frogodoroSeq: 1 } },
+    {
+      // The remote-start record is released with the activity it stands for —
+      // it never expires on its own, so leaving it would block the island for
+      // a later session that happened to land on the same end time.
+      $set: {
+        activeFrogodoroTimer: null,
+        liveActivity: null,
+        liveActivityRemoteStart: null,
+      },
+      $inc: { frogodoroSeq: 1 },
+    },
     { new: true, projection: { frogodoroSeq: 1 } },
   ).lean();
   const seq = (doc as { frogodoroSeq?: number } | null)?.frogodoroSeq ?? 0;

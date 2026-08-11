@@ -91,6 +91,7 @@ const config: CapacitorConfig = {
   appId: 'io.frog.tasks',
   appName: 'Frogress',
   webDir: 'out',
+  appendUserAgent: 'FrogressApp',
   server: {
     url: serverUrl,
     // Only allow plain HTTP when explicitly pointing at a local dev server.

@@ -123,6 +123,17 @@ let remoteStartRequestedSig: string | null = null;
 
 async function requestRemoteStart(sig: string): Promise<void> {
   if (remoteStartRequestedSig === sig) return;
+  // An island already on this device must never be asked for again: APNs
+  // push-to-start has no dedupe, so a second push is a second island on the
+  // lock screen. The server can't see this one (a backgrounded/terminated app
+  // may not have registered its activity push token yet), so the check has to
+  // happen here, against ActivityKit itself.
+  const existing = await getCurrentLiveActivityState();
+  if (existing?.active) {
+    remoteStartRequestedSig = sig;
+    return;
+  }
+  if (remoteStartRequestedSig === sig) return;
   remoteStartRequestedSig = sig;
   const attempt = async (): Promise<boolean> => {
     try {
@@ -257,6 +268,7 @@ export async function reconcileLiveTimer(snap: LiveTimerSnapshot): Promise<void>
   try {
     if (!desiredSig) {
       await FrogLiveActivity.end();
+      remoteStartRequestedSig = null;
       void deletePushToken();
       return;
     }

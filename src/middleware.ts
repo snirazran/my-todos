@@ -20,7 +20,12 @@ export async function middleware(req: NextRequest) {
   // The root route serves a public product homepage to signed-out visitors and
   // the task dashboard to authenticated users. Keep it reachable so OAuth
   // reviewers and prospective users can understand the app without an account.
-  const isPublicHomepage = req.nextUrl.pathname === '/';
+  const isNativeApp = (req.headers.get('user-agent') ?? '').includes(
+    'FrogressApp',
+  );
+  const isPublicHomepage =
+    req.nextUrl.pathname === '/' &&
+    (!isNativeApp || req.nextUrl.searchParams.has('guest'));
 
   if (!isAuth && !isAuthRoute && !isPublicHomepage) {
     // Check if it's a public path or asset not caught by matcher

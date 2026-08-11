@@ -268,6 +268,18 @@ public class FrogLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
+    // Getting this token to the server is what stops the server from ever
+    // needing another push-to-start: with it, every later change is an
+    // `event: "update"` to THIS activity instead of a new island.
+    //
+    // Apple DTS on exactly this callback: "You should be able to just make the
+    // API call from that block as it will wake your app in the background to
+    // allow for this." So the request is issued unconditionally — the expiring
+    // activity is only borrowed runtime to keep it in flight. It must never
+    // GATE the upload: performExpiringActivity invokes its block with
+    // expired = true when the assertion can't be granted, and the old
+    // `guard !expired else { return }` silently dropped the token there,
+    // leaving the server believing no island exists.
     private static func uploadActivityToken(activityId: String, token: String) {
         let suite = UserDefaults(suiteName: "group.io.frog.tasks.liveactivities")
         let auth =
@@ -275,28 +287,31 @@ public class FrogLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
             ?? suite?.string(forKey: "frogPushToStartToken")
         let origin = suite?.string(forKey: "frogApiOrigin") ?? "https://frogress.com"
         guard let auth, let url = URL(string: "\(origin)/api/frogodoro/live-activity") else { return }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        request.timeoutInterval = 8
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: [
+            "activityId": activityId,
+            "pushToken": token,
+            "authToken": auth,
+            "clientNow": Int(Date().timeIntervalSince1970 * 1000),
+        ])
+
+        let semaphore = DispatchSemaphore(value: 0)
+        URLSession.shared.dataTask(with: request) { _, response, error in
+            if let http = response as? HTTPURLResponse {
+                NSLog("FrogActivityToken: PUT -> %d", http.statusCode)
+            } else if let error {
+                NSLog("FrogActivityToken: PUT failed: %@", error.localizedDescription)
+            }
+            semaphore.signal()
+        }.resume()
+
         ProcessInfo.processInfo.performExpiringActivity(withReason: "FrogActivityTokenUpload") { expired in
             guard !expired else { return }
-            var request = URLRequest(url: url)
-            request.httpMethod = "PUT"
-            request.timeoutInterval = 8
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            request.httpBody = try? JSONSerialization.data(withJSONObject: [
-                "activityId": activityId,
-                "pushToken": token,
-                "authToken": auth,
-                "clientNow": Int(Date().timeIntervalSince1970 * 1000),
-            ])
-            let semaphore = DispatchSemaphore(value: 0)
-            URLSession.shared.dataTask(with: request) { _, response, error in
-                if let http = response as? HTTPURLResponse {
-                    NSLog("FrogActivityToken: PUT -> %d", http.statusCode)
-                } else if let error {
-                    NSLog("FrogActivityToken: PUT failed: %@", error.localizedDescription)
-                }
-                semaphore.signal()
-            }.resume()
-            semaphore.wait()
+            _ = semaphore.wait(timeout: .now() + 10)
         }
     }
 

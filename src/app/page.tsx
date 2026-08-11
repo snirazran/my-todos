@@ -10,6 +10,8 @@ export const metadata: Metadata = {
   alternates: { canonical: '/' },
 };
 
+const NATIVE_WELCOME_REDIRECT = `(function(){try{var c=window.Capacitor;if(c&&(typeof c.isNativePlatform==='function'?c.isNativePlatform():c.isNative)){location.replace('/welcome'+location.search)}}catch(e){}})();`;
+
 export default async function HomePage({
   searchParams,
 }: {
@@ -19,5 +21,12 @@ export default async function HomePage({
   const hasSession = cookieStore.has('token');
   const isGuestPreview = Object.prototype.hasOwnProperty.call(params, 'guest');
 
-  return hasSession || isGuestPreview ? <HomeDashboard /> : <PublicHomepage />;
+  if (hasSession || isGuestPreview) return <HomeDashboard />;
+
+  return (
+    <>
+      <script dangerouslySetInnerHTML={{ __html: NATIVE_WELCOME_REDIRECT }} />
+      <PublicHomepage />
+    </>
+  );
 }
