@@ -10,7 +10,7 @@ import {
 import { buildLiveActivityData } from '@/lib/liveActivityData';
 import { sendTimerControlPush } from '@/lib/notifications/timer';
 import {
-  fliesCaughtFor,
+  focusPhaseCatches,
   deepFocusPledgeLive,
   priorDayFocusSeconds,
 } from '@/lib/focusFlies';
@@ -54,12 +54,13 @@ export function timerHuntExtras(
   const sessionFocus =
     (timer.sessionStats?.focusTime ?? 0) +
     (timer.phase === 'focus' ? Math.max(0, phaseElapsed - flushed) : 0);
-  const prior = Math.max(0, priorFocusSeconds);
-  const fliesCaught = fliesCaughtFor(sessionFocus, prior);
-  const fliesPotential =
-    timer.phase === 'focus'
-      ? fliesCaughtFor(sessionFocus + remaining, prior)
-      : fliesCaught;
+  const { caught: fliesCaught, potential: fliesPotential } = focusPhaseCatches({
+    sessionFocusSeconds: sessionFocus,
+    phaseElapsedSeconds: phaseElapsed,
+    phaseFullSeconds: total,
+    priorFocusSeconds: Math.max(0, priorFocusSeconds),
+    onFocusPhase: timer.phase === 'focus',
+  });
   return {
     fliesCaught,
     fliesPotential,

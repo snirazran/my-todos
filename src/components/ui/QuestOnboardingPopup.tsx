@@ -14,6 +14,7 @@ export function QuestOnboardingPopup({
   show,
   isCompleted = false,
   initialSelectedCategoryIds,
+  initialCategoryTagMap,
   categories,
   onCompleted,
   onClose,
@@ -68,7 +69,7 @@ export function QuestOnboardingPopup({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           selectedCategoryIds,
-          categoryTagMap: [],
+          categoryTagMap: initialCategoryTagMap ?? [],
           createSuggestions: false,
           timezone,
         }),

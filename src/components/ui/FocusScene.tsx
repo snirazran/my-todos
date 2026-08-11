@@ -25,9 +25,10 @@ export function entrySideFor(drift: (typeof FOCUS_DRIFTS)[number]): number {
  * The live session scene: the user's frog perched on the PAUSE button while
  * flies drift around the card. The swarm is the flies still owed. The frog
  * hunts with its real tongue: on a loose rhythm it lunges, aims just past a
- * fly, and comes back empty — the miss. Only when `caught` increments (one
- * per 15 focused minutes, mirroring the fly the server credited) does the
- * tongue actually land: fly snatched, love emote, "+1" pop.
+ * fly, and comes back empty — the miss. Only when `caught` increments (the
+ * session's flies spread evenly across the phase, last one landing as the
+ * timer runs out) does the tongue actually land: fly snatched, love emote,
+ * "+1" pop.
  */
 export function FocusScene({
   indices,
@@ -35,6 +36,7 @@ export function FocusScene({
   showFlies,
   caught,
   fliesPotential = 0,
+  catchImminent,
   frogWidth = 144,
   counterRef,
   onGainLand,
@@ -50,6 +52,9 @@ export function FocusScene({
   caught: number;
   /** Flies this session yields end-to-end, already-caught ones included. */
   fliesPotential?: number;
+  /** True when a real catch is about to fire — hold the miss so the two
+   *  tongues don't collide. Read on demand, never subscribed. */
+  catchImminent?: () => boolean;
   frogWidth?: number;
   /** The caught-count chip a snatched fly flies into (currency-gain style). */
   counterRef?: React.RefObject<HTMLElement | null>;
@@ -125,7 +130,12 @@ export function FocusScene({
       allowCameraFollow,
     });
 
-  const flyCount = sceneFlyCount(fliesPotential - caught);
+  // The swarm shrinks only once the catch that claimed a fly has FINISHED.
+  // Sizing it straight off `caught` unmounted the target in the same render
+  // the catch was announced, so the tongue had nothing left to reach for —
+  // which silently robbed the last catch of every session of its lunge.
+  const [settledCaught, setSettledCaught] = useState(caught);
+  const flyCount = sceneFlyCount(fliesPotential - settledCaught);
 
   const pickLiveIndex = useCallback(() => {
     const live: number[] = [];
@@ -156,6 +166,7 @@ export function FocusScene({
   useEffect(() => {
     if (caught <= prevCaughtRef.current) {
       prevCaughtRef.current = caught;
+      setSettledCaught((v) => Math.min(v, caught));
       return;
     }
     const caughtNow = caught;
@@ -166,6 +177,7 @@ export function FocusScene({
     if (index < 0 || suspended) {
       frogRef.current?.fireEmote('love');
       launchGain();
+      setSettledCaught(caughtNow);
       return;
     }
     const key = `scene-fly-${index}`;
@@ -176,6 +188,7 @@ export function FocusScene({
       onPersist: () => {
         launchGain();
         eatAndRespawn(key);
+        setSettledCaught(caughtNow);
       },
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -184,16 +197,21 @@ export function FocusScene({
   // Failed hunts: the tongue aims a bit past a fly — away from the frog —
   // and returns empty. First one early (teaches the mechanic once), then a
   // loose 45–90s rhythm: personality actions read as scripted when they
-  // repeat often, and a focus surface must stay glanceable, not busy.
+  // repeat often, and a focus surface must stay glanceable, not busy. An
+  // attempt that can't fire retries in seconds instead of waiting out the
+  // full interval, so the cadence still reads the same.
+  const catchImminentRef = useRef(catchImminent);
+  catchImminentRef.current = catchImminent;
   useEffect(() => {
     if (!running || !showFlies || suspended) return;
     let timer = 0;
-    const attempt = () => {
+    const attempt = (): boolean => {
+      if (catchImminentRef.current?.()) return false;
       const index = pickLiveIndex();
       const key = index >= 0 ? `scene-fly-${index}` : null;
       const el = key ? flyRefs.current[key] : null;
       const mouth = frogRef.current?.getMouthPoint();
-      if (index < 0 || !el || !mouth) return;
+      if (index < 0 || !el || !mouth) return false;
       const overshoot = 44 + Math.random() * 26;
       const jitterX = Math.random() * 28 - 14;
       const rect = el.getBoundingClientRect();
@@ -215,11 +233,14 @@ export function FocusScene({
           onPersist: () => setMissMode(false),
         });
       });
+      return true;
     };
     const schedule = (delay: number) => {
       timer = window.setTimeout(() => {
-        attempt();
-        schedule(45000 + Math.random() * 45000);
+        const fired = attempt();
+        schedule(
+          fired ? 45000 + Math.random() * 45000 : 8000 + Math.random() * 7000,
+        );
       }, delay);
     };
     schedule(9000 + Math.random() * 5000);

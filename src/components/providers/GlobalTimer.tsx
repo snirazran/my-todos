@@ -22,7 +22,7 @@ import { notifyQuestClaims } from '@/lib/questClaims';
 import { emitCampaignTrigger } from '@/lib/campaigns/orchestrator';
 import { useNotification } from '@/components/providers/NotificationProvider';
 import { useAuth } from '@/components/auth/AuthContext';
-import { fliesCaughtFor, priorDayFocusSeconds } from '@/lib/focusFlies';
+import { focusPhaseCatches, priorDayFocusSeconds } from '@/lib/focusFlies';
 import { hapticCelebrate, hapticImpact } from '@/lib/haptics';
 import { markFlyEarn } from '@/lib/flyEarn';
 import {
@@ -89,19 +89,23 @@ export function GlobalTimer() {
   // Selected as the derived count, not the raw seconds, so the per-second tick
   // doesn't re-render this provider — it only wakes when a fly is actually caught.
   const fliesCaughtLive = useFrogodoroStore((s) => {
+    const onFocusPhase = s.phase === 'focus' && s.timerActive;
+    const phaseFull = getPhaseDuration('focus', s.settings);
+    const phaseElapsed = onFocusPhase ? Math.max(0, phaseFull - s.timeLeft) : 0;
     const sessionFocus =
       s.sessionStats.focusTime +
-      (s.phase === 'focus' && s.timerActive
-        ? Math.max(
-            0,
-            getPhaseDuration('focus', s.settings) - s.timeLeft - s.phaseElapsed,
-          )
-        : 0);
-    return fliesCaughtFor(
-      sessionFocus,
-      priorDayFocusSeconds(focusFlyDaily, sessionFocus),
-    );
+      (onFocusPhase ? Math.max(0, phaseElapsed - s.phaseElapsed) : 0);
+    return focusPhaseCatches({
+      sessionFocusSeconds: sessionFocus,
+      phaseElapsedSeconds: phaseElapsed,
+      phaseFullSeconds: phaseFull,
+      priorFocusSeconds: priorDayFocusSeconds(focusFlyDaily, sessionFocus),
+      onFocusPhase,
+    }).caught;
   });
+  // Read by the flush interval, which must not re-subscribe on every catch.
+  const caughtLiveRef = useRef(fliesCaughtLive);
+  caughtLiveRef.current = fliesCaughtLive;
   const prevCaughtRef = useRef(fliesCaughtLive);
   useEffect(() => {
     if (fliesCaughtLive > prevCaughtRef.current && timerActive) {
@@ -232,12 +236,15 @@ export function GlobalTimer() {
 
   // Save Progress API Caller. totalPhaseElapsed (when known) tells the server
   // how much of the current phase is now persisted in total, so the
-  // phase-completion save only adds the remainder.
+  // phase-completion save only adds the remainder. Sent with the phase's full
+  // length, it also tells the server the phase is still on the clock, so focus
+  // flies are credited on its catch marks rather than the raw day curve.
   const saveProgress = async (
     taskId: string,
     phaseForSave: PomodoroPhase,
     seconds: number,
     totalPhaseElapsed?: number,
+    phaseFull?: number,
   ) => {
     const today = format(new Date(), 'yyyy-MM-dd');
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -262,6 +269,9 @@ export function GlobalTimer() {
             ? {
                 activePhaseElapsed: Math.max(0, Math.round(totalPhaseElapsed)),
                 activePhase: phaseForSave,
+                ...(typeof phaseFull === 'number'
+                  ? { activePhaseFull: Math.max(1, Math.round(phaseFull)) }
+                  : {}),
               }
             : {}),
         }),
@@ -769,7 +779,15 @@ export function GlobalTimer() {
         const elapsed = phaseDuration - store.timeLeft;
         const unsavedElapsed = elapsed - store.phaseElapsed;
         if (unsavedElapsed > 0) {
-          saveProgress(store.selectedTaskId, pausedPhase, unsavedElapsed, elapsed);
+          // A pause is not the end of the phase — the user can still resume
+          // into its remaining catch marks, so this stays a mid-phase flush.
+          saveProgress(
+            store.selectedTaskId,
+            pausedPhase,
+            unsavedElapsed,
+            elapsed,
+            phaseDuration,
+          );
           setPhaseElapsed(elapsed);
           // Fold the just-elapsed time into sessionStats synchronously so the
           // stats display doesn't momentarily drop to 0 between resetting
@@ -793,8 +811,14 @@ export function GlobalTimer() {
   // lags the quest bar behind the visible timer). The server subtracts these
   // flushes from the completion save via savedElapsed, so nothing is counted
   // twice.
+  //
+  // A crossed catch mark also forces a flush off the minute: the flush is what
+  // carries the phase's elapsed to the server, and the server can only credit
+  // the fly once it has it. Without this the credit would wait for the next
+  // whole minute, well after the frog was seen catching it.
   useEffect(() => {
     if (!isRunning || !endTime) return;
+    let caughtAtLastFlush = caughtLiveRef.current;
     const interval = setInterval(() => {
       if (!ownsTimerRef.current) return;
       if (phaseRef.current !== 'focus') return;
@@ -806,8 +830,11 @@ export function GlobalTimer() {
       );
       const elapsed = Math.max(0, phaseDuration - timeLeftRef.current);
       const unsaved = elapsed - phaseElapsedRef.current;
-      if (unsaved < 60) return;
-      saveProgress(taskId, 'focus', unsaved, elapsed);
+      if (unsaved <= 0) return;
+      const caughtNow = caughtLiveRef.current;
+      if (unsaved < 60 && caughtNow <= caughtAtLastFlush) return;
+      caughtAtLastFlush = caughtNow;
+      saveProgress(taskId, 'focus', unsaved, elapsed, phaseDuration);
       setPhaseElapsed(elapsed);
       const store = useFrogodoroStore.getState();
       const stats = store.sessionStats;

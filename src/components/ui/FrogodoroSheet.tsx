@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { format } from 'date-fns';
 import {
@@ -44,6 +44,7 @@ import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
 import type { Trackable } from '@/lib/questClaims';
 import { FocusScene } from '@/components/ui/FocusScene';
 import {
+  focusPhaseCatches,
   fliesCaughtFor,
   deepFocusPledgeLive,
   priorDayFocusSeconds,
@@ -52,7 +53,9 @@ import {
   FOCUS_FLY_DAILY_CAP,
   DEEP_FOCUS_BONUS_FLIES,
 } from '@/lib/focusFlies';
-import { useInventory } from '@/hooks/useInventory';
+import { useInventory, mutateInventoryCaches } from '@/hooks/useInventory';
+import { markFlyEarn } from '@/lib/flyEarn';
+import type { FocusFlyDaily } from '@/lib/types/UserDoc';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
 import { requestFrogStamp } from '@/lib/frogStampEngine';
 import Frog from '@/components/ui/frog';
@@ -114,6 +117,38 @@ function sessionFocusLiveSeconds(s: TickState) {
       : 0)
   );
 }
+
+// A miss this close to the next real catch would hold the tongue when the
+// catch fires — the grab falls back to a bare "+1" with no lunge. Covers the
+// full tongue (offset + duration + the hook's cooldown) with room to spare.
+const MISS_CLEARANCE_SECONDS = 8;
+
+function phaseCatchesOf(s: TickState, focusFlyDaily?: FocusFlyDaily) {
+  const sessionFocus = sessionFocusLiveSeconds(s);
+  return focusPhaseCatches({
+    sessionFocusSeconds: sessionFocus,
+    phaseElapsedSeconds: liveElapsedSeconds(s),
+    phaseFullSeconds: phaseDurationSeconds(s),
+    priorFocusSeconds: priorDayFocusSeconds(focusFlyDaily, sessionFocus),
+    onFocusPhase: s.phase === 'focus',
+  });
+}
+
+// What the session is worth priced at the time ACTUALLY focused — 20 minutes
+// is still one fly. Ending a session early re-prices it to this, so a fly the
+// price covers but the phase's marks never reached gets caught on the way out
+// instead of turning up in the wallet unseen.
+function settledCatchesOf(s: TickState, focusFlyDaily?: FocusFlyDaily) {
+  const sessionFocus = sessionFocusLiveSeconds(s);
+  return fliesCaughtFor(
+    sessionFocus,
+    priorDayFocusSeconds(focusFlyDaily, sessionFocus),
+  );
+}
+
+// Tongue offset + flight: long enough for the frog to land the grab before the
+// session tears down. The "+1" arc finishes after, over the now-idle card.
+const SETTLE_CATCH_MS = 1150;
 
 function formatTime(seconds: number) {
   const m = Math.floor(seconds / 60);
@@ -497,11 +532,14 @@ export default function FrogodoroSheet({
       liveElapsedSeconds(live) - live.phaseElapsed,
     );
     setConfirmTaskSwitch(false);
-    if (oldTaskId && unsavedElapsed > 0) {
+    if (oldTaskId) {
       await saveSessionToDb(oldTaskId, live.phase, unsavedElapsed);
-      onMutateToday?.();
+      if (unsavedElapsed > 0) onMutateToday?.();
     }
+    const settled = await catchOwedBeforeEnding();
     stopTimer();
+    setSettleCaught(null);
+    if (settled) refreshWalletAfterSettle();
     bindTaskToStore();
   };
 
@@ -646,7 +684,10 @@ export default function FrogodoroSheet({
     currentPhase: typeof phase,
     elapsed: number,
   ) => {
-    if (elapsed <= 0) return;
+    // 0 is allowed and meaningful: a session ending between flushes still has
+    // to tell the server to settle, or the fly its final price covers is never
+    // credited. Sending no activePhaseFull is what marks this as the settle.
+    if (elapsed < 0) return;
     const today = format(new Date(), 'yyyy-MM-dd');
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const session = {
@@ -708,11 +749,14 @@ export default function FrogodoroSheet({
     const currentPhase = phase;
 
     setConfirmStop(false);
-    if (taskId && unsavedElapsed > 0) {
+    if (taskId) {
       await saveSessionToDb(taskId, currentPhase, unsavedElapsed);
-      onMutateToday?.();
+      if (unsavedElapsed > 0) onMutateToday?.();
     }
+    const settled = await catchOwedBeforeEnding();
     stopTimer();
+    setSettleCaught(null);
+    if (settled) refreshWalletAfterSettle();
   };
 
   // Ending a focus session with meaningful time on the clock asks first — a
@@ -895,25 +939,56 @@ export default function FrogodoroSheet({
     celebrateFocus && deepFocus && !lastPhasePaused && lastFocusElapsed >= 15 * 60;
 
   // Focused seconds this session (same store-derived formula the home hero
-  // uses, so every surface shows the same swarm/caught count). 1 fly per 15
-  // focused minutes — drives the live catch animation and the caught chip.
+  // uses, so every surface shows the same swarm/caught count). The phase pays
+  // 1 fly per 15 focused minutes and spreads those catches evenly across its
+  // own length — drives the live catch animation and the caught chip.
   // Number-returning selectors: the parent only re-renders when a count
-  // actually changes (every 15 focused minutes), not on every tick.
-  const fliesCaught = useFrogodoroStore((s) => {
-    const sessionFocus = sessionFocusLiveSeconds(s);
-    return fliesCaughtFor(
-      sessionFocus,
-      priorDayFocusSeconds(focusFlyDaily, sessionFocus),
-    );
-  });
+  // actually changes, not on every tick.
+  const fliesCaught = useFrogodoroStore(
+    (s) => phaseCatchesOf(s, focusFlyDaily).caught,
+  );
   // What this session can reach if it runs to the end — the visible goal.
-  const fliesPotential = useFrogodoroStore((s) => {
-    const sessionFocus = sessionFocusLiveSeconds(s);
-    return fliesCaughtFor(
-      sessionFocus + (s.phase === 'focus' ? Math.max(0, s.timeLeft) : 0),
-      priorDayFocusSeconds(focusFlyDaily, sessionFocus),
+  const fliesPotential = useFrogodoroStore(
+    (s) => phaseCatchesOf(s, focusFlyDaily).potential,
+  );
+  // Set for the beat between "session is ending" and the teardown, so the
+  // frog is seen catching the fly the final price covers. An override rather
+  // than an addend: once the session ends `fliesCaught` settles to this exact
+  // number, so clearing it can never read as a fresh catch.
+  const [settleCaught, setSettleCaught] = useState<number | null>(null);
+  const sceneCaught = settleCaught ?? fliesCaught;
+
+  // Ending a session re-prices it at the time actually focused. Anything that
+  // price covers but the phase's marks never reached is caught here, on the
+  // way out, rather than appearing in the wallet with nothing to watch.
+  const catchOwedBeforeEnding = async () => {
+    const live = useFrogodoroStore.getState();
+    const settled = settledCatchesOf(live, focusFlyDaily);
+    if (settled <= phaseCatchesOf(live, focusFlyDaily).caught) return false;
+    setSettleCaught(settled);
+    await new Promise((resolve) =>
+      window.setTimeout(resolve, SETTLE_CATCH_MS),
     );
-  });
+    return true;
+  };
+
+  // GlobalTimer's optimistic wallet bump only fires while a timer is active,
+  // and this catch lands as the session ends — so re-read the balance the
+  // settle already wrote instead.
+  const refreshWalletAfterSettle = () => {
+    markFlyEarn(120_000);
+    mutateInventoryCaches();
+    window.setTimeout(mutateInventoryCaches, 20_000);
+  };
+
+  // Read on demand inside the scene's miss scheduler (never subscribed), so a
+  // value that changes every second can't re-render the sheet.
+  const catchImminent = useCallback(
+    () =>
+      (phaseCatchesOf(useFrogodoroStore.getState(), focusFlyDaily)
+        .nextCatchIn ?? Infinity) <= MISS_CLEARANCE_SECONDS,
+    [focusFlyDaily],
+  );
 
   // Names what's inside and its current value, so the collapsed row says both
   // what tapping it changes and what the break is set to right now.
@@ -1166,7 +1241,8 @@ export default function FrogodoroSheet({
                                 phase === 'focus' &&
                                 fliesPotential > 0 ? (
                                   <span className="text-[13px] font-black tabular-nums text-white">
-                                    {fliesCaught}/{fliesPotential}
+                                    {sceneCaught}/
+                                    {Math.max(fliesPotential, sceneCaught)}
                                   </span>
                                 ) : (
                                   <ChevronRight className="h-3.5 w-3.5 text-white/80" />
@@ -1612,8 +1688,9 @@ export default function FrogodoroSheet({
                         {/* The frog perches on the START/PAUSE button from the
                             moment the sheet opens; when a focus session starts
                             the flies slide in from the sides, the frog lunges
-                            and misses, and truly catches one per 15 focused
-                            minutes. */}
+                            and misses, and truly catches on the phase's own
+                            marks — the last one landing as the timer runs
+                            out. */}
                         {!awaitingDone && (
                           <div className="relative z-30">
                             {sheetEntered && (
@@ -1621,8 +1698,12 @@ export default function FrogodoroSheet({
                                 indices={frogIndices}
                                 running={isRunning}
                                 showFlies={timerActive && phase === 'focus'}
-                                caught={fliesCaught}
-                                fliesPotential={fliesPotential}
+                                caught={sceneCaught}
+                                fliesPotential={Math.max(
+                                  fliesPotential,
+                                  sceneCaught,
+                                )}
+                                catchImminent={catchImminent}
                                 counterRef={catchChipRef}
                                 onGainLand={() => setChipPulse((p) => p + 1)}
                                 onFrogReady={handleFrogReady}

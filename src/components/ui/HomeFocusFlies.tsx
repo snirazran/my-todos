@@ -9,7 +9,7 @@ import { DriftFly, FOCUS_DRIFTS } from '@/components/ui/FocusFlyLayer';
 import { entrySideFor } from '@/components/ui/FocusScene';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import {
-  fliesCaughtFor,
+  focusPhaseCatches,
   sceneFlyCount,
   priorDayFocusSeconds,
 } from '@/lib/focusFlies';
@@ -19,6 +19,9 @@ export const HOME_FOCUS_FLY_PREFIX = 'home-focus-fly-';
 const MISS_KEY = 'home-focus-miss';
 const BAND_H = 176;
 const FLY_PX = 34;
+// A miss inside this window would still hold the tongue when the real catch
+// fires, dropping it to a bare "+1" with no lunge.
+const MISS_CLEARANCE_SECONDS = 8;
 
 function visibleRatio(rect: DOMRect): number {
   const vw = window.innerWidth;
@@ -108,12 +111,18 @@ export function HomeFocusFlies({
     sessionStats.focusTime +
     (phase === 'focus' ? Math.max(0, liveElapsed - phaseElapsed) : 0);
   const prior = priorDayFocusSeconds(focusFlyDaily, focusLive);
-  const caught = fliesCaughtFor(focusLive, prior);
-  const fliesPotential = fliesCaughtFor(
-    focusLive + (phase === 'focus' ? Math.max(0, timeLeft) : 0),
-    prior,
-  );
-  const flyCount = sceneFlyCount(fliesPotential - caught);
+  const { caught, potential, nextCatchIn } = focusPhaseCatches({
+    sessionFocusSeconds: focusLive,
+    phaseElapsedSeconds: liveElapsed,
+    phaseFullSeconds: phaseFull,
+    priorFocusSeconds: prior,
+    onFocusPhase: phase === 'focus',
+  });
+  // Shrink the swarm only once the catch that claimed a fly has FINISHED —
+  // sizing it straight off `caught` unmounts the tongue's target in the same
+  // render the catch is announced. Same reason as FocusScene.
+  const [settledCaught, setSettledCaught] = useState(caught);
+  const flyCount = sceneFlyCount(potential - settledCaught);
   const suppressed = hidden || sheetOpen;
 
   // Positioned inside the frog container, measured against the frog's live
@@ -184,19 +193,31 @@ export function HomeFocusFlies({
   // at the fly, or fall back to a love emote if the frog isn't in view.
   const prevCaughtRef = useRef(caught);
   useEffect(() => {
-    if (caught > prevCaughtRef.current && running && !suppressed) {
-      const key = pickLiveFly();
-      if (key && frogVisibleEnough()) {
-        void effTrigger({
-          key,
-          completed: false,
-          onPersist: () => eatAndRespawn(key),
-        });
-      } else {
-        frogRef.current?.fireEmote('love');
-      }
-    }
+    const rose = caught > prevCaughtRef.current;
     prevCaughtRef.current = caught;
+    if (!rose) {
+      setSettledCaught((v) => (caught < v ? caught : v));
+      return;
+    }
+    const caughtNow = caught;
+    if (!running || suppressed) {
+      setSettledCaught(caughtNow);
+      return;
+    }
+    const key = pickLiveFly();
+    if (key && frogVisibleEnough()) {
+      void effTrigger({
+        key,
+        completed: false,
+        onPersist: () => {
+          eatAndRespawn(key);
+          setSettledCaught(caughtNow);
+        },
+      });
+    } else {
+      frogRef.current?.fireEmote('love');
+      setSettledCaught(caughtNow);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [caught, running, suppressed]);
 
@@ -229,15 +250,19 @@ export function HomeFocusFlies({
 
   // Sheet closed: this layer is its own conductor for misses — same rhythm
   // as the sheet scene (first lunge early, then a loose 45–90s beat). A
-  // skipped attempt (frog scrolled out of view, fly mid-respawn) retries in
-  // seconds instead of waiting out the full interval, so the cadence FEELS
-  // the same as the popup's.
+  // skipped attempt (frog scrolled out of view, fly mid-respawn, a real catch
+  // about to fire) retries in seconds instead of waiting out the full
+  // interval, so the cadence FEELS the same as the popup's.
+  const nextCatchInRef = useRef(nextCatchIn);
+  nextCatchInRef.current = nextCatchIn;
   useEffect(() => {
     if (!running || suppressed) return;
     let timer = 0;
     const schedule = (delay: number) => {
       timer = window.setTimeout(() => {
-        const fired = lungeMiss(44 + Math.random() * 26, Math.random() * 28 - 14);
+        const fired =
+          (nextCatchInRef.current ?? Infinity) > MISS_CLEARANCE_SECONDS &&
+          lungeMiss(44 + Math.random() * 26, Math.random() * 28 - 14);
         schedule(fired ? 45000 + Math.random() * 45000 : 8000 + Math.random() * 7000);
       }, delay);
     };

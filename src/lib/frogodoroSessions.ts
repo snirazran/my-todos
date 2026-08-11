@@ -3,19 +3,111 @@ import UserModel from '@/lib/models/User';
 import {
   FOCUS_FLY_RATE_SECONDS,
   FOCUS_FLY_DAILY_CAP,
+  CATCH_LEAD_SECONDS,
 } from '@/lib/focusFlies';
 import { FLY_HUNGER_REWARD_MS, MAX_HUNGER_MS } from '@/lib/hungerLogic';
+
+/** A focus phase still on the clock when this flush was taken. */
+export type RunningFocusPhase = {
+  elapsedSeconds: number;
+  fullSeconds: number;
+};
 
 // Credits flies for focused time: 1 fly per 15 focused minutes, capped per day.
 // Runs as a single aggregation-pipeline update so concurrent flushes (live
 // ticks, pause saves, the completion processor) can never double-award.
+//
+// WHEN each of those flies lands depends on what the flush describes:
+//
+//   `runningPhase` given (a live/paused focus phase)  → pay on the phase's own
+//     marks, spread evenly across its length, so the credit lands on the tick
+//     the frog is seen catching it. Mirrors `focusPhaseCatches` on the client
+//     exactly — same integer arithmetic, same lead — so no surface can show a
+//     catch the wallet hasn't been paid for, or vice versa.
+//
+//   `runningPhase` absent (Stop, task switch, phase completion, or a client
+//     too old to send it) → settle on the plain day curve, which pays out
+//     whatever the marks hadn't reached yet.
+//
+// `earned` is therefore accumulated with $max rather than recomputed: a
+// mid-phase target is lower than the settled curve by design, and must never
+// claw back a fly an earlier flush already paid.
 async function awardFocusFlies(
   userId: string,
   date: string,
   focusSeconds: number,
+  runningPhase?: RunningFocusPhase | null,
 ): Promise<void> {
-  if (focusSeconds <= 0) return;
+  // A settle carrying no new seconds is the whole point of the call — it is
+  // how a session that ends between flushes gets priced at the time it
+  // actually focused. Only a mid-phase flush needs seconds to be worth running.
+  if (focusSeconds < 0 || (focusSeconds === 0 && runningPhase)) return;
   const fresh = { date, focusSeconds: 0, earned: 0 };
+
+  const curveOf = (value: unknown) => ({
+    $min: [
+      FOCUS_FLY_DAILY_CAP,
+      { $floor: { $divide: [value, FOCUS_FLY_RATE_SECONDS] } },
+    ],
+  });
+
+  const target: unknown = runningPhase
+    ? {
+        $let: {
+          // Focus banked today BEFORE this phase — the baseline its marks
+          // count up from. Derived by subtraction so it holds still as the
+          // phase runs (both totals grow together).
+          vars: {
+            banked: {
+              $max: [
+                0,
+                { $subtract: ['$$seconds', runningPhase.elapsedSeconds] },
+              ],
+            },
+          },
+          in: {
+            $let: {
+              vars: {
+                before: curveOf('$$banked'),
+                potential: curveOf({
+                  $add: ['$$banked', runningPhase.fullSeconds],
+                }),
+              },
+              in: {
+                $let: {
+                  vars: { owed: { $subtract: ['$$potential', '$$before'] } },
+                  in: {
+                    $add: [
+                      '$$before',
+                      {
+                        $min: [
+                          '$$owed',
+                          {
+                            $floor: {
+                              $divide: [
+                                {
+                                  $multiply: [
+                                    runningPhase.elapsedSeconds +
+                                      CATCH_LEAD_SECONDS,
+                                    '$$owed',
+                                  ],
+                                },
+                                runningPhase.fullSeconds,
+                              ],
+                            },
+                          },
+                        ],
+                      },
+                    ],
+                  },
+                },
+              },
+            },
+          },
+        },
+      }
+    : curveOf('$$seconds');
+
   await UserModel.updateOne({ _id: userId }, [
     {
       $set: {
@@ -44,10 +136,7 @@ async function awardFocusFlies(
               date,
               focusSeconds: '$$seconds',
               earned: {
-                $min: [
-                  FOCUS_FLY_DAILY_CAP,
-                  { $floor: { $divide: ['$$seconds', FOCUS_FLY_RATE_SECONDS] } },
-                ],
+                $max: [{ $ifNull: ['$_focusFlyPrev.earned', 0] }, target],
               },
             },
           },
@@ -126,10 +215,14 @@ export async function addFrogodoroSession(
   date: string,
   focusTime: number,
   breakTime: number,
+  runningPhase?: RunningFocusPhase | null,
 ): Promise<boolean> {
-  await awardFocusFlies(userId, date, focusTime).catch((error) => {
+  await awardFocusFlies(userId, date, focusTime, runningPhase).catch((error) => {
     console.error('Focus fly award failed:', error);
   });
+  // Settle-only call (a session ending between flushes): the fly ledger above
+  // is the point; there is no time to log, so don't touch the task's rows.
+  if (focusTime === 0 && breakTime === 0) return true;
   const inc = await TaskModel.updateOne(
     { id: taskId, userId, 'frogodoroSessions.date': date },
     {

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import { reconcileLiveTimer } from '@/lib/liveTimer';
 import {
-  fliesCaughtFor,
+  focusPhaseCatches,
   deepFocusPledgeLive,
   priorDayFocusSeconds,
 } from '@/lib/focusFlies';
@@ -65,14 +65,13 @@ export function LiveTimerController() {
       ? Math.max(0, liveElapsed - phaseElapsed)
       : 0);
   const priorFocus = priorDayFocusSeconds(focusFlyDaily, sessionFocusLive);
-  const fliesCaught = fliesCaughtFor(sessionFocusLive, priorFocus);
-  const fliesPotential =
-    displayPhase === 'focus'
-      ? fliesCaughtFor(
-          sessionFocusLive + (awaitingDone ? 0 : Math.max(0, timeLeft)),
-          priorFocus,
-        )
-      : fliesCaught;
+  const { caught: fliesCaught, potential: fliesPotential } = focusPhaseCatches({
+    sessionFocusSeconds: sessionFocusLive,
+    phaseElapsedSeconds: liveElapsed,
+    phaseFullSeconds: totalSeconds,
+    priorFocusSeconds: priorFocus,
+    onFocusPhase: displayPhase === 'focus' && !awaitingDone,
+  });
   const pledgeLive = deepFocusPledgeLive({
     deepFocus,
     pausedThisPhase,

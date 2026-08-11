@@ -44,6 +44,85 @@ export function fliesCaughtFor(
   );
 }
 
+// A catch fires this many seconds before its mark, so the whole grab — tongue
+// out, snatch, gulp, "+1" arc into the chip — plays out and finishes as the
+// timer reaches zero instead of starting there and colliding with the alarm.
+export const CATCH_LEAD_SECONDS = 2;
+
+export type FocusPhaseCatches = {
+  caught: number;
+  potential: number;
+  /** Seconds until the next catch fires; null once the phase owes none. */
+  nextCatchIn: number | null;
+};
+
+/**
+ * WHEN a focus phase's flies are caught, as opposed to how many it pays.
+ *
+ * The payout curve is untouched — `focusFliesEarnedForDay` still decides what
+ * the server credits, and `potential` here is the same number every surface
+ * showed before. What changes is the rhythm: instead of landing on raw
+ * 15-minute boundaries (which made a 25-minute session catch its only fly at
+ * 15:00 and then coast for ten empty minutes), the phase's flies are spread
+ * evenly across its own length. 25 min → one catch at the end. 35 min → two,
+ * at the halfway mark and the end.
+ *
+ * A proportional mark is never earlier than the boundary that pays for it
+ * (a phase yielding N flies is at least N * 15 minutes long), so the frog can
+ * only ever catch a fly the server has already credited — never the reverse.
+ */
+export function focusPhaseCatches({
+  sessionFocusSeconds,
+  phaseElapsedSeconds,
+  phaseFullSeconds,
+  priorFocusSeconds,
+  onFocusPhase,
+}: {
+  /** Live focused seconds this session, the running phase included. */
+  sessionFocusSeconds: number;
+  /** Seconds elapsed in the running focus phase. */
+  phaseElapsedSeconds: number;
+  /** Full length of the focus phase. */
+  phaseFullSeconds: number;
+  /** Focused seconds banked earlier today, outside this session. */
+  priorFocusSeconds: number;
+  /** False on a break or once the phase has finished. */
+  onFocusPhase: boolean;
+}): FocusPhaseCatches {
+  const prior = Math.max(0, priorFocusSeconds);
+  const sessionFocus = Math.max(0, sessionFocusSeconds);
+  if (!onFocusPhase) {
+    const done = fliesCaughtFor(sessionFocus, prior);
+    return { caught: done, potential: done, nextCatchIn: null };
+  }
+  const full = Math.max(1, Math.round(phaseFullSeconds));
+  const elapsed = Math.min(full, Math.max(0, Math.round(phaseElapsedSeconds)));
+  // Focus banked by earlier phases of this session. Derived by subtraction so
+  // it holds still as the phase runs and the count never ticks backwards.
+  const before = fliesCaughtFor(Math.max(0, sessionFocus - elapsed), prior);
+  const potential = fliesCaughtFor(
+    Math.max(0, sessionFocus - elapsed) + full,
+    prior,
+  );
+  const owed = potential - before;
+  if (owed <= 0) return { caught: before, potential, nextCatchIn: null };
+
+  // Integer math throughout: mark k sits at k * full / owed, and the last one
+  // lands on the exact tick the phase ends rather than a frame either side.
+  const hit = Math.min(
+    owed,
+    Math.floor(((elapsed + CATCH_LEAD_SECONDS) * owed) / full),
+  );
+  return {
+    caught: before + hit,
+    potential,
+    nextCatchIn:
+      hit >= owed
+        ? null
+        : Math.ceil(((hit + 1) * full) / owed) - CATCH_LEAD_SECONDS - elapsed,
+  };
+}
+
 // Focused seconds banked EARLIER today, outside the running session — the
 // baseline a session's catch count counts up from. Stays stable as the session
 // grows (both totals grow together), so the count never ticks backwards.

@@ -2034,12 +2034,44 @@ export async function syncQuestState(args: {
     selectedDailyTemplates.map((t) => t.templateId),
   );
 
+  const selectedCategoryIdSet = new Set(profile.selectedCategoryIds);
+  const parkedCategoryDocs = allExistingDocs.filter(
+    (doc) =>
+      doc.placement === 'category' &&
+      !!doc.categoryId &&
+      !selectedCategoryIdSet.has(doc.categoryId),
+  );
+  const parkedIdSet = new Set(
+    parkedCategoryDocs.map((doc) => doc._id.toString()),
+  );
+  const parkPromises = parkedCategoryDocs
+    .filter(
+      (doc) =>
+        typeof doc.lockedRemainingMs !== 'number' &&
+        !!doc.expiresAt &&
+        doc.expiresAt.getTime() > nowMs,
+    )
+    .map((doc) =>
+      QuestModel.updateOne(
+        { _id: doc._id },
+        {
+          $set: {
+            lockedRemainingMs: doc.expiresAt!.getTime() - nowMs,
+            startedAt: null,
+            expiresAt: null,
+          },
+        },
+        { timestamps: false },
+      ),
+    );
+
   // Find docs to delete in-memory and batch delete by IDs
   const docsToDelete = allExistingDocs.filter((doc) => {
     if (doc.placement === 'daily' && doc.windowKey === todayKey) {
       return !eligibleDailyTemplateIds.has(doc.templateId);
     }
     if (doc.placement === 'category') {
+      if (parkedIdSet.has(doc._id.toString())) return false;
       return !categoryDocIdsToKeep.has(doc._id.toString());
     }
     // Delete stale daily docs from other days
@@ -2050,10 +2082,12 @@ export async function syncQuestState(args: {
   });
 
   const deleteIdSet = new Set(docsToDelete.map((doc) => doc._id.toString()));
-  const deletePromise =
+  const deletePromise = Promise.all([
     deleteIdSet.size > 0
       ? QuestModel.deleteMany({ _id: { $in: docsToDelete.map((d) => d._id) } })
-      : Promise.resolve();
+      : Promise.resolve(),
+    ...parkPromises,
+  ]);
 
   // Build lookup of existing docs by templateId+windowKey for syncQuestForTemplate
   const existingDocMap = new Map(
@@ -2069,7 +2103,8 @@ export async function syncQuestState(args: {
   if (needsCounters) {
     let sinceDateKey = todayKey;
     for (const doc of allExistingDocs) {
-      if (deleteIdSet.has(doc._id.toString())) continue;
+      const docId = doc._id.toString();
+      if (deleteIdSet.has(docId) || parkedIdSet.has(docId)) continue;
       const created = getZonedYMD(doc.createdAt ?? new Date(), timezone);
       if (created < sinceDateKey) sinceDateKey = created;
     }

@@ -38,21 +38,45 @@ export async function PUT(
     }
 
     if (session && session.date) {
+      const activePhaseElapsed = Number(body.activePhaseElapsed);
+      const activePhaseFull = Number(body.activePhaseFull);
+      const activePhase =
+        body.activePhase === 'break' ? 'break' : ('focus' as const);
+
+      // A flush that names a live focus phase is mid-session, so its flies land
+      // on the phase's own catch marks. One that doesn't — Stop, a task switch,
+      // the offline completion save, or a client too old to send the phase
+      // length — settles on the day curve instead. Either way the phase's total
+      // payout is the same; only the moment it lands moves.
+      const runningPhase =
+        activePhase === 'focus' &&
+        Number.isFinite(activePhaseElapsed) &&
+        activePhaseElapsed > 0 &&
+        Number.isFinite(activePhaseFull) &&
+        activePhaseFull >= 60 &&
+        activePhaseFull <= 24 * 60 * 60
+          ? {
+              fullSeconds: Math.floor(activePhaseFull),
+              elapsedSeconds: Math.min(
+                Math.floor(activePhaseElapsed),
+                Math.floor(activePhaseFull),
+              ),
+            }
+          : null;
+
       await addFrogodoroSession(
         userId,
         id,
         session.date,
         session.focusTime ?? 0,
         session.breakTime ?? 0,
+        runningPhase,
       );
       isModified = true;
 
       // Record how much of the current phase has been persisted so the
       // phase-completion save (frogodoroTimerProcessor) only adds the
       // remainder instead of the full duration.
-      const activePhaseElapsed = Number(body.activePhaseElapsed);
-      const activePhase =
-        body.activePhase === 'break' ? 'break' : ('focus' as const);
       if (Number.isFinite(activePhaseElapsed) && activePhaseElapsed > 0) {
         await UserModel.updateOne(
           {
