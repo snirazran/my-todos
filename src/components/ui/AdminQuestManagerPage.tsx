@@ -16,6 +16,7 @@ import {
   Gift,
   Layers3,
   Monitor,
+  CalendarDays,
   Pencil,
   Plus,
   RotateCcw,
@@ -26,6 +27,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { AdminPactManager } from '@/components/ui/AdminPactManager';
 import {
   Dialog,
   DialogContent,
@@ -203,6 +205,7 @@ type ViewLevel =
   | 'focus'
   | 'onboarding'
   | 'streaks'
+  | 'pact'
   | 'moveToWeb'
   | 'season'
   | 'category'
@@ -1196,6 +1199,22 @@ export function AdminQuestManagerPage() {
           {loginStreakConfig ? (loginStreakConfig.isActive ? 'On' : 'Off') : '–'}
         </p>
         <p className="text-xs text-muted-foreground">login streak</p>
+      </button>
+
+      <button
+        onClick={() => setView('pact')}
+        className="group rounded-2xl border border-border/40 bg-card/60 p-6 text-left transition hover:border-teal-500/25 hover:bg-teal-500/[0.04]"
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-teal-500/10 text-teal-600 dark:text-teal-400">
+            <CalendarDays className="h-6 w-6" />
+          </div>
+          <ChevronRight className="h-5 w-5 text-muted-foreground/30 transition group-hover:translate-x-0.5 group-hover:text-muted-foreground" />
+        </div>
+        <p className="mt-5 text-lg font-black text-foreground">Weekly Pact</p>
+        <p className="mt-1 text-sm text-muted-foreground">One area a week, written into the user&apos;s real task list.</p>
+        <p className="mt-4 text-3xl font-black text-foreground">Manage</p>
+        <p className="text-xs text-muted-foreground">ideas, rewards, shields</p>
       </button>
 
       <button
@@ -3325,6 +3344,7 @@ export function AdminQuestManagerPage() {
     view === 'focus' ? 'Quest Manager' :
     view === 'onboarding' ? 'Quest Manager' :
     view === 'streaks' ? 'Quest Manager' :
+    view === 'pact' ? 'Quest Manager' :
     view === 'moveToWeb' ? 'Quest Manager' :
     view === 'season' ? 'Quest Manager' :
     view === 'category' ? 'Focus Quests' :
@@ -3396,6 +3416,7 @@ export function AdminQuestManagerPage() {
                 {view === 'focus' && renderFocus()}
                 {view === 'onboarding' && renderOnboarding()}
                 {view === 'streaks' && renderStreaks()}
+                {view === 'pact' && <AdminPactManager />}
                 {view === 'moveToWeb' && renderMoveToWeb()}
                 {view === 'season' && renderSeason()}
                 {view === 'category' && renderCategory()}

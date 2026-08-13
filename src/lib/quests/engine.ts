@@ -742,6 +742,15 @@ function sanitizeRewardSet(rewards: unknown): QuestRewards {
     .map(sanitizeReward);
 }
 
+// A target scaled up to the user's own rate has to pay for the extra work, or
+// the objective gets harder every week while the payout stays where it was.
+// Only scales up: a smaller target still pays the authored amount.
+function scaleFlyReward(reward: QuestReward, scale: number): QuestReward {
+  if (reward.type !== 'FLIES' || scale <= 1) return reward;
+  const amount = Math.max(1, reward.amount ?? 1);
+  return { ...reward, amount: Math.max(amount, Math.round(amount * scale)) };
+}
+
 function resolveReward(reward: QuestReward, seed: string): QuestReward {
   if (reward.type === 'FLIES') {
     return {
@@ -1470,12 +1479,16 @@ async function syncQuestForTemplate(args: {
     const progress = block.preCredited
       ? target
       : Math.max(0, rawProgress - progressOffset);
+    const payScale = Math.max(1, baselineScaleForBlock(block, baseline));
     const resolvedRewards = (block.rewards ?? [])
       .filter((r): r is QuestReward => isSupportedReward(r as { type?: string }))
       .map((r, ri) =>
-        resolveReward(
-          r,
-          `${userId}:${template.templateId}:${windowKey}:${doc.rollKey}:obj-reward:${block.id}:${ri}`,
+        scaleFlyReward(
+          resolveReward(
+            r,
+            `${userId}:${template.templateId}:${windowKey}:${doc.rollKey}:obj-reward:${block.id}:${ri}`,
+          ),
+          payScale,
         ),
       );
     return {

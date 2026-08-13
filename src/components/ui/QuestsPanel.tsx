@@ -64,6 +64,8 @@ import {
   takeQuestScrollTarget,
 } from '@/lib/questClaims';
 import { rankByQuestPriority, rewardWorth } from '@/lib/quests/priority';
+import { usePactView } from '@/components/pact/PactCard';
+import { PactAreaPanel } from '@/components/pact/PactAreaPanel';
 import { QuestPriorityDebug } from '@/components/ui/QuestPriorityDebug';
 import { PlusUpgradeModal } from './PlusUpgradeModal';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
@@ -451,6 +453,8 @@ export function QuestsPanel({
   >('idle');
   const sawLockedAreasRef = useRef(false);
   const [pinnedCategoryId, setPinnedCategoryId] = useState<string | null>(null);
+  const { data: pactView } = usePactView();
+  const pactActive = !!pactView?.enabled && !pactView.needsAreas;
   const [pendingSwitchCategoryId, setPendingSwitchCategoryId] = useState<
     string | null
   >(null);
@@ -1459,7 +1463,7 @@ export function QuestsPanel({
                               </div>
                             );
                           });
-                          const areaRows = benchQuests.length > 0 && (
+                          const areaRows = !pactActive && benchQuests.length > 0 && (
                             <div
                               className={cn(
                                 'mt-0.5',
@@ -1590,17 +1594,25 @@ export function QuestsPanel({
                             }
                             return content;
                           };
+                          // The weekly pact owns "which area am I on" now.
+                          // Showing the old chooser beside it asks the same
+                          // question twice with two different answers.
                           const focusSlot = buildFocusSlot(
-                            chooserMode
-                              ? areaChooser
-                              : renderFocusSection(true),
+                            pactActive
+                              ? <PactAreaPanel />
+                              : chooserMode
+                                ? areaChooser
+                                : renderFocusSection(true),
                           );
                           const focusSlotDesktop = buildFocusSlot(
-                            chooserMode
-                              ? areaChooser
-                              : renderFocusSection(false),
+                            pactActive
+                              ? <PactAreaPanel />
+                              : chooserMode
+                                ? areaChooser
+                                : renderFocusSection(false),
                           );
                           const showDesktopShelf =
+                            !pactActive &&
                             !chooserMode &&
                             focusUnlocked &&
                             !ceremonyActive &&

@@ -243,6 +243,22 @@ const GUIDES: Record<string, HintGuide> = {
       },
     ],
   },
+  // No href: the "This week" card sits on both surfaces a quest hint can be
+  // opened from (home and quests), so the coach rings it where the user
+  // already is instead of bouncing them to another page. The selector falls
+  // back to the pre-pact anchors for accounts with the pact turned off.
+  'pick-pact-area': {
+    id: 'pick-pact-area',
+    steps: [
+      {
+        anchor: 'pact-pick-area',
+        selector:
+          '[data-hint="pact-pick-area"], [data-hint="start-focus-quest"], [data-area-unlock-anchor]',
+        label: 'Pick the one area you want this week',
+        timeoutMs: 30_000,
+      },
+    ],
+  },
   // Anchor lives on the hero card's Start button, the area chooser grid, or
   // (still locked) the unlock teaser — whichever the quests page is showing.
   'start-focus-quest': {
@@ -512,7 +528,7 @@ const METRIC_GUIDE_IDS: Record<string, string> = {
   skin_equipped: 'equip-skin',
   skin_sold: 'sell-skin',
   trade_completed: 'trade-skins',
-  focus_tag_linked: 'start-focus-quest',
+  focus_tag_linked: 'pick-pact-area',
   focus_started: 'focus',
   friend_invited: 'invite-friend',
   task_saved_later: 'save-later',

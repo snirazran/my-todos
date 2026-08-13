@@ -171,7 +171,15 @@ export function objectiveHintText(
   focusTagName?: string,
   options?: { omitTagScope?: boolean },
 ): string {
-  if (block.helpText) return block.helpText;
+  // A metric fully determines the action, so its copy outranks helpText:
+  // re-pointing a block at another metric in the admin leaves the old text
+  // behind, and a hint describing the wrong feature is worse than losing a
+  // custom phrasing that had nothing left to add.
+  const metricCopy =
+    block.type === 'metric_count' && block.metricKey
+      ? METRIC_HINT_COPY[block.metricKey]
+      : undefined;
+  if (block.helpText && !metricCopy) return block.helpText;
 
   const usesFocusTags = block.tagMode === 'focus_category_tags';
   const tagName = usesFocusTags
@@ -206,7 +214,8 @@ export function objectiveHintText(
       : null;
     const base = streakMatch
       ? `Complete the same repeating task ${streakMatch[1]} days in a row.`
-      : METRIC_HINT_COPY[block.metricKey ?? ''] ??
+      : metricCopy ??
+        block.helpText ??
         'Keep using the app — this one fills up on its own.';
     return `${base}${scopeSuffix}`;
   }

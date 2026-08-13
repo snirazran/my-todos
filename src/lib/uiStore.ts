@@ -1,8 +1,12 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { HintGuideContext } from '@/lib/hints/guides';
+import { normalizeWeekStart, type WeekStartDay } from '@/lib/weekStart';
 
 interface UIState {
+  weekStartsOn: WeekStartDay;
+  setWeekStartsOn: (day: WeekStartDay) => void;
+
   isWardrobeOpen: boolean;
   openWardrobe: () => void;
   closeWardrobe: () => void;
@@ -58,6 +62,10 @@ interface UIState {
 export const useUIStore = create<UIState>()(
   persist(
     (set) => ({
+      weekStartsOn: 0 as WeekStartDay,
+      setWeekStartsOn: (day: WeekStartDay) =>
+        set({ weekStartsOn: normalizeWeekStart(day) }),
+
       isWardrobeOpen: false,
       openWardrobe: () => set({ isWardrobeOpen: true }),
       closeWardrobe: () => set({ isWardrobeOpen: false }),
@@ -133,7 +141,10 @@ export const useUIStore = create<UIState>()(
     }),
     {
       name: 'frogress-ui-storage',
-      partialize: (state) => ({ isDebugMode: state.isDebugMode }), // Only persist debug mode
+      partialize: (state) => ({
+        isDebugMode: state.isDebugMode,
+        weekStartsOn: state.weekStartsOn,
+      }),
     }
   )
 );

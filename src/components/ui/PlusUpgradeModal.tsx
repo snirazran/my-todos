@@ -273,7 +273,7 @@ export function PlusUpgradeModal({
 const PLUS_WELCOME_HIGHLIGHTS = [
   'Double rewards',
   'Every gift opens twice',
-  'All quests in parallel',
+  'Write your own weekly pact',
   'Weekly streak rescue',
 ];
 
@@ -522,8 +522,8 @@ function Step0({
         <Reveal delay={0.12}>
           <FeatureRow
             icon={<Unlock className="h-5 w-5 text-amber-300" />}
-            title="Progress on every quest at once"
-            subtitle="All quests run together, with unlimited tags."
+            title="Write your own weekly pact"
+            subtitle="Set exactly what you'll do and when, instead of picking from three. Unlimited tags."
           />
         </Reveal>
         <Reveal delay={0.18}>
@@ -594,7 +594,9 @@ function FeatureRow({
 }
 
 const COMPARISON_ROWS: { label: string; free: boolean }[] = [
-  { label: 'All quests in parallel', free: false },
+  { label: 'Write your own weekly pact', free: false },
+  { label: '4 pact shields a month', free: false },
+  { label: 'Change your area mid-week', free: false },
   { label: 'Unlimited tags', free: false },
   { label: 'Double rewards', free: false },
   { label: 'Every gift opens twice', free: false },

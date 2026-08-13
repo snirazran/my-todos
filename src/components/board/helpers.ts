@@ -1,5 +1,8 @@
 // components/board/helpers.ts
 
+import { useUIStore } from '@/lib/uiStore';
+import { normalizeWeekStart, type WeekStartDay } from '@/lib/weekStart';
+
 export type Task = {
   id: string;
   text: string;
@@ -50,9 +53,10 @@ export type ApiDay = -1 | 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
 export const DAYS = 8 as const;
 
-// --- CONFIG: change this to 'monday' if you want Monday first ---
-export const WEEK_START: 'sunday' | 'monday' =
-  (process.env.NEXT_PUBLIC_WEEK_START as 'sunday' | 'monday') || 'sunday';
+// The user's own choice, from Settings. Read at call time so switching it
+// takes effect without a reload; the env var is only the pre-login default.
+export const WEEK_START = (): 'sunday' | 'monday' =>
+  currentWeekStart() === 1 ? 'monday' : 'sunday';
 
 // Labels for real days (0..6) in API order (Sun..Sat)
 export const englishDays = [
@@ -68,31 +72,50 @@ export const englishDays = [
 // UI order (display index -> api day 0..6)
 const SUNDAY_FIRST: ReadonlyArray<Exclude<ApiDay, -1>> = [0, 1, 2, 3, 4, 5, 6];
 const MONDAY_FIRST: ReadonlyArray<Exclude<ApiDay, -1>> = [1, 2, 3, 4, 5, 6, 0];
-export const WEEK_ORDER = WEEK_START === 'monday' ? MONDAY_FIRST : SUNDAY_FIRST;
+
+function currentWeekStart(): WeekStartDay {
+  if (typeof window === 'undefined') {
+    return normalizeWeekStart(
+      process.env.NEXT_PUBLIC_WEEK_START === 'monday' ? 1 : 0,
+    );
+  }
+  return normalizeWeekStart(useUIStore.getState().weekStartsOn);
+}
+
+/**
+ * Weekday columns in the user's reading order. A function, not a constant —
+ * a constant would freeze whichever value was live when the module first
+ * loaded, so changing the setting would need a reload.
+ */
+export const weekOrder = (): ReadonlyArray<Exclude<ApiDay, -1>> =>
+  currentWeekStart() === 1 ? MONDAY_FIRST : SUNDAY_FIRST;
+
+/** @deprecated Call `weekOrder()` — this snapshots the value at import time. */
+export const WEEK_ORDER = SUNDAY_FIRST;
 
 // --- Mapping helpers ---
 
 /** UI/display day index (0..6, 7=Later) -> API day (-1 for Later, else 0..6) */
 export const apiDayFromDisplay = (
   displayDay: DisplayDay,
-  order: ReadonlyArray<Exclude<ApiDay, -1>> = WEEK_ORDER,
+  order: ReadonlyArray<Exclude<ApiDay, -1>> = weekOrder(),
 ): ApiDay => (displayDay === 7 ? -1 : order[displayDay]);
 
 /** API day (0..6, -1=Later) -> UI/display index (0..6, 7=Later) */
 export const displayDayFromApi = (
   apiDay: ApiDay,
-  order: ReadonlyArray<Exclude<ApiDay, -1>> = WEEK_ORDER,
+  order: ReadonlyArray<Exclude<ApiDay, -1>> = weekOrder(),
 ): DisplayDay => (apiDay === -1 ? 7 : (order.indexOf(apiDay) as DisplayDay));
 
 /** Label for a weekday display index (0..6). For index 7, use your own EXTRA label. */
 export const labelForDisplayDay = (
   displayDay: Exclude<DisplayDay, 7>,
-  order: ReadonlyArray<Exclude<ApiDay, -1>> = WEEK_ORDER,
+  order: ReadonlyArray<Exclude<ApiDay, -1>> = weekOrder(),
 ): string => englishDays[order[displayDay]];
 
 /** Today as UI/display index (0..6) using provided order */
 export const todayDisplayIndex = (
-  order: ReadonlyArray<Exclude<ApiDay, -1>> = WEEK_ORDER,
+  order: ReadonlyArray<Exclude<ApiDay, -1>> = weekOrder(),
 ): Exclude<DisplayDay, 7> => {
   const apiToday = new Date().getDay() as Exclude<ApiDay, -1>; // 0..6 Sun..Sat
   return order.indexOf(apiToday) as Exclude<DisplayDay, 7>;

@@ -81,6 +81,7 @@ import { MobileHeaderActions } from '@/components/ui/MobileHeaderActions';
 import { MobileMenuCluster } from '@/components/ui/siteHeader';
 import { FlyCatchSwipeLauncher } from '@/components/ui/FlyCatchSwipeLauncher';
 import { NextQuestStrip } from '@/components/ui/NextQuestStrip';
+import { PactCard } from '@/components/pact/PactCard';
 import { BuddyNudgeCard } from '@/components/ui/BuddyNudgeCard';
 import { HomeShopRail } from '@/components/home/HomeShopRail';
 import { TryOnPill } from '@/components/ui/TryOnPill';
@@ -724,6 +725,7 @@ export default function HomeDashboard() {
           >
             <div className="flex w-full flex-col gap-2 md:gap-5">
               <GuestAccountBanner />
+              {user && <PactCard />}
               {user && (
                 <NextQuestStrip
                   claimables={questsData?.claimables}

@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
 import { useUIStore } from '@/lib/uiStore';
+import { WEEK_START_LABEL, type WeekStartDay } from '@/lib/weekStart';
 import { clearSessionCookie } from '@/lib/authCookie';
 import { signOutNativeGoogle } from '@/lib/googleAuth';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
@@ -34,7 +35,7 @@ import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
 import useSWR, { mutate as swrMutate } from 'swr';
 import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
 import { motion, AnimatePresence, useAnimationControls } from 'framer-motion';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, CalendarDays } from 'lucide-react';
 import Fly from '@/components/ui/fly';
 import { FlyCounter } from '@/components/ui/FlyCounter';
 import {
@@ -1780,6 +1781,10 @@ function PreferencesView({
         </motion.button>
       </MenuSection>
 
+      <MenuSection title="Calendar">
+        <WeekStartRow />
+      </MenuSection>
+
       <MenuSection title="Feedback">
         <HapticsToggleRow />
         <CatchSoundsToggleRow />
@@ -1796,6 +1801,74 @@ function PreferencesView({
       <MenuSection title="Wardrobe">
         <SkinRotationRow />
       </MenuSection>
+    </div>
+  );
+}
+
+function WeekStartRow() {
+  const weekStartsOn = useUIStore((state) => state.weekStartsOn);
+  const setWeekStartsOn = useUIStore((state) => state.setWeekStartsOn);
+  const [saving, setSaving] = useState(false);
+
+  const choose = async (next: WeekStartDay) => {
+    if (next === weekStartsOn || saving) return;
+    const previous = weekStartsOn;
+    setWeekStartsOn(next);
+    setSaving(true);
+    try {
+      const res = await fetch('/api/user', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          weekStartsOn: next,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        }),
+      });
+      if (!res.ok) throw new Error('save failed');
+      await swrMutate(
+        (key: unknown) =>
+          typeof key === 'string' &&
+          (key.startsWith('/api/tasks') || key.startsWith('/api/pact')),
+      );
+    } catch {
+      setWeekStartsOn(previous);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="bg-card px-4 py-4 first:rounded-t-2xl last:rounded-b-2xl">
+      <div className="flex items-center gap-3">
+        <div className="flex h-9 w-12 items-center justify-center">
+          <CalendarDays className="w-7 h-7 text-emerald-500" />
+        </div>
+        <span className="flex flex-col">
+          <span className="font-bold text-sm">Week starts on</span>
+          <span className="text-[11px] font-semibold text-muted-foreground">
+            Changes your board, planner, streaks and weekly pact
+          </span>
+        </span>
+      </div>
+      <div className="mt-3 flex gap-2">
+        {([0, 1] as WeekStartDay[]).map((day) => (
+          <button
+            key={day}
+            type="button"
+            disabled={saving}
+            aria-pressed={weekStartsOn === day}
+            onClick={() => void choose(day)}
+            className={cn(
+              'h-10 flex-1 rounded-xl text-[13px] font-black transition disabled:opacity-60',
+              weekStartsOn === day
+                ? 'bg-emerald-500 text-white'
+                : 'bg-muted text-muted-foreground hover:bg-muted/70',
+            )}
+          >
+            {WEEK_START_LABEL[day]}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

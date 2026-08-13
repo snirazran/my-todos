@@ -17,14 +17,15 @@ export const RARITY_CONFIG: Record<
   common: {
     border: 'border-slate-300 dark:border-slate-600',
     bg: 'bg-slate-50 dark:bg-slate-800',
-    text: 'text-slate-600 dark:text-slate-400',
+    text: 'text-slate-600 dark:text-slate-300',
     glow: 'shadow-slate-500/20',
     label: 'Common',
     gradient:
       'from-slate-200 to-slate-100 dark:from-slate-800 dark:to-slate-900',
     shadow: 'shadow-xl shadow-slate-900/10',
     rays: 'text-slate-400/20',
-    button: 'bg-background text-foreground hover:bg-accent',
+    button:
+      'bg-slate-700 text-white ring-1 ring-inset ring-slate-400/50 hover:bg-slate-600',
   },
   uncommon: {
     border: 'border-emerald-400',

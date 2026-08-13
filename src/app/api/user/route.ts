@@ -10,6 +10,7 @@ import { getAdminAuth } from '@/lib/firebaseAdmin';
 import connectMongo from '@/lib/mongoose';
 import { MAX_HUNGER_MS, TASK_HUNGER_REWARD_MS } from '@/lib/hungerLogic';
 import { getZonedToday } from '@/lib/utils';
+import { normalizeWeekStart } from '@/lib/weekStart';
 import { v4 as uuid } from 'uuid';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
 import AnalyticsEventModel from '@/lib/models/AnalyticsEvent';
@@ -35,7 +36,7 @@ export async function GET(req: NextRequest) {
     await connectMongo();
     
     const user = await UserModel.findById(uid)
-      .select('createdAt premiumUntil calendarSyncEnabled calendarAccessToken name frogName birthday onboardingCompleted')
+      .select('createdAt premiumUntil calendarSyncEnabled calendarAccessToken name frogName birthday onboardingCompleted weekStartsOn')
       .lean();
 
     if (!user) {
@@ -57,6 +58,7 @@ export async function GET(req: NextRequest) {
       frogName: user.frogName ?? null,
       birthday: user.birthday ?? null,
       onboardingCompleted: user.onboardingCompleted ?? null,
+      weekStartsOn: normalizeWeekStart((user as { weekStartsOn?: unknown }).weekStartsOn),
     });
   } catch (error) {
     console.error('Error fetching user data:', error);
@@ -201,6 +203,33 @@ export async function PATCH(req: NextRequest) {
     const { calendarSyncEnabled, calendarAccessToken, name, frogName, birthday } = body;
 
     const updates: any = {};
+    if (body.weekStartsOn !== undefined) {
+      const { normalizeWeekStart, startOfWeekYMD } = await import('@/lib/weekStart');
+      const next = normalizeWeekStart(body.weekStartsOn);
+      const existing = await UserModel.findById(uid).select('weekStartsOn').lean();
+      const previous = normalizeWeekStart((existing as any)?.weekStartsOn);
+      updates.weekStartsOn = next;
+
+      // Saved ("Later") tasks are bucketed by the week they were parked in, so
+      // moving the boundary would strand the current bucket. Re-key it.
+      if (next !== previous) {
+        const { getZonedToday } = await import('@/lib/utils');
+        const TaskModel = (await import('@/lib/models/Task')).default;
+        const tz =
+          typeof body.timezone === 'string' && body.timezone
+            ? body.timezone
+            : 'UTC';
+        const todayKey = getZonedToday(tz);
+        const from = startOfWeekYMD(todayKey, previous);
+        const to = startOfWeekYMD(todayKey, next);
+        if (from !== to) {
+          await TaskModel.updateMany(
+            { userId: uid, type: 'backlog', weekStart: from },
+            { $set: { weekStart: to } },
+          );
+        }
+      }
+    }
     if (typeof calendarSyncEnabled === 'boolean') {
       updates.calendarSyncEnabled = calendarSyncEnabled;
     }

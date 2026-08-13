@@ -21,6 +21,7 @@ import {
 } from '@/lib/hungerLogic';
 import { syncQuestState, isPremiumUser } from '@/lib/quests/engine';
 import { getZonedToday, getZonedYMD } from '@/lib/utils';
+import { normalizeWeekStart, type WeekStartDay } from '@/lib/weekStart';
 import { notifyTaskChanged } from '@/lib/taskSync';
 import {
   TaskSectionModel,
@@ -97,12 +98,18 @@ function unauth() {
 
 // --- Timezone Helpers ---
 
-function getRollingWeekDatesZoned(tz: string) {
+async function weekStartFor(uid: string): Promise<WeekStartDay> {
+  const doc = await UserModel.findById(uid).select('weekStartsOn').lean();
+  return normalizeWeekStart((doc as { weekStartsOn?: unknown } | null)?.weekStartsOn);
+}
+
+function getRollingWeekDatesZoned(tz: string, weekStartsOn: WeekStartDay = 0) {
   const todayYMD = getZonedToday(tz);
   const todayDate = new Date(`${todayYMD}T12:00:00Z`);
   const dow = todayDate.getUTCDay();
+  const back = (dow - weekStartsOn + 7) % 7;
   const sundayDate = new Date(todayDate);
-  sundayDate.setUTCDate(todayDate.getUTCDate() - dow);
+  sundayDate.setUTCDate(todayDate.getUTCDate() - back);
   const weekStart = sundayDate.toISOString().split('T')[0];
   const weekDates: string[] = [];
   for (let i = 0; i < 7; i++) {
@@ -846,7 +853,7 @@ export async function createTasksForUser(
           .filter((d) => d === -1 || isWeekday(d));
   if (days.length === 0 && explicitDates.length === 0)
     return { ok: false, error: 'days must include -1 or 0..6', status: 400 };
-  const { weekStart, weekDates } = getRollingWeekDatesZoned(tz);
+  const { weekStart, weekDates } = getRollingWeekDatesZoned(tz, await weekStartFor(uid));
   const createdIds: string[] = [];
   const now = new Date();
   const createdTasks: any[] = [];
@@ -1344,7 +1351,7 @@ export async function applySetRepeat(
           : mode === 'weekend'
             ? [0, 6]
             : [1, 2, 3, 4, 5];
-      const { weekDates } = getRollingWeekDatesZoned(tz);
+      const { weekDates } = getRollingWeekDatesZoned(tz, await weekStartFor(uid));
       const now = new Date();
       for (const d of allDays.filter((day) => day !== weeklyDay)) {
         const order = await nextOrderForDay(uid, d as Weekday, weekDates[d]);
@@ -1450,7 +1457,7 @@ async function handleBulkPut(uid: string, bulk: BulkBody, tz: string) {
     if (!toBacklog && !YMD_RE.test(target))
       return NextResponse.json({ error: 'date required' }, { status: 400 });
 
-    const { weekStart } = getRollingWeekDatesZoned(tz);
+    const { weekStart } = getRollingWeekDatesZoned(tz, await weekStartFor(uid));
     const atIndex =
       !toBacklog &&
       typeof bulk.atIndex === 'number' &&
@@ -1776,7 +1783,7 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
 
     const now = new Date();
-    const { weekStart, weekDates } = getRollingWeekDatesZoned(tz);
+    const { weekStart, weekDates } = getRollingWeekDatesZoned(tz, await weekStartFor(uid));
 
     // MOVING TO BACKLOG
     if (type === 'backlog') {
@@ -2438,7 +2445,7 @@ async function handleDailyGet(req: NextRequest, userId: string, tz: string) {
 }
 
 async function handleBoardGet(req: NextRequest, uid: string, tz: string) {
-  const { weekStart, weekDates } = getRollingWeekDatesZoned(tz);
+  const { weekStart, weekDates } = getRollingWeekDatesZoned(tz, await weekStartFor(uid));
   const dayParam = req.nextUrl.searchParams.get('day');
   if (dayParam !== null) {
     const dayNum = Number(dayParam);
@@ -2684,7 +2691,7 @@ async function handleDateRangeGet(req: NextRequest, uid: string, tz: string) {
   const dateSet = new Set(dates);
   const dowSet = new Set(dates.map((d) => dowFromYMD(d)));
 
-  const { weekStart } = getRollingWeekDatesZoned(tz);
+  const { weekStart } = getRollingWeekDatesZoned(tz, await weekStartFor(uid));
 
   const docs: TaskDoc[] = await TaskModel.find({
     userId: uid,
@@ -2967,7 +2974,7 @@ async function handleBoardPut(
       { status: 400 },
     );
   const now = new Date();
-  const { weekStart, weekDates } = getRollingWeekDatesZoned(tz);
+  const { weekStart, weekDates } = getRollingWeekDatesZoned(tz, await weekStartFor(uid));
   if (day === -1) {
     const ids = (tasks as Array<{ id: string }>).map((t) => t.id);
     if (ids.length === 0) {
@@ -3263,7 +3270,7 @@ async function handleBoardPutByDate(
   const notesById = new Map(docs.map((d) => [d.id, d.notes]));
   const checklistById = new Map(docs.map((d) => [d.id, d.checklist]));
   const weekday = dowFromYMD(dateKey);
-  const { weekStart } = getRollingWeekDatesZoned(tz);
+  const { weekStart } = getRollingWeekDatesZoned(tz, await weekStartFor(uid));
 
   await Promise.all(
     tasks.map((t, i) => {
@@ -3435,7 +3442,7 @@ async function handleBoardDelete(
       { status: 400 },
     );
   if (day === -1) {
-    const { weekStart } = getRollingWeekDatesZoned(tz);
+    const { weekStart } = getRollingWeekDatesZoned(tz, await weekStartFor(uid));
     const backlogDoc = await TaskModel.findOne(
       { userId: uid, type: 'backlog', weekStart, id: taskId },
       { bondId: 1 },

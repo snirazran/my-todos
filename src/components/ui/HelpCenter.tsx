@@ -108,8 +108,8 @@ const HELP_CATEGORIES: HelpCategory[] = [
         a: 'When an objective is complete, a Claim button appears. Daily rewards can be claimed once their day arrives.',
       },
       {
-        q: 'Can I progress every quest at once?',
-        a: 'Yes — with Frogress Plus you can advance every quest at the same time, so you never have to switch areas.',
+        q: 'What is the weekly pact?',
+        a: 'Each week you pick one life area and one thing you will actually do. We add it to your task list at the times you choose, and you keep a weekly streak for every week you finish it. One area at a time is the point — it is what makes the habit stick.',
       },
     ],
   },
@@ -166,7 +166,7 @@ const HELP_CATEGORIES: HelpCategory[] = [
     items: [
       {
         q: 'What is Frogress Plus?',
-        a: 'Plus is an optional subscription that supercharges your progress — advance every quest at once, unlock premium reward tracks, and earn bonus flies.',
+        a: 'Plus is an optional subscription. You write your own weekly pact instead of choosing from three, get four streak shields a month, can change your area mid-week without losing your streak, unlock premium reward tracks, and earn double rewards.',
       },
       {
         q: 'How do I get Plus?',

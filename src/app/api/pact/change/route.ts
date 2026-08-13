@@ -1,0 +1,116 @@
+export const dynamic = 'force-dynamic';
+
+import { NextRequest, NextResponse } from 'next/server';
+import { requireUserId } from '@/lib/auth';
+import connectMongo from '@/lib/mongoose';
+import PactModel from '@/lib/models/Pact';
+import UserModel from '@/lib/models/User';
+import { releasePactTasks } from '@/lib/pact/commit';
+import {
+  getPactView,
+  newPactId,
+  normalizePactStreak,
+  weekKeyFor,
+} from '@/lib/pact/engine';
+import { notifyTaskChanged } from '@/lib/taskSync';
+import { getZonedToday } from '@/lib/utils';
+import { normalizeWeekStart } from '@/lib/weekStart';
+import { recordAnalyticsEvent } from '@/lib/analytics/server';
+
+export async function POST(req: NextRequest) {
+  let userId: string;
+  try {
+    userId = await requireUserId();
+  } catch {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  try {
+    const body = await req.json();
+    const timezone = typeof body.timezone === 'string' ? body.timezone : 'UTC';
+    const action = body.action === 'skip' ? 'skip' : 'drop';
+    await connectMongo();
+
+    const userDoc = await UserModel.findById(userId).select('weekStartsOn').lean();
+    const weekKey = weekKeyFor(
+      getZonedToday(timezone),
+      normalizeWeekStart((userDoc as { weekStartsOn?: unknown } | null)?.weekStartsOn),
+    );
+
+    if (action === 'skip') {
+      await PactModel.updateOne(
+        { userId, weekKey },
+        {
+          $setOnInsert: {
+            pactId: newPactId(),
+            categoryId: '',
+            commitmentText: 'Skipped this week',
+            days: [],
+            startTime: '',
+            target: 0,
+            progress: 0,
+            taskIds: [],
+            source: 'library',
+          },
+          $set: { status: 'skipped', settledAt: new Date() },
+        },
+        { upsert: true },
+      );
+      await recordAnalyticsEvent({
+        userId,
+        name: 'pact_skipped',
+        properties: { week_key: weekKey },
+      });
+      const view = await getPactView({ userId, timezone });
+      return NextResponse.json({ ok: true, view });
+    }
+
+    const pact = await PactModel.findOne({ userId, weekKey });
+    if (!pact || pact.status === 'skipped') {
+      return NextResponse.json({ error: 'No pact to change' }, { status: 400 });
+    }
+    if (pact.claimedAt) {
+      return NextResponse.json(
+        { error: 'This week is already finished' },
+        { status: 400 },
+      );
+    }
+
+    const user = await UserModel.findById(userId).lean();
+    const streak = normalizePactStreak(user as any);
+    const useToken = streak.swapTokens > 0;
+
+    await releasePactTasks({ userId, pact });
+    await PactModel.deleteOne({ _id: pact._id });
+
+    const nextStreak = {
+      ...streak,
+      swapTokens: useToken ? streak.swapTokens - 1 : streak.swapTokens,
+      weeks: useToken ? streak.weeks : 0,
+    };
+    await UserModel.updateOne(
+      { _id: userId },
+      { $set: { 'quests.pactStreak': nextStreak } },
+    );
+
+    await notifyTaskChanged(userId);
+    await recordAnalyticsEvent({
+      userId,
+      name: 'pact_dropped',
+      properties: {
+        week_key: weekKey,
+        category_id: pact.categoryId,
+        used_token: useToken,
+        progress: pact.progress,
+      },
+    });
+
+    const view = await getPactView({ userId, timezone });
+    return NextResponse.json({ ok: true, usedToken: useToken, view });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Could not update' },
+      { status: 400 },
+    );
+  }
+}

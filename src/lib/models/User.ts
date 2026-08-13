@@ -119,6 +119,7 @@ const UserSchema = new Schema<UserDoc>(
       default: undefined,
     },
     calendarSyncEnabled: { type: Boolean, default: false },
+    weekStartsOn: { type: Number, default: 0 },
     calendarAccessToken: { type: String },
     cosmeticOverrides: {
       type: Schema.Types.Mixed,

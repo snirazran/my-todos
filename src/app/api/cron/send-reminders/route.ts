@@ -230,6 +230,56 @@ async function countUnclaimedFriendFlies(
 }
 
 /**
+ * The week's pact, when it still needs work. Ranks above generic open tasks:
+ * a named commitment with a streak on it is the strongest evening message
+ * the app has. Returns null when there is nothing pact-shaped to say.
+ */
+async function pactMessage(
+  userId: string,
+  tz: string,
+  frog: string,
+): Promise<PushMessage | null> {
+  try {
+    const { getPactView } = await import('@/lib/pact/engine');
+    const { dowFromYMD } = await import('@/lib/weekStart');
+    const view = await getPactView({ userId, timezone: tz });
+    if (!view.enabled || view.needsAreas) return null;
+    const isWeekStartDay =
+      dowFromYMD(getTodayInTz(tz)) === view.weekStartsOn;
+
+    if (!view.active) {
+      // Only nudge on the user's own week-start day. Any other day they can
+      // still start one — we just don't interrupt them about it.
+      if (!isWeekStartDay) return null;
+      return {
+        title: 'A fresh week',
+        body: `Pick one area to push. ${frog} is ready when you are.`,
+        data: { type: 'pact_pick', path: '/' },
+      };
+    }
+
+    const active = view.active;
+    if (active.progress >= active.target) return null;
+
+    const left = Math.max(1, active.target - active.progress);
+    const title =
+      view.streak.atRisk && view.streak.weeks > 0
+        ? `${view.streak.weeks}-week streak on the line`
+        : `${active.categoryName} this week`;
+    return {
+      title,
+      body:
+        left === 1
+          ? `One left: ${active.commitmentText}`
+          : `${left} left: ${active.commitmentText}`,
+      data: { type: 'pact_reminder', path: '/' },
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * GET /api/cron/send-reminders
  *
  * Called by an external cron service every 30 minutes.
@@ -371,13 +421,26 @@ export async function GET(req: NextRequest) {
             data: { type: 'friend_flies', path: '/friends' },
           };
         } else {
-          message = routineNudge('evening');
-          isRoutine = message !== null;
+          const pactNudge = await pactMessage(userId, tz, frog);
+          if (pactNudge) {
+            message = pactNudge;
+          } else {
+            message = routineNudge('evening');
+            isRoutine = message !== null;
+          }
         }
       }
     } else {
-      message = routineNudge('morning');
-      isRoutine = message !== null;
+      // On the first day of the user's own week, the pick nudge takes the
+      // morning slot instead of the routine one — a fresh week is the moment
+      // the ritual is asking for, and it costs no extra notification.
+      const pactNudge = await pactMessage(userId, tz, frog);
+      if (pactNudge && pactNudge.data.type === 'pact_pick') {
+        message = pactNudge;
+      } else {
+        message = routineNudge('morning');
+        isRoutine = message !== null;
+      }
     }
 
     if (!message) {

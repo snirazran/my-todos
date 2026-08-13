@@ -177,6 +177,8 @@ export type UserDoc = {
   notificationPrefs?: NotificationPrefs;
   styleShuffle?: StyleShufflePrefs | null;
   calendarSyncEnabled?: boolean;
+  /** 0 = Sunday, 1 = Monday. Drives every week boundary in the app. */
+  weekStartsOn?: 0 | 1;
   calendarAccessToken?: string;
   cosmeticOverrides?: Partial<Record<'skin' | 'hat' | 'body' | 'hand_item', number>>;
   activeFrogodoroTimer?: ActiveFrogodoroTimer | null;
