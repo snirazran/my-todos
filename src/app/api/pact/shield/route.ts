@@ -122,7 +122,11 @@ export async function POST(req: NextRequest) {
     await user.save();
 
     const view = await getPactView({ userId, timezone });
-    return NextResponse.json({ ok: true, view });
+    return NextResponse.json({
+      ok: true,
+      view,
+      flyBalance: Math.max(0, Number((user as any).wardrobe?.flies) || 0),
+    });
   } catch (error) {
     return NextResponse.json(
       {

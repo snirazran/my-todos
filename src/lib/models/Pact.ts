@@ -16,6 +16,8 @@ export interface PactDoc {
   target: number;
   progress: number;
   taskIds: string[];
+  /** The area tag stamped on this pact's tasks. */
+  tagId?: string;
   source: 'library' | 'generated' | 'repeat' | 'custom';
   shieldUsed: boolean;
   /** This pact's position in the streak, written when the week settles. */
@@ -44,6 +46,7 @@ const PactSchema = new Schema<PactDoc>(
     target: { type: Number, default: 1 },
     progress: { type: Number, default: 0 },
     taskIds: { type: [String], default: [] },
+    tagId: { type: String },
     source: { type: String, default: 'library' },
     shieldUsed: { type: Boolean, default: false },
     streakWeek: { type: Number, default: undefined },

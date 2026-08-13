@@ -3,6 +3,7 @@ import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import UserModel from '@/lib/models/User';
 import { buildRewardCatalog, syncQuestState } from '@/lib/quests/engine';
+import { ensurePactConfig } from '@/lib/pact/engine';
 import { loadStreakConfig, previousDayKey, syncDailyStreak } from '@/lib/quests/streak';
 import { parseTaskStreakDays } from '@/lib/quests/metrics';
 import { rewardWorth } from '@/lib/quests/priority';
@@ -458,7 +459,7 @@ export async function GET(req: Request) {
       view === 'home' ||
       searchParams.get('includeCategories') === '1';
 
-    const [dashboard, activeSeason, streakConfig, moveToWebConfig] =
+    const [dashboard, activeSeason, streakConfig, moveToWebConfig, pactConfig] =
       await Promise.all([
         syncQuestState({
           userId,
@@ -469,7 +470,13 @@ export async function GET(req: Request) {
         getActiveQuestSeasonView({ userId, timezone }),
         loadStreakConfig(),
         loadMoveToWebConfig(),
+        ensurePactConfig(),
       ]);
+
+    // The weekly pact replaced area quests outright. They are dropped at the
+    // source rather than hidden per-surface, so they cannot come back as a
+    // "next up" objective, a claimable, or a badge count while the pact runs.
+    if (pactConfig.isActive) dashboard.categoryQuests = [];
     const dailyStreak = await syncDailyStreak({
       user: dashboard.user,
       config: streakConfig,

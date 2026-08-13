@@ -39,6 +39,7 @@ import {
   type PactSizeTier,
   type PactStreakView,
   type PactSuggestion,
+  type PactUserTag,
   type PactView,
 } from './types';
 
@@ -769,6 +770,7 @@ export async function getPactView(args: {
       rewardFlies: optionRewardFlies(config, activeDoc.days, activeDoc.tier),
       daysLeft: Math.max(0, daysBetween(todayKey, weekEnd)),
       shieldUsed: activeDoc.shieldUsed,
+      tagId: activeDoc.tagId,
       nextTaskLabel:
         upcoming === undefined
           ? null
@@ -779,6 +781,17 @@ export async function getPactView(args: {
   const selectedIds = profile.selectedCategoryIds ?? [];
   const tagMap = new Map(
     (profile.categoryTagMap ?? []).map((entry) => [entry.categoryId, entry.tagIds ?? []]),
+  );
+
+  const userTags: PactUserTag[] = ((user as any)?.tags ?? [])
+    .map((tag: any) => ({
+      id: String(tag?.id ?? ''),
+      name: String(tag?.name ?? ''),
+      color: String(tag?.color ?? '#22c55e'),
+    }))
+    .filter((tag: PactUserTag) => tag.id && tag.name);
+  const userTagsById = new Map<string, PactUserTag>(
+    userTags.map((tag) => [tag.id, tag] as const),
   );
 
   const areas: PactAreaChoice[] = selectedIds
@@ -802,6 +815,21 @@ export async function getPactView(args: {
         weeksKept: streak.areaWeeks[categoryId] ?? 0,
         recommended: false,
         hasTag: tagIds.length > 0,
+        // Same precedence commitPact uses, read-only: a tag already linked to
+        // the area wins, then one named after it. Nothing shown means the
+        // pact will have to make one.
+        ...(() => {
+          const linked = tagIds.find((id) => userTagsById.has(id));
+          const byName = userTags.find(
+            (tag) =>
+              tag.name.toLowerCase() ===
+              (category.shortLabel || category.name).toLowerCase(),
+          );
+          const tag = linked ? userTagsById.get(linked) : byName;
+          return tag
+            ? { tagId: tag.id, tagName: tag.name, tagColor: tag.color }
+            : {};
+        })(),
       };
     })
     .filter((entry): entry is PactAreaChoice => !!entry);
@@ -864,6 +892,8 @@ export async function getPactView(args: {
     },
     completionRewards: config.completionRewards ?? [],
     forgoneFlies: streak.forgoneFlies,
+    userTags,
+    flyBalance,
     nextMilestone: nextMilestoneFor({
       config,
       streak,

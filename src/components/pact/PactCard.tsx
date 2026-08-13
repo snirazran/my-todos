@@ -2,27 +2,37 @@
 
 import { useState } from 'react';
 import useSWR from 'swr';
-import { Flame, Loader2, Play, ShieldCheck, Sparkles } from 'lucide-react';
+import {
+  Flame,
+  Loader2,
+  Play,
+  RefreshCw,
+  ShieldCheck,
+  Sparkles,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { FlyWorth } from '@/components/ui/QuestCards';
+import { ObjectiveProgressBar } from '@/lib/questClaims';
 import type { PactView } from '@/lib/pact/types';
 import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
-import { PactMilestoneRow } from './PactMilestoneRow';
 import { PactShieldSheet } from './PactShieldSheet';
 import { PactPickSheet } from './PactPickSheet';
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
-export function usePactView() {
-  const timezone =
-    typeof window === 'undefined'
+export function pactViewKey(timezone?: string) {
+  const tz =
+    timezone ??
+    (typeof window === 'undefined'
       ? 'UTC'
-      : Intl.DateTimeFormat().resolvedOptions().timeZone;
-  return useSWR<PactView>(
-    `/api/pact?timezone=${encodeURIComponent(timezone)}`,
-    fetcher,
-    { revalidateOnFocus: false },
-  );
+      : Intl.DateTimeFormat().resolvedOptions().timeZone);
+  return `/api/pact?timezone=${encodeURIComponent(tz)}`;
+}
+
+export function usePactView() {
+  return useSWR<PactView>(pactViewKey(), fetcher, {
+    revalidateOnFocus: false,
+  });
 }
 
 /**
@@ -48,6 +58,8 @@ export function PactCard({
   const [claiming, setClaiming] = useState(false);
   const [plusOpen, setPlusOpen] = useState(false);
   const [claimingRetro, setClaimingRetro] = useState(false);
+  const [confirmChange, setConfirmChange] = useState(false);
+  const [changing, setChanging] = useState(false);
 
   if (!data || !data.enabled || data.needsAreas) return null;
 
@@ -85,15 +97,48 @@ export function PactCard({
     }
   };
 
-  const active = data.active;
-  const teaser = data.areas.find((entry) => entry.recommended) ?? data.areas[0];
-  const pct = active
-    ? Math.min(100, (active.progress / Math.max(1, active.target)) * 100)
-    : 0;
+  // Swapping is destructive — the week's tasks are released and the pact is
+  // deleted — so it always states its price first. A swap token absorbs it;
+  // without one the streak goes back to zero.
+  const changeCommitment = async () => {
+    if (changing) return;
+    setChanging(true);
+    try {
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const res = await fetch('/api/pact/change', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ timezone, action: 'drop' }),
+      });
+      const payload = await res.json();
+      if (res.ok) {
+        mutate(payload.view, { revalidate: false });
+        setConfirmChange(false);
+        setPickOpen(true);
+      }
+    } finally {
+      setChanging(false);
+    }
+  };
 
+  const active = data.active;
+  // Home shows a running pact through the quest strip instead — a full card
+  // there sat between the frog and the task list and read as an interruption.
+  // The quests page keeps the whole card, where it is the main event.
+  //
+  // Hidden, not unmounted: the pick sheet lives inside this component, so
+  // returning null the instant a pact exists tore the sheet off the screen
+  // mid-commit and took its success step with it.
+  const hideCard = variant === 'home' && !!active;
+  const teaser = data.areas.find((entry) => entry.recommended) ?? data.areas[0];
   return (
     <>
-      <div className="mx-1.5 mb-2 w-[calc(100%-0.75rem)] md:mx-4 md:w-[calc(100%-2rem)]">
+      <div
+        className={cn(
+          'mx-1.5 mb-2 w-[calc(100%-0.75rem)] md:mx-4 md:w-[calc(100%-2rem)]',
+          hideCard && 'hidden',
+        )}
+      >
         {/* The retroactive pile. Free users see what is waiting; the moment
             they subscribe the same row becomes a claim. */}
         {data.forgoneFlies > 0 && (
@@ -243,19 +288,15 @@ export function PactCard({
                 {active.commitmentText}
               </p>
 
-              <div className="mt-2.5 flex items-center gap-2.5">
-                <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-muted">
-                  <div
-                    className={cn(
-                      'h-full rounded-full transition-[width] duration-500',
-                      active.claimable ? 'bg-lime-500' : 'bg-primary',
-                    )}
-                    style={{ width: `${pct}%` }}
-                  />
-                </div>
-                <span className="shrink-0 text-[12px] font-black tabular-nums text-muted-foreground">
-                  {active.progress}/{active.target}
-                </span>
+              {/* The same bar every quest objective uses — a pact is one more
+                  thing being counted toward, and a second bar style made it
+                  look like a different kind of progress. */}
+              <div className="mt-2.5">
+                <ObjectiveProgressBar
+                  heightClassName="h-4 md:h-3.5"
+                  progress={active.progress}
+                  target={active.target}
+                />
               </div>
 
               <div className="mt-2 flex items-center justify-between gap-2">
@@ -302,12 +343,48 @@ export function PactCard({
                 )}
               </div>
 
-              {data.nextMilestone && (
-                <PactMilestoneRow
-                  milestone={data.nextMilestone}
-                  rewardCatalog={data.rewardCatalog}
-                  isPremium={data.isPremium}
-                />
+              {!active.claimed && (
+                <div className="mt-2 flex items-center justify-end">
+                  {confirmChange ? (
+                    <span className="flex w-full items-center justify-between gap-2 rounded-xl bg-muted/50 px-3 py-2">
+                      <span className="min-w-0 text-[11px] font-bold text-muted-foreground">
+                        {data.swapTokens > 0
+                          ? `Uses 1 of your ${data.swapTokens} swaps — streak safe`
+                          : 'This resets your streak to zero'}
+                      </span>
+                      <span className="flex shrink-0 items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setConfirmChange(false)}
+                          className="h-7 rounded-lg px-2 text-[11px] font-black text-muted-foreground"
+                        >
+                          Keep
+                        </button>
+                        <button
+                          type="button"
+                          onClick={changeCommitment}
+                          disabled={changing}
+                          className="inline-flex h-7 min-w-[4.5rem] items-center justify-center rounded-lg bg-destructive px-2.5 text-[11px] font-black text-white disabled:opacity-60"
+                        >
+                          {changing ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            'Change'
+                          )}
+                        </button>
+                      </span>
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setConfirmChange(true)}
+                      className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] font-black text-muted-foreground transition hover:text-foreground"
+                    >
+                      <RefreshCw className="h-3.5 w-3.5" strokeWidth={2.5} />
+                      Change commitment
+                    </button>
+                  )}
+                </div>
               )}
 
               {/* Surfaced on the active card only, and loudest when the week

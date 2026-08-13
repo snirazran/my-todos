@@ -81,7 +81,7 @@ import { MobileHeaderActions } from '@/components/ui/MobileHeaderActions';
 import { MobileMenuCluster } from '@/components/ui/siteHeader';
 import { FlyCatchSwipeLauncher } from '@/components/ui/FlyCatchSwipeLauncher';
 import { NextQuestStrip } from '@/components/ui/NextQuestStrip';
-import { PactCard } from '@/components/pact/PactCard';
+import { PactCard, pactViewKey } from '@/components/pact/PactCard';
 import { BuddyNudgeCard } from '@/components/ui/BuddyNudgeCard';
 import { HomeShopRail } from '@/components/home/HomeShopRail';
 import { TryOnPill } from '@/components/ui/TryOnPill';
@@ -546,6 +546,7 @@ export default function HomeDashboard() {
         await toggleTask(taskId, false);
         await mutateQuests();
         void swrMutate(getQuestsUrl(timezone));
+        void swrMutate(pactViewKey(timezone));
       } else {
         persistGuestTask(taskId, false);
       }
@@ -598,6 +599,7 @@ export default function HomeDashboard() {
           await toggleTask(taskId, true);
           await mutateQuests();
           void swrMutate(getQuestsUrl(timezone));
+          void swrMutate(pactViewKey(timezone));
         } else {
           persistGuestTask(taskId, true);
         }

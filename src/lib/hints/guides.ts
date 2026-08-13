@@ -247,6 +247,22 @@ const GUIDES: Record<string, HintGuide> = {
   // opened from (home and quests), so the coach rings it where the user
   // already is instead of bouncing them to another page. The selector falls
   // back to the pre-pact anchors for accounts with the pact turned off.
+  // The sessions already exist on the list, so there is nothing to create —
+  // the guide just points at the ones carrying this pact's area tag.
+  'pact-session': {
+    id: 'pact-session',
+    steps: [
+      {
+        href: '/',
+        anchor: 'task-list',
+        label: 'Tap the fly to finish this week’s session',
+        requirePresent: '[data-hint="task-fly"]',
+        flyGlow: 'tagged',
+        hideRing: true,
+        timeoutMs: 90_000,
+      },
+    ],
+  },
   'pick-pact-area': {
     id: 'pick-pact-area',
     steps: [

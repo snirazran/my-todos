@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { cn } from '@/lib/utils';
-import { normalizeWeekStart, weekOrder } from '@/lib/weekStart';
+import { normalizeWeekStart, weekDatesFor, weekOrder } from '@/lib/weekStart';
 import { PRIMARY_OPTIONS } from '@/lib/pact/types';
 import { QuestRewardTileBadge } from '@/lib/questClaims';
 import { PlusDoubleNote, PlusPill } from './PlusBits';
@@ -60,6 +60,8 @@ export function PactPickSheet({
   const [startTime, setStartTime] = useState('19:00');
   const [writingOwn, setWritingOwn] = useState(false);
   const [perDayTimes, setPerDayTimes] = useState(false);
+  const [tagId, setTagId] = useState<string | null>(null);
+  const [pickingTag, setPickingTag] = useState(false);
   const [dayTimes, setDayTimes] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -85,6 +87,8 @@ export function PactPickSheet({
     setOptionId(null);
     setWritingOwn(false);
     setCustomText('');
+    setTagId(null);
+    setPickingTag(false);
     setError(null);
     setResult(null);
   }, [open]);
@@ -112,10 +116,10 @@ export function PactPickSheet({
         `/api/pact?timezone=${encodeURIComponent(timezone)}&categoryId=${encodeURIComponent(categoryId)}`,
       );
       const payload = await res.json();
-      if (!res.ok) throw new Error(payload.error || 'Could not load ideas');
+      if (!res.ok) throw new Error(payload.error || 'Couldn’t load ideas');
       setOptions(payload.options ?? []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not load ideas');
+      setError(err instanceof Error ? err.message : 'Couldn’t load ideas');
     } finally {
       setLoading(false);
     }
@@ -134,7 +138,7 @@ export function PactPickSheet({
     if (!area) return;
     const text = writingOwn ? customText.trim() : (option?.text ?? '');
     if (!text) {
-      setError('Say what you will do');
+      setError('Say what you’ll do');
       return;
     }
     setSaving(true);
@@ -151,13 +155,14 @@ export function PactPickSheet({
           days,
           startTime,
           dayTimes: perDayTimes ? dayTimes : undefined,
+          tagId: tagId ?? undefined,
           tier: writingOwn ? 'steady' : option?.tier,
           suggestionId: writingOwn ? undefined : option?.id,
           source: writingOwn ? 'custom' : option?.source,
         }),
       });
       const payload = await res.json();
-      if (!res.ok) throw new Error(payload.error || 'Could not save');
+      if (!res.ok) throw new Error(payload.error || 'Couldn’t save');
       setResult({
         scheduleLabel: payload.scheduleLabel,
         rewardFlies: payload.rewardFlies,
@@ -166,13 +171,14 @@ export function PactPickSheet({
       setStep('done');
       onCommitted(payload.view);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not save');
+      setError(err instanceof Error ? err.message : 'Couldn’t save');
     } finally {
       setSaving(false);
     }
   };
 
   const toggleDay = (day: number) => {
+    if (isPastDay(day)) return;
     setDays((prev) =>
       prev.includes(day)
         ? prev.filter((d) => d !== day)
@@ -183,7 +189,19 @@ export function PactPickSheet({
   const previewText = writingOwn ? customText.trim() : (option?.text ?? '');
   const previewMinutes = writingOwn ? undefined : option?.minutes;
   const visibleOptions = (options ?? []).slice(0, PRIMARY_OPTIONS);
-  const orderedDays = weekOrder(normalizeWeekStart(view.weekStartsOn));
+  const weekStartsOn = normalizeWeekStart(view.weekStartsOn);
+  const orderedDays = weekOrder(weekStartsOn);
+  // A weekday already behind us this week can never hold a session — the
+  // week's tasks stop at Saturday — so it is shown spent rather than picked
+  // and silently dropped on save.
+  const todayKey = new Intl.DateTimeFormat('en-CA', {
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+  }).format(new Date());
+  const weekDates = weekDatesFor(view.weekKey, weekStartsOn);
+  const isPastDay = (day: number) => {
+    const index = orderedDays.indexOf(day as 0 | 1 | 2 | 3 | 4 | 5 | 6);
+    return index >= 0 && weekDates[index] < todayKey;
+  };
   const hasFooter = step === 'commitment' || step === 'confirm';
   const rewardPreview =
     days.length * view.flyRates.perTask +
@@ -228,15 +246,15 @@ export function PactPickSheet({
                     One area. One week.
                   </h2>
                   <p className="mx-auto max-w-[36ch] text-[14px] font-semibold leading-snug text-muted-foreground">
-                    Choose one thing you&apos;ll actually do. We&apos;ll put it
-                    in your week, at times you pick.
+                    Pick one thing you&apos;ll actually do. We&apos;ll add it
+                    to your week.
                   </p>
                 </div>
                 <ol className="mx-auto flex w-full max-w-[20rem] flex-col gap-2.5 text-left">
                   {[
                     'Pick your area',
                     'Choose what you’ll do',
-                    'We add it to your week',
+                    'Set days and times',
                   ].map((label, index) => (
                     <li key={label} className="flex items-center gap-3">
                       <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-[12px] font-black text-white">
@@ -268,7 +286,7 @@ export function PactPickSheet({
                     Which area gets your attention?
                   </h2>
                   <p className="mt-1 text-[13px] font-semibold text-muted-foreground">
-                    Pick one. You can change it next week.
+                    Pick one. You can switch next week.
                   </p>
                 </div>
                 {/* Always two columns: a full-width card at 16/9 is enormous on
@@ -564,13 +582,16 @@ export function PactPickSheet({
                           key={day}
                           type="button"
                           onClick={() => toggleDay(day)}
+                          disabled={isPastDay(day)}
                           aria-label={DAY_NAMES[day]}
                           aria-pressed={days.includes(day)}
                           className={cn(
                             'h-10 flex-1 rounded-lg text-[13px] font-black transition',
-                            days.includes(day)
-                              ? 'bg-primary text-white'
-                              : 'bg-muted text-muted-foreground hover:bg-muted/70',
+                            isPastDay(day)
+                              ? 'cursor-not-allowed bg-muted/40 text-muted-foreground/40 line-through'
+                              : days.includes(day)
+                                ? 'bg-primary text-white'
+                                : 'bg-muted text-muted-foreground hover:bg-muted/70',
                           )}
                         >
                           {DAY_LABELS[day]}
@@ -630,6 +651,82 @@ export function PactPickSheet({
                       />
                     )}
                   </div>
+                </div>
+
+                {/* Which tag the sessions carry is invisible until the tasks
+                    appear, and by then it is already on them. Named here, with
+                    the user's own tags one tap away. */}
+                <div className="flex flex-col gap-2">
+                  <p className="text-[11px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+                    Tag
+                  </p>
+                  {(() => {
+                    const chosen = tagId
+                      ? view.userTags.find((tag) => tag.id === tagId)
+                      : null;
+                    const shown = chosen ??
+                      (area.tagId
+                        ? {
+                            id: area.tagId,
+                            name: area.tagName ?? area.shortLabel,
+                            color: area.tagColor ?? '#22c55e',
+                          }
+                        : null);
+                    return (
+                      <div className="flex flex-wrap items-center gap-2">
+                        {shown ? (
+                          <span
+                            className="inline-flex max-w-[12rem] items-center truncate rounded-xl px-2.5 py-1 text-[12px] font-black"
+                            style={{
+                              backgroundColor: `${shown.color}22`,
+                              color: shown.color,
+                            }}
+                          >
+                            {shown.name}
+                          </span>
+                        ) : (
+                          <span className="text-[12.5px] font-bold text-muted-foreground">
+                            We&apos;ll make a “{area.shortLabel}” tag
+                          </span>
+                        )}
+                        {view.userTags.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setPickingTag((v) => !v)}
+                            className="text-[11px] font-black text-primary"
+                          >
+                            {pickingTag ? 'Done' : 'Use another'}
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })()}
+                  {pickingTag && (
+                    <div className="flex flex-wrap gap-1.5 rounded-xl bg-muted/40 p-2">
+                      {view.userTags.map((tag) => (
+                        <button
+                          key={tag.id}
+                          type="button"
+                          onClick={() => {
+                            setTagId(tag.id);
+                            setPickingTag(false);
+                          }}
+                          className={cn(
+                            'max-w-[10rem] truncate rounded-lg px-2.5 py-1 text-[12px] font-black transition',
+                            (tagId ?? area.tagId) === tag.id
+                              ? 'ring-2 ring-primary'
+                              : 'opacity-80 hover:opacity-100',
+                          )}
+                          style={{
+                            backgroundColor: `${tag.color}22`,
+                            color: tag.color,
+                          }}
+                        >
+                          {tag.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {error && (

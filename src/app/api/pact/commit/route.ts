@@ -39,6 +39,7 @@ export async function POST(req: NextRequest) {
       startTime: body.startTime,
       dayTimes:
         body.dayTimes && typeof body.dayTimes === 'object' ? body.dayTimes : undefined,
+      tagId: typeof body.tagId === 'string' ? body.tagId : undefined,
       tier: body.tier,
       suggestionId:
         typeof body.suggestionId === 'string' && !body.suggestionId.startsWith('repeat-')

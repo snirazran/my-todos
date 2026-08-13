@@ -6,7 +6,7 @@ import TaskModel from '@/lib/models/Task';
 import UserModel from '@/lib/models/User';
 import connectMongo from '@/lib/mongoose';
 import { getZonedToday } from '@/lib/utils';
-import { normalizeWeekStart } from '@/lib/weekStart';
+import { normalizeWeekStart, weekDatesFor, weekOrder } from '@/lib/weekStart';
 import { normalizeFocusProfile } from '@/lib/quests/engine';
 import type { UserDoc } from '@/lib/types/UserDoc';
 import {
@@ -30,6 +30,7 @@ export type CommitPactInput = {
   startTime: string;
   /** Per-day override, keyed by weekday number. Falls back to startTime. */
   dayTimes?: Record<number, string>;
+  tagId?: string;
   tier: PactSizeTier;
   suggestionId?: string;
   source: PactDoc['source'];
@@ -65,6 +66,8 @@ async function resolveAreaTag(args: {
   categoryId: string;
   accent: string;
   areaName: string;
+  /** A tag the user picked on the confirm step; beats every other rule. */
+  preferredTagId?: string;
 }): Promise<string> {
   const { userId, categoryId, accent, areaName } = args;
   const user = await UserModel.findById(userId);
@@ -79,7 +82,30 @@ async function resolveAreaTag(args: {
     tags.map((t) => (typeof t === 'string' ? t : t?.id ?? t?.name)).filter(Boolean) as string[],
   );
 
-  const alive = linked.find((tagId) => existingIds.has(tagId));
+  const preferred =
+    args.preferredTagId && existingIds.has(args.preferredTagId)
+      ? args.preferredTagId
+      : null;
+  const alive = preferred ?? linked.find((tagId) => existingIds.has(tagId));
+  if (alive && alive === preferred) {
+    // An explicit pick also becomes the area's link, so next week's pact and
+    // the area's quest scoping both follow the tag the user actually chose.
+    const nextLinked = Array.from(
+      new Set([preferred, ...linked.filter((id) => existingIds.has(id))]),
+    );
+    user.focusProfile = {
+      ...profile,
+      categoryTagMap: [
+        ...profile.categoryTagMap.filter(
+          (entry) => entry.categoryId !== categoryId,
+        ),
+        { categoryId, tagIds: nextLinked },
+      ],
+    } as any;
+    user.markModified('focusProfile');
+    await user.save();
+    return preferred;
+  }
   if (alive) return alive;
 
   const byName = tags.find(
@@ -129,9 +155,10 @@ export async function commitPact(
       hour12: false,
     }).format(new Date()),
   );
+  const weekStartsOn = normalizeWeekStart(user.weekStartsOn);
   const weekKey = planningWeekKey(
     todayKey,
-    normalizeWeekStart(user.weekStartsOn),
+    weekStartsOn,
     Number.isFinite(nowHour) ? nowHour : 0,
     config.pickHour ?? 18,
   );
@@ -152,7 +179,19 @@ export async function commitPact(
   const text = String(input.text ?? '').trim().slice(0, TASK_TEXT_MAX);
   if (!text) throw new Error('Say what you will do');
 
-  const days = sanitizeDays(input.days);
+  const rawDays = sanitizeDays(input.days);
+  // The week's tasks are bounded by repeatEndDate, so a weekday already behind
+  // us this week can never occur. Committing to it produced a target the user
+  // could not physically reach, and the days that never appeared looked like
+  // tasks that were never created.
+  const weekDates = weekDatesFor(weekKey, weekStartsOn);
+  const days = rawDays.filter((day) => {
+    const index = weekOrder(weekStartsOn).indexOf(day as 0 | 1 | 2 | 3 | 4 | 5 | 6);
+    return index < 0 || weekDates[index] >= todayKey;
+  });
+  if (days.length === 0) {
+    throw new Error('Those days already passed this week — pick a later day');
+  }
   const startTime = sanitizeTime(input.startTime);
   const tier: PactSizeTier =
     input.tier === 'starter' || input.tier === 'strong' ? input.tier : 'steady';
@@ -162,6 +201,7 @@ export async function commitPact(
     categoryId,
     accent: category.accent,
     areaName: category.shortLabel || category.name,
+    preferredTagId: input.tagId,
   });
 
   // A 6am gym slot and a 9pm wind-down are both reasonable in one week, so
@@ -213,6 +253,7 @@ export async function commitPact(
     target: days.length,
     progress: 0,
     taskIds,
+    tagId,
     source,
     shieldUsed: false,
   });

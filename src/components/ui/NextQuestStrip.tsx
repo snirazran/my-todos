@@ -27,6 +27,8 @@ import {
   resetCountdownLabel,
 } from '@/lib/quests/priority';
 import { QuestPriorityDebug } from '@/components/ui/QuestPriorityDebug';
+import { usePactView } from '@/components/pact/PactCard';
+import { PactStripRow } from '@/components/pact/PactStripRow';
 import { useUIStore } from '@/lib/uiStore';
 
 export function NextQuestStrip({
@@ -42,6 +44,7 @@ export function NextQuestStrip({
 }) {
   const router = useRouter();
   const startHintGuide = useUIStore((state) => state.startHintGuide);
+  const { data: pactView } = usePactView();
   const [claiming, setClaiming] = useState(false);
 
   const claimable =
@@ -112,6 +115,22 @@ export function NextQuestStrip({
       : null;
   const displayNextUp = fillingTrackable ?? nextUp;
   const showClaimable = !!claimable && !fillingTrackable;
+
+  // One slot, one winner. Rewards outrank work, so a finished pact week comes
+  // first and a quest claimable second; below that the pact holds the slot for
+  // as long as it is running, because it is the only thing on this page the
+  // user personally promised — quests are ambient by comparison.
+  const livePact =
+    pactView?.enabled && !pactView.needsAreas && pactView.active
+      ? pactView
+      : null;
+  const pactReady = !!livePact?.active?.claimable && !livePact.active.claimed;
+  // Onboarding is the one thing that outranks a running pact: it teaches the
+  // app, it is finite, and burying it leaves a new user stuck on step one.
+  const onboardingPending = nextUp?.placement === 'onboarding';
+  if (livePact && (pactReady || (!claimable && !onboardingPending))) {
+    return <PactStripRow view={livePact} />;
+  }
 
   if (!claimable && !nextUp) return null;
 

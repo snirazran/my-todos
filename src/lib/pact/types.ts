@@ -95,7 +95,13 @@ export type PactAreaChoice = {
   weeksKept: number;
   recommended: boolean;
   hasTag: boolean;
+  /** The tag this area's tasks will carry. Absent = one gets created. */
+  tagId?: string;
+  tagName?: string;
+  tagColor?: string;
 };
+
+export type PactUserTag = { id: string; name: string; color: string };
 
 export type ActivePactView = {
   id: string;
@@ -119,6 +125,8 @@ export type ActivePactView = {
   daysLeft: number;
   shieldUsed: boolean;
   nextTaskLabel: string | null;
+  /** Area tag on this pact's tasks, for hint targeting. */
+  tagId?: string;
 };
 
 export type PactStatus = 'active' | 'kept' | 'missed' | 'skipped';
@@ -174,4 +182,8 @@ export type PactView = {
   /** Flies Plus would have added to past claims. Claimable once premium. */
   forgoneFlies: number;
   nextMilestone: PactMilestone | null;
+  /** Every tag the user owns, so a pact can be pointed at their own. */
+  userTags: PactUserTag[];
+  /** Current fly balance, so purchase sheets need no second fetch. */
+  flyBalance: number;
 };
