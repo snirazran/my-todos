@@ -56,8 +56,12 @@ export type PactConfigView = {
   milestoneRewards: QuestRewards;
   streakTiers: PactStreakTier[];
   masteryTiers: PactAreaMasteryTier[];
-  shieldsFreePerMonth: number;
-  shieldsPlusPerMonth: number;
+  shieldCapFree: number;
+  shieldCapPlus: number;
+  shieldEarnEveryWeeks: number;
+  shieldPriceFlies: number;
+  shieldAdsRequired: number;
+  shieldAdMinStreak: number;
   plusSwapTokensPerMonth: number;
   minOptionsPerArea: number;
   autoGenerate: boolean;
@@ -136,7 +140,15 @@ export type PactStreakView = {
   weeks: number;
   best: number;
   shields: number;
-  shieldsPerMonth: number;
+  /** Most shields that can be held at once. Small on purpose. */
+  shieldCap: number;
+  shieldPriceFlies: number;
+  /** Ads needed for one shield right now; rises with the streak. */
+  shieldAdsRequired: number;
+  canBuyShield: boolean;
+  canEarnShieldWithAd: boolean;
+  /** A rescued week cannot be followed by another rescued week. */
+  rescueOnCooldown: boolean;
   atRisk: boolean;
 };
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   Check,
@@ -13,7 +13,6 @@ import { BaseSheet } from '@/components/ui/BaseSheet';
 import { cn } from '@/lib/utils';
 import { normalizeWeekStart, weekOrder } from '@/lib/weekStart';
 import { PRIMARY_OPTIONS } from '@/lib/pact/types';
-import { BareRewardIcon, FlyWorth } from '@/components/ui/QuestCards';
 import { QuestRewardTileBadge } from '@/lib/questClaims';
 import { PlusDoubleNote, PlusPill } from './PlusBits';
 import type { PactAreaChoice, PactOption, PactView } from '@/lib/pact/types';
@@ -71,9 +70,16 @@ export function PactPickSheet({
     taskCount: number;
   } | null>(null);
 
+  // Opening the sheet resets it — nothing else may. Committing hands the
+  // fresh view up to the card, and that view carries introSeen flipped true
+  // by the intro step, which re-ran this effect and wiped the success screen
+  // back to the area grid the instant the pact was saved.
+  const introSeenRef = useRef(view.introSeen);
+  introSeenRef.current = view.introSeen;
+
   useEffect(() => {
     if (!open) return;
-    setStep(view.introSeen ? 'area' : 'intro');
+    setStep(introSeenRef.current ? 'area' : 'intro');
     setAreaId(null);
     setOptions(null);
     setOptionId(null);
@@ -81,7 +87,7 @@ export function PactPickSheet({
     setCustomText('');
     setError(null);
     setResult(null);
-  }, [open, view.introSeen]);
+  }, [open]);
 
   const area = useMemo(
     () => view.areas.find((entry) => entry.categoryId === areaId) ?? null,
@@ -178,9 +184,6 @@ export function PactPickSheet({
   const previewMinutes = writingOwn ? undefined : option?.minutes;
   const visibleOptions = (options ?? []).slice(0, PRIMARY_OPTIONS);
   const orderedDays = weekOrder(normalizeWeekStart(view.weekStartsOn));
-  // What a typical 3-session week pays, so the area cards can show a "worth"
-  // before any commitment has been chosen.
-  const weekWorth = 3 * view.flyRates.perTask + view.flyRates.weekBonus;
   const hasFooter = step === 'commitment' || step === 'confirm';
   const rewardPreview =
     days.length * view.flyRates.perTask +
@@ -344,20 +347,6 @@ export function PactPickSheet({
                             )}
                           >
                             {quietLabel(entry)}
-                          </span>
-                          <span className="flex min-w-0 items-center gap-1.5">
-                            <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground/80">
-                              worth
-                            </span>
-                            <FlyWorth amount={weekWorth} />
-                            {view.completionRewards.map((reward, i) => (
-                              <BareRewardIcon
-                                key={`${reward.type}-${reward.itemId ?? i}`}
-                                reward={reward}
-                                rewardCatalog={view.rewardCatalog as never}
-                                isPremium={view.isPremium}
-                              />
-                            ))}
                           </span>
                           {/* A real button, not just a tappable card — the card
                             alone gave no affordance that it was clickable. */}
@@ -651,7 +640,7 @@ export function PactPickSheet({
               </div>
             )}
 
-            {step === 'done' && result && (
+            {step === 'done' && (
               <div className="flex flex-col gap-5 py-8 text-center">
                 <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/15">
                   <Check className="h-7 w-7 text-primary" strokeWidth={3} />
@@ -661,9 +650,9 @@ export function PactPickSheet({
                     You&apos;re set for the week
                   </h2>
                   <p className="mx-auto max-w-[32ch] text-[14px] font-semibold leading-snug text-muted-foreground">
-                    {result.taskCount} task{result.taskCount === 1 ? '' : 's'}{' '}
-                    added — {result.scheduleLabel}. We&apos;ll remind you each
-                    time.
+                    {result
+                      ? `${result.taskCount} task${result.taskCount === 1 ? '' : 's'} added — ${result.scheduleLabel}. We'll remind you each time.`
+                      : "Your tasks are on your list. We'll remind you each time."}
                   </p>
                 </div>
                 <button

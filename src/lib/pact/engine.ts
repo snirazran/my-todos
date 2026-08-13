@@ -50,7 +50,10 @@ export type PactStreakState = {
   best: number;
   lastKeptWeek: string;
   shields: number;
-  shieldMonth: string;
+  /** Week key of the last week a shield rescued, for the back-to-back guard. */
+  shieldRescueWeek: string;
+  /** Lifetime rescues, which is what escalates the ad price. */
+  shieldRescues: number;
   swapTokens: number;
   swapMonth: string;
   introSeen: boolean;
@@ -69,7 +72,8 @@ const EMPTY_STREAK: PactStreakState = {
   best: 0,
   lastKeptWeek: '',
   shields: 0,
-  shieldMonth: '',
+  shieldRescueWeek: '',
+  shieldRescues: 0,
   swapTokens: 0,
   swapMonth: '',
   introSeen: false,
@@ -86,7 +90,9 @@ export function normalizePactStreak(user: Partial<UserDoc> | null): PactStreakSt
     best: Math.max(0, Number(raw.best) || 0),
     lastKeptWeek: typeof raw.lastKeptWeek === 'string' ? raw.lastKeptWeek : '',
     shields: Math.max(0, Number(raw.shields) || 0),
-    shieldMonth: typeof raw.shieldMonth === 'string' ? raw.shieldMonth : '',
+    shieldRescueWeek:
+      typeof raw.shieldRescueWeek === 'string' ? raw.shieldRescueWeek : '',
+    shieldRescues: Math.max(0, Number(raw.shieldRescues) || 0),
     swapTokens: Math.max(0, Number(raw.swapTokens) || 0),
     swapMonth: typeof raw.swapMonth === 'string' ? raw.swapMonth : '',
     introSeen: !!raw.introSeen,
@@ -171,6 +177,20 @@ export async function ensurePactConfig(): Promise<PactConfigDoc> {
     }
     if (!existing.masteryTiers?.length) {
       backfill.masteryTiers = DEFAULT_PACT_MASTERY_TIERS;
+    }
+    if (typeof existing.shieldCapFree !== 'number') backfill.shieldCapFree = 1;
+    if (typeof existing.shieldCapPlus !== 'number') backfill.shieldCapPlus = 2;
+    if (typeof existing.shieldEarnEveryWeeks !== 'number') {
+      backfill.shieldEarnEveryWeeks = 2;
+    }
+    if (typeof existing.shieldPriceFlies !== 'number') {
+      backfill.shieldPriceFlies = 100;
+    }
+    if (typeof existing.shieldAdsRequired !== 'number') {
+      backfill.shieldAdsRequired = 1;
+    }
+    if (typeof existing.shieldAdMinStreak !== 'number') {
+      backfill.shieldAdMinStreak = 2;
     }
     if (Object.keys(backfill).length === 0) return existing;
     await PactConfigModel.updateOne(
@@ -430,6 +450,26 @@ export async function syncPactProgress(args: {
   return Math.min(pact.target, done);
 }
 
+export function shieldCapFor(config: PactConfigDoc, isPremium: boolean) {
+  const cap = isPremium ? config.shieldCapPlus : config.shieldCapFree;
+  return Math.max(0, Number(cap ?? (isPremium ? 2 : 1)));
+}
+
+/**
+ * Ads for one shield. Priced off lifetime rescues rather than the current
+ * streak: someone who leans on rescues pays more each time, while a long
+ * clean streak that finally slips still pays the base.
+ */
+export function shieldAdsRequiredFor(
+  config: PactConfigDoc,
+  rescuesUsed: number,
+) {
+  const base = Math.max(1, Number(config.shieldAdsRequired ?? 1));
+  if (rescuesUsed >= 6) return base + 2;
+  if (rescuesUsed >= 2) return base + 1;
+  return base;
+}
+
 export function refreshMonthlyAllowances(
   streak: PactStreakState,
   config: PactConfigDoc,
@@ -438,13 +478,10 @@ export function refreshMonthlyAllowances(
 ): PactStreakState {
   const month = monthKeyFor(todayKey);
   const next = { ...streak };
-  const shieldAllowance = isPremium
-    ? config.shieldsPlusPerMonth
-    : config.shieldsFreePerMonth;
-  if (next.shieldMonth !== month) {
-    next.shieldMonth = month;
-    next.shields = Math.max(0, shieldAllowance);
-  }
+  // Shields are held stock, not a monthly grant: refills are earned by kept
+  // weeks, bought with flies, or watched for. A monthly top-up handed Plus a
+  // shield for every week of the month, which is immunity, not a safety net.
+  next.shields = Math.min(next.shields, shieldCapFor(config, isPremium));
   if (next.swapMonth !== month) {
     next.swapMonth = month;
     next.swapTokens = isPremium ? Math.max(0, config.plusSwapTokensPerMonth) : 0;
@@ -485,8 +522,21 @@ export async function settleFinishedWeeks(args: {
     const kept = progress >= pact.target;
     let usedShield = false;
 
-    if (!kept && !pact.shieldUsed && next.shields > 0 && progress > 0) {
+    // Two rescued weeks in a row would let someone who finishes nothing hold
+    // a twelve-week streak, so a rescue always has to be followed by a week
+    // actually kept. Zero progress is never rescuable either.
+    const rescuedLastWeek =
+      next.shieldRescueWeek === shiftYMD(pact.weekKey, -7);
+    if (
+      !kept &&
+      !pact.shieldUsed &&
+      next.shields > 0 &&
+      progress > 0 &&
+      !rescuedLastWeek
+    ) {
       next.shields -= 1;
+      next.shieldRescueWeek = pact.weekKey;
+      next.shieldRescues += 1;
       usedShield = true;
     }
 
@@ -510,6 +560,16 @@ export async function settleFinishedWeeks(args: {
     if (survives) {
       pact.streakWeek = next.weeks;
       pact.areaWeek = next.areaWeeks[pact.categoryId];
+    }
+
+    // Shields are earned by the behaviour they protect: every Nth week you
+    // actually keep hands one back, up to the cap. Rescued weeks earn nothing.
+    const earnEvery = Math.max(0, Number(args.config.shieldEarnEveryWeeks ?? 0));
+    if (kept && earnEvery > 0 && next.weeks % earnEvery === 0) {
+      next.shields = Math.min(
+        next.shields + 1,
+        shieldCapFor(args.config, isPremium),
+      );
     }
 
     // Only a genuinely finished week pays; a shield rescues the streak, not
@@ -753,13 +813,26 @@ export async function getPactView(args: {
   });
   if (areas.length > 0) areas[0].recommended = true;
 
+  const shieldCap = shieldCapFor(config, isPremium);
+  const flyBalance = Math.max(0, Number((user as any)?.wardrobe?.flies) || 0);
+  const shieldPriceFlies = Math.max(1, Number(config.shieldPriceFlies ?? 100));
+  const roomForShield = streak.shields < shieldCap;
   const streakView: PactStreakView = {
     weeks: streak.weeks,
     best: streak.best,
     shields: streak.shields,
-    shieldsPerMonth: isPremium
-      ? config.shieldsPlusPerMonth
-      : config.shieldsFreePerMonth,
+    shieldCap,
+    shieldPriceFlies,
+    shieldAdsRequired: shieldAdsRequiredFor(config, streak.shieldRescues),
+    canBuyShield: roomForShield && flyBalance >= shieldPriceFlies,
+    // Never for Plus — not paying to watch ads is part of what Plus is.
+    canEarnShieldWithAd:
+      !isPremium &&
+      roomForShield &&
+      streak.weeks >= Math.max(0, Number(config.shieldAdMinStreak ?? 0)),
+    rescueOnCooldown:
+      !!streak.shieldRescueWeek &&
+      streak.shieldRescueWeek === shiftYMD(currentWeek, -7),
     atRisk:
       !!active &&
       active.progress < active.target &&

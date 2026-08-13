@@ -595,7 +595,7 @@ function FeatureRow({
 
 const COMPARISON_ROWS: { label: string; free: boolean }[] = [
   { label: 'Write your own weekly pact', free: false },
-  { label: '4 pact shields a month', free: false },
+  { label: 'Hold 2 streak shields, not 1', free: false },
   { label: 'Change your area mid-week', free: false },
   { label: 'Unlimited tags', free: false },
   { label: 'Double rewards', free: false },

@@ -310,18 +310,51 @@ export function AdminPactManager() {
 
         <div className="mt-4 grid gap-4 sm:grid-cols-3">
           <NumberField
-            label="Free shields / month"
+            label="Shield cap — free"
+            hint="Most held at once. Keep it small or the streak can't break."
             min={0}
-            max={10}
-            value={config.shieldsFreePerMonth}
-            onChange={(shieldsFreePerMonth) => patch({ shieldsFreePerMonth })}
+            max={5}
+            value={config.shieldCapFree}
+            onChange={(shieldCapFree) => patch({ shieldCapFree })}
           />
           <NumberField
-            label="Plus shields / month"
+            label="Shield cap — Plus"
+            hint="Convenience, not immunity"
             min={0}
-            max={20}
-            value={config.shieldsPlusPerMonth}
-            onChange={(shieldsPlusPerMonth) => patch({ shieldsPlusPerMonth })}
+            max={5}
+            value={config.shieldCapPlus}
+            onChange={(shieldCapPlus) => patch({ shieldCapPlus })}
+          />
+          <NumberField
+            label="Earn a shield every N kept weeks"
+            hint="0 turns earning off"
+            min={0}
+            max={12}
+            value={config.shieldEarnEveryWeeks}
+            onChange={(shieldEarnEveryWeeks) => patch({ shieldEarnEveryWeeks })}
+          />
+          <NumberField
+            label="Shield price (flies)"
+            min={1}
+            max={2000}
+            value={config.shieldPriceFlies}
+            onChange={(shieldPriceFlies) => patch({ shieldPriceFlies })}
+          />
+          <NumberField
+            label="Ads per shield"
+            hint="Rises to +1 after 2 rescues, +2 after 6"
+            min={1}
+            max={5}
+            value={config.shieldAdsRequired}
+            onChange={(shieldAdsRequired) => patch({ shieldAdsRequired })}
+          />
+          <NumberField
+            label="Min streak for ad shields"
+            hint="Stops week-one users farming ads"
+            min={0}
+            max={12}
+            value={config.shieldAdMinStreak}
+            onChange={(shieldAdMinStreak) => patch({ shieldAdMinStreak })}
           />
           <NumberField
             label="Plus swap tokens / month"

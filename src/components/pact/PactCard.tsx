@@ -2,12 +2,13 @@
 
 import { useState } from 'react';
 import useSWR from 'swr';
-import { Flame, Loader2, Play, Sparkles } from 'lucide-react';
+import { Flame, Loader2, Play, ShieldCheck, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { FlyWorth } from '@/components/ui/QuestCards';
 import type { PactView } from '@/lib/pact/types';
 import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
 import { PactMilestoneRow } from './PactMilestoneRow';
+import { PactShieldSheet } from './PactShieldSheet';
 import { PactPickSheet } from './PactPickSheet';
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
@@ -43,6 +44,7 @@ export function PactCard({
   const ratio = BANNER_RATIO[variant];
   const { data, mutate } = usePactView();
   const [pickOpen, setPickOpen] = useState(false);
+  const [shieldOpen, setShieldOpen] = useState(false);
   const [claiming, setClaiming] = useState(false);
   const [plusOpen, setPlusOpen] = useState(false);
   const [claimingRetro, setClaimingRetro] = useState(false);
@@ -307,6 +309,40 @@ export function PactCard({
                   isPremium={data.isPremium}
                 />
               )}
+
+              {/* Surfaced on the active card only, and loudest when the week
+                  is slipping — a safety net advertised before there is
+                  anything to lose is just noise. */}
+              <button
+                type="button"
+                onClick={() => setShieldOpen(true)}
+                className={cn(
+                  'mt-2 flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-left transition active:scale-[0.99]',
+                  data.streak.atRisk
+                    ? 'bg-sky-500/12 ring-1 ring-sky-500/35'
+                    : 'bg-muted/40',
+                )}
+              >
+                <span className="inline-flex items-center gap-1.5 text-[12px] font-bold text-muted-foreground">
+                  <ShieldCheck
+                    className={cn(
+                      'h-4 w-4',
+                      data.streak.shields > 0
+                        ? 'text-sky-500'
+                        : 'text-muted-foreground',
+                    )}
+                    strokeWidth={2.5}
+                  />
+                  {data.streak.shields > 0
+                    ? `${data.streak.shields} shield${data.streak.shields === 1 ? '' : 's'} ready`
+                    : 'No shield if you miss'}
+                </span>
+                <span className="text-[12px] font-black text-primary">
+                  {data.streak.shields >= data.streak.shieldCap
+                    ? 'How it works'
+                    : 'Get one'}
+                </span>
+              </button>
             </div>
           </div>
         )}
@@ -318,6 +354,13 @@ export function PactCard({
         view={data}
         onCommitted={(next) => mutate(next, { revalidate: false })}
         onUpgrade={() => setPlusOpen(true)}
+      />
+
+      <PactShieldSheet
+        open={shieldOpen}
+        onClose={() => setShieldOpen(false)}
+        view={data}
+        onChanged={(next) => mutate(next, { revalidate: false })}
       />
 
       <PlusUpgradeModal

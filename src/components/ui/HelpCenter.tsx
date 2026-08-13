@@ -166,7 +166,7 @@ const HELP_CATEGORIES: HelpCategory[] = [
     items: [
       {
         q: 'What is Frogress Plus?',
-        a: 'Plus is an optional subscription. You write your own weekly pact instead of choosing from three, get four streak shields a month, can change your area mid-week without losing your streak, unlock premium reward tracks, and earn double rewards.',
+        a: 'Plus is an optional subscription. You write your own weekly pact instead of choosing from three, can hold two streak shields instead of one, can change your area mid-week without losing your streak, unlock premium reward tracks, and earn double rewards.',
       },
       {
         q: 'How do I get Plus?',
