@@ -262,9 +262,11 @@ function rewardQuantityLabel(reward: any): string {
     if (reward.amountMode === 'random') {
       const min = Math.max(1, reward.minAmount ?? 1);
       const max = Math.max(min, reward.maxAmount ?? min);
-      return min === max ? String(max) : `${min}-${max}`;
+      return min === max
+        ? max.toLocaleString()
+        : `${min.toLocaleString()}-${max.toLocaleString()}`;
     }
-    return String(Math.max(0, reward.amount ?? 0));
+    return Math.max(0, reward.amount ?? 0).toLocaleString();
   }
   const base = reward?.amount && reward.amount > 1 ? reward.amount : 1;
   return `x${base}`;

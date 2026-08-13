@@ -35,8 +35,7 @@ export function PactStripRow({ view }: { view: PactView }) {
   // A guide that says "tap the fly" on a day with no session sends the user
   // hunting for a task that is not there. On those days the hint reports when
   // the next one lands and drops Show me entirely.
-  const todayDow = new Date().getDay();
-  const sessionToday = active.days.includes(todayDow);
+  const sessionToday = active.openToday;
 
   const claim = async () => {
     if (claiming) return;

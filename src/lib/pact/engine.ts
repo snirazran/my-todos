@@ -749,6 +749,15 @@ export async function getPactView(args: {
     const upcoming = Array.from(new Set(activeDoc.days))
       .sort((a, b) => a - b)
       .find((d) => ((d - todayDow + 7) % 7) <= 6);
+    const pactTaskIds = new Set(activeDoc.taskIds ?? []);
+    const openToday =
+      activeDoc.days.includes(todayDow) &&
+      tasks.some(
+        (task) =>
+          pactTaskIds.has(task.id) &&
+          task.dayOfWeek === todayDow &&
+          !(task.completedDates ?? []).includes(todayKey),
+      );
     active = {
       id: activeDoc.pactId,
       weekKey: activeDoc.weekKey,
@@ -771,6 +780,7 @@ export async function getPactView(args: {
       daysLeft: Math.max(0, daysBetween(todayKey, weekEnd)),
       shieldUsed: activeDoc.shieldUsed,
       tagId: activeDoc.tagId,
+      openToday,
       nextTaskLabel:
         upcoming === undefined
           ? null
@@ -790,6 +800,24 @@ export async function getPactView(args: {
       color: String(tag?.color ?? '#22c55e'),
     }))
     .filter((tag: PactUserTag) => tag.id && tag.name);
+  const areaByTagId = new Map<string, { id: string; name: string }>();
+  for (const [categoryId, ids] of Array.from(tagMap.entries())) {
+    const cat = categories.find((c) => c.categoryId === categoryId);
+    if (!cat) continue;
+    for (const id of ids) {
+      areaByTagId.set(id, {
+        id: categoryId,
+        name: cat.shortLabel || cat.name,
+      });
+    }
+  }
+  for (const tag of userTags) {
+    const linked = areaByTagId.get(tag.id);
+    if (linked) {
+      tag.linkedCategoryId = linked.id;
+      tag.linkedAreaName = linked.name;
+    }
+  }
   const userTagsById = new Map<string, PactUserTag>(
     userTags.map((tag) => [tag.id, tag] as const),
   );

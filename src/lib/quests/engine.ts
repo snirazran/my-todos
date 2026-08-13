@@ -613,7 +613,7 @@ function enforceLadderShape(
 function resolveRewardAmount(reward: QuestReward, seed: string) {
   const amountMode = reward.amountMode ?? 'fixed';
   if (amountMode === 'fixed') {
-    return Math.max(1, reward.amount ?? 1);
+    return Math.min(MAX_REWARD_FLIES, Math.max(1, reward.amount ?? 1));
   }
 
   const min = Math.max(1, Math.min(reward.minAmount ?? 1, reward.maxAmount ?? 1));
@@ -713,14 +713,32 @@ function progressForLogicBlock(args: {
   );
 }
 
+// No authored reward is anywhere near this. An amount that escapes it came
+// from bad data, not a decision, and unbounded it would both print as a
+// nonsense badge and pay out for real.
+export const MAX_REWARD_FLIES = 10_000;
+
+function clampFlies(value: unknown): number | undefined {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return undefined;
+  return Math.min(MAX_REWARD_FLIES, Math.max(0, Math.floor(n)));
+}
+
 function sanitizeReward(reward: QuestReward) {
   const next: QuestReward = {
     type: reward.type,
   };
-  if (typeof reward.amount === 'number') next.amount = reward.amount;
+  const flies = reward.type === 'FLIES';
+  if (typeof reward.amount === 'number') {
+    next.amount = flies ? clampFlies(reward.amount) : reward.amount;
+  }
   if (reward.amountMode) next.amountMode = reward.amountMode;
-  if (typeof reward.minAmount === 'number') next.minAmount = reward.minAmount;
-  if (typeof reward.maxAmount === 'number') next.maxAmount = reward.maxAmount;
+  if (typeof reward.minAmount === 'number') {
+    next.minAmount = flies ? clampFlies(reward.minAmount) : reward.minAmount;
+  }
+  if (typeof reward.maxAmount === 'number') {
+    next.maxAmount = flies ? clampFlies(reward.maxAmount) : reward.maxAmount;
+  }
   if (reward.itemId) next.itemId = reward.itemId;
   if (reward.backgroundId) next.backgroundId = reward.backgroundId;
   return next;
@@ -748,7 +766,13 @@ function sanitizeRewardSet(rewards: unknown): QuestRewards {
 function scaleFlyReward(reward: QuestReward, scale: number): QuestReward {
   if (reward.type !== 'FLIES' || scale <= 1) return reward;
   const amount = Math.max(1, reward.amount ?? 1);
-  return { ...reward, amount: Math.max(amount, Math.round(amount * scale)) };
+  return {
+    ...reward,
+    amount: Math.min(
+      MAX_REWARD_FLIES,
+      Math.max(amount, Math.round(amount * scale)),
+    ),
+  };
 }
 
 function resolveReward(reward: QuestReward, seed: string): QuestReward {

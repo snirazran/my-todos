@@ -101,7 +101,14 @@ export type PactAreaChoice = {
   tagColor?: string;
 };
 
-export type PactUserTag = { id: string; name: string; color: string };
+export type PactUserTag = {
+  id: string;
+  name: string;
+  color: string;
+  /** Focus area this tag is already connected to, if any. */
+  linkedCategoryId?: string;
+  linkedAreaName?: string;
+};
 
 export type ActivePactView = {
   id: string;
@@ -125,6 +132,8 @@ export type ActivePactView = {
   daysLeft: number;
   shieldUsed: boolean;
   nextTaskLabel: string | null;
+  /** A session is scheduled today and is still open. */
+  openToday: boolean;
   /** Area tag on this pact's tasks, for hint targeting. */
   tagId?: string;
 };

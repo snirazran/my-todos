@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   Check,
   Loader2,
+  Lock,
   Pencil,
   Play,
   Sparkles,
@@ -571,7 +572,7 @@ export function PactPickSheet({
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-3 rounded-2xl border border-border/60 bg-card/60 p-4">
+                <div className="flex min-w-0 flex-col gap-3 rounded-2xl border border-border/60 bg-card/60 p-4">
                   <div>
                     <p className="mb-2 text-[11px] font-black uppercase tracking-wider text-muted-foreground">
                       Days
@@ -637,7 +638,7 @@ export function PactPickSheet({
                                     [day]: event.target.value,
                                   }))
                                 }
-                                className="h-9 flex-1 rounded-lg bg-transparent text-[15px] font-bold text-foreground outline-none"
+                                className="box-border h-9 w-full min-w-0 flex-1 rounded-lg bg-transparent text-[15px] font-bold text-foreground outline-none"
                               />
                             </label>
                           ))}
@@ -647,7 +648,7 @@ export function PactPickSheet({
                         type="time"
                         value={startTime}
                         onChange={(event) => setStartTime(event.target.value)}
-                        className="h-11 w-full rounded-xl border border-border/60 bg-background px-3 text-[15px] font-bold text-foreground outline-none focus:border-primary"
+                        className="box-border h-11 w-full min-w-0 max-w-full rounded-xl border border-border/60 bg-background px-3 text-[15px] font-bold text-foreground outline-none focus:border-primary"
                       />
                     )}
                   </div>
@@ -703,28 +704,52 @@ export function PactPickSheet({
                   })()}
                   {pickingTag && (
                     <div className="flex flex-wrap gap-1.5 rounded-xl bg-muted/40 p-2">
-                      {view.userTags.map((tag) => (
-                        <button
-                          key={tag.id}
-                          type="button"
-                          onClick={() => {
-                            setTagId(tag.id);
-                            setPickingTag(false);
-                          }}
-                          className={cn(
-                            'max-w-[10rem] truncate rounded-lg px-2.5 py-1 text-[12px] font-black transition',
-                            (tagId ?? area.tagId) === tag.id
-                              ? 'ring-2 ring-primary'
-                              : 'opacity-80 hover:opacity-100',
-                          )}
-                          style={{
-                            backgroundColor: `${tag.color}22`,
-                            color: tag.color,
-                          }}
-                        >
-                          {tag.name}
-                        </button>
-                      ))}
+                      {view.userTags.map((tag) => {
+                        const takenByOther =
+                          !!tag.linkedCategoryId &&
+                          tag.linkedCategoryId !== area.categoryId;
+                        const locked = takenByOther && !view.isPremium;
+                        return (
+                          <button
+                            key={tag.id}
+                            type="button"
+                            disabled={locked}
+                            title={
+                              takenByOther
+                                ? `Connected to ${tag.linkedAreaName}`
+                                : undefined
+                            }
+                            onClick={() => {
+                              if (locked) {
+                                onUpgrade();
+                                return;
+                              }
+                              setTagId(tag.id);
+                              setPickingTag(false);
+                            }}
+                            className={cn(
+                              'inline-flex max-w-[10rem] items-center gap-1 truncate rounded-lg px-2.5 py-1 text-[12px] font-black transition',
+                              locked && 'cursor-not-allowed opacity-40',
+                              !locked &&
+                                ((tagId ?? area.tagId) === tag.id
+                                  ? 'ring-2 ring-primary'
+                                  : 'opacity-80 hover:opacity-100'),
+                            )}
+                            style={{
+                              backgroundColor: `${tag.color}22`,
+                              color: tag.color,
+                            }}
+                          >
+                            {locked && (
+                              <Lock
+                                className="h-3 w-3 shrink-0"
+                                strokeWidth={3}
+                              />
+                            )}
+                            {tag.name}
+                          </button>
+                        );
+                      })}
                     </div>
                   )}
                 </div>

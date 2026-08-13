@@ -125,10 +125,15 @@ export function NextQuestStrip({
       ? pactView
       : null;
   const pactReady = !!livePact?.active?.claimable && !livePact.active.claimed;
-  // Onboarding is the one thing that outranks a running pact: it teaches the
-  // app, it is finite, and burying it leaves a new user stuck on step one.
   const onboardingPending = nextUp?.placement === 'onboarding';
-  if (livePact && (pactReady || (!claimable && !onboardingPending))) {
+  // The slot goes to whatever the user can act on now. A pact with no session
+  // today, or today's session already done, is not actionable — holding the
+  // slot then hides the daily quests that are.
+  const pactActionable = !!livePact?.active?.openToday;
+  if (
+    livePact &&
+    (pactReady || (pactActionable && !claimable && !onboardingPending))
+  ) {
     return <PactStripRow view={livePact} />;
   }
 
