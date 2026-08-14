@@ -952,6 +952,35 @@ function rollBonusRewards(
   return granted;
 }
 
+function rollSlotRewards(slot: RecipeSlot, seedBase: string): QuestRewards {
+  return [
+    ...pickSlotReward(slot.rewards, `${seedBase}:reward`),
+    ...rollBonusRewards(slot.bonusRewards, `${seedBase}:bonus`),
+  ];
+}
+
+function backfillAuthoredRewards(args: {
+  logic: QuestLogicBlock[];
+  slots: RecipeSlot[];
+  userId: string;
+  templateId: string;
+}): QuestLogicBlock[] {
+  const { logic, slots, userId, templateId } = args;
+  return logic.map((block) => {
+    if (block.baseRewards?.length) return block;
+    const match = /^slot-(\d+)$/.exec(block.id);
+    const index = match ? Number(match[1]) - 1 : -1;
+    const slot = index >= 0 ? slots[index] : undefined;
+    if (!slot) return block;
+    const authored = rollSlotRewards(
+      slot,
+      `${userId}:${templateId}:slot:${index}`,
+    );
+    if (authored.length === 0) return block;
+    return { ...block, baseRewards: authored, rewards: authored };
+  });
+}
+
 // Streak pool entries roll their day requirement from the admin-configured
 // range; the rolled length is baked into the metric key (task_streak_N).
 function resolveRecipeMetricKey(
@@ -1504,21 +1533,23 @@ async function syncQuestForTemplate(args: {
       ? target
       : Math.max(0, rawProgress - progressOffset);
     const payScale = Math.max(1, baselineScaleForBlock(block, baseline));
-    const resolvedRewards = (block.rewards ?? [])
-      .filter((r): r is QuestReward => isSupportedReward(r as { type?: string }))
-      .map((r, ri) =>
-        scaleFlyReward(
-          resolveReward(
-            r,
-            `${userId}:${template.templateId}:${windowKey}:${doc.rollKey}:obj-reward:${block.id}:${ri}`,
-          ),
-          payScale,
+    const authoredRewards = (block.baseRewards ?? block.rewards ?? []).filter(
+      (r): r is QuestReward => isSupportedReward(r as { type?: string }),
+    );
+    const resolvedRewards = authoredRewards.map((r, ri) =>
+      scaleFlyReward(
+        resolveReward(
+          r,
+          `${userId}:${template.templateId}:${windowKey}:${doc.rollKey}:obj-reward:${block.id}:${ri}`,
         ),
-      );
+        payScale,
+      ),
+    );
     return {
       ...resolvedBlock,
       progress,
       progressOffset,
+      baseRewards: authoredRewards.length > 0 ? authoredRewards : undefined,
       rewards: resolvedRewards.length > 0 ? resolvedRewards : undefined,
     };
   });
@@ -1736,7 +1767,12 @@ export async function syncQuestState(args: {
       (doc) => doc.placement === 'daily' && doc.templateId === templateId,
     );
     const rolledLogic = frozenDaily?.logic?.length
-      ? (frozenDaily.logic as QuestLogicBlock[])
+      ? backfillAuthoredRewards({
+          logic: frozenDaily.logic as QuestLogicBlock[],
+          slots: (dailyRecipe.slots ?? []) as RecipeSlot[],
+          userId,
+          templateId,
+        })
       : (dailyRecipe.slots as RecipeSlot[])
       .map((slot, index) => {
         const pool = buildEligiblePool({
@@ -1770,16 +1806,10 @@ export async function syncQuestState(args: {
             ? resolveRecipeMetricKey(pick, `${userId}:${templateId}:slot:${index}:streak`)
             : undefined,
           ...recipePickModifiers(pick),
-          rewards: [
-            ...pickSlotReward(
-              slot.rewards,
-              `${userId}:${templateId}:slot:${index}:reward`,
-            ),
-            ...rollBonusRewards(
-              slot.bonusRewards,
-              `${userId}:${templateId}:slot:${index}:bonus`,
-            ),
-          ],
+          rewards: rollSlotRewards(
+            slot,
+            `${userId}:${templateId}:slot:${index}`,
+          ),
         };
         return block;
       })
@@ -1957,7 +1987,12 @@ export async function syncQuestState(args: {
       // Same freeze as the daily roll: a live doc keeps its rolled logic so
       // pool eligibility changes can't swap objectives mid-roll.
       const logic = existing?.logic?.length
-        ? (existing.logic as QuestLogicBlock[])
+        ? backfillAuthoredRewards({
+            logic: existing.logic as QuestLogicBlock[],
+            slots: (recipe.slots ?? []) as RecipeSlot[],
+            userId,
+            templateId,
+          })
         : (recipe.slots as RecipeSlot[])
         .map((slot, index) => {
           const pool = buildEligiblePool({
@@ -1996,16 +2031,10 @@ export async function syncQuestState(args: {
                 : 'ignore',
             metricKey,
             ...recipePickModifiers(pick),
-            rewards: [
-              ...pickSlotReward(
-                slot.rewards,
-                `${userId}:${templateId}:slot:${index}:reward`,
-              ),
-              ...rollBonusRewards(
-                slot.bonusRewards,
-                `${userId}:${templateId}:slot:${index}:bonus`,
-              ),
-            ],
+            rewards: rollSlotRewards(
+              slot,
+              `${userId}:${templateId}:slot:${index}`,
+            ),
           };
           return block;
         })

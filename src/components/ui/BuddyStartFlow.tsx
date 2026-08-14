@@ -75,14 +75,12 @@ export function BuddyStartFlow({
     }
   }, [open, friends.length, source]);
 
-  if (!open) return null;
-
   const backToChoose = friends.length > 0 ? () => setMode('choose') : null;
 
   return (
     <>
       <ChooseSheet
-        open={mode === 'choose'}
+        open={open && mode === 'choose'}
         friends={friends}
         onClose={onClose}
         onPick={(f) => {
@@ -105,7 +103,7 @@ export function BuddyStartFlow({
 
       {picked && (
         <BuddyUpFlow
-          open={mode === 'picked'}
+          open={open && mode === 'picked'}
           friend={picked}
           onClose={onClose}
           onBack={backToChoose}
@@ -114,7 +112,7 @@ export function BuddyStartFlow({
 
       {visitedInvite && (
         <BuddyInviteFlow
-          open={mode === 'invite'}
+          open={open && mode === 'invite'}
           indices={indices}
           onClose={onClose}
           onBack={backToChoose}

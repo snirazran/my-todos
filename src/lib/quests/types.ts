@@ -58,6 +58,8 @@ export type QuestLogicBlock = {
   // carries over from a previous roll that got far enough to earn one.
   preCredited?: boolean;
   rewards?: QuestRewards;
+  // The authored reward, before scaling. `rewards` holds the resolved payout.
+  baseRewards?: QuestRewards;
 };
 
 export type QuestVisibilityCondition = {
