@@ -8,7 +8,7 @@ import QuestRecipeModel, {
   type RecipePoolEntry,
   type RecipeSlot,
 } from '@/lib/models/QuestRecipe';
-import { ensureDefaultQuestRecipe } from '@/lib/quests/recipeDefaults';
+import { ensureDefaultDailyRecipe } from '@/lib/quests/recipeDefaults';
 import { isValidQuestMetricKey } from '@/lib/quests/metrics';
 import { sanitizeRewards } from '@/app/api/admin/quests/route';
 import {
@@ -114,10 +114,7 @@ function recipeToJSON(recipe: QuestRecipeDoc) {
   return {
     recipeId: recipe.recipeId,
     name: recipe.name,
-    placement: recipe.placement ?? 'category',
     isActive: recipe.isActive,
-    durationMinutes: recipe.durationMinutes,
-    categoryIds: recipe.categoryIds ?? [],
     coverImageUrl: recipe.coverImageUrl,
     slots: recipe.slots ?? [],
   };
@@ -130,24 +127,14 @@ function parseRecipeBody(body: any) {
   if (slots.length === 0) {
     return { error: 'Add at least one slot with a pool entry and a reward' };
   }
-  const durationMinutes = Math.floor(Number(body?.durationMinutes));
   return {
     value: {
       name:
         typeof body?.name === 'string' && body.name.trim()
           ? body.name.trim()
-          : 'Focus Ladder',
-      placement: body?.placement === 'daily' ? ('daily' as const) : ('category' as const),
+          : 'Daily Roll',
+      placement: 'daily' as const,
       isActive: body?.isActive !== false,
-      durationMinutes:
-        Number.isFinite(durationMinutes) && durationMinutes > 0
-          ? durationMinutes
-          : 3 * 24 * 60,
-      categoryIds: Array.isArray(body?.categoryIds)
-        ? body.categoryIds.filter(
-            (id: unknown): id is string => typeof id === 'string' && !!id,
-          )
-        : [],
       slots,
     },
   };
@@ -157,8 +144,8 @@ export async function GET() {
   try {
     await requireUserId();
     await connectMongo();
-    await ensureDefaultQuestRecipe();
-    const recipes = await QuestRecipeModel.find()
+    await ensureDefaultDailyRecipe();
+    const recipes = await QuestRecipeModel.find({ placement: 'daily' })
       .sort({ createdAt: 1 })
       .lean<QuestRecipeDoc[]>();
     return NextResponse.json({ recipes: recipes.map(recipeToJSON) });

@@ -168,8 +168,6 @@ export function objectiveHintText(
     requiresFollowThrough?: boolean;
     beforeHour?: number;
   },
-  focusTagName?: string,
-  options?: { omitTagScope?: boolean },
 ): string {
   // A metric fully determines the action, so its copy outranks helpText:
   // re-pointing a block at another metric in the admin leaves the old text
@@ -181,22 +179,13 @@ export function objectiveHintText(
       : undefined;
   if (block.helpText && !metricCopy) return block.helpText;
 
-  const usesFocusTags = block.tagMode === 'focus_category_tags';
-  const tagName = usesFocusTags
-    ? focusTagName
-    : block.resolvedTagNames?.[0] ?? block.resolvedTagName;
+  const tagName = block.resolvedTagNames?.[0] ?? block.resolvedTagName;
   const tagScoped =
-    usesFocusTags ||
     !!block.resolvedTagName ||
     (block.resolvedTagNames?.length ?? 0) > 0 ||
     !!block.previewTagLabel;
-  const scopeSuffix = !tagScoped
-    ? ''
-    : tagName
-      ? options?.omitTagScope
-        ? ''
-        : ` Only tasks tagged “${tagName}” count.`
-      : ' Tap Start quest on the area card first.';
+  const scopeSuffix =
+    tagScoped && tagName ? ` Only tasks tagged “${tagName}” count.` : '';
 
   if (block.type === 'focus_minutes') {
     return `Start a focus timer on a task — every focused minute counts.${scopeSuffix}`;

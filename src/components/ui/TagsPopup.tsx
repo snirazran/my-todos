@@ -65,7 +65,6 @@ export default function TagsPopup({
   });
 
   const { data: questContext } = useSWR<{
-    activeFocusCategoryId?: string | null;
     onboarding?: {
       selectedCategoryIds?: string[];
       categoryTagMap?: { categoryId: string; tagIds: string[] }[];
@@ -83,13 +82,9 @@ export default function TagsPopup({
   const questTagIds = useMemo(() => {
     const tagMap = questContext?.onboarding?.categoryTagMap;
     const focusIds = questContext?.onboarding?.selectedCategoryIds;
-    const activeFocusCategoryId = questContext?.activeFocusCategoryId ?? null;
     const ids = new Set<string>();
     for (const entry of tagMap ?? []) {
       if (focusIds && !focusIds.includes(entry.categoryId)) continue;
-      if (activeFocusCategoryId && entry.categoryId !== activeFocusCategoryId) {
-        continue;
-      }
       for (const id of entry.tagIds) ids.add(id);
     }
     return ids;

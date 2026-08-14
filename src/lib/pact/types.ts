@@ -1,24 +1,15 @@
 import type { QuestRewards } from '@/lib/quests/types';
 
-export type PactSizeTier = 'starter' | 'steady' | 'strong';
-
-export const PACT_SIZE_TIERS: PactSizeTier[] = ['starter', 'steady', 'strong'];
-
 /**
- * Three options, one per effort tier. Choice overload is contested in general
- * (the jam study largely fails to replicate) but reproduces reliably under
- * Chernev's moderators — high preference uncertainty, multi-attribute options,
- * a committed choice, an effort-minimising goal — all of which describe this
- * screen exactly. "Write my own" carries anyone who wants something else.
+ * Three options, one per step up the session ladder. Choice overload is
+ * contested in general (the jam study largely fails to replicate) but
+ * reproduces reliably under Chernev's moderators — high preference
+ * uncertainty, multi-attribute options, a committed choice, an
+ * effort-minimising goal — all of which describe this screen exactly.
+ * "Write my own" carries anyone who wants something else.
  */
 export const PRIMARY_OPTIONS = 3;
 export const MAX_OPTIONS = 3;
-
-export const PACT_SIZE_LABEL: Record<PactSizeTier, string> = {
-  starter: 'Easy',
-  steady: 'Steady',
-  strong: 'Push',
-};
 
 export const PACT_MAX_SESSIONS = 7;
 
@@ -74,7 +65,6 @@ export type PactSuggestion = {
   days?: number[];
   startTime?: string;
   minutes?: number;
-  tier: PactSizeTier;
   isActive: boolean;
   generated?: boolean;
   picked: number;
@@ -124,8 +114,6 @@ export type PactOption = {
   startTime: string;
   /** Sessions a week — what the option asks for, and what it is priced on. */
   sessions: number;
-  tier: PactSizeTier;
-  tierLabel: string;
   taskCount: number;
   rewardFlies: number;
   scheduleLabel: string;

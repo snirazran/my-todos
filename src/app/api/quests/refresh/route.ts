@@ -8,15 +8,13 @@ export async function POST(req: NextRequest) {
     const userId = await requireUserId();
     const body = await req.json().catch(() => ({}));
     const timezone = body.timezone || 'UTC';
-    const scope = body.scope === 'focus' ? 'focus' : 'daily';
 
     await connectMongo();
     const dashboard = await syncQuestState({
       userId,
       timezone,
-      refreshDaily: scope === 'daily',
-      refreshFocus: scope === 'focus',
-      dailySelectionSeed: scope === 'daily' ? `${Date.now()}` : undefined,
+      refreshDaily: true,
+      dailySelectionSeed: `${Date.now()}`,
     });
 
     const withCover = <T extends { templateId?: string; coverImageUrl?: string }>(
@@ -31,9 +29,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       ok: true,
-      scope,
       dailyQuests: dashboard.dailyQuests.map(withCover),
-      categoryQuests: dashboard.categoryQuests.map(withCover),
     });
   } catch (error) {
     return NextResponse.json(

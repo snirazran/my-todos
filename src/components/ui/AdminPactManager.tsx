@@ -4,16 +4,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Loader2, Plus, Sparkles, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import {
-  PACT_SIZE_LABEL,
-  PACT_SIZE_TIERS,
-  suggestionSessions,
-} from '@/lib/pact/types';
-import type {
-  PactConfigView,
-  PactSizeTier,
-  PactSuggestion,
-} from '@/lib/pact/types';
+import { suggestionSessions } from '@/lib/pact/types';
+import type { PactConfigView, PactSuggestion } from '@/lib/pact/types';
 
 const SESSION_CHOICES = [1, 2, 3, 4, 5, 6, 7];
 
@@ -127,7 +119,6 @@ export function AdminPactManager() {
                 categoryId: activeCategoryId,
                 text: '',
                 sessions: 3,
-                tier: 'steady' as PactSizeTier,
                 isActive: true,
                 picked: 0,
                 kept: 0,
@@ -467,21 +458,6 @@ export function AdminPactManager() {
                   }
                   className={cn(inputClass, 'min-w-0 flex-1')}
                 />
-                <select
-                  value={entry.tier}
-                  onChange={(event) =>
-                    patchSuggestion(entry.id, {
-                      tier: event.target.value as PactSizeTier,
-                    })
-                  }
-                  className={inputClass}
-                >
-                  {PACT_SIZE_TIERS.map((tier) => (
-                    <option key={tier} value={tier}>
-                      {PACT_SIZE_LABEL[tier]}
-                    </option>
-                  ))}
-                </select>
                 <button
                   type="button"
                   onClick={() => removeSuggestion(entry.id)}

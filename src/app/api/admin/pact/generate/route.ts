@@ -24,9 +24,8 @@ const SUGGESTION_SCHEMA = {
           // Structured outputs reject numeric bounds (minimum/maximum), so the
           // range is expressed as the enum of allowed session counts.
           sessions: { type: 'integer', enum: [1, 2, 3, 4, 5, 6, 7] },
-          tier: { type: 'string', enum: ['starter', 'steady', 'strong'] },
         },
-        required: ['text', 'sessions', 'tier'],
+        required: ['text', 'sessions'],
         additionalProperties: false,
       },
     },
@@ -76,7 +75,7 @@ export async function POST(req: NextRequest) {
             existing.length
               ? `Do not repeat these existing ideas: ${existing.join('; ')}`
               : '',
-            'Write 6 commitments: 2 tier "starter" (small, under 15 minutes, 1-2 sessions a week), 2 tier "steady" (moderate, 3 sessions), 2 tier "strong" (demanding, 4-5 sessions).',
+            'Write 6 commitments spread across the effort range: 2 small (under 15 minutes, 1-2 sessions a week), 2 moderate (3 sessions), 2 demanding (4-5 sessions).',
             'sessions is how many times that week the action happens, 1 to 7. If a duration is part of the action, put it in the text ("Take a 20-minute walk"), not in a separate field.',
           ]
             .filter(Boolean)
@@ -112,10 +111,6 @@ export async function POST(req: NextRequest) {
           categoryId,
           text,
           sessions: suggestionSessions(entry ?? {}),
-          tier:
-            entry?.tier === 'starter' || entry?.tier === 'strong'
-              ? entry.tier
-              : 'steady',
           isActive: false,
           generated: true,
           picked: 0,

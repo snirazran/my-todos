@@ -565,9 +565,7 @@ export function guideIdForBlock(block: {
   metricKey?: string;
   tagMode?: string;
 }): string | null {
-  const tagScoped =
-    block.tagMode === 'focus_category_tags' ||
-    block.tagMode === 'random_user_tag';
+  const tagScoped = block.tagMode === 'random_user_tag';
   if (block.type === 'focus_minutes' || block.type === 'deep_session') {
     return tagScoped ? 'focus-tagged' : 'focus';
   }

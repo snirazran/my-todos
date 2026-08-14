@@ -33,7 +33,6 @@ import type { UserDoc } from '@/lib/types/UserDoc';
 import {
   DEFAULT_PACT_START_TIME,
   MAX_OPTIONS,
-  PACT_SIZE_LABEL,
   PRIMARY_OPTIONS,
   daysForSessions,
   suggestionSessions,
@@ -41,7 +40,6 @@ import {
   type PactAreaChoice,
   type PactMilestone,
   type PactOption,
-  type PactSizeTier,
   type PactStreakView,
   type PactSuggestion,
   type PactUserTag,
@@ -254,10 +252,10 @@ export function pactComebackFlies(config: PactConfigDoc) {
 
 /**
  * What a week is worth end to end, for previews only — sessions are paid as
- * they happen and the bonus lands on the last one. Deliberately blind to tier:
- * a difficulty nobody can verify must never move the rate, or the
- * hardest-labelled option becomes strictly dominant. Ambition is priced in
- * sessions, which is the one unit of effort the app can actually see.
+ * they happen and the bonus lands on the last one. Deliberately blind to how
+ * hard an idea claims to be: a difficulty nobody can verify must never move the
+ * rate, or the hardest-labelled option becomes strictly dominant. Ambition is
+ * priced in sessions, which is the one unit of effort the app can actually see.
  */
 export function optionRewardFlies(config: PactConfigDoc, days: number[]) {
   const taskCount = Math.max(1, new Set(days).size);
@@ -280,8 +278,6 @@ function suggestionToOption(
     days,
     startTime: DEFAULT_PACT_START_TIME,
     sessions,
-    tier: suggestion.tier,
-    tierLabel: PACT_SIZE_LABEL[suggestion.tier],
     taskCount: sessions,
     rewardFlies: optionRewardFlies(config, days),
     scheduleLabel: scheduleLabel(days, DEFAULT_PACT_START_TIME),
@@ -294,40 +290,22 @@ function suggestionToOption(
 function universalFallbacks(
   categoryId: string,
   areaName: string,
-  quickAdd: string[] = [],
 ): PactSuggestion[] {
   const label = areaName.trim();
-  const base = (
-    tier: PactSizeTier,
-    text: string,
-    sessions: number,
-  ): PactSuggestion => ({
-    id: `fallback-${categoryId}-${tier}`,
+  const base = (text: string, sessions: number): PactSuggestion => ({
+    id: `fallback-${categoryId}-${sessions}`,
     categoryId,
     text,
     sessions,
-    tier,
     isActive: true,
     picked: 0,
     kept: 0,
   });
 
-  // An area's own quick-add suggestions are already authored, area-specific
-  // task titles — far better than anything generic we could compose.
-  if (quickAdd.length > 0) {
-    const tiers: PactSizeTier[] = ['starter', 'steady', 'strong'];
-    const sessions = [2, 3, 5];
-    return quickAdd
-      .slice(0, 3)
-      .map((text, index) =>
-        base(tiers[index] ?? 'steady', text, sessions[index] ?? 3),
-      );
-  }
-
   return [
-    base('starter', `15-minute ${label} session`, 2),
-    base('steady', `25-minute ${label} session`, 3),
-    base('strong', `45-minute ${label} session`, 5),
+    base(`15-minute ${label} session`, 2),
+    base(`25-minute ${label} session`, 3),
+    base(`45-minute ${label} session`, 5),
   ];
 }
 
@@ -341,7 +319,6 @@ export function buildOptionsForArea(args: {
   categoryId: string;
   areaName: string;
   weeksKept: number;
-  quickAdd?: string[];
   lastPact?: PactDoc | null;
 }): PactOption[] {
   const { config, categoryId, areaName, weeksKept, lastPact } = args;
@@ -351,7 +328,7 @@ export function buildOptionsForArea(args: {
   const pool =
     library.length > 0
       ? library
-      : universalFallbacks(categoryId, areaName, args.quickAdd);
+      : universalFallbacks(categoryId, areaName);
 
   // Sessions are what the week is priced on, so the menu has to ladder by
   // them. Ranking by an authored difficulty label instead produced menus whose
@@ -414,8 +391,6 @@ export function buildOptionsForArea(args: {
       days: lastPact.days,
       startTime: lastPact.startTime,
       sessions: new Set(lastPact.days).size,
-      tier: lastPact.tier,
-      tierLabel: PACT_SIZE_LABEL[lastPact.tier],
       taskCount: new Set(lastPact.days).size,
       rewardFlies: optionRewardFlies(config, lastPact.days),
       scheduleLabel: scheduleLabel(lastPact.days, lastPact.startTime),
@@ -1094,9 +1069,6 @@ export async function getAreaOptions(args: {
     categoryId,
     areaName: category?.shortLabel || category?.name || 'this area',
     weeksKept: streak.areaWeeks[categoryId] ?? 0,
-    quickAdd: (category?.quickAddSuggestions ?? [])
-      .map((entry) => entry?.text?.trim())
-      .filter((text): text is string => !!text),
     lastPact,
   });
 }

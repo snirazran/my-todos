@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminUserId as requireUserId } from '@/lib/adminAuth';
 import connectMongo from '@/lib/mongoose';
 import QuestTemplateModel from '@/lib/models/QuestTemplate';
-import QuestCategoryModel from '@/lib/models/QuestCategory';
 import { templateToView } from '@/lib/quests/engine';
 import { QUEST_METRIC_KEYS } from '@/lib/quests/metrics';
 import {
@@ -29,11 +28,7 @@ import type {
 const json = (body: unknown, status = 200) =>
   NextResponse.json(body, { status });
 
-const VALID_PLACEMENTS = new Set<QuestPlacement>([
-  'daily',
-  'category',
-  'onboarding',
-]);
+const VALID_PLACEMENTS = new Set<QuestPlacement>(['onboarding']);
 const VALID_LOGIC_TYPES = new Set<QuestLogicType>([
   'count',
   'focus_minutes',
@@ -128,12 +123,7 @@ function sanitizeLogicBlock(input: any): QuestLogicBlock | null {
     type: input.type,
     subject: input.subject,
     amountMode: input.amountMode,
-    tagMode:
-      input.tagMode === 'random_user_tag'
-        ? 'random_user_tag'
-        : input.tagMode === 'focus_category_tags'
-          ? 'focus_category_tags'
-          : 'ignore',
+    tagMode: input.tagMode === 'random_user_tag' ? 'random_user_tag' : 'ignore',
   };
 
   if (block.type === 'count') {
@@ -205,21 +195,11 @@ function sanitizeVisibilityCondition(input: any): QuestVisibilityCondition | nul
   };
 }
 
-function sanitizeDurationMinutes(input: any) {
-  const numeric = Number(input);
-  if (!Number.isFinite(numeric) || numeric <= 0) return undefined;
-  return Math.min(Math.floor(numeric), 525_600);
-}
-
 function sanitizeTemplateBody(body: any) {
   const name = typeof body?.name === 'string' ? body.name.trim() : '';
   const description =
     typeof body?.description === 'string' ? body.description.trim() : '';
   const placement = body?.placement as QuestPlacement;
-  const categoryId =
-    typeof body?.categoryId === 'string' && body.categoryId.trim()
-      ? body.categoryId.trim()
-      : undefined;
   // Accept a freshly-uploaded data URL (new image) or our existing proxy URL
   // (an edit that leaves the cover unchanged). Anything else clears the cover.
   const coverImageUrl =
@@ -235,55 +215,34 @@ function sanitizeTemplateBody(body: any) {
     ? body.visibilityConditions.map(sanitizeVisibilityCondition).filter(Boolean)
     : [];
   const isActive = body?.isActive !== false;
-  const durationMinutes = sanitizeDurationMinutes(body?.durationMinutes);
 
   if (!name) return { error: 'Quest name is required' };
   if (!VALID_PLACEMENTS.has(placement)) return { error: 'Invalid placement' };
-  if (placement === 'category' && !categoryId) {
-    return { error: 'A category quest needs a valid category' };
-  }
   if (!logic.length) return { error: 'Add at least one logic block' };
   if ((logic as QuestLogicBlock[]).some((b) => !(b.rewards?.length ?? 0))) {
     return { error: 'Each objective needs at least one reward' };
   }
-
-  const normalizedLogic: QuestLogicBlock[] = (logic as QuestLogicBlock[]).map(
-    (block): QuestLogicBlock => {
-      if (placement === 'category') {
-        return { ...block, tagMode: 'focus_category_tags' as const };
-      }
-
-      return block.tagMode !== 'focus_category_tags'
-        ? block
-        : { ...block, tagMode: 'ignore' as const };
-    },
-  );
 
   return {
     payload: {
       name,
       description,
       placement,
-      categoryId: placement === 'category' ? categoryId : undefined,
-      durationMinutes: placement === 'category' ? durationMinutes : undefined,
       coverImageUrl,
-      logic: normalizedLogic,
+      logic: logic as QuestLogicBlock[],
       visibilityConditions: visibilityConditions as QuestVisibilityCondition[],
       isActive,
     },
   };
 }
 
-async function categoryExists(categoryId: string | undefined) {
-  if (!categoryId) return false;
-  return !!(await QuestCategoryModel.exists({ categoryId }));
-}
-
 export async function GET() {
   try {
     await requireUserId();
     await connectMongo();
-    const templates = await QuestTemplateModel.find({}).lean();
+    const templates = await QuestTemplateModel.find({
+      placement: 'onboarding',
+    }).lean();
     templates.sort(
       (a, b) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
@@ -302,13 +261,6 @@ export async function POST(req: NextRequest) {
     if ('error' in sanitized) return json({ error: sanitized.error }, 400);
 
     await connectMongo();
-    if (
-      sanitized.payload.placement === 'category' &&
-      !(await categoryExists(sanitized.payload.categoryId))
-    ) {
-      return json({ error: 'A category quest needs a valid category' }, 400);
-    }
-
     const templateId = uuid();
 
     // Upload a new cover to Firebase; store only the proxy URL + metadata.
@@ -354,12 +306,6 @@ export async function PUT(req: NextRequest) {
     if ('error' in sanitized) return json({ error: sanitized.error }, 400);
 
     await connectMongo();
-    if (
-      sanitized.payload.placement === 'category' &&
-      !(await categoryExists(sanitized.payload.categoryId))
-    ) {
-      return json({ error: 'A category quest needs a valid category' }, 400);
-    }
     const updateSet: Record<string, unknown> = {
       ...sanitized.payload,
     };
@@ -383,15 +329,8 @@ export async function PUT(req: NextRequest) {
       unsetFields.coverImageFile = 1;
     }
 
-    if (!sanitized.payload.categoryId) {
-      delete updateSet.categoryId;
-      unsetFields.categoryId = 1;
-    }
-
-    if (!sanitized.payload.durationMinutes) {
-      delete updateSet.durationMinutes;
-      unsetFields.durationMinutes = 1;
-    }
+    unsetFields.categoryId = 1;
+    unsetFields.durationMinutes = 1;
 
     const template = await QuestTemplateModel.findOneAndUpdate(
       { templateId },

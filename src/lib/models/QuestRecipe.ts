@@ -46,10 +46,13 @@ export interface QuestRecipeDoc {
   _id?: mongoose.Types.ObjectId;
   recipeId: string;
   name: string;
-  placement: 'category' | 'daily';
+  /**
+   * Only 'daily' rolls now. Kept on the doc so the retired focus-area recipes
+   * still sitting in the collection stay excluded rather than silently
+   * becoming the daily roll.
+   */
+  placement: 'daily';
   isActive: boolean;
-  durationMinutes: number;
-  categoryIds: string[];
   coverImageUrl?: string;
   coverImageFile?: QuestCoverImageFile | null;
   slots: RecipeSlot[];
@@ -63,12 +66,10 @@ const QuestRecipeSchema = new Schema<QuestRecipeDoc>(
     name: { type: String, required: true },
     placement: {
       type: String,
-      enum: ['category', 'daily'],
-      default: 'category',
+      enum: ['daily'],
+      default: 'daily',
     },
     isActive: { type: Boolean, default: true },
-    durationMinutes: { type: Number, default: 3 * 24 * 60 },
-    categoryIds: { type: [String], default: [] },
     coverImageUrl: { type: String, default: undefined },
     coverImageFile: { type: Schema.Types.Mixed, default: undefined },
     slots: { type: [Schema.Types.Mixed], default: [] } as any,

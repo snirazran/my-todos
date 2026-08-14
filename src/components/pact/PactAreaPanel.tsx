@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { Compass } from 'lucide-react';
-import { PactCard } from './PactCard';
+import { PactCard, usePactView } from './PactCard';
 
 /**
  * The "Your areas" slot on the quests page. The pact answers the same question
@@ -10,6 +10,7 @@ import { PactCard } from './PactCard';
  */
 export function PactAreaPanel() {
   const ref = useRef<HTMLDivElement | null>(null);
+  const { data } = usePactView();
 
   // Arriving from the home strip's row: land on the pact, not the top of the
   // quests page. The hash survives the client nav, so it is read once here.
@@ -22,6 +23,10 @@ export function PactAreaPanel() {
     }, 250);
     return () => window.clearTimeout(timer);
   }, []);
+
+  // PactCard renders nothing when the pact is off or no areas are picked yet;
+  // without this the section heading would sit above an empty slot.
+  if (!data || !data.enabled || data.needsAreas) return null;
 
   return (
     <div ref={ref} id="pact" className="flex flex-col gap-2 pb-6">

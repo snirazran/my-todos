@@ -1,6 +1,5 @@
 import mongoose, { Schema, type Model } from 'mongoose';
 import type {
-  MacroCategoryId,
   QuestLogicBlock,
   QuestPlacement,
   QuestVisibilityCondition,
@@ -21,8 +20,6 @@ export interface QuestTemplateDoc {
   coverImageUrl?: string;
   coverImageFile?: QuestCoverImageFile | null;
   placement: QuestPlacement;
-  categoryId?: MacroCategoryId;
-  durationMinutes?: number;
   logic: QuestLogicBlock[];
   visibilityConditions: QuestVisibilityCondition[];
   isActive: boolean;
@@ -39,16 +36,8 @@ const QuestTemplateSchema = new Schema<QuestTemplateDoc>(
     coverImageFile: { type: Schema.Types.Mixed, default: undefined },
     placement: {
       type: String,
-      enum: ['daily', 'category', 'onboarding'],
+      enum: ['daily', 'onboarding'],
       required: true,
-    },
-    categoryId: {
-      type: String,
-      default: undefined,
-    },
-    durationMinutes: {
-      type: Number,
-      default: undefined,
     },
     logic: { type: [Schema.Types.Mixed], default: [] } as any,
     visibilityConditions: { type: [Schema.Types.Mixed], default: [] } as any,

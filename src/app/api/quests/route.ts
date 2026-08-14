@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
-import UserModel from '@/lib/models/User';
 import { buildRewardCatalog, syncQuestState } from '@/lib/quests/engine';
-import { ensurePactConfig } from '@/lib/pact/engine';
 import { loadStreakConfig, previousDayKey, syncDailyStreak } from '@/lib/quests/streak';
 import { parseTaskStreakDays } from '@/lib/quests/metrics';
 import { rewardWorth } from '@/lib/quests/priority';
@@ -28,56 +26,6 @@ const categoryCoverRef = (categoryId: string) =>
   `/api/quests/cover?type=category&id=${encodeURIComponent(categoryId)}`;
 
 const FREE_TAG_LIMIT = 6;
-const AREA_UNLOCK_STEP_TARGET = 5;
-const AREA_UNLOCK_LIFETIME_TASKS = 10;
-
-async function resolveAreaQuestsUnlocked(
-  userId: string,
-  dashboard: Awaited<ReturnType<typeof syncQuestState>>,
-): Promise<Date | null> {
-  const existing = dashboard.focusProfile.areaQuestsUnlockedAt;
-  if (existing) return new Date(existing);
-
-  const earlySteps = dashboard.earlyObjectiveSteps;
-  const hasFocusFootprint =
-    (dashboard.focusProfile.categoryTagMap?.length ?? 0) > 0 ||
-    dashboard.categoryQuests.some(
-      (quest) =>
-        quest.claimedObjectiveIds.length > 0 ||
-        quest.logic.some((block) => block.progress > 0),
-    );
-  const lifetimeTaskCompletions = dashboard.tasks.reduce(
-    (sum, task) =>
-      sum + (task.completedDates?.length ?? 0) + (task.completed ? 1 : 0),
-    0,
-  );
-  // Escape hatch: when the only objectives left on screen ask the user to
-  // start an area quest, keeping areas locked would deadlock progression.
-  const visibleBlocks = [
-    ...(dashboard.onboardingQuests ?? []),
-    ...dashboard.dailyQuests,
-  ].flatMap((quest) => quest.logic);
-  const unmetBlocks = visibleBlocks.filter(
-    (block) => block.progress < Math.max(1, block.target),
-  );
-  const stuckOnAreaStart =
-    unmetBlocks.length > 0 &&
-    unmetBlocks.every((block) => block.metricKey === 'focus_tag_linked');
-
-  const unlocked =
-    hasFocusFootprint ||
-    earlySteps >= AREA_UNLOCK_STEP_TARGET ||
-    lifetimeTaskCompletions >= AREA_UNLOCK_LIFETIME_TASKS ||
-    stuckOnAreaStart;
-  if (!unlocked) return null;
-  const unlockedAt = new Date();
-  await UserModel.updateOne(
-    { _id: userId },
-    { $set: { 'focusProfile.areaQuestsUnlockedAt': unlockedAt } },
-  );
-  return unlockedAt;
-}
-
 function withTemplateCover<T extends { templateId?: string; coverImageUrl?: string }>(
   quest: T,
   templatesWithCover: Set<string>,
@@ -106,49 +54,25 @@ type ObjectiveLabelBlock = {
   beforeHour?: number;
 };
 
-function objectiveSummaryLabel(
-  block: ObjectiveLabelBlock,
-  tagName?: string,
-): string {
+function objectiveSummaryLabel(block: ObjectiveLabelBlock): string {
   const target = Math.max(0, block.target ?? 0);
-  const usesFocusTags = block.tagMode === 'focus_category_tags';
   if (block.type === 'metric_count') {
-    return metricObjectiveLabel(block.metricKey, target, {
-      tagScoped: usesFocusTags,
-    });
+    return metricObjectiveLabel(block.metricKey, target);
   }
   if (block.type === 'focus_minutes') {
-    if (!usesFocusTags) return `Focus for ${target} minutes on tasks`;
-    return tagName
-      ? `Focus for ${target} minutes on ${tagName}`
-      : `Focus for ${target} minutes on quest tasks`;
+    return `Focus for ${target} minutes on tasks`;
   }
   if (block.type === 'distinct_days') {
     const days = target === 1 ? 'day' : 'different days';
-    const scope = usesFocusTags
-      ? tagName
-        ? ` on ${tagName}`
-        : ' on quest tasks'
-      : '';
-    return `Show up${scope} ${target} ${days}`;
+    return `Show up ${target} ${days}`;
   }
   if (block.type === 'deep_session') {
     const minutes = block.sessionMinutes ?? 25;
-    const scope = usesFocusTags
-      ? tagName
-        ? ` on ${tagName}`
-        : ' on a quest task'
-      : '';
     return target === 1
-      ? `Focus ${minutes} min without a break${scope}`
-      : `Focus ${minutes} min without a break${scope}, ${target} times`;
+      ? `Focus ${minutes} min without a break`
+      : `Focus ${minutes} min without a break, ${target} times`;
   }
-  const subject = block.subject === 'any' || target !== 1 ? 'tasks' : 'task';
-  const scope = usesFocusTags
-    ? tagName
-      ? `${tagName} ${subject}`
-      : `quest ${subject}`
-    : subject;
+  const scope = block.subject === 'any' || target !== 1 ? 'tasks' : 'task';
   if (block.action === 'add') {
     return block.requiresFollowThrough
       ? `Plan ${target} ${scope} and finish ${target === 1 ? 'it' : 'them'}`
@@ -177,7 +101,7 @@ type ClaimableEntry = {
   questId?: string;
   objectiveId?: string;
   kind: 'objective' | 'season';
-  placement?: 'daily' | 'category' | 'onboarding';
+  placement?: 'daily' | 'onboarding';
   categoryName?: string;
   objectiveLabel?: string;
   tags?: ObjectiveTagChip[];
@@ -191,7 +115,7 @@ type ClaimableEntry = {
 type TrackableEntry = {
   id: string;
   questId: string;
-  placement: 'daily' | 'category' | 'onboarding';
+  placement: 'daily' | 'onboarding';
   categoryId?: string;
   categoryName?: string;
   objectiveLabel: string;
@@ -344,23 +268,16 @@ function objectiveEffort(
 
 function objectiveRemainingLabel(
   block: ObjectiveLabelBlock,
-  tagName?: string,
 ): string {
   const target = Math.max(1, block.target ?? 1);
   const progress = Math.max(0, block.progress ?? 0);
-  if (progress <= 0) return objectiveSummaryLabel(block, tagName);
+  if (progress <= 0) return objectiveSummaryLabel(block);
   const remaining = Math.max(1, target - progress);
-  const usesFocusTags = block.tagMode === 'focus_category_tags';
   if (block.type === 'metric_count') {
-    return metricRemainingLabel(block.metricKey, remaining, {
-      tagScoped: usesFocusTags,
-    });
+    return metricRemainingLabel(block.metricKey, remaining);
   }
   if (block.type === 'focus_minutes') {
-    if (!usesFocusTags) return `Focus ${remaining} more min`;
-    return tagName
-      ? `Focus ${remaining} more min on ${tagName}`
-      : `Focus ${remaining} more min on quest tasks`;
+    return `Focus ${remaining} more min`;
   }
   if (block.type === 'distinct_days') {
     return remaining === 1
@@ -373,12 +290,7 @@ function objectiveRemainingLabel(
       ? `One more ${minutes}-min unbroken session`
       : `${remaining} more ${minutes}-min unbroken sessions`;
   }
-  const subject = remaining === 1 ? 'task' : 'tasks';
-  const scope = usesFocusTags
-    ? tagName
-      ? `${tagName} ${subject}`
-      : `quest ${subject}`
-    : subject;
+  const scope = remaining === 1 ? 'task' : 'tasks';
   if (block.action === 'add') {
     return block.requiresFollowThrough
       ? `Finish ${remaining} more planned ${scope}`
@@ -459,7 +371,7 @@ export async function GET(req: Request) {
       view === 'home' ||
       searchParams.get('includeCategories') === '1';
 
-    const [dashboard, activeSeason, streakConfig, moveToWebConfig, pactConfig] =
+    const [dashboard, activeSeason, streakConfig, moveToWebConfig] =
       await Promise.all([
         syncQuestState({
           userId,
@@ -470,13 +382,8 @@ export async function GET(req: Request) {
         getActiveQuestSeasonView({ userId, timezone }),
         loadStreakConfig(),
         loadMoveToWebConfig(),
-        ensurePactConfig(),
       ]);
 
-    // The weekly pact replaced area quests outright. They are dropped at the
-    // source rather than hidden per-surface, so they cannot come back as a
-    // "next up" objective, a claimable, or a badge count while the pact runs.
-    if (pactConfig.isActive) dashboard.categoryQuests = [];
     const dailyStreak = await syncDailyStreak({
       user: dashboard.user,
       config: streakConfig,
@@ -490,17 +397,12 @@ export async function GET(req: Request) {
     const moveToWeb = dashboard.firstOnboardingComplete
       ? moveToWebSynced
       : null;
-    const areaQuestsUnlockedAt = await resolveAreaQuestsUnlocked(
-      userId,
-      dashboard,
-    );
-    const areaQuestsUnlocked = !!areaQuestsUnlockedAt;
     // Count prizes ready to collect. Quests no longer have an end-reward —
     // only per-objective rewards are claimable, so count one per completed
     // objective with unclaimed rewards.
-    const questClaimable = [...(dashboard.onboardingQuests ?? []), ...dashboard.dailyQuests, ...dashboard.categoryQuests].reduce(
+    const questClaimable = [...(dashboard.onboardingQuests ?? []), ...dashboard.dailyQuests].reduce(
       (sum, quest) => {
-        if (quest.claimed || quest.locked) return sum;
+        if (quest.claimed) return sum;
         let count = 0;
         quest.logic.forEach((block) => {
           if (
@@ -522,9 +424,6 @@ export async function GET(req: Request) {
     const claimableCount =
       questClaimable + seasonDailyClaimable + streakClaimable + moveToWebClaimable;
 
-    const categoryNameById = new Map<string, string>(
-      (dashboard.macroCategories ?? []).map((c: any) => [c.id, c.name]),
-    );
     const tagChipById = new Map<string, ObjectiveTagChip>();
     for (const tag of (dashboard.user.tags ?? []) as unknown[]) {
       if (typeof tag === 'string') {
@@ -550,19 +449,9 @@ export async function GET(req: Request) {
           : '#22c55e';
       tagChipById.set(id, { id, name, color });
     }
-    const focusTagsByCategory = new Map<string, ObjectiveTagChip[]>(
-      (dashboard.focusProfile.categoryTagMap ?? []).map((entry: any) => [
-        entry.categoryId,
-        (entry.tagIds ?? [])
-          .map((tagId: string) => tagChipById.get(tagId))
-          .filter(Boolean) as ObjectiveTagChip[],
-      ]),
-    );
-    const questFocusTags = (quest: { categoryId?: string }) =>
-      quest.categoryId ? focusTagsByCategory.get(quest.categoryId) ?? [] : [];
     const claimables: ClaimableEntry[] = [];
-    for (const quest of [...(dashboard.onboardingQuests ?? []), ...dashboard.dailyQuests, ...dashboard.categoryQuests]) {
-      if (quest.claimed || quest.locked) continue;
+    for (const quest of [...(dashboard.onboardingQuests ?? []), ...dashboard.dailyQuests]) {
+      if (quest.claimed) continue;
       const activeOnboardingObjectiveId =
         quest.placement === 'onboarding'
           ? quest.logic.find(
@@ -589,18 +478,7 @@ export async function GET(req: Request) {
             objectiveId: block.id,
             kind: 'objective',
             placement: quest.placement,
-            categoryName:
-              quest.placement === 'category'
-                ? categoryNameById.get(quest.categoryId ?? '')
-                : undefined,
-            objectiveLabel: objectiveSummaryLabel(
-              block,
-              categoryNameById.get(quest.categoryId ?? ''),
-            ),
-            tags:
-              block.tagMode === 'focus_category_tags'
-                ? questFocusTags(quest)
-                : undefined,
+            objectiveLabel: objectiveSummaryLabel(block),
             reward: block.rewards?.[0],
             rewards: block.rewards ?? undefined,
           });
@@ -609,26 +487,15 @@ export async function GET(req: Request) {
     }
     const trackables: TrackableEntry[] = [];
     const effortTodayKey = getZonedToday(timezone);
-    const withBlockEffort = <
-      T extends { categoryId?: string; logic: any[] },
-    >(
-      quest: T,
-    ): T => ({
+    const withBlockEffort = <T extends { logic: any[] }>(quest: T): T => ({
       ...quest,
       logic: quest.logic.map((block) => ({
         ...block,
-        ...objectiveEffort(
-          block,
-          dashboard.tasks,
-          effortTodayKey,
-          block.tagMode === 'focus_category_tags'
-            ? questFocusTags(quest).map((tag) => tag.id)
-            : undefined,
-        ),
+        ...objectiveEffort(block, dashboard.tasks, effortTodayKey),
       })),
     });
-    for (const quest of [...(dashboard.onboardingQuests ?? []), ...dashboard.dailyQuests, ...dashboard.categoryQuests]) {
-      if (quest.claimed || quest.locked) continue;
+    for (const quest of [...(dashboard.onboardingQuests ?? []), ...dashboard.dailyQuests]) {
+      if (quest.claimed) continue;
       const activeOnboardingObjectiveId =
         quest.placement === 'onboarding'
           ? quest.logic.find(
@@ -654,20 +521,8 @@ export async function GET(req: Request) {
           questId: quest.id,
           placement: quest.placement,
           tierIndex,
-          categoryId:
-            quest.placement === 'category' ? quest.categoryId : undefined,
-          categoryName:
-            quest.placement === 'category'
-              ? categoryNameById.get(quest.categoryId ?? '')
-              : undefined,
-          objectiveLabel: objectiveSummaryLabel(
-            block,
-            categoryNameById.get(quest.categoryId ?? ''),
-          ),
-          remainingLabel: objectiveRemainingLabel(
-            block,
-            categoryNameById.get(quest.categoryId ?? ''),
-          ),
+          objectiveLabel: objectiveSummaryLabel(block),
+          remainingLabel: objectiveRemainingLabel(block),
           objectiveType: block.type,
           // Where this objective sits in its ladder, so a surface can show the
           // whole arc without re-deriving it from a list that omits finished
@@ -690,47 +545,17 @@ export async function GET(req: Request) {
             block.beforeHour ?? '',
             block.requiresFollowThrough ? 'follow' : '',
           ].join('|'),
-          tags:
-            block.tagMode === 'focus_category_tags'
-              ? questFocusTags(quest)
-              : undefined,
-          needsFocusTags:
-            quest.placement === 'category' &&
-            block.tagMode === 'focus_category_tags' &&
-            questFocusTags(quest).length === 0,
           progress: Math.max(0, block.progress),
           target,
-          ...objectiveEffort(
-            block,
-            dashboard.tasks,
-            effortTodayKey,
-            block.tagMode === 'focus_category_tags'
-              ? questFocusTags(quest).map((tag) => tag.id)
-              : undefined,
-          ),
+          ...objectiveEffort(block, dashboard.tasks, effortTodayKey),
           reward: block.rewards?.[0],
           rewards: block.rewards ?? undefined,
           rewardValue: rewardWorth(block.rewards),
           lastProgressAt: quest.lastProgressAt,
           expiresAt: quest.expiresAt,
-          hint: objectiveHintText(block, questFocusTags(quest)[0]?.name, {
-            omitTagScope: block.tagMode === 'focus_category_tags',
-          }),
+          hint: objectiveHintText(block),
           guideId: guideIdForBlock(block) ?? undefined,
-          guideContext: (() => {
-            const context = guideContextForBlock(block);
-            const focusTags = questFocusTags(quest);
-            const tagNames =
-              context?.tagNames ??
-              (focusTags.length > 0
-                ? focusTags.map((tag) => tag.name)
-                : undefined);
-            const tags = focusTags.length > 0 ? focusTags : undefined;
-            const tagIds = context?.tagIds ?? tags?.map((tag) => tag.id);
-            return context || tagNames
-              ? { ...context, tagNames, tags, tagIds }
-              : undefined;
-          })(),
+          guideContext: guideContextForBlock(block) ?? undefined,
         });
       }
     }
@@ -764,8 +589,8 @@ export async function GET(req: Request) {
     }
 
     // Count active quests the user can still work on (not claimed, not yet fully claimable)
-    const activeCount = [...(dashboard.onboardingQuests ?? []), ...dashboard.dailyQuests, ...dashboard.categoryQuests].filter(
-      (quest) => !quest.claimed && !quest.claimable && !quest.locked,
+    const activeCount = [...(dashboard.onboardingQuests ?? []), ...dashboard.dailyQuests].filter(
+      (quest) => !quest.claimed && !quest.claimable,
     ).length;
     const lightMacroCategories = dashboard.macroCategories.map(lightenCategory);
 
@@ -778,9 +603,6 @@ export async function GET(req: Request) {
           trackables,
           claimablesRewardCatalog,
           activeCount,
-          activeFocusCategoryId: dashboard.activeFocusCategoryId,
-          areaQuestsUnlocked,
-          areaQuestsUnlockedAt,
           dailyStreak,
           onboarding: {
             complete: !!dashboard.focusProfile.completedAt,
@@ -824,10 +646,6 @@ export async function GET(req: Request) {
         isPremium: dashboard.isPremium,
         claimableCount,
         activeCount,
-        activeFocusCategoryId: dashboard.activeFocusCategoryId,
-        areaQuestsUnlocked,
-        areaQuestsUnlockedAt,
-        rentedFocus: dashboard.rentedFocus,
         frogName: (dashboard.user as { frogName?: string }).frogName ?? null,
         dailyStreak,
         moveToWeb,
@@ -845,13 +663,9 @@ export async function GET(req: Request) {
         dailyQuestsGated: dashboard.dailyQuestsGated,
         firstOnboardingComplete: dashboard.firstOnboardingComplete,
         earlyObjectiveSteps: dashboard.earlyObjectiveSteps,
-        categoryQuests: dashboard.categoryQuests.map((q) =>
-          withBlockEffort(withTemplateCover(q, dashboard.templatesWithCover)),
-        ),
         onboardingQuests: (dashboard.onboardingQuests ?? []).map((q) =>
           withBlockEffort(withTemplateCover(q, dashboard.templatesWithCover)),
         ),
-        unlockedAnimationIds: dashboard.focusProfile.unlockedAnimationIds ?? [],
         rewardCatalog: {
           ...dashboard.rewardCatalog,
           ...seasonRewardCatalog,

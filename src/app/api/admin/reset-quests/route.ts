@@ -20,7 +20,6 @@ export async function POST() {
             focusProfile: {
               selectedCategoryIds: [],
               categoryTagMap: [],
-              unlockedAnimationIds: [],
             },
           },
         },

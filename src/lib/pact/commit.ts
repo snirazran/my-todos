@@ -17,7 +17,6 @@ import {
   scheduleLabel,
   shiftYMD,
 } from './engine';
-import type { PactSizeTier } from './types';
 
 const TASK_TEXT_MAX = 80;
 
@@ -31,7 +30,6 @@ export type CommitPactInput = {
   /** Per-day override, keyed by weekday number. Falls back to startTime. */
   dayTimes?: Record<number, string>;
   tagId?: string;
-  tier: PactSizeTier;
   suggestionId?: string;
   source: PactDoc['source'];
 };
@@ -193,8 +191,6 @@ export async function commitPact(
     throw new Error('Those days already passed this week — pick a later day');
   }
   const startTime = sanitizeTime(input.startTime);
-  const tier: PactSizeTier =
-    input.tier === 'starter' || input.tier === 'strong' ? input.tier : 'steady';
 
   const tagId = await resolveAreaTag({
     userId,
@@ -247,7 +243,6 @@ export async function commitPact(
     status: 'active',
     commitmentText: text,
     suggestionId,
-    tier,
     days,
     startTime,
     target: days.length,

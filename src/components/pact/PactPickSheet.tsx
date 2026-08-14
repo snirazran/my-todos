@@ -188,7 +188,6 @@ export function PactPickSheet({
           startTime,
           dayTimes: perDayTimes ? dayTimes : undefined,
           tagId: tagId ?? undefined,
-          tier: writingOwn ? 'steady' : option?.tier,
           suggestionId: writingOwn ? undefined : option?.id,
           source: writingOwn ? 'custom' : option?.source,
         }),

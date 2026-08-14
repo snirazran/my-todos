@@ -21,9 +21,7 @@ import {
   Plus,
   RotateCcw,
   ScrollText,
-  Sparkles,
   Trash2,
-  X,
   XCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -64,8 +62,6 @@ type AdminQuestTemplate = {
   description: string;
   coverImageUrl?: string;
   placement: QuestPlacement;
-  categoryId?: string;
-  durationMinutes?: number;
   logic: QuestLogicBlock[];
   visibilityConditions: QuestVisibilityCondition[];
   isActive: boolean;
@@ -124,12 +120,6 @@ type AdminLoginStreakConfig = {
   goalTiers: AdminLoginStreakTier[];
   limits: { freezeCapMin: number; freezeCapMax: number };
 };
-type QuickAddSuggestionDraft = {
-  id: string;
-  text: string;
-  emoji: string;
-};
-
 type AdminCategory = {
   id: string;
   name: string;
@@ -140,8 +130,6 @@ type AdminCategory = {
   accent: string;
   backgroundFrom: string;
   backgroundTo: string;
-  questMode?: 'templates' | 'generated';
-  quickAddSuggestions: { text: string; emoji: string }[];
 };
 
 type CategoryFormState = {
@@ -149,8 +137,6 @@ type CategoryFormState = {
   description: string;
   onboardingSentence: string;
   coverImageUrl?: string;
-  questMode: 'templates' | 'generated';
-  quickAddSuggestions: QuickAddSuggestionDraft[];
 };
 
 type AdminRecipePoolEntryStreak = {
@@ -191,10 +177,7 @@ type AdminRecipeSlot = {
 type AdminRecipe = {
   recipeId: string;
   name: string;
-  placement: 'category' | 'daily';
   isActive: boolean;
-  durationMinutes: number;
-  categoryIds: string[];
   coverImageUrl?: string;
   slots: AdminRecipeSlot[];
 };
@@ -202,13 +185,11 @@ type AdminRecipe = {
 type ViewLevel =
   | 'home'
   | 'daily'
-  | 'focus'
   | 'onboarding'
   | 'streaks'
   | 'pact'
   | 'moveToWeb'
   | 'season'
-  | 'category'
   | 'form';
 
 type FormState = {
@@ -217,8 +198,6 @@ type FormState = {
   description: string;
   coverImageUrl?: string;
   placement: QuestPlacement;
-  categoryId?: string;
-  durationMinutes?: number;
   logic: QuestLogicBlock[];
   visibilityConditions: QuestVisibilityCondition[];
   isActive: boolean;
@@ -253,7 +232,7 @@ type ConfirmAction =
   | 'save-category'
   | `delete-category:${string}`;
 
-const createLogic = (placement: QuestPlacement = 'daily'): QuestLogicBlock => ({
+const createLogic = (): QuestLogicBlock => ({
   id: crypto.randomUUID(),
   type: 'count',
   subject: 'task',
@@ -262,7 +241,7 @@ const createLogic = (placement: QuestPlacement = 'daily'): QuestLogicBlock => ({
   amount: 3,
   minAmount: undefined,
   maxAmount: undefined,
-  tagMode: placement === 'category' ? 'focus_category_tags' : 'ignore',
+  tagMode: 'ignore',
 });
 const createVisibilityCondition = (): QuestVisibilityCondition => ({
   id: crypto.randomUUID(),
@@ -271,22 +250,11 @@ const createVisibilityCondition = (): QuestVisibilityCondition => ({
   value: 0,
 });
 
-const TASK_STREAK_METRIC_PATTERN = /^task_streak_(\d+)$/;
-
-function isFocusTagScopedMetricKey(metricKey?: string) {
-  return (
-    metricKey === 'buddy_task_completed' ||
-    (!!metricKey && TASK_STREAK_METRIC_PATTERN.test(metricKey))
-  );
-}
-
 const emptyForm = (): FormState => ({
   name: '',
   description: '',
   coverImageUrl: undefined,
-  placement: 'daily',
-  categoryId: undefined,
-  durationMinutes: undefined,
+  placement: 'onboarding',
   logic: [createLogic()],
   visibilityConditions: [],
   isActive: true,
@@ -310,25 +278,6 @@ const emptySeasonForm = (): SeasonFormState => {
   };
 };
 
-const visibilityMetricLabel: Record<QuestVisibilityMetric, string> = {
-  daily_tasks_count: 'User tasks today',
-  tags_count: 'User tags count',
-};
-
-const visibilityOperatorLabel: Record<QuestVisibilityOperator, string> = {
-  gt: 'More than',
-  lt: 'Less than',
-};
-
-async function readFileAsDataUrl(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result ?? ''));
-    reader.onerror = () => reject(new Error('Could not read image'));
-    reader.readAsDataURL(file);
-  });
-}
-
 function positiveNumber(value: number | undefined, fallback: number) {
   const numeric = Number(value);
   return Number.isFinite(numeric) && numeric > 0 ? numeric : fallback;
@@ -338,45 +287,6 @@ function amountRangeLabel(min: number | undefined, max: number | undefined) {
   const safeMin = positiveNumber(min, 1);
   const safeMax = Math.max(safeMin, positiveNumber(max, safeMin));
   return safeMin === safeMax ? String(safeMax) : `${safeMin}-${safeMax}`;
-}
-
-function formatDurationMinutes(minutes: number | undefined) {
-  if (!minutes || minutes <= 0) return 'No time limit';
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.floor(minutes / 60);
-  const remainingMinutes = minutes % 60;
-  if (hours < 24) {
-    return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
-  }
-  const days = Math.floor(hours / 24);
-  const remainingHours = hours % 24;
-  return remainingHours > 0 ? `${days}d ${remainingHours}h` : `${days}d`;
-}
-
-function formatAdminPreviewTime(placement: QuestPlacement, minutes: number | undefined) {
-  if (placement === 'daily') return '24H';
-  return minutes && minutes > 0 ? formatDurationMinutes(minutes) : 'No time limit';
-}
-
-function getDurationDays(minutes: number | undefined) {
-  if (!minutes || minutes <= 0) return '';
-  const days = Math.floor(minutes / 1_440);
-  return days > 0 ? String(days) : '';
-}
-
-function getDurationHours(minutes: number | undefined) {
-  if (!minutes || minutes <= 0) return '';
-  const hours = Math.ceil((minutes % 1_440) / 60);
-  return hours > 0 ? String(hours) : '';
-}
-
-function durationFromParts(daysValue: string, hoursValue: string) {
-  const days = Number(daysValue);
-  const hours = Number(hoursValue);
-  const safeDays = Number.isFinite(days) && days > 0 ? Math.floor(days) : 0;
-  const safeHours = Number.isFinite(hours) && hours > 0 ? Math.floor(hours) : 0;
-  const total = safeDays * 1_440 + safeHours * 60;
-  return total > 0 ? total : undefined;
 }
 
 function toDateTimeLocalValue(date: Date) {
@@ -456,11 +366,7 @@ function buildPreviewLogicBlock(block: QuestLogicBlock): QuestCardLogicBlock {
     resolvedTagName:
       block.tagMode === 'random_user_tag' ? 'Random user tag' : undefined,
     previewTagLabel:
-      block.tagMode === 'focus_category_tags'
-        ? 'Saved focus tags'
-        : block.tagMode === 'random_user_tag'
-          ? 'Random user tag'
-          : undefined,
+      block.tagMode === 'random_user_tag' ? 'Random user tag' : undefined,
     rewards: block.rewards,
   };
 }
@@ -504,10 +410,6 @@ function normalizeRewardList(rewards: QuestReward[]) {
   return [...flies, ...items, ...boxes, ...backgrounds];
 }
 
-function normalizeSingleReward(rewards: QuestReward[]) {
-  return normalizeRewardList(rewards).slice(0, 1);
-}
-
 function normalizeSeasonLaneRewards(rewards: QuestReward[]) {
   return normalizeRewardList(rewards).slice(0, SEASON_REWARDS_PER_LANE);
 }
@@ -543,7 +445,6 @@ export function AdminQuestManagerPage() {
 
   // Navigation
   const [view, setView] = useState<ViewLevel>('home');
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
 
   // Category dialog
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
@@ -555,8 +456,6 @@ export function AdminQuestManagerPage() {
     description: '',
     onboardingSentence: '',
     coverImageUrl: undefined,
-    questMode: 'templates',
-    quickAddSuggestions: [],
   });
 
   // Daily streak bonus config
@@ -685,15 +584,7 @@ export function AdminQuestManagerPage() {
       description: template.description,
       coverImageUrl: template.coverImageUrl,
       placement: template.placement,
-      categoryId: template.categoryId,
-      durationMinutes: template.durationMinutes,
-      logic: template.logic.map((block) => ({
-        ...block,
-        tagMode:
-          template.placement === 'category'
-            ? 'focus_category_tags'
-            : block.tagMode,
-      })),
+      logic: template.logic.map((block) => ({ ...block })),
       visibilityConditions: (template.visibilityConditions ?? []).map((condition) => ({
         ...condition,
       })),
@@ -716,16 +607,7 @@ export function AdminQuestManagerPage() {
     setForm((prev) => ({
       ...prev,
       logic: prev.logic.map((block) =>
-        block.id === id
-          ? {
-              ...block,
-              ...patch,
-              tagMode:
-                prev.placement === 'category'
-                  ? 'focus_category_tags'
-                  : patch.tagMode ?? block.tagMode,
-            }
-          : block,
+        block.id === id ? { ...block, ...patch } : block,
       ),
     }));
   };
@@ -781,15 +663,7 @@ export function AdminQuestManagerPage() {
       if (!res.ok) throw new Error(data.error || 'Could not delete quest');
       await loadData();
       resetForm();
-      if (view === 'form') {
-        setView(
-          form.placement === 'daily'
-            ? 'daily'
-            : form.placement === 'onboarding'
-              ? 'onboarding'
-              : 'category',
-        );
-      }
+      if (view === 'form') setView('onboarding');
       setResult({ type: 'success', message: 'Quest deleted' });
     } catch (error) {
       setResult({
@@ -810,20 +684,12 @@ export function AdminQuestManagerPage() {
             description: cat.description,
             onboardingSentence: cat.onboardingSentence ?? '',
             coverImageUrl: cat.coverImageUrl,
-            questMode: cat.questMode ?? 'templates',
-            quickAddSuggestions: (cat.quickAddSuggestions ?? []).map((s) => ({
-              id: crypto.randomUUID(),
-              text: s.text,
-              emoji: s.emoji ?? '',
-            })),
           }
         : {
             name: '',
             description: '',
             onboardingSentence: '',
             coverImageUrl: undefined,
-            questMode: 'templates',
-            quickAddSuggestions: [],
           },
     );
     setConfirmAction(null);
@@ -834,12 +700,7 @@ export function AdminQuestManagerPage() {
     if (!confirmBeforeAction('save-category')) return;
     setSavingCategory(true);
     try {
-      const payload = {
-        ...categoryForm,
-        quickAddSuggestions: categoryForm.quickAddSuggestions
-          .map((s) => ({ text: s.text.trim(), emoji: s.emoji.trim() }))
-          .filter((s) => s.text.length > 0),
-      };
+      const payload = { ...categoryForm };
       const res = await fetch('/api/admin/quests/categories', {
         method: editingCategory ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -878,11 +739,6 @@ export function AdminQuestManagerPage() {
     }
   };
 
-  const adminCategoryMap = useMemo(
-    () => Object.fromEntries(adminCategories.map((c) => [c.id, c])),
-    [adminCategories],
-  );
-
   const rewardCatalog = useMemo(
     () => Object.fromEntries(rewardItems.map((reward) => [reward.id, reward])),
     [rewardItems],
@@ -892,11 +748,7 @@ export function AdminQuestManagerPage() {
 
 
 
-  const selectedCategory = selectedCategoryId ? adminCategoryMap[selectedCategoryId] : null;
-  const formTimeLabel = formatAdminPreviewTime(
-    form.placement,
-    form.durationMinutes,
-  );
+  const formTimeLabel = 'One-time';
   const questSaveButtonLabel = saving
     ? 'Saving...'
     : confirmAction === 'save-quest'
@@ -917,6 +769,10 @@ export function AdminQuestManagerPage() {
       : seasonForm.id
         ? 'Save Season'
         : 'Create Season';
+  const dailyRecipeSlotCount = adminRecipes.reduce(
+    (sum, recipe) => sum + recipe.slots.length,
+    0,
+  );
   const categorySaveButtonLabel = savingCategory
     ? 'Saving...'
     : confirmAction === 'save-category'
@@ -926,7 +782,6 @@ export function AdminQuestManagerPage() {
       : editingCategory
         ? 'Save Changes'
         : 'Create Category';
-  const dailyTemplates = templates.filter((t) => t.placement === 'daily');
   const onboardingTemplates = templates
     .filter((t) => t.placement === 'onboarding')
     .sort(
@@ -934,23 +789,12 @@ export function AdminQuestManagerPage() {
         new Date(a.createdAt ?? 0).getTime() -
         new Date(b.createdAt ?? 0).getTime(),
     );
-  const categoryTemplates = templates.filter(
-    (t) => t.placement === 'category' && t.categoryId === selectedCategoryId,
-  );
-
-  const navigateToQuestForm = (template?: AdminQuestTemplate, placementOverride?: QuestPlacement, categoryIdOverride?: string) => {
+  const navigateToQuestForm = (template?: AdminQuestTemplate) => {
     if (template) {
       startEditing(template);
     } else {
       const newForm = emptyForm();
-      newForm.placement = placementOverride ?? 'daily';
-      newForm.categoryId = categoryIdOverride;
-      if (newForm.placement === 'category') {
-        newForm.logic = newForm.logic.map((block) => ({
-          ...block,
-          tagMode: 'focus_category_tags',
-        }));
-      }
+      newForm.placement = 'onboarding';
       setForm(newForm);
       setResult(null);
     }
@@ -1146,25 +990,9 @@ export function AdminQuestManagerPage() {
           <ChevronRight className="h-5 w-5 text-muted-foreground/30 transition group-hover:translate-x-0.5 group-hover:text-muted-foreground" />
         </div>
         <p className="mt-5 text-lg font-black text-foreground">Daily Quests</p>
-        <p className="mt-1 text-sm text-muted-foreground">Quests that appear for all users each day.</p>
-        <p className="mt-4 text-3xl font-black text-foreground">{dailyTemplates.length}</p>
-        <p className="text-xs text-muted-foreground">template{dailyTemplates.length !== 1 ? 's' : ''}</p>
-      </button>
-
-      <button
-        onClick={() => setView('focus')}
-        className="group rounded-2xl border border-border/40 bg-card/60 p-6 text-left transition hover:border-emerald-500/25 hover:bg-emerald-500/[0.04]"
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-            <Sparkles className="h-6 w-6" />
-          </div>
-          <ChevronRight className="h-5 w-5 text-muted-foreground/30 transition group-hover:translate-x-0.5 group-hover:text-muted-foreground" />
-        </div>
-        <p className="mt-5 text-lg font-black text-foreground">Focus Quests</p>
-        <p className="mt-1 text-sm text-muted-foreground">Quests organized by focus category.</p>
-        <p className="mt-4 text-3xl font-black text-foreground">{adminCategories.length}</p>
-        <p className="text-xs text-muted-foreground">categor{adminCategories.length !== 1 ? 'ies' : 'y'}</p>
+        <p className="mt-1 text-sm text-muted-foreground">Rolled for every user each day from the recipe.</p>
+        <p className="mt-4 text-3xl font-black text-foreground">{dailyRecipeSlotCount}</p>
+        <p className="text-xs text-muted-foreground">recipe slot{dailyRecipeSlotCount !== 1 ? 's' : ''}</p>
       </button>
 
       <button
@@ -1213,8 +1041,10 @@ export function AdminQuestManagerPage() {
         </div>
         <p className="mt-5 text-lg font-black text-foreground">Weekly Pact</p>
         <p className="mt-1 text-sm text-muted-foreground">One area a week, written into the user&apos;s real task list.</p>
-        <p className="mt-4 text-3xl font-black text-foreground">Manage</p>
-        <p className="text-xs text-muted-foreground">ideas, rewards, shields</p>
+        <p className="mt-4 text-3xl font-black text-foreground">{adminCategories.length}</p>
+        <p className="text-xs text-muted-foreground">
+          focus area{adminCategories.length !== 1 ? 's' : ''} · ideas, rewards, shields
+        </p>
       </button>
 
       <button
@@ -1254,7 +1084,7 @@ export function AdminQuestManagerPage() {
   );
 
   // ── Quest list (shared by Daily and Category views) ───────────────────────
-  const renderQuestList = (questTemplates: AdminQuestTemplate[], placement: QuestPlacement, catId?: string) => (
+  const renderQuestList = (questTemplates: AdminQuestTemplate[]) => (
     <div className="space-y-2">
       {loading && <div className="rounded-2xl bg-muted/30 p-4 text-sm text-muted-foreground">Loading...</div>}
       {!loading && questTemplates.length === 0 && (
@@ -1294,12 +1124,6 @@ export function AdminQuestManagerPage() {
             )}
             <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
               <span>{template.logic.length} block{template.logic.length !== 1 ? 's' : ''}</span>
-              {placement === 'category' && template.durationMinutes && (
-                <>
-                  <span className="text-border">&middot;</span>
-                  <span>{formatDurationMinutes(template.durationMinutes)}</span>
-                </>
-              )}
               {template.visibilityConditions.length > 0 && (
                 <>
                   <span className="text-border">·</span>
@@ -1318,16 +1142,13 @@ export function AdminQuestManagerPage() {
   // ── Daily view ────────────────────────────────────────────────────────────
   const renderDaily = () => (
     <div className="space-y-4">
-      <div className="flex items-center justify-end">
-        <Button size="sm" className="rounded-xl" onClick={() => navigateToQuestForm(undefined, 'daily')}>
-          <Plus className="mr-1 h-4 w-4" />
-          Add Quest
-        </Button>
-      </div>
-      {adminRecipes.filter((r) => r.placement === 'daily').map(renderRecipeCard)}
+      <p className="text-sm text-muted-foreground">
+        Every user gets one daily quest rolled from this recipe — one objective
+        per slot, easiest first.
+      </p>
+      {adminRecipes.map(renderRecipeCard)}
       {recipeRewardDialog}
       {renderStreakCard()}
-      {renderQuestList(dailyTemplates, 'daily')}
     </div>
   );
 
@@ -1339,12 +1160,12 @@ export function AdminQuestManagerPage() {
           New users see one quest at a time, oldest first. The next quest
           appears once every reward in the previous one is claimed.
         </p>
-        <Button size="sm" className="rounded-xl" onClick={() => navigateToQuestForm(undefined, 'onboarding')}>
+        <Button size="sm" className="rounded-xl" onClick={() => navigateToQuestForm()}>
           <Plus className="mr-1 h-4 w-4" />
           Add Quest
         </Button>
       </div>
-      {renderQuestList(onboardingTemplates, 'onboarding')}
+      {renderQuestList(onboardingTemplates)}
     </div>
   );
 
@@ -1587,7 +1408,6 @@ export function AdminQuestManagerPage() {
   };
 
   const renderRecipeCard = (r: AdminRecipe) => {
-    const isDaily = r.placement === 'daily';
     const open = openRecipeId === r.recipeId;
     return (
       <div key={r.recipeId} className="rounded-2xl border border-border/40 bg-card/60">
@@ -1598,22 +1418,18 @@ export function AdminQuestManagerPage() {
         >
           <div className="min-w-0 flex-1">
             <p className="flex items-center gap-2 text-sm font-bold text-foreground">
-              {isDaily ? 'Generated daily quest' : 'Generated focus recipe'}
-              {isDaily && (
-                <span className={cn(
-                  'rounded-full border px-2 py-0.5 text-[10px] font-black uppercase tracking-wide',
-                  r.isActive
-                    ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                    : 'border-border/50 bg-muted/40 text-muted-foreground',
-                )}>
-                  {r.isActive ? 'On' : 'Off'}
-                </span>
-              )}
+              Generated daily quest
+              <span className={cn(
+                'rounded-full border px-2 py-0.5 text-[10px] font-black uppercase tracking-wide',
+                r.isActive
+                  ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                  : 'border-border/50 bg-muted/40 text-muted-foreground',
+              )}>
+                {r.isActive ? 'On' : 'Off'}
+              </span>
             </p>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              {isDaily
-                ? `One quest · ${r.slots.length} objectives, easiest first · replaces authored dailies when on`
-                : `${r.slots.length} tiers · ${Math.max(1, Math.round(r.durationMinutes / 1440))}-day window · applies to categories set to Generated`}
+              {`One quest · ${r.slots.length} objectives, easiest first`}
             </p>
           </div>
           <span className="text-xs font-bold text-muted-foreground">{open ? 'Hide' : 'Edit'}</span>
@@ -1621,9 +1437,7 @@ export function AdminQuestManagerPage() {
 
         {open && (
           <div className="space-y-3 border-t border-border/30 px-4 py-4">
-            {isDaily ? (
-              <>
-                <button
+            <button
                   type="button"
                   onClick={() => updateRecipe(r.recipeId, (prev) => ({ ...prev, isActive: !prev.isActive }))}
                   className={cn(
@@ -1667,23 +1481,12 @@ export function AdminQuestManagerPage() {
                     )}
                   </div>
                 </div>
-              </>
-            ) : (
-              <div className="flex flex-wrap items-center gap-x-1.5 gap-y-2 leading-[30px]">
-                <span className="text-sm font-medium text-muted-foreground">Each roll lasts</span>
-                <InlinePillNumber
-                  value={Math.max(1, Math.round(r.durationMinutes / 1440))}
-                  onChange={(v) => updateRecipe(r.recipeId, (prev) => ({ ...prev, durationMinutes: Math.max(1, v) * 1440 }))}
-                />
-                <span className="text-sm font-medium text-muted-foreground">days; finished ladders re-roll after the day ends.</span>
-              </div>
-            )}
 
             {r.slots.map((slot, slotIndex) => (
               <div key={slot.id} className="rounded-2xl border border-border/50 bg-muted/30 px-4 py-3.5">
                 <div className="mb-2.5 flex items-center justify-between">
                   <span className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">
-                    {isDaily ? 'Objective' : 'Tier'} {slotIndex + 1}{slotIndex === 0 ? ' · easiest' : slotIndex === r.slots.length - 1 ? ' · hardest' : ''}
+                    Objective {slotIndex + 1}{slotIndex === 0 ? ' · easiest' : slotIndex === r.slots.length - 1 ? ' · hardest' : ''}
                   </span>
                   {r.slots.length > 1 && (
                     <button onClick={() => removeRecipeSlot(r.recipeId, slot.id)} className="rounded-lg p-1 text-muted-foreground/60 transition hover:bg-red-500/10 hover:text-red-500">
@@ -1712,7 +1515,7 @@ export function AdminQuestManagerPage() {
                           })
                         }
                       >
-                        <option value="count">{isDaily ? 'Tasks' : 'Tagged tasks'}</option>
+                        <option value="count">Tasks</option>
                         <option value="focus_minutes">Focus minutes</option>
                         <option value="distinct_days">Days shown up</option>
                         <option value="deep_session">Unbroken sessions</option>
@@ -1814,13 +1617,6 @@ export function AdminQuestManagerPage() {
                       )}
                       <span className="text-sm font-medium text-muted-foreground">· weight</span>
                       <InlinePillNumber value={entry.weight} onChange={(v) => updateRecipePoolEntry(r.recipeId, slot.id, entry.id, { weight: v })} />
-                      {!isDaily &&
-                        entry.type === 'metric_count' &&
-                        isFocusTagScopedMetricKey(entry.metricKey) && (
-                          <span className="text-sm font-medium text-muted-foreground">
-                            · tagged with their focus tags
-                          </span>
-                        )}
                       {slot.pool.length > 1 && (
                         <button onClick={() => removeRecipePoolEntry(r.recipeId, slot.id, entry.id)} className="rounded-lg p-1 text-muted-foreground/60 transition hover:bg-red-500/10 hover:text-red-500">
                           <Trash2 className="h-3 w-3" />
@@ -1907,13 +1703,13 @@ export function AdminQuestManagerPage() {
                 className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-background px-3 py-1.5 text-xs font-bold text-muted-foreground transition hover:border-primary/30 hover:text-foreground"
               >
                 <Plus className="h-3.5 w-3.5" />
-                {isDaily ? 'Add objective' : 'Add tier'}
+                Add objective
               </button>
               <div className="flex items-center gap-2">
                 {confirmResetRecipeId === r.recipeId ? (
                   <>
                     <span className="text-xs font-bold text-red-500">
-                      Discard these {isDaily ? 'objectives' : 'tiers'}?
+                      Discard these objectives?
                     </span>
                     <button
                       type="button"
@@ -2587,21 +2383,26 @@ export function AdminQuestManagerPage() {
     );
   };
 
-  const renderFocus = () => (
-    <div className="space-y-4">
-      <div className="flex items-center justify-end">
-        <Button size="sm" className="rounded-xl" onClick={() => openCategoryDialog()}>
-          <Plus className="mr-1 h-4 w-4" />
-          Add Category
-        </Button>
-      </div>
-
-      {adminRecipes.filter((r) => r.placement !== 'daily').map(renderRecipeCard)}
-      {recipeRewardDialog}
+  // Focus areas and the weekly pact are one screen: an area only exists so a
+  // pact can be made in it, so authoring them apart invited them to drift.
+  const renderPact = () => (
+    <div className="space-y-8">
+      <div className="space-y-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-black text-foreground">Focus areas</p>
+            <p className="text-xs text-muted-foreground">
+              The areas a user picks between each week.
+            </p>
+          </div>
+          <Button size="sm" className="rounded-xl" onClick={() => openCategoryDialog()}>
+            <Plus className="mr-1 h-4 w-4" />
+            Add Area
+          </Button>
+        </div>
 
       <div className="space-y-2">
         {adminCategories.map((cat) => {
-          const questCount = templates.filter((t) => t.placement === 'category' && t.categoryId === cat.id).length;
           const deleteAction = `delete-category:${cat.id}` as const;
           const confirmingDelete = confirmAction === deleteAction;
           const deletingCategory = deletingCategoryId === cat.id;
@@ -2620,22 +2421,15 @@ export function AdminQuestManagerPage() {
                 )}
               </div>
               <button
-                onClick={() => { setSelectedCategoryId(cat.id); setView('category'); }}
+                onClick={() => openCategoryDialog(cat)}
                 className="min-w-0 flex-1 text-left"
               >
-                <p className="flex items-center gap-2 truncate text-sm font-bold text-foreground">
-                  <span className="truncate">{cat.name}</span>
-                  {cat.questMode === 'generated' && (
-                    <span className="shrink-0 rounded-full border border-violet-500/25 bg-violet-500/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-violet-600 dark:text-violet-400">
-                      Generated
-                    </span>
-                  )}
-                </p>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  {cat.questMode === 'generated'
-                    ? 'Quests rolled from the recipe'
-                    : `${questCount} quest${questCount !== 1 ? 's' : ''}`}{cat.description ? ` · ${cat.description}` : ''}
-                </p>
+                <p className="truncate text-sm font-bold text-foreground">{cat.name}</p>
+                {cat.description && (
+                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                    {cat.description}
+                  </p>
+                )}
               </button>
               <div className={cn(
                 'flex shrink-0 items-center gap-1 opacity-100 transition [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100',
@@ -2672,24 +2466,11 @@ export function AdminQuestManagerPage() {
           );
         })}
       </div>
+      </div>
+
+      <AdminPactManager />
     </div>
   );
-
-  // ── Category quests view ──────────────────────────────────────────────────
-  const renderCategory = () => {
-    if (!selectedCategory) return null;
-    return (
-      <div className="space-y-4">
-        <div className="flex items-center justify-end">
-          <Button size="sm" className="rounded-xl" onClick={() => navigateToQuestForm(undefined, 'category', selectedCategoryId ?? undefined)}>
-            <Plus className="mr-1 h-4 w-4" />
-            Add Quest
-          </Button>
-        </div>
-        {renderQuestList(categoryTemplates, 'category', selectedCategoryId ?? undefined)}
-      </div>
-    );
-  };
 
   // ── Interactive preview-centered quest editor ─────────────────────────────
   const saveSeasonAutoConfig = async () => {
@@ -3242,46 +3023,6 @@ export function AdminQuestManagerPage() {
 
           {/* Action buttons row */}
           <div className="flex flex-wrap items-center gap-2 pt-1">
-            {form.placement === 'category' && (
-              <label className="flex items-center gap-1.5 rounded-full border border-border/50 bg-background/80 px-3 py-1.5 text-xs font-bold text-muted-foreground">
-                <Clock className="h-3 w-3" />
-                <span>Time</span>
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={getDurationDays(form.durationMinutes)}
-                  onChange={(event) => {
-                    const daysValue = event.target.value;
-                    const hoursValue = getDurationHours(form.durationMinutes);
-                    setForm((prev) => ({
-                      ...prev,
-                      durationMinutes: durationFromParts(daysValue, hoursValue),
-                    }));
-                  }}
-                  placeholder="0"
-                  className="h-5 w-10 bg-transparent text-center text-xs font-black text-foreground outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                />
-                <span>d</span>
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={getDurationHours(form.durationMinutes)}
-                  onChange={(event) => {
-                    const daysValue = getDurationDays(form.durationMinutes);
-                    const hoursValue = event.target.value;
-                    setForm((prev) => ({
-                      ...prev,
-                      durationMinutes: durationFromParts(daysValue, hoursValue),
-                    }));
-                  }}
-                  placeholder="0"
-                  className="h-5 w-10 bg-transparent text-center text-xs font-black text-foreground outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                />
-                <span>h</span>
-              </label>
-            )}
             <button
               type="button"
               onClick={() => setAvailabilityPopupOpen(true)}
@@ -3309,7 +3050,7 @@ export function AdminQuestManagerPage() {
       <div className="flex items-center gap-3 rounded-[24px] border border-border/50 bg-background/95 px-4 py-3 shadow-lg backdrop-blur">
         <p className="flex-1 text-sm text-muted-foreground">{form.id ? 'Editing existing template.' : 'Creating a new template.'}</p>
         {form.id && <Button size="sm" variant="destructive" onClick={deleteQuest} disabled={saving} className="rounded-xl">{questDeleteButtonLabel}</Button>}
-        <Button size="sm" variant="outline" onClick={() => { resetForm(); setView(questFormParentView(form.placement)); }} disabled={saving} className="rounded-xl">Cancel</Button>
+        <Button size="sm" variant="outline" onClick={() => { resetForm(); setView('onboarding'); }} disabled={saving} className="rounded-xl">Cancel</Button>
         <Button size="sm" onClick={saveQuest} disabled={saving} className="rounded-xl font-black">{questSaveButtonLabel}</Button>
       </div>
 
@@ -3322,7 +3063,7 @@ export function AdminQuestManagerPage() {
         rewardItems={rewardItems}
         rewardCatalog={rewardCatalog}
         onUpdate={updateLogic}
-        onAdd={() => setForm((prev) => ({ ...prev, logic: [...prev.logic, createLogic(prev.placement)] }))}
+        onAdd={() => setForm((prev) => ({ ...prev, logic: [...prev.logic, createLogic()] }))}
         onRemove={(id) => setForm((prev) => ({ ...prev, logic: prev.logic.filter((b) => b.id !== id) }))}
       />
 
@@ -3339,26 +3080,10 @@ export function AdminQuestManagerPage() {
 
   // ── Back button label ─────────────────────────────────────────────────────
   const backLabel =
-    view === 'home' ? null :
-    view === 'daily' ? 'Quest Manager' :
-    view === 'focus' ? 'Quest Manager' :
-    view === 'onboarding' ? 'Quest Manager' :
-    view === 'streaks' ? 'Quest Manager' :
-    view === 'pact' ? 'Quest Manager' :
-    view === 'moveToWeb' ? 'Quest Manager' :
-    view === 'season' ? 'Quest Manager' :
-    view === 'category' ? 'Focus Quests' :
-    form.placement === 'daily' ? 'Daily Quests' :
-    form.placement === 'onboarding' ? 'Onboarding' :
-    selectedCategory?.name ?? 'Focus Quests';
-
-  const questFormParentView = (placement: QuestPlacement): ViewLevel =>
-    placement === 'daily' ? 'daily' : placement === 'onboarding' ? 'onboarding' : 'category';
+    view === 'home' ? null : view === 'form' ? 'Onboarding' : 'Quest Manager';
 
   const handleBack = () => {
-    if (view === 'daily' || view === 'focus' || view === 'onboarding' || view === 'streaks' || view === 'season') setView('home');
-    else if (view === 'category') setView('focus');
-    else if (view === 'form') setView(questFormParentView(form.placement));
+    setView(view === 'form' ? 'onboarding' : 'home');
   };
 
 
@@ -3379,12 +3104,11 @@ export function AdminQuestManagerPage() {
           <h1 className="text-2xl font-black tracking-tight text-foreground">
             {view === 'home' && 'Quest Manager'}
             {view === 'daily' && 'Daily Quests'}
-            {view === 'focus' && 'Focus Quests'}
+            {view === 'pact' && 'Weekly Pact'}
             {view === 'onboarding' && 'Onboarding Quests'}
             {view === 'streaks' && 'Streak Manager'}
             {view === 'moveToWeb' && 'Move to Web'}
             {view === 'season' && 'Season'}
-            {view === 'category' && (selectedCategory?.name ?? 'Category')}
             {view === 'form' && (form.id ? 'Edit Quest' : 'New Quest')}
           </h1>
         </div>
@@ -3413,13 +3137,11 @@ export function AdminQuestManagerPage() {
               <>
                 {view === 'home' && renderHome()}
                 {view === 'daily' && renderDaily()}
-                {view === 'focus' && renderFocus()}
                 {view === 'onboarding' && renderOnboarding()}
                 {view === 'streaks' && renderStreaks()}
-                {view === 'pact' && <AdminPactManager />}
+                {view === 'pact' && renderPact()}
                 {view === 'moveToWeb' && renderMoveToWeb()}
                 {view === 'season' && renderSeason()}
-                {view === 'category' && renderCategory()}
               </>
             )}
           </>
@@ -3459,33 +3181,6 @@ export function AdminQuestManagerPage() {
                   Shown as this area&apos;s label in the user onboarding flow. Falls back to the name if empty.
                 </span>
               </label>
-              <div className="grid gap-2">
-                <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Quest Mode</span>
-                <div className="grid grid-cols-2 gap-2">
-                  {(['templates', 'generated'] as const).map((mode) => (
-                    <button
-                      key={mode}
-                      type="button"
-                      onClick={() => setCategoryForm((p) => ({ ...p, questMode: mode }))}
-                      className={cn(
-                        'rounded-2xl border px-4 py-3 text-left transition',
-                        categoryForm.questMode === mode
-                          ? 'border-primary/40 bg-primary/10'
-                          : 'border-border bg-background hover:border-primary/20',
-                      )}
-                    >
-                      <p className="text-sm font-bold text-foreground">
-                        {mode === 'templates' ? 'Authored quests' : 'Generated ladder'}
-                      </p>
-                      <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
-                        {mode === 'templates'
-                          ? 'Uses the quest templates you create for this category.'
-                          : 'Rolls a fresh objective ladder from the recipe on a timer.'}
-                      </p>
-                    </button>
-                  ))}
-                </div>
-              </div>
               <div className="rounded-2xl border border-border/50 bg-background/70 p-3">
                 <div className="mb-2 flex items-center justify-between gap-3">
                   <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Category Photo</p>
@@ -3530,79 +3225,6 @@ export function AdminQuestManagerPage() {
                     </span>
                   )}
                 </button>
-              </div>
-              <div className="rounded-2xl border border-border/50 bg-background/70 p-3">
-                <div className="mb-2 flex items-center justify-between gap-3">
-                  <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Quick-Add Suggestions</p>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setCategoryForm((prev) => ({
-                        ...prev,
-                        quickAddSuggestions: [
-                          ...prev.quickAddSuggestions,
-                          { id: crypto.randomUUID(), text: '', emoji: '' },
-                        ],
-                      }))
-                    }
-                    className="rounded-lg bg-primary/10 px-2.5 py-1 text-[11px] font-black uppercase tracking-[0.12em] text-primary transition hover:bg-primary/15"
-                  >
-                    + Add
-                  </button>
-                </div>
-                {categoryForm.quickAddSuggestions.length === 0 ? (
-                  <p className="text-[11px] text-muted-foreground">
-                    Shown in the quick-add sheet under this category. Add a few tasks users can pick with one tap.
-                  </p>
-                ) : (
-                  <div className="flex flex-col gap-2">
-                    {categoryForm.quickAddSuggestions.map((s, index) => (
-                      <div key={s.id} className="flex items-center gap-2">
-                        <input
-                          value={s.emoji}
-                          onChange={(e) =>
-                            setCategoryForm((prev) => ({
-                              ...prev,
-                              quickAddSuggestions: prev.quickAddSuggestions.map((item, i) =>
-                                i === index ? { ...item, emoji: e.target.value } : item,
-                              ),
-                            }))
-                          }
-                          placeholder="🏃"
-                          maxLength={8}
-                          className="h-9 w-12 shrink-0 rounded-xl border border-border bg-background text-center text-base outline-none focus:border-primary/30"
-                        />
-                        <input
-                          value={s.text}
-                          onChange={(e) =>
-                            setCategoryForm((prev) => ({
-                              ...prev,
-                              quickAddSuggestions: prev.quickAddSuggestions.map((item, i) =>
-                                i === index ? { ...item, text: e.target.value } : item,
-                              ),
-                            }))
-                          }
-                          placeholder="Task suggestion"
-                          maxLength={80}
-                          className="h-9 flex-1 rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-primary/30"
-                        />
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setCategoryForm((prev) => ({
-                              ...prev,
-                              quickAddSuggestions: prev.quickAddSuggestions.filter((_, i) => i !== index),
-                            }))
-                          }
-                          aria-label="Remove suggestion"
-                          className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-border bg-background text-muted-foreground transition hover:border-destructive/40 hover:text-destructive"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
             </div>
             <DialogFooter className="shrink-0 border-t border-border/50 bg-card/95 px-6 py-4 sm:gap-3">
@@ -3726,9 +3348,7 @@ function ObjectivesEditorDialog({
                   </InlinePillSelect>
 
                   {block.tagMode !== 'ignore' && (
-                    <span className={word}>
-                      tagged with {block.tagMode === 'focus_category_tags' ? 'their focus tags' : 'a random tag'}
-                    </span>
+                    <span className={word}>tagged with a random tag</span>
                   )}
                 </div>
               ) : block.type === 'metric_count' ? (
@@ -3753,12 +3373,6 @@ function ObjectivesEditorDialog({
                       <InlinePillNumber value={block.maxAmount ?? 3} onChange={(v) => onUpdate(block.id, { maxAmount: v })} />
                     </>
                   )}
-                  {placement === 'category' &&
-                    isFocusTagScopedMetricKey(block.metricKey) && (
-                      <span className={word}>
-                        tagged with their focus tags
-                      </span>
-                    )}
                 </div>
               ) : (
                 <div className="flex flex-wrap items-center gap-x-1.5 gap-y-2 leading-[30px]">
@@ -3820,7 +3434,7 @@ function ObjectivesEditorDialog({
                         ? { type: 'focus_minutes', subject: 'task', action: undefined, metricKey: undefined }
                         : block.type === 'focus_minutes'
                           ? { type: 'metric_count', subject: 'task', action: undefined, metricKey: 'trade_completed', tagMode: 'ignore' }
-                          : { type: 'count', subject: 'task', action: 'complete', metricKey: undefined, tagMode: placement === 'category' ? 'focus_category_tags' : 'ignore' },
+                          : { type: 'count', subject: 'task', action: 'complete', metricKey: undefined, tagMode: 'ignore' as const },
                     )
                   }
                   className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-background px-2.5 py-1 text-[11px] font-bold text-muted-foreground transition hover:border-primary/30 hover:text-foreground"
@@ -3838,7 +3452,7 @@ function ObjectivesEditorDialog({
                 >
                   {block.amountMode === 'fixed' ? 'Use random range' : 'Use fixed amount'}
                 </button>
-                {block.type === 'count' && placement !== 'category' && (
+                {block.type === 'count' && (
                   <button
                     type="button"
                     onClick={() => onUpdate(block.id, { tagMode: block.tagMode === 'ignore' ? 'random_user_tag' : 'ignore' })}
@@ -3849,11 +3463,6 @@ function ObjectivesEditorDialog({
                   >
                     {block.tagMode !== 'ignore' ? 'Tag filter on' : 'Add tag filter'}
                   </button>
-                )}
-                {block.type === 'count' && placement === 'category' && (
-                  <span className="inline-flex items-center gap-1 rounded-full border border-primary/25 bg-primary/8 px-2.5 py-1 text-[11px] font-bold text-primary">
-                    Tag filter on
-                  </span>
                 )}
                 <button
                   type="button"

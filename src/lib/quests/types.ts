@@ -19,7 +19,7 @@ export type QuestRewards = QuestReward[];
 /** Max rewards an admin can stack on one lane (free/premium) of a season day. */
 export const SEASON_REWARDS_PER_LANE = 2;
 
-export type QuestPlacement = 'daily' | 'category' | 'onboarding';
+export type QuestPlacement = 'daily' | 'onboarding';
 export type QuestSubject = 'task' | 'any';
 export type QuestCountAction = 'complete' | 'add';
 export type QuestAmountMode = 'fixed' | 'random';
@@ -43,7 +43,7 @@ export type QuestLogicBlock = {
   minAmount?: number;
   maxAmount?: number;
   action?: QuestCountAction;
-  tagMode?: 'ignore' | 'random_user_tag' | 'focus_category_tags';
+  tagMode?: 'ignore' | 'random_user_tag';
   // For type 'metric_count': which QuestCounter metric this block tracks.
   metricKey?: string;
   // For type 'deep_session': minutes one unbroken session must reach.
@@ -72,10 +72,6 @@ export type QuestVisibilityCondition = {
 export type ResolvedQuestLogicBlock = QuestLogicBlock & {
   target: number;
   progress: number;
-  // Raw progress accrued while the quest was locked (free users' non-active
-  // focus quests). Subtracted from the recomputed raw count so locked quests
-  // don't advance; grows while locked, frozen once the quest is active.
-  progressOffset?: number;
   resolvedTagId?: string;
   resolvedTagIds?: string[];
   resolvedTagName?: string;
@@ -91,8 +87,6 @@ export type QuestTemplateView = {
   description: string;
   coverImageUrl?: string;
   placement: QuestPlacement;
-  categoryId?: MacroCategoryId;
-  durationMinutes?: number;
   logic: QuestLogicBlock[];
   visibilityConditions: QuestVisibilityCondition[];
   isActive: boolean;
@@ -110,33 +104,16 @@ export type FocusProfile = {
   selectedCategoryIds: MacroCategoryId[];
   categoryTagMap: FocusCategoryTagMap[];
   suggestedContentCreatedAt?: Date | string | null;
-  unlockedAnimationIds?: string[];
-  // Set once when the area-quests section is first unlocked; never cleared,
-  // so the section can't re-lock after daily quests reset.
-  areaQuestsUnlockedAt?: Date | string | null;
-  // Free users may only actively progress one focus quest at a time; this is
-  // the category they've chosen. Ignored for premium (all focuses are active).
-  activeFocusCategoryId?: MacroCategoryId | null;
-  // Ad-rented second focus slot. adsWatched tracks progress toward unlock;
-  // expiresAt is set once the required ads are watched (24h rental).
-  rentedFocus?: {
-    categoryId: MacroCategoryId;
-    adsWatched: number;
-    expiresAt: Date | string | null;
-  } | null;
 };
 
 export type QuestProgressView = {
   id: string;
   templateId: string;
   placement: QuestPlacement;
-  categoryId?: MacroCategoryId;
   windowKey: string;
   title: string;
   description: string;
   coverImageUrl?: string;
-  durationMinutes?: number;
-  startedAt?: string;
   expiresAt?: string;
   // Last time synced progress increased (quest creation date if never).
   lastProgressAt?: string;
@@ -145,24 +122,12 @@ export type QuestProgressView = {
   completed: boolean;
   claimable: boolean;
   claimed: boolean;
-  // Free users: a category quest that is not their active focus is locked
-  // (visible but not trackable/claimable). Always false for premium.
-  locked?: boolean;
   logic: ResolvedQuestLogicBlock[];
   claimedObjectiveIds: string[];
-  // Tiers granted complete at roll time as a head start from the last ladder.
-  carriedTiers?: number;
-  // Objective rerolls still available on this roll; 0 for authored quests.
-  rerollsLeft?: number;
 };
 
 export type DailyQuestProgressView = QuestProgressView & {
   placement: 'daily';
-};
-
-export type CategoryQuestProgressView = QuestProgressView & {
-  placement: 'category';
-  categoryId: MacroCategoryId;
 };
 
 export type MacroCategoryDefinition = {
@@ -175,8 +140,4 @@ export type MacroCategoryDefinition = {
   accent: string;
   backgroundFrom: string;
   backgroundTo: string;
-  taskSuggestions: string[];
-  campaignHeadlines: string[];
-  durationDaysOptions: number[];
-  premiumAnimationId: string;
 };

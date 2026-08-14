@@ -9,14 +9,6 @@ export const QUEST_MACRO_CATEGORIES: MacroCategoryDefinition[] = [
     accent: '#22c55e',
     backgroundFrom: '#f59e0b',
     backgroundTo: '#fb7185',
-    taskSuggestions: [
-      'Plan your next workout',
-      'Prep your gym bag',
-      'Schedule a walk after lunch',
-    ],
-    campaignHeadlines: ['Training Sprint', 'Momentum Pass', 'Endurance Push'],
-    durationDaysOptions: [7, 14],
-    premiumAnimationId: 'sport_victory_bounce',
   },
   {
     id: 'family',
@@ -26,14 +18,6 @@ export const QUEST_MACRO_CATEGORIES: MacroCategoryDefinition[] = [
     accent: '#f97316',
     backgroundFrom: '#1d4ed8',
     backgroundTo: '#0f172a',
-    taskSuggestions: [
-      'Plan quality time with family',
-      'Send a thoughtful check-in message',
-      'Book a catch-up call',
-    ],
-    campaignHeadlines: ['Connection Bundle', 'Family Focus', 'Together Time'],
-    durationDaysOptions: [7, 14],
-    premiumAnimationId: 'family_firefly_hug',
   },
   {
     id: 'mindfulness',
@@ -43,14 +27,6 @@ export const QUEST_MACRO_CATEGORIES: MacroCategoryDefinition[] = [
     accent: '#8b5cf6',
     backgroundFrom: '#06b6d4',
     backgroundTo: '#2563eb',
-    taskSuggestions: [
-      'Write down one thing you are grateful for',
-      'Block a 15-minute reflection session',
-      'Create a self-care checklist',
-    ],
-    campaignHeadlines: ['Calm Mode', 'Mind Garden', 'Grounding Run'],
-    durationDaysOptions: [7, 14],
-    premiumAnimationId: 'mindfulness_lotus_glow',
   },
   {
     id: 'house_chores',
@@ -60,14 +36,6 @@ export const QUEST_MACRO_CATEGORIES: MacroCategoryDefinition[] = [
     accent: '#eab308',
     backgroundFrom: '#7c3aed',
     backgroundTo: '#c026d3',
-    taskSuggestions: [
-      'Reset the kitchen counters',
-      'Sort one clutter hotspot',
-      'Run one laundry cycle',
-    ],
-    campaignHeadlines: ['Home Reset', 'Clean Sweep', 'Tidy Track'],
-    durationDaysOptions: [7, 14],
-    premiumAnimationId: 'chores_sparkle_spin',
   },
   {
     id: 'sleep',
@@ -77,14 +45,6 @@ export const QUEST_MACRO_CATEGORIES: MacroCategoryDefinition[] = [
     accent: '#38bdf8',
     backgroundFrom: '#0f172a',
     backgroundTo: '#1d4ed8',
-    taskSuggestions: [
-      'Set a wind-down reminder',
-      'Prepare tomorrow before bed',
-      'Put devices away 30 minutes before sleep',
-    ],
-    campaignHeadlines: ['Sleep Reset', 'Night Shift', 'Moonlight Routine'],
-    durationDaysOptions: [7, 14],
-    premiumAnimationId: 'sleep_moon_drift',
   },
 ];
 

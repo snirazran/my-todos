@@ -81,7 +81,6 @@ const UserSchema = new Schema<UserDoc>(
       default: () => ({
         selectedCategoryIds: [],
         categoryTagMap: [],
-        unlockedAnimationIds: [],
       }),
     },
     platformsSeen: {

@@ -67,7 +67,7 @@ function rewardType(summary: RewardSummary) {
 }
 
 export function questAnalyticsProperties(
-  quest: Pick<QuestDoc, 'templateId' | 'placement' | 'categoryId' | 'logic'>,
+  quest: Pick<QuestDoc, 'templateId' | 'placement' | 'logic'>,
   summary: RewardSummary,
   block?: ResolvedQuestLogicBlock,
 ): AnalyticsProperties {
@@ -75,7 +75,6 @@ export function questAnalyticsProperties(
   const properties: AnalyticsProperties = {
     quest_placement: quest.placement,
     claim_type: quest.placement,
-    quest_category: quest.categoryId ?? (quest.placement === 'daily' ? 'daily' : 'uncategorized'),
     quest_generation: generated ? 'generated' : 'authored',
     quest_tier: generated
       ? block

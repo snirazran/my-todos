@@ -1,10 +1,5 @@
 import mongoose, { Schema, type Model } from 'mongoose';
 
-export interface QuickAddSuggestionEntry {
-  text: string;
-  emoji: string;
-}
-
 export type { QuestCoverImageFile } from './QuestTemplate';
 import type { QuestCoverImageFile } from './QuestTemplate';
 
@@ -21,19 +16,9 @@ export interface QuestCategoryDoc {
   backgroundFrom: string;
   backgroundTo: string;
   isBuiltIn: boolean;
-  questMode?: 'templates' | 'generated';
-  quickAddSuggestions: QuickAddSuggestionEntry[];
   createdAt: Date;
   updatedAt: Date;
 }
-
-const QuickAddSuggestionSchema = new Schema<QuickAddSuggestionEntry>(
-  {
-    text: { type: String, required: true },
-    emoji: { type: String, default: '' },
-  },
-  { _id: false },
-);
 
 const QuestCategorySchema = new Schema<QuestCategoryDoc>(
   {
@@ -48,12 +33,6 @@ const QuestCategorySchema = new Schema<QuestCategoryDoc>(
     backgroundFrom: { type: String, default: '#1e1b4b' },
     backgroundTo: { type: String, default: '#312e81' },
     isBuiltIn: { type: Boolean, default: false },
-    questMode: {
-      type: String,
-      enum: ['templates', 'generated'],
-      default: 'templates',
-    },
-    quickAddSuggestions: { type: [QuickAddSuggestionSchema], default: [] },
   },
   {
     collection: 'quest_categories',

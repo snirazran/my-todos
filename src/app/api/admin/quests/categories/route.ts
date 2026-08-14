@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminUserId as requireUserId } from '@/lib/adminAuth';
 import connectMongo from '@/lib/mongoose';
-import QuestCategoryModel, {
-  type QuickAddSuggestionEntry,
-} from '@/lib/models/QuestCategory';
+import QuestCategoryModel from '@/lib/models/QuestCategory';
 import {
   isCoverDataUrl,
   isCoverProxyUrl,
@@ -18,34 +16,6 @@ function sanitizeCoverImageUrl(value: unknown) {
     : undefined;
 }
 
-function sanitizeQuickAddSuggestions(value: unknown): QuickAddSuggestionEntry[] {
-  if (!Array.isArray(value)) return [];
-  const seen = new Set<string>();
-  const out: QuickAddSuggestionEntry[] = [];
-  for (const raw of value) {
-    if (!raw || typeof raw !== 'object') continue;
-    const text =
-      typeof (raw as { text?: unknown }).text === 'string'
-        ? (raw as { text: string }).text.trim().slice(0, 80)
-        : '';
-    if (!text) continue;
-    const emojiRaw =
-      typeof (raw as { emoji?: unknown }).emoji === 'string'
-        ? (raw as { emoji: string }).emoji.trim().slice(0, 8)
-        : '';
-    const key = text.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push({ text, emoji: emojiRaw });
-    if (out.length >= 50) break;
-  }
-  return out;
-}
-
-function sanitizeQuestMode(value: unknown): 'templates' | 'generated' {
-  return value === 'generated' ? 'generated' : 'templates';
-}
-
 function categoryToJSON(c: {
   categoryId: string;
   name: string;
@@ -57,8 +27,6 @@ function categoryToJSON(c: {
   backgroundFrom: string;
   backgroundTo: string;
   isBuiltIn: boolean;
-  questMode?: 'templates' | 'generated';
-  quickAddSuggestions?: QuickAddSuggestionEntry[];
 }) {
   return {
     id: c.categoryId,
@@ -71,8 +39,6 @@ function categoryToJSON(c: {
     backgroundFrom: c.backgroundFrom,
     backgroundTo: c.backgroundTo,
     isBuiltIn: c.isBuiltIn,
-    questMode: c.questMode ?? 'templates',
-    quickAddSuggestions: c.quickAddSuggestions ?? [],
   };
 }
 
@@ -98,8 +64,6 @@ export async function GET() {
           backgroundFrom: c.backgroundFrom,
           backgroundTo: c.backgroundTo,
           isBuiltIn: false,
-          questMode: c.questMode,
-          quickAddSuggestions: c.quickAddSuggestions,
         }),
       ),
     });
@@ -115,7 +79,6 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { name, shortLabel, description, onboardingSentence, accent, backgroundFrom, backgroundTo } = body;
     const rawCoverImageUrl = sanitizeCoverImageUrl(body.coverImageUrl);
-    const quickAddSuggestions = sanitizeQuickAddSuggestions(body.quickAddSuggestions);
 
     if (!name?.trim()) {
       return NextResponse.json({ error: 'Category name is required' }, { status: 400 });
@@ -146,8 +109,6 @@ export async function POST(req: NextRequest) {
       backgroundFrom: backgroundFrom ?? '#1e1b4b',
       backgroundTo: backgroundTo ?? '#312e81',
       isBuiltIn: false,
-      questMode: sanitizeQuestMode(body.questMode),
-      quickAddSuggestions,
     });
 
     return NextResponse.json({
@@ -163,8 +124,6 @@ export async function POST(req: NextRequest) {
         backgroundFrom: category.backgroundFrom,
         backgroundTo: category.backgroundTo,
         isBuiltIn: category.isBuiltIn,
-        questMode: category.questMode,
-        quickAddSuggestions: category.quickAddSuggestions,
       }),
     });
   } catch {
@@ -179,7 +138,6 @@ export async function PUT(req: NextRequest) {
     const body = await req.json();
     const { id, name, shortLabel, description, onboardingSentence, accent, backgroundFrom, backgroundTo } = body;
     const rawCoverImageUrl = sanitizeCoverImageUrl(body.coverImageUrl);
-    const quickAddSuggestions = sanitizeQuickAddSuggestions(body.quickAddSuggestions);
 
     if (!id) return NextResponse.json({ error: 'Category id required' }, { status: 400 });
     if (!name?.trim()) return NextResponse.json({ error: 'Name required' }, { status: 400 });
@@ -193,8 +151,6 @@ export async function PUT(req: NextRequest) {
       backgroundFrom: backgroundFrom ?? '#1e1b4b',
       backgroundTo: backgroundTo ?? '#312e81',
       isBuiltIn: false,
-      questMode: sanitizeQuestMode(body.questMode),
-      quickAddSuggestions,
     };
     const unsetFields: Record<string, 1> = {};
 
@@ -235,8 +191,6 @@ export async function PUT(req: NextRequest) {
         backgroundFrom: category.backgroundFrom,
         backgroundTo: category.backgroundTo,
         isBuiltIn: category.isBuiltIn,
-        questMode: category.questMode,
-        quickAddSuggestions: category.quickAddSuggestions,
       }),
     });
   } catch {

@@ -1,5 +1,5 @@
 import mongoose, { Schema, type Model } from 'mongoose';
-import type { PactSizeTier, PactStatus } from '@/lib/pact/types';
+import type { PactStatus } from '@/lib/pact/types';
 
 export interface PactDoc {
   _id?: mongoose.Types.ObjectId;
@@ -10,7 +10,6 @@ export interface PactDoc {
   status: PactStatus;
   commitmentText: string;
   suggestionId?: string;
-  tier: PactSizeTier;
   days: number[];
   startTime: string;
   target: number;
@@ -44,7 +43,6 @@ const PactSchema = new Schema<PactDoc>(
     status: { type: String, default: 'active' },
     commitmentText: { type: String, required: true },
     suggestionId: { type: String, default: undefined },
-    tier: { type: String, default: 'steady' },
     days: { type: [Number], default: [] },
     startTime: { type: String, default: '' },
     target: { type: Number, default: 1 },

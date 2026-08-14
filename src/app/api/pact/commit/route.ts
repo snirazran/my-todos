@@ -40,7 +40,6 @@ export async function POST(req: NextRequest) {
       dayTimes:
         body.dayTimes && typeof body.dayTimes === 'object' ? body.dayTimes : undefined,
       tagId: typeof body.tagId === 'string' ? body.tagId : undefined,
-      tier: body.tier,
       suggestionId:
         typeof body.suggestionId === 'string' && !body.suggestionId.startsWith('repeat-')
           ? body.suggestionId
@@ -60,7 +59,6 @@ export async function POST(req: NextRequest) {
       name: 'pact_committed',
       properties: {
         category_id: categoryId,
-        tier: result.pact.tier,
         days: result.pact.days.length,
         source: result.pact.source,
         has_time: !!result.pact.startTime,

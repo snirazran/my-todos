@@ -138,7 +138,6 @@ export async function POST(req: NextRequest) {
       focusProfile: {
         selectedCategoryIds: [],
         categoryTagMap: [],
-        unlockedAnimationIds: [],
       },
     });
 

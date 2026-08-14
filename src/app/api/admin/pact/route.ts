@@ -19,8 +19,6 @@ function sanitizeSuggestions(raw: unknown): PactSuggestion[] {
       const text = String(entry?.text ?? '').trim().slice(0, 80);
       const categoryId = String(entry?.categoryId ?? '').trim();
       if (!text || !categoryId) return null;
-      const tier =
-        entry?.tier === 'starter' || entry?.tier === 'strong' ? entry.tier : 'steady';
       return {
         id: String(entry?.id ?? '').trim() || uuid(),
         categoryId,
@@ -29,7 +27,6 @@ function sanitizeSuggestions(raw: unknown): PactSuggestion[] {
         // over the schedule rather than the commitment, so the schedule is the
         // user's to set. A legacy day list still yields its count.
         sessions: suggestionSessions(entry ?? {}),
-        tier,
         isActive: entry?.isActive !== false,
         generated: !!entry?.generated,
         picked: Math.max(0, Number(entry?.picked) || 0),

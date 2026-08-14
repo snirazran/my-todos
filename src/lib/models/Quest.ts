@@ -1,6 +1,5 @@
 import mongoose, { Schema, type Model } from 'mongoose';
 import type {
-  MacroCategoryId,
   QuestPlacement,
   ResolvedQuestLogicBlock,
 } from '@/lib/quests/types';
@@ -12,15 +11,11 @@ export interface QuestDoc {
   templateId: string;
   rollKey: string;
   placement: QuestPlacement;
-  categoryId?: MacroCategoryId;
   windowKey: string;
   title: string;
   description: string;
   coverImageUrl?: string;
-  durationMinutes?: number;
-  startedAt?: Date | null;
   expiresAt?: Date | null;
-  lockedRemainingMs?: number | null;
   target: number;
   progress: number;
   logic: ResolvedQuestLogicBlock[];
@@ -29,14 +24,6 @@ export interface QuestDoc {
   claimedAt?: Date | null;
   // Last time synced progress increased; drives staleness in quest priority.
   lastProgressAt?: Date | null;
-  // Generated (recipe-rolled) quests: local day the quest finished; a new roll
-  // is generated once the user's local date moves past it.
-  regenAfterDay?: string;
-  // Objective rerolls spent on this roll, against REROLLS_PER_LADDER.
-  rerollsUsed?: number;
-  // Tiers granted at roll time because the previous ladder got far enough to
-  // earn a head start. Kept for reporting; the grant itself rides on the block.
-  carriedTiers?: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -49,21 +36,14 @@ const QuestSchema = new Schema<QuestDoc>(
     rollKey: { type: String, required: true, index: true },
     placement: {
       type: String,
-      enum: ['daily', 'category', 'onboarding'],
+      enum: ['daily', 'onboarding'],
       required: true,
-    },
-    categoryId: {
-      type: String,
-      default: undefined,
     },
     windowKey: { type: String, required: true, index: true },
     title: { type: String, required: true },
     description: { type: String, default: '' },
     coverImageUrl: { type: String, default: undefined },
-    durationMinutes: { type: Number, default: undefined },
-    startedAt: { type: Date, default: null },
     expiresAt: { type: Date, default: null, index: true },
-    lockedRemainingMs: { type: Number, default: null },
     target: { type: Number, required: true },
     progress: { type: Number, default: 0 },
     logic: { type: [Schema.Types.Mixed], default: [] } as any,
@@ -71,9 +51,6 @@ const QuestSchema = new Schema<QuestDoc>(
     completedAt: { type: Date, default: null },
     claimedAt: { type: Date, default: null },
     lastProgressAt: { type: Date, default: null },
-    regenAfterDay: { type: String, default: undefined },
-    rerollsUsed: { type: Number, default: 0 },
-    carriedTiers: { type: Number, default: 0 },
   },
   {
     collection: 'quests',

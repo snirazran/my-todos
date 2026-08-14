@@ -13,13 +13,10 @@ import { getFullCatalog } from '@/lib/skins/getCatalog';
 import { loadBackgroundPrizes } from '@/lib/skins/gifts';
 import { getZonedToday, getZonedYMD } from '@/lib/utils';
 import { recordDoubleableClaim } from '@/lib/rewards/adDouble';
-import { recordAnalyticsEvent } from '@/lib/analytics/server';
 import {
-  isTagScopedQuestMetric,
   loadQuestCounters,
   parseTaskStreakDays,
   sumCounters,
-  sumCountersForTags,
   taskStreakMetric,
   type QuestCounterEntry,
 } from './metrics';
@@ -28,10 +25,8 @@ import QuestRecipeModel, {
   type RecipePoolEntry,
   type RecipeSlot,
 } from '@/lib/models/QuestRecipe';
-import { ensureDefaultQuestRecipe } from './recipeDefaults';
 import { ensureDefaultOnboardingTemplates } from './onboardingQuests';
 import type {
-  CategoryQuestProgressView,
   DailyQuestProgressView,
   FocusCategoryTagMap,
   FocusProfile,
@@ -69,15 +64,6 @@ function createSeededRandom(seed: string) {
   };
 }
 
-function shuffle<T>(items: T[], rng: () => number) {
-  const copy = [...items];
-  for (let i = copy.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(rng() * (i + 1));
-    [copy[i], copy[j]] = [copy[j], copy[i]];
-  }
-  return copy;
-}
-
 function byTemplateOrder(a: QuestTemplateDoc, b: QuestTemplateDoc) {
   if (a.placement !== b.placement) {
     return a.placement.localeCompare(b.placement);
@@ -99,60 +85,10 @@ export function normalizeFocusProfile(user: UserDoc): FocusProfile {
     categoryTagMap: user.focusProfile?.categoryTagMap ?? [],
     suggestedContentCreatedAt:
       user.focusProfile?.suggestedContentCreatedAt ?? null,
-    unlockedAnimationIds: user.focusProfile?.unlockedAnimationIds ?? [],
-    areaQuestsUnlockedAt: user.focusProfile?.areaQuestsUnlockedAt ?? null,
-    activeFocusCategoryId: user.focusProfile?.activeFocusCategoryId ?? null,
-    rentedFocus: user.focusProfile?.rentedFocus ?? null,
   };
 }
 
-export const RENT_SLOT_ADS_REQUIRED = 1;
-export const RENT_SLOT_DURATION_MS = 24 * 60 * 60 * 1000;
 export const DAILY_QUESTS_UNLOCK_STEP_TARGET = 5;
-
-export function activeRentedFocusCategoryId(
-  profile: FocusProfile,
-  now: Date = new Date(),
-): string | null {
-  const rented = profile.rentedFocus;
-  if (!rented?.categoryId || !rented.expiresAt) return null;
-  if (new Date(rented.expiresAt) <= now) return null;
-  if (!(profile.selectedCategoryIds ?? []).includes(rented.categoryId)) {
-    return null;
-  }
-  return rented.categoryId;
-}
-
-// The set of focus categories a user may progress right now; null means all
-// (premium). Free users get their active focus plus an unexpired rental.
-export function resolveUnlockedFocusCategoryIds(
-  profile: FocusProfile,
-  isPremium: boolean,
-  now: Date = new Date(),
-): string[] | null {
-  if (isPremium) return null;
-  const ids: string[] = [];
-  const active = resolveActiveFocusCategoryId(profile, false);
-  if (active) ids.push(active);
-  const rented = activeRentedFocusCategoryId(profile, now);
-  if (rented && rented !== active) ids.push(rented);
-  return ids;
-}
-
-// The single focus category a free user is actively progressing. Premium users
-// progress every focus in parallel, so this returns null for them. Falls back
-// to the first selected category when no valid choice is stored.
-export function resolveActiveFocusCategoryId(
-  profile: FocusProfile,
-  isPremium: boolean,
-): string | null {
-  if (isPremium) return null;
-  const selected = profile.selectedCategoryIds ?? [];
-  if (selected.length === 0) return null;
-  const chosen = profile.activeFocusCategoryId;
-  if (chosen && selected.includes(chosen)) return chosen;
-  return selected[0];
-}
 
 function getUserTagId(tag: unknown) {
   if (!tag || typeof tag !== 'object') return null;
@@ -219,21 +155,12 @@ function matchesLogicBlock(task: TaskDoc, block: QuestLogicBlock) {
   const effectiveSubject: QuestSubject =
     block.type === 'focus_minutes' ? 'task' : block.subject;
   if (!matchesSubject(task, effectiveSubject)) return false;
+  const resolvedTagId = (block as ResolvedQuestLogicBlock).resolvedTagId;
   const tagIds =
-    block.tagMode === 'random_user_tag' &&
-    'resolvedTagId' in block &&
-    block.resolvedTagId
-      ? [block.resolvedTagId]
-      : block.tagMode === 'focus_category_tags' &&
-          'resolvedTagIds' in block &&
-          Array.isArray(block.resolvedTagIds)
-        ? block.resolvedTagIds
-        : undefined;
-  if (
-    (block.tagMode === 'random_user_tag' ||
-      block.tagMode === 'focus_category_tags') &&
-    (!tagIds || tagIds.length === 0)
-  ) {
+    block.tagMode === 'random_user_tag' && resolvedTagId
+      ? [resolvedTagId]
+      : undefined;
+  if (block.tagMode === 'random_user_tag' && !tagIds) {
     return false;
   }
   if (!hasAnyTag(task, tagIds)) return false;
@@ -452,10 +379,9 @@ function computeQuestBaseline(args: {
   timezone: string;
   todayKey: string;
   tagIds?: string[];
-  focusCategoryId?: string;
   accountCreatedAt?: Date | null;
 }): QuestBaseline {
-  const { tasks, timezone, todayKey, tagIds, focusCategoryId } = args;
+  const { tasks, timezone, todayKey, tagIds } = args;
   const startKey = shiftDateKey(todayKey, -BASELINE_LOOKBACK_DAYS);
   const endKey = shiftDateKey(todayKey, -1);
 
@@ -476,9 +402,7 @@ function computeQuestBaseline(args: {
   observedDays = Math.max(BASELINE_MIN_OBSERVED_DAYS, observedDays);
 
   const matches = (task: TaskDoc) => {
-    if (task.type === 'focus-area') {
-      return focusCategoryId ? task.focusAreaId === focusCategoryId : true;
-    }
+    if (task.type === 'focus-area') return true;
     return hasAnyTag(task, tagIds);
   };
 
@@ -630,24 +554,11 @@ function progressForLogicBlock(args: {
   startDate: string;
   endDate: string;
   counters?: QuestCounterEntry[];
-  focusCategoryId?: string;
 }) {
-  const { block, tasks, timezone, startDate, endDate, counters, focusCategoryId } = args;
+  const { block, tasks, timezone, startDate, endDate, counters } = args;
 
   if (block.type === 'metric_count') {
     if (!block.metricKey) return 0;
-    if (
-      block.tagMode === 'focus_category_tags' &&
-      isTagScopedQuestMetric(block.metricKey)
-    ) {
-      return sumCountersForTags(
-        counters ?? [],
-        block.metricKey,
-        startDate,
-        endDate,
-        block.resolvedTagIds ?? [],
-      );
-    }
     return sumCounters(counters ?? [], block.metricKey, startDate, endDate);
   }
 
@@ -655,13 +566,10 @@ function progressForLogicBlock(args: {
     return Math.floor(
       sumFocusSeconds(tasks, startDate, endDate, (task) => {
         if (task.type !== 'focus-area') return matchesLogicBlock(task, block);
-        if (focusCategoryId) return task.focusAreaId === focusCategoryId;
         const scopedTags =
           block.tagMode === 'random_user_tag' && block.resolvedTagId
             ? [block.resolvedTagId]
-            : block.tagMode === 'focus_category_tags'
-              ? block.resolvedTagIds
-              : undefined;
+            : undefined;
         return scopedTags ? hasAnyTag(task, scopedTags) : true;
       }) / 60,
     );
@@ -681,10 +589,7 @@ function progressForLogicBlock(args: {
       block.sessionMinutes ?? 25,
       (task) => {
         if (task.type !== 'focus-area') return matchesLogicBlock(task, block);
-        if (focusCategoryId) return task.focusAreaId === focusCategoryId;
-        return block.tagMode === 'focus_category_tags'
-          ? hasAnyTag(task, block.resolvedTagIds)
-          : true;
+        return true;
       },
     );
   }
@@ -751,13 +656,6 @@ function isSupportedReward(reward: { type?: string }): reward is QuestReward {
     reward.type === 'BOX' ||
     reward.type === 'BACKGROUND'
   );
-}
-
-function sanitizeRewardSet(rewards: unknown): QuestRewards {
-  if (!Array.isArray(rewards)) return [];
-  return rewards
-    .filter((reward): reward is QuestReward => isSupportedReward(reward as { type?: string }))
-    .map(sanitizeReward);
 }
 
 // A target scaled up to the user's own rate has to pay for the extra work, or
@@ -867,10 +765,6 @@ function categoryDocToDefinition(doc: QuestCategoryDoc): MacroCategoryDefinition
     accent: doc.accent,
     backgroundFrom: doc.backgroundFrom,
     backgroundTo: doc.backgroundTo,
-    taskSuggestions: [],
-    campaignHeadlines: [],
-    durationDaysOptions: [],
-    premiumAnimationId: '',
   };
 }
 
@@ -881,11 +775,6 @@ function templateToView(doc: QuestTemplateDoc): QuestTemplateView {
     description: doc.description,
     coverImageUrl: doc.coverImageUrl,
     placement: doc.placement,
-    categoryId: doc.categoryId,
-    durationMinutes:
-      doc.placement === 'category' && doc.durationMinutes && doc.durationMinutes > 0
-        ? doc.durationMinutes
-        : undefined,
     logic: doc.logic,
     visibilityConditions: doc.visibilityConditions ?? [],
     isActive: doc.isActive,
@@ -901,13 +790,10 @@ function questDocToView(doc: QuestDoc): QuestProgressView {
     id: doc.questId,
     templateId: doc.templateId,
     placement: doc.placement,
-    categoryId: doc.categoryId,
     windowKey: doc.windowKey,
     title: doc.title,
     description: doc.description,
     coverImageUrl: doc.coverImageUrl,
-    durationMinutes: doc.durationMinutes,
-    startedAt: doc.startedAt?.toISOString(),
     expiresAt: doc.expiresAt?.toISOString(),
     lastProgressAt: (doc.lastProgressAt ?? doc.createdAt)?.toISOString(),
     target: doc.target,
@@ -917,10 +803,6 @@ function questDocToView(doc: QuestDoc): QuestProgressView {
     claimed,
     logic: doc.logic,
     claimedObjectiveIds: doc.claimedObjectiveIds ?? [],
-    carriedTiers: doc.carriedTiers ?? 0,
-    rerollsLeft: doc.templateId.startsWith('gen:')
-      ? Math.max(0, REROLLS_PER_LADDER - (doc.rerollsUsed ?? 0))
-      : 0,
   };
 }
 
@@ -999,84 +881,6 @@ function resolveRecipeMetricKey(
 // Tiers a ladder must reach before the next roll starts with a head start,
 // and how many it gets. Nunes & Drèze: a card with the first stamps already
 // filled gets finished far more often than an equivalent empty one.
-const CARRYOVER_EARNED_AFTER_TIERS = 3;
-const CARRYOVER_TIERS_GRANTED = 1;
-
-export const REROLLS_PER_LADDER = 1;
-
-function tiersReached(quest: {
-  logic?: ResolvedQuestLogicBlock[];
-}): number {
-  return (quest.logic ?? []).filter(
-    (block) => (block.progress ?? 0) >= Math.max(1, block.target ?? 1),
-  ).length;
-}
-
-function carryOverTiersFor(quest: { logic?: ResolvedQuestLogicBlock[] }): number {
-  return tiersReached(quest) >= CARRYOVER_EARNED_AFTER_TIERS
-    ? CARRYOVER_TIERS_GRANTED
-    : 0;
-}
-
-function ladderEngaged(quest: QuestDoc): boolean {
-  if ((quest.claimedObjectiveIds ?? []).length > 0) return true;
-  if ((quest.rerollsUsed ?? 0) > 0) return true;
-  return (quest.logic ?? []).some(
-    (block) => !block.preCredited && (block.progress ?? 0) > 0,
-  );
-}
-
-type LadderOutcome =
-  | 'completed'
-  | 'expired_attempted'
-  | 'expired_untouched'
-  | 'expired_locked';
-
-// Where a ladder stopped, recorded once as it is replaced. Without this the
-// stall points are invisible and target calibration is guesswork.
-async function recordLadderOutcome(args: {
-  userId: string;
-  quest: QuestDoc;
-  outcome: LadderOutcome;
-  carriedTiers: number;
-}): Promise<void> {
-  const { quest, outcome } = args;
-  const total = (quest.logic ?? []).length;
-  if (total === 0) return;
-  const reached = tiersReached(quest);
-  const attempted = outcome === 'completed' || outcome === 'expired_attempted';
-  try {
-    await recordAnalyticsEvent({
-      userId: args.userId,
-      name: 'quest_ladder_finished',
-      properties: {
-        placement: quest.placement,
-        category_id: quest.categoryId ?? 'uncategorized',
-        template_id: quest.templateId,
-        reason: outcome === 'completed' ? 'completed' : 'expired',
-        outcome,
-        attempted,
-        tiers_total: total,
-        tiers_reached: reached,
-        tiers_claimed: (quest.claimedObjectiveIds ?? []).length,
-        stalled_at_tier: !attempted || reached >= total ? null : reached + 1,
-        stalled_objective_type:
-          !attempted || reached >= total
-            ? null
-            : quest.logic?.[reached]?.type ?? null,
-        rerolls_used: quest.rerollsUsed ?? 0,
-        carried_in: quest.carriedTiers ?? 0,
-        carried_out: args.carriedTiers,
-      },
-    });
-  } catch (err) {
-    console.error('recordLadderOutcome failed', err);
-  }
-}
-
-// Pool-entry fields that shape what a rolled block asks for, rather than how
-// much of it. Omitted entirely when unset so a block never carries a key the
-// admin did not author.
 function recipePickModifiers(pick: RecipePoolEntry): Partial<QuestLogicBlock> {
   const modifiers: Partial<QuestLogicBlock> = {};
   if (pick.type === 'deep_session') {
@@ -1348,9 +1152,7 @@ async function syncQuestForTemplate(args: {
   const questId =
     template.placement === 'daily'
       ? `${template.templateId}:${windowKey}`
-      : template.placement === 'onboarding'
-        ? `${template.templateId}:onboarding`
-        : `${template.templateId}:category`;
+      : `${template.templateId}:onboarding`;
 
   let doc =
     args.existingDoc ??
@@ -1360,7 +1162,6 @@ async function syncQuestForTemplate(args: {
       templateId: template.templateId,
       rollKey: crypto.randomUUID(),
       placement: template.placement,
-      categoryId: template.categoryId,
       windowKey,
       title: template.name,
       description: template.description,
@@ -1373,14 +1174,6 @@ async function syncQuestForTemplate(args: {
     doc.rollKey = crypto.randomUUID();
   }
 
-  const templateDurationMinutes =
-    template.placement === 'category' &&
-    typeof template.durationMinutes === 'number' &&
-    Number.isFinite(template.durationMinutes) &&
-    template.durationMinutes > 0
-      ? Math.floor(template.durationMinutes)
-      : undefined;
-
   const startDate =
     template.placement === 'daily'
       ? windowKey
@@ -1389,91 +1182,20 @@ async function syncQuestForTemplate(args: {
   const userTags = (user.tags ?? []).filter(
     (tag) => !!getUserTagId(tag),
   );
-  const profile = normalizeFocusProfile(user);
-  const categoryTagIds =
-    template.categoryId
-      ? profile.categoryTagMap.find(
-          (entry) => entry.categoryId === template.categoryId,
-        )?.tagIds ?? []
-      : [];
-  const categoryTags = userTags.filter((tag) => {
-    const tagId = getUserTagId(tag);
-    return tagId ? categoryTagIds.includes(tagId) : false;
-  });
-  const templateLogic =
-    template.placement === 'category'
-      ? template.logic.map((block) =>
-          block.type === 'metric_count' &&
-          !isTagScopedQuestMetric(block.metricKey)
-            ? block
-            : { ...block, tagMode: 'focus_category_tags' as const },
-        )
-      : template.logic;
-
-  const unlockedFocusIds = resolveUnlockedFocusCategoryIds(
-    profile,
-    isPremiumUser(user),
-  );
-  const lockedForFreeUser =
-    template.placement === 'category' &&
-    unlockedFocusIds !== null &&
-    unlockedFocusIds.length > 0 &&
-    !unlockedFocusIds.includes(template.categoryId ?? '');
+  const templateLogic = template.logic;
 
   // Onboarding targets are a hand-authored sequence; only rolled placements
   // scale to the user. Anchored to the window's start, not today, so a target
   // cannot drift under the user as they make progress against it.
   const baseline =
-    template.placement === 'onboarding' || lockedForFreeUser
+    template.placement === 'onboarding'
       ? NEUTRAL_BASELINE
       : computeQuestBaseline({
           tasks,
           timezone,
           todayKey: startDate,
-          tagIds:
-            template.placement === 'category' ? categoryTagIds : undefined,
-          focusCategoryId:
-            template.placement === 'category' ? template.categoryId : undefined,
           accountCreatedAt: user.createdAt ?? null,
         });
-
-  let nextDurationMinutes: number | undefined;
-  let nextStartedAt: Date | null;
-  let nextExpiresAt: Date | null;
-  let nextLockedRemainingMs: number | null;
-  if (templateDurationMinutes) {
-    const nowMs = Date.now();
-    const windowMs = templateDurationMinutes * 60_000;
-    nextDurationMinutes = doc.durationMinutes ?? templateDurationMinutes;
-    if (lockedForFreeUser) {
-      const carried =
-        doc.lockedRemainingMs ??
-        (doc.expiresAt ? doc.expiresAt.getTime() - nowMs : windowMs);
-      nextLockedRemainingMs = carried > 0 ? carried : windowMs;
-      nextStartedAt = null;
-      nextExpiresAt = null;
-    } else if (typeof doc.lockedRemainingMs === 'number') {
-      nextStartedAt = new Date(nowMs);
-      nextExpiresAt = new Date(
-        nowMs + (doc.lockedRemainingMs > 0 ? doc.lockedRemainingMs : windowMs),
-      );
-      nextLockedRemainingMs = null;
-    } else {
-      nextStartedAt = doc.startedAt ?? new Date(nowMs);
-      nextExpiresAt =
-        doc.expiresAt ?? new Date(nextStartedAt.getTime() + windowMs);
-      nextLockedRemainingMs = null;
-    }
-  } else {
-    nextDurationMinutes = undefined;
-    nextStartedAt = null;
-    nextExpiresAt = null;
-    nextLockedRemainingMs = null;
-  }
-
-  const prevBlocksById = new Map(
-    (doc.logic ?? []).map((block) => [block.id, block]),
-  );
 
   const resolvedLogic: ResolvedQuestLogicBlock[] = templateLogic.map((block) => {
       const resolvedTag =
@@ -1490,28 +1212,14 @@ async function syncQuestForTemplate(args: {
       block,
       `${userId}:${template.templateId}:${windowKey}:${doc.rollKey}:${block.id}`,
       baseline,
-      templateDurationMinutes
-        ? Math.max(1, Math.round(templateDurationMinutes / (24 * 60)))
-        : 1,
+      1,
     );
       const resolvedBlock: ResolvedQuestLogicBlock = {
         ...block,
         target,
         progress: 0,
         resolvedTagId: getUserTagId(resolvedTag) ?? undefined,
-        resolvedTagIds:
-          block.tagMode === 'focus_category_tags'
-            ? categoryTags
-                .map((tag) => getUserTagId(tag))
-                .filter((tagId): tagId is string => !!tagId)
-            : undefined,
         resolvedTagName: getUserTagName(resolvedTag) ?? undefined,
-        resolvedTagNames:
-          block.tagMode === 'focus_category_tags'
-            ? categoryTags
-                .map((tag) => getUserTagName(tag))
-                .filter((tagName): tagName is string => !!tagName)
-            : undefined,
       };
     const rawProgress = progressForLogicBlock({
       block: resolvedBlock,
@@ -1520,18 +1228,8 @@ async function syncQuestForTemplate(args: {
       startDate,
       endDate,
       counters,
-      focusCategoryId:
-        template.placement === 'category' ? template.categoryId : undefined,
     });
-    const prevBlock = prevBlocksById.get(block.id);
-    const prevOffset = Math.max(0, prevBlock?.progressOffset ?? 0);
-    const prevProgress = Math.max(0, prevBlock?.progress ?? 0);
-    const progressOffset = lockedForFreeUser
-      ? Math.max(0, rawProgress - prevProgress)
-      : prevOffset;
-    const progress = block.preCredited
-      ? target
-      : Math.max(0, rawProgress - progressOffset);
+    const progress = block.preCredited ? target : Math.max(0, rawProgress);
     const payScale = Math.max(1, baselineScaleForBlock(block, baseline));
     const authoredRewards = (block.baseRewards ?? block.rewards ?? []).filter(
       (r): r is QuestReward => isSupportedReward(r as { type?: string }),
@@ -1548,18 +1246,12 @@ async function syncQuestForTemplate(args: {
     return {
       ...resolvedBlock,
       progress,
-      progressOffset,
       baseRewards: authoredRewards.length > 0 ? authoredRewards : undefined,
       rewards: resolvedRewards.length > 0 ? resolvedRewards : undefined,
     };
   });
 
-  enforceLadderShape(
-    resolvedLogic,
-    templateDurationMinutes
-      ? Math.max(1, Math.round(templateDurationMinutes / (24 * 60)))
-      : 1,
-  );
+  enforceLadderShape(resolvedLogic, 1);
   for (const block of resolvedLogic) {
     if (block.preCredited) block.progress = block.target;
   }
@@ -1580,22 +1272,10 @@ async function syncQuestForTemplate(args: {
   let changed = !!(doc as any).isNew;
   changed = setQuestField(doc, 'questId', questId) || changed;
   changed = setQuestField(doc, 'placement', template.placement) || changed;
-  changed = setQuestField(doc, 'categoryId', template.categoryId) || changed;
   changed = setQuestField(doc, 'windowKey', windowKey) || changed;
   changed = setQuestField(doc, 'title', template.name) || changed;
   changed = setQuestField(doc, 'description', template.description) || changed;
-  changed = setQuestField(doc, 'durationMinutes', nextDurationMinutes) || changed;
-  changed = setQuestField(doc, 'startedAt', nextStartedAt) || changed;
-  changed = setQuestField(doc, 'expiresAt', nextExpiresAt) || changed;
-  changed =
-    setQuestField(doc, 'lockedRemainingMs', nextLockedRemainingMs) || changed;
   changed = setQuestField(doc, 'logic', resolvedLogic) || changed;
-  changed =
-    setQuestField(
-      doc,
-      'carriedTiers',
-      resolvedLogic.filter((block) => block.preCredited).length,
-    ) || changed;
   changed = setQuestField(doc, 'target', target) || changed;
   changed = setQuestField(doc, 'progress', progress) || changed;
   changed = setQuestField(doc, 'completedAt', nextCompletedAt) || changed;
@@ -1632,7 +1312,6 @@ export async function syncQuestState(args: {
   includeCatalog?: boolean;
   includeCategories?: boolean;
   refreshDaily?: boolean;
-  refreshFocus?: boolean;
   dailySelectionSeed?: string;
 }) {
   const { userId, timezone } = args;
@@ -1661,13 +1340,13 @@ export async function syncQuestState(args: {
         ? Promise.resolve(args.catalog)
         : getFullCatalog()
       : Promise.resolve([] as ItemDef[]),
-    QuestTemplateModel.find({ isActive: true }).lean<QuestTemplateDoc[]>(),
+    QuestTemplateModel.find({
+      isActive: true,
+      placement: 'onboarding',
+    }).lean<QuestTemplateDoc[]>(),
     includeCategories
       ? QuestCategoryModel.find({}).sort({ createdAt: 1 }).lean<QuestCategoryDoc[]>()
-      : QuestCategoryModel.find(
-          {},
-          { categoryId: 1, name: 1, shortLabel: 1, questMode: 1 },
-        )
+      : QuestCategoryModel.find({}, { categoryId: 1, name: 1, shortLabel: 1 })
           .sort({ createdAt: 1 })
           .lean<QuestCategoryDoc[]>(),
     QuestModel.find({ userId }).select('-coverImageUrl'),
@@ -1698,13 +1377,6 @@ export async function syncQuestState(args: {
       (doc) => !(doc.placement === 'daily' && doc.windowKey === todayKey),
     );
   }
-  if (args.refreshFocus) {
-    await QuestModel.deleteMany({ userId, placement: 'category' });
-    allExistingDocs = allExistingDocs.filter(
-      (doc) => doc.placement !== 'category',
-    );
-  }
-
   const filteredTemplates = [...templates]
     .sort(byTemplateOrder)
     .filter((template) =>
@@ -1714,52 +1386,15 @@ export async function syncQuestState(args: {
     ),
   );
 
-  const dailyTemplates = filteredTemplates.filter(
-    (template) => template.placement === 'daily',
-  );
-  const questModeByCategoryId = new Map(
-    categories.map((c) => [c.categoryId, c.questMode ?? 'templates']),
-  );
-  const categoryTemplates = filteredTemplates.filter((template) => {
-    if (template.placement !== 'category' || !template.categoryId) return false;
-    if (questModeByCategoryId.get(template.categoryId) === 'generated') {
-      return false;
-    }
-    return profile.selectedCategoryIds.includes(template.categoryId);
-  });
-
-  const existingDailyDocs = allExistingDocs.filter(
-    (doc) => doc.placement === 'daily' && doc.windowKey === todayKey,
-  );
-
   let selectedDailyTemplates: QuestTemplateDoc[] = [];
-  if (existingDailyDocs.length > 0) {
-    const templateIds = new Set(existingDailyDocs.map((doc) => doc.templateId));
-    const matchedTemplates = dailyTemplates.filter((template) =>
-      templateIds.has(template.templateId),
-    );
-    if (matchedTemplates.length > 0) {
-      selectedDailyTemplates = matchedTemplates;
-    }
-  }
 
-  if (selectedDailyTemplates.length === 0) {
-    const rng = createSeededRandom(
-      `${userId}:${todayKey}:${args.dailySelectionSeed ?? 'default'}`,
-    );
-    selectedDailyTemplates = shuffle(dailyTemplates, rng).slice(0, 3);
-  }
-
-  // An active daily recipe replaces authored daily templates with ONE quest
-  // holding an objective per slot (slot order = difficulty order, like the
-  // focus ladders). The roll is frozen in the day's quest doc once created:
+  // The day's quests are ONE quest holding an objective per recipe slot (slot
+  // order = difficulty order). The roll is frozen in the day's quest doc once
+  // created:
   // pool eligibility depends on user state (flies, inventory) that changes
   // during the day, so re-rolling mid-day could swap objectives.
   const dailyRecipe = recipes.find(
-    (r) =>
-      (r.placement ?? 'category') === 'daily' &&
-      r.isActive &&
-      (r.slots ?? []).length > 0,
+    (r) => r.placement === 'daily' && r.isActive && (r.slots ?? []).length > 0,
   );
   if (dailyRecipe) {
     const templateId = `gend:${todayKey}`;
@@ -1829,234 +1464,6 @@ export async function syncQuestState(args: {
     }
   }
 
-  // Per-category rotation: each selected category has exactly one active quest.
-  // If the active quest's template is expired, rotate to a different template
-  // from the same category (or re-roll the same template if it's the only one).
-  const templatesByCategoryId = new Map<string, QuestTemplateDoc[]>();
-  for (const template of categoryTemplates) {
-    if (!template.categoryId) continue;
-    const arr = templatesByCategoryId.get(template.categoryId) ?? [];
-    arr.push(template);
-    templatesByCategoryId.set(template.categoryId, arr);
-  }
-
-  const existingByCategoryId = new Map<string, QuestDoc[]>();
-  for (const doc of allExistingDocs) {
-    if (doc.placement === 'category' && doc.categoryId) {
-      const arr = existingByCategoryId.get(doc.categoryId) ?? [];
-      arr.push(doc);
-      existingByCategoryId.set(doc.categoryId, arr);
-    }
-  }
-
-  const selectedCategoryTemplates: QuestTemplateDoc[] = [];
-  const categoryDocIdsToKeep = new Set<string>();
-  const nowMs = Date.now();
-
-  Array.from(templatesByCategoryId.entries()).forEach(
-    ([categoryId, templatesForCat]: [string, QuestTemplateDoc[]]) => {
-      if (templatesForCat.length === 0) return;
-      const existingDocs = existingByCategoryId.get(categoryId) ?? [];
-      const validTemplateIds = new Set(
-        templatesForCat.map((t: QuestTemplateDoc) => t.templateId),
-      );
-
-      const liveDoc = existingDocs.find((doc) => {
-        if (!validTemplateIds.has(doc.templateId)) return false;
-        return !doc.expiresAt || doc.expiresAt.getTime() > nowMs;
-      });
-
-      let chosenTemplate: QuestTemplateDoc;
-      if (liveDoc) {
-        chosenTemplate =
-          templatesForCat.find(
-            (t: QuestTemplateDoc) => t.templateId === liveDoc.templateId,
-          ) ?? templatesForCat[0];
-        categoryDocIdsToKeep.add(String(liveDoc._id));
-      } else {
-        const lastTemplateId = existingDocs[0]?.templateId;
-        const rotated =
-          lastTemplateId && templatesForCat.length > 1
-            ? templatesForCat.filter(
-                (t: QuestTemplateDoc) => t.templateId !== lastTemplateId,
-              )
-            : templatesForCat;
-        const pool = rotated.length > 0 ? rotated : templatesForCat;
-        const rng = createSeededRandom(
-          `${userId}:rotate:${categoryId}:${nowMs}`,
-        );
-        chosenTemplate = pool[Math.floor(rng() * pool.length)];
-      }
-
-      selectedCategoryTemplates.push(chosenTemplate);
-    },
-  );
-
-  // Generated mode: categories whose quests are rolled from a recipe instead
-  // of authored templates. A roll lives until its window expires (immediate
-  // re-roll) or it is fully claimed (re-roll after the local day ends).
-  const generatedCategoryIds = profile.selectedCategoryIds.filter(
-    (categoryId) => questModeByCategoryId.get(categoryId) === 'generated',
-  );
-  const generatedTemplates: QuestTemplateDoc[] = [];
-  const generatedUnlockedFocusIds = resolveUnlockedFocusCategoryIds(
-    profile,
-    isPremiumUser(user),
-  );
-  if (generatedCategoryIds.length > 0) {
-    let activeRecipes = recipes.filter((r) => (r.placement ?? 'category') !== 'daily');
-    if (activeRecipes.length === 0) {
-      const seeded = await ensureDefaultQuestRecipe();
-      if (seeded && seeded.isActive) activeRecipes = [seeded];
-    }
-    for (const categoryId of generatedCategoryIds) {
-      const recipe =
-        activeRecipes.find((r) => (r.categoryIds ?? []).includes(categoryId)) ??
-        activeRecipes.find((r) => (r.categoryIds ?? []).length === 0);
-      if (!recipe || (recipe.slots ?? []).length === 0) continue;
-
-      let existing =
-        allExistingDocs.find(
-          (doc) =>
-            doc.placement === 'category' &&
-            doc.categoryId === categoryId &&
-            doc.templateId.startsWith('gen:'),
-        ) ?? null;
-
-      let carriedTiers = 0;
-      if (existing) {
-        const rewardBlocks = (existing.logic ?? []).filter(
-          (block) => (block.rewards?.length ?? 0) > 0,
-        );
-        const fullyClaimed =
-          rewardBlocks.length > 0 &&
-          rewardBlocks.every((block) =>
-            (existing!.claimedObjectiveIds ?? []).includes(block.id),
-          );
-        if (fullyClaimed && !existing.regenAfterDay) {
-          existing.regenAfterDay = todayKey;
-          await QuestModel.updateOne(
-            { _id: existing._id },
-            { $set: { regenAfterDay: todayKey } },
-          );
-        }
-        const cooldownOver =
-          !!existing.regenAfterDay && todayKey > existing.regenAfterDay;
-        const expired =
-          !fullyClaimed &&
-          !!existing.expiresAt &&
-          existing.expiresAt.getTime() <= nowMs;
-        if (cooldownOver || expired) {
-          const lockedNow =
-            generatedUnlockedFocusIds !== null &&
-            generatedUnlockedFocusIds.length > 0 &&
-            !generatedUnlockedFocusIds.includes(categoryId);
-          const engaged = ladderEngaged(existing);
-          const outcome: LadderOutcome = !expired
-            ? 'completed'
-            : lockedNow
-              ? 'expired_locked'
-              : engaged
-                ? 'expired_attempted'
-                : 'expired_untouched';
-          carriedTiers =
-            expired && !engaged
-              ? Math.max(existing.carriedTiers ?? 0, carryOverTiersFor(existing))
-              : carryOverTiersFor(existing);
-          await recordLadderOutcome({
-            userId,
-            quest: existing,
-            outcome,
-            carriedTiers,
-          });
-          existing = null;
-        } else {
-          categoryDocIdsToKeep.add(String(existing._id));
-        }
-      }
-
-      const rollKey = existing?.rollKey ?? crypto.randomUUID();
-      const templateId = existing?.templateId ?? `gen:${categoryId}:${rollKey}`;
-      const recipeTagIds =
-        profile.categoryTagMap.find((entry) => entry.categoryId === categoryId)
-          ?.tagIds ?? [];
-      const recipeWindowDays = Math.max(
-        1,
-        Math.round((recipe.durationMinutes ?? 3 * 24 * 60) / (24 * 60)),
-      );
-      // Same freeze as the daily roll: a live doc keeps its rolled logic so
-      // pool eligibility changes can't swap objectives mid-roll.
-      const logic = existing?.logic?.length
-        ? backfillAuthoredRewards({
-            logic: existing.logic as QuestLogicBlock[],
-            slots: (recipe.slots ?? []) as RecipeSlot[],
-            userId,
-            templateId,
-          })
-        : (recipe.slots as RecipeSlot[])
-        .map((slot, index) => {
-          const pool = buildEligiblePool({
-            slot,
-            placement: 'category',
-            user,
-            catalog,
-            tasks,
-            todayKey,
-            hasFriends,
-            windowDays: recipeWindowDays,
-            tagIds: recipeTagIds,
-          });
-          const pick = pickWeighted(
-            pool,
-            createSeededRandom(`${userId}:${templateId}:slot:${index}`),
-          );
-          if (!pick) return null;
-          const isMetric = pick.type === 'metric_count';
-          const minAmount = Math.max(1, Math.floor(pick.minTarget));
-          const metricKey = isMetric
-            ? resolveRecipeMetricKey(pick, `${userId}:${templateId}:slot:${index}:streak`)
-            : undefined;
-          const block: QuestLogicBlock = {
-            id: `slot-${index + 1}`,
-            type: pick.type,
-            subject: 'task',
-            ...(index < carriedTiers ? { preCredited: true } : {}),
-            action: pick.type === 'count' ? pick.action ?? 'complete' : undefined,
-            amountMode: 'random',
-            minAmount,
-            maxAmount: Math.max(minAmount, Math.floor(pick.maxTarget)),
-            tagMode:
-              !isMetric || isTagScopedQuestMetric(metricKey)
-                ? 'focus_category_tags'
-                : 'ignore',
-            metricKey,
-            ...recipePickModifiers(pick),
-            rewards: rollSlotRewards(
-              slot,
-              `${userId}:${templateId}:slot:${index}`,
-            ),
-          };
-          return block;
-        })
-        .filter((block): block is QuestLogicBlock => !!block);
-      if (logic.length === 0) continue;
-
-      const category = categories.find((c) => c.categoryId === categoryId);
-      generatedTemplates.push({
-        templateId,
-        name: `${category?.shortLabel || category?.name || 'Focus'} Goals`,
-        description: 'A fresh set of goals rolled just for you.',
-        placement: 'category',
-        categoryId,
-        durationMinutes:
-          recipe.durationMinutes > 0 ? recipe.durationMinutes : undefined,
-        logic,
-        visibilityConditions: [],
-        isActive: true,
-      } as unknown as QuestTemplateDoc);
-    }
-  }
-
   // Onboarding quests: admin-managed templates shown one at a time, oldest
   // first; the next appears once the previous is fully claimed. Fully-claimed
   // docs stay in the DB (never re-emitted) so these one-time quests never
@@ -2092,53 +1499,16 @@ export async function syncQuestState(args: {
 
   const eligibleTemplates = [
     ...selectedDailyTemplates,
-    ...selectedCategoryTemplates,
-    ...generatedTemplates,
     ...onboardingTemplates,
   ];
   const eligibleDailyTemplateIds = new Set(
     selectedDailyTemplates.map((t) => t.templateId),
   );
 
-  const selectedCategoryIdSet = new Set(profile.selectedCategoryIds);
-  const parkedCategoryDocs = allExistingDocs.filter(
-    (doc) =>
-      doc.placement === 'category' &&
-      !!doc.categoryId &&
-      !selectedCategoryIdSet.has(doc.categoryId),
-  );
-  const parkedIdSet = new Set(
-    parkedCategoryDocs.map((doc) => doc._id.toString()),
-  );
-  const parkPromises = parkedCategoryDocs
-    .filter(
-      (doc) =>
-        typeof doc.lockedRemainingMs !== 'number' &&
-        !!doc.expiresAt &&
-        doc.expiresAt.getTime() > nowMs,
-    )
-    .map((doc) =>
-      QuestModel.updateOne(
-        { _id: doc._id },
-        {
-          $set: {
-            lockedRemainingMs: doc.expiresAt!.getTime() - nowMs,
-            startedAt: null,
-            expiresAt: null,
-          },
-        },
-        { timestamps: false },
-      ),
-    );
-
   // Find docs to delete in-memory and batch delete by IDs
   const docsToDelete = allExistingDocs.filter((doc) => {
     if (doc.placement === 'daily' && doc.windowKey === todayKey) {
       return !eligibleDailyTemplateIds.has(doc.templateId);
-    }
-    if (doc.placement === 'category') {
-      if (parkedIdSet.has(doc._id.toString())) return false;
-      return !categoryDocIdsToKeep.has(doc._id.toString());
     }
     // Delete stale daily docs from other days
     if (doc.placement === 'daily' && doc.windowKey !== todayKey) {
@@ -2148,12 +1518,10 @@ export async function syncQuestState(args: {
   });
 
   const deleteIdSet = new Set(docsToDelete.map((doc) => doc._id.toString()));
-  const deletePromise = Promise.all([
-    deleteIdSet.size > 0
+  const deletePromise =
+    docsToDelete.length > 0
       ? QuestModel.deleteMany({ _id: { $in: docsToDelete.map((d) => d._id) } })
-      : Promise.resolve(),
-    ...parkPromises,
-  ]);
+      : Promise.resolve();
 
   // Build lookup of existing docs by templateId+windowKey for syncQuestForTemplate
   const existingDocMap = new Map(
@@ -2170,7 +1538,7 @@ export async function syncQuestState(args: {
     let sinceDateKey = todayKey;
     for (const doc of allExistingDocs) {
       const docId = doc._id.toString();
-      if (deleteIdSet.has(docId) || parkedIdSet.has(docId)) continue;
+      if (deleteIdSet.has(docId)) continue;
       const created = getZonedYMD(doc.createdAt ?? new Date(), timezone);
       if (created < sinceDateKey) sinceDateKey = created;
     }
@@ -2197,16 +1565,6 @@ export async function syncQuestState(args: {
         ? { ...quest, coverImageUrl: dailyRecipe.coverImageUrl }
         : quest,
     );
-  const categoryQuests = questViews
-    .filter(
-      (quest): quest is CategoryQuestProgressView => quest.placement === 'category',
-    )
-    .sort((a, b) => {
-      if ((a.categoryId ?? '') !== (b.categoryId ?? '')) {
-        return (a.categoryId ?? '').localeCompare(b.categoryId ?? '');
-      }
-      return a.title.localeCompare(b.title);
-    });
   const onboardingQuests = questViews.filter(
     (quest) => quest.placement === 'onboarding',
   );
@@ -2286,20 +1644,6 @@ export async function syncQuestState(args: {
 
   const premium = isPremiumUser(user);
   const rewardBackgrounds = includeCatalog ? await loadBackgroundPrizes() : [];
-  const activeFocusCategoryId = resolveActiveFocusCategoryId(profile, premium);
-  const unlockedFocusIds = resolveUnlockedFocusCategoryIds(profile, premium);
-  const rentedFocusCategoryId = premium
-    ? null
-    : activeRentedFocusCategoryId(profile);
-  const gatedCategoryQuests: CategoryQuestProgressView[] = categoryQuests.map(
-    (quest) => ({
-      ...quest,
-      locked:
-        unlockedFocusIds !== null &&
-        unlockedFocusIds.length > 0 &&
-        !unlockedFocusIds.includes(quest.categoryId),
-    }),
-  );
 
   return {
     user,
@@ -2307,29 +1651,18 @@ export async function syncQuestState(args: {
     catalog,
     isPremium: premium,
     focusProfile: profile,
-    activeFocusCategoryId,
-    rentedFocus: rentedFocusCategoryId
-      ? {
-          categoryId: rentedFocusCategoryId,
-          expiresAt: profile.rentedFocus?.expiresAt ?? null,
-        }
-      : null,
     macroCategories: categories.map(categoryDocToDefinition),
     templatesWithCover,
     dailyQuests: visibleDailyQuests,
     dailyQuestsGated,
     firstOnboardingComplete,
     earlyObjectiveSteps,
-    categoryQuests: gatedCategoryQuests,
     onboardingQuests,
     rewardCatalog: includeCatalog
       ? buildRewardCatalog(
           catalog,
           [
             ...dailyQuests.flatMap((quest) =>
-              quest.logic.map((block) => block.rewards ?? []),
-            ),
-            ...categoryQuests.flatMap((quest) =>
               quest.logic.map((block) => block.rewards ?? []),
             ),
             ...onboardingQuests.flatMap((quest) =>
@@ -2367,7 +1700,6 @@ export async function saveFocusProfile(args: {
     completedAt: existing.completedAt ?? new Date(),
     selectedCategoryIds,
     categoryTagMap,
-    unlockedAnimationIds: existing.unlockedAnimationIds ?? [],
   };
   user.markModified('focusProfile');
   await user.save();
@@ -2379,8 +1711,6 @@ export async function saveFocusProfile(args: {
       categoryTagMap,
       completedAt: new Date(),
       suggestedContentCreatedAt: new Date(),
-      unlockedAnimationIds:
-        (user.focusProfile as FocusProfile)?.unlockedAnimationIds ?? [],
     };
     user.markModified('focusProfile');
     await user.save();
@@ -2389,128 +1719,9 @@ export async function saveFocusProfile(args: {
   return syncQuestState({ userId, timezone });
 }
 
-// Free users pick which single focus quest is active. Must be one of their
-// selected focus categories.
-export async function saveActiveFocusCategory(args: {
-  userId: string;
-  categoryId: string;
-}) {
-  const { userId, categoryId } = args;
-  await connectMongo();
-  const user = await UserModel.findById(userId);
-  if (!user) throw new Error('User not found');
-
-  const profile = normalizeFocusProfile(user.toObject());
-  if (!profile.selectedCategoryIds.includes(categoryId)) {
-    throw new Error('That category is not one of your focus areas');
-  }
-
-  // Switching costs you the progress on the focus you're leaving: re-anchor its
-  // quest so progress recomputes from now, and clear its completion/claims.
-  const previousActive = resolveActiveFocusCategoryId(profile, false);
-  if (previousActive && previousActive !== categoryId) {
-    const now = new Date();
-    const outgoing = await QuestModel.find({
-      userId,
-      placement: 'category',
-      categoryId: previousActive,
-    });
-    await Promise.all(
-      outgoing.map((quest) => {
-        const zeroedLogic = (quest.logic ?? []).map((block: any) => ({
-          ...block,
-          progress: 0,
-        }));
-        return QuestModel.updateOne(
-          { _id: quest._id },
-          {
-            $set: {
-              createdAt: now,
-              startedAt: null,
-              expiresAt: null,
-              progress: 0,
-              completedAt: null,
-              claimedAt: null,
-              claimedObjectiveIds: [],
-              logic: zeroedLogic,
-            },
-          },
-          { timestamps: false },
-        );
-      }),
-    );
-  }
-
-  user.focusProfile = {
-    ...((user.focusProfile as FocusProfile) ?? {}),
-    activeFocusCategoryId: categoryId,
-  };
-  user.markModified('focusProfile');
-  await user.save();
-
-  return { activeFocusCategoryId: categoryId };
-}
-
-// When a free user fully finishes (claims) their active focus quest, advance the
-// active focus to the next selected category that still has an available quest,
-// so they keep progressing without manually switching. Mutates
-// `user.focusProfile` in place; the caller is responsible for saving the user.
-// Unlike a manual switch, this does NOT zero any progress. Returns the new
-// category id, or null if nothing changed.
-async function advanceActiveFocusAfterFinish(args: {
-  user: InstanceType<typeof UserModel>;
-  finishedCategoryId?: string | null;
-}): Promise<string | null> {
-  const { user, finishedCategoryId } = args;
-  if (!finishedCategoryId) return null;
-  // Premium users progress every focus in parallel — no single active focus.
-  if (isPremiumUser(user.toObject())) return null;
-
-  const profile = normalizeFocusProfile(user.toObject());
-  const currentActive = resolveActiveFocusCategoryId(profile, false);
-  // Only advance when the finished quest is the one they were actively progressing.
-  if (!currentActive || currentActive !== finishedCategoryId) return null;
-
-  const candidates = (profile.selectedCategoryIds ?? []).filter(
-    (id) => id !== currentActive,
-  );
-  if (candidates.length === 0) return null;
-
-  const quests = await QuestModel.find({
-    userId: String(user._id),
-    placement: 'category',
-    categoryId: { $in: candidates },
-  }).lean<QuestDoc[]>();
-
-  // A focus quest is "available" if it still has a reward to earn, or an
-  // objective in progress.
-  const isAvailable = (quest: QuestDoc) => {
-    const claimed = new Set(quest.claimedObjectiveIds ?? []);
-    return (quest.logic ?? []).some((block: any) =>
-      block.rewards?.length
-        ? !claimed.has(block.id)
-        : block.progress < block.target,
-    );
-  };
-
-  // Keep the user's own selection order so the next focus is predictable.
-  const nextCategoryId =
-    candidates.find((id) =>
-      quests.some((quest) => quest.categoryId === id && isAvailable(quest)),
-    ) ?? null;
-  if (!nextCategoryId) return null;
-
-  user.focusProfile = {
-    ...((user.focusProfile as FocusProfile) ?? {}),
-    activeFocusCategoryId: nextCategoryId,
-  };
-  user.markModified('focusProfile');
-  return nextCategoryId;
-}
-
 export async function claimQuestReward(args: {
   userId: string;
-  claimType: 'daily' | 'category';
+  claimType: 'daily';
   targetId: string;
   timezone: string;
 }) {
@@ -2598,14 +1809,6 @@ export async function claimQuestReward(args: {
   recordDoubleableClaim(user, summary);
   user.markModified('wardrobe');
 
-  // Claiming the whole quest finishes it — advance a free user's active focus.
-  if (quest.placement === 'category') {
-    await advanceActiveFocusAfterFinish({
-      user,
-      finishedCategoryId: quest.categoryId,
-    });
-  }
-
   // Save quest and user in parallel
   await Promise.all([quest.save(), user.save()]);
   return summary;
@@ -2627,24 +1830,6 @@ export async function claimObjectiveReward(args: {
   ]);
   if (!user) throw new Error('User not found');
   if (!quest) throw new Error('Quest not found');
-
-  // Free users can only claim from their active focus quest (or a rental).
-  if (quest.placement === 'category') {
-    const premium = isPremiumUser(user.toObject());
-    const unlockedIds = resolveUnlockedFocusCategoryIds(
-      normalizeFocusProfile(user.toObject()),
-      premium,
-    );
-    if (
-      unlockedIds !== null &&
-      unlockedIds.length > 0 &&
-      !unlockedIds.includes(quest.categoryId ?? '')
-    ) {
-      throw new Error(
-        'This focus quest is locked. Switch your active focus or upgrade to Premium.',
-      );
-    }
-  }
 
   const alreadyClaimed = (quest.claimedObjectiveIds ?? []).includes(objectiveId);
   if (alreadyClaimed) throw new Error('Objective reward already claimed');
@@ -2704,189 +1889,7 @@ export async function claimObjectiveReward(args: {
   quest.markModified('claimedObjectiveIds');
   user.markModified('wardrobe');
 
-  // If this was the last objective — i.e. every reward objective is now complete
-  // and claimed — the focus quest is finished, so advance a free user's active
-  // focus to the next available category.
-  if (quest.placement === 'category') {
-    const claimed = new Set(quest.claimedObjectiveIds);
-    const rewardBlocks = (quest.logic ?? []).filter((b) => b.rewards?.length);
-    const finished =
-      rewardBlocks.length > 0 &&
-      rewardBlocks.every((b) => b.progress >= b.target && claimed.has(b.id));
-    if (finished) {
-      await advanceActiveFocusAfterFinish({
-        user,
-        finishedCategoryId: quest.categoryId,
-      });
-    }
-  }
-
   // Save quest and user in parallel
   await Promise.all([quest.save(), user.save()]);
   return summary;
-}
-
-// Re-rolls one unfinished, unclaimed objective from its recipe slot. The pool
-// pick is reseeded off the spend count so the same slot cannot hand back the
-// objective the user was trying to get rid of.
-export async function rerollQuestObjective(args: {
-  userId: string;
-  questId: string;
-  objectiveId: string;
-  timezone: string;
-}) {
-  const { userId, questId, objectiveId, timezone } = args;
-  await connectMongo();
-
-  const [user, quest] = await Promise.all([
-    UserModel.findById(userId).lean<UserDoc | null>(),
-    QuestModel.findOne({ userId, questId }),
-  ]);
-  if (!user) throw new Error('User not found');
-  if (!quest) throw new Error('Quest not found');
-  if (!quest.templateId.startsWith('gen:')) {
-    throw new Error('This quest cannot be rerolled');
-  }
-  const spent = quest.rerollsUsed ?? 0;
-  if (spent >= REROLLS_PER_LADDER) {
-    throw new Error('No rerolls left on this quest');
-  }
-
-  const blockIndex = (quest.logic ?? []).findIndex(
-    (block) => block.id === objectiveId,
-  );
-  if (blockIndex < 0) throw new Error('Objective not found');
-  const block = quest.logic[blockIndex];
-  if ((quest.claimedObjectiveIds ?? []).includes(objectiveId)) {
-    throw new Error('Objective is already claimed');
-  }
-  if ((block.progress ?? 0) >= Math.max(1, block.target ?? 1)) {
-    throw new Error('Objective is already finished');
-  }
-  if (block.preCredited) {
-    throw new Error('Objective is already finished');
-  }
-
-  const recipes = await QuestRecipeModel.find({
-    placement: { $ne: 'daily' },
-    isActive: true,
-  }).lean<QuestRecipeDoc[]>();
-  const recipe =
-    recipes.find((r) =>
-      (r.categoryIds ?? []).includes(quest.categoryId ?? ''),
-    ) ?? recipes.find((r) => (r.categoryIds ?? []).length === 0);
-  const slot = recipe?.slots?.[blockIndex];
-  if (!recipe || !slot) throw new Error('Recipe slot not found');
-
-  const [tasks, catalog, hasFriends] = await Promise.all([
-    TaskModel.find(
-      { userId, deletedAt: { $exists: false } },
-      {
-        type: 1,
-        completed: 1,
-        completedDates: 1,
-        completedAtByDate: 1,
-        lateCompletedDates: 1,
-        date: 1,
-        createdAt: 1,
-        tags: 1,
-        focusAreaId: 1,
-        frogodoroSessions: 1,
-        isStarter: 1,
-      },
-    ).lean<TaskDoc[]>(),
-    getFullCatalog(),
-    FriendshipModel.exists({
-      status: 'accepted',
-      $or: [{ requesterId: userId }, { addresseeId: userId }],
-    }).then((doc) => !!doc),
-  ]);
-
-  const profile = normalizeFocusProfile(user);
-  const tagIds =
-    profile.categoryTagMap.find(
-      (entry) => entry.categoryId === quest.categoryId,
-    )?.tagIds ?? [];
-  const todayKey = getZonedToday(timezone);
-  const windowDays = Math.max(
-    1,
-    Math.round((recipe.durationMinutes ?? 3 * 24 * 60) / (24 * 60)),
-  );
-
-  const pool = buildEligiblePool({
-    slot,
-    placement: 'category',
-    user,
-    catalog,
-    tasks,
-    todayKey,
-    hasFriends,
-    windowDays,
-    tagIds,
-  });
-  // Anything but what they already have, unless the slot has nothing else to
-  // offer — a reroll that returns the same objective is worse than refusing.
-  const alternatives = pool.filter(
-    (entry) =>
-      !(
-        entry.type === block.type &&
-        (entry.action ?? undefined) === (block.action ?? undefined) &&
-        (entry.metricKey ?? undefined) === (block.metricKey ?? undefined)
-      ),
-  );
-  const candidates = alternatives.length > 0 ? alternatives : pool;
-  const seed = `${userId}:${quest.templateId}:slot:${blockIndex}:reroll:${spent + 1}`;
-  const pick = pickWeighted(candidates, createSeededRandom(seed));
-  if (!pick) throw new Error('Nothing to reroll into');
-
-  const isMetric = pick.type === 'metric_count';
-  const minAmount = Math.max(1, Math.floor(pick.minTarget));
-  const metricKey = isMetric
-    ? resolveRecipeMetricKey(pick, `${seed}:streak`)
-    : undefined;
-  const nextBlock: ResolvedQuestLogicBlock = {
-    ...block,
-    type: pick.type,
-    subject: 'task',
-    action: pick.type === 'count' ? pick.action ?? 'complete' : undefined,
-    amountMode: 'random',
-    minAmount,
-    maxAmount: Math.max(minAmount, Math.floor(pick.maxTarget)),
-    tagMode:
-      !isMetric || isTagScopedQuestMetric(metricKey)
-        ? 'focus_category_tags'
-        : 'ignore',
-    metricKey,
-    sessionMinutes: undefined,
-    requiresFollowThrough: undefined,
-    beforeHour: undefined,
-    ...recipePickModifiers(pick),
-    target: 1,
-    progress: 0,
-    progressOffset: 0,
-  };
-
-  quest.logic[blockIndex] = nextBlock;
-  quest.rerollsUsed = spent + 1;
-  quest.markModified('logic');
-  await quest.save();
-
-  await recordAnalyticsEvent({
-    userId,
-    name: 'quest_objective_rerolled',
-    properties: {
-      category_id: quest.categoryId ?? 'uncategorized',
-      template_id: quest.templateId,
-      tier: blockIndex + 1,
-      from_type: block.type,
-      to_type: nextBlock.type,
-      rerolls_used: quest.rerollsUsed,
-    },
-  }).catch(() => {});
-
-  // The rolled block carries min/max, not a target; the next sync resolves it
-  // against the user's baseline exactly as it would a fresh roll.
-  await syncQuestState({ userId, timezone, includeCatalog: false });
-
-  return { ok: true, rerollsLeft: REROLLS_PER_LADDER - quest.rerollsUsed };
 }

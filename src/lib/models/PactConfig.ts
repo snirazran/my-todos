@@ -40,8 +40,8 @@ export interface PactConfigDoc {
 export const PACT_CONFIG_ID = 'weekly-pact';
 
 /**
- * v1 paid nothing until the whole week landed and handed the hardest tier a
- * flat bonus for a difficulty nobody could verify. v2 pays per kept session as
+ * v1 paid nothing until the whole week landed and handed the hardest-labelled
+ * ideas a flat bonus nobody could verify. v2 pays per kept session as
  * it happens, keeps a bonus for finishing, and prices ambition in sessions —
  * the only unit of effort the app can actually see.
  */
@@ -88,30 +88,30 @@ type SeedEntry = Omit<PactSuggestion, 'id' | 'isActive' | 'picked' | 'kept'>;
 // An idea is a what and a how-often. Which days and what time belong to the
 // person doing it, and they answer that on the confirm step.
 const SEED_SUGGESTIONS: SeedEntry[] = [
-  { categoryId: 'sport', text: 'Take a 20-minute walk', sessions: 2, tier: 'starter' },
-  { categoryId: 'sport', text: 'Do a 15-minute home workout', sessions: 3, tier: 'steady' },
-  { categoryId: 'sport', text: 'Stretch for 10 minutes', sessions: 5, tier: 'steady' },
-  { categoryId: 'sport', text: 'Train at the gym for 45 minutes', sessions: 4, tier: 'strong' },
+  { categoryId: 'sport', text: 'Take a 20-minute walk', sessions: 2 },
+  { categoryId: 'sport', text: 'Do a 15-minute home workout', sessions: 3 },
+  { categoryId: 'sport', text: 'Stretch for 10 minutes', sessions: 5 },
+  { categoryId: 'sport', text: 'Train at the gym for 45 minutes', sessions: 4 },
 
-  { categoryId: 'mindfulness', text: 'Breathe slowly for 5 minutes', sessions: 2, tier: 'starter' },
-  { categoryId: 'mindfulness', text: 'Write three lines in a journal', sessions: 3, tier: 'steady' },
-  { categoryId: 'mindfulness', text: 'Sit quietly for 10 minutes, no phone', sessions: 5, tier: 'steady' },
-  { categoryId: 'mindfulness', text: 'Meditate for 20 minutes', sessions: 4, tier: 'strong' },
+  { categoryId: 'mindfulness', text: 'Breathe slowly for 5 minutes', sessions: 2 },
+  { categoryId: 'mindfulness', text: 'Write three lines in a journal', sessions: 3 },
+  { categoryId: 'mindfulness', text: 'Sit quietly for 10 minutes, no phone', sessions: 5 },
+  { categoryId: 'mindfulness', text: 'Meditate for 20 minutes', sessions: 4 },
 
-  { categoryId: 'family', text: 'Call someone you love', sessions: 1, tier: 'starter' },
-  { categoryId: 'family', text: 'Send a proper check-in message', sessions: 2, tier: 'starter' },
-  { categoryId: 'family', text: 'Eat dinner together, phones away', sessions: 3, tier: 'steady' },
-  { categoryId: 'family', text: 'Plan and do one outing together', sessions: 5, tier: 'strong' },
+  { categoryId: 'family', text: 'Call someone you love', sessions: 1 },
+  { categoryId: 'family', text: 'Send a proper check-in message', sessions: 2 },
+  { categoryId: 'family', text: 'Eat dinner together, phones away', sessions: 3 },
+  { categoryId: 'family', text: 'Plan and do one outing together', sessions: 5 },
 
-  { categoryId: 'house_chores', text: 'Tidy one surface for 10 minutes', sessions: 2, tier: 'starter' },
-  { categoryId: 'house_chores', text: 'Reset the kitchen before bed', sessions: 5, tier: 'steady' },
-  { categoryId: 'house_chores', text: 'Do one load of laundry end to end', sessions: 3, tier: 'steady' },
-  { categoryId: 'house_chores', text: 'Deep clean one room', sessions: 1, tier: 'strong' },
+  { categoryId: 'house_chores', text: 'Tidy one surface for 10 minutes', sessions: 2 },
+  { categoryId: 'house_chores', text: 'Reset the kitchen before bed', sessions: 5 },
+  { categoryId: 'house_chores', text: 'Do one load of laundry end to end', sessions: 3 },
+  { categoryId: 'house_chores', text: 'Deep clean one room', sessions: 1 },
 
-  { categoryId: 'sleep', text: 'Put the phone away 30 minutes before bed', sessions: 2, tier: 'starter' },
-  { categoryId: 'sleep', text: 'Start winding down at the same time', sessions: 3, tier: 'steady' },
-  { categoryId: 'sleep', text: 'Be in bed by 23:00', sessions: 5, tier: 'steady' },
-  { categoryId: 'sleep', text: 'No screens after 21:30, lights out by 22:30', sessions: 7, tier: 'strong' },
+  { categoryId: 'sleep', text: 'Put the phone away 30 minutes before bed', sessions: 2 },
+  { categoryId: 'sleep', text: 'Start winding down at the same time', sessions: 3 },
+  { categoryId: 'sleep', text: 'Be in bed by 23:00', sessions: 5 },
+  { categoryId: 'sleep', text: 'No screens after 21:30, lights out by 22:30', sessions: 7 },
 ];
 
 export function seedSuggestions(): PactSuggestion[] {
