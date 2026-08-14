@@ -21,13 +21,20 @@ import type { PactAreaChoice, PactOption, PactView } from '@/lib/pact/types';
 const DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+const TIME_INPUT_RESET = cn(
+  'block box-border w-full min-w-0 max-w-full appearance-none overflow-hidden',
+  '[-webkit-appearance:none]',
+  '[&::-webkit-date-and-time-value]:m-0 [&::-webkit-date-and-time-value]:p-0',
+  '[&::-webkit-datetime-edit]:p-0',
+);
+
 type Step = 'intro' | 'area' | 'commitment' | 'confirm' | 'done';
 
-// "2 sessions · 15 min each" — never a single total the reader could mistake
-// for the whole week's budget.
-function sessionsLabel(dayCount: number, minutes?: number) {
-  const sessions = `${dayCount} session${dayCount === 1 ? '' : 's'}`;
-  return minutes ? `${sessions} · ${minutes} min each` : sessions;
+// How often, and nothing else. Days and times are chosen on the next step, so
+// putting them here only gave the reader a reason to turn down a commitment
+// they liked. A "20 min each" line was worse — nothing ever checked it.
+function sessionsLabel(count: number) {
+  return `${count} session${count === 1 ? '' : 's'} this week`;
 }
 
 function quietLabel(area: PactAreaChoice) {
@@ -52,12 +59,36 @@ export function PactPickSheet({
   onCommitted: (next: PactView) => void;
   onUpgrade: () => void;
 }) {
+  const weekStartsOn = normalizeWeekStart(view.weekStartsOn);
+  const orderedDays = weekOrder(weekStartsOn);
+  // A weekday already behind us this week can never hold a session — the
+  // week's tasks stop at Saturday — so it is shown spent rather than picked
+  // and silently dropped on save.
+  const todayKey = new Intl.DateTimeFormat('en-CA', {
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+  }).format(new Date());
+  const weekDates = weekDatesFor(view.weekKey, weekStartsOn);
+  const isPastDay = (day: number) => {
+    const index = orderedDays.indexOf(day as 0 | 1 | 2 | 3 | 4 | 5 | 6);
+    return index >= 0 && weekDates[index] < todayKey;
+  };
+  const fitDays = (desired: number[]) => {
+    const kept = desired.filter((day) => !isPastDay(day));
+    if (kept.length === desired.length) return kept;
+    const filler = orderedDays.filter(
+      (day) => !isPastDay(day) && !kept.includes(day),
+    );
+    return [...kept, ...filler.slice(0, desired.length - kept.length)].sort(
+      (a, b) => a - b,
+    );
+  };
+
   const [step, setStep] = useState<Step>(view.introSeen ? 'area' : 'intro');
   const [areaId, setAreaId] = useState<string | null>(null);
   const [options, setOptions] = useState<PactOption[] | null>(null);
   const [optionId, setOptionId] = useState<string | null>(null);
   const [customText, setCustomText] = useState('');
-  const [days, setDays] = useState<number[]>([1, 3, 5]);
+  const [days, setDays] = useState<number[]>(() => fitDays([1, 3, 5]));
   const [startTime, setStartTime] = useState('19:00');
   const [writingOwn, setWritingOwn] = useState(false);
   const [perDayTimes, setPerDayTimes] = useState(false);
@@ -188,26 +219,12 @@ export function PactPickSheet({
   };
 
   const previewText = writingOwn ? customText.trim() : (option?.text ?? '');
-  const previewMinutes = writingOwn ? undefined : option?.minutes;
   const visibleOptions = (options ?? []).slice(0, PRIMARY_OPTIONS);
-  const weekStartsOn = normalizeWeekStart(view.weekStartsOn);
-  const orderedDays = weekOrder(weekStartsOn);
-  // A weekday already behind us this week can never hold a session — the
-  // week's tasks stop at Saturday — so it is shown spent rather than picked
-  // and silently dropped on save.
-  const todayKey = new Intl.DateTimeFormat('en-CA', {
-    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-  }).format(new Date());
-  const weekDates = weekDatesFor(view.weekKey, weekStartsOn);
-  const isPastDay = (day: number) => {
-    const index = orderedDays.indexOf(day as 0 | 1 | 2 | 3 | 4 | 5 | 6);
-    return index >= 0 && weekDates[index] < todayKey;
-  };
   const hasFooter = step === 'commitment' || step === 'confirm';
+  // Sessions are the only thing that moves the number, and every one of them
+  // is a box the app watches get ticked.
   const rewardPreview =
-    days.length * view.flyRates.perTask +
-    view.flyRates.weekBonus +
-    (option?.tier === 'strong' ? view.flyRates.pushBonus : 0);
+    days.length * view.flyRates.perTask + view.flyRates.weekBonus;
 
   return (
     <BaseSheet
@@ -419,7 +436,7 @@ export function PactPickSheet({
                           onClick={() => {
                             setWritingOwn(false);
                             setOptionId(entry.id);
-                            setDays(entry.days);
+                            setDays(fitDays(entry.days));
                             setStartTime(entry.startTime);
                           }}
                           className={cn(
@@ -439,7 +456,7 @@ export function PactPickSheet({
                               {entry.text}
                             </span>
                             <span className="text-[12.5px] font-bold text-muted-foreground">
-                              {sessionsLabel(entry.days.length, entry.minutes)}
+                              {sessionsLabel(fitDays(entry.days).length)}
                               {entry.source === 'repeat' && ' · Worked before'}
                             </span>
                           </span>
@@ -564,11 +581,6 @@ export function PactPickSheet({
                     <p className="text-[17px] font-black leading-snug text-foreground">
                       {previewText}
                     </p>
-                    {previewMinutes ? (
-                      <p className="mt-1 text-[13px] font-bold text-muted-foreground">
-                        {previewMinutes} min per session
-                      </p>
-                    ) : null}
                   </div>
                 </div>
 
@@ -638,7 +650,11 @@ export function PactPickSheet({
                                     [day]: event.target.value,
                                   }))
                                 }
-                                className="box-border h-9 w-full min-w-0 flex-1 rounded-lg bg-transparent text-[15px] font-bold text-foreground outline-none"
+                                className={cn(
+                                  TIME_INPUT_RESET,
+                                  'h-9 flex-1 rounded-lg bg-transparent text-left text-[15px] font-bold leading-9 text-foreground outline-none',
+                                  '[&::-webkit-date-and-time-value]:text-left',
+                                )}
                               />
                             </label>
                           ))}
@@ -648,7 +664,11 @@ export function PactPickSheet({
                         type="time"
                         value={startTime}
                         onChange={(event) => setStartTime(event.target.value)}
-                        className="box-border h-11 w-full min-w-0 max-w-full rounded-xl border border-border/60 bg-background px-3 text-[15px] font-bold text-foreground outline-none focus:border-primary"
+                        className={cn(
+                          TIME_INPUT_RESET,
+                          'h-11 rounded-xl border border-border/60 bg-background px-3 text-center text-[15px] font-bold leading-[42px] text-foreground outline-none focus:border-primary',
+                          '[&::-webkit-date-and-time-value]:text-center',
+                        )}
                       />
                     )}
                   </div>

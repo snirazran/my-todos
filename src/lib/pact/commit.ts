@@ -279,7 +279,7 @@ export async function commitPact(
     taskIds,
     tagId,
     scheduleLabel: scheduleLabel(days, startTime),
-    rewardFlies: optionRewardFlies(config, days, tier),
+    rewardFlies: optionRewardFlies(config, days),
   };
 }
 

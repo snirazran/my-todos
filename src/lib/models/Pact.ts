@@ -16,6 +16,10 @@ export interface PactDoc {
   target: number;
   progress: number;
   taskIds: string[];
+  /** Sessions already paid for. The ledger the per-session grant reconciles against. */
+  paidSessions: number;
+  /** The comeback bonus is once a week, so it needs its own latch. */
+  comebackPaid: boolean;
   /** The area tag stamped on this pact's tasks. */
   tagId?: string;
   source: 'library' | 'generated' | 'repeat' | 'custom';
@@ -46,6 +50,8 @@ const PactSchema = new Schema<PactDoc>(
     target: { type: Number, default: 1 },
     progress: { type: Number, default: 0 },
     taskIds: { type: [String], default: [] },
+    paidSessions: { type: Number, default: 0 },
+    comebackPaid: { type: Boolean, default: false },
     tagId: { type: String },
     source: { type: String, default: 'library' },
     shieldUsed: { type: Boolean, default: false },

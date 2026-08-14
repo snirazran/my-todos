@@ -15,6 +15,9 @@ export interface PactConfigDoc {
   fliesPerCompletion: number;
   weekBonusFlies: number;
   bigCommitmentBonusFlies: number;
+  comebackBonusFlies: number;
+  /** Which payout model this doc is on. Bumping it re-seeds the fly numbers. */
+  payoutVersion: number;
   completionRewards: QuestRewards;
   milestoneEveryWeeks: number;
   milestoneRewards: QuestRewards;
@@ -35,6 +38,21 @@ export interface PactConfigDoc {
 }
 
 export const PACT_CONFIG_ID = 'weekly-pact';
+
+/**
+ * v1 paid nothing until the whole week landed and handed the hardest tier a
+ * flat bonus for a difficulty nobody could verify. v2 pays per kept session as
+ * it happens, keeps a bonus for finishing, and prices ambition in sessions —
+ * the only unit of effort the app can actually see.
+ */
+export const PACT_PAYOUT_VERSION = 2;
+
+export const PACT_V2_PAYOUT = {
+  fliesPerCompletion: 7,
+  weekBonusFlies: 32,
+  comebackBonusFlies: 5,
+  bigCommitmentBonusFlies: 0,
+} as const;
 
 // The old focus quest dropped a gift every 3-day cycle — 2.33 a week — and was
 // the main source behind the PDF's "2–3 Simple gifts a week". One weekly event
@@ -67,37 +85,33 @@ export const DEFAULT_PACT_MASTERY_TIERS: PactAreaMasteryTier[] = [
 
 type SeedEntry = Omit<PactSuggestion, 'id' | 'isActive' | 'picked' | 'kept'>;
 
-const MWF = [1, 3, 5];
-const TT = [2, 4];
-const WEEKDAYS = [1, 2, 3, 4, 5];
-const EVERY_DAY = [0, 1, 2, 3, 4, 5, 6];
-const WEEKEND = [0, 6];
-
+// An idea is a what and a how-often. Which days and what time belong to the
+// person doing it, and they answer that on the confirm step.
 const SEED_SUGGESTIONS: SeedEntry[] = [
-  { categoryId: 'sport', text: 'Take a 20-minute walk', days: TT, startTime: '18:00', minutes: 20, tier: 'starter' },
-  { categoryId: 'sport', text: 'Do a 15-minute home workout', days: MWF, startTime: '07:30', minutes: 15, tier: 'steady' },
-  { categoryId: 'sport', text: 'Stretch for 10 minutes', days: EVERY_DAY, startTime: '21:30', minutes: 10, tier: 'steady' },
-  { categoryId: 'sport', text: 'Train at the gym for 45 minutes', days: MWF, startTime: '18:30', minutes: 45, tier: 'strong' },
+  { categoryId: 'sport', text: 'Take a 20-minute walk', sessions: 2, tier: 'starter' },
+  { categoryId: 'sport', text: 'Do a 15-minute home workout', sessions: 3, tier: 'steady' },
+  { categoryId: 'sport', text: 'Stretch for 10 minutes', sessions: 5, tier: 'steady' },
+  { categoryId: 'sport', text: 'Train at the gym for 45 minutes', sessions: 4, tier: 'strong' },
 
-  { categoryId: 'mindfulness', text: 'Breathe slowly for 5 minutes', days: TT, startTime: '21:00', minutes: 5, tier: 'starter' },
-  { categoryId: 'mindfulness', text: 'Write three lines in a journal', days: MWF, startTime: '21:30', minutes: 10, tier: 'steady' },
-  { categoryId: 'mindfulness', text: 'Sit quietly for 10 minutes, no phone', days: EVERY_DAY, startTime: '08:00', minutes: 10, tier: 'steady' },
-  { categoryId: 'mindfulness', text: 'Meditate for 20 minutes', days: WEEKDAYS, startTime: '07:00', minutes: 20, tier: 'strong' },
+  { categoryId: 'mindfulness', text: 'Breathe slowly for 5 minutes', sessions: 2, tier: 'starter' },
+  { categoryId: 'mindfulness', text: 'Write three lines in a journal', sessions: 3, tier: 'steady' },
+  { categoryId: 'mindfulness', text: 'Sit quietly for 10 minutes, no phone', sessions: 5, tier: 'steady' },
+  { categoryId: 'mindfulness', text: 'Meditate for 20 minutes', sessions: 4, tier: 'strong' },
 
-  { categoryId: 'family', text: 'Call someone you love', days: [0], startTime: '19:00', minutes: 15, tier: 'starter' },
-  { categoryId: 'family', text: 'Send a proper check-in message', days: TT, startTime: '20:00', minutes: 5, tier: 'starter' },
-  { categoryId: 'family', text: 'Eat dinner together, phones away', days: MWF, startTime: '19:00', minutes: 45, tier: 'steady' },
-  { categoryId: 'family', text: 'Plan and do one outing together', days: WEEKEND, startTime: '11:00', minutes: 120, tier: 'strong' },
+  { categoryId: 'family', text: 'Call someone you love', sessions: 1, tier: 'starter' },
+  { categoryId: 'family', text: 'Send a proper check-in message', sessions: 2, tier: 'starter' },
+  { categoryId: 'family', text: 'Eat dinner together, phones away', sessions: 3, tier: 'steady' },
+  { categoryId: 'family', text: 'Plan and do one outing together', sessions: 5, tier: 'strong' },
 
-  { categoryId: 'house_chores', text: 'Tidy one surface for 10 minutes', days: TT, startTime: '20:00', minutes: 10, tier: 'starter' },
-  { categoryId: 'house_chores', text: 'Reset the kitchen before bed', days: WEEKDAYS, startTime: '21:00', minutes: 15, tier: 'steady' },
-  { categoryId: 'house_chores', text: 'Do one load of laundry end to end', days: [0, 3], startTime: '18:00', minutes: 30, tier: 'steady' },
-  { categoryId: 'house_chores', text: 'Deep clean one room', days: [6], startTime: '10:00', minutes: 90, tier: 'strong' },
+  { categoryId: 'house_chores', text: 'Tidy one surface for 10 minutes', sessions: 2, tier: 'starter' },
+  { categoryId: 'house_chores', text: 'Reset the kitchen before bed', sessions: 5, tier: 'steady' },
+  { categoryId: 'house_chores', text: 'Do one load of laundry end to end', sessions: 3, tier: 'steady' },
+  { categoryId: 'house_chores', text: 'Deep clean one room', sessions: 1, tier: 'strong' },
 
-  { categoryId: 'sleep', text: 'Put the phone away 30 minutes before bed', days: MWF, startTime: '22:00', minutes: 30, tier: 'starter' },
-  { categoryId: 'sleep', text: 'Start winding down at the same time', days: WEEKDAYS, startTime: '22:15', minutes: 15, tier: 'steady' },
-  { categoryId: 'sleep', text: 'Be in bed by 23:00', days: EVERY_DAY, startTime: '23:00', minutes: 5, tier: 'steady' },
-  { categoryId: 'sleep', text: 'No screens after 21:30, lights out by 22:30', days: EVERY_DAY, startTime: '21:30', minutes: 60, tier: 'strong' },
+  { categoryId: 'sleep', text: 'Put the phone away 30 minutes before bed', sessions: 2, tier: 'starter' },
+  { categoryId: 'sleep', text: 'Start winding down at the same time', sessions: 3, tier: 'steady' },
+  { categoryId: 'sleep', text: 'Be in bed by 23:00', sessions: 5, tier: 'steady' },
+  { categoryId: 'sleep', text: 'No screens after 21:30, lights out by 22:30', sessions: 7, tier: 'strong' },
 ];
 
 export function seedSuggestions(): PactSuggestion[] {
@@ -116,13 +130,24 @@ const PactConfigSchema = new Schema<PactConfigDoc>(
     isActive: { type: Boolean, default: true },
     pickHour: { type: Number, default: 18 },
     // The old focus quest paid 23 flies per 3-DAY cycle = 53.7 flies/week, and
-    // that faucet is what the pact replaces. 5/session + 38 lands a 2–5 session
-    // week at 48–63 (avg 55), holding free income at the PDF's ~37 flies/day.
-    // Sub-linear on purpose — per session it falls 24 → 12.6 as days are added,
-    // so stacking days is never the cheap way to farm.
-    fliesPerCompletion: { type: Number, default: 5 },
-    weekBonusFlies: { type: Number, default: 38 },
-    bigCommitmentBonusFlies: { type: Number, default: 8 },
+    // that faucet is what the pact replaces. 7/session + 32 lands a 2–5 session
+    // week at 46–67, with the modal 3-session week on 53 — free income holds at
+    // the PDF's ~37 flies/day. Sub-linear on purpose: per session it falls 23 →
+    // 13.4 as days are added, so stacking days is never the cheap way to farm.
+    fliesPerCompletion: { type: Number, default: PACT_V2_PAYOUT.fliesPerCompletion },
+    weekBonusFlies: { type: Number, default: PACT_V2_PAYOUT.weekBonusFlies },
+    // Paid once a week, on the first session completed after a scheduled one
+    // was missed. The largest single effect in the 53-arm gym megastudy came
+    // from paying for exactly this return, so it is a faucet, not a courtesy.
+    comebackBonusFlies: { type: Number, default: PACT_V2_PAYOUT.comebackBonusFlies },
+    // Retired. Difficulty is self-declared and unverifiable, so paying for it
+    // made the hardest-labelled option strictly dominant. Ambition is priced in
+    // sessions now. Kept at 0 so an existing admin form doesn't break.
+    bigCommitmentBonusFlies: {
+      type: Number,
+      default: PACT_V2_PAYOUT.bigCommitmentBonusFlies,
+    },
+    payoutVersion: { type: Number, default: PACT_PAYOUT_VERSION },
     completionRewards: {
       type: [Schema.Types.Mixed],
       default: DEFAULT_PACT_COMPLETION_REWARDS,

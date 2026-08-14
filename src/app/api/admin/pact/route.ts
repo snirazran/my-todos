@@ -3,10 +3,13 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminUserId } from '@/lib/adminAuth';
 import connectMongo from '@/lib/mongoose';
-import PactConfigModel, { PACT_CONFIG_ID } from '@/lib/models/PactConfig';
+import PactConfigModel, {
+  PACT_CONFIG_ID,
+  PACT_V2_PAYOUT,
+} from '@/lib/models/PactConfig';
 import QuestCategoryModel from '@/lib/models/QuestCategory';
 import { ensurePactConfig } from '@/lib/pact/engine';
-import type { PactSuggestion } from '@/lib/pact/types';
+import { suggestionSessions, type PactSuggestion } from '@/lib/pact/types';
 import { v4 as uuid } from 'uuid';
 
 function sanitizeSuggestions(raw: unknown): PactSuggestion[] {
@@ -16,26 +19,16 @@ function sanitizeSuggestions(raw: unknown): PactSuggestion[] {
       const text = String(entry?.text ?? '').trim().slice(0, 80);
       const categoryId = String(entry?.categoryId ?? '').trim();
       if (!text || !categoryId) return null;
-      const days = Array.from(
-        new Set<number>(
-          (Array.isArray(entry?.days) ? entry.days : []).map(Number),
-        ),
-      )
-        .filter((d) => Number.isInteger(d) && d >= 0 && d <= 6)
-        .sort((a, b) => a - b);
       const tier =
         entry?.tier === 'starter' || entry?.tier === 'strong' ? entry.tier : 'steady';
       return {
         id: String(entry?.id ?? '').trim() || uuid(),
         categoryId,
         text,
-        days: days.length ? days : [1, 3, 5],
-        startTime: /^\d{2}:\d{2}$/.test(String(entry?.startTime))
-          ? String(entry.startTime)
-          : '19:00',
-        minutes: Number.isFinite(Number(entry?.minutes))
-          ? Math.max(0, Math.floor(Number(entry.minutes)))
-          : undefined,
+        // Sessions only. An idea authored with days and a time got rejected
+        // over the schedule rather than the commitment, so the schedule is the
+        // user's to set. A legacy day list still yields its count.
+        sessions: suggestionSessions(entry ?? {}),
         tier,
         isActive: entry?.isActive !== false,
         generated: !!entry?.generated,
@@ -83,9 +76,24 @@ export async function PUT(req: NextRequest) {
     const update: Record<string, unknown> = {
       isActive: body.isActive !== false,
       pickHour: clampInt(body.pickHour, 0, 23, 18),
-      fliesPerCompletion: clampInt(body.fliesPerCompletion, 0, 200, 5),
-      weekBonusFlies: clampInt(body.weekBonusFlies, 0, 2000, 38),
-      bigCommitmentBonusFlies: clampInt(body.bigCommitmentBonusFlies, 0, 2000, 8),
+      fliesPerCompletion: clampInt(
+        body.fliesPerCompletion,
+        0,
+        200,
+        PACT_V2_PAYOUT.fliesPerCompletion,
+      ),
+      weekBonusFlies: clampInt(
+        body.weekBonusFlies,
+        0,
+        2000,
+        PACT_V2_PAYOUT.weekBonusFlies,
+      ),
+      comebackBonusFlies: clampInt(
+        body.comebackBonusFlies,
+        0,
+        2000,
+        PACT_V2_PAYOUT.comebackBonusFlies,
+      ),
       milestoneEveryWeeks: clampInt(body.milestoneEveryWeeks, 0, 52, 2),
       shieldCapFree: clampInt(body.shieldCapFree, 0, 5, 1),
       shieldCapPlus: clampInt(body.shieldCapPlus, 0, 5, 2),

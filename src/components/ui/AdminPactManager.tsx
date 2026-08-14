@@ -4,15 +4,18 @@ import { useEffect, useMemo, useState } from 'react';
 import { Loader2, Plus, Sparkles, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { PACT_SIZE_LABEL, PACT_SIZE_TIERS } from '@/lib/pact/types';
+import {
+  PACT_SIZE_LABEL,
+  PACT_SIZE_TIERS,
+  suggestionSessions,
+} from '@/lib/pact/types';
 import type {
   PactConfigView,
   PactSizeTier,
   PactSuggestion,
 } from '@/lib/pact/types';
 
-const DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const SESSION_CHOICES = [1, 2, 3, 4, 5, 6, 7];
 
 type AdminCategory = {
   categoryId: string;
@@ -123,9 +126,7 @@ export function AdminPactManager() {
                 id: crypto.randomUUID(),
                 categoryId: activeCategoryId,
                 text: '',
-                days: [1, 3, 5],
-                startTime: '19:00',
-                minutes: 15,
+                sessions: 3,
                 tier: 'steady' as PactSizeTier,
                 isActive: true,
                 picked: 0,
@@ -245,14 +246,32 @@ export function AdminPactManager() {
       <div className="rounded-2xl border border-border/40 bg-card/60 p-5">
         <p className="text-lg font-black text-foreground">Rewards</p>
         <p className="text-sm text-muted-foreground">
-          Flies per session plus a completion bonus. Defaults land a 2–5 session
-          week between {2 * config.fliesPerCompletion + config.weekBonusFlies} and{' '}
-          {5 * config.fliesPerCompletion + config.weekBonusFlies} flies — the old
-          focus-quest cycle paid 23, so keep it near there or fly income drifts.
+          Each session pays the moment its task is ticked; the bonus lands on
+          the last one. Defaults put a 2–5 session week between{' '}
+          {2 * config.fliesPerCompletion + config.weekBonusFlies} and{' '}
+          {5 * config.fliesPerCompletion + config.weekBonusFlies} flies, with
+          the usual 3-session week on{' '}
+          {3 * config.fliesPerCompletion + config.weekBonusFlies} — the old
+          focus-quest cycle paid 53.7 a week, so keep it near there or fly
+          income drifts.
+        </p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Keep the bonus the larger half. It is what makes committing to more
+          sessions a real bet rather than free money: a 5-session week that
+          delivers 2 pays{' '}
+          <span className="font-bold text-foreground">
+            {2 * config.fliesPerCompletion}
+          </span>
+          , where committing to 2 and keeping both pays{' '}
+          <span className="font-bold text-foreground">
+            {2 * config.fliesPerCompletion + config.weekBonusFlies}
+          </span>
+          . Flatten the bonus and over-committing stops costing anything.
         </p>
         <div className="mt-4 grid gap-4 sm:grid-cols-3">
           <NumberField
-            label="Flies per task"
+            label="Flies per session"
+            hint="Paid as each task is ticked"
             min={0}
             max={200}
             value={config.fliesPerCompletion}
@@ -267,14 +286,12 @@ export function AdminPactManager() {
             onChange={(weekBonusFlies) => patch({ weekBonusFlies })}
           />
           <NumberField
-            label="Push bonus"
-            hint="Extra for the hardest tier"
+            label="Comeback bonus"
+            hint="Once a week, for the first session after a miss"
             min={0}
             max={2000}
-            value={config.bigCommitmentBonusFlies}
-            onChange={(bigCommitmentBonusFlies) =>
-              patch({ bigCommitmentBonusFlies })
-            }
+            value={config.comebackBonusFlies}
+            onChange={(comebackBonusFlies) => patch({ comebackBonusFlies })}
           />
         </div>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -476,39 +493,39 @@ export function AdminPactManager() {
               </div>
 
               <div className="mt-2.5 flex flex-wrap items-center gap-3">
-                <div className="flex gap-1">
-                  {DAY_LABELS.map((label, day) => (
-                    <button
-                      key={day}
-                      type="button"
-                      aria-label={DAY_NAMES[day]}
-                      aria-pressed={entry.days.includes(day)}
-                      onClick={() =>
-                        patchSuggestion(entry.id, {
-                          days: entry.days.includes(day)
-                            ? entry.days.filter((d) => d !== day)
-                            : [...entry.days, day].sort((a, b) => a - b),
-                        })
-                      }
-                      className={cn(
-                        'h-8 w-8 rounded-lg text-xs font-black transition',
-                        entry.days.includes(day)
-                          ? 'bg-primary text-white'
-                          : 'bg-muted text-muted-foreground',
-                      )}
-                    >
-                      {label}
-                    </button>
-                  ))}
+                {/* How often, never which days. A schedule set here got the
+                    whole commitment turned down over a Tuesday the user
+                    couldn't do — they pick days and times on the confirm
+                    step, which is also the half of a commitment that the
+                    evidence says does the work. */}
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">
+                    Sessions
+                  </span>
+                  <div className="flex gap-1">
+                    {SESSION_CHOICES.map((count) => (
+                      <button
+                        key={count}
+                        type="button"
+                        aria-pressed={suggestionSessions(entry) === count}
+                        onClick={() =>
+                          patchSuggestion(entry.id, { sessions: count })
+                        }
+                        className={cn(
+                          'h-8 w-8 rounded-lg text-xs font-black tabular-nums transition',
+                          suggestionSessions(entry) === count
+                            ? 'bg-primary text-white'
+                            : 'bg-muted text-muted-foreground',
+                        )}
+                      >
+                        {count}
+                      </button>
+                    ))}
+                  </div>
+                  <span className="text-[11px] font-bold text-muted-foreground">
+                    a week
+                  </span>
                 </div>
-                <input
-                  type="time"
-                  value={entry.startTime}
-                  onChange={(event) =>
-                    patchSuggestion(entry.id, { startTime: event.target.value })
-                  }
-                  className={inputClass}
-                />
                 <label className="flex items-center gap-1.5 text-xs font-bold">
                   <input
                     type="checkbox"

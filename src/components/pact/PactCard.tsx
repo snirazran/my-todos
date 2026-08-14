@@ -122,6 +122,10 @@ export function PactCard({
   };
 
   const active = data.active;
+  const fliesToFinish = active
+    ? Math.max(0, active.target - active.progress) * active.sessionFlies +
+      active.weekBonusFlies
+    : 0;
   // Home shows a running pact through the quest strip instead — a full card
   // there sat between the frog and the task list and read as an interruption.
   // The quests page keeps the whole card, where it is the main event.
@@ -303,8 +307,18 @@ export function PactCard({
                 <span className="flex min-w-0 items-center gap-1.5 text-[12px] font-semibold text-muted-foreground">
                   {active.claimable ? (
                     <>
-                      <FlyWorth amount={active.rewardFlies} />
+                      <FlyWorth amount={active.weekBonusFlies} />
                       <span>ready</span>
+                    </>
+                  ) : active.earnedFlies > 0 ? (
+                    // Banked flies are the whole point of paying per session:
+                    // a week that lost one is still visibly worth finishing,
+                    // and the number left is the pull toward the last box.
+                    <>
+                      <FlyWorth amount={active.earnedFlies} />
+                      <span className="truncate">
+                        banked · +{fliesToFinish} to finish
+                      </span>
                     </>
                   ) : (
                     <span className="truncate">

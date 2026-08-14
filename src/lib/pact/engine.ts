@@ -6,6 +6,8 @@ import PactConfigModel, {
   DEFAULT_PACT_MILESTONE_REWARDS,
   DEFAULT_PACT_STREAK_TIERS,
   PACT_CONFIG_ID,
+  PACT_PAYOUT_VERSION,
+  PACT_V2_PAYOUT,
   seedSuggestions,
   type PactConfigDoc,
 } from '@/lib/models/PactConfig';
@@ -26,12 +28,15 @@ import {
   normalizeFocusProfile,
 } from '@/lib/quests/engine';
 import { getFullCatalog } from '@/lib/skins/getCatalog';
-import { applyPactRewards } from './grant';
+import { applyPactRewards, applyPactSessionFlies } from './grant';
 import type { UserDoc } from '@/lib/types/UserDoc';
 import {
+  DEFAULT_PACT_START_TIME,
   MAX_OPTIONS,
   PACT_SIZE_LABEL,
   PRIMARY_OPTIONS,
+  daysForSessions,
+  suggestionSessions,
   type ActivePactView,
   type PactAreaChoice,
   type PactMilestone,
@@ -193,6 +198,15 @@ export async function ensurePactConfig(): Promise<PactConfigDoc> {
     if (typeof existing.shieldAdMinStreak !== 'number') {
       backfill.shieldAdMinStreak = 2;
     }
+    // A doc written under v1 carries hand-tuned v1 numbers, so a plain
+    // "is it missing?" backfill would leave it paying nothing until the week
+    // landed. The version stamp is what makes the re-seed run exactly once.
+    if ((existing.payoutVersion ?? 1) < PACT_PAYOUT_VERSION) {
+      Object.assign(backfill, PACT_V2_PAYOUT);
+      backfill.payoutVersion = PACT_PAYOUT_VERSION;
+    } else if (typeof existing.comebackBonusFlies !== 'number') {
+      backfill.comebackBonusFlies = PACT_V2_PAYOUT.comebackBonusFlies;
+    }
     if (Object.keys(backfill).length === 0) return existing;
     await PactConfigModel.updateOne(
       { configId: PACT_CONFIG_ID },
@@ -207,26 +221,47 @@ export async function ensurePactConfig(): Promise<PactConfigDoc> {
   return created.toObject() as PactConfigDoc;
 }
 
-function tierForAreaWeeks(weeksKept: number): PactSizeTier {
-  if (weeksKept >= 6) return 'strong';
-  if (weeksKept >= 2) return 'steady';
-  return 'starter';
+/**
+ * Most sessions a week may ask for at this much tenure in the area. The paid
+ * gym experiments found the whole effect came from people who weren't already
+ * doing the behaviour, and a beginner's menu that opens with five sessions
+ * loses exactly those people — so the ladder is earned, not offered up front.
+ */
+function sessionCeilingForAreaWeeks(weeksKept: number) {
+  if (weeksKept >= 6) return 7;
+  if (weeksKept >= 2) return 4;
+  return 3;
 }
 
-function tierRank(tier: PactSizeTier) {
-  return tier === 'starter' ? 0 : tier === 'steady' ? 1 : 2;
+function sessionCount(suggestion: PactSuggestion) {
+  return suggestionSessions(suggestion);
 }
 
-export function optionRewardFlies(
-  config: PactConfigDoc,
-  days: number[],
-  tier: PactSizeTier,
-) {
+/** Flies one kept session pays, the moment its task is ticked. */
+export function pactSessionFlies(config: PactConfigDoc) {
+  return Math.max(0, Number(config.fliesPerCompletion ?? 0));
+}
+
+/** Flies held back for finishing the whole week. */
+export function pactWeekBonusFlies(config: PactConfigDoc) {
+  return Math.max(0, Number(config.weekBonusFlies ?? 0));
+}
+
+/** Flies for the first session completed after a scheduled one was missed. */
+export function pactComebackFlies(config: PactConfigDoc) {
+  return Math.max(0, Number(config.comebackBonusFlies ?? 0));
+}
+
+/**
+ * What a week is worth end to end, for previews only — sessions are paid as
+ * they happen and the bonus lands on the last one. Deliberately blind to tier:
+ * a difficulty nobody can verify must never move the rate, or the
+ * hardest-labelled option becomes strictly dominant. Ambition is priced in
+ * sessions, which is the one unit of effort the app can actually see.
+ */
+export function optionRewardFlies(config: PactConfigDoc, days: number[]) {
   const taskCount = Math.max(1, new Set(days).size);
-  const base = taskCount * Math.max(1, config.fliesPerCompletion);
-  const bonus = Math.max(0, config.weekBonusFlies);
-  const push = tier === 'strong' ? Math.max(0, config.bigCommitmentBonusFlies) : 0;
-  return base + bonus + push;
+  return taskCount * pactSessionFlies(config) + pactWeekBonusFlies(config);
 }
 
 function suggestionToOption(
@@ -234,18 +269,22 @@ function suggestionToOption(
   config: PactConfigDoc,
   source: PactOption['source'] = 'library',
 ): PactOption {
-  const days = suggestion.days.length ? suggestion.days : [1, 3, 5];
+  // An idea says what to do and how often. When is the user's answer, given on
+  // the next step — an idea that arrived pinned to Tuesday at 21:00 got turned
+  // down over the Tuesday rather than over the commitment.
+  const sessions = suggestionSessions(suggestion);
+  const days = daysForSessions(sessions);
   return {
     id: suggestion.id,
     text: suggestion.text,
     days,
-    startTime: suggestion.startTime || '19:00',
-    minutes: suggestion.minutes,
+    startTime: DEFAULT_PACT_START_TIME,
+    sessions,
     tier: suggestion.tier,
     tierLabel: PACT_SIZE_LABEL[suggestion.tier],
-    taskCount: new Set(days).size,
-    rewardFlies: optionRewardFlies(config, days, suggestion.tier),
-    scheduleLabel: scheduleLabel(days, suggestion.startTime || '19:00'),
+    taskCount: sessions,
+    rewardFlies: optionRewardFlies(config, days),
+    scheduleLabel: scheduleLabel(days, DEFAULT_PACT_START_TIME),
     source,
   };
 }
@@ -261,16 +300,12 @@ function universalFallbacks(
   const base = (
     tier: PactSizeTier,
     text: string,
-    days: number[],
-    startTime: string,
-    minutes: number,
+    sessions: number,
   ): PactSuggestion => ({
     id: `fallback-${categoryId}-${tier}`,
     categoryId,
     text,
-    days,
-    startTime,
-    minutes,
+    sessions,
     tier,
     isActive: true,
     picked: 0,
@@ -281,26 +316,18 @@ function universalFallbacks(
   // task titles — far better than anything generic we could compose.
   if (quickAdd.length > 0) {
     const tiers: PactSizeTier[] = ['starter', 'steady', 'strong'];
-    const schedules: [number[], string, number][] = [
-      [[2, 4], '18:00', 15],
-      [[1, 3, 5], '18:30', 25],
-      [[1, 2, 3, 4, 5], '19:00', 45],
-    ];
-    return quickAdd.slice(0, 3).map((text, index) =>
-      base(
-        tiers[index] ?? 'steady',
-        text,
-        schedules[index]?.[0] ?? [1, 3, 5],
-        schedules[index]?.[1] ?? '18:30',
-        schedules[index]?.[2] ?? 20,
-      ),
-    );
+    const sessions = [2, 3, 5];
+    return quickAdd
+      .slice(0, 3)
+      .map((text, index) =>
+        base(tiers[index] ?? 'steady', text, sessions[index] ?? 3),
+      );
   }
 
   return [
-    base('starter', `15-minute ${label} session`, [2, 4], '18:00', 15),
-    base('steady', `25-minute ${label} session`, [1, 3, 5], '18:30', 25),
-    base('strong', `45-minute ${label} session`, [1, 3, 5], '19:00', 45),
+    base('starter', `15-minute ${label} session`, 2),
+    base('steady', `25-minute ${label} session`, 3),
+    base('strong', `45-minute ${label} session`, 5),
   ];
 }
 
@@ -318,7 +345,6 @@ export function buildOptionsForArea(args: {
   lastPact?: PactDoc | null;
 }): PactOption[] {
   const { config, categoryId, areaName, weeksKept, lastPact } = args;
-  const preferredTier = tierForAreaWeeks(weeksKept);
   const library = (config.suggestions ?? []).filter(
     (s) => s.isActive && s.categoryId === categoryId,
   );
@@ -327,42 +353,71 @@ export function buildOptionsForArea(args: {
       ? library
       : universalFallbacks(categoryId, areaName, args.quickAdd);
 
-  const ranked = [...pool].sort((a, b) => {
-    const aDist = Math.abs(tierRank(a.tier) - tierRank(preferredTier));
-    const bDist = Math.abs(tierRank(b.tier) - tierRank(preferredTier));
-    if (aDist !== bDist) return aDist - bDist;
-    return keepRate(b) - keepRate(a);
-  });
+  // Sessions are what the week is priced on, so the menu has to ladder by
+  // them. Ranking by an authored difficulty label instead produced menus whose
+  // three rows could all cost the same and pay differently — the shape that
+  // makes over-claiming free.
+  const ceiling = sessionCeilingForAreaWeeks(weeksKept);
+  const byEffort = (list: PactSuggestion[]) =>
+    [...list].sort((a, b) => {
+      const bySessions = sessionCount(a) - sessionCount(b);
+      if (bySessions !== 0) return bySessions;
+      return keepRate(b) - keepRate(a);
+    });
 
-  // The first three cover one tier each so the default view spans easy →
-  // hard; the rest follow and the sheet keeps them behind "More ideas".
-  // Trimming the library outright would punish a user who knows exactly what
-  // they want, so the extra options are deferred rather than deleted.
-  const chosen: PactSuggestion[] = [];
-  const seenTiers = new Set<PactSizeTier>();
-  for (const entry of ranked) {
-    if (chosen.length >= PRIMARY_OPTIONS) break;
-    if (seenTiers.has(entry.tier) && ranked.length > 3) continue;
-    seenTiers.add(entry.tier);
-    chosen.push(entry);
+  // One idea per session count — the best-kept one — so the menu is a ladder
+  // of distinct asks rather than three rows that cost the same.
+  const bestPerCount = new Map<number, PactSuggestion>();
+  for (const entry of byEffort(pool)) {
+    const count = sessionCount(entry);
+    if (!bestPerCount.has(count)) bestPerCount.set(count, entry);
   }
-  for (const entry of ranked) {
-    if (chosen.length >= MAX_OPTIONS) break;
-    if (!chosen.includes(entry)) chosen.push(entry);
+  const counts = Array.from(bestPerCount.keys()).sort((a, b) => a - b);
+  const withinReach = counts.filter((count) => count <= ceiling);
+  const beyond = counts.filter((count) => count > ceiling);
+
+  // Spread the picks across the whole reachable range instead of taking the
+  // three smallest. Clustering at the bottom made the tenure ceiling inert —
+  // week 1 and week 6 in an area produced an identical menu, so the ladder the
+  // ceiling exists to create never actually appeared.
+  const spread = (values: number[], take: number) => {
+    if (values.length <= take) return values;
+    const last = values.length - 1;
+    const picked = new Set<number>();
+    for (let i = 0; i < take; i += 1) {
+      picked.add(values[Math.round((i * last) / (take - 1))]);
+    }
+    return Array.from(picked).sort((a, b) => a - b);
+  };
+
+  // A thin library must never leave a beginner staring at a single row, so the
+  // ceiling relaxes before the menu shrinks — anything above it lands last,
+  // where it reads as the stretch option rather than the default.
+  const pickedCounts = spread(withinReach, PRIMARY_OPTIONS);
+  for (const count of beyond) {
+    if (pickedCounts.length >= PRIMARY_OPTIONS) break;
+    pickedCounts.push(count);
   }
+
+  const chosen = pickedCounts
+    .map((count) => bestPerCount.get(count))
+    .filter((entry): entry is PactSuggestion => !!entry);
 
   const options = chosen.map((entry) => suggestionToOption(entry, config));
 
   if (lastPact && lastPact.status === 'kept') {
+    // The one option that keeps its schedule: these days and this time are the
+    // user's own answer from a week that worked, not an authored guess.
     const repeat: PactOption = {
       id: `repeat-${lastPact.pactId}`,
       text: lastPact.commitmentText,
       days: lastPact.days,
       startTime: lastPact.startTime,
+      sessions: new Set(lastPact.days).size,
       tier: lastPact.tier,
       tierLabel: PACT_SIZE_LABEL[lastPact.tier],
       taskCount: new Set(lastPact.days).size,
-      rewardFlies: optionRewardFlies(config, lastPact.days, lastPact.tier),
+      rewardFlies: optionRewardFlies(config, lastPact.days),
       scheduleLabel: scheduleLabel(lastPact.days, lastPact.startTime),
       source: 'repeat',
     };
@@ -428,27 +483,79 @@ function lastActivityKeyForArea(
   return latest;
 }
 
-export async function syncPactProgress(args: {
+export type PactSessionLedger = {
+  progress: number;
+  /**
+   * A scheduled session went by unticked and a later one was still kept. The
+   * single largest effect in the 53-arm gym megastudy came from paying for
+   * exactly this return, so it is worth detecting precisely.
+   */
+  cameBack: boolean;
+};
+
+/**
+ * Reads one pact's week off its tasks: how many sessions landed, and whether
+ * the user missed one and came back. Pass the week context to get the second
+ * answer — progress alone doesn't need it.
+ *
+ * A session completed late still counts for the day it was scheduled on, so
+ * catching up on Wednesday clears Monday rather than burning it.
+ */
+export function readPactSessions(args: {
   pact: PactDoc;
   tasks: TaskDoc[];
   timezone: string;
-}): Promise<number> {
-  const { pact, tasks, timezone } = args;
+  weekStartsOn?: WeekStartDay;
+  todayKey?: string;
+}): PactSessionLedger {
+  const { pact, tasks, timezone, weekStartsOn, todayKey } = args;
   const ids = new Set(pact.taskIds ?? []);
-  if (ids.size === 0) return pact.progress ?? 0;
+  if (ids.size === 0) {
+    return { progress: pact.progress ?? 0, cameBack: false };
+  }
   const weekEnd = shiftYMD(pact.weekKey, 6);
+  const order = weekStartsOn === undefined ? null : weekOrder(weekStartsOn);
+
   let done = 0;
+  let earliestMiss: string | null = null;
+  let latestKept: string | null = null;
+
   for (const task of tasks) {
     if (!ids.has(task.id)) continue;
+    let keptOn: string | null = null;
     for (const occurrence of task.completedDates ?? []) {
       const stamp = task.completedAtByDate?.[occurrence];
       const key = stamp
         ? getZonedYMD(stamp instanceof Date ? stamp : new Date(stamp), timezone)
         : occurrence;
-      if (key >= pact.weekKey && key <= weekEnd) done += 1;
+      if (key < pact.weekKey || key > weekEnd) continue;
+      done += 1;
+      if (!keptOn || key < keptOn) keptOn = key;
     }
+    if (keptOn) {
+      if (!latestKept || keptOn > latestKept) latestKept = keptOn;
+      continue;
+    }
+    if (!order || !todayKey) continue;
+    const offset = order.indexOf(task.dayOfWeek as 0 | 1 | 2 | 3 | 4 | 5 | 6);
+    if (offset < 0) continue;
+    const scheduled = shiftYMD(pact.weekKey, offset);
+    if (scheduled >= todayKey) continue;
+    if (!earliestMiss || scheduled < earliestMiss) earliestMiss = scheduled;
   }
-  return Math.min(pact.target, done);
+
+  return {
+    progress: Math.min(pact.target, done),
+    cameBack: !!earliestMiss && !!latestKept && latestKept > earliestMiss,
+  };
+}
+
+export async function syncPactProgress(args: {
+  pact: PactDoc;
+  tasks: TaskDoc[];
+  timezone: string;
+}): Promise<number> {
+  return readPactSessions(args).progress;
 }
 
 export function shieldCapFor(config: PactConfigDoc, isPremium: boolean) {
@@ -519,9 +626,35 @@ export async function settleFinishedWeeks(args: {
   let autoGrantedFlies = 0;
 
   for (const pact of ordered) {
-    const progress = await syncPactProgress({ pact, tasks, timezone });
+    // The week is over, so every scheduled day is in the past — asking the
+    // ledger as of the day after it ended is what makes a miss a miss.
+    const ledger = readPactSessions({
+      pact,
+      tasks,
+      timezone,
+      weekStartsOn: args.weekStartsOn,
+      todayKey: shiftYMD(pact.weekKey, 7),
+    });
+    const progress = ledger.progress;
     const kept = progress >= pact.target;
     let usedShield = false;
+
+    // Sessions ticked at the week's edge may never have been reconciled while
+    // the week was still current, and once it rolls over nothing else looks at
+    // them. Settle them here so no kept session goes unpaid.
+    const owedSessions = progress - Math.max(0, pact.paidSessions ?? 0);
+    const earnsComeback = ledger.cameBack && !pact.comebackPaid;
+    if (userDoc && (owedSessions !== 0 || earnsComeback)) {
+      autoGrantedFlies += applyPactSessionFlies({
+        user: userDoc,
+        config: args.config,
+        owedSessions,
+        comeback: earnsComeback,
+        isPremium,
+      });
+      pact.paidSessions = progress;
+      if (earnsComeback) pact.comebackPaid = true;
+    }
 
     // Two rescued weeks in a row would let someone who finishes nothing hold
     // a twelve-week streak, so a rescue always has to be followed by a week
@@ -776,8 +909,13 @@ export async function getPactView(args: {
       status: activeDoc.status,
       claimable: progress >= activeDoc.target && !activeDoc.claimedAt,
       claimed: !!activeDoc.claimedAt,
-      rewardFlies: optionRewardFlies(config, activeDoc.days, activeDoc.tier),
-      daysLeft: Math.max(0, daysBetween(todayKey, weekEnd)),
+      rewardFlies: optionRewardFlies(config, activeDoc.days),
+      sessionFlies: pactSessionFlies(config),
+      weekBonusFlies: pactWeekBonusFlies(config),
+      earnedFlies:
+        Math.max(0, activeDoc.paidSessions ?? 0) * pactSessionFlies(config) +
+        (activeDoc.comebackPaid ? pactComebackFlies(config) : 0),
+      daysLeft: Math.max(0, daysBetween(todayKey, weekEnd) + 1),
       shieldUsed: activeDoc.shieldUsed,
       tagId: activeDoc.tagId,
       openToday,
@@ -892,7 +1030,7 @@ export async function getPactView(args: {
     atRisk:
       !!active &&
       active.progress < active.target &&
-      active.daysLeft <= 1 &&
+      active.daysLeft <= 2 &&
       streak.weeks > 0,
   };
 
@@ -903,7 +1041,6 @@ export async function getPactView(args: {
     pickOpen:
       !active &&
       isPickWindowOpen(),
-    daysLeftInWeek: Math.max(0, daysBetween(todayKey, shiftYMD(currentWeek, 6))),
     active,
     areas,
     streak: streakView,
@@ -914,9 +1051,9 @@ export async function getPactView(args: {
     needsAreas: areas.length === 0,
     weekStartsOn,
     flyRates: {
-      perTask: Math.max(1, config.fliesPerCompletion),
-      weekBonus: Math.max(0, config.weekBonusFlies),
-      pushBonus: Math.max(0, config.bigCommitmentBonusFlies),
+      perTask: pactSessionFlies(config),
+      weekBonus: pactWeekBonusFlies(config),
+      comeback: pactComebackFlies(config),
     },
     completionRewards: config.completionRewards ?? [],
     forgoneFlies: streak.forgoneFlies,

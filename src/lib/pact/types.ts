@@ -20,12 +20,59 @@ export const PACT_SIZE_LABEL: Record<PactSizeTier, string> = {
   strong: 'Push',
 };
 
+export const PACT_MAX_SESSIONS = 7;
+
+/** Where the day toggles start on the confirm step, before the user moves them. */
+export const DEFAULT_PACT_START_TIME = '19:00';
+
+/**
+ * A starting spread for N sessions, chosen to leave rest days between them
+ * rather than stacking a week at the front. It is only ever a default — the
+ * confirm step is where the user says which days are actually theirs, and
+ * that choice is the part of a commitment the evidence says does the work.
+ */
+const SESSION_DAY_SPREAD: Record<number, number[]> = {
+  1: [3],
+  2: [2, 4],
+  3: [1, 3, 5],
+  4: [1, 2, 4, 5],
+  5: [1, 2, 3, 4, 5],
+  6: [1, 2, 3, 4, 5, 6],
+  7: [0, 1, 2, 3, 4, 5, 6],
+};
+
+export function daysForSessions(sessions: number): number[] {
+  const n = Math.min(PACT_MAX_SESSIONS, Math.max(1, Math.round(sessions)));
+  return [...(SESSION_DAY_SPREAD[n] ?? SESSION_DAY_SPREAD[3])];
+}
+
+/** Sessions an idea asks for, recovering the count from a legacy schedule. */
+export function suggestionSessions(suggestion: {
+  sessions?: number;
+  days?: number[];
+}): number {
+  const authored = Number(suggestion.sessions);
+  if (Number.isFinite(authored) && authored >= 1) {
+    return Math.min(PACT_MAX_SESSIONS, Math.round(authored));
+  }
+  const legacy = new Set(suggestion.days ?? []).size;
+  return legacy >= 1 ? Math.min(PACT_MAX_SESSIONS, legacy) : 3;
+}
+
 export type PactSuggestion = {
   id: string;
   categoryId: string;
   text: string;
-  days: number[];
-  startTime: string;
+  /** How many times a week this asks for — the only thing an idea commits to. */
+  sessions: number;
+  /**
+   * Legacy. Ideas used to ship a fixed schedule, which meant a good commitment
+   * could be turned down over an admin's choice of Tuesday. The user picks
+   * days and times on the confirm step now; these are only read to recover a
+   * session count from an idea authored before the change.
+   */
+  days?: number[];
+  startTime?: string;
   minutes?: number;
   tier: PactSizeTier;
   isActive: boolean;
@@ -51,6 +98,7 @@ export type PactConfigView = {
   fliesPerCompletion: number;
   weekBonusFlies: number;
   bigCommitmentBonusFlies: number;
+  comebackBonusFlies: number;
   completionRewards: QuestRewards;
   milestoneEveryWeeks: number;
   milestoneRewards: QuestRewards;
@@ -71,9 +119,11 @@ export type PactConfigView = {
 export type PactOption = {
   id: string;
   text: string;
+  /** A starting spread the user rearranges on the confirm step. */
   days: number[];
   startTime: string;
-  minutes?: number;
+  /** Sessions a week — what the option asks for, and what it is priced on. */
+  sessions: number;
   tier: PactSizeTier;
   tierLabel: string;
   taskCount: number;
@@ -128,7 +178,14 @@ export type ActivePactView = {
   status: PactStatus;
   claimable: boolean;
   claimed: boolean;
+  /** What the whole week is worth if every session lands. */
   rewardFlies: number;
+  /** Flies each session pays the moment it is ticked. */
+  sessionFlies: number;
+  /** Flies still waiting on the last session. */
+  weekBonusFlies: number;
+  /** Flies this pact has already banked — sessions kept, plus any comeback. */
+  earnedFlies: number;
   daysLeft: number;
   shieldUsed: boolean;
   nextTaskLabel: string | null;
@@ -174,7 +231,6 @@ export type PactView = {
   weekKey: string;
   weekLabel: string;
   pickOpen: boolean;
-  daysLeftInWeek: number;
   active: ActivePactView | null;
   areas: PactAreaChoice[];
   streak: PactStreakView;
@@ -184,7 +240,7 @@ export type PactView = {
   introSeen: boolean;
   needsAreas: boolean;
   weekStartsOn: number;
-  flyRates: { perTask: number; weekBonus: number; pushBonus: number };
+  flyRates: { perTask: number; weekBonus: number; comeback: number };
   /** What finishing this week grants on top of flies (usually a gift box). */
   completionRewards: QuestRewards;
   rewardCatalog: Record<string, unknown>;

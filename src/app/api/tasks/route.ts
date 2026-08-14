@@ -29,6 +29,7 @@ import {
 } from '@/lib/models/TaskSection';
 import { severBond, handleBuddyCompletion } from '@/lib/buddy/server';
 import { bumpQuestMetric, taskStreakMetric } from '@/lib/quests/metrics';
+import { reconcilePactSessionFlies } from '@/lib/pact/sessions';
 import {
   checklistBonus,
   checklistContent,
@@ -363,9 +364,17 @@ async function currentFlyStatus(
 }
 
 function syncGamification(userId: string, timezone: string) {
-  return syncQuestState({ userId, timezone }).catch((error) => {
-    console.error('Quest sync failed:', error);
-  });
+  // The pact reconciles here rather than at each completion call site: ticking
+  // a task arrives from several routes and can be undone, and this is the one
+  // hook all of them already share.
+  return Promise.all([
+    syncQuestState({ userId, timezone }).catch((error) => {
+      console.error('Quest sync failed:', error);
+    }),
+    reconcilePactSessionFlies({ userId, timezone }).catch((error) => {
+      console.error('Pact session sync failed:', error);
+    }),
+  ]);
 }
 
 async function awardFlyForTask(
@@ -1542,6 +1551,7 @@ async function handleBulkPut(uid: string, bulk: BulkBody, tz: string) {
           startTime: doc.startTime,
           endTime: doc.endTime,
           reminder: doc.reminder,
+          ...(doc.sectionId ? { sectionId: doc.sectionId } : {}),
         });
         landedIds.push(newId);
         affected++;
@@ -2959,6 +2969,24 @@ function sectionOps(t: { sectionId?: string | null } | undefined): {
   return { set: {}, unset: { sectionId: 1 } };
 }
 
+async function applySectionToSeries(
+  userId: string,
+  doc: { id: string; repeatGroupId?: string } | undefined,
+  sec: { set: Record<string, unknown>; unset: Record<string, 1> },
+) {
+  if (!doc?.repeatGroupId) return;
+  const hasSet = Object.keys(sec.set).length > 0;
+  const hasUnset = Object.keys(sec.unset).length > 0;
+  if (!hasSet && !hasUnset) return;
+  await TaskModel.updateMany(
+    { userId, repeatGroupId: doc.repeatGroupId, id: { $ne: doc.id } },
+    {
+      ...(hasSet ? { $set: sec.set } : {}),
+      ...(hasUnset ? { $unset: sec.unset } : {}),
+    },
+  );
+}
+
 async function handleBoardPut(
   uid: string,
   body: {
@@ -3087,11 +3115,12 @@ async function handleBoardPut(
 
   const docs: TaskDoc[] = await TaskModel.find(
     { userId: uid, id: { $in: ids } },
-    { id: 1, type: 1, text: 1, tags: 1, notes: 1, checklist: 1, calendarEventId: 1, startTime: 1, endTime: 1, reminder: 1 },
+    { id: 1, type: 1, text: 1, tags: 1, notes: 1, checklist: 1, calendarEventId: 1, startTime: 1, endTime: 1, reminder: 1, repeatGroupId: 1 },
   )
     .lean<TaskDoc[]>()
     .exec();
   const typeById = new Map(docs.map((d) => [d.id, d.type]));
+  const docById = new Map(docs.map((d) => [d.id, d]));
   const textById = new Map(docs.map((d) => [d.id, d.text]));
   const tagsById = new Map(docs.map((d) => [d.id, d.tags ?? []]));
   const notesById = new Map(docs.map((d) => [d.id, d.notes]));
@@ -3124,20 +3153,23 @@ async function handleBoardPut(
         ? { $unset: sec.unset }
         : {};
       if (ttype === 'weekly')
-        return TaskModel.updateOne(
-          { userId: uid, type: 'weekly', id: t.id },
-          {
-            $set: {
-              dayOfWeek: weekday,
-              order: i + 1,
-              [`orderOverrides.${weekDates[weekday]}`]: i + 1,
-              updatedAt: now,
-              tags,
-              ...sec.set,
+        return Promise.all([
+          TaskModel.updateOne(
+            { userId: uid, type: 'weekly', id: t.id },
+            {
+              $set: {
+                dayOfWeek: weekday,
+                order: i + 1,
+                [`orderOverrides.${weekDates[weekday]}`]: i + 1,
+                updatedAt: now,
+                tags,
+                ...sec.set,
+              },
+              ...secUnset,
             },
-            ...secUnset,
-          },
-        );
+          ),
+          applySectionToSeries(uid, docById.get(t.id), sec),
+        ]);
       if (ttype === 'regular')
         return TaskModel.updateOne(
           { userId: uid, type: 'regular', id: t.id },
@@ -3258,6 +3290,7 @@ async function handleBoardPutByDate(
       repeatDayOfMonth: 1,
       repeatRule: 1,
       repeatStartDate: 1,
+      repeatGroupId: 1,
       frogodoroSessions: 1,
     },
   )
@@ -3318,18 +3351,21 @@ async function handleBoardPutByDate(
                 : false;
         if (occursHere) {
           const sec = sectionOps(t);
-          return TaskModel.updateOne(
-            { userId: uid, id: t.id },
-            {
-              $set: {
-                [`orderOverrides.${dateKey}`]: i + 1,
-                updatedAt: now,
-                tags,
-                ...sec.set,
+          return Promise.all([
+            TaskModel.updateOne(
+              { userId: uid, id: t.id },
+              {
+                $set: {
+                  [`orderOverrides.${dateKey}`]: i + 1,
+                  updatedAt: now,
+                  tags,
+                  ...sec.set,
+                },
+                ...(Object.keys(sec.unset).length ? { $unset: sec.unset } : {}),
               },
-              ...(Object.keys(sec.unset).length ? { $unset: sec.unset } : {}),
-            },
-          );
+            ),
+            applySectionToSeries(uid, doc, sec),
+          ]);
         }
         // Lands on a non-occurrence day: detach into a one-off regular task.
         return TaskModel.updateOne(

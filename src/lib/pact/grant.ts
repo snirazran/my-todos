@@ -1,7 +1,11 @@
 import type { PactDoc } from '@/lib/models/Pact';
 import type { PactConfigDoc } from '@/lib/models/PactConfig';
 import type { QuestReward } from '@/lib/quests/types';
-import { optionRewardFlies } from './engine';
+import {
+  pactComebackFlies,
+  pactSessionFlies,
+  pactWeekBonusFlies,
+} from './engine';
 
 export type PactRewardSummary = {
   fliesGranted: number;
@@ -14,8 +18,43 @@ export type PactRewardSummary = {
 };
 
 /**
- * Pays out one kept pact onto a loaded user document — flies, the weekly gift,
- * the milestone gift, and any streak/mastery tier the week lands on.
+ * Moves a pact's session flies onto a loaded user document. `owedSessions` is
+ * a delta, so an undone completion passes a negative and gets refunded.
+ * Returns what actually moved, which a clamped refund makes smaller than asked.
+ *
+ * Mutates `user`; the caller saves.
+ */
+export function applyPactSessionFlies(args: {
+  user: any;
+  config: PactConfigDoc;
+  owedSessions: number;
+  comeback: boolean;
+  isPremium: boolean;
+}): number {
+  const { user, config, owedSessions, comeback, isPremium } = args;
+  const multiplier = isPremium ? 2 : 1;
+  const amount =
+    owedSessions * pactSessionFlies(config) * multiplier +
+    (comeback ? pactComebackFlies(config) * multiplier : 0);
+  if (amount === 0) return 0;
+
+  if (!user.wardrobe) {
+    user.wardrobe = { equipped: {}, inventory: {}, unseenItems: [], flies: 0 };
+  }
+  const before = Math.max(0, Number(user.wardrobe.flies) || 0);
+  // A refund can never dig a hole: flies spent between earning and undoing are
+  // the user's, and a negative balance breaks every price check downstream.
+  const after = Math.max(0, before + amount);
+  user.wardrobe.flies = after;
+  user.markModified('wardrobe');
+  return after - before;
+}
+
+/**
+ * Pays out one kept pact onto a loaded user document — the week bonus, the
+ * weekly gift, the milestone gift, and any streak/mastery tier the week lands
+ * on. The sessions themselves were already paid as they were ticked (see
+ * `reconcilePactSessionFlies`), so this is only what finishing adds.
  *
  * Deliberately takes the week numbers as arguments rather than deriving them:
  * the claim path runs before the week is settled (so it projects), while the
@@ -80,9 +119,7 @@ export function applyPactRewards(args: {
     }
   };
 
-  applyRewards([
-    { type: 'FLIES', amount: optionRewardFlies(config, pact.days, pact.tier) },
-  ]);
+  applyRewards([{ type: 'FLIES', amount: pactWeekBonusFlies(config) }]);
 
   applyRewards(config.completionRewards);
   const everyN = Math.max(0, config.milestoneEveryWeeks ?? 0);

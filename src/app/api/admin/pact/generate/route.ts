@@ -8,7 +8,7 @@ import connectMongo from '@/lib/mongoose';
 import PactConfigModel, { PACT_CONFIG_ID } from '@/lib/models/PactConfig';
 import QuestCategoryModel from '@/lib/models/QuestCategory';
 import { ensurePactConfig } from '@/lib/pact/engine';
-import type { PactSuggestion } from '@/lib/pact/types';
+import { suggestionSessions, type PactSuggestion } from '@/lib/pact/types';
 
 const MODEL = 'claude-haiku-4-5';
 
@@ -21,12 +21,12 @@ const SUGGESTION_SCHEMA = {
         type: 'object',
         properties: {
           text: { type: 'string' },
-          days: { type: 'array', items: { type: 'integer', enum: [0, 1, 2, 3, 4, 5, 6] } },
-          startTime: { type: 'string' },
-          minutes: { type: 'integer' },
+          // Structured outputs reject numeric bounds (minimum/maximum), so the
+          // range is expressed as the enum of allowed session counts.
+          sessions: { type: 'integer', enum: [1, 2, 3, 4, 5, 6, 7] },
           tier: { type: 'string', enum: ['starter', 'steady', 'strong'] },
         },
-        required: ['text', 'days', 'startTime', 'minutes', 'tier'],
+        required: ['text', 'sessions', 'tier'],
         additionalProperties: false,
       },
     },
@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
       model: MODEL,
       max_tokens: 2000,
       system:
-        'You write weekly commitments for a habit app. Each one is a single concrete action a person can finish in one sitting, written as an instruction they would recognise in their own to-do list. No motivational language, no emoji, no numbering. Under 60 characters. Pick days and a realistic local start time that suits the action.',
+        'You write weekly commitments for a habit app. Each one is a single concrete action a person can finish in one sitting, written as an instruction they would recognise in their own to-do list. No motivational language, no emoji, no numbering. Under 60 characters. Say what the action is and how often it should happen — never which days or what time, because the person choosing it sets their own schedule.',
       messages: [
         {
           role: 'user',
@@ -76,8 +76,8 @@ export async function POST(req: NextRequest) {
             existing.length
               ? `Do not repeat these existing ideas: ${existing.join('; ')}`
               : '',
-            'Write 6 commitments: 2 tier "starter" (small, under 15 minutes, 2 days a week), 2 tier "steady" (moderate, 3 days a week), 2 tier "strong" (demanding, 3+ days or 45+ minutes).',
-            'days uses 0=Sunday through 6=Saturday. startTime is 24-hour HH:MM. minutes is how long the action takes.',
+            'Write 6 commitments: 2 tier "starter" (small, under 15 minutes, 1-2 sessions a week), 2 tier "steady" (moderate, 3 sessions), 2 tier "strong" (demanding, 4-5 sessions).',
+            'sessions is how many times that week the action happens, 1 to 7. If a duration is part of the action, put it in the text ("Take a 20-minute walk"), not in a separate field.',
           ]
             .filter(Boolean)
             .join('\n'),
@@ -107,22 +107,11 @@ export async function POST(req: NextRequest) {
       .map((entry: any): PactSuggestion | null => {
         const text = String(entry?.text ?? '').trim().slice(0, 80);
         if (!text) return null;
-        const days = Array.from(
-          new Set<number>(
-            (Array.isArray(entry?.days) ? entry.days : []).map(Number),
-          ),
-        )
-          .filter((d) => Number.isInteger(d) && d >= 0 && d <= 6)
-          .sort((a, b) => a - b);
         return {
           id: uuid(),
           categoryId,
           text,
-          days: days.length ? days : [1, 3, 5],
-          startTime: /^\d{1,2}:\d{2}$/.test(String(entry?.startTime))
-            ? String(entry.startTime).padStart(5, '0')
-            : '19:00',
-          minutes: Math.max(1, Math.floor(Number(entry?.minutes) || 15)),
+          sessions: suggestionSessions(entry ?? {}),
           tier:
             entry?.tier === 'starter' || entry?.tier === 'strong'
               ? entry.tier
