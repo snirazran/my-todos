@@ -33,9 +33,8 @@ import type { UserDoc } from '@/lib/types/UserDoc';
 import {
   DEFAULT_PACT_START_TIME,
   MAX_OPTIONS,
+  PACT_QUIET_NUDGE_DAYS,
   PRIMARY_OPTIONS,
-  daysForSessions,
-  suggestionSessions,
   type ActivePactView,
   type PactAreaChoice,
   type PactMilestone,
@@ -44,9 +43,26 @@ import {
   type PactSuggestion,
   type PactUserTag,
   type PactView,
+  type PactWeekResult,
 } from './types';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Deterministic per-seed shuffle source, so a menu never reshuffles on reopen. */
+function createSeededRandom(seed: string) {
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i += 1) {
+    h ^= seed.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return () => {
+    h += 0x6d2b79f5;
+    let t = h;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export type PactStreakState = {
@@ -69,6 +85,8 @@ export type PactStreakState = {
    * unlock the highest-converting moment in the system.
    */
   forgoneFlies: number;
+  /** Last settled week, held until the user has been shown it once. */
+  pendingResult: PactWeekResult | null;
 };
 
 const EMPTY_STREAK: PactStreakState = {
@@ -84,6 +102,7 @@ const EMPTY_STREAK: PactStreakState = {
   areaWeeks: {},
   areaLastWeek: {},
   forgoneFlies: 0,
+  pendingResult: null,
 };
 
 export function normalizePactStreak(user: Partial<UserDoc> | null): PactStreakState {
@@ -104,6 +123,10 @@ export function normalizePactStreak(user: Partial<UserDoc> | null): PactStreakSt
     areaLastWeek:
       raw.areaLastWeek && typeof raw.areaLastWeek === 'object' ? raw.areaLastWeek : {},
     forgoneFlies: Math.max(0, Number(raw.forgoneFlies) || 0),
+    pendingResult:
+      raw.pendingResult && typeof raw.pendingResult === 'object'
+        ? (raw.pendingResult as PactWeekResult)
+        : null,
   };
 }
 
@@ -225,16 +248,6 @@ export async function ensurePactConfig(): Promise<PactConfigDoc> {
  * doing the behaviour, and a beginner's menu that opens with five sessions
  * loses exactly those people — so the ladder is earned, not offered up front.
  */
-function sessionCeilingForAreaWeeks(weeksKept: number) {
-  if (weeksKept >= 6) return 7;
-  if (weeksKept >= 2) return 4;
-  return 3;
-}
-
-function sessionCount(suggestion: PactSuggestion) {
-  return suggestionSessions(suggestion);
-}
-
 /** Flies one kept session pays, the moment its task is ticked. */
 export function pactSessionFlies(config: PactConfigDoc) {
   return Math.max(0, Number(config.fliesPerCompletion ?? 0));
@@ -262,25 +275,26 @@ export function optionRewardFlies(config: PactConfigDoc, days: number[]) {
   return taskCount * pactSessionFlies(config) + pactWeekBonusFlies(config);
 }
 
+/**
+ * An idea is only a what. How often and when are the user's answer, given on
+ * the next step: goal-setting theory's difficulty effects are conditional on
+ * the goal being self-endorsed, and an authored session count arrives as an
+ * assignment — it buys compliance, not commitment. It also anchored the
+ * ambition of the week to whatever an admin happened to type.
+ */
 function suggestionToOption(
   suggestion: PactSuggestion,
-  config: PactConfigDoc,
   source: PactOption['source'] = 'library',
 ): PactOption {
-  // An idea says what to do and how often. When is the user's answer, given on
-  // the next step — an idea that arrived pinned to Tuesday at 21:00 got turned
-  // down over the Tuesday rather than over the commitment.
-  const sessions = suggestionSessions(suggestion);
-  const days = daysForSessions(sessions);
   return {
     id: suggestion.id,
     text: suggestion.text,
-    days,
+    days: [],
     startTime: DEFAULT_PACT_START_TIME,
-    sessions,
-    taskCount: sessions,
-    rewardFlies: optionRewardFlies(config, days),
-    scheduleLabel: scheduleLabel(days, DEFAULT_PACT_START_TIME),
+    sessions: 0,
+    taskCount: 0,
+    rewardFlies: 0,
+    scheduleLabel: '',
     source,
   };
 }
@@ -309,19 +323,14 @@ function universalFallbacks(
   ];
 }
 
-function keepRate(suggestion: PactSuggestion) {
-  if (suggestion.picked < 3) return 0.5;
-  return suggestion.kept / suggestion.picked;
-}
-
 export function buildOptionsForArea(args: {
   config: PactConfigDoc;
   categoryId: string;
   areaName: string;
-  weeksKept: number;
+  weekKey: string;
   lastPact?: PactDoc | null;
 }): PactOption[] {
-  const { config, categoryId, areaName, weeksKept, lastPact } = args;
+  const { config, categoryId, areaName, weekKey, lastPact } = args;
   const library = (config.suggestions ?? []).filter(
     (s) => s.isActive && s.categoryId === categoryId,
   );
@@ -330,57 +339,20 @@ export function buildOptionsForArea(args: {
       ? library
       : universalFallbacks(categoryId, areaName);
 
-  // Sessions are what the week is priced on, so the menu has to ladder by
-  // them. Ranking by an authored difficulty label instead produced menus whose
-  // three rows could all cost the same and pay differently — the shape that
-  // makes over-claiming free.
-  const ceiling = sessionCeilingForAreaWeeks(weeksKept);
-  const byEffort = (list: PactSuggestion[]) =>
-    [...list].sort((a, b) => {
-      const bySessions = sessionCount(a) - sessionCount(b);
-      if (bySessions !== 0) return bySessions;
-      return keepRate(b) - keepRate(a);
-    });
-
-  // One idea per session count — the best-kept one — so the menu is a ladder
-  // of distinct asks rather than three rows that cost the same.
-  const bestPerCount = new Map<number, PactSuggestion>();
-  for (const entry of byEffort(pool)) {
-    const count = sessionCount(entry);
-    if (!bestPerCount.has(count)) bestPerCount.set(count, entry);
+  // Three ideas, drawn at random and held steady for the week. With sessions
+  // gone from the ideas there is no ladder left to build — every row now costs
+  // whatever the user decides it costs — so the menu's only job is variety.
+  // Seeded so re-opening the sheet shows the same three: a menu that reshuffles
+  // under the reader turns picking into shopping.
+  const rng = createSeededRandom(`${categoryId}:${weekKey}:${pool.length}`);
+  const shuffled = [...pool];
+  for (let i = shuffled.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(rng() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
-  const counts = Array.from(bestPerCount.keys()).sort((a, b) => a - b);
-  const withinReach = counts.filter((count) => count <= ceiling);
-  const beyond = counts.filter((count) => count > ceiling);
+  const chosen = shuffled.slice(0, PRIMARY_OPTIONS);
 
-  // Spread the picks across the whole reachable range instead of taking the
-  // three smallest. Clustering at the bottom made the tenure ceiling inert —
-  // week 1 and week 6 in an area produced an identical menu, so the ladder the
-  // ceiling exists to create never actually appeared.
-  const spread = (values: number[], take: number) => {
-    if (values.length <= take) return values;
-    const last = values.length - 1;
-    const picked = new Set<number>();
-    for (let i = 0; i < take; i += 1) {
-      picked.add(values[Math.round((i * last) / (take - 1))]);
-    }
-    return Array.from(picked).sort((a, b) => a - b);
-  };
-
-  // A thin library must never leave a beginner staring at a single row, so the
-  // ceiling relaxes before the menu shrinks — anything above it lands last,
-  // where it reads as the stretch option rather than the default.
-  const pickedCounts = spread(withinReach, PRIMARY_OPTIONS);
-  for (const count of beyond) {
-    if (pickedCounts.length >= PRIMARY_OPTIONS) break;
-    pickedCounts.push(count);
-  }
-
-  const chosen = pickedCounts
-    .map((count) => bestPerCount.get(count))
-    .filter((entry): entry is PactSuggestion => !!entry);
-
-  const options = chosen.map((entry) => suggestionToOption(entry, config));
+  const options = chosen.map((entry) => suggestionToOption(entry));
 
   if (lastPact && lastPact.status === 'kept') {
     // The one option that keeps its schedule: these days and this time are the
@@ -433,6 +405,12 @@ async function loadCategories() {
   return QuestCategoryModel.find({}).sort({ createdAt: 1 }).lean();
 }
 
+/**
+ * When the user last *finished* something in this area, measured only from
+ * completed tasks carrying one of the area's tags. Deliberately blind to
+ * whether a pact was ever made here: a promise is not activity, and counting
+ * one reset the gap for areas the user had done nothing in.
+ */
 function lastActivityKeyForArea(
   tasks: TaskDoc[],
   tagIds: string[],
@@ -442,11 +420,7 @@ function lastActivityKeyForArea(
   const wanted = new Set(tagIds);
   let latest: string | null = null;
   for (const task of tasks) {
-    const matches =
-      task.focusAreaId && tagIds.length
-        ? false
-        : (task.tags ?? []).some((tagId) => wanted.has(tagId));
-    if (!matches) continue;
+    if (!(task.tags ?? []).some((tagId) => wanted.has(tagId))) continue;
     for (const occurrence of task.completedDates ?? []) {
       const stamp = task.completedAtByDate?.[occurrence];
       const key = stamp
@@ -460,6 +434,10 @@ function lastActivityKeyForArea(
 
 export type PactSessionLedger = {
   progress: number;
+  /** Scheduled days already behind the user with nothing ticked on them. */
+  missed: number;
+  /** Scheduled days still ahead, today included. */
+  remaining: number;
   /**
    * A scheduled session went by unticked and a later one was still kept. The
    * single largest effect in the 53-arm gym megastudy came from paying for
@@ -486,12 +464,14 @@ export function readPactSessions(args: {
   const { pact, tasks, timezone, weekStartsOn, todayKey } = args;
   const ids = new Set(pact.taskIds ?? []);
   if (ids.size === 0) {
-    return { progress: pact.progress ?? 0, cameBack: false };
+    return { progress: pact.progress ?? 0, cameBack: false, missed: 0, remaining: 0 };
   }
   const weekEnd = shiftYMD(pact.weekKey, 6);
   const order = weekStartsOn === undefined ? null : weekOrder(weekStartsOn);
 
   let done = 0;
+  let missed = 0;
+  let remaining = 0;
   let earliestMiss: string | null = null;
   let latestKept: string | null = null;
 
@@ -515,13 +495,21 @@ export function readPactSessions(args: {
     const offset = order.indexOf(task.dayOfWeek as 0 | 1 | 2 | 3 | 4 | 5 | 6);
     if (offset < 0) continue;
     const scheduled = shiftYMD(pact.weekKey, offset);
-    if (scheduled >= todayKey) continue;
+    // Today still counts as available: a session is only missed once its day
+    // is behind you, which is also when it stops being something you can fix.
+    if (scheduled >= todayKey) {
+      remaining += 1;
+      continue;
+    }
+    missed += 1;
     if (!earliestMiss || scheduled < earliestMiss) earliestMiss = scheduled;
   }
 
   return {
     progress: Math.min(pact.target, done),
     cameBack: !!earliestMiss && !!latestKept && latestKept > earliestMiss,
+    missed,
+    remaining,
   };
 }
 
@@ -600,7 +588,11 @@ export async function settleFinishedWeeks(args: {
   const isPremium = userDoc ? isPremiumUser(userDoc.toObject()) : false;
   let autoGrantedFlies = 0;
 
+  const categories = await loadCategories();
+
   for (const pact of ordered) {
+    const streakBefore = next.weeks;
+    const grantedBefore = autoGrantedFlies;
     // The week is over, so every scheduled day is in the past — asking the
     // ledger as of the day after it ended is what makes a miss a miss.
     const ledger = readPactSessions({
@@ -695,6 +687,7 @@ export async function settleFinishedWeeks(args: {
       autoGrantedFlies += summary.fliesGranted;
       pact.claimedAt = new Date();
     }
+    const grantedThisWeek = autoGrantedFlies - grantedBefore;
 
     pact.progress = progress;
     pact.status = kept ? 'kept' : usedShield ? 'kept' : 'missed';
@@ -702,6 +695,26 @@ export async function settleFinishedWeeks(args: {
     pact.settledAt = new Date();
     if (kept && !pact.completedAt) pact.completedAt = new Date();
     await pact.save();
+
+    // The week is over and nobody watched it end. Keep the outcome so the
+    // next visit can say what happened — a streak that breaks in silence
+    // teaches nothing, and a shield spent in silence is a feature the user
+    // paid for and never saw work.
+    const settledCategory = categories.find(
+      (entry) => entry.categoryId === pact.categoryId,
+    );
+    next.pendingResult = {
+      weekKey: pact.weekKey,
+      categoryName:
+        settledCategory?.shortLabel || settledCategory?.name || 'your area',
+      outcome: kept ? 'kept' : usedShield ? 'rescued' : 'missed',
+      progress,
+      target: pact.target,
+      streakBefore,
+      streakAfter: next.weeks,
+      fliesGranted: grantedThisWeek,
+      shieldsLeft: next.shields,
+    };
   }
 
   if (!isPremium && autoGrantedFlies > 0) {
@@ -837,11 +850,14 @@ export async function getPactView(args: {
       : null);
   let active: ActivePactView | null = null;
   if (activeDoc && activeDoc.status !== 'skipped') {
-    const progress = await syncPactProgress({
+    const ledger = readPactSessions({
       pact: activeDoc,
       tasks,
       timezone,
+      weekStartsOn,
+      todayKey,
     });
+    const progress = ledger.progress;
     if (progress !== activeDoc.progress) {
       activeDoc.progress = progress;
       if (progress >= activeDoc.target && !activeDoc.completedAt) {
@@ -894,6 +910,11 @@ export async function getPactView(args: {
       shieldUsed: activeDoc.shieldUsed,
       tagId: activeDoc.tagId,
       openToday,
+      missedSessions: ledger.missed,
+      // Whether the whole week is still reachable. Once it is not, the bonus
+      // and the gift are gone no matter what happens next, and saying so is
+      // the only way the user finds out before the week quietly ends.
+      canStillFinish: progress + ledger.remaining >= activeDoc.target,
       nextTaskLabel:
         upcoming === undefined
           ? null
@@ -941,8 +962,6 @@ export async function getPactView(args: {
       if (!category) return null;
       const tagIds = tagMap.get(categoryId) ?? [];
       const lastActivity = lastActivityKeyForArea(tasks, tagIds, timezone);
-      const lastPactWeek = streak.areaLastWeek[categoryId] ?? '';
-      const reference = [lastActivity, lastPactWeek].filter(Boolean).sort().pop();
       return {
         categoryId,
         name: category.name,
@@ -951,7 +970,9 @@ export async function getPactView(args: {
         coverImageUrl: category.coverImageUrl,
         backgroundFrom: category.backgroundFrom,
         backgroundTo: category.backgroundTo,
-        quietDays: reference ? Math.max(0, daysBetween(reference, todayKey)) : null,
+        quietDays: lastActivity
+          ? Math.max(0, daysBetween(lastActivity, todayKey))
+          : null,
         streakWeeks: streak.areaWeeks[categoryId] ?? 0,
         weeksKept: streak.areaWeeks[categoryId] ?? 0,
         recommended: false,
@@ -975,12 +996,26 @@ export async function getPactView(args: {
     })
     .filter((entry): entry is PactAreaChoice => !!entry);
 
-  areas.sort((a, b) => {
-    const aQuiet = a.quietDays ?? 999;
-    const bQuiet = b.quietDays ?? 999;
-    return bQuiet - aQuiet;
-  });
-  if (areas.length > 0) areas[0].recommended = true;
+  // How much attention an area is owed. An area with no tag connected cannot
+  // be measured at all, so it sorts last instead of pretending to be the most
+  // neglected — which is what treating "no data" as a 999-day gap used to do.
+  const needScore = (entry: PactAreaChoice) => {
+    if (!entry.hasTag) return -1;
+    if (entry.quietDays === null) return 10_000;
+    return entry.quietDays;
+  };
+  areas.sort((a, b) => needScore(b) - needScore(a));
+
+  // "Needs you" is a claim about evidence, so it is only made when there is
+  // some: a tagged area gone quiet for a week, or one never finished in.
+  const mostNeglected = areas[0];
+  if (
+    mostNeglected?.hasTag &&
+    (mostNeglected.quietDays === null ||
+      mostNeglected.quietDays >= PACT_QUIET_NUDGE_DAYS)
+  ) {
+    mostNeglected.recommended = true;
+  }
 
   const shieldCap = shieldCapFor(config, isPremium);
   const flyBalance = Math.max(0, Number((user as any)?.wardrobe?.flies) || 0);
@@ -1031,6 +1066,7 @@ export async function getPactView(args: {
       comeback: pactComebackFlies(config),
     },
     completionRewards: config.completionRewards ?? [],
+    weekResult: streak.pendingResult,
     forgoneFlies: streak.forgoneFlies,
     userTags,
     flyBalance,
@@ -1054,7 +1090,7 @@ export async function getAreaOptions(args: {
   categoryId: string;
   timezone: string;
 }): Promise<PactOption[]> {
-  const { userId, categoryId } = args;
+  const { userId, categoryId, timezone } = args;
   await connectMongo();
   const config = await ensurePactConfig();
   const [user, categories, lastPact] = await Promise.all([
@@ -1062,13 +1098,13 @@ export async function getAreaOptions(args: {
     loadCategories(),
     PactModel.findOne({ userId, categoryId }).sort({ weekKey: -1 }).lean<PactDoc>(),
   ]);
-  const streak = normalizePactStreak(user);
   const category = categories.find((c) => c.categoryId === categoryId);
+  const weekStartsOn = normalizeWeekStart((user as any)?.weekStartsOn);
   return buildOptionsForArea({
     config,
     categoryId,
     areaName: category?.shortLabel || category?.name || 'this area',
-    weeksKept: streak.areaWeeks[categoryId] ?? 0,
+    weekKey: weekKeyFor(getZonedToday(timezone), weekStartsOn),
     lastPact,
   });
 }

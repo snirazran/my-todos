@@ -69,7 +69,10 @@ export async function POST(req: NextRequest) {
     if (!pact || pact.status === 'skipped') {
       return NextResponse.json({ error: 'No pact to change' }, { status: 400 });
     }
-    if (pact.claimedAt) {
+    // Finished is finished, collected or not. Allowing a swap after the last
+    // session would let a kept week be thrown away — and, since a fresh pact
+    // could then be committed in the same week, let one week be farmed twice.
+    if (pact.claimedAt || pact.progress >= pact.target) {
       return NextResponse.json(
         { error: 'This week is already finished' },
         { status: 400 },

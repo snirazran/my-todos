@@ -23,6 +23,7 @@ import {
   Paintbrush,
   ScrollText,
   Bug,
+  CalendarCheck,
   RefreshCcw,
   UserPlus,
   BarChart3,
@@ -200,6 +201,17 @@ function AdminPageContent() {
     }
   };
 
+  const handleResetPacts = () =>
+    runConfirmed(
+      'reset-pacts',
+      '/api/admin/reset-pacts',
+      { method: 'POST', credentials: 'include' },
+      () => {
+        mutate((key) => typeof key === 'string' && key.startsWith('/api/pact'));
+        window.location.reload();
+      },
+    );
+
   const handleRefreshQuests = () =>
     runConfirmed(
       'refresh-quests',
@@ -360,6 +372,17 @@ function AdminPageContent() {
               loading={loading === 'refresh-quests'}
               warningText="Warning: This deletes all onboarding, daily and area quest progress, every quest counter, your focus areas and their tag links. Click again to confirm."
               onClick={handleRefreshQuests}
+            />
+            <ConfirmActionRow
+              icon={<CalendarCheck className="w-5 h-5" />}
+              accent="bg-sky-500/10 text-sky-600 dark:text-sky-400"
+              warningAccent="bg-sky-50 dark:bg-sky-950/20 border-sky-200 dark:border-sky-900 text-sky-600 dark:text-sky-400"
+              title="Reset Weekly Commitments"
+              description="Delete every pact, its scheduled tasks, and the streak"
+              isConfirming={confirmAction === 'reset-pacts'}
+              loading={loading === 'reset-pacts'}
+              warningText="Warning: This deletes every weekly commitment, removes the session tasks they wrote to your list, and clears your pact streak, shields and swaps. Click again to confirm."
+              onClick={handleResetPacts}
             />
             <ConfirmActionRow
               icon={<DollarSign className="w-5 h-5" />}

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { ChevronRight, Tags } from 'lucide-react';
 import type { QuestRewardCatalogItem } from '@/components/ui/QuestCards';
@@ -31,6 +32,13 @@ import { usePactView } from '@/components/pact/PactCard';
 import { PactStripRow } from '@/components/pact/PactStripRow';
 import { useUIStore } from '@/lib/uiStore';
 
+/**
+ * The bar's fill runs 500ms, so the hold has to clear that plus a beat to
+ * read the finished state — handing the slot over any earlier cuts the
+ * animation off part-way, which is the whole thing this exists to prevent.
+ */
+const PACT_ADVANCE_HOLD_MS = 950;
+
 export function NextQuestStrip({
   claimables,
   trackables,
@@ -43,6 +51,7 @@ export function NextQuestStrip({
   isPremium?: boolean;
 }) {
   const router = useRouter();
+  const reduceMotion = useReducedMotion();
   const startHintGuide = useUIStore((state) => state.startHintGuide);
   const { data: pactView } = usePactView();
   const [claiming, setClaiming] = useState(false);
@@ -124,20 +133,44 @@ export function NextQuestStrip({
     pactView?.enabled && !pactView.needsAreas && pactView.active
       ? pactView
       : null;
+
+  // A finished session both advances the bar and disqualifies the pact from
+  // the slot in the same render, so the fill it earned never got to play —
+  // the row was replaced by the next quest mid-frame. Holding the slot for
+  // one bar animation makes the cause visible before the effect: you see the
+  // thing you just did land, and only then does the slot change hands.
+  const pactProgress = livePact?.active?.progress ?? null;
+  const prevPactProgress = useRef<number | null>(null);
+  const [holdUntil, setHoldUntil] = useState(0);
+  useEffect(() => {
+    const prev = prevPactProgress.current;
+    prevPactProgress.current = pactProgress;
+    if (prev === null || pactProgress === null || pactProgress <= prev) return;
+    setHoldUntil(Date.now() + PACT_ADVANCE_HOLD_MS);
+  }, [pactProgress]);
+  useEffect(() => {
+    if (!holdUntil) return;
+    const remaining = holdUntil - Date.now();
+    if (remaining <= 0) {
+      setHoldUntil(0);
+      return;
+    }
+    const timer = window.setTimeout(() => setHoldUntil(0), remaining);
+    return () => window.clearTimeout(timer);
+  }, [holdUntil]);
+  const holdingPactAdvance = holdUntil > 0;
+
   const pactReady = !!livePact?.active?.claimable && !livePact.active.claimed;
   const onboardingPending = nextUp?.placement === 'onboarding';
   // The slot goes to whatever the user can act on now. A pact with no session
   // today, or today's session already done, is not actionable — holding the
   // slot then hides the daily quests that are.
   const pactActionable = !!livePact?.active?.openToday;
-  if (
-    livePact &&
-    (pactReady || (pactActionable && !claimable && !onboardingPending))
-  ) {
-    return <PactStripRow view={livePact} />;
-  }
-
-  if (!claimable && !nextUp) return null;
+  const pactWins =
+    !!livePact &&
+    (pactReady ||
+      holdingPactAdvance ||
+      (pactActionable && !claimable && !onboardingPending));
 
   const resolvedCatalog = catalog ?? {};
   const targetQuestId =
@@ -201,8 +234,33 @@ export function NextQuestStrip({
     }
   };
 
-  return (
-    <>
+  // Transform and opacity only: both are composited, so the swap never asks
+  // the main thread for layout or paint while it plays.
+  const slotMotion = reduceMotion
+    ? {
+        initial: { opacity: 0 },
+        animate: { opacity: 1 },
+        exit: { opacity: 0 },
+        transition: { duration: 0.12 },
+      }
+    : {
+        initial: { opacity: 0, y: 10, scale: 0.985 },
+        animate: { opacity: 1, y: 0, scale: 1 },
+        exit: { opacity: 0, y: -8, scale: 0.985 },
+        transition: { duration: 0.22, ease: [0.32, 0.72, 0, 1] as const },
+      };
+
+  const slotKey = pactWins
+    ? 'pact'
+    : showClaimable && claimable
+      ? `claim:${claimable.id}`
+      : displayNextUp
+        ? `next:${displayNextUp.id}`
+        : 'empty';
+
+  const strip = pactWins && livePact ? (
+    <PactStripRow view={livePact} />
+  ) : !claimable && !nextUp ? null : (
     <div
       role="button"
       tabIndex={0}
@@ -341,6 +399,24 @@ export function NextQuestStrip({
         </>
       ) : null}
     </div>
+  );
+
+  return (
+    <>
+    {/* mode="wait" so the outgoing row finishes leaving before the next one
+        arrives — two rows cross-fading in the same slot read as a glitch,
+        one handing over to the other reads as a consequence. */}
+    <AnimatePresence mode="wait" initial={false}>
+      {strip && (
+        <motion.div
+          key={slotKey}
+          {...slotMotion}
+          style={{ willChange: 'transform, opacity' }}
+        >
+          {strip}
+        </motion.div>
+      )}
+    </AnimatePresence>
     <div className="mx-1.5 mb-2 w-[calc(100%-0.75rem)] empty:hidden md:mx-4 md:w-[calc(100%-2rem)]">
       <QuestPriorityDebug
         title="home next-up"

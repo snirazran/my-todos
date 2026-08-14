@@ -45,11 +45,30 @@ export function PlusPill({
  * line it qualifies, so it reads as a note on the deal rather than a second
  * announcement competing with it.
  */
-export function PlusDoubleNote() {
-  return (
-    <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[12px] font-black leading-none text-amber-600 dark:text-amber-400">
+export function PlusDoubleNote({ onClick }: { onClick?: () => void }) {
+  const content = (
+    <>
       <Icon name="frogPlus" className="h-[22px] w-[22px] shrink-0" />
       Plus doubles rewards
-    </span>
+    </>
+  );
+  const className =
+    'inline-flex items-center gap-1.5 whitespace-nowrap text-[12px] font-black leading-none text-amber-600 dark:text-amber-400';
+
+  // The note names a thing the reader cannot have yet, so it is the most
+  // likely place on the screen for them to reach out and tap. Left inert it
+  // read as a dead end; given a handler it becomes the offer it describes.
+  if (!onClick) return <span className={className}>{content}</span>;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        className,
+        'rounded-md underline decoration-amber-500/40 decoration-2 underline-offset-2 transition-opacity active:opacity-70 [@media(hover:hover)]:hover:opacity-80',
+      )}
+    >
+      {content}
+    </button>
   );
 }

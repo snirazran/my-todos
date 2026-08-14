@@ -776,7 +776,7 @@ function QuestSeasonBanner({
                 <div className="relative mt-2 h-8 overflow-hidden rounded-full bg-muted sm:mt-3">
                   <div className="absolute inset-1">
                     <div
-                      className="relative h-full min-w-7 overflow-hidden rounded-full bg-amber-400 transition-all"
+                      className="relative h-full min-w-7 overflow-hidden rounded-full bg-amber-400 transition-all duration-500"
                       style={{ width: pct > 0 ? `${pct}%` : '1.75rem' }}
                     >
                       <span
@@ -785,7 +785,19 @@ function QuestSeasonBanner({
                       />
                     </div>
                   </div>
-                  <span className="absolute inset-0 flex items-center justify-center gap-1.5 text-sm font-black tabular-nums text-muted-foreground">
+                  {/* Two copies of the same label, the second clipped to the
+                      filled width in the bar's own dark tone — the objective
+                      bars' trick. A single muted label sat unreadable on top
+                      of the amber in both themes. */}
+                  <span className="absolute inset-0 flex items-center justify-center gap-1.5 text-sm font-black tabular-nums text-foreground/70">
+                    {progress} / {season.dailyTargetFlies}
+                    <Fly size={26} y={-3} paused={false} interactive={false} />
+                  </span>
+                  <span
+                    aria-hidden
+                    className="absolute inset-0 flex items-center justify-center gap-1.5 text-sm font-black tabular-nums text-amber-950"
+                    style={{ clipPath: `inset(0 ${100 - pct}% 0 0)` }}
+                  >
                     {progress} / {season.dailyTargetFlies}
                     <Fly size={26} y={-3} paused={false} interactive={false} />
                   </span>
@@ -1245,11 +1257,18 @@ function QuestSeasonEventOverlay({
                     <div className="relative h-7 flex-1 overflow-hidden rounded-full border border-border/60 bg-muted md:h-8">
                       <div className="absolute inset-1">
                         <div
-                          className="h-full min-w-6 rounded-full bg-amber-400 transition-all md:min-w-7"
+                          className="h-full min-w-6 rounded-full bg-amber-400 transition-all duration-500 md:min-w-7"
                           style={{ width: pct > 0 ? `${pct}%` : '1.5rem' }}
                         />
                       </div>
-                      <span className="absolute inset-0 flex items-center justify-center text-xs font-black tabular-nums text-muted-foreground md:text-sm">
+                      <span className="absolute inset-0 flex items-center justify-center text-xs font-black tabular-nums text-foreground/70 md:text-sm">
+                        {progress} / {season.dailyTargetFlies}
+                      </span>
+                      <span
+                        aria-hidden
+                        className="absolute inset-0 flex items-center justify-center text-xs font-black tabular-nums text-amber-950 md:text-sm"
+                        style={{ clipPath: `inset(0 ${100 - pct}% 0 0)` }}
+                      >
                         {progress} / {season.dailyTargetFlies}
                       </span>
                     </div>

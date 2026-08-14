@@ -8,12 +8,12 @@ import {
   Lock,
   Pencil,
   Play,
-  Sparkles,
 } from 'lucide-react';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { cn } from '@/lib/utils';
 import { normalizeWeekStart, weekDatesFor, weekOrder } from '@/lib/weekStart';
-import { PRIMARY_OPTIONS } from '@/lib/pact/types';
+import { PACT_QUIET_NUDGE_DAYS, PRIMARY_OPTIONS } from '@/lib/pact/types';
+import { useReducedMotion } from 'framer-motion';
 import { QuestRewardTileBadge } from '@/lib/questClaims';
 import { PlusDoubleNote, PlusPill } from './PlusBits';
 import type { PactAreaChoice, PactOption, PactView } from '@/lib/pact/types';
@@ -30,20 +30,46 @@ const TIME_INPUT_RESET = cn(
 
 type Step = 'intro' | 'area' | 'commitment' | 'confirm' | 'done';
 
-// How often, and nothing else. Days and times are chosen on the next step, so
-// putting them here only gave the reader a reason to turn down a commitment
-// they liked. A "20 min each" line was worse — nothing ever checked it.
-function sessionsLabel(count: number) {
-  return `${count} session${count === 1 ? '' : 's'} this week`;
+// An option is a what, never a how-often: the week's ambition is the user's
+// answer on the next step. Printing an authored session count here made the
+// menu a set of pre-priced packages and quietly anchored how much the reader
+// thought they should take on.
+function repeatLabel(option: PactOption) {
+  return `Worked before · ${option.scheduleLabel}`;
 }
 
-function quietLabel(area: PactAreaChoice) {
+/**
+ * What the area's own tasks say, and nothing more.
+ *
+ * One verb — "finished" — across every state, because the card is reporting a
+ * single measurement (when a task carrying this area's tag was last completed)
+ * and giving that measurement three different names made the reader work out
+ * whether "quiet", "not started" and "active" were the same scale. Urgency
+ * rides on colour instead of vocabulary, so the wording stays factual: a claim
+ * like "you have neglected this" invites action out of guilt, which buys a
+ * session now at the cost of the habit later.
+ */
+function areaStatus(area: PactAreaChoice): {
+  label: string;
+  tone: 'good' | 'plain' | 'urgent';
+} {
   if (area.streakWeeks > 0) {
-    return `${area.streakWeeks} week${area.streakWeeks === 1 ? '' : 's'} strong`;
+    return {
+      label: `${area.streakWeeks} week${area.streakWeeks === 1 ? '' : 's'} strong`,
+      tone: 'good',
+    };
   }
-  if (area.quietDays === null) return 'Not started yet';
-  if (area.quietDays <= 1) return 'Active today';
-  return `Quiet for ${area.quietDays} days`;
+  // No tag means there is nothing to measure. Saying "not started" would be a
+  // guess; the useful thing to say is what would make it measurable.
+  if (!area.hasTag) return { label: 'Add a tag to track this', tone: 'plain' };
+  if (area.quietDays === null) {
+    return { label: 'Nothing finished here yet', tone: 'urgent' };
+  }
+  if (area.quietDays <= 1) return { label: 'Finished something today', tone: 'good' };
+  return {
+    label: `Last finished ${area.quietDays} days ago`,
+    tone: area.quietDays >= PACT_QUIET_NUDGE_DAYS ? 'urgent' : 'plain',
+  };
 }
 
 export function PactPickSheet({
@@ -251,30 +277,33 @@ export function PactPickSheet({
             )}
           >
             {step === 'intro' && (
-              <div className="flex flex-col gap-5 py-6 text-center">
-                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
-                  <Sparkles
-                    className="h-7 w-7 text-primary"
-                    strokeWidth={2.5}
-                  />
-                </div>
-                <div className="flex flex-col gap-2">
-                  <h2 className="text-[22px] font-black leading-tight text-foreground">
+              <div className="flex flex-col gap-4 pb-2 pt-1">
+                {/* Every area at once, drifting. A single hero card sold one
+                    area; the promise of this feature is the whole set, and a
+                    wall of them says "there is somewhere here for whatever
+                    you are neglecting" faster than any sentence could. */}
+                <AreaMarquee areas={view.areas} />
+
+                <div className="text-center">
+                  <h2 className="text-[21px] font-black leading-tight text-foreground">
                     One area. One week.
                   </h2>
-                  <p className="mx-auto max-w-[36ch] text-[14px] font-semibold leading-snug text-muted-foreground">
-                    Pick one thing you&apos;ll actually do. We&apos;ll add it
-                    to your week.
+                  <p className="mx-auto mt-1 max-w-[34ch] text-[13.5px] font-semibold leading-snug text-muted-foreground">
+                    Pick one thing you&apos;ll actually do. We&apos;ll put it
+                    on your list.
                   </p>
                 </div>
-                <ol className="mx-auto flex w-full max-w-[20rem] flex-col gap-2.5 text-left">
+
+                {/* One grouped card with dividers, the shape every other row
+                    on this feature uses, instead of three floating lines. */}
+                <ol className="flex flex-col divide-y divide-border/50 overflow-hidden rounded-2xl bg-muted/40">
                   {[
                     'Pick your area',
                     'Choose what you’ll do',
                     'Set days and times',
                   ].map((label, index) => (
-                    <li key={label} className="flex items-center gap-3">
-                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-[12px] font-black text-white">
+                    <li key={label} className="flex items-center gap-3 px-3.5 py-2.5">
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-[12px] font-black tabular-nums text-white">
                         {index + 1}
                       </span>
                       <span className="text-[14px] font-bold text-foreground">
@@ -283,10 +312,11 @@ export function PactPickSheet({
                     </li>
                   ))}
                 </ol>
+
                 <button
                   type="button"
                   onClick={dismissIntro}
-                  className="mt-1 h-12 w-full rounded-2xl bg-[#4f9149] text-[15px] font-black text-white shadow-[0_4px_0_0_#34631f] ring-1 ring-[#34631f]/40 transition-transform active:translate-y-[2px] active:shadow-none"
+                  className="h-12 w-full rounded-2xl bg-[#4f9149] text-[15px] font-black text-white shadow-[0_4px_0_0_#34631f] ring-1 ring-[#34631f]/40 transition-transform active:translate-y-[2px] active:shadow-none"
                 >
                   Let&apos;s go
                 </button>
@@ -366,23 +396,28 @@ export function PactPickSheet({
                           </span>
                           {entry.recommended && (
                             <span className="absolute right-2.5 top-2.5 rounded-lg bg-amber-500 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-white shadow-[0_2px_0_0_#b45309]">
-                              Needs you
+                              Start here
                             </span>
                           )}
                         </div>
                         <div className="flex flex-col gap-2 px-3 py-2.5">
-                          <span
-                            className={cn(
-                              'min-w-0 truncate text-[11px] font-bold',
-                              entry.streakWeeks > 0
-                                ? 'text-primary'
-                                : (entry.quietDays ?? 0) >= 7
-                                  ? 'text-amber-600 dark:text-amber-400'
-                                  : 'text-muted-foreground',
-                            )}
-                          >
-                            {quietLabel(entry)}
-                          </span>
+                          {(() => {
+                            const status = areaStatus(entry);
+                            return (
+                              <span
+                                className={cn(
+                                  'min-w-0 truncate text-[11px] font-bold',
+                                  status.tone === 'good'
+                                    ? 'text-primary'
+                                    : status.tone === 'urgent'
+                                      ? 'text-amber-600 dark:text-amber-400'
+                                      : 'text-muted-foreground',
+                                )}
+                              >
+                                {status.label}
+                              </span>
+                            );
+                          })()}
                           {/* A real button, not just a tappable card — the card
                             alone gave no affordance that it was clickable. */}
                           <span className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-xl bg-amber-500 text-[13px] font-black text-white shadow-[0_3px_0_0_#b45309]">
@@ -435,7 +470,15 @@ export function PactPickSheet({
                           onClick={() => {
                             setWritingOwn(false);
                             setOptionId(entry.id);
-                            setDays(fitDays(entry.days));
+                            // Only a repeat carries a schedule, and it is the
+                            // user's own from a week that worked. Everything
+                            // else starts blank so the days are chosen, not
+                            // inherited.
+                            setDays(
+                              entry.source === 'repeat'
+                                ? fitDays(entry.days)
+                                : [],
+                            );
                             setStartTime(entry.startTime);
                           }}
                           className={cn(
@@ -454,10 +497,11 @@ export function PactPickSheet({
                             <span className="text-[15px] font-black leading-snug text-foreground">
                               {entry.text}
                             </span>
-                            <span className="text-[12.5px] font-bold text-muted-foreground">
-                              {sessionsLabel(fitDays(entry.days).length)}
-                              {entry.source === 'repeat' && ' · Worked before'}
-                            </span>
+                            {entry.source === 'repeat' && (
+                              <span className="text-[12.5px] font-bold text-muted-foreground">
+                                {repeatLabel(entry)}
+                              </span>
+                            )}
                           </span>
                           {selected && (
                             <Check
@@ -537,9 +581,14 @@ export function PactPickSheet({
                   >
                     <ArrowLeft className="h-4 w-4" strokeWidth={2.5} />
                   </button>
-                  <h2 className="text-[19px] font-black leading-tight text-foreground">
-                    When will you do it?
-                  </h2>
+                  <div className="min-w-0">
+                    <h2 className="text-[19px] font-black leading-tight text-foreground">
+                      How often, and when?
+                    </h2>
+                    <p className="text-[12.5px] font-bold text-muted-foreground">
+                      More days, bigger reward — if you keep them all.
+                    </p>
+                  </div>
                 </div>
 
                 <div className="overflow-hidden rounded-[24px] border border-border/50 bg-card shadow-sm">
@@ -813,18 +862,26 @@ export function PactPickSheet({
                   what you do on the left, what it pays on the right. Both
                   steps show the same row, so the second step teaches nothing
                   new — it just keeps the number in view while days change. */}
-              {previewText && days.length > 0 && (
+              {step === 'confirm' && previewText && days.length > 0 && (
                 <div className="mb-2.5 flex items-center justify-between gap-3 rounded-xl bg-muted/50 px-3 py-2.5">
                   {/* Two columns, not two rows: what you do reads down the
                       left, what it pays sits whole on the right. The Plus
                       note belongs to the label it qualifies, so it lives in
                       the label's column and stays smaller than the reward. */}
+                  {/* A condition, not a formula. The earlier "7 a session ·
+                      +32 for all 2" asked the reader to hold three unlabelled
+                      numbers and add them to reach the one already printed on
+                      the right — and it read as nonsense at one day ("+32 for
+                      all 1"). Naming what has to happen leaves the badge to
+                      say what it is worth, which is the half that moves as
+                      days are tapped. */}
                   <span className="flex min-w-0 flex-col gap-1">
                     <span className="truncate text-[12.5px] font-bold text-muted-foreground">
-                      Finish all {days.length} session
-                      {days.length === 1 ? '' : 's'}
+                      {days.length === 1
+                        ? 'If you do it this week'
+                        : `If you do all ${days.length} this week`}
                     </span>
-                    {!view.isPremium && <PlusDoubleNote />}
+                    {!view.isPremium && <PlusDoubleNote onClick={onUpgrade} />}
                   </span>
                   <QuestRewardTileBadge
                     rewards={[
@@ -869,5 +926,95 @@ export function PactPickSheet({
         </div>
       )}
     </BaseSheet>
+  );
+}
+
+
+/**
+ * Two rows of area art drifting in opposite directions.
+ *
+ * Each row renders its tiles twice and animates to translateX(-50%): the
+ * duplicate lands exactly where the original began, so the loop point cannot
+ * be seen. `linear` timing is what sells it — any easing exposes the reset.
+ * Only `transform` animates, so both rows stay on the compositor no matter
+ * how many tiles are on screen.
+ */
+function AreaMarquee({ areas }: { areas: PactAreaChoice[] }) {
+  const reduceMotion = useReducedMotion();
+  if (areas.length === 0) return null;
+
+  // A short list would leave gaps mid-loop, so it is repeated until each row
+  // is comfortably wider than any phone before the duplicate is appended.
+  const padded: PactAreaChoice[] = [];
+  while (padded.length < 8) padded.push(...areas);
+  const rowA = padded;
+  const rowB = [...padded.slice(Math.ceil(padded.length / 2)), ...padded.slice(0, Math.ceil(padded.length / 2))];
+
+  const renderRow = (row: PactAreaChoice[], reverse: boolean, seconds: number) => (
+    <div
+      className="flex w-max gap-2.5"
+      style={
+        reduceMotion
+          ? undefined
+          : {
+              animation: `pact-marquee ${seconds}s linear infinite`,
+              animationDirection: reverse ? 'reverse' : 'normal',
+              willChange: 'transform',
+            }
+      }
+    >
+      {[...row, ...row].map((area, index) => (
+        <div
+          key={`${area.categoryId}-${index}`}
+          className="relative h-[86px] w-[124px] shrink-0 overflow-hidden rounded-2xl border border-border/40 shadow-sm"
+        >
+          {area.coverImageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={area.coverImageUrl}
+              alt=""
+              aria-hidden
+              decoding="async"
+              loading="lazy"
+              className="h-full w-full object-cover object-[center_40%]"
+            />
+          ) : (
+            <div
+              className="h-full w-full"
+              style={{
+                background: `linear-gradient(135deg, ${area.backgroundFrom ?? '#134e4a'}, ${area.backgroundTo ?? '#0f172a'})`,
+              }}
+            />
+          )}
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />
+          <span
+            className="absolute bottom-1.5 left-2 right-2 truncate text-[11px] uppercase leading-none tracking-wide text-white drop-shadow-[0_2px_0_rgba(15,23,42,0.9)]"
+            style={{
+              fontFamily: 'var(--font-display), "Luckiest Guy", cursive',
+              WebkitTextStroke: '1px rgba(15, 23, 42, 0.95)',
+              paintOrder: 'stroke fill',
+            }}
+          >
+            {area.shortLabel || area.name}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+
+  return (
+    <div
+      aria-hidden
+      className="-mx-5 flex flex-col gap-2.5 overflow-hidden py-1"
+      style={{
+        maskImage:
+          'linear-gradient(to right, transparent, #000 14%, #000 86%, transparent)',
+        WebkitMaskImage:
+          'linear-gradient(to right, transparent, #000 14%, #000 86%, transparent)',
+      }}
+    >
+      {renderRow(rowA, false, 38)}
+      {renderRow(rowB, true, 46)}
+    </div>
   );
 }

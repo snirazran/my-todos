@@ -8,7 +8,7 @@ import connectMongo from '@/lib/mongoose';
 import PactConfigModel, { PACT_CONFIG_ID } from '@/lib/models/PactConfig';
 import QuestCategoryModel from '@/lib/models/QuestCategory';
 import { ensurePactConfig } from '@/lib/pact/engine';
-import { suggestionSessions, type PactSuggestion } from '@/lib/pact/types';
+import { type PactSuggestion } from '@/lib/pact/types';
 
 const MODEL = 'claude-haiku-4-5';
 
@@ -21,11 +21,8 @@ const SUGGESTION_SCHEMA = {
         type: 'object',
         properties: {
           text: { type: 'string' },
-          // Structured outputs reject numeric bounds (minimum/maximum), so the
-          // range is expressed as the enum of allowed session counts.
-          sessions: { type: 'integer', enum: [1, 2, 3, 4, 5, 6, 7] },
         },
-        required: ['text', 'sessions'],
+        required: ['text'],
         additionalProperties: false,
       },
     },
@@ -75,8 +72,8 @@ export async function POST(req: NextRequest) {
             existing.length
               ? `Do not repeat these existing ideas: ${existing.join('; ')}`
               : '',
-            'Write 6 commitments spread across the effort range: 2 small (under 15 minutes, 1-2 sessions a week), 2 moderate (3 sessions), 2 demanding (4-5 sessions).',
-            'sessions is how many times that week the action happens, 1 to 7. If a duration is part of the action, put it in the text ("Take a 20-minute walk"), not in a separate field.',
+            'Write 6 commitments spread across the effort range: 2 small (under 15 minutes), 2 moderate, 2 demanding.',
+            'Each one describes ONE sitting, never a weekly quota — the user chooses how many times a week it happens. So "Take a 20-minute walk", never "Walk 3 times a week". Put any duration in the text.',
           ]
             .filter(Boolean)
             .join('\n'),
@@ -110,7 +107,6 @@ export async function POST(req: NextRequest) {
           id: uuid(),
           categoryId,
           text,
-          sessions: suggestionSessions(entry ?? {}),
           isActive: false,
           generated: true,
           picked: 0,

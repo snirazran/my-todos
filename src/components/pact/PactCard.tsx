@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import useSWR from 'swr';
 import {
   Flame,
@@ -8,14 +8,20 @@ import {
   Play,
   RefreshCw,
   ShieldCheck,
-  Sparkles,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { FlyWorth } from '@/components/ui/QuestCards';
-import { ObjectiveProgressBar } from '@/lib/questClaims';
+import {
+  HintButton,
+  ObjectiveProgressBar,
+  QuestRewardTileBadge,
+} from '@/lib/questClaims';
+import { useUIStore } from '@/lib/uiStore';
 import type { PactView } from '@/lib/pact/types';
 import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
+import { PactChangeSheet } from './PactChangeSheet';
 import { PactShieldSheet } from './PactShieldSheet';
+import { PactWeekResultSheet } from './PactWeekResultSheet';
 import { PactPickSheet } from './PactPickSheet';
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
@@ -41,6 +47,24 @@ export function usePactView() {
  * card is the main event. Ratios are inline rather than Tailwind arbitrary
  * classes so they cannot be dropped by a stale JIT pass.
  */
+/**
+ * Weeks the home teaser has been waved off. Per-device and per-week on
+ * purpose: the pick is a nudge, and a nudge that cannot be dismissed becomes
+ * a demand. The quests page ignores this entirely, so saying no here never
+ * closes the door — it just stops the home page asking twice.
+ */
+const DEFERRED_WEEK_KEY = 'frog:pactDeferredWeek';
+
+const WEEK_START_DAY_NAMES = [
+  'Sunday',
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+] as const;
+
 const BANNER_RATIO = {
   home: { empty: '16 / 4.5', active: '16 / 4' },
   panel: { empty: '16 / 7', active: '16 / 6' },
@@ -60,8 +84,38 @@ export function PactCard({
   const [claimingRetro, setClaimingRetro] = useState(false);
   const [confirmChange, setConfirmChange] = useState(false);
   const [changing, setChanging] = useState(false);
+  const startHintGuide = useUIStore((state) => state.startHintGuide);
+  const [deferredWeek, setDeferredWeek] = useState<string | null>(null);
+  // Shown in the card's place right after deferring, so the escape hatch is
+  // learned at the one moment the user is looking for it.
+  const [justDeferred, setJustDeferred] = useState(false);
+
+  useEffect(() => {
+    try {
+      setDeferredWeek(window.localStorage.getItem(DEFERRED_WEEK_KEY));
+    } catch {
+      /* private mode — the nudge simply keeps showing */
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!justDeferred) return;
+    const timer = window.setTimeout(() => setJustDeferred(false), 7000);
+    return () => window.clearTimeout(timer);
+  }, [justDeferred]);
 
   if (!data || !data.enabled || data.needsAreas) return null;
+
+  const dismissWeekResult = async () => {
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const res = await fetch('/api/pact/result', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ timezone }),
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (res.ok) mutate(payload.view, { revalidate: false });
+  };
 
   const claim = async () => {
     if (claiming) return;
@@ -122,10 +176,15 @@ export function PactCard({
   };
 
   const active = data.active;
-  const fliesToFinish = active
-    ? Math.max(0, active.target - active.progress) * active.sessionFlies +
-      active.weekBonusFlies
-    : 0;
+  // Every session done. The week is over as far as the work goes, whether or
+  // not the reward has been collected yet — and nothing that implies more is
+  // owed ("next session", "to finish", "change commitment") may show again.
+  const weekFinished = !!active && active.progress >= active.target;
+  // Named, not "next week": the day a new commitment opens is the user's own
+  // week-start setting, and "Sunday" is a date you can plan around in a way
+  // that "when the week rolls over" is not.
+  const weekStartDayName =
+    WEEK_START_DAY_NAMES[data.weekStartsOn] ?? 'the new week';
   // Home shows a running pact through the quest strip instead — a full card
   // there sat between the frog and the task list and read as an interruption.
   // The quests page keeps the whole card, where it is the main event.
@@ -134,6 +193,18 @@ export function PactCard({
   // returning null the instant a pact exists tore the sheet off the screen
   // mid-commit and took its success step with it.
   const hideCard = variant === 'home' && !!active;
+  // Only the home nudge can be waved off. The quests page is where the user
+  // goes looking for this, so it always offers it.
+  const deferredHere = variant === 'home' && deferredWeek === data.weekKey;
+  const deferWeek = () => {
+    try {
+      window.localStorage.setItem(DEFERRED_WEEK_KEY, data.weekKey);
+    } catch {
+      /* private mode — deferral lasts for this render only */
+    }
+    setDeferredWeek(data.weekKey);
+    setJustDeferred(true);
+  };
   const teaser = data.areas.find((entry) => entry.recommended) ?? data.areas[0];
   return (
     <>
@@ -143,48 +214,45 @@ export function PactCard({
           hideCard && 'hidden',
         )}
       >
-        {/* The retroactive pile. Free users see what is waiting; the moment
-            they subscribe the same row becomes a claim. */}
-        {data.forgoneFlies > 0 && (
+        {/* Only ever an owed payout, never a pitch. The gold Plus banner sat
+            above the artwork and was the loudest thing on the card — it out-
+            shouted the commitment the card exists to show, and for a free
+            user it advertised flies they could not take. Plus users still
+            need somewhere to collect, so that case keeps a quiet row. */}
+        {data.isPremium && data.forgoneFlies > 0 && (
           <button
             type="button"
-            onClick={() =>
-              data.isPremium ? void claimRetro() : setPlusOpen(true)
-            }
-            className="mb-2 flex w-full items-center gap-2.5 rounded-2xl border border-amber-400/50 bg-amber-400/10 px-3 py-2.5 text-left transition active:scale-[0.99]"
+            onClick={() => void claimRetro()}
+            className="mb-2 flex w-full items-center justify-between gap-2 rounded-xl bg-muted/40 px-3 py-2 text-left transition active:scale-[0.99] [@media(hover:hover)]:hover:bg-muted/70"
           >
-            <Sparkles
-              className="h-4 w-4 shrink-0 text-amber-500 dark:text-amber-400"
-              strokeWidth={2.75}
-            />
-            <span className="min-w-0 flex-1 text-[12px] font-bold leading-snug text-foreground">
-              {data.isPremium ? (
-                <>
-                  <span className="font-black text-amber-500 dark:text-amber-400">
-                    {data.forgoneFlies} flies
-                  </span>{' '}
-                  waiting from before Plus
-                </>
-              ) : (
-                <>
-                  <span className="font-black text-amber-500 dark:text-amber-400">
-                    {data.forgoneFlies} flies
-                  </span>{' '}
-                  waiting — Plus doubles every pact
-                </>
-              )}
+            <span className="inline-flex min-w-0 items-center gap-1.5 text-[12px] font-bold text-muted-foreground">
+              <FlyWorth amount={data.forgoneFlies} />
+              <span className="truncate">earned before Plus</span>
             </span>
-            <span className="inline-flex h-8 shrink-0 items-center rounded-xl bg-amber-500 px-3 text-[12px] font-black text-white">
-              {data.isPremium ? (claimingRetro ? '…' : 'Collect') : 'See Plus'}
+            <span className="shrink-0 text-[12px] font-black text-primary">
+              {claimingRetro ? '…' : 'Collect'}
             </span>
           </button>
         )}
-        {!active ? (
+
+        {!active && deferredHere ? (
+          justDeferred ? (
+            <div className="rounded-[20px] border border-border/50 bg-card px-4 py-3">
+              <p className="text-[12.5px] font-bold text-foreground">
+                Put off until next week.
+              </p>
+              <p className="mt-0.5 text-[12px] font-semibold text-muted-foreground">
+                Changed your mind? Your areas are on the Quests page.
+              </p>
+            </div>
+          ) : null
+        ) : !active ? (
+          <div className="w-full overflow-hidden rounded-[24px] border border-border/50 bg-card text-left shadow-sm">
           <button
             type="button"
             data-hint="pact-pick-area"
             onClick={() => setPickOpen(true)}
-            className="w-full overflow-hidden rounded-[24px] border border-border/50 bg-card text-left shadow-sm transition active:scale-[0.99] [@media(hover:hover)]:hover:shadow-md"
+            className="block w-full text-left transition active:scale-[0.99]"
           >
             {/* Full-width art on a short band. The crop is biased upward so
                 the frog's head survives a ratio this wide. */}
@@ -226,18 +294,41 @@ export function PactCard({
                 Pick your area
               </span>
             </div>
-            <div className="flex items-center justify-between gap-3 px-3.5 py-2.5">
-              <span className="min-w-0 truncate text-[12px] font-bold text-muted-foreground">
-                {teaser
-                  ? `${teaser.name} has been quiet`
-                  : 'Takes about a minute'}
-              </span>
-              <span className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-amber-500 px-3.5 text-[13px] font-black text-white shadow-[0_3px_0_0_#b45309]">
-                <Play className="h-3.5 w-3.5 fill-current" />
-                Start
-              </span>
-            </div>
           </button>
+            <div className="flex items-center justify-between gap-3 px-3.5 py-2.5">
+              <span className="min-w-0 flex-1 truncate text-[12px] font-bold text-muted-foreground">
+                {teaser ? `Suggested: ${teaser.name}` : 'Takes about a minute'}
+              </span>
+              {/* Paired with Start rather than banished to the far edge: the
+                  two are answers to the same question, and separating them
+                  read as an unrelated link. Deliberately quieter than Start —
+                  a text button beside a filled one is legible as the lesser
+                  path without being hidden, which is what keeps the choice
+                  real rather than rhetorical. */}
+              <div className="flex shrink-0 items-center gap-1.5">
+                {/* Home only. The quests page is where "later" sends people,
+                    so offering to defer again there would be a dead end. */}
+                {variant === 'home' && (
+                  <button
+                    type="button"
+                    onClick={deferWeek}
+                    className="rounded-lg px-2 py-1.5 text-[12.5px] font-bold text-muted-foreground transition-colors [@media(hover:hover)]:hover:text-foreground"
+                  >
+                    Do later
+                  </button>
+                )}
+                <button
+                  type="button"
+                  data-hint="pact-pick-area"
+                  onClick={() => setPickOpen(true)}
+                  className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-amber-500 px-3.5 text-[13px] font-black text-white shadow-[0_3px_0_0_#b45309] transition active:translate-y-[2px] active:shadow-none"
+                >
+                  <Play className="h-3.5 w-3.5 fill-current" />
+                  Start
+                </button>
+              </div>
+            </div>
+          </div>
         ) : (
           <div
             className={cn(
@@ -279,6 +370,16 @@ export function PactCard({
               >
                 {active.categoryName}
               </span>
+              {/* When it happens next, on the art rather than under the bar:
+                  it belongs with the area's identity, and down in the body it
+                  was a third line competing with what the week is worth. */}
+              {!weekFinished && (active.nextTaskLabel || active.scheduleLabel) && (
+                <span className="absolute bottom-2.5 right-2.5 max-w-[60%] truncate rounded-lg bg-black/55 px-2 py-1 text-[11px] font-bold text-white backdrop-blur-sm">
+                  {active.nextTaskLabel
+                    ? `Next: ${active.nextTaskLabel}`
+                    : active.scheduleLabel}
+                </span>
+              )}
               {data.streak.weeks > 0 && (
                 <span className="absolute right-2.5 top-2.5 inline-flex items-center gap-1 rounded-lg bg-black/45 px-2 py-1 text-[11px] font-black text-amber-300 backdrop-blur-sm">
                   <Flame className="h-3.5 w-3.5" strokeWidth={2.75} />
@@ -288,122 +389,149 @@ export function PactCard({
             </div>
 
             <div className="px-3.5 py-3">
-              <p className="text-[15px] font-black leading-snug text-foreground">
-                {active.commitmentText}
-              </p>
-
-              {/* The same bar every quest objective uses — a pact is one more
-                  thing being counted toward, and a second bar style made it
-                  look like a different kind of progress. */}
-              <div className="mt-2.5">
-                <ObjectiveProgressBar
-                  heightClassName="h-4 md:h-3.5"
-                  progress={active.progress}
-                  target={active.target}
+              {/* Laid out exactly like a quest objective row — reward tile
+                  spanning the left, what-to-do stacked over its own bar, hint
+                  on the right — because that is what a pact is. The prize
+                  beside the bar answers "what am I filling this for" while
+                  the bar is being read, not in a line underneath it. */}
+              <div className="flex items-center gap-2.5">
+                <QuestRewardTileBadge
+                  rewards={[
+                    { type: 'FLIES', amount: active.rewardFlies },
+                    ...data.completionRewards,
+                  ]}
+                  catalog={data.rewardCatalog as never}
+                  isPremium={data.isPremium}
                 />
-              </div>
-
-              <div className="mt-2 flex items-center justify-between gap-2">
-                <span className="flex min-w-0 items-center gap-1.5 text-[12px] font-semibold text-muted-foreground">
-                  {active.claimable ? (
-                    <>
-                      <FlyWorth amount={active.weekBonusFlies} />
-                      <span>ready</span>
-                    </>
-                  ) : active.earnedFlies > 0 ? (
-                    // Banked flies are the whole point of paying per session:
-                    // a week that lost one is still visibly worth finishing,
-                    // and the number left is the pull toward the last box.
-                    <>
-                      <FlyWorth amount={active.earnedFlies} />
-                      <span className="truncate">
-                        banked · +{fliesToFinish} to finish
-                      </span>
-                    </>
-                  ) : (
-                    <span className="truncate">
-                      {active.nextTaskLabel
-                        ? `Next: ${active.nextTaskLabel}`
-                        : active.scheduleLabel}
+                <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                  <p
+                    className={cn(
+                      'text-[15px] font-black leading-snug',
+                      weekFinished
+                        ? 'text-muted-foreground line-through decoration-1'
+                        : 'text-foreground',
+                    )}
+                  >
+                    {active.commitmentText}
+                  </p>
+                  <ObjectiveProgressBar
+                    progress={active.progress}
+                    target={active.target}
+                  />
+                </div>
+                <span
+                  className="shrink-0"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  {weekFinished ? (
+                    // The Hint slot, holding a state rather than an action:
+                    // there is nothing left to explain, and leaving the slot
+                    // empty made the finished row reflow narrower than the
+                    // one it replaced.
+                    <span className="inline-flex h-8 items-center justify-center rounded-xl border border-lime-500/40 bg-lime-500/10 px-3 text-[12px] font-black uppercase tracking-wider text-lime-600 dark:text-lime-400 min-[400px]:px-3.5">
+                      Done
                     </span>
+                  ) : (
+                  <HintButton
+                    text={
+                      weekFinished
+                        ? `All ${active.target} session${active.target === 1 ? '' : 's'} done. You can set a new commitment when the week rolls over.`
+                        : active.openToday
+                          ? `Today's session is on your list, tagged ${active.categoryName}. Finish all ${active.target} this week.`
+                          : active.nextTaskLabel
+                            ? `Next session: ${active.nextTaskLabel}. ${active.progress} of ${active.target} done this week.`
+                            : `No sessions left. ${active.progress} of ${active.target} done this week.`
+                    }
+                    onShowMe={
+                      !weekFinished && active.openToday
+                        ? () =>
+                            startHintGuide(
+                              'pact-session',
+                              active.tagId ? { tagIds: [active.tagId] } : undefined,
+                            )
+                        : undefined
+                    }
+                  />
                   )}
                 </span>
-                {active.claimable && !active.claimed ? (
-                  <button
-                    type="button"
-                    onClick={claim}
-                    disabled={claiming}
-                    className="inline-flex h-8 min-w-[5.5rem] items-center justify-center rounded-xl bg-amber-500 px-3 text-[13px] font-black text-white shadow-[0_3px_0_0_#b45309] transition-transform active:translate-y-[2px] active:shadow-none disabled:opacity-60"
-                  >
-                    {claiming ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      'Claim'
-                    )}
-                  </button>
-                ) : (
-                  <span
-                    className={cn(
-                      'text-[11px] font-bold',
-                      data.streak.atRisk
-                        ? 'text-amber-600 dark:text-amber-400'
-                        : 'text-muted-foreground',
-                    )}
-                  >
-                    {data.streak.atRisk
-                      ? 'Streak at risk!'
-                      : `${active.daysLeft} day${active.daysLeft === 1 ? '' : 's'} left`}
-                  </span>
-                )}
               </div>
 
-              {!active.claimed && (
-                <div className="mt-2 flex items-center justify-end">
-                  {confirmChange ? (
-                    <span className="flex w-full items-center justify-between gap-2 rounded-xl bg-muted/50 px-3 py-2">
-                      <span className="min-w-0 text-[11px] font-bold text-muted-foreground">
-                        {data.swapTokens > 0
-                          ? `Uses 1 of your ${data.swapTokens} swaps — streak safe`
-                          : 'This resets your streak to zero'}
+              {/* What the user could not otherwise know. Per-session flies
+                  are paid the moment a task is ticked, so "banked · +39 to
+                  finish" was three unexplained numbers describing money that
+                  had already arrived. What is genuinely invisible is a day
+                  that went by untouched — nothing said so until the week had
+                  quietly ended and the streak was gone. */}
+              {(weekFinished || active.missedSessions > 0) && (
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  <span className="flex min-w-0 items-center gap-1.5 text-[12px] font-semibold text-muted-foreground">
+                    {active.claimable ? (
+                      <>
+                        <FlyWorth amount={active.weekBonusFlies} />
+                        <span>ready to collect</span>
+                      </>
+                    ) : active.claimed ? (
+                      <span className="truncate">
+                        Start new commitment on {weekStartDayName}
                       </span>
-                      <span className="flex shrink-0 items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => setConfirmChange(false)}
-                          className="h-7 rounded-lg px-2 text-[11px] font-black text-muted-foreground"
-                        >
-                          Keep
-                        </button>
-                        <button
-                          type="button"
-                          onClick={changeCommitment}
-                          disabled={changing}
-                          className="inline-flex h-7 min-w-[4.5rem] items-center justify-center rounded-lg bg-destructive px-2.5 text-[11px] font-black text-white disabled:opacity-60"
-                        >
-                          {changing ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            'Change'
-                          )}
-                        </button>
+                    ) : (
+                      <span
+                        className={cn(
+                          'truncate font-bold',
+                          active.canStillFinish
+                            ? 'text-amber-600 dark:text-amber-400'
+                            : 'text-muted-foreground',
+                        )}
+                      >
+                        {active.canStillFinish
+                          ? `Missed ${active.missedSessions} session${active.missedSessions === 1 ? '' : 's'} — the rest still count`
+                          : `Missed ${active.missedSessions} session${active.missedSessions === 1 ? '' : 's'} — not finishable this week`}
                       </span>
-                    </span>
-                  ) : (
+                    )}
+                  </span>
+                  {active.claimable && !active.claimed ? (
                     <button
                       type="button"
-                      onClick={() => setConfirmChange(true)}
-                      className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] font-black text-muted-foreground transition hover:text-foreground"
+                      onClick={claim}
+                      disabled={claiming}
+                      className="inline-flex h-8 min-w-[5.5rem] items-center justify-center rounded-xl bg-amber-500 px-3 text-[13px] font-black text-white shadow-[0_3px_0_0_#b45309] transition-transform active:translate-y-[2px] active:shadow-none disabled:opacity-60"
                     >
-                      <RefreshCw className="h-3.5 w-3.5" strokeWidth={2.5} />
-                      Change commitment
+                      {claiming ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        'Claim'
+                      )}
                     </button>
-                  )}
+                  ) : null}
                 </div>
               )}
 
-              {/* Surfaced on the active card only, and loudest when the week
-                  is slipping — a safety net advertised before there is
-                  anything to lose is just noise. */}
+              {/* Given the same weight as the shield row below it: both are
+                  things you can do to the week, and a bare muted label
+                  floating right read as a caption rather than a control. */}
+              {!weekFinished && (
+                <button
+                  type="button"
+                  onClick={() => setConfirmChange(true)}
+                  className="mt-2 flex w-full items-center justify-between gap-2 rounded-xl bg-muted/40 px-3 py-2 text-left transition active:scale-[0.99] [@media(hover:hover)]:hover:bg-muted/70"
+                >
+                  <span className="inline-flex items-center gap-1.5 text-[12px] font-bold text-muted-foreground">
+                    <RefreshCw className="h-3.5 w-3.5" strokeWidth={2.5} />
+                    Change commitment
+                  </span>
+                  <span className="shrink-0 text-[12px] font-black text-primary">
+                    {data.swapTokens > 0
+                      ? `${data.swapTokens} swap${data.swapTokens === 1 ? '' : 's'}`
+                      : 'Swap'}
+                  </span>
+                </button>
+              )}
+
+              {/* Only while there is no shield. Held protection needs no row:
+                  it changes nothing the user has to decide this week, and a
+                  standing "1 shield ready" line spends a slot on reassurance
+                  next to the two rows that are actually actionable. */}
+              {data.streak.shields === 0 && !weekFinished && (
               <button
                 type="button"
                 onClick={() => setShieldOpen(true)}
@@ -416,24 +544,16 @@ export function PactCard({
               >
                 <span className="inline-flex items-center gap-1.5 text-[12px] font-bold text-muted-foreground">
                   <ShieldCheck
-                    className={cn(
-                      'h-4 w-4',
-                      data.streak.shields > 0
-                        ? 'text-sky-500'
-                        : 'text-muted-foreground',
-                    )}
+                    className="h-4 w-4 text-muted-foreground"
                     strokeWidth={2.5}
                   />
-                  {data.streak.shields > 0
-                    ? `${data.streak.shields} shield${data.streak.shields === 1 ? '' : 's'} ready`
-                    : 'No shield if you miss'}
+                  No shield if you miss
                 </span>
                 <span className="text-[12px] font-black text-primary">
-                  {data.streak.shields >= data.streak.shieldCap
-                    ? 'How it works'
-                    : 'Get one'}
+                  Get one
                 </span>
               </button>
+              )}
             </div>
           </div>
         )}
@@ -452,6 +572,33 @@ export function PactCard({
         onClose={() => setShieldOpen(false)}
         view={data}
         onChanged={(next) => mutate(next, { revalidate: false })}
+      />
+
+      {/* Only the quests page reports the week that ended: the home card is
+          hidden while a pact runs, and a settlement sheet that can appear on
+          either surface would race itself into showing twice. */}
+      {variant === 'panel' && data.weekResult && (
+        <PactWeekResultSheet
+          key={data.weekResult.weekKey}
+          result={data.weekResult}
+          onClose={() => void dismissWeekResult()}
+          onGetShield={() => {
+            void dismissWeekResult();
+            setShieldOpen(true);
+          }}
+        />
+      )}
+
+      <PactChangeSheet
+        open={confirmChange}
+        onClose={() => setConfirmChange(false)}
+        view={data}
+        changing={changing}
+        onConfirm={changeCommitment}
+        onUpgrade={() => {
+          setConfirmChange(false);
+          setPlusOpen(true);
+        }}
       />
 
       <PlusUpgradeModal

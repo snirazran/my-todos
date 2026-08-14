@@ -720,3 +720,17 @@ body.dragging {
   color: hsl(var(--primary));
   text-decoration: underline;
 }
+
+/* Poster-wall marquee for the pact intro. One keyframe drives both rows —
+   the second runs it in reverse — and the track is the tile list rendered
+   twice, so translating exactly -50% lands the duplicate where the original
+   started and the loop point is invisible. transform only, so the whole
+   thing lives on the compositor. */
+@keyframes pact-marquee {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}

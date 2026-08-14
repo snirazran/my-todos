@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { Compass } from 'lucide-react';
+import { CalendarCheck, Clock } from 'lucide-react';
 import { PactCard, usePactView } from './PactCard';
+import { cn } from '@/lib/utils';
 
 /**
  * The "Your areas" slot on the quests page. The pact answers the same question
@@ -31,16 +32,48 @@ export function PactAreaPanel() {
   return (
     <div ref={ref} id="pact" className="flex flex-col gap-2 pb-6">
       <div className="px-1">
-        <p className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
-          <Compass className="h-3.5 w-3.5 text-primary" strokeWidth={2.75} />
-          Your areas
-        </p>
-        <p className="mt-1.5 text-lg font-black leading-tight text-foreground">
-          One area at a time
-        </p>
-        <p className="mt-0.5 text-xs font-bold text-muted-foreground/80">
-          Pick one area a week. The others wait their turn.
-        </p>
+        {/* Section label left, the week's clock right — the same row shape the
+            daily quests use for "Resets in 8h". A countdown belongs to the
+            section, not to one line inside the card, and down there it was
+            competing with the next session for the same glance. */}
+        <div className="flex items-center justify-between gap-2">
+          <p className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+            <CalendarCheck
+              className="h-3.5 w-3.5 text-primary"
+              strokeWidth={2.75}
+            />
+            Weekly commitment
+          </p>
+          {data.active && !data.active.claimed && (
+            <span
+              className={cn(
+                'inline-flex items-center gap-1 text-[11px] font-black uppercase tracking-wide',
+                data.streak.atRisk
+                  ? 'text-amber-600 dark:text-amber-400'
+                  : 'text-muted-foreground',
+              )}
+            >
+              <Clock className="h-3.5 w-3.5" strokeWidth={2.75} />
+              {data.streak.atRisk
+                ? 'Streak at risk'
+                : `${data.active.daysLeft} day${data.active.daysLeft === 1 ? '' : 's'} left`}
+            </span>
+          )}
+        </div>
+        {/* The pitch for picking one area, shown only while there is still a
+            pick to make. Once the week is committed it argues for a decision
+            already taken, and pushes the thing the user came here to see —
+            their commitment — further down the page. */}
+        {!data.active && (
+          <>
+            <p className="mt-1.5 text-lg font-black leading-tight text-foreground">
+              One area at a time
+            </p>
+            <p className="mt-0.5 text-xs font-bold text-muted-foreground/80">
+              Pick one area a week. The others wait their turn.
+            </p>
+          </>
+        )}
       </div>
       <div className="-mx-1.5 mt-1 md:-mx-4">
         <PactCard variant="panel" />

@@ -4,10 +4,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Loader2, Plus, Sparkles, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { suggestionSessions } from '@/lib/pact/types';
 import type { PactConfigView, PactSuggestion } from '@/lib/pact/types';
 
-const SESSION_CHOICES = [1, 2, 3, 4, 5, 6, 7];
 
 type AdminCategory = {
   categoryId: string;
@@ -118,7 +116,6 @@ export function AdminPactManager() {
                 id: crypto.randomUUID(),
                 categoryId: activeCategoryId,
                 text: '',
-                sessions: 3,
                 isActive: true,
                 picked: 0,
                 kept: 0,
@@ -469,39 +466,6 @@ export function AdminPactManager() {
               </div>
 
               <div className="mt-2.5 flex flex-wrap items-center gap-3">
-                {/* How often, never which days. A schedule set here got the
-                    whole commitment turned down over a Tuesday the user
-                    couldn't do — they pick days and times on the confirm
-                    step, which is also the half of a commitment that the
-                    evidence says does the work. */}
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">
-                    Sessions
-                  </span>
-                  <div className="flex gap-1">
-                    {SESSION_CHOICES.map((count) => (
-                      <button
-                        key={count}
-                        type="button"
-                        aria-pressed={suggestionSessions(entry) === count}
-                        onClick={() =>
-                          patchSuggestion(entry.id, { sessions: count })
-                        }
-                        className={cn(
-                          'h-8 w-8 rounded-lg text-xs font-black tabular-nums transition',
-                          suggestionSessions(entry) === count
-                            ? 'bg-primary text-white'
-                            : 'bg-muted text-muted-foreground',
-                        )}
-                      >
-                        {count}
-                      </button>
-                    ))}
-                  </div>
-                  <span className="text-[11px] font-bold text-muted-foreground">
-                    a week
-                  </span>
-                </div>
                 <label className="flex items-center gap-1.5 text-xs font-bold">
                   <input
                     type="checkbox"

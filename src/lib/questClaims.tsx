@@ -627,6 +627,12 @@ export function ObjectiveProgressBar({
     <div
       className={`relative ${heightClassName} overflow-hidden rounded-full bg-muted ${className ?? ''}`}
     >
+      {/* Width-driven at 500ms — the original, and the one that actually
+          reads as a bar filling rather than snapping. A transform version
+          animated on the compositor but the shine had to ride the fill's
+          right edge to stay visible, which washed out the pill at low
+          progress. Anything that waits on this fill (see the home strip's
+          hand-over hold) has to outlast the 500ms. */}
       <div className="absolute inset-[3px]">
         <div
           className={`relative h-full min-w-8 overflow-hidden rounded-full transition-all duration-500 ${done ? 'bg-lime-600' : 'bg-amber-400'}`}
@@ -651,7 +657,7 @@ export function ObjectiveProgressBar({
           on the lime/amber bar regardless of theme. */}
       <span
         aria-hidden
-        className={`${overlayClass} ${done ? 'text-lime-950' : 'text-amber-950'}`}
+        className={`${overlayClass} transition-[clip-path] duration-500 ${done ? 'text-lime-950' : 'text-amber-950'}`}
         style={{ clipPath: `inset(0 ${100 - pct}% 0 0)` }}
       >
         {countLabel}

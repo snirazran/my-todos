@@ -9,7 +9,7 @@ import PactConfigModel, {
 } from '@/lib/models/PactConfig';
 import QuestCategoryModel from '@/lib/models/QuestCategory';
 import { ensurePactConfig } from '@/lib/pact/engine';
-import { suggestionSessions, type PactSuggestion } from '@/lib/pact/types';
+import { type PactSuggestion } from '@/lib/pact/types';
 import { v4 as uuid } from 'uuid';
 
 function sanitizeSuggestions(raw: unknown): PactSuggestion[] {
@@ -23,10 +23,6 @@ function sanitizeSuggestions(raw: unknown): PactSuggestion[] {
         id: String(entry?.id ?? '').trim() || uuid(),
         categoryId,
         text,
-        // Sessions only. An idea authored with days and a time got rejected
-        // over the schedule rather than the commitment, so the schedule is the
-        // user's to set. A legacy day list still yields its count.
-        sessions: suggestionSessions(entry ?? {}),
         isActive: entry?.isActive !== false,
         generated: !!entry?.generated,
         picked: Math.max(0, Number(entry?.picked) || 0),

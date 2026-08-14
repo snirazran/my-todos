@@ -13,55 +13,29 @@ export const MAX_OPTIONS = 3;
 
 export const PACT_MAX_SESSIONS = 7;
 
+/**
+ * A gap only reads as neglect after about a week: shorter than that and
+ * "quiet" describes an ordinary few days off, which is the kind of claim that
+ * pushes a user into acting out of guilt rather than interest. Below this the
+ * card states the gap plainly instead.
+ */
+export const PACT_QUIET_NUDGE_DAYS = 7;
+
 /** Where the day toggles start on the confirm step, before the user moves them. */
 export const DEFAULT_PACT_START_TIME = '19:00';
-
-/**
- * A starting spread for N sessions, chosen to leave rest days between them
- * rather than stacking a week at the front. It is only ever a default — the
- * confirm step is where the user says which days are actually theirs, and
- * that choice is the part of a commitment the evidence says does the work.
- */
-const SESSION_DAY_SPREAD: Record<number, number[]> = {
-  1: [3],
-  2: [2, 4],
-  3: [1, 3, 5],
-  4: [1, 2, 4, 5],
-  5: [1, 2, 3, 4, 5],
-  6: [1, 2, 3, 4, 5, 6],
-  7: [0, 1, 2, 3, 4, 5, 6],
-};
-
-export function daysForSessions(sessions: number): number[] {
-  const n = Math.min(PACT_MAX_SESSIONS, Math.max(1, Math.round(sessions)));
-  return [...(SESSION_DAY_SPREAD[n] ?? SESSION_DAY_SPREAD[3])];
-}
-
-/** Sessions an idea asks for, recovering the count from a legacy schedule. */
-export function suggestionSessions(suggestion: {
-  sessions?: number;
-  days?: number[];
-}): number {
-  const authored = Number(suggestion.sessions);
-  if (Number.isFinite(authored) && authored >= 1) {
-    return Math.min(PACT_MAX_SESSIONS, Math.round(authored));
-  }
-  const legacy = new Set(suggestion.days ?? []).size;
-  return legacy >= 1 ? Math.min(PACT_MAX_SESSIONS, legacy) : 3;
-}
 
 export type PactSuggestion = {
   id: string;
   categoryId: string;
+  /** The whole idea: one sitting, described. How often is the user's answer. */
   text: string;
-  /** How many times a week this asks for — the only thing an idea commits to. */
-  sessions: number;
   /**
-   * Legacy. Ideas used to ship a fixed schedule, which meant a good commitment
-   * could be turned down over an admin's choice of Tuesday. The user picks
-   * days and times on the confirm step now; these are only read to recover a
-   * session count from an idea authored before the change.
+   * Legacy, still on old docs. Ideas used to ship a session count and even a
+   * fixed schedule, which made the week's ambition an admin's choice and got
+   * good commitments turned down over someone else's Tuesday. Nothing reads
+   * these any more — the confirm step is where how-often and when are decided.
    */
+  sessions?: number;
   days?: number[];
   startTime?: string;
   minutes?: number;
@@ -69,6 +43,25 @@ export type PactSuggestion = {
   generated?: boolean;
   picked: number;
   kept: number;
+};
+
+/**
+ * What happened to the week that just ended, held until the user has been
+ * shown it once. Settlement is lazy — it runs on the next page load after the
+ * week rolls over — so without a record the entire outcome (a broken streak, a
+ * shield spent, rewards auto-granted) happened while nobody was looking.
+ */
+export type PactWeekResult = {
+  weekKey: string;
+  categoryName: string;
+  outcome: 'kept' | 'rescued' | 'missed';
+  progress: number;
+  target: number;
+  streakBefore: number;
+  streakAfter: number;
+  /** Flies granted at settlement, for a week finished but never claimed. */
+  fliesGranted: number;
+  shieldsLeft: number;
 };
 
 export type PactStreakTier = {
@@ -179,6 +172,10 @@ export type ActivePactView = {
   nextTaskLabel: string | null;
   /** A session is scheduled today and is still open. */
   openToday: boolean;
+  /** Scheduled days already gone by with nothing ticked on them. */
+  missedSessions: number;
+  /** False once too few days remain for every session to land. */
+  canStillFinish: boolean;
   /** Area tag on this pact's tasks, for hint targeting. */
   tagId?: string;
 };
@@ -239,4 +236,6 @@ export type PactView = {
   userTags: PactUserTag[];
   /** Current fly balance, so purchase sheets need no second fetch. */
   flyBalance: number;
+  /** Last week's outcome, until it has been shown once. */
+  weekResult: PactWeekResult | null;
 };
