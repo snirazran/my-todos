@@ -42,7 +42,6 @@ type Props = {
   /** When set, offers a one-tap chip to create/select a tag with this name. */
   suggestedTagName?: string;
   /** Tags currently connected to the active area quest. */
-  questTagIds?: ReadonlySet<string>;
   /** Show the "connect to focus area" chips when creating a new tag. */
   showFocusConnect?: boolean;
   /**
@@ -67,7 +66,6 @@ export function TagsView({
   onBlockedTagToggle,
   doneLabel = 'Done',
   suggestedTagName,
-  questTagIds,
   showFocusConnect = true,
   partialTagIds,
   doneCountLabel,
@@ -288,7 +286,6 @@ export function TagsView({
           <div className="flex max-h-[46vh] flex-wrap content-start items-start gap-2.5 overflow-y-auto px-1 py-1.5">
             {unlockedTags.map((st) => {
               const isSelected = selectedTagIds.includes(st.id);
-              const isQuestTag = questTagIds?.has(st.id) ?? false;
               return (
                 <button
                   key={st.id}
@@ -317,9 +314,7 @@ export function TagsView({
                     }
                     handleToggle(st);
                   }}
-                  className={`relative inline-flex max-w-full select-none items-center justify-center gap-1.5 rounded-2xl border py-2.5 text-[13px] font-black uppercase tracking-wider shadow-sm transition-all [@media(hover:hover)]:hover:opacity-75 active:scale-95 ${
-                    isQuestTag ? 'pl-[58px] pr-4' : 'px-4'
-                  } ${
+                  className={`relative inline-flex max-w-full select-none items-center justify-center gap-1.5 rounded-2xl border px-4 py-2.5 text-[13px] font-black uppercase tracking-wider shadow-sm transition-all [@media(hover:hover)]:hover:opacity-75 active:scale-95 ${
                     isSelected && !manageTagsMode
                       ? 'ring-2 ring-offset-1 ring-offset-background'
                       : ''
@@ -333,14 +328,6 @@ export function TagsView({
                       : {}),
                   }}
                 >
-                  {isQuestTag && (
-                    <span
-                      className="pointer-events-none absolute left-1 top-1/2 grid h-12 w-11 -translate-y-1/2 -rotate-3 place-items-center rounded-[10px] border bg-background shadow-sm"
-                      style={{ borderColor: `${st.color}40` }}
-                    >
-                      <Icon name="quests" className="h-7 w-7" />
-                    </span>
-                  )}
                   {isSelected &&
                     !manageTagsMode &&
                     (partialTagIds?.has(st.id) ? (
@@ -374,7 +361,11 @@ export function TagsView({
                   strokeWidth={2.75}
                 />
                 <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground/60">
-                  Locked · unlock with Plus
+                  Locked · unlock with
+                </span>
+                <span className="inline-flex items-center gap-0.5 text-[10px] font-extrabold uppercase tracking-wide text-amber-600 dark:text-amber-400">
+                  <Icon name="frogPlus" className="h-7 w-7 shrink-0" />
+                  Plus
                 </span>
               </div>
               <div className="flex flex-wrap gap-2 px-1">

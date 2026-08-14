@@ -1,7 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import useSWR from 'swr';
+import React, { useEffect, useRef, useState } from 'react';
 import { Lock } from 'lucide-react';
 import { Icon } from '@/components/ui/Icon';
 import { BaseSheet } from '@/components/ui/BaseSheet';
@@ -63,32 +62,6 @@ export default function TagsPopup({
     maxSelectedTags,
     onMaxSelectedTags: () => setShowFocusTagLimit(true),
   });
-
-  const { data: questContext } = useSWR<{
-    onboarding?: {
-      selectedCategoryIds?: string[];
-      categoryTagMap?: { categoryId: string; tagIds: string[] }[];
-    };
-  }>(
-    open
-      ? `/api/quests?view=home&timezone=${encodeURIComponent(
-          Intl.DateTimeFormat().resolvedOptions().timeZone,
-        )}`
-      : null,
-    (url: string) => fetch(url).then((res) => res.json()),
-    { revalidateOnFocus: false },
-  );
-
-  const questTagIds = useMemo(() => {
-    const tagMap = questContext?.onboarding?.categoryTagMap;
-    const focusIds = questContext?.onboarding?.selectedCategoryIds;
-    const ids = new Set<string>();
-    for (const entry of tagMap ?? []) {
-      if (focusIds && !focusIds.includes(entry.categoryId)) continue;
-      for (const id of entry.tagIds) ids.add(id);
-    }
-    return ids;
-  }, [questContext]);
 
   // Cache last good props so the slide-down exit can still render content
   // after the parent clears taskId.
@@ -213,7 +186,6 @@ export default function TagsPopup({
               onBlockedTagToggle={handleBlockedTagToggle}
               doneLabel={isSaving ? 'Saving...' : saveLabel}
               suggestedTagName={displaySuggested}
-              questTagIds={questTagIds}
               showFocusConnect={!currentFocusCategoryId}
             />
           </div>

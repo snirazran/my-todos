@@ -29,7 +29,6 @@ import {
   type DisplayDay,
 } from '@/components/board/helpers';
 import Fly from '@/components/ui/fly';
-import { Icon as AppIcon } from '@/components/ui/Icon';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
 import { hapticTick } from '@/lib/haptics';
 import { PlusUpgradeModal } from './PlusUpgradeModal';
@@ -459,35 +458,7 @@ export default function QuickAddSheet({
     { revalidateOnFocus: false },
   );
 
-  const questTagIds = useMemo(() => {
-    const resolvedTagMap =
-      categoryTagMap ?? questContext?.onboarding?.categoryTagMap;
-    const resolvedFocusIds =
-      focusCategoryIds ?? questContext?.onboarding?.selectedCategoryIds;
-    const ids = new Set<string>();
-    for (const entry of resolvedTagMap ?? []) {
-      if (resolvedFocusIds && !resolvedFocusIds.includes(entry.categoryId as any)) {
-        continue;
-      }
-      for (const id of entry.tagIds) ids.add(id);
-    }
-    return ids;
-  }, [categoryTagMap, focusCategoryIds, questContext]);
-
-  const stripTags = useMemo(() => {
-    if (questTagIds.size === 0) return tagManager.savedTags;
-    return [
-      ...tagManager.savedTags.filter((t) => questTagIds.has(t.id)),
-      ...tagManager.savedTags.filter((t) => !questTagIds.has(t.id)),
-    ];
-  }, [tagManager.savedTags, questTagIds]);
-
-  // The quest badge is taller than the chip it sits on, so rows only need the
-  // extra clearance when one is actually in the strip.
-  const stripHasQuestBadge = useMemo(
-    () => stripTags.some((t) => questTagIds.has(t.id) && !t.disabled),
-    [stripTags, questTagIds],
-  );
+  const stripTags = tagManager.savedTags;
 
   useEffect(() => {
     updateTagFade();
@@ -1315,27 +1286,13 @@ export default function QuickAddSheet({
                                       : [...prev, suggestedTag.id],
                                   ),
                                 )}
-                                className={`relative inline-flex h-9 min-w-0 items-center gap-1.5 rounded-xl border pr-3 text-[11px] font-black uppercase tracking-wider shadow-sm transition-all active:scale-95 [@media(hover:hover)]:hover:opacity-75 ${
-                                  questTagIds.has(suggestedTag.id)
-                                    ? 'pl-[56px]'
-                                    : 'pl-3'
-                                }`}
+                                className="relative inline-flex h-9 min-w-0 items-center gap-1.5 rounded-xl border px-3 text-[11px] font-black uppercase tracking-wider shadow-sm transition-all active:scale-95 [@media(hover:hover)]:hover:opacity-75"
                                 style={{
                                   backgroundColor: `${suggestedTag.color}20`,
                                   color: suggestedTag.color,
                                   borderColor: `${suggestedTag.color}40`,
                                 }}
                               >
-                                {questTagIds.has(suggestedTag.id) && (
-                                  <span
-                                    className="pointer-events-none absolute left-1 top-1/2 grid h-12 w-11 -translate-y-1/2 -rotate-3 place-items-center rounded-[10px] border bg-popover shadow-sm"
-                                    style={{
-                                      borderColor: `${suggestedTag.color}40`,
-                                    }}
-                                  >
-                                    <AppIcon name="quests" className="h-7 w-7" />
-                                  </span>
-                                )}
                                 <Plus className="h-3.5 w-3.5 shrink-0 stroke-[3]" />
                                 <span className="max-w-[128px] truncate">
                                   {suggestedTag.name}
@@ -1374,17 +1331,13 @@ export default function QuickAddSheet({
                           onMouseMove={tagScroll.handlers.onMouseMove}
                           className={`grid auto-cols-max grid-flow-col ${
                             stripTags.length > 5 ? 'grid-rows-2' : 'grid-rows-1'
-                          } ${
-                            stripHasQuestBadge ? 'gap-y-5' : 'gap-y-3'
-                          } cursor-grab select-none items-center gap-x-3 overflow-x-auto overscroll-x-none no-scrollbar px-2 pt-2 pb-2 touch-pan-x active:cursor-grabbing ${
+                          } gap-y-3 cursor-grab select-none items-center gap-x-3 overflow-x-auto overscroll-x-none no-scrollbar px-2 pt-2 pb-2 touch-pan-x active:cursor-grabbing ${
                             tagFadeRight ? 'mask-fade-right' : ''
                           }`}
                           style={{ overscrollBehaviorX: 'none' }}
                         >
                         {stripTags.map((tag) => {
                           const selected = tags.includes(tag.id);
-                          const isQuestTag =
-                            questTagIds.has(tag.id) && !tag.disabled;
                           return (
                             <button
                               key={tag.id}
@@ -1447,9 +1400,7 @@ export default function QuickAddSheet({
                                 }
                                 tagManager.toggleTag(tag);
                               })}
-                              className={`relative inline-flex h-9 select-none items-center justify-center gap-1.5 rounded-xl border pr-3 text-[11px] font-black uppercase tracking-wider shadow-sm transition-all active:scale-95 [@media(hover:hover)]:hover:opacity-75 ${
-                                isQuestTag ? 'pl-[56px]' : 'pl-3'
-                              } ${
+                              className={`relative inline-flex h-9 select-none items-center justify-center gap-1.5 rounded-xl border px-3 text-[11px] font-black uppercase tracking-wider shadow-sm transition-all active:scale-95 [@media(hover:hover)]:hover:opacity-75 ${
                                 tag.disabled
                                   ? 'border-dashed border-border bg-muted text-muted-foreground/70'
                                   : selected
@@ -1466,14 +1417,6 @@ export default function QuickAddSheet({
                                     }
                               }
                             >
-                              {isQuestTag && (
-                                <span
-                                  className="pointer-events-none absolute left-1 top-1/2 grid h-12 w-11 -translate-y-1/2 -rotate-3 place-items-center rounded-[10px] border bg-popover shadow-sm"
-                                  style={{ borderColor: `${tag.color}40` }}
-                                >
-                                  <AppIcon name="quests" className="h-7 w-7" />
-                                </span>
-                              )}
                               <span className="max-w-[128px] truncate">
                                 {tag.name}
                               </span>
@@ -1717,7 +1660,6 @@ export default function QuickAddSheet({
                   setSelectedTagIds={setTags}
                   onPremiumLimit={() => setShowPremiumLimit(true)}
                   tagInputRef={tagInputRef}
-                  questTagIds={questTagIds}
                 />
               </AnimatePresence>
             </>
