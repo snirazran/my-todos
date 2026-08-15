@@ -19,6 +19,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
   EyeOff,
+  ListChecks,
   Plus,
 } from 'lucide-react';
 import useSWR from 'swr';
@@ -2057,22 +2058,15 @@ export default function TaskBoard({
                 maxHeightClass="max-h-[calc(100svh-315px-var(--safe-bottom)-env(safe-area-inset-top))] md:max-h-[calc(100svh-224px-var(--safe-bottom))]"
                 isToday={dk === todayKey}
                 isPast={cmpYmd(dk, todayKey) < 0}
-                selectActive={selection.active}
-                onSelectClick={
-                  (tasksByDate[dk] ?? []).length === 0 && !selection.active
-                    ? undefined
-                    : () =>
-                        selection.active ? selection.exit() : selection.enter()
-                }
-                onAddClick={
-                  cmpYmd(dk, todayKey) < 0
-                    ? undefined
-                    : () => {
-                        setQuickText('');
-                        setInitialDateKey(dk);
-                        setPageIndex(i);
-                        setShowQuickAdd(true);
-                      }
+                headerAction={
+                  <div className="hidden md:block">
+                    <FilterTriggerButton
+                      compact
+                      onClick={() => setFilterSheetOpen(true)}
+                      activeCount={activeFilterCount}
+                      open={filterSheetOpen}
+                    />
+                  </div>
                 }
               >
                 <TaskList
@@ -2131,6 +2125,22 @@ export default function TaskBoard({
                     setMoveCalendarOpen(true);
                   }}
                 />
+                {cmpYmd(dk, todayKey) >= 0 &&
+                  (sortedTasksByDate[dk] ?? []).length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setQuickText('');
+                        setInitialDateKey(dk);
+                        setPageIndex(i);
+                        setShowQuickAdd(true);
+                      }}
+                      className="mt-1.5 hidden w-full items-center gap-2 rounded-xl px-2.5 py-2 text-[13px] font-bold text-muted-foreground/80 transition-colors md:flex [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground"
+                    >
+                      <Plus className="h-4 w-4" strokeWidth={3} />
+                      <span>Add a task</span>
+                    </button>
+                  )}
               </DayColumn>
             </div>
           ))}
@@ -2144,25 +2154,13 @@ export default function TaskBoard({
           calendarOpen ? 'z-[97]' : 'z-[60]'
         } ${moveCalendarOpen ? 'hidden' : ''}`}
       >
-        {/* The date stays optically centred; the filter rides beside it. */}
-        <div className="md:hidden pointer-events-auto grid w-full grid-cols-[1fr_auto_1fr] items-center">
-          <span aria-hidden />
+        <div className="md:hidden pointer-events-auto flex w-full items-center justify-center">
           <PlannerHeader
             dateKey={activeDateKey}
             expanded={calendarOpen}
             onToggle={() => setCalendarOpen((v) => !v)}
             variant="mobile"
           />
-          {!calendarOpen && (
-            <div className="justify-self-start pl-1.5">
-              <FilterTriggerButton
-                compact
-                onClick={() => setFilterSheetOpen(true)}
-                activeCount={activeFilterCount}
-                open={filterSheetOpen}
-              />
-            </div>
-          )}
         </div>
         <div className="hidden md:flex items-center gap-2 pointer-events-auto">
           <PlannerHeader
@@ -2201,16 +2199,10 @@ export default function TaskBoard({
         )}
       </div>
 
-      {/* Desktop filter bar — clear of the 64px site header, above the columns. */}
-      <div className="pointer-events-none fixed inset-x-0 top-[68px] z-[61] hidden items-center gap-2 px-4 md:flex">
-        <div className="pointer-events-auto">
-          <FilterTriggerButton
-            onClick={() => setFilterSheetOpen(true)}
-            activeCount={activeFilterCount}
-            open={filterSheetOpen}
-          />
-        </div>
-        {filtersActive && (
+      {/* Desktop applied-filter chips — clear of the 64px site header. The
+          trigger itself now lives in each day column's header. */}
+      {filtersActive && (
+        <div className="pointer-events-none fixed inset-x-0 top-[72px] z-[61] hidden items-center px-4 md:flex">
           <div className="pointer-events-auto min-w-0 flex-1">
             <AppliedFilterChips
               filters={filters}
@@ -2220,8 +2212,8 @@ export default function TaskBoard({
               onClearAll={resetFilters}
             />
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       <TaskFilterSheet
         open={filterSheetOpen}
@@ -2346,7 +2338,7 @@ export default function TaskBoard({
             // the bar never resizes) and a single drop strip takes over
             // almost the full bar — no per-item growing/shrinking fight, so
             // nothing clips or fights for space.
-            <div className="relative flex h-16 w-full max-w-[300px] items-center rounded-[28px] border border-border/50 bg-card px-2 shadow-sm">
+            <div className="relative flex h-16 w-full max-w-[340px] items-center rounded-[28px] border border-border/50 bg-card px-1.5 shadow-sm">
               <div
                 className={`flex w-full items-center gap-1 transition-opacity duration-150 ${
                   drag?.active ? 'pointer-events-none opacity-0' : 'opacity-100'
@@ -2362,8 +2354,16 @@ export default function TaskBoard({
                   onClick={() => setBacklogOpen(true)}
                 />
 
+                <FilterTriggerButton
+                  compact
+                  size="lg"
+                  onClick={() => setFilterSheetOpen(true)}
+                  activeCount={activeFilterCount}
+                  open={filterSheetOpen}
+                />
+
                 <div
-                  className="flex min-w-0 flex-1 items-center justify-center gap-1.5 overflow-hidden"
+                  className="flex min-w-0 flex-1 items-center justify-center gap-1 overflow-hidden"
                   aria-label={`Visible day: ${windowDates[pageIndex] ?? activeDateKey}`}
                 >
                   {WEEK_ORDER.map((day) => {
@@ -2380,6 +2380,20 @@ export default function TaskBoard({
                     );
                   })}
                 </div>
+
+                <button
+                  type="button"
+                  aria-label="Select tasks"
+                  title="Select tasks"
+                  disabled={
+                    (tasksByDate[windowDates[pageIndex] ?? activeDateKey] ?? [])
+                      .length === 0
+                  }
+                  onClick={() => selection.enter()}
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-muted-foreground transition-all active:scale-90 disabled:opacity-30 [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground"
+                >
+                  <ListChecks size={20} strokeWidth={2.5} />
+                </button>
 
                 <button
                   type="button"

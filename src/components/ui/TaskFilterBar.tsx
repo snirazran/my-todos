@@ -10,6 +10,7 @@ export function FilterTriggerButton({
   activeCount,
   open,
   compact = false,
+  size = 'sm',
   label = 'Filter',
   triggerRef,
 }: {
@@ -17,26 +18,37 @@ export function FilterTriggerButton({
   activeCount: number;
   open?: boolean;
   compact?: boolean;
+  /** Compact only — 'lg' is the thumb-sized variant for the mobile toolbar. */
+  size?: 'sm' | 'lg';
   label?: string;
   triggerRef?: React.Ref<HTMLButtonElement>;
 }) {
   const on = activeCount > 0 || open;
   if (compact) {
+    const lg = size === 'lg';
     return (
       <button
         ref={triggerRef}
         onClick={onClick}
         aria-label="Filter"
         title="Filter"
-        className={`relative flex h-7 w-7 items-center justify-center rounded-lg transition-all active:scale-90 ${
+        className={`relative flex items-center justify-center transition-all active:scale-90 ${
+          lg ? 'h-11 w-11 rounded-2xl' : 'h-7 w-7 rounded-lg'
+        } ${
           on
             ? 'bg-primary/10 text-primary'
             : 'text-muted-foreground [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground'
         }`}
       >
-        <Filter size={16} />
+        <Filter size={lg ? 20 : 16} strokeWidth={lg ? 2.5 : 2} />
         {activeCount > 0 && (
-          <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-primary px-1 text-[9px] font-black tabular-nums text-primary-foreground ring-2 ring-card">
+          <span
+            className={`absolute grid place-items-center rounded-full bg-primary font-black tabular-nums text-primary-foreground ring-2 ring-card ${
+              lg
+                ? 'right-0.5 top-0.5 h-[18px] min-w-[18px] px-1 text-[10px]'
+                : '-right-1 -top-1 h-4 min-w-4 px-1 text-[9px]'
+            }`}
+          >
             {activeCount}
           </span>
         )}

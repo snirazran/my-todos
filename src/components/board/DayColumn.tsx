@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Plus, CalendarCheck, ListChecks } from 'lucide-react';
+import { CalendarCheck } from 'lucide-react';
 
 export default function DayColumn({
   title,
@@ -16,9 +16,7 @@ export default function DayColumn({
   compact = false,
   isToday = false,
   isPast = false,
-  onAddClick,
-  onSelectClick,
-  selectActive = false,
+  headerAction,
   disableVerticalScroll = false,
 }: {
   title: string;
@@ -31,15 +29,8 @@ export default function DayColumn({
   compact?: boolean;
   isToday?: boolean;
   isPast?: boolean;
-  /** When provided, renders a + button in the header that triggers add-task for this column. */
-  onAddClick?: () => void;
-  /**
-   * When provided, renders the multi-select toggle beside +. This is the only
-   * touch entry into bulk mode — long-press is the drag gesture and cards have
-   * no visible ⋯ trigger, so the column header carries it.
-   */
-  onSelectClick?: () => void;
-  selectActive?: boolean;
+  /** Rendered at the header's trailing edge — the column's own controls. */
+  headerAction?: React.ReactNode;
   /** Keep the task surface fully expanded instead of making it its own scroller. */
   disableVerticalScroll?: boolean;
 }) {
@@ -100,41 +91,9 @@ export default function DayColumn({
             )}
           </h2>
 
-          <div className="flex items-center gap-2.5 relative">
-            {onSelectClick && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onSelectClick();
-                }}
-                title={selectActive ? 'Done selecting' : 'Select tasks'}
-                aria-label={selectActive ? 'Done selecting' : 'Select tasks'}
-                aria-pressed={selectActive}
-                className={`flex h-6 w-6 items-center justify-center rounded-full transition-all active:scale-90 ${
-                  selectActive
-                    ? 'bg-primary/15 text-primary'
-                    : 'text-muted-foreground/70 [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground'
-                }`}
-              >
-                <ListChecks size={15} strokeWidth={2.75} />
-              </button>
-            )}
-
-            {onAddClick && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onAddClick();
-                }}
-                title="Add task"
-                aria-label="Add task"
-                className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground hover:bg-primary/90 active:scale-90 transition-all"
-              >
-                <Plus size={14} strokeWidth={3} />
-              </button>
-            )}
-
-          </div>
+          {headerAction ? (
+            <div className="relative flex items-center gap-2.5">{headerAction}</div>
+          ) : null}
         </div>
 
         {count !== undefined && (
