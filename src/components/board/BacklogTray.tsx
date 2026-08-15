@@ -9,7 +9,9 @@ import { EditTaskDialog } from '@/components/ui/EditTaskDialog';
 import { DeleteDialog } from '@/components/ui/DeleteDialog';
 import TagsPopup from '@/components/ui/TagsPopup';
 import {
+  FilterChipStrip,
   FilteredEmptyState,
+  FilterStatusLine,
   FilterTriggerButton,
 } from '@/components/ui/TaskFilterBar';
 import { matchesTaskFilters, sortTasks, type TaskFilters } from '@/lib/taskFilters';
@@ -51,6 +53,8 @@ interface Props {
   userTags?: { id: string; name: string; color: string }[];
   /** The board-wide filter — the tray narrows with the columns. */
   filters: TaskFilters;
+  baseFilters?: TaskFilters;
+  onChangeFilters?: (filters: TaskFilters) => void;
   filtersActive?: boolean;
   activeFilterCount?: number;
   onOpenFilters?: () => void;
@@ -74,6 +78,8 @@ export default React.memo(function BacklogTray({
   onScheduleTask,
   userTags = [],
   filters,
+  baseFilters,
+  onChangeFilters,
   filtersActive = false,
   activeFilterCount = 0,
   onOpenFilters,
@@ -100,6 +106,8 @@ export default React.memo(function BacklogTray({
 
   const [isMobile, setIsMobile] = useState(false);
   const [page, setPage] = useState(0);
+  const [stripOpen, setStripOpen] = useState(false);
+  const canFilterInline = !!onChangeFilters && !!baseFilters;
 
   useEffect(() => {
     const query = window.matchMedia('(max-width: 767px)');
@@ -180,13 +188,46 @@ export default React.memo(function BacklogTray({
         isDraggingAny={isDraggingAny}
         closeProgress={closeProgress}
         rightActions={
-          <FilterTriggerButton
-            compact
-            onClick={() => onOpenFilters?.()}
-            activeCount={activeFilterCount}
-          />
+          canFilterInline ? (
+            <FilterTriggerButton
+              compact
+              onClick={() => setStripOpen((v) => !v)}
+              activeCount={activeFilterCount}
+              open={stripOpen}
+            />
+          ) : (
+            <FilterTriggerButton
+              compact
+              onClick={() => onOpenFilters?.()}
+              activeCount={activeFilterCount}
+            />
+          )
         }
       >
+        {canFilterInline && (stripOpen || filtersActive) && (
+          <div
+            style={{ ['--strip-fade' as string]: 'var(--card)' }}
+            className="sticky top-0 z-20 -mx-1 flex flex-col gap-1.5 bg-card px-1 pb-2 pt-1"
+          >
+            <FilterChipStrip
+              filters={filters}
+              base={baseFilters!}
+              tags={userTags}
+              tasks={tasks}
+              onChange={onChangeFilters!}
+              onClearAll={() => onClearFilters?.()}
+              onOpenMore={() => onOpenFilters?.()}
+            />
+            {filtersActive && (
+              <FilterStatusLine
+                tasks={tasks}
+                filters={filters}
+                onClearAll={() => onClearFilters?.()}
+                className="self-start"
+              />
+            )}
+          </div>
+        )}
         {isMobile && pageCount > 1 ? (
           <div className="sticky top-0 z-10 -mx-1 flex shrink-0 items-center justify-between bg-card px-1 py-2">
             <button

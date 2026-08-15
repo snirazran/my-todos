@@ -50,7 +50,8 @@ import { monthlyRepeatLabel } from '@/components/ui/quick-add/utils';
 import type { RepeatMode, RepeatRule } from '@/components/ui/quick-add/utils';
 import { TaskFilterSheet } from '@/components/ui/TaskFilterSheet';
 import {
-  AppliedFilterChips,
+  FilterChipStrip,
+  FilterStatusLine,
   FilterTriggerButton,
 } from '@/components/ui/TaskFilterBar';
 import { useTaskFilters } from '@/hooks/useTaskFilters';
@@ -360,6 +361,7 @@ export default function TaskBoard({
     activeCount: activeFilterCount,
   } = useTaskFilters('planner');
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
+  const [stripOpen, setStripOpen] = useState(false);
   const filterPool = useMemo(
     () => [...windowDates.flatMap((d) => tasksByDate[d] ?? []), ...backlog],
     [windowDates, tasksByDate, backlog],
@@ -2062,11 +2064,20 @@ export default function TaskBoard({
                   <div className="hidden md:block">
                     <FilterTriggerButton
                       compact
-                      onClick={() => setFilterSheetOpen(true)}
+                      onClick={() => setStripOpen((v) => !v)}
                       activeCount={activeFilterCount}
-                      open={filterSheetOpen}
+                      open={stripOpen}
                     />
                   </div>
+                }
+                note={
+                  filtersActive ? (
+                    <FilterStatusLine
+                      tasks={tasksByDate[dk] ?? []}
+                      filters={filters}
+                      onClearAll={resetFilters}
+                    />
+                  ) : undefined
                 }
               >
                 <TaskList
@@ -2199,17 +2210,19 @@ export default function TaskBoard({
         )}
       </div>
 
-      {/* Desktop applied-filter chips — clear of the 64px site header. The
-          trigger itself now lives in each day column's header. */}
-      {filtersActive && (
-        <div className="pointer-events-none fixed inset-x-0 top-[72px] z-[61] hidden items-center px-4 md:flex">
+      {/* Desktop lens — the chips sit on the board, not over it, so the columns
+          visibly re-filter under each tap. Toggled from any column header. */}
+      {(stripOpen || filtersActive) && (
+        <div className="pointer-events-none fixed inset-x-0 top-[70px] z-[61] hidden items-center px-4 md:flex">
           <div className="pointer-events-auto min-w-0 flex-1">
-            <AppliedFilterChips
+            <FilterChipStrip
               filters={filters}
               base={baseFilters}
               tags={tagsData?.tags || []}
+              tasks={filterPool}
               onChange={setFilters}
               onClearAll={resetFilters}
+              onOpenMore={() => setFilterSheetOpen(true)}
             />
           </div>
         </div>
@@ -2226,7 +2239,10 @@ export default function TaskBoard({
         presets={presets}
         onSavePreset={savePreset}
         onDeletePreset={deletePreset}
-        title="Filter planner"
+        showTags={false}
+        showSort={false}
+        showCompletedToggle={false}
+        title="More filters"
       />
 
       {/* Month calendar overlay */}
@@ -2329,6 +2345,30 @@ export default function TaskBoard({
             : ''
         }`}
       >
+        <AnimatePresence>
+          {isMobile && (stripOpen || filtersActive) && !drag?.active && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 8 }}
+              transition={{ type: 'spring', stiffness: 460, damping: 34 }}
+              style={{ ['--strip-fade' as string]: 'var(--card)' }}
+              className="pointer-events-auto mx-auto mb-2 w-[88vw] max-w-[340px] rounded-[22px] border border-border/50 bg-card/95 px-2 py-1.5 shadow-sm backdrop-blur-xl"
+            >
+              <FilterChipStrip
+                filters={filters}
+                base={baseFilters}
+                tags={tagsData?.tags || []}
+                tasks={filterPool}
+                onChange={setFilters}
+                onClearAll={resetFilters}
+                onOpenMore={() => setFilterSheetOpen(true)}
+                menuDirection="up"
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <div className="pointer-events-auto mx-auto flex w-[88vw] max-w-none flex-col items-center justify-center md:w-full md:max-w-[480px]">
           {isMobile ? (
             // One shared surface for the saved-tasks target, the week dots,
@@ -2357,13 +2397,16 @@ export default function TaskBoard({
                 <FilterTriggerButton
                   compact
                   size="lg"
-                  onClick={() => setFilterSheetOpen(true)}
+                  onClick={() => setStripOpen((v) => !v)}
                   activeCount={activeFilterCount}
-                  open={filterSheetOpen}
+                  open={stripOpen}
                 />
 
+                {/* Below ~380px the bar can't hold these and the controls at a
+                    tappable size — the day is already named up top, so the dots
+                    are what goes. */}
                 <div
-                  className="flex min-w-0 flex-1 items-center justify-center gap-1 overflow-hidden"
+                  className="flex min-w-0 flex-1 items-center justify-center gap-1 overflow-hidden narrow:hidden"
                   aria-label={`Visible day: ${windowDates[pageIndex] ?? activeDateKey}`}
                 >
                   {WEEK_ORDER.map((day) => {
@@ -2380,6 +2423,7 @@ export default function TaskBoard({
                     );
                   })}
                 </div>
+                <span className="hidden flex-1 narrow:block" aria-hidden />
 
                 <button
                   type="button"
@@ -2508,6 +2552,8 @@ export default function TaskBoard({
         }}
         hideDoTodayButton={true}
         filters={filters}
+        baseFilters={baseFilters}
+        onChangeFilters={setFilters}
         filtersActive={filtersActive}
         activeFilterCount={activeFilterCount}
         onOpenFilters={() => setFilterSheetOpen(true)}

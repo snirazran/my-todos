@@ -40,7 +40,7 @@ const sections: LegalSection[] = [
     body: [
       "Frogress's use and transfer to any other application of information received from Google APIs will adhere to the Google API Services User Data Policy, including the Limited Use requirements (developers.google.com/terms/api-services-user-data-policy).",
       'We use Google Calendar data only to provide the calendar sync features you see in the app. We do not use Google user data for advertising, do not sell it, and do not transfer it to third parties except as needed to provide the sync itself (for example, our hosting and database providers), to comply with applicable law, or as part of a merger or acquisition with notice to you. Humans do not read this data except with your explicit permission for support, where required for security or abuse investigations, or where required by law.',
-      'You can disconnect Google Calendar at any time in Frogress settings or by revoking access at myaccount.google.com/permissions. When you disconnect through the app, Frogress deletes the "Frogress" calendar it created in your Google account, along with the stored sync tokens and authorization token. Tasks previously imported from your calendar remain in your Frogress account as ordinary tasks, and you can delete them like any other task or request full deletion of your data at support@frogress.com.',
+      'You can disconnect Google Calendar at any time in Frogress settings or by revoking access at myaccount.google.com/permissions. When you disconnect through the app, Frogress deletes the "Frogress" calendar it created in your Google account, along with the stored sync tokens and authorization token. Tasks previously imported from your calendar remain in your Frogress account as ordinary tasks, and you can delete them like any other task or request full deletion of your data at help@frogress.com.',
     ],
   },
   {
@@ -74,7 +74,7 @@ const sections: LegalSection[] = [
     body: [
       'We use information to create and secure accounts, sync tasks across devices, operate task boards and planners, run quests and rewards, save wardrobe and frog customization, support friend and buddy features, send reminders, process support requests, and maintain app reliability.',
       'We may also use information to prevent abuse, debug errors, analyze aggregate product performance, improve features, and comply with legal obligations.',
-      'To keep the rewards economy fair, we automatically check activity patterns on your account, such as how many tasks you complete in a day, how quickly tasks are created and completed, repeated or near-identical task titles, and whether tasks are opened or edited. Where these patterns indicate that rewards are being generated artificially rather than earned, we may automatically limit reward earning, gift drops, trade-ups, or friend rewards on the account. These limits are reversible and are removed once normal use resumes. We do this to protect the service and other users, and you can ask us to review a decision by contacting support@frogress.com.',
+      'To keep the rewards economy fair, we automatically check activity patterns on your account, such as how many tasks you complete in a day, how quickly tasks are created and completed, repeated or near-identical task titles, and whether tasks are opened or edited. Where these patterns indicate that rewards are being generated artificially rather than earned, we may automatically limit reward earning, gift drops, trade-ups, or friend rewards on the account. These limits are reversible and are removed once normal use resumes. We do this to protect the service and other users, and you can ask us to review a decision by contacting help@frogress.com.',
     ],
   },
   {
@@ -97,7 +97,7 @@ const sections: LegalSection[] = [
     title: '12. Your choices',
     body: [
       'You can update many account and app preferences in Frogress. You can disable notifications in app settings, browser settings, or device settings. You can disconnect Google Calendar through Frogress or your Google account settings. You can disconnect any AI assistant, and revoke its access key, in Frogress under Menu > Integrations.',
-      'You may request access, correction, deletion, or export of your personal information by contacting support@frogress.com. We may need to verify your identity before completing certain requests.',
+      'You may request access, correction, deletion, or export of your personal information by contacting help@frogress.com. We may need to verify your identity before completing certain requests.',
     ],
   },
   {
@@ -128,7 +128,7 @@ const sections: LegalSection[] = [
   {
     title: '17. Contact',
     body: [
-      'Questions or requests about privacy can be sent to support@frogress.com.',
+      'Questions or requests about privacy can be sent to help@frogress.com.',
     ],
   },
 ];

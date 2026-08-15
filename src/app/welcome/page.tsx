@@ -250,7 +250,7 @@ export default function WelcomePage() {
           </Link>
           {' · '}
           <a
-            href="mailto:support@frogress.com"
+            href="mailto:help@frogress.com"
             className="underline-offset-4 hover:underline"
           >
             Contact

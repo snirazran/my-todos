@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   Check,
+  Flame,
   Loader2,
   Lock,
   Pencil,
@@ -552,7 +553,7 @@ export function PactPickSheet({
                           maxLength={80}
                           placeholder="e.g. 20-minute walk"
                           autoFocus
-                          className="h-11 w-full rounded-xl border border-border/60 bg-background px-3 text-[15px] font-bold text-foreground outline-none focus:border-primary"
+                          className="h-11 w-full rounded-xl border border-border/60 bg-background px-3 text-[16px] font-bold text-foreground outline-none focus:border-primary"
                         />
                         <p className="mt-2 text-[12px] font-semibold text-muted-foreground">
                           Describe one session. Days and time come next.
@@ -881,6 +882,12 @@ export function PactPickSheet({
                         ? 'If you do it this week'
                         : `If you do all ${days.length} this week`}
                     </span>
+                    {view.ladder.multiplier > 1 && (
+                      <span className="inline-flex w-fit items-center gap-1 rounded-full bg-orange-500/12 px-2 py-0.5 text-[11px] font-black text-orange-600 dark:text-orange-400">
+                        <Flame className="h-3 w-3 fill-current" strokeWidth={2} />
+                        ×{view.ladder.multiplier} streak included
+                      </span>
+                    )}
                     {!view.isPremium && <PlusDoubleNote onClick={onUpgrade} />}
                   </span>
                   <QuestRewardTileBadge

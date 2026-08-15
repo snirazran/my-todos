@@ -411,7 +411,7 @@ const CONTACT_TOPICS = [
 
 type ContactTopic = (typeof CONTACT_TOPICS)[number]['id'];
 
-const SUPPORT_EMAIL = 'support@frogress.com';
+const SUPPORT_EMAIL = 'help@frogress.com';
 
 export function ContactPanel({
   uid,

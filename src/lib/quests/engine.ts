@@ -1510,8 +1510,11 @@ export async function syncQuestState(args: {
     if (doc.placement === 'daily' && doc.windowKey === todayKey) {
       return !eligibleDailyTemplateIds.has(doc.templateId);
     }
-    // Delete stale daily docs from other days
-    if (doc.placement === 'daily' && doc.windowKey !== todayKey) {
+    // Delete stale daily docs from PAST days only. A window key ahead of today
+    // means this sync is running on a lagging clock — a write whose request
+    // carried no timezone falls back to UTC, which is still yesterday for a
+    // user east of it — and that roll is the live one, not a stale one.
+    if (doc.placement === 'daily' && doc.windowKey < todayKey) {
       return true;
     }
     return false;

@@ -4,11 +4,11 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Icon } from '@/components/ui/Icon';
 import { useAuth } from '@/components/auth/AuthContext';
-import { useInventory } from '@/hooks/useInventory';
 import useSWR from 'swr';
 import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
 import { useState, useEffect } from 'react';
-import { WardrobePopup } from '@/components/ui/WardrobePopup';
+import { WardrobePopup, useWardrobeBadges } from '@/components/ui/WardrobePopup';
+import { TRADE_ITEM_COUNT } from '@/lib/skins/catalog';
 import { hapticTick } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
 
@@ -16,8 +16,8 @@ export default function MobileNav() {
   const pathname = usePathname();
   const router = useRouter();
   const { user } = useAuth();
-  const { unseenCount, unseenContainerCount } = useInventory(!!user, true);
-  const inventoryBadge = unseenCount + unseenContainerCount;
+  const { inventoryBadge, tradeSpares } = useWardrobeBadges();
+  const tradeReady = tradeSpares >= TRADE_ITEM_COUNT;
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const [wardrobePopupOpen, setWardrobePopupOpen] = useState(false);
   const [pendingHref, setPendingHref] = useState<string | null>(null);
@@ -139,11 +139,17 @@ export default function MobileNav() {
                     label={item.label}
                     className={cn('w-9 h-9', item.label === 'Friends' && 'scale-125')}
                   />
-                  {item.label === 'Wardrobe' && inventoryBadge > 0 && (
+                  {/* New items outrank spares: unseen loot is the thing you
+                      can only act on here, trading keeps until tomorrow. */}
+                  {item.label === 'Wardrobe' && inventoryBadge > 0 ? (
                     <span className="absolute -top-2 -right-3 flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-[10px] font-bold text-white bg-rose-500 rounded-full border-2 border-background animate-in zoom-in duration-300 shadow-sm">
                       {inventoryBadge > 9 ? '9+' : inventoryBadge}
                     </span>
-                  )}
+                  ) : item.label === 'Wardrobe' && tradeReady ? (
+                    <span className="absolute -top-2 -right-3 flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-[10px] font-bold text-white bg-amber-500 rounded-full border-2 border-background animate-in zoom-in duration-300 shadow-sm">
+                      {tradeSpares > 9 ? '9+' : tradeSpares}
+                    </span>
+                  ) : null}
                   {item.label === 'Quests' && questClaimableCount > 0 ? (
                     <span className="absolute -top-2 -right-3 flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-[10px] font-bold text-white bg-amber-500 rounded-full border-2 border-background animate-in zoom-in duration-300 shadow-sm">
                       {questClaimableCount > 99 ? '99+' : questClaimableCount}

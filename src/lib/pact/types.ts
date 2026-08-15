@@ -64,6 +64,13 @@ export type PactWeekResult = {
   shieldsLeft: number;
 };
 
+/** What a kept week pays at, once the streak reaches `weeks`. */
+export type PactStreakMultiplier = {
+  weeks: number;
+  multiplier: number;
+};
+
+/** Legacy lump-payout tracks. Retired in payout v3; nothing reads them. */
 export type PactStreakTier = {
   weeks: number;
   rewards: QuestRewards;
@@ -83,10 +90,7 @@ export type PactConfigView = {
   bigCommitmentBonusFlies: number;
   comebackBonusFlies: number;
   completionRewards: QuestRewards;
-  milestoneEveryWeeks: number;
-  milestoneRewards: QuestRewards;
-  streakTiers: PactStreakTier[];
-  masteryTiers: PactAreaMasteryTier[];
+  streakMultipliers: PactStreakMultiplier[];
   shieldCapFree: number;
   shieldCapPlus: number;
   shieldEarnEveryWeeks: number;
@@ -187,12 +191,23 @@ export type PactStatus = 'active' | 'kept' | 'missed' | 'skipped';
  * near a goal, so the card shows the next near-end rather than the whole
  * 2/4/8/12 ladder — there is always another one to accelerate toward.
  */
-export type PactMilestone = {
-  kind: 'streak' | 'mastery';
+export type PactLadderRung = {
   weeks: number;
-  weeksDone: number;
-  rewards: QuestRewards;
-  areaName?: string;
+  multiplier: number;
+  reached: boolean;
+};
+
+/**
+ * One ladder, one unit. Every extra payout track — lump tiers at 2/4/8/12
+ * weeks, area mastery, a gift every other week — was a separate reward on a
+ * separate clock, and four clocks is what made the week impossible to price.
+ * The streak now does exactly one thing: it multiplies what a kept week pays,
+ * so the ladder's effect shows up in the number already on the card.
+ */
+export type PactLadderView = {
+  rungs: PactLadderRung[];
+  /** What the week in progress pays at, including the streak it will reach. */
+  multiplier: number;
 };
 
 export type PactStreakView = {
@@ -231,7 +246,7 @@ export type PactView = {
   rewardCatalog: Record<string, unknown>;
   /** Flies Plus would have added to past claims. Claimable once premium. */
   forgoneFlies: number;
-  nextMilestone: PactMilestone | null;
+  ladder: PactLadderView;
   /** Every tag the user owns, so a pact can be pointed at their own. */
   userTags: PactUserTag[];
   /** Current fly balance, so purchase sheets need no second fetch. */

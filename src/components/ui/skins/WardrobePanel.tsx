@@ -25,7 +25,13 @@ import {
   Gift,
 } from 'lucide-react';
 import type { ItemDef, WardrobeSlot } from '@/lib/skins/catalog';
-import { rarityRank, byId as staticById, sellPriceOf } from '@/lib/skins/catalog';
+import {
+  rarityRank,
+  byId as staticById,
+  sellPriceOf,
+  countInventorySpares,
+  TRADE_ITEM_COUNT,
+} from '@/lib/skins/catalog';
 import Fly from '@/components/ui/fly';
 import Frog from '@/components/ui/frog';
 import { Icon as AppIcon } from '@/components/ui/Icon';
@@ -303,6 +309,13 @@ function WardrobeManagerContent({
   const { user } = useAuth();
   const { data, mutate, unseenItems, unseenContainers, markItemSeen } =
     useInventory(open);
+
+  const tradeSpares = useMemo(
+    () =>
+      countInventorySpares(data?.wardrobe?.inventory, data?.catalog).spares,
+    [data],
+  );
+  const tradeReady = tradeSpares >= TRADE_ITEM_COUNT;
 
   const [activeTab, setActiveTab] = useState<string>(defaultTab);
   useEffect(() => {
@@ -1370,6 +1383,11 @@ function WardrobeManagerContent({
                 >
                   <AppIcon name="trade" className="w-5 h-5" />
                   <span>Trade</span>
+                  {tradeReady && (
+                    <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[9px] font-black leading-none text-white shadow-sm">
+                      {tradeSpares > 9 ? '9+' : tradeSpares}
+                    </span>
+                  )}
                 </TabsTrigger>
               </TabsList>
 

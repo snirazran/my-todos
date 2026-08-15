@@ -17,6 +17,7 @@ export default function DayColumn({
   isToday = false,
   isPast = false,
   headerAction,
+  note,
   disableVerticalScroll = false,
 }: {
   title: string;
@@ -31,6 +32,8 @@ export default function DayColumn({
   isPast?: boolean;
   /** Rendered at the header's trailing edge — the column's own controls. */
   headerAction?: React.ReactNode;
+  /** Rides beside the task count — e.g. how much a filter is hiding. */
+  note?: React.ReactNode;
   /** Keep the task surface fully expanded instead of making it its own scroller. */
   disableVerticalScroll?: boolean;
 }) {
@@ -96,18 +99,23 @@ export default function DayColumn({
           ) : null}
         </div>
 
-        {count !== undefined && (
-          <div className="flex items-center gap-1.5 -mt-1">
-            <CalendarCheck className="w-3.5 h-3.5 text-primary" />
-            <span
-              className={`text-xs font-bold ${
-                isPast ? 'text-muted-foreground/60' : 'text-muted-foreground'
-              }`}
-            >
-              {totalCount !== undefined && count !== totalCount
-                ? `${count} left · ${totalCount} total`
-                : `${count} ${count === 1 ? 'task' : 'tasks'}`}
-            </span>
+        {(count !== undefined || note) && (
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 -mt-1">
+            {count !== undefined && (
+              <span className="flex items-center gap-1.5">
+                <CalendarCheck className="w-3.5 h-3.5 text-primary" />
+                <span
+                  className={`text-xs font-bold ${
+                    isPast ? 'text-muted-foreground/60' : 'text-muted-foreground'
+                  }`}
+                >
+                  {totalCount !== undefined && count !== totalCount
+                    ? `${count} left · ${totalCount} total`
+                    : `${count} ${count === 1 ? 'task' : 'tasks'}`}
+                </span>
+              </span>
+            )}
+            {note}
           </div>
         )}
       </div>

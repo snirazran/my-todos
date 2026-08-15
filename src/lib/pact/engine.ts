@@ -2,9 +2,7 @@ import { v4 as uuid } from 'uuid';
 import PactModel, { type PactDoc } from '@/lib/models/Pact';
 import PactConfigModel, {
   DEFAULT_PACT_COMPLETION_REWARDS,
-  DEFAULT_PACT_MASTERY_TIERS,
-  DEFAULT_PACT_MILESTONE_REWARDS,
-  DEFAULT_PACT_STREAK_TIERS,
+  DEFAULT_PACT_STREAK_MULTIPLIERS,
   PACT_CONFIG_ID,
   PACT_PAYOUT_VERSION,
   PACT_V2_PAYOUT,
@@ -37,7 +35,7 @@ import {
   PRIMARY_OPTIONS,
   type ActivePactView,
   type PactAreaChoice,
-  type PactMilestone,
+  type PactLadderView,
   type PactOption,
   type PactStreakView,
   type PactSuggestion,
@@ -193,17 +191,8 @@ export async function ensurePactConfig(): Promise<PactConfigDoc> {
     if (!existing.completionRewards) {
       backfill.completionRewards = DEFAULT_PACT_COMPLETION_REWARDS;
     }
-    if (!existing.milestoneRewards) {
-      backfill.milestoneRewards = DEFAULT_PACT_MILESTONE_REWARDS;
-    }
-    if (typeof existing.milestoneEveryWeeks !== 'number') {
-      backfill.milestoneEveryWeeks = 2;
-    }
-    if (!existing.streakTiers?.length) {
-      backfill.streakTiers = DEFAULT_PACT_STREAK_TIERS;
-    }
-    if (!existing.masteryTiers?.length) {
-      backfill.masteryTiers = DEFAULT_PACT_MASTERY_TIERS;
+    if (!existing.streakMultipliers?.length) {
+      backfill.streakMultipliers = DEFAULT_PACT_STREAK_MULTIPLIERS;
     }
     if (typeof existing.shieldCapFree !== 'number') backfill.shieldCapFree = 1;
     if (typeof existing.shieldCapPlus !== 'number') backfill.shieldCapPlus = 2;
@@ -222,11 +211,21 @@ export async function ensurePactConfig(): Promise<PactConfigDoc> {
     // A doc written under v1 carries hand-tuned v1 numbers, so a plain
     // "is it missing?" backfill would leave it paying nothing until the week
     // landed. The version stamp is what makes the re-seed run exactly once.
-    if ((existing.payoutVersion ?? 1) < PACT_PAYOUT_VERSION) {
+    const version = existing.payoutVersion ?? 1;
+    if (version < 2) {
       Object.assign(backfill, PACT_V2_PAYOUT);
-      backfill.payoutVersion = PACT_PAYOUT_VERSION;
     } else if (typeof existing.comebackBonusFlies !== 'number') {
       backfill.comebackBonusFlies = PACT_V2_PAYOUT.comebackBonusFlies;
+    }
+    // v3 retires the lump tracks. Cleared rather than merely ignored, so the
+    // admin screen and the database agree about what is no longer paid. Rates
+    // an admin tuned under v2 are left exactly as they are.
+    if (version < PACT_PAYOUT_VERSION) {
+      backfill.payoutVersion = PACT_PAYOUT_VERSION;
+      backfill.streakTiers = [];
+      backfill.masteryTiers = [];
+      backfill.milestoneEveryWeeks = 0;
+      backfill.milestoneRewards = [];
     }
     if (Object.keys(backfill).length === 0) return existing;
     await PactConfigModel.updateOne(
@@ -264,15 +263,44 @@ export function pactComebackFlies(config: PactConfigDoc) {
 }
 
 /**
+ * What a week at this position in the streak pays at. `streakWeeks` is the
+ * week's OWN number — the streak it lands on, not the one it started from — so
+ * the week that takes a run to two weeks is already paid at the two-week rate.
+ * Anything below the first rung pays flat.
+ */
+export function pactStreakMultiplier(
+  config: PactConfigDoc,
+  streakWeeks: number,
+) {
+  const rungs = [...(config.streakMultipliers ?? [])].sort(
+    (a, b) => a.weeks - b.weeks,
+  );
+  let multiplier = 1;
+  for (const rung of rungs) {
+    if (streakWeeks >= rung.weeks) {
+      multiplier = Math.max(1, Number(rung.multiplier) || 1);
+    }
+  }
+  return multiplier;
+}
+
+/**
  * What a week is worth end to end, for previews only — sessions are paid as
  * they happen and the bonus lands on the last one. Deliberately blind to how
  * hard an idea claims to be: a difficulty nobody can verify must never move the
  * rate, or the hardest-labelled option becomes strictly dominant. Ambition is
  * priced in sessions, which is the one unit of effort the app can actually see.
  */
-export function optionRewardFlies(config: PactConfigDoc, days: number[]) {
+export function optionRewardFlies(
+  config: PactConfigDoc,
+  days: number[],
+  streakMultiplier = 1,
+) {
   const taskCount = Math.max(1, new Set(days).size);
-  return taskCount * pactSessionFlies(config) + pactWeekBonusFlies(config);
+  return (
+    (taskCount * pactSessionFlies(config) + pactWeekBonusFlies(config)) *
+    Math.max(1, streakMultiplier)
+  );
 }
 
 /**
@@ -329,8 +357,10 @@ export function buildOptionsForArea(args: {
   areaName: string;
   weekKey: string;
   lastPact?: PactDoc | null;
+  streakMultiplier?: number;
 }): PactOption[] {
   const { config, categoryId, areaName, weekKey, lastPact } = args;
+  const streakMultiplier = args.streakMultiplier ?? 1;
   const library = (config.suggestions ?? []).filter(
     (s) => s.isActive && s.categoryId === categoryId,
   );
@@ -364,7 +394,7 @@ export function buildOptionsForArea(args: {
       startTime: lastPact.startTime,
       sessions: new Set(lastPact.days).size,
       taskCount: new Set(lastPact.days).size,
-      rewardFlies: optionRewardFlies(config, lastPact.days),
+      rewardFlies: optionRewardFlies(config, lastPact.days, streakMultiplier),
       scheduleLabel: scheduleLabel(lastPact.days, lastPact.startTime),
       source: 'repeat',
     };
@@ -618,6 +648,9 @@ export async function settleFinishedWeeks(args: {
         owedSessions,
         comeback: earnsComeback,
         isPremium,
+        // The rate this week was lived under: the streak it was reaching for,
+        // which is what reconcile paid its earlier sessions at.
+        streakWeeks: streakBefore + 1,
       });
       pact.paidSessions = progress;
       if (earnsComeback) pact.comebackPaid = true;
@@ -681,7 +714,6 @@ export async function settleFinishedWeeks(args: {
         config: args.config,
         pact,
         streakWeeks: next.weeks,
-        areaWeeks: next.areaWeeks[pact.categoryId] ?? 1,
         isPremium,
       });
       autoGrantedFlies += summary.fliesGranted;
@@ -733,50 +765,23 @@ export async function settleFinishedWeeks(args: {
   return next;
 }
 
-/**
- * The nearest unclaimed rung — whichever of the overall streak ladder or this
- * area's mastery ladder the user will reach first. Showing one near goal beats
- * showing the whole ladder: the pull comes from a target within reach.
- */
-function nextMilestoneFor(args: {
+function ladderFor(args: {
   config: PactConfigDoc;
   streak: PactStreakState;
-  categoryId?: string;
-  categoryName?: string;
-}): PactMilestone | null {
-  const { config, streak, categoryId, categoryName } = args;
-  const areaWeeks = categoryId ? streak.areaWeeks[categoryId] ?? 0 : 0;
-
-  const streakNext = (config.streakTiers ?? [])
-    .filter((tier) => tier.weeks > streak.weeks)
-    .sort((a, b) => a.weeks - b.weeks)[0];
-  const masteryNext = categoryId
-    ? (config.masteryTiers ?? [])
-        .filter((tier) => tier.weeks > areaWeeks)
-        .sort((a, b) => a.weeks - b.weeks)[0]
-    : undefined;
-
-  const streakToGo = streakNext ? streakNext.weeks - streak.weeks : Infinity;
-  const masteryToGo = masteryNext ? masteryNext.weeks - areaWeeks : Infinity;
-  if (streakToGo === Infinity && masteryToGo === Infinity) return null;
-
-  if (masteryToGo < streakToGo && masteryNext) {
-    return {
-      kind: 'mastery',
-      weeks: masteryNext.weeks,
-      weeksDone: areaWeeks,
-      rewards: masteryNext.rewards ?? [],
-      areaName: categoryName,
-    };
-  }
-  return streakNext
-    ? {
-        kind: 'streak',
-        weeks: streakNext.weeks,
-        weeksDone: streak.weeks,
-        rewards: streakNext.rewards ?? [],
-      }
-    : null;
+  /** The week the user is playing for — the streak's next number. */
+  weekStreakNumber: number;
+}): PactLadderView {
+  const { config, streak, weekStreakNumber } = args;
+  return {
+    rungs: [...(config.streakMultipliers ?? [])]
+      .sort((a, b) => a.weeks - b.weeks)
+      .map((rung) => ({
+        weeks: rung.weeks,
+        multiplier: Math.max(1, Number(rung.multiplier) || 1),
+        reached: streak.weeks >= rung.weeks,
+      })),
+    multiplier: pactStreakMultiplier(config, weekStreakNumber),
+  };
 }
 
 export async function getPactView(args: {
@@ -843,6 +848,10 @@ export async function getPactView(args: {
     weekStartsOn,
   });
 
+  // The rate the week in progress is being paid at. Every fly number the card
+  // shows is already multiplied by it, so the user reads one true number.
+  const weekMultiplier = pactStreakMultiplier(config, streak.weeks + 1);
+
   const activeDoc =
     (await PactModel.findOne({ userId, weekKey: currentWeek })) ??
     (planningWeek !== currentWeek
@@ -900,12 +909,13 @@ export async function getPactView(args: {
       status: activeDoc.status,
       claimable: progress >= activeDoc.target && !activeDoc.claimedAt,
       claimed: !!activeDoc.claimedAt,
-      rewardFlies: optionRewardFlies(config, activeDoc.days),
-      sessionFlies: pactSessionFlies(config),
-      weekBonusFlies: pactWeekBonusFlies(config),
+      rewardFlies: optionRewardFlies(config, activeDoc.days, weekMultiplier),
+      sessionFlies: pactSessionFlies(config) * weekMultiplier,
+      weekBonusFlies: pactWeekBonusFlies(config) * weekMultiplier,
       earnedFlies:
-        Math.max(0, activeDoc.paidSessions ?? 0) * pactSessionFlies(config) +
-        (activeDoc.comebackPaid ? pactComebackFlies(config) : 0),
+        (Math.max(0, activeDoc.paidSessions ?? 0) * pactSessionFlies(config) +
+          (activeDoc.comebackPaid ? pactComebackFlies(config) : 0)) *
+        weekMultiplier,
       daysLeft: Math.max(0, daysBetween(todayKey, weekEnd) + 1),
       shieldUsed: activeDoc.shieldUsed,
       tagId: activeDoc.tagId,
@@ -1060,27 +1070,22 @@ export async function getPactView(args: {
     introSeen: streak.introSeen,
     needsAreas: areas.length === 0,
     weekStartsOn,
+    // Already at the week's rate, like every other fly number in the view. A
+    // preview that quotes the base while the card quotes the multiplied total
+    // is two prices for one week.
     flyRates: {
-      perTask: pactSessionFlies(config),
-      weekBonus: pactWeekBonusFlies(config),
-      comeback: pactComebackFlies(config),
+      perTask: pactSessionFlies(config) * weekMultiplier,
+      weekBonus: pactWeekBonusFlies(config) * weekMultiplier,
+      comeback: pactComebackFlies(config) * weekMultiplier,
     },
     completionRewards: config.completionRewards ?? [],
     weekResult: streak.pendingResult,
     forgoneFlies: streak.forgoneFlies,
     userTags,
     flyBalance,
-    nextMilestone: nextMilestoneFor({
-      config,
-      streak,
-      categoryId: active?.categoryId ?? areas[0]?.categoryId,
-      categoryName: active?.categoryName ?? areas[0]?.shortLabel,
-    }),
+    ladder: ladderFor({ config, streak, weekStreakNumber: streak.weeks + 1 }),
     rewardCatalog: buildRewardCatalog(await getFullCatalog(), [
       config.completionRewards ?? [],
-      config.milestoneRewards ?? [],
-      ...(config.streakTiers ?? []).map((tier) => tier.rewards ?? []),
-      ...(config.masteryTiers ?? []).map((tier) => tier.rewards ?? []),
     ]),
   };
 }
@@ -1106,6 +1111,10 @@ export async function getAreaOptions(args: {
     areaName: category?.shortLabel || category?.name || 'this area',
     weekKey: weekKeyFor(getZonedToday(timezone), weekStartsOn),
     lastPact,
+    streakMultiplier: pactStreakMultiplier(
+      config,
+      normalizePactStreak(user).weeks + 1,
+    ),
   });
 }
 

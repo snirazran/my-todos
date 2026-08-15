@@ -1000,7 +1000,11 @@ export default function QuickAddSheet({
         fetch(`/api/tasks?view=board`, {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ day: -1, taskId: pickedBacklogTaskId }),
+          body: JSON.stringify({
+            day: -1,
+            taskId: pickedBacklogTaskId,
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          }),
         })
           .then(() => mutate(backlogKey))
           .catch(console.error);

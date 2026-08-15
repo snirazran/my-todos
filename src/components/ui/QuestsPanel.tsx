@@ -758,7 +758,9 @@ function QuestSeasonBanner({
             </>
           ) : (
             <>
-              <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-muted/60 sm:h-20 sm:w-20">
+              {/* The count badge overhangs the tile's corner, so the copy needs
+                  clearance the container's own gap doesn't give it. */}
+              <div className="relative mr-2.5 flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-muted/60 sm:mr-3 sm:h-20 sm:w-20">
                 {previewReward ? (
                   <SeasonRewardPreview
                     reward={previewReward}
@@ -805,12 +807,12 @@ function QuestSeasonBanner({
               </div>
             </>
           )}
-          <div className="relative flex w-[6.25rem] shrink-0 items-center sm:w-[8.5rem]">
+          <div className="relative flex w-[6.75rem] shrink-0 items-center sm:w-[9.5rem]">
             <button
               type="button"
               onClick={onView}
               className={cn(
-                'w-full whitespace-nowrap rounded-2xl px-2.5 pb-3 pt-4 text-xs font-black text-white transition active:translate-y-1 active:shadow-none sm:px-4 sm:text-sm',
+                'w-full whitespace-nowrap rounded-2xl px-2.5 pb-3.5 pt-[1.125rem] text-[13px] font-black text-white transition active:translate-y-1 active:shadow-none sm:px-5 sm:text-base',
                 season.claimable
                   ? 'bg-amber-500 shadow-[0_5px_0_#b45309]'
                   : 'bg-lime-600 shadow-[0_5px_0_#3f6212]',
@@ -844,44 +846,50 @@ function SeasonRewardPreview({
   const isGift = item?.slot === 'container';
 
   return (
-    <div
-      className={cn(
-        'relative flex h-full w-full items-center justify-center rounded-2xl bg-card',
-        className,
-      )}
-    >
-      <div className="absolute inset-0 overflow-hidden rounded-2xl">
-        <SeasonPrizeRays colorClass={raysClass} />
+    <div className={cn('relative h-full w-full', className)}>
+      {/* The prize fills its frame instead of floating in it — overflow is
+          clipped here so nothing spills onto the bar, while the count badge
+          stays outside this box and rides the corner. */}
+      <div className="absolute inset-0 flex items-center justify-center overflow-hidden rounded-2xl bg-card">
+        <div className="absolute inset-0">
+          <SeasonPrizeRays colorClass={raysClass} />
+        </div>
+        {isGift ? (
+          <div className="relative z-10 h-[128%] w-[128%]">
+            <GiftRive
+              className="h-full w-full"
+              color={item.riveIndex}
+              paused={false}
+            />
+          </div>
+        ) : (
+          <div
+            className="relative z-10 flex h-full w-full items-center justify-center"
+            style={{
+              transform: reward.type === 'FLIES' ? undefined : 'scale(1.35)',
+            }}
+          >
+            <RewardTile
+              reward={reward}
+              rewardCatalog={rewardCatalog}
+              isPremium={isPremium}
+              compact
+              flySize={64}
+              paused={paused}
+              hideBadge
+              className={cn(
+                'h-full w-full rounded-2xl border-0 bg-transparent shadow-none',
+                // Rendered at the desktop size and scaled down on the small
+                // tile — downscaling keeps the canvas sharp, upscaling wouldn't.
+                reward.type === 'FLIES' && 'scale-[0.82] sm:scale-100',
+              )}
+            />
+          </div>
+        )}
       </div>
-      {isGift ? (
-        <div className="relative z-10 h-[86%] w-[86%]">
-          <GiftRive
-            className="h-full w-full"
-            color={item.riveIndex}
-            paused={false}
-          />
-        </div>
-      ) : (
-        <div
-          className="relative z-10 flex items-center justify-center"
-          style={{
-            transform: reward.type === 'FLIES' ? undefined : 'scale(1.6)',
-          }}
-        >
-          <RewardTile
-            reward={reward}
-            rewardCatalog={rewardCatalog}
-            isPremium={isPremium}
-            compact
-            flySize={48}
-            paused={paused}
-            hideBadge
-            className="rounded-2xl border-0 bg-transparent shadow-none"
-          />
-        </div>
-      )}
-      <div className="pointer-events-none absolute right-1 top-1 z-20">
-        <span className="flex min-w-5 items-center justify-center rounded-md border border-white/10 bg-black/55 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white shadow-sm backdrop-blur-sm">
+
+      <div className="pointer-events-none absolute -right-2 -top-2 z-30">
+        <span className="flex min-w-5 items-center justify-center rounded-md bg-black/75 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white shadow-md ring-2 ring-background">
           {getRewardQuantityLabel(reward, isPremium)}
         </span>
       </div>

@@ -282,34 +282,79 @@ export function AdminPactManager() {
             onChange={(comebackBonusFlies) => patch({ comebackBonusFlies })}
           />
         </div>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <NumberField
-            label="Better gift every N weeks"
-            hint="0 turns it off. Every other kept week pays the normal gift."
-            min={0}
-            max={52}
-            value={config.milestoneEveryWeeks}
-            onChange={(milestoneEveryWeeks) => patch({ milestoneEveryWeeks })}
-          />
-          <div className="rounded-xl bg-muted/30 p-3 text-[12px] leading-snug text-muted-foreground">
-            Every kept week also pays{' '}
+        <div className="mt-6">
+          <p className="text-sm font-bold text-foreground">Streak multiplier</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            The only thing a streak does: it multiplies every fly a kept week
+            pays, sessions and bonus alike. Gifts never multiply. A week is paid
+            at the rung its own number reaches, so the week that takes a run to{' '}
+            {config.streakMultipliers?.[0]?.weeks ?? 2} already pays at that
+            rate. Whole numbers only — the point is that nobody has to do
+            arithmetic to know what a week is worth.
+          </p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-4">
+            {(config.streakMultipliers ?? []).map((rung, index) => (
+              <div
+                key={index}
+                className="rounded-xl border border-border/60 p-3"
+              >
+                <NumberField
+                  label={`Rung ${index + 1} — weeks`}
+                  min={1}
+                  max={104}
+                  value={rung.weeks}
+                  onChange={(weeks) =>
+                    patch({
+                      streakMultipliers: (config.streakMultipliers ?? []).map(
+                        (entry, i) => (i === index ? { ...entry, weeks } : entry),
+                      ),
+                    })
+                  }
+                />
+                <div className="mt-2">
+                  <NumberField
+                    label="Pays"
+                    hint={`x${rung.multiplier} of the week's flies`}
+                    min={1}
+                    max={20}
+                    value={rung.multiplier}
+                    onChange={(multiplier) =>
+                      patch({
+                        streakMultipliers: (config.streakMultipliers ?? []).map(
+                          (entry, i) =>
+                            i === index ? { ...entry, multiplier } : entry,
+                        ),
+                      })
+                    }
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 rounded-xl bg-muted/30 p-3 text-[12px] leading-snug text-muted-foreground">
+            A 2-session week pays{' '}
+            <span className="font-bold text-foreground">
+              {2 * config.fliesPerCompletion + config.weekBonusFlies}
+            </span>{' '}
+            at x1 and{' '}
+            <span className="font-bold text-foreground">
+              {(2 * config.fliesPerCompletion + config.weekBonusFlies) *
+                Math.max(
+                  1,
+                  config.streakMultipliers?.[
+                    (config.streakMultipliers?.length ?? 1) - 1
+                  ]?.multiplier ?? 1,
+                )}
+            </span>{' '}
+            at the top rung, plus{' '}
             <span className="font-bold text-foreground">
               {config.completionRewards?.length
                 ? config.completionRewards
                     .map((r) => r.itemId ?? `${r.amount ?? ''} ${r.type}`.trim())
                     .join(', ')
                 : 'nothing'}
-            </span>
-            , and every {config.milestoneEveryWeeks || '—'}
-            {config.milestoneEveryWeeks ? 'th' : ''} pays{' '}
-            <span className="font-bold text-foreground">
-              {config.milestoneRewards?.length
-                ? config.milestoneRewards
-                    .map((r) => r.itemId ?? `${r.amount ?? ''} ${r.type}`.trim())
-                    .join(', ')
-                : 'nothing'}
             </span>{' '}
-            instead.
+            every kept week regardless.
           </div>
         </div>
 

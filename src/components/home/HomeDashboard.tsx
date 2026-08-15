@@ -49,7 +49,8 @@ import FrogodoroPill from '@/components/ui/FrogodoroPill';
 import { useFrogodoroUiStore } from '@/lib/frogodoroUiStore';
 import { TaskFilterSheet } from '@/components/ui/TaskFilterSheet';
 import {
-  AppliedFilterChips,
+  FilterChipStrip,
+  FilterStatusLine,
   FilterTriggerButton,
 } from '@/components/ui/TaskFilterBar';
 import { useTaskFilters } from '@/hooks/useTaskFilters';
@@ -198,6 +199,7 @@ export default function HomeDashboard() {
     activeCount: activeFilterCount,
   } = useTaskFilters('home', HOME_FILTER_BASE);
   const [isHeaderMenuOpen, setIsHeaderMenuOpen] = useState(false);
+  const [stripOpen, setStripOpen] = useState(false);
   const headerMenuBtnRef = useRef<HTMLButtonElement>(null);
   const headerMenuRef = useRef<HTMLDivElement>(null);
 
@@ -742,9 +744,12 @@ export default function HomeDashboard() {
                     has nothing to count or filter — either way the header
                     steps aside, unless filters are on and must stay reachable. */}
                 {!((dayCleared || data.length === 0) && !filtersActive) && (
-                  <div className="mb-2 flex items-center justify-between px-2 md:mb-4 md:px-4">
-                    <div className="flex items-center gap-2 ml-3 cursor-pointer group md:gap-2.5">
-                      <Icon name="planner" className="w-7 h-7 md:w-8 md:h-8" />
+                  <div className="mb-2 flex items-center justify-between gap-2 px-2 md:mb-4 md:px-4">
+                    <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 ml-3 cursor-pointer group md:gap-2.5 narrow:ml-1">
+                      <Icon
+                        name="planner"
+                        className="w-7 h-7 shrink-0 md:w-8 md:h-8"
+                      />
                       <span className="text-sm font-black tracking-tight lowercase text-foreground md:text-base">
                         {dayCleared
                           ? 'all done for today!'
@@ -752,15 +757,22 @@ export default function HomeDashboard() {
                               openTaskCount === 1 ? 'fly' : 'flies'
                             } left for today!`}
                       </span>
+                      {filtersActive && (
+                        <FilterStatusLine
+                          tasks={data}
+                          filters={filters}
+                          onClearAll={resetFilters}
+                        />
+                      )}
                     </div>
 
                     <div className="flex items-center gap-1">
                       <HomeFocusTimerButton onClick={openFocusLauncher} />
                       <FilterTriggerButton
                         triggerRef={headerMenuBtnRef}
-                        onClick={() => setIsHeaderMenuOpen(true)}
+                        onClick={() => setStripOpen((v) => !v)}
                         activeCount={activeFilterCount}
-                        open={isHeaderMenuOpen}
+                        open={stripOpen}
                       />
                     </div>
                   </div>
@@ -776,15 +788,23 @@ export default function HomeDashboard() {
                   presets={presets}
                   onSavePreset={savePreset}
                   onDeletePreset={deletePreset}
+                  showTags={false}
+                  showSort={false}
+                  showCompletedToggle={false}
+                  title="More filters"
                 />
-                <AppliedFilterChips
-                  filters={filters}
-                  base={baseFilters}
-                  tags={tags || []}
-                  onChange={setFilters}
-                  onClearAll={resetFilters}
-                  className="mb-2 px-2 md:mb-3 md:px-4"
-                />
+                {(stripOpen || filtersActive) && (
+                  <FilterChipStrip
+                    filters={filters}
+                    base={baseFilters}
+                    tags={tags || []}
+                    tasks={data}
+                    onChange={setFilters}
+                    onClearAll={resetFilters}
+                    onOpenMore={() => setIsHeaderMenuOpen(true)}
+                    className="mb-2 px-2 md:mb-3 md:px-4"
+                  />
+                )}
                 {/* The visible Fly Catch card was replaced by the frog swipe gesture. */}
                 <TaskList
                   tasks={data}
@@ -1256,6 +1276,8 @@ export default function HomeDashboard() {
         isOpen={isBacklogOpen}
         onClose={() => setIsBacklogOpen(false)}
         filters={filters}
+        baseFilters={baseFilters}
+        onChangeFilters={setFilters}
         filtersActive={filtersActive}
         activeFilterCount={activeFilterCount}
         onOpenFilters={() => setIsHeaderMenuOpen(true)}

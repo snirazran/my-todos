@@ -16,6 +16,7 @@ module.exports = {
   theme: {
     extend: {
       screens: {
+        narrow: { raw: '(max-width: 380px)' },
         short: { raw: '(max-width: 767px) and (max-height: 700px)' },
         'short-screen': { raw: '(max-height: 800px)' },
         'roomy-screen': { raw: '(min-height: 700px)' },

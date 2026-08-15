@@ -25,8 +25,7 @@ export async function POST(req: NextRequest) {
       name: 'pact_claimed',
       properties: {
         flies: rewardSummary.fliesGranted,
-        streak_tier: rewardSummary.streakTierHit,
-        mastery_tier: rewardSummary.masteryTierHit,
+        streak_multiplier: rewardSummary.streakMultiplier,
       },
     });
     const view = await getPactView({ userId, timezone });

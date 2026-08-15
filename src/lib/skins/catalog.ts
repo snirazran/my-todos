@@ -294,6 +294,29 @@ export const byId: Readonly<Record<string, ItemDef>> = Object.freeze(
   Object.fromEntries(CATALOG.map((s) => [s.id, s]))
 );
 
+/**
+ * Owned distinct items and how many copies past the first — the spares are what
+ * a trade can actually consume. Containers never count: they're consumables,
+ * not wearables. `catalog` covers server-side items the static list predates.
+ */
+export function countInventorySpares(
+  inventory: Record<string, number> | undefined | null,
+  catalog?: { id: string; slot?: string }[],
+): { spares: number; owned: number } {
+  const bySlot: Record<string, { slot?: string }> = {};
+  for (const item of catalog ?? []) bySlot[item.id] = item;
+  let spares = 0;
+  let owned = 0;
+  for (const [id, count] of Object.entries(inventory ?? {})) {
+    if ((count ?? 0) <= 0) continue;
+    const def = bySlot[id] ?? byId[id];
+    if (def?.slot === 'container') continue;
+    owned += 1;
+    if ((count ?? 0) > 1) spares += count - 1;
+  }
+  return { spares, owned };
+}
+
 export const sortByRarity = <T extends ItemDef>(arr: T[]) =>
   [...arr].sort(
     (a, b) =>

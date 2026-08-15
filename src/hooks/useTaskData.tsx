@@ -704,6 +704,7 @@ export function useTaskData({
             date: dateStr,
             taskId,
             permanent: forcePermanent,
+            timezone: tz,
           }),
         });
         cancelNotification(taskId);
@@ -719,7 +720,7 @@ export function useTaskData({
         });
       }
     },
-    [todayData, tasks, mutateToday, dateStr, showNotification],
+    [todayData, tasks, mutateToday, dateStr, showNotification, tz],
   );
 
   /**
@@ -826,7 +827,7 @@ export function useTaskData({
         await fetch('/api/tasks?view=board', {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ day: -1, taskId }),
+          body: JSON.stringify({ day: -1, taskId, timezone: tz }),
         });
       } catch (e) {
         console.error('Backlog delete failed', e);
@@ -839,7 +840,7 @@ export function useTaskData({
         });
       }
     },
-    [backlogData, mutateBacklog],
+    [backlogData, mutateBacklog, tz],
   );
 
   /**

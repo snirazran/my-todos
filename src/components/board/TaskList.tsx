@@ -467,7 +467,7 @@ export default React.memo(function TaskList({
           await fetch('/api/tasks', {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ date, taskId: dialog.task.id }),
+            body: JSON.stringify({ date, taskId: dialog.task.id, timezone: tz }),
           });
           window.dispatchEvent(new Event('board-refresh'));
         }

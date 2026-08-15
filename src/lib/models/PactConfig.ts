@@ -2,6 +2,7 @@ import mongoose, { Schema, type Model } from 'mongoose';
 import type { QuestRewards } from '@/lib/quests/types';
 import type {
   PactAreaMasteryTier,
+  PactStreakMultiplier,
   PactStreakTier,
   PactSuggestion,
 } from '@/lib/pact/types';
@@ -19,6 +20,8 @@ export interface PactConfigDoc {
   /** Which payout model this doc is on. Bumping it re-seeds the fly numbers. */
   payoutVersion: number;
   completionRewards: QuestRewards;
+  streakMultipliers: PactStreakMultiplier[];
+  /** Retired in payout v3. Kept on the doc so old configs still load. */
   milestoneEveryWeeks: number;
   milestoneRewards: QuestRewards;
   streakTiers: PactStreakTier[];
@@ -44,8 +47,13 @@ export const PACT_CONFIG_ID = 'weekly-pact';
  * ideas a flat bonus nobody could verify. v2 pays per kept session as
  * it happens, keeps a bonus for finishing, and prices ambition in sessions —
  * the only unit of effort the app can actually see.
+ *
+ * v3 collapses the four payout tracks into one. Lump tiers at 2/4/8/12 weeks,
+ * area mastery and a gift every other week were four rewards on three clocks,
+ * none of which could be read off the card the user was looking at. The streak
+ * now multiplies the week instead, so there is one rule and one number.
  */
-export const PACT_PAYOUT_VERSION = 2;
+export const PACT_PAYOUT_VERSION = 3;
 
 export const PACT_V2_PAYOUT = {
   fliesPerCompletion: 7,
@@ -66,22 +74,23 @@ export const DEFAULT_PACT_MILESTONE_REWARDS: QuestRewards = [
   { type: 'BOX', itemId: 'gift_box_rare' },
 ];
 
-// Mirrors the persistence-pledge ladder (20/50/120/250) so two long-horizon
-// commitment systems pay at the same rate for the same calendar effort.
-export const DEFAULT_PACT_STREAK_TIERS: PactStreakTier[] = [
-  { weeks: 2, rewards: [{ type: 'FLIES', amountMode: 'fixed', amount: 20 }] },
-  { weeks: 4, rewards: [{ type: 'FLIES', amountMode: 'fixed', amount: 50 }] },
-  { weeks: 8, rewards: [{ type: 'FLIES', amountMode: 'fixed', amount: 120 }] },
-  { weeks: 12, rewards: [{ type: 'FLIES', amountMode: 'fixed', amount: 250 }] },
+// Whole numbers on purpose: "your weeks pay x3" needs no arithmetic to act on,
+// where "+50% after the first two" needs a calculator and a base. Four rungs
+// keeps the climb short enough that a broken streak still looks recoverable.
+// A clean 12-week run pays ~1,748 flies on a 2-session week, which is where the
+// retired lump ladder landed — this is a re-shaping of the faucet, not a cut.
+export const DEFAULT_PACT_STREAK_MULTIPLIERS: PactStreakMultiplier[] = [
+  { weeks: 2, multiplier: 2 },
+  { weeks: 4, multiplier: 3 },
+  { weeks: 8, multiplier: 4 },
+  { weeks: 12, multiplier: 5 },
 ];
 
-// Depth in ONE area pays in gifts, not flies — it is the "you actually
-// improved this part of your life" track and must not inflate fly income.
-export const DEFAULT_PACT_MASTERY_TIERS: PactAreaMasteryTier[] = [
-  { weeks: 3, rewards: [{ type: 'BOX', itemId: 'gift_box_1' }] },
-  { weeks: 6, rewards: [{ type: 'BOX', itemId: 'gift_box_rare' }] },
-  { weeks: 12, rewards: [{ type: 'BOX', itemId: 'gift_box_legendary' }] },
-];
+/** @deprecated Retired in payout v3 — the streak multiplies the week instead. */
+export const DEFAULT_PACT_STREAK_TIERS: PactStreakTier[] = [];
+
+/** @deprecated Retired in payout v3. */
+export const DEFAULT_PACT_MASTERY_TIERS: PactAreaMasteryTier[] = [];
 
 type SeedEntry = Omit<PactSuggestion, 'id' | 'isActive' | 'picked' | 'kept'>;
 
@@ -152,13 +161,14 @@ const PactConfigSchema = new Schema<PactConfigDoc>(
       type: [Schema.Types.Mixed],
       default: DEFAULT_PACT_COMPLETION_REWARDS,
     } as any,
-    milestoneEveryWeeks: { type: Number, default: 2 },
-    milestoneRewards: {
+    streakMultipliers: {
       type: [Schema.Types.Mixed],
-      default: DEFAULT_PACT_MILESTONE_REWARDS,
+      default: DEFAULT_PACT_STREAK_MULTIPLIERS,
     } as any,
-    streakTiers: { type: [Schema.Types.Mixed], default: DEFAULT_PACT_STREAK_TIERS } as any,
-    masteryTiers: { type: [Schema.Types.Mixed], default: DEFAULT_PACT_MASTERY_TIERS } as any,
+    milestoneEveryWeeks: { type: Number, default: 0 },
+    milestoneRewards: { type: [Schema.Types.Mixed], default: [] } as any,
+    streakTiers: { type: [Schema.Types.Mixed], default: [] } as any,
+    masteryTiers: { type: [Schema.Types.Mixed], default: [] } as any,
     // Held, not granted monthly. A weekly pact with 4 monthly shields is a
     // pact that can never be broken, and a streak that cannot break stops
     // motivating — the cap is small on purpose, and refills are earned.

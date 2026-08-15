@@ -83,7 +83,7 @@ export function LegalPage({
             Pricing
           </Link>
           <a
-            href="mailto:support@frogress.com"
+            href="mailto:help@frogress.com"
             className="rounded-xl bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90"
           >
             Contact support

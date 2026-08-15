@@ -83,12 +83,16 @@ export async function reconcilePactSessionFlies(args: {
   if (sessionsDelta === 0 && !earnsComeback) return null;
 
   const isPremium = isPremiumUser(user.toObject() as UserDoc);
+  const streakState = normalizePactStreak(user.toObject() as UserDoc);
   const granted = applyPactSessionFlies({
     user,
     config,
     owedSessions: sessionsDelta,
     comeback: earnsComeback,
     isPremium,
+    // The week in progress is the next one the streak will reach, so it pays
+    // at that rung from its first session rather than a week behind.
+    streakWeeks: streakState.weeks + 1,
   });
 
   // Same bookkeeping the claim path does, so the retroactive-unlock pitch
@@ -96,10 +100,9 @@ export async function reconcilePactSessionFlies(args: {
   // It tracks refunds in both directions, or undoing a session would leave a
   // free user owed flies for work they took back.
   if (!isPremium && granted !== 0) {
-    const streak = normalizePactStreak(user.toObject() as UserDoc);
     (user as any).set(
       'quests.pactStreak.forgoneFlies',
-      Math.max(0, streak.forgoneFlies + granted),
+      Math.max(0, streakState.forgoneFlies + granted),
     );
   }
 

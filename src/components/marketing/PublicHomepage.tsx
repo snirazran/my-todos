@@ -338,7 +338,7 @@ export function PublicHomepage() {
             <Link href="/privacy" className="hover:text-foreground hover:underline">Privacy</Link>
             <Link href="/terms" className="hover:text-foreground hover:underline">Terms</Link>
             <Link href="/refund-policy" className="hover:text-foreground hover:underline">Refunds</Link>
-            <a href="mailto:support@frogress.com" className="hover:text-foreground hover:underline">Contact</a>
+            <a href="mailto:help@frogress.com" className="hover:text-foreground hover:underline">Contact</a>
           </nav>
           <p>© {new Date().getFullYear()} Frogress</p>
         </div>

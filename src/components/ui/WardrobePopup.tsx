@@ -12,7 +12,7 @@ import { useAuth } from '@/components/auth/AuthContext';
 import { useInventory } from '@/hooks/useInventory';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
-import { byId as staticById, TRADE_ITEM_COUNT } from '@/lib/skins/catalog';
+import { countInventorySpares, TRADE_ITEM_COUNT } from '@/lib/skins/catalog';
 import { hapticTick } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
 
@@ -29,18 +29,10 @@ export function useWardrobeBadges() {
   const dealEndsAt = data?.dailyDeals?.[0]?.endsAt ?? null;
 
   const { tradeSpares, ownedCount } = useMemo(() => {
-    const inv = data?.wardrobe?.inventory ?? {};
-    const catalogById: Record<string, { slot?: string }> = {};
-    for (const item of data?.catalog ?? []) catalogById[item.id] = item;
-    let spares = 0;
-    let owned = 0;
-    for (const [id, count] of Object.entries(inv)) {
-      if ((count ?? 0) <= 0) continue;
-      const def = catalogById[id] ?? staticById[id];
-      if (def?.slot === 'container') continue;
-      owned += 1;
-      if ((count ?? 0) > 1) spares += count - 1;
-    }
+    const { spares, owned } = countInventorySpares(
+      data?.wardrobe?.inventory,
+      data?.catalog,
+    );
     return { tradeSpares: spares, ownedCount: owned };
   }, [data]);
 

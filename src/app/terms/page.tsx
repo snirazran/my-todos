@@ -84,7 +84,7 @@ const sections: LegalSection[] = [
     body: [
       'Flies are meant to reward real use of Frogress. A daily limit applies to how many flies any account can earn from completing tasks, and similar limits may apply to other reward sources. Work you do beyond the limit still counts toward streaks, quests, and seasons; it just stops paying flies for that day.',
       'You may not create tasks, checklists, accounts, or friend connections for the purpose of generating flies or rewards, use automation to complete tasks, or otherwise manipulate the rewards system. If we detect this, we may reduce or pause reward earning on the account, suspend gift drops, trade-ups, or friend rewards, and reverse flies and items obtained this way. These measures may be applied automatically and are lifted once normal use resumes.',
-      'If you believe a limit has been applied to your account in error, contact us at support@frogress.com and we will review it.',
+      'If you believe a limit has been applied to your account in error, contact us at help@frogress.com and we will review it.',
     ],
   },
   {
@@ -124,7 +124,7 @@ const sections: LegalSection[] = [
   {
     title: '16. Contact',
     body: [
-      'Frogress is operated by Snir Azran. Questions about these Terms can be sent to support@frogress.com.',
+      'Frogress is operated by Snir Azran. Questions about these Terms can be sent to help@frogress.com.',
     ],
   },
 ];

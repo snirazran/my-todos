@@ -3,12 +3,13 @@
 import { useEffect, useState } from 'react';
 import useSWR from 'swr';
 import {
+  ArrowLeftRight,
   Flame,
   Loader2,
   Play,
-  RefreshCw,
   ShieldCheck,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { FlyWorth } from '@/components/ui/QuestCards';
 import {
@@ -69,6 +70,53 @@ const BANNER_RATIO = {
   home: { empty: '16 / 4.5', active: '16 / 4' },
   panel: { empty: '16 / 7', active: '16 / 6' },
 } as const;
+
+const badgeCount = (value: number) => (value > 9 ? '9+' : String(value));
+
+function PactHudButton({
+  icon: Icon,
+  label,
+  badge,
+  tone = 'have',
+  urgent,
+  onClick,
+}: {
+  icon: LucideIcon;
+  label: string;
+  badge: string | null;
+  tone?: 'have' | 'action';
+  urgent?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={(event) => {
+        event.stopPropagation();
+        onClick();
+      }}
+      className="relative inline-flex h-8 w-8 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition active:scale-95 after:absolute after:-inset-1.5 after:content-[''] [@media(hover:hover)]:hover:bg-black/65"
+    >
+      <Icon className="h-[17px] w-[17px]" strokeWidth={2.75} aria-hidden="true" />
+      {badge && (
+        <span
+          aria-hidden="true"
+          className={cn(
+            'absolute -right-1 -top-1 grid h-[17px] min-w-[17px] place-items-center rounded-full px-1 text-[10px] font-black leading-none ring-2 ring-black/55',
+            tone === 'have'
+              ? 'bg-lime-400 text-lime-950'
+              : 'bg-amber-400 text-amber-950',
+            urgent && 'animate-pulse',
+          )}
+        >
+          {badge}
+        </span>
+      )}
+    </button>
+  );
+}
 
 export function PactCard({
   variant = 'home',
@@ -293,6 +341,15 @@ export function PactCard({
               >
                 Pick your area
               </span>
+              {data.streak.weeks > 0 && (
+                <span className="absolute right-2.5 top-2.5 inline-flex h-7 items-center gap-1 rounded-full bg-black/50 px-2.5 text-[11px] font-black text-white backdrop-blur-sm">
+                  <Flame
+                    className="h-3.5 w-3.5 fill-current text-amber-300"
+                    strokeWidth={2}
+                  />
+                  {data.streak.weeks}w · pays ×{data.ladder.multiplier}
+                </span>
+              )}
             </div>
           </button>
             <div className="flex items-center justify-between gap-3 px-3.5 py-2.5">
@@ -380,12 +437,44 @@ export function PactCard({
                     : active.scheduleLabel}
                 </span>
               )}
-              {data.streak.weeks > 0 && (
-                <span className="absolute right-2.5 top-2.5 inline-flex items-center gap-1 rounded-lg bg-black/45 px-2 py-1 text-[11px] font-black text-amber-300 backdrop-blur-sm">
-                  <Flame className="h-3.5 w-3.5" strokeWidth={2.75} />
-                  {data.streak.weeks}
-                </span>
-              )}
+              <div className="absolute right-2.5 top-2.5 flex items-center gap-3">
+                {data.streak.weeks > 0 && (
+                  <span className="inline-flex h-8 items-center gap-1 rounded-full bg-black/45 px-2.5 text-[11px] font-black text-amber-300 backdrop-blur-sm">
+                    <Flame className="h-3.5 w-3.5" strokeWidth={2.75} />
+                    {data.streak.weeks}
+                  </span>
+                )}
+                <PactHudButton
+                  icon={ShieldCheck}
+                  onClick={() => setShieldOpen(true)}
+                  badge={
+                    data.streak.shields > 0
+                      ? badgeCount(data.streak.shields)
+                      : '+'
+                  }
+                  tone={data.streak.shields > 0 ? 'have' : 'action'}
+                  urgent={data.streak.shields === 0 && data.streak.atRisk}
+                  label={
+                    data.streak.shields > 0
+                      ? `Streak shield — ${data.streak.shields} held`
+                      : 'No streak shield if you miss — get one'
+                  }
+                />
+                {!weekFinished && (
+                  <PactHudButton
+                    icon={ArrowLeftRight}
+                    onClick={() => setConfirmChange(true)}
+                    badge={
+                      data.swapTokens > 0 ? badgeCount(data.swapTokens) : null
+                    }
+                    label={
+                      data.swapTokens > 0
+                        ? `Change commitment — ${data.swapTokens} swap${data.swapTokens === 1 ? '' : 's'} left`
+                        : 'Change commitment — no swaps left'
+                    }
+                  />
+                )}
+              </div>
             </div>
 
             <div className="px-3.5 py-3">
@@ -504,55 +593,6 @@ export function PactCard({
                     </button>
                   ) : null}
                 </div>
-              )}
-
-              {/* Given the same weight as the shield row below it: both are
-                  things you can do to the week, and a bare muted label
-                  floating right read as a caption rather than a control. */}
-              {!weekFinished && (
-                <button
-                  type="button"
-                  onClick={() => setConfirmChange(true)}
-                  className="mt-2 flex w-full items-center justify-between gap-2 rounded-xl bg-muted/40 px-3 py-2 text-left transition active:scale-[0.99] [@media(hover:hover)]:hover:bg-muted/70"
-                >
-                  <span className="inline-flex items-center gap-1.5 text-[12px] font-bold text-muted-foreground">
-                    <RefreshCw className="h-3.5 w-3.5" strokeWidth={2.5} />
-                    Change commitment
-                  </span>
-                  <span className="shrink-0 text-[12px] font-black text-primary">
-                    {data.swapTokens > 0
-                      ? `${data.swapTokens} swap${data.swapTokens === 1 ? '' : 's'}`
-                      : 'Swap'}
-                  </span>
-                </button>
-              )}
-
-              {/* Only while there is no shield. Held protection needs no row:
-                  it changes nothing the user has to decide this week, and a
-                  standing "1 shield ready" line spends a slot on reassurance
-                  next to the two rows that are actually actionable. */}
-              {data.streak.shields === 0 && !weekFinished && (
-              <button
-                type="button"
-                onClick={() => setShieldOpen(true)}
-                className={cn(
-                  'mt-2 flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-left transition active:scale-[0.99]',
-                  data.streak.atRisk
-                    ? 'bg-sky-500/12 ring-1 ring-sky-500/35'
-                    : 'bg-muted/40',
-                )}
-              >
-                <span className="inline-flex items-center gap-1.5 text-[12px] font-bold text-muted-foreground">
-                  <ShieldCheck
-                    className="h-4 w-4 text-muted-foreground"
-                    strokeWidth={2.5}
-                  />
-                  No shield if you miss
-                </span>
-                <span className="text-[12px] font-black text-primary">
-                  Get one
-                </span>
-              </button>
               )}
             </div>
           </div>

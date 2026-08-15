@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { CalendarCheck, Clock } from 'lucide-react';
 import { PactCard, usePactView } from './PactCard';
+import { PactStreakLadder } from './PactStreakLadder';
 import { cn } from '@/lib/utils';
 
 /**
@@ -77,6 +78,9 @@ export function PactAreaPanel() {
       </div>
       <div className="-mx-1.5 mt-1 md:-mx-4">
         <PactCard variant="panel" />
+      </div>
+      <div className="mx-1.5 md:mx-4">
+        <PactStreakLadder />
       </div>
     </div>
   );

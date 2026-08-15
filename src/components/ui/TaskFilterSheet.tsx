@@ -50,6 +50,8 @@ export function TaskFilterSheet({
   onSavePreset,
   onDeletePreset,
   showSort = true,
+  showTags = true,
+  showCompletedToggle = true,
   title = 'Filter',
 }: {
   open: boolean;
@@ -64,6 +66,10 @@ export function TaskFilterSheet({
   onSavePreset: (name: string) => void;
   onDeletePreset: (id: string) => void;
   showSort?: boolean;
+  /** Off where a live chip strip already owns the tags. */
+  showTags?: boolean;
+  /** Off where a view menu already owns the completed toggle. */
+  showCompletedToggle?: boolean;
   title?: string;
 }) {
   const [inputFocused, setInputFocused] = useState(false);
@@ -109,6 +115,11 @@ export function TaskFilterSheet({
     setSavingPreset(false);
   };
 
+  const anyFilterOn =
+    filters.search.trim().length > 0 ||
+    filters.tags.length > 0 ||
+    filters.views.length > 0;
+
   // Only tags that actually sit on something in this pool are worth offering —
   // plus any already picked, so a chip can never strand itself.
   const usedTagIds = new Set<string>();
@@ -127,7 +138,7 @@ export function TaskFilterSheet({
     };
   }).filter((o) => o.on || o.n > 0);
 
-  const tagOptions = tags
+  const tagOptions = (showTags ? tags : [])
     .filter((t) => usedTagIds.has(t.id) || filters.tags.includes(t.id))
     .map((tag) => {
       const on = filters.tags.includes(tag.id);
@@ -153,7 +164,7 @@ export function TaskFilterSheet({
         <div className="flex min-h-0 w-full flex-1 flex-col">
         <div
           ref={bindScroll}
-          className="min-h-0 w-full flex-1 touch-pan-y overflow-y-auto overscroll-contain px-5 pt-1"
+          className="min-h-0 w-full flex-1 touch-pan-y overflow-y-auto overscroll-contain px-5 pt-1 narrow:px-4"
         >
           <div className="relative mb-4 flex h-9 items-center justify-center sm:justify-start">
             <h2 className="text-[17px] font-black text-foreground">{title}</h2>
@@ -182,30 +193,6 @@ export function TaskFilterSheet({
           </div>
 
           <div className="sm:grid sm:grid-cols-2 sm:gap-x-6">
-          {quickViewOptions.length > 0 && (
-            <div className="mb-5">
-              <SectionLabel>Quick views</SectionLabel>
-              <div className="flex flex-wrap gap-2">
-                {quickViewOptions.map(({ view, on, n }) => (
-                  <button
-                    key={view.id}
-                    onClick={() => toggleView(view.id)}
-                    aria-pressed={on}
-                    className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-[12px] font-black transition-all active:scale-95 ${
-                      on
-                        ? 'border-primary bg-primary text-primary-foreground shadow-sm'
-                        : 'border-border bg-background text-muted-foreground [@media(hover:hover)]:hover:border-foreground/30 [@media(hover:hover)]:hover:text-foreground'
-                    }`}
-                  >
-                    {on && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
-                    {view.label}
-                    <Count n={n} on={on} />
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
           {tagOptions.length > 0 && (
             <div className="mb-5">
               <div className="flex items-center justify-between">
@@ -247,6 +234,30 @@ export function TaskFilterSheet({
               </div>
             </div>
           )}
+
+          {quickViewOptions.length > 0 && (
+            <div className="mb-5">
+              <SectionLabel>Quick views</SectionLabel>
+              <div className="flex flex-wrap gap-2">
+                {quickViewOptions.map(({ view, on, n }) => (
+                  <button
+                    key={view.id}
+                    onClick={() => toggleView(view.id)}
+                    aria-pressed={on}
+                    className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-[12px] font-black transition-all active:scale-95 ${
+                      on
+                        ? 'border-primary bg-primary text-primary-foreground shadow-sm'
+                        : 'border-border bg-background text-muted-foreground [@media(hover:hover)]:hover:border-foreground/30 [@media(hover:hover)]:hover:text-foreground'
+                    }`}
+                  >
+                    {on && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
+                    {view.label}
+                    <Count n={n} on={on} />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           </div>
 
           <button
@@ -254,7 +265,9 @@ export function TaskFilterSheet({
               onChange({ ...filters, showCompleted: !filters.showCompleted })
             }
             aria-pressed={filters.showCompleted}
-            className="mb-5 flex w-full items-center justify-between rounded-2xl bg-muted/50 px-4 py-3 text-left transition-colors [@media(hover:hover)]:hover:bg-muted"
+            className={`mb-5 w-full items-center justify-between rounded-2xl bg-muted/50 px-4 py-3 text-left transition-colors [@media(hover:hover)]:hover:bg-muted ${
+              showCompletedToggle ? 'flex' : 'hidden'
+            }`}
           >
             <span className="text-[14px] font-black text-foreground">
               Show completed
@@ -275,7 +288,7 @@ export function TaskFilterSheet({
           {showSort && (
             <div className="mb-5">
               <SectionLabel>Sort</SectionLabel>
-              <div className="grid grid-cols-5 gap-1 rounded-2xl bg-muted/50 p-1.5">
+              <div className="grid grid-cols-5 gap-1 rounded-2xl bg-muted/50 p-1.5 narrow:grid-cols-3">
                 {SORTS.map((sort) => (
                   <button
                     key={sort}
@@ -301,7 +314,13 @@ export function TaskFilterSheet({
             </div>
           )}
 
-          <div className="mb-6">
+          {/* Saved views only show up once there's something worth saving —
+              until then the machinery is pure perceived weight. */}
+          <div
+            className={`mb-6 ${
+              presets.length > 0 || anyFilterOn ? '' : 'hidden'
+            }`}
+          >
             <button
               onClick={() => setShowPresets((v) => !v)}
               aria-expanded={showPresets}
@@ -380,8 +399,9 @@ export function TaskFilterSheet({
 
         </div>
 
-        {/* Pinned so Clear all / Done never scroll out of reach. */}
-        <div className="shrink-0 border-t border-border/60 bg-background px-5 pb-[calc(env(safe-area-inset-bottom)+16px)] pt-3 sm:pb-4">
+        {/* Pinned so Clear all / Close never scroll out of reach. Nothing here
+            commits anything — every control above already applied itself. */}
+        <div className="shrink-0 border-t border-border/60 bg-background px-5 pb-[calc(env(safe-area-inset-bottom)+16px)] pt-3 narrow:px-4 sm:pb-4">
           <div className="flex gap-2.5">
             <button
               onClick={onReset}
@@ -393,7 +413,7 @@ export function TaskFilterSheet({
               onClick={() => onOpenChange(false)}
               className="h-12 flex-[1.4] rounded-2xl bg-[#4f9149] text-[15px] font-black text-white shadow-[0_3px_0_0_#34631f] transition-all active:translate-y-[2px] active:shadow-none"
             >
-              Done
+              Close
             </button>
           </div>
         </div>

@@ -50,7 +50,6 @@ export async function claimPactReward(args: {
     config,
     pact,
     streakWeeks,
-    areaWeeks,
     isPremium,
   });
 

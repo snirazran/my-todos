@@ -87,7 +87,6 @@ export async function PUT(req: NextRequest) {
         2000,
         PACT_V2_PAYOUT.comebackBonusFlies,
       ),
-      milestoneEveryWeeks: clampInt(body.milestoneEveryWeeks, 0, 52, 2),
       shieldCapFree: clampInt(body.shieldCapFree, 0, 5, 1),
       shieldCapPlus: clampInt(body.shieldCapPlus, 0, 5, 2),
       shieldEarnEveryWeeks: clampInt(body.shieldEarnEveryWeeks, 0, 12, 2),
@@ -102,23 +101,11 @@ export async function PUT(req: NextRequest) {
     if (Array.isArray(body.completionRewards)) {
       update.completionRewards = body.completionRewards;
     }
-    if (Array.isArray(body.milestoneRewards)) {
-      update.milestoneRewards = body.milestoneRewards;
-    }
-    if (Array.isArray(body.streakTiers)) {
-      update.streakTiers = body.streakTiers
-        .map((tier: any) => ({
-          weeks: clampInt(tier?.weeks, 1, 520, 2),
-          rewards: Array.isArray(tier?.rewards) ? tier.rewards : [],
-        }))
-        .sort((a: any, b: any) => a.weeks - b.weeks);
-    }
-    if (Array.isArray(body.masteryTiers)) {
-      update.masteryTiers = body.masteryTiers
-        .map((tier: any) => ({
-          weeks: clampInt(tier?.weeks, 1, 520, 3),
-          rewards: Array.isArray(tier?.rewards) ? tier.rewards : [],
-          plusRewards: Array.isArray(tier?.plusRewards) ? tier.plusRewards : undefined,
+    if (Array.isArray(body.streakMultipliers)) {
+      update.streakMultipliers = body.streakMultipliers
+        .map((rung: any) => ({
+          weeks: clampInt(rung?.weeks, 1, 104, 2),
+          multiplier: clampInt(rung?.multiplier, 1, 20, 1),
         }))
         .sort((a: any, b: any) => a.weeks - b.weeks);
     }

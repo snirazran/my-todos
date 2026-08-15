@@ -15,7 +15,7 @@ const sections: LegalSection[] = [
     title: '2. Purchases made on our website',
     body: [
       'Web purchases are processed by Paddle.com, our merchant of record. Paddle handles checkout, billing, taxes, and receipts for these purchases.',
-      'If you are not happy with Frogress Plus, you can request a full refund within 14 days of your initial purchase, no questions asked. To request a refund, email support@frogress.com from the email you purchased with, or reply to your Paddle receipt email, and include your order number if you have it.',
+      'If you are not happy with Frogress Plus, you can request a full refund within 14 days of your initial purchase, no questions asked. To request a refund, email help@frogress.com from the email you purchased with, or reply to your Paddle receipt email, and include your order number if you have it.',
       'Renewal charges can also be refunded if you contact us within 14 days of the renewal date. Approved refunds are returned to your original payment method, typically within 5 to 10 business days depending on your bank. When a refund is issued, your Plus access ends.',
     ],
   },
@@ -23,14 +23,14 @@ const sections: LegalSection[] = [
     title: '3. Purchases made through the Apple App Store',
     body: [
       'Subscriptions and consumable fly packs purchased inside the iOS app are billed by Apple, and under Apple\'s rules only Apple can issue refunds for them.',
-      'To request a refund, go to reportaproblem.apple.com, sign in with your Apple ID, and select the Frogress Plus purchase, or request a refund through your device\'s subscription settings. Apple decides these requests under its own policies. If you have trouble, contact us at support@frogress.com and we will do our best to help.',
+      'To request a refund, go to reportaproblem.apple.com, sign in with your Apple ID, and select the Frogress Plus purchase, or request a refund through your device\'s subscription settings. Apple decides these requests under its own policies. If you have trouble, contact us at help@frogress.com and we will do our best to help.',
     ],
   },
   {
     title: '4. Purchases made through Google Play',
     body: [
       'Subscriptions and consumable fly packs purchased inside the Android app are billed by Google Play. You can request a refund through the Google Play Store app or at play.google.com under Order history.',
-      'Google decides refund requests made after its initial refund window under its own policies. If Google directs you to the developer or you have trouble, contact us at support@frogress.com and we will review your request under the same 14-day standard described above.',
+      'Google decides refund requests made after its initial refund window under its own policies. If Google directs you to the developer or you have trouble, contact us at help@frogress.com and we will review your request under the same 14-day standard described above.',
     ],
   },
   {
@@ -39,7 +39,7 @@ const sections: LegalSection[] = [
       'Fly packs are one-time purchases of in-app currency, delivered to your account immediately. If you have a statutory right of withdrawal or cancellation — for example the 14-day right in the EU and the UK, or the cancellation right under Israeli consumer protection law — you can exercise it for flies you have not yet spent, and we will refund that part of the purchase. Flies you have already spent in the app cannot be withdrawn or refunded, because the content has been delivered and used.',
       'Items received from gift boxes, trade-ups, and other randomized rewards are delivered as soon as they are opened and are not refundable, including when the item you receive is not the one you hoped for. The chances for each rarity are shown in the app before you open a gift box or start a trade-up.',
       'Flies earned by using the app, rather than bought, have no monetary value and are not refundable. Refunds are made in real money for the amount you paid; we do not refund purchases in flies.',
-      'For fly packs bought inside the iOS or Android apps, the store refund processes in sections 3 and 4 apply. For fly packs bought on our website, contact support@frogress.com.',
+      'For fly packs bought inside the iOS or Android apps, the store refund processes in sections 3 and 4 apply. For fly packs bought on our website, contact help@frogress.com.',
     ],
   },
   {
@@ -53,13 +53,13 @@ const sections: LegalSection[] = [
     title: '7. Cancelling your subscription',
     body: [
       'Cancelling stops future charges and is different from a refund. When you cancel, your Plus access continues until the end of the period you already paid for.',
-      'Web purchases can be cancelled from the subscription management link in your Paddle receipt email or by emailing support@frogress.com. App Store purchases are cancelled in your device\'s subscription settings, and Google Play purchases are cancelled in the Play Store\'s subscriptions section. Deleting the app does not cancel a subscription.',
+      'Web purchases can be cancelled from the subscription management link in your Paddle receipt email or by emailing help@frogress.com. App Store purchases are cancelled in your device\'s subscription settings, and Google Play purchases are cancelled in the Play Store\'s subscriptions section. Deleting the app does not cancel a subscription.',
     ],
   },
   {
     title: '8. Contact',
     body: [
-      'Questions about refunds or cancellations can be sent to support@frogress.com. Please include the email address you purchased with and, for web purchases, your Paddle order number so we can find your purchase quickly.',
+      'Questions about refunds or cancellations can be sent to help@frogress.com. Please include the email address you purchased with and, for web purchases, your Paddle order number so we can find your purchase quickly.',
     ],
   },
 ];

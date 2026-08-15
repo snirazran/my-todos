@@ -4,6 +4,7 @@ import type { QuestReward } from '@/lib/quests/types';
 import {
   pactComebackFlies,
   pactSessionFlies,
+  pactStreakMultiplier,
   pactWeekBonusFlies,
 } from './engine';
 
@@ -13,8 +14,8 @@ export type PactRewardSummary = {
   flyBalanceAfter: number;
   grantedItemIds: string[];
   grantedBackgroundIds: string[];
-  streakTierHit: number | null;
-  masteryTierHit: number | null;
+  /** What the week was multiplied by, for the settlement screen to report. */
+  streakMultiplier: number;
 };
 
 /**
@@ -30,9 +31,13 @@ export function applyPactSessionFlies(args: {
   owedSessions: number;
   comeback: boolean;
   isPremium: boolean;
+  /** The week's own streak number. Constant for a whole week, so a refund
+   *  always gives back exactly what the session paid. */
+  streakWeeks: number;
 }): number {
   const { user, config, owedSessions, comeback, isPremium } = args;
-  const multiplier = isPremium ? 2 : 1;
+  const multiplier =
+    (isPremium ? 2 : 1) * pactStreakMultiplier(config, args.streakWeeks);
   const amount =
     owedSessions * pactSessionFlies(config) * multiplier +
     (comeback ? pactComebackFlies(config) * multiplier : 0);
@@ -51,15 +56,14 @@ export function applyPactSessionFlies(args: {
 }
 
 /**
- * Pays out one kept pact onto a loaded user document — the week bonus, the
- * weekly gift, the milestone gift, and any streak/mastery tier the week lands
- * on. The sessions themselves were already paid as they were ticked (see
- * `reconcilePactSessionFlies`), so this is only what finishing adds.
+ * Pays out one kept pact onto a loaded user document — the week bonus and the
+ * week's gift, both at the streak's rate. The sessions themselves were already
+ * paid as they were ticked (see `reconcilePactSessionFlies`), so this is only
+ * what finishing adds.
  *
- * Deliberately takes the week numbers as arguments rather than deriving them:
- * the claim path runs before the week is settled (so it projects), while the
- * settle path runs after (so it passes the numbers it just wrote). Deriving
- * them internally is what made tiers fire twice or not at all.
+ * Deliberately takes the week's streak number as an argument rather than
+ * deriving it: the claim path runs before the week is settled (so it projects),
+ * while the settle path runs after (so it passes the number it just wrote).
  *
  * Mutates `user`; the caller saves.
  */
@@ -68,11 +72,15 @@ export function applyPactRewards(args: {
   config: PactConfigDoc;
   pact: PactDoc;
   streakWeeks: number;
-  areaWeeks: number;
   isPremium: boolean;
 }): PactRewardSummary {
-  const { user, config, pact, streakWeeks, areaWeeks, isPremium } = args;
-  const multiplier = isPremium ? 2 : 1;
+  const { user, config, streakWeeks, isPremium } = args;
+  const streakMultiplier = pactStreakMultiplier(config, streakWeeks);
+  const plusMultiplier = isPremium ? 2 : 1;
+  // Only flies scale with the streak. Copies of a gift box are not a bigger
+  // reward, they are five of the same thing to open — and a week's gift that
+  // arrives five-at-a-time stops reading as the week's gift.
+  const flyMultiplier = plusMultiplier * streakMultiplier;
 
   if (!user.wardrobe) {
     user.wardrobe = { equipped: {}, inventory: {}, unseenItems: [], flies: 0 };
@@ -92,24 +100,23 @@ export function applyPactRewards(args: {
     flyBalanceAfter: user.wardrobe.flies,
     grantedItemIds: [],
     grantedBackgroundIds: [],
-    streakTierHit: null,
-    masteryTierHit: null,
+    streakMultiplier,
   };
 
   const applyRewards = (rewards: QuestReward[] | undefined) => {
     for (const reward of rewards ?? []) {
       if (reward.type === 'FLIES') {
-        const amount = (reward.amount ?? 0) * multiplier;
+        const amount = (reward.amount ?? 0) * flyMultiplier;
         user.wardrobe.flies += amount;
         summary.fliesGranted += amount;
       } else if (reward.type === 'BACKGROUND' && reward.backgroundId) {
         const inv = user.wardrobe.backgrounds.inventory;
-        for (let i = 0; i < multiplier; i += 1) {
+        for (let i = 0; i < plusMultiplier; i += 1) {
           inv[reward.backgroundId] = (inv[reward.backgroundId] ?? 0) + 1;
           summary.grantedBackgroundIds.push(reward.backgroundId);
         }
       } else if (reward.itemId) {
-        for (let i = 0; i < multiplier; i += 1) {
+        for (let i = 0; i < plusMultiplier; i += 1) {
           user.wardrobe.inventory[reward.itemId] =
             (user.wardrobe.inventory[reward.itemId] ?? 0) + 1;
           user.wardrobe.unseenItems.push(reward.itemId);
@@ -120,34 +127,7 @@ export function applyPactRewards(args: {
   };
 
   applyRewards([{ type: 'FLIES', amount: pactWeekBonusFlies(config) }]);
-
   applyRewards(config.completionRewards);
-  const everyN = Math.max(0, config.milestoneEveryWeeks ?? 0);
-  if (everyN > 0 && streakWeeks % everyN === 0) {
-    applyRewards(config.milestoneRewards);
-  }
-
-  // Tiers match the exact week they sit on, so the number passed in has to be
-  // the week this pact actually is — not "wherever the streak happens to be".
-  const streakTier = (config.streakTiers ?? []).find(
-    (tier) => tier.weeks === streakWeeks,
-  );
-  if (streakTier) {
-    applyRewards(streakTier.rewards);
-    summary.streakTierHit = streakTier.weeks;
-  }
-
-  const masteryTier = (config.masteryTiers ?? []).find(
-    (tier) => tier.weeks === areaWeeks,
-  );
-  if (masteryTier) {
-    applyRewards(
-      isPremium && masteryTier.plusRewards?.length
-        ? masteryTier.plusRewards
-        : masteryTier.rewards,
-    );
-    summary.masteryTierHit = masteryTier.weeks;
-  }
 
   summary.flyBalanceAfter = user.wardrobe.flies;
   user.markModified('wardrobe');
