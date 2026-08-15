@@ -3,8 +3,7 @@
 import React, { useMemo } from 'react';
 import useSWR from 'swr';
 import { motion } from 'framer-motion';
-import { Moon, Sparkles } from 'lucide-react';
-import { rankByQuestPriority } from '@/lib/quests/priority';
+import { Sparkles } from 'lucide-react';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
@@ -27,7 +26,7 @@ export function questHomeKey() {
 /**
  * The focus-session payoff, rendered inside the colored Done card: the user's
  * frog celebrating, the minutes this session earned, the deep-focus bonus fly,
- * and the focus quests those minutes visibly filled.
+ * and the quests those minutes visibly filled.
  */
 export function FocusCelebration({
   seconds,
@@ -64,24 +63,6 @@ export function FocusCelebration({
     });
     return trackables.slice(0, compact ? 1 : 2);
   }, [data?.trackables, compact]);
-
-  // One quiet reminder for the area that's been waiting longest, so sessions
-  // don't only reinforce the areas already moving.
-  const neglectedArea = useMemo(() => {
-    if (compact) return null;
-    const shownIds = new Set(focusQuests.map((t) => t.id));
-    const candidates = (data?.trackables ?? []).filter(
-      (t) =>
-        t.placement === 'category' &&
-        !t.needsFocusTags &&
-        !!t.categoryName &&
-        !shownIds.has(t.id),
-    );
-    const ranked = rankByQuestPriority(candidates);
-    return (
-      ranked.find(({ result }) => result.reason === 'neglected') ?? null
-    );
-  }, [data?.trackables, focusQuests, compact]);
 
   const focusClaimable = useMemo(
     () =>
@@ -215,27 +196,6 @@ export function FocusCelebration({
             );
           })}
         </div>
-      )}
-
-      {neglectedArea && (
-        <motion.div
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1.1 }}
-          className="mt-3 w-full px-2"
-        >
-          <div className="flex items-center gap-2 rounded-xl bg-black/20 px-3 py-2">
-            <Moon className="h-3.5 w-3.5 shrink-0 text-white/80" />
-            <div className="min-w-0 leading-tight">
-              <p className="truncate text-[11px] font-black text-white">
-                {neglectedArea.item.categoryName} misses you
-              </p>
-              <p className="truncate text-[10px] font-bold text-white/75">
-                {neglectedArea.item.remainingLabel}
-              </p>
-            </div>
-          </div>
-        </motion.div>
       )}
     </div>
   );

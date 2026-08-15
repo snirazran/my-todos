@@ -805,7 +805,7 @@ export function GlobalTimer() {
   }, [isRunning, setPhaseElapsed]);
 
   // Live progress: while a focus phase runs on the owning device, persist
-  // each full unsaved minute so focus quests advance during the session
+  // each full unsaved minute so focus objectives advance during the session
   // instead of only at pause/completion. Checked every 15s against actual
   // elapsed time (an interval counted from resume drifts after pauses and
   // lags the quest bar behind the visible timer). The server subtracts these

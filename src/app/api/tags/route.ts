@@ -338,8 +338,8 @@ export async function DELETE(req: NextRequest) {
       pullQuery.tags = { $in: [id, tagToRemove.name] };
     }
 
-    // A deleted tag must also stop powering area quests, or the quest map
-    // keeps a dead id and the quest looks half-started.
+    // A deleted tag must also stop powering its focus area, or the map keeps
+    // a dead id and the area's pact points at nothing.
     const categoryTagMap = (user as any)?.focusProfile?.categoryTagMap as
       | Array<{ categoryId: string; tagIds?: string[] }>
       | undefined;
@@ -363,7 +363,7 @@ export async function DELETE(req: NextRequest) {
       ),
       // 2. Remove the tag definition from the user
       UserModel.updateOne({ _id: userId }, { $pull: { tags: { id } } }),
-      // 3. Unlink it from any area quest it powered
+      // 3. Unlink it from any focus area it powered
       ...(mapChanged
         ? [
             UserModel.updateOne(

@@ -41,7 +41,6 @@ type Props = {
   doneLabel?: string;
   /** When set, offers a one-tap chip to create/select a tag with this name. */
   suggestedTagName?: string;
-  /** Tags currently connected to the active area quest. */
   /** Show the "connect to focus area" chips when creating a new tag. */
   showFocusConnect?: boolean;
   /**

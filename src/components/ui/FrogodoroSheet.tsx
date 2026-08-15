@@ -14,7 +14,6 @@ import {
   Check,
   ChevronRight,
   Repeat,
-  Scroll,
   Coffee,
 } from 'lucide-react';
 import { motion, AnimatePresence, useDragControls } from 'framer-motion';
@@ -39,9 +38,7 @@ import { useNotificationStatus } from '@/hooks/useNotificationStatus';
 import { hapticImpact, hapticTick } from '@/lib/haptics';
 import { Bell, Volume2, VolumeX, Zap } from 'lucide-react';
 import { useIntros } from '@/hooks/useIntros';
-import { FocusCelebration, questHomeKey } from '@/components/ui/FocusCelebration';
-import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
-import type { Trackable } from '@/lib/questClaims';
+import { FocusCelebration } from '@/components/ui/FocusCelebration';
 import { FocusScene } from '@/components/ui/FocusScene';
 import {
   focusPhaseCatches,
@@ -407,34 +404,6 @@ export default function FrogodoroSheet({
   );
   const addOpenSheet = useFrogodoroUiStore((s) => s.addOpenSheet);
   const removeOpenSheet = useFrogodoroUiStore((s) => s.removeOpenSheet);
-
-  const { data: questHomeData } = useSWR<{ trackables?: Trackable[] }>(
-    open && task ? questHomeKey() : null,
-    bootstrapFetcher,
-    { revalidateOnFocus: false },
-  );
-  // Which area quests this session's focus minutes will fill, matched by the
-  // task's tags against each active area quest's focus tags.
-  const sessionAreas = useMemo(() => {
-    const areaFocus = (questHomeData?.trackables ?? []).filter(
-      (t) =>
-        t.placement === 'category' &&
-        t.objectiveType === 'focus_minutes' &&
-        !t.needsFocusTags &&
-        (t.tags?.length ?? 0) > 0,
-    );
-    if (areaFocus.length === 0) return null;
-    const taskTagIds = new Set(task?.tags ?? []);
-    const matchedNames: string[] = [];
-    for (const t of areaFocus) {
-      const name = t.categoryName;
-      if (!name || matchedNames.includes(name)) continue;
-      if (t.tags!.some((tag) => taskTagIds.has(tag.id))) {
-        matchedNames.push(name);
-      }
-    }
-    return { matchedNames };
-  }, [questHomeData?.trackables, task?.tags]);
 
   const [previewingId, setPreviewingId] = useState<TimerSound | null>(null);
   const {
@@ -1380,35 +1349,6 @@ export default function FrogodoroSheet({
                             </p>
                           </div>
                         )}
-
-                        {/* Session intent — which area quests this focus session
-                            advances (task tags vs area focus tags), shown before
-                            START so picking an area is a conscious choice. */}
-                        {task &&
-                          sessionAreas &&
-                          !timerActive &&
-                          !awaitingDone &&
-                          phase === 'focus' && (
-                            <div className="-mt-2 mb-4 flex justify-center px-6">
-                              {sessionAreas.matchedNames.length > 0 ? (
-                                <span className="flex max-w-full items-center gap-1 rounded-full bg-black/15 px-2.5 py-1 text-[10px] font-bold text-white/80">
-                                  <Scroll className="h-3 w-3 shrink-0 opacity-80" />
-                                  <span className="truncate">
-                                    Counts toward{' '}
-                                    {sessionAreas.matchedNames.join(' · ')}
-                                  </span>
-                                </span>
-                              ) : (
-                                <span className="flex max-w-full items-center gap-1 rounded-full bg-black/10 px-2.5 py-1 text-[10px] font-bold text-white/60">
-                                  <Scroll className="h-3 w-3 shrink-0 opacity-60" />
-                                  <span className="truncate">
-                                    Not linked to an area quest — tag this task to
-                                    link one
-                                  </span>
-                                </span>
-                              )}
-                            </div>
-                          )}
 
                         {/* Mode row. Idle: switchable Focus/Break tabs (pick what
                             to start). Mid-session: locked label of the current

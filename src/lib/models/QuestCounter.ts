@@ -6,7 +6,7 @@ export interface QuestCounterDoc {
   metric: string;
   dateKey: string;
   // Sorted tag ids of the task the event came from, '' when untagged. Rows are
-  // split per tag combination so focus quests can count only their own tags;
+  // split per tag combination so tag-scoped quests count only their own tags;
   // the metric's global total is the sum across all rows for the day.
   tagKey: string;
   tagIds: string[];

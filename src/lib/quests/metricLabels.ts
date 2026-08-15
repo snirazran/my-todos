@@ -73,11 +73,11 @@ export const QUEST_METRIC_COPY: Record<string, MetricCopy> = {
     remaining: (n) => `Equip ${n} more ${n === 1 ? 'skin' : 'skins'}`,
   },
   focus_tag_linked: {
-    adminLabel: 'Area quest started',
+    adminLabel: 'Weekly pacts started',
     label: (n) =>
-      n === 1 ? 'Start an area quest' : `Start ${n} area quests`,
+      n === 1 ? 'Start your weekly pact' : `Start ${n} weekly pacts`,
     remaining: (n) =>
-      n === 1 ? 'Start an area quest' : `Start ${n} more area quests`,
+      n === 1 ? 'Start your weekly pact' : `Start ${n} more weekly pacts`,
   },
   focus_started: {
     adminLabel: 'Focus timers started',
@@ -147,7 +147,7 @@ const METRIC_HINT_COPY: Record<string, string> = {
   task_saved_later: "Use a task's menu to move it to Saved Tasks.",
   skin_equipped: 'Equip a skin on your frog in the Wardrobe.',
   focus_tag_linked:
-    'On the Quests page, tap Start quest on an area quest and pick a tag for it.',
+    'Pick this week’s area on the Quests page and commit to one thing in it.',
   focus_started:
     'Start the focus timer on any task — any length counts.',
   frog_fed_full:

@@ -42,9 +42,9 @@ export function MarketingFocusPreview() {
         </h2>
         <p className="mt-5 max-w-[65ch] text-pretty text-sm font-medium leading-7 text-muted-foreground sm:text-base">
           Choose a task, set the time, and give it your full attention. Every
-          fifteen focused minutes earns your frog another fly, while every minute
-          moves the matching Area Quest closer to its next reward. Your session
-          stays in sync across web and mobile, even if you close the tab.
+          fifteen focused minutes earns your frog another fly, and those minutes
+          fill any daily quest asking for them. Your session stays in sync
+          across web and mobile, even if you close the tab.
         </p>
         <div className="mt-6 flex flex-wrap items-center gap-2 text-[11px] font-black text-muted-foreground">
           <span className="rounded-full border border-border bg-card px-3 py-2">Pick a task</span>

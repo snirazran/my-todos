@@ -370,7 +370,7 @@ function AdminPageContent() {
               description="Wipe every quest, counter, and focus area — onboarding starts over"
               isConfirming={confirmAction === 'refresh-quests'}
               loading={loading === 'refresh-quests'}
-              warningText="Warning: This deletes all onboarding, daily and area quest progress, every quest counter, your focus areas and their tag links. Click again to confirm."
+              warningText="Warning: This deletes all onboarding and daily quest progress, every quest counter, your focus areas and their tag links. Click again to confirm."
               onClick={handleRefreshQuests}
             />
             <ConfirmActionRow

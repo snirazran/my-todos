@@ -245,8 +245,7 @@ const GUIDES: Record<string, HintGuide> = {
   },
   // No href: the "This week" card sits on both surfaces a quest hint can be
   // opened from (home and quests), so the coach rings it where the user
-  // already is instead of bouncing them to another page. The selector falls
-  // back to the pre-pact anchors for accounts with the pact turned off.
+  // already is instead of bouncing them to another page.
   // The sessions already exist on the list, so there is nothing to create —
   // the guide just points at the ones carrying this pact's area tag.
   'pact-session': {
@@ -268,24 +267,7 @@ const GUIDES: Record<string, HintGuide> = {
     steps: [
       {
         anchor: 'pact-pick-area',
-        selector:
-          '[data-hint="pact-pick-area"], [data-hint="start-focus-quest"], [data-area-unlock-anchor]',
         label: 'Pick the one area you want this week',
-        timeoutMs: 30_000,
-      },
-    ],
-  },
-  // Anchor lives on the hero card's Start button, the area chooser grid, or
-  // (still locked) the unlock teaser — whichever the quests page is showing.
-  'start-focus-quest': {
-    id: 'start-focus-quest',
-    steps: [
-      {
-        href: '/quests',
-        anchor: 'start-focus-quest',
-        selector:
-          '[data-hint="start-focus-quest"], [data-area-unlock-anchor]',
-        label: 'Start an area quest — pick your life area',
         timeoutMs: 30_000,
       },
     ],

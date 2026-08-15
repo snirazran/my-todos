@@ -254,7 +254,7 @@ export async function commitPact(
   });
 
   // Committing a pact links the area's tag, which is exactly what the
-  // "Start an area quest" onboarding step is waiting for.
+  // "Start your weekly pact" onboarding step is waiting for.
   try {
     const { bumpQuestMetric } = await import('@/lib/quests/metrics');
     await bumpQuestMetric({ userId, metric: 'focus_tag_linked', timezone });

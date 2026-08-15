@@ -30,7 +30,7 @@ export type Claimable = {
   questId?: string;
   objectiveId?: string;
   kind: 'objective' | 'season';
-  placement?: 'daily' | 'category' | 'onboarding';
+  placement?: 'daily' | 'onboarding';
   categoryName?: string;
   objectiveLabel?: string;
   tags?: ObjectiveTagChip[];
@@ -44,7 +44,7 @@ export type Claimable = {
 export type Trackable = {
   id: string;
   questId?: string;
-  placement: 'daily' | 'category' | 'onboarding';
+  placement: 'daily' | 'onboarding';
   categoryId?: string;
   categoryName?: string;
   objectiveLabel: string;
@@ -668,18 +668,14 @@ export function ObjectiveProgressBar({
 
 function toastTitle(c: Claimable): string {
   if (c.kind === 'season') return 'Season reward ready';
-  if (c.placement === 'category') {
-    return `${c.categoryName ?? 'Focus'} objective complete`;
-  }
   if (c.placement === 'onboarding') return 'Starter objective complete';
   return 'Daily objective complete';
 }
 
 export function trackableEyebrow(t: {
-  placement: 'daily' | 'category' | 'onboarding';
+  placement: 'daily' | 'onboarding';
   categoryName?: string;
 }): string {
-  if (t.placement === 'category') return t.categoryName ?? 'Focus quest';
   if (t.placement === 'onboarding') return 'Getting started';
   return 'Daily quest';
 }

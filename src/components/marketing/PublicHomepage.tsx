@@ -9,7 +9,7 @@ import Fly from '@/components/ui/fly';
 import { MarketingFrogHero } from '@/components/marketing/MarketingFrogHero';
 import { MarketingFocusPreview } from '@/components/marketing/MarketingFocusPreview';
 import { MarketingPlannerPreview } from '@/components/marketing/MarketingPlannerPreview';
-import { MarketingQuestPreview } from '@/components/marketing/MarketingQuestPreview';
+import { MarketingPactPreview } from '@/components/marketing/MarketingPactPreview';
 import { MarketingWardrobePreview } from '@/components/marketing/MarketingWardrobePreview';
 
 const supportingFeatures = [
@@ -253,20 +253,21 @@ export function PublicHomepage() {
           <div className="mt-20 grid items-center gap-10 lg:mt-28 lg:grid-cols-[0.8fr_1.2fr] lg:gap-14">
             <div>
               <p className="text-xs font-black uppercase tracking-[0.2em] text-primary">
-                Rewards built around your priorities
+                One promise a week
               </p>
               <h2 className="mt-3 text-balance text-3xl font-black tracking-tight sm:text-5xl">
                 Grow the parts of life you care about.
               </h2>
               <p className="mt-4 max-w-[65ch] text-pretty text-sm font-medium leading-7 text-muted-foreground sm:text-base">
-                Choose the Areas you want to move forward—like work, fitness,
-                mindfulness, or home. Each one gets its own quest. The tasks
-                and focused minutes improving your life fill objectives and
-                unlock rewards as you go.
+                Pick one area for the week—work, fitness, mindfulness, or
+                home—and say what you&apos;ll actually do in it. We put those
+                sessions on your days at the time you choose, so the promise
+                shows up as real tasks. Finish them all and the week pays out.
+                Keep the streak and every week after pays more.
               </p>
             </div>
 
-            <MarketingQuestPreview />
+            <MarketingPactPreview />
           </div>
         </div>
       </section>
