@@ -59,6 +59,8 @@ export type PactWeekResult = {
   target: number;
   streakBefore: number;
   streakAfter: number;
+  /** The week finished the ladder: it paid the top rate, and the climb resets. */
+  lapCompleted?: boolean;
   /** Flies granted at settlement, for a week finished but never claimed. */
   fliesGranted: number;
   shieldsLeft: number;
@@ -68,6 +70,8 @@ export type PactWeekResult = {
 export type PactStreakMultiplier = {
   weeks: number;
   multiplier: number;
+  /** The gift a week pays at this rate. Falls back to `completionRewards`. */
+  rewards?: QuestRewards;
 };
 
 /** Legacy lump-payout tracks. Retired in payout v3; nothing reads them. */
@@ -192,8 +196,10 @@ export type PactStatus = 'active' | 'kept' | 'missed' | 'skipped';
  * 2/4/8/12 ladder — there is always another one to accelerate toward.
  */
 export type PactLadderRung = {
+  /** 0 is the base rung — the rate a week pays with no streak behind it. */
   weeks: number;
   multiplier: number;
+  rewards: QuestRewards;
   reached: boolean;
 };
 
@@ -213,6 +219,8 @@ export type PactLadderView = {
 export type PactStreakView = {
   weeks: number;
   best: number;
+  /** Full climbs completed. The ladder resets at the top, so this is the tally. */
+  laps: number;
   shields: number;
   /** Most shields that can be held at once. Small on purpose. */
   shieldCap: number;

@@ -79,7 +79,7 @@ export function PactAreaPanel() {
       <div className="-mx-1.5 mt-1 md:-mx-4">
         <PactCard variant="panel" />
       </div>
-      <div className="mx-1.5 md:mx-4">
+      <div className="-mx-1.5 md:-mx-4">
         <PactStreakLadder />
       </div>
     </div>

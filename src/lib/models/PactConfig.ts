@@ -79,11 +79,30 @@ export const DEFAULT_PACT_MILESTONE_REWARDS: QuestRewards = [
 // keeps the climb short enough that a broken streak still looks recoverable.
 // A clean 12-week run pays ~1,748 flies on a 2-session week, which is where the
 // retired lump ladder landed — this is a re-shaping of the faucet, not a cut.
+// The gift climbs with the rate, so one rung is one promise: keep the streak
+// and the week pays more flies AND a better box. Rarity is the app's own
+// colour language, which is why a rung can be read before it is parsed.
 export const DEFAULT_PACT_STREAK_MULTIPLIERS: PactStreakMultiplier[] = [
-  { weeks: 2, multiplier: 2 },
-  { weeks: 4, multiplier: 3 },
-  { weeks: 8, multiplier: 4 },
-  { weeks: 12, multiplier: 5 },
+  {
+    weeks: 2,
+    multiplier: 2,
+    rewards: [{ type: 'BOX', itemId: 'gift_box_rare' }],
+  },
+  {
+    weeks: 4,
+    multiplier: 3,
+    rewards: [{ type: 'BOX', itemId: 'gift_box_rare' }],
+  },
+  {
+    weeks: 8,
+    multiplier: 4,
+    rewards: [{ type: 'BOX', itemId: 'gift_box_rare' }],
+  },
+  {
+    weeks: 12,
+    multiplier: 5,
+    rewards: [{ type: 'BOX', itemId: 'gift_box_legendary' }],
+  },
 ];
 
 /** @deprecated Retired in payout v3 — the streak multiplies the week instead. */

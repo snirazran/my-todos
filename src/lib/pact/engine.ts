@@ -28,6 +28,7 @@ import {
 import { getFullCatalog } from '@/lib/skins/getCatalog';
 import { applyPactRewards, applyPactSessionFlies } from './grant';
 import type { UserDoc } from '@/lib/types/UserDoc';
+import type { QuestRewards } from '@/lib/quests/types';
 import {
   DEFAULT_PACT_START_TIME,
   MAX_OPTIONS,
@@ -36,6 +37,7 @@ import {
   type ActivePactView,
   type PactAreaChoice,
   type PactLadderView,
+  type PactStreakMultiplier,
   type PactOption,
   type PactStreakView,
   type PactSuggestion,
@@ -66,6 +68,8 @@ const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 export type PactStreakState = {
   weeks: number;
   best: number;
+  /** Times the ladder has been climbed end to end. Survives the lap reset. */
+  laps: number;
   lastKeptWeek: string;
   shields: number;
   /** Week key of the last week a shield rescued, for the back-to-back guard. */
@@ -90,6 +94,7 @@ export type PactStreakState = {
 const EMPTY_STREAK: PactStreakState = {
   weeks: 0,
   best: 0,
+  laps: 0,
   lastKeptWeek: '',
   shields: 0,
   shieldRescueWeek: '',
@@ -109,6 +114,7 @@ export function normalizePactStreak(user: Partial<UserDoc> | null): PactStreakSt
   return {
     weeks: Math.max(0, Number(raw.weeks) || 0),
     best: Math.max(0, Number(raw.best) || 0),
+    laps: Math.max(0, Number(raw.laps) || 0),
     lastKeptWeek: typeof raw.lastKeptWeek === 'string' ? raw.lastKeptWeek : '',
     shields: Math.max(0, Number(raw.shields) || 0),
     shieldRescueWeek:
@@ -193,6 +199,19 @@ export async function ensurePactConfig(): Promise<PactConfigDoc> {
     }
     if (!existing.streakMultipliers?.length) {
       backfill.streakMultipliers = DEFAULT_PACT_STREAK_MULTIPLIERS;
+    } else if (existing.streakMultipliers.some((r) => !r.rewards?.length)) {
+      // Rungs seeded before gifts climbed with the rate. Weeks and multipliers
+      // an admin tuned are kept; only the missing gift is filled in.
+      backfill.streakMultipliers = existing.streakMultipliers.map(
+        (rung, index) => ({
+          ...rung,
+          rewards: rung.rewards?.length
+            ? rung.rewards
+            : (DEFAULT_PACT_STREAK_MULTIPLIERS[
+                Math.min(index, DEFAULT_PACT_STREAK_MULTIPLIERS.length - 1)
+              ].rewards ?? []),
+        }),
+      );
     }
     if (typeof existing.shieldCapFree !== 'number') backfill.shieldCapFree = 1;
     if (typeof existing.shieldCapPlus !== 'number') backfill.shieldCapPlus = 2;
@@ -268,20 +287,42 @@ export function pactComebackFlies(config: PactConfigDoc) {
  * the week that takes a run to two weeks is already paid at the two-week rate.
  * Anything below the first rung pays flat.
  */
+function pactRungFor(config: PactConfigDoc, streakWeeks: number) {
+  const rungs = [...(config.streakMultipliers ?? [])].sort(
+    (a, b) => a.weeks - b.weeks,
+  );
+  let reached: PactStreakMultiplier | null = null;
+  for (const rung of rungs) {
+    if (streakWeeks >= rung.weeks) reached = rung;
+  }
+  return reached;
+}
+
 export function pactStreakMultiplier(
   config: PactConfigDoc,
   streakWeeks: number,
 ) {
-  const rungs = [...(config.streakMultipliers ?? [])].sort(
-    (a, b) => a.weeks - b.weeks,
+  const rung = pactRungFor(config, streakWeeks);
+  return Math.max(1, Number(rung?.multiplier) || 1);
+}
+
+/** Weeks on the last rung — the length of one full climb. 0 = no ladder. */
+export function pactTopRungWeeks(config: PactConfigDoc) {
+  return (config.streakMultipliers ?? []).reduce(
+    (max, rung) => Math.max(max, Number(rung.weeks) || 0),
+    0,
   );
-  let multiplier = 1;
-  for (const rung of rungs) {
-    if (streakWeeks >= rung.weeks) {
-      multiplier = Math.max(1, Number(rung.multiplier) || 1);
-    }
-  }
-  return multiplier;
+}
+
+/** The gift a week at this position pays. Below the first rung, the base one. */
+export function pactStreakRewards(
+  config: PactConfigDoc,
+  streakWeeks: number,
+): QuestRewards {
+  const rung = pactRungFor(config, streakWeeks);
+  return rung?.rewards?.length
+    ? rung.rewards
+    : (config.completionRewards ?? []);
 }
 
 /**
@@ -721,6 +762,21 @@ export async function settleFinishedWeeks(args: {
     }
     const grantedThisWeek = autoGrantedFlies - grantedBefore;
 
+    // Finishing the ladder is a lap, not a plateau. Holding the top rate
+    // forever turns a twelve-week streak into permanent multiplied income —
+    // the strongest faucet in the app, paid to a player who has already proved
+    // the habit. The top rung pays its legendary box, then the climb restarts.
+    // Deliberately after the payout: the week that completes the ladder is
+    // still paid at the top rate it earned.
+    const topRungWeeks = pactTopRungWeeks(args.config);
+    const streakReached = next.weeks;
+    const lapCompleted =
+      survives && topRungWeeks > 0 && streakReached >= topRungWeeks;
+    if (lapCompleted) {
+      next.laps += 1;
+      next.weeks = 0;
+    }
+
     pact.progress = progress;
     pact.status = kept ? 'kept' : usedShield ? 'kept' : 'missed';
     pact.shieldUsed = usedShield;
@@ -743,7 +799,10 @@ export async function settleFinishedWeeks(args: {
       progress,
       target: pact.target,
       streakBefore,
-      streakAfter: next.weeks,
+      // The number the week actually reached, not the post-lap zero — a
+      // completed ladder shown as "11 → 0" reads as a broken streak.
+      streakAfter: streakReached,
+      lapCompleted,
       fliesGranted: grantedThisWeek,
       shieldsLeft: next.shields,
     };
@@ -773,13 +832,27 @@ function ladderFor(args: {
 }): PactLadderView {
   const { config, streak, weekStreakNumber } = args;
   return {
-    rungs: [...(config.streakMultipliers ?? [])]
-      .sort((a, b) => a.weeks - b.weeks)
-      .map((rung) => ({
-        weeks: rung.weeks,
-        multiplier: Math.max(1, Number(rung.multiplier) || 1),
-        reached: streak.weeks >= rung.weeks,
-      })),
+    // The base rate leads the ladder as a real rung: a week with no streak
+    // behind it still pays, and a ladder that opens at "nothing" is a ladder
+    // nobody is standing on.
+    rungs: [
+      {
+        weeks: 0,
+        multiplier: 1,
+        rewards: config.completionRewards ?? [],
+        reached: true,
+      },
+      ...[...(config.streakMultipliers ?? [])]
+        .sort((a, b) => a.weeks - b.weeks)
+        .map((rung) => ({
+          weeks: rung.weeks,
+          multiplier: Math.max(1, Number(rung.multiplier) || 1),
+          rewards: rung.rewards?.length
+            ? rung.rewards
+            : (config.completionRewards ?? []),
+          reached: streak.weeks >= rung.weeks,
+        })),
+    ],
     multiplier: pactStreakMultiplier(config, weekStreakNumber),
   };
 }
@@ -1034,6 +1107,7 @@ export async function getPactView(args: {
   const streakView: PactStreakView = {
     weeks: streak.weeks,
     best: streak.best,
+    laps: streak.laps,
     shields: streak.shields,
     shieldCap,
     shieldPriceFlies,
@@ -1086,6 +1160,7 @@ export async function getPactView(args: {
     ladder: ladderFor({ config, streak, weekStreakNumber: streak.weeks + 1 }),
     rewardCatalog: buildRewardCatalog(await getFullCatalog(), [
       config.completionRewards ?? [],
+      ...(config.streakMultipliers ?? []).map((rung) => rung.rewards ?? []),
     ]),
   };
 }

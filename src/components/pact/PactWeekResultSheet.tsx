@@ -93,18 +93,25 @@ export function PactWeekResultSheet({
                 Last week · {result.categoryName}
               </p>
               <h2 className="mt-1.5 text-[21px] font-black leading-tight text-foreground">
-                {kept
-                  ? 'You kept your word'
-                  : rescued
-                    ? 'A shield saved your streak'
-                    : 'That week got away'}
+                {result.lapCompleted
+                  ? 'You finished the whole ladder'
+                  : kept
+                    ? 'You kept your word'
+                    : rescued
+                      ? 'A shield saved your streak'
+                      : 'That week got away'}
               </h2>
+              {/* A lap has to explain itself here or nowhere: the streak the
+                  user is about to see is zero, and without this screen that
+                  reads as the thing they were trying to avoid. */}
               <p className="mx-auto mt-1.5 max-w-[34ch] text-[13.5px] font-semibold leading-snug text-muted-foreground">
-                {kept
-                  ? `All ${result.target} session${result.target === 1 ? '' : 's'} done.`
-                  : rescued
-                    ? `You finished ${result.progress} of ${result.target}. A shield covered the rest, so the streak stands.`
-                    : `You finished ${result.progress} of ${result.target}. Sessions you did still paid — the week bonus needed all of them.`}
+                {result.lapCompleted
+                  ? `${result.streakAfter} weeks straight, paid at the top rate. The climb starts again from ×1 — your best gift is at the top.`
+                  : kept
+                    ? `All ${result.target} session${result.target === 1 ? '' : 's'} done.`
+                    : rescued
+                      ? `You finished ${result.progress} of ${result.target}. A shield covered the rest, so the streak stands.`
+                      : `You finished ${result.progress} of ${result.target}. Sessions you did still paid — the week bonus needed all of them.`}
               </p>
             </div>
           </div>

@@ -106,6 +106,7 @@ export async function PUT(req: NextRequest) {
         .map((rung: any) => ({
           weeks: clampInt(rung?.weeks, 1, 104, 2),
           multiplier: clampInt(rung?.multiplier, 1, 20, 1),
+          rewards: Array.isArray(rung?.rewards) ? rung.rewards : [],
         }))
         .sort((a: any, b: any) => a.weeks - b.weeks);
     }

@@ -5,6 +5,7 @@ import {
   pactComebackFlies,
   pactSessionFlies,
   pactStreakMultiplier,
+  pactStreakRewards,
   pactWeekBonusFlies,
 } from './engine';
 
@@ -127,7 +128,7 @@ export function applyPactRewards(args: {
   };
 
   applyRewards([{ type: 'FLIES', amount: pactWeekBonusFlies(config) }]);
-  applyRewards(config.completionRewards);
+  applyRewards(pactStreakRewards(config, streakWeeks));
 
   summary.flyBalanceAfter = user.wardrobe.flies;
   user.markModified('wardrobe');
