@@ -239,12 +239,20 @@ export async function ensurePactConfig(): Promise<PactConfigDoc> {
     // v3 retires the lump tracks. Cleared rather than merely ignored, so the
     // admin screen and the database agree about what is no longer paid. Rates
     // an admin tuned under v2 are left exactly as they are.
-    if (version < PACT_PAYOUT_VERSION) {
-      backfill.payoutVersion = PACT_PAYOUT_VERSION;
+    if (version < 3) {
       backfill.streakTiers = [];
       backfill.masteryTiers = [];
       backfill.milestoneEveryWeeks = 0;
       backfill.milestoneRewards = [];
+    }
+    // v4 reshapes the ladder itself, so a doc still carrying the v3 rungs has
+    // to be re-seeded rather than backfilled — the old rungs are present and
+    // valid, they are simply the wrong curve.
+    if (version < 4) {
+      backfill.streakMultipliers = DEFAULT_PACT_STREAK_MULTIPLIERS;
+    }
+    if (version < PACT_PAYOUT_VERSION) {
+      backfill.payoutVersion = PACT_PAYOUT_VERSION;
     }
     if (Object.keys(backfill).length === 0) return existing;
     await PactConfigModel.updateOne(

@@ -52,8 +52,12 @@ export const PACT_CONFIG_ID = 'weekly-pact';
  * area mastery and a gift every other week were four rewards on three clocks,
  * none of which could be read off the card the user was looking at. The streak
  * now multiplies the week instead, so there is one rule and one number.
+ *
+ * v4 caps the ladder at x4 over three rungs. v3's four-rung x5 ladder averaged
+ * x3.17 and pushed a kept 3-session week to 53.5 flies/day all-in, past the
+ * economy doc's tighten-above-50 line.
  */
-export const PACT_PAYOUT_VERSION = 3;
+export const PACT_PAYOUT_VERSION = 4;
 
 export const PACT_V2_PAYOUT = {
   fliesPerCompletion: 7,
@@ -75,13 +79,19 @@ export const DEFAULT_PACT_MILESTONE_REWARDS: QuestRewards = [
 ];
 
 // Whole numbers on purpose: "your weeks pay x3" needs no arithmetic to act on,
-// where "+50% after the first two" needs a calculator and a base. Four rungs
-// keeps the climb short enough that a broken streak still looks recoverable.
-// A clean 12-week run pays ~1,748 flies on a 2-session week, which is where the
-// retired lump ladder landed — this is a re-shaping of the faucet, not a cut.
-// The gift climbs with the rate, so one rung is one promise: keep the streak
-// and the week pays more flies AND a better box. Rarity is the app's own
-// colour language, which is why a rung can be read before it is parsed.
+// where "+50% after the first two" needs a calculator and a base. The gift
+// climbs with the rate, so one rung is one promise: keep the streak and the
+// week pays more flies AND a better box. Rarity is the app's own colour
+// language, which is why a rung can be read before it is parsed.
+//
+// Three rungs, not four. Topping out at x5 averaged x3.17 across the lap and
+// put a kept 3-session week at 53.5 flies/day all-in — past the economy doc's
+// "over 50 and tighten" line. Capping at x4 could not simply relabel the old
+// x4 rung, or two stops would pay the same; one rung had to go and the rest
+// re-space. Averaging x2.58 lands the same player at 49.1.
+//
+// The first rung stays at 2 weeks. Moving it to 3 saved only 0.7 flies/day and
+// cost the early win that is the whole reason anyone starts a second week.
 export const DEFAULT_PACT_STREAK_MULTIPLIERS: PactStreakMultiplier[] = [
   {
     weeks: 2,
@@ -89,18 +99,13 @@ export const DEFAULT_PACT_STREAK_MULTIPLIERS: PactStreakMultiplier[] = [
     rewards: [{ type: 'BOX', itemId: 'gift_box_rare' }],
   },
   {
-    weeks: 4,
+    weeks: 6,
     multiplier: 3,
     rewards: [{ type: 'BOX', itemId: 'gift_box_rare' }],
   },
   {
-    weeks: 8,
-    multiplier: 4,
-    rewards: [{ type: 'BOX', itemId: 'gift_box_rare' }],
-  },
-  {
     weeks: 12,
-    multiplier: 5,
+    multiplier: 4,
     rewards: [{ type: 'BOX', itemId: 'gift_box_legendary' }],
   },
 ];
