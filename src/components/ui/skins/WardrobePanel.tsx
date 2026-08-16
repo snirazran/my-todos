@@ -1998,6 +1998,7 @@ function WardrobeManagerContent({
                   isPremium={!!data.isPremium}
                   balance={balance}
                   onGetFlies={(shortBy) => openFlyShop(shortBy)}
+                  onUpgrade={() => openPlus('trade_perks')}
                   onGoToShop={() => {
                     setActiveTab('shop');
                     scrollPageToTop();

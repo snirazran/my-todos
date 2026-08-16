@@ -53,6 +53,7 @@ import Fly from '@/components/ui/fly';
 import { Button } from '@/components/ui/button';
 import confetti from 'canvas-confetti';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
+import { Icon as AppIcon } from '@/components/ui/Icon';
 import { ItemCard } from './ItemCard';
 
 // Import from gift-box for the reward UI
@@ -190,6 +191,7 @@ type TradePanelProps = {
   balance?: number;
   onGoToShop?: () => void;
   onGetFlies?: (shortBy: number) => void;
+  onUpgrade?: () => void;
 };
 
 type TradePrize = ItemDef & { kind?: 'item' | 'background'; imageUrl?: string };
@@ -209,6 +211,7 @@ export function TradePanel({
   balance = 0,
   onGoToShop,
   onGetFlies,
+  onUpgrade,
 }: TradePanelProps) {
   // --- State ---
   const modifiers = useTradeConfig();
@@ -245,6 +248,8 @@ export function TradePanel({
   const groupRefs = useRef(new Map<Rarity, HTMLElement>());
   const slotRefs = useRef(new Map<string, HTMLElement>());
   const dockAnchorRef = useRef<HTMLDivElement | null>(null);
+  const dockRef = useRef<HTMLDivElement | null>(null);
+  const [dockHeight, setDockHeight] = useState(0);
   const [flights, setFlights] = useState<Flight[]>([]);
   const flightSeq = useRef(0);
 
@@ -904,6 +909,40 @@ export function TradePanel({
     };
   })();
 
+  // What Plus would change about *this* contract, quoted from the same helpers
+  // the trade itself uses — so the pitch can never promise a perk the recipe
+  // doesn't actually grant.
+  const plusPerk = useMemo(() => {
+    if (isPremium || !recipe || !onUpgrade) return null;
+    const withPlus = quoteTradeFuel({
+      modifiers,
+      recipe,
+      allSpares,
+      isPlus: true,
+    });
+    const saved = fuelQuote.count - withPlus.count;
+    if (saved > 0 && recipe.fuelRarity) {
+      return `Plus skips ${countOf(saved, recipe.fuelRarity)} here`;
+    }
+    const plusAim = quoteAimPrice({ modifiers, recipe, isPlus: true });
+    if (canAim && plusAim.price < aimQuote.price) {
+      return `Plus takes ${modifiers.aimPlusDiscountPercent}% off Aim`;
+    }
+    if (modifiers.wishlistSlotsPlus > modifiers.wishlistSlotsFree) {
+      return `Plus saves ${modifiers.wishlistSlotsPlus} wishlist picks to aim at`;
+    }
+    return null;
+  }, [
+    isPremium,
+    recipe,
+    onUpgrade,
+    modifiers,
+    allSpares,
+    fuelQuote.count,
+    canAim,
+    aimQuote.price,
+  ]);
+
   const aimTarget = !nextRarity
     ? ''
     : wishlistHits === 1
@@ -937,32 +976,87 @@ export function TradePanel({
     root.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
   };
 
+  // Always the tier the contract is asking for right now — never the top of
+  // the grid, which sorts the lower-rarity extras *above* the target tier and
+  // so would jump straight past the items still being collected.
+  const scrollToRarity = (rarity: Rarity | null) => {
+    if (!rarity) return;
+    requestAnimationFrame(() =>
+      scrollGridTo(groupRefs.current.get(rarity) ?? gridTopRef.current),
+    );
+  };
+
   const prevScopeKey = useRef('');
   useEffect(() => {
     const key = gridScope ? Array.from(gridScope).join(',') : '';
-    if (key && key !== prevScopeKey.current) {
-      const frame = requestAnimationFrame(() =>
-        scrollGridTo(gridTopRef.current),
-      );
-      prevScopeKey.current = key;
-      return () => cancelAnimationFrame(frame);
+    if (key && key !== prevScopeKey.current && !mainFilled) {
+      scrollToRarity(targetRarity);
     }
     prevScopeKey.current = key;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gridScope]);
 
+  // Only once the main slots are done does the extras tier become the thing to
+  // find, so the jump waits for that edge rather than firing on the first pick.
   const needsExtras = mainFilled && !!fuelRarity && !fuelFilled;
   const prevNeedsExtras = useRef(false);
   useEffect(() => {
-    if (needsExtras && !prevNeedsExtras.current && fuelRarity) {
-      const target = groupRefs.current.get(fuelRarity) ?? gridTopRef.current;
-      const frame = requestAnimationFrame(() => scrollGridTo(target));
-      prevNeedsExtras.current = needsExtras;
-      return () => cancelAnimationFrame(frame);
-    }
+    if (needsExtras && !prevNeedsExtras.current) scrollToRarity(fuelRarity);
     prevNeedsExtras.current = needsExtras;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [needsExtras, fuelRarity]);
+
+  // Scrolling means the player has gone back to browsing, and the open stage
+  // leaves them reading the grid through a slit. Collapsing to the peek bar
+  // hands the screen back — the bar still carries progress, count and the CTA,
+  // and picks keep landing in it.
+  useEffect(() => {
+    if (isLarge || !isContractExpanded) return;
+    const root =
+      (gridTopRef.current && scrollableAncestor(gridTopRef.current)) ??
+      document.getElementById('main-scroll');
+    if (!root) return;
+
+    // `scroll` was the wrong signal: opening the stage repads the grid, and at
+    // the bottom of the list the browser re-clamps scrollTop and fires one —
+    // closing the sheet on the very tap that opened it. Wheel and touch are
+    // real gestures that no reflow can produce.
+    const collapse = () => setIsContractExpanded(false);
+    let touchY = 0;
+    const onTouchStart = (event: TouchEvent) => {
+      touchY = event.touches[0]?.clientY ?? 0;
+    };
+    const onTouchMove = (event: TouchEvent) => {
+      const y = event.touches[0]?.clientY ?? 0;
+      if (Math.abs(y - touchY) > 24) collapse();
+    };
+
+    root.addEventListener('wheel', collapse, { passive: true });
+    root.addEventListener('touchstart', onTouchStart, { passive: true });
+    root.addEventListener('touchmove', onTouchMove, { passive: true });
+    return () => {
+      root.removeEventListener('wheel', collapse);
+      root.removeEventListener('touchstart', onTouchStart);
+      root.removeEventListener('touchmove', onTouchMove);
+    };
+  }, [isLarge, isContractExpanded]);
+
+  // The dock grows a lot when the stage opens, so a fixed bottom padding left
+  // the last rows permanently trapped beneath it. The grid reserves exactly as
+  // much room as the dock currently occupies.
+  useEffect(() => {
+    const node = dockRef.current;
+    if (!node || isLarge) {
+      setDockHeight(0);
+      return;
+    }
+    const observer = new ResizeObserver(([entry]) =>
+      setDockHeight(entry.contentRect.height),
+    );
+    observer.observe(node);
+    setDockHeight(node.getBoundingClientRect().height);
+    return () => observer.disconnect();
+  }, [isLarge, mounted, isContractExpanded]);
 
   const inFlightSlots = new Set(flights.map((flight) => flight.slotKey));
 
@@ -1217,36 +1311,44 @@ export function TradePanel({
               </button>
             )}
 
+            {recipe?.fuelRarity && targetRarity && (
+              <div className="mb-1.5 flex items-center justify-between gap-2">
+                <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+                  Needs{' '}
+                  <span className="text-foreground">
+                    {countOf(slotCount, targetRarity)}
+                  </span>
+                  {(fuelQuote.count || fuelQuote.baseCount) > 0 && (
+                    <>
+                      {' + '}
+                      <span className="text-foreground">
+                        {countOf(
+                          fuelQuote.count || fuelQuote.baseCount,
+                          recipe.fuelRarity,
+                        )}
+                      </span>
+                    </>
+                  )}
+                </span>
+                {fuelQuote.waived > 0 && (
+                  <span className="flex flex-wrap items-center justify-end gap-1">
+                    {fuelQuote.allSparesWaived > 0 && (
+                      <WaiverChip>All spares −{fuelQuote.allSparesWaived}</WaiverChip>
+                    )}
+                    {fuelQuote.plusWaived > 0 && (
+                      <WaiverChip>Plus −{fuelQuote.plusWaived}</WaiverChip>
+                    )}
+                  </span>
+                )}
+              </div>
+            )}
+
             <div className="mb-2 lg:mb-3">
-              {recipe?.fuelRarity && targetRarity && (
-                <p className="mb-1.5 text-[10px] font-black uppercase tracking-wider text-muted-foreground">
-                  Needs · {countOf(slotCount, targetRarity)}
-                </p>
-              )}
               {renderSlotGrid(selectedIds, slotCount, handleRemove, 'main')}
             </div>
 
             {recipe?.fuelRarity && (
               <div className="mb-2 lg:mb-3">
-                <div className="mb-1.5 flex items-center justify-between gap-2">
-                  <span className="flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-muted-foreground">
-                    Also needs ·{' '}
-                    {countOf(
-                      fuelQuote.count || fuelQuote.baseCount,
-                      recipe.fuelRarity,
-                    )}
-                  </span>
-                  {fuelQuote.waived > 0 && (
-                    <span className="flex flex-wrap items-center justify-end gap-1">
-                      {fuelQuote.allSparesWaived > 0 && (
-                        <WaiverChip>All spares −{fuelQuote.allSparesWaived}</WaiverChip>
-                      )}
-                      {fuelQuote.plusWaived > 0 && (
-                        <WaiverChip>Plus −{fuelQuote.plusWaived}</WaiverChip>
-                      )}
-                    </span>
-                  )}
-                </div>
                 {fuelQuote.count > 0 ? (
                   renderSlotGrid(fuelIds, fuelQuote.count, handleRemoveFuel, 'fuel')
                 ) : (
@@ -1313,6 +1415,30 @@ export function TradePanel({
               </button>
             )}
 
+            {plusPerk && (
+              <button
+                type="button"
+                onClick={() => {
+                  hapticSelect();
+                  onUpgrade?.();
+                }}
+                className="group mb-2 flex w-full items-center gap-2 rounded-xl px-1.5 py-1.5 text-left transition-colors hover:bg-amber-500/10"
+              >
+                <AppIcon
+                  name="frogPlus"
+                  label="Plus"
+                  className="h-6 w-6 shrink-0"
+                />
+                <span className="min-w-0 flex-1 truncate text-[11px] font-bold text-muted-foreground transition-colors group-hover:text-amber-700 dark:group-hover:text-amber-400">
+                  {plusPerk}
+                </span>
+                <ChevronDown
+                  size={14}
+                  className="-rotate-90 shrink-0 text-muted-foreground/50"
+                />
+              </button>
+            )}
+
             {error && (
               <div className="flex items-center justify-center gap-2 mb-2 text-xs font-bold text-destructive">
                 <AlertCircle size={14} /> {error}
@@ -1348,7 +1474,10 @@ export function TradePanel({
   // frog hero in the page's stacking order, so no local z-index can lift it
   // over the frog. Portalling it to the body puts it in the root context.
   const dockNode = (
-    <div className="lg:hidden fixed bottom-[calc(76px+env(safe-area-inset-bottom))] md:bottom-0 left-0 w-full z-[60] max-h-[82svh] overflow-y-auto bg-card border-t border-border shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.1)] flex flex-col">
+    <div
+      ref={dockRef}
+      className="lg:hidden fixed bottom-[calc(76px+env(safe-area-inset-bottom))] md:bottom-0 left-0 w-full z-[60] max-h-[72svh] overflow-y-auto bg-card border-t border-border shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.1)] flex flex-col"
+    >
       {renderContract(false)}
     </div>
   );
@@ -1524,6 +1653,9 @@ export function TradePanel({
 
         <div
           ref={gridTopRef}
+          style={
+            dockHeight > 0 ? { paddingBottom: dockHeight + 24 } : undefined
+          }
           className={cn(
             pageScroll
               ? '-mx-4 rounded-none border border-x-0 border-border/40 bg-muted/40 p-3 pb-52 md:mx-0 md:rounded-[20px] md:border-x md:px-4 md:pt-4 lg:rounded-none lg:border-0 lg:bg-transparent lg:p-4'
