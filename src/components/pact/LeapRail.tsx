@@ -138,8 +138,12 @@ function Pad({ stop }: { stop: LeapStop }) {
         // that reads as light against a dark card washes out to nothing against
         // a white one, where the halo has to be DARKER than the surface to be
         // seen at all.
+        // Softer on dark than on light. Against a dark card the neighbouring
+        // pads are already dimmed, so contrast is doing most of the work and
+        // the halo only has to confirm it; against white nothing else separates
+        // the target, so the glow has to carry it alone.
         next &&
-          'drop-shadow-[0_0_5px_rgba(202,138,4,0.9)] dark:drop-shadow-[0_0_6px_rgba(245,179,1,0.95)]',
+          'drop-shadow-[0_0_5px_rgba(202,138,4,0.9)] dark:drop-shadow-[0_0_4px_rgba(245,179,1,0.5)]',
       )}
     />
   );
