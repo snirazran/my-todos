@@ -28,7 +28,6 @@ type DbItem = {
   riveIndex: number;
   rarity: string;
   priceFlies: number;
-  sellFlies?: number | null;
   availableFrom?: string | null;
   availableUntil?: string | null;
   hidden?: boolean;
@@ -59,10 +58,9 @@ export function AdminCosmeticsPopup({
     riveIndex: string;
     rarity: string;
     priceFlies: string;
-    sellFlies: string;
     availableFrom: string;
     availableUntil: string;
-  }>({ name: '', riveIndex: '', rarity: 'common', priceFlies: '100', sellFlies: '', availableFrom: '', availableUntil: '' });
+  }>({ name: '', riveIndex: '', rarity: 'common', priceFlies: '100', availableFrom: '', availableUntil: '' });
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvInputKey, setCsvInputKey] = useState(0);
   const [importing, setImporting] = useState(false);
@@ -164,7 +162,6 @@ export function AdminCosmeticsPopup({
       riveIndex: String(item.riveIndex),
       rarity: item.rarity,
       priceFlies: String(item.priceFlies),
-      sellFlies: typeof item.sellFlies === 'number' ? String(item.sellFlies) : '',
       availableFrom: toDateInput(item.availableFrom),
       availableUntil: toDateInput(item.availableUntil),
     });
@@ -186,7 +183,6 @@ export function AdminCosmeticsPopup({
           riveIndex: Number(editValues.riveIndex),
           rarity: editValues.rarity,
           priceFlies: Number(editValues.priceFlies) || 0,
-          sellFlies: editValues.sellFlies.trim() === '' ? null : Number(editValues.sellFlies),
           availableFrom: editValues.availableFrom || null,
           availableUntil: editValues.availableUntil || null,
         }),
@@ -367,8 +363,7 @@ export function AdminCosmeticsPopup({
               </p>
               <p className="mt-1 text-[11px] font-medium text-muted-foreground">
                 Columns: id, name, rarity, price, skin, body, hat, handItem — plus optional
-                sellPrice (blank = half of price), startDate and endDate (YYYY-MM-DD, UTC,
-                blank = always in the shop).
+                startDate and endDate (YYYY-MM-DD, UTC, blank = always in the shop).
               </p>
             </div>
 
@@ -410,14 +405,6 @@ export function AdminCosmeticsPopup({
                       placeholder="Price (flies)"
                       value={editValues.priceFlies}
                       onChange={(e) => setEditValues((p) => ({ ...p, priceFlies: e.target.value }))}
-                      min={0}
-                      className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/30"
-                    />
-                    <input
-                      type="number"
-                      placeholder="Sell price (blank = half)"
-                      value={editValues.sellFlies}
-                      onChange={(e) => setEditValues((p) => ({ ...p, sellFlies: e.target.value }))}
                       min={0}
                       className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/30"
                     />
@@ -667,12 +654,6 @@ function CosmeticCard({
         {item.priceFlies ? (
           <span className="text-[10px] text-muted-foreground">
             {item.priceFlies} flies
-            <span className="opacity-60">
-              {' · sells '}
-              {typeof item.sellFlies === 'number'
-                ? item.sellFlies
-                : Math.floor(item.priceFlies / 2)}
-            </span>
           </span>
         ) : null}
         {windowLabel ? (

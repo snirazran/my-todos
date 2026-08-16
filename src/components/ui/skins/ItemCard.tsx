@@ -7,7 +7,6 @@ import { Check, Info, Loader2, X } from 'lucide-react';
 import Fly from '@/components/ui/fly';
 import { cn } from '@/lib/utils';
 import type { ItemDef, Rarity } from '@/lib/skins/catalog';
-import { sellPriceOf } from '@/lib/skins/catalog';
 import { RarityCornerBadge } from './RarityCornerBadge';
 import Frog from '@/components/ui/frog';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
@@ -97,7 +96,6 @@ function ItemCardComponent({
   mode,
   selectedCount,
   isNew,
-  onSell,
   customAction,
   customPreview,
   hidePrice,
@@ -114,14 +112,12 @@ function ItemCardComponent({
   giftAnimation,
   centerFrogPreview = false,
   compact = false,
-  sellMode = false,
 }: {
   item: ItemDef;
   ownedCount: number;
   isEquipped: boolean;
   canAfford: boolean;
   onAction?: (e: React.MouseEvent) => void;
-  onSell?: () => void;
   actionLabel?: React.ReactNode;
   actionLoading: boolean;
   mode: 'inventory' | 'shop' | 'trade';
@@ -144,7 +140,6 @@ function ItemCardComponent({
   giftAnimation?: string;
   centerFrogPreview?: boolean;
   compact?: boolean;
-  sellMode?: boolean;
 }) {
   const config = RARITY_CONFIG[item.rarity];
   const isOwned = ownedCount > 0;
@@ -261,7 +256,6 @@ function ItemCardComponent({
           : 'p-2.5 pb-1 md:p-3.5 md:pb-1.5 rounded-2xl border-[3px]',
         compact &&
           mode === 'inventory' &&
-          !sellMode &&
           item.slot !== 'container' &&
           'pb-1.5 md:pb-2',
         config.border,
@@ -461,20 +455,6 @@ function ItemCardComponent({
           </button>
         )}
 
-        {/* Sell Mode Price Chip */}
-        {mode === 'inventory' &&
-          compact &&
-          sellMode &&
-          !customAction &&
-          (item.priceFlies ?? 0) > 0 && (
-            <div className="h-7 w-full flex items-center justify-center gap-1 text-xs md:text-sm font-black tracking-tight text-foreground">
-              <Fly size={26} y={-2} paused={true} />
-              <span className="tabular-nums leading-none">
-                +{sellPriceOf(item)}
-              </span>
-            </div>
-          )}
-
         {/* Equip Status Bar (Inventory Mode) */}
         {mode === 'inventory' &&
           !compact &&
@@ -498,32 +478,6 @@ function ItemCardComponent({
             )}
           </div>
         )}
-
-        {/* Sell Button (Inventory Mode) */}
-        {mode === 'inventory' &&
-          !compact &&
-          onSell &&
-          (item.priceFlies ?? 0) > 0 &&
-          !customAction && (
-            <div className="mt-1 text-center w-full">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onSell();
-                }}
-                className="w-full h-5 rounded-md text-[9px] font-bold uppercase tracking-wide text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 border border-transparent hover:border-red-200 dark:hover:border-red-900 transition-all shadow-none active:scale-95 gap-1 px-1"
-              >
-                <span className="flex items-center gap-0.5">
-                  Sell
-                  <span className="mx-0.5 opacity-40">|</span>
-                  <Fly size={14} className="opacity-80" y={-2} paused={true} />+
-                  {sellPriceOf(item)}
-                </span>
-              </Button>
-            </div>
-          )}
 
         {/* Drop Rates Button (Containers only) */}
         {item.slot === 'container' && !hideDropRates && (

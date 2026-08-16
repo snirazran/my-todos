@@ -5,7 +5,6 @@ import { Check, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import Fly from '@/components/ui/fly';
-import { Button } from '@/components/ui/button';
 import type { BackgroundItem, BackgroundRarity } from '@/hooks/useBackgrounds';
 
 const RARITY_CONFIG: Record<
@@ -70,9 +69,7 @@ export function BackgroundCard({
   confirming,
   selectedCount = 0,
   onAction,
-  onSell,
   compact = false,
-  sellMode = false,
 }: {
   item: BackgroundItem;
   owned: boolean;
@@ -84,9 +81,7 @@ export function BackgroundCard({
   confirming?: boolean;
   selectedCount?: number;
   onAction: (e: React.MouseEvent) => void;
-  onSell?: () => void;
   compact?: boolean;
-  sellMode?: boolean;
 }) {
   const config = RARITY_CONFIG[item.rarity];
   const preview = item.images.mobile || item.images.tablet || item.images.web || item.images.webLarge;
@@ -126,7 +121,7 @@ export function BackgroundCard({
         compact
           ? 'p-1.5 pb-0 md:p-2 md:pb-0.5 rounded-xl border-2'
           : 'p-2.5 pb-1 md:p-3.5 md:pb-1.5 rounded-2xl border-[3px]',
-        compact && mode === 'inventory' && !sellMode && 'pb-1.5 md:pb-2',
+        compact && mode === 'inventory' && 'pb-1.5 md:pb-2',
         config.border,
         config.bg,
         isEquipped
@@ -204,57 +199,26 @@ export function BackgroundCard({
       </div>
 
       <div className={cn('w-full mx-auto md:w-3/4', compact ? 'mt-0' : 'mt-2')}>
-        {mode === 'inventory' && compact ? (
-          sellMode && (item.priceFlies ?? 0) > 0 ? (
-            <div className="h-7 w-full flex items-center justify-center gap-1 text-xs md:text-sm font-black tracking-tight text-foreground">
-              <Fly size={26} y={-2} paused={true} />
-              <span className="tabular-nums leading-none">
-                +{Math.floor((item.priceFlies || 0) / 2)}
-              </span>
-            </div>
-          ) : null
-        ) : mode === 'inventory' ? (
-          <>
-            <div
-              className={cn(
-                'h-7 md:h-8 w-full flex items-center justify-center gap-1 rounded-lg text-[10px] md:text-xs font-black uppercase tracking-wide transition-colors duration-200',
-                isEquipped
-                  ? 'bg-green-500 text-white shadow-md'
-                  : 'bg-primary/15 text-primary border border-primary/30 group-hover:bg-primary/25',
-              )}
-            >
-              {actionLoading ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : isEquipped ? (
-                <>
-                  <Check className="w-3 h-3 md:w-3.5 md:h-3.5 stroke-[4]" />
-                  <span>Equipped</span>
-                </>
-              ) : (
-                <span>Equip</span>
-              )}
-            </div>
-            {onSell && (item.priceFlies ?? 0) > 0 && (
-              <div className="mt-1 text-center w-full">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onSell();
-                  }}
-                  className="w-full h-5 rounded-md text-[9px] font-bold uppercase tracking-wide text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 border border-transparent hover:border-red-200 dark:hover:border-red-900 transition-all shadow-none active:scale-95 gap-1 px-1"
-                >
-                  <span className="flex items-center gap-0.5">
-                    Sell
-                    <span className="mx-0.5 opacity-40">|</span>
-                    <Fly size={14} className="opacity-80" y={-2} paused={true} />+
-                    {Math.floor((item.priceFlies || 0) / 2)}
-                  </span>
-                </Button>
-              </div>
+        {mode === 'inventory' && compact ? null : mode === 'inventory' ? (
+          <div
+            className={cn(
+              'h-7 md:h-8 w-full flex items-center justify-center gap-1 rounded-lg text-[10px] md:text-xs font-black uppercase tracking-wide transition-colors duration-200',
+              isEquipped
+                ? 'bg-green-500 text-white shadow-md'
+                : 'bg-primary/15 text-primary border border-primary/30 group-hover:bg-primary/25',
             )}
-          </>
+          >
+            {actionLoading ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : isEquipped ? (
+              <>
+                <Check className="w-3 h-3 md:w-3.5 md:h-3.5 stroke-[4]" />
+                <span>Equipped</span>
+              </>
+            ) : (
+              <span>Equip</span>
+            )}
+          </div>
         ) : mode === 'trade' ? (
           <div
             className={cn(

@@ -135,19 +135,6 @@ function csvToCatalogDocs(text: string) {
       throw new Error(`Row ${rowNumber}: id can only contain letters, numbers, underscores, and hyphens`);
     }
 
-    const sellRaw = cell('sellprice');
-    const sellFlies = sellRaw
-      ? parseInteger(sellRaw, 'sellPrice', rowNumber)
-      : null;
-    if (sellFlies !== null && sellFlies < 0) {
-      throw new Error(`Row ${rowNumber}: sellPrice cannot be negative`);
-    }
-    if (sellFlies !== null && sellFlies > priceFlies) {
-      throw new Error(
-        `Row ${rowNumber}: sellPrice (${sellFlies}) cannot be higher than price (${priceFlies})`,
-      );
-    }
-
     const availableFrom = parseWindowDate(cell('startdate'), 'startDate', 'start', rowNumber);
     const availableUntil = parseWindowDate(cell('enddate'), 'endDate', 'end', rowNumber);
     if (availableFrom && availableUntil && availableUntil <= availableFrom) {
@@ -181,7 +168,6 @@ function csvToCatalogDocs(text: string) {
       riveIndex: activeInput.riveIndex,
       icon: '',
       priceFlies,
-      sellFlies,
       availableFrom,
       availableUntil,
       hidden: false,

@@ -98,18 +98,6 @@ export const EXPLORER_QUEST: OnboardingQuestDef = {
       rewards: fixedFlies(10),
     },
     {
-      id: 'sell-skin',
-      type: 'metric_count',
-      subject: 'task',
-      amountMode: 'fixed',
-      amount: 1,
-      tagMode: 'ignore',
-      metricKey: 'skin_sold',
-      helpText:
-        'Sell a skin you no longer want from the Wardrobe to get flies back.',
-      rewards: fixedFlies(10),
-    },
-    {
       id: 'trade',
       type: 'metric_count',
       subject: 'task',

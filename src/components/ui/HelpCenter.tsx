@@ -127,8 +127,8 @@ const HELP_CATEGORIES: HelpCategory[] = [
         a: 'Use flies in the Shop to buy gift boxes and cosmetic items to customize your frog.',
       },
       {
-        q: 'Can I get flies back from items?',
-        a: 'Yes — you can sell items you own from your Wardrobe for a partial fly refund.',
+        q: 'What can I do with duplicate items?',
+        a: 'Take them to the Trade tab in your Wardrobe — five same-rarity items trade up for one of a higher rarity.',
       },
     ],
   },

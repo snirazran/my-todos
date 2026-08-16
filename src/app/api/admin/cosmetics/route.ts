@@ -99,7 +99,6 @@ export async function PUT(req: NextRequest) {
       riveIndex?: number;
       rarity?: string;
       priceFlies?: number;
-      sellFlies?: number | null;
       availableFrom?: string | null;
       availableUntil?: string | null;
       hidden?: boolean;
@@ -119,12 +118,6 @@ export async function PUT(req: NextRequest) {
     if (typeof body.riveIndex === 'number') update.riveIndex = body.riveIndex;
     if (body.rarity) update.rarity = body.rarity;
     if (typeof body.priceFlies === 'number') update.priceFlies = body.priceFlies;
-    if (body.sellFlies !== undefined) {
-      update.sellFlies =
-        typeof body.sellFlies === 'number' && body.sellFlies >= 0
-          ? Math.floor(body.sellFlies)
-          : null;
-    }
     if (body.availableFrom !== undefined) {
       update.availableFrom = parseAvailabilityDate(body.availableFrom ?? '', 'start');
     }

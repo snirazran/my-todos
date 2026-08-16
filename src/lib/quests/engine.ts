@@ -938,7 +938,7 @@ const NEARLY_AFFORDABLE_FLIES = 10;
 
 // Whether the user can act on a rolled pool entry right now: trading needs a
 // full set of same-rarity skins (owned, or buyable with current flies plus a
-// day's earnings), selling needs a duplicate, acquiring needs spending power
+// day's earnings), acquiring needs spending power
 // or an unopened gift, and a task streak needs a weekly task whose run can
 // still reach the required length before the window closes. Filtering these at
 // roll time keeps dead objectives out of a user's quest.
@@ -962,11 +962,7 @@ function isPoolEntryEligible(args: {
   // with — never roll them into a quest.
   if (metricKey === 'buddy_task_completed' && !args.hasFriends) return false;
 
-  if (
-    metricKey === 'trade_completed' ||
-    metricKey === 'skin_sold' ||
-    metricKey === 'skin_acquired'
-  ) {
+  if (metricKey === 'trade_completed' || metricKey === 'skin_acquired') {
     if (catalog.length === 0) return false;
     const byId = new Map(catalog.map((item) => [item.id, item]));
     const flies = user.wardrobe?.flies ?? 0;
@@ -1003,13 +999,6 @@ function isPoolEntryEligible(args: {
       return Array.from(cheapestByRarity.entries()).some(([rarity, price]) => {
         const missing = TRADE_ITEM_COUNT - (ownedByRarity.get(rarity) ?? 0);
         return flies + NEARLY_AFFORDABLE_FLIES >= missing * price;
-      });
-    }
-
-    if (metricKey === 'skin_sold') {
-      return Object.entries(inventory).some(([itemId, count]) => {
-        const def = byId.get(itemId);
-        return !!def && def.slot !== 'container' && (count ?? 0) >= 2;
       });
     }
 

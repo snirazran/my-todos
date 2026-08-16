@@ -223,16 +223,6 @@ const GUIDES: Record<string, HintGuide> = {
       },
     ],
   },
-  'sell-skin': {
-    id: 'sell-skin',
-    steps: [
-      {
-        href: '/wardrobe',
-        anchor: 'wardrobe-inventory-tab',
-        label: 'Tap a skin you own to sell it for flies',
-      },
-    ],
-  },
   'trade-skins': {
     id: 'trade-skins',
     steps: [
@@ -524,7 +514,6 @@ const GUIDES: Record<string, HintGuide> = {
 const METRIC_GUIDE_IDS: Record<string, string> = {
   skin_acquired: 'buy-skin',
   skin_equipped: 'equip-skin',
-  skin_sold: 'sell-skin',
   trade_completed: 'trade-skins',
   focus_tag_linked: 'pick-pact-area',
   focus_started: 'focus',

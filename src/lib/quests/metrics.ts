@@ -3,7 +3,6 @@ import { getZonedToday } from '@/lib/utils';
 
 export type QuestMetricKey =
   | 'trade_completed'
-  | 'skin_sold'
   | 'skin_acquired'
   | 'friend_invited'
   | 'buddy_task_completed'
@@ -16,7 +15,6 @@ export type QuestMetricKey =
 
 export const QUEST_METRIC_KEYS: QuestMetricKey[] = [
   'trade_completed',
-  'skin_sold',
   'skin_acquired',
   'friend_invited',
   'buddy_task_completed',

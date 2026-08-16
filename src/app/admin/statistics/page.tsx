@@ -891,15 +891,12 @@ const FLY_SOURCE_LABELS: Record<string, string> = {
   cross_platform_gift: 'Cross-platform gift',
   friend_activity: 'Friend activity',
   friend_reward_double: 'Doubled friend rewards',
-  background_sale: 'Background sales',
-  skin_sale: 'Skin sales',
 };
 
-function FlySourceBreakdown({ rows, questRows, seasonRows, skinRows }: {
+function FlySourceBreakdown({ rows, questRows, seasonRows }: {
   rows: StatisticsData['economy']['flySources'];
   questRows: StatisticsData['engagement']['questObjectiveMix'];
   seasonRows: StatisticsData['economy']['seasons'];
-  skinRows: StatisticsData['economy']['skins'];
 }) {
   const [expanded, setExpanded] = useState<string | null>(null);
   if (!rows.length) return <EmptyState text="No gameplay flies earned in this period." />;
@@ -949,11 +946,6 @@ function FlySourceBreakdown({ rows, questRows, seasonRows, skinRows }: {
                       <SeasonRewardPerformance rows={seasonRows.filter((season) => season.flies > 0)} />
                     </div>
                   ) : null}
-                  {row.source === 'skin_sale' ? (
-                    <div className="mt-5 border-t border-border/60 pt-5">
-                      <SkinSaleRarityPerformance rows={skinRows.filter((skin) => skin.action === 'sold')} />
-                    </div>
-                  ) : null}
                 </div>
               ) : null}
             </div>
@@ -974,20 +966,26 @@ const RARITY_SWATCHES: Record<string, string> = {
 };
 const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'unknown'];
 
-function SkinSaleRarityPerformance({ rows }: { rows: StatisticsData['economy']['skins'] }) {
-  if (!rows.length) return <EmptyState text="No skin sales with fly returns in this period." />;
+function SkinMarketBreakdown({ rows }: { rows: StatisticsData['economy']['skins'] }) {
+  if (!rows.length) return <EmptyState text="No skin purchases in this period." />;
+  const total = (key: 'transactions' | 'items' | 'flies') => rows.reduce((sum, row) => sum + row[key], 0);
+
   return (
     <div>
-      <h3 className="mb-3 text-xs font-black">Sales by rarity</h3>
+      <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-3">
+        <InlineMetric label="Shop purchases" value={total('transactions')} />
+        <InlineMetric label="Items bought" value={total('items')} />
+        <InlineMetric label="Flies spent" value={total('flies')} />
+      </div>
       <div className="overflow-x-auto">
-        <div className="min-w-[650px] divide-y divide-border">
-          <div className="grid grid-cols-[minmax(150px,1fr)_90px_100px_80px_80px_120px] gap-3 pb-2 text-[10px] font-bold uppercase text-muted-foreground">
-            <span>Rarity</span><span>Account</span><span className="text-right">Sales</span><span className="text-right">Items</span><span className="text-right">Users</span><span className="text-right">Flies returned</span>
+        <div className="min-w-[660px] divide-y divide-border">
+          <div className="grid grid-cols-[minmax(150px,1fr)_90px_100px_80px_80px_110px] gap-3 pb-2 text-[10px] font-bold uppercase text-muted-foreground">
+            <span>Rarity</span><span>Account</span><span className="text-right">Transactions</span><span className="text-right">Items</span><span className="text-right">Users</span><span className="text-right">Flies spent</span>
           </div>
           {[...rows]
             .sort((a, b) => RARITY_ORDER.indexOf(a.rarity) - RARITY_ORDER.indexOf(b.rarity) || a.tier.localeCompare(b.tier))
             .map((row, index) => (
-              <div key={`${row.rarity}-${row.tier}-${index}`} className="grid grid-cols-[minmax(150px,1fr)_90px_100px_80px_80px_120px] items-center gap-3 py-3 text-xs">
+              <div key={`${row.rarity}-${row.tier}-${index}`} className="grid grid-cols-[minmax(150px,1fr)_90px_100px_80px_80px_110px] items-center gap-3 py-3 text-xs">
                 <span className="flex items-center gap-2 font-bold"><span className={`h-3 w-3 shrink-0 rounded-sm ${RARITY_SWATCHES[row.rarity] ?? RARITY_SWATCHES.unknown}`} />{humanize(row.rarity)}</span>
                 <span className="font-semibold text-muted-foreground">{row.tier === 'premium' ? 'Plus' : 'Free'}</span>
                 <span className="text-right tabular-nums text-muted-foreground">{integer.format(row.transactions)}</span>
@@ -997,58 +995,6 @@ function SkinSaleRarityPerformance({ rows }: { rows: StatisticsData['economy']['
               </div>
             ))}
         </div>
-      </div>
-    </div>
-  );
-}
-
-function SkinMarketBreakdown({ rows }: { rows: StatisticsData['economy']['skins'] }) {
-  if (!rows.length) return <EmptyState text="No skin purchases or sales in this period." />;
-  const purchases = rows.filter((row) => row.action === 'purchased');
-  const sales = rows.filter((row) => row.action === 'sold');
-  const total = (items: typeof rows, key: 'transactions' | 'items' | 'flies') => items.reduce((sum, row) => sum + row[key], 0);
-
-  const section = (title: string, subtitle: string, items: typeof rows, fliesLabel: string) => (
-    <div>
-      <div className="mb-3">
-        <h3 className="text-xs font-black">{title}</h3>
-        <p className="mt-0.5 text-[10px] text-muted-foreground">{subtitle}</p>
-      </div>
-      {items.length ? (
-        <div className="overflow-x-auto">
-          <div className="min-w-[660px] divide-y divide-border">
-            <div className="grid grid-cols-[minmax(150px,1fr)_90px_100px_80px_80px_110px] gap-3 pb-2 text-[10px] font-bold uppercase text-muted-foreground">
-              <span>Rarity</span><span>Account</span><span className="text-right">Transactions</span><span className="text-right">Items</span><span className="text-right">Users</span><span className="text-right">{fliesLabel}</span>
-            </div>
-            {[...items]
-              .sort((a, b) => RARITY_ORDER.indexOf(a.rarity) - RARITY_ORDER.indexOf(b.rarity) || a.tier.localeCompare(b.tier))
-              .map((row, index) => (
-                <div key={`${title}-${row.rarity}-${row.tier}-${index}`} className="grid grid-cols-[minmax(150px,1fr)_90px_100px_80px_80px_110px] items-center gap-3 py-3 text-xs">
-                  <span className="flex items-center gap-2 font-bold"><span className={`h-3 w-3 shrink-0 rounded-sm ${RARITY_SWATCHES[row.rarity] ?? RARITY_SWATCHES.unknown}`} />{humanize(row.rarity)}</span>
-                  <span className="font-semibold text-muted-foreground">{row.tier === 'premium' ? 'Plus' : 'Free'}</span>
-                  <span className="text-right tabular-nums text-muted-foreground">{integer.format(row.transactions)}</span>
-                  <span className="text-right tabular-nums text-muted-foreground">{integer.format(row.items)}</span>
-                  <span className="text-right tabular-nums text-muted-foreground">{integer.format(row.users)}</span>
-                  <span className="text-right font-bold tabular-nums">{integer.format(row.flies)}</span>
-                </div>
-              ))}
-          </div>
-        </div>
-      ) : <EmptyState text={`No ${title.toLowerCase()} in this period.`} />}
-    </div>
-  );
-
-  return (
-    <div>
-      <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
-        <InlineMetric label="Shop purchases" value={total(purchases, 'transactions')} />
-        <InlineMetric label="Flies spent" value={total(purchases, 'flies')} />
-        <InlineMetric label="Items sold back" value={total(sales, 'items')} />
-        <InlineMetric label="Flies returned" value={total(sales, 'flies')} />
-      </div>
-      <div className="grid gap-7 xl:grid-cols-2">
-        {section('Bought from the shop', 'Flies removed from the economy', purchases, 'Flies spent')}
-        {section('Sold back by users', 'Flies returned to users at the resale value', sales, 'Flies returned')}
       </div>
     </div>
   );
@@ -1078,16 +1024,12 @@ function SeasonRewardPerformance({ rows }: { rows: StatisticsData['economy']['se
 function Economy({ data }: { data: StatisticsData }) {
   const free = data.economy.flyEarning.free;
   const premium = data.economy.flyEarning.premium;
-  const returns = data.economy.skins
-    .filter((row) => row.action === 'sold')
-    .reduce((sum, row) => sum + row.flies, 0);
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
         <Kpi icon={<TrendingUp />} label="Free flies / user" value={integer.format(free.averagePerUser)} detail={`${integer.format(free.flies)} gameplay flies earned`} />
         <Kpi icon={<TrendingUp />} label="Plus flies / user" value={integer.format(premium.averagePerUser)} detail={`${integer.format(premium.flies)} gameplay flies earned`} />
         <Kpi icon={<CircleDollarSign />} label="Flies spent" value={integer.format(data.economy.flySpending.total)} detail="All tracked economy sinks" />
-        <Kpi icon={<CircleDollarSign />} label="Resale returns" value={integer.format(returns)} detail="Flies returned from sales" />
       </div>
 
       <Panel title="Fly earning by source" subtitle="Gameplay earnings only; expand a source for its Free and Plus payout split">
@@ -1095,7 +1037,6 @@ function Economy({ data }: { data: StatisticsData }) {
           rows={data.economy.flySources}
           questRows={data.engagement.questObjectiveMix}
           seasonRows={data.economy.seasons}
-          skinRows={data.economy.skins}
         />
       </Panel>
 
@@ -1118,7 +1059,7 @@ function Economy({ data }: { data: StatisticsData }) {
         />
       </Panel>
 
-      <Panel title="Skin purchases and sales by rarity" subtitle="Compare what users buy with what they sell back, including Free and Plus activity">
+      <Panel title="Skin purchases by rarity" subtitle="What users buy from the shop, including Free and Plus activity">
         <SkinMarketBreakdown rows={data.economy.skins} />
       </Panel>
 

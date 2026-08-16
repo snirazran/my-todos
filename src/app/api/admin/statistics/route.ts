@@ -45,7 +45,6 @@ type EconomyRow = {
   users: string[];
   flies: number;
   spent: number;
-  received: number;
   items: number;
   revenue: number;
 };
@@ -306,7 +305,6 @@ export async function GET(req: NextRequest) {
               'fly_earned',
               'fly_spent',
               'skin_purchased',
-              'skin_sold',
               'skin_traded',
               'season_reward_claimed',
               'fly_shop_viewed',
@@ -344,7 +342,6 @@ export async function GET(req: NextRequest) {
           users: { $addToSet: '$userId' },
           flies: { $sum: { $ifNull: ['$properties.fly_amount', 0] } },
           spent: { $sum: { $ifNull: ['$properties.flies_spent', 0] } },
-          received: { $sum: { $ifNull: ['$properties.flies_received', 0] } },
           items: { $sum: { $ifNull: ['$properties.item_count', 0] } },
           revenue: {
             $sum: {
@@ -698,16 +695,13 @@ export async function GET(req: NextRequest) {
       averagePerUser: row.users.length ? round(row.flies / row.users.length) : 0,
     })).sort((a, b) => b.flies - a.flies),
   };
-  const skinRows = economyRows.filter((row) =>
-    ['skin_purchased', 'skin_sold'].includes(row._id.name),
-  ).map((row) => ({
-    action: row._id.name === 'skin_purchased' ? 'purchased' : 'sold',
+  const skinRows = economyRows.filter((row) => row._id.name === 'skin_purchased').map((row) => ({
     rarity: row._id.rarity,
     tier: row._id.tier,
     transactions: row.count,
     users: row.users.length,
     items: row.items || row.count,
-    flies: row._id.name === 'skin_purchased' ? row.spent : row.received,
+    flies: row.spent,
   })).sort((a, b) => b.transactions - a.transactions);
   const tradeRows = economyRows.filter((row) => row._id.name === 'skin_traded').map((row) => ({
     tier: row._id.tier,

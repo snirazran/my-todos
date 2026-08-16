@@ -80,7 +80,6 @@ function itemToDef(item: {
   riveIndex: number;
   icon?: string;
   priceFlies?: number;
-  sellFlies?: number | null;
   availableFrom?: Date | string | null;
   availableUntil?: Date | string | null;
 }): ItemDef {
@@ -97,7 +96,6 @@ function itemToDef(item: {
     riveIndex: item.riveIndex,
     icon: item.icon || '',
     priceFlies: item.priceFlies ?? 0,
-    sellFlies: typeof item.sellFlies === 'number' ? item.sellFlies : null,
     availableFrom: iso(item.availableFrom),
     availableUntil: iso(item.availableUntil),
   };
@@ -222,7 +220,6 @@ export async function getGiftConfigs(includeHidden = false): Promise<GiftConfigV
       riveIndex: item.riveIndex,
       icon: item.icon,
       priceFlies: item.priceFlies,
-      sellFlies: item.sellFlies,
       availableFrom: item.availableFrom,
       availableUntil: item.availableUntil,
     }),

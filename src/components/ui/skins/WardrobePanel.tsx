@@ -5,7 +5,6 @@ import {
   mutateInventorySummary,
   useInventory,
 } from '@/hooks/useInventory';
-import { markFlyEarn } from '@/lib/flyEarn';
 import { hapticTick, hapticImpact, hapticSelect } from '@/lib/haptics';
 import { useMemo, useState, useEffect } from 'react';
 import React from 'react';
@@ -28,7 +27,6 @@ import type { ItemDef, WardrobeSlot } from '@/lib/skins/catalog';
 import {
   rarityRank,
   byId as staticById,
-  sellPriceOf,
   countInventorySpares,
   TRADE_ITEM_COUNT,
 } from '@/lib/skins/catalog';
@@ -50,7 +48,6 @@ import { useMediaQuery } from '@/hooks/useMediaQuery';
 
 import { TradePanel } from './TradePanel';
 import GiftBoxOpening from '@/components/ui/gift-box/GiftBoxOpening';
-import { SellConfirmationDialog } from './SellConfirmationDialog';
 import { StreakFreezeShopCard } from '@/components/ui/streak/StreakFreezeShopCard';
 import { DailyDealsShelf, DailyDealsTeaser } from './DailyDealsShelf';
 import { SeenOnFriendsRow } from './SeenOnFriendsRow';
@@ -331,10 +328,6 @@ function WardrobeManagerContent({
     );
   }, [activeTab]);
   const [activeFilter, setActiveFilter] = useState<FilterCategory>('all');
-  const [sellMode, setSellMode] = useState(false);
-  useEffect(() => {
-    setSellMode(false);
-  }, [activeTab]);
   const [visitedCategories, setVisitedCategories] = useState<
     Set<FilterCategory>
   >(new Set<FilterCategory>(['all']));
@@ -355,9 +348,6 @@ function WardrobeManagerContent({
   const [shopHasScrolled, setShopHasScrolled] = useState(false);
   const [gridInitialSize, setGridInitialSize] = useState(4);
   const [gridBatchSize, setGridBatchSize] = useState(6);
-
-  // --- Sell Dialog Logic ---
-  const [itemToSell, setItemToSell] = useState<ItemDef | null>(null);
 
   const bg = useBackgroundActions({
     isGuest: !user,
@@ -440,69 +430,6 @@ function WardrobeManagerContent({
     query.addEventListener('change', update);
     return () => query.removeEventListener('change', update);
   }, []);
-
-  const confirmSell = (amount: number) => {
-    if (itemToSell) {
-      sellItem(itemToSell, amount);
-      setItemToSell(null);
-    }
-  };
-
-  // Re-added sellItem
-  const sellItem = async (item: ItemDef, qty: number = 1) => {
-    if (!user || !data?.wardrobe) return;
-
-    const currentCount = data.wardrobe.inventory?.[item.id] ?? 0;
-    const refund = sellPriceOf(item);
-    // Refund for this batch
-    const totalRefund = refund * qty;
-
-    if (currentCount < qty) return;
-
-    markFlyEarn();
-    // Optimistic
-    mutate(
-      (curr) =>
-        curr?.wardrobe
-          ? {
-              ...curr,
-              wardrobe: {
-                ...curr.wardrobe,
-                flies: (curr.wardrobe.flies ?? 0) + totalRefund,
-                inventory: {
-                  ...curr.wardrobe.inventory,
-                  [item.id]: Math.max(
-                    0,
-                    (curr.wardrobe.inventory?.[item.id] ?? 0) - qty,
-                  ),
-                },
-              },
-            }
-          : curr,
-      { revalidate: false },
-    );
-
-    // setActionId(item.id); // Removed
-    try {
-      const res = await fetch('/api/skins/sell', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ itemId: item.id, amount: qty }),
-      });
-
-      if (res.ok) {
-        setNotif({ msg: `Sold ${qty}x ${item.name}!`, type: 'success' });
-        refreshInventory();
-      } else {
-        throw new Error('Failed');
-      }
-    } catch (e) {
-      setNotif({ msg: 'Sell failed.', type: 'error' });
-      refreshInventory();
-    } finally {
-      // setActionId(null); // Removed
-    }
-  };
 
   // Handle Mark Seen on Close — call API directly since data is cleared when open→false
   const prevOpen = React.useRef(open);
@@ -1104,17 +1031,7 @@ function WardrobeManagerContent({
         }
         canAfford={true}
         actionLoading={false}
-        sellMode={sellMode}
-        onAction={() => {
-          if (!sellMode) {
-            handleItemAction(card.item);
-            return;
-          }
-          if ((card.item.priceFlies ?? 0) > 0) setItemToSell(card.item);
-        }}
-        onSell={() => {
-          setItemToSell(card.item);
-        }}
+        onAction={() => handleItemAction(card.item)}
         actionLabel={null}
         isNew={unseenInventorySet.has(card.item.id)}
         deferPreview
@@ -1138,16 +1055,8 @@ function WardrobeManagerContent({
         canAfford={bg.balance >= card.bg.priceFlies}
         mode="inventory"
         compact
-        sellMode={sellMode}
         actionLoading={bg.busyId === card.bg.id}
-        onAction={() => {
-          if (!sellMode) {
-            bg.handleEquip(card.bg);
-            return;
-          }
-          if ((card.bg.priceFlies ?? 0) > 0) bg.setSellTarget(card.bg);
-        }}
-        onSell={() => bg.setSellTarget(card.bg)}
+        onAction={() => bg.handleEquip(card.bg)}
       />
     );
 
@@ -1238,22 +1147,6 @@ function WardrobeManagerContent({
         onAction={() => openBgPurchase(card.bg)}
       />
     );
-
-  const sellToggle =
-    activeTab === 'inventory' ? (
-      <button
-        type="button"
-        onClick={() => setSellMode((v) => !v)}
-        className={cn(
-          'h-12 shrink-0 rounded-[18px] border px-3.5 text-xs font-black uppercase tracking-wide transition-all shadow-sm',
-          sellMode
-            ? 'border-primary bg-primary/10 text-primary'
-            : 'border-border/50 bg-card/50 text-muted-foreground backdrop-blur-md hover:bg-accent/50',
-        )}
-      >
-        Sell
-      </button>
-    ) : null;
 
   return (
     <div
@@ -1393,7 +1286,6 @@ function WardrobeManagerContent({
 
               {!embedded && (
                 <div className="flex items-center gap-2">
-                  {sellToggle}
                   <SortMenu
                     value={sortBy}
                     onChange={setSortBy}
@@ -1507,7 +1399,6 @@ function WardrobeManagerContent({
                     'bg-background',
                   )}
                 >
-                  {sellToggle}
                   <SortMenu
                     value={sortBy}
                     onChange={setSortBy}
@@ -1953,36 +1844,6 @@ function WardrobeManagerContent({
           </div>
         </Tabs>
       </div>
-
-      <SellConfirmationDialog
-        open={!!itemToSell}
-        onClose={() => setItemToSell(null)}
-        onConfirm={confirmSell}
-        item={itemToSell}
-        ownedCount={
-          itemToSell ? (data?.wardrobe?.inventory?.[itemToSell.id] ?? 0) : 0
-        }
-        paused={isDragging}
-      />
-
-      <SellConfirmationDialog
-        open={!!bg.sellTarget}
-        onClose={() => bg.setSellTarget(null)}
-        onConfirm={bg.confirmSell}
-        item={
-          bg.sellTarget
-            ? {
-                id: bg.sellTarget.id,
-                name: bg.sellTarget.name,
-                rarity: bg.sellTarget.rarity,
-                priceFlies: bg.sellTarget.priceFlies,
-              }
-            : null
-        }
-        imageUrl={bg.sellTarget ? backgroundPreview(bg.sellTarget) : undefined}
-        ownedCount={bg.sellTarget ? (bg.inventory[bg.sellTarget.id] ?? 0) : 0}
-        paused={isDragging}
-      />
 
       {openingGiftId && (
         <GiftBoxOpening

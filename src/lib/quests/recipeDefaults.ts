@@ -63,7 +63,7 @@ const giftBonus = (chance: number) => [
 ];
 
 // Daily roll: 3 objectives, easy -> medium -> hard. Economy-loop metrics
-// (trade/sell/acquire) are in the pools but the engine only rolls them for
+// (trade/acquire) are in the pools but the engine only rolls them for
 // users who can actually perform them today (see isPoolEntryEligible), so a
 // day-one user never sees a dead objective. Free payout: 2+3+5 = 10 flies
 // plus a 15% gift roll on the capstone.
@@ -94,7 +94,6 @@ export async function ensureDefaultDailyRecipe(): Promise<void> {
           { type: 'deep_session', sessionMinutes: 25, minTarget: 1, maxTarget: 1, weight: 2 },
           { type: 'count', action: 'complete', beforeHour: 12, minTarget: 2, maxTarget: 3, weight: 2 },
           { type: 'metric_count', metricKey: 'skin_acquired', minTarget: 1, maxTarget: 1, weight: 1 },
-          { type: 'metric_count', metricKey: 'skin_sold', minTarget: 1, maxTarget: 1, weight: 1 },
         ],
         flies(3),
       ),

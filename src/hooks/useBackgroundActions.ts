@@ -13,7 +13,6 @@ import {
   endEquipMutation,
   mutateInventoryCaches,
 } from '@/hooks/useInventory';
-import { markFlyEarn } from '@/lib/flyEarn';
 import { DEFAULT_BACKGROUND_ID } from '@/lib/backgrounds/constants';
 
 type Notif = { msg: string; type: 'success' | 'error' };
@@ -58,7 +57,6 @@ export function useBackgroundActions({
   const { data, mutate, isLoading } = useBackgrounds(!isGuest);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [confirmingBuyId, setConfirmingBuyId] = useState<string | null>(null);
-  const [sellTarget, setSellTarget] = useState<BackgroundItem | null>(null);
 
   const balance = shopBalance ?? data?.flies ?? 0;
   const equipped = data?.equipped ?? null;
@@ -202,38 +200,6 @@ export function useBackgroundActions({
     }
   };
 
-  const sellBackground = async (item: BackgroundItem, qty: number) => {
-    if (isGuest) return;
-    const currentCount = inventory[item.id] ?? 0;
-    if (currentCount < qty) return;
-
-    setBusyId(item.id);
-    try {
-      const res = await fetch('/api/backgrounds/sell', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: item.id, amount: qty }),
-      });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body.error || 'Sell failed');
-      onNotify?.({ msg: `Sold ${qty}x ${item.name}!`, type: 'success' });
-      onSpend?.(0);
-      markFlyEarn();
-      refresh();
-    } catch (err) {
-      onNotify?.({ msg: err instanceof Error ? err.message : 'Sell failed', type: 'error' });
-    } finally {
-      setBusyId(null);
-    }
-  };
-
-  const confirmSell = (qty: number) => {
-    if (sellTarget) {
-      void sellBackground(sellTarget, qty);
-      setSellTarget(null);
-    }
-  };
-
   return {
     isLoading,
     catalog,
@@ -243,12 +209,9 @@ export function useBackgroundActions({
     busyId,
     confirmingBuyId,
     setConfirmingBuyId,
-    sellTarget,
-    setSellTarget,
     sortItems,
     handleEquip,
     handleBuy,
     buyNow,
-    confirmSell,
   };
 }

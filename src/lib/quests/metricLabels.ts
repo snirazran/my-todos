@@ -25,11 +25,6 @@ export const QUEST_METRIC_COPY: Record<string, MetricCopy> = {
     label: (n) => (n === 1 ? 'Complete a trade' : `Complete ${n} trades`),
     remaining: (n) => `Complete ${n} more ${n === 1 ? 'trade' : 'trades'}`,
   },
-  skin_sold: {
-    adminLabel: 'Skins sold',
-    label: (n) => (n === 1 ? 'Sell a skin' : `Sell ${n} skins`),
-    remaining: (n) => `Sell ${n} more ${n === 1 ? 'skin' : 'skins'}`,
-  },
   skin_acquired: {
     adminLabel: 'Skins bought or received',
     label: (n) => (n === 1 ? 'Get a new skin' : `Get ${n} new skins`),
@@ -138,7 +133,6 @@ export function metricObjectiveLabel(
 const METRIC_HINT_COPY: Record<string, string> = {
   trade_completed:
     'In the Wardrobe, trade five same-rarity skins for one of a higher rarity.',
-  skin_sold: 'Sell a skin you no longer want from the Wardrobe.',
   skin_acquired: 'Buy a skin in the Wardrobe shop, or win one from a gift box.',
   friend_invited:
     'Invite a friend from the Friends page — you both get a gift when they join.',
