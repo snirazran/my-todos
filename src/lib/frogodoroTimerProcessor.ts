@@ -76,6 +76,10 @@ function getNextTimer(timer: ActiveFrogodoroTimer, now: Date) {
         finished: !autoStart,
         finishedAt: autoStart ? null : now.toISOString(),
         deepFocusBroken: false,
+        // The phase that just ended was credited in full below; the phase this
+        // hands off to has nothing persisted yet. Carrying the old watermark
+        // over would silently swallow the next phase's time.
+        savedElapsed: 0,
         settings,
         sessionStats: {
           ...sessionStats,
@@ -101,6 +105,7 @@ function getNextTimer(timer: ActiveFrogodoroTimer, now: Date) {
       finished: true,
       finishedAt: now.toISOString(),
       deepFocusBroken: false,
+      savedElapsed: 0,
       settings,
       sessionStats: {
         ...sessionStats,
@@ -549,5 +554,16 @@ export async function advanceUserTimer(
   if (!isDue) return timer;
 
   const outcome = await processOneDueTimer(user, now, opts);
-  return outcome.timer ?? timer;
+  if (outcome.timer) return outcome.timer;
+
+  // Someone else claimed the transition while we were reading (the scheduled
+  // job, another surface). What we hold is a phase that no longer exists, so
+  // re-read rather than hand a caller a timer that looks due all over again.
+  const fresh = await UserModel.findById(userId)
+    .select('activeFrogodoroTimer')
+    .lean()
+    .exec();
+  return (
+    ((fresh as any)?.activeFrogodoroTimer as ActiveFrogodoroTimer | null) ?? null
+  );
 }

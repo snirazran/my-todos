@@ -9,6 +9,10 @@ import {
 } from '@/lib/frogodoroDelayedTimer';
 import { fanOutTimerState, clearTimerAndFanOut } from '@/lib/frogodoroSync';
 import { advanceUserTimer } from '@/lib/frogodoroTimerProcessor';
+import { addFrogodoroSession } from '@/lib/frogodoroSessions';
+import { syncQuestState } from '@/lib/quests/engine';
+import { notifyTaskChanged } from '@/lib/taskSync';
+import { getZonedToday } from '@/lib/utils';
 import type {
   ActiveFrogodoroTimer,
   LiveActivityRef,
@@ -55,6 +59,83 @@ function controlSeqFilter(userId: string, controlSeq: number | null) {
       { frogodoroControlSeq: { $lt: controlSeq } },
     ],
   };
+}
+
+// Where the current phase stands: how much of it has run, and how much of that
+// the task's session rows already hold (`savedElapsed`, the same watermark the
+// completion save subtracts).
+function phaseProgress(timer: ActiveFrogodoroTimer, now: number) {
+  const minutes =
+    timer.phase === 'focus'
+      ? timer.settings.focusDuration
+      : timer.settings.breakDuration;
+  const fullSeconds = Math.max(1, Math.round(minutes * 60));
+  const remaining =
+    timer.status === 'running' && timer.endsAt
+      ? Math.max(0, Math.round((new Date(timer.endsAt).getTime() - now) / 1000))
+      : Math.max(0, Math.round(timer.timeLeft));
+  const elapsedSeconds = Math.min(fullSeconds, Math.max(0, fullSeconds - remaining));
+  const savedSeconds = Math.max(0, Math.floor(timer.savedElapsed ?? 0));
+  return {
+    fullSeconds,
+    elapsedSeconds,
+    unsavedSeconds: Math.max(0, elapsedSeconds - savedSeconds),
+  };
+}
+
+// Bank the part of the current phase the task's rows don't have yet. A web
+// client flushes its own time on pause/stop; the island and the notification
+// have no client to do it for them, so without this the minutes a native pause
+// or X ended on were simply dropped.
+//
+// `settle` is the difference the fly ledger cares about: a pause leaves the
+// phase on the clock (its flies stay on the phase's own catch marks), while
+// ending the session re-prices what was actually focused on the day curve.
+async function flushPhaseProgress(
+  userId: string,
+  timer: ActiveFrogodoroTimer,
+  timezone: string,
+  settle: boolean,
+  progress = phaseProgress(timer, Date.now()),
+): Promise<boolean> {
+  const { fullSeconds, elapsedSeconds, unsavedSeconds } = progress;
+  if (!timer.taskId || elapsedSeconds <= 0) return false;
+  if (!settle && unsavedSeconds <= 0) return false;
+  // A phase that reached its end belongs to the completion path, which credits
+  // it in one claimed write. Banking it here as well is how the same session
+  // gets counted twice when a button and the due-processor land together.
+  if (elapsedSeconds >= fullSeconds) return false;
+
+  // Raise the watermark before the rows move, so a completion that lands in
+  // between adds only the remainder rather than the whole phase.
+  await UserModel.updateOne(
+    {
+      _id: userId,
+      'activeFrogodoroTimer.taskId': timer.taskId,
+      'activeFrogodoroTimer.phase': timer.phase,
+    },
+    { $max: { 'activeFrogodoroTimer.savedElapsed': elapsedSeconds } },
+  ).catch(() => {});
+
+  await addFrogodoroSession(
+    userId,
+    timer.taskId,
+    getZonedToday(timezone),
+    timer.phase === 'focus' ? unsavedSeconds : 0,
+    timer.phase === 'break' ? unsavedSeconds : 0,
+    settle || timer.phase !== 'focus' ? null : { elapsedSeconds, fullSeconds },
+  ).catch((error) => {
+    console.error('Frogodoro control: progress flush failed', error);
+    return false;
+  });
+
+  if (unsavedSeconds > 0) {
+    await notifyTaskChanged(userId).catch(() => {});
+    void syncQuestState({ userId, timezone }).catch((error) => {
+      console.error('Quest sync failed after native timer flush:', error);
+    });
+  }
+  return unsavedSeconds > 0;
 }
 
 // Drive the timer from a native surface (iOS Live Activity / Android notification
@@ -142,29 +223,44 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      const timezone = prefs?.timezone || 'UTC';
+
       // Acknowledging a phase can beat the processor that credits it (the alarm
       // rings on the phase's own end, the finished state lands a tick later), and
       // clearing the timer first would drop the focus time, flies and deep-focus
-      // bonus it earned. Stop is an abandon, so it credits nothing.
-      if (action !== 'stop') {
-        const advanced = await advanceUserTimer(userId, { silent: true }).catch(
-          () => null,
+      // bonus it earned. Stop runs it too: a phase that reached its end is
+      // credited by the completion, whichever button ends the session — and
+      // going through the advance is what keeps that credit a single write when
+      // the processor is racing this request for the same phase.
+      const advanced = await advanceUserTimer(userId, { silent: true }).catch(
+        () => null,
+      );
+
+      // alarmStop is the AlarmKit slide, which can't tell whether the alarm
+      // outlived its phase. A phase still running is an auto-started break the
+      // user never finished: the slide silenced the alarm, nothing more.
+      if (action === 'alarmStop' && advanced?.status === 'running') {
+        console.log(
+          `Frogodoro control: alarmStop — ${advanced.phase} still running, alarm silenced only`,
         );
-        // alarmStop is the AlarmKit slide, which can't tell whether the alarm
-        // outlived its phase. A phase still running is an auto-started break the
-        // user never finished: the slide silenced the alarm, nothing more.
-        if (action === 'alarmStop' && advanced?.status === 'running') {
-          console.log(
-            `Frogodoro control: alarmStop — ${advanced.phase} still running, alarm silenced only`,
+        if (controlSeq !== null) {
+          await UserModel.updateOne(
+            { _id: userId },
+            { $max: { frogodoroControlSeq: controlSeq } },
           );
-          if (controlSeq !== null) {
-            await UserModel.updateOne(
-              { _id: userId },
-              { $max: { frogodoroControlSeq: controlSeq } },
-            );
-          }
-          return NextResponse.json({ ok: true, running: true });
         }
+        return NextResponse.json({ ok: true, running: true });
+      }
+
+      // Whatever the session ran without reaching a phase end is banked here —
+      // the minutes behind an island X, or a Done taken on a phase that still
+      // had time on it. A phase that DID just complete was credited in full by
+      // the advance above and lands here as a fresh next phase with nothing
+      // elapsed, so this adds nothing on top of it.
+      if (advanced) {
+        await flushPhaseProgress(userId, advanced, timezone, true).catch(
+          () => false,
+        );
       }
 
       await clearTimerAndFanOut(userId, live, prefs);
@@ -190,10 +286,31 @@ export async function POST(req: NextRequest) {
       const timeLeft = endsAtMs
         ? Math.max(0, Math.round((endsAtMs - now) / 1000))
         : timer.timeLeft;
+      // Pausing from a native surface persists the phase's time here, the way a
+      // web client flushes before it publishes a pause — and records how much of
+      // the phase is now banked, so the completion save adds only the rest.
+      const progress = phaseProgress(timer, now);
+      // A phase already at its end is completing, not pausing — leave its time
+      // (and its watermark) to the completion.
+      const banks =
+        timer.status === 'running' &&
+        progress.elapsedSeconds < progress.fullSeconds;
+      if (banks) {
+        await flushPhaseProgress(
+          userId,
+          timer,
+          prefs?.timezone || 'UTC',
+          false,
+          progress,
+        ).catch(() => false);
+      }
       next = {
         ...timer,
         status: 'paused',
         timeLeft: timer.status === 'running' ? timeLeft : timer.timeLeft,
+        savedElapsed: banks
+          ? Math.max(Math.floor(timer.savedElapsed ?? 0), progress.elapsedSeconds)
+          : timer.savedElapsed,
         endsAt: null,
         finished: false,
         finishedAt: null,

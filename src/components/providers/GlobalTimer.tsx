@@ -774,7 +774,10 @@ export function GlobalTimer() {
 
       const store = useFrogodoroStore.getState();
       const pausedPhase = store.phase;
-      if (store.selectedTaskId) {
+      // A finished phase is not a pause: it ran to zero and the server credited
+      // the whole thing when it completed. Its timeLeft of 0 would read here as
+      // a full phase nobody saved, so flushing it would bank the session twice.
+      if (store.selectedTaskId && !store.awaitingDone) {
         const phaseDuration = getPhaseDuration(pausedPhase, store.settings);
         const elapsed = phaseDuration - store.timeLeft;
         const unsavedElapsed = elapsed - store.phaseElapsed;
@@ -928,7 +931,14 @@ export function GlobalTimer() {
           }
           throw new Error('advance failed');
         } catch {
-          if (selectedTaskIdRef.current) {
+          // Only credit the phase locally when the server has no record of this
+          // timer (an offline session it never adopted). Once it does — rev is
+          // set — the completion is the server's to write, and it always gets
+          // there: its own scheduler, the next resync's advance, the cron sweep.
+          // Saving here as well is how a finished phase got banked twice.
+          const adopted =
+            useFrogodoroStore.getState().activeTimerRev !== null;
+          if (selectedTaskIdRef.current && !adopted) {
             const phaseDuration = getPhaseDuration(
               phaseRef.current,
               settingsRef.current,
@@ -942,7 +952,9 @@ export function GlobalTimer() {
                 selectedTaskIdRef.current,
                 phaseRef.current,
                 unsavedElapsed,
+                phaseDuration,
               );
+              useFrogodoroStore.getState().setPhaseElapsed(phaseDuration);
             }
           }
           // Offline: applyRemoteTimer never ran, so own the alarm here.

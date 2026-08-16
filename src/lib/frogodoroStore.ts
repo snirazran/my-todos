@@ -543,6 +543,14 @@ export const useFrogodoroStore = create<FrogodoroState>()(
             isRunning: snapshot.isRunning && timeLeft > 0,
             endTime: snapshot.isRunning && timeLeft > 0 ? snapshot.endTime : null,
             timeLeft,
+            // A ringing island describes a phase that already ran out, and the
+            // server credited it in full when it completed. Marking the whole
+            // phase as persisted keeps every "unsaved = elapsed - phaseElapsed"
+            // flush (pause, Stop, task complete) from saving it a second time —
+            // this snapshot lands with timeLeft 0, which otherwise reads as a
+            // full phase nobody has saved yet.
+            phaseElapsed:
+              snapshot.finished === true ? full : state.phaseElapsed,
             awaitingDone: snapshot.finished === true ? true : state.awaitingDone,
             remainingByPhase: {
               ...state.remainingByPhase,
@@ -613,6 +621,19 @@ export const useFrogodoroStore = create<FrogodoroState>()(
           return cur > 0 && cur < full;
         };
 
+        // savedElapsed is the server's record of how much of THIS phase the
+        // task's session rows already hold — the same thing phaseElapsed means
+        // locally. Adopting it is what stops a second surface (a phone that
+        // never ran the flushes, a device woken mid-phase) from re-saving time
+        // another device already persisted; a local flush that hasn't reached
+        // the server yet still wins, hence the max.
+        const samePhase =
+          prev.selectedTaskId === timer.taskId && prev.phase === timer.phase;
+        const serverSaved = Math.max(0, Math.floor(timer.savedElapsed ?? 0));
+        const phaseElapsed = samePhase
+          ? Math.max(prev.phaseElapsed, serverSaved)
+          : serverSaved;
+
         set({
           selectedTaskId: timer.taskId,
           settings: timer.settings,
@@ -631,6 +652,7 @@ export const useFrogodoroStore = create<FrogodoroState>()(
             break: timer.phase === 'break' ? started : keepStarted('break'),
           },
           sessionStats: timer.sessionStats,
+          phaseElapsed,
           activeTimerRev: timer.rev ?? null,
           pausedThisPhase:
             timer.deepFocusBroken === true ? true : prev.pausedThisPhase,
