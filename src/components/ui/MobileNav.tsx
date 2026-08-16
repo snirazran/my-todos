@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -16,13 +16,13 @@ export default function MobileNav() {
   const pathname = usePathname();
   const router = useRouter();
   const { user } = useAuth();
-  const { inventoryBadge, tradeSpares } = useWardrobeBadges();
-  const tradeReady = tradeSpares >= TRADE_MIN_ITEM_COUNT;
+  const { inventoryBadge, readyTrades } = useWardrobeBadges();
+  const tradeReady = readyTrades > 0;
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const [wardrobePopupOpen, setWardrobePopupOpen] = useState(false);
   const [pendingHref, setPendingHref] = useState<string | null>(null);
 
-  // The nav rides above the popup's backdrop while it's open — and must stay
+  // The nav rides above the popup's backdrop while it's open ג€” and must stay
   // raised until the exit animation lands, or the sheet slides down OVER the
   // nav the moment `open` flips false.
   const [navRaised, setNavRaised] = useState(false);
@@ -147,7 +147,7 @@ export default function MobileNav() {
                     </span>
                   ) : item.label === 'Wardrobe' && tradeReady ? (
                     <span className="absolute -top-2 -right-3 flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-[10px] font-bold text-white bg-amber-500 rounded-full border-2 border-background animate-in zoom-in duration-300 shadow-sm">
-                      {tradeSpares > 9 ? '9+' : tradeSpares}
+                      {readyTrades > 9 ? '9+' : readyTrades}
                     </span>
                   ) : null}
                   {item.label === 'Quests' && questClaimableCount > 0 ? (

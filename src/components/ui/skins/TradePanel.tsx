@@ -1,6 +1,12 @@
 'use client';
 
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, {
+  useState,
+  useMemo,
+  useEffect,
+  useRef,
+  useDeferredValue,
+} from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -16,6 +22,9 @@ import {
   Play,
   Repeat,
   ShoppingBag,
+  Trash2,
+  X,
+  Zap,
 } from 'lucide-react';
 import { hapticTick, hapticSelect, hapticCelebrate } from '@/lib/haptics';
 import {
@@ -24,6 +33,7 @@ import {
   takePlusOfferAfterAd,
 } from '@/lib/ads';
 import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
+import { BaseSheet } from '@/components/ui/BaseSheet';
 import { cn } from '@/lib/utils';
 import {
   ItemDef,
@@ -38,6 +48,7 @@ import {
   quoteTradeFuel,
   recipeFor,
 } from '@/lib/skins/tradeModifiers';
+import { isAvailableAt } from '@/lib/skins/availability';
 import Fly from '@/components/ui/fly';
 import { Button } from '@/components/ui/button';
 import confetti from 'canvas-confetti';
@@ -132,12 +143,34 @@ import { WardrobeEmptyState } from './WardrobeEmptyState';
 import type { BackgroundItem } from '@/hooks/useBackgrounds';
 
 
+const FLIGHT_MS = 300;
+
 type TradeEntry = {
   uid: string;
   id: string;
   kind: 'item' | 'background';
   rarity: Rarity;
   owned: number;
+  item?: ItemDef;
+  bg?: BackgroundItem;
+};
+
+type Flight = {
+  id: number;
+  slotKey: string;
+  rarity: Rarity;
+  /** Pixels lifted off the card that was tapped, so the ghost needs no render. */
+  image: string | null;
+  cover: boolean;
+  from: DOMRect;
+  to: DOMRect;
+};
+
+type RewardPreview = {
+  key: string;
+  name: string;
+  owned: boolean;
+  wishlisted: boolean;
   item?: ItemDef;
   bg?: BackgroundItem;
 };
@@ -198,14 +231,22 @@ export function TradePanel({
   const [gridBatchSize, setGridBatchSize] = useState(6);
   const inventoryScrollRef = useRef<HTMLDivElement | null>(null);
   const threeCol = useMediaQuery('(min-width: 380px)');
+  const isLarge = useMediaQuery('(min-width: 1024px)');
   const cardGridClass = cn(
     'grid md:grid-cols-4 md:gap-4',
     threeCol ? 'grid-cols-3 gap-2' : 'grid-cols-2 gap-3',
   );
-  // Mobile-only collapse for the contract slot grid. Auto-expands when items are added,
-  // auto-collapses when cleared. Desktop (lg+) ignores this and always shows the grid.
+  // The mobile dock rests as a peek bar so the grid keeps the screen; expanding
+  // raises the full contract stage. Desktop (lg+) is always expanded.
   const [isContractExpanded, setIsContractExpanded] = useState(false);
-  const prevSelectedCountRef = useRef(0);
+  const [poolOpen, setPoolOpen] = useState(false);
+  const cardRefs = useRef(new Map<string, HTMLElement>());
+  const gridTopRef = useRef<HTMLDivElement | null>(null);
+  const groupRefs = useRef(new Map<Rarity, HTMLElement>());
+  const slotRefs = useRef(new Map<string, HTMLElement>());
+  const dockAnchorRef = useRef<HTMLDivElement | null>(null);
+  const [flights, setFlights] = useState<Flight[]>([]);
+  const flightSeq = useRef(0);
 
   useEffect(() => {
     setMounted(true);
@@ -252,16 +293,33 @@ export function TradePanel({
     return entryMap.get(selectedIds[0])?.rarity ?? null;
   }, [selectedIds, entryMap]);
 
+  const recipe = targetRarity ? recipeFor(modifiers, targetRarity) : null;
+  const slotCount = recipe?.itemCount ?? TRADE_MIN_ITEM_COUNT;
+  const nextRarity: Rarity | null = recipe?.to ?? null;
+
+  // Picking a rarity locks the contract to it, so the grid narrows to what can
+  // still go in rather than leaving the player to scroll past greyed-out cards.
+  const scopeRarities = useMemo(() => {
+    if (!targetRarity) return null;
+    const set = new Set<Rarity>([targetRarity]);
+    if (recipe?.fuelRarity) set.add(recipe.fuelRarity);
+    return set;
+  }, [targetRarity, recipe?.fuelRarity]);
+
+  // Narrowing the grid tears down every off-rarity card (and its canvas) in one
+  // go. Deferred, so the first pick's slot fill and flight render immediately
+  // and the regrid lands a frame later instead of stalling the animation.
+  const gridScope = useDeferredValue(scopeRarities);
+
   useEffect(() => {
     setInventoryHasScrolled(false);
   }, [activeFilter, sortBy, targetRarity]);
 
   useEffect(() => {
-    const prev = prevSelectedCountRef.current;
-    const curr = selectedIds.length;
-    if (prev === 0 && curr > 0) setIsContractExpanded(true);
-    else if (prev > 0 && curr === 0) setIsContractExpanded(false);
-    prevSelectedCountRef.current = curr;
+    if (selectedIds.length === 0) {
+      setIsContractExpanded(false);
+      setPoolOpen(false);
+    }
   }, [selectedIds.length]);
 
   useEffect(() => {
@@ -291,8 +349,9 @@ export function TradePanel({
         ? entry.item?.priceFlies ?? 0
         : entry.bg?.priceFlies ?? 0;
 
-    const result = Array.from(entryMap.values()).filter((entry) =>
-      matchesFilter(entry),
+    const result = Array.from(entryMap.values()).filter(
+      (entry) =>
+        matchesFilter(entry) && (!gridScope || gridScope.has(entry.rarity)),
     );
 
     return result.sort((a, b) => {
@@ -309,7 +368,7 @@ export function TradePanel({
           return 0;
       }
     });
-  }, [entryMap, targetRarity, activeFilter, sortBy]);
+  }, [entryMap, gridScope, activeFilter, sortBy]);
 
   const availableGrid = useInfiniteScroll(availableItems, {
     initial: availableItems.length,
@@ -366,9 +425,6 @@ export function TradePanel({
     return counts;
   }, [selectedIds, fuelIds]);
 
-  const recipe = targetRarity ? recipeFor(modifiers, targetRarity) : null;
-  const slotCount = recipe?.itemCount ?? TRADE_MIN_ITEM_COUNT;
-
   // Every main input has to be a spare — one-of-a-kind items you would regret
   // burning don't earn the waiver.
   const allSpares =
@@ -402,6 +458,56 @@ export function TradePanel({
     return total;
   }, [entryMap, fuelRarity]);
 
+  // The pool the reward is drawn from, mirrored off `pickTradeReward` so the
+  // preview can't promise something the server would never hand back.
+  const rewardPool = useMemo<RewardPreview[]>(() => {
+    if (!nextRarity) return [];
+    const wishKeys = new Set(
+      wishlistItems.map((entry) => `${entry.kind}:${entry.itemId}`),
+    );
+    const out: RewardPreview[] = [];
+
+    catalog.forEach((item) => {
+      if (item.rarity !== nextRarity) return;
+      if (item.slot === 'container') return;
+      if (!isAvailableAt(item)) return;
+      out.push({
+        key: `item:${item.id}`,
+        name: item.name,
+        item,
+        owned: (inventory[item.id] ?? 0) > 0,
+        wishlisted: wishKeys.has(`item:${item.id}`),
+      });
+    });
+
+    backgrounds.forEach((background) => {
+      if (background.rarity !== nextRarity) return;
+      if (background.hidden) return;
+      out.push({
+        key: `background:${background.id}`,
+        name: background.name,
+        bg: background,
+        owned: (backgroundInventory[background.id] ?? 0) > 0,
+        wishlisted: wishKeys.has(`background:${background.id}`),
+      });
+    });
+
+    return out.sort((a, b) => {
+      if (a.wishlisted !== b.wishlisted) return a.wishlisted ? -1 : 1;
+      if (a.owned !== b.owned) return a.owned ? 1 : -1;
+      return a.name.localeCompare(b.name);
+    });
+  }, [
+    nextRarity,
+    catalog,
+    backgrounds,
+    inventory,
+    backgroundInventory,
+    wishlistItems,
+  ]);
+
+  const newInPool = rewardPool.filter((prize) => !prize.owned).length;
+
   // Trimming a waiver mid-build can ask for fuel the player already dropped,
   // so the surplus is released rather than silently counted.
   useEffect(() => {
@@ -429,6 +535,38 @@ export function TradePanel({
     return !targetRarity || entry.rarity === targetRarity;
   };
 
+  // The tapped card visibly travels into its slot — without it, items teleport
+  // and the tap reads as "did that register?". While the stage is collapsed the
+  // slots still occupy layout below the fold, so the peek bar's orb stands in
+  // for them; aiming at the hidden slot threw the ghost off-screen.
+  const launchFlight = (entry: TradeEntry, slotKey: string) => {
+    const source = cardRefs.current.get(entry.uid);
+    if (!source) return;
+    const stageOpen = isLarge || isContractExpanded;
+    const to =
+      (stageOpen ? slotRefs.current.get(slotKey)?.getBoundingClientRect() : null) ??
+      dockAnchorRef.current?.getBoundingClientRect();
+    if (!to || to.width === 0) return;
+
+    const id = (flightSeq.current += 1);
+    setFlights((prev) => [
+      ...prev,
+      {
+        id,
+        slotKey,
+        rarity: entry.rarity,
+        image: captureCardPixels(source),
+        cover: entry.kind === 'background',
+        from: source.getBoundingClientRect(),
+        to,
+      },
+    ]);
+    window.setTimeout(
+      () => setFlights((prev) => prev.filter((flight) => flight.id !== id)),
+      FLIGHT_MS + 40,
+    );
+  };
+
   const handleSelect = (entry: TradeEntry) => {
     const currentlySelected = selectedCounts[entry.uid] || 0;
     if (currentlySelected >= entry.owned) return;
@@ -436,6 +574,7 @@ export function TradePanel({
     if (canTakeAsFuel(entry)) {
       if (fuelIds.length + 1 === fuelQuote.count) hapticTick();
       else hapticSelect();
+      launchFlight(entry, `fuel-${fuelIds.length}`);
       setFuelIds((prev) => [...prev, entry.uid]);
       return;
     }
@@ -444,6 +583,7 @@ export function TradePanel({
     if (targetRarity && entry.rarity !== targetRarity) return;
     if (selectedIds.length + 1 === slotCount) hapticTick();
     else hapticSelect();
+    launchFlight(entry, `main-${selectedIds.length}`);
     setSelectedIds((prev) => [...prev, entry.uid]);
   };
 
@@ -458,9 +598,114 @@ export function TradePanel({
   };
 
   const handleClear = () => {
+    hapticSelect();
     setSelectedIds([]);
     setFuelIds([]);
     setAimOn(false);
+    setError(null);
+  };
+
+  // One tap from "a pile of spares" to "a signed contract". Deep stacks are
+  // spent first so a one-of-a-kind item is only ever burned as a last resort.
+  const quickFillPlan = useMemo(() => {
+    const remaining = new Map<string, number>();
+    entryMap.forEach((entry) => remaining.set(entry.uid, entry.owned));
+    [...selectedIds, ...fuelIds].forEach((uid) =>
+      remaining.set(uid, (remaining.get(uid) ?? 0) - 1),
+    );
+
+    const take = (rarity: Rarity, need: number) => {
+      if (need <= 0) return [];
+      const pool = Array.from(entryMap.values())
+        .filter(
+          (entry) =>
+            entry.rarity === rarity && (remaining.get(entry.uid) ?? 0) > 0,
+        )
+        .sort(
+          (a, b) =>
+            (remaining.get(b.uid) ?? 0) - (remaining.get(a.uid) ?? 0),
+        );
+      const picked: string[] = [];
+      for (const entry of pool) {
+        while (
+          picked.length < need &&
+          (remaining.get(entry.uid) ?? 0) > 0
+        ) {
+          picked.push(entry.uid);
+          remaining.set(entry.uid, (remaining.get(entry.uid) ?? 0) - 1);
+        }
+        if (picked.length >= need) break;
+      }
+      return picked;
+    };
+
+    const startRarity =
+      targetRarity ??
+      (() => {
+        const copies = new Map<Rarity, number>();
+        entryMap.forEach((entry) =>
+          copies.set(entry.rarity, (copies.get(entry.rarity) ?? 0) + entry.owned),
+        );
+        const ladder = [...modifiers.recipes].sort(
+          (a, b) => rarityRank[a.from] - rarityRank[b.from],
+        );
+        const completable = ladder.find(
+          (candidate) => (copies.get(candidate.from) ?? 0) >= candidate.itemCount,
+        );
+        if (completable) return completable.from;
+        let best: Rarity | null = null;
+        copies.forEach((count, rarity) => {
+          if (count > 0 && (!best || count > (copies.get(best) ?? 0))) best = rarity;
+        });
+        return best;
+      })();
+
+    if (!startRarity) return null;
+    const plannedRecipe = recipeFor(modifiers, startRarity);
+    if (!plannedRecipe) return null;
+
+    const keptMain = targetRarity === startRarity ? selectedIds : [];
+    const mainAdds = take(startRarity, plannedRecipe.itemCount - keptMain.length);
+    const nextSelected = [...keptMain, ...mainAdds];
+    if (mainAdds.length === 0 && nextSelected.length < plannedRecipe.itemCount) {
+      return null;
+    }
+
+    const complete = nextSelected.length === plannedRecipe.itemCount;
+    const spares =
+      complete &&
+      Array.from(new Set(nextSelected)).every(
+        (uid) => (entryMap.get(uid)?.owned ?? 0) >= 2,
+      );
+    const plannedFuel = quoteTradeFuel({
+      modifiers,
+      recipe: plannedRecipe,
+      allSpares: spares,
+      isPlus: isPremium,
+    });
+    const keptFuel = targetRarity === startRarity ? fuelIds : [];
+    const fuelAdds =
+      complete && plannedRecipe.fuelRarity
+        ? take(plannedRecipe.fuelRarity, plannedFuel.count - keptFuel.length)
+        : [];
+
+    const nextFuel = [...keptFuel, ...fuelAdds];
+    const adds = mainAdds.length + fuelAdds.length;
+    if (adds === 0) return null;
+
+    return {
+      selected: nextSelected,
+      fuel: nextFuel,
+      adds,
+      completes: complete && nextFuel.length === plannedFuel.count,
+    };
+  }, [entryMap, selectedIds, fuelIds, targetRarity, modifiers, isPremium]);
+
+  const handleQuickFill = () => {
+    if (!quickFillPlan) return;
+    hapticTick();
+    setSelectedIds(quickFillPlan.selected);
+    setFuelIds(quickFillPlan.fuel);
     setError(null);
   };
 
@@ -574,32 +819,165 @@ export function TradePanel({
   const mainFilled = selectedIds.length === slotCount;
   const fuelFilled = fuelIds.length === fuelQuote.count;
   const isReady = mainFilled && fuelFilled;
-  const nextRarity: Rarity | null = recipe?.to ?? null;
   const needsFlies = aimActive && !canAffordAim;
 
-  let contractHint = 'Combine same-rarity items to upgrade.';
-  if (isReady && nextRarity) {
-    contractHint = needsFlies
-      ? `You need ${(aimQuote.price - balance).toLocaleString()} more flies to aim this trade.`
-      : aimActive
-        ? `Ready! Aimed at your wishlisted ${nextRarity} items.`
-        : `Ready! Combine into 1 ${nextRarity} reward.`;
-  } else if (mainFilled && fuelRarity) {
-    const left = fuelQuote.count - fuelIds.length;
-    contractHint =
-      fuelOwned - fuelIds.length >= left
-        ? `Add ${left} more ${fuelRarity} ${left === 1 ? 'item' : 'items'} as fuel.`
-        : `You need ${left} spare ${fuelRarity} ${left === 1 ? 'item' : 'items'} to fuel this trade.`;
-  } else if (targetRarity) {
-    const left = slotCount - selectedIds.length;
-    contractHint = `Add ${left} more ${targetRarity} ${left === 1 ? 'item' : 'items'}.`;
-  }
+  const totalSlots = slotCount + fuelQuote.count;
+  const totalPicked = selectedIds.length + fuelIds.length;
+  const progress = totalSlots > 0 ? totalPicked / totalSlots : 0;
+  const mainLeft = slotCount - selectedIds.length;
+  const fuelLeft = fuelQuote.count - fuelIds.length;
+  const fuelStage = mainFilled && !!fuelRarity && !fuelFilled;
+
+  const primaryCta = (() => {
+    if (isTrading)
+      return {
+        tone: 'trade' as const,
+        disabled: true,
+        onClick: undefined,
+        label: (
+          <span className="inline-flex items-center gap-2">
+            <Sparkles className="w-5 h-5 animate-spin" />
+            Trading
+          </span>
+        ),
+      };
+    if (isReady && needsFlies)
+      return {
+        tone: 'flies' as const,
+        disabled: false,
+        onClick: handleConfirmTrade,
+        label: (
+          <span className="relative inline-flex items-center justify-center">
+            Get&nbsp;
+            <span className="tabular-nums">
+              {(aimQuote.price - balance).toLocaleString()}
+            </span>
+            &nbsp;flies
+            <Fly
+              size={36}
+              paused
+              x={2}
+              y={-5}
+              className="absolute inset-y-0 left-full my-auto"
+            />
+          </span>
+        ),
+      };
+    if (isReady)
+      return {
+        tone: 'trade' as const,
+        disabled: false,
+        onClick: handleConfirmTrade,
+        label: (
+          <span className="inline-flex items-center gap-2">
+            Trade up
+            <ArrowUp size={18} strokeWidth={3} />
+          </span>
+        ),
+      };
+    if (quickFillPlan)
+      return {
+        tone: 'fill' as const,
+        disabled: false,
+        onClick: handleQuickFill,
+        label: (
+          <span className="inline-flex items-center gap-2">
+            <Zap className="w-4 h-4" strokeWidth={3} />
+            Quick fill
+            <span className="tabular-nums opacity-70">
+              +{quickFillPlan.adds}
+            </span>
+          </span>
+        ),
+      };
+    return {
+      tone: 'idle' as const,
+      disabled: true,
+      onClick: undefined,
+      label: !hasAnySpares
+        ? 'Nothing to trade yet'
+        : fuelStage
+          ? `Need ${countOf(fuelLeft, fuelRarity)} more`
+          : targetRarity
+            ? `Need ${countOf(mainLeft, targetRarity)} more`
+            : 'Pick an item to start',
+    };
+  })();
+
+  const aimTarget = !nextRarity
+    ? ''
+    : wishlistHits === 1
+      ? `your wishlisted ${nextRarity}`
+      : `1 of your ${wishlistHits} wishlisted ${nextRarity}s`;
+
+  const contractHint =
+    isReady && aimActive && nextRarity
+      ? `The reward is locked to your wishlist.`
+      : fuelStage && fuelOwned - fuelIds.length < fuelLeft
+        ? `You're out of spare ${fuelRarity} items for this contract.`
+        : !targetRarity && hasAnySpares
+          ? `Combine ${slotCount} items of one rarity into the tier above.`
+          : null;
+
+  // Narrowing to one rarity shortens the list under the player's feet, so the
+  // old offset can leave them parked past the end of it. Both times the grid
+  // changes what it's asking for, it takes them to the top of that section.
+  const scrollGridTo = (el: HTMLElement | null) => {
+    if (!el) return;
+    const root =
+      scrollableAncestor(el) ?? document.getElementById('main-scroll');
+    if (!root) return;
+    const sticky = document.querySelector<HTMLElement>('[data-wardrobe-sticky]');
+    const offset = (sticky?.getBoundingClientRect().height ?? 0) + 12;
+    const top =
+      root.scrollTop +
+      el.getBoundingClientRect().top -
+      root.getBoundingClientRect().top -
+      offset;
+    root.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+  };
+
+  const prevScopeKey = useRef('');
+  useEffect(() => {
+    const key = gridScope ? Array.from(gridScope).join(',') : '';
+    if (key && key !== prevScopeKey.current) {
+      const frame = requestAnimationFrame(() =>
+        scrollGridTo(gridTopRef.current),
+      );
+      prevScopeKey.current = key;
+      return () => cancelAnimationFrame(frame);
+    }
+    prevScopeKey.current = key;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gridScope]);
+
+  const needsExtras = mainFilled && !!fuelRarity && !fuelFilled;
+  const prevNeedsExtras = useRef(false);
+  useEffect(() => {
+    if (needsExtras && !prevNeedsExtras.current && fuelRarity) {
+      const target = groupRefs.current.get(fuelRarity) ?? gridTopRef.current;
+      const frame = requestAnimationFrame(() => scrollGridTo(target));
+      prevNeedsExtras.current = needsExtras;
+      return () => cancelAnimationFrame(frame);
+    }
+    prevNeedsExtras.current = needsExtras;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [needsExtras, fuelRarity]);
+
+  const inFlightSlots = new Set(flights.map((flight) => flight.slotKey));
 
   const renderContract = (desktopMode: boolean) => {
     const expanded = desktopMode || isContractExpanded;
-    const totalSlots = slotCount + fuelQuote.count;
-    const totalPicked = selectedIds.length + fuelIds.length;
+    const liveRefs = desktopMode === isLarge;
 
+    const bindSlot = (key: string) => (el: HTMLButtonElement | null) => {
+      if (!liveRefs) return;
+      if (el) slotRefs.current.set(key, el);
+      else slotRefs.current.delete(key);
+    };
+
+    // Fuel shares the main row's column width — sizing each row by its own
+    // slot count made two fuel slots twice the size of four contract slots.
     const renderSlotGrid = (
       uids: string[],
       count: number,
@@ -608,21 +986,30 @@ export function TradePanel({
     ) => (
       <div
         className="grid gap-1.5 lg:gap-2"
-        style={{ gridTemplateColumns: `repeat(${count}, minmax(0, 1fr))` }}
+        style={{
+          gridTemplateColumns: `repeat(${Math.max(slotCount, count)}, minmax(0, 1fr))`,
+        }}
       >
         {Array.from({ length: count }).map((_, i) => {
           const uid = uids[i];
           const entry = uid ? entryMap.get(uid) : null;
           const config = entry ? RARITY_CONFIG[entry.rarity] : null;
+          const slotKey = `${keyPrefix}-${i}`;
+          const arriving = inFlightSlots.has(slotKey);
+          const name =
+            entry?.item?.name ?? entry?.bg?.name ?? `slot ${i + 1}`;
 
           return (
             <button
               key={`${keyPrefix}-${i}`}
+              ref={bindSlot(`${keyPrefix}-${i}`)}
               type="button"
+              disabled={!entry}
               onClick={() => entry && onRemove(i)}
+              aria-label={entry ? `Remove ${name}` : `Empty slot ${i + 1}`}
               className={cn(
-                'h-12 lg:h-auto lg:aspect-square rounded-lg border-2 flex items-center justify-center relative overflow-hidden transition-colors duration-200',
-                !entry && 'border-dashed border-border bg-muted/50',
+                'aspect-square rounded-xl border-2 flex items-center justify-center relative overflow-hidden transition-colors duration-200',
+                !entry && 'border-dashed border-border bg-muted/40',
                 entry && config && cn(config.border, config.bg, 'shadow-sm'),
               )}
             >
@@ -633,7 +1020,12 @@ export function TradePanel({
                     initial={{ scale: 0.4, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     exit={{ scale: 0.4, opacity: 0 }}
-                    transition={{ type: 'spring', stiffness: 480, damping: 26 }}
+                    transition={{
+                      type: 'spring',
+                      stiffness: 480,
+                      damping: 26,
+                      delay: arriving ? FLIGHT_MS / 1000 - 0.06 : 0,
+                    }}
                     className="absolute inset-0 flex items-center justify-center"
                   >
                     {entry.kind === 'background' && entry.bg ? (
@@ -652,17 +1044,20 @@ export function TradePanel({
                           hand_item: 0,
                           [entry.item.slot]: entry.item.riveIndex,
                         }}
-                        width={44}
-                        height={44}
-                        visualOffsetY={3}
-                        className="pointer-events-none"
+                        width="100%"
+                        height="100%"
+                        visualOffsetY={0}
+                        className="pointer-events-none translate-y-[6%]"
                       />
                     ) : null}
+                    <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-background/80 text-muted-foreground shadow-sm">
+                      <X className="h-2.5 w-2.5" strokeWidth={3.5} />
+                    </span>
                   </motion.div>
                 )}
               </AnimatePresence>
               {!entry && (
-                <span className="text-[10px] font-bold text-muted-foreground/40">
+                <span className="text-[11px] font-black text-muted-foreground/40">
                   {i + 1}
                 </span>
               )}
@@ -672,84 +1067,114 @@ export function TradePanel({
       </div>
     );
 
-    const headerInfo = (
-      <div className="flex items-center gap-2 min-w-0">
-        {!desktopMode && (
-          <ChevronDown
-            size={16}
-            className={cn(
-              'transition-transform duration-200 text-muted-foreground shrink-0',
-              expanded ? '' : '-rotate-180',
-            )}
-          />
-        )}
-        <h3 className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-black uppercase text-foreground min-w-0">
-          Contract
-          {targetRarity && nextRarity && (
-            <span className="flex items-center gap-1 min-w-0">
-              <span
-                className={`text-[10px] px-2 py-0.5 rounded uppercase font-bold ${getRarityBg(targetRarity)}`}
-              >
-                {targetRarity}
-              </span>
-              <ArrowRight size={12} className="shrink-0 text-muted-foreground/60" />
-              <span
-                className={`text-[10px] px-2 py-0.5 rounded uppercase font-bold ${getRarityBg(nextRarity)}`}
-              >
-                {nextRarity}
-              </span>
-            </span>
-          )}
-        </h3>
-      </div>
+    const ladder = targetRarity && nextRarity && (
+      <span className="flex items-center gap-1 min-w-0">
+        <span
+          className={`text-[10px] px-2 py-0.5 rounded uppercase font-bold ${getRarityBg(targetRarity)}`}
+        >
+          {targetRarity}
+        </span>
+        <ArrowRight size={12} className="shrink-0 text-muted-foreground/60" />
+        <span
+          className={`text-[10px] px-2 py-0.5 rounded uppercase font-bold ${getRarityBg(nextRarity)}`}
+        >
+          {nextRarity}
+        </span>
+      </span>
     );
 
-    const headerCount = (
-      <motion.div
-        key={totalPicked}
-        initial={{ scale: 1.35 }}
-        animate={{ scale: 1 }}
-        transition={{ type: 'spring', stiffness: 500, damping: 22 }}
+    const primaryButton = (
+      <Button
+        disabled={primaryCta.disabled}
+        onClick={primaryCta.onClick}
         className={cn(
-          'text-base font-black',
-          isReady ? 'text-green-500' : 'text-primary',
+          'relative w-full h-12 lg:h-14 font-black uppercase tracking-wider transition-all overflow-hidden text-sm rounded-xl',
+          primaryCta.tone === 'trade' &&
+            !primaryCta.disabled &&
+            'bg-primary text-primary-foreground shadow-[0_4px_0_0_hsl(var(--primary)/0.55)] active:translate-y-0.5 active:shadow-[0_2px_0_0_hsl(var(--primary)/0.55)]',
+          primaryCta.tone === 'flies' &&
+            'bg-amber-500 text-white shadow-[0_4px_0_0_#b45309] active:translate-y-0.5',
+          primaryCta.tone === 'fill' &&
+            'bg-foreground/90 text-background shadow-[0_4px_0_0_hsl(var(--foreground)/0.45)] active:translate-y-0.5',
+          primaryCta.tone === 'idle' && 'bg-muted text-muted-foreground/70',
         )}
       >
-        {totalPicked}
-        <span className="text-muted-foreground/40">/{totalSlots}</span>
-      </motion.div>
+        {primaryCta.tone === 'trade' && !primaryCta.disabled && (
+          <span className="absolute top-0 left-0 z-10 block w-1/2 h-full pointer-events-none bg-gradient-to-r from-transparent via-white to-transparent opacity-25 animate-shine" />
+        )}
+        {primaryCta.label}
+      </Button>
     );
 
     return (
       <>
         {desktopMode ? (
           <div className="flex items-center justify-between w-full gap-3 px-4 py-3 border-b border-border bg-muted/30 shrink-0">
-            {headerInfo}
-            <div className="text-right shrink-0">{headerCount}</div>
+            <h3 className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-black uppercase text-foreground min-w-0">
+              Contract
+              {ladder}
+            </h3>
+            <div className="flex items-center gap-2 shrink-0">
+              {totalPicked > 0 && (
+                <button
+                  type="button"
+                  onClick={handleClear}
+                  aria-label="Clear contract"
+                  className="flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                >
+                  <Trash2 className="h-4 w-4" strokeWidth={2.5} />
+                </button>
+              )}
+              <SlotCounter picked={totalPicked} total={totalSlots} ready={isReady} />
+            </div>
           </div>
         ) : (
-          <button
-            type="button"
-            onClick={() => setIsContractExpanded((v) => !v)}
-            aria-expanded={isContractExpanded}
-            className="flex items-center justify-between w-full gap-3 px-4 py-2.5 text-left border-b border-border bg-muted/30 shrink-0"
-          >
-            {headerInfo}
-            <div className="text-right shrink-0">{headerCount}</div>
-          </button>
+          <div className="flex w-full items-center gap-3 px-3 pt-2.5 pb-2">
+            <button
+              type="button"
+              onClick={() => {
+                hapticSelect();
+                setIsContractExpanded((v) => !v);
+              }}
+              aria-expanded={isContractExpanded}
+              aria-label={expanded ? 'Hide contract' : 'Show contract'}
+              className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
+            >
+              <div ref={liveRefs ? dockAnchorRef : undefined} className="shrink-0">
+                <PrizeOrb
+                  rarity={nextRarity}
+                  progress={progress}
+                  ready={isReady}
+                  size={40}
+                />
+              </div>
+              <span className="flex min-w-0 flex-1 flex-col gap-1">
+                <span className="flex items-center gap-2 min-w-0">
+                  {ladder ?? (
+                    <span className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">
+                      Contract
+                    </span>
+                  )}
+                </span>
+                <ProgressTrack value={progress} ready={isReady} />
+              </span>
+              <SlotCounter picked={totalPicked} total={totalSlots} ready={isReady} />
+              <ChevronDown
+                size={16}
+                className={cn(
+                  'shrink-0 text-muted-foreground transition-transform duration-200',
+                  expanded ? '' : '-rotate-180',
+                )}
+              />
+            </button>
+          </div>
         )}
 
-        <div className="w-full h-1 overflow-hidden bg-muted shrink-0">
-          <motion.div
-            initial={false}
-            animate={{ scaleX: totalPicked / totalSlots }}
-            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-            className={cn(
-              'h-full w-full origin-left',
-              isReady ? 'bg-green-500' : 'bg-primary',
-            )}
-          />
-        </div>
+        {desktopMode && (
+          <div className="w-full px-4 pt-3 shrink-0">
+            <ProgressTrack value={progress} ready={isReady} />
+          </div>
+        )}
 
         <motion.div
           initial={false}
@@ -757,16 +1182,59 @@ export function TradePanel({
           transition={{ type: 'spring', stiffness: 340, damping: 34 }}
           className="w-full overflow-hidden"
         >
-          <div className="w-full max-w-md mx-auto p-2.5 lg:p-4">
-            <div className="mb-2 lg:mb-4">
+          <div className="w-full max-w-md mx-auto px-3 pt-1 pb-2 lg:px-4 lg:pt-4">
+            {nextRarity && (
+              <button
+                type="button"
+                onClick={() => {
+                  hapticSelect();
+                  setPoolOpen(true);
+                }}
+                disabled={rewardPool.length === 0}
+                className={cn(
+                  'mb-3 flex w-full items-center gap-3 rounded-xl border border-border/60 bg-muted/40 p-2 text-left transition-colors active:bg-muted lg:mb-4 lg:flex-col lg:gap-2 lg:p-3',
+                )}
+              >
+                <PrizeOrb
+                  rarity={nextRarity}
+                  progress={progress}
+                  ready={isReady}
+                  size={desktopMode ? 88 : 60}
+                />
+                <RewardSummary
+                  rarity={nextRarity}
+                  total={rewardPool.length}
+                  fresh={newInPool}
+                  wishlisted={wishlistHits}
+                  centered={desktopMode}
+                />
+                {rewardPool.length > 0 && (
+                  <ChevronDown
+                    size={16}
+                    className="-rotate-90 shrink-0 text-muted-foreground lg:hidden"
+                  />
+                )}
+              </button>
+            )}
+
+            <div className="mb-2 lg:mb-3">
+              {recipe?.fuelRarity && targetRarity && (
+                <p className="mb-1.5 text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+                  Needs · {countOf(slotCount, targetRarity)}
+                </p>
+              )}
               {renderSlotGrid(selectedIds, slotCount, handleRemove, 'main')}
             </div>
 
-            {fuelRarity && (
-              <div className="mb-2 lg:mb-4">
-                <div className="mb-1.5 flex items-center justify-between">
-                  <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
-                    Fuel · {fuelRarity}
+            {recipe?.fuelRarity && (
+              <div className="mb-2 lg:mb-3">
+                <div className="mb-1.5 flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+                    Also needs ·{' '}
+                    {countOf(
+                      fuelQuote.count || fuelQuote.baseCount,
+                      recipe.fuelRarity,
+                    )}
                   </span>
                   {fuelQuote.waived > 0 && (
                     <span className="flex flex-wrap items-center justify-end gap-1">
@@ -779,73 +1247,70 @@ export function TradePanel({
                     </span>
                   )}
                 </div>
-                {renderSlotGrid(
-                  fuelIds,
-                  fuelQuote.count,
-                  handleRemoveFuel,
-                  'fuel',
+                {fuelQuote.count > 0 ? (
+                  renderSlotGrid(fuelIds, fuelQuote.count, handleRemoveFuel, 'fuel')
+                ) : (
+                  <p className="rounded-lg bg-green-500/10 px-2.5 py-1.5 text-[10px] font-bold text-green-700 dark:text-green-400">
+                    All {fuelQuote.baseCount} waived — no extras on this one.
+                  </p>
                 )}
               </div>
             )}
 
             {recipe && wishlistHits > 0 && (
-              <div className="mb-2 overflow-hidden rounded-lg bg-muted/60">
-                <button
-                  type="button"
-                  onClick={() => {
-                    hapticSelect();
-                    setAimOn((v) => !v);
-                  }}
-                  className="flex w-full items-center gap-2 px-2.5 py-2 text-left"
+              <button
+                type="button"
+                onClick={() => {
+                  hapticSelect();
+                  setAimOn((v) => !v);
+                }}
+                aria-pressed={aimActive}
+                className={cn(
+                  'mb-2 flex w-full items-center gap-2.5 rounded-xl border-2 px-2.5 py-2 text-left transition-colors',
+                  aimActive
+                    ? 'border-primary bg-primary/10'
+                    : 'border-border bg-muted/50',
+                )}
+              >
+                <span
+                  className={cn(
+                    'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors',
+                    aimActive
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-background text-muted-foreground',
+                  )}
                 >
+                  <Crosshair className="h-4 w-4" strokeWidth={3} />
+                </span>
+                <span className="flex min-w-0 flex-1 flex-col leading-tight">
+                  <span className="text-[11px] font-black uppercase tracking-wider text-foreground">
+                    Aim
+                  </span>
+                  <span className="text-[10px] font-bold text-muted-foreground">
+                    {aimActive
+                      ? `Guaranteed — you'll get ${aimTarget}`
+                      : `Guarantee ${aimTarget}, instead of a ${modifiers.wishlistRedirectPercent}% chance`}
+                  </span>
+                </span>
+                <span className="flex shrink-0 items-center gap-1">
+                  {aimQuote.discountPercent > 0 && (
+                    <span className="text-[11px] font-bold tabular-nums text-muted-foreground line-through opacity-60">
+                      {aimQuote.basePrice.toLocaleString()}
+                    </span>
+                  )}
+                  <Fly size={30} paused y={-4} />
                   <span
                     className={cn(
-                      'flex h-4 w-4 shrink-0 items-center justify-center rounded border-2 transition-colors',
-                      aimActive
-                        ? 'border-primary bg-primary text-primary-foreground'
-                        : 'border-border',
+                      'text-sm font-black tabular-nums',
+                      !aimActive || canAffordAim
+                        ? 'text-foreground'
+                        : 'text-amber-600 dark:text-amber-400',
                     )}
                   >
-                    {aimActive && <Check className="h-3 w-3" strokeWidth={4} />}
+                    {aimQuote.price.toLocaleString()}
                   </span>
-                  <span className="flex min-w-0 flex-1 flex-col">
-                    <span className="flex items-center gap-1 text-[11px] font-black uppercase tracking-wider text-foreground">
-                      <Crosshair className="h-3 w-3 shrink-0" strokeWidth={3} />
-                      Aim
-                    </span>
-                    <span className="text-[10px] font-bold text-muted-foreground">
-                      Guarantee one of your {wishlistHits} wishlisted{' '}
-                      {nextRarity}
-                      {wishlistHits === 1 ? ' item' : ' items'}
-                    </span>
-                  </span>
-                  <span className="flex shrink-0 items-center gap-1">
-                    {aimQuote.discountPercent > 0 && (
-                      <span className="text-[11px] font-bold tabular-nums text-muted-foreground line-through opacity-60">
-                        {aimQuote.basePrice.toLocaleString()}
-                      </span>
-                    )}
-                    <Fly size={22} paused y={-5} />
-                    <span
-                      className={cn(
-                        'text-sm font-black tabular-nums',
-                        !aimActive || canAffordAim
-                          ? 'text-foreground'
-                          : 'text-amber-600 dark:text-amber-400',
-                      )}
-                    >
-                      {aimQuote.price.toLocaleString()}
-                    </span>
-                  </span>
-                </button>
-                {!aimActive && (
-                  <p className="flex items-center gap-1 px-2.5 pb-2 text-[10px] font-bold text-muted-foreground">
-                    <Bookmark className="h-3 w-3 shrink-0" strokeWidth={3} />
-                    Free trades already have a{' '}
-                    {modifiers.wishlistRedirectPercent}% chance of landing one.
-                  </p>
-                )}
-              </div>
+                </span>
+              </button>
             )}
 
             {error && (
@@ -854,60 +1319,41 @@ export function TradePanel({
               </div>
             )}
 
-            <div className="flex gap-2">
-              {selectedIds.length > 0 && (
-                <Button
-                  variant="outline"
-                  onClick={handleClear}
-                  className="h-10 px-3 lg:h-12 shrink-0 border-destructive/20 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                >
-                  Clear
-                </Button>
-              )}
-              <Button
-                disabled={!isReady || isTrading}
-                onClick={handleConfirmTrade}
-                className={cn(
-                  'group relative flex-1 h-10 lg:h-14 font-black uppercase tracking-wider transition-all overflow-hidden text-sm',
-                  isReady && !needsFlies
-                    ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/40'
-                    : isReady
-                      ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30'
-                      : 'bg-muted text-muted-foreground',
-                )}
+            {!desktopMode && totalPicked > 0 && (
+              <button
+                type="button"
+                onClick={handleClear}
+                className="mb-2 flex w-full items-center justify-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-muted-foreground transition-colors active:text-destructive"
               >
-                {isReady && !needsFlies && !isTrading && (
-                  <>
-                    <span className="absolute inset-0 pointer-events-none animate-pulse bg-primary-foreground/10" />
-                    <span className="absolute top-0 left-0 z-10 block w-1/2 h-full pointer-events-none bg-gradient-to-r from-transparent via-white to-transparent opacity-25 animate-shine" />
-                  </>
-                )}
-                {isTrading ? (
-                  <Sparkles className="w-5 h-5 mr-2 animate-spin" />
-                ) : isReady && needsFlies ? (
-                  <span className="inline-flex items-center gap-1.5">
-                    Get
-                    <Fly size={26} paused y={-4} />
-                    <span className="tabular-nums">
-                      {(aimQuote.price - balance).toLocaleString()}
-                    </span>
-                    flies
-                  </span>
-                ) : (
-                  <>
-                    Trade Up <ArrowUp size={18} className="ml-2" />
-                  </>
-                )}
-              </Button>
-            </div>
-            <p className="text-[10px] text-center text-muted-foreground mt-1.5">
-              {contractHint}
-            </p>
+                <Trash2 className="h-3 w-3" strokeWidth={3} />
+                Clear contract
+              </button>
+            )}
           </div>
         </motion.div>
+
+        <div className="sticky bottom-0 z-10 w-full max-w-md mx-auto shrink-0 bg-card px-3 pb-3 pt-1 lg:px-4 lg:pb-4">
+          {primaryButton}
+          {contractHint && (
+            <p className="mt-1.5 text-center text-[10px] font-bold text-muted-foreground">
+              {contractHint}
+            </p>
+          )}
+        </div>
       </>
     );
   };
+
+  // On the wardrobe page the dock lives inside a section that sits *below* the
+  // frog hero in the page's stacking order, so no local z-index can lift it
+  // over the frog. Portalling it to the body puts it in the root context.
+  const dockNode = (
+    <div className="lg:hidden fixed bottom-[calc(76px+env(safe-area-inset-bottom))] md:bottom-0 left-0 w-full z-[60] max-h-[82svh] overflow-y-auto bg-card border-t border-border shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.1)] flex flex-col">
+      {renderContract(false)}
+    </div>
+  );
+  const contractDock =
+    pageScroll && mounted ? createPortal(dockNode, document.body) : dockNode;
 
   // --- Render ---
   return (
@@ -917,8 +1363,19 @@ export function TradePanel({
         pageScroll ? '' : 'h-full overflow-y-auto lg:overflow-hidden',
       )}
     >
+      {mounted &&
+        flights.length > 0 &&
+        createPortal(
+          <div className="pointer-events-none fixed inset-0 z-[9998]">
+            {flights.map((flight) => (
+              <FlightGhost key={flight.id} flight={flight} />
+            ))}
+          </div>,
+          document.body,
+        )}
+
       {/* --- RESULT OVERLAY --- */}
-      {mounted && tradeResult && 
+      {mounted && tradeResult &&
         createPortal(
           <div className="fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden pointer-events-auto">
             {/* Background Backdrop */}
@@ -1026,6 +1483,15 @@ export function TradePanel({
         onClose={() => setShowPlusOffer(false)}
       />
 
+      <RewardPoolSheet
+        open={poolOpen}
+        onClose={() => setPoolOpen(false)}
+        rarity={nextRarity}
+        prizes={rewardPool}
+        wishlisted={wishlistHits}
+        redirectPercent={modifiers.wishlistRedirectPercent}
+      />
+
       {/* --- INVENTORY + CONTRACT SIDEBAR (lg+) --- */}
       <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-4 lg:items-start">
       <div
@@ -1057,12 +1523,39 @@ export function TradePanel({
       >
 
         <div
+          ref={gridTopRef}
           className={cn(
             pageScroll
               ? '-mx-4 rounded-none border border-x-0 border-border/40 bg-muted/40 p-3 pb-52 md:mx-0 md:rounded-[20px] md:border-x md:px-4 md:pt-4 lg:rounded-none lg:border-0 lg:bg-transparent lg:p-4'
               : 'px-4 pb-52 lg:p-4',
           )}
         >
+          {targetRarity && (
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={handleClear}
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-wider transition-colors',
+                  getRarityBg(targetRarity),
+                  'border-transparent',
+                )}
+              >
+                {targetRarity} contract
+                <X className="h-3 w-3" strokeWidth={3.5} />
+              </button>
+              {fuelRarity && (
+                <span
+                  className={cn(
+                    'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wider',
+                    getRarityBg(fuelRarity),
+                  )}
+                >
+                  + {countOf(fuelQuote.count, fuelRarity)}
+                </span>
+              )}
+            </div>
+          )}
           {availableItems.length === 0 ? (
             // Two different causes, two different answers: a filter is hiding
             // the spares, or there are no spares to begin with. Saying
@@ -1099,6 +1592,10 @@ export function TradePanel({
                   return (
                     <div
                       key={entry.uid}
+                      ref={(el) => {
+                        if (el) cardRefs.current.set(entry.uid, el);
+                        else cardRefs.current.delete(entry.uid);
+                      }}
                       className={cn(
                         'transition-[opacity,filter] duration-300',
                         isDimmed && 'opacity-40 grayscale pointer-events-none',
@@ -1162,7 +1659,14 @@ export function TradePanel({
                 }
                 let entryIndex = 0;
                 return groups.map((group) => (
-                  <div key={group.rarity} className="pb-2 last:pb-4">
+                  <div
+                    key={group.rarity}
+                    ref={(el) => {
+                      if (el) groupRefs.current.set(group.rarity, el);
+                      else groupRefs.current.delete(group.rarity);
+                    }}
+                    className="pb-2 last:pb-4"
+                  >
                     <p
                       className={cn(
                         'mb-2 px-1 text-[10px] font-black uppercase tracking-[0.18em]',
@@ -1192,16 +1696,383 @@ export function TradePanel({
         </div>
       </div>
 
-        <aside className="hidden lg:flex lg:flex-col lg:sticky lg:top-36 overflow-hidden rounded-2xl border border-border/60 bg-card shadow-lg">
+        <aside className="hidden lg:flex lg:flex-col lg:sticky lg:top-36 lg:max-h-[calc(100svh-11rem)] overflow-y-auto rounded-2xl border border-border/60 bg-card shadow-lg">
           {renderContract(true)}
         </aside>
       </div>
 
       {/* --- CONTRACT DOCK (mobile/tablet) --- */}
-      <div className="lg:hidden fixed bottom-[calc(76px+env(safe-area-inset-bottom))] md:bottom-0 left-0 w-full z-[60] bg-card border-t border-border shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.1)] flex flex-col">
-        {renderContract(false)}
-      </div>
+      {contractDock}
     </div>
+  );
+}
+
+const ORB_RING: Record<Rarity, string> = {
+  common: 'stroke-slate-400',
+  uncommon: 'stroke-emerald-500',
+  rare: 'stroke-sky-500',
+  epic: 'stroke-violet-500',
+  legendary: 'stroke-amber-500',
+};
+
+/**
+ * Lifts the already-drawn pixels off the tapped card. Re-rendering the item in
+ * the ghost meant waiting on a Rive stamp, so the very first pick appeared only
+ * after its flight had finished and looked like a stuck sprite.
+ */
+function captureCardPixels(source: HTMLElement): string | null {
+  const canvas = source.querySelector('canvas');
+  if (canvas && canvas.width > 0 && canvas.height > 0) {
+    try {
+      return canvas.toDataURL();
+    } catch {
+      return null;
+    }
+  }
+  const img = source.querySelector('img');
+  return img?.currentSrc || img?.src || null;
+}
+
+function FlightGhost({ flight }: { flight: Flight }) {
+  const { from, to, image, rarity, cover } = flight;
+  const size = Math.min(from.width, from.height, 88);
+  const config = RARITY_CONFIG[rarity];
+  const at = (rect: DOMRect) => ({
+    x: rect.left + rect.width / 2 - size / 2,
+    y: rect.top + rect.height / 2 - size / 2,
+  });
+
+  return (
+    <motion.div
+      initial={{ ...at(from), scale: 1, opacity: 1 }}
+      animate={{ ...at(to), scale: 0.5, opacity: 0.9 }}
+      transition={{ duration: FLIGHT_MS / 1000, ease: [0.32, 0.72, 0.3, 1] }}
+      style={{ position: 'absolute', left: 0, top: 0, width: size, height: size }}
+      className={cn(
+        'flex items-center justify-center overflow-hidden rounded-xl border-2 bg-gradient-to-b shadow-lg',
+        config.border,
+        config.gradient,
+      )}
+    >
+      {image && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={image}
+          alt=""
+          className={cn(
+            'h-full w-full',
+            cover ? 'object-cover' : 'object-contain',
+          )}
+        />
+      )}
+    </motion.div>
+  );
+}
+
+function PrizeOrb({
+  rarity,
+  progress,
+  ready,
+  size,
+}: {
+  rarity: Rarity | null;
+  progress: number;
+  ready: boolean;
+  size: number;
+}) {
+  const stroke = Math.max(3, Math.round(size / 14));
+  const radius = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const config = rarity ? RARITY_CONFIG[rarity] : null;
+
+  return (
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      <motion.div
+        animate={ready ? { scale: [1, 1.07, 1] } : { scale: 1 }}
+        transition={
+          ready
+            ? { duration: 1.7, repeat: Infinity, ease: 'easeInOut' }
+            : { type: 'spring', stiffness: 400, damping: 26 }
+        }
+        style={{ inset: stroke + 1 }}
+        className={cn(
+          'absolute flex items-center justify-center rounded-full bg-gradient-to-b',
+          config ? config.gradient : 'from-muted to-muted/40',
+        )}
+      >
+        <span
+          className={cn(
+            'font-black leading-none',
+            config ? config.text : 'text-muted-foreground/50',
+          )}
+          style={{ fontSize: Math.round(size * 0.4) }}
+        >
+          ?
+        </span>
+      </motion.div>
+      <svg
+        width={size}
+        height={size}
+        className="absolute inset-0 -rotate-90"
+        aria-hidden="true"
+      >
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          strokeWidth={stroke}
+          className="stroke-border"
+        />
+        <motion.circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          className={cn(
+            ready ? 'stroke-green-500' : rarity ? ORB_RING[rarity] : 'stroke-primary',
+          )}
+          style={{ strokeDasharray: circumference }}
+          initial={false}
+          animate={{
+            strokeDashoffset:
+              circumference * (1 - Math.max(0, Math.min(1, progress))),
+          }}
+          transition={{ type: 'spring', stiffness: 260, damping: 30 }}
+        />
+      </svg>
+    </div>
+  );
+}
+
+function ProgressTrack({ value, ready }: { value: number; ready: boolean }) {
+  return (
+    <span className="block h-1.5 w-full overflow-hidden rounded-full bg-muted">
+      <motion.span
+        initial={false}
+        animate={{ scaleX: Math.max(0, Math.min(1, value)) }}
+        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+        className={cn(
+          'block h-full w-full origin-left rounded-full',
+          ready ? 'bg-green-500' : 'bg-primary',
+        )}
+      />
+    </span>
+  );
+}
+
+function SlotCounter({
+  picked,
+  total,
+  ready,
+}: {
+  picked: number;
+  total: number;
+  ready: boolean;
+}) {
+  return (
+    <motion.div
+      key={picked}
+      initial={{ scale: 1.35 }}
+      animate={{ scale: 1 }}
+      transition={{ type: 'spring', stiffness: 500, damping: 22 }}
+      className={cn(
+        'shrink-0 text-base font-black tabular-nums',
+        ready ? 'text-green-500' : 'text-primary',
+      )}
+    >
+      {picked}
+      <span className="text-muted-foreground/40">/{total}</span>
+    </motion.div>
+  );
+}
+
+function RewardSummary({
+  rarity,
+  total,
+  fresh,
+  wishlisted,
+  centered = false,
+}: {
+  rarity: Rarity;
+  total: number;
+  fresh: number;
+  wishlisted: number;
+  centered?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        'flex min-w-0 flex-col gap-0.5',
+        centered && 'items-center text-center',
+      )}
+    >
+      <span
+        className={cn(
+          'text-[11px] font-black uppercase tracking-[0.16em]',
+          RARITY_CONFIG[rarity].text,
+        )}
+      >
+        1 {rarity} reward
+      </span>
+      <span className="text-[10px] font-bold text-muted-foreground">
+        {total} possible
+        {fresh > 0 && ` · ${fresh} you don't own`}
+      </span>
+      <span
+        className={cn(
+          'flex items-center gap-1.5',
+          centered && 'justify-center',
+        )}
+      >
+        <span className="text-[10px] font-black uppercase tracking-wider text-primary underline underline-offset-2">
+          See them all
+        </span>
+        {wishlisted > 0 && (
+          <span className="inline-flex items-center gap-0.5 rounded-full bg-primary/15 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-primary">
+            <Bookmark className="h-2.5 w-2.5" strokeWidth={3.5} fill="currentColor" />
+            {wishlisted}
+          </span>
+        )}
+      </span>
+    </div>
+  );
+}
+
+function RewardPoolTile({ prize }: { prize: RewardPreview }) {
+  const config = RARITY_CONFIG[prize.item?.rarity ?? prize.bg?.rarity ?? 'common'];
+
+  return (
+    <div
+      className={cn(
+        'relative flex flex-col overflow-hidden rounded-xl border-2 bg-gradient-to-br p-1.5 shadow-sm',
+        config.border,
+        config.gradient,
+        prize.owned && 'opacity-55',
+      )}
+    >
+      <div className="relative aspect-square w-full overflow-hidden rounded-lg bg-background/50">
+        {prize.bg ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={backgroundPreview(prize.bg)}
+            alt={prize.name}
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+        ) : prize.item ? (
+          <FrogSnapshot
+            indices={{
+              skin: 0,
+              hat: 0,
+              body: 0,
+              hand_item: 0,
+              [prize.item.slot]: prize.item.riveIndex,
+            }}
+            width="100%"
+            height="100%"
+            visualOffsetY={0}
+            className="pointer-events-none translate-y-[6%]"
+          />
+        ) : null}
+        {prize.wishlisted && (
+          <span className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm">
+            <Bookmark className="h-3 w-3" strokeWidth={3.5} fill="currentColor" />
+          </span>
+        )}
+      </div>
+      <p className="mt-1 truncate px-0.5 text-[11px] font-bold leading-tight text-foreground">
+        {prize.name}
+      </p>
+      <p
+        className={cn(
+          'px-0.5 text-[9px] font-black uppercase tracking-wider',
+          prize.owned ? 'text-muted-foreground' : 'text-primary',
+        )}
+      >
+        {prize.owned ? 'Owned' : 'New'}
+      </p>
+    </div>
+  );
+}
+
+function RewardPoolSheet({
+  open,
+  onClose,
+  rarity,
+  prizes,
+  wishlisted,
+  redirectPercent,
+}: {
+  open: boolean;
+  onClose: () => void;
+  rarity: Rarity | null;
+  prizes: RewardPreview[];
+  wishlisted: number;
+  redirectPercent: number;
+}) {
+  const fresh = prizes.filter((prize) => !prize.owned).length;
+
+  return (
+    <BaseSheet
+      open={open && !!rarity}
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
+      className="max-h-[88dvh] select-none sm:max-h-[84dvh] sm:max-w-[560px]"
+      zIndex={1150}
+      closeAriaLabel="Close possible rewards"
+    >
+      {({ bindScroll }) => (
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div className="shrink-0 px-5 pb-3 pt-3 sm:px-6 sm:pt-6">
+            <div className="flex items-center gap-2 pr-12 sm:pr-14">
+              <h2 className="text-lg font-black text-foreground">
+                Possible rewards
+              </h2>
+              {rarity && (
+                <span
+                  className={cn(
+                    'rounded px-2 py-0.5 text-[10px] font-bold uppercase',
+                    getRarityBg(rarity),
+                  )}
+                >
+                  {rarity}
+                </span>
+              )}
+            </div>
+            <p className="mt-1 text-xs font-bold text-muted-foreground">
+              {prizes.length} in the pool · {fresh} you don&apos;t own
+            </p>
+            {wishlisted > 0 && (
+              <p className="mt-2 flex items-start gap-1.5 rounded-lg bg-primary/10 px-2.5 py-1.5 text-[11px] font-bold text-primary">
+                <Bookmark
+                  className="mt-px h-3 w-3 shrink-0"
+                  strokeWidth={3}
+                  fill="currentColor"
+                />
+                <span>
+                  {wishlisted} wishlisted — a free trade lands one{' '}
+                  {redirectPercent}% of the time, or Aim makes it certain.
+                </span>
+              </p>
+            )}
+          </div>
+
+          <div
+            ref={bindScroll}
+            className="min-h-0 flex-1 overflow-y-auto px-5 pb-6 sm:px-6"
+          >
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+              {prizes.map((prize) => (
+                <RewardPoolTile key={prize.key} prize={prize} />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </BaseSheet>
   );
 }
 
@@ -1225,6 +2096,25 @@ function ScrollMoreCue() {
 }
 
 // --- Helpers ---
+function scrollableAncestor(el: HTMLElement): HTMLElement | null {
+  let node = el.parentElement;
+  while (node) {
+    const overflowY = getComputedStyle(node).overflowY;
+    if (
+      (overflowY === 'auto' || overflowY === 'scroll') &&
+      node.scrollHeight > node.clientHeight
+    ) {
+      return node;
+    }
+    node = node.parentElement;
+  }
+  return null;
+}
+
+function countOf(count: number, rarity: Rarity) {
+  return `${count} ${rarity}${count === 1 ? '' : 's'}`;
+}
+
 function getRarityColor(rarity: Rarity) {
   switch (rarity) {
     case 'common':

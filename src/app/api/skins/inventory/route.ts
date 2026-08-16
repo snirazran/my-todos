@@ -163,9 +163,15 @@ export async function GET(req: NextRequest) {
         dealRerolls,
       );
       // The home shop rail renders straight off this summary, so the deal items
-      // ride along with the equipped ones — no second catalog request.
+      // ride along with the equipped ones — no second catalog request. Owned
+      // ids come too: the catalog is DB-driven, so anything added after the
+      // static seed has no client-side definition, and a consumer reading
+      // `inventory` off this payload would silently skip those items.
       const summaryIds = new Set(equippedIds);
       for (const deal of dailyDeals) summaryIds.add(deal.itemId);
+      for (const [id, count] of Object.entries(wardrobe.inventory ?? {})) {
+        if ((count ?? 0) > 0) summaryIds.add(id);
+      }
 
       return json({
         wardrobe: {
@@ -184,6 +190,7 @@ export async function GET(req: NextRequest) {
           await loadWishlistState(wardrobe, fullCatalog, isPremium),
         ),
         catalog: fullCatalog.filter((item) => summaryIds.has(item.id)),
+        isPremium,
         dailyDeals,
         unseenCount: unseenIds.filter((id) => !containerIds.has(id)).length,
         unseenContainerCount: unseenIds.filter((id) => containerIds.has(id))

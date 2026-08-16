@@ -27,10 +27,9 @@ import type { ItemDef, WardrobeSlot } from '@/lib/skins/catalog';
 import {
   rarityRank,
   byId as staticById,
-  countInventorySpares,
   isTradeOnlyRarity,
-  TRADE_MIN_ITEM_COUNT,
 } from '@/lib/skins/catalog';
+import { useReadyTrades } from '@/hooks/useReadyTrades';
 import Fly from '@/components/ui/fly';
 import Frog from '@/components/ui/frog';
 import { Icon as AppIcon } from '@/components/ui/Icon';
@@ -55,7 +54,7 @@ import { WishlistButton } from './WishlistButton';
 import { WishlistShelf } from './WishlistShelf';
 import { WishlistSheet } from './WishlistSheet';
 import { SeenOnFriendsRow } from './SeenOnFriendsRow';
-import { LooksRow } from './LooksRow';
+import { LooksRow, SaveFitButton } from './LooksRow';
 import { WardrobeEmptyState } from './WardrobeEmptyState';
 import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
 import { WardrobeGridSkeleton } from '@/components/ui/Skeleton';
@@ -318,12 +317,7 @@ function WardrobeManagerContent({
   const { data, mutate, unseenItems, unseenContainers, markItemSeen } =
     useInventory(open);
 
-  const tradeSpares = useMemo(
-    () =>
-      countInventorySpares(data?.wardrobe?.inventory, data?.catalog).spares,
-    [data],
-  );
-  const tradeReady = tradeSpares >= TRADE_MIN_ITEM_COUNT;
+  const readyTrades = useReadyTrades(!!user);
 
   const [activeTab, setActiveTab] = useState<string>(defaultTab);
   useEffect(() => {
@@ -393,17 +387,74 @@ function WardrobeManagerContent({
   const stickySentinelRef = React.useRef<HTMLDivElement | null>(null);
   const [isStuck, setIsStuck] = React.useState(false);
   const setWardrobeStuck = useUIStore((s) => s.setWardrobeStuck);
+  // Sticking changes the header's own height, so the toggle feeds back into
+  // what triggered it: at the page bottom the browser re-clamps scrollTop and
+  // the state flips straight back, forever. A dead band — stick at the
+  // sentinel, release only well after it's back in view — absorbs that, and
+  // measuring beats a 1px sentinel at `threshold: 0`, which can also chatter
+  // on sub-pixel scroll offsets.
   React.useEffect(() => {
     if (!embedded) return;
     const sentinel = stickySentinelRef.current;
-    if (!sentinel) return;
     const root = document.getElementById('main-scroll');
-    const observer = new IntersectionObserver(
-      ([entry]) => setIsStuck(!entry.isIntersecting),
-      { root, threshold: 0 },
-    );
-    observer.observe(sentinel);
-    return () => observer.disconnect();
+    if (!sentinel || !root) return;
+
+    const RELEASE_GAP = 120;
+    const MIN_DWELL_MS = 200;
+    let stuck = false;
+    let triggerY = 0;
+    let lastFlip = 0;
+    let frame = 0;
+    let dwell = 0;
+
+    const measure = () => {
+      frame = 0;
+      // Nothing above the sentinel changes when the header sticks, so its
+      // position in scroll-content space is a fixed trigger line. Comparing
+      // scrollTop against a line cached while released keeps the header's own
+      // height out of the condition that toggles it — measuring live let the
+      // bottom-of-page scrollTop clamp flip the state straight back.
+      if (!stuck) {
+        triggerY =
+          sentinel.getBoundingClientRect().top -
+          root.getBoundingClientRect().top +
+          root.scrollTop;
+      }
+      const next = stuck
+        ? root.scrollTop >= triggerY - RELEASE_GAP
+        : root.scrollTop >= triggerY;
+      if (next === stuck) return;
+      const now = Date.now();
+      const waited = now - lastFlip;
+      if (waited < MIN_DWELL_MS) {
+        // Re-check once the dwell expires, or a flip requested mid-window
+        // would be dropped when the user stops scrolling.
+        if (!dwell) {
+          dwell = window.setTimeout(() => {
+            dwell = 0;
+            measure();
+          }, MIN_DWELL_MS - waited);
+        }
+        return;
+      }
+      lastFlip = now;
+      stuck = next;
+      setIsStuck(next);
+    };
+    const schedule = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(measure);
+    };
+
+    measure();
+    root.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('resize', schedule);
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      if (dwell) clearTimeout(dwell);
+      root.removeEventListener('scroll', schedule);
+      window.removeEventListener('resize', schedule);
+    };
   }, [embedded]);
   React.useEffect(() => {
     if (!embedded) return;
@@ -1271,6 +1322,7 @@ function WardrobeManagerContent({
             <div ref={stickySentinelRef} aria-hidden className="h-px -mb-px" />
           )}
           <div
+            data-wardrobe-sticky
             className={cn(
               'shrink-0',
               embedded
@@ -1347,9 +1399,12 @@ function WardrobeManagerContent({
                 >
                   <AppIcon name="trade" className="w-5 h-5" />
                   <span>Trade</span>
-                  {tradeReady && (
-                    <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[9px] font-black leading-none text-white shadow-sm">
-                      {tradeSpares > 9 ? '9+' : tradeSpares}
+                  {readyTrades > 0 && (
+                    <span
+                      title={`${readyTrades} trade${readyTrades === 1 ? '' : 's'} ready`}
+                      className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[9px] font-black leading-none text-white shadow-sm"
+                    >
+                      {readyTrades > 9 ? '9+' : readyTrades}
                     </span>
                   )}
                 </TabsTrigger>
@@ -1587,15 +1642,6 @@ function WardrobeManagerContent({
                 />
               ) : activeTab === 'inventory' ? (
                 <>
-                  {activeFilter === 'all' && !!data?.dailyDeals?.length && (
-                    <DailyDealsTeaser
-                      endsAt={data.dailyDeals[0].endsAt}
-                      onClick={() => {
-                        setActiveTab('shop');
-                        scrollPageToTop();
-                      }}
-                    />
-                  )}
                   {(() => {
                     const merged = mergeWardrobeCards(
                       inventoryGrid.visibleItems,
@@ -1659,17 +1705,21 @@ function WardrobeManagerContent({
                       labelClass: string,
                       cards: WardrobeCard[],
                       renderCard: (card: WardrobeCard) => React.ReactNode,
+                      action?: React.ReactNode,
                     ) =>
                       cards.length ? (
                         <div key={key} className="pb-2 last:pb-4">
-                          <p
-                            className={cn(
-                              'mb-2 px-1 text-[10px] font-black uppercase tracking-[0.18em]',
-                              labelClass,
-                            )}
-                          >
-                            {label}
-                          </p>
+                          <div className="mb-2 flex items-center gap-2 px-1">
+                            <p
+                              className={cn(
+                                'text-[10px] font-black uppercase tracking-[0.18em]',
+                                labelClass,
+                              )}
+                            >
+                              {label}
+                            </p>
+                            {action}
+                          </div>
                           <DragScrollRow>{cards.map(renderCard)}</DragScrollRow>
                         </div>
                       ) : null;
@@ -1709,6 +1759,22 @@ function WardrobeManagerContent({
                     );
                     return (
                       <>
+                        {rowSection(
+                          'worn',
+                          'Currently wearing',
+                          'text-foreground',
+                          worn,
+                          renderWornRowCard,
+                          activeFilter === 'all' ? (
+                            <SaveFitButton
+                              enabled={!isGuest}
+                              equipped={data?.wardrobe?.equipped}
+                              equippedBackgroundId={bg.equipped}
+                              onNotify={setNotif}
+                              onUpgrade={() => openPlus('wardrobe_looks')}
+                            />
+                          ) : null,
+                        )}
                         {activeFilter === 'all' && (
                           <LooksRow
                             enabled={!isGuest}
@@ -1717,13 +1783,6 @@ function WardrobeManagerContent({
                             onNotify={setNotif}
                             onUpgrade={() => openPlus('wardrobe_looks')}
                           />
-                        )}
-                        {rowSection(
-                          'worn',
-                          'Currently wearing',
-                          'text-foreground',
-                          worn,
-                          renderWornRowCard,
                         )}
                         {rowSection(
                           'gifts',
@@ -1749,6 +1808,15 @@ function WardrobeManagerContent({
                       ref={inventoryGrid.sentinelRef}
                       className="h-8"
                       aria-hidden="true"
+                    />
+                  )}
+                  {activeFilter === 'all' && !!data?.dailyDeals?.length && (
+                    <DailyDealsTeaser
+                      endsAt={data.dailyDeals[0].endsAt}
+                      onClick={() => {
+                        setActiveTab('shop');
+                        scrollPageToTop();
+                      }}
                     />
                   )}
                 </>

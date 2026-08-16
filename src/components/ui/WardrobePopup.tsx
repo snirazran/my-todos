@@ -12,7 +12,8 @@ import { useAuth } from '@/components/auth/AuthContext';
 import { useInventory } from '@/hooks/useInventory';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
-import { countInventorySpares, TRADE_MIN_ITEM_COUNT } from '@/lib/skins/catalog';
+import { countInventorySpares } from '@/lib/skins/catalog';
+import { useReadyTrades } from '@/hooks/useReadyTrades';
 import { hapticTick } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
 
@@ -28,15 +29,14 @@ export function useWardrobeBadges() {
   const flyBalance = data?.wardrobe?.flies;
   const dealEndsAt = data?.dailyDeals?.[0]?.endsAt ?? null;
 
-  const { tradeSpares, ownedCount } = useMemo(() => {
-    const { spares, owned } = countInventorySpares(
-      data?.wardrobe?.inventory,
-      data?.catalog,
-    );
-    return { tradeSpares: spares, ownedCount: owned };
-  }, [data]);
+  const ownedCount = useMemo(
+    () =>
+      countInventorySpares(data?.wardrobe?.inventory, data?.catalog).owned,
+    [data],
+  );
+  const readyTrades = useReadyTrades(!!user);
 
-  return { inventoryBadge, flyBalance, tradeSpares, ownedCount, dealEndsAt };
+  return { inventoryBadge, flyBalance, readyTrades, ownedCount, dealEndsAt };
 }
 
 const SHEET_ENTER = {
@@ -125,7 +125,7 @@ export function WardrobePopup({
   useEffect(() => setMounted(true), []);
   const { user } = useAuth();
   const { indices } = useWardrobeIndices(!!user);
-  const { inventoryBadge, flyBalance, tradeSpares, ownedCount, dealEndsAt } =
+  const { inventoryBadge, flyBalance, readyTrades, ownedCount, dealEndsAt } =
     useWardrobeBadges();
   const dealCountdown = useCountdown(
     open && dealEndsAt ? dealEndsAt : undefined,
@@ -133,7 +133,7 @@ export function WardrobePopup({
   useRegisterOpenSheet(open);
   if (!mounted) return null;
 
-  const tradeReady = tradeSpares >= TRADE_MIN_ITEM_COUNT;
+  const tradeReady = readyTrades > 0;
 
   const pick = (tab: WardrobeTab) => {
     hapticTick();
@@ -229,11 +229,11 @@ export function WardrobePopup({
                   label="Trade"
                   detail={
                     tradeReady
-                      ? `${tradeSpares} ready`
-                      : `${TRADE_MIN_ITEM_COUNT} to swap`
+                      ? `${readyTrades} ready`
+                      : 'Nothing to swap'
                   }
                   detailTone={tradeReady ? 'amber' : 'muted'}
-                  badge={tradeReady ? tradeSpares : 0}
+                  badge={readyTrades}
                   badgeTone="amber"
                   onClick={() => pick('trade')}
                 />

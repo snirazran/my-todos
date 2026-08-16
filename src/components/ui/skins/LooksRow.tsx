@@ -10,6 +10,78 @@ import { useLooks } from '@/hooks/useLooks';
 import type { WardrobeSlot } from '@/lib/skins/catalog';
 import { LOOK_SLOTS, SAVED_LOOKS_PLUS } from '@/lib/skins/looks';
 
+export function SaveFitButton({
+  enabled,
+  equipped,
+  equippedBackgroundId,
+  onNotify,
+  onUpgrade,
+}: {
+  enabled: boolean;
+  equipped: Partial<Record<WardrobeSlot, string | null>> | undefined;
+  equippedBackgroundId: string | null | undefined;
+  onNotify: (n: { msg: string; type: 'error' | 'success' }) => void;
+  onUpgrade: () => void;
+}) {
+  const { looks, max, isPremium, isFull, busy, save } = useLooks(enabled);
+
+  const alreadySaved = React.useMemo(
+    () =>
+      looks.some(
+        (look) =>
+          LOOK_SLOTS.every(
+            (slot) =>
+              (look.equipped[slot] ?? null) === (equipped?.[slot] ?? null),
+          ) && (look.backgroundId ?? null) === (equippedBackgroundId ?? null),
+      ),
+    [looks, equipped, equippedBackgroundId],
+  );
+
+  if (!enabled) return null;
+
+  if (alreadySaved) {
+    return (
+      <span className="ml-auto inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-muted-foreground">
+        <Bookmark className="h-3 w-3 fill-current" />
+        Saved
+      </span>
+    );
+  }
+
+  if (isFull) {
+    if (isPremium) return null;
+    return (
+      <button
+        type="button"
+        onClick={onUpgrade}
+        className="ml-auto inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-amber-700 dark:bg-amber-950/40 dark:text-amber-400"
+      >
+        <Icon name="frogPlus" label="Plus" className="h-3.5 w-3.5" />
+        {SAVED_LOOKS_PLUS} look slots
+      </button>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      disabled={busy}
+      onClick={async () => {
+        const result = await save();
+        if (result.ok) onNotify({ msg: 'Look saved!', type: 'success' });
+        else if (result.error) onNotify({ msg: result.error, type: 'error' });
+      }}
+      className="ml-auto inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-foreground transition-colors hover:bg-muted/70 disabled:opacity-50"
+    >
+      <Plus className="h-3 w-3" strokeWidth={3} />
+      Save fit
+      <span className="tabular-nums text-muted-foreground">
+        {looks.length}/{max}
+      </span>
+    </button>
+  );
+}
+
 /**
  * Saved outfits. Without this, a combination you liked is gone the moment
  * anything changes it — which Style Shuffle does on a timer.
@@ -27,7 +99,7 @@ export function LooksRow({
   onNotify: (n: { msg: string; type: 'error' | 'success' }) => void;
   onUpgrade: () => void;
 }) {
-  const { looks, max, isPremium, isFull, busy, save, apply, remove } =
+  const { looks, max, isPremium, isFull, busy, apply, remove } =
     useLooks(enabled);
   const [removing, setRemoving] = React.useState(false);
 
@@ -46,13 +118,7 @@ export function LooksRow({
     if (!looks.length) setRemoving(false);
   }, [looks.length]);
 
-  if (!enabled) return null;
-
-  const handleSave = async () => {
-    const result = await save();
-    if (result.ok) onNotify({ msg: 'Look saved!', type: 'success' });
-    else if (result.error) onNotify({ msg: result.error, type: 'error' });
-  };
+  if (!enabled || !looks.length) return null;
 
   const handleApply = async (lookId: string, name: string) => {
     if (lookId === wearingId) return;
@@ -73,39 +139,21 @@ export function LooksRow({
         <span className="text-[10px] font-bold tabular-nums text-muted-foreground">
           {looks.length}/{max}
         </span>
-        {looks.length > 0 && (
-          <button
-            type="button"
-            onClick={() => setRemoving((v) => !v)}
-            className={cn(
-              'ml-auto rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide transition-colors',
-              removing
-                ? 'bg-primary/10 text-primary'
-                : 'text-muted-foreground hover:bg-muted',
-            )}
-          >
-            {removing ? 'Done' : 'Edit'}
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => setRemoving((v) => !v)}
+          className={cn(
+            'ml-auto rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide transition-colors',
+            removing
+              ? 'bg-primary/10 text-primary'
+              : 'text-muted-foreground hover:bg-muted',
+          )}
+        >
+          {removing ? 'Done' : 'Edit'}
+        </button>
       </div>
 
       <DragScrollRow>
-        {!isFull && (
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={busy}
-            className="flex h-[104px] w-[84px] shrink-0 flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-border/70 bg-card text-muted-foreground transition-colors hover:border-[#4f9149] hover:text-[#4f9149] disabled:opacity-50"
-          >
-            <Plus className="h-5 w-5" strokeWidth={3} />
-            <span className="text-[10px] font-black uppercase tracking-wide">
-              Save
-              <br />
-              this fit
-            </span>
-          </button>
-        )}
-
         {looks.map((look) => {
           const isWearing = look.id === wearingId;
           return (
@@ -114,42 +162,33 @@ export function LooksRow({
                 type="button"
                 onClick={() => handleApply(look.id, look.name)}
                 disabled={busy || removing}
+                title={look.name}
+                aria-label={`Wear ${look.name}`}
                 className={cn(
-                  'flex h-[104px] w-[84px] flex-col items-stretch overflow-hidden rounded-xl border-2 bg-card p-1 text-left transition-transform active:scale-[0.97] disabled:opacity-90',
+                  'relative flex h-[104px] w-[84px] items-end justify-center overflow-hidden rounded-xl border-2 bg-muted/40 transition-transform active:scale-[0.97] disabled:opacity-90',
                   isWearing ? 'border-[#4f9149]' : 'border-border/50',
                 )}
               >
-                <span className="relative flex h-16 items-end justify-center overflow-hidden rounded-lg bg-muted/40">
-                  {look.backgroundImage && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={look.backgroundImage}
-                      alt=""
-                      aria-hidden="true"
-                      className="absolute inset-0 h-full w-full object-cover"
-                    />
-                  )}
-                  <FrogSnapshot
-                    className="relative h-[125%] w-[125%] object-contain"
-                    indices={look.indices}
-                    width={110}
-                    height={110}
+                {look.backgroundImage && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={look.backgroundImage}
+                    alt=""
+                    aria-hidden="true"
+                    className="absolute inset-0 h-full w-full object-cover"
                   />
-                  {isWearing && !removing && (
-                    <span className="absolute right-1 top-1 grid h-4 w-4 place-items-center rounded-full bg-[#4f9149] text-white">
-                      <Check className="h-2.5 w-2.5 stroke-[4]" />
-                    </span>
-                  )}
-                </span>
-                <span
-                  title={look.name}
-                  className={cn(
-                    'mt-1 line-clamp-2 text-[10px] font-black leading-[1.15]',
-                    isWearing ? 'text-[#4f9149]' : 'text-foreground',
-                  )}
-                >
-                  {look.name}
-                </span>
+                )}
+                <FrogSnapshot
+                  className="relative"
+                  indices={look.indices}
+                  width={120}
+                  height={120}
+                />
+                {isWearing && !removing && (
+                  <span className="absolute right-1 top-1 grid h-4 w-4 place-items-center rounded-full bg-[#4f9149] text-white shadow-sm">
+                    <Check className="h-2.5 w-2.5 stroke-[4]" />
+                  </span>
+                )}
               </button>
 
               {removing && (
@@ -168,28 +207,20 @@ export function LooksRow({
           );
         })}
 
-        {isFull &&
-          (isPremium ? (
-            <div className="flex h-[104px] w-[84px] shrink-0 flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-border/50 px-1 text-center text-muted-foreground">
-              <Bookmark className="h-4 w-4" />
-              <span className="text-[9px] font-bold leading-tight">
-                All {max} slots full
-              </span>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={onUpgrade}
-              className="flex h-[104px] w-[84px] shrink-0 flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-amber-400/60 bg-amber-50 px-1 text-center text-amber-700 transition-transform active:scale-[0.97] dark:bg-amber-950/30 dark:text-amber-400"
-            >
-              <Icon name="frogPlus" label="Plus" className="h-8 w-8" />
-              <span className="text-[9px] font-black leading-tight">
-                {SAVED_LOOKS_PLUS} slots
-                <br />
-                with Plus
-              </span>
-            </button>
-          ))}
+        {isFull && !isPremium && (
+          <button
+            type="button"
+            onClick={onUpgrade}
+            className="flex h-[104px] w-[84px] shrink-0 flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-amber-400/60 bg-amber-50 px-1 text-center text-amber-700 transition-transform active:scale-[0.97] dark:bg-amber-950/30 dark:text-amber-400"
+          >
+            <Icon name="frogPlus" label="Plus" className="h-8 w-8" />
+            <span className="text-[9px] font-black leading-tight">
+              {SAVED_LOOKS_PLUS} slots
+              <br />
+              with Plus
+            </span>
+          </button>
+        )}
       </DragScrollRow>
     </div>
   );

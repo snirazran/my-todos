@@ -48,7 +48,7 @@ export function DailyDealsTeaser({
     <button
       type="button"
       onClick={onClick}
-      className="mb-3 flex w-full items-center gap-2 rounded-xl border border-amber-400/40 bg-gradient-to-r from-amber-100/70 to-amber-50/40 px-3 py-2 text-left shadow-sm transition-transform active:scale-[0.99] dark:from-amber-900/30 dark:to-amber-950/20"
+      className="mt-1 mb-1 flex w-full items-center gap-2 rounded-xl border border-amber-400/40 bg-gradient-to-r from-amber-100/70 to-amber-50/40 px-3 py-2 text-left shadow-sm transition-transform active:scale-[0.99] dark:from-amber-900/30 dark:to-amber-950/20"
     >
       <Sparkles className="h-4 w-4 shrink-0 text-amber-500" />
       <span className="min-w-0 flex-1 truncate text-xs font-black uppercase tracking-wide text-foreground">

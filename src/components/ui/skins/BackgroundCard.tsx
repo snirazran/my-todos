@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import Fly from '@/components/ui/fly';
 import { isTradeOnlyRarity } from '@/lib/skins/catalog';
 import type { BackgroundItem, BackgroundRarity } from '@/hooks/useBackgrounds';
+import { StackBadge } from './StackBadge';
 
 const RARITY_CONFIG: Record<
   BackgroundRarity,
@@ -140,11 +141,6 @@ export function BackgroundCard({
           <Check className="w-3 h-3 md:w-3.5 md:h-3.5 stroke-[4]" />
         </div>
       )}
-      {mode === 'trade' && isSelected && (
-        <div className="absolute z-30 flex h-6 min-w-6 items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-black text-primary-foreground shadow-md top-1.5 right-1.5">
-          {selectedCount}
-        </div>
-      )}
 
       <div className="absolute top-0 left-0 z-20 overflow-hidden rounded-br-2xl bg-background">
         <div
@@ -189,9 +185,10 @@ export function BackgroundCard({
         )}
 
         {ownedCount > 0 && (
-          <div className="absolute top-1 right-1 md:top-1.5 md:right-1.5 bg-black/50 backdrop-blur-sm text-white text-[9px] md:text-[10px] font-bold px-1.5 py-0.5 rounded-md md:rounded-lg shadow-sm border border-white/10 z-20">
-            x{ownedCount}
-          </div>
+          <StackBadge
+            owned={ownedCount}
+            selected={mode === 'trade' ? selectedCount : 0}
+          />
         )}
         {compact && isEquipped && (
           <div className="absolute bottom-1 right-1 z-20 p-1 text-white bg-green-500 rounded-full shadow-md">

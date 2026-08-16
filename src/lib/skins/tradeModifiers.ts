@@ -1,4 +1,4 @@
-import type { Rarity } from './catalog';
+import { byId as staticById, rarityRank, type Rarity } from './catalog';
 
 export type TradeRecipe = {
   from: Rarity;
@@ -165,4 +165,120 @@ export function tradeNewFirstWeight(
 
 export function wishlistSlots(modifiers: TradeModifiers, isPlus: boolean) {
   return isPlus ? modifiers.wishlistSlotsPlus : modifiers.wishlistSlotsFree;
+}
+
+export type TradeCandidate = { rarity: Rarity; owned: number };
+
+/**
+ * Every copy the trade panel would let the player spend — items and
+ * backgrounds alike, one entry per owned id. Shared so the tab badge and the
+ * panel can never disagree about what counts as tradeable.
+ *
+ * Walks the *inventory*, not the catalogue: the summary endpoint ships only
+ * the equipped and on-sale slice of the catalogue, so iterating it silently
+ * dropped nearly every item the player actually owns. Ids missing from the
+ * passed catalogue fall back to the static one.
+ */
+export function tradeCandidates({
+  catalog = [],
+  inventory,
+  backgrounds = [],
+  backgroundInventory = {},
+  modifiers,
+  skipBackgroundIds = [],
+}: {
+  catalog?: readonly { id: string; rarity: Rarity; slot?: string }[];
+  inventory: Record<string, number> | null | undefined;
+  backgrounds?: readonly { id: string; rarity: Rarity }[];
+  backgroundInventory?: Record<string, number> | null;
+  modifiers: TradeModifiers;
+  skipBackgroundIds?: readonly string[];
+}): TradeCandidate[] {
+  const out: TradeCandidate[] = [];
+  const skip = new Set(skipBackgroundIds);
+  const itemById = new Map(catalog.map((item) => [item.id, item]));
+  const backgroundById = new Map(
+    backgrounds.map((background) => [background.id, background]),
+  );
+
+  for (const [id, count] of Object.entries(inventory ?? {})) {
+    const owned = count ?? 0;
+    if (owned <= 0) continue;
+    const def = itemById.get(id) ?? staticById[id];
+    if (!def) continue;
+    if (def.slot === 'container') continue;
+    if (!recipeFor(modifiers, def.rarity)) continue;
+    out.push({ rarity: def.rarity, owned });
+  }
+
+  for (const [id, count] of Object.entries(backgroundInventory ?? {})) {
+    const owned = count ?? 0;
+    if (owned <= 0) continue;
+    if (skip.has(id)) continue;
+    const def = backgroundById.get(id);
+    if (!def) continue;
+    if (!recipeFor(modifiers, def.rarity)) continue;
+    out.push({ rarity: def.rarity, owned });
+  }
+
+  return out;
+}
+
+export type TradeReadiness = {
+  /** Contracts completable right now, spending each copy at most once. */
+  trades: number;
+  /** Cheapest tier with a completable contract, for the "start here" cue. */
+  startRarity: Rarity | null;
+};
+
+/**
+ * Duplicates alone never answered "can I trade?" — a contract needs N copies of
+ * *one* rarity plus its fuel, so the count is a greedy spend of the real pool
+ * from the cheapest tier up. Fuel waivers that depend on the final picks are
+ * ignored, so this under-promises rather than over-promises.
+ */
+export function countReadyTrades({
+  candidates,
+  modifiers,
+  isPlus,
+}: {
+  candidates: readonly TradeCandidate[];
+  modifiers: TradeModifiers;
+  isPlus: boolean;
+}): TradeReadiness {
+  const pool = {} as Record<Rarity, number>;
+  for (const candidate of candidates) {
+    pool[candidate.rarity] =
+      (pool[candidate.rarity] ?? 0) + Math.max(0, candidate.owned);
+  }
+
+  const ladder = [...modifiers.recipes].sort(
+    (a, b) => rarityRank[a.from] - rarityRank[b.from],
+  );
+
+  let trades = 0;
+  let startRarity: Rarity | null = null;
+
+  for (const recipe of ladder) {
+    const itemCount = Math.max(1, recipe.itemCount);
+    const fuel = quoteTradeFuel({
+      modifiers,
+      recipe,
+      allSpares: false,
+      isPlus,
+    });
+    const fuelRarity = fuel.count > 0 ? recipe.fuelRarity : null;
+
+    while ((pool[recipe.from] ?? 0) >= itemCount) {
+      if (fuelRarity) {
+        if ((pool[fuelRarity] ?? 0) < fuel.count) break;
+        pool[fuelRarity] -= fuel.count;
+      }
+      pool[recipe.from] -= itemCount;
+      trades += 1;
+      if (!startRarity) startRarity = recipe.from;
+    }
+  }
+
+  return { trades, startRarity };
 }

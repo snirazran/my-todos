@@ -1,4 +1,4 @@
-// components/SiteHeader.tsx
+﻿// components/SiteHeader.tsx
 'use client';
 
 import Link from 'next/link';
@@ -81,8 +81,8 @@ export default function SiteHeader() {
   const { unseenCount, unseenContainerCount, data: inventoryData } = useInventory(!!user, true);
   const flyBalance = inventoryData?.wardrobe?.flies;
   const inventoryBadge = unseenCount + unseenContainerCount;
-  const { tradeSpares } = useWardrobeBadges();
-  const tradeSparesReady = tradeSpares >= TRADE_MIN_ITEM_COUNT;
+  const { readyTrades } = useWardrobeBadges();
+  const tradeSparesReady = readyTrades > 0;
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const [wardrobeDropdownOpen, setWardrobeDropdownOpen] = useState(false);
   const wardrobeRef = useRef<HTMLDivElement>(null);
@@ -196,7 +196,7 @@ export default function SiteHeader() {
         )}
       >
       <div className="flex items-center justify-between h-full gap-4 px-6 py-3 mx-auto max-w-7xl md:px-10">
-        {/* ───────── Logo ───────── */}
+        {/* ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ Logo ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ */}
         <Link
           href="/"
           className="relative inline-flex items-center gap-2 group focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg shrink-0"
@@ -208,7 +208,7 @@ export default function SiteHeader() {
 
         <CurrencyShop />
 
-        {/* ───────── Desktop Navigation (Centered) ───────── */}
+        {/* ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ Desktop Navigation (Centered) ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ */}
         <div className="hidden md:flex flex-1 min-w-0 items-center justify-center gap-0.5 xl:gap-1">
           {navItems.map((item) => {
             const isActive = item.href ? pathname === item.href : item.isActive;
@@ -236,7 +236,7 @@ export default function SiteHeader() {
                       </span>
                     ) : tradeSparesReady ? (
                       <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white shadow-sm ml-1">
-                        {tradeSpares > 9 ? '9+' : tradeSpares}
+                        {readyTrades > 9 ? '9+' : readyTrades}
                       </span>
                     ) : null}
                   </button>
@@ -268,7 +268,7 @@ export default function SiteHeader() {
                                 wItem.tab === 'inventory'
                                   ? inventoryBadge
                                   : wItem.tab === 'trade' && tradeSparesReady
-                                    ? tradeSpares
+                                    ? readyTrades
                                     : 0;
                               return (
                                 <button
@@ -349,7 +349,7 @@ export default function SiteHeader() {
           })}
         </div>
 
-        {/* ───────── Right Side (Desktop: User Menu, Mobile: Hamburger) ───────── */}
+        {/* ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ Right Side (Desktop: User Menu, Mobile: Hamburger) ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ */}
         <div className="flex items-center gap-3 shrink-0">
           <RightActions
             user={user}
@@ -395,7 +395,7 @@ export default function SiteHeader() {
   );
 }
 
-// ─── Sub-Components ───
+// ג”€ג”€ג”€ Sub-Components ג”€ג”€ג”€
 
 import {
   Menu,
@@ -497,7 +497,7 @@ function RightActions({
   const { openQuestOnboarding } = useUIStore();
   const { isAdmin } = useIsAdmin();
 
-  // No click-outside listener needed — the settings sheet covers the entire viewport.
+  // No click-outside listener needed ג€” the settings sheet covers the entire viewport.
 
   const handleSignOut = async () => {
     setSigningOut(true);
@@ -750,7 +750,7 @@ function MobileSheet({
   }, [isOpen, view, subviewControls]);
 
   const flashSoon = (label: string) => {
-    setToast(`${label} — coming soon`);
+    setToast(`${label} ג€” coming soon`);
     window.setTimeout(() => setToast(null), 1800);
   };
 
@@ -760,8 +760,8 @@ function MobileSheet({
     else if (next === 'denied')
       setToast(
         isWeb
-          ? 'Blocked — allow notifications in your browser site settings.'
-          : 'Opening settings — turn notifications on there.',
+          ? 'Blocked ג€” allow notifications in your browser site settings.'
+          : 'Opening settings ג€” turn notifications on there.',
       );
     else setToast('Permission still pending');
     window.setTimeout(() => setToast(null), 2500);
@@ -1425,7 +1425,7 @@ function MainView({
           icon={<Bell className="w-7 h-7 text-amber-300" strokeWidth={2.5} />}
           title="Enable notifications"
           subtitle={`Get reminded to check in on ${frogName}!`}
-          actionLabel={notifLoading ? 'Enabling…' : 'Enable'}
+          actionLabel={notifLoading ? 'Enablingג€¦' : 'Enable'}
           onAction={onEnableNotifs}
           disabled={notifLoading}
         />
@@ -1448,7 +1448,7 @@ function MainView({
                   aiConnections > 0 ? 'AI assistant' : null,
                 ]
                   .filter(Boolean)
-                  .join(' · ')
+                  .join(' ֲ· ')
               : 'Calendar and AI'
         }
       />
@@ -1604,7 +1604,7 @@ function MainView({
                 </span>
               </p>
               <p className="mt-1 text-sm font-bold text-emerald-900/85">
-                Your subscription is active 🎉
+                Your subscription is active נ‰
               </p>
             </div>
 
@@ -1620,8 +1620,8 @@ function MainView({
                 </div>
               )}
               <p className="mt-4 text-center text-xs font-semibold text-muted-foreground">
-                Thanks for supporting Frogress — you&apos;re helping us keep
-                building 🐸
+                Thanks for supporting Frogress ג€” you&apos;re helping us keep
+                building נ¸
               </p>
             </div>
           </div>
@@ -1720,7 +1720,7 @@ function GuestSignOutConfirm({
           Your frog will be lost forever
         </h2>
         <p className="mt-2 text-sm font-medium text-muted-foreground">
-          You&apos;re in Guest Mode — there&apos;s no way to sign back in. Signing
+          You&apos;re in Guest Mode ג€” there&apos;s no way to sign back in. Signing
           out permanently deletes your frog, streaks, and all progress. Create a
           free account first to keep them.
         </p>
@@ -1986,7 +1986,7 @@ function NotificationsView({
             {notifsEnabled
               ? isWeb
                 ? 'This browser will get timer & reminder alerts.'
-                : 'You’re all set to get reminders.'
+                : 'Youג€™re all set to get reminders.'
               : 'Turn these on to get reminders from your frog.'}
           </p>
         </div>
@@ -2032,7 +2032,7 @@ function NotificationsView({
           className="w-full h-12 rounded-2xl bg-primary text-sm font-black tracking-wide text-primary-foreground shadow-lg shadow-primary/25 transition-all active:scale-[0.98] hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
         >
           {notifLoading
-            ? 'Enabling…'
+            ? 'Enablingג€¦'
             : notifsEnabled
               ? 'Manage in system settings'
               : 'Enable notifications'}
@@ -2230,7 +2230,7 @@ function QuickTilesGrid({
             </span>
           }
           title="Fly Catch"
-          subtitle="30 seconds · catch one more · climb the leaderboard"
+          subtitle="30 seconds ֲ· catch one more ֲ· climb the leaderboard"
           onClick={() => window.location.assign('/fly-catch')}
         />
       */}
@@ -2249,7 +2249,7 @@ function QuickTilesGrid({
       <QuickTile
         icon={<Icon name="patterns" label="Your patterns" className="h-[52px] w-[52px]" />}
         title="Your patterns"
-        subtitle="See what’s working"
+        subtitle="See whatג€™s working"
         onClick={() => window.location.assign('/insights')}
       />
       <QuickTile

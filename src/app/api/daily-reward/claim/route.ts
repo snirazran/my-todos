@@ -63,7 +63,6 @@ export async function POST(request: Request) {
         lastClaimDate: null,
         claimedDays: [],
         month: currentMonth,
-        streak: 0,
       };
     }
 

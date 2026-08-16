@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { isTradeOnlyRarity } from '@/lib/skins/catalog';
 import type { ItemDef, Rarity } from '@/lib/skins/catalog';
 import { RarityCornerBadge } from './RarityCornerBadge';
+import { StackBadge } from './StackBadge';
 import Frog from '@/components/ui/frog';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -285,17 +286,6 @@ function ItemCardComponent({
             <Check className="w-3 h-3 md:w-3.5 md:h-3.5 stroke-[4]" />
           </motion.div>
         )}
-        {/* Trade Selection Count */}
-        {mode === 'trade' && isSelected && (
-          <motion.div
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0, opacity: 0 }}
-            className="absolute z-30 px-2 py-0.5 text-primary-foreground bg-primary rounded-full shadow-md top-2 right-2 text-[10px] font-black"
-          >
-            {selectedCount}
-          </motion.div>
-        )}
       </AnimatePresence>
 
       {/* Rarity Tag */}
@@ -371,9 +361,10 @@ function ItemCardComponent({
         )}
 
         {ownedCount > 0 && (
-          <div className="absolute top-1 right-1 md:top-1.5 md:right-1.5 bg-black/50 backdrop-blur-sm text-white text-[9px] md:text-[10px] font-bold px-1.5 py-0.5 rounded-md md:rounded-lg shadow-sm border border-white/10 z-20">
-            x{ownedCount}
-          </div>
+          <StackBadge
+            owned={ownedCount}
+            selected={mode === 'trade' ? selectedCount || 0 : 0}
+          />
         )}
         <AnimatePresence>
           {compact && isEquipped && !customAction && (

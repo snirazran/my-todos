@@ -44,7 +44,6 @@ export async function GET(request: Request) {
         lastClaimDate: null,
         claimedDays: [],
         month: todayString,
-        streak: 0,
       };
       // Ideally we save this reset, but for GET just returning clean state is OK.
       // The claiming logic will handle the actual DB update if needed,

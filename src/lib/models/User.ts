@@ -107,7 +107,6 @@ const UserSchema = new Schema<UserDoc>(
       lastClaimDate: { type: Date },
       claimedDays: { type: [Number], default: [] },
       month: { type: String }, // Format YYYY-MM
-      streak: { type: Number, default: 0 },
     },
     notificationPrefs: {
       type: Schema.Types.Mixed,
