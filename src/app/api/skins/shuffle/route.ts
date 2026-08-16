@@ -6,6 +6,7 @@ import BackgroundModel from '@/lib/models/Background';
 import { getFullCatalog } from '@/lib/skins/getCatalog';
 import { notifyUserChanged } from '@/lib/taskSync';
 import { bumpQuestMetric } from '@/lib/quests/metrics';
+import { isTradeOnlyRarity } from '@/lib/skins/catalog';
 import type { ItemDef, WardrobeSlot } from '@/lib/skins/catalog';
 import { isAvailableAt } from '@/lib/skins/availability';
 import {
@@ -104,6 +105,7 @@ function pickTryOn(user: LeanUser, catalog: ItemDef[]) {
       slots.includes(item.slot) &&
       (inventory[item.id] ?? 0) <= 0 &&
       (item.priceFlies ?? 0) > 0 &&
+      !isTradeOnlyRarity(item.rarity) &&
       isAvailableAt(item),
   );
   if (unowned.length === 0) return null;

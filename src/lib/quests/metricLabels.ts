@@ -132,7 +132,7 @@ export function metricObjectiveLabel(
 
 const METRIC_HINT_COPY: Record<string, string> = {
   trade_completed:
-    'In the Wardrobe, trade five same-rarity skins for one of a higher rarity.',
+    'In the Wardrobe, trade four same-rarity skins for one of a higher rarity.',
   skin_acquired: 'Buy a skin in the Wardrobe shop, or win one from a gift box.',
   friend_invited:
     'Invite a friend from the Friends page — you both get a gift when they join.',

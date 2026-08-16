@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Check, Loader2 } from 'lucide-react';
+import { Check, Loader2, Repeat } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import Fly from '@/components/ui/fly';
+import { isTradeOnlyRarity } from '@/lib/skins/catalog';
 import type { BackgroundItem, BackgroundRarity } from '@/hooks/useBackgrounds';
 
 const RARITY_CONFIG: Record<
@@ -84,6 +85,7 @@ export function BackgroundCard({
   compact?: boolean;
 }) {
   const config = RARITY_CONFIG[item.rarity];
+  const tradeOnly = isTradeOnlyRarity(item.rarity);
   const preview = item.images.mobile || item.images.tablet || item.images.web || item.images.webLarge;
   const isSelected = selectedCount > 0;
   const prevEquippedRef = useRef(isEquipped);
@@ -242,11 +244,13 @@ export function BackgroundCard({
             className={cn(
               'group/buy w-full flex items-center justify-center gap-1 font-black tracking-tight transition-colors active:scale-95 bg-transparent border-0 shadow-none',
               compact ? 'h-7 text-xs md:text-sm' : 'h-8 text-sm md:text-base',
-              canAfford
-                ? compact
-                  ? 'text-foreground hover:brightness-110'
-                  : cn(config.text, 'hover:brightness-110')
-                : 'text-red-500 dark:text-red-400',
+              tradeOnly
+                ? cn(config.text, 'hover:brightness-110')
+                : canAfford
+                  ? compact
+                    ? 'text-foreground hover:brightness-110'
+                    : cn(config.text, 'hover:brightness-110')
+                  : 'text-red-500 dark:text-red-400',
               actionLoading && 'opacity-60 cursor-wait',
             )}
           >
@@ -254,6 +258,11 @@ export function BackgroundCard({
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : confirming ? (
               <span>CONFIRM</span>
+            ) : tradeOnly ? (
+              <span className="inline-flex items-center gap-1 text-[10px] md:text-[11px] uppercase tracking-[0.12em]">
+                <Repeat className="h-3 w-3 md:h-3.5 md:w-3.5" strokeWidth={3} />
+                Trade only
+              </span>
             ) : (
               <>
                 <Fly size={compact ? 26 : 22} className="transition-transform group-hover/buy:scale-110" y={compact ? -2 : -3} paused={true} />

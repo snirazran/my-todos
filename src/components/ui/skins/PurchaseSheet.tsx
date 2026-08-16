@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bookmark, BookmarkCheck, Check, Loader2 } from 'lucide-react';
+import { Bookmark, BookmarkCheck, Check, Loader2, Repeat } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import Fly from '@/components/ui/fly';
@@ -12,8 +12,10 @@ import { useUIStore } from '@/lib/uiStore';
 import { emitCampaignTrigger } from '@/lib/campaigns/orchestrator';
 import { hapticSuccess } from '@/lib/haptics';
 import { useWishlist } from '@/hooks/useWishlist';
+import { useTradeConfig } from '@/hooks/useTradeConfig';
+import { Icon } from '@/components/ui/Icon';
 import type { WishlistKind } from '@/lib/skins/wishlist';
-import type { Rarity } from '@/lib/skins/catalog';
+import { isTradeOnlyRarity, type Rarity } from '@/lib/skins/catalog';
 
 const RARITY: Record<
   Rarity,
@@ -98,8 +100,11 @@ export function PurchaseSheet({
   balance,
   ownedCount,
   isGuest,
+  isPremium = false,
   onBuy,
   onEquip,
+  onGoToTrade,
+  onUpgrade,
   equipLabel = 'Equip now',
   previewWide = false,
 }: {
@@ -110,8 +115,11 @@ export function PurchaseSheet({
   balance: number;
   ownedCount: number;
   isGuest: boolean;
+  isPremium?: boolean;
   onBuy: () => Promise<boolean>;
   onEquip: () => Promise<void>;
+  onGoToTrade?: () => void;
+  onUpgrade?: () => void;
   equipLabel?: string;
   previewWide?: boolean;
 }) {
@@ -120,17 +128,47 @@ export function PurchaseSheet({
   const primaryRef = useRef<HTMLButtonElement>(null);
   const openFlyShop = useUIStore((s) => s.openFlyShop);
   const {
-    wishlist,
-    pin,
-    clear: clearWishlist,
+    has: onWishlist,
+    add: addToWishlist,
+    remove: removeFromWishlist,
+    slots: wishlistSlots,
+    isFull: wishlistFull,
     busy: wishlistBusy,
+    error: wishlistError,
   } = useWishlist(open && !isGuest);
-  const isPinned = !!target && wishlist?.itemId === target.id;
-  const pinThis = () => {
+  const modifiers = useTradeConfig(open && !isGuest);
+  const plusSlots = modifiers.wishlistSlotsPlus;
+  const isPinned = !!target && onWishlist(target.id, target.kind ?? 'item');
+  const wishlistLocked = !isPinned && wishlistFull;
+  const wishlistUpsell = wishlistLocked && !isPremium && !!onUpgrade;
+  const toggleWishlist = async () => {
     if (!target) return;
-    void pin(target.id, target.kind ?? 'item');
-    emitCampaignTrigger('wishlist_pinned');
+    if (wishlistUpsell) {
+      onUpgrade?.();
+      return;
+    }
+    if (wishlistLocked) return;
+    const kind = target.kind ?? 'item';
+    if (isPinned) {
+      await removeFromWishlist(target.id, kind);
+      return;
+    }
+    const ok = await addToWishlist(target.id, kind);
+    if (ok) emitCampaignTrigger('wishlist_pinned');
   };
+  const wishlistLabel = (base: string) =>
+    wishlistUpsell
+      ? `Wishlist full — get ${plusSlots} slots`
+      : wishlistLocked
+        ? 'Wishlist full'
+        : base;
+  const wishlistHint = wishlistError
+    ? wishlistError
+    : wishlistLocked
+      ? wishlistUpsell
+        ? 'Or free a slot by removing one.'
+        : 'Remove one to save this instead.'
+      : null;
 
   useEffect(() => {
     if (open) {
@@ -142,14 +180,15 @@ export function PurchaseSheet({
   const rarity = target ? RARITY[target.rarity] : RARITY.common;
   const price = target?.price ?? 0;
   const owned = ownedCount > 0;
+  const tradeOnly = !!target && isTradeOnlyRarity(target.rarity);
   const canAfford = !isGuest && balance >= price;
   const shortBy = Math.max(0, price - balance);
 
   // The gap is the strongest signal this app produces about intent to spend.
   useEffect(() => {
-    if (!open || !target || isGuest || canAfford || owned) return;
+    if (!open || !target || isGuest || canAfford || owned || tradeOnly) return;
     emitCampaignTrigger('insufficient_flies', { gap: shortBy });
-  }, [open, target?.id, isGuest, canAfford, owned, shortBy]);
+  }, [open, target?.id, isGuest, canAfford, owned, shortBy, tradeOnly]);
 
   const handleBuy = async () => {
     if (busy) return;
@@ -267,12 +306,36 @@ export function PurchaseSheet({
               {phase === 'success'
                 ? 'Added to your wardrobe.'
                 : owned
-                  ? 'You already own this — wear it or grab another.'
-                  : 'Preview it on your frog, then make it yours.'}
+                  ? tradeOnly
+                    ? 'You already own this one — wear it any time.'
+                    : 'You already own this — wear it or grab another.'
+                  : tradeOnly
+                    ? 'Not for sale at any price. Trade four Epics for it.'
+                    : 'Preview it on your frog, then make it yours.'}
             </p>
 
+            {/* Trade-only explainer */}
+            {phase === 'confirm' && !owned && tradeOnly && (
+              <div className="mt-4 rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4">
+                <div className="flex items-center gap-2">
+                  <Repeat
+                    className="h-4 w-4 text-amber-600 dark:text-amber-400"
+                    strokeWidth={3}
+                  />
+                  <span className="text-[11px] font-black uppercase tracking-[0.14em] text-amber-700 dark:text-amber-400">
+                    Trade only
+                  </span>
+                </div>
+                <p className="mt-2 text-sm font-medium text-muted-foreground">
+                  {rarity.label}s never appear on the shelf. The trade-up is the
+                  only way in — and wishlisting this one tilts the draw toward
+                  it.
+                </p>
+              </div>
+            )}
+
             {/* Cost breakdown */}
-            {phase === 'confirm' && !owned && (
+            {phase === 'confirm' && !owned && !tradeOnly && (
               <div className="mt-4 rounded-2xl border border-border/60 bg-muted/40 p-4">
                 <Row label="Price">
                   {target.originalPrice != null &&
@@ -334,6 +397,45 @@ export function PurchaseSheet({
                     Keep shopping
                   </GhostButton>
                 </>
+              ) : owned && tradeOnly ? (
+                <PrimaryButton ref={primaryRef} onClick={handleEquip} busy={busy}>
+                  {equipLabel}
+                </PrimaryButton>
+              ) : tradeOnly ? (
+                <>
+                  <PrimaryButton
+                    ref={primaryRef}
+                    onClick={() => {
+                      onClose();
+                      onGoToTrade?.();
+                    }}
+                  >
+                    <span className="inline-flex items-center gap-2">
+                      <Repeat className="h-5 w-5" strokeWidth={3} />
+                      Trade for it
+                    </span>
+                  </PrimaryButton>
+                  {!isGuest && (
+                    <>
+                      <WishlistButton
+                        isPinned={isPinned}
+                        upsell={wishlistUpsell}
+                        disabled={
+                          wishlistBusy || (wishlistLocked && !wishlistUpsell)
+                        }
+                        onClick={toggleWishlist}
+                        pinnedLabel="On your wishlist"
+                        label={wishlistLabel('Add to wishlist')}
+                      />
+                      <p className="text-center text-xs font-bold text-muted-foreground">
+                        {wishlistHint ??
+                          (isPinned
+                            ? 'Trades now favour this one when you reach its tier.'
+                            : `${wishlistSlots.used} of ${wishlistSlots.max} wishlist slots used.`)}
+                      </p>
+                    </>
+                  )}
+                </>
               ) : owned ? (
                 <>
                   <PrimaryButton ref={primaryRef} onClick={handleEquip} busy={busy}>
@@ -363,14 +465,30 @@ export function PurchaseSheet({
                   </GhostButton>
                 </>
               ) : canAfford ? (
-                <PrimaryButton ref={primaryRef} onClick={handleBuy} busy={busy}>
-                  <span className="inline-flex items-center gap-2">
-                    Buy
-                    <span className="opacity-50">·</span>
-                    <Fly size={28} paused y={-6} />
-                    <span className="tabular-nums">{price.toLocaleString()}</span>
-                  </span>
-                </PrimaryButton>
+                <>
+                  <PrimaryButton ref={primaryRef} onClick={handleBuy} busy={busy}>
+                    <span className="inline-flex items-center gap-2">
+                      Buy
+                      <span className="opacity-50">·</span>
+                      <Fly size={28} paused y={-6} />
+                      <span className="tabular-nums">{price.toLocaleString()}</span>
+                    </span>
+                  </PrimaryButton>
+                  <WishlistButton
+                    isPinned={isPinned}
+                    upsell={wishlistUpsell}
+                    disabled={wishlistBusy || (wishlistLocked && !wishlistUpsell)}
+                    onClick={toggleWishlist}
+                    pinnedLabel="On your wishlist"
+                    label={wishlistLabel('Save it for later')}
+                    ghost
+                  />
+                  {wishlistHint && (
+                    <p className="text-center text-xs font-bold text-muted-foreground">
+                      {wishlistHint}
+                    </p>
+                  )}
+                </>
               ) : isGuest ? (
                 <button
                   ref={primaryRef}
@@ -395,33 +513,19 @@ export function PurchaseSheet({
                       flies
                     </span>
                   </PrimaryButton>
-                  <button
-                    type="button"
-                    onClick={isPinned ? clearWishlist : pinThis}
-                    disabled={wishlistBusy}
-                    className={cn(
-                      'flex h-12 w-full items-center justify-center gap-2 rounded-2xl text-sm font-black transition-colors disabled:opacity-60',
-                      isPinned
-                        ? 'bg-green-500/10 text-green-700 dark:text-green-400'
-                        : 'bg-muted/70 text-foreground hover:bg-muted',
-                    )}
-                  >
-                    {isPinned ? (
-                      <>
-                        <BookmarkCheck className="h-5 w-5" strokeWidth={2.75} />
-                        Tracking this goal
-                      </>
-                    ) : (
-                      <>
-                        <Bookmark className="h-5 w-5" strokeWidth={2.75} />
-                        Make it my goal
-                      </>
-                    )}
-                  </button>
+                  <WishlistButton
+                    isPinned={isPinned}
+                    upsell={wishlistUpsell}
+                    disabled={wishlistBusy || (wishlistLocked && !wishlistUpsell)}
+                    onClick={toggleWishlist}
+                    pinnedLabel="Tracking this goal"
+                    label={wishlistLabel('Make it my goal')}
+                  />
                   <p className="text-center text-xs font-bold text-muted-foreground">
-                    {isPinned
-                      ? `${shortBy.toLocaleString()} flies to go — we're counting it down for you.`
-                      : 'We’ll track your progress until you can afford it.'}
+                    {wishlistHint ??
+                      (isPinned
+                        ? `${shortBy.toLocaleString()} flies to go — we're counting it down for you.`
+                        : `We’ll track your progress until you can afford it. ${wishlistSlots.used} of ${wishlistSlots.max} slots used.`)}
                   </p>
                 </>
               )}
@@ -430,6 +534,60 @@ export function PurchaseSheet({
         ) : null
       }
     </BaseSheet>
+  );
+}
+
+function WishlistButton({
+  isPinned,
+  disabled,
+  onClick,
+  label,
+  pinnedLabel,
+  ghost,
+  upsell,
+}: {
+  isPinned: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+  label: string;
+  pinnedLabel: string;
+  ghost?: boolean;
+  upsell?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        'flex w-full items-center justify-center gap-2 rounded-2xl font-black transition-colors disabled:opacity-60',
+        ghost && !upsell ? 'h-11 text-sm' : 'h-12 text-sm',
+        isPinned
+          ? 'bg-green-500/10 text-green-700 dark:text-green-400'
+          : upsell
+            ? 'border border-amber-400/60 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-950/30 dark:text-amber-400'
+            : ghost
+              ? 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'
+              : 'bg-muted/70 text-foreground hover:bg-muted',
+      )}
+    >
+      {isPinned ? (
+        <>
+          <BookmarkCheck className="h-5 w-5" strokeWidth={2.75} />
+          {pinnedLabel}
+        </>
+      ) : upsell ? (
+        <>
+          <Icon name="frogPlus" label="Plus" className="h-6 w-6" />
+          {label}
+        </>
+      ) : (
+        <>
+          <Bookmark className="h-5 w-5" strokeWidth={2.75} />
+          {label}
+        </>
+      )}
+    </button>
   );
 }
 

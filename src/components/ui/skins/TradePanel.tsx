@@ -1,14 +1,17 @@
 'use client';
 
-import { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Sparkles,
   AlertCircle,
   ArrowRight,
+  Bookmark,
   ArrowUp,
+  Check,
   ChevronDown,
+  Crosshair,
   Dices,
   Play,
   Repeat,
@@ -26,9 +29,16 @@ import {
   ItemDef,
   Rarity,
   rarityRank,
-  RARITY_ORDER,
-  TRADE_ITEM_COUNT,
+  TRADE_MIN_ITEM_COUNT,
 } from '@/lib/skins/catalog';
+import { useTradeConfig } from '@/hooks/useTradeConfig';
+import { useWishlist } from '@/hooks/useWishlist';
+import {
+  quoteAimPrice,
+  quoteTradeFuel,
+  recipeFor,
+} from '@/lib/skins/tradeModifiers';
+import Fly from '@/components/ui/fly';
 import { Button } from '@/components/ui/button';
 import confetti from 'canvas-confetti';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
@@ -144,8 +154,12 @@ type TradePanelProps = {
   paused?: boolean;
   pageScroll?: boolean;
   isPremium?: boolean;
+  balance?: number;
   onGoToShop?: () => void;
+  onGetFlies?: (shortBy: number) => void;
 };
+
+type TradePrize = ItemDef & { kind?: 'item' | 'background'; imageUrl?: string };
 
 export function TradePanel({
   inventory,
@@ -159,14 +173,20 @@ export function TradePanel({
   paused = false,
   pageScroll = false,
   isPremium = false,
+  balance = 0,
   onGoToShop,
+  onGetFlies,
 }: TradePanelProps) {
   // --- State ---
+  const modifiers = useTradeConfig();
+  const { items: wishlistItems } = useWishlist(true);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [fuelIds, setFuelIds] = useState<string[]>([]);
+  const [aimOn, setAimOn] = useState(false);
   const [isTrading, setIsTrading] = useState(false);
-  const [tradeResult, setTradeResult] = useState<
-    (ItemDef & { kind?: 'item' | 'background'; imageUrl?: string }) | null
-  >(null);
+  const [rewardQueue, setRewardQueue] = useState<TradePrize[]>([]);
+  const [wasGolden, setWasGolden] = useState(false);
+  const tradeResult = rewardQueue[0] ?? null;
   const [rerollClaimId, setRerollClaimId] = useState<string | null>(null);
   const [rerollBusy, setRerollBusy] = useState(false);
   const [rerollError, setRerollError] = useState<string | null>(null);
@@ -199,14 +219,14 @@ export function TradePanel({
       const owned = inventory[item.id] ?? 0;
       if (owned <= 0) return;
       if (item.slot === 'container') return;
-      if (item.rarity === 'legendary') return;
+      if (!recipeFor(modifiers, item.rarity)) return;
       const uid = `item:${item.id}`;
       map.set(uid, { uid, id: item.id, kind: 'item', rarity: item.rarity, owned, item });
     });
     backgrounds.forEach((bgItem) => {
       const owned = backgroundInventory[bgItem.id] ?? 0;
       if (owned <= 0) return;
-      if (bgItem.rarity === 'legendary') return;
+      if (!recipeFor(modifiers, bgItem.rarity)) return;
       // Granted to everyone, so there's nothing to spend — the server rejects
       // it too.
       if (bgItem.id === DEFAULT_BACKGROUND_ID) return;
@@ -221,7 +241,7 @@ export function TradePanel({
       });
     });
     return map;
-  }, [catalog, inventory, backgrounds, backgroundInventory]);
+  }, [catalog, inventory, backgrounds, backgroundInventory, modifiers]);
 
   // Unfiltered, so the empty state can tell "a filter is hiding them" apart
   // from "you own none".
@@ -340,20 +360,91 @@ export function TradePanel({
 
   const selectedCounts = useMemo(() => {
     const counts: Record<string, number> = {};
-    selectedIds.forEach((id) => (counts[id] = (counts[id] || 0) + 1));
+    [...selectedIds, ...fuelIds].forEach(
+      (id) => (counts[id] = (counts[id] || 0) + 1),
+    );
     return counts;
-  }, [selectedIds]);
+  }, [selectedIds, fuelIds]);
+
+  const recipe = targetRarity ? recipeFor(modifiers, targetRarity) : null;
+  const slotCount = recipe?.itemCount ?? TRADE_MIN_ITEM_COUNT;
+
+  // Every main input has to be a spare — one-of-a-kind items you would regret
+  // burning don't earn the waiver.
+  const allSpares =
+    selectedIds.length > 0 &&
+    Array.from(new Set(selectedIds)).every(
+      (uid) => (entryMap.get(uid)?.owned ?? 0) >= 2,
+    );
+  const fuelQuote = quoteTradeFuel({
+    modifiers,
+    recipe,
+    allSpares,
+    isPlus: isPremium,
+  });
+  const fuelRarity = fuelQuote.count > 0 ? recipe?.fuelRarity ?? null : null;
+  const aimQuote = quoteAimPrice({ modifiers, recipe, isPlus: isPremium });
+  const wishlistHits = recipe
+    ? wishlistItems.filter(
+        (entry) => entry.rarity === recipe.to && !entry.owned,
+      ).length
+    : 0;
+  const canAim = wishlistHits > 0 && aimQuote.price > 0;
+  const aimActive = aimOn && canAim;
+  const canAffordAim = balance >= aimQuote.price;
+
+  const fuelOwned = useMemo(() => {
+    if (!fuelRarity) return 0;
+    let total = 0;
+    entryMap.forEach((entry) => {
+      if (entry.rarity === fuelRarity) total += entry.owned;
+    });
+    return total;
+  }, [entryMap, fuelRarity]);
+
+  // Trimming a waiver mid-build can ask for fuel the player already dropped,
+  // so the surplus is released rather than silently counted.
+  useEffect(() => {
+    setFuelIds((prev) =>
+      prev.length > fuelQuote.count ? prev.slice(0, fuelQuote.count) : prev,
+    );
+  }, [fuelQuote.count]);
+
+  useEffect(() => {
+    if (!canAim && aimOn) setAimOn(false);
+  }, [canAim, aimOn]);
 
   // --- Actions ---
+  // Main inputs fill first, then fuel — so the same tap on the same card means
+  // different things at different stages of the contract.
+  const canTakeAsFuel = (entry: TradeEntry) =>
+    !!fuelRarity &&
+    entry.rarity === fuelRarity &&
+    selectedIds.length === slotCount &&
+    fuelIds.length < fuelQuote.count;
+
+  const canSelect = (entry: TradeEntry) => {
+    if (canTakeAsFuel(entry)) return true;
+    if (selectedIds.length >= slotCount) return false;
+    return !targetRarity || entry.rarity === targetRarity;
+  };
+
   const handleSelect = (entry: TradeEntry) => {
-    if (selectedIds.length >= TRADE_ITEM_COUNT) return;
-    if (targetRarity && entry.rarity !== targetRarity) return;
     const currentlySelected = selectedCounts[entry.uid] || 0;
-    if (currentlySelected < entry.owned) {
-      if (selectedIds.length + 1 === TRADE_ITEM_COUNT) hapticTick();
+    if (currentlySelected >= entry.owned) return;
+
+    if (canTakeAsFuel(entry)) {
+      if (fuelIds.length + 1 === fuelQuote.count) hapticTick();
       else hapticSelect();
-      setSelectedIds((prev) => [...prev, entry.uid]);
+      setFuelIds((prev) => [...prev, entry.uid]);
+      return;
     }
+
+    if (selectedIds.length >= slotCount) return;
+    if (targetRarity && entry.rarity !== targetRarity) return;
+    if (selectedIds.length + 1 === slotCount) hapticTick();
+    else hapticSelect();
+    setSelectedIds((prev) => [...prev, entry.uid]);
   };
 
   const handleRemove = (index: number) => {
@@ -361,32 +452,59 @@ export function TradePanel({
     setSelectedIds((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const handleRemoveFuel = (index: number) => {
+    hapticSelect();
+    setFuelIds((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const handleClear = () => {
     setSelectedIds([]);
+    setFuelIds([]);
+    setAimOn(false);
     setError(null);
   };
 
+  const toPick = (uid: string) => {
+    const [kind, ...rest] = uid.split(':');
+    return {
+      id: rest.join(':'),
+      kind: kind === 'background' ? 'background' : 'item',
+    };
+  };
+
   const handleConfirmTrade = async () => {
-    if (selectedIds.length !== TRADE_ITEM_COUNT) return;
+    if (selectedIds.length !== slotCount) return;
+    if (fuelIds.length !== fuelQuote.count) return;
+    if (aimActive && !canAffordAim) {
+      onGetFlies?.(aimQuote.price - balance);
+      return;
+    }
     setIsTrading(true);
     setError(null);
     try {
-      const picks = selectedIds.map((uid) => {
-        const [kind, ...rest] = uid.split(':');
-        return { id: rest.join(':'), kind: kind === 'background' ? 'background' : 'item' };
-      });
       const res = await fetch('/api/skins/trade', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ picks }),
+        body: JSON.stringify({
+          picks: selectedIds.map(toPick),
+          fuel: fuelIds.map(toPick),
+          aim: aimActive,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Trade failed');
 
-      setTradeResult(data.reward);
+      setRewardQueue(
+        Array.isArray(data.rewards) && data.rewards.length > 0
+          ? data.rewards
+          : [data.reward],
+      );
+      setWasGolden(!!data.golden);
       setRerollClaimId(data.rerollClaimId ?? null);
       setRerollError(null);
       setSelectedIds([]);
+      setFuelIds([]);
+      setAimOn(false);
       hapticCelebrate();
       if (onTradeSuccess) onTradeSuccess();
 
@@ -404,7 +522,7 @@ export function TradePanel({
   };
 
   const handleClaimReward = () => {
-    setTradeResult(null);
+    setRewardQueue((prev) => prev.slice(1));
     setRerollClaimId(null);
     setRerollError(null);
   };
@@ -435,7 +553,7 @@ export function TradePanel({
         return;
       }
       setRerollClaimId(null);
-      setTradeResult(data.reward);
+      setRewardQueue([data.reward]);
       hapticCelebrate();
       if (onTradeSuccess) onTradeSuccess();
       confetti({
@@ -453,21 +571,106 @@ export function TradePanel({
   };
 
 
-  const isReady = selectedIds.length === TRADE_ITEM_COUNT;
-  const nextRarity: Rarity | null =
-    targetRarity && targetRarity !== 'legendary'
-      ? (RARITY_ORDER[rarityRank[targetRarity] + 1] as Rarity)
-      : null;
+  const mainFilled = selectedIds.length === slotCount;
+  const fuelFilled = fuelIds.length === fuelQuote.count;
+  const isReady = mainFilled && fuelFilled;
+  const nextRarity: Rarity | null = recipe?.to ?? null;
+  const needsFlies = aimActive && !canAffordAim;
 
-  let contractHint = `Combine ${TRADE_ITEM_COUNT} same-rarity items to upgrade.`;
+  let contractHint = 'Combine same-rarity items to upgrade.';
   if (isReady && nextRarity) {
-    contractHint = `Ready! Combine into 1 ${nextRarity} reward.`;
+    contractHint = needsFlies
+      ? `You need ${(aimQuote.price - balance).toLocaleString()} more flies to aim this trade.`
+      : aimActive
+        ? `Ready! Aimed at your wishlisted ${nextRarity} items.`
+        : `Ready! Combine into 1 ${nextRarity} reward.`;
+  } else if (mainFilled && fuelRarity) {
+    const left = fuelQuote.count - fuelIds.length;
+    contractHint =
+      fuelOwned - fuelIds.length >= left
+        ? `Add ${left} more ${fuelRarity} ${left === 1 ? 'item' : 'items'} as fuel.`
+        : `You need ${left} spare ${fuelRarity} ${left === 1 ? 'item' : 'items'} to fuel this trade.`;
   } else if (targetRarity) {
-    contractHint = `Add ${TRADE_ITEM_COUNT - selectedIds.length} more ${targetRarity} items.`;
+    const left = slotCount - selectedIds.length;
+    contractHint = `Add ${left} more ${targetRarity} ${left === 1 ? 'item' : 'items'}.`;
   }
 
   const renderContract = (desktopMode: boolean) => {
     const expanded = desktopMode || isContractExpanded;
+    const totalSlots = slotCount + fuelQuote.count;
+    const totalPicked = selectedIds.length + fuelIds.length;
+
+    const renderSlotGrid = (
+      uids: string[],
+      count: number,
+      onRemove: (index: number) => void,
+      keyPrefix: string,
+    ) => (
+      <div
+        className="grid gap-1.5 lg:gap-2"
+        style={{ gridTemplateColumns: `repeat(${count}, minmax(0, 1fr))` }}
+      >
+        {Array.from({ length: count }).map((_, i) => {
+          const uid = uids[i];
+          const entry = uid ? entryMap.get(uid) : null;
+          const config = entry ? RARITY_CONFIG[entry.rarity] : null;
+
+          return (
+            <button
+              key={`${keyPrefix}-${i}`}
+              type="button"
+              onClick={() => entry && onRemove(i)}
+              className={cn(
+                'h-12 lg:h-auto lg:aspect-square rounded-lg border-2 flex items-center justify-center relative overflow-hidden transition-colors duration-200',
+                !entry && 'border-dashed border-border bg-muted/50',
+                entry && config && cn(config.border, config.bg, 'shadow-sm'),
+              )}
+            >
+              <AnimatePresence>
+                {entry && (
+                  <motion.div
+                    key={`${uid}-${i}`}
+                    initial={{ scale: 0.4, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.4, opacity: 0 }}
+                    transition={{ type: 'spring', stiffness: 480, damping: 26 }}
+                    className="absolute inset-0 flex items-center justify-center"
+                  >
+                    {entry.kind === 'background' && entry.bg ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={backgroundPreview(entry.bg)}
+                        alt={entry.bg.name}
+                        className="absolute inset-0 object-cover w-full h-full"
+                      />
+                    ) : entry.item ? (
+                      <FrogSnapshot
+                        indices={{
+                          skin: 0,
+                          hat: 0,
+                          body: 0,
+                          hand_item: 0,
+                          [entry.item.slot]: entry.item.riveIndex,
+                        }}
+                        width={44}
+                        height={44}
+                        visualOffsetY={3}
+                        className="pointer-events-none"
+                      />
+                    ) : null}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+              {!entry && (
+                <span className="text-[10px] font-bold text-muted-foreground/40">
+                  {i + 1}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    );
 
     const headerInfo = (
       <div className="flex items-center gap-2 min-w-0">
@@ -503,7 +706,7 @@ export function TradePanel({
 
     const headerCount = (
       <motion.div
-        key={selectedIds.length}
+        key={totalPicked}
         initial={{ scale: 1.35 }}
         animate={{ scale: 1 }}
         transition={{ type: 'spring', stiffness: 500, damping: 22 }}
@@ -512,8 +715,8 @@ export function TradePanel({
           isReady ? 'text-green-500' : 'text-primary',
         )}
       >
-        {selectedIds.length}
-        <span className="text-muted-foreground/40">/{TRADE_ITEM_COUNT}</span>
+        {totalPicked}
+        <span className="text-muted-foreground/40">/{totalSlots}</span>
       </motion.div>
     );
 
@@ -539,7 +742,7 @@ export function TradePanel({
         <div className="w-full h-1 overflow-hidden bg-muted shrink-0">
           <motion.div
             initial={false}
-            animate={{ scaleX: selectedIds.length / TRADE_ITEM_COUNT }}
+            animate={{ scaleX: totalPicked / totalSlots }}
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
             className={cn(
               'h-full w-full origin-left',
@@ -555,67 +758,95 @@ export function TradePanel({
           className="w-full overflow-hidden"
         >
           <div className="w-full max-w-md mx-auto p-2.5 lg:p-4">
-            <div className="grid grid-cols-5 gap-1.5 lg:gap-2 mb-2 lg:mb-4">
-              {Array.from({ length: TRADE_ITEM_COUNT }).map((_, i) => {
-                const uid = selectedIds[i];
-                const entry = uid ? entryMap.get(uid) : null;
-                const config = entry ? RARITY_CONFIG[entry.rarity] : null;
+            <div className="mb-2 lg:mb-4">
+              {renderSlotGrid(selectedIds, slotCount, handleRemove, 'main')}
+            </div>
 
-                return (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() => entry && handleRemove(i)}
+            {fuelRarity && (
+              <div className="mb-2 lg:mb-4">
+                <div className="mb-1.5 flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+                    Fuel · {fuelRarity}
+                  </span>
+                  {fuelQuote.waived > 0 && (
+                    <span className="flex flex-wrap items-center justify-end gap-1">
+                      {fuelQuote.allSparesWaived > 0 && (
+                        <WaiverChip>All spares −{fuelQuote.allSparesWaived}</WaiverChip>
+                      )}
+                      {fuelQuote.plusWaived > 0 && (
+                        <WaiverChip>Plus −{fuelQuote.plusWaived}</WaiverChip>
+                      )}
+                    </span>
+                  )}
+                </div>
+                {renderSlotGrid(
+                  fuelIds,
+                  fuelQuote.count,
+                  handleRemoveFuel,
+                  'fuel',
+                )}
+              </div>
+            )}
+
+            {recipe && wishlistHits > 0 && (
+              <div className="mb-2 overflow-hidden rounded-lg bg-muted/60">
+                <button
+                  type="button"
+                  onClick={() => {
+                    hapticSelect();
+                    setAimOn((v) => !v);
+                  }}
+                  className="flex w-full items-center gap-2 px-2.5 py-2 text-left"
+                >
+                  <span
                     className={cn(
-                      'h-12 lg:h-auto lg:aspect-square rounded-lg border-2 flex items-center justify-center relative overflow-hidden transition-colors duration-200',
-                      !entry && 'border-dashed border-border bg-muted/50',
-                      entry && config && cn(config.border, config.bg, 'shadow-sm'),
+                      'flex h-4 w-4 shrink-0 items-center justify-center rounded border-2 transition-colors',
+                      aimActive
+                        ? 'border-primary bg-primary text-primary-foreground'
+                        : 'border-border',
                     )}
                   >
-                    <AnimatePresence>
-                      {entry && (
-                        <motion.div
-                          key={`${uid}-${i}`}
-                          initial={{ scale: 0.4, opacity: 0 }}
-                          animate={{ scale: 1, opacity: 1 }}
-                          exit={{ scale: 0.4, opacity: 0 }}
-                          transition={{ type: 'spring', stiffness: 480, damping: 26 }}
-                          className="absolute inset-0 flex items-center justify-center"
-                        >
-                          {entry.kind === 'background' && entry.bg ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={backgroundPreview(entry.bg)}
-                              alt={entry.bg.name}
-                              className="absolute inset-0 object-cover w-full h-full"
-                            />
-                          ) : entry.item ? (
-                            <FrogSnapshot
-                              indices={{
-                                skin: 0,
-                                hat: 0,
-                                body: 0,
-                                hand_item: 0,
-                                [entry.item.slot]: entry.item.riveIndex,
-                              }}
-                              width={44}
-                              height={44}
-                              visualOffsetY={3}
-                              className="pointer-events-none"
-                            />
-                          ) : null}
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                    {!entry && (
-                      <span className="text-[10px] font-bold text-muted-foreground/40">
-                        {i + 1}
+                    {aimActive && <Check className="h-3 w-3" strokeWidth={4} />}
+                  </span>
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="flex items-center gap-1 text-[11px] font-black uppercase tracking-wider text-foreground">
+                      <Crosshair className="h-3 w-3 shrink-0" strokeWidth={3} />
+                      Aim
+                    </span>
+                    <span className="text-[10px] font-bold text-muted-foreground">
+                      Guarantee one of your {wishlistHits} wishlisted{' '}
+                      {nextRarity}
+                      {wishlistHits === 1 ? ' item' : ' items'}
+                    </span>
+                  </span>
+                  <span className="flex shrink-0 items-center gap-1">
+                    {aimQuote.discountPercent > 0 && (
+                      <span className="text-[11px] font-bold tabular-nums text-muted-foreground line-through opacity-60">
+                        {aimQuote.basePrice.toLocaleString()}
                       </span>
                     )}
-                  </button>
-                );
-              })}
-            </div>
+                    <Fly size={22} paused y={-5} />
+                    <span
+                      className={cn(
+                        'text-sm font-black tabular-nums',
+                        !aimActive || canAffordAim
+                          ? 'text-foreground'
+                          : 'text-amber-600 dark:text-amber-400',
+                      )}
+                    >
+                      {aimQuote.price.toLocaleString()}
+                    </span>
+                  </span>
+                </button>
+                {!aimActive && (
+                  <p className="flex items-center gap-1 px-2.5 pb-2 text-[10px] font-bold text-muted-foreground">
+                    <Bookmark className="h-3 w-3 shrink-0" strokeWidth={3} />
+                    Free trades already have a{' '}
+                    {modifiers.wishlistRedirectPercent}% chance of landing one.
+                  </p>
+                )}
+              </div>
+            )}
 
             {error && (
               <div className="flex items-center justify-center gap-2 mb-2 text-xs font-bold text-destructive">
@@ -638,12 +869,14 @@ export function TradePanel({
                 onClick={handleConfirmTrade}
                 className={cn(
                   'group relative flex-1 h-10 lg:h-14 font-black uppercase tracking-wider transition-all overflow-hidden text-sm',
-                  isReady
+                  isReady && !needsFlies
                     ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/40'
-                    : 'bg-muted text-muted-foreground',
+                    : isReady
+                      ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30'
+                      : 'bg-muted text-muted-foreground',
                 )}
               >
-                {isReady && !isTrading && (
+                {isReady && !needsFlies && !isTrading && (
                   <>
                     <span className="absolute inset-0 pointer-events-none animate-pulse bg-primary-foreground/10" />
                     <span className="absolute top-0 left-0 z-10 block w-1/2 h-full pointer-events-none bg-gradient-to-r from-transparent via-white to-transparent opacity-25 animate-shine" />
@@ -651,6 +884,15 @@ export function TradePanel({
                 )}
                 {isTrading ? (
                   <Sparkles className="w-5 h-5 mr-2 animate-spin" />
+                ) : isReady && needsFlies ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    Get
+                    <Fly size={26} paused y={-4} />
+                    <span className="tabular-nums">
+                      {(aimQuote.price - balance).toLocaleString()}
+                    </span>
+                    flies
+                  </span>
                 ) : (
                   <>
                     Trade Up <ArrowUp size={18} className="ml-2" />
@@ -704,6 +946,18 @@ export function TradePanel({
 
             {/* Main Content */}
             <div className="relative z-10 flex flex-col items-center justify-center w-full max-w-md p-6">
+              {wasGolden && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10, scale: 0.9 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  transition={{ type: 'spring', stiffness: 380, damping: 22 }}
+                  className="mb-3 flex items-center gap-1.5 rounded-full bg-gradient-to-r from-amber-400 to-yellow-300 px-3.5 py-1.5 text-[11px] font-black uppercase tracking-[0.16em] text-amber-950 shadow-lg shadow-amber-500/30"
+                >
+                  <Sparkles className="h-3.5 w-3.5" strokeWidth={3} />
+                  Golden trade — two items
+                  {rewardQueue.length > 1 && <span>· 1 of 2</span>}
+                </motion.div>
+              )}
               <RewardCard
                 key={`card-${tradeResult.id}-${rerollClaimId ?? 'rerolled'}`}
                 prize={tradeResult}
@@ -819,7 +1073,7 @@ export function TradePanel({
               description={
                 hasAnySpares
                   ? undefined
-                  : `Collect ${TRADE_ITEM_COUNT} of one rarity to trade up.`
+                  : `Collect ${TRADE_MIN_ITEM_COUNT} of one rarity to trade up.`
               }
               action={
                 hasAnySpares || !onGoToShop
@@ -840,9 +1094,7 @@ export function TradePanel({
                 ) => {
                   const selected = selectedCounts[entry.uid] || 0;
                   const remaining = entry.owned - selected;
-                  const isWrongRarity =
-                    !!targetRarity && entry.rarity !== targetRarity;
-                  const isDimmed = remaining === 0 || isWrongRarity;
+                  const isDimmed = remaining === 0 || !canSelect(entry);
 
                   return (
                     <div
@@ -950,6 +1202,14 @@ export function TradePanel({
         {renderContract(false)}
       </div>
     </div>
+  );
+}
+
+function WaiverChip({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="rounded-full bg-green-500/15 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-green-700 dark:text-green-400">
+      {children}
+    </span>
   );
 }
 

@@ -8,7 +8,7 @@ import useSWR from 'swr';
 import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
 import { useState, useEffect } from 'react';
 import { WardrobePopup, useWardrobeBadges } from '@/components/ui/WardrobePopup';
-import { TRADE_ITEM_COUNT } from '@/lib/skins/catalog';
+import { TRADE_MIN_ITEM_COUNT } from '@/lib/skins/catalog';
 import { hapticTick } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
 
@@ -17,7 +17,7 @@ export default function MobileNav() {
   const router = useRouter();
   const { user } = useAuth();
   const { inventoryBadge, tradeSpares } = useWardrobeBadges();
-  const tradeReady = tradeSpares >= TRADE_ITEM_COUNT;
+  const tradeReady = tradeSpares >= TRADE_MIN_ITEM_COUNT;
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const [wardrobePopupOpen, setWardrobePopupOpen] = useState(false);
   const [pendingHref, setPendingHref] = useState<string | null>(null);

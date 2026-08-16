@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import useSWR from 'swr';
 import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
 import {
@@ -10,13 +10,17 @@ import {
 import { hapticImpact, hapticTick } from '@/lib/haptics';
 import {
   resolveWishlistPricing,
+  wishlistPinKey,
   wishlistProgress,
   type WishlistKind,
+  type WishlistState,
   type WishlistView,
 } from '@/lib/skins/wishlist';
 
 type SummaryShape = {
   wishlist?: WishlistView | null;
+  wishlistItems?: WishlistView[];
+  wishlistSlots?: WishlistState['slots'];
   wardrobe?: { flies?: number };
   dailyDeals?: {
     itemId: string;
@@ -25,10 +29,19 @@ type SummaryShape = {
   }[];
 };
 
+type WishlistResponse = {
+  wishlist?: WishlistView | null;
+  wishlistItems?: WishlistView[];
+  wishlistSlots?: WishlistState['slots'];
+  error?: string;
+};
+
+const EMPTY: WishlistView[] = [];
+
 /**
- * The single "saving for" pin, read off the inventory summary that every
- * balance surface already subscribes to — so the goal rides along with the
- * balance instead of adding a request per surface.
+ * The saving-for list, read off the inventory summary that every balance
+ * surface already subscribes to — so the goal rides along with the balance
+ * instead of adding a request per surface.
  */
 export function useWishlist(enabled: boolean = true) {
   const { data } = useSWR<SummaryShape>(
@@ -37,18 +50,39 @@ export function useWishlist(enabled: boolean = true) {
     { revalidateOnFocus: false },
   );
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const wishlist = data?.wishlist ?? null;
+  const items = data?.wishlistItems ?? EMPTY;
+  const slots = data?.wishlistSlots ?? { used: items.length, max: 0 };
   const balance = data?.wardrobe?.flies ?? 0;
   const pricing = resolveWishlistPricing(wishlist, data?.dailyDeals);
-  const progress = pricing
-    ? wishlistProgress(pricing.price, balance)
-    : null;
+  const progress = pricing ? wishlistProgress(pricing.price, balance) : null;
 
-  const pin = useCallback(
+  const keys = useMemo(
+    () => new Set(items.map((entry) => wishlistPinKey(entry))),
+    [items],
+  );
+  const has = useCallback(
+    (itemId: string, kind: WishlistKind = 'item') =>
+      keys.has(wishlistPinKey({ itemId, kind })),
+    [keys],
+  );
+  const isFull = slots.max > 0 && slots.used >= slots.max;
+
+  const apply = (payload: WishlistResponse) => {
+    patchInventoryWishlist({
+      wishlist: payload.wishlist ?? null,
+      wishlistItems: payload.wishlistItems ?? [],
+      wishlistSlots: payload.wishlistSlots,
+    });
+  };
+
+  const add = useCallback(
     async (itemId: string, kind: WishlistKind = 'item') => {
       if (busy) return false;
       setBusy(true);
+      setError(null);
       hapticImpact();
       try {
         const res = await fetch('/api/skins/wishlist', {
@@ -56,9 +90,37 @@ export function useWishlist(enabled: boolean = true) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ itemId, kind }),
         });
-        const payload = await res.json().catch(() => ({}));
-        if (!res.ok || !payload.wishlist) return false;
-        patchInventoryWishlist(payload.wishlist as WishlistView);
+        const payload: WishlistResponse = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setError(payload.error ?? 'Could not add this to your wishlist.');
+          return false;
+        }
+        apply(payload);
+        return true;
+      } catch {
+        setError('Could not add this to your wishlist.');
+        return false;
+      } finally {
+        setBusy(false);
+      }
+    },
+    [busy],
+  );
+
+  const remove = useCallback(
+    async (itemId: string, kind: WishlistKind = 'item') => {
+      if (busy) return false;
+      setBusy(true);
+      setError(null);
+      hapticTick();
+      try {
+        const res = await fetch(
+          `/api/skins/wishlist?itemId=${encodeURIComponent(itemId)}&kind=${kind}`,
+          { method: 'DELETE' },
+        );
+        const payload: WishlistResponse = await res.json().catch(() => ({}));
+        if (!res.ok) return false;
+        apply(payload);
         return true;
       } catch {
         return false;
@@ -69,13 +131,21 @@ export function useWishlist(enabled: boolean = true) {
     [busy],
   );
 
+  const toggle = useCallback(
+    async (itemId: string, kind: WishlistKind = 'item') =>
+      has(itemId, kind) ? remove(itemId, kind) : add(itemId, kind),
+    [add, has, remove],
+  );
+
   const clear = useCallback(async () => {
     if (busy) return false;
     setBusy(true);
     hapticTick();
-    patchInventoryWishlist(null);
+    patchInventoryWishlist({ wishlist: null, wishlistItems: [] });
     try {
-      await fetch('/api/skins/wishlist', { method: 'DELETE' });
+      const res = await fetch('/api/skins/wishlist', { method: 'DELETE' });
+      const payload: WishlistResponse = await res.json().catch(() => ({}));
+      if (res.ok) apply(payload);
       return true;
     } catch {
       return false;
@@ -84,5 +154,22 @@ export function useWishlist(enabled: boolean = true) {
     }
   }, [busy]);
 
-  return { wishlist, balance, pricing, progress, pin, clear, busy };
+  return {
+    wishlist,
+    items,
+    slots,
+    isFull,
+    balance,
+    pricing,
+    progress,
+    has,
+    add,
+    /** @deprecated Use `add` — kept so older callers keep compiling. */
+    pin: add,
+    remove,
+    toggle,
+    clear,
+    busy,
+    error,
+  };
 }

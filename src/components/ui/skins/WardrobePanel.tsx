@@ -28,7 +28,8 @@ import {
   rarityRank,
   byId as staticById,
   countInventorySpares,
-  TRADE_ITEM_COUNT,
+  isTradeOnlyRarity,
+  TRADE_MIN_ITEM_COUNT,
 } from '@/lib/skins/catalog';
 import Fly from '@/components/ui/fly';
 import Frog from '@/components/ui/frog';
@@ -50,6 +51,9 @@ import { TradePanel } from './TradePanel';
 import GiftBoxOpening from '@/components/ui/gift-box/GiftBoxOpening';
 import { StreakFreezeShopCard } from '@/components/ui/streak/StreakFreezeShopCard';
 import { DailyDealsShelf, DailyDealsTeaser } from './DailyDealsShelf';
+import { WishlistButton } from './WishlistButton';
+import { WishlistShelf } from './WishlistShelf';
+import { WishlistSheet } from './WishlistSheet';
 import { SeenOnFriendsRow } from './SeenOnFriendsRow';
 import { LooksRow } from './LooksRow';
 import { WardrobeEmptyState } from './WardrobeEmptyState';
@@ -64,6 +68,13 @@ import {
   backgroundPreview,
 } from '@/hooks/useBackgroundActions';
 import { useUIStore } from '@/lib/uiStore';
+import { useWishlist } from '@/hooks/useWishlist';
+import {
+  buildWishlistEntries,
+  wishlistBucket,
+  type WishlistEntry,
+} from '@/lib/skins/wishlist';
+import { trackAnalyticsEvent } from '@/lib/analytics/client';
 
 type WardrobeCard =
   | {
@@ -312,7 +323,7 @@ function WardrobeManagerContent({
       countInventorySpares(data?.wardrobe?.inventory, data?.catalog).spares,
     [data],
   );
-  const tradeReady = tradeSpares >= TRADE_ITEM_COUNT;
+  const tradeReady = tradeSpares >= TRADE_MIN_ITEM_COUNT;
 
   const [activeTab, setActiveTab] = useState<string>(defaultTab);
   useEffect(() => {
@@ -337,6 +348,12 @@ function WardrobeManagerContent({
     null,
   );
   const [plusOpen, setPlusOpen] = useState(false);
+  const [plusPlacement, setPlusPlacement] = useState('premium_daily_deal');
+  const [wishlistOpen, setWishlistOpen] = useState(false);
+  const openPlus = (placement: string) => {
+    setPlusPlacement(placement);
+    setPlusOpen(true);
+  };
   const [sortBy, setSortBy] = useState<SortOrder>('latest');
   const [notif, setNotif] = useState<{
     msg: string;
@@ -395,6 +412,7 @@ function WardrobeManagerContent({
   }, [embedded, isStuck, setWardrobeStuck]);
 
   const setWardrobeTab = useUIStore((s) => s.setWardrobeTab);
+  const openFlyShop = useUIStore((s) => s.openFlyShop);
   React.useEffect(() => {
     if (!embedded) return;
     setWardrobeTab(activeTab);
@@ -747,6 +765,10 @@ function WardrobeManagerContent({
       return false;
     }
     if (!data?.wardrobe || buyingId) return false;
+    if (isTradeOnlyRarity(item.rarity)) {
+      setNotif({ msg: 'This one is trade-only.', type: 'error' });
+      return false;
+    }
     const balance = data.wardrobe.flies ?? 0;
     const price = priceOverride ?? item.priceFlies ?? 0;
     if (balance < price) {
@@ -891,6 +913,55 @@ function WardrobeManagerContent({
 
   const balance = data?.wardrobe?.flies ?? 0;
   const isGuest = !user;
+
+  const { remove: removeFromWishlist, busy: wishlistBusy } = useWishlist(false);
+  const wishlistEntries = useMemo(
+    () => buildWishlistEntries(data?.wishlistItems, data?.dailyDeals, balance),
+    [data?.wishlistItems, data?.dailyDeals, balance],
+  );
+  const wishlistSlots = data?.wishlistSlots ?? {
+    used: wishlistEntries.length,
+    max: 0,
+  };
+  const wishlistedItemIds = useMemo(
+    () =>
+      new Set(
+        (data?.wishlistItems ?? [])
+          .filter((entry) => entry.kind === 'item')
+          .map((entry) => entry.itemId),
+      ),
+    [data?.wishlistItems],
+  );
+  const wishlistReadyCount = wishlistEntries.filter((entry) => {
+    const bucket = wishlistBucket(entry);
+    return bucket === 'ready' || bucket === 'deal';
+  }).length;
+  const dealsVisible = activeFilter === 'all' && !!data?.dailyDeals?.length;
+  const shelfWishlistEntries = wishlistEntries.filter(
+    (entry) => !(dealsVisible && entry.onDeal),
+  );
+
+  const openWishlist = () => {
+    setWishlistOpen(true);
+    trackAnalyticsEvent('wishlist_opened', {
+      tab: activeTab,
+      count: wishlistEntries.length,
+      ready: wishlistReadyCount,
+    });
+  };
+  const openWishlistEntry = (entry: WishlistEntry) => {
+    if (entry.view.kind === 'background') {
+      const bgItem = bg.catalog.find(
+        (candidate) => candidate.id === entry.view.itemId,
+      );
+      if (bgItem) openBgPurchase(bgItem);
+      return;
+    }
+    const item = data?.catalog?.find(
+      (candidate) => candidate.id === entry.view.itemId,
+    );
+    if (item) openItemPurchase(item, entry.onDeal ? entry.price : null);
+  };
 
   const purchaseItem = purchaseCard?.kind === 'item' ? purchaseCard.item : null;
   const purchaseBg = purchaseCard?.kind === 'bg' ? purchaseCard.bg : null;
@@ -1286,6 +1357,13 @@ function WardrobeManagerContent({
 
               {!embedded && (
                 <div className="flex items-center gap-2">
+                  {!isGuest && (
+                    <WishlistButton
+                      count={wishlistEntries.length}
+                      readyCount={wishlistReadyCount}
+                      onClick={openWishlist}
+                    />
+                  )}
                   <SortMenu
                     value={sortBy}
                     onChange={setSortBy}
@@ -1395,10 +1473,17 @@ function WardrobeManagerContent({
               {embedded && (
                 <div
                   className={cn(
-                    'relative z-10 flex shrink-0 items-center gap-2 self-stretch border-l border-border/40 pl-3',
+                    'relative z-10 flex shrink-0 items-center gap-1.5 self-stretch border-l border-border/40 pl-2.5',
                     'bg-background',
                   )}
                 >
+                  {!isGuest && (
+                    <WishlistButton
+                      count={wishlistEntries.length}
+                      readyCount={wishlistReadyCount}
+                      onClick={openWishlist}
+                    />
+                  )}
                   <SortMenu
                     value={sortBy}
                     onChange={setSortBy}
@@ -1630,7 +1715,7 @@ function WardrobeManagerContent({
                             equipped={data?.wardrobe?.equipped}
                             equippedBackgroundId={bg.equipped}
                             onNotify={setNotif}
-                            onUpgrade={() => setPlusOpen(true)}
+                            onUpgrade={() => openPlus('wardrobe_looks')}
                           />
                         )}
                         {rowSection(
@@ -1709,11 +1794,27 @@ function WardrobeManagerContent({
                       isPremium={!!data.isPremium}
                       rerollsLeft={data.dealRerollsLeft ?? 0}
                       rerolling={rerolling}
+                      wishlistedIds={wishlistedItemIds}
                       onBuy={(item, dealPrice) =>
                         openItemPurchase(item, dealPrice)
                       }
                       onReroll={rerollDeals}
-                      onUpgrade={() => setPlusOpen(true)}
+                      onUpgrade={() => openPlus('premium_daily_deal')}
+                    />
+                  )}
+                  {activeFilter === 'all' && !isGuest && (
+                    <WishlistShelf
+                      entries={shelfWishlistEntries}
+                      slots={wishlistSlots}
+                      removing={wishlistBusy}
+                      onOpen={openWishlistEntry}
+                      onRemove={(entry) =>
+                        void removeFromWishlist(
+                          entry.view.itemId,
+                          entry.view.kind,
+                        )
+                      }
+                      onSeeAll={openWishlist}
                     />
                   )}
                   {activeFilter === 'all' && !isGuest && (
@@ -1829,6 +1930,8 @@ function WardrobeManagerContent({
                   paused={isDragging}
                   pageScroll={embedded}
                   isPremium={!!data.isPremium}
+                  balance={balance}
+                  onGetFlies={(shortBy) => openFlyShop(shortBy)}
                   onGoToShop={() => {
                     setActiveTab('shop');
                     scrollPageToTop();
@@ -1866,6 +1969,8 @@ function WardrobeManagerContent({
         balance={balance}
         ownedCount={purchaseOwnedCount}
         isGuest={isGuest}
+        isPremium={!!data?.isPremium}
+        onUpgrade={() => openPlus('wishlist_slots')}
         equipLabel={purchaseBg ? 'Use background' : 'Equip now'}
         onBuy={async () => {
           if (purchaseItem)
@@ -1880,9 +1985,45 @@ function WardrobeManagerContent({
           if (purchaseItem) await equipItemDirect(purchaseItem);
           else if (purchaseBg) await bg.handleEquip(purchaseBg);
         }}
+        onGoToTrade={() => {
+          setActiveTab('trade');
+          scrollPageToTop();
+        }}
       />
 
-      <PlusUpgradeModal open={plusOpen} placement="premium_daily_deal" onClose={() => setPlusOpen(false)} />
+      <WishlistSheet
+        open={wishlistOpen}
+        onClose={() => setWishlistOpen(false)}
+        entries={wishlistEntries}
+        slots={wishlistSlots}
+        balance={balance}
+        removing={wishlistBusy}
+        isPremium={!!data?.isPremium}
+        onUpgrade={() => openPlus('wishlist_slots')}
+        onOpen={openWishlistEntry}
+        onRemove={(entry) =>
+          void removeFromWishlist(entry.view.itemId, entry.view.kind)
+        }
+        onGoToShop={() => {
+          setWishlistOpen(false);
+          setActiveTab('shop');
+          scrollPageToTop();
+        }}
+        onGoToTrade={() => {
+          setWishlistOpen(false);
+          setActiveTab('trade');
+          scrollPageToTop();
+        }}
+      />
+
+      <PlusUpgradeModal
+        open={plusOpen}
+        placement={plusPlacement}
+        onClose={() => {
+          setPlusOpen(false);
+          mutateInventoryCaches();
+        }}
+      />
     </div>
   );
 }

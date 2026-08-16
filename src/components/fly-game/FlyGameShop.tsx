@@ -14,6 +14,7 @@ import {
 } from '@/hooks/useInventory';
 import { mutateBackgrounds, useBackgrounds, type BackgroundItem } from '@/hooks/useBackgrounds';
 import { hapticImpact, hapticTick } from '@/lib/haptics';
+import { isTradeOnlyRarity } from '@/lib/skins/catalog';
 import type { ItemDef } from '@/lib/skins/catalog';
 import { cn } from '@/lib/utils';
 
@@ -54,7 +55,11 @@ export function FlyGameShop({ open, onClose }: { open: boolean; onClose: () => v
     const owned = (entry: GameShopEntry) => entry.kind === 'item'
       ? (data?.wardrobe?.inventory?.[entry.id] ?? 0) > 0
       : (backgroundData?.inventory?.[entry.id] ?? 0) > 0;
-    return [...clothing, ...backgrounds].filter((entry) => tab === 'inventory' ? owned(entry) : !owned(entry));
+    return [...clothing, ...backgrounds].filter((entry) =>
+      tab === 'inventory'
+        ? owned(entry)
+        : !owned(entry) && !isTradeOnlyRarity(entry.rarity),
+    );
   }, [backgroundData?.catalog, backgroundData?.inventory, data?.catalog, data?.wardrobe?.inventory, tab]);
 
   const showNotice = (text: string, error = false) => {

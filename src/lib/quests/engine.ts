@@ -8,7 +8,7 @@ import QuestCategoryModel, { type QuestCategoryDoc } from '@/lib/models/QuestCat
 import FriendshipModel from '@/lib/models/Friendship';
 import connectMongo from '@/lib/mongoose';
 import type { UserDoc } from '@/lib/types/UserDoc';
-import { TRADE_ITEM_COUNT, type ItemDef } from '@/lib/skins/catalog';
+import { TRADE_MIN_ITEM_COUNT, type ItemDef } from '@/lib/skins/catalog';
 import { getFullCatalog } from '@/lib/skins/getCatalog';
 import { loadBackgroundPrizes } from '@/lib/skins/gifts';
 import { getZonedToday, getZonedYMD } from '@/lib/utils';
@@ -981,7 +981,7 @@ function isPoolEntryEligible(args: {
       }
       if (
         Array.from(ownedByRarity.values()).some(
-          (total) => total >= TRADE_ITEM_COUNT,
+          (total) => total >= TRADE_MIN_ITEM_COUNT,
         )
       ) {
         return true;
@@ -997,7 +997,7 @@ function isPoolEntryEligible(args: {
         }
       }
       return Array.from(cheapestByRarity.entries()).some(([rarity, price]) => {
-        const missing = TRADE_ITEM_COUNT - (ownedByRarity.get(rarity) ?? 0);
+        const missing = TRADE_MIN_ITEM_COUNT - (ownedByRarity.get(rarity) ?? 0);
         return flies + NEARLY_AFFORDABLE_FLIES >= missing * price;
       });
     }

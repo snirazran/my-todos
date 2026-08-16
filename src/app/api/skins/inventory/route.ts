@@ -11,7 +11,8 @@ import {
   isPremiumActive,
   rerollsUsed,
 } from '@/lib/skins/dailyDeal';
-import { loadWishlistView } from '@/lib/skins/wishlistServer';
+import { loadWishlistState } from '@/lib/skins/wishlistServer';
+import type { WishlistState } from '@/lib/skins/wishlist';
 import { notifyUserChanged } from '@/lib/taskSync';
 import { bumpQuestMetric } from '@/lib/quests/metrics';
 import type { UserWardrobe } from '@/lib/types/UserDoc';
@@ -22,6 +23,14 @@ const json = (body: unknown, init = 200) =>
   NextResponse.json(body, { status: init });
 
 type LeanUser = UserDoc & { _id: string };
+
+function wishlistPayload(state: WishlistState) {
+  return {
+    wishlist: state.goal,
+    wishlistItems: state.items,
+    wishlistSlots: state.slots,
+  };
+}
 
 /**
  * Scheduled and expired items leave the shop, but anything the player already
@@ -129,6 +138,10 @@ export async function GET(req: NextRequest) {
     const wardrobe = await ensureWardrobe(userId);
     if (!wardrobe) return json({ error: 'User not found' }, 404);
     const fullCatalog = await getFullCatalog();
+    const premiumUser = (await UserModel.findById(userId)
+      .select('premiumUntil')
+      .lean()) as { premiumUntil?: Date | null } | null;
+    const isPremium = isPremiumActive(premiumUser?.premiumUntil);
     if (isSummary) {
       const unseenIds = wardrobe.unseenItems ?? [];
       const containerIds = new Set(
@@ -167,7 +180,9 @@ export async function GET(req: NextRequest) {
               ? wardrobe.focusFlyDaily
               : { date: today, focusSeconds: 0, earned: 0 },
         },
-        wishlist: await loadWishlistView(wardrobe, fullCatalog),
+        ...wishlistPayload(
+          await loadWishlistState(wardrobe, fullCatalog, isPremium),
+        ),
         catalog: fullCatalog.filter((item) => summaryIds.has(item.id)),
         dailyDeals,
         unseenCount: unseenIds.filter((id) => !containerIds.has(id)).length,
@@ -175,19 +190,18 @@ export async function GET(req: NextRequest) {
           .length,
       });
     }
-    const premiumUser = (await UserModel.findById(userId)
-      .select('premiumUntil')
-      .lean()) as { premiumUntil?: Date | null } | null;
     const now = new Date();
     const dayKey = getZonedToday(timezone);
     const usedRerolls = rerollsUsed(wardrobe.dealReroll ?? undefined, dayKey);
     return json({
       wardrobe,
-      wishlist: await loadWishlistView(wardrobe, fullCatalog),
+      ...wishlistPayload(
+        await loadWishlistState(wardrobe, fullCatalog, isPremium),
+      ),
       catalog: visibleCatalog(fullCatalog, wardrobe, now),
       dailyDeals: getDailyDeals(fullCatalog, now, timezone, usedRerolls),
       dealRerollsLeft: DAILY_DEAL_REROLLS - usedRerolls,
-      isPremium: isPremiumActive(premiumUser?.premiumUntil),
+      isPremium,
     });
   } catch {
     // Guest Mode or Unauthorized
@@ -202,6 +216,7 @@ export async function GET(req: NextRequest) {
         unseenItems: [],
       },
       wishlist: null,
+      wishlistItems: [],
       catalog: guestCatalog,
       dailyDeals: getDailyDeals([...guestCatalog], new Date(), timezone),
       isPremium: false,

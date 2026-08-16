@@ -2,7 +2,9 @@ import { useMemo } from 'react';
 import useSWR, { mutate as mutateGlobal } from 'swr';
 import type { ItemDef, WardrobeSlot } from '@/lib/skins/catalog';
 import type { DailyDeal } from '@/lib/skins/dailyDeal';
-import type { WishlistView } from '@/lib/skins/wishlist';
+import type { WishlistState, WishlistView } from '@/lib/skins/wishlist';
+
+type WishlistSlots = WishlistState['slots'];
 import type { FocusFlyDaily } from '@/lib/types/UserDoc';
 import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
 import { markFlyEarn } from '@/lib/flyEarn';
@@ -58,6 +60,8 @@ type ApiData = {
   };
   catalog: ItemDef[];
   wishlist?: WishlistView | null;
+  wishlistItems?: WishlistView[];
+  wishlistSlots?: WishlistSlots;
   unseenCount?: number;
   unseenContainerCount?: number;
   dailyDeals?: DailyDeal[];
@@ -65,8 +69,12 @@ type ApiData = {
   isPremium?: boolean;
 };
 
-export function patchInventoryWishlist(wishlist: WishlistView | null) {
-  const patch = (curr: any) => (curr ? { ...curr, wishlist } : curr);
+export function patchInventoryWishlist(next: {
+  wishlist: WishlistView | null;
+  wishlistItems?: WishlistView[];
+  wishlistSlots?: WishlistSlots;
+}) {
+  const patch = (curr: any) => (curr ? { ...curr, ...next } : curr);
   mutateGlobal(INVENTORY_KEY, patch, { revalidate: false });
   mutateGlobal(INVENTORY_SUMMARY_KEY, patch, { revalidate: false });
 }

@@ -9,7 +9,7 @@ import {
   LogOut,
 } from 'lucide-react';
 import { useWardrobeBadges } from '@/components/ui/WardrobePopup';
-import { TRADE_ITEM_COUNT } from '@/lib/skins/catalog';
+import { TRADE_MIN_ITEM_COUNT } from '@/lib/skins/catalog';
 import { Icon } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
@@ -82,7 +82,7 @@ export default function SiteHeader() {
   const flyBalance = inventoryData?.wardrobe?.flies;
   const inventoryBadge = unseenCount + unseenContainerCount;
   const { tradeSpares } = useWardrobeBadges();
-  const tradeSparesReady = tradeSpares >= TRADE_ITEM_COUNT;
+  const tradeSparesReady = tradeSpares >= TRADE_MIN_ITEM_COUNT;
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const [wardrobeDropdownOpen, setWardrobeDropdownOpen] = useState(false);
   const wardrobeRef = useRef<HTMLDivElement>(null);

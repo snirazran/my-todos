@@ -73,8 +73,10 @@ export type UserWardrobe = {
   friendFlyDaily?: FriendFlyDaily;
   /** Lifetime flies each friend has contributed to you (by friend userId). */
   friendFlyTotals?: Record<string, number>;
-  /** The one shop item this user is saving toward. */
+  /** @deprecated Superseded by `wishlistItems`; still read to migrate old accounts. */
   wishlist?: WishlistPin | null;
+  /** Everything this user is saving toward, newest first. */
+  wishlistItems?: WishlistPin[];
   /** Daily-deal rerolls spent today (Plus perk). */
   dealReroll?: DealReroll | null;
   /** Outfits the user saved so a good combination isn't lost to a shuffle. */
@@ -151,6 +153,7 @@ export type UserDoc = {
     rewardId: string;
     rewardKind: 'item' | 'background';
     rarity: string;
+    aimed?: boolean;
     used: boolean;
     createdAt: Date;
   };

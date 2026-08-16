@@ -28,6 +28,7 @@ import {
   UserPlus,
   BarChart3,
   MessageSquare,
+  Sliders,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -317,6 +318,22 @@ function AdminPageContent() {
               title="Gift Manager"
               description="Create gifts and configure item drop chances."
               onClick={() => setGiftManagerOpen(true)}
+            />
+          </div>
+        </Section>
+
+        {/* Modifiers */}
+        <Section
+          title="Modifiers"
+          subtitle="The tunable rules behind the economy loops."
+        >
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <ManagerLinkCard
+              href="/admin/modifiers"
+              icon={<Sliders className="w-5 h-5" />}
+              accent="bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"
+              title="Trade Modifiers"
+              description="Recipe ratios and fees, duplicate and Plus discounts, golden trades, draw weighting, wishlist slots."
             />
           </div>
         </Section>

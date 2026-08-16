@@ -12,7 +12,7 @@ import { useAuth } from '@/components/auth/AuthContext';
 import { useInventory } from '@/hooks/useInventory';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
-import { countInventorySpares, TRADE_ITEM_COUNT } from '@/lib/skins/catalog';
+import { countInventorySpares, TRADE_MIN_ITEM_COUNT } from '@/lib/skins/catalog';
 import { hapticTick } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
 
@@ -133,7 +133,7 @@ export function WardrobePopup({
   useRegisterOpenSheet(open);
   if (!mounted) return null;
 
-  const tradeReady = tradeSpares >= TRADE_ITEM_COUNT;
+  const tradeReady = tradeSpares >= TRADE_MIN_ITEM_COUNT;
 
   const pick = (tab: WardrobeTab) => {
     hapticTick();
@@ -230,7 +230,7 @@ export function WardrobePopup({
                   detail={
                     tradeReady
                       ? `${tradeSpares} ready`
-                      : `${TRADE_ITEM_COUNT} to swap`
+                      : `${TRADE_MIN_ITEM_COUNT} to swap`
                   }
                   detailTone={tradeReady ? 'amber' : 'muted'}
                   badge={tradeReady ? tradeSpares : 0}

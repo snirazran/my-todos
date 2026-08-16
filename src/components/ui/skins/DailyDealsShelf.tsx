@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { ChevronRight, Clock, RefreshCw, Sparkles } from 'lucide-react';
+import { Bookmark, ChevronRight, Clock, RefreshCw, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Icon } from '@/components/ui/Icon';
 import Fly from '@/components/ui/fly';
@@ -69,6 +69,7 @@ export function DailyDealsShelf({
   isPremium,
   rerollsLeft = 0,
   rerolling = false,
+  wishlistedIds,
   onBuy,
   onReroll,
   onUpgrade,
@@ -78,6 +79,7 @@ export function DailyDealsShelf({
   isPremium: boolean;
   rerollsLeft?: number;
   rerolling?: boolean;
+  wishlistedIds?: Set<string>;
   onBuy: (item: ItemDef, dealPrice: number) => void;
   onReroll: () => void;
   onUpgrade: () => void;
@@ -87,9 +89,17 @@ export function DailyDealsShelf({
     () => new Map(catalog.map((i) => [i.id, i])),
     [catalog],
   );
+  const isWishlisted = (id: string) => !!wishlistedIds?.has(id);
   const entries = deals
     .map((deal) => ({ deal, item: byId.get(deal.itemId) }))
-    .filter((e): e is { deal: DailyDeal; item: ItemDef } => !!e.item);
+    .filter((e): e is { deal: DailyDeal; item: ItemDef } => !!e.item)
+    .sort(
+      (a, b) =>
+        Number(isWishlisted(b.item.id)) - Number(isWishlisted(a.item.id)),
+    );
+  const wishlistHits = entries.filter((entry) =>
+    isWishlisted(entry.item.id),
+  ).length;
 
   if (!entries.length) return null;
 
@@ -143,6 +153,7 @@ export function DailyDealsShelf({
       <DragScrollRow>
         {entries.map(({ deal, item }) => {
           const config = RARITY_CONFIG[item.rarity];
+          const wishlisted = isWishlisted(item.id);
           return (
             <button
               key={item.id}
@@ -152,6 +163,8 @@ export function DailyDealsShelf({
                 'relative flex w-[148px] shrink-0 flex-col items-stretch overflow-hidden rounded-xl border-2 bg-gradient-to-br p-2 text-left shadow-sm transition-transform active:scale-[0.97]',
                 config.border,
                 config.gradient,
+                wishlisted &&
+                  'ring-2 ring-primary/60 ring-offset-1 ring-offset-background',
               )}
             >
               <div className="absolute top-0 left-0 z-20 overflow-hidden rounded-br-2xl bg-background">
@@ -166,6 +179,16 @@ export function DailyDealsShelf({
                   {config.label}
                 </div>
               </div>
+              {wishlisted && (
+                <span className="absolute right-1.5 top-1.5 z-20 inline-flex items-center gap-1 rounded-full bg-primary px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider text-primary-foreground shadow-sm">
+                  <Bookmark
+                    className="h-2.5 w-2.5"
+                    strokeWidth={3.5}
+                    fill="currentColor"
+                  />
+                  Wishlist
+                </span>
+              )}
               <div className="relative flex h-24 items-end justify-center overflow-hidden rounded-lg bg-background/50">
                 <FrogSnapshot
                   className="h-[120%] w-[120%] object-contain"
@@ -191,6 +214,14 @@ export function DailyDealsShelf({
         })}
       </DragScrollRow>
 
+      {wishlistHits > 0 && (
+        <p className="mt-1.5 flex items-center gap-1.5 px-1 text-[11px] font-black text-emerald-600 dark:text-emerald-400">
+          <Bookmark className="h-3 w-3 shrink-0" strokeWidth={3.5} fill="currentColor" />
+          {wishlistHits === 1
+            ? 'Something from your wishlist is on sale today.'
+            : `${wishlistHits} of your wishlist picks are on sale today.`}
+        </p>
+      )}
     </div>
   );
 }

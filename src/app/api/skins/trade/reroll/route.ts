@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireUserId } from '@/lib/auth';
 import dbConnect from '@/lib/mongoose';
 import User from '@/lib/models/User';
-import { getRewardPool } from '@/lib/skins/gifts';
+import { getRewardPool, type PrizeKind } from '@/lib/skins/gifts';
+import { ensureTradeModifiersConfig } from '@/lib/models/TradeModifiersConfig';
+import { pickTradeReward } from '@/lib/skins/tradeRewards';
+import { readWishlistPins, wishlistPinKey } from '@/lib/skins/wishlist';
+import { dropFromWishlist } from '@/lib/skins/wishlistServer';
+import type { Rarity } from '@/lib/skins/catalog';
 import { DOUBLE_CLAIM_WINDOW_MS } from '@/lib/rewards/adDouble';
 
 export async function POST(req: NextRequest) {
@@ -37,6 +42,7 @@ export async function POST(req: NextRequest) {
           rewardId: string;
           rewardKind: 'item' | 'background';
           rarity: string;
+          aimed?: boolean;
           used: boolean;
           createdAt: Date | string;
         }
@@ -59,25 +65,42 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ granted: false });
     }
 
-    const pool = await getRewardPool();
-    let candidates = pool.filter(
-      (p) =>
-        p.rarity === claim.rarity &&
-        p.slot !== 'container' &&
-        !(p.kind === claim.rewardKind && p.id === claim.rewardId),
+    const [pool, modifiers] = await Promise.all([
+      getRewardPool(),
+      ensureTradeModifiersConfig(),
+    ]);
+    const owns = (prize: { kind: string; id: string }) =>
+      ((prize.kind === 'background' ? bgInv[prize.id] : itemInv[prize.id]) || 0) >
+      0;
+    const wishlistKeys = new Set(
+      readWishlistPins(user.wardrobe).map((pin) => wishlistPinKey(pin)),
     );
-    if (candidates.length === 0) {
-      candidates = pool.filter(
-        (p) => p.rarity === claim.rarity && p.slot !== 'container',
-      );
-    }
-    if (candidates.length === 0) {
+    const draw = (
+      exclude: { kind: PrizeKind; id: string } | null,
+      aimed: boolean,
+    ) =>
+      pickTradeReward({
+        pool,
+        rarity: claim.rarity as Rarity,
+        owns,
+        wishlistKeys,
+        modifiers,
+        aimed,
+        exclude: exclude as any,
+      });
+    const excluded = { kind: claim.rewardKind, id: claim.rewardId };
+    // An aimed trade paid for a wishlist hit, so its reroll stays on the
+    // wishlist — it only swaps which one. It falls back to an open draw when
+    // that was the last un-owned wishlisted item at this tier.
+    const reward = claim.aimed
+      ? (draw(excluded, true) ?? draw(null, true) ?? draw(excluded, false) ?? draw(null, false))
+      : (draw(excluded, false) ?? draw(null, false));
+    if (!reward) {
       return NextResponse.json(
         { error: `No prizes for rarity ${claim.rarity}` },
         { status: 500 },
       );
     }
-    const reward = candidates[Math.floor(Math.random() * candidates.length)];
 
     if (!user.wardrobe) {
       user.wardrobe = { equipped: {}, inventory: {}, unseenItems: [], flies: 0 };
@@ -128,6 +151,7 @@ export async function POST(req: NextRequest) {
     (user as any).tradeRerollClaim = { ...claim, used: true };
     user.markModified('tradeRerollClaim');
     await user.save();
+    await dropFromWishlist(userId, user.wardrobe, reward.id, reward.kind);
 
     return NextResponse.json({ granted: true, reward });
   } catch (error) {

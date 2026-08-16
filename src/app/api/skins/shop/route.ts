@@ -11,6 +11,8 @@ import {
 } from '@/lib/skins/dailyDeal';
 import { getZonedToday } from '@/lib/utils';
 import { availabilityStateAt } from '@/lib/skins/availability';
+import { isTradeOnlyRarity } from '@/lib/skins/catalog';
+import { dropFromWishlist } from '@/lib/skins/wishlistServer';
 import { bumpQuestMetric } from '@/lib/quests/metrics';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
 
@@ -36,6 +38,9 @@ export async function POST(req: NextRequest) {
     const fullCatalog = await getFullCatalog();
     const byId = buildById(fullCatalog);
     if (!itemId || !byId[itemId]) return json({ error: 'Unknown itemId' }, 400);
+    if (isTradeOnlyRarity(byId[itemId].rarity)) {
+      return json({ error: 'This item can only be earned by trading up' }, 400);
+    }
     const state = availabilityStateAt(byId[itemId]);
     if (state !== 'active') {
       return json(
@@ -112,12 +117,7 @@ export async function POST(req: NextRequest) {
 
     await bumpQuestMetric({ userId, metric: 'skin_acquired' });
 
-    if (user.wardrobe.wishlist?.itemId === itemId) {
-      await UserModel.updateOne(
-        { _id: user._id },
-        { $unset: { 'wardrobe.wishlist': '' } },
-      );
-    }
+    await dropFromWishlist(userId, user.wardrobe, itemId, 'item');
 
     await recordAnalyticsEvent({
       userId,

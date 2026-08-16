@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronRight, Clock } from 'lucide-react';
+import { Bookmark, ChevronRight, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Fly from '@/components/ui/fly';
 import Frog from '@/components/ui/frog';
@@ -13,8 +13,9 @@ import { useCountdown } from '@/components/ui/skins/DailyDealsShelf';
 import { useInventory } from '@/hooks/useInventory';
 import { useAuth } from '@/components/auth/AuthContext';
 import {
-  resolveWishlistPricing,
-  wishlistProgress,
+  buildWishlistEntries,
+  type WishlistEntry,
+  type WishlistView,
 } from '@/lib/skins/wishlist';
 import { rarityRank, type ItemDef } from '@/lib/skins/catalog';
 import { hapticTick } from '@/lib/haptics';
@@ -35,19 +36,12 @@ type ShopPick = {
  * the bottom. The frog art spans only ~58% of its box width, hence 84 for a
  * 64px well.
  */
-function WishlistThumb({
-  wishlist,
-  tone = 'muted',
-}: {
-  wishlist: NonNullable<ReturnType<typeof useInventory>['data']>['wishlist'];
-  tone?: 'muted' | 'emerald';
-}) {
-  if (!wishlist) return null;
+function WishlistThumb({ wishlist }: { wishlist: WishlistView }) {
   return (
     <span
       className={cn(
-        'flex h-16 w-16 shrink-0 items-end justify-center overflow-hidden rounded-xl',
-        tone === 'emerald' ? 'bg-emerald-500/10' : 'bg-muted/50',
+        'flex h-16 w-16 shrink-0 items-end justify-center overflow-hidden rounded-xl bg-gradient-to-br',
+        RARITY_CONFIG[wishlist.rarity].gradient,
       )}
     >
       {wishlist.kind === 'background' && wishlist.imageUrl ? (
@@ -72,6 +66,19 @@ function WishlistThumb({
   );
 }
 
+function pickWishlistFocus(entries: WishlistEntry[]) {
+  return (
+    entries
+      .filter((entry) => !entry.tradeOnly && !entry.view.owned)
+      .sort(
+        (a, b) =>
+          b.ratio - a.ratio ||
+          Number(b.onDeal) - Number(a.onDeal) ||
+          b.price - a.price,
+      )[0] ?? null
+  );
+}
+
 /**
  * Today's shop, brought to the home page instead of waiting behind the
  * wardrobe tab. It sits below the task list on purpose: the work zone above it
@@ -87,9 +94,12 @@ export function HomeShopRail() {
   const balance = data?.wardrobe?.flies ?? 0;
   const deals = data?.dailyDeals ?? [];
   const countdown = useCountdown(deals[0]?.endsAt);
-  const wishlist = data?.wishlist ?? null;
-  const pricing = resolveWishlistPricing(wishlist, deals);
-  const goal = pricing ? wishlistProgress(pricing.price, balance) : null;
+  const wishlistEntries = React.useMemo(
+    () => buildWishlistEntries(data?.wishlistItems, deals, balance),
+    [data?.wishlistItems, deals, balance],
+  );
+  const focus = pickWishlistFocus(wishlistEntries);
+  const savedCount = wishlistEntries.length;
 
   const picks = React.useMemo<ShopPick[]>(() => {
     const byId = new Map((data?.catalog ?? []).map((i) => [i.id, i]));
@@ -132,14 +142,14 @@ export function HomeShopRail() {
         trackAnalyticsEvent('home_shop_rail_viewed', {
           pick_count: picks.length,
           affordable: picks.filter((p) => p.price <= balance).length,
-          has_wishlist: !!wishlist,
+          has_wishlist: savedCount > 0,
         });
       },
       { threshold: 0.4 },
     );
     observer.observe(node);
     return () => observer.disconnect();
-  }, [picks, balance, wishlist]);
+  }, [picks, balance, savedCount]);
 
   if (!user || !picks.length) return null;
 
@@ -159,63 +169,73 @@ export function HomeShopRail() {
 
   return (
     <div ref={rootRef} className="mx-1.5 mt-4 md:mx-4 md:mt-8">
-      {goal && wishlist && !goal.reached && (
+      {focus && (
         <button
           type="button"
-          onClick={() => open('goal', wishlist.itemId, wishlist.kind)}
-          className="mb-3 flex w-full items-center gap-3 rounded-2xl border border-border/50 bg-card px-3 py-2.5 text-left shadow-sm transition-colors hover:bg-muted/40"
+          onClick={() =>
+            open(
+              focus.affordable ? 'goal_reached' : 'goal',
+              focus.view.itemId,
+              focus.view.kind,
+            )
+          }
+          className={cn(
+            'mb-3 flex w-full items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition-colors',
+            focus.affordable
+              ? 'border-emerald-500/40 bg-emerald-500/[0.06] hover:bg-emerald-500/10'
+              : 'border-border/40 bg-card/60 hover:bg-muted/40',
+          )}
         >
-          <WishlistThumb wishlist={wishlist} />
+          <WishlistThumb wishlist={focus.view} />
           <span className="min-w-0 flex-1">
-            <span className="flex items-baseline justify-between gap-2">
-              <span className="truncate text-[13px] font-black tracking-tight text-foreground">
-                Saving for {wishlist.name}
+            <span className="flex items-center gap-1.5">
+              <Bookmark
+                className="h-3 w-3 shrink-0 text-muted-foreground/70"
+                strokeWidth={3}
+                fill="currentColor"
+              />
+              <span className="text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+                Wishlist
+                {savedCount > 1 ? ` · ${savedCount} saved` : ''}
               </span>
-              <span className="flex shrink-0 items-center gap-1 text-[11px] font-black tabular-nums text-muted-foreground">
-                <Fly size={28} paused y={-5} x={4} />
-                {goal.remaining.toLocaleString()} to go
-              </span>
+              {focus.onDeal && (
+                <span className="rounded-full bg-amber-500/15 px-1.5 py-px text-[9px] font-black uppercase tracking-wider text-amber-700 dark:text-amber-400">
+                  {focus.discountPercent}% off
+                </span>
+              )}
             </span>
-            <span className="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-muted">
+            <span className="mt-0.5 flex items-baseline justify-between gap-2">
+              <span className="truncate text-[13px] font-black tracking-tight text-foreground">
+                {focus.view.name}
+              </span>
+              {focus.affordable ? (
+                <span className="shrink-0 text-[10px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                  Ready to buy
+                </span>
+              ) : (
+                <span className="flex shrink-0 items-center gap-1 text-[11px] font-black tabular-nums text-muted-foreground">
+                  <Fly size={26} paused y={-5} x={3} />
+                  {focus.remaining.toLocaleString()} to go
+                </span>
+              )}
+            </span>
+            <span className="mt-1.5 block h-1 overflow-hidden rounded-full bg-muted">
               <span
                 className={cn(
                   'block h-full rounded-full transition-[width] duration-700 ease-out',
-                  pricing?.onDeal ? 'bg-amber-500' : 'bg-primary',
+                  focus.affordable
+                    ? 'bg-emerald-500'
+                    : focus.onDeal
+                      ? 'bg-amber-500'
+                      : 'bg-primary',
                 )}
-                style={{ width: `${Math.round(goal.ratio * 100)}%` }}
+                style={{
+                  width: `${Math.max(3, Math.round(focus.ratio * 100))}%`,
+                }}
               />
             </span>
-            {/* On the shelf today: the goal moved, so show the price that's
-                actually being charged and what it was. */}
-            {pricing?.onDeal && (
-              <span className="mt-1.5 flex items-center gap-1.5">
-                <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-amber-700 dark:text-amber-400">
-                  {pricing.discountPercent}% off today
-                </span>
-                <span className="text-[10px] font-bold tabular-nums text-muted-foreground line-through decoration-2 opacity-70">
-                  {pricing.fullPrice.toLocaleString()}
-                </span>
-                <span className="inline-flex items-center gap-0.5 text-[11px] font-black tabular-nums text-foreground">
-                  <Fly size={16} paused y={-2} />
-                  {pricing.price.toLocaleString()}
-                </span>
-              </span>
-            )}
           </span>
-        </button>
-      )}
-
-      {goal && wishlist && goal.reached && (
-        <button
-          type="button"
-          onClick={() => open('goal_reached', wishlist.itemId, wishlist.kind)}
-          className="mb-3 flex w-full items-center gap-3 rounded-2xl border border-emerald-400/50 bg-emerald-50 px-3 py-2.5 text-left shadow-sm dark:bg-emerald-950/30"
-        >
-          <WishlistThumb wishlist={wishlist} tone="emerald" />
-          <span className="min-w-0 flex-1 truncate text-[13px] font-black tracking-tight text-emerald-700 dark:text-emerald-300">
-            {wishlist.name} is yours — you saved enough!
-          </span>
-          <ChevronRight className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/50" />
         </button>
       )}
 

@@ -3,9 +3,10 @@
 import React, { memo, useMemo, useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
-import { Check, Info, Loader2, X } from 'lucide-react';
+import { Check, Info, Loader2, Repeat, X } from 'lucide-react';
 import Fly from '@/components/ui/fly';
 import { cn } from '@/lib/utils';
+import { isTradeOnlyRarity } from '@/lib/skins/catalog';
 import type { ItemDef, Rarity } from '@/lib/skins/catalog';
 import { RarityCornerBadge } from './RarityCornerBadge';
 import Frog from '@/components/ui/frog';
@@ -143,6 +144,7 @@ function ItemCardComponent({
 }) {
   const config = RARITY_CONFIG[item.rarity];
   const isOwned = ownedCount > 0;
+  const tradeOnly = isTradeOnlyRarity(item.rarity);
   const cardRef = useRef<HTMLDivElement>(null);
   const prevEquippedRef = useRef(isEquipped);
   const [equipPulse, setEquipPulse] = useState<'on' | 'off' | null>(null);
@@ -429,11 +431,13 @@ function ItemCardComponent({
             className={cn(
               'group/buy w-full flex items-center justify-center gap-1 font-black tracking-tight transition-colors active:scale-95 bg-transparent border-0 shadow-none',
               compact ? 'h-7 text-xs md:text-sm' : 'h-8 text-sm md:text-base',
-              canAfford
-                ? compact
-                  ? 'text-foreground hover:brightness-110'
-                  : cn(config.text, 'hover:brightness-110')
-                : 'text-red-500 dark:text-red-400',
+              tradeOnly
+                ? cn(config.text, 'hover:brightness-110')
+                : canAfford
+                  ? compact
+                    ? 'text-foreground hover:brightness-110'
+                    : cn(config.text, 'hover:brightness-110')
+                  : 'text-red-500 dark:text-red-400',
               actionLoading && 'opacity-60 cursor-wait',
             )}
           >
@@ -441,6 +445,14 @@ function ItemCardComponent({
               <span>...</span>
             ) : actionLabel ? (
               <span>{actionLabel}</span>
+            ) : tradeOnly ? (
+              <span className="inline-flex items-center gap-1 text-[10px] md:text-[11px] uppercase tracking-[0.12em]">
+                <Repeat
+                  className="h-3 w-3 md:h-3.5 md:w-3.5"
+                  strokeWidth={3}
+                />
+                Trade only
+              </span>
             ) : (
               <>
                 <Fly

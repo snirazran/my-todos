@@ -21,7 +21,19 @@ export const RARITY_ORDER = [
   'legendary',
 ] as const;
 
-export const TRADE_ITEM_COUNT = 5;
+/** Smallest recipe on the trade ladder — what "ready to trade" badges count against. */
+export const TRADE_MIN_ITEM_COUNT = 4;
+
+/**
+ * Rarities the shop only displays. They have a price for book-keeping (deals,
+ * trade-up value, wishlist maths) but no route to buy them — the trade-up is
+ * the only way in.
+ */
+export const TRADE_ONLY_RARITIES: readonly Rarity[] = ['legendary'];
+
+export function isTradeOnlyRarity(rarity: Rarity): boolean {
+  return TRADE_ONLY_RARITIES.includes(rarity);
+}
 
 export const rarityRank: Record<Rarity, number> = {
   common: 0,

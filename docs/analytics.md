@@ -40,7 +40,7 @@ Never add task titles, notes, checklist text, tag names, quest titles, or other 
 - Monetization funnel: `paywall_viewed`, `purchase_started`, `purchase_completed`, `purchase_cancelled`, `purchase_failed`
 - Subscription lifecycle: `subscription_started`, `subscription_renewed`, `subscription_cancelled`, `subscription_expired`, `subscription_billing_issue`, `subscription_refunded`, `subscription_product_changed`
 - Paid-acquisition demo: `try_funnel_viewed`, `try_task_completed`, `try_gift_opened`, `try_signin_started`, `try_signup_completed`, `try_gift_claimed`, `try_cosmetic_previewed`, `try_continued`, `try_store_clicked`
-- Economy: `fly_earned`, `fly_spent`, `skin_purchased`, `skin_sold`, `skin_traded`, `season_reward_claimed`
+- Economy: `fly_earned`, `fly_spent`, `skin_purchased`, `skin_traded`, `season_reward_claimed`
 - Fly Shop: `fly_shop_viewed`, `fly_pack_selected`, `fly_pack_purchase_started`, `fly_pack_purchase_completed`, `fly_pack_purchase_cancelled`, `fly_pack_purchase_failed`
 
 Properties are allowlisted in `src/lib/analytics/events.ts`. Do not add free-form user content, email, phone number, exact birthday, notification tokens, calendar data, task IDs, or advertising identifiers.

@@ -106,7 +106,7 @@ export const EXPLORER_QUEST: OnboardingQuestDef = {
       tagMode: 'ignore',
       metricKey: 'trade_completed',
       helpText:
-        'In the Wardrobe, trade five same-rarity skins for one of a higher rarity.',
+        'In the Wardrobe, trade four same-rarity skins for one of a higher rarity.',
       rewards: fixedFlies(15),
     },
     {

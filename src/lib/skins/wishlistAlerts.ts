@@ -3,7 +3,7 @@ import connectMongo from '@/lib/mongoose';
 import { getCachedCatalog, buildById } from '@/lib/skins/getCatalog';
 import { getDailyDeals, rerollsUsed } from '@/lib/skins/dailyDeal';
 import { sendWardrobePush } from '@/lib/skins/push';
-import { isWishlistPin } from '@/lib/skins/wishlist';
+import { readWishlistPins } from '@/lib/skins/wishlist';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
 import { getZonedToday } from '@/lib/utils';
 
@@ -37,6 +37,7 @@ type Candidate = {
   _id: string;
   wardrobe?: {
     wishlist?: unknown;
+    wishlistItems?: unknown;
     dealReroll?: { date: string; count: number } | null;
   };
   notificationPrefs?: { timezone?: string; enabled?: boolean };
@@ -60,12 +61,16 @@ export async function runWishlistDealAlerts(): Promise<{
 
   const users = (await UserModel.find(
     {
-      'wardrobe.wishlist': { $ne: null, $exists: true },
+      $or: [
+        { 'wardrobe.wishlist': { $ne: null, $exists: true } },
+        { 'wardrobe.wishlistItems.0': { $exists: true } },
+      ],
       'notificationPrefs.enabled': { $ne: false },
       'notificationPrefs.fcmTokens.0': { $exists: true },
     },
     {
       'wardrobe.wishlist': 1,
+      'wardrobe.wishlistItems': 1,
       'wardrobe.dealReroll': 1,
       'notificationPrefs.timezone': 1,
       'notificationPrefs.enabled': 1,
@@ -79,43 +84,73 @@ export async function runWishlistDealAlerts(): Promise<{
   let sent = 0;
 
   for (const user of users) {
-    const pin = user.wardrobe?.wishlist;
-    if (!isWishlistPin(pin)) continue;
-    // Backgrounds never appear on the shelf — getDailyDeals draws from the
-    // item catalog only.
-    if (pin.kind !== 'item') continue;
-
     const tz = user.notificationPrefs?.timezone || 'UTC';
     const hour = hourIn(tz);
     if (hour < EARLIEST_HOUR || hour > LATEST_HOUR) continue;
 
     const today = getZonedToday(tz);
-    const dealKey = `${today}:${pin.itemId}`;
-    if (pin.notifiedDealKey === dealKey) continue;
-
     const deals = getDailyDeals(
       catalog,
       new Date(),
       tz,
       rerollsUsed(user.wardrobe?.dealReroll ?? undefined, today),
     );
-    const deal = deals.find((entry) => entry.itemId === pin.itemId);
-    if (!deal) continue;
+    if (deals.length === 0) continue;
 
-    const hoursLeft =
-      (new Date(deal.endsAt).getTime() - Date.now()) / 3_600_000;
-    if (hoursLeft < MIN_HOURS_LEFT) continue;
+    // Several pins can be on the shelf at once; the alert is still one item,
+    // never a digest — the point is that the player chose this exact thing.
+    const pins = readWishlistPins(user.wardrobe);
+    const hit = pins
+      .filter((pin) => pin.kind === 'item')
+      .map((pin) => ({
+        pin,
+        deal: deals.find((entry) => entry.itemId === pin.itemId),
+      }))
+      .find(
+        ({ pin, deal }) =>
+          !!deal &&
+          pin.notifiedDealKey !== `${today}:${pin.itemId}` &&
+          (new Date(deal.endsAt).getTime() - Date.now()) / 3_600_000 >=
+            MIN_HOURS_LEFT &&
+          !!byId[pin.itemId],
+      );
+    if (!hit?.deal) continue;
 
+    const { pin, deal } = hit;
+    const dealKey = `${today}:${pin.itemId}`;
     const item = byId[pin.itemId];
-    if (!item) continue;
 
     // Claim before sending: a crashed send is better than a duplicate, and
     // the conditional write stops two overlapping cron runs double-firing.
-    const claimed = await UserModel.findOneAndUpdate(
-      { _id: user._id, 'wardrobe.wishlist.notifiedDealKey': { $ne: dealKey } },
-      { $set: { 'wardrobe.wishlist.notifiedDealKey': dealKey } },
-      { projection: { _id: 1 } },
-    ).lean();
+    const claimed = Array.isArray(user.wardrobe?.wishlistItems)
+      ? await UserModel.findOneAndUpdate(
+          {
+            _id: user._id,
+            'wardrobe.wishlistItems': {
+              $elemMatch: {
+                itemId: pin.itemId,
+                notifiedDealKey: { $ne: dealKey },
+              },
+            },
+          },
+          {
+            $set: {
+              'wardrobe.wishlistItems.$[entry].notifiedDealKey': dealKey,
+            },
+          },
+          {
+            projection: { _id: 1 },
+            arrayFilters: [{ 'entry.itemId': pin.itemId }],
+          },
+        ).lean()
+      : await UserModel.findOneAndUpdate(
+          {
+            _id: user._id,
+            'wardrobe.wishlist.notifiedDealKey': { $ne: dealKey },
+          },
+          { $set: { 'wardrobe.wishlist.notifiedDealKey': dealKey } },
+          { projection: { _id: 1 } },
+        ).lean();
     if (!claimed) continue;
 
     const ok = await sendWardrobePush(user._id, {

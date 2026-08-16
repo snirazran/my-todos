@@ -4,6 +4,8 @@ import connectMongo from '@/lib/mongoose';
 import BackgroundModel from '@/lib/models/Background';
 import UserModel, { type UserDoc } from '@/lib/models/User';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
+import { isTradeOnlyRarity } from '@/lib/skins/catalog';
+import { dropFromWishlist } from '@/lib/skins/wishlistServer';
 import { DEFAULT_BACKGROUND_ID } from '@/lib/backgrounds/constants';
 
 const json = (body: unknown, init = 200) =>
@@ -31,6 +33,10 @@ export async function POST(req: NextRequest) {
     const bg = await BackgroundModel.findOne({ id, hidden: { $ne: true } }).lean();
     if (!bg) return json({ error: 'Unknown background' }, 400);
 
+    if (isTradeOnlyRarity(bg.rarity)) {
+      return json({ error: 'This one can only be earned by trading up' }, 400);
+    }
+
     const user = (await UserModel.findById(userId).lean()) as LeanUser | null;
     if (!user) return json({ error: 'User not found' }, 404);
 
@@ -52,12 +58,7 @@ export async function POST(req: NextRequest) {
       return json({ error: 'Not enough flies' }, 400);
     }
 
-    if (user.wardrobe?.wishlist?.itemId === id) {
-      await UserModel.updateOne(
-        { _id: user._id },
-        { $unset: { 'wardrobe.wishlist': '' } },
-      );
-    }
+    await dropFromWishlist(userId, user.wardrobe, id, 'background');
 
     const isPremium = !!user.premiumUntil && new Date(user.premiumUntil) > new Date();
     await recordAnalyticsEvent({
