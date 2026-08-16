@@ -1384,7 +1384,7 @@ export function AdminQuestManagerPage() {
             {shieldField(
               'Earn every N pact weeks',
               'earnEveryPactWeeks',
-              'Kept weeks that hand one back. 0 turns earning off.',
+              'Kept weeks that hand one back. 0 (the default) turns it off — the pact milestones issue Lily Pads now, and against this cap a second faucet oversupplies.',
               0,
               52,
             )}

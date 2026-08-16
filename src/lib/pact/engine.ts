@@ -1,11 +1,10 @@
 import { v4 as uuid } from 'uuid';
 import PactModel, { type PactDoc } from '@/lib/models/Pact';
 import PactConfigModel, {
-  DEFAULT_PACT_COMPLETION_REWARDS,
-  DEFAULT_PACT_STREAK_MULTIPLIERS,
   PACT_CONFIG_ID,
+  PACT_PAYOUT,
   PACT_PAYOUT_VERSION,
-  PACT_V2_PAYOUT,
+  RETIRED_PACT_CONFIG_FIELDS,
   seedSuggestions,
   type PactConfigDoc,
 } from '@/lib/models/PactConfig';
@@ -26,7 +25,11 @@ import {
   normalizeFocusProfile,
 } from '@/lib/quests/engine';
 import { getFullCatalog } from '@/lib/skins/getCatalog';
-import { applyPactRewards, applyPactSessionFlies } from './grant';
+import {
+  applyPactBonusRewards,
+  applyPactRewards,
+  applyPactSessionFlies,
+} from './grant';
 import {
   canRescue,
   consumeShield,
@@ -43,6 +46,7 @@ import type { QuestRewards } from '@/lib/quests/types';
 import {
   DEFAULT_PACT_START_TIME,
   MAX_OPTIONS,
+  PACT_MAX_SESSIONS,
   PACT_QUIET_NUDGE_DAYS,
   PRIMARY_OPTIONS,
   type ActivePactView,
@@ -54,6 +58,7 @@ import {
   type PactSuggestion,
   type PactUserTag,
   type PactView,
+  type PactWeekPreview,
   type PactWeekResult,
 } from './types';
 
@@ -79,8 +84,14 @@ const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 export type PactStreakState = {
   weeks: number;
   best: number;
-  /** Times the ladder has been climbed end to end. Survives the lap reset. */
+  /** Cycles completed end to end. Survives the reset, and buys the base rate. */
   laps: number;
+  /**
+   * Highest milestone rung already collected in THIS cycle. Milestones pay
+   * once, and settlement is lazy, so a re-run has to be able to tell a rung it
+   * already paid from one the streak has only just reached.
+   */
+  milestonesPaid: number;
   lastKeptWeek: string;
   /** Week key of the last week a shield rescued, for the back-to-back guard. */
   shieldRescueWeek: string;
@@ -103,6 +114,7 @@ const EMPTY_STREAK: PactStreakState = {
   weeks: 0,
   best: 0,
   laps: 0,
+  milestonesPaid: 0,
   lastKeptWeek: '',
   shieldRescueWeek: '',
   swapTokens: 0,
@@ -121,6 +133,15 @@ export function normalizePactStreak(user: Partial<UserDoc> | null): PactStreakSt
     weeks: Math.max(0, Number(raw.weeks) || 0),
     best: Math.max(0, Number(raw.best) || 0),
     laps: Math.max(0, Number(raw.laps) || 0),
+    // A document written before milestones existed has no record of which
+    // rungs a running streak already passed. Seeding it from the streak treats
+    // them as collected — the alternative pays every rung at or below the
+    // current week again the next time one lands, which is a retroactive
+    // windfall nobody did the work for under these rules.
+    milestonesPaid:
+      raw.milestonesPaid === undefined
+        ? Math.max(0, Number(raw.weeks) || 0)
+        : Math.max(0, Number(raw.milestonesPaid) || 0),
     lastKeptWeek: typeof raw.lastKeptWeek === 'string' ? raw.lastKeptWeek : '',
     shieldRescueWeek:
       typeof raw.shieldRescueWeek === 'string' ? raw.shieldRescueWeek : '',
@@ -192,70 +213,54 @@ export async function ensurePactConfig(): Promise<PactConfigDoc> {
   const existing = await PactConfigModel.findOne({
     configId: PACT_CONFIG_ID,
   }).lean<PactConfigDoc>();
-  if (existing) {
-    // Fields added after this doc was written have no value on it — Mongoose
-    // defaults only apply to new documents — so backfill them here or the
-    // feature silently runs without gifts, tiers, or suggestions.
-    const backfill: Partial<PactConfigDoc> = {};
-    if (!existing.suggestions?.length) backfill.suggestions = seedSuggestions();
-    if (!existing.completionRewards) {
-      backfill.completionRewards = DEFAULT_PACT_COMPLETION_REWARDS;
-    }
-    if (!existing.streakMultipliers?.length) {
-      backfill.streakMultipliers = DEFAULT_PACT_STREAK_MULTIPLIERS;
-    } else if (existing.streakMultipliers.some((r) => !r.rewards?.length)) {
-      // Rungs seeded before gifts climbed with the rate. Weeks and multipliers
-      // an admin tuned are kept; only the missing gift is filled in.
-      backfill.streakMultipliers = existing.streakMultipliers.map(
-        (rung, index) => ({
-          ...rung,
-          rewards: rung.rewards?.length
-            ? rung.rewards
-            : (DEFAULT_PACT_STREAK_MULTIPLIERS[
-                Math.min(index, DEFAULT_PACT_STREAK_MULTIPLIERS.length - 1)
-              ].rewards ?? []),
-        }),
-      );
-    }
-    // A doc written under v1 carries hand-tuned v1 numbers, so a plain
-    // "is it missing?" backfill would leave it paying nothing until the week
-    // landed. The version stamp is what makes the re-seed run exactly once.
-    const version = existing.payoutVersion ?? 1;
-    if (version < 2) {
-      Object.assign(backfill, PACT_V2_PAYOUT);
-    } else if (typeof existing.comebackBonusFlies !== 'number') {
-      backfill.comebackBonusFlies = PACT_V2_PAYOUT.comebackBonusFlies;
-    }
-    // v3 retires the lump tracks. Cleared rather than merely ignored, so the
-    // admin screen and the database agree about what is no longer paid. Rates
-    // an admin tuned under v2 are left exactly as they are.
-    if (version < 3) {
-      backfill.streakTiers = [];
-      backfill.masteryTiers = [];
-      backfill.milestoneEveryWeeks = 0;
-      backfill.milestoneRewards = [];
-    }
-    // v4 reshapes the ladder itself, so a doc still carrying the v3 rungs has
-    // to be re-seeded rather than backfilled — the old rungs are present and
-    // valid, they are simply the wrong curve.
-    if (version < 4) {
-      backfill.streakMultipliers = DEFAULT_PACT_STREAK_MULTIPLIERS;
-    }
-    if (version < PACT_PAYOUT_VERSION) {
-      backfill.payoutVersion = PACT_PAYOUT_VERSION;
-    }
-    if (Object.keys(backfill).length === 0) return existing;
-    await PactConfigModel.updateOne(
-      { configId: PACT_CONFIG_ID },
-      { $set: backfill },
-    );
-    return { ...existing, ...backfill };
+  if (!existing) {
+    const created = await PactConfigModel.create({
+      configId: PACT_CONFIG_ID,
+      suggestions: seedSuggestions(),
+    });
+    return created.toObject() as PactConfigDoc;
   }
-  const created = await PactConfigModel.create({
-    configId: PACT_CONFIG_ID,
-    suggestions: seedSuggestions(),
-  });
-  return created.toObject() as PactConfigDoc;
+
+  // Mongoose defaults only apply to new documents, so anything the current
+  // payout added since this doc was written has to be filled in here or the
+  // feature silently runs without it.
+  const backfill: Partial<PactConfigDoc> = {};
+  if (!existing.suggestions?.length) backfill.suggestions = seedSuggestions();
+
+  // There is one payout model, and a doc either holds it or is seeded to it.
+  // Keyed on the SHAPE rather than the version stamp: a stamp is written by one
+  // line and its payload by another, so any window where the constant is live
+  // and the write is not — a half-applied deploy, a dev server reloading
+  // mid-edit — burns the stamp on a doc that never got the numbers, and a
+  // stamp-only check then refuses to ever fix it. `weekValuePerSession` is the
+  // tell: the payout always writes it, and no admin action can remove it.
+  if (typeof existing.weekValuePerSession !== 'number') {
+    Object.assign(backfill, PACT_PAYOUT);
+  }
+  if (existing.payoutVersion !== PACT_PAYOUT_VERSION) {
+    backfill.payoutVersion = PACT_PAYOUT_VERSION;
+  }
+
+  // Earlier payout models left keys behind that nothing reads. Dropped rather
+  // than merely ignored, so the database and the code agree about what is paid.
+  const unset: Record<string, ''> = {};
+  for (const field of RETIRED_PACT_CONFIG_FIELDS) {
+    if ((existing as unknown as Record<string, unknown>)[field] !== undefined) {
+      unset[field] = '';
+    }
+  }
+
+  const hasBackfill = Object.keys(backfill).length > 0;
+  const hasUnset = Object.keys(unset).length > 0;
+  if (!hasBackfill && !hasUnset) return existing;
+  await PactConfigModel.updateOne(
+    { configId: PACT_CONFIG_ID },
+    {
+      ...(hasBackfill ? { $set: backfill } : {}),
+      ...(hasUnset ? { $unset: unset } : {}),
+    },
+  );
+  return { ...existing, ...backfill };
 }
 
 /**
@@ -269,9 +274,32 @@ export function pactSessionFlies(config: PactConfigDoc) {
   return Math.max(0, Number(config.fliesPerCompletion ?? 0));
 }
 
-/** Flies held back for finishing the whole week. */
-export function pactWeekBonusFlies(config: PactConfigDoc) {
-  return Math.max(0, Number(config.weekBonusFlies ?? 0));
+/**
+ * One formula prices the whole system: a pact is worth
+ * `weekValuePerSession × (sessions + weekValueBaseSessions)`. Deliberately
+ * blind to how hard an idea claims to be — a difficulty nobody can verify must
+ * never move the rate, or the hardest-labelled option becomes strictly
+ * dominant. Ambition is priced in sessions, the one unit of effort the app can
+ * actually see, and sub-linearly at that: the `+1` means the second session
+ * adds a third of what the first one did.
+ */
+export function pactWeekValueFlies(config: PactConfigDoc, sessions: number) {
+  const perSession = Math.max(0, Number(config.weekValuePerSession ?? 20));
+  const base = Math.max(0, Number(config.weekValueBaseSessions ?? 1));
+  return Math.max(0, Math.round(perSession * (Math.max(0, sessions) + base)));
+}
+
+/**
+ * Flies held back for finishing the whole week: the remainder of the formula
+ * once every session has been paid for. At the defaults that is roughly three
+ * quarters of the week's value, back-loaded onto the last session where the
+ * goal gradient does the most work.
+ */
+export function pactWeekBonusFlies(config: PactConfigDoc, sessions: number) {
+  return Math.max(
+    0,
+    pactWeekValueFlies(config, sessions) - pactSessionFlies(config) * sessions,
+  );
 }
 
 /** Flies for the first session completed after a scheduled one was missed. */
@@ -282,8 +310,8 @@ export function pactComebackFlies(config: PactConfigDoc) {
 /**
  * What a week at this position in the streak pays at. `streakWeeks` is the
  * week's OWN number — the streak it lands on, not the one it started from — so
- * the week that takes a run to two weeks is already paid at the two-week rate.
- * Anything below the first rung pays flat.
+ * the week that takes a run to four weeks is already paid at the four-week
+ * rate. Anything below the first rung pays flat.
  */
 function pactRungFor(config: PactConfigDoc, streakWeeks: number) {
   const rungs = [...(config.streakMultipliers ?? [])].sort(
@@ -296,7 +324,8 @@ function pactRungFor(config: PactConfigDoc, streakWeeks: number) {
   return reached;
 }
 
-export function pactStreakMultiplier(
+/** The streak's own step, before prestige raises the floor under it. */
+export function pactRungMultiplier(
   config: PactConfigDoc,
   streakWeeks: number,
 ) {
@@ -304,41 +333,78 @@ export function pactStreakMultiplier(
   return Math.max(1, Number(rung?.multiplier) || 1);
 }
 
-/** Weeks on the last rung — the length of one full climb. 0 = no ladder. */
-export function pactTopRungWeeks(config: PactConfigDoc) {
-  return (config.streakMultipliers ?? []).reduce(
-    (max, rung) => Math.max(max, Number(rung.weeks) || 0),
-    0,
+/**
+ * The permanent floor. Prestige gains are never taken back: breaking a streak
+ * costs the streak multiplier, never the base a completed cycle bought.
+ */
+export function pactPrestigeBase(config: PactConfigDoc, laps: number) {
+  const step = Math.max(0, Number(config.prestigeBaseStep ?? 0.15));
+  return 1 + step * Math.max(0, Math.floor(laps));
+}
+
+export function pactMultiplierCap(config: PactConfigDoc) {
+  return Math.max(1, Number(config.maxEffectiveMultiplier ?? 2.5));
+}
+
+/**
+ * What a week actually pays at: the prestige floor times the streak's step,
+ * hard-capped. Without the cap a long-running Plus veteran earns more from this
+ * one system than every shop price is written against.
+ *
+ * The Plus doubling sits OUTSIDE this cap — it is a purchase, not progression.
+ */
+export function pactMultiplier(
+  config: PactConfigDoc,
+  streakWeeks: number,
+  laps = 0,
+) {
+  return Math.min(
+    pactMultiplierCap(config),
+    pactPrestigeBase(config, laps) * pactRungMultiplier(config, streakWeeks),
   );
 }
 
-/** The gift a week at this position pays. Below the first rung, the base one. */
-export function pactStreakRewards(
+/** Weeks that complete a cycle. 0 = no prestige. */
+export function pactPrestigeWeeks(config: PactConfigDoc) {
+  return Math.max(0, Math.floor(Number(config.prestigeWeeks ?? 0)));
+}
+
+/** Sessions that keep a streak alive without finishing the week. */
+export function pactNearMissTarget(config: PactConfigDoc, sessions: number) {
+  const percent = Math.max(0, Math.min(100, Number(config.nearMissPercent ?? 0)));
+  if (percent <= 0 || sessions <= 0) return sessions;
+  return Math.min(sessions, Math.ceil((sessions * percent) / 100));
+}
+
+/** The gift at completion for a week of this many sessions. */
+export function pactCompletionRewards(
   config: PactConfigDoc,
-  streakWeeks: number,
+  sessions: number,
 ): QuestRewards {
-  const rung = pactRungFor(config, streakWeeks);
-  return rung?.rewards?.length
-    ? rung.rewards
-    : (config.completionRewards ?? []);
+  const tiers = [...(config.completionGiftTiers ?? [])].sort(
+    (a, b) => a.minSessions - b.minSessions,
+  );
+  let reached: QuestRewards | null = null;
+  for (const tier of tiers) {
+    if (sessions >= tier.minSessions && tier.rewards?.length) {
+      reached = tier.rewards;
+    }
+  }
+  return reached ?? config.completionRewards ?? [];
 }
 
 /**
  * What a week is worth end to end, for previews only — sessions are paid as
- * they happen and the bonus lands on the last one. Deliberately blind to how
- * hard an idea claims to be: a difficulty nobody can verify must never move the
- * rate, or the hardest-labelled option becomes strictly dominant. Ambition is
- * priced in sessions, which is the one unit of effort the app can actually see.
+ * they happen and the bonus lands on the last one.
  */
 export function optionRewardFlies(
   config: PactConfigDoc,
   days: number[],
-  streakMultiplier = 1,
+  multiplier = 1,
 ) {
-  const taskCount = Math.max(1, new Set(days).size);
-  return (
-    (taskCount * pactSessionFlies(config) + pactWeekBonusFlies(config)) *
-    Math.max(1, streakMultiplier)
+  const sessions = Math.max(1, new Set(days).size);
+  return Math.round(
+    pactWeekValueFlies(config, sessions) * Math.max(1, multiplier),
   );
 }
 
@@ -638,9 +704,16 @@ export async function settleFinishedWeeks(args: {
 
   const categories = await loadCategories();
 
+  const rungs = [...(args.config.streakMultipliers ?? [])].sort(
+    (a, b) => a.weeks - b.weeks,
+  );
+  const prestigeWeeks = pactPrestigeWeeks(args.config);
+  const cycles = args.config.prestigeCycles ?? [];
+
   for (const pact of ordered) {
     const streakBefore = next.weeks;
     const grantedBefore = autoGrantedFlies;
+    const lapsBefore = next.laps;
     // The week is over, so every scheduled day is in the past — asking the
     // ledger as of the day after it ended is what makes a miss a miss.
     const ledger = readPactSessions({
@@ -652,23 +725,32 @@ export async function settleFinishedWeeks(args: {
     });
     const progress = ledger.progress;
     const kept = progress >= pact.target;
+    // Near miss: finish most of the week and the run survives. This one rule
+    // saves more long-running pacts than shields do — but it buys survival
+    // only. The completion bonus, the gift and the milestone are all forfeit,
+    // so it can never become the cheap way to climb.
+    const nearMissTarget = pactNearMissTarget(args.config, pact.target);
+    const nearMiss = !kept && progress > 0 && progress >= nearMissTarget;
     let usedShield = false;
 
     // Sessions ticked at the week's edge may never have been reconciled while
     // the week was still current, and once it rolls over nothing else looks at
     // them. Settle them here so no kept session goes unpaid.
-    const owedSessions = progress - Math.max(0, pact.paidSessions ?? 0);
+    const paidSessions = Math.max(0, pact.paidSessions ?? 0);
+    const owedSessions = progress - paidSessions;
     const earnsComeback = ledger.cameBack && !pact.comebackPaid;
     if (userDoc && (owedSessions !== 0 || earnsComeback)) {
       autoGrantedFlies += applyPactSessionFlies({
         user: userDoc,
         config: args.config,
+        paidSessions,
         owedSessions,
         comeback: earnsComeback,
         isPremium,
         // The rate this week was lived under: the streak it was reaching for,
         // which is what reconcile paid its earlier sessions at.
         streakWeeks: streakBefore + 1,
+        laps: lapsBefore,
       });
       pact.paidSessions = progress;
       if (earnsComeback) pact.comebackPaid = true;
@@ -676,13 +758,15 @@ export async function settleFinishedWeeks(args: {
 
     // Two rescued weeks in a row would let someone who finishes nothing hold
     // a twelve-week streak, so a rescue always has to be followed by a week
-    // actually kept. Zero progress is never rescuable either. The shield
-    // spends itself — the user is never asked to arm it.
+    // actually kept. Zero progress is never rescuable either, and a near miss
+    // never spends one — protection the user already has for free must not
+    // cost them a Lily Pad. The shield spends itself; nobody arms it.
     const rescuedLastWeek =
       next.shieldRescueWeek === shiftYMD(pact.weekKey, -7);
     const settleDay = shiftYMD(pact.weekKey, 7);
     if (
       !kept &&
+      !nearMiss &&
       !pact.shieldUsed &&
       progress > 0 &&
       !rescuedLastWeek &&
@@ -693,8 +777,11 @@ export async function settleFinishedWeeks(args: {
       usedShield = true;
     }
 
-    const survives = kept || usedShield;
-    if (survives) {
+    // Only a finished week ADVANCES. A rescue and a near miss both hold the
+    // number where it is: a milestone reached on a week nobody did the work
+    // for is a milestone the ladder no longer means anything at.
+    const held = usedShield || nearMiss;
+    if (kept) {
       next.weeks += 1;
       next.best = Math.max(next.best, next.weeks);
       next.lastKeptWeek = pact.weekKey;
@@ -706,17 +793,23 @@ export async function settleFinishedWeeks(args: {
         ...next.areaLastWeek,
         [pact.categoryId]: pact.weekKey,
       };
-    } else {
+    } else if (!held) {
       next.weeks = 0;
+      // A broken run gives the milestones back to climb again. The prestige
+      // base it already bought is untouched — nothing earned is ever taken.
+      next.milestonesPaid = 0;
     }
 
-    if (survives) {
+    const survives = kept || held;
+    if (kept) {
       pact.streakWeek = next.weeks;
       pact.areaWeek = next.areaWeeks[pact.categoryId];
     }
 
     // Shields are earned by the behaviour they protect: every Nth week you
-    // actually keep hands one back, up to the cap. Rescued weeks earn nothing.
+    // actually keep hands one back, up to the cap. Off by default in v5 — the
+    // milestone rungs issue them now, and against a holding cap of 2 a second
+    // faucet only oversupplies.
     const earnEvery = Math.max(0, shieldConfig.earnEveryPactWeeks);
     if (kept && earnEvery > 0 && next.weeks % earnEvery === 0) {
       shieldState = grantShields(shieldState, shieldConfig, isPremium, 1);
@@ -730,30 +823,75 @@ export async function settleFinishedWeeks(args: {
         config: args.config,
         pact,
         streakWeeks: next.weeks,
+        laps: lapsBefore,
         isPremium,
       });
       autoGrantedFlies += summary.fliesGranted;
       pact.claimedAt = new Date();
     }
-    const grantedThisWeek = autoGrantedFlies - grantedBefore;
 
-    // Finishing the ladder is a lap, not a plateau. Holding the top rate
-    // forever turns a twelve-week streak into permanent multiplied income —
-    // the strongest faucet in the app, paid to a player who has already proved
-    // the habit. The top rung pays its legendary box, then the climb restarts.
-    // Deliberately after the payout: the week that completes the ladder is
-    // still paid at the top rate it earned.
-    const topRungWeeks = pactTopRungWeeks(args.config);
+    // Milestones pay once each, the first time the streak reaches them. Only
+    // a kept week can reach one, so a held week never triggers this.
+    let milestoneWeeks: number | undefined;
+    const bonusItemIds: string[] = [];
+    if (kept && userDoc) {
+      for (const rung of rungs) {
+        const weeks = Math.max(0, Number(rung.weeks) || 0);
+        if (weeks <= next.milestonesPaid || next.weeks < weeks) continue;
+        next.milestonesPaid = weeks;
+        milestoneWeeks = weeks;
+        if (!rung.rewards?.length) continue;
+        const bonus = await applyPactBonusRewards({
+          user: userDoc,
+          rewards: rung.rewards,
+          isPremium,
+          shieldState,
+          shieldConfig,
+        });
+        shieldState = bonus.shieldState;
+        autoGrantedFlies += bonus.fliesGranted;
+        bonusItemIds.push(...bonus.grantedItemIds);
+      }
+    }
+
+    // Prestige. Holding the top rate forever turns a finished cycle into
+    // permanent multiplied income — the strongest faucet in the app, paid to
+    // someone who has already proved the habit. So the streak resets and the
+    // permanent base rises instead: everything already earned is kept, and
+    // there is a new twelve weeks to climb. Deliberately after the payout —
+    // the week that completes a cycle is still paid at the rate it earned.
     const streakReached = next.weeks;
-    const lapCompleted =
-      survives && topRungWeeks > 0 && streakReached >= topRungWeeks;
+    const lapCompleted = kept && prestigeWeeks > 0 && streakReached >= prestigeWeeks;
+    let prestigeLabel: string | undefined;
     if (lapCompleted) {
       next.laps += 1;
       next.weeks = 0;
+      next.milestonesPaid = 0;
+      const cycle = cycles[next.laps - 1];
+      // After the last cycle the run still pays — well — but issues no new
+      // piece: a sixth would cheapen the five that make the set.
+      const setPiece = cycle?.rewards ?? [];
+      const rewards = cycle
+        ? [...(args.config.prestigeRewards ?? []), ...setPiece]
+        : (args.config.postSetPrestigeRewards ?? []);
+      if (cycle?.label) prestigeLabel = cycle.label;
+      if (userDoc && rewards.length) {
+        const bonus = await applyPactBonusRewards({
+          user: userDoc,
+          rewards,
+          isPremium,
+          shieldState,
+          shieldConfig,
+        });
+        shieldState = bonus.shieldState;
+        autoGrantedFlies += bonus.fliesGranted;
+        bonusItemIds.push(...bonus.grantedItemIds);
+      }
     }
+    const grantedThisWeek = autoGrantedFlies - grantedBefore;
 
     pact.progress = progress;
-    pact.status = kept ? 'kept' : usedShield ? 'kept' : 'missed';
+    pact.status = survives ? 'kept' : 'missed';
     pact.shieldUsed = usedShield;
     pact.settledAt = new Date();
     if (kept && !pact.completedAt) pact.completedAt = new Date();
@@ -770,15 +908,27 @@ export async function settleFinishedWeeks(args: {
       weekKey: pact.weekKey,
       categoryName:
         settledCategory?.shortLabel || settledCategory?.name || 'your area',
-      outcome: kept ? 'kept' : usedShield ? 'rescued' : 'missed',
+      outcome: kept
+        ? 'kept'
+        : usedShield
+          ? 'rescued'
+          : nearMiss
+            ? 'near_miss'
+            : 'missed',
       progress,
       target: pact.target,
       streakBefore,
-      // The number the week actually reached, not the post-lap zero — a
-      // completed ladder shown as "11 → 0" reads as a broken streak.
+      // The number the week actually reached, not the post-prestige zero — a
+      // completed cycle shown as "11 → 0" reads as a broken streak.
       streakAfter: streakReached,
       lapCompleted,
+      milestoneWeeks,
+      prestigeLabel,
+      prestigeBase: lapCompleted
+        ? pactPrestigeBase(args.config, next.laps)
+        : undefined,
       fliesGranted: grantedThisWeek,
+      grantedItemIds: bonusItemIds,
       shieldsLeft: shieldState.count,
     };
   }
@@ -808,6 +958,12 @@ function ladderFor(args: {
   weekStreakNumber: number;
 }): PactLadderView {
   const { config, streak, weekStreakNumber } = args;
+  const laps = streak.laps;
+  const base = pactPrestigeBase(config, laps);
+  const cap = pactMultiplierCap(config);
+  const cycles = config.prestigeCycles ?? [];
+  const cycle = cycles[laps];
+  const prestigeWeeks = pactPrestigeWeeks(config);
   return {
     // The base rate leads the ladder as a real rung: a week with no streak
     // behind it still pays, and a ladder that opens at "nothing" is a ladder
@@ -816,22 +972,65 @@ function ladderFor(args: {
       {
         weeks: 0,
         multiplier: 1,
-        rewards: config.completionRewards ?? [],
+        effective: Math.min(cap, base),
+        rewards: [],
         reached: true,
+        paid: true,
       },
       ...[...(config.streakMultipliers ?? [])]
         .sort((a, b) => a.weeks - b.weeks)
         .map((rung) => ({
           weeks: rung.weeks,
           multiplier: Math.max(1, Number(rung.multiplier) || 1),
-          rewards: rung.rewards?.length
-            ? rung.rewards
-            : (config.completionRewards ?? []),
+          effective: Math.min(
+            cap,
+            base * Math.max(1, Number(rung.multiplier) || 1),
+          ),
+          rewards: rung.rewards ?? [],
           reached: streak.weeks >= rung.weeks,
+          paid: streak.milestonesPaid >= rung.weeks,
         })),
     ],
-    multiplier: pactStreakMultiplier(config, weekStreakNumber),
+    multiplier: pactMultiplier(config, weekStreakNumber, laps),
+    baseMultiplier: base,
+    cap,
+    cycle: laps + 1,
+    prestigeWeeks,
+    prestigeRewards: [
+      ...(cycle
+        ? (config.prestigeRewards ?? [])
+        : (config.postSetPrestigeRewards ?? [])),
+      ...(cycle?.rewards ?? []),
+    ],
+    prestigeLabel: cycle?.label,
+    setSize: cycles.length,
+    setOwned: Math.min(cycles.length, laps),
+    nextBaseMultiplier: pactPrestigeBase(config, laps + 1),
   };
+}
+
+/**
+ * Every session count the pick sheet can offer, priced once on the server.
+ * A client that recomputes the formula drifts from what settlement actually
+ * pays the moment either side is tuned, and the number on the confirm step is
+ * the promise the whole commitment is made against.
+ */
+function weekPreviewFor(
+  config: PactConfigDoc,
+  multiplier: number,
+): PactWeekPreview[] {
+  return Array.from({ length: PACT_MAX_SESSIONS }, (_, index) => {
+    const sessions = index + 1;
+    return {
+      sessions,
+      flies: Math.round(pactWeekValueFlies(config, sessions) * multiplier),
+      sessionFlies: Math.round(pactSessionFlies(config) * multiplier),
+      bonusFlies: Math.round(
+        pactWeekBonusFlies(config, sessions) * multiplier,
+      ),
+      rewards: pactCompletionRewards(config, sessions),
+    };
+  });
 }
 
 export async function getPactView(args: {
@@ -898,9 +1097,10 @@ export async function getPactView(args: {
     weekStartsOn,
   });
 
-  // The rate the week in progress is being paid at. Every fly number the card
-  // shows is already multiplied by it, so the user reads one true number.
-  const weekMultiplier = pactStreakMultiplier(config, streak.weeks + 1);
+  // The rate the week in progress is being paid at — the prestige floor times
+  // the streak's step, capped. Every fly number the card shows is already
+  // multiplied by it, so the user reads one true number.
+  const weekMultiplier = pactMultiplier(config, streak.weeks + 1, streak.laps);
 
   const activeDoc =
     (await PactModel.findOne({ userId, weekKey: currentWeek })) ??
@@ -960,12 +1160,19 @@ export async function getPactView(args: {
       claimable: progress >= activeDoc.target && !activeDoc.claimedAt,
       claimed: !!activeDoc.claimedAt,
       rewardFlies: optionRewardFlies(config, activeDoc.days, weekMultiplier),
-      sessionFlies: pactSessionFlies(config) * weekMultiplier,
-      weekBonusFlies: pactWeekBonusFlies(config) * weekMultiplier,
-      earnedFlies:
+      sessionFlies: Math.round(pactSessionFlies(config) * weekMultiplier),
+      weekBonusFlies: Math.round(
+        pactWeekBonusFlies(config, activeDoc.target) * weekMultiplier,
+      ),
+      earnedFlies: Math.round(
         (Math.max(0, activeDoc.paidSessions ?? 0) * pactSessionFlies(config) +
           (activeDoc.comebackPaid ? pactComebackFlies(config) : 0)) *
-        weekMultiplier,
+          weekMultiplier,
+      ),
+      completionRewards: pactCompletionRewards(config, activeDoc.target),
+      nearMissTarget: pactNearMissTarget(config, activeDoc.target),
+      canHoldStreak:
+        progress + ledger.remaining >= pactNearMissTarget(config, activeDoc.target),
       daysLeft: Math.max(0, daysBetween(todayKey, weekEnd) + 1),
       shieldUsed: activeDoc.shieldUsed,
       tagId: activeDoc.tagId,
@@ -1109,7 +1316,9 @@ export async function getPactView(args: {
     areas,
     streak: streakView,
     isPremium,
-    canWriteOwn: isPremium,
+    // Always true. Kept on the view so an older client build that still reads
+    // it stops gating rather than gating everyone.
+    canWriteOwn: true,
     swapTokens: streak.swapTokens,
     introSeen: streak.introSeen,
     needsAreas: areas.length === 0,
@@ -1118,10 +1327,10 @@ export async function getPactView(args: {
     // preview that quotes the base while the card quotes the multiplied total
     // is two prices for one week.
     flyRates: {
-      perTask: pactSessionFlies(config) * weekMultiplier,
-      weekBonus: pactWeekBonusFlies(config) * weekMultiplier,
-      comeback: pactComebackFlies(config) * weekMultiplier,
+      perTask: Math.round(pactSessionFlies(config) * weekMultiplier),
+      comeback: Math.round(pactComebackFlies(config) * weekMultiplier),
     },
+    weekPreview: weekPreviewFor(config, weekMultiplier),
     completionRewards: config.completionRewards ?? [],
     weekResult: streak.pendingResult,
     forgoneFlies: streak.forgoneFlies,
@@ -1130,7 +1339,18 @@ export async function getPactView(args: {
     ladder: ladderFor({ config, streak, weekStreakNumber: streak.weeks + 1 }),
     rewardCatalog: buildRewardCatalog(await getFullCatalog(), [
       config.completionRewards ?? [],
-      ...(config.streakMultipliers ?? []).map((rung) => rung.rewards ?? []),
+      ...(config.completionGiftTiers ?? []).map((tier) => tier.rewards ?? []),
+      // Milestone and prestige lanes carry SHIELD and RARITY_ITEM entries the
+      // catalog has no id for; they resolve to nothing rather than throwing,
+      // and the client renders those two by name instead of by tile.
+      ...(config.streakMultipliers ?? []).map(
+        (rung) => (rung.rewards ?? []) as QuestRewards,
+      ),
+      (config.prestigeRewards ?? []) as QuestRewards,
+      (config.postSetPrestigeRewards ?? []) as QuestRewards,
+      ...(config.prestigeCycles ?? []).map(
+        (cycle) => (cycle.rewards ?? []) as QuestRewards,
+      ),
     ]),
   };
 }
@@ -1156,9 +1376,10 @@ export async function getAreaOptions(args: {
     areaName: category?.shortLabel || category?.name || 'this area',
     weekKey: weekKeyFor(getZonedToday(timezone), weekStartsOn),
     lastPact,
-    streakMultiplier: pactStreakMultiplier(
+    streakMultiplier: pactMultiplier(
       config,
       normalizePactStreak(user).weeks + 1,
+      normalizePactStreak(user).laps,
     ),
   });
 }

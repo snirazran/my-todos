@@ -22,7 +22,7 @@ export default function MobileNav() {
   const [wardrobePopupOpen, setWardrobePopupOpen] = useState(false);
   const [pendingHref, setPendingHref] = useState<string | null>(null);
 
-  // The nav rides above the popup's backdrop while it's open ג€” and must stay
+  // The nav rides above the popup's backdrop while it's open — and must stay
   // raised until the exit animation lands, or the sheet slides down OVER the
   // nav the moment `open` flips false.
   const [navRaised, setNavRaised] = useState(false);

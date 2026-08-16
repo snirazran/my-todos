@@ -1,4 +1,27 @@
-import type { QuestRewards } from '@/lib/quests/types';
+import type { QuestReward, QuestRewards } from '@/lib/quests/types';
+
+export type PactRarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
+
+/** One Lily Pad, from the shared shield pool. */
+export type PactShieldReward = { type: 'SHIELD'; amount?: number };
+
+/**
+ * A guaranteed rarity, drawn identity. The tier is certain and only which item
+ * lands is rolled — the same contract trade-ups run on, so it steers by the
+ * wishlist and favours items the user does not already own.
+ */
+export type PactRarityItemReward = {
+  type: 'RARITY_ITEM';
+  rarity: PactRarity;
+  amount?: number;
+};
+
+/** What milestones and prestige may pay, over and above a week's own gift. */
+export type PactBonusReward =
+  | QuestReward
+  | PactShieldReward
+  | PactRarityItemReward;
+export type PactBonusRewards = PactBonusReward[];
 
 /**
  * Three options, one per step up the session ladder. Choice overload is
@@ -54,15 +77,24 @@ export type PactSuggestion = {
 export type PactWeekResult = {
   weekKey: string;
   categoryName: string;
-  outcome: 'kept' | 'rescued' | 'missed';
+  /** `near_miss` kept the streak on ≥ the configured share of the sessions. */
+  outcome: 'kept' | 'rescued' | 'near_miss' | 'missed';
   progress: number;
   target: number;
   streakBefore: number;
   streakAfter: number;
-  /** The week finished the ladder: it paid the top rate, and the climb resets. */
+  /** The week finished a cycle: it prestiged, and the climb resets. */
   lapCompleted?: boolean;
+  /** Milestone rung this week reached for the first time, if any. */
+  milestoneWeeks?: number;
+  /** Label of the set piece a prestige awarded, if any. */
+  prestigeLabel?: string;
+  /** Base multiplier the prestige raised the floor to. */
+  prestigeBase?: number;
   /** Flies granted at settlement, for a week finished but never claimed. */
   fliesGranted: number;
+  /** Items handed over at settlement — milestone and prestige payouts. */
+  grantedItemIds?: string[];
   shieldsLeft: number;
 };
 
@@ -70,31 +102,39 @@ export type PactWeekResult = {
 export type PactStreakMultiplier = {
   weeks: number;
   multiplier: number;
-  /** The gift a week pays at this rate. Falls back to `completionRewards`. */
-  rewards?: QuestRewards;
+  /** Paid ONCE, the first time a streak reaches this rung. */
+  rewards?: PactBonusRewards;
 };
 
-/** Legacy lump-payout tracks. Retired in payout v3; nothing reads them. */
-export type PactStreakTier = {
-  weeks: number;
+/** The gift a completed week hands over, by how many sessions it asked for. */
+export type PactCompletionGiftTier = {
+  minSessions: number;
   rewards: QuestRewards;
 };
 
-export type PactAreaMasteryTier = {
-  weeks: number;
-  rewards: QuestRewards;
-  plusRewards?: QuestRewards;
+/** One turn of the twelve-week ladder, and the set piece finishing it awards. */
+export type PactPrestigeCycle = {
+  label?: string;
+  rewards: PactBonusRewards;
 };
 
 export type PactConfigView = {
   isActive: boolean;
   pickHour: number;
   fliesPerCompletion: number;
-  weekBonusFlies: number;
-  bigCommitmentBonusFlies: number;
+  weekValuePerSession: number;
+  weekValueBaseSessions: number;
   comebackBonusFlies: number;
   completionRewards: QuestRewards;
+  completionGiftTiers: PactCompletionGiftTier[];
   streakMultipliers: PactStreakMultiplier[];
+  prestigeWeeks: number;
+  prestigeBaseStep: number;
+  maxEffectiveMultiplier: number;
+  prestigeRewards: PactBonusRewards;
+  prestigeCycles: PactPrestigeCycle[];
+  postSetPrestigeRewards: PactBonusRewards;
+  nearMissPercent: number;
   plusSwapTokensPerMonth: number;
   minOptionsPerArea: number;
   autoGenerate: boolean;
@@ -180,6 +220,15 @@ export type ActivePactView = {
   canStillFinish: boolean;
   /** Area tag on this pact's tasks, for hint targeting. */
   tagId?: string;
+  /** The gift this week's session count pays at completion. */
+  completionRewards: QuestRewards;
+  /** Sessions that keep the streak alive without finishing the week. */
+  nearMissTarget: number;
+  /**
+   * Near-miss protection is still reachable. False once even that is out of
+   * range, which is the only point at which the week is truly over.
+   */
+  canHoldStreak: boolean;
 };
 
 export type PactStatus = 'active' | 'kept' | 'missed' | 'skipped';
@@ -192,9 +241,15 @@ export type PactStatus = 'active' | 'kept' | 'missed' | 'skipped';
 export type PactLadderRung = {
   /** 0 is the base rung — the rate a week pays with no streak behind it. */
   weeks: number;
+  /** The rung's own step, before the prestige base is applied. */
   multiplier: number;
-  rewards: QuestRewards;
+  /** What a week here actually pays at: base × step, capped. */
+  effective: number;
+  /** The one-time payout for reaching this rung. Empty on the base rung. */
+  rewards: PactBonusRewards;
   reached: boolean;
+  /** Already collected in this cycle. */
+  paid: boolean;
 };
 
 /**
@@ -208,6 +263,40 @@ export type PactLadderView = {
   rungs: PactLadderRung[];
   /** What the week in progress pays at, including the streak it will reach. */
   multiplier: number;
+  /** The permanent floor prestige has bought. Never lost to a broken streak. */
+  baseMultiplier: number;
+  /** Hard ceiling on base × streak. Plus doubling sits outside it. */
+  cap: number;
+  /** Which turn of the ladder this is, 1-based. */
+  cycle: number;
+  /** Weeks that complete a cycle and prestige. */
+  prestigeWeeks: number;
+  /** What finishing the cycle pays, this cycle's set piece included. */
+  prestigeRewards: PactBonusRewards;
+  /** Name of the piece this cycle awards, when it awards one. */
+  prestigeLabel?: string;
+  /** Pieces in the set, and how many are already held. */
+  setSize: number;
+  setOwned: number;
+  /** The base the next prestige raises the floor to. */
+  nextBaseMultiplier: number;
+};
+
+/**
+ * What one session count is worth this week, already multiplied. The client
+ * never recomputes the formula: a preview that derives its own number drifts
+ * from the one settlement pays the moment either side is tuned.
+ */
+export type PactWeekPreview = {
+  sessions: number;
+  /** The whole week if every session lands. */
+  flies: number;
+  /** What one session pays the moment it is ticked. */
+  sessionFlies: number;
+  /** What is held back for finishing. */
+  bonusFlies: number;
+  /** The gift at completion for this many sessions. */
+  rewards: QuestRewards;
 };
 
 export type PactStreakView = {
@@ -238,8 +327,10 @@ export type PactView = {
   introSeen: boolean;
   needsAreas: boolean;
   weekStartsOn: number;
-  flyRates: { perTask: number; weekBonus: number; comeback: number };
-  /** What finishing this week grants on top of flies (usually a gift box). */
+  flyRates: { perTask: number; comeback: number };
+  /** Every session count the pick sheet can offer, priced and gifted. */
+  weekPreview: PactWeekPreview[];
+  /** The gift a week below the first tier pays. */
   completionRewards: QuestRewards;
   rewardCatalog: Record<string, unknown>;
   /** Flies Plus would have added to past claims. Claimable once premium. */

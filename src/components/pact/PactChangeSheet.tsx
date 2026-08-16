@@ -67,7 +67,7 @@ export function PactChangeSheet({
             </span>
             <div>
               <h2 className="text-[20px] font-black leading-tight text-foreground">
-                Swap this week&apos;s commitment?
+                Swap this week&apos;s Leap?
               </h2>
               <p className="mx-auto mt-1.5 max-w-[34ch] text-[13.5px] font-semibold leading-snug text-muted-foreground">
                 {hasSwap
@@ -180,7 +180,7 @@ export function PactChangeSheet({
               onClick={onClose}
               className="h-11 w-full rounded-2xl text-[14px] font-black text-muted-foreground transition-colors hover:text-foreground"
             >
-              Keep my commitment
+              Keep my Leap
             </button>
           </div>
         </div>

@@ -1,9 +1,10 @@
 import mongoose, { Schema, type Model } from 'mongoose';
 import type { QuestRewards } from '@/lib/quests/types';
 import type {
-  PactAreaMasteryTier,
+  PactBonusRewards,
+  PactCompletionGiftTier,
+  PactPrestigeCycle,
   PactStreakMultiplier,
-  PactStreakTier,
   PactSuggestion,
 } from '@/lib/pact/types';
 
@@ -14,18 +15,32 @@ export interface PactConfigDoc {
   /** Local hour on the user's own week-start day when the pick nudge fires. */
   pickHour: number;
   fliesPerCompletion: number;
-  weekBonusFlies: number;
-  bigCommitmentBonusFlies: number;
   comebackBonusFlies: number;
+  /** The 20 in `20 × (sessions + 1)`: what one session adds to a week. */
+  weekValuePerSession: number;
+  /** The `+ 1`: sessions' worth of value that finishing adds on its own. */
+  weekValueBaseSessions: number;
   /** Which payout model this doc is on. Bumping it re-seeds the fly numbers. */
   payoutVersion: number;
+  /** Gift for a session count below the first tier. */
   completionRewards: QuestRewards;
+  /** Gift at completion, by how many sessions the week asked for. */
+  completionGiftTiers: PactCompletionGiftTier[];
   streakMultipliers: PactStreakMultiplier[];
-  /** Retired in payout v3. Kept on the doc so old configs still load. */
-  milestoneEveryWeeks: number;
-  milestoneRewards: QuestRewards;
-  streakTiers: PactStreakTier[];
-  masteryTiers: PactAreaMasteryTier[];
+  /** Weeks held that complete a cycle and trigger prestige. */
+  prestigeWeeks: number;
+  /** Permanent base multiplier each completed cycle adds. */
+  prestigeBaseStep: number;
+  /** Hard ceiling on base × streak, before the Plus doubling. */
+  maxEffectiveMultiplier: number;
+  /** Paid every prestige until the set is complete. */
+  prestigeRewards: PactBonusRewards;
+  /** One entry per cycle — the exclusive piece that cycle awards. */
+  prestigeCycles: PactPrestigeCycle[];
+  /** Paid instead of a set piece once every cycle has been claimed. */
+  postSetPrestigeRewards: PactBonusRewards;
+  /** Share of the week's sessions that keeps a streak alive without finishing. */
+  nearMissPercent: number;
   plusSwapTokensPerMonth: number;
   minOptionsPerArea: number;
   autoGenerate: boolean;
@@ -37,78 +52,170 @@ export interface PactConfigDoc {
 export const PACT_CONFIG_ID = 'weekly-pact';
 
 /**
- * v1 paid nothing until the whole week landed and handed the hardest-labelled
- * ideas a flat bonus nobody could verify. v2 pays per kept session as
- * it happens, keeps a bonus for finishing, and prices ambition in sessions —
- * the only unit of effort the app can actually see.
+ * The pact is the deepest ladder in the game — around fourteen months of
+ * progression ending in a five-piece legendary set. One formula prices a week
+ * (`20 × (sessions + 1)`), the streak multiplies it in fractional steps every
+ * three weeks, and every twelfth week prestiges: the streak resets, the base
+ * rate rises permanently, and a set piece is issued.
  *
- * v3 collapses the four payout tracks into one. Lump tiers at 2/4/8/12 weeks,
- * area mastery and a gift every other week were four rewards on three clocks,
- * none of which could be read off the card the user was looking at. The streak
- * now multiplies the week instead, so there is one rule and one number.
- *
- * v4 caps the ladder at x4 over three rungs. v3's four-rung x5 ladder averaged
- * x3.17 and pushed a kept 3-session week to 53.5 flies/day all-in, past the
- * economy doc's tighten-above-50 line.
+ * There is only ever ONE payout model in this file. Earlier ones are deleted
+ * rather than kept as branches — a config doc is seeded to the current shape or
+ * it is not, and a ladder of historical `if (version < n)` blocks made it
+ * impossible to read what the app actually pays today.
  */
-export const PACT_PAYOUT_VERSION = 4;
+export const PACT_PAYOUT_VERSION = 5;
 
-export const PACT_V2_PAYOUT = {
-  fliesPerCompletion: 7,
-  weekBonusFlies: 32,
-  comebackBonusFlies: 5,
-  bigCommitmentBonusFlies: 0,
-} as const;
+/**
+ * Fields earlier payout models wrote that nothing reads any more. Removed from
+ * live documents on the next seed, so the database and this file never disagree
+ * about what is paid.
+ */
+export const RETIRED_PACT_CONFIG_FIELDS = [
+  'weekBonusFlies',
+  'bigCommitmentBonusFlies',
+  'milestoneEveryWeeks',
+  'milestoneRewards',
+  'streakTiers',
+  'masteryTiers',
+] as const;
 
-// The old focus quest dropped a gift every 3-day cycle — 2.33 a week — and was
-// the main source behind the PDF's "2–3 Simple gifts a week". One weekly event
-// can't match that count, so the milestone gift stacks ON TOP every 2nd week
-// rather than replacing that week's, recovering most of the lost frequency.
+const SIMPLE_GIFT = 'gift_box_1';
+const FANCY_GIFT = 'gift_box_rare';
+const AMAZING_GIFT = 'gift_box_legendary';
+
+// The gift a week below the first tier pays — a one-session pact. Every other
+// session count is priced by `DEFAULT_PACT_COMPLETION_GIFT_TIERS`.
 export const DEFAULT_PACT_COMPLETION_REWARDS: QuestRewards = [
-  { type: 'BOX', itemId: 'gift_box_1' },
+  { type: 'BOX', itemId: SIMPLE_GIFT },
 ];
 
-export const DEFAULT_PACT_MILESTONE_REWARDS: QuestRewards = [
-  { type: 'BOX', itemId: 'gift_box_rare' },
+/**
+ * The gift arrives only at completion, never per session: a gift delivered
+ * mid-pact spends the anticipation that pulls someone through session four.
+ * It climbs with what the week asked for, so a bigger commitment is visibly
+ * worth more before it is made.
+ */
+export const DEFAULT_PACT_COMPLETION_GIFT_TIERS: PactCompletionGiftTier[] = [
+  { minSessions: 2, rewards: [{ type: 'BOX', itemId: FANCY_GIFT }] },
+  { minSessions: 4, rewards: [{ type: 'BOX', itemId: AMAZING_GIFT }] },
+  {
+    minSessions: 6,
+    rewards: [
+      { type: 'BOX', itemId: AMAZING_GIFT },
+      { type: 'BOX', itemId: FANCY_GIFT },
+    ],
+  },
 ];
 
-// Whole numbers on purpose: "your weeks pay x3" needs no arithmetic to act on,
-// where "+50% after the first two" needs a calculator and a base. The gift
-// climbs with the rate, so one rung is one promise: keep the streak and the
-// week pays more flies AND a better box. Rarity is the app's own colour
-// language, which is why a rung can be read before it is parsed.
-//
-// Three rungs, not four. Topping out at x5 averaged x3.17 across the lap and
-// put a kept 3-session week at 53.5 flies/day all-in — past the economy doc's
-// "over 50 and tighten" line. Capping at x4 could not simply relabel the old
-// x4 rung, or two stops would pay the same; one rung had to go and the rest
-// re-space. Averaging x2.58 lands the same player at 49.1.
-//
-// The first rung stays at 2 weeks. Moving it to 3 saved only 0.7 flies/day and
-// cost the early win that is the whole reason anyone starts a second week.
+/**
+ * Milestones every three weeks: two feels unearned, four is too far to see.
+ * The multiplier applies to the whole payout, sessions and bonus alike, and a
+ * rung's rewards are paid ONCE, the first time the streak reaches it — the
+ * week's own gift comes from the session-count tiers instead.
+ *
+ * Fractional steps rather than whole numbers. A ladder that has to reach x4 in
+ * three stops prices the twelfth week at four times the first, which is what
+ * makes a reset feel like a cliff. 1.25 → 1.50 → 1.80 climbs the same distance
+ * in feel while leaving room for prestige to keep raising the floor underneath
+ * it for the next fourteen months.
+ */
 export const DEFAULT_PACT_STREAK_MULTIPLIERS: PactStreakMultiplier[] = [
   {
-    weeks: 2,
-    multiplier: 2,
-    rewards: [{ type: 'BOX', itemId: 'gift_box_rare' }],
+    weeks: 4,
+    multiplier: 1.25,
+    rewards: [
+      { type: 'FLIES', amount: 120 },
+      { type: 'BOX', itemId: FANCY_GIFT },
+    ],
   },
   {
-    weeks: 6,
-    multiplier: 3,
-    rewards: [{ type: 'BOX', itemId: 'gift_box_rare' }],
+    weeks: 7,
+    multiplier: 1.5,
+    rewards: [
+      { type: 'FLIES', amount: 250 },
+      { type: 'BOX', itemId: AMAZING_GIFT },
+      { type: 'SHIELD', amount: 1 },
+    ],
   },
   {
-    weeks: 12,
-    multiplier: 4,
-    rewards: [{ type: 'BOX', itemId: 'gift_box_legendary' }],
+    weeks: 10,
+    multiplier: 1.8,
+    rewards: [
+      { type: 'FLIES', amount: 400 },
+      { type: 'BOX', itemId: AMAZING_GIFT },
+      { type: 'RARITY_ITEM', rarity: 'epic' },
+    ],
   },
 ];
 
-/** @deprecated Retired in payout v3 — the streak multiplies the week instead. */
-export const DEFAULT_PACT_STREAK_TIERS: PactStreakTier[] = [];
+/**
+ * Five cycles, five unique legendaries that form a visible matching set. A
+ * half-complete set of five is one of the most reliable long-horizon
+ * motivators there is — far stronger than five unrelated legendaries of the
+ * same value.
+ *
+ * Named for the pads, not the system. The user Leaps every week and a Lily Pad
+ * catches them when they miss, so the thing twelve Leaps carries them to is the
+ * next pad across the pond — one picture the whole feature runs on, and no
+ * vocabulary to learn beyond the metal.
+ *
+ * The pieces ship as a drawn legendary rather than a named item because the art
+ * does not exist yet. Point each cycle at its real item id from the admin
+ * screen and the set becomes a set; until then a cycle still pays a legendary,
+ * so nobody is short-changed while the art is made.
+ */
+export const DEFAULT_PACT_PRESTIGE_CYCLES: PactPrestigeCycle[] = [
+  { label: 'Bronze Lily', rewards: [{ type: 'RARITY_ITEM', rarity: 'legendary' }] },
+  { label: 'Silver Lily', rewards: [{ type: 'RARITY_ITEM', rarity: 'legendary' }] },
+  { label: 'Gold Lily', rewards: [{ type: 'RARITY_ITEM', rarity: 'legendary' }] },
+  { label: 'Emerald Lily', rewards: [{ type: 'RARITY_ITEM', rarity: 'legendary' }] },
+  { label: 'Diamond Lily', rewards: [{ type: 'RARITY_ITEM', rarity: 'legendary' }] },
+];
 
-/** @deprecated Retired in payout v3. */
-export const DEFAULT_PACT_MASTERY_TIERS: PactAreaMasteryTier[] = [];
+/** Paid on every prestige, on top of that cycle's set piece. */
+export const DEFAULT_PACT_PRESTIGE_REWARDS: PactBonusRewards = [
+  { type: 'FLIES', amount: 700 },
+  { type: 'BOX', itemId: AMAZING_GIFT, amount: 2 },
+  { type: 'SHIELD', amount: 2 },
+];
+
+/**
+ * The ladder continues after the set is finished — each further twelve-week
+ * run pays well — but it issues no new legendary, because a sixth piece would
+ * cheapen the other five.
+ */
+export const DEFAULT_PACT_POST_SET_PRESTIGE_REWARDS: PactBonusRewards = [
+  { type: 'FLIES', amount: 1500 },
+  { type: 'BOX', itemId: AMAZING_GIFT, amount: 2 },
+];
+
+/**
+ * The scalar half of the payout, split out so the Mongoose schema can use the
+ * same numbers as its field defaults. Effective multiplier is hard capped at
+ * 2.50: without it a 60-week Plus veteran on a 7-session pact earns ~900 flies
+ * a week from this system alone, which breaks every shop price.
+ */
+export const PACT_PAYOUT_NUMBERS = {
+  fliesPerCompletion: 6,
+  weekValuePerSession: 20,
+  weekValueBaseSessions: 1,
+  comebackBonusFlies: 5,
+  prestigeWeeks: 12,
+  prestigeBaseStep: 0.15,
+  maxEffectiveMultiplier: 2.5,
+  nearMissPercent: 80,
+} as const;
+
+/** The whole payout, as one block a config doc can be seeded from. */
+export const PACT_PAYOUT: Partial<PactConfigDoc> = {
+  ...PACT_PAYOUT_NUMBERS,
+  completionRewards: DEFAULT_PACT_COMPLETION_REWARDS,
+  completionGiftTiers: DEFAULT_PACT_COMPLETION_GIFT_TIERS,
+  streakMultipliers: DEFAULT_PACT_STREAK_MULTIPLIERS,
+  prestigeRewards: DEFAULT_PACT_PRESTIGE_REWARDS,
+  prestigeCycles: DEFAULT_PACT_PRESTIGE_CYCLES,
+  postSetPrestigeRewards: DEFAULT_PACT_POST_SET_PRESTIGE_REWARDS,
+};
 
 type SeedEntry = Omit<PactSuggestion, 'id' | 'isActive' | 'picked' | 'kept'>;
 
@@ -156,37 +263,73 @@ const PactConfigSchema = new Schema<PactConfigDoc>(
     configId: { type: String, required: true, unique: true, index: true },
     isActive: { type: Boolean, default: true },
     pickHour: { type: Number, default: 18 },
-    // The old focus quest paid 23 flies per 3-DAY cycle = 53.7 flies/week, and
-    // that faucet is what the pact replaces. 7/session + 32 lands a 2–5 session
-    // week at 46–67, with the modal 3-session week on 53 — free income holds at
-    // the PDF's ~37 flies/day. Sub-linear on purpose: per session it falls 23 →
-    // 13.4 as days are added, so stacking days is never the cheap way to farm.
-    fliesPerCompletion: { type: Number, default: PACT_V2_PAYOUT.fliesPerCompletion },
-    weekBonusFlies: { type: Number, default: PACT_V2_PAYOUT.weekBonusFlies },
+    // One formula: a week is worth `weekValuePerSession × (sessions + base)`.
+    // Of that, `fliesPerCompletion` lands on each completed session and the
+    // remainder lands at the finish — so roughly three quarters of the value
+    // is back-loaded onto the last session, where the goal-gradient effect
+    // does the most work. At the defaults a 2-session week is 60 flies and a
+    // 7-session week is 160, sub-linear per session by design.
+    fliesPerCompletion: {
+      type: Number,
+      default: PACT_PAYOUT_NUMBERS.fliesPerCompletion,
+    },
+    weekValuePerSession: {
+      type: Number,
+      default: PACT_PAYOUT_NUMBERS.weekValuePerSession,
+    },
+    weekValueBaseSessions: {
+      type: Number,
+      default: PACT_PAYOUT_NUMBERS.weekValueBaseSessions,
+    },
     // Paid once a week, on the first session completed after a scheduled one
     // was missed. The largest single effect in the 53-arm gym megastudy came
     // from paying for exactly this return, so it is a faucet, not a courtesy.
-    comebackBonusFlies: { type: Number, default: PACT_V2_PAYOUT.comebackBonusFlies },
-    // Retired. Difficulty is self-declared and unverifiable, so paying for it
-    // made the hardest-labelled option strictly dominant. Ambition is priced in
-    // sessions now. Kept at 0 so an existing admin form doesn't break.
-    bigCommitmentBonusFlies: {
+    comebackBonusFlies: {
       type: Number,
-      default: PACT_V2_PAYOUT.bigCommitmentBonusFlies,
+      default: PACT_PAYOUT_NUMBERS.comebackBonusFlies,
     },
     payoutVersion: { type: Number, default: PACT_PAYOUT_VERSION },
     completionRewards: {
       type: [Schema.Types.Mixed],
       default: DEFAULT_PACT_COMPLETION_REWARDS,
     } as any,
+    completionGiftTiers: {
+      type: [Schema.Types.Mixed],
+      default: DEFAULT_PACT_COMPLETION_GIFT_TIERS,
+    } as any,
     streakMultipliers: {
       type: [Schema.Types.Mixed],
       default: DEFAULT_PACT_STREAK_MULTIPLIERS,
     } as any,
-    milestoneEveryWeeks: { type: Number, default: 0 },
-    milestoneRewards: { type: [Schema.Types.Mixed], default: [] } as any,
-    streakTiers: { type: [Schema.Types.Mixed], default: [] } as any,
-    masteryTiers: { type: [Schema.Types.Mixed], default: [] } as any,
+    prestigeWeeks: { type: Number, default: PACT_PAYOUT_NUMBERS.prestigeWeeks },
+    prestigeBaseStep: {
+      type: Number,
+      default: PACT_PAYOUT_NUMBERS.prestigeBaseStep,
+    },
+    maxEffectiveMultiplier: {
+      type: Number,
+      default: PACT_PAYOUT_NUMBERS.maxEffectiveMultiplier,
+    },
+    prestigeRewards: {
+      type: [Schema.Types.Mixed],
+      default: DEFAULT_PACT_PRESTIGE_REWARDS,
+    } as any,
+    prestigeCycles: {
+      type: [Schema.Types.Mixed],
+      default: DEFAULT_PACT_PRESTIGE_CYCLES,
+    } as any,
+    postSetPrestigeRewards: {
+      type: [Schema.Types.Mixed],
+      default: DEFAULT_PACT_POST_SET_PRESTIGE_REWARDS,
+    } as any,
+    // Near-miss protection: finish this share of the week and the streak
+    // survives. The completion bonus and the milestone are still forfeit, but
+    // the run does not fall to zero — this single rule saves more long-running
+    // pacts than shields do.
+    nearMissPercent: {
+      type: Number,
+      default: PACT_PAYOUT_NUMBERS.nearMissPercent,
+    },
     plusSwapTokensPerMonth: { type: Number, default: 4 },
     minOptionsPerArea: { type: Number, default: 3 },
     autoGenerate: { type: Boolean, default: true },

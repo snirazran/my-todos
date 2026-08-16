@@ -929,7 +929,7 @@ export function TradePanel({
       return `Plus takes ${modifiers.aimPlusDiscountPercent}% off Aim`;
     }
     if (modifiers.wishlistSlotsPlus > modifiers.wishlistSlotsFree) {
-      return `Plus saves ${modifiers.wishlistSlotsPlus} wishlist picks to aim at`;
+      return `Plus aims at ${modifiers.wishlistSlotsPlus} wishlist picks, not ${modifiers.wishlistSlotsFree}`;
     }
     return null;
   }, [

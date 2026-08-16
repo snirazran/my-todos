@@ -78,7 +78,7 @@ export function PactStripRow({ view }: { view: PactView }) {
       <QuestRewardTileBadge
         rewards={[
           { type: 'FLIES', amount: active.rewardFlies },
-          ...view.completionRewards,
+          ...active.completionRewards,
         ]}
         catalog={view.rewardCatalog as never}
         isPremium={view.isPremium}

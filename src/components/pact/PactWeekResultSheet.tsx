@@ -2,13 +2,14 @@
 
 import { useEffect, useRef, useState } from 'react';
 import confetti from 'canvas-confetti';
-import { Flame, HeartCrack, Trophy } from 'lucide-react';
+import { Flame, HeartCrack, ShieldCheck, Trophy } from 'lucide-react';
 import { Icon } from '@/components/ui/Icon';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { FlyWorth } from '@/components/ui/QuestCards';
 import { hapticCelebrate } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
 import type { PactWeekResult } from '@/lib/pact/types';
+import { formatPactRate } from '@/lib/pact/format';
 
 /**
  * The one moment the weekly pact never had.
@@ -62,11 +63,12 @@ export function PactWeekResultSheet({
 
   const kept = result.outcome === 'kept';
   const rescued = result.outcome === 'rescued';
+  const nearMiss = result.outcome === 'near_miss';
   const missed = result.outcome === 'missed';
 
   const tone = missed
     ? 'bg-muted text-muted-foreground'
-    : rescued
+    : rescued || nearMiss
       ? 'bg-sky-500/12 text-sky-600 dark:text-sky-400'
       : 'bg-lime-500/12 text-lime-600 dark:text-lime-400';
 
@@ -85,34 +87,44 @@ export function PactWeekResultSheet({
                 <HeartCrack className="h-8 w-8" strokeWidth={2.25} />
               ) : rescued ? (
                 <Icon name="lilyPad" className="h-8 w-8" />
+              ) : nearMiss ? (
+                <ShieldCheck className="h-8 w-8" strokeWidth={2.25} />
               ) : (
                 <Trophy className="h-8 w-8" strokeWidth={2.25} />
               )}
             </span>
             <div>
               <p className="text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
-                Last week · {result.categoryName}
+                Your Leap · {result.categoryName}
               </p>
               <h2 className="mt-1.5 text-[21px] font-black leading-tight text-foreground">
                 {result.lapCompleted
-                  ? 'You finished the whole ladder'
+                  ? result.prestigeLabel
+                    ? `You earned ${result.prestigeLabel}`
+                    : 'You finished the whole cycle'
                   : kept
                     ? 'You kept your word'
                     : rescued
                       ? 'A Lily Pad caught your streak'
-                      : 'That week got away'}
+                      : nearMiss
+                        ? 'Close enough to hold'
+                        : 'That week got away'}
               </h2>
-              {/* A lap has to explain itself here or nowhere: the streak the
-                  user is about to see is zero, and without this screen that
-                  reads as the thing they were trying to avoid. */}
+              {/* Prestige has to explain itself here or nowhere: the streak
+                  the user is about to see is zero, and without this screen
+                  that reads as the thing they were trying to avoid. */}
               <p className="mx-auto mt-1.5 max-w-[34ch] text-[13.5px] font-semibold leading-snug text-muted-foreground">
                 {result.lapCompleted
-                  ? `${result.streakAfter} weeks straight, paid at the top rate. The climb starts again from ×1 — your best gift is at the top.`
+                  ? `${result.streakAfter} weeks straight. The climb starts again — but every week from now pays ${formatPactRate(result.prestigeBase ?? 1)} before your streak is counted, and that never goes away.`
                   : kept
-                    ? `All ${result.target} session${result.target === 1 ? '' : 's'} done.`
+                    ? result.milestoneWeeks
+                      ? `All ${result.target} session${result.target === 1 ? '' : 's'} done — and that is ${result.milestoneWeeks} weeks running.`
+                      : `All ${result.target} session${result.target === 1 ? '' : 's'} done.`
                     : rescued
-                      ? `You finished ${result.progress} of ${result.target}. A Lily Pad caught the rest, so the streak stands.`
-                      : `You finished ${result.progress} of ${result.target}. Sessions you did still paid — the week bonus needed all of them.`}
+                      ? `You finished ${result.progress} of ${result.target}. A Lily Pad caught the rest, so the streak stands where it is.`
+                      : nearMiss
+                        ? `You finished ${result.progress} of ${result.target} — enough to keep the streak. It holds at ${result.streakAfter} rather than moving up, and this week's bonus and gift are gone.`
+                        : `You finished ${result.progress} of ${result.target}. Sessions you did still paid — the bonus needed all of them.`}
               </p>
             </div>
           </div>
@@ -143,10 +155,19 @@ export function PactWeekResultSheet({
             </span>
           </div>
 
-          {result.fliesGranted > 0 && (
+          {(result.fliesGranted > 0 ||
+            (result.grantedItemIds?.length ?? 0) > 0) && (
             <div className="flex items-center gap-1.5 rounded-2xl bg-lime-500/10 px-4 py-3 text-[12.5px] font-bold text-lime-700 dark:text-lime-400">
-              <FlyWorth amount={result.fliesGranted} />
-              <span>collected for you</span>
+              {result.fliesGranted > 0 && (
+                <FlyWorth amount={result.fliesGranted} />
+              )}
+              <span>
+                {(result.grantedItemIds?.length ?? 0) > 0
+                  ? `${result.fliesGranted > 0 ? 'and ' : ''}${result.grantedItemIds!.length} ${
+                      result.grantedItemIds!.length === 1 ? 'prize' : 'prizes'
+                    } are waiting in your wardrobe`
+                  : 'collected for you'}
+              </span>
             </div>
           )}
 

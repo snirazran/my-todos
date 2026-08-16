@@ -2,17 +2,21 @@
 
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Check, Flame } from 'lucide-react';
+import { Check, Flame, Trophy } from 'lucide-react';
 import Fly from '@/components/ui/fly';
 import { GiftRive } from '@/components/ui/gift-box/GiftBox';
 
-const FLIES_PER_SESSION = 7;
-const WEEK_BONUS_FLIES = 32;
+// Mirrors the live defaults in PactConfig: a week is worth 20 × (sessions + 1),
+// six of which lands on each session as it is ticked.
+const FLIES_PER_SESSION = 6;
+const WEEK_VALUE_PER_SESSION = 20;
+const WEEK_VALUE_BASE_SESSIONS = 1;
 
 const LADDER = [
-  { weeks: 2, multiplier: 2 },
-  { weeks: 6, multiplier: 3 },
-  { weeks: 12, multiplier: 4 },
+  { weeks: 4, multiplier: 1.25 },
+  { weeks: 7, multiplier: 1.5 },
+  { weeks: 10, multiplier: 1.8 },
+  { weeks: 12, multiplier: 1.8, prestige: true },
 ];
 
 type PactPreview = {
@@ -79,6 +83,10 @@ function multiplierFor(weeks: number) {
   return rate;
 }
 
+function rateLabel(multiplier: number) {
+  return `×${Number.isInteger(multiplier) ? multiplier : multiplier.toFixed(2).replace(/0$/, '')}`;
+}
+
 function AreaArt({ pact }: { pact: PactPreview }) {
   const [failed, setFailed] = useState(false);
 
@@ -113,7 +121,9 @@ export function MarketingPactPreview() {
   const done = activePact.sessions.filter((session) => session.done).length;
   const target = activePact.sessions.length;
   const rate = multiplierFor(activePact.streakWeeks);
-  const weekFlies = (target * FLIES_PER_SESSION + WEEK_BONUS_FLIES) * rate;
+  const weekFlies = Math.round(
+    WEEK_VALUE_PER_SESSION * (target + WEEK_VALUE_BASE_SESSIONS) * rate,
+  );
   const nextRung = LADDER.find((rung) => activePact.streakWeeks < rung.weeks);
   const nextIndex = nextRung ? LADDER.indexOf(nextRung) : -1;
 
@@ -148,7 +158,7 @@ export function MarketingPactPreview() {
               </span>
               <span className="absolute right-2.5 top-2.5 inline-flex h-7 items-center gap-1 rounded-full bg-black/50 px-2.5 text-[11px] font-black text-white backdrop-blur-sm">
                 <Flame className="h-3.5 w-3.5 fill-current text-amber-300" strokeWidth={2} />
-                {activePact.streakWeeks}w · pays ×{rate}
+                {activePact.streakWeeks} Leaps · pays {rateLabel(rate)}
               </span>
               <span
                 className="absolute bottom-2 left-3.5 text-[22px] uppercase leading-none tracking-wide text-white"
@@ -258,10 +268,14 @@ export function MarketingPactPreview() {
       <div className="mt-5 rounded-[22px] border border-border/50 bg-muted/25 px-3.5 py-3">
         <p className="text-[12.5px] font-black leading-snug">
           {nextRung
-            ? `${nextRung.weeks - activePact.streakWeeks} more week${
-                nextRung.weeks - activePact.streakWeeks === 1 ? '' : 's'
-              } and every week pays ×${nextRung.multiplier}`
-            : 'Every week pays ×4 flies and a legendary gift'}
+            ? nextRung.prestige
+              ? `${nextRung.weeks - activePact.streakWeeks} more week${
+                  nextRung.weeks - activePact.streakWeeks === 1 ? '' : 's'
+                } to finish the cycle and claim a legendary`
+              : `${nextRung.weeks - activePact.streakWeeks} more week${
+                  nextRung.weeks - activePact.streakWeeks === 1 ? '' : 's'
+                } and every week pays ${rateLabel(nextRung.multiplier)}`
+            : 'Twelve weeks straight — the set piece is yours'}
         </p>
         <div className="relative mt-3">
           <div className="absolute inset-x-3 top-[15px] h-1.5 -translate-y-1/2 rounded-full bg-muted" />
@@ -286,7 +300,7 @@ export function MarketingPactPreview() {
             }}
             transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
           />
-          <div className="relative grid grid-cols-3">
+          <div className="relative grid grid-cols-4">
             {LADDER.map((rung, index) => {
               const reached = activePact.streakWeeks >= rung.weeks;
               const isNext = index === nextIndex;
@@ -301,7 +315,11 @@ export function MarketingPactPreview() {
                           : 'bg-muted text-muted-foreground/70'
                     }`}
                   >
-                    ×{rung.multiplier}
+                    {rung.prestige ? (
+                      <Trophy className="h-4 w-4" strokeWidth={2.5} />
+                    ) : (
+                      rateLabel(rung.multiplier)
+                    )}
                   </span>
                   <span
                     className={`text-[9.5px] font-black uppercase tracking-wider tabular-nums ${

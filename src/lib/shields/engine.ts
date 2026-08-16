@@ -2,6 +2,7 @@ import connectMongo from '@/lib/mongoose';
 import UserModel from '@/lib/models/User';
 import ShieldConfigModel, {
   SHIELD_CONFIG_ID,
+  SHIELD_CONFIG_VERSION,
   SHIELD_DEFAULTS,
   CAP_MIN,
   CAP_MAX,
@@ -31,9 +32,28 @@ export function dayKeyDiff(fromKey: string, toKey: string): number {
 
 export async function loadShieldConfig(): Promise<ShieldConfigView> {
   await connectMongo();
-  const doc = await ShieldConfigModel.findOne({
+  let doc = await ShieldConfigModel.findOne({
     configId: SHIELD_CONFIG_ID,
-  }).lean<ShieldConfigView | null>();
+  }).lean<(ShieldConfigView & { configVersion?: number }) | null>();
+  // A doc written before v2 carries the retired auto-grant as a real, tuned
+  // value, so a "is it missing?" backfill would never touch it. The version
+  // stamp is what makes the retirement run exactly once and stay admin-tunable.
+  if (doc && (doc.configVersion ?? 1) < SHIELD_CONFIG_VERSION) {
+    await ShieldConfigModel.updateOne(
+      { configId: SHIELD_CONFIG_ID },
+      {
+        $set: {
+          earnEveryPactWeeks: SHIELD_DEFAULTS.earnEveryPactWeeks,
+          configVersion: SHIELD_CONFIG_VERSION,
+        },
+      },
+    );
+    doc = {
+      ...doc,
+      earnEveryPactWeeks: SHIELD_DEFAULTS.earnEveryPactWeeks,
+      configVersion: SHIELD_CONFIG_VERSION,
+    };
+  }
   const num = (value: unknown, fallback: number, min = 0) =>
     Math.max(min, Math.floor(Number(value ?? fallback) || fallback));
   return {

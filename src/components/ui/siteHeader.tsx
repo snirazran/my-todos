@@ -497,7 +497,7 @@ function RightActions({
   const { openQuestOnboarding } = useUIStore();
   const { isAdmin } = useIsAdmin();
 
-  // No click-outside listener needed ג€” the settings sheet covers the entire viewport.
+  // No click-outside listener needed — the settings sheet covers the entire viewport.
 
   const handleSignOut = async () => {
     setSigningOut(true);
@@ -750,7 +750,7 @@ function MobileSheet({
   }, [isOpen, view, subviewControls]);
 
   const flashSoon = (label: string) => {
-    setToast(`${label} ג€” coming soon`);
+    setToast(`${label} — coming soon`);
     window.setTimeout(() => setToast(null), 1800);
   };
 
@@ -760,8 +760,8 @@ function MobileSheet({
     else if (next === 'denied')
       setToast(
         isWeb
-          ? 'Blocked ג€” allow notifications in your browser site settings.'
-          : 'Opening settings ג€” turn notifications on there.',
+          ? 'Blocked — allow notifications in your browser site settings.'
+          : 'Opening settings — turn notifications on there.',
       );
     else setToast('Permission still pending');
     window.setTimeout(() => setToast(null), 2500);
@@ -1425,7 +1425,7 @@ function MainView({
           icon={<Bell className="w-7 h-7 text-amber-300" strokeWidth={2.5} />}
           title="Enable notifications"
           subtitle={`Get reminded to check in on ${frogName}!`}
-          actionLabel={notifLoading ? 'Enablingג€¦' : 'Enable'}
+          actionLabel={notifLoading ? 'Enabling…' : 'Enable'}
           onAction={onEnableNotifs}
           disabled={notifLoading}
         />
@@ -1620,7 +1620,7 @@ function MainView({
                 </div>
               )}
               <p className="mt-4 text-center text-xs font-semibold text-muted-foreground">
-                Thanks for supporting Frogress ג€” you&apos;re helping us keep
+                Thanks for supporting Frogress — you&apos;re helping us keep
                 building נ¸
               </p>
             </div>
@@ -1720,7 +1720,7 @@ function GuestSignOutConfirm({
           Your frog will be lost forever
         </h2>
         <p className="mt-2 text-sm font-medium text-muted-foreground">
-          You&apos;re in Guest Mode ג€” there&apos;s no way to sign back in. Signing
+          You&apos;re in Guest Mode — there&apos;s no way to sign back in. Signing
           out permanently deletes your frog, streaks, and all progress. Create a
           free account first to keep them.
         </p>
@@ -1986,7 +1986,7 @@ function NotificationsView({
             {notifsEnabled
               ? isWeb
                 ? 'This browser will get timer & reminder alerts.'
-                : 'Youג€™re all set to get reminders.'
+                : 'You’re all set to get reminders.'
               : 'Turn these on to get reminders from your frog.'}
           </p>
         </div>
@@ -2032,7 +2032,7 @@ function NotificationsView({
           className="w-full h-12 rounded-2xl bg-primary text-sm font-black tracking-wide text-primary-foreground shadow-lg shadow-primary/25 transition-all active:scale-[0.98] hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
         >
           {notifLoading
-            ? 'Enablingג€¦'
+            ? 'Enabling…'
             : notifsEnabled
               ? 'Manage in system settings'
               : 'Enable notifications'}
@@ -2249,7 +2249,7 @@ function QuickTilesGrid({
       <QuickTile
         icon={<Icon name="patterns" label="Your patterns" className="h-[52px] w-[52px]" />}
         title="Your patterns"
-        subtitle="See whatג€™s working"
+        subtitle="See what’s working"
         onClick={() => window.location.assign('/insights')}
       />
       <QuickTile

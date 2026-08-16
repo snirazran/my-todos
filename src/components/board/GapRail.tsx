@@ -78,7 +78,7 @@ export default function GapRail({
                 </div>
               </div>
 
-              {/* lily-pad ג€+ג€ */}
+              {/* lily-pad “+” */}
               <button
                 type="button"
                 title="Add task (ribbit!)"

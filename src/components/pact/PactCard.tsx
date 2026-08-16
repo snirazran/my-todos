@@ -18,6 +18,7 @@ import {
 } from '@/lib/questClaims';
 import { useUIStore } from '@/lib/uiStore';
 import type { PactView } from '@/lib/pact/types';
+import { formatPactRate } from '@/lib/pact/format';
 import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
 import { PactChangeSheet } from './PactChangeSheet';
 import { openShieldSheet } from '@/hooks/useShields';
@@ -346,7 +347,7 @@ export function PactCard({
                     className="h-3.5 w-3.5 fill-current text-amber-300"
                     strokeWidth={2}
                   />
-                  {data.streak.weeks}w · pays ×{data.ladder.multiplier}
+                  {data.streak.weeks}w · pays {formatPactRate(data.ladder.multiplier)}
                 </span>
               )}
             </div>
@@ -468,8 +469,8 @@ export function PactCard({
                     }
                     label={
                       data.swapTokens > 0
-                        ? `Change commitment — ${data.swapTokens} swap${data.swapTokens === 1 ? '' : 's'} left`
-                        : 'Change commitment — no swaps left'
+                        ? `Change Leap — ${data.swapTokens} swap${data.swapTokens === 1 ? '' : 's'} left`
+                        : 'Change Leap — no swaps left'
                     }
                   />
                 )}
@@ -486,7 +487,7 @@ export function PactCard({
                 <QuestRewardTileBadge
                   rewards={[
                     { type: 'FLIES', amount: active.rewardFlies },
-                    ...data.completionRewards,
+                    ...active.completionRewards,
                   ]}
                   catalog={data.rewardCatalog as never}
                   isPremium={data.isPremium}
@@ -523,7 +524,7 @@ export function PactCard({
                   <HintButton
                     text={
                       weekFinished
-                        ? `All ${active.target} session${active.target === 1 ? '' : 's'} done. You can set a new commitment when the week rolls over.`
+                        ? `All ${active.target} session${active.target === 1 ? '' : 's'} done. You can take a new Leap when the week rolls over.`
                         : active.openToday
                           ? `Today's session is on your list, tagged ${active.categoryName}. Finish all ${active.target} this week.`
                           : active.nextTaskLabel
@@ -560,7 +561,7 @@ export function PactCard({
                       </>
                     ) : active.claimed ? (
                       <span className="truncate">
-                        Start new commitment on {weekStartDayName}
+                        Next Leap opens {weekStartDayName}
                       </span>
                     ) : (
                       <span
@@ -573,7 +574,14 @@ export function PactCard({
                       >
                         {active.canStillFinish
                           ? `Missed ${active.missedSessions} session${active.missedSessions === 1 ? '' : 's'} — the rest still count`
-                          : `Missed ${active.missedSessions} session${active.missedSessions === 1 ? '' : 's'} — not finishable this week`}
+                          : // The bonus is gone, but the streak may not be.
+                            // Saying which is the difference between "why
+                            // bother" and one more session tonight.
+                            !active.canHoldStreak
+                            ? `Missed ${active.missedSessions} session${active.missedSessions === 1 ? '' : 's'} — not finishable this week`
+                            : active.progress >= active.nearMissTarget
+                              ? 'Bonus is gone — your streak is safe'
+                              : `Bonus is gone — ${active.nearMissTarget} sessions still holds your streak`}
                       </span>
                     )}
                   </span>

@@ -87,12 +87,14 @@ export async function reconcilePactSessionFlies(args: {
   const granted = applyPactSessionFlies({
     user,
     config,
+    paidSessions: paid,
     owedSessions: sessionsDelta,
     comeback: earnsComeback,
     isPremium,
     // The week in progress is the next one the streak will reach, so it pays
     // at that rung from its first session rather than a week behind.
     streakWeeks: streakState.weeks + 1,
+    laps: streakState.laps,
   });
 
   // Same bookkeeping the claim path does, so the retroactive-unlock pitch

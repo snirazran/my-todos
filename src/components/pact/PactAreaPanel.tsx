@@ -43,7 +43,7 @@ export function PactAreaPanel() {
               className="h-3.5 w-3.5 text-primary"
               strokeWidth={2.75}
             />
-            Weekly commitment
+            This week&apos;s Leap
           </p>
           {data.active && !data.active.claimed && (
             <span

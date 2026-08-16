@@ -13,6 +13,8 @@ export interface ShieldConfigDoc {
   offerCooldownDays: number;
   offerMinStreak: number;
   earnEveryPactWeeks: number;
+  /** Which defaults this doc was written against. Bumping re-seeds a field. */
+  configVersion: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -21,6 +23,14 @@ export const SHIELD_CONFIG_ID = 'shields';
 
 export const CAP_MIN = 1;
 export const CAP_MAX = 5;
+
+/**
+ * v2 retires the every-other-kept-week auto-grant. The pact ladder issues Lily
+ * Pads at its 7-week milestone and again at every prestige, and against a
+ * holding cap of 2 a second faucet only oversupplies — a player who never runs
+ * out has nothing to buy and nothing to lose.
+ */
+export const SHIELD_CONFIG_VERSION = 2;
 
 export const SHIELD_DEFAULTS = {
   isActive: true,
@@ -32,7 +42,7 @@ export const SHIELD_DEFAULTS = {
   rescueCooldownDays: 14,
   offerCooldownDays: 7,
   offerMinStreak: 3,
-  earnEveryPactWeeks: 2,
+  earnEveryPactWeeks: 0,
 } as const;
 
 const ShieldConfigSchema = new Schema<ShieldConfigDoc>(
@@ -63,6 +73,7 @@ const ShieldConfigSchema = new Schema<ShieldConfigDoc>(
       type: Number,
       default: SHIELD_DEFAULTS.earnEveryPactWeeks,
     },
+    configVersion: { type: Number, default: SHIELD_CONFIG_VERSION },
   },
   {
     collection: 'shieldConfigs',

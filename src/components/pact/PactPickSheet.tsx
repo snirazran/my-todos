@@ -14,6 +14,7 @@ import { BaseSheet } from '@/components/ui/BaseSheet';
 import { cn } from '@/lib/utils';
 import { normalizeWeekStart, weekDatesFor, weekOrder } from '@/lib/weekStart';
 import { PACT_QUIET_NUDGE_DAYS, PRIMARY_OPTIONS } from '@/lib/pact/types';
+import { formatPactRate } from '@/lib/pact/format';
 import { useReducedMotion } from 'framer-motion';
 import { QuestRewardTileBadge } from '@/lib/questClaims';
 import { PlusDoubleNote, PlusPill } from './PlusBits';
@@ -248,9 +249,12 @@ export function PactPickSheet({
   const visibleOptions = (options ?? []).slice(0, PRIMARY_OPTIONS);
   const hasFooter = step === 'commitment' || step === 'confirm';
   // Sessions are the only thing that moves the number, and every one of them
-  // is a box the app watches get ticked.
-  const rewardPreview =
-    days.length * view.flyRates.perTask + view.flyRates.weekBonus;
+  // is a box the app watches get ticked. Priced on the server: the gift climbs
+  // with the session count too, so re-deriving it here would drift the moment
+  // either the formula or a gift tier is tuned.
+  const preview =
+    view.weekPreview.find((entry) => entry.sessions === days.length) ?? null;
+  const rewardPreview = preview?.flies ?? 0;
 
   return (
     <BaseSheet
@@ -287,11 +291,13 @@ export function PactPickSheet({
 
                 <div className="text-center">
                   <h2 className="text-[21px] font-black leading-tight text-foreground">
-                    One area. One week.
+                    One Leap a week
                   </h2>
+                  {/* The one place the word is taught. A concrete name only
+                      costs the reader one exposure, and this is it. */}
                   <p className="mx-auto mt-1 max-w-[34ch] text-[13.5px] font-semibold leading-snug text-muted-foreground">
-                    Pick one thing you&apos;ll actually do. We&apos;ll put it
-                    on your list.
+                    A Leap is one area, one promise, one week. Pick something
+                    you&apos;ll actually do — we&apos;ll put it on your list.
                   </p>
                 </div>
 
@@ -395,9 +401,14 @@ export function PactPickSheet({
                           >
                             {entry.name}
                           </span>
+                          {/* States what was measured, never what to do. The
+                              badge is only shown where there is evidence (see
+                              PACT_QUIET_NUDGE_DAYS), and an observation lets
+                              the user draw their own conclusion — an
+                              instruction buys a pick out of obligation. */}
                           {entry.recommended && (
                             <span className="absolute right-2.5 top-2.5 rounded-lg bg-amber-500 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-white shadow-[0_2px_0_0_#b45309]">
-                              Start here
+                              Gone quiet
                             </span>
                           )}
                         </div>
@@ -514,15 +525,14 @@ export function PactPickSheet({
                       );
                     })}
 
+                    {/* Never gated. The pact is the one system where the user
+                        names their own goal, and goal-setting theory's
+                        difficulty effects are conditional on the goal being
+                        self-endorsed — charging for that turns the whole
+                        mechanic into someone else's assignment. */}
                     <button
                       type="button"
                       onClick={() => {
-                        // Locked is a sales moment, not a dead end — show what
-                        // Plus buys instead of an unresponsive row.
-                        if (!view.canWriteOwn) {
-                          onUpgrade();
-                          return;
-                        }
                         setWritingOwn(true);
                         setOptionId(null);
                       }}
@@ -540,10 +550,9 @@ export function PactPickSheet({
                       <span className="min-w-0 flex-1 text-[15px] font-black text-foreground">
                         Write my own
                       </span>
-                      {!view.canWriteOwn && <PlusPill>Plus</PlusPill>}
                     </button>
 
-                    {writingOwn && view.canWriteOwn && (
+                    {writingOwn && (
                       <div className="rounded-2xl border border-border/60 bg-card/60 p-3.5">
                         <input
                           value={customText}
@@ -838,7 +847,7 @@ export function PactPickSheet({
                 </div>
                 <div className="flex flex-col gap-2">
                   <h2 className="text-[21px] font-black leading-tight text-foreground">
-                    You&apos;re set for the week
+                    Your Leap is set
                   </h2>
                   <p className="mx-auto max-w-[32ch] text-[14px] font-semibold leading-snug text-muted-foreground">
                     {result
@@ -885,7 +894,7 @@ export function PactPickSheet({
                     {view.ladder.multiplier > 1 && (
                       <span className="inline-flex w-fit items-center gap-1 rounded-full bg-orange-500/12 px-2 py-0.5 text-[11px] font-black text-orange-600 dark:text-orange-400">
                         <Flame className="h-3 w-3 fill-current" strokeWidth={2} />
-                        ×{view.ladder.multiplier} streak included
+                        {formatPactRate(view.ladder.multiplier)} streak included
                       </span>
                     )}
                     {!view.isPremium && <PlusDoubleNote onClick={onUpgrade} />}
@@ -893,7 +902,7 @@ export function PactPickSheet({
                   <QuestRewardTileBadge
                     rewards={[
                       { type: 'FLIES', amount: rewardPreview },
-                      ...view.completionRewards,
+                      ...(preview?.rewards ?? view.completionRewards),
                     ]}
                     catalog={view.rewardCatalog as never}
                     isPremium={view.isPremium}

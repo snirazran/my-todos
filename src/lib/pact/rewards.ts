@@ -50,6 +50,7 @@ export async function claimPactReward(args: {
     config,
     pact,
     streakWeeks,
+    laps: streak.laps,
     isPremium,
   });
 
