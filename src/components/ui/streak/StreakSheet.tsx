@@ -20,7 +20,8 @@ import {
   localDayKey,
 } from '@/hooks/useLoginStreak';
 import { patchInventoryFlies, useInventory } from '@/hooks/useInventory';
-import { FreezePurchaseSheet } from './FreezePurchaseSheet';
+import { Icon } from '@/components/ui/Icon';
+import { openShieldSheet } from '@/hooks/useShields';
 import { StreakCelebration } from './StreakCelebration';
 import type {
   CheckInResult,
@@ -43,29 +44,33 @@ const STREAK_REVEAL_MESSAGES = [
   'Consistency starts small. You added another day.',
 ] as const;
 
+// `STREAK_FREEZE` is what tiers authored before the shield merge still say.
+const isShieldReward = (reward: LoginStreakReward) =>
+  reward.type === 'SHIELD' || (reward.type as string) === 'STREAK_FREEZE';
+
 function rewardsLabel(rewards: LoginStreakReward[]) {
   const parts: string[] = [];
   let flies = 0;
-  let freezes = 0;
+  let shields = 0;
   let items = 0;
   for (const r of rewards) {
-    if (r.type === 'STREAK_FREEZE') freezes += r.amount ?? 1;
+    if (isShieldReward(r)) shields += (r as any).amount ?? 1;
     else if (r.type === 'FLIES')
       flies += r.amountMode === 'random' ? (r.maxAmount ?? 0) : (r.amount ?? 0);
     else items += 1;
   }
   if (flies > 0) parts.push(`${flies} flies`);
-  if (freezes > 0) parts.push(`${freezes} freeze${freezes > 1 ? 's' : ''}`);
+  if (shields > 0) parts.push(`${shields} Lily Pad${shields > 1 ? 's' : ''}`);
   if (items > 0) parts.push(`${items} item${items > 1 ? 's' : ''}`);
   return parts.join(' + ') || 'Surprise';
 }
 
 function RewardVisuals({ rewards }: { rewards: LoginStreakReward[] }) {
   let flies = 0;
-  let freezes = 0;
+  let shields = 0;
   let items = 0;
   for (const reward of rewards) {
-    if (reward.type === 'STREAK_FREEZE') freezes += reward.amount ?? 1;
+    if (isShieldReward(reward)) shields += (reward as any).amount ?? 1;
     else if (reward.type === 'FLIES') {
       flies +=
         reward.amountMode === 'random'
@@ -90,16 +95,16 @@ function RewardVisuals({ rewards }: { rewards: LoginStreakReward[] }) {
           <span className="tabular-nums">{flies}</span>
         </span>
       )}
-      {flies > 0 && (freezes > 0 || items > 0) && (
+      {flies > 0 && (shields > 0 || items > 0) && (
         <span className="text-muted-foreground/50">+</span>
       )}
-      {freezes > 0 && (
-        <span className="inline-flex items-center gap-1 font-black text-sky-500">
-          <Snowflake className="w-4 h-4" />
-          <span className="tabular-nums">{freezes}</span>
+      {shields > 0 && (
+        <span className="inline-flex items-center gap-1 font-black text-[#4f9149]">
+          <Icon name="lilyPad" label="Lily Pad" className="h-4 w-4" />
+          <span className="tabular-nums">{shields}</span>
         </span>
       )}
-      {freezes > 0 && items > 0 && (
+      {shields > 0 && items > 0 && (
         <span className="text-muted-foreground/50">+</span>
       )}
       {items > 0 && (
@@ -128,7 +133,7 @@ function WeekStrip({
   }, [today]);
   const runStart = useMemo(() => {
     if (view.count <= 0 || !view.lastDayKey) return null;
-    const frozen = new Set(view.freezeUsedDayKeys);
+    const frozen = new Set(view.shieldedDayKeys);
     let cursor = view.lastDayKey;
     let remaining = view.count;
     for (let i = view.count + frozen.size; i > 0; i--) {
@@ -137,12 +142,12 @@ function WeekStrip({
       cursor = addDaysToKey(cursor, -1);
     }
     return cursor;
-  }, [view.count, view.lastDayKey, view.freezeUsedDayKeys]);
+  }, [view.count, view.lastDayKey, view.shieldedDayKeys]);
 
   return (
     <div className="mt-6 grid w-full max-w-sm grid-cols-7 gap-1.5 short-screen:mt-3 short-screen:gap-1 md:mt-7">
       {days.map((dayKey, i) => {
-        const frozen = view.freezeUsedDayKeys.includes(dayKey);
+        const frozen = view.shieldedDayKeys.includes(dayKey);
         const lit =
           !!runStart && dayKey >= runStart && dayKey <= view.lastDayKey;
         const isToday = dayKey === today;
@@ -178,8 +183,8 @@ function WeekStrip({
                 'grid h-10 w-10 place-items-center rounded-full short-screen:h-8 short-screen:w-8',
                 frozen
                   ? light
-                    ? 'bg-white text-sky-500'
-                    : 'bg-sky-100 text-sky-500 dark:bg-sky-500/15'
+                    ? 'bg-white'
+                    : 'bg-emerald-100 dark:bg-emerald-500/15'
                   : lit
                     ? light
                       ? 'bg-white text-orange-500'
@@ -194,7 +199,7 @@ function WeekStrip({
               )}
             >
               {frozen ? (
-                <Snowflake className="w-4 h-4" />
+                <Icon name="lilyPad" label="Covered" className="h-4 w-4" />
               ) : lit ? (
                 <Flame className="w-4 h-4 fill-current" />
               ) : (
@@ -327,8 +332,8 @@ function RevealStep({
               transition={{ delay: 0.35 }}
               className="mt-3 flex min-h-10 max-w-[34ch] items-center justify-center text-pretty text-center text-sm font-bold leading-snug text-white drop-shadow-[0_1px_3px_rgba(124,45,18,0.55)] short-screen:mt-2 short-screen:min-h-8 short-screen:text-xs"
             >
-              {celebration.freezeConsumedDays.length > 0
-                ? '❄️ A streak freeze covered your missed day. Welcome back!'
+              {celebration.shieldConsumedDays.length > 0
+                ? '🪷 A Lily Pad caught your missed day. Welcome back!'
                 : revealMessage}
             </motion.p>
           </div>
@@ -591,14 +596,14 @@ function HomeStep({
   view,
   indices,
   frogReady,
-  onBuyFreeze,
+  onGetLilyPad,
   onCommit,
   onDone,
 }: {
   view: LoginStreakView;
   indices: Partial<Record<'skin' | 'hat' | 'body' | 'hand_item', number>>;
   frogReady: boolean;
-  onBuyFreeze: () => void;
+  onGetLilyPad: () => void;
   onCommit: () => void;
   onDone: () => void;
 }) {
@@ -648,38 +653,36 @@ function HomeStep({
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="flex items-center gap-1.5 text-sm font-black text-foreground">
-                    <Snowflake className="w-4 h-4 text-sky-500" />
-                    Streak freezes
+                    <Icon name="lilyPad" className="h-4 w-4" />
+                    Lily Pads
                   </p>
                   <p className="mt-0.5 text-xs font-medium text-muted-foreground">
-                    Auto-protects your streak when you miss a day.
+                    Catches your streak by itself the day you miss.
                   </p>
                 </div>
                 <div className="flex items-center gap-1">
-                  {Array.from({ length: view.freezeCap }, (_, i) => (
+                  {Array.from({ length: view.shieldCap }, (_, i) => (
                     <div
                       key={i}
                       className={cn(
                         'grid h-8 w-8 place-items-center rounded-full',
-                        i < view.freezes
-                          ? 'bg-sky-100 text-sky-500 dark:bg-sky-500/15'
-                          : 'bg-muted/60 text-muted-foreground/30',
+                        i < view.shields
+                          ? 'bg-emerald-100 dark:bg-emerald-500/15'
+                          : 'bg-muted/60 opacity-30 grayscale',
                       )}
                     >
-                      <Snowflake className="w-4 h-4" />
+                      <Icon name="lilyPad" className="h-4 w-4" />
                     </div>
                   ))}
                 </div>
               </div>
-              {view.freezes < view.freezeCap && (
+              {view.shields < view.shieldCap && (
                 <button
                   type="button"
-                  onClick={onBuyFreeze}
-                  className="mt-3 flex h-10 w-full items-center justify-center gap-1.5 rounded-xl bg-sky-500 text-sm font-black text-white shadow-[0_3px_0_0_#0369a1] transition-all active:translate-y-0.5 active:shadow-none"
+                  onClick={onGetLilyPad}
+                  className="mt-3 flex h-10 w-full items-center justify-center gap-1.5 rounded-xl bg-[#4f9149] text-sm font-black text-white shadow-[0_3px_0_0_#3b7a38] transition-all active:translate-y-0.5 active:shadow-none"
                 >
-                  Get a freeze ·
-                  <Fly size={16} paused y={-1} />
-                  {view.freezePriceFlies}
+                  Get a Lily Pad
                 </button>
               )}
             </div>
@@ -884,7 +887,7 @@ export function StreakSheet({
                     view={view}
                     indices={indices}
                     frogReady={frogReady}
-                    onBuyFreeze={() => setBuyOpen(true)}
+                    onGetLilyPad={() => openShieldSheet()}
                     onCommit={() => setStep('commit')}
                     onDone={() => onOpenChange(false)}
                   />
@@ -914,16 +917,6 @@ export function StreakSheet({
             </button>
           )}
 
-          <FreezePurchaseSheet
-            open={buyOpen}
-            onClose={() => setBuyOpen(false)}
-            view={view}
-            balance={flyBalance}
-            onPurchased={(freezes, balance) => {
-              patchStreakView({ ...view, freezes });
-              patchInventoryFlies(balance);
-            }}
-          />
         </motion.div>
       )}
     </AnimatePresence>,

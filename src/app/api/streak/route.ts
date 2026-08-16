@@ -8,6 +8,12 @@ import {
   loadLoginStreakConfig,
   readLoginStreakState,
 } from '@/lib/streak/loginStreak';
+import { isPremiumUser } from '@/lib/quests/engine';
+import {
+  loadShieldConfig,
+  readShieldState,
+  shieldCapFor,
+} from '@/lib/shields/engine';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,9 +23,10 @@ export async function GET(req: NextRequest) {
     const timezone = req.nextUrl.searchParams.get('timezone') || 'UTC';
 
     await connectMongo();
-    const [user, config] = await Promise.all([
-      UserModel.findById(userId).select('quests').lean(),
+    const [user, config, shieldConfig] = await Promise.all([
+      UserModel.findById(userId).select('quests premiumUntil').lean(),
       loadLoginStreakConfig(),
+      loadShieldConfig(),
     ]);
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -30,9 +37,13 @@ export async function GET(req: NextRequest) {
 
     const todayKey = getZonedToday(timezone);
     const state = readLoginStreakState(user);
+    const shieldState = readShieldState(user);
     return NextResponse.json({
       active: true,
-      view: buildLoginStreakView(state, config, todayKey),
+      view: buildLoginStreakView(state, config, todayKey, {
+        count: shieldState.count,
+        cap: shieldCapFor(shieldConfig, isPremiumUser(user as any)),
+      }),
       rescue:
         state.rescue && state.rescue.offeredDayKey === todayKey
           ? state.rescue

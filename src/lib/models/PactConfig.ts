@@ -26,12 +26,6 @@ export interface PactConfigDoc {
   milestoneRewards: QuestRewards;
   streakTiers: PactStreakTier[];
   masteryTiers: PactAreaMasteryTier[];
-  shieldCapFree: number;
-  shieldCapPlus: number;
-  shieldEarnEveryWeeks: number;
-  shieldPriceFlies: number;
-  shieldAdsRequired: number;
-  shieldAdMinStreak: number;
   plusSwapTokensPerMonth: number;
   minOptionsPerArea: number;
   autoGenerate: boolean;
@@ -193,15 +187,6 @@ const PactConfigSchema = new Schema<PactConfigDoc>(
     milestoneRewards: { type: [Schema.Types.Mixed], default: [] } as any,
     streakTiers: { type: [Schema.Types.Mixed], default: [] } as any,
     masteryTiers: { type: [Schema.Types.Mixed], default: [] } as any,
-    // Held, not granted monthly. A weekly pact with 4 monthly shields is a
-    // pact that can never be broken, and a streak that cannot break stops
-    // motivating — the cap is small on purpose, and refills are earned.
-    shieldCapFree: { type: Number, default: 1 },
-    shieldCapPlus: { type: Number, default: 2 },
-    shieldEarnEveryWeeks: { type: Number, default: 2 },
-    shieldPriceFlies: { type: Number, default: 100 },
-    shieldAdsRequired: { type: Number, default: 1 },
-    shieldAdMinStreak: { type: Number, default: 2 },
     plusSwapTokensPerMonth: { type: Number, default: 4 },
     minOptionsPerArea: { type: Number, default: 3 },
     autoGenerate: { type: Boolean, default: true },

@@ -1,0 +1,81 @@
+import mongoose, { Schema, type Model } from 'mongoose';
+
+export interface ShieldConfigDoc {
+  _id?: mongoose.Types.ObjectId;
+  configId: string;
+  isActive: boolean;
+  priceFlies: number;
+  twoPackPriceFlies: number;
+  capFree: number;
+  capPlus: number;
+  plusMonthlyGrant: number;
+  rescueCooldownDays: number;
+  offerCooldownDays: number;
+  offerMinStreak: number;
+  earnEveryPactWeeks: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export const SHIELD_CONFIG_ID = 'shields';
+
+export const CAP_MIN = 1;
+export const CAP_MAX = 5;
+
+export const SHIELD_DEFAULTS = {
+  isActive: true,
+  priceFlies: 350,
+  twoPackPriceFlies: 600,
+  capFree: 2,
+  capPlus: 3,
+  plusMonthlyGrant: 1,
+  rescueCooldownDays: 14,
+  offerCooldownDays: 7,
+  offerMinStreak: 3,
+  earnEveryPactWeeks: 2,
+} as const;
+
+const ShieldConfigSchema = new Schema<ShieldConfigDoc>(
+  {
+    configId: { type: String, required: true, unique: true, index: true },
+    isActive: { type: Boolean, default: SHIELD_DEFAULTS.isActive },
+    priceFlies: { type: Number, default: SHIELD_DEFAULTS.priceFlies },
+    twoPackPriceFlies: {
+      type: Number,
+      default: SHIELD_DEFAULTS.twoPackPriceFlies,
+    },
+    capFree: { type: Number, default: SHIELD_DEFAULTS.capFree },
+    capPlus: { type: Number, default: SHIELD_DEFAULTS.capPlus },
+    plusMonthlyGrant: {
+      type: Number,
+      default: SHIELD_DEFAULTS.plusMonthlyGrant,
+    },
+    rescueCooldownDays: {
+      type: Number,
+      default: SHIELD_DEFAULTS.rescueCooldownDays,
+    },
+    offerCooldownDays: {
+      type: Number,
+      default: SHIELD_DEFAULTS.offerCooldownDays,
+    },
+    offerMinStreak: { type: Number, default: SHIELD_DEFAULTS.offerMinStreak },
+    earnEveryPactWeeks: {
+      type: Number,
+      default: SHIELD_DEFAULTS.earnEveryPactWeeks,
+    },
+  },
+  {
+    collection: 'shieldConfigs',
+    timestamps: { createdAt: 'createdAt', updatedAt: 'updatedAt' },
+  },
+);
+
+if (process.env.NODE_ENV === 'development') {
+  delete mongoose.models.ShieldConfig;
+}
+
+const ShieldConfigModel: Model<ShieldConfigDoc> =
+  (mongoose.models.ShieldConfig as Model<ShieldConfigDoc>) ||
+  mongoose.model<ShieldConfigDoc>('ShieldConfig', ShieldConfigSchema);
+
+export default ShieldConfigModel;

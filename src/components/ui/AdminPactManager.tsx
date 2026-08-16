@@ -358,54 +358,13 @@ export function AdminPactManager() {
           </div>
         </div>
 
+        <div className="mt-4 rounded-xl border border-border/40 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+          Lily Pads (price, caps, how many kept weeks earn one, and the rescue
+          cooldown) are tuned under <span className="font-bold">Shields</span> —
+          one pool covers this streak and the daily one.
+        </div>
+
         <div className="mt-4 grid gap-4 sm:grid-cols-3">
-          <NumberField
-            label="Shield cap — free"
-            hint="Most held at once. Keep it small or the streak can't break."
-            min={0}
-            max={5}
-            value={config.shieldCapFree}
-            onChange={(shieldCapFree) => patch({ shieldCapFree })}
-          />
-          <NumberField
-            label="Shield cap — Plus"
-            hint="Convenience, not immunity"
-            min={0}
-            max={5}
-            value={config.shieldCapPlus}
-            onChange={(shieldCapPlus) => patch({ shieldCapPlus })}
-          />
-          <NumberField
-            label="Earn a shield every N kept weeks"
-            hint="0 turns earning off"
-            min={0}
-            max={12}
-            value={config.shieldEarnEveryWeeks}
-            onChange={(shieldEarnEveryWeeks) => patch({ shieldEarnEveryWeeks })}
-          />
-          <NumberField
-            label="Shield price (flies)"
-            min={1}
-            max={2000}
-            value={config.shieldPriceFlies}
-            onChange={(shieldPriceFlies) => patch({ shieldPriceFlies })}
-          />
-          <NumberField
-            label="Ads per shield"
-            hint="Rises to +1 after 2 rescues, +2 after 6"
-            min={1}
-            max={5}
-            value={config.shieldAdsRequired}
-            onChange={(shieldAdsRequired) => patch({ shieldAdsRequired })}
-          />
-          <NumberField
-            label="Min streak for ad shields"
-            hint="Stops week-one users farming ads"
-            min={0}
-            max={12}
-            value={config.shieldAdMinStreak}
-            onChange={(shieldAdMinStreak) => patch({ shieldAdMinStreak })}
-          />
           <NumberField
             label="Plus swap tokens / month"
             hint="Change area mid-week, keep the streak"

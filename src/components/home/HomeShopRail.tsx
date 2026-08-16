@@ -188,25 +188,22 @@ export function HomeShopRail() {
         >
           <WishlistThumb wishlist={focus.view} />
           <span className="min-w-0 flex-1">
-            <span className="flex items-center gap-1.5">
-              <Bookmark
-                className="h-3 w-3 shrink-0 text-muted-foreground/70"
-                strokeWidth={3}
-                fill="currentColor"
-              />
-              <span className="text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground">
-                Wishlist
-                {savedCount > 1 ? ` · ${savedCount} saved` : ''}
-              </span>
-              {focus.onDeal && (
-                <span className="rounded-full bg-amber-500/15 px-1.5 py-px text-[9px] font-black uppercase tracking-wider text-amber-700 dark:text-amber-400">
-                  {focus.discountPercent}% off
+            <span className="flex items-center justify-between gap-2">
+              <span className="flex min-w-0 items-center gap-1.5">
+                <Bookmark
+                  className="h-3 w-3 shrink-0 text-muted-foreground/70"
+                  strokeWidth={3}
+                  fill="currentColor"
+                />
+                <span className="text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+                  Wishlist
+                  {savedCount > 1 ? ` · ${savedCount} saved` : ''}
                 </span>
-              )}
-            </span>
-            <span className="mt-0.5 flex items-baseline justify-between gap-2">
-              <span className="truncate text-[13px] font-black tracking-tight text-foreground">
-                {focus.view.name}
+                {focus.onDeal && (
+                  <span className="rounded-full bg-amber-500/15 px-1.5 py-px text-[9px] font-black uppercase tracking-wider text-amber-700 dark:text-amber-400">
+                    {focus.discountPercent}% off
+                  </span>
+                )}
               </span>
               {focus.affordable ? (
                 <span className="shrink-0 text-[10px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
@@ -219,7 +216,7 @@ export function HomeShopRail() {
                 </span>
               )}
             </span>
-            <span className="mt-1.5 block h-1 overflow-hidden rounded-full bg-muted">
+            <span className="mt-2 block h-1 overflow-hidden rounded-full bg-muted">
               <span
                 className={cn(
                   'block h-full rounded-full transition-[width] duration-700 ease-out',

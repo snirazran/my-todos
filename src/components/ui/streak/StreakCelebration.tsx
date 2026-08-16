@@ -4,9 +4,10 @@ import React, { useEffect, useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import { hapticCelebrate } from '@/lib/haptics';
-import { Snowflake, Trophy } from 'lucide-react';
+import { Trophy } from 'lucide-react';
 import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
 import Fly from '@/components/ui/fly';
+import { Icon } from '@/components/ui/Icon';
 import { byId as catalogById } from '@/lib/skins/catalog';
 import type {
   CheckInResult,
@@ -27,10 +28,10 @@ function RewardChips({ summary }: { summary: LoginStreakRewardSummary }) {
           <Fly size={22} paused y={-2} />+{summary.fliesGranted}
         </span>
       )}
-      {summary.freezesGranted > 0 && (
+      {summary.shieldsGranted > 0 && (
         <span className="flex items-center gap-1.5 rounded-full bg-white/15 px-4 py-2 text-lg font-black text-white backdrop-blur">
-          <Snowflake className="h-5 w-5 text-sky-300" />+
-          {summary.freezesGranted}
+          <Icon name="lilyPad" label="Lily Pad" className="h-5 w-5" />+
+          {summary.shieldsGranted}
         </span>
       )}
       {Object.entries(itemCounts).map(([itemId, count]) => {

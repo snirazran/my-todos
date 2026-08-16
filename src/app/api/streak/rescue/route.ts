@@ -14,10 +14,13 @@ export async function POST(req: NextRequest) {
     if (!rescueId) {
       return NextResponse.json({ error: 'Missing rescueId' }, { status: 400 });
     }
-    const method = body.method === 'freeze' ? 'freeze' : 'ad';
-
     await connectMongo();
-    const result = await performRescue({ userId, timezone, rescueId, method });
+    const result = await performRescue({
+      userId,
+      timezone,
+      rescueId,
+      method: 'ad',
+    });
 
     return NextResponse.json(result);
   } catch (error) {

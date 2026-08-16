@@ -101,6 +101,8 @@ export const ANALYTICS_EVENTS = [
   'pact_skipped',
   'pact_dropped',
   'pact_retro_claimed',
+  'shield_sheet_opened',
+  'shield_purchased',
 ] as const;
 
 export type AnalyticsEventName = (typeof ANALYTICS_EVENTS)[number];
@@ -212,6 +214,8 @@ const EVENT_CATEGORIES: Record<AnalyticsEventName, string> = {
   pact_skipped: 'engagement',
   pact_dropped: 'engagement',
   pact_retro_claimed: 'monetization',
+  shield_sheet_opened: 'monetization',
+  shield_purchased: 'monetization',
 };
 
 export function analyticsCategory(name: AnalyticsEventName) {

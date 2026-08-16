@@ -3,8 +3,6 @@ import { requireAdminUserId as requireUserId } from '@/lib/adminAuth';
 import connectMongo from '@/lib/mongoose';
 import LoginStreakConfigModel, {
   LOGIN_STREAK_CONFIG_ID,
-  FREEZE_CAP_MIN,
-  FREEZE_CAP_MAX,
   DEFAULT_GOAL_TIERS,
 } from '@/lib/models/LoginStreakConfig';
 import { loadLoginStreakConfig } from '@/lib/streak/loginStreak';
@@ -26,10 +24,11 @@ const VALID_AMOUNT_MODES = new Set<QuestAmountMode>(['fixed', 'random']);
 function sanitizeReward(input: any): LoginStreakReward | null {
   if (!input) return null;
 
-  if (input.type === 'STREAK_FREEZE') {
+  // `STREAK_FREEZE` is what tiers authored before the shield merge still say.
+  if (input.type === 'SHIELD' || input.type === 'STREAK_FREEZE') {
     const amount = Math.floor(Number(input.amount) || 1);
     if (amount < 1 || amount > 3) return null;
-    return { type: 'STREAK_FREEZE', amount };
+    return { type: 'SHIELD', amount };
   }
 
   if (!VALID_REWARD_TYPES.has(input.type)) return null;
@@ -106,11 +105,8 @@ export async function GET() {
     return NextResponse.json({
       loginStreak: {
         isActive: config.isActive,
-        freezePriceFlies: config.freezePriceFlies,
-        freezeCap: config.freezeCap,
         saverMinStreak: config.saverMinStreak,
         goalTiers: config.goalTiers,
-        limits: { freezeCapMin: FREEZE_CAP_MIN, freezeCapMax: FREEZE_CAP_MAX },
       },
     });
   } catch (error) {
@@ -133,14 +129,6 @@ export async function PUT(req: NextRequest) {
     const body = await req.json();
 
     const isActive = body?.isActive !== false;
-    const freezePriceFlies = Math.max(
-      1,
-      Math.floor(Number(body?.freezePriceFlies) || 100),
-    );
-    const freezeCap = Math.min(
-      FREEZE_CAP_MAX,
-      Math.max(FREEZE_CAP_MIN, Math.floor(Number(body?.freezeCap) || 2)),
-    );
     const saverMinStreak = Math.min(
       10,
       Math.max(1, Math.floor(Number(body?.saverMinStreak) || 2)),
@@ -153,12 +141,10 @@ export async function PUT(req: NextRequest) {
       {
         $set: {
           isActive,
-          freezePriceFlies,
-          freezeCap,
           saverMinStreak,
           goalTiers: goalTiers.length > 0 ? goalTiers : DEFAULT_GOAL_TIERS,
         },
-        $unset: { milestones: '' },
+        $unset: { milestones: '', freezePriceFlies: '', freezeCap: '' },
       },
       { new: true, upsert: true },
     ).lean();
@@ -167,11 +153,8 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({
       loginStreak: {
         isActive: config.isActive,
-        freezePriceFlies: config.freezePriceFlies,
-        freezeCap: config.freezeCap,
         saverMinStreak: config.saverMinStreak,
         goalTiers: config.goalTiers,
-        limits: { freezeCapMin: FREEZE_CAP_MIN, freezeCapMax: FREEZE_CAP_MAX },
       },
     });
   } catch (error) {

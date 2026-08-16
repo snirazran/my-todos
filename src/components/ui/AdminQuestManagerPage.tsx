@@ -25,6 +25,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Icon } from '@/components/ui/Icon';
 import { AdminPactManager } from '@/components/ui/AdminPactManager';
 import {
   Dialog,
@@ -114,11 +115,8 @@ type AdminLoginStreakTier = {
 
 type AdminLoginStreakConfig = {
   isActive: boolean;
-  freezePriceFlies: number;
-  freezeCap: number;
   saverMinStreak: number;
   goalTiers: AdminLoginStreakTier[];
-  limits: { freezeCapMin: number; freezeCapMax: number };
 };
 type AdminCategory = {
   id: string;
@@ -182,11 +180,26 @@ type AdminRecipe = {
   slots: AdminRecipeSlot[];
 };
 
+type AdminShieldConfig = {
+  isActive: boolean;
+  priceFlies: number;
+  twoPackPriceFlies: number;
+  capFree: number;
+  capPlus: number;
+  plusMonthlyGrant: number;
+  rescueCooldownDays: number;
+  offerCooldownDays: number;
+  offerMinStreak: number;
+  earnEveryPactWeeks: number;
+  limits: { capMin: number; capMax: number };
+};
+
 type ViewLevel =
   | 'home'
   | 'daily'
   | 'onboarding'
   | 'streaks'
+  | 'shields'
   | 'pact'
   | 'moveToWeb'
   | 'season'
@@ -489,6 +502,12 @@ export function AdminQuestManagerPage() {
   const [loginStreakConfig, setLoginStreakConfig] =
     useState<AdminLoginStreakConfig | null>(null);
   const [savingLoginStreak, setSavingLoginStreak] = useState(false);
+
+  // Lily Pad (shield) economy — one pool shared by every protected streak
+  const [shieldConfig, setShieldConfig] = useState<AdminShieldConfig | null>(
+    null,
+  );
+  const [savingShields, setSavingShields] = useState(false);
   const [loginRewardTarget, setLoginRewardTarget] = useState<{
     list: 'goalTiers';
     days: number;
@@ -518,7 +537,7 @@ export function AdminQuestManagerPage() {
     setLoading(true);
     setResult(null);
     try {
-      const [templatesRes, metaRes, categoriesRes, seasonsRes, recipesRes, streakRes, loginStreakRes, moveToWebRes, seasonAutoRes] = await Promise.all([
+      const [templatesRes, metaRes, categoriesRes, seasonsRes, recipesRes, streakRes, loginStreakRes, moveToWebRes, seasonAutoRes, shieldsRes] = await Promise.all([
         fetch('/api/admin/quests', { credentials: 'include' }),
         fetch('/api/admin/quests/meta', { credentials: 'include' }),
         fetch('/api/admin/quests/categories', { credentials: 'include' }),
@@ -528,6 +547,7 @@ export function AdminQuestManagerPage() {
         fetch('/api/admin/streak/login', { credentials: 'include' }),
         fetch('/api/admin/quests/move-to-web', { credentials: 'include' }),
         fetch('/api/admin/quests/seasons/auto', { credentials: 'include' }),
+        fetch('/api/admin/shields', { credentials: 'include' }),
       ]);
       const templatesData = await templatesRes.json();
       const metaData = await metaRes.json();
@@ -560,6 +580,10 @@ export function AdminQuestManagerPage() {
       const seasonAutoData = await seasonAutoRes.json();
       if (seasonAutoRes.ok && seasonAutoData.seasonAuto) {
         setSeasonAutoConfig(seasonAutoData.seasonAuto);
+      }
+      const shieldsData = await shieldsRes.json();
+      if (shieldsRes.ok && shieldsData.shields) {
+        setShieldConfig(shieldsData.shields);
       }
     } catch (error) {
       setResult({
@@ -1022,11 +1046,31 @@ export function AdminQuestManagerPage() {
           <ChevronRight className="h-5 w-5 text-muted-foreground/30 transition group-hover:translate-x-0.5 group-hover:text-muted-foreground" />
         </div>
         <p className="mt-5 text-lg font-black text-foreground">Streak Manager</p>
-        <p className="mt-1 text-sm text-muted-foreground">Login streak commitments and freezes.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Login streak commitments and goal prizes.</p>
         <p className="mt-4 text-3xl font-black text-foreground">
           {loginStreakConfig ? (loginStreakConfig.isActive ? 'On' : 'Off') : '–'}
         </p>
         <p className="text-xs text-muted-foreground">login streak</p>
+      </button>
+
+      <button
+        onClick={() => setView('shields')}
+        className="group rounded-2xl border border-border/40 bg-card/60 p-6 text-left transition hover:border-emerald-500/25 hover:bg-emerald-500/[0.04]"
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/10">
+            <Icon name="lilyPad" className="h-6 w-6" />
+          </div>
+          <ChevronRight className="h-5 w-5 text-muted-foreground/30 transition group-hover:translate-x-0.5 group-hover:text-muted-foreground" />
+        </div>
+        <p className="mt-5 text-lg font-black text-foreground">Shields</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Lily Pad price, caps, cooldowns and how often the offer may appear.
+        </p>
+        <p className="mt-4 text-3xl font-black text-foreground">
+          {shieldConfig ? shieldConfig.priceFlies.toLocaleString() : '–'}
+        </p>
+        <p className="text-xs text-muted-foreground">flies each</p>
       </button>
 
       <button
@@ -1178,6 +1222,221 @@ export function AdminQuestManagerPage() {
       {renderLoginStreakCard()}
     </div>
   );
+
+  const saveShieldConfig = async () => {
+    if (!shieldConfig) return;
+    setSavingShields(true);
+    setResult(null);
+    try {
+      const res = await fetch('/api/admin/shields', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(shieldConfig),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not save shields');
+      setShieldConfig(data.shields);
+      setResult({ type: 'success', message: 'Shields saved' });
+    } catch (error) {
+      setResult({
+        type: 'error',
+        message:
+          error instanceof Error ? error.message : 'Could not save shields',
+      });
+    } finally {
+      setSavingShields(false);
+    }
+  };
+
+  const shieldField = (
+    label: string,
+    field: keyof Omit<AdminShieldConfig, 'isActive' | 'limits'>,
+    hint: string,
+    min: number,
+    max: number,
+  ) => (
+    <label key={field} className="block">
+      <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+        {label}
+      </span>
+      <input
+        type="number"
+        min={min}
+        max={max}
+        value={shieldConfig?.[field] ?? 0}
+        onChange={(e) =>
+          setShieldConfig((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  [field]: Math.min(
+                    max,
+                    Math.max(min, Math.floor(Number(e.target.value) || 0)),
+                  ),
+                }
+              : prev,
+          )
+        }
+        className="mt-1 block h-10 w-28 rounded-xl border border-border/50 bg-background px-3 text-sm font-bold text-foreground"
+      />
+      <span className="mt-1 block max-w-[15rem] text-[11px] leading-snug text-muted-foreground">
+        {hint}
+      </span>
+    </label>
+  );
+
+  const renderShields = () => {
+    if (!shieldConfig) {
+      return (
+        <div className="rounded-2xl bg-muted/30 p-4 text-sm text-muted-foreground">
+          Loading...
+        </div>
+      );
+    }
+    const capMin = shieldConfig.limits?.capMin ?? 1;
+    const capMax = shieldConfig.limits?.capMax ?? 5;
+    return (
+      <div className="space-y-4">
+        <div className="rounded-2xl border border-border/40 bg-card/60 px-4 py-3.5">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-bold text-foreground">
+                Lily Pad (one shield, every streak)
+              </p>
+              <p className="mt-0.5 max-w-2xl text-xs text-muted-foreground">
+                Auto-consumes on a miss — never equipped, never armed. Protects
+                the login streak and the weekly pact. It is not sold in the
+                shop: the only place to buy one is the offer that appears when a
+                user holds none and has something on the line.
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={shieldConfig.isActive}
+              onClick={() =>
+                setShieldConfig((prev) =>
+                  prev ? { ...prev, isActive: !prev.isActive } : prev,
+                )
+              }
+              className={cn(
+                'relative h-6 w-11 shrink-0 rounded-full transition-colors',
+                shieldConfig.isActive ? 'bg-emerald-500' : 'bg-muted',
+              )}
+            >
+              <span
+                className={cn(
+                  'absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform',
+                  shieldConfig.isActive
+                    ? 'translate-x-[22px]'
+                    : 'translate-x-0.5',
+                )}
+              />
+            </button>
+          </div>
+
+          <p className="mt-5 text-[11px] font-black uppercase tracking-wide text-muted-foreground">
+            Price
+          </p>
+          <div className="mt-2 flex flex-wrap items-start gap-5">
+            {shieldField(
+              'Price (flies)',
+              'priceFlies',
+              'What one costs in the offer.',
+              1,
+              100000,
+            )}
+            {shieldField(
+              'Two-pack (flies)',
+              'twoPackPriceFlies',
+              'Only shown when there is room for two.',
+              1,
+              200000,
+            )}
+          </div>
+
+          <p className="mt-5 text-[11px] font-black uppercase tracking-wide text-muted-foreground">
+            Holding
+          </p>
+          <div className="mt-2 flex flex-wrap items-start gap-5">
+            {shieldField(
+              'Cap — free',
+              'capFree',
+              'Most a free user can hold at once.',
+              capMin,
+              capMax,
+            )}
+            {shieldField(
+              'Cap — Plus',
+              'capPlus',
+              'Most a Plus user can hold at once.',
+              capMin,
+              capMax,
+            )}
+            {shieldField(
+              'Plus monthly grant',
+              'plusMonthlyGrant',
+              'Free ones handed to Plus each calendar month. 0 turns it off.',
+              0,
+              capMax,
+            )}
+            {shieldField(
+              'Earn every N pact weeks',
+              'earnEveryPactWeeks',
+              'Kept weeks that hand one back. 0 turns earning off.',
+              0,
+              52,
+            )}
+          </div>
+
+          <p className="mt-5 text-[11px] font-black uppercase tracking-wide text-muted-foreground">
+            Rescue limit
+          </p>
+          <div className="mt-2 flex flex-wrap items-start gap-5">
+            {shieldField(
+              'Rescue cooldown (days)',
+              'rescueCooldownDays',
+              'Max one rescue per system per this many days. A streak that cannot break stops motivating.',
+              0,
+              365,
+            )}
+          </div>
+
+          <p className="mt-5 text-[11px] font-black uppercase tracking-wide text-muted-foreground">
+            Offer popup
+          </p>
+          <div className="mt-2 flex flex-wrap items-start gap-5">
+            {shieldField(
+              'Offer cooldown (days)',
+              'offerCooldownDays',
+              'Minimum gap between auto-shows. Doubles after each dismissal, up to 4×.',
+              1,
+              365,
+            )}
+            {shieldField(
+              'Offer min streak',
+              'offerMinStreak',
+              'Nothing at stake below this — the popup stays away.',
+              1,
+              365,
+            )}
+          </div>
+
+          <div className="mt-5 flex">
+            <Button
+              size="sm"
+              className="ml-auto rounded-xl font-black"
+              onClick={() => void saveShieldConfig()}
+              disabled={savingShields}
+            >
+              {savingShields ? 'Saving…' : 'Save shields'}
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   const renderMoveToWeb = () => (
     <div className="space-y-4">
@@ -2113,8 +2372,6 @@ export function AdminQuestManagerPage() {
         credentials: 'include',
         body: JSON.stringify({
           isActive: loginStreakConfig.isActive,
-          freezePriceFlies: loginStreakConfig.freezePriceFlies,
-          freezeCap: loginStreakConfig.freezeCap,
           saverMinStreak: loginStreakConfig.saverMinStreak,
           goalTiers: loginStreakConfig.goalTiers,
         }),
@@ -2134,11 +2391,13 @@ export function AdminQuestManagerPage() {
     }
   };
 
+  const isShieldReward = (reward: LoginStreakReward) =>
+    reward.type === 'SHIELD' || (reward.type as string) === 'STREAK_FREEZE';
   const loginQuestRewards = (rewards: LoginStreakReward[]) =>
-    rewards.filter((r) => r.type !== 'STREAK_FREEZE') as QuestReward[];
-  const loginFreezeCount = (rewards: LoginStreakReward[]) =>
+    rewards.filter((r) => !isShieldReward(r)) as QuestReward[];
+  const loginShieldCount = (rewards: LoginStreakReward[]) =>
     rewards.reduce(
-      (sum, r) => (r.type === 'STREAK_FREEZE' ? sum + (r.amount ?? 1) : sum),
+      (sum, r) => (isShieldReward(r) ? sum + ((r as any).amount ?? 1) : sum),
       0,
     );
   const setLoginTier = (
@@ -2154,10 +2413,10 @@ export function AdminQuestManagerPage() {
       return { ...prev, [list]: tiers };
     });
   };
-  const mergeLoginRewards = (quest: QuestReward[], freezes: number) => [
+  const mergeLoginRewards = (quest: QuestReward[], shields: number) => [
     ...quest,
-    ...(freezes > 0
-      ? [{ type: 'STREAK_FREEZE', amount: freezes } as LoginStreakReward]
+    ...(shields > 0
+      ? [{ type: 'SHIELD', amount: shields } as LoginStreakReward]
       : []),
   ];
 
@@ -2183,9 +2442,10 @@ export function AdminQuestManagerPage() {
                 isPremium={false}
               />
             ))}
-            {loginFreezeCount(tier.rewards) > 0 && (
-              <span className="rounded-full bg-sky-100 px-2.5 py-1 text-xs font-black text-sky-600 dark:bg-sky-500/15">
-                ❄️ ×{loginFreezeCount(tier.rewards)}
+            {loginShieldCount(tier.rewards) > 0 && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-black text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400">
+                <Icon name="lilyPad" className="h-3.5 w-3.5" />×
+                {loginShieldCount(tier.rewards)}
               </span>
             )}
             <button
@@ -2198,20 +2458,20 @@ export function AdminQuestManagerPage() {
             </button>
           </div>
           <label className="flex items-center gap-1 text-xs font-bold text-muted-foreground">
-            ❄️
+            <Icon name="lilyPad" label="Lily Pads" className="h-4 w-4" />
             <input
               type="number"
               min={0}
               max={3}
-              value={loginFreezeCount(tier.rewards)}
+              value={loginShieldCount(tier.rewards)}
               onChange={(e) => {
-                const freezes = Math.min(
+                const shields = Math.min(
                   3,
                   Math.max(0, Math.floor(Number(e.target.value) || 0)),
                 );
                 setLoginTier(list, tier.days, (t) => ({
                   ...t,
-                  rewards: mergeLoginRewards(loginQuestRewards(t.rewards), freezes),
+                  rewards: mergeLoginRewards(loginQuestRewards(t.rewards), shields),
                 }));
               }}
               className="h-8 w-14 rounded-lg border border-border/50 bg-background px-2 text-sm font-bold text-foreground"
@@ -2238,7 +2498,8 @@ export function AdminQuestManagerPage() {
             </p>
             <p className="mt-0.5 text-xs text-muted-foreground">
               Opening the app daily grows the streak. Commitments grant the
-              prizes below; freezes auto-protect missed days.
+              prizes below. Missed days are covered by Lily Pads, tuned under
+              Shields.
             </p>
           </div>
           <button
@@ -2267,58 +2528,6 @@ export function AdminQuestManagerPage() {
         </div>
 
         <div className="mt-4 flex flex-wrap items-end gap-4">
-          <label className="block">
-            <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-              Freeze price (flies)
-            </span>
-            <input
-              type="number"
-              min={1}
-              value={loginStreakConfig.freezePriceFlies}
-              onChange={(e) =>
-                setLoginStreakConfig((prev) =>
-                  prev
-                    ? {
-                        ...prev,
-                        freezePriceFlies: Math.max(
-                          1,
-                          Math.floor(Number(e.target.value) || 1),
-                        ),
-                      }
-                    : prev,
-                )
-              }
-              className="mt-1 block h-10 w-28 rounded-xl border border-border/50 bg-background px-3 text-sm font-bold text-foreground"
-            />
-          </label>
-          <label className="block">
-            <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-              Freeze cap
-            </span>
-            <input
-              type="number"
-              min={loginStreakConfig.limits.freezeCapMin}
-              max={loginStreakConfig.limits.freezeCapMax}
-              value={loginStreakConfig.freezeCap}
-              onChange={(e) =>
-                setLoginStreakConfig((prev) =>
-                  prev
-                    ? {
-                        ...prev,
-                        freezeCap: Math.min(
-                          prev.limits.freezeCapMax,
-                          Math.max(
-                            prev.limits.freezeCapMin,
-                            Math.floor(Number(e.target.value) || 1),
-                          ),
-                        ),
-                      }
-                    : prev,
-                )
-              }
-              className="mt-1 block h-10 w-20 rounded-xl border border-border/50 bg-background px-3 text-sm font-bold text-foreground"
-            />
-          </label>
           <label className="block">
             <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
               Saver push min streak
@@ -2373,7 +2582,7 @@ export function AdminQuestManagerPage() {
             onSave={(rewards) => {
               setLoginTier(loginRewardTarget.list, loginRewardTarget.days, (t) => ({
                 ...t,
-                rewards: mergeLoginRewards(rewards, loginFreezeCount(t.rewards)),
+                rewards: mergeLoginRewards(rewards, loginShieldCount(t.rewards)),
               }));
               setLoginRewardTarget(null);
             }}
@@ -3107,6 +3316,7 @@ export function AdminQuestManagerPage() {
             {view === 'pact' && 'Weekly Pact'}
             {view === 'onboarding' && 'Onboarding Quests'}
             {view === 'streaks' && 'Streak Manager'}
+            {view === 'shields' && 'Shields'}
             {view === 'moveToWeb' && 'Move to Web'}
             {view === 'season' && 'Season'}
             {view === 'form' && (form.id ? 'Edit Quest' : 'New Quest')}
@@ -3139,6 +3349,7 @@ export function AdminQuestManagerPage() {
                 {view === 'daily' && renderDaily()}
                 {view === 'onboarding' && renderOnboarding()}
                 {view === 'streaks' && renderStreaks()}
+                {view === 'shields' && renderShields()}
                 {view === 'pact' && renderPact()}
                 {view === 'moveToWeb' && renderMoveToWeb()}
                 {view === 'season' && renderSeason()}

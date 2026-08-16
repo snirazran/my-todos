@@ -21,6 +21,7 @@ import {
 import { getZonedToday } from '@/lib/utils';
 import { previousDayKey } from '@/lib/quests/streak';
 import { computeGap, readLoginStreakState } from '@/lib/streak/loginStreak';
+import { readShieldState } from '@/lib/shields/engine';
 import type { DailyFlyProgress, FriendFlyDaily } from '@/lib/types/UserDoc';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
 
@@ -92,7 +93,9 @@ export async function GET(req: NextRequest) {
       ) {
         return state.count;
       }
-      return computeGap(state.lastDayKey, today) <= state.freezes
+      // A held Lily Pad only ever covers one day, so anything longer is dead.
+      return computeGap(state.lastDayKey, today) === 1 &&
+        readShieldState(u).count > 0
         ? state.count
         : 0;
     };

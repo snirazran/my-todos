@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import confetti from 'canvas-confetti';
-import { Flame, HeartCrack, ShieldCheck, Trophy } from 'lucide-react';
+import { Flame, HeartCrack, Trophy } from 'lucide-react';
+import { Icon } from '@/components/ui/Icon';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { FlyWorth } from '@/components/ui/QuestCards';
 import { hapticCelebrate } from '@/lib/haptics';
@@ -83,7 +84,7 @@ export function PactWeekResultSheet({
               {missed ? (
                 <HeartCrack className="h-8 w-8" strokeWidth={2.25} />
               ) : rescued ? (
-                <ShieldCheck className="h-8 w-8" strokeWidth={2.25} />
+                <Icon name="lilyPad" className="h-8 w-8" />
               ) : (
                 <Trophy className="h-8 w-8" strokeWidth={2.25} />
               )}
@@ -98,7 +99,7 @@ export function PactWeekResultSheet({
                   : kept
                     ? 'You kept your word'
                     : rescued
-                      ? 'A shield saved your streak'
+                      ? 'A Lily Pad caught your streak'
                       : 'That week got away'}
               </h2>
               {/* A lap has to explain itself here or nowhere: the streak the
@@ -110,7 +111,7 @@ export function PactWeekResultSheet({
                   : kept
                     ? `All ${result.target} session${result.target === 1 ? '' : 's'} done.`
                     : rescued
-                      ? `You finished ${result.progress} of ${result.target}. A shield covered the rest, so the streak stands.`
+                      ? `You finished ${result.progress} of ${result.target}. A Lily Pad caught the rest, so the streak stands.`
                       : `You finished ${result.progress} of ${result.target}. Sessions you did still paid — the week bonus needed all of them.`}
               </p>
             </div>
@@ -160,10 +161,10 @@ export function PactWeekResultSheet({
                   setOpen(false);
                   window.setTimeout(onGetShield, 260);
                 }}
-                className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-sky-500 text-[15px] font-black text-white shadow-[0_4px_0_0_#0369a1] transition-transform active:translate-y-[2px] active:shadow-none"
+                className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#4f9149] text-[15px] font-black text-white shadow-[0_4px_0_0_#3b7a38] transition-transform active:translate-y-[2px] active:shadow-none"
               >
-                <ShieldCheck className="h-4 w-4" strokeWidth={2.75} />
-                Get a shield for next time
+                <Icon name="lilyPad" className="h-4 w-4" />
+                Get a Lily Pad for next time
               </button>
             )}
             <button

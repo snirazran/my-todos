@@ -4,10 +4,22 @@ import UserModel from '@/lib/models/User';
 import LoginStreakConfigModel, {
   LOGIN_STREAK_CONFIG_ID,
   DEFAULT_GOAL_TIERS,
-  FREEZE_CAP_MIN,
-  FREEZE_CAP_MAX,
   type LoginStreakConfigDoc,
 } from '@/lib/models/LoginStreakConfig';
+import {
+  applyMonthlyGrant,
+  canRescue,
+  consumeShield,
+  grantShields,
+  loadShieldConfig,
+  markOfferShown,
+  persistShieldState,
+  readShieldState,
+  setShieldStateOn,
+  shieldCapFor,
+  shouldOfferShield,
+} from '@/lib/shields/engine';
+import type { ShieldConfigView, ShieldOffer, ShieldState } from '@/lib/shields/types';
 import { previousDayKey } from '@/lib/quests/streak';
 import { isPremiumUser } from '@/lib/quests/engine';
 import { getZonedToday } from '@/lib/utils';
@@ -27,7 +39,7 @@ import type {
   TaskStreakAtRisk,
 } from './types';
 
-const FREEZE_HISTORY_LIMIT = 14;
+const SHIELD_HISTORY_LIMIT = 14;
 const PROTECTED_HISTORY_LIMIT = 60;
 export const SAVER_MUTE_THRESHOLD = 7;
 export const RESCUE_MIN_STREAK = 3;
@@ -79,12 +91,11 @@ function readRescue(raw: any): StreakRescue | null {
     adsRequired: Math.max(0, Math.floor(raw.adsRequired ?? 0)),
     adsWatched: Math.max(0, Math.floor(raw.adsWatched ?? 0)),
     adEligible: raw.adEligible !== false,
-    freezesAvailable: Math.max(0, Math.floor(raw.freezesAvailable ?? 0)),
   };
 }
 
 /**
- * Days shielded by a Streak Freeze or an ad rescue. A shield is day-scoped, not
+ * Days covered by a shield or an ad rescue. Cover is day-scoped, not
  * habit-scoped: one protected day bridges the login streak AND every habit
  * streak scheduled that day.
  */
@@ -108,11 +119,6 @@ export async function loadLoginStreakConfig(): Promise<LoginStreakConfigDoc> {
   return {
     configId: LOGIN_STREAK_CONFIG_ID,
     isActive: doc?.isActive ?? true,
-    freezePriceFlies: Math.max(1, doc?.freezePriceFlies ?? 100),
-    freezeCap: Math.min(
-      FREEZE_CAP_MAX,
-      Math.max(FREEZE_CAP_MIN, doc?.freezeCap ?? 2),
-    ),
     saverMinStreak: Math.max(1, doc?.saverMinStreak ?? 2),
     goalTiers:
       doc?.goalTiers && doc.goalTiers.length > 0
@@ -138,10 +144,11 @@ export function readLoginStreakState(user: any): LoginStreakState {
     count: Math.max(0, Math.floor(raw?.count ?? 0)),
     lastDayKey: typeof raw?.lastDayKey === 'string' ? raw.lastDayKey : '',
     longestStreak: Math.max(0, Math.floor(raw?.longestStreak ?? 0)),
-    freezes: Math.max(0, Math.floor(raw?.freezes ?? 0)),
-    freezeUsedDayKeys: Array.isArray(raw?.freezeUsedDayKeys)
-      ? raw.freezeUsedDayKeys.filter((k: unknown) => typeof k === 'string')
-      : [],
+    shieldedDayKeys: Array.isArray(raw?.shieldedDayKeys)
+      ? raw.shieldedDayKeys.filter((k: unknown) => typeof k === 'string')
+      : Array.isArray(raw?.freezeUsedDayKeys)
+        ? raw.freezeUsedDayKeys.filter((k: unknown) => typeof k === 'string')
+        : [],
     protectedDayKeys: Array.isArray(raw?.protectedDayKeys)
       ? raw.protectedDayKeys.filter((k: unknown) => typeof k === 'string')
       : [],
@@ -175,50 +182,52 @@ export function computeGap(lastDayKey: string, todayKey: string): number {
   if (!lastDayKey || lastDayKey >= todayKey) return 0;
   let gap = 0;
   let cursor = previousDayKey(todayKey);
-  while (cursor > lastDayKey && gap <= FREEZE_HISTORY_LIMIT) {
+  while (cursor > lastDayKey && gap <= SHIELD_HISTORY_LIMIT) {
     gap += 1;
     cursor = previousDayKey(cursor);
   }
   return gap;
 }
 
-function gapDayKeys(lastDayKey: string, todayKey: string): string[] {
-  const days: string[] = [];
-  let cursor = previousDayKey(todayKey);
-  while (cursor > lastDayKey && days.length <= FREEZE_HISTORY_LIMIT) {
-    days.unshift(cursor);
-    cursor = previousDayKey(cursor);
-  }
-  return days;
-}
-
-export async function applyFreezeCoverage(args: {
+/**
+ * Auto-consumes one shield to cover a single missed day. Deliberately capped at
+ * a one-day gap: the shield's rescue cooldown allows one save per system per
+ * window, so a longer absence was never coverable no matter what is in stock.
+ *
+ * Nothing here is armed or equipped by the user — a shield the player forgot to
+ * turn on is worse than no shield, because it turns a rescue into a betrayal.
+ */
+export async function applyShieldCoverage(args: {
   userId: string;
   state: LoginStreakState;
+  shieldState: ShieldState;
+  shieldConfig: ShieldConfigView;
   todayKey: string;
-}): Promise<{ state: LoginStreakState; consumed: string[] } | null> {
-  const { userId, state, todayKey } = args;
+}): Promise<{
+  state: LoginStreakState;
+  shieldState: ShieldState;
+  consumed: string[];
+} | null> {
+  const { userId, state, shieldState, shieldConfig, todayKey } = args;
   if (state.count <= 0 || !state.lastDayKey) return null;
-  const gap = computeGap(state.lastDayKey, todayKey);
-  if (gap === 0 || gap > state.freezes) return null;
+  if (computeGap(state.lastDayKey, todayKey) !== 1) return null;
+  if (!canRescue(shieldState, shieldConfig, 'login', todayKey)) return null;
 
-  const coveredDays = gapDayKeys(state.lastDayKey, todayKey);
+  const missedDay = previousDayKey(todayKey);
   const res = await UserModel.updateOne(
     {
       _id: userId,
       'quests.loginStreak.lastDayKey': state.lastDayKey,
-      'quests.loginStreak.freezes': { $gte: gap },
     },
     {
-      $set: { 'quests.loginStreak.lastDayKey': previousDayKey(todayKey) },
-      $inc: { 'quests.loginStreak.freezes': -gap },
+      $set: { 'quests.loginStreak.lastDayKey': missedDay },
       $push: {
-        'quests.loginStreak.freezeUsedDayKeys': {
-          $each: coveredDays,
-          $slice: -FREEZE_HISTORY_LIMIT,
+        'quests.loginStreak.shieldedDayKeys': {
+          $each: [missedDay],
+          $slice: -SHIELD_HISTORY_LIMIT,
         },
         'quests.loginStreak.protectedDayKeys': {
-          $each: coveredDays,
+          $each: [missedDay],
           $slice: -PROTECTED_HISTORY_LIMIT,
         },
       },
@@ -226,19 +235,22 @@ export async function applyFreezeCoverage(args: {
   );
   if (res.modifiedCount === 0) return null;
 
+  const nextShields = consumeShield(shieldState, 'login', todayKey);
+  await persistShieldState(userId, nextShields);
+
   return {
     state: {
       ...state,
-      lastDayKey: previousDayKey(todayKey),
-      freezes: state.freezes - gap,
-      freezeUsedDayKeys: [...state.freezeUsedDayKeys, ...coveredDays].slice(
-        -FREEZE_HISTORY_LIMIT,
+      lastDayKey: missedDay,
+      shieldedDayKeys: [...state.shieldedDayKeys, missedDay].slice(
+        -SHIELD_HISTORY_LIMIT,
       ),
-      protectedDayKeys: [...state.protectedDayKeys, ...coveredDays].slice(
+      protectedDayKeys: [...state.protectedDayKeys, missedDay].slice(
         -PROTECTED_HISTORY_LIMIT,
       ),
     },
-    consumed: coveredDays,
+    shieldState: nextShields,
+    consumed: [missedDay],
   };
 }
 
@@ -246,21 +258,22 @@ export function buildLoginStreakView(
   state: LoginStreakState,
   config: LoginStreakConfigDoc,
   todayKey: string,
+  shields: { count: number; cap: number },
 ): LoginStreakView {
   const gap = computeGap(state.lastDayKey, todayKey);
   const checkedInToday = state.lastDayKey === todayKey;
   const alive =
-    state.count > 0 && (checkedInToday || gap === 0 || gap <= state.freezes);
+    state.count > 0 &&
+    (checkedInToday || gap === 0 || (gap === 1 && shields.count > 0));
   return {
     count: alive ? state.count : 0,
     longestStreak: state.longestStreak,
     lastDayKey: state.lastDayKey,
     checkedInToday,
     alive,
-    freezes: state.freezes,
-    freezeCap: config.freezeCap,
-    freezePriceFlies: config.freezePriceFlies,
-    freezeUsedDayKeys: state.freezeUsedDayKeys,
+    shields: shields.count,
+    shieldCap: shields.cap,
+    shieldedDayKeys: state.shieldedDayKeys,
     protectedDayKeys: state.protectedDayKeys,
     goal: state.goal
       ? {
@@ -277,15 +290,16 @@ export function buildLoginStreakView(
 
 function splitRewards(rewards: LoginStreakReward[]) {
   const questRewards: QuestReward[] = [];
-  let freezes = 0;
+  let shields = 0;
   for (const reward of rewards) {
-    if (reward.type === 'STREAK_FREEZE') {
-      freezes += Math.max(1, Math.floor(reward.amount ?? 1));
+    // `STREAK_FREEZE` is what tiers authored before the merge still say.
+    if (reward.type === 'SHIELD' || (reward.type as string) === 'STREAK_FREEZE') {
+      shields += Math.max(1, Math.floor((reward as any).amount ?? 1));
     } else {
       questRewards.push(reward as QuestReward);
     }
   }
-  return { questRewards, freezes };
+  return { questRewards, shields };
 }
 
 function grantQuestRewards(
@@ -311,7 +325,7 @@ function grantQuestRewards(
     flyBalanceAfter: user.wardrobe.flies,
     grantedItemIds: [],
     grantedBackgroundIds: [],
-    freezesGranted: 0,
+    shieldsGranted: 0,
   };
 
   for (const reward of rewards) {
@@ -346,25 +360,37 @@ function applyStreakRewardGrants(args: {
   user: any;
   next: LoginStreakState;
   config: LoginStreakConfigDoc;
+  shieldConfig: ShieldConfigView;
+  shieldState: ShieldState;
   todayKey: string;
   goalCompleted: LoginStreakGoal | null;
-}): LoginStreakRewardEvent | null {
-  const { user, next, config, todayKey, goalCompleted } = args;
-  if (!goalCompleted) return null;
+}): {
+  event: LoginStreakRewardEvent | null;
+  shieldState: ShieldState;
+} {
+  const { user, next, config, shieldConfig, todayKey, goalCompleted } = args;
+  if (!goalCompleted) return { event: null, shieldState: args.shieldState };
 
-  const multiplier = isPremiumUser(user.toObject()) ? 2 : 1;
+  const isPremium = isPremiumUser(user.toObject());
+  const multiplier = isPremium ? 2 : 1;
   const tier = config.goalTiers.find((t) => t.days === goalCompleted.days);
-  const { questRewards, freezes } = splitRewards(tier?.rewards ?? []);
+  const { questRewards, shields } = splitRewards(tier?.rewards ?? []);
   const summary = grantQuestRewards(user, questRewards, multiplier);
-  summary.freezesGranted = freezes;
+  summary.shieldsGranted = shields;
   next.goalsCompleted = [
     ...next.goalsCompleted,
     { days: goalCompleted.days, dayKey: todayKey },
   ];
   next.goal = null;
-  next.freezes = Math.min(config.freezeCap, next.freezes + freezes);
 
-  return { days: goalCompleted.days, rewardSummary: summary };
+  const shieldState = shields
+    ? grantShields(args.shieldState, shieldConfig, isPremium, shields)
+    : args.shieldState;
+
+  return {
+    event: { days: goalCompleted.days, rewardSummary: summary },
+    shieldState,
+  };
 }
 
 function activeRescueForDay(
@@ -375,10 +401,10 @@ function activeRescueForDay(
 }
 
 /**
- * Builds the day-scoped rescue offer for `missedDayKey`. Returns null when
- * nothing broke, or when nothing the user owns could save it (ad cooldown still
- * running and no freeze in inventory) — an offer with no action is just a
- * funeral notice.
+ * Builds the day-scoped rescue offer for `missedDayKey`. Only reached when no
+ * shield covered the miss, so the ad run is the last thing standing between the
+ * user and a broken streak. Returns null when nothing broke or when the ad
+ * cooldown is still running — an offer with no action is just a funeral notice.
  */
 function buildRescueOffer(args: {
   user: any;
@@ -402,7 +428,7 @@ function buildRescueOffer(args: {
   const adEligible =
     !state.lastRescueDayKey ||
     dayKeyDiff(state.lastRescueDayKey, todayKey) >= RESCUE_COOLDOWN_DAYS;
-  if (!adEligible && state.freezes <= 0) return null;
+  if (!adEligible) return null;
 
   const largest = Math.max(
     loginCountAtRisk,
@@ -419,7 +445,6 @@ function buildRescueOffer(args: {
     adsRequired: isPremiumUser(user.toObject()) ? 0 : rescueAdsRequired(largest),
     adsWatched: 0,
     adEligible,
-    freezesAvailable: state.freezes,
   };
 }
 
@@ -430,14 +455,37 @@ export async function performCheckIn(args: {
   const { userId, timezone } = args;
   await connectMongo();
 
-  const [user, config] = await Promise.all([
+  const [user, config, shieldConfig] = await Promise.all([
     UserModel.findById(userId),
     loadLoginStreakConfig(),
+    loadShieldConfig(),
   ]);
   if (!user) throw new Error('User not found');
 
   const todayKey = getZonedToday(timezone);
-  const state = readLoginStreakState(user.toObject());
+  const userObject = user.toObject();
+  const state = readLoginStreakState(userObject);
+  const isPremium = isPremiumUser(userObject);
+
+  const storedShields = readShieldState(userObject);
+  let shieldState = applyMonthlyGrant(
+    storedShields,
+    shieldConfig,
+    isPremium,
+    todayKey,
+  );
+  // The pool is written on any change, including the first read of a document
+  // that still held the two separate legacy stocks.
+  if (
+    shieldState !== storedShields ||
+    !(userObject as any)?.quests?.shields?.merged
+  ) {
+    await persistShieldState(userId, shieldState);
+  }
+  const shieldSnapshot = () => ({
+    count: shieldState.count,
+    cap: shieldCapFor(shieldConfig, isPremium),
+  });
 
   if (!config.isActive) {
     return {
@@ -445,9 +493,10 @@ export async function performCheckIn(args: {
       extended: false,
       previousCount: state.count,
       view: null,
-      freezeConsumedDays: [],
+      shieldConsumedDays: [],
       goalEvent: null,
       rescue: null,
+      shieldOffer: null,
     };
   }
 
@@ -456,14 +505,22 @@ export async function performCheckIn(args: {
       active: true,
       extended: false,
       previousCount: state.count,
-      view: buildLoginStreakView(state, config, todayKey),
-      freezeConsumedDays: [],
+      view: buildLoginStreakView(state, config, todayKey, shieldSnapshot()),
+      shieldConsumedDays: [],
       goalEvent: null,
       rescue: activeRescueForDay(state.rescue, todayKey),
+      shieldOffer: null,
     };
   }
 
-  const coverage = await applyFreezeCoverage({ userId, state, todayKey });
+  const coverage = await applyShieldCoverage({
+    userId,
+    state,
+    shieldState,
+    shieldConfig,
+    todayKey,
+  });
+  if (coverage) shieldState = coverage.shieldState;
   const freshState = coverage?.state ?? state;
   const yesterdayKey = previousDayKey(todayKey);
   const previousCount = freshState.count;
@@ -524,20 +581,24 @@ export async function performCheckIn(args: {
   let goalEvent: LoginStreakRewardEvent | null = null;
 
   if (goalCompleted) {
-    goalEvent = applyStreakRewardGrants({
+    const granted = applyStreakRewardGrants({
       user,
       next,
       config,
+      shieldConfig,
+      shieldState,
       todayKey,
       goalCompleted,
     });
+    goalEvent = granted.event;
+    shieldState = granted.shieldState;
 
     const currentQuests =
       typeof (user as any).quests === 'object' && (user as any).quests
         ? (user as any).quests
         : {};
     (user as any).quests = { ...currentQuests, loginStreak: next };
-    user.markModified('quests');
+    setShieldStateOn(user, shieldState);
     user.markModified('wardrobe');
     await user.save();
   } else {
@@ -558,11 +619,40 @@ export async function performCheckIn(args: {
         active: true,
         extended: currentState.lastDayKey === todayKey,
         previousCount,
-        view: buildLoginStreakView(currentState, config, todayKey),
-        freezeConsumedDays: [],
+        view: buildLoginStreakView(
+          currentState,
+          config,
+          todayKey,
+          shieldSnapshot(),
+        ),
+        shieldConsumedDays: [],
         goalEvent: null,
         rescue: activeRescueForDay(currentState.rescue, todayKey),
+        shieldOffer: null,
       };
+    }
+  }
+
+  // A miss that nothing covered is the one moment the offer has earned: the
+  // user just watched a streak break for want of the thing being offered.
+  // Everything else about whether to actually interrupt lives in the governor.
+  let shieldOffer: ShieldOffer | null = null;
+  if (!coverage && somethingBroke) {
+    shieldOffer = shouldOfferShield({
+      state: shieldState,
+      config: shieldConfig,
+      todayKey,
+      reason: 'missed',
+      system: 'login',
+      atStake: Math.max(
+        loginBroke ? previousCount : 0,
+        ...taskStreaksAtRisk.map((t) => t.count),
+        0,
+      ),
+    });
+    if (shieldOffer) {
+      shieldState = markOfferShown(shieldState, todayKey);
+      await persistShieldState(userId, shieldState);
     }
   }
 
@@ -570,10 +660,11 @@ export async function performCheckIn(args: {
     active: true,
     extended: true,
     previousCount,
-    view: buildLoginStreakView(next, config, todayKey),
-    freezeConsumedDays: coverage?.consumed ?? [],
+    view: buildLoginStreakView(next, config, todayKey, shieldSnapshot()),
+    shieldConsumedDays: coverage?.consumed ?? [],
     goalEvent,
     rescue: next.rescue,
+    shieldOffer,
   };
 }
 
@@ -583,17 +674,25 @@ export async function performRescue(args: {
   rescueId: string;
   method: RescueMethod;
 }): Promise<RescueResult> {
-  const { userId, timezone, rescueId, method } = args;
+  const { userId, timezone, rescueId } = args;
   await connectMongo();
 
-  const [user, config] = await Promise.all([
+  const [user, config, shieldConfig] = await Promise.all([
     UserModel.findById(userId),
     loadLoginStreakConfig(),
+    loadShieldConfig(),
   ]);
   if (!user) throw new Error('User not found');
 
   const todayKey = getZonedToday(timezone);
-  const state = readLoginStreakState(user.toObject());
+  const userObject = user.toObject();
+  const state = readLoginStreakState(userObject);
+  const isPremium = isPremiumUser(userObject);
+  let shieldState = readShieldState(userObject);
+  const shieldSnapshot = () => ({
+    count: shieldState.count,
+    cap: shieldCapFor(shieldConfig, isPremium),
+  });
   const rescue = state.rescue;
 
   if (
@@ -602,65 +701,39 @@ export async function performRescue(args: {
     rescue.id !== rescueId ||
     rescue.offeredDayKey !== todayKey ||
     state.lastDayKey !== todayKey ||
-    (method === 'ad' && !rescue.adEligible)
+    !rescue.adEligible
   ) {
     return {
       granted: false,
       completed: false,
       rescue: null,
       view: config.isActive
-        ? buildLoginStreakView(state, config, todayKey)
+        ? buildLoginStreakView(state, config, todayKey, shieldSnapshot())
         : null,
       goalEvent: null,
       error: 'expired',
     };
   }
 
-  // A freeze bought in advance redeems in one tap; ads pay the tiered price.
-  if (method === 'freeze') {
-    const spent = await UserModel.updateOne(
-      {
-        _id: userId,
-        'quests.loginStreak.rescue.id': rescue.id,
-        'quests.loginStreak.freezes': { $gte: 1 },
-      },
-      { $inc: { 'quests.loginStreak.freezes': -1 } },
+  const adsWatched = rescue.adsWatched + 1;
+  if (adsWatched < rescue.adsRequired) {
+    const updated: StreakRescue = { ...rescue, adsWatched };
+    await UserModel.updateOne(
+      { _id: userId, 'quests.loginStreak.rescue.id': rescue.id },
+      { $set: { 'quests.loginStreak.rescue': updated } },
     );
-    if (spent.modifiedCount === 0) {
-      return {
-        granted: false,
-        completed: false,
-        rescue,
-        view: buildLoginStreakView(state, config, todayKey),
-        goalEvent: null,
-        error: 'no-freeze',
-      };
-    }
-    state.freezes = Math.max(0, state.freezes - 1);
-    state.freezeUsedDayKeys = [
-      ...state.freezeUsedDayKeys,
-      rescue.missedDayKey,
-    ].slice(-FREEZE_HISTORY_LIMIT);
-  } else {
-    const adsWatched = rescue.adsWatched + 1;
-    if (adsWatched < rescue.adsRequired) {
-      const updated: StreakRescue = { ...rescue, adsWatched };
-      await UserModel.updateOne(
-        { _id: userId, 'quests.loginStreak.rescue.id': rescue.id },
-        { $set: { 'quests.loginStreak.rescue': updated } },
-      );
-      return {
-        granted: true,
-        completed: false,
-        rescue: updated,
-        view: buildLoginStreakView(
-          { ...state, rescue: updated },
-          config,
-          todayKey,
-        ),
-        goalEvent: null,
-      };
-    }
+    return {
+      granted: true,
+      completed: false,
+      rescue: updated,
+      view: buildLoginStreakView(
+        { ...state, rescue: updated },
+        config,
+        todayKey,
+        shieldSnapshot(),
+      ),
+      goalEvent: null,
+    };
   }
 
   const loginRestored = rescue.previousCount > 0;
@@ -673,27 +746,31 @@ export async function performRescue(args: {
       -PROTECTED_HISTORY_LIMIT,
     ),
     rescue: null,
-    lastRescueDayKey: method === 'ad' ? todayKey : state.lastRescueDayKey,
+    lastRescueDayKey: todayKey,
   };
 
   const goalCompleted =
     loginRestored && next.goal && newCount - next.goal.startCount >= next.goal.days
       ? next.goal
       : null;
-  const goalEvent = applyStreakRewardGrants({
+  const granted = applyStreakRewardGrants({
     user,
     next,
     config,
+    shieldConfig,
+    shieldState,
     todayKey,
     goalCompleted,
   });
+  const goalEvent = granted.event;
+  shieldState = granted.shieldState;
 
   const currentQuests =
     typeof (user as any).quests === 'object' && (user as any).quests
       ? (user as any).quests
       : {};
   (user as any).quests = { ...currentQuests, loginStreak: next };
-  user.markModified('quests');
+  setShieldStateOn(user, shieldState);
   user.markModified('wardrobe');
   await user.save();
 
@@ -701,7 +778,7 @@ export async function performRescue(args: {
     granted: true,
     completed: true,
     rescue: null,
-    view: buildLoginStreakView(next, config, todayKey),
+    view: buildLoginStreakView(next, config, todayKey, shieldSnapshot()),
     goalEvent,
   };
 }

@@ -8,6 +8,12 @@ import {
   loadLoginStreakConfig,
   readLoginStreakState,
 } from '@/lib/streak/loginStreak';
+import { isPremiumUser } from '@/lib/quests/engine';
+import {
+  loadShieldConfig,
+  readShieldState,
+  shieldCapFor,
+} from '@/lib/shields/engine';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,7 +36,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid goal' }, { status: 400 });
     }
 
-    const user = await UserModel.findById(userId).select('quests').lean();
+    const user = await UserModel.findById(userId)
+      .select('quests premiumUntil')
+      .lean();
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
@@ -67,9 +75,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const shieldState = readShieldState(user);
     return NextResponse.json({
       ok: true,
-      view: buildLoginStreakView({ ...state, goal }, config, todayKey),
+      view: buildLoginStreakView({ ...state, goal }, config, todayKey, {
+        count: shieldState.count,
+        cap: shieldCapFor(await loadShieldConfig(), isPremiumUser(user as any)),
+      }),
     });
   } catch (error) {
     console.error('Streak goal failed:', error);

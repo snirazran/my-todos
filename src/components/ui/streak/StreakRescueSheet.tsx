@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import confetti from 'canvas-confetti';
-import { Flame, Play, Shield, ShieldCheck } from 'lucide-react';
+import { Flame, Play, ShieldCheck } from 'lucide-react';
 import Frog, { type FrogHandle } from '@/components/ui/frog';
 import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
 import { cn } from '@/lib/utils';
@@ -31,9 +31,10 @@ function toCelebrationResult(result: RescueResult): CheckInResult {
     extended: true,
     previousCount: result.view?.count ?? 0,
     view: result.view,
-    freezeConsumedDays: [],
+    shieldConsumedDays: [],
     goalEvent: result.goalEvent,
     rescue: null,
+    shieldOffer: null,
   };
 }
 
@@ -65,7 +66,6 @@ export function StreakRescueSheet({
   const { indices } = useWardrobeIndices(open);
   const frogRef = useRef<FrogHandle>(null);
   const [adsWatched, setAdsWatched] = useState(0);
-  const [freezes, setFreezes] = useState(0);
   const [busy, setBusy] = useState<RescueMethod | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<RescueResult | null>(null);
@@ -77,7 +77,6 @@ export function StreakRescueSheet({
   useEffect(() => {
     if (!open) return;
     setAdsWatched(offer?.adsWatched ?? 0);
-    setFreezes(offer?.freezesAvailable ?? 0);
     setBusy(null);
     setError(null);
     setSaved(null);
@@ -110,7 +109,6 @@ export function StreakRescueSheet({
   if (typeof document === 'undefined' || !offer) return null;
 
   const isFreeSave = offer.adsRequired === 0;
-  const canUseFreeze = freezes > 0;
   const canWatchAd = offer.adEligible;
   const adsLeft = Math.max(0, offer.adsRequired - adsWatched);
   const largest = rows.reduce((max, r) => Math.max(max, r.count), 0);
@@ -132,17 +130,11 @@ export function StreakRescueSheet({
       }
       const result = await rescueStreak(offer.id, method);
       if (!result || !result.granted) {
-        setError(
-          result?.error === 'no-freeze'
-            ? "You don't have a Streak Freeze left."
-            : 'Could not save your streaks — try again.',
-        );
-        if (result?.error === 'no-freeze') setFreezes(0);
+        setError('Could not save your streaks — try again.');
         return;
       }
       if (result.completed) {
         setSaved(result);
-        if (method === 'freeze') setFreezes((f) => Math.max(0, f - 1));
         frogRef.current?.fireEmote('love');
         confetti({
           particleCount: 120,
@@ -259,7 +251,8 @@ export function StreakRescueSheet({
                       : `Your ${largest}-day streak is about to break`}
                   </h2>
                   <p className="mt-2 max-w-xs text-center text-sm font-bold text-white/60">
-                    Yesterday went unmarked. One shield covers the whole day.
+                    Yesterday went unmarked, and you had no Lily Pad under you.
+                    One save covers the whole day.
                   </p>
 
                   <div className="mt-5 w-full max-w-[320px] divide-y divide-white/10 rounded-2xl bg-white/[0.06] px-4 py-1">
@@ -312,32 +305,13 @@ export function StreakRescueSheet({
                     </button>
                   ) : (
                     <div className="mt-6 flex w-full max-w-[300px] flex-col gap-3">
-                      {canUseFreeze && (
-                        <button
-                          type="button"
-                          onClick={() => handleSave('freeze')}
-                          disabled={!!busy}
-                          className={cn(
-                            'flex w-full items-center justify-center gap-2 rounded-2xl bg-sky-400 py-3.5 text-sm font-black uppercase tracking-wide text-slate-900 shadow-[0_5px_0_0_rgba(0,0,0,0.3)] transition-all active:translate-y-1 active:shadow-none',
-                            busy && 'opacity-70',
-                          )}
-                        >
-                          <Shield className="h-4 w-4 fill-current" />
-                          {busy === 'freeze'
-                            ? 'Saving…'
-                            : `Use 1 Streak Freeze (${freezes})`}
-                        </button>
-                      )}
                       {canWatchAd && (
                         <button
                           type="button"
                           onClick={() => handleSave('ad')}
                           disabled={!!busy}
                           className={cn(
-                            'flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-black uppercase tracking-wide transition-all active:translate-y-1 active:shadow-none',
-                            canUseFreeze
-                              ? 'bg-white/10 text-white shadow-[0_4px_0_0_rgba(0,0,0,0.25)]'
-                              : 'bg-amber-400 text-slate-900 shadow-[0_5px_0_0_rgba(0,0,0,0.3)]',
+                            'flex w-full items-center justify-center gap-2 rounded-2xl bg-amber-400 py-3.5 text-sm font-black uppercase tracking-wide text-slate-900 shadow-[0_5px_0_0_rgba(0,0,0,0.3)] transition-all active:translate-y-1 active:shadow-none',
                             busy && 'opacity-70',
                           )}
                         >

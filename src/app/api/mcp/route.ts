@@ -8,6 +8,7 @@ import type { AuthContext } from '@/lib/auth';
 import { verifyBearerToken } from '@/lib/apiTokens';
 import { callRoute } from '@/lib/mcp/callRoute';
 import { readLoginStreakState } from '@/lib/streak/loginStreak';
+import { readShieldState } from '@/lib/shields/engine';
 import { getZonedToday } from '@/lib/utils';
 import {
   GET as tasksGet,
@@ -370,7 +371,7 @@ const handler = createMcpHandler(
           assertScope(toolCtx, 'progress:read');
           await connectMongo();
           const user = await UserModel.findById(toolCtx.auth.uid)
-            .select('wardrobe.flies quests.loginStreak timezone')
+            .select('wardrobe.flies quests timezone')
             .lean();
           const streak = readLoginStreakState(user);
           return textResult({
@@ -379,7 +380,7 @@ const handler = createMcpHandler(
             flies: (user as any)?.wardrobe?.flies ?? 0,
             loginStreak: streak.count,
             longestStreak: streak.longestStreak,
-            streakFreezes: streak.freezes,
+            lilyPads: readShieldState(user).count,
           });
         } catch (error) {
           return errorResult((error as Error).message);

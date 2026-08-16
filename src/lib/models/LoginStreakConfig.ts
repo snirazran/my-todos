@@ -10,8 +10,6 @@ export interface LoginStreakConfigDoc {
   _id?: mongoose.Types.ObjectId;
   configId: string;
   isActive: boolean;
-  freezePriceFlies: number;
-  freezeCap: number;
   saverMinStreak: number;
   goalTiers: LoginStreakGoalTier[];
   createdAt: Date;
@@ -19,8 +17,6 @@ export interface LoginStreakConfigDoc {
 }
 
 export const LOGIN_STREAK_CONFIG_ID = 'login-streak';
-export const FREEZE_CAP_MIN = 1;
-export const FREEZE_CAP_MAX = 5;
 
 export const DEFAULT_GOAL_TIERS: LoginStreakGoalTier[] = [
   { days: 7, rewards: [{ type: 'FLIES', amountMode: 'fixed', amount: 50 }] },
@@ -29,14 +25,14 @@ export const DEFAULT_GOAL_TIERS: LoginStreakGoalTier[] = [
     days: 30,
     rewards: [
       { type: 'FLIES', amountMode: 'fixed', amount: 300 },
-      { type: 'STREAK_FREEZE', amount: 1 },
+      { type: 'SHIELD', amount: 1 },
     ],
   },
   {
     days: 50,
     rewards: [
       { type: 'FLIES', amountMode: 'fixed', amount: 600 },
-      { type: 'STREAK_FREEZE', amount: 1 },
+      { type: 'SHIELD', amount: 1 },
     ],
   },
 ];
@@ -45,8 +41,6 @@ const LoginStreakConfigSchema = new Schema<LoginStreakConfigDoc>(
   {
     configId: { type: String, required: true, unique: true, index: true },
     isActive: { type: Boolean, default: true },
-    freezePriceFlies: { type: Number, default: 100 },
-    freezeCap: { type: Number, default: 2 },
     saverMinStreak: { type: Number, default: 2 },
     goalTiers: { type: [Schema.Types.Mixed], default: [] } as any,
   },

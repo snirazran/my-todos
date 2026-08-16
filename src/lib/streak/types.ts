@@ -1,11 +1,12 @@
 import type { QuestReward } from '@/lib/quests/types';
+import type { ShieldOffer } from '@/lib/shields/types';
 
-export type StreakFreezeReward = {
-  type: 'STREAK_FREEZE';
+export type ShieldReward = {
+  type: 'SHIELD';
   amount: number;
 };
 
-export type LoginStreakReward = QuestReward | StreakFreezeReward;
+export type LoginStreakReward = QuestReward | ShieldReward;
 
 export type LoginStreakGoal = {
   days: number;
@@ -27,8 +28,11 @@ export type TaskStreakAtRisk = {
 
 /**
  * A single missed day, and everything it is about to break. Day-scoped by
- * design: one freeze (or one ad run) shields the day and therefore every streak
- * listed here at once.
+ * design: one ad run covers the day and therefore every streak listed here at
+ * once.
+ *
+ * A held shield never reaches this offer — it fires by itself at check-in, so
+ * this sheet only appears for a user with nothing in stock.
  */
 export type StreakRescue = {
   id: string;
@@ -40,10 +44,9 @@ export type StreakRescue = {
   adsRequired: number;
   adsWatched: number;
   adEligible: boolean;
-  freezesAvailable: number;
 };
 
-export type RescueMethod = 'ad' | 'freeze';
+export type RescueMethod = 'ad';
 
 export type LoginStreakRescue = StreakRescue;
 
@@ -51,8 +54,8 @@ export type LoginStreakState = {
   count: number;
   lastDayKey: string;
   longestStreak: number;
-  freezes: number;
-  freezeUsedDayKeys: string[];
+  /** Days a shield auto-covered, for the snowflake marks on the week strip. */
+  shieldedDayKeys: string[];
   protectedDayKeys: string[];
   goal: LoginStreakGoal | null;
   goalsCompleted: { days: number; dayKey: string }[];
@@ -72,10 +75,10 @@ export type LoginStreakView = {
   lastDayKey: string;
   checkedInToday: boolean;
   alive: boolean;
-  freezes: number;
-  freezeCap: number;
-  freezePriceFlies: number;
-  freezeUsedDayKeys: string[];
+  /** The shared shield pool, mirrored here so the streak sheet needs no second fetch. */
+  shields: number;
+  shieldCap: number;
+  shieldedDayKeys: string[];
   protectedDayKeys: string[];
   goal: (LoginStreakGoal & { progress: number }) | null;
   goalTiers: LoginStreakGoalTierView[];
@@ -87,7 +90,7 @@ export type LoginStreakRewardSummary = {
   flyBalanceAfter: number;
   grantedItemIds: string[];
   grantedBackgroundIds: string[];
-  freezesGranted: number;
+  shieldsGranted: number;
 };
 
 export type LoginStreakRewardEvent = {
@@ -100,9 +103,12 @@ export type CheckInResult = {
   extended: boolean;
   previousCount: number;
   view: LoginStreakView | null;
-  freezeConsumedDays: string[];
+  /** Days a shield covered during this check-in, for the "saved you" notice. */
+  shieldConsumedDays: string[];
   goalEvent: LoginStreakRewardEvent | null;
   rescue: LoginStreakRescue | null;
+  /** Set when the miss went uncovered and the user holds nothing. */
+  shieldOffer: ShieldOffer | null;
 };
 
 export type RescueResult = {
@@ -111,5 +117,5 @@ export type RescueResult = {
   rescue: StreakRescue | null;
   view: LoginStreakView | null;
   goalEvent: LoginStreakRewardEvent | null;
-  error?: 'no-freeze' | 'expired';
+  error?: 'expired';
 };

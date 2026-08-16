@@ -95,12 +95,6 @@ export type PactConfigView = {
   comebackBonusFlies: number;
   completionRewards: QuestRewards;
   streakMultipliers: PactStreakMultiplier[];
-  shieldCapFree: number;
-  shieldCapPlus: number;
-  shieldEarnEveryWeeks: number;
-  shieldPriceFlies: number;
-  shieldAdsRequired: number;
-  shieldAdMinStreak: number;
   plusSwapTokensPerMonth: number;
   minOptionsPerArea: number;
   autoGenerate: boolean;
@@ -221,15 +215,11 @@ export type PactStreakView = {
   best: number;
   /** Full climbs completed. The ladder resets at the top, so this is the tally. */
   laps: number;
+  /** The shared shield pool, mirrored here so the pact card needs no second fetch. */
   shields: number;
   /** Most shields that can be held at once. Small on purpose. */
   shieldCap: number;
-  shieldPriceFlies: number;
-  /** Ads needed for one shield right now; rises with the streak. */
-  shieldAdsRequired: number;
-  canBuyShield: boolean;
-  canEarnShieldWithAd: boolean;
-  /** A rescued week cannot be followed by another rescued week. */
+  /** A rescued week cannot be followed by another, and the pool has its own window. */
   rescueOnCooldown: boolean;
   atRisk: boolean;
 };

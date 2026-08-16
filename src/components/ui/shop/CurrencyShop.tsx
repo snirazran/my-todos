@@ -148,13 +148,13 @@ export function CurrencyShop() {
                 <span className="text-[13px] font-black text-foreground">
                   You need
                 </span>
-                <Fly size={22} y={-3} paused />
                 <span className="text-[13px] font-black tabular-nums text-foreground">
                   {need.toLocaleString()}
                 </span>
                 <span className="text-[13px] font-black text-foreground">
                   more flies
                 </span>
+                <Fly size={32} y={-4} paused />
               </div>
             ) : (
               <WishlistGoalCard open={open} onNavigate={() => setOpen(false)} />

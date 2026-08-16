@@ -48,7 +48,6 @@ import { useMediaQuery } from '@/hooks/useMediaQuery';
 
 import { TradePanel } from './TradePanel';
 import GiftBoxOpening from '@/components/ui/gift-box/GiftBoxOpening';
-import { StreakFreezeShopCard } from '@/components/ui/streak/StreakFreezeShopCard';
 import { DailyDealsShelf, DailyDealsTeaser } from './DailyDealsShelf';
 import { WishlistButton } from './WishlistButton';
 import { WishlistShelf } from './WishlistShelf';
@@ -1896,7 +1895,6 @@ function WardrobeManagerContent({
                       onPickBackground={openBgPurchase}
                     />
                   )}
-                  {activeFilter === 'all' && <StreakFreezeShopCard />}
                   {(() => {
                     const cards = mergeWardrobeCards(
                       shopGrid.visibleItems,

@@ -7,7 +7,6 @@ import {
   Flame,
   Loader2,
   Play,
-  ShieldCheck,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -21,7 +20,8 @@ import { useUIStore } from '@/lib/uiStore';
 import type { PactView } from '@/lib/pact/types';
 import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
 import { PactChangeSheet } from './PactChangeSheet';
-import { PactShieldSheet } from './PactShieldSheet';
+import { openShieldSheet } from '@/hooks/useShields';
+import LilyPadIcon from '../../../public/icons/LilyPad.svg';
 import { PactWeekResultSheet } from './PactWeekResultSheet';
 import { PactPickSheet } from './PactPickSheet';
 
@@ -81,7 +81,7 @@ function PactHudButton({
   urgent,
   onClick,
 }: {
-  icon: LucideIcon;
+  icon: LucideIcon | React.FC<React.SVGProps<SVGSVGElement>>;
   label: string;
   badge: string | null;
   tone?: 'have' | 'action';
@@ -126,7 +126,6 @@ export function PactCard({
   const ratio = BANNER_RATIO[variant];
   const { data, mutate } = usePactView();
   const [pickOpen, setPickOpen] = useState(false);
-  const [shieldOpen, setShieldOpen] = useState(false);
   const [claiming, setClaiming] = useState(false);
   const [plusOpen, setPlusOpen] = useState(false);
   const [claimingRetro, setClaimingRetro] = useState(false);
@@ -445,8 +444,8 @@ export function PactCard({
                   </span>
                 )}
                 <PactHudButton
-                  icon={ShieldCheck}
-                  onClick={() => setShieldOpen(true)}
+                  icon={LilyPadIcon}
+                  onClick={() => openShieldSheet()}
                   badge={
                     data.streak.shields > 0
                       ? badgeCount(data.streak.shields)
@@ -456,8 +455,8 @@ export function PactCard({
                   urgent={data.streak.shields === 0 && data.streak.atRisk}
                   label={
                     data.streak.shields > 0
-                      ? `Streak shield — ${data.streak.shields} held`
-                      : 'No streak shield if you miss — get one'
+                      ? `Lily Pad — ${data.streak.shields} held`
+                      : 'Nothing under your week — get a Lily Pad'
                   }
                 />
                 {!weekFinished && (
@@ -607,13 +606,6 @@ export function PactCard({
         onUpgrade={() => setPlusOpen(true)}
       />
 
-      <PactShieldSheet
-        open={shieldOpen}
-        onClose={() => setShieldOpen(false)}
-        view={data}
-        onChanged={(next) => mutate(next, { revalidate: false })}
-      />
-
       {/* Only the quests page reports the week that ended: the home card is
           hidden while a pact runs, and a settlement sheet that can appear on
           either surface would race itself into showing twice. */}
@@ -624,7 +616,7 @@ export function PactCard({
           onClose={() => void dismissWeekResult()}
           onGetShield={() => {
             void dismissWeekResult();
-            setShieldOpen(true);
+            openShieldSheet();
           }}
         />
       )}

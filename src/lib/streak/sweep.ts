@@ -2,12 +2,18 @@ import UserModel from '@/lib/models/User';
 import type { NotificationPrefs } from '@/lib/types/UserDoc';
 import { previousDayKey } from '@/lib/quests/streak';
 import {
-  applyFreezeCoverage,
+  applyShieldCoverage,
   loadLoginStreakConfig,
   readLoginStreakState,
   RESCUE_MIN_TASK_STREAK,
   SAVER_MUTE_THRESHOLD,
 } from '@/lib/streak/loginStreak';
+import {
+  applyMonthlyGrant,
+  loadShieldConfig,
+  readShieldState,
+} from '@/lib/shields/engine';
+import { isPremiumUser } from '@/lib/quests/engine';
 import { findTaskStreaksAtRisk } from '@/lib/streak/taskStreaks';
 import { sendStreakPush } from '@/lib/streak/push';
 import type { TaskStreakAtRisk } from '@/lib/streak/types';
@@ -58,28 +64,28 @@ function hoursSince(date: Date | string | undefined | null): number {
 function buildSaverMessage(args: {
   loginCount: number;
   habits: TaskStreakAtRisk[];
-  freezes: number;
+  shields: number;
 }): { title: string; body: string } {
-  const { loginCount, habits, freezes } = args;
+  const { loginCount, habits, shields } = args;
   const total = habits.length + (loginCount > 0 ? 1 : 0);
   const named = habits
     .slice(0, SAVER_NAMED_HABITS)
     .map((h) => `${h.text} (${h.count})`)
     .join(', ');
   const rest = habits.length - Math.min(habits.length, SAVER_NAMED_HABITS);
-  // Freezes are not spent from a push — they apply on their own the next
-  // morning. So the freeze angle is "don't waste one", not "buy your way out".
-  const freezeNote =
-    freezes > 0
-      ? ` Otherwise it costs you one of your ${freezes} freezes.`
-      : ' You have no freezes left to catch it.';
+  // Lily Pads are not spent from a push — they apply on their own the next
+  // morning. So the angle is "don't waste one", not "buy your way out".
+  const shieldNote =
+    shields > 0
+      ? ` Otherwise it costs you one of your ${shields} Lily Pads.`
+      : ' You have no Lily Pad left to catch it.';
 
   if (total > 1) {
     return {
       title: `${total} streaks end at midnight`,
       body: named
-        ? `${named}${rest > 0 ? ` and ${rest} more` : ''}.${freezeNote}`
-        : `Check in to keep them all.${freezeNote}`,
+        ? `${named}${rest > 0 ? ` and ${rest} more` : ''}.${shieldNote}`
+        : `Check in to keep them all.${shieldNote}`,
     };
   }
 
@@ -87,13 +93,13 @@ function buildSaverMessage(args: {
     const h = habits[0];
     return {
       title: `${h.text} — ${h.count}-day streak ends at midnight`,
-      body: `Ticking it off saves it.${freezeNote}`,
+      body: `Ticking it off saves it.${shieldNote}`,
     };
   }
 
   return {
     title: `Your ${loginCount}-day streak ends at midnight`,
-    body: `A 30-second check-in saves it.${freezeNote}`,
+    body: `A 30-second check-in saves it.${shieldNote}`,
   };
 }
 
@@ -102,6 +108,7 @@ export async function runLoginStreakSweep() {
   if (!config.isActive) {
     return { ok: true, skipped: 'inactive' as const };
   }
+  const shieldConfig = await loadShieldConfig();
 
   const users = await UserModel.find({
     'quests.loginStreak.lastDayKey': { $exists: true, $ne: '' },
@@ -129,11 +136,24 @@ export async function runLoginStreakSweep() {
     const yesterdayKey = previousDayKey(todayKey);
 
     let state = readLoginStreakState(user);
+    let shieldState = applyMonthlyGrant(
+      readShieldState(user),
+      shieldConfig,
+      isPremiumUser(user as any),
+      todayKey,
+    );
 
     if (state.lastDayKey !== todayKey) {
-      const coverage = await applyFreezeCoverage({ userId, state, todayKey });
+      const coverage = await applyShieldCoverage({
+        userId,
+        state,
+        shieldState,
+        shieldConfig,
+        todayKey,
+      });
       if (coverage) {
         state = coverage.state;
+        shieldState = coverage.shieldState;
         results.covered += 1;
       }
     }
@@ -145,7 +165,7 @@ export async function runLoginStreakSweep() {
     const eveningSlot = prefs?.eveningSlot ?? 21;
 
     const lastFrozen =
-      state.freezeUsedDayKeys[state.freezeUsedDayKeys.length - 1];
+      state.shieldedDayKeys[state.shieldedDayKeys.length - 1];
     if (
       hour === morningSlot &&
       lastFrozen &&
@@ -169,10 +189,10 @@ export async function runLoginStreakSweep() {
       );
       if (claim.modifiedCount === 1) {
         await sendStreakPush(userId, {
-          title: `A freeze saved your ${state.count}-day streak`,
+          title: `A Lily Pad caught your ${state.count}-day streak`,
           body:
-            state.freezes > 0
-              ? `${state.freezes} freeze${state.freezes === 1 ? '' : 's'} left. Check in today and keep climbing.`
+            shieldState.count > 0
+              ? `${shieldState.count} Lily Pad${shieldState.count === 1 ? '' : 's'} left. Check in today and keep climbing.`
               : `That was your last one. Check in today — your streak is on its own now.`,
           type: 'streak_freeze_used',
         });
@@ -219,7 +239,7 @@ export async function runLoginStreakSweep() {
             ...buildSaverMessage({
               loginCount: loginAtRisk,
               habits: habitsAtRisk,
-              freezes: state.freezes,
+              shields: shieldState.count,
             }),
             type: 'streak_saver',
           });
