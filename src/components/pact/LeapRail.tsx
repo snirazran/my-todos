@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useState } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { Trophy } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -50,8 +50,62 @@ export type LeapStop = {
 };
 
 const DOTS_PER_GAP = 5;
-/** Height of the trail box. Its bottom edge sits on the pad's centre line. */
-const TRAIL_H = 26;
+
+/**
+ * Pads take a fixed SHARE OF THE RAIL, never a fixed pixel size and never a
+ * share of the viewport.
+ *
+ * Viewport units failed because this card is not full-bleed, so `vw` sized the
+ * pads against something considerably wider than the box they actually sit in.
+ * A percentage of the rail is the only basis that tracks the thing the pads
+ * have to fit inside.
+ *
+ * Five pads at 13.2% leave 8.4% for each of the four gaps — a gap:pad ratio of
+ * about 0.64, which is what the rail looked like at the width that read best.
+ * The cap stops it inflating inside a wide desktop column; past that point the
+ * spare space goes to the gaps, which only makes the leaps longer.
+ *
+ * Below the width where the pads hit that cap the rail stops shrinking and
+ * scrolls sideways instead. Squeezing it further is what skewed it on a 320px
+ * screen: the pads shrank past the point where their badges could sit under
+ * them, and the trail — which lives entirely in the gaps — was the first thing
+ * to be squeezed out. FLOOR_GAP is the gap the rail resolves to at the width
+ * that reads best, so the geometry a 500px screen gets is the geometry every
+ * narrower screen gets, just panned.
+ */
+const PAD_COL = '13.2%';
+const FLOOR_PAD = 56;
+const FLOOR_GAP = 45;
+const PAD_COL_MAX = `${FLOOR_PAD}px`;
+/** How much wider the destination pad is drawn than its column, and the bleed
+ *  either side that keeps it centred. Insets rather than a translate, so the
+ *  tilt below is the only transform on the artwork. */
+const DEST_SCALE = '116%';
+const DEST_BLEED = '-8%';
+
+/**
+ * A per-pad turn, so the row reads as five lily pads floating on water rather
+ * than one asset stamped five times. Fixed angles keyed by position, not random
+ * ones: the rail must not re-arrange itself between renders.
+ *
+ * `spin` is the one that does the work — a rotateY under perspective, so the
+ * pad turns about its own vertical axis and its notch swings to face somewhere
+ * else. Rotating in the plane of the screen instead would have tipped the
+ * ellipse off the waterline, which reads as a pad standing up rather than a pad
+ * facing away. `tilt` is a small in-plane lean on top, for the drift a floating
+ * thing has.
+ */
+const PAD_TURN = [
+  { spin: -26, tilt: -5 },
+  { spin: 30, tilt: 4 },
+  { spin: -15, tilt: -6 },
+  { spin: 23, tilt: 6 },
+  { spin: -32, tilt: -3.5 },
+  { spin: 18, tilt: 5 },
+];
+/** Close enough to exaggerate the turn at this pad size; further away and a
+ *  rotateY just flattens the artwork instead of turning it. */
+const PAD_PERSPECTIVE = '220px';
 
 /**
  * The hop between two pads, drawn as a dotted arc the way a route is drawn on
@@ -64,8 +118,14 @@ const TRAIL_H = 26;
  */
 function HopTrail({ filled }: { filled: number }) {
   return (
-    <div className="relative h-[26px] flex-1">
-      {Array.from({ length: DOTS_PER_GAP }, (_, index) => {
+    // Stretched to the pad row, then the arc is drawn in its top half only, so
+    // the trail's bottom edge lands exactly on the pads' centre line whatever
+    // height the pads have resolved to. Percentages against a stretched box
+    // resolve reliably; a percentage height on the flex item itself would not,
+    // because the row's height comes from its content.
+    <div className="relative flex-1 self-stretch">
+      <div className="absolute inset-x-0 bottom-1/2 top-0">
+        {Array.from({ length: DOTS_PER_GAP }, (_, index) => {
         // Quadratic from pad centre to pad centre, peaking halfway up. Its x
         // works out to exactly t, so the dots space evenly across the gap.
         const t = (index + 0.5) / DOTS_PER_GAP;
@@ -78,9 +138,12 @@ function HopTrail({ filled }: { filled: number }) {
         return (
           <span
             key={index}
+            // Vertical position as a percentage of the box, not pixels: the box
+            // is now fluid, and a px offset would drift off the pad centre at
+            // every width but one.
             style={{
               left: `${t * 100}%`,
-              top: `${y * TRAIL_H}px`,
+              top: `${y * 100}%`,
               width: `${size}px`,
               height: `${size}px`,
             }}
@@ -89,18 +152,25 @@ function HopTrail({ filled }: { filled: number }) {
               // Pond green for water yet to be crossed, warm gold for the part
               // already behind you — the two colours the rest of the feature
               // already runs on.
-              landed
-                ? 'bg-amber-400 shadow-[0_0_4px_rgba(245,179,1,0.55)]'
-                : 'bg-[#6FBF5F]/45',
-            )}
-          />
-        );
-      })}
+                landed
+                  ? 'bg-amber-400 shadow-[0_0_4px_rgba(245,179,1,0.55)]'
+                  : 'bg-[#6FBF5F]/45',
+              )}
+            />
+          );
+        })}
+      </div>
     </div>
   );
 }
 
-function Pad({ stop }: { stop: LeapStop }) {
+function Pad({
+  stop,
+  turn,
+}: {
+  stop: LeapStop;
+  turn: (typeof PAD_TURN)[number];
+}) {
   const [broken, setBroken] = useState(false);
   const next = stop.state === 'next';
   // Everything past the one you are climbing toward recedes a little — but
@@ -118,11 +188,25 @@ function Pad({ stop }: { stop: LeapStop }) {
       // A tier pad whose art has not been drawn yet falls back to the plain one
       // rather than showing a broken image in the middle of the ladder.
       onError={() => setBroken(true)}
+      // Absolutely positioned so the cell's height comes from its aspect ratio
+      // alone. The destination is drawn wider than its column and overflows
+      // upward from the shared waterline — if it grew the cell instead, its
+      // badge and label would drop off the row's baseline.
+      //
+      // The destination is placed with insets rather than a translate for the
+      // same reason: `transform` here belongs to the turn alone, and a
+      // centring translate would have had to be folded into every pad's matrix.
+      style={{
+        transform: `perspective(${PAD_PERSPECTIVE}) rotateY(${turn.spin}deg) rotateZ(${turn.tilt}deg)`,
+        ...(stop.isDestination
+          ? { left: DEST_BLEED, width: DEST_SCALE }
+          : { width: '100%', height: '100%' }),
+      }}
       className={cn(
         'select-none object-contain transition',
-        // The finish line is the most valuable stop on the rail and used to be
-        // the least emphasised thing on it. It gets the extra size.
-        stop.isDestination ? 'h-11 w-16' : 'h-9 w-14',
+        stop.isDestination
+          ? 'absolute bottom-0 h-auto'
+          : 'absolute inset-0',
         // Only slightly. Enough to put the far stops behind the near ones, not
         // enough to throw away the metal that says what a rung is worth.
         //
@@ -149,6 +233,93 @@ function Pad({ stop }: { stop: LeapStop }) {
   );
 }
 
+/**
+ * Which end of the rail has more to show, and a mouse fallback for reaching it.
+ *
+ * Touch already pans this natively, and a trackpad throws horizontal deltas at
+ * it, but a plain wheel mouse has no way to scroll a hidden-scrollbar row at
+ * all — so a mouse drag moves it. Only a mouse: intercepting touch would trade
+ * the platform's momentum and rubber-banding for a worse hand-rolled version.
+ */
+function useRailScroll() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [edges, setEdges] = useState({ start: false, end: false });
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    // A pixel of slack: fractional layout widths mean scrollLeft never lands
+    // exactly on the maximum, and a fade that can never fully clear reads as a
+    // rendering fault rather than an affordance.
+    const sync = () => {
+      const max = el.scrollWidth - el.clientWidth;
+      setEdges({ start: el.scrollLeft > 1, end: el.scrollLeft < max - 1 });
+    };
+    sync();
+    el.addEventListener('scroll', sync, { passive: true });
+    const observer = new ResizeObserver(sync);
+    observer.observe(el);
+    return () => {
+      el.removeEventListener('scroll', sync);
+      observer.disconnect();
+    };
+  }, []);
+
+  const onPointerDown = useCallback((event: React.PointerEvent) => {
+    const el = ref.current;
+    if (!el || event.pointerType !== 'mouse' || event.button !== 0) return;
+    if (el.scrollWidth <= el.clientWidth) return;
+    // Without this the browser starts its own gesture on mousedown — a text
+    // selection over the labels, or an image drag off a pad — and that gesture
+    // owns the pointer for the rest of the stroke, so the rail never moves.
+    // Cancelling the default before it begins is what makes the drag the only
+    // thing happening.
+    event.preventDefault();
+    const originX = event.clientX;
+    const originScroll = el.scrollLeft;
+    const drag = (move: PointerEvent) => {
+      el.scrollLeft = originScroll - (move.clientX - originX);
+    };
+    const release = () => {
+      window.removeEventListener('pointermove', drag);
+      window.removeEventListener('pointerup', release);
+      window.removeEventListener('pointercancel', release);
+    };
+    window.addEventListener('pointermove', drag);
+    window.addEventListener('pointerup', release);
+    window.addEventListener('pointercancel', release);
+  }, []);
+
+  return { ref, edges, onPointerDown };
+}
+
+/**
+ * The one thing that says the rail continues past the card edge. It sits on the
+ * card's own colour so the pads dissolve into the surface instead of being cut
+ * off by it — a hard edge reads as a layout bug, a soft one reads as more.
+ */
+function EdgeFade({ side, shown }: { side: 'left' | 'right'; shown: boolean }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={cn(
+        // Matched to the scroller's box, which starts above this one — the
+        // "you are here" marker lives in that overhang and has to fade with
+        // everything else.
+        //
+        // Fading to `card/0` rather than `transparent`: transparent is
+        // transparent BLACK, and a ramp through it lays a grey haze over a
+        // light card. The same colour at zero alpha ramps to nothing at all.
+        'pointer-events-none absolute -top-2 bottom-0 z-10 w-7 transition-opacity duration-200',
+        side === 'left'
+          ? '-left-1 bg-gradient-to-r from-card to-card/0'
+          : '-right-1 bg-gradient-to-l from-card to-card/0',
+        shown ? 'opacity-100' : 'opacity-0',
+      )}
+    />
+  );
+}
+
 export function LeapRail({
   stops,
   /** How far into the leap toward the next pad the user stands, 0–1. */
@@ -159,49 +330,60 @@ export function LeapRail({
   progress: number;
   className?: string;
 }) {
+  const { ref, edges, onPointerDown } = useRailScroll();
+
   if (stops.length === 0) return null;
   const nextIndex = stops.findIndex((stop) => stop.state === 'next');
 
-  return (
-    <div className={cn('flex items-start', className)}>
-      {stops.map((stop, index) => {
-        const locked = stop.state === 'locked';
-        // The trail into this pad: full once you are standing on it, partial
-        // while the leap is in the air, empty beyond.
-        const filled =
-          stop.state === 'reached'
-            ? DOTS_PER_GAP
-            : index === nextIndex
-              ? Math.round(Math.min(1, Math.max(0, progress)) * DOTS_PER_GAP)
-              : 0;
+  const cell = { width: PAD_COL, maxWidth: PAD_COL_MAX };
+  const railFloor = stops.length * FLOOR_PAD + (stops.length - 1) * FLOOR_GAP;
+  const filledInto = (index: number) =>
+    stops[index].state === 'reached'
+      ? DOTS_PER_GAP
+      : index === nextIndex
+        ? Math.round(Math.min(1, Math.max(0, progress)) * DOTS_PER_GAP)
+        : 0;
 
-        return (
-          <Fragment key={stop.label}>
-            {index > 0 && <HopTrail filled={filled} />}
-            <div
-              className={cn(
-                'flex shrink-0 flex-col items-center',
-                stop.isDestination ? 'w-16' : 'w-14',
-              )}
-            >
-              {/* Fixed height, bottom aligned: the destination pad is larger
-                  than the rest, and letting it grow the column pushed its badge
-                  and label off the row's baseline. Growing upward from a shared
-                  waterline keeps every label on one line and reads as the
-                  bigger pad sitting in the same pond. */}
-              <div className="flex h-11 items-end">
-                <div className="relative">
-                  <Pad stop={stop} />
+  return (
+    // Two rows sharing one set of column widths, rather than one row of stacked
+    // columns. The trail has to know how tall the pads are so it can end on
+    // their centre line, and inside a single column that height is polluted by
+    // the badge and label sitting underneath. Split, the pad row's height is
+    // the pads and nothing else, and the label row lines up because both rows
+    // are built from the same percentages.
+    // The scroller carries the padding the "you are here" marker and the target
+    // pad's glow need: an overflow-x scroller clips vertically too, and both of
+    // those live outside the pad row's own box.
+    <div className={cn('relative', className)}>
+      <div
+        ref={ref}
+        onPointerDown={onPointerDown}
+        className={cn(
+          '-mx-1 -mt-2 select-none overflow-x-auto overscroll-x-contain px-1 pb-0.5 pt-2 [-ms-overflow-style:none] [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+          (edges.start || edges.end) && 'cursor-grab active:cursor-grabbing',
+        )}
+      >
+        <div style={{ minWidth: `${railFloor}px` }}>
+          <div className="flex items-end">
+            {stops.map((stop, index) => (
+              <Fragment key={stop.label}>
+                {index > 0 && <HopTrail filled={filledInto(index)} />}
+                {/* Aspect ratio, not a height: the cell's height follows its
+                    own width, so every pad keeps the artwork's proportions at
+                    any rail width and all five cells stay exactly as tall as
+                    each other. */}
+                <div className="relative aspect-[280/180] shrink-0" style={cell}>
+                  <Pad stop={stop} turn={PAD_TURN[index % PAD_TURN.length]} />
                   {/* You are here. Without it the only marked pad is the
                       target, which a first-time reader takes for their own
                       position and then reads the whole rail one stop out.
                       Placeholder until the frog token is drawn — he belongs on
-                      this pad. */}
-                  {/* Neutral, not amber. Amber already means "earned or worth
-                      earning" everywhere else on this card — flame, covered
-                      trail, the prize at the end — and a marker that borrows
-                      the reward colour reads as a reward. A position is not a
-                      prize, so it gets its own form and a neutral tone. */}
+                      this pad.
+
+                      Neutral, not amber: amber already means "earned or worth
+                      earning" everywhere else on this card, and a marker that
+                      borrows the reward colour reads as a reward. A position is
+                      not a prize. */}
                   {stop.isHere && (
                     <span
                       aria-label="You are here"
@@ -209,48 +391,68 @@ export function LeapRail({
                     />
                   )}
                 </div>
-              </div>
-              {/* Sits below the pad rather than over it. Overlapping covered
-                  the extruded side wall, which is the only thing giving the
-                  artwork its depth — the badge was flattening the pad it
-                  labelled. */}
-              <span
-                className={cn(
-                  'mt-1 grid h-[15px] min-w-[15px] place-items-center rounded-md border px-1.5 text-[9px] font-black leading-none tabular-nums shadow-sm',
-                  stop.isDestination
-                    ? 'border-amber-300/40 bg-amber-500 text-amber-950'
-                    : locked
-                      ? 'border-white/10 bg-black/45 text-white'
-                      : 'border-white/10 bg-black/75 text-white',
-                )}
-              >
-                {stop.isDestination ? (
-                  <Trophy className="h-3 w-3" strokeWidth={2.75} />
-                ) : (
-                  // Optically centred, not geometrically. The line box already
-                  // sits dead centre, but "×1.25" has no descenders, so its ink
-                  // occupies only the upper half of that box and reads high.
-                  // The nudge is on the text alone — the trophy is a symmetric
-                  // glyph and is already where it should be.
-                  <span className="translate-y-[0.5px]">{stop.rate}</span>
-                )}
-              </span>
-              <span
-                className={cn(
-                  'mt-1 text-[9.5px] font-black uppercase tracking-wider tabular-nums',
-                  stop.isDestination
-                    ? 'text-amber-600 dark:text-amber-400'
-                    : locked
-                      ? 'text-muted-foreground/60'
-                      : 'text-foreground',
-                )}
-              >
-                {stop.label}
-              </span>
-            </div>
-          </Fragment>
-        );
-      })}
+              </Fragment>
+            ))}
+          </div>
+
+          <div className="mt-1 flex">
+            {stops.map((stop, index) => {
+              const locked = stop.state === 'locked';
+              return (
+                <Fragment key={stop.label}>
+                  {index > 0 && <span className="flex-1" />}
+                  <span
+                    className="flex shrink-0 flex-col items-center"
+                    style={cell}
+                  >
+                    {/* Below the pad rather than over it. Overlapping covered
+                        the extruded side wall, which is the only thing giving
+                        the artwork its depth — the badge was flattening the pad
+                        it labelled. */}
+                    <span
+                      className={cn(
+                        'grid h-[15px] min-w-[15px] place-items-center rounded-md border px-1.5 text-[9px] font-black leading-none tabular-nums shadow-sm',
+                        stop.isDestination
+                          ? 'border-amber-300/40 bg-amber-500 text-amber-950'
+                          : locked
+                            ? 'border-white/10 bg-black/45 text-white'
+                            : 'border-white/10 bg-black/75 text-white',
+                      )}
+                    >
+                      {stop.isDestination ? (
+                        <Trophy className="h-3 w-3" strokeWidth={2.75} />
+                      ) : (
+                        // Optically centred, not geometrically. The line box
+                        // sits dead centre already, but "×1.25" has no
+                        // descenders, so its ink occupies only the upper half of
+                        // that box and reads high. The nudge is on the text
+                        // alone — the trophy is symmetric and is already where
+                        // it should be.
+                        <span className="translate-y-[0.5px]">{stop.rate}</span>
+                      )}
+                    </span>
+                    <span
+                      className={cn(
+                        'mt-1 text-[9.5px] font-black uppercase tracking-wider tabular-nums',
+                        stop.isDestination
+                          ? 'text-amber-600 dark:text-amber-400'
+                          : locked
+                            ? 'text-muted-foreground/60'
+                            : 'text-foreground',
+                      )}
+                    >
+                      {stop.label}
+                    </span>
+                  </span>
+                </Fragment>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      <EdgeFade side="left" shown={edges.start} />
+      <EdgeFade side="right" shown={edges.end} />
     </div>
   );
 }
