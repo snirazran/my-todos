@@ -1,4 +1,8 @@
 import {
+  DEFAULT_CHECKLIST_TIERS,
+  type ChecklistTier,
+} from '@/lib/checklist';
+import {
   DEFAULT_STREAK_MILESTONES,
   DEFAULT_STREAK_REPEAT,
   DEFAULT_STREAK_TIERS,
@@ -22,6 +26,10 @@ export type FlyEconomyConfig = {
     pebblesPerGift: number;
     giftsPerWeek: number;
     giftItemId: string;
+  };
+  checklist: {
+    /** Length bands and where inside the list each band's flies are pinned. */
+    tiers: ChecklistTier[];
   };
   taskStreak: {
     /** Per-completion rates; each REPLACES the base fly, never stacks with it. */
@@ -81,6 +89,12 @@ export const FLY_ECONOMY_DEFAULTS: FlyEconomyConfig = {
     giftsPerWeek: 1,
     giftItemId: 'gift_box_1',
   },
+  checklist: {
+    tiers: DEFAULT_CHECKLIST_TIERS.map((tier) => ({
+      ...tier,
+      markers: [...tier.markers],
+    })),
+  },
   taskStreak: {
     tiers: [...DEFAULT_STREAK_TIERS],
     milestones: [...DEFAULT_STREAK_MILESTONES],
@@ -135,6 +149,7 @@ export const FLY_ECONOMY_LIMITS: Record<
     pebblesPerGift: { min: 1, max: 500 },
     giftsPerWeek: { min: 0, max: 20 },
   },
+  checklist: {},
   taskStreak: {
     repeatEveryDays: { min: 0, max: 365 },
     repeatFlies: { min: 0, max: 1000 },
@@ -168,6 +183,26 @@ export const FLY_ECONOMY_LIMITS: Record<
     changesPerDay: { min: 1, max: 24 },
   },
 };
+
+function normalizeChecklistTiers(
+  value: unknown,
+  fallback: ChecklistTier[],
+): ChecklistTier[] {
+  if (!Array.isArray(value)) return fallback;
+  const tiers = value
+    .map((entry) => ({
+      minItems: Math.max(1, Math.floor(Number((entry as any)?.minItems))),
+      markers: Array.isArray((entry as any)?.markers)
+        ? (entry as any).markers
+            .map((marker: unknown) => String(marker ?? '').trim())
+            .filter(Boolean)
+            .slice(0, 10)
+        : [],
+    }))
+    .filter((tier) => Number.isFinite(tier.minItems))
+    .sort((a, b) => a.minItems - b.minItems);
+  return tiers.length ? tiers : fallback;
+}
 
 function normalizeTiers(value: unknown, fallback: StreakTier[]): StreakTier[] {
   if (!Array.isArray(value)) return fallback;
@@ -236,7 +271,9 @@ export function mergeFlyEconomyConfig(patch: unknown): FlyEconomyConfig {
 
       Object.entries(defaults).forEach(([key, fallback]) => {
         const value = incoming[key];
-        if (key === 'tiers') {
+        if (key === 'tiers' && group === 'checklist') {
+          merged[key] = normalizeChecklistTiers(value, fallback as ChecklistTier[]);
+        } else if (key === 'tiers') {
           merged[key] = normalizeTiers(value, fallback as StreakTier[]);
         } else if (key === 'milestones') {
           merged[key] = normalizeMilestones(value, fallback as StreakMilestone[]);

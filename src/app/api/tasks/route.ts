@@ -38,6 +38,7 @@ import {
   checklistPayoutForDate,
   normalizeChecklistRewards,
   withChecklistBudget,
+  type ChecklistTier,
   withChecklistDone,
 } from '@/lib/checklist';
 import {
@@ -301,10 +302,11 @@ function taskFlyBreakdown(
   streak: number = 0,
   completed: boolean = true,
   tiers?: readonly StreakTier[],
+  checklistTiers?: readonly ChecklistTier[],
 ): { base: number; checklist: number; streak: number; total: number } {
   const base = completed ? 1 : 0;
   const streakUplift = completed ? streakFlyBonus(streak, tiers) : 0;
-  const checklist = checklistPayoutForDate(task, date).earned;
+  const checklist = checklistPayoutForDate(task, date, checklistTiers).earned;
   return {
     base,
     checklist,
@@ -321,6 +323,7 @@ async function lockChecklistBudget(
   userId: string,
   doc: Pick<TaskDoc, 'id' | 'checklist' | 'checklistBudgetByDate'>,
   date: string,
+  checklistTiers?: readonly ChecklistTier[],
 ) {
   const steps = (doc.checklist ?? []).length;
   if (!steps || typeof doc.checklistBudgetByDate?.[date] === 'number') return;
@@ -331,7 +334,7 @@ async function lockChecklistBudget(
         checklistBudgetByDate: withChecklistBudget(
           doc.checklistBudgetByDate,
           date,
-          checklistBonus(steps),
+          checklistBonus(steps, checklistTiers),
         ),
       },
     },
@@ -2161,11 +2164,19 @@ export async function PUT(req: NextRequest) {
     const occurrenceDate = doc.type === 'weekly' ? viewDate : doc.date;
     if (items?.length && occurrenceDate && doc.type !== 'backlog') {
       const economyTz = await resolveEconomyTimezone(uid, tz);
-      const value = taskFlyBreakdown(nextDoc, occurrenceDate, 0, false);
+      const economyConfig = await loadFlyEconomyConfig();
+      const value = taskFlyBreakdown(
+        nextDoc,
+        occurrenceDate,
+        0,
+        false,
+        economyConfig.taskStreak.tiers,
+        economyConfig.checklist.tiers,
+      );
       const payable = isPayableOccurrenceDate(
         occurrenceDate,
         getZonedToday(economyTz),
-        (await loadFlyEconomyConfig()).taskIncome.backdateGraceHours,
+        economyConfig.taskIncome.backdateGraceHours,
       );
       if (value.total > 0) {
         const res = await awardFlyForTask(
@@ -2368,10 +2379,17 @@ export async function PUT(req: NextRequest) {
       taskId,
       economyTz,
       payable,
-      taskFlyBreakdown(doc, date, streakNow, true, economyConfig.taskStreak.tiers),
+      taskFlyBreakdown(
+        doc,
+        date,
+        streakNow,
+        true,
+        economyConfig.taskStreak.tiers,
+        economyConfig.checklist.tiers,
+      ),
       { topUp: true, countTask: isTodayCompletion, occurrenceDate: date, payable },
     );
-    await lockChecklistBudget(uid, doc, date);
+    await lockChecklistBudget(uid, doc, date, economyConfig.checklist.tiers);
     flyStatus = res.flyStatus;
     hungerStatus = res.hungerStatus;
     dailyTasksCount = res.dailyTasksCount;
@@ -2700,6 +2718,7 @@ async function handleDailyGet(req: NextRequest, userId: string, tz: string) {
         streak: projectedStreak,
         budgetLock: t.checklistBudgetByDate?.[date],
         tiers: economyConfig.taskStreak.tiers,
+        checklistTiers: economyConfig.checklist.tiers,
       }),
       frogodoroSettings: t.frogodoroSettings,
       frogodoroSession: sessionForRow(t, date),

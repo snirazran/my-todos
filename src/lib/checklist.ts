@@ -14,52 +14,110 @@ type ChecklistCarrier = {
 
 export const CHECKLIST_MAX_ITEMS = 20;
 
+export type ChecklistTier = {
+  /** Checklist length this tier starts at. */
+  minItems: number;
+  /**
+   * Where the bonus is delivered inside the list. Each marker pays one fly the
+   * moment it is passed. `final` is the last item, `50%` is halfway through,
+   * and a bare number is that item's position.
+   */
+  markers: string[];
+};
+
 /**
- * Bonus flies a checklist pays on TOP of the task's own fly. The first two
- * steps pay nothing, so a short checklist never takes the completion fly away
- * from the task. Deliberately sub-linear beyond that: a checklist is always
- * worth less per box than the same number of separate tasks, so nesting deeper
- * never pays better.
+ * Payout starts at the 3rd item and is sub-linear in length: a 20-item
+ * checklist must never pay 20 flies, or every task becomes a checklist and the
+ * daily cap turns into the only thing holding the economy up. The bonus is
+ * delivered at pinned markers inside the list so the goal-gradient pull works
+ * DURING the task, and partial credit is kept — pass a marker, keep the fly
+ * even if the list is never finished.
  */
-export function checklistBonus(steps: number): number {
-  if (steps <= 2) return 0;
-  if (steps <= 6) return 1;
-  return 2;
+export const DEFAULT_CHECKLIST_TIERS: readonly ChecklistTier[] = [
+  { minItems: 1, markers: [] },
+  { minItems: 3, markers: ['final'] },
+  { minItems: 5, markers: ['3', 'final'] },
+  { minItems: 8, markers: ['33%', '67%', 'final'] },
+  { minItems: 12, markers: ['25%', '50%', '75%', 'final'] },
+];
+
+function tierFor(
+  steps: number,
+  tiers: readonly ChecklistTier[] = DEFAULT_CHECKLIST_TIERS,
+): ChecklistTier | null {
+  let match: ChecklistTier | null = null;
+  for (const tier of [...tiers].sort((a, b) => a.minItems - b.minItems)) {
+    if (steps >= tier.minItems) match = tier;
+  }
+  return match;
 }
 
-/** Evenly spread `count` marker slots over `steps`, never on the last step. */
-function defaultMarkerIndexes(count: number, steps: number): number[] {
-  const out: number[] = [];
-  for (let i = 1; i <= count; i++) {
-    let idx = Math.max(
-      0,
-      Math.min(steps - 2, Math.round((i * steps) / (count + 1)) - 1),
-    );
-    while (out.includes(idx) && idx < steps - 2) idx++;
-    while (out.includes(idx) && idx > 0) idx--;
-    if (!out.includes(idx)) out.push(idx);
+/** Resolve one marker spec to a 0-based item index, or null if it can't be. */
+function markerIndex(marker: string, steps: number): number | null {
+  const raw = String(marker ?? '').trim().toLowerCase();
+  if (!raw || steps <= 0) return null;
+  if (raw === 'final' || raw === 'last') return steps - 1;
+  if (raw.endsWith('%')) {
+    const percent = Number(raw.slice(0, -1));
+    if (!Number.isFinite(percent)) return null;
+    const index = Math.round((steps * percent) / 100) - 1;
+    return Math.min(steps - 1, Math.max(0, index));
   }
-  return out.sort((a, b) => a - b);
+  const position = Number(raw);
+  if (!Number.isFinite(position)) return null;
+  return Math.min(steps - 1, Math.max(0, Math.round(position) - 1));
+}
+
+/** The item positions that pay, for a list of this length. */
+export function checklistMarkerIndexes(
+  steps: number,
+  tiers: readonly ChecklistTier[] = DEFAULT_CHECKLIST_TIERS,
+): number[] {
+  const tier = tierFor(steps, tiers);
+  if (!tier || steps === 0) return [];
+  const indexes = new Set<number>();
+  for (const marker of tier.markers) {
+    const index = markerIndex(marker, steps);
+    if (index !== null) indexes.add(index);
+  }
+  return Array.from(indexes).sort((a, b) => a - b);
+}
+
+/**
+ * Bonus flies a checklist pays on TOP of the task's own fly — one per marker,
+ * so the table's "bonus flies" column is never able to disagree with where the
+ * flies actually land.
+ */
+export function checklistBonus(
+  steps: number,
+  tiers: readonly ChecklistTier[] = DEFAULT_CHECKLIST_TIERS,
+): number {
+  return checklistMarkerIndexes(steps, tiers).length;
 }
 
 /**
  * The same items with their reward markers set. Positions are derived purely
- * from the step count — evenly spread, with the last always on the final step
- * so the budget can never be stacked onto one early checkbox. A checklist too
- * short to earn a bonus carries no markers at all. Because nothing is
- * remembered per item, reordering steps leaves the flies where they are.
+ * from the step count, so nothing is remembered per item and reordering steps
+ * leaves the flies where they are. A checklist too short to earn a bonus
+ * carries no markers at all.
  */
 export function normalizeChecklistRewards(
   items: ChecklistItem[],
-  budget: number = checklistBonus(items.length),
+  budgetOrTiers?: number | readonly ChecklistTier[],
+  tiers: readonly ChecklistTier[] = DEFAULT_CHECKLIST_TIERS,
 ): ChecklistItem[] {
   const steps = items.length;
   if (steps === 0) return items;
-  const free = Math.max(0, Math.min(budget - 1, steps - 1));
-  const marked =
-    budget > 0
-      ? new Set([...defaultMarkerIndexes(free, steps), steps - 1])
-      : new Set<number>();
+  const table = Array.isArray(budgetOrTiers)
+    ? (budgetOrTiers as readonly ChecklistTier[])
+    : tiers;
+  const budget =
+    typeof budgetOrTiers === 'number'
+      ? budgetOrTiers
+      : checklistBonus(steps, table);
+  const marked = new Set(
+    budget > 0 ? checklistMarkerIndexes(steps, table).slice(0, budget) : [],
+  );
   return items.map((it, i) =>
     !!it.reward === marked.has(i) ? it : { ...it, reward: marked.has(i) },
   );
@@ -86,12 +144,13 @@ export type ChecklistPayout = {
  */
 export function checklistPayout(
   items: ChecklistItem[],
-  opts: { budgetLock?: number | null } = {},
+  opts: { budgetLock?: number | null; tiers?: readonly ChecklistTier[] } = {},
 ): ChecklistPayout {
   const { budgetLock } = opts;
   const steps = items.length;
-  const full = checklistBonus(steps);
-  const normalized = normalizeChecklistRewards(items, full);
+  const tiers = opts.tiers ?? DEFAULT_CHECKLIST_TIERS;
+  const full = checklistBonus(steps, tiers);
+  const normalized = normalizeChecklistRewards(items, full, tiers);
   const budget =
     typeof budgetLock === 'number' && budgetLock >= 0
       ? Math.min(full, budgetLock)
@@ -154,9 +213,11 @@ export function checklistDoneIdsForDate(
 export function checklistPayoutForDate(
   task: ChecklistCarrier & { checklistBudgetByDate?: Record<string, number> },
   date: string,
+  tiers?: readonly ChecklistTier[],
 ): ChecklistPayout {
   return checklistPayout(checklistForDate(task, date), {
     budgetLock: task.checklistBudgetByDate?.[date],
+    tiers,
   });
 }
 

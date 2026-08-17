@@ -6,6 +6,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Flame,
+  ListChecks,
   Loader2,
   Plus,
   Repeat,
@@ -26,9 +27,14 @@ import {
   FLY_ECONOMY_DEFAULTS,
   type FlyEconomyConfig,
 } from '@/lib/economy/defaults';
+import {
+  checklistMarkerIndexes,
+  type ChecklistTier,
+} from '@/lib/checklist';
 
-type View = 'home' | 'trade' | 'streak';
+type View = 'home' | 'trade' | 'streak' | 'checklist';
 type TaskStreakConfig = FlyEconomyConfig['taskStreak'];
+type ChecklistConfig = FlyEconomyConfig['checklist'];
 
 const inputClass =
   'h-9 w-full rounded-lg border border-border/60 bg-background px-2.5 text-sm font-medium text-foreground outline-none focus:border-primary';
@@ -154,6 +160,11 @@ export function AdminModifiersManager() {
       prev ? { ...prev, taskStreak: { ...prev.taskStreak, ...next } } : prev,
     );
 
+  const patchChecklist = (next: Partial<ChecklistConfig>) =>
+    setEconomy((prev) =>
+      prev ? { ...prev, checklist: { ...prev.checklist, ...next } } : prev,
+    );
+
   const saveStreak = async () => {
     if (!economy) return;
     setSaving(true);
@@ -241,6 +252,8 @@ export function AdminModifiersManager() {
                 <Repeat className="h-7 w-7" />
               ) : view === 'streak' ? (
                 <Flame className="h-7 w-7" />
+              ) : view === 'checklist' ? (
+                <ListChecks className="h-7 w-7" />
               ) : (
                 <Sliders className="h-7 w-7" />
               )}
@@ -251,21 +264,25 @@ export function AdminModifiersManager() {
                   ? 'Trade modifiers'
                   : view === 'streak'
                     ? 'Task streaks'
-                    : 'Modifiers'}
+                    : view === 'checklist'
+                      ? 'Checklist rewards'
+                      : 'Modifiers'}
               </h1>
               <p className="text-sm font-medium text-muted-foreground">
                 {view === 'trade'
                   ? 'Recipe ratios, fuel, aim prices and the draw rules behind every trade-up.'
                   : view === 'streak'
                     ? 'The per-completion rate, the one-time milestones and the mercy that keeps a long habit alive.'
-                    : 'The tunable rules behind the economy loops.'}
+                    : view === 'checklist'
+                      ? 'How much a checklist pays for its length, and where inside the list the flies are pinned.'
+                      : 'The tunable rules behind the economy loops.'}
               </p>
             </div>
           </div>
           {view !== 'home' && (
             <button
-              onClick={view === 'streak' ? saveStreak : save}
-              disabled={saving || (view === 'streak' ? !economy : !config)}
+              onClick={view === 'trade' ? save : saveStreak}
+              disabled={saving || (view === 'trade' ? !config : !economy)}
               className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-black text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
             >
               {saving ? (
@@ -321,9 +338,26 @@ export function AdminModifiersManager() {
               }
               onClick={() => setView('streak')}
             />
+            <CategoryCard
+              icon={<ListChecks className="h-5 w-5" />}
+              accent="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+              title="Task checklist rewards"
+              description="What a checklist pays for its length, and the marker positions inside the list where those flies are handed over."
+              stat={
+                economy
+                  ? `${economy.checklist.tiers.length} length bands`
+                  : 'Unavailable'
+              }
+              onClick={() => setView('checklist')}
+            />
           </div>
         ) : view === 'streak' ? (
           <StreakEditor streak={streak} patch={patchStreak} />
+        ) : view === 'checklist' ? (
+          <ChecklistRewardsEditor
+            checklist={economy?.checklist ?? null}
+            patch={patchChecklist}
+          />
         ) : (
           <div className="space-y-4">
             <section className="rounded-2xl border border-border/40 bg-card/60 p-5">
@@ -915,6 +949,196 @@ function StreakEditor({
             value={streak.freeSlipEveryDays}
             onChange={(freeSlipEveryDays) => patch({ freeSlipEveryDays })}
           />
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function ChecklistRewardsEditor({
+  checklist,
+  patch,
+}: {
+  checklist: ChecklistConfig | null;
+  patch: (next: Partial<ChecklistConfig>) => void;
+}) {
+  if (!checklist) {
+    return (
+      <div className="rounded-2xl bg-red-500/10 p-4 text-sm font-bold text-red-600 dark:text-red-400">
+        Could not load the fly economy config.
+      </div>
+    );
+  }
+
+  const tiers = checklist.tiers;
+  const patchTier = (index: number, next: Partial<ChecklistTier>) =>
+    patch({
+      tiers: tiers.map((tier, i) => (i === index ? { ...tier, ...next } : tier)),
+    });
+
+  const bandLabel = (index: number) => {
+    const from = tiers[index].minItems;
+    const next = tiers[index + 1]?.minItems;
+    if (!next) return `${from}+ items`;
+    if (next - from === 1) return `${from} item${from === 1 ? '' : 's'}`;
+    return `${from}–${next - 1} items`;
+  };
+
+  const previewLengths = [2, 3, 5, 7, 8, 12, 20];
+
+  return (
+    <div className="space-y-4">
+      <section className="rounded-2xl border border-border/40 bg-card/60 p-5">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-lg font-black text-foreground">Length bands</p>
+            <p className="text-sm text-muted-foreground">
+              Each marker pays one fly the moment it is passed, and partial
+              credit is kept — pass a marker, keep the fly even if the list is
+              never finished. Write a marker as <code>final</code>, a percentage
+              like <code>50%</code>, or a plain item number like <code>3</code>.
+              Payout is deliberately sub-linear: a 20-item checklist must never
+              pay 20 flies, or every task becomes a checklist.
+            </p>
+          </div>
+          <button
+            onClick={() =>
+              patch({
+                tiers: FLY_ECONOMY_DEFAULTS.checklist.tiers.map((tier) => ({
+                  ...tier,
+                  markers: [...tier.markers],
+                })),
+              })
+            }
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-muted px-2.5 py-1.5 text-xs font-black text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            Defaults
+          </button>
+        </div>
+
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full min-w-[620px] border-separate border-spacing-y-2">
+            <thead>
+              <tr className="text-left text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+                <th className="px-2">Band</th>
+                <th className="px-2">From items</th>
+                <th className="px-2">Marker positions</th>
+                <th className="px-2 text-right">Bonus flies</th>
+                <th className="px-2" />
+              </tr>
+            </thead>
+            <tbody>
+              {tiers.map((tier, index) => (
+                <tr key={`${tier.minItems}-${index}`} className="bg-muted/40">
+                  <td className="rounded-l-xl px-3 py-2 text-xs font-black uppercase tracking-wider text-foreground">
+                    {bandLabel(index)}
+                  </td>
+                  <td className="px-2 py-2">
+                    <input
+                      type="number"
+                      min={1}
+                      value={tier.minItems}
+                      onChange={(event) =>
+                        patchTier(index, {
+                          minItems: Number(event.target.value),
+                        })
+                      }
+                      className={cn(inputClass, 'max-w-[90px]')}
+                    />
+                  </td>
+                  <td className="px-2 py-2">
+                    <input
+                      value={tier.markers.join(', ')}
+                      placeholder="none"
+                      onChange={(event) =>
+                        patchTier(index, {
+                          markers: event.target.value
+                            .split(',')
+                            .map((marker) => marker.trim())
+                            .filter(Boolean),
+                        })
+                      }
+                      className={cn(inputClass, 'min-w-[220px]')}
+                    />
+                  </td>
+                  <td className="px-2 py-2 text-right text-sm font-black tabular-nums text-foreground">
+                    +{tier.markers.length}
+                  </td>
+                  <td className="rounded-r-xl px-2 py-2 text-right">
+                    <button
+                      onClick={() =>
+                        patch({ tiers: tiers.filter((_, i) => i !== index) })
+                      }
+                      disabled={tiers.length <= 1}
+                      className="rounded-lg p-2 text-muted-foreground transition-colors hover:text-red-500 disabled:opacity-30"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <button
+          onClick={() =>
+            patch({
+              tiers: [
+                ...tiers,
+                {
+                  minItems: (tiers[tiers.length - 1]?.minItems ?? 0) + 4,
+                  markers: ['50%', 'final'],
+                },
+              ],
+            })
+          }
+          className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-muted px-3 py-2 text-xs font-black text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          Add band
+        </button>
+      </section>
+
+      <section className="rounded-2xl border border-border/40 bg-card/60 p-5">
+        <p className="text-lg font-black text-foreground">Preview</p>
+        <p className="mb-4 text-sm text-muted-foreground">
+          Which boxes actually pay, at a few list lengths. The max task total
+          adds the task&apos;s own fly on top.
+        </p>
+        <div className="space-y-2">
+          {previewLengths.map((length) => {
+            const indexes = checklistMarkerIndexes(length, tiers);
+            return (
+              <div
+                key={length}
+                className="flex flex-wrap items-center gap-3 rounded-xl bg-muted/40 px-3 py-2"
+              >
+                <span className="w-20 shrink-0 text-xs font-black uppercase tracking-wider text-muted-foreground">
+                  {length} items
+                </span>
+                <span className="flex flex-wrap gap-1">
+                  {Array.from({ length }, (_, i) => (
+                    <span
+                      key={i}
+                      className={cn(
+                        'grid h-6 w-6 place-items-center rounded-md text-[10px] font-black tabular-nums',
+                        indexes.includes(i)
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-background text-muted-foreground',
+                      )}
+                    >
+                      {i + 1}
+                    </span>
+                  ))}
+                </span>
+                <span className="ml-auto text-xs font-black tabular-nums text-foreground">
+                  +{indexes.length} flies · max task total {1 + indexes.length}
+                </span>
+              </div>
+            );
+          })}
         </div>
       </section>
     </div>

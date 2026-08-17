@@ -1,4 +1,8 @@
-import { checklistPayout, type ChecklistItem } from './checklist';
+import {
+  checklistPayout,
+  type ChecklistItem,
+  type ChecklistTier,
+} from './checklist';
 
 export type StreakTier = {
   /** Streak length this rate starts at. */
@@ -138,10 +142,14 @@ export function taskFlyWorthNow(opts: {
   streak?: number;
   budgetLock?: number | null;
   tiers?: readonly StreakTier[];
+  checklistTiers?: readonly ChecklistTier[];
 }): number {
   const items = opts.checklist ?? [];
   const earned = items.length
-    ? checklistPayout(items, { budgetLock: opts.budgetLock }).earned
+    ? checklistPayout(items, {
+        budgetLock: opts.budgetLock,
+        tiers: opts.checklistTiers,
+      }).earned
     : 0;
   return streakFlyBase(opts.streak ?? 0, opts.tiers) + earned;
 }
