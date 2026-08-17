@@ -288,7 +288,10 @@ export default function TaskDetailSheet({
   };
 
   const doneCount = checklist.filter((it) => it.done).length;
-  const taskFlies = taskFlyWorthNow({ checklist });
+  const taskFlies = taskFlyWorthNow({
+    checklist,
+    streak: (displayTask.streak ?? 0) + (isCompleted ? 0 : 1),
+  });
   // For weekly tasks use their stored weekday; otherwise anchor to the date the
   // task sits on (the column being edited), falling back to today.
   const repeatDay =

@@ -314,11 +314,13 @@ export function AdminEconomyManager() {
                 }
               />
               <NumberField
-                label="Streak payouts"
+                label="Milestone payouts"
                 suffix="per day"
-                hint="How many tasks a day may collect the streak uplift."
-                value={config.streakMilestones.dailyCap}
-                onChange={(dailyCap) => patch('streakMilestones', { dailyCap })}
+                hint="Across all tasks; extras queue to tomorrow. Edit the milestones themselves in Modifiers → Task streak."
+                value={config.taskStreak.milestonesPerDay}
+                onChange={(milestonesPerDay) =>
+                  patch('taskStreak', { milestonesPerDay })
+                }
               />
             </Group>
 

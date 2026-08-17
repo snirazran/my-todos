@@ -44,6 +44,8 @@ export interface Task {
   completedDates?: string[];
   /** Consecutive-completion streak for a repeating task, as of today. */
   streak?: number;
+  /** Flies ticking this row would pay right now, streak rate included. */
+  flyWorth?: number;
   frogodoroSettings?: {
     focusDuration: number;
     breakDuration: number;
@@ -79,6 +81,15 @@ export type FlyStatus = {
   payingCompletionsLeft?: number;
   plusLimit?: number;
   blockedReason?: 'backdated' | 'completions' | 'cap' | 'breaker';
+};
+
+export type MilestonePayout = {
+  taskId: string;
+  taskText: string;
+  day: number;
+  flies: number;
+  giftItemId?: string;
+  shields: number;
 };
 
 export type JarStatus = {
@@ -432,6 +443,32 @@ export function useTaskData({
                   );
                 }
               }
+            }
+
+            const milestone = json.milestone as MilestonePayout | undefined;
+            if (milestone) {
+              const extras = [
+                milestone.giftItemId ? 'a gift' : null,
+                milestone.shields ? 'a Lily Pad' : null,
+              ].filter(Boolean);
+              showNotification(
+                <div className="flex w-full items-center gap-3">
+                  <div className="grid h-12 w-12 shrink-0 place-items-center">
+                    <Fly size={44} y={-2} />
+                  </div>
+                  <div className="flex min-w-0 flex-1 flex-col leading-tight">
+                    <span className="text-[14px] font-black text-foreground">
+                      {milestone.day}-day streak — +{milestone.flies} flies
+                    </span>
+                    <span className="mt-0.5 truncate text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                      {milestone.taskText}
+                      {extras.length ? ` · ${extras.join(' + ')}` : ''}
+                    </span>
+                  </div>
+                </div>,
+                undefined,
+                { durationMs: 7000 },
+              );
             }
 
             const jar = json.jar as JarStatus | undefined;

@@ -9,11 +9,14 @@ import { logFlyGrant, type FlySource } from './ledger';
  */
 const ALREADY_LEDGERED = new Set([
   'task',
+  'task_streak_milestone',
   'buddy_task',
   'rewarded_ad',
   'friend_activity',
   'friend_reward_double',
   'invite_tier',
+  'focus_session',
+  'deep_focus',
 ]);
 
 /**
@@ -23,8 +26,6 @@ const ALREADY_LEDGERED = new Set([
  * of tuning data see the whole faucet, not just the parts with occurrences.
  */
 const SOURCE_MAP: Record<string, FlySource> = {
-  focus_session: 'focus',
-  deep_focus: 'deep_focus',
   quest_objective: 'quest',
   quest_reward: 'quest',
   quest_streak: 'quest',
@@ -54,7 +55,10 @@ export async function bridgeFlyEarnedToLedger(input: {
   properties?: Record<string, unknown>;
   occurredAt?: Date;
 }) {
-  const rawSource = input.properties?.source;
+  const rawSource =
+    typeof input.properties?.source === 'string'
+      ? input.properties.source
+      : 'other';
   const source = ledgerSourceFor(rawSource);
   if (!source) return;
 
@@ -65,10 +69,10 @@ export async function bridgeFlyEarnedToLedger(input: {
   await logFlyGrant({
     userId: input.userId,
     source,
-    occurrenceKey: `rollup:${String(rawSource ?? 'other')}:${dayKey}`,
+    occurrenceKey: `rollup:${rawSource}:${dayKey}`,
     dayKey,
     amount,
-    meta: { rollup: true, reported: String(rawSource ?? 'other') },
+    meta: { rollup: true, reported: rawSource },
   });
 }
 
@@ -77,7 +81,10 @@ export async function bridgeFlySpentToLedger(input: {
   userId: string;
   properties?: Record<string, unknown>;
 }) {
-  const rawSource = String(input.properties?.source ?? 'spend');
+  const rawSource =
+    typeof input.properties?.source === 'string'
+      ? input.properties.source
+      : 'spend';
   const amount = Number(
     input.properties?.fly_amount ?? input.properties?.flies_spent,
   );

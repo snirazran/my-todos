@@ -373,10 +373,12 @@ export default function TaskCard({
     isToday && isRepeating
       ? (task.streak ?? 0) + (task.completed ? 0 : 1)
       : 0;
-  const flyValue = taskFlyWorthNow({
-    checklist: task.checklist,
-    streak: projectedStreak,
-  });
+  const flyValue =
+    task.flyWorth ??
+    taskFlyWorthNow({
+      checklist: task.checklist,
+      streak: projectedStreak,
+    });
   const chipClass = compact
     ? 'inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-bold tracking-normal uppercase transition-colors border shadow-sm'
     : 'inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[9px] font-bold tracking-wider uppercase transition-colors border shadow-sm';

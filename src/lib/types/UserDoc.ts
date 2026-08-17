@@ -17,8 +17,6 @@ export type DailyFlyProgress = {
   limitNotified?: boolean;
   /** Completions that have drawn from the paying-completions allowance today. */
   paidCompletions?: number;
-  /** Tasks that have drawn today's streak-uplift payouts. */
-  streakTaskIds?: string[];
   /** Tasks whose completion earned pebbles instead of flies. */
   jarTaskIds?: string[];
 };
@@ -159,6 +157,15 @@ export type UserDoc = {
     windowStartedAt?: Date | string;
     changesInWindow?: number;
   };
+  /** Streak milestones waiting for a day with a payout left. */
+  taskStreakQueue?: {
+    key: string;
+    groupKey: string;
+    taskId: string;
+    taskText: string;
+    day: number;
+    queuedAt: Date | string;
+  }[];
   dailyQuestReroll?: {
     date: string;
     count: number;

@@ -19,6 +19,23 @@ export function isWithinStreakCreditWindow(date: string, today: string) {
   return date >= addDaysYMD(today, -STREAK_CREDIT_WINDOW_DAYS);
 }
 
+function daysApart(from: string, to: string): number {
+  return Math.abs(
+    Math.round(
+      (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) /
+        86_400_000,
+    ),
+  );
+}
+
+/**
+ * A repeating task forgives one missed day in every window of this many days,
+ * automatically and with no shield spent. A single missed Tuesday should never
+ * cost a 60-day habit, and shielding dozens of habits one by one would be both
+ * farmable and exhausting to manage.
+ */
+export const FREE_SLIP_EVERY_DAYS = 30;
+
 export type GroupStreakOptions = {
   protectedDays?: ReadonlySet<string>;
   /**
@@ -27,6 +44,8 @@ export type GroupStreakOptions = {
    * streak as of a past date silently forgives that date's miss.
    */
   todayIsOver?: boolean;
+  /** Overrides the built-in free-slip window; 0 disables the mercy entirely. */
+  freeSlipEveryDays?: number;
 };
 
 /**
@@ -63,6 +82,8 @@ export function computeGroupStreak(
     const rs = repeatStartForDoc(s, tz);
     if (rs && (!earliestStart || rs < earliestStart)) earliestStart = rs;
   }
+  const slipWindow = options.freeSlipEveryDays ?? FREE_SLIP_EVERY_DAYS;
+  let lastSlip: string | null = null;
   let streak = 0;
   let skipRun = 0;
   let d = today;
@@ -79,6 +100,14 @@ export function computeGroupStreak(
       } else if (suppressed.has(d)) {
         skipRun++;
         if (skipRun > MAX_CONSECUTIVE_SKIPS) break;
+      } else if (
+        slipWindow > 0 &&
+        (!lastSlip || daysApart(d, lastSlip) >= slipWindow)
+      ) {
+        // The free slip: bridges the day without crediting it, so a miss costs
+        // the streak a day of growth but never the run itself.
+        lastSlip = d;
+        skipRun = 0;
       } else {
         break;
       }
@@ -126,6 +155,8 @@ export async function findTaskStreaksAtRisk(args: {
   timezone: string;
   protectedDays: ReadonlySet<string>;
   minStreak: number;
+  /** Defaults to the built-in window; pass the configured one where known. */
+  freeSlipEveryDays?: number;
 }): Promise<TaskStreakAtRisk[]> {
   const { userId, missedDayKey, timezone, protectedDays, minStreak } = args;
   if (protectedDays.has(missedDayKey)) return [];
@@ -153,6 +184,15 @@ export async function findTaskStreaksAtRisk(args: {
       todayIsOver: true,
     });
     if (count < minStreak) continue;
+
+    // The free slip may already cover this miss. Offering a shield for a day
+    // the task forgives on its own would be selling something free.
+    const survives = computeGroupStreak(sibs, missedDayKey, timezone, {
+      protectedDays,
+      todayIsOver: true,
+      freeSlipEveryDays: args.freeSlipEveryDays,
+    });
+    if (survives >= count) continue;
 
     atRisk.push({
       taskId: sibs[0].id,

@@ -40,7 +40,11 @@ import {
   withChecklistBudget,
   withChecklistDone,
 } from '@/lib/checklist';
-import { streakFlyBonus } from '@/lib/flyValue';
+import {
+  streakFlyBonus,
+  taskFlyWorthNow,
+  type StreakTier,
+} from '@/lib/flyValue';
 import {
   FLY_ECONOMY_DEFAULTS,
   loadFlyEconomyConfig,
@@ -52,6 +56,12 @@ import {
   resolveEconomyTimezone,
 } from '@/lib/economy/guards';
 import { accrueOverflowPebbles } from '@/lib/economy/overflowJar';
+import {
+  creditTaskStreakMilestones,
+  drainTaskStreakQueue,
+  streakGroupKey,
+  type MilestonePayout,
+} from '@/lib/economy/taskStreakMilestones';
 import {
   dowFromYMD,
   domFromYMD,
@@ -170,7 +180,11 @@ async function streakMapForWeeklyDocs(
   const map = new Map<string, number>();
   if (weeklyDocs.length === 0) return map;
 
-  const protectedDays = await loadProtectedDays(uid);
+  const [protectedDays, economyConfig] = await Promise.all([
+    loadProtectedDays(uid),
+    loadFlyEconomyConfig(),
+  ]);
+  const freeSlipEveryDays = economyConfig.taskStreak.freeSlipEveryDays;
 
   const groupIds = Array.from(
     new Set(
@@ -214,7 +228,10 @@ async function streakMapForWeeklyDocs(
       d.repeatGroupId && byGroup.has(d.repeatGroupId)
         ? byGroup.get(d.repeatGroupId)!
         : [d];
-    map.set(d.id, computeGroupStreak(sibs, today, tz, { protectedDays }));
+    map.set(
+      d.id,
+      computeGroupStreak(sibs, today, tz, { protectedDays, freeSlipEveryDays }),
+    );
   }
   return map;
 }
@@ -241,7 +258,6 @@ const initDailyFly = (date: string): DailyFlyProgress => ({
   taskHunger: {},
   limitNotified: false,
   paidCompletions: 0,
-  streakTaskIds: [],
   jarTaskIds: [],
 });
 
@@ -261,7 +277,6 @@ function normalizeDailyFly(
         flyDaily.paidCompletions ??
           Object.values(flyDaily.taskFlies ?? {}).filter((n) => n > 0).length,
       ),
-      streakTaskIds: flyDaily.streakTaskIds ?? [],
       jarTaskIds: flyDaily.jarTaskIds ?? [],
     };
   }
@@ -285,9 +300,10 @@ function taskFlyBreakdown(
   date: string,
   streak: number = 0,
   completed: boolean = true,
+  tiers?: readonly StreakTier[],
 ): { base: number; checklist: number; streak: number; total: number } {
   const base = completed ? 1 : 0;
-  const streakUplift = completed ? streakFlyBonus(streak) : 0;
+  const streakUplift = completed ? streakFlyBonus(streak, tiers) : 0;
   const checklist = checklistPayoutForDate(task, date).earned;
   return {
     base,
@@ -295,15 +311,6 @@ function taskFlyBreakdown(
     streak: streakUplift,
     total: base + checklist + streakUplift,
   };
-}
-
-function taskFlyValue(
-  task: FlyValueTask,
-  date: string,
-  streak: number = 0,
-  completed: boolean = true,
-): number {
-  return taskFlyBreakdown(task, date, streak, completed).total;
 }
 
 /**
@@ -550,11 +557,10 @@ async function awardFlyForTask(
   const completionsAllowance = config.taskIncome.payingCompletionsPerDay;
   const completionsExhausted =
     isNewPayingCompletion && (daily.paidCompletions ?? 0) >= completionsAllowance;
-  const streakTaskIds = daily.streakTaskIds ?? [];
-  const streakAllowed =
-    streakTaskIds.includes(taskId) ||
-    streakTaskIds.length < config.streakMilestones.dailyCap;
-  const streakPaid = streakAllowed ? Math.max(0, value.streak) : 0;
+  // The per-completion uplift always applies — it replaces the base fly and
+  // stops climbing at the top tier, so it needs no cap of its own beyond the
+  // day's task-income budget. Only MILESTONES are rationed (one a day).
+  const streakPaid = Math.max(0, value.streak);
 
   const desired =
     payable && !completionsExhausted
@@ -672,7 +678,6 @@ async function awardFlyForTask(
   if (grant > 0) setFields['wardrobe.flies'] = nextBalance;
 
   const startedPayingCompletion = isNewPayingCompletion && grant > 0;
-  const paidStreak = startedPayingCompletion && streakPaid > 0;
   const goesToJar =
     payable &&
     countTowardDaily &&
@@ -699,9 +704,6 @@ async function awardFlyForTask(
     limitNotified: limitNotified || hitLimit,
     paidCompletions:
       (daily.paidCompletions ?? 0) + (startedPayingCompletion ? 1 : 0),
-    streakTaskIds: paidStreak
-      ? Array.from(new Set([...streakTaskIds, taskId]))
-      : streakTaskIds,
     jarTaskIds: goesToJar
       ? Array.from(new Set([...(daily.jarTaskIds ?? []), taskId]))
       : (daily.jarTaskIds ?? []),
@@ -877,7 +879,6 @@ async function unawardFlyForTask(
         0,
         (daily.paidCompletions ?? 0) - (granted > 0 ? 1 : 0),
       ),
-      streakTaskIds: (daily.streakTaskIds ?? []).filter((id) => id !== taskId),
       jarTaskIds: (daily.jarTaskIds ?? []).filter((id) => id !== taskId),
     };
     setFields['wardrobe.flies'] = nextBalance;
@@ -2332,6 +2333,8 @@ export async function PUT(req: NextRequest) {
   let awarded = false;
   let granted = 0;
   let jar: JarStatus | undefined;
+  let milestone: MilestonePayout | undefined;
+  let milestonesQueued = 0;
   const isTodayCompletion = date === getZonedToday(tz);
   // Fly accounting runs on the zone the server has agreed to, not on whatever
   // the request happens to claim, so a timezone flip can't reopen the day.
@@ -2365,7 +2368,7 @@ export async function PUT(req: NextRequest) {
       taskId,
       economyTz,
       payable,
-      taskFlyBreakdown(doc, date, streakNow, true),
+      taskFlyBreakdown(doc, date, streakNow, true, economyConfig.taskStreak.tiers),
       { topUp: true, countTask: isTodayCompletion, occurrenceDate: date, payable },
     );
     await lockChecklistBudget(uid, doc, date);
@@ -2416,6 +2419,23 @@ export async function PUT(req: NextRequest) {
       });
     }
   }
+  // Milestones are their own event: one-time per task, one payout a day across
+  // all of them, and outside the day's task-income budget.
+  if (completed && !alreadyCompletedForDate && freshWeekly && payable) {
+    const result = await creditTaskStreakMilestones({
+      userId: uid,
+      groupKey: streakGroupKey(freshWeekly),
+      taskId: freshWeekly.id,
+      taskText: freshWeekly.text,
+      streak: streakNow,
+      dayKey: getZonedToday(economyTz),
+    }).catch((error) => {
+      console.error('Streak milestone failed:', error);
+      return null;
+    });
+    milestone = result?.paid ?? undefined;
+    milestonesQueued = result?.queued ?? 0;
+  }
   void syncGamification(uid, tz);
   await notifyTaskChanged(uid, {
     eventKind: completed ? 'task-completed' : 'task-uncompleted',
@@ -2452,6 +2472,8 @@ export async function PUT(req: NextRequest) {
     hungerStatus,
     dailyTasksCount,
     jar,
+    milestone,
+    milestonesQueued: milestonesQueued || undefined,
     lateForStreak: lateForStreak && doc.type === 'weekly' ? true : undefined,
   });
 }
@@ -2640,14 +2662,25 @@ async function handleDailyGet(req: NextRequest, userId: string, tz: string) {
     todayLocal,
     tz,
   );
+  const economyConfig = await loadFlyEconomyConfig();
   const output = filtered
-    .map((t: TaskDoc) => ({
+    .map((t: TaskDoc) => {
+      const completed =
+        (t.completedDates ?? []).includes(date) ||
+        (!!t.completed && t.type === 'regular');
+      const streak = t.type === 'weekly' ? streakMap.get(t.id) ?? 0 : 0;
+      // What the row would pay if it were ticked now — the streak rate it is
+      // about to reach, not the one it is on. Computed here so every surface
+      // shows the same number the completion will actually pay.
+      const projectedStreak =
+        date === todayLocal && t.type === 'weekly'
+          ? streak + (completed ? 0 : 1)
+          : 0;
+      return {
       id: t.id,
       text: t.text,
       order: t.orderOverrides?.[date] ?? t.order ?? 0,
-      completed:
-        (t.completedDates ?? []).includes(date) ||
-        (!!t.completed && t.type === 'regular'),
+      completed,
       type: t.type,
       origin: t.type as Origin,
       tags: t.tags ?? [],
@@ -2661,7 +2694,13 @@ async function handleDailyGet(req: NextRequest, userId: string, tz: string) {
       repeatRule: t.repeatRule,
       dayOfWeek: t.dayOfWeek,
       completedDates: t.completedDates ?? [],
-      streak: t.type === 'weekly' ? streakMap.get(t.id) ?? 0 : 0,
+      streak,
+      flyWorth: taskFlyWorthNow({
+        checklist: checklistForDate(t, date),
+        streak: projectedStreak,
+        budgetLock: t.checklistBudgetByDate?.[date],
+        tiers: economyConfig.taskStreak.tiers,
+      }),
       frogodoroSettings: t.frogodoroSettings,
       frogodoroSession: sessionForRow(t, date),
       calendarEventId: t.calendarEventId,
@@ -2670,8 +2709,16 @@ async function handleDailyGet(req: NextRequest, userId: string, tz: string) {
       reminder: t.reminder,
       isStarter: t.isStarter,
       sectionId: t.sectionId,
-    }))
+      };
+    })
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  if (date === todayLocal) {
+    // A queue built up on a busy day drains itself here: no cron, and the user
+    // meets yesterday's milestone the next time they open the list.
+    void drainTaskStreakQueue({ userId, dayKey: todayLocal }).catch((error) => {
+      console.error('Streak milestone drain failed:', error);
+    });
+  }
   const [{ flyStatus, hungerStatus, dailyTasksCount }, sectionDocs] =
     await Promise.all([
       currentFlyStatus(userId, tz),

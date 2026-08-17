@@ -847,7 +847,14 @@ export default function HomeDashboard() {
                           paused={isPaused}
                         />
                         <FlyValueBadge
-                          value={taskFlyWorthNow({ checklist: task.checklist })}
+                          value={
+                            task.flyWorth ??
+                            taskFlyWorthNow({
+                              checklist: task.checklist,
+                              streak:
+                                (task.streak ?? 0) + (task.completed ? 0 : 1),
+                            })
+                          }
                         />
                       </div>
                     );

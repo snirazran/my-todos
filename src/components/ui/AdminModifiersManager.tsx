@@ -5,11 +5,14 @@ import Link from 'next/link';
 import {
   ChevronLeft,
   ChevronRight,
+  Flame,
   Loader2,
+  Plus,
   Repeat,
   RotateCcw,
   Save,
   Sliders,
+  Trash2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -19,8 +22,13 @@ import {
   type TradeRecipe,
 } from '@/lib/skins/tradeModifiers';
 import { RARITY_ORDER, rarityRank, type Rarity } from '@/lib/skins/catalog';
+import {
+  FLY_ECONOMY_DEFAULTS,
+  type FlyEconomyConfig,
+} from '@/lib/economy/defaults';
 
-type View = 'home' | 'trade';
+type View = 'home' | 'trade' | 'streak';
+type TaskStreakConfig = FlyEconomyConfig['taskStreak'];
 
 const inputClass =
   'h-9 w-full rounded-lg border border-border/60 bg-background px-2.5 text-sm font-medium text-foreground outline-none focus:border-primary';
@@ -99,6 +107,7 @@ function CategoryCard({
 export function AdminModifiersManager() {
   const [view, setView] = useState<View>('home');
   const [config, setConfig] = useState<TradeModifiers | null>(null);
+  const [economy, setEconomy] = useState<FlyEconomyConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{
@@ -109,11 +118,14 @@ export function AdminModifiersManager() {
   useEffect(() => {
     void (async () => {
       try {
-        const res = await fetch('/api/admin/trade-modifiers', {
-          credentials: 'include',
-        });
-        const payload = await res.json();
-        if (res.ok) setConfig(payload.config);
+        const [tradeRes, economyRes] = await Promise.all([
+          fetch('/api/admin/trade-modifiers', { credentials: 'include' }),
+          fetch('/api/admin/economy', { credentials: 'include' }),
+        ]);
+        const tradePayload = await tradeRes.json();
+        if (tradeRes.ok) setConfig(tradePayload.config);
+        const economyPayload = await economyRes.json().catch(() => null);
+        if (economyRes.ok && economyPayload) setEconomy(economyPayload.economy);
       } finally {
         setLoading(false);
       }
@@ -134,6 +146,39 @@ export function AdminModifiersManager() {
           }
         : prev,
     );
+
+  const streak = economy?.taskStreak ?? null;
+
+  const patchStreak = (next: Partial<TaskStreakConfig>) =>
+    setEconomy((prev) =>
+      prev ? { ...prev, taskStreak: { ...prev.taskStreak, ...next } } : prev,
+    );
+
+  const saveStreak = async () => {
+    if (!economy) return;
+    setSaving(true);
+    setMessage(null);
+    try {
+      const res = await fetch('/api/admin/economy', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ economy }),
+      });
+      const payload = await res.json();
+      if (!res.ok) throw new Error(payload.error || 'Could not save');
+      setEconomy(payload.economy);
+      setMessage({ type: 'success', text: 'Saved' });
+    } catch (error) {
+      setMessage({
+        type: 'error',
+        text: error instanceof Error ? error.message : 'Could not save',
+      });
+    } finally {
+      setSaving(false);
+      setTimeout(() => setMessage(null), 3500);
+    }
+  };
 
   const save = async () => {
     if (!config) return;
@@ -194,25 +239,33 @@ export function AdminModifiersManager() {
             <div className="rounded-2xl bg-indigo-500/10 p-3 text-indigo-600 dark:text-indigo-400">
               {view === 'trade' ? (
                 <Repeat className="h-7 w-7" />
+              ) : view === 'streak' ? (
+                <Flame className="h-7 w-7" />
               ) : (
                 <Sliders className="h-7 w-7" />
               )}
             </div>
             <div>
               <h1 className="text-2xl font-black tracking-tight md:text-3xl">
-                {view === 'trade' ? 'Trade modifiers' : 'Modifiers'}
+                {view === 'trade'
+                  ? 'Trade modifiers'
+                  : view === 'streak'
+                    ? 'Task streaks'
+                    : 'Modifiers'}
               </h1>
               <p className="text-sm font-medium text-muted-foreground">
                 {view === 'trade'
                   ? 'Recipe ratios, fuel, aim prices and the draw rules behind every trade-up.'
-                  : 'The tunable rules behind the economy loops.'}
+                  : view === 'streak'
+                    ? 'The per-completion rate, the one-time milestones and the mercy that keeps a long habit alive.'
+                    : 'The tunable rules behind the economy loops.'}
               </p>
             </div>
           </div>
-          {view === 'trade' && (
+          {view !== 'home' && (
             <button
-              onClick={save}
-              disabled={saving || !config}
+              onClick={view === 'streak' ? saveStreak : save}
+              disabled={saving || (view === 'streak' ? !economy : !config)}
               className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-black text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
             >
               {saving ? (
@@ -256,7 +309,21 @@ export function AdminModifiersManager() {
               stat={`${config.recipes.length} recipes · golden ${config.goldenTradeChancePercent}%`}
               onClick={() => setView('trade')}
             />
+            <CategoryCard
+              icon={<Flame className="h-5 w-5" />}
+              accent="bg-orange-500/10 text-orange-600 dark:text-orange-400"
+              title="Task streaks"
+              description="Per-completion rates that replace the base fly, one-time milestone payouts with gifts and Lily Pads, and the free missed day."
+              stat={
+                streak
+                  ? `${streak.tiers.length} tiers · ${streak.milestones.length} milestones · ${streak.milestonesPerDay}/day`
+                  : 'Unavailable'
+              }
+              onClick={() => setView('streak')}
+            />
           </div>
+        ) : view === 'streak' ? (
+          <StreakEditor streak={streak} patch={patchStreak} />
         ) : (
           <div className="space-y-4">
             <section className="rounded-2xl border border-border/40 bg-card/60 p-5">
@@ -526,6 +593,330 @@ export function AdminModifiersManager() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function StreakEditor({
+  streak,
+  patch,
+}: {
+  streak: TaskStreakConfig | null;
+  patch: (next: Partial<TaskStreakConfig>) => void;
+}) {
+  if (!streak) {
+    return (
+      <div className="rounded-2xl bg-red-500/10 p-4 text-sm font-bold text-red-600 dark:text-red-400">
+        Could not load the fly economy config.
+      </div>
+    );
+  }
+
+  const patchTier = (index: number, next: Partial<TaskStreakConfig['tiers'][number]>) =>
+    patch({
+      tiers: streak.tiers.map((tier, i) =>
+        i === index ? { ...tier, ...next } : tier,
+      ),
+    });
+
+  const patchMilestone = (
+    index: number,
+    next: Partial<TaskStreakConfig['milestones'][number]>,
+  ) =>
+    patch({
+      milestones: streak.milestones.map((milestone, i) =>
+        i === index ? { ...milestone, ...next } : milestone,
+      ),
+    });
+
+  const lastTier = streak.tiers[streak.tiers.length - 1];
+  const lastMilestone = streak.milestones[streak.milestones.length - 1];
+
+  return (
+    <div className="space-y-4">
+      <section className="rounded-2xl border border-border/40 bg-card/60 p-5">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-lg font-black text-foreground">Per completion</p>
+            <p className="text-sm text-muted-foreground">
+              What one tick pays at a given streak length. This REPLACES the
+              base fly rather than stacking with it, and it stops climbing at
+              the last tier — an ever-growing per-tick figure is the exploit
+              surface. The prestige is the number, not the payout.
+            </p>
+          </div>
+          <button
+            onClick={() => patch({ tiers: [...FLY_ECONOMY_DEFAULTS.taskStreak.tiers] })}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-muted px-2.5 py-1.5 text-xs font-black text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            Defaults
+          </button>
+        </div>
+
+        <div className="mt-4 space-y-2">
+          {streak.tiers.map((tier, index) => (
+            <div
+              key={`${tier.minDays}-${index}`}
+              className="flex items-center gap-3 rounded-xl bg-muted/40 px-3 py-2"
+            >
+              <span className="w-24 shrink-0 text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+                From day
+              </span>
+              <input
+                type="number"
+                min={1}
+                value={tier.minDays}
+                onChange={(event) =>
+                  patchTier(index, { minDays: Number(event.target.value) })
+                }
+                className={cn(inputClass, 'max-w-[90px]')}
+              />
+              <span className="text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+                pays
+              </span>
+              <input
+                type="number"
+                min={0}
+                value={tier.flies}
+                onChange={(event) =>
+                  patchTier(index, { flies: Number(event.target.value) })
+                }
+                className={cn(inputClass, 'max-w-[90px]')}
+              />
+              <span className="text-xs font-bold text-muted-foreground">
+                flies
+              </span>
+              <button
+                onClick={() =>
+                  patch({ tiers: streak.tiers.filter((_, i) => i !== index) })
+                }
+                disabled={streak.tiers.length <= 1}
+                className="ml-auto rounded-lg p-2 text-muted-foreground transition-colors hover:text-red-500 disabled:opacity-30"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
+          ))}
+          <button
+            onClick={() =>
+              patch({
+                tiers: [
+                  ...streak.tiers,
+                  {
+                    minDays: (lastTier?.minDays ?? 0) + 7,
+                    flies: (lastTier?.flies ?? 1) + 1,
+                  },
+                ],
+              })
+            }
+            className="inline-flex items-center gap-1.5 rounded-lg bg-muted px-3 py-2 text-xs font-black text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Add tier
+          </button>
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-border/40 bg-card/60 p-5">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-lg font-black text-foreground">Milestones</p>
+            <p className="text-sm text-muted-foreground">
+              One-time payouts per task. Only one lands a day across every task
+              — the rest queue for tomorrow, which is the anti-farm guard and is
+              invisible to anyone keeping a normal number of habits.
+            </p>
+          </div>
+          <button
+            onClick={() =>
+              patch({ milestones: [...FLY_ECONOMY_DEFAULTS.taskStreak.milestones] })
+            }
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-muted px-2.5 py-1.5 text-xs font-black text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            Defaults
+          </button>
+        </div>
+
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full min-w-[620px] border-separate border-spacing-y-2">
+            <thead>
+              <tr className="text-left text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+                <th className="px-2">At day</th>
+                <th className="px-2">Flies</th>
+                <th className="px-2">Gift item id</th>
+                <th className="px-2">Lily Pads</th>
+                <th className="px-2" />
+              </tr>
+            </thead>
+            <tbody>
+              {streak.milestones.map((milestone, index) => (
+                <tr key={`${milestone.atDays}-${index}`} className="bg-muted/40">
+                  <td className="rounded-l-xl px-2 py-2">
+                    <input
+                      type="number"
+                      min={1}
+                      value={milestone.atDays}
+                      onChange={(event) =>
+                        patchMilestone(index, {
+                          atDays: Number(event.target.value),
+                        })
+                      }
+                      className={cn(inputClass, 'max-w-[90px]')}
+                    />
+                  </td>
+                  <td className="px-2 py-2">
+                    <input
+                      type="number"
+                      min={0}
+                      value={milestone.flies}
+                      onChange={(event) =>
+                        patchMilestone(index, {
+                          flies: Number(event.target.value),
+                        })
+                      }
+                      className={cn(inputClass, 'max-w-[90px]')}
+                    />
+                  </td>
+                  <td className="px-2 py-2">
+                    <input
+                      value={milestone.giftItemId ?? ''}
+                      placeholder="none"
+                      onChange={(event) =>
+                        patchMilestone(index, {
+                          giftItemId: event.target.value,
+                        })
+                      }
+                      className={cn(inputClass, 'max-w-[180px]')}
+                    />
+                  </td>
+                  <td className="px-2 py-2">
+                    <input
+                      type="number"
+                      min={0}
+                      max={5}
+                      value={milestone.shields ?? 0}
+                      onChange={(event) =>
+                        patchMilestone(index, {
+                          shields: Number(event.target.value),
+                        })
+                      }
+                      className={cn(inputClass, 'max-w-[90px]')}
+                    />
+                  </td>
+                  <td className="rounded-r-xl px-2 py-2 text-right">
+                    <button
+                      onClick={() =>
+                        patch({
+                          milestones: streak.milestones.filter(
+                            (_, i) => i !== index,
+                          ),
+                        })
+                      }
+                      className="rounded-lg p-2 text-muted-foreground transition-colors hover:text-red-500"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <button
+          onClick={() =>
+            patch({
+              milestones: [
+                ...streak.milestones,
+                {
+                  atDays: (lastMilestone?.atDays ?? 0) + 30,
+                  flies: lastMilestone?.flies ?? 30,
+                },
+              ],
+            })
+          }
+          className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-muted px-3 py-2 text-xs font-black text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          Add milestone
+        </button>
+      </section>
+
+      <section className="rounded-2xl border border-border/40 bg-card/60 p-5">
+        <p className="text-lg font-black text-foreground">
+          After the last milestone
+        </p>
+        <p className="mb-4 text-sm text-muted-foreground">
+          What every further cycle pays, so a habit kept for years still has
+          something ahead of it.
+        </p>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <NumberField
+            label="Repeat every"
+            suffix="days"
+            min={0}
+            max={365}
+            value={streak.repeatEveryDays}
+            onChange={(repeatEveryDays) => patch({ repeatEveryDays })}
+          />
+          <NumberField
+            label="Flies"
+            min={0}
+            max={1000}
+            value={streak.repeatFlies}
+            onChange={(repeatFlies) => patch({ repeatFlies })}
+          />
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-bold text-foreground">
+              Gift item id
+            </span>
+            <input
+              value={streak.repeatGiftItemId}
+              onChange={(event) =>
+                patch({ repeatGiftItemId: event.target.value })
+              }
+              className={inputClass}
+            />
+          </label>
+          <NumberField
+            label="Lily Pads"
+            min={0}
+            max={5}
+            value={streak.repeatShields}
+            onChange={(repeatShields) => patch({ repeatShields })}
+          />
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-border/40 bg-card/60 p-5">
+        <p className="text-lg font-black text-foreground">Guards</p>
+        <p className="mb-4 text-sm text-muted-foreground">
+          The queue and the mercy. A single missed Tuesday should never cost a
+          60-day habit, and no shield is spent on it.
+        </p>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <NumberField
+            label="Milestone payouts"
+            suffix="per day"
+            hint="Across all tasks; extras queue to tomorrow."
+            min={0}
+            max={20}
+            value={streak.milestonesPerDay}
+            onChange={(milestonesPerDay) => patch({ milestonesPerDay })}
+          />
+          <NumberField
+            label="Free missed day"
+            suffix="every N days"
+            hint="One missed day per window is bridged automatically, with no prompt."
+            min={1}
+            max={365}
+            value={streak.freeSlipEveryDays}
+            onChange={(freeSlipEveryDays) => patch({ freeSlipEveryDays })}
+          />
+        </div>
+      </section>
     </div>
   );
 }

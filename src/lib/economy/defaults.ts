@@ -1,3 +1,11 @@
+import {
+  DEFAULT_STREAK_MILESTONES,
+  DEFAULT_STREAK_REPEAT,
+  DEFAULT_STREAK_TIERS,
+  type StreakMilestone,
+  type StreakTier,
+} from '@/lib/flyValue';
+
 export type FlyEconomyConfig = {
   taskIncome: {
     /** Ceiling on everything a day of task completions can pay. */
@@ -15,9 +23,20 @@ export type FlyEconomyConfig = {
     giftsPerWeek: number;
     giftItemId: string;
   };
-  streakMilestones: {
-    /** Streak-uplift payouts allowed per day, across all tasks. */
-    dailyCap: number;
+  taskStreak: {
+    /** Per-completion rates; each REPLACES the base fly, never stacks with it. */
+    tiers: StreakTier[];
+    /** One-time payouts per task, at these streak lengths. */
+    milestones: StreakMilestone[];
+    /** After the last fixed milestone, a payout every this many days. */
+    repeatEveryDays: number;
+    repeatFlies: number;
+    repeatGiftItemId: string;
+    repeatShields: number;
+    /** Milestone payouts a day, across all tasks; the rest queue to tomorrow. */
+    milestonesPerDay: number;
+    /** A repeating task forgives one missed day per this many days. */
+    freeSlipEveryDays: number;
   };
   buddy: {
     bonusFlies: number;
@@ -62,8 +81,15 @@ export const FLY_ECONOMY_DEFAULTS: FlyEconomyConfig = {
     giftsPerWeek: 1,
     giftItemId: 'gift_box_1',
   },
-  streakMilestones: {
-    dailyCap: 1,
+  taskStreak: {
+    tiers: [...DEFAULT_STREAK_TIERS],
+    milestones: [...DEFAULT_STREAK_MILESTONES],
+    repeatEveryDays: DEFAULT_STREAK_REPEAT.everyDays,
+    repeatFlies: DEFAULT_STREAK_REPEAT.flies,
+    repeatGiftItemId: DEFAULT_STREAK_REPEAT.giftItemId,
+    repeatShields: DEFAULT_STREAK_REPEAT.shields,
+    milestonesPerDay: 1,
+    freeSlipEveryDays: 30,
   },
   buddy: {
     bonusFlies: 1,
@@ -109,8 +135,12 @@ export const FLY_ECONOMY_LIMITS: Record<
     pebblesPerGift: { min: 1, max: 500 },
     giftsPerWeek: { min: 0, max: 20 },
   },
-  streakMilestones: {
-    dailyCap: { min: 0, max: 50 },
+  taskStreak: {
+    repeatEveryDays: { min: 0, max: 365 },
+    repeatFlies: { min: 0, max: 1000 },
+    repeatShields: { min: 0, max: 5 },
+    milestonesPerDay: { min: 0, max: 20 },
+    freeSlipEveryDays: { min: 1, max: 365 },
   },
   buddy: {
     bonusFlies: { min: 0, max: 100 },
@@ -139,6 +169,48 @@ export const FLY_ECONOMY_LIMITS: Record<
   },
 };
 
+function normalizeTiers(value: unknown, fallback: StreakTier[]): StreakTier[] {
+  if (!Array.isArray(value)) return fallback;
+  const tiers = value
+    .map((entry) => ({
+      minDays: Math.max(1, Math.floor(Number((entry as any)?.minDays))),
+      flies: Math.max(0, Math.floor(Number((entry as any)?.flies))),
+    }))
+    .filter((tier) => Number.isFinite(tier.minDays) && Number.isFinite(tier.flies))
+    .sort((a, b) => a.minDays - b.minDays);
+  return tiers.length ? tiers : fallback;
+}
+
+function normalizeMilestones(
+  value: unknown,
+  fallback: StreakMilestone[],
+): StreakMilestone[] {
+  if (!Array.isArray(value)) return fallback;
+  const milestones = value
+    .map((entry) => {
+      const atDays = Math.max(1, Math.floor(Number((entry as any)?.atDays)));
+      const flies = Math.max(0, Math.floor(Number((entry as any)?.flies)));
+      const giftItemId =
+        typeof (entry as any)?.giftItemId === 'string' &&
+        (entry as any).giftItemId.trim()
+          ? String((entry as any).giftItemId).trim()
+          : undefined;
+      const shields = Math.max(
+        0,
+        Math.min(5, Math.floor(Number((entry as any)?.shields) || 0)),
+      );
+      return {
+        atDays,
+        flies,
+        ...(giftItemId ? { giftItemId } : {}),
+        ...(shields ? { shields } : {}),
+      };
+    })
+    .filter((milestone) => Number.isFinite(milestone.atDays))
+    .sort((a, b) => a.atDays - b.atDays);
+  return milestones.length ? milestones : fallback;
+}
+
 function clampNumber(value: unknown, fallback: number, bound?: Bound): number {
   const parsed = Math.floor(Number(value));
   if (!Number.isFinite(parsed)) return fallback;
@@ -164,7 +236,11 @@ export function mergeFlyEconomyConfig(patch: unknown): FlyEconomyConfig {
 
       Object.entries(defaults).forEach(([key, fallback]) => {
         const value = incoming[key];
-        if (typeof fallback === 'boolean') {
+        if (key === 'tiers') {
+          merged[key] = normalizeTiers(value, fallback as StreakTier[]);
+        } else if (key === 'milestones') {
+          merged[key] = normalizeMilestones(value, fallback as StreakMilestone[]);
+        } else if (typeof fallback === 'boolean') {
           merged[key] = typeof value === 'boolean' ? value : fallback;
         } else if (typeof fallback === 'number') {
           merged[key] = clampNumber(value, fallback, bounds[key]);

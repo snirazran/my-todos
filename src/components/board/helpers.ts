@@ -35,6 +35,8 @@ export type Task = {
   completedDates?: string[];
   /** Consecutive-completion streak for a repeating task, as of today. */
   streak?: number;
+  /** Flies ticking this row would pay right now, streak rate included. */
+  flyWorth?: number;
   frogodoroSession?: {
     date: string;
     focusTime: number;
