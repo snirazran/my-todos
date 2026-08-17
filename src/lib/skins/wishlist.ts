@@ -109,20 +109,30 @@ export function catalogToWishlistSource(item: ItemDef): WishlistSource {
 }
 
 /**
- * What the pinned item actually costs right now. When it lands on the daily
- * shelf the goal has to move with it — otherwise the counter keeps saving
- * toward a price nobody is charging today.
+ * What the pinned item actually costs right now. When it lands on the shop's
+ * discounted slots the goal has to move with it — otherwise the counter keeps
+ * saving toward a price nobody is charging today. Sitting on the shelf at full
+ * price is not a deal, so only a real markdown counts.
  */
 export function resolveWishlistPricing(
   wishlist: WishlistView | null | undefined,
   deals:
-    | { itemId: string; dealPrice: number; discountPercent: number }[]
+    | {
+        itemId: string;
+        dealPrice: number;
+        discountPercent: number;
+        onSale?: boolean;
+      }[]
     | undefined,
 ) {
   if (!wishlist) return null;
   const deal =
     wishlist.kind === 'item'
-      ? deals?.find((entry) => entry.itemId === wishlist.itemId)
+      ? deals?.find(
+          (entry) =>
+            entry.itemId === wishlist.itemId &&
+            (entry.onSale ?? entry.dealPrice < wishlist.price),
+        )
       : undefined;
   return {
     price: deal ? deal.dealPrice : wishlist.price,
@@ -147,6 +157,7 @@ export type WishlistDeal = {
   itemId: string;
   dealPrice: number;
   discountPercent: number;
+  onSale?: boolean;
 };
 
 export type WishlistEntry = {

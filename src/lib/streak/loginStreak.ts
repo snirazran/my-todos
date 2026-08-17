@@ -24,6 +24,7 @@ import {
 import type { ShieldConfigView, ShieldOffer, ShieldState } from '@/lib/shields/types';
 import { previousDayKey } from '@/lib/quests/streak';
 import { isPremiumUser } from '@/lib/quests/engine';
+import { recordDoubleableClaim } from '@/lib/rewards/adDouble';
 import { getZonedToday } from '@/lib/utils';
 import type { QuestReward } from '@/lib/quests/types';
 import { findTaskStreaksAtRisk } from './taskStreaks';
@@ -487,10 +488,9 @@ function grantQuestRewards(
       inv[reward.backgroundId] = (inv[reward.backgroundId] ?? 0) + 1;
       summary.grantedBackgroundIds.push(reward.backgroundId);
     } else if (reward.itemId) {
-      // A pledge rung promises "all of it doubled by Plus", so gifts scale with
-      // the flies. Lily Pads are excluded on purpose — they have their own cap
-      // and monthly grant, and doubling them here would fight both.
-      const copies = Math.max(1, reward.amount ?? 1) * multiplier;
+      // Doubling never means a second box: a Plus gift is opened twice instead,
+      // so the rung hands over exactly the boxes it promises.
+      const copies = Math.max(1, reward.amount ?? 1);
       for (let i = 0; i < copies; i += 1) {
         user.wardrobe.inventory[reward.itemId] =
           (user.wardrobe.inventory[reward.itemId] ?? 0) + 1;
@@ -560,6 +560,9 @@ async function applyStreakRewardGrants(args: {
   const shieldState = payableShields
     ? grantShields(args.shieldState, shieldConfig, isPremium, payableShields)
     : args.shieldState;
+
+  // Plus took its double above; a free player takes the same one from an ad.
+  recordDoubleableClaim(user, summary);
 
   return {
     event: {

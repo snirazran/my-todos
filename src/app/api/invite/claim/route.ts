@@ -73,9 +73,11 @@ export async function POST(req: NextRequest) {
     await createFriendship(referral.inviterId, userId, 'invite');
 
     const inviter = await UserModel.findById(referral.inviterId)
-      .select('name frogName')
-      .lean<{ name?: string; frogName?: string }>();
+      .select('name frogName premiumUntil')
+      .lean<{ name?: string; frogName?: string; premiumUntil?: Date }>();
     const inviterName = inviter?.name || inviter?.frogName || 'A friend';
+    const inviterIsPlus =
+      !!inviter?.premiumUntil && new Date(inviter.premiumUntil) > new Date();
 
     // Grant the gift to the new user
     const giftHistorySet =
@@ -135,14 +137,17 @@ export async function POST(req: NextRequest) {
                       1),
                 ) + Math.max(1, reward.minAmount ?? 1)
               : reward.amount ?? 0;
-          if (amount > 0 && invitesPayFlies) {
+          // An invite reward is one of the doubled sources, and the inviter is
+          // not on screen to watch an ad for it, so Plus takes it here.
+          const payout = amount * (inviterIsPlus ? 2 : 1);
+          if (payout > 0 && invitesPayFlies) {
             const settlement = await settleFlyGrant({
               userId: referral.inviterId,
               source: 'invite',
               occurrenceKey: `${referral.code ?? referral._id}:tier${tier.tier}`,
               dayKey: getZonedToday('UTC'),
-              targetAmount: amount,
-              meta: { tier: tier.tier },
+              targetAmount: payout,
+              meta: { tier: tier.tier, doubled: inviterIsPlus },
             });
             if (settlement.delta > 0) {
               inc['wardrobe.flies'] =

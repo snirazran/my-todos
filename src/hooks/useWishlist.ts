@@ -26,6 +26,7 @@ type SummaryShape = {
     itemId: string;
     dealPrice: number;
     discountPercent: number;
+    onSale?: boolean;
   }[];
 };
 

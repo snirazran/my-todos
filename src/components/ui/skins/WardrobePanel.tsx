@@ -35,7 +35,7 @@ import Frog from '@/components/ui/frog';
 import { Icon as AppIcon } from '@/components/ui/Icon';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
 import { GiftRive } from '@/components/ui/gift-box/GiftBox';
-import { ItemCard } from './ItemCard';
+import { GiftOddsButton, ItemCard } from './ItemCard';
 import { PurchaseSheet, type PurchaseTarget } from './PurchaseSheet';
 import { FilterBar, FilterCategory } from './FilterBar';
 import { SortMenu, SortOrder } from './SortMenu';
@@ -73,6 +73,7 @@ import {
   type WishlistEntry,
 } from '@/lib/skins/wishlist';
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
+import { showRewardedAd, takePlusOfferAfterAd } from '@/lib/ads';
 
 type WardrobeCard =
   | {
@@ -560,14 +561,28 @@ function WardrobeManagerContent({
   const [rerolling, setRerolling] = useState(false);
   const rerollDeals = async () => {
     if (rerolling) return;
+    const isPlus = !!data?.isPremium;
     setRerolling(true);
     hapticImpact();
     try {
+      if (!isPlus) {
+        const adResult = await showRewardedAd('shop_reroll');
+        if (adResult !== 'rewarded') {
+          if (adResult === 'failed') {
+            setNotif({
+              msg: 'Ad not available right now — try again in a moment.',
+              type: 'error',
+            });
+          }
+          return;
+        }
+      }
       const res = await fetch('/api/skins/deals/reroll', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          viaAd: !isPlus,
         }),
       });
       const payload = await res.json().catch(() => ({}));
@@ -586,11 +601,15 @@ function WardrobeManagerContent({
                 ...curr,
                 dailyDeals: payload.dailyDeals,
                 dealRerollsLeft: payload.rerollsLeft,
+                dealRerollsAllowed: payload.rerollsAllowed,
               }
             : curr,
         { revalidate: false },
       );
       mutateInventoryCaches();
+      if (!isPlus && takePlusOfferAfterAd()) {
+        setTimeout(() => openPlus('premium_daily_deal'), 1200);
+      }
     } catch {
       setNotif({ msg: 'Could not reroll deals.', type: 'error' });
     } finally {
@@ -959,10 +978,10 @@ function WardrobeManagerContent({
 
   const shopItems = useMemo(() => {
     if (!data?.catalog) return [];
-    // Anything on today's shelf is excluded from the main grid — showing the
-    // same item twice, once discounted and once at full price, makes the deal
-    // look like a trick and the grid price look wrong. Only when the shelf is
-    // actually on screen, though: under a category filter it's hidden, and
+    // Anything on today's shelf is excluded from the main grid — a second copy
+    // of the same item, at a price the shelf may have marked down, makes the
+    // deal look like a trick and the grid price look wrong. Only when the shelf
+    // is actually on screen, though: under a category filter it's hidden, and
     // dropping the items there would make them disappear from the shop.
     const dealsVisible =
       activeFilter === 'all' && !!data.dailyDeals?.length;
@@ -1147,13 +1166,12 @@ function WardrobeManagerContent({
 
   const openItemPurchase = (item: ItemDef, dealPrice: number | null = null) => {
     hapticSelect();
-    // Deals apply everywhere, not just on the deals shelf — resolve today's
+    // Sale prices apply everywhere, not just on the shelf — resolve today's
     // price here so a card opened from the main grid quotes what the server
-    // will actually charge.
-    const resolved =
-      dealPrice ??
-      data?.dailyDeals?.find((d) => d.itemId === item.id)?.dealPrice ??
-      null;
+    // will actually charge. A slot sitting at its standing price is not a deal,
+    // so it must not hand the sheet a "was" figure to strike through.
+    const today = data?.dailyDeals?.find((d) => d.itemId === item.id);
+    const resolved = dealPrice ?? (today?.onSale ? today.dealPrice : null);
     setPurchaseDealPrice(resolved);
     setPurchaseCard({
       kind: 'item',
@@ -1195,9 +1213,7 @@ function WardrobeManagerContent({
     } else {
       const item = data?.catalog?.find((entry) => entry.id === focusItemId);
       if (!item) return;
-      const deal = data?.dailyDeals?.find((d) => d.itemId === focusItemId);
-      open = () =>
-        openItemPurchase(item, data?.isPremium && deal ? deal.dealPrice : null);
+      open = () => openItemPurchase(item);
     }
 
     focusHandledRef.current = focusItemId;
@@ -1303,6 +1319,9 @@ function WardrobeManagerContent({
         count={data?.wardrobe?.inventory?.[card.item.id] ?? 0}
         isNew={unseenInventorySet.has(card.item.id)}
         rarityBadge
+        corner={
+          <GiftOddsButton giftId={card.item.id} name={card.item.name} />
+        }
         onClick={() => handleItemAction(card.item)}
       >
         <div className="h-[115%] w-[115%]">
@@ -1890,6 +1909,9 @@ function WardrobeManagerContent({
                   {activeFilter === 'all' && !!data?.dailyDeals?.length && (
                     <DailyDealsTeaser
                       endsAt={data.dailyDeals[0].endsAt}
+                      saleCount={
+                        data.dailyDeals.filter((deal) => deal.onSale).length
+                      }
                       onClick={() => {
                         setActiveTab('shop');
                         scrollPageToTop();
@@ -1940,9 +1962,7 @@ function WardrobeManagerContent({
                       rerollsLeft={data.dealRerollsLeft ?? 0}
                       rerolling={rerolling}
                       wishlistedIds={wishlistedItemIds}
-                      onBuy={(item, dealPrice) =>
-                        openItemPurchase(item, dealPrice)
-                      }
+                      onBuy={(item) => openItemPurchase(item)}
                       onReroll={rerollDeals}
                       onUpgrade={() => openPlus('premium_daily_deal')}
                     />
@@ -2182,6 +2202,7 @@ function WardrobeRowCard({
   isNew,
   equipped,
   rarityBadge,
+  corner,
   onClick,
   children,
 }: {
@@ -2193,71 +2214,83 @@ function WardrobeRowCard({
   isNew?: boolean;
   equipped?: boolean;
   rarityBadge?: boolean;
+  corner?: React.ReactNode;
   onClick: () => void;
   children: React.ReactNode;
 }) {
   const config = RARITY_CONFIG[rarity];
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        'relative flex w-[132px] shrink-0 flex-col items-stretch overflow-hidden rounded-xl border-2 bg-card p-2 text-left shadow-sm transition-transform active:scale-[0.97]',
-        config.border,
-      )}
-    >
-      {rarityBadge && (
-        <span className="absolute left-0 top-0 z-20 overflow-hidden rounded-br-2xl bg-background">
-          <span
-            className={cn(
-              'block rounded-br-2xl border-b border-r px-2 py-1 text-[8px] font-black uppercase tracking-wider',
-              config.bg,
-              config.text,
-              config.border,
-            )}
-          >
-            {config.label}
-          </span>
-        </span>
-      )}
-      <div className="relative flex h-20 items-end justify-center overflow-hidden rounded-lg bg-muted/40">
-        {children}
-        {isNew && (
-          <span
-            className={cn(
-              'absolute left-1 z-20 animate-pulse rounded-md bg-red-500 px-1.5 py-0.5 text-[8px] font-black uppercase text-white shadow-sm',
-              rarityBadge ? 'bottom-1' : 'top-1',
-            )}
-          >
-            New
-          </span>
-        )}
-        {(count ?? 0) > 1 && (
-          <span className="absolute right-1 top-1 z-20 rounded-md border border-white/10 bg-black/50 px-1.5 py-0.5 text-[9px] font-bold text-white backdrop-blur-sm">
-            x{count}
-          </span>
-        )}
-        {equipped && (
-          <span className="absolute right-1 top-1 z-20 flex h-5 w-5 items-center justify-center rounded-full bg-green-500 p-0.5 text-white shadow-md">
-            <Check className="h-3 w-3 stroke-[4]" />
-          </span>
-        )}
-      </div>
-      {name && (
-        <p className="mt-1.5 truncate text-xs font-black text-foreground">
-          {name}
-        </p>
-      )}
-      <p
+    <div className="relative w-[132px] shrink-0">
+      <button
+        type="button"
+        onClick={onClick}
         className={cn(
-          'truncate text-[10px] font-semibold',
-          !name && 'mt-1.5',
-          sublabelClass ?? 'text-muted-foreground',
+          'relative flex w-full flex-col items-stretch overflow-hidden rounded-xl border-2 bg-card p-2 text-left shadow-sm transition-transform active:scale-[0.97]',
+          config.border,
         )}
       >
-        {sublabel}
-      </p>
-    </button>
+        {rarityBadge && (
+          <span className="absolute left-0 top-0 z-20 overflow-hidden rounded-br-2xl bg-background">
+            <span
+              className={cn(
+                'block rounded-br-2xl border-b border-r px-2 py-1 text-[8px] font-black uppercase tracking-wider',
+                config.bg,
+                config.text,
+                config.border,
+              )}
+            >
+              {config.label}
+            </span>
+          </span>
+        )}
+        <div className="relative flex h-20 items-end justify-center overflow-hidden rounded-lg bg-muted/40">
+          {children}
+          {isNew && (
+            <span
+              className={cn(
+                'absolute left-1 z-20 animate-pulse rounded-md bg-red-500 px-1.5 py-0.5 text-[8px] font-black uppercase text-white shadow-sm',
+                rarityBadge ? 'bottom-1' : 'top-1',
+              )}
+            >
+              New
+            </span>
+          )}
+          {(count ?? 0) > 1 && (
+            <span className="absolute right-1 top-1 z-20 rounded-md border border-white/10 bg-black/50 px-1.5 py-0.5 text-[9px] font-bold text-white backdrop-blur-sm">
+              x{count}
+            </span>
+          )}
+          {equipped && (
+            <span className="absolute right-1 top-1 z-20 flex h-5 w-5 items-center justify-center rounded-full bg-green-500 p-0.5 text-white shadow-md">
+              <Check className="h-3 w-3 stroke-[4]" />
+            </span>
+          )}
+        </div>
+        {name && (
+          <p
+            className={cn(
+              'mt-1.5 truncate text-xs font-black text-foreground',
+              corner && 'pr-7',
+            )}
+          >
+            {name}
+          </p>
+        )}
+        <p
+          className={cn(
+            'truncate text-[10px] font-semibold',
+            !name && 'mt-1.5',
+            corner && 'pr-7',
+            sublabelClass ?? 'text-muted-foreground',
+          )}
+        >
+          {sublabel}
+        </p>
+      </button>
+      {corner && (
+        <div className="absolute bottom-2 right-2 z-30">{corner}</div>
+      )}
+    </div>
   );
 }
 

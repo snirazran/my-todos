@@ -1,11 +1,12 @@
 import UserModel from '@/lib/models/User';
 import connectMongo from '@/lib/mongoose';
 import { getCachedCatalog, buildById } from '@/lib/skins/getCatalog';
-import { getDailyDeals, rerollsUsed } from '@/lib/skins/dailyDeal';
+import { isPremiumActive, shopDay } from '@/lib/skins/dailyDeal';
+import { loadShopRotation } from '@/lib/skins/shopRotationServer';
+import { ensureShopSalesConfig } from '@/lib/models/ShopSalesConfig';
 import { sendWardrobePush } from '@/lib/skins/push';
 import { readWishlistPins } from '@/lib/skins/wishlist';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
-import { getZonedToday } from '@/lib/utils';
 
 /**
  * Local hours the alert may fire in. A deal dies at local midnight, so waiting
@@ -17,6 +18,22 @@ const LATEST_HOUR = 21;
 
 /** Below this there isn't enough of the day left to act on it. */
 const MIN_HOURS_LEFT = 2;
+
+/**
+ * Days before the same pin may be pushed about again. The reserved slot puts a
+ * pinned item on the shelf every single day, and every slot is discounted, so
+ * without this the alert would fire daily about one hat until the player either
+ * bought it or turned notifications off.
+ */
+const MIN_DAYS_BETWEEN_ALERTS = 6;
+
+/** Whole days between two `YYYY-MM-DD` keys. */
+function daysBetween(from: string, to: string): number {
+  const a = Date.parse(`${from}T00:00:00Z`);
+  const b = Date.parse(`${to}T00:00:00Z`);
+  if (Number.isNaN(a) || Number.isNaN(b)) return Number.POSITIVE_INFINITY;
+  return Math.round((b - a) / 86_400_000);
+}
 
 function hourIn(tz: string): number {
   try {
@@ -35,7 +52,9 @@ function hourIn(tz: string): number {
 
 type Candidate = {
   _id: string;
+  premiumUntil?: Date | null;
   wardrobe?: {
+    inventory?: Record<string, number> | null;
     wishlist?: unknown;
     wishlistItems?: unknown;
     dealReroll?: { date: string; count: number } | null;
@@ -69,6 +88,8 @@ export async function runWishlistDealAlerts(): Promise<{
       'notificationPrefs.fcmTokens.0': { $exists: true },
     },
     {
+      premiumUntil: 1,
+      'wardrobe.inventory': 1,
       'wardrobe.wishlist': 1,
       'wardrobe.wishlistItems': 1,
       'wardrobe.dealReroll': 1,
@@ -81,6 +102,7 @@ export async function runWishlistDealAlerts(): Promise<{
 
   const catalog = await getCachedCatalog();
   const byId = buildById(catalog);
+  const config = await ensureShopSalesConfig();
   let sent = 0;
 
   for (const user of users) {
@@ -88,13 +110,14 @@ export async function runWishlistDealAlerts(): Promise<{
     const hour = hourIn(tz);
     if (hour < EARLIEST_HOUR || hour > LATEST_HOUR) continue;
 
-    const today = getZonedToday(tz);
-    const deals = getDailyDeals(
+    const today = shopDay(new Date(), tz, config).dayKey;
+    const { deals } = await loadShopRotation({
       catalog,
-      new Date(),
-      tz,
-      rerollsUsed(user.wardrobe?.dealReroll ?? undefined, today),
-    );
+      wardrobe: user.wardrobe,
+      timezone: tz,
+      isPlus: isPremiumActive(user.premiumUntil),
+      config,
+    });
     if (deals.length === 0) continue;
 
     // Several pins can be on the shelf at once; the alert is still one item,
@@ -108,8 +131,9 @@ export async function runWishlistDealAlerts(): Promise<{
       }))
       .find(
         ({ pin, deal }) =>
-          !!deal &&
-          pin.notifiedDealKey !== `${today}:${pin.itemId}` &&
+          !!deal?.onSale &&
+          daysBetween(pin.notifiedDealKey?.split(':')[0] ?? '', today) >=
+            MIN_DAYS_BETWEEN_ALERTS &&
           (new Date(deal.endsAt).getTime() - Date.now()) / 3_600_000 >=
             MIN_HOURS_LEFT &&
           !!byId[pin.itemId],

@@ -159,14 +159,13 @@ export function enqueueQuestRewardReveal(
     const count = itemCounts[itemId];
     const key = `${item.id}-${revealIdCounter}`;
     revealIdCounter += 1;
-    const baseCount = isPremium ? Math.floor(count / 2) || 1 : count;
+    // Doubling only ever touches flies and the prizes inside a gift, so an item
+    // card carries neither the "×2 Plus" split nor the watch-an-ad offer.
     nextEntries.push({
       key,
       item: item as QuestRewardRevealEntry['item'],
       quantity: count > 1 ? count : undefined,
-      baseQuantity: isPremium && count > 1 ? baseCount : undefined,
       isQuestReward: true,
-      doubleClaimId: summary?.doubleClaimId,
       grantPremium: isPremium,
       suppressFlyPill,
     });
@@ -186,7 +185,6 @@ export function enqueueQuestRewardReveal(
     const count = bgCounts[bgId];
     const key = `${bgId}-${revealIdCounter}`;
     revealIdCounter += 1;
-    const baseCount = isPremium ? Math.floor(count / 2) || 1 : count;
     nextEntries.push({
       key,
       item: {
@@ -201,9 +199,7 @@ export function enqueueQuestRewardReveal(
         imageUrl: meta.imageUrl,
       },
       quantity: count > 1 ? count : undefined,
-      baseQuantity: isPremium && count > 1 ? baseCount : undefined,
       isQuestReward: true,
-      doubleClaimId: summary?.doubleClaimId,
       grantPremium: isPremium,
       suppressFlyPill,
     });
@@ -298,10 +294,6 @@ async function handleWatchAdDouble(entry: QuestRewardRevealEntry) {
           next.fliesGranted = e.fliesGranted * 2;
           next.flyBalanceAfter = balanceAfter;
           knownFlyBalance = balanceAfter;
-        } else {
-          const base = e.quantity ?? 1;
-          next.baseQuantity = base;
-          next.quantity = base * 2;
         }
         return next;
       }),
@@ -464,7 +456,9 @@ function QuestRewardRevealOverlay({
               }
               quantity={entry.quantity}
               baseQuantity={entry.baseQuantity}
-              isPremium={isPremium && !!entry.isQuestReward}
+              isPremium={
+                isPremium && !!entry.isQuestReward && !!entry.fliesGranted
+              }
               showDoubleUpsell={
                 !isPremium &&
                 !!entry.isQuestReward &&

@@ -35,7 +35,8 @@ export const DEFAULT_REPEAT_PAYOUT_FLOOR_PERCENT = 60;
  * The pledge ladder. Flies per day climb with the length of the promise
  * (10.0 / 11.4 / 12.0 / 13.6) so a longer pledge is always worth more per day
  * than a short one — that gradient is what makes the ladder pull upward. Plus
- * doubles all of it at grant time.
+ * doubles the flies at grant time; a free player buys the same double with one
+ * rewarded ad. Gifts are never duplicated — they open twice instead.
  */
 export const DEFAULT_GOAL_TIERS: LoginStreakGoalTier[] = [
   {

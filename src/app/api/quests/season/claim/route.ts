@@ -22,7 +22,6 @@ import {
   readShieldState,
   setShieldStateOn,
 } from '@/lib/shields/engine';
-import { recordDoubleableClaim } from '@/lib/rewards/adDouble';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
 import type { QuestRewards, SeasonLane } from '@/lib/quests/types';
 
@@ -171,8 +170,9 @@ export async function POST(req: NextRequest) {
     const claimedTiers = Array.from(
       new Set([...takeFree, ...takePlus]),
     ).sort((a, b) => a - b);
+    // The season track is never doubled — the Plus lane is the benefit — so
+    // there is no ad offer here either.
     const summary = { ...rewardSummary, shieldsGranted };
-    recordDoubleableClaim(user, summary as any);
 
     user.markModified('quests');
     user.markModified('wardrobe');

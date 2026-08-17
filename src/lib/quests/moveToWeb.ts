@@ -5,8 +5,6 @@ import QuestMoveToWebConfigModel, {
   type QuestMoveToWebConfigDoc,
 } from '@/lib/models/QuestMoveToWebConfig';
 import { WEB_APP_URL } from '@/lib/appStores';
-import { recordDoubleableClaim } from '@/lib/rewards/adDouble';
-import { isPremiumUser } from './engine';
 import type { QuestReward } from './types';
 
 export type MoveToWebState = {
@@ -101,8 +99,6 @@ export async function claimMoveToWebReward(args: { userId: string }) {
     throw new Error('Log in on the web to unlock this reward');
   }
 
-  const multiplier = isPremiumUser(user.toObject()) ? 2 : 1;
-
   if (!user.wardrobe) {
     user.wardrobe = { equipped: {}, inventory: {}, unseenItems: [], flies: 0 };
   }
@@ -133,18 +129,15 @@ export async function claimMoveToWebReward(args: { userId: string }) {
             return min + Math.floor(Math.random() * (max - min + 1));
           })()
         : reward.amount ?? 0;
-    const amount = base * multiplier;
-    user.wardrobe.flies += amount;
-    summary.fliesGranted += amount;
+    user.wardrobe.flies += base;
+    summary.fliesGranted += base;
     summary.flyBalanceAfter = user.wardrobe.flies;
   } else if (reward.type === 'BACKGROUND' && reward.backgroundId) {
     const inv = user.wardrobe.backgrounds.inventory;
-    for (let i = 0; i < multiplier; i += 1) {
-      inv[reward.backgroundId] = (inv[reward.backgroundId] ?? 0) + 1;
-      summary.grantedBackgroundIds.push(reward.backgroundId);
-    }
+    inv[reward.backgroundId] = (inv[reward.backgroundId] ?? 0) + 1;
+    summary.grantedBackgroundIds.push(reward.backgroundId);
   } else if (reward.itemId) {
-    const copies = Math.max(1, reward.amount ?? 1) * multiplier;
+    const copies = Math.max(1, reward.amount ?? 1);
     for (let i = 0; i < copies; i += 1) {
       user.wardrobe.inventory[reward.itemId] =
         (user.wardrobe.inventory[reward.itemId] ?? 0) + 1;
@@ -152,8 +145,6 @@ export async function claimMoveToWebReward(args: { userId: string }) {
       summary.grantedItemIds.push(reward.itemId);
     }
   }
-
-  recordDoubleableClaim(user, summary);
 
   const currentQuests =
     typeof (user as any).quests === 'object' && (user as any).quests

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import { hapticCelebrate } from '@/lib/haptics';
@@ -9,12 +9,21 @@ import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
 import Fly from '@/components/ui/fly';
 import { Icon } from '@/components/ui/Icon';
 import { byId as catalogById } from '@/lib/skins/catalog';
+import { showRewardedAd } from '@/lib/ads';
+import { mutateInventoryCaches } from '@/hooks/useInventory';
+import { markFlyEarn } from '@/lib/flyEarn';
 import type {
   CheckInResult,
   LoginStreakRewardSummary,
 } from '@/lib/streak/types';
 
-function RewardChips({ summary }: { summary: LoginStreakRewardSummary }) {
+function RewardChips({
+  summary,
+  flies,
+}: {
+  summary: LoginStreakRewardSummary;
+  flies: number;
+}) {
   const itemCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const id of summary.grantedItemIds) counts[id] = (counts[id] ?? 0) + 1;
@@ -23,9 +32,9 @@ function RewardChips({ summary }: { summary: LoginStreakRewardSummary }) {
 
   return (
     <div className="flex flex-wrap items-center justify-center gap-2.5">
-      {summary.fliesGranted > 0 && (
+      {flies > 0 && (
         <span className="flex items-center gap-1.5 rounded-full bg-white/15 px-4 py-2 text-lg font-black text-white backdrop-blur">
-          <Fly size={22} paused y={-2} />+{summary.fliesGranted}
+          <Fly size={22} paused y={-2} />+{flies}
         </span>
       )}
       {summary.shieldsGranted > 0 && (
@@ -79,6 +88,38 @@ export function StreakCelebration({
   }, [open]);
 
   const goal = result.goalEvent;
+  const claimId = goal?.rewardSummary.doubleClaimId;
+  const baseFlies = goal?.rewardSummary.fliesGranted ?? 0;
+  const [flies, setFlies] = useState(baseFlies);
+  const [doubled, setDoubled] = useState(false);
+  const [doubling, setDoubling] = useState(false);
+
+  useEffect(() => {
+    setFlies(baseFlies);
+    setDoubled(false);
+  }, [baseFlies, claimId]);
+
+  const handleWatchAd = async () => {
+    if (!claimId || doubled || doubling) return;
+    setDoubling(true);
+    try {
+      const outcome = await showRewardedAd('streak_commitment_double');
+      if (outcome !== 'rewarded') return;
+      const res = await fetch('/api/rewards/double', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ claimId }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.granted) return;
+      setDoubled(true);
+      setFlies((current) => current * 2);
+      markFlyEarn();
+      mutateInventoryCaches();
+    } finally {
+      setDoubling(false);
+    }
+  };
 
   return (
     <AnimatePresence>
@@ -119,7 +160,17 @@ export function StreakCelebration({
                 </p>
 
                 <div className="mt-6 space-y-3 short-screen:mt-3 short-screen:space-y-2">
-                  <RewardChips summary={goal.rewardSummary} />
+                  <RewardChips summary={goal.rewardSummary} flies={flies} />
+                  {claimId && !doubled && baseFlies > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleWatchAd}
+                      disabled={doubling}
+                      className="mx-auto flex h-11 items-center justify-center gap-2 rounded-2xl bg-white/20 px-5 text-xs font-black uppercase tracking-[0.14em] text-white backdrop-blur transition-colors hover:bg-white/30 disabled:opacity-60"
+                    >
+                      {doubling ? 'Loading ad…' : 'Watch an ad — double the flies'}
+                    </button>
+                  )}
                 </div>
               </motion.div>
             </div>

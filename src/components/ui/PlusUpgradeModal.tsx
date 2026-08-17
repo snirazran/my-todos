@@ -7,7 +7,7 @@ import { mutate } from 'swr';
 import { Capacitor } from '@capacitor/core';
 import { Icon } from '@/components/ui/Icon';
 import { AppImage } from '@/components/ui/AppImage';
-import { BadgePercent, Check, Heart, Sparkle, Unlock, X } from 'lucide-react';
+import { BadgePercent, Check, Heart, Sparkle, X } from 'lucide-react';
 import { SAVED_LOOKS_PLUS } from '@/lib/skins/looks';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import Frog from '@/components/ui/frog';
@@ -273,7 +273,6 @@ export function PlusUpgradeModal({
 const PLUS_WELCOME_HIGHLIGHTS = [
   'Double rewards',
   'Every gift opens twice',
-  'Write your own weekly leap',
   'Weekly streak rescue',
 ];
 
@@ -521,33 +520,26 @@ function Step0({
       <div className="mt-5 space-y-3 rounded-2xl bg-white/10 p-4 md:mt-6">
         <Reveal delay={0.12}>
           <FeatureRow
-            icon={<Unlock className="h-5 w-5 text-amber-300" />}
-            title="Write your own weekly leap"
-            subtitle="Set exactly what you'll do and when, instead of picking from three. Unlimited tags."
+            icon={<span className="text-sm font-black text-amber-300">×2</span>}
+            title="Earn outfits twice as fast"
+            subtitle="Double flies on daily quests, leaps and commitments — and every gift opens twice."
           />
         </Reveal>
         <Reveal delay={0.18}>
           <FeatureRow
-            icon={<span className="text-sm font-black text-amber-300">×2</span>}
-            title="Earn outfits twice as fast"
-            subtitle="Double rewards on every task and quest — every gift opens twice."
+            icon={<BadgePercent className="h-5 w-5 text-amber-300" />}
+            title="Reroll the daily deals"
+            subtitle="Don't like today's shelf? Swap it for a fresh one once a day, no ad."
           />
         </Reveal>
         <Reveal delay={0.24}>
-          <FeatureRow
-            icon={<BadgePercent className="h-5 w-5 text-amber-300" />}
-            title="Reroll the daily deals"
-            subtitle="Don't like today's shelf? Swap it for a fresh one, twice a day."
-          />
-        </Reveal>
-        <Reveal delay={0.3}>
           <FeatureRow
             icon={<Sparkle className="h-5 w-5 text-amber-300" />}
             title="Season Plus rewards"
             subtitle="The Plus track opens — earn it as you play."
           />
         </Reveal>
-        <Reveal delay={0.36}>
+        <Reveal delay={0.3}>
           <FeatureRow
             icon={<Heart className="h-5 w-5 text-rose-300" fill="currentColor" />}
             title="Support our mission"
@@ -594,7 +586,6 @@ function FeatureRow({
 }
 
 const COMPARISON_ROWS: { label: string; free: boolean }[] = [
-  { label: 'Write your own weekly leap', free: false },
   { label: 'Hold 3 Lily Pads, plus a free one monthly', free: false },
   { label: 'Change your area mid-week', free: false },
   { label: 'Unlimited tags', free: false },
@@ -603,7 +594,7 @@ const COMPARISON_ROWS: { label: string; free: boolean }[] = [
   { label: 'Golden fly companion', free: false },
   { label: 'Weekly streak rescue', free: false },
   { label: 'Free trade rerolls', free: false },
-  { label: 'Reroll the daily deals', free: false },
+  { label: 'Reroll the daily deals without an ad', free: false },
   { label: `${SAVED_LOOKS_PLUS} saved looks`, free: false },
   { label: 'Season Plus rewards', free: false },
 ];

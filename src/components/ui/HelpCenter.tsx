@@ -124,11 +124,11 @@ const HELP_CATEGORIES: HelpCategory[] = [
       },
       {
         q: 'What can I spend flies on?',
-        a: 'Use flies in the Shop to buy gift boxes and cosmetic items to customize your frog.',
+        a: 'Use flies in the Shop for cosmetics and backgrounds to customize your frog, or to skip ahead a tier on the season pass. Gift boxes are not for sale — you earn those.',
       },
       {
         q: 'What can I do with duplicate items?',
-        a: 'Take them to the Trade tab in your Wardrobe — five same-rarity items trade up for one of a higher rarity.',
+        a: 'A duplicate is a spare, and spares are what trade-ups run on. Take them to the Trade tab in your Wardrobe to swap same-rarity spares for one item of a higher rarity — the tab shows how many each trade needs.',
       },
     ],
   },
@@ -143,7 +143,11 @@ const HELP_CATEGORIES: HelpCategory[] = [
       },
       {
         q: 'What are gift boxes?',
-        a: 'Gift boxes come in Common, Rare, and Legendary rarities and contain random cosmetics. Rarer boxes have better odds for rare items — tap "Drop Rates" on any gift to see the exact chances.',
+        a: 'Gift boxes come in Common, Rare, and Legendary rarities and contain random cosmetics. Rarer boxes have better odds for rare items. You earn them from quests, streaks and the season pass — they are never bought.',
+      },
+      {
+        q: 'How do I see a gift\'s odds?',
+        a: 'Tap the "?" on any gift in your inventory — or "Drop Rates" on its card in the Gifts tab — for the exact chance of every item and rarity in that box, plus how the Luck guarantees work.',
       },
       {
         q: 'How do I open a gift?',
@@ -166,7 +170,7 @@ const HELP_CATEGORIES: HelpCategory[] = [
     items: [
       {
         q: 'What is Frogress Plus?',
-        a: 'Plus is an optional subscription. You write your own weekly leap instead of choosing from three, hold three Lily Pads instead of two and get one free every month, can change your area mid-week without losing your streak, unlock premium reward tracks, and earn double rewards.',
+        a: 'Plus is an optional subscription. You hold three Lily Pads instead of two and get one free every month, can change your area mid-week without losing your streak, unlock premium reward tracks, and earn double rewards.',
       },
       {
         q: 'How do I get Plus?',

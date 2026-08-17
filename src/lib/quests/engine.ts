@@ -1978,17 +1978,13 @@ export async function claimQuestReward(args: {
         summary.flyBalanceAfter = user.wardrobe!.flies;
       } else if (reward.type === 'BACKGROUND' && reward.backgroundId) {
         const inv = user.wardrobe!.backgrounds!.inventory;
-        for (let i = 0; i < multiplier; i += 1) {
-          inv[reward.backgroundId] = (inv[reward.backgroundId] ?? 0) + 1;
-          summary.grantedBackgroundIds.push(reward.backgroundId);
-        }
+        inv[reward.backgroundId] = (inv[reward.backgroundId] ?? 0) + 1;
+        summary.grantedBackgroundIds.push(reward.backgroundId);
       } else if (reward.itemId) {
-        for (let i = 0; i < multiplier; i += 1) {
-          user.wardrobe!.inventory[reward.itemId] =
-            (user.wardrobe!.inventory[reward.itemId] ?? 0) + 1;
-          user.wardrobe!.unseenItems!.push(reward.itemId);
-          summary.grantedItemIds.push(reward.itemId);
-        }
+        user.wardrobe!.inventory[reward.itemId] =
+          (user.wardrobe!.inventory[reward.itemId] ?? 0) + 1;
+        user.wardrobe!.unseenItems!.push(reward.itemId);
+        summary.grantedItemIds.push(reward.itemId);
       }
     }
   };
@@ -2058,7 +2054,10 @@ export async function claimObjectiveReward(args: {
     grantedBackgroundIds: [] as string[],
   };
 
-  const multiplier = isPremium ? 2 : 1;
+  // Onboarding is a one-time grant, so it is paid flat to everyone: neither
+  // Plus nor a rewarded ad doubles it.
+  const doubles = quest.placement === 'daily';
+  const multiplier = doubles && isPremium ? 2 : 1;
 
   for (const reward of block.rewards) {
     if (reward.type === 'FLIES') {
@@ -2068,20 +2067,16 @@ export async function claimObjectiveReward(args: {
       summary.flyBalanceAfter = user.wardrobe.flies;
     } else if (reward.type === 'BACKGROUND' && reward.backgroundId) {
       const inv = user.wardrobe.backgrounds.inventory;
-      for (let i = 0; i < multiplier; i += 1) {
-        inv[reward.backgroundId] = (inv[reward.backgroundId] ?? 0) + 1;
-        summary.grantedBackgroundIds.push(reward.backgroundId);
-      }
+      inv[reward.backgroundId] = (inv[reward.backgroundId] ?? 0) + 1;
+      summary.grantedBackgroundIds.push(reward.backgroundId);
     } else if (reward.itemId) {
-      for (let i = 0; i < multiplier; i += 1) {
-        user.wardrobe.inventory[reward.itemId] =
-          (user.wardrobe.inventory[reward.itemId] ?? 0) + 1;
-        user.wardrobe.unseenItems!.push(reward.itemId);
-        summary.grantedItemIds.push(reward.itemId);
-      }
+      user.wardrobe.inventory[reward.itemId] =
+        (user.wardrobe.inventory[reward.itemId] ?? 0) + 1;
+      user.wardrobe.unseenItems!.push(reward.itemId);
+      summary.grantedItemIds.push(reward.itemId);
     }
   }
-  recordDoubleableClaim(user, summary);
+  if (doubles) recordDoubleableClaim(user, summary);
   user.markModified('wardrobe');
 
   quest.claimedObjectiveIds = [...(quest.claimedObjectiveIds ?? []), objectiveId];

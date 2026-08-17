@@ -195,7 +195,7 @@ export function PactStreakLadder() {
           <div className="relative flex shrink-0 items-center">
             {tiles.slice(0, 3).map((reward, index) => (
               <div
-                key={`${reward.type}-${reward.itemId ?? index}`}
+                key={`${index}-${reward.type}-${reward.itemId ?? ''}`}
                 className="relative"
                 style={rewardStackTileStyle(index, Math.min(3, tiles.length))}
               >

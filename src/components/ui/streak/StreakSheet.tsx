@@ -203,7 +203,7 @@ function PledgeRewardTiles({
   const tiles: { key: string; node: React.ReactNode }[] = itemRewards
     .slice(0, 3)
     .map((reward, index) => ({
-      key: `${reward.type}-${reward.itemId ?? index}`,
+      key: `${index}-${reward.type}-${reward.itemId ?? ''}`,
       node: (
         <RewardTile
           reward={reward}

@@ -846,6 +846,7 @@ export async function settleFinishedWeeks(args: {
           user: userDoc,
           rewards: rung.rewards,
           isPremium,
+          doubles: false,
           shieldState,
           shieldConfig,
         });
@@ -881,6 +882,7 @@ export async function settleFinishedWeeks(args: {
           user: userDoc,
           rewards,
           isPremium,
+          doubles: false,
           shieldState,
           shieldConfig,
         });

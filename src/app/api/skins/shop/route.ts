@@ -4,12 +4,8 @@ import connectMongo from '@/lib/mongoose';
 import UserModel, { type UserDoc } from '@/lib/models/User';
 import type { UserWardrobe } from '@/lib/types/UserDoc';
 import { getFullCatalog, buildById } from '@/lib/skins/getCatalog';
-import {
-  getDailyDeals,
-  isPremiumActive,
-  rerollsUsed,
-} from '@/lib/skins/dailyDeal';
-import { getZonedToday } from '@/lib/utils';
+import { isPremiumActive } from '@/lib/skins/dailyDeal';
+import { loadShopRotation } from '@/lib/skins/shopRotationServer';
 import { availabilityStateAt } from '@/lib/skins/availability';
 import { isTradeOnlyRarity } from '@/lib/skins/catalog';
 import { dropFromWishlist } from '@/lib/skins/wishlistServer';
@@ -73,16 +69,17 @@ export async function POST(req: NextRequest) {
       return json({ ok: true });
     }
 
-    // Check balance. Daily deals apply to everyone — Plus buys rerolls of the
+    // Check balance. Sale prices apply to everyone — Plus buys a reroll of the
     // shelf, not a cheaper price on it.
     let price = byId[itemId].priceFlies ?? 0;
-    const deal = getDailyDeals(
-      fullCatalog,
-      new Date(),
+    const rotation = await loadShopRotation({
+      catalog: fullCatalog,
+      wardrobe: user.wardrobe,
       timezone,
-      rerollsUsed(user.wardrobe?.dealReroll ?? undefined, getZonedToday(timezone)),
-    ).find((d) => d.itemId === itemId);
-    if (deal) {
+      isPlus: isPremiumActive(user.premiumUntil),
+    });
+    const deal = rotation.deals.find((d) => d.itemId === itemId);
+    if (deal?.onSale) {
       price = deal.dealPrice;
     }
 
@@ -126,7 +123,7 @@ export async function POST(req: NextRequest) {
         rarity: byId[itemId].rarity,
         slot: byId[itemId].slot,
         flies_spent: price,
-        discounted: !!deal,
+        discounted: !!deal?.onSale,
         is_premium: isPremiumActive(user.premiumUntil),
       },
     });

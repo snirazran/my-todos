@@ -398,6 +398,7 @@ export async function claimSweepRoll(args: {
     user,
     rewards: rewards.map(toPactBonusReward),
     isPremium,
+    doubles: true,
     shieldState: readShieldState(user),
     shieldConfig,
   });

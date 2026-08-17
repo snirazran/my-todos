@@ -118,7 +118,9 @@ export function applyPactRewards(args: {
   const plusMultiplier = isPremium ? 2 : 1;
   // Only flies scale with the streak. Copies of a gift box are not a bigger
   // reward, they are five of the same thing to open — and a week's gift that
-  // arrives five-at-a-time stops reading as the week's gift.
+  // arrives five-at-a-time stops reading as the week's gift. Plus doubles the
+  // flies for the same reason it never doubles the box: the second prize comes
+  // out of the one box when it is opened.
   const flyMultiplier = plusMultiplier * streakMultiplier;
   const sessions = Math.max(0, pact.target ?? 0);
 
@@ -141,13 +143,11 @@ export function applyPactRewards(args: {
         summary.fliesGranted += amount;
       } else if (reward.type === 'BACKGROUND' && reward.backgroundId) {
         const inv = user.wardrobe.backgrounds.inventory;
-        for (let i = 0; i < plusMultiplier; i += 1) {
-          inv[reward.backgroundId] = (inv[reward.backgroundId] ?? 0) + 1;
-          summary.grantedBackgroundIds.push(reward.backgroundId);
-        }
+        inv[reward.backgroundId] = (inv[reward.backgroundId] ?? 0) + 1;
+        summary.grantedBackgroundIds.push(reward.backgroundId);
       } else if (reward.itemId) {
         const copies = Math.max(1, Math.floor(reward.amount ?? 1));
-        for (let i = 0; i < copies * plusMultiplier; i += 1) {
+        for (let i = 0; i < copies; i += 1) {
           user.wardrobe.inventory[reward.itemId] =
             (user.wardrobe.inventory[reward.itemId] ?? 0) + 1;
           user.wardrobe.unseenItems.push(reward.itemId);
@@ -223,9 +223,13 @@ async function drawRarityItem(user: any, rarity: PactRarity) {
  * are one-time, so nothing here is multiplied by the streak — a rung is worth
  * what it says it is worth, at every point on the ladder.
  *
- * Plus doubles flies and boxes, as it does everywhere else, but never a drawn
- * item or a shield: two copies of a set piece is not a reward, and shields are
- * capped by the pool anyway.
+ * `doubles` is off for those one-time rungs: a subscription that doubled every
+ * trophy would devalue all of them. The Reward Roll runs through here too and
+ * passes it on, because a daily roll is recurring income.
+ *
+ * Even when it is on it only touches flies. Items, backgrounds and shields are
+ * granted exactly as authored — a gift is doubled by opening twice, a second
+ * copy of a set piece is not a reward, and shields are capped by the pool.
  *
  * Mutates `user`; the caller saves.
  */
@@ -233,11 +237,12 @@ export async function applyPactBonusRewards(args: {
   user: any;
   rewards: PactBonusRewards;
   isPremium: boolean;
+  doubles: boolean;
   shieldState: ShieldState;
   shieldConfig: ShieldConfigView;
 }): Promise<PactBonusSummary> {
   const { user, rewards, isPremium, shieldConfig } = args;
-  const plusMultiplier = isPremium ? 2 : 1;
+  const plusMultiplier = args.doubles && isPremium ? 2 : 1;
   ensureWardrobe(user);
 
   const summary: PactBonusSummary = {
@@ -293,14 +298,10 @@ export async function applyPactBonusRewards(args: {
       summary.fliesGranted += amount;
     } else if (questReward.type === 'BACKGROUND' && questReward.backgroundId) {
       const inv = user.wardrobe.backgrounds.inventory;
-      for (let i = 0; i < plusMultiplier; i += 1) {
-        inv[questReward.backgroundId] =
-          (inv[questReward.backgroundId] ?? 0) + 1;
-        summary.grantedBackgroundIds.push(questReward.backgroundId);
-      }
+      inv[questReward.backgroundId] = (inv[questReward.backgroundId] ?? 0) + 1;
+      summary.grantedBackgroundIds.push(questReward.backgroundId);
     } else if (questReward.itemId) {
-      const copies = Math.max(1, Math.floor(questReward.amount ?? 1));
-      addItem(questReward.itemId, copies * plusMultiplier);
+      addItem(questReward.itemId, Math.max(1, Math.floor(questReward.amount ?? 1)));
     }
   }
 

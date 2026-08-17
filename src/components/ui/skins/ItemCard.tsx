@@ -639,6 +639,58 @@ function DropRatesButton({ giftId, name }: { giftId: string; name: string }) {
   );
 }
 
+/** The same odds sheet as {@link DropRatesButton}, sized for a compact card
+ *  that has no room for a labelled row. */
+export function GiftOddsButton({
+  giftId,
+  name,
+  className,
+}: {
+  giftId: string;
+  name: string;
+  className?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const closingRef = useRef(false);
+
+  const handleClose = () => {
+    setOpen(false);
+    closingRef.current = true;
+    setTimeout(() => {
+      closingRef.current = false;
+    }, 300);
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        aria-label={`Drop rates for ${name}`}
+        title="Drop rates"
+        onClick={(e) => {
+          e.stopPropagation();
+          if (closingRef.current) return;
+          setOpen(true);
+        }}
+        onMouseDown={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
+        className={cn(
+          'flex h-6 w-6 touch-manipulation items-center justify-center rounded-full border border-border/70 bg-background/90 text-[11px] font-black leading-none text-muted-foreground shadow-sm backdrop-blur transition-colors hover:border-primary/40 hover:text-foreground active:scale-95',
+          className,
+        )}
+      >
+        ?
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <DropRatesPopup giftId={giftId} name={name} onClose={handleClose} />
+        )}
+      </AnimatePresence>
+    </>
+  );
+}
+
 function DropRatesPopup({
   giftId,
   name,

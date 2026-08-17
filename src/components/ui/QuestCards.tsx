@@ -1895,7 +1895,7 @@ function RewardDetailsPopup({
         <div className="grid grid-cols-2 gap-3 mt-5 sm:gap-4">
           {rewards.map((reward, index) => (
             <QuestRewardDetailCard
-              key={`${reward.type}-${reward.itemId ?? reward.amount ?? reward.minAmount ?? index}`}
+              key={`${index}-${reward.type}-${reward.itemId ?? reward.amount ?? reward.minAmount ?? ''}`}
               reward={reward}
               rewardCatalog={rewardCatalog}
               isPremium={isPremium}

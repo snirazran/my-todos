@@ -3,14 +3,10 @@ import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import UserModel, { type UserDoc } from '@/lib/models/User';
 import { getFullCatalog } from '@/lib/skins/getCatalog';
-import {
-  DAILY_DEAL_REROLLS,
-  getDailyDeals,
-  isPremiumActive,
-  rerollsUsed,
-  type DealReroll,
-} from '@/lib/skins/dailyDeal';
-import { getZonedToday } from '@/lib/utils';
+import { isPremiumActive, shopDay } from '@/lib/skins/dailyDeal';
+import { loadShopRotation } from '@/lib/skins/shopRotationServer';
+import { ensureShopSalesConfig } from '@/lib/models/ShopSalesConfig';
+import { rerollsAllowed } from '@/lib/skins/shopSales';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
 
 const json = (body: unknown, init = 200) =>
@@ -22,27 +18,38 @@ export async function POST(req: NextRequest) {
   try {
     const userId = await requireUserId();
 
-    let body: { timezone?: unknown } = {};
+    let body: { timezone?: unknown; viaAd?: unknown } = {};
     try {
       body = await req.json();
     } catch {}
     const timezone =
       typeof body.timezone === 'string' && body.timezone ? body.timezone : 'UTC';
+    const viaAd = body.viaAd === true;
 
     await connectMongo();
     const user = (await UserModel.findById(userId)
-      .select('premiumUntil wardrobe.dealReroll')
+      .select('premiumUntil wardrobe')
       .lean()) as LeanUser | null;
     if (!user) return json({ error: 'User not found' }, 404);
-    if (!isPremiumActive(user.premiumUntil))
-      return json({ error: 'Rerolls are a Plus perk' }, 403);
 
-    const today = getZonedToday(timezone);
-    const used = rerollsUsed(
-      user.wardrobe?.dealReroll as DealReroll | undefined,
-      today,
-    );
-    if (used >= DAILY_DEAL_REROLLS)
+    const isPlus = isPremiumActive(user.premiumUntil);
+    const config = await ensureShopSalesConfig();
+    const allowed = rerollsAllowed(config, isPlus);
+    if (allowed <= 0) {
+      return json({ error: 'Rerolls are a Plus perk', rerollsLeft: 0 }, 403);
+    }
+    // Plus pays with the membership, everyone else pays with a rewarded ad.
+    if (!isPlus && !viaAd) {
+      return json({ error: 'Watch a short ad to reroll', rerollsLeft: 0 }, 403);
+    }
+
+    const { dayKey } = shopDay(new Date(), timezone, config);
+    const stored = user.wardrobe?.dealReroll ?? null;
+    const used =
+      stored && stored.date === dayKey
+        ? Math.max(0, Math.min(allowed, stored.count))
+        : 0;
+    if (used >= allowed)
       return json({ error: 'No rerolls left today', rerollsLeft: 0 }, 429);
 
     const next = used + 1;
@@ -54,28 +61,41 @@ export async function POST(req: NextRequest) {
         $or: [
           { 'wardrobe.dealReroll': { $exists: false } },
           { 'wardrobe.dealReroll': null },
-          { 'wardrobe.dealReroll.date': { $ne: today } },
+          { 'wardrobe.dealReroll.date': { $ne: dayKey } },
           { 'wardrobe.dealReroll.count': used },
         ],
       },
-      { $set: { 'wardrobe.dealReroll': { date: today, count: next } } },
+      { $set: { 'wardrobe.dealReroll': { date: dayKey, count: next } } },
       { projection: { _id: 1 } },
     ).lean();
     if (!claimed) return json({ error: 'Try again' }, 409);
 
     const catalog = await getFullCatalog();
-    const dailyDeals = getDailyDeals(catalog, new Date(), timezone, next);
+    const rotation = await loadShopRotation({
+      catalog,
+      wardrobe: user.wardrobe,
+      timezone,
+      isPlus,
+      config,
+      rerollOverride: next,
+    });
 
     await recordAnalyticsEvent({
       userId,
       name: 'daily_deals_rerolled',
-      properties: { reroll_index: next, deals: dailyDeals.length },
+      properties: {
+        reroll_index: next,
+        deals: rotation.deals.length,
+        discounts: rotation.deals.filter((deal) => deal.onSale).length,
+        via_ad: !isPlus,
+      },
     });
 
     return json({
       ok: true,
-      dailyDeals,
-      rerollsLeft: DAILY_DEAL_REROLLS - next,
+      dailyDeals: rotation.deals,
+      rerollsLeft: Math.max(0, allowed - next),
+      rerollsAllowed: allowed,
     });
   } catch {
     return json({ error: 'Unauthorized' }, 401);

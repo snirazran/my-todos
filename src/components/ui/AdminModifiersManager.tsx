@@ -13,6 +13,7 @@ import {
   RotateCcw,
   Save,
   Sliders,
+  Store,
   Trash2,
   Users,
 } from 'lucide-react';
@@ -25,6 +26,11 @@ import {
 } from '@/lib/skins/tradeModifiers';
 import { RARITY_ORDER, rarityRank, type Rarity } from '@/lib/skins/catalog';
 import {
+  DEFAULT_SHOP_SALES,
+  SHOP_TIERS,
+  type ShopSalesConfig,
+} from '@/lib/skins/shopSales';
+import {
   FLY_ECONOMY_DEFAULTS,
   type FlyEconomyConfig,
 } from '@/lib/economy/defaults';
@@ -33,7 +39,7 @@ import {
   type ChecklistTier,
 } from '@/lib/checklist';
 
-type View = 'home' | 'trade' | 'streak' | 'checklist' | 'social';
+type View = 'home' | 'trade' | 'shop' | 'streak' | 'checklist' | 'social';
 type TaskStreakConfig = FlyEconomyConfig['taskStreak'];
 type ChecklistConfig = FlyEconomyConfig['checklist'];
 
@@ -115,6 +121,7 @@ export function AdminModifiersManager() {
   const [view, setView] = useState<View>('home');
   const [config, setConfig] = useState<TradeModifiers | null>(null);
   const [economy, setEconomy] = useState<FlyEconomyConfig | null>(null);
+  const [shop, setShop] = useState<ShopSalesConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{
@@ -125,14 +132,17 @@ export function AdminModifiersManager() {
   useEffect(() => {
     void (async () => {
       try {
-        const [tradeRes, economyRes] = await Promise.all([
+        const [tradeRes, economyRes, shopRes] = await Promise.all([
           fetch('/api/admin/trade-modifiers', { credentials: 'include' }),
           fetch('/api/admin/economy', { credentials: 'include' }),
+          fetch('/api/admin/shop-sales', { credentials: 'include' }),
         ]);
         const tradePayload = await tradeRes.json();
         if (tradeRes.ok) setConfig(tradePayload.config);
         const economyPayload = await economyRes.json().catch(() => null);
         if (economyRes.ok && economyPayload) setEconomy(economyPayload.economy);
+        const shopPayload = await shopRes.json().catch(() => null);
+        if (shopRes.ok && shopPayload) setShop(shopPayload.config);
       } finally {
         setLoading(false);
       }
@@ -175,6 +185,35 @@ export function AdminModifiersManager() {
     setEconomy((prev) =>
       prev ? { ...prev, friendsPond: { ...prev.friendsPond, ...next } } : prev,
     );
+
+  const patchShop = (next: Partial<ShopSalesConfig>) =>
+    setShop((prev) => (prev ? { ...prev, ...next } : prev));
+
+  const saveShop = async () => {
+    if (!shop) return;
+    setSaving(true);
+    setMessage(null);
+    try {
+      const res = await fetch('/api/admin/shop-sales', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(shop),
+      });
+      const payload = await res.json();
+      if (!res.ok) throw new Error(payload.error || 'Could not save');
+      setShop(payload.config);
+      setMessage({ type: 'success', text: 'Saved' });
+    } catch (error) {
+      setMessage({
+        type: 'error',
+        text: error instanceof Error ? error.message : 'Could not save',
+      });
+    } finally {
+      setSaving(false);
+      setTimeout(() => setMessage(null), 3500);
+    }
+  };
 
   const saveStreak = async () => {
     if (!economy) return;
@@ -261,6 +300,8 @@ export function AdminModifiersManager() {
             <div className="rounded-2xl bg-indigo-500/10 p-3 text-indigo-600 dark:text-indigo-400">
               {view === 'trade' ? (
                 <Repeat className="h-7 w-7" />
+              ) : view === 'shop' ? (
+                <Store className="h-7 w-7" />
               ) : view === 'streak' ? (
                 <Flame className="h-7 w-7" />
               ) : view === 'checklist' ? (
@@ -275,7 +316,9 @@ export function AdminModifiersManager() {
               <h1 className="text-2xl font-black tracking-tight md:text-3xl">
                 {view === 'trade'
                   ? 'Trade modifiers'
-                  : view === 'streak'
+                  : view === 'shop'
+                    ? 'Shop sales'
+                    : view === 'streak'
                     ? 'Task streaks'
                     : view === 'checklist'
                       ? 'Checklist rewards'
@@ -286,6 +329,8 @@ export function AdminModifiersManager() {
               <p className="text-sm font-medium text-muted-foreground">
                 {view === 'trade'
                   ? 'Recipe ratios, fuel, aim prices and the draw rules behind every trade-up.'
+                  : view === 'shop'
+                    ? 'How the daily shelf is composed, which slots get marked down, and who can reroll it.'
                   : view === 'streak'
                     ? 'The per-completion rate, the one-time milestones and the mercy that keeps a long habit alive.'
                     : view === 'checklist'
@@ -298,8 +343,13 @@ export function AdminModifiersManager() {
           </div>
           {view !== 'home' && (
             <button
-              onClick={view === 'trade' ? save : saveStreak}
-              disabled={saving || (view === 'trade' ? !config : !economy)}
+              onClick={
+                view === 'trade' ? save : view === 'shop' ? saveShop : saveStreak
+              }
+              disabled={
+                saving ||
+                (view === 'trade' ? !config : view === 'shop' ? !shop : !economy)
+              }
               className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-black text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
             >
               {saving ? (
@@ -344,6 +394,18 @@ export function AdminModifiersManager() {
               onClick={() => setView('trade')}
             />
             <CategoryCard
+              icon={<Store className="h-5 w-5" />}
+              accent="bg-amber-500/10 text-amber-600 dark:text-amber-400"
+              title="Shop sales"
+              description="The daily rotation: how many slots and of which tiers, the reserved wishlist slot, per-tier discounts and how often each tier goes on sale, the weekend special, and rerolls."
+              stat={
+                shop
+                  ? `${shop.slots} slots · ${shop.discountedSlots} on sale · rolls at ${String(shop.refreshHour).padStart(2, '0')}:00`
+                  : 'Unavailable'
+              }
+              onClick={() => setView('shop')}
+            />
+            <CategoryCard
               icon={<Flame className="h-5 w-5" />}
               accent="bg-orange-500/10 text-orange-600 dark:text-orange-400"
               title="Task streaks"
@@ -380,6 +442,8 @@ export function AdminModifiersManager() {
               onClick={() => setView('social')}
             />
           </div>
+        ) : view === 'shop' ? (
+          <ShopSalesEditor shop={shop} patch={patchShop} />
         ) : view === 'streak' ? (
           <StreakEditor streak={streak} patch={patchStreak} />
         ) : view === 'checklist' ? (
@@ -662,6 +726,407 @@ export function AdminModifiersManager() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+const WEEKDAYS = [
+  'Sunday',
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+];
+
+function ShopSalesEditor({
+  shop,
+  patch,
+}: {
+  shop: ShopSalesConfig | null;
+  patch: (next: Partial<ShopSalesConfig>) => void;
+}) {
+  if (!shop) {
+    return (
+      <div className="rounded-2xl bg-red-500/10 p-4 text-sm font-bold text-red-600 dark:text-red-400">
+        Could not load the shop sales config.
+      </div>
+    );
+  }
+
+  const patchMap = (
+    key: 'rarityDiscountPercent' | 'raritySaleDaysPercent',
+    rarity: Rarity,
+    value: number,
+  ) => patch({ [key]: { ...shop[key], [rarity]: value } } as Partial<ShopSalesConfig>);
+
+  const planned = shop.affordableSlots + shop.rareSlots + shop.epicSlots;
+  const commonShare = Math.round(
+    (shop.affordableSlots * shop.commonWeightPercent) / 100,
+  );
+
+  const stale = (
+    [
+      'discountedSlots',
+      'weekendDiscountedSlots',
+      'wishlistDealChancePercent',
+    ] as const
+  ).filter((key) => shop[key] !== DEFAULT_SHOP_SALES[key]).length;
+
+  const resetAll = () =>
+    patch({
+      ...DEFAULT_SHOP_SALES,
+      rarityDiscountPercent: { ...DEFAULT_SHOP_SALES.rarityDiscountPercent },
+      raritySaleDaysPercent: { ...DEFAULT_SHOP_SALES.raritySaleDaysPercent },
+    });
+
+  return (
+    <div className="space-y-4">
+      {/* Saved values win over code defaults forever — that is what keeps an
+          admin edit from being wiped on deploy, but it also means a config
+          written under older defaults keeps serving them until reset here. */}
+      <div className="flex items-center justify-between gap-3 rounded-2xl border border-border/40 bg-muted/30 px-4 py-3">
+        <p className="text-xs font-medium text-muted-foreground">
+          These values are stored, not read from the code — a shelf saved under
+          older settings keeps them until you reset.
+          {stale > 0 && (
+            <span className="font-black text-amber-600 dark:text-amber-400">
+              {' '}
+              {stale} setting{stale === 1 ? '' : 's'} still differ from the
+              current defaults.
+            </span>
+          )}
+        </p>
+        <button
+          onClick={resetAll}
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-muted px-2.5 py-1.5 text-xs font-black text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <RotateCcw className="h-3.5 w-3.5" />
+          Reset all
+        </button>
+      </div>
+
+      <section className="rounded-2xl border border-border/40 bg-card/60 p-5">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-lg font-black text-foreground">Rotation</p>
+            <p className="text-sm text-muted-foreground">
+              The shelf is composed by tier so there is always something buyable
+              today and something to save toward. Items the player already owns
+              never appear, and legendaries never do — they are trade-only.
+            </p>
+          </div>
+          <button
+            onClick={() =>
+              patch({
+                slots: DEFAULT_SHOP_SALES.slots,
+                refreshHour: DEFAULT_SHOP_SALES.refreshHour,
+                affordableSlots: DEFAULT_SHOP_SALES.affordableSlots,
+                commonWeightPercent: DEFAULT_SHOP_SALES.commonWeightPercent,
+                rareSlots: DEFAULT_SHOP_SALES.rareSlots,
+                epicSlots: DEFAULT_SHOP_SALES.epicSlots,
+              })
+            }
+            className="inline-flex items-center gap-1.5 rounded-lg bg-muted px-2.5 py-1.5 text-xs font-black text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            Defaults
+          </button>
+        </div>
+        <div className="mt-4 grid gap-4 sm:grid-cols-3">
+          <NumberField
+            label="Slots"
+            hint={
+              planned === shop.slots
+                ? 'Tier counts add up.'
+                : `Tier counts add up to ${planned} — the rest fills from the cheap tiers.`
+            }
+            min={1}
+            max={12}
+            value={shop.slots}
+            onChange={(slots) => patch({ slots })}
+          />
+          <NumberField
+            label="Refresh hour"
+            hint="Local hour the shelf rolls over. Later than midnight, so someone still up at 1am isn't cut off mid-decision."
+            min={0}
+            max={23}
+            suffix=":00"
+            value={shop.refreshHour}
+            onChange={(refreshHour) => patch({ refreshHour })}
+          />
+          <NumberField
+            label="Affordable slots"
+            hint={`Common or uncommon — about ${commonShare} common per day.`}
+            min={0}
+            max={12}
+            value={shop.affordableSlots}
+            onChange={(affordableSlots) => patch({ affordableSlots })}
+          />
+          <NumberField
+            label="Common share"
+            hint="Split inside the affordable slots — the rest go to uncommon."
+            min={0}
+            max={100}
+            suffix="%"
+            value={shop.commonWeightPercent}
+            onChange={(commonWeightPercent) => patch({ commonWeightPercent })}
+          />
+          <NumberField
+            label="Rare slots"
+            hint="The week-long save."
+            min={0}
+            max={12}
+            value={shop.rareSlots}
+            onChange={(rareSlots) => patch({ rareSlots })}
+          />
+          <NumberField
+            label="Epic slots"
+            hint="The aspiration slot."
+            min={0}
+            max={12}
+            value={shop.epicSlots}
+            onChange={(epicSlots) => patch({ epicSlots })}
+          />
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-border/40 bg-card/60 p-5">
+        <p className="text-lg font-black text-foreground">Wishlist slot</p>
+        <p className="text-sm text-muted-foreground">
+          One slot reserved for something the player already pinned and
+          doesn&apos;t own — the highest-converting slot there is. Players with
+          nothing pinned lose nothing: the slot goes back to the normal tier
+          draw, so the shelf is always six deep.
+        </p>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-bold text-foreground">
+              Reserve a slot
+            </span>
+            <select
+              value={shop.wishlistSlot ? 'on' : 'off'}
+              onChange={(event) =>
+                patch({ wishlistSlot: event.target.value === 'on' })
+              }
+              className={inputClass}
+            >
+              <option value="on">On</option>
+              <option value="off">Off</option>
+            </select>
+            <span className="text-[11px] text-muted-foreground">
+              Skipped when the player has no un-owned pins.
+            </span>
+          </label>
+          <NumberField
+            label="Discounted on"
+            hint="Share of days the reserved slot is one of the day's sales."
+            min={0}
+            max={100}
+            suffix="% of days"
+            value={shop.wishlistDealChancePercent}
+            onChange={(wishlistDealChancePercent) =>
+              patch({ wishlistDealChancePercent })
+            }
+          />
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-border/40 bg-card/60 p-5">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-lg font-black text-foreground">Discounts</p>
+            <p className="text-sm text-muted-foreground">
+              Every slot carries a discount; what changes is how deep. Rarer
+              tiers cut deeper, so the epic markdown is still the one worth
+              coming back for. The ceiling is the trade-up guard: let a discount
+              go deeper and buying the exact item undercuts the trade.
+            </p>
+          </div>
+          <button
+            onClick={() =>
+              patch({
+                rarityDiscountPercent: {
+                  ...DEFAULT_SHOP_SALES.rarityDiscountPercent,
+                },
+                raritySaleDaysPercent: {
+                  ...DEFAULT_SHOP_SALES.raritySaleDaysPercent,
+                },
+                discountedSlots: DEFAULT_SHOP_SALES.discountedSlots,
+                maxDiscountPercent: DEFAULT_SHOP_SALES.maxDiscountPercent,
+              })
+            }
+            className="inline-flex items-center gap-1.5 rounded-lg bg-muted px-2.5 py-1.5 text-xs font-black text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            Defaults
+          </button>
+        </div>
+
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full min-w-[520px] border-separate border-spacing-y-2">
+            <thead>
+              <tr className="text-left text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+                <th className="px-2">Tier</th>
+                <th className="px-2">Discount</th>
+                <th className="px-2">Sale days</th>
+                <th className="px-2">How often</th>
+              </tr>
+            </thead>
+            <tbody>
+              {SHOP_TIERS.map((rarity) => {
+                const days = shop.raritySaleDaysPercent[rarity] ?? 0;
+                return (
+                  <tr key={rarity} className="bg-muted/40">
+                    <td className="rounded-l-xl px-3 py-2 text-xs font-black uppercase tracking-wider text-foreground">
+                      {rarity}
+                    </td>
+                    <td className="px-2 py-2">
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={shop.rarityDiscountPercent[rarity] ?? 0}
+                        onChange={(event) =>
+                          patchMap(
+                            'rarityDiscountPercent',
+                            rarity,
+                            Number(event.target.value),
+                          )
+                        }
+                        className={cn(inputClass, 'max-w-[90px]')}
+                      />
+                    </td>
+                    <td className="px-2 py-2">
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={days}
+                        onChange={(event) =>
+                          patchMap(
+                            'raritySaleDaysPercent',
+                            rarity,
+                            Number(event.target.value),
+                          )
+                        }
+                        className={cn(inputClass, 'max-w-[90px]')}
+                      />
+                    </td>
+                    <td className="rounded-r-xl px-3 py-2 text-xs font-medium text-muted-foreground">
+                      {days >= 100
+                        ? 'Every day this tier is on the shelf'
+                        : days <= 0
+                          ? 'Never on sale'
+                          : `~${Math.round((days / 100) * 5)} day${Math.round((days / 100) * 5) === 1 ? '' : 's'} in 5`}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <NumberField
+            label="Discounted slots"
+            hint={
+              shop.discountedSlots >= shop.slots
+                ? 'The whole shelf, on a normal day.'
+                : 'On a normal day. The rest of the shelf sits at its standing price, and the sale-days column decides which tiers get picked.'
+            }
+            min={0}
+            max={shop.slots}
+            value={shop.discountedSlots}
+            onChange={(discountedSlots) => patch({ discountedSlots })}
+          />
+          <NumberField
+            label="Discount ceiling"
+            hint="Clamps every discount, weekend included."
+            min={0}
+            max={90}
+            suffix="%"
+            value={shop.maxDiscountPercent}
+            onChange={(maxDiscountPercent) => patch({ maxDiscountPercent })}
+          />
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-border/40 bg-card/60 p-5">
+        <p className="text-lg font-black text-foreground">Weekend special</p>
+        <p className="text-sm text-muted-foreground">
+          One day a week every discount deepens to a single flat rate, overriding
+          the per-tier cuts above — this is the day worth showing up for.
+        </p>
+        <div className="mt-4 grid gap-4 sm:grid-cols-3">
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-bold text-foreground">Day</span>
+            <select
+              value={shop.weekendDay}
+              onChange={(event) =>
+                patch({ weekendDay: Number(event.target.value) })
+              }
+              className={inputClass}
+            >
+              {WEEKDAYS.map((day, index) => (
+                <option key={day} value={index}>
+                  {day}
+                </option>
+              ))}
+            </select>
+          </label>
+          <NumberField
+            label="Discounted slots"
+            min={0}
+            max={shop.slots}
+            value={shop.weekendDiscountedSlots}
+            onChange={(weekendDiscountedSlots) =>
+              patch({ weekendDiscountedSlots })
+            }
+          />
+          <NumberField
+            label="Discount"
+            hint="Flat across every discounted slot that day, then clamped by the ceiling."
+            min={0}
+            max={90}
+            suffix="%"
+            value={shop.weekendDiscountPercent}
+            onChange={(weekendDiscountPercent) =>
+              patch({ weekendDiscountPercent })
+            }
+          />
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-border/40 bg-card/60 p-5">
+        <p className="text-lg font-black text-foreground">Rerolls</p>
+        <p className="text-sm text-muted-foreground">
+          A reroll swaps the whole shelf. Every roll carries at least one
+          discount and nothing the player owns, so a reroll can never land worse
+          than what it replaced.
+        </p>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <NumberField
+            label="Plus rerolls"
+            hint="Free, per day."
+            min={0}
+            max={10}
+            suffix="/ day"
+            value={shop.plusRerolls}
+            onChange={(plusRerolls) => patch({ plusRerolls })}
+          />
+          <NumberField
+            label="Free rerolls"
+            hint="Each one costs a rewarded ad."
+            min={0}
+            max={10}
+            suffix="/ day"
+            value={shop.adRerolls}
+            onChange={(adRerolls) => patch({ adRerolls })}
+          />
+        </div>
+      </section>
     </div>
   );
 }

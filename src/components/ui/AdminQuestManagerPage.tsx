@@ -2025,7 +2025,7 @@ export function AdminQuestManagerPage() {
                   <div className="flex flex-wrap gap-2">
                     {slot.rewards.map((reward, ri) => (
                       <RewardTile
-                        key={`${reward.type}-${reward.itemId ?? reward.amount ?? ri}`}
+                        key={`${ri}-${reward.type}-${reward.itemId ?? reward.amount ?? ''}`}
                         reward={reward}
                         rewardCatalog={rewardCatalog}
                         isPremium={false}
@@ -2628,7 +2628,7 @@ export function AdminQuestManagerPage() {
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
             {loginQuestRewards(tier.rewards).map((reward, ri) => (
               <RewardTile
-                key={`${reward.type}-${reward.itemId ?? reward.backgroundId ?? reward.amount ?? ri}`}
+                key={`${ri}-${reward.type}-${reward.itemId ?? reward.backgroundId ?? reward.amount ?? ''}`}
                 reward={reward}
                 rewardCatalog={rewardCatalog}
                 isPremium={false}
@@ -3897,7 +3897,7 @@ export function AdminQuestManagerPage() {
                       <div className="mt-2 flex items-center gap-2">
                         <div className="flex flex-wrap gap-1.5">
                           {block.rewards!.map((r, ri) => (
-                            <RewardTile key={`${r.type}-${r.itemId ?? r.amount ?? ri}`} reward={r} rewardCatalog={rewardCatalog} isPremium={false} />
+                            <RewardTile key={`${ri}-${r.type}-${r.itemId ?? r.amount ?? ''}`} reward={r} rewardCatalog={rewardCatalog} isPremium={false} />
                           ))}
                         </div>
                       </div>
@@ -4625,7 +4625,7 @@ function ObjectivesEditorDialog({
                   <div className="flex flex-wrap gap-2">
                     {block.rewards!.map((reward, ri) => (
                       <RewardTile
-                        key={`${reward.type}-${reward.itemId ?? reward.amount ?? ri}`}
+                        key={`${ri}-${reward.type}-${reward.itemId ?? reward.amount ?? ''}`}
                         reward={reward}
                         rewardCatalog={rewardCatalog}
                         isPremium={false}

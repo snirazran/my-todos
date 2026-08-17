@@ -129,10 +129,16 @@ export async function POST(req: NextRequest) {
     const state = rollPond(prior, today, generatedToday, config);
     const owed = pondOwed(state, generatedToday);
 
+    // A pond claim is recurring income, so it doubles: Plus takes it here,
+    // everyone else takes it from the ad offer below. The cap doubles with it
+    // (20 → 40), and only the payout is doubled — what each friend generated
+    // is credited once, or the second claim of the day would find it spent.
+    const plusMultiplier = premium ? 2 : 1;
+
     // Each friend can only send so much a day, the day before is still
     // claimable until it expires, and the pond as a whole has its own ceiling.
     let granted = 0;
-    let headroom = pondRemaining;
+    let headroom = Math.ceil(pondRemaining / plusMultiplier);
     const credited = { ...(state.credited ?? {}) };
     const prevCredited = { ...(state.prevCredited ?? {}) };
     const incTotals: Record<string, number> = {};
@@ -166,9 +172,9 @@ export async function POST(req: NextRequest) {
       source: 'friend_pond',
       occurrenceKey: today,
       dayKey: today,
-      targetAmount: pondRowToday + granted,
+      targetAmount: pondRowToday + granted * plusMultiplier,
       capRemaining: pondRemaining,
-      meta: { friends: claimedFrom.length },
+      meta: { friends: claimedFrom.length, doubled: premium },
     });
 
     if (settlement.delta <= 0) {
@@ -197,7 +203,7 @@ export async function POST(req: NextRequest) {
       date: today,
       credited,
       prevCredited,
-      lastClaim: { amount: settlement.delta, doubled: false },
+      lastClaim: { amount: settlement.delta, doubled: premium },
       weekKey,
       weekDays,
       weekFriends,
@@ -228,6 +234,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       granted: settlement.delta,
       gate,
+      doubled: premium,
       weeklyBonus: earnsWeeklyBonus
         ? { giftItemId: bonusGiftId, friends: weekFriends.length, days: weekDays.length }
         : undefined,

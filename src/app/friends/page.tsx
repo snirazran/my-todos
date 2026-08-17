@@ -109,7 +109,10 @@ export default function FriendsPage() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inboxOpen, setInboxOpen] = useState(false);
   const [claiming, setClaiming] = useState(false);
-  const [claimReward, setClaimReward] = useState<number | null>(null);
+  const [claimReward, setClaimReward] = useState<{
+    amount: number;
+    doubled: boolean;
+  } | null>(null);
   const [removeTarget, setRemoveTarget] = useState<FriendSummary | null>(null);
   const [detailTarget, setDetailTarget] = useState<FriendSummary | null>(null);
   const [buddyTarget, setBuddyTarget] = useState<FriendSummary | null>(null);
@@ -145,7 +148,7 @@ export default function FriendsPage() {
         }
         mutateInventoryCaches();
         await mutateFriends();
-        setClaimReward(granted);
+        setClaimReward({ amount: granted, doubled: !!data?.doubled });
       }
     } finally {
       setClaiming(false);
@@ -420,7 +423,8 @@ export default function FriendsPage() {
       <FriendRequestsInbox open={inboxOpen} onClose={() => setInboxOpen(false)} />
       {claimReward !== null && (
         <FlyClaimRewardOverlay
-          amount={claimReward}
+          amount={claimReward.amount}
+          alreadyDoubled={claimReward.doubled}
           tz={tz}
           onClose={() => setClaimReward(null)}
         />
@@ -632,17 +636,20 @@ function makeFlyPrize(amount: number): ItemDef {
 
 function FlyClaimRewardOverlay({
   amount,
+  alreadyDoubled,
   tz,
   onClose,
 }: {
   amount: number;
+  /** Plus already took the double on the server, so there is nothing to offer. */
+  alreadyDoubled: boolean;
   tz: string;
   onClose: () => void;
 }) {
   useRegisterOpenSheet(true);
   const [displayAmount, setDisplayAmount] = useState(amount);
   const [doubling, setDoubling] = useState(false);
-  const doubledRef = useRef(false);
+  const doubledRef = useRef(alreadyDoubled);
 
   React.useEffect(() => {
     hapticCelebrate();

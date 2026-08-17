@@ -124,6 +124,8 @@ export type LoginStreakRewardSummary = {
   grantedItemIds: string[];
   grantedBackgroundIds: string[];
   shieldsGranted: number;
+  /** Present for free players only: the ad that buys the same double Plus got. */
+  doubleClaimId?: string;
 };
 
 export type LoginStreakRewardEvent = {

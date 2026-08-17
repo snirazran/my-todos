@@ -345,7 +345,7 @@ export function QuestRewardTileBadge({
       {shown.map((item, i) => {
         return (
           <div
-            key={`${item.type}-${item.itemId ?? item.backgroundId ?? item.amount ?? i}`}
+            key={`${i}-${item.type}-${item.itemId ?? item.backgroundId ?? item.amount ?? ''}`}
             className="relative"
             style={rewardStackTileStyle(i, shown.length)}
           >

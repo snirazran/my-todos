@@ -66,6 +66,7 @@ type ApiData = {
   unseenContainerCount?: number;
   dailyDeals?: DailyDeal[];
   dealRerollsLeft?: number;
+  dealRerollsAllowed?: number;
   isPremium?: boolean;
 };
 

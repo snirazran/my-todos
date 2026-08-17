@@ -5,12 +5,8 @@ import UserModel, { type UserDoc } from '@/lib/models/User';
 import { CATALOG, type ItemDef, type WardrobeSlot } from '@/lib/skins/catalog';
 import { getFullCatalog, buildById } from '@/lib/skins/getCatalog';
 import { isAvailableAt, filterAvailable } from '@/lib/skins/availability';
-import {
-  DAILY_DEAL_REROLLS,
-  getDailyDeals,
-  isPremiumActive,
-  rerollsUsed,
-} from '@/lib/skins/dailyDeal';
+import { getShopRotation, isPremiumActive } from '@/lib/skins/dailyDeal';
+import { loadShopRotation } from '@/lib/skins/shopRotationServer';
 import { loadWishlistState } from '@/lib/skins/wishlistServer';
 import type { WishlistState } from '@/lib/skins/wishlist';
 import { notifyUserChanged } from '@/lib/taskSync';
@@ -155,13 +151,13 @@ export async function GET(req: NextRequest) {
         ),
       );
       const today = getZonedToday(timezone);
-      const dealRerolls = rerollsUsed(wardrobe.dealReroll ?? undefined, today);
-      const dailyDeals = getDailyDeals(
-        fullCatalog,
-        new Date(),
+      const rotation = await loadShopRotation({
+        catalog: fullCatalog,
+        wardrobe,
         timezone,
-        dealRerolls,
-      );
+        isPlus: isPremium,
+      });
+      const dailyDeals = rotation.deals;
       // The home shop rail renders straight off this summary, so the deal items
       // ride along with the equipped ones — no second catalog request. Owned
       // ids come too: the catalog is DB-driven, so anything added after the
@@ -192,22 +188,30 @@ export async function GET(req: NextRequest) {
         catalog: fullCatalog.filter((item) => summaryIds.has(item.id)),
         isPremium,
         dailyDeals,
+        dealRerollsLeft: rotation.rerollsLeft,
+        dealRerollsAllowed: rotation.rerollsAllowed,
         unseenCount: unseenIds.filter((id) => !containerIds.has(id)).length,
         unseenContainerCount: unseenIds.filter((id) => containerIds.has(id))
           .length,
       });
     }
     const now = new Date();
-    const dayKey = getZonedToday(timezone);
-    const usedRerolls = rerollsUsed(wardrobe.dealReroll ?? undefined, dayKey);
+    const rotation = await loadShopRotation({
+      catalog: fullCatalog,
+      wardrobe,
+      timezone,
+      isPlus: isPremium,
+      now,
+    });
     return json({
       wardrobe,
       ...wishlistPayload(
         await loadWishlistState(wardrobe, fullCatalog, isPremium),
       ),
       catalog: visibleCatalog(fullCatalog, wardrobe, now),
-      dailyDeals: getDailyDeals(fullCatalog, now, timezone, usedRerolls),
-      dealRerollsLeft: DAILY_DEAL_REROLLS - usedRerolls,
+      dailyDeals: rotation.deals,
+      dealRerollsLeft: rotation.rerollsLeft,
+      dealRerollsAllowed: rotation.rerollsAllowed,
       isPremium,
     });
   } catch {
@@ -225,7 +229,7 @@ export async function GET(req: NextRequest) {
       wishlist: null,
       wishlistItems: [],
       catalog: guestCatalog,
-      dailyDeals: getDailyDeals([...guestCatalog], new Date(), timezone),
+      dailyDeals: getShopRotation({ catalog: [...guestCatalog], timezone }),
       isPremium: false,
     });
   }

@@ -26,6 +26,7 @@ type ShopPick = {
   price: number;
   wasPrice: number;
   discountPercent: number;
+  onSale: boolean;
 };
 
 /**
@@ -103,9 +104,9 @@ export function HomeShopRail() {
 
   const picks = React.useMemo<ShopPick[]>(() => {
     const byId = new Map((data?.catalog ?? []).map((i) => [i.id, i]));
-    // Same membership rule as the shop's daily-deals shelf: every deal whose
-    // item resolves in the catalog. Filtering owned items out here made the
-    // two shelves disagree on how many deals the day has.
+    // Same membership rule as the shop's shelf: every slot whose item resolves
+    // in the catalog. Filtering owned items out here made the two shelves
+    // disagree on how many slots the day has.
     const candidates: ShopPick[] = [];
     for (const deal of deals) {
       const item = byId.get(deal.itemId);
@@ -115,18 +116,18 @@ export function HomeShopRail() {
         price: deal.dealPrice,
         wasPrice: deal.priceFlies,
         discountPercent: deal.discountPercent,
+        onSale: !!deal.onSale,
       });
     }
     if (!candidates.length) return [];
 
-    // The whole shelf is here (it scrolls), but one you can afford leads so the
-    // rail opens on something attainable rather than a wall of locked prices.
-    const affordable = candidates
-      .filter((c) => c.price <= balance)
-      .sort((a, b) => rarityRank[b.item.rarity] - rarityRank[a.item.rarity]);
-    const rest = candidates
-      .filter((c) => c.price > balance)
-      .sort((a, b) => rarityRank[b.item.rarity] - rarityRank[a.item.rarity]);
+    // Today's discounts lead, then whatever you can afford, so the rail opens
+    // on something attainable rather than a wall of locked prices.
+    const rank = (a: ShopPick, b: ShopPick) =>
+      Number(b.onSale) - Number(a.onSale) ||
+      rarityRank[b.item.rarity] - rarityRank[a.item.rarity];
+    const affordable = candidates.filter((c) => c.price <= balance).sort(rank);
+    const rest = candidates.filter((c) => c.price > balance).sort(rank);
     return [...affordable, ...rest];
   }, [data?.catalog, deals, balance]);
 
@@ -256,7 +257,7 @@ export function HomeShopRail() {
       {/* Same card as the shop's daily-deals shelf — corner rarity ribbon,
           rarity gradient, struck original, effective discount. */}
       <DragScrollRow>
-        {picks.map(({ item, price, wasPrice, discountPercent }) => {
+        {picks.map(({ item, price, wasPrice, discountPercent, onSale }) => {
           const config = RARITY_CONFIG[item.rarity];
           return (
             <button
@@ -292,7 +293,7 @@ export function HomeShopRail() {
               </span>
 
               <span className="mt-1.5 flex items-center justify-center gap-1.5">
-                {wasPrice > price && (
+                {onSale && (
                   <span className="text-[11px] font-bold tabular-nums text-muted-foreground line-through decoration-2 opacity-70">
                     {wasPrice.toLocaleString()}
                   </span>
@@ -304,7 +305,7 @@ export function HomeShopRail() {
               </span>
 
               <span className="mt-0.5 text-center text-[10px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-                {discountPercent}% off today
+                {onSale ? `${discountPercent}% off today` : ' '}
               </span>
             </button>
           );

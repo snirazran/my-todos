@@ -20,12 +20,17 @@ export type AdDoubleClaim = {
 
 export const DOUBLE_CLAIM_WINDOW_MS = 15 * 60 * 1000;
 
+/**
+ * The ad-funded half of the one doubling rule: a free player watching one
+ * rewarded ad gets exactly what Plus gets automatically, which is flies ×2 and
+ * nothing else. A gift is doubled where it is opened — two prizes out of the
+ * one box (see /api/skins/open-gift/double) — so an item or a background that
+ * came with the claim is never re-granted here; a duplicate skin is not a
+ * second reward. Sources the doc marks "never doubled" must not call this at
+ * all, or the ad would hand out what a subscription deliberately does not.
+ */
 export function recordDoubleableClaim(user: any, summary: DoubleableSummary) {
-  const hasGrant =
-    (summary.fliesGranted ?? 0) > 0 ||
-    (summary.grantedItemIds?.length ?? 0) > 0 ||
-    (summary.grantedBackgroundIds?.length ?? 0) > 0;
-  if (!hasGrant) return;
+  if ((summary.fliesGranted ?? 0) <= 0) return;
   const isPremium = user.premiumUntil
     ? new Date(user.premiumUntil) > new Date()
     : false;
@@ -34,8 +39,8 @@ export function recordDoubleableClaim(user: any, summary: DoubleableSummary) {
   const claim: AdDoubleClaim = {
     id: randomUUID(),
     fliesGranted: summary.fliesGranted ?? 0,
-    grantedItemIds: [...(summary.grantedItemIds ?? [])],
-    grantedBackgroundIds: [...(summary.grantedBackgroundIds ?? [])],
+    grantedItemIds: [],
+    grantedBackgroundIds: [],
     doubled: false,
     createdAt: new Date(),
   };
