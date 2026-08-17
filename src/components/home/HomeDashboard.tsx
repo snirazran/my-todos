@@ -1061,6 +1061,43 @@ export default function HomeDashboard() {
         focusCategoryIds={questOnboarding?.selectedCategoryIds}
         categoryTagMap={questOnboarding?.categoryTagMap}
         sections={user ? sections : []}
+        onBulkSubmit={async (bulkTasks) => {
+          if (!user) throw new Error('Sign in to add tasks.');
+          const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+          const res = await fetch('/api/tasks?view=board', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tasks: bulkTasks, timezone }),
+          });
+          const payload = await res.json().catch(() => ({}));
+          if (!res.ok || !payload.ok) {
+            throw new Error(payload.error ?? 'Could not add these tasks.');
+          }
+
+          await Promise.all([mutateToday(), mutateBacklog()]);
+          void notifyQuestClaims(showNotification);
+          showNotification(
+            `Added ${bulkTasks.length} ${bulkTasks.length === 1 ? 'task' : 'tasks'}`,
+            payload.batchId
+              ? async () => {
+                  const undoRes = await fetch('/api/tasks?view=board', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      creationBatchId: payload.batchId,
+                      timezone,
+                    }),
+                  });
+                  const undoPayload = await undoRes.json().catch(() => ({}));
+                  if (!undoRes.ok) {
+                    throw new Error(undoPayload.error ?? 'Could not undo this batch.');
+                  }
+                  await Promise.all([mutateToday(), mutateBacklog()]);
+                }
+              : undefined,
+            { durationMs: 6000 },
+          );
+        }}
         onSubmit={async ({
           text,
           days,

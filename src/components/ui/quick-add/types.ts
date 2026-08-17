@@ -37,10 +37,13 @@ export type QuickAddSubmit = {
   sectionId?: string | null;
 };
 
+export type QuickAddBulkSubmit = QuickAddSubmit[];
+
 export type QuickAddSheetProps = Readonly<{
   open: boolean;
   onOpenChange: (v: boolean) => void;
   onSubmit: (data: QuickAddSubmit) => Promise<void> | void;
+  onBulkSubmit?: (tasks: QuickAddBulkSubmit) => Promise<void> | void;
   initialText?: string;
   defaultRepeat?: RepeatChoice;
   defaultPickedDay?: number;

@@ -72,6 +72,7 @@ import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import { useFrogodoroUiStore } from '@/lib/frogodoroUiStore';
 import { useSheetStore } from '@/lib/sheetStore';
 import { useRiveInteractionPause } from '@/lib/riveInteractionPause';
+import { notifyQuestClaims } from '@/lib/questClaims';
 
 type RepeatChoice = 'this-week' | 'weekly';
 
@@ -2584,6 +2585,62 @@ export default function TaskBoard({
         defaultDateKey={initialDateKey ?? activeDateKey}
         daysOrder={daysOrder}
         sections={boardSections}
+        onBulkSubmit={async (bulkTasks) => {
+          const anchor = initialDateKey ?? activeDateKey;
+          const anchorDate = parseYmd(anchor);
+          const anchorDow = anchorDate.getDay();
+          const translatedTasks = bulkTasks.map((task) => {
+            if (task.dates?.length || task.repeat !== 'weekly') return task;
+            const dates = task.days.flatMap((day) => {
+              if (day === -1) return [];
+              const offset = (day - anchorDow + 7) % 7;
+              return [
+                ymd(
+                  new Date(
+                    anchorDate.getFullYear(),
+                    anchorDate.getMonth(),
+                    anchorDate.getDate() + offset,
+                  ),
+                ),
+              ];
+            });
+            return { ...task, dates };
+          });
+
+          const res = await fetch('/api/tasks?view=board', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tasks: translatedTasks, timezone: tz }),
+          });
+          const payload = await res.json().catch(() => ({}));
+          if (!res.ok || !payload.ok) {
+            throw new Error(payload.error ?? 'Could not add these tasks.');
+          }
+
+          window.dispatchEvent(new Event('board-refresh'));
+          void notifyQuestClaims(showNotification);
+          showNotification(
+            `Added ${bulkTasks.length} ${bulkTasks.length === 1 ? 'task' : 'tasks'}`,
+            payload.batchId
+              ? async () => {
+                  const undoRes = await fetch('/api/tasks?view=board', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      creationBatchId: payload.batchId,
+                      timezone: tz,
+                    }),
+                  });
+                  const undoPayload = await undoRes.json().catch(() => ({}));
+                  if (!undoRes.ok) {
+                    throw new Error(undoPayload.error ?? 'Could not undo this batch.');
+                  }
+                  window.dispatchEvent(new Event('board-refresh'));
+                }
+              : undefined,
+            { durationMs: 6000 },
+          );
+        }}
         onSubmit={async ({
           text,
           days,

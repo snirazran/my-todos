@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import dynamic from 'next/dynamic';
 import useSWR, { mutate } from 'swr';
 import {
   AnimatePresence,
@@ -14,6 +15,7 @@ import {
   Bell,
   CalendarDays,
   Check,
+  ListPlus,
   Lock,
   Plus,
   Repeat,
@@ -38,6 +40,7 @@ import { SuggestionTabs } from './quick-add/SuggestionTabs';
 import { useTagManager } from './quick-add/useTagManager';
 import { useCalendarMonth } from './quick-add/useCalendarMonth';
 import { useKeyboardInset } from './quick-add/useKeyboardInset';
+import { parseBulkTasks } from './quick-add/bulkTasks';
 import {
   matchSuggestionBuckets,
   nameMatchesBucket,
@@ -284,9 +287,15 @@ import type {
   ActivePicker,
   ChecklistItem,
   QuickAddSheetProps,
+  QuickAddSubmit,
   RepeatChoice,
   SavedTag,
 } from './quick-add/types';
+
+const BulkAddReviewSheet = dynamic(
+  () => import('./quick-add/BulkAddReviewSheet'),
+  { ssr: false },
+);
 
 export type { QuickAddSheetProps } from './quick-add/types';
 
@@ -294,6 +303,7 @@ export default function QuickAddSheet({
   open,
   onOpenChange,
   onSubmit,
+  onBulkSubmit,
   initialText = '',
   defaultRepeat = 'this-week',
   defaultPickedDay,
@@ -308,6 +318,8 @@ export default function QuickAddSheet({
   sections = [],
 }: QuickAddSheetProps) {
   const [text, setText] = useState(initialText);
+  const [bulkInitialTasks, setBulkInitialTasks] = useState<string[] | null>(null);
+  const [bulkOmittedCount, setBulkOmittedCount] = useState(0);
   const [nlDismissed, setNlDismissed] = useState('');
   const [repeat, setRepeat] = useState<RepeatChoice>(defaultRepeat);
   const [tags, setTags] = useState<string[]>([]);
@@ -500,7 +512,7 @@ export default function QuickAddSheet({
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
-      if (showPremiumLimit || showSavedConfirm) return;
+      if (showPremiumLimit || showSavedConfirm || bulkInitialTasks) return;
       if (showSectionPicker) {
         closeSectionPicker();
         return;
@@ -524,6 +536,7 @@ export default function QuickAddSheet({
     showReminderPicker,
     showPremiumLimit,
     showSavedConfirm,
+    bulkInitialTasks,
     showSectionPicker,
     managedTag,
     onOpenChange,
@@ -546,6 +559,8 @@ export default function QuickAddSheet({
     if (!open) return;
 
     setText(initialText);
+    setBulkInitialTasks(null);
+    setBulkOmittedCount(0);
 
     const initialDay = (() => {
       if (defaultDateKey) {
@@ -950,16 +965,18 @@ export default function QuickAddSheet({
     setActivePicker(null);
   };
 
-  const doSubmit = async (removeSavedTask: boolean) => {
-    if (isSubmitting) return;
-    const trimmed = text.trim();
-    if (!trimmed) return;
+  const submitDataFor = (
+    taskText: string,
+    includeSavedDetails: boolean,
+  ): QuickAddSubmit | null => {
+    const trimmed = taskText.trim();
+    if (!trimmed) return null;
 
     const apiDays: ApiDay[] = pickedDays
       .slice()
       .sort()
-      .map((d) => apiDayFromDisplay(d, daysOrder));
-    if (apiDays.length === 0) return;
+      .map((day) => apiDayFromDisplay(day, daysOrder));
+    if (apiDays.length === 0) return null;
 
     const exactDates =
       repeat === 'monthly' || repeat === 'custom'
@@ -970,23 +987,32 @@ export default function QuickAddSheet({
           ? [selectedDateKey]
           : undefined;
 
+    return {
+      text: trimmed,
+      days: apiDays,
+      dates: exactDates,
+      repeat,
+      tags,
+      startTime: startTime || undefined,
+      endTime: endTime || undefined,
+      reminder: notifyEnabled ? reminder : undefined,
+      repeatEndDate: repeat !== 'this-week' ? repeatEndDate : null,
+      repeatRule: repeat === 'custom' ? repeatRule : null,
+      notes: includeSavedDetails && pickedBacklogTaskId ? pickedNotes : undefined,
+      checklist:
+        includeSavedDetails && pickedBacklogTaskId ? pickedChecklist : undefined,
+      sectionId: pickedSectionId ?? undefined,
+    };
+  };
+
+  const doSubmit = async (removeSavedTask: boolean) => {
+    if (isSubmitting) return;
+    const submitData = submitDataFor(text, true);
+    if (!submitData) return;
+
     setIsSubmitting(true);
     try {
-      await onSubmit({
-        text: trimmed,
-        days: apiDays,
-        dates: exactDates,
-        repeat,
-        tags,
-        startTime: startTime || undefined,
-        endTime: endTime || undefined,
-        reminder: notifyEnabled ? reminder : undefined,
-        repeatEndDate: repeat !== 'this-week' ? repeatEndDate : null,
-        repeatRule: repeat === 'custom' ? repeatRule : null,
-        notes: pickedBacklogTaskId ? pickedNotes : undefined,
-        checklist: pickedBacklogTaskId ? pickedChecklist : undefined,
-        sectionId: pickedSectionId ?? undefined,
-      });
+      await onSubmit(submitData);
       if (removeSavedTask && pickedBacklogTaskId) {
         const backlogKey = '/api/tasks?view=board&day=-1';
         // Drop it from the SWR cache right away so it doesn't flicker back in
@@ -1013,6 +1039,47 @@ export default function QuickAddSheet({
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const submitBulkTasks = async (taskTexts: string[]) => {
+    if (isSubmitting) return;
+    const tasks = taskTexts
+      .map((taskText) => submitDataFor(taskText, false))
+      .filter((task): task is QuickAddSubmit => !!task);
+    if (tasks.length === 0) return;
+
+    hapticTick();
+    setIsSubmitting(true);
+    try {
+      if (onBulkSubmit) {
+        await onBulkSubmit(tasks);
+      } else {
+        for (const task of tasks) await onSubmit(task);
+      }
+      setBulkInitialTasks(null);
+      onOpenChange(false);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const openBulkAdd = (tasks: string[], omittedCount = 0) => {
+    inputRef.current?.blur();
+    setBulkInitialTasks(tasks.length > 0 ? tasks : ['']);
+    setBulkOmittedCount(omittedCount);
+  };
+
+  const handleTaskPaste = (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const pasted = event.clipboardData.getData('text/plain');
+    if (!/[\r\n]/.test(pasted)) return;
+    const target = event.currentTarget;
+    const start = target.selectionStart ?? text.length;
+    const end = target.selectionEnd ?? start;
+    const combined = `${text.slice(0, start)}${pasted}${text.slice(end)}`;
+    const parsed = parseBulkTasks(combined);
+    if (parsed.tasks.length < 2) return;
+    event.preventDefault();
+    openBulkAdd(parsed.tasks, parsed.omittedCount);
   };
 
   const handleSubmit = async () => {
@@ -1228,6 +1295,7 @@ export default function QuickAddSheet({
                             onChange={(e) =>
                               setText(e.target.value.replace(/\s*\n+\s*/g, ' '))
                             }
+                            onPaste={handleTaskPaste}
                             onFocus={() => setInputFocused(true)}
                             onBlur={() => setInputFocused(false)}
                             placeholder="Add a task"
@@ -1474,6 +1542,11 @@ export default function QuickAddSheet({
                               onClick={toggleSectionPicker}
                             />
                           )}
+                          <ToolbarIcon
+                            icon={<ListPlus className="h-5 w-5" />}
+                            label="Add multiple tasks"
+                            onClick={() => openBulkAdd([])}
+                          />
                           <ToolbarIcon
                             icon={<Bell className="h-5 w-5" />}
                             label="Reminder"
@@ -1795,6 +1868,28 @@ export default function QuickAddSheet({
         </div>,
         document.body,
       )}
+
+      {bulkInitialTasks ? (
+        <BulkAddReviewSheet
+          open
+          initialTasks={bulkInitialTasks}
+          initialOmittedCount={bulkOmittedCount}
+          summary={[
+            selectedDateLabel,
+            ...(repeatsOn ? [repeatShortLabel] : []),
+            ...(tags.length > 0
+              ? [`${tags.length} ${tags.length === 1 ? 'tag' : 'tags'}`]
+              : []),
+            ...(notifyEnabled ? ['Reminder'] : []),
+            ...(pickedSection ? [pickedSection.name] : []),
+          ]}
+          submitting={isSubmitting}
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen && !isSubmitting) setBulkInitialTasks(null);
+          }}
+          onConfirm={submitBulkTasks}
+        />
+      ) : null}
     </>
   );
 }

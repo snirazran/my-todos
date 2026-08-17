@@ -119,6 +119,8 @@ type JarStatus = {
 
 const DAILY_FLY_LIMIT_FREE = FLY_ECONOMY_DEFAULTS.taskIncome.dailyCapFree;
 const DAILY_FLY_LIMIT_PREMIUM = FLY_ECONOMY_DEFAULTS.taskIncome.dailyCapPlus;
+const MAX_BULK_TASKS = 50;
+const MAX_TASK_TEXT_LENGTH = 100;
 
 const isWeekday = (n: number): n is Weekday =>
   Number.isInteger(n) && n >= 0 && n <= 6;
@@ -937,6 +939,89 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const tz = body.timezone || 'UTC';
 
+  if (Object.prototype.hasOwnProperty.call(body, 'tasks')) {
+    if (!Array.isArray(body.tasks) || body.tasks.length === 0) {
+      return NextResponse.json(
+        { error: 'tasks must be a non-empty array' },
+        { status: 400 },
+      );
+    }
+    if (body.tasks.length > MAX_BULK_TASKS) {
+      return NextResponse.json(
+        { error: `A batch can contain at most ${MAX_BULK_TASKS} tasks` },
+        { status: 400 },
+      );
+    }
+    for (const item of body.tasks) {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) {
+        return NextResponse.json(
+          { error: 'Every task must be an object' },
+          { status: 400 },
+        );
+      }
+      const taskText = typeof item.text === 'string' ? item.text.trim() : '';
+      if (!taskText) {
+        return NextResponse.json(
+          { error: 'Every task needs a name' },
+          { status: 400 },
+        );
+      }
+      if (taskText.length > MAX_TASK_TEXT_LENGTH) {
+        return NextResponse.json(
+          { error: `Task names must be ${MAX_TASK_TEXT_LENGTH} characters or less` },
+          { status: 400 },
+        );
+      }
+    }
+
+    const creationBatchId = uuid();
+    const ids: string[] = [];
+    const tasks: any[] = [];
+    try {
+      for (const item of body.tasks) {
+        const result = await createTasksForUser(uid, item, tz, {
+          creationBatchId,
+        });
+        if (!result.ok) {
+          await TaskModel.deleteMany({ userId: uid, creationBatchId });
+          return NextResponse.json(
+            { error: result.error },
+            { status: result.status },
+          );
+        }
+        ids.push(...result.ids);
+        tasks.push(...result.tasks);
+      }
+    } catch (error) {
+      await TaskModel.deleteMany({ userId: uid, creationBatchId });
+      console.error('Bulk task creation failed:', error);
+      return NextResponse.json(
+        { error: 'Could not add these tasks. Please try again.' },
+        { status: 500 },
+      );
+    }
+
+    void syncGamification(uid, tz);
+    await notifyTaskChanged(uid);
+    const analyticsUser = await UserModel.findById(uid).select('focusProfile').lean();
+    await recordAnalyticsEvent({
+      userId: uid,
+      name: 'task_created',
+      properties: taskAnalyticsProperties(
+        tasks[0] ?? body.tasks[0],
+        analyticsUser?.focusProfile,
+        { count: body.tasks.length, task_type: 'bulk' },
+      ),
+    });
+    return NextResponse.json({
+      ok: true,
+      batchId: creationBatchId,
+      createdCount: body.tasks.length,
+      ids,
+      tasks,
+    });
+  }
+
   // Duplicate an existing task onto a target date (used for completed tasks).
   if (body.duplicateFrom && body.date) {
     const src = await TaskModel.findOne({
@@ -1038,10 +1123,17 @@ export async function createTasksForUser(
   uid: string,
   body: any,
   tz: string,
-  opts?: { bondId?: string; buddyUserId?: string },
+  opts?: {
+    bondId?: string;
+    buddyUserId?: string;
+    creationBatchId?: string;
+  },
 ): Promise<CreateTasksResult> {
   const buddyFields = opts?.bondId
     ? { bondId: opts.bondId, buddyUserId: opts.buddyUserId }
+    : {};
+  const batchFields = opts?.creationBatchId
+    ? { creationBatchId: opts.creationBatchId }
     : {};
   const sectionFields =
     typeof body?.sectionId === 'string' && body.sectionId
@@ -1115,6 +1207,7 @@ export async function createTasksForUser(
       repeatEndDate,
       repeatDayOfMonth,
       ...buddyFields,
+      ...batchFields,
       ...sectionFields,
     });
     return {
@@ -1136,6 +1229,7 @@ export async function createTasksForUser(
           repeatEndDate,
           repeatDayOfMonth,
           ...buddyFields,
+          ...batchFields,
           ...sectionFields,
         },
       ],
@@ -1172,6 +1266,7 @@ export async function createTasksForUser(
       repeatEndDate,
       repeatRule: rule,
       ...buddyFields,
+      ...batchFields,
       ...sectionFields,
     });
     return {
@@ -1193,6 +1288,7 @@ export async function createTasksForUser(
           repeatEndDate,
           repeatRule: rule,
           ...buddyFields,
+          ...batchFields,
           ...sectionFields,
         },
       ],
@@ -1249,6 +1345,7 @@ export async function createTasksForUser(
         repeatStartDate,
         repeatEndDate,
         ...buddyFields,
+        ...batchFields,
         ...sectionFields,
       });
       createdIds.push(id);
@@ -1268,6 +1365,7 @@ export async function createTasksForUser(
         repeatStartDate,
         repeatEndDate,
         ...buddyFields,
+        ...batchFields,
         ...sectionFields,
       });
     }
@@ -1295,6 +1393,7 @@ export async function createTasksForUser(
       endTime,
       reminder,
       ...buddyFields,
+      ...batchFields,
       ...sectionFields,
     });
     createdIds.push(id);
@@ -1312,6 +1411,7 @@ export async function createTasksForUser(
       endTime: task.endTime,
       reminder: task.reminder,
       ...buddyFields,
+      ...batchFields,
       ...sectionFields,
     });
   }
@@ -1337,6 +1437,7 @@ export async function createTasksForUser(
         endTime,
         reminder,
         ...buddyFields,
+        ...batchFields,
       });
       createdTasks.push({
         id: task.id,
@@ -1351,6 +1452,7 @@ export async function createTasksForUser(
         endTime: task.endTime,
         reminder: task.reminder,
         ...buddyFields,
+        ...batchFields,
       });
     } else {
       const weekday = d as Weekday;
@@ -1373,6 +1475,7 @@ export async function createTasksForUser(
         endTime,
         reminder,
         ...buddyFields,
+        ...batchFields,
         ...sectionFields,
       });
       createdTasks.push({
@@ -1389,6 +1492,7 @@ export async function createTasksForUser(
         endTime: task.endTime,
         reminder: task.reminder,
         ...buddyFields,
+        ...batchFields,
         ...sectionFields,
       });
     }
@@ -2502,6 +2606,33 @@ export async function DELETE(req: NextRequest) {
   await connectMongo();
   const body = await req.json();
   const tz = body.timezone || 'UTC';
+
+  if (typeof body.creationBatchId === 'string') {
+    const creationBatchId = body.creationBatchId.trim();
+    if (!/^[0-9a-f-]{36}$/i.test(creationBatchId)) {
+      return NextResponse.json({ error: 'Invalid batch id' }, { status: 400 });
+    }
+    const hasProgress = await TaskModel.exists({
+      userId: uid,
+      creationBatchId,
+      $or: [
+        { completed: true },
+        { 'completedDates.0': { $exists: true } },
+        { 'checklist.done': true },
+        { 'frogodoroSessions.0': { $exists: true } },
+      ],
+    });
+    if (hasProgress) {
+      return NextResponse.json(
+        { error: 'This batch can no longer be undone because work has started.' },
+        { status: 409 },
+      );
+    }
+    const deleted = await TaskModel.deleteMany({ userId: uid, creationBatchId });
+    await syncGamification(uid, tz);
+    await notifyTaskChanged(uid);
+    return NextResponse.json({ ok: true, deletedCount: deleted.deletedCount });
+  }
 
   // Delete a whole repeat series (the linked group, or a lone weekly task):
   // stop it going forward, but preserve every PAST occurrence as a standalone
