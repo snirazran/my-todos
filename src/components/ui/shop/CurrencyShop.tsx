@@ -46,6 +46,8 @@ type AdFlyStatus = {
   remaining: number;
   cooldownSeconds?: number;
   cooldownLeft?: number;
+  available?: boolean;
+  isPremium?: boolean;
 };
 
 /** BaseSheet's mobile slide-in runs 400ms; give it a frame of headroom. */
@@ -343,6 +345,8 @@ function FreeFliesCard({ open }: { open: boolean }) {
   }, [cooldown]);
 
   if (!available) return null;
+  // Plus pays to not see ads, so the surface is gone rather than merely refused.
+  if (data && data.available === false) return null;
 
   const remaining = data?.remaining ?? 0;
   const cap = data?.cap ?? 5;
@@ -379,6 +383,7 @@ function FreeFliesCard({ open }: { open: boolean }) {
           remaining: payload.remaining,
           cooldownSeconds: payload.cooldownSeconds,
           cooldownLeft: payload.cooldownLeft,
+          available: true,
         },
         { revalidate: false },
       );

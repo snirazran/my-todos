@@ -86,8 +86,15 @@ export type FlyEconomyConfig = {
   };
   rewardedAds: {
     reward: number;
+    /** Views of the flat-fly placement a day; still bounded by `totalDailyCap`. */
     dailyCap: number;
     cooldownSeconds: number;
+    /** Rewarded views a day across every placement combined. */
+    totalDailyCap: number;
+    doubleRewardPerDay: number;
+    giftDoublePerDay: number;
+    shopRerollPerDay: number;
+    tradeRerollPerDay: number;
   };
   circuitBreaker: {
     /** Flies from every source combined, per user per day. */
@@ -157,6 +164,11 @@ export const FLY_ECONOMY_DEFAULTS: FlyEconomyConfig = {
     reward: 10,
     dailyCap: 6,
     cooldownSeconds: 60,
+    totalDailyCap: 6,
+    doubleRewardPerDay: 2,
+    giftDoublePerDay: 2,
+    shopRerollPerDay: 1,
+    tradeRerollPerDay: 1,
   },
   circuitBreaker: {
     dailyCap: 400,
@@ -216,6 +228,11 @@ export const FLY_ECONOMY_LIMITS: Record<
     reward: { min: 0, max: 1000 },
     dailyCap: { min: 0, max: 100 },
     cooldownSeconds: { min: 0, max: 3600 },
+    totalDailyCap: { min: 0, max: 100 },
+    doubleRewardPerDay: { min: 0, max: 50 },
+    giftDoublePerDay: { min: 0, max: 50 },
+    shopRerollPerDay: { min: 0, max: 50 },
+    tradeRerollPerDay: { min: 0, max: 50 },
   },
   circuitBreaker: {
     dailyCap: { min: 1, max: 100_000 },

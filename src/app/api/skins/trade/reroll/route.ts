@@ -10,6 +10,8 @@ import { dropFromWishlist } from '@/lib/skins/wishlistServer';
 import { clearGiftLuckForPrizes } from '@/lib/skins/giftLuck';
 import type { Rarity } from '@/lib/skins/catalog';
 import { DOUBLE_CLAIM_WINDOW_MS } from '@/lib/rewards/adDouble';
+import { consumeAdView } from '@/lib/rewards/adBudget';
+import { isPremiumActive } from '@/lib/skins/dailyDeal';
 
 export async function POST(req: NextRequest) {
   let userId: string;
@@ -54,6 +56,18 @@ export async function POST(req: NextRequest) {
     const age = Date.now() - new Date(claim.createdAt).getTime();
     if (age > DOUBLE_CLAIM_WINDOW_MS) {
       return NextResponse.json({ granted: false });
+    }
+
+    const premium = isPremiumActive(user.premiumUntil);
+    if (!premium) {
+      const spend = await consumeAdView({
+        userId,
+        placement: 'trade_reroll',
+        premium: false,
+      });
+      if (!spend.ok) {
+        return NextResponse.json({ granted: false, reason: spend.reason });
+      }
     }
 
     const itemInv = user.wardrobe?.inventory ?? {};

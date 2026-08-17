@@ -4,6 +4,7 @@ import connectMongo from '@/lib/mongoose';
 import UserModel, { type UserDoc } from '@/lib/models/User';
 import { getFullCatalog } from '@/lib/skins/getCatalog';
 import { isPremiumActive, shopDay } from '@/lib/skins/dailyDeal';
+import { consumeAdView } from '@/lib/rewards/adBudget';
 import { loadShopRotation } from '@/lib/skins/shopRotationServer';
 import { ensureShopSalesConfig } from '@/lib/models/ShopSalesConfig';
 import { rerollsAllowed } from '@/lib/skins/shopSales';
@@ -38,9 +39,24 @@ export async function POST(req: NextRequest) {
     if (allowed <= 0) {
       return json({ error: 'Rerolls are a Plus perk', rerollsLeft: 0 }, 403);
     }
-    // Plus pays with the membership, everyone else pays with a rewarded ad.
+    // Plus pays with the membership, everyone else pays with a rewarded ad —
+    // and that ad comes out of the one daily view budget.
     if (!isPlus && !viaAd) {
       return json({ error: 'Watch a short ad to reroll', rerollsLeft: 0 }, 403);
+    }
+    if (!isPlus) {
+      const spend = await consumeAdView({
+        userId,
+        placement: 'shop_reroll',
+        premium: false,
+        tz: timezone,
+      });
+      if (!spend.ok) {
+        return json(
+          { error: 'No ad rerolls left today', reason: spend.reason, rerollsLeft: 0 },
+          429,
+        );
+      }
     }
 
     const { dayKey } = shopDay(new Date(), timezone, config);

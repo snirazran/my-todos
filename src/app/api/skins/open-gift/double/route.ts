@@ -8,6 +8,8 @@ import { giftLuckUpdate, readUserGiftLuck } from '@/lib/skins/giftLuck';
 import { readWishlistPins, wishlistPinKey } from '@/lib/skins/wishlist';
 import { dropFromWishlist } from '@/lib/skins/wishlistServer';
 import { DOUBLE_CLAIM_WINDOW_MS } from '@/lib/rewards/adDouble';
+import { consumeAdView } from '@/lib/rewards/adBudget';
+import { isPremiumActive } from '@/lib/skins/dailyDeal';
 
 const json = (body: unknown, init = 200) =>
   NextResponse.json(body, { status: init });
@@ -50,6 +52,20 @@ export async function POST(req: NextRequest) {
     const age = Date.now() - new Date(claim.createdAt).getTime();
     if (age > DOUBLE_CLAIM_WINDOW_MS) {
       return json({ granted: false });
+    }
+
+    // Plus opens twice on the membership; a free player buys the same second
+    // open with one view out of the shared daily ad budget.
+    const premium = isPremiumActive(user.premiumUntil);
+    if (!premium) {
+      const spend = await consumeAdView({
+        userId,
+        placement: 'gift_double',
+        premium: false,
+      });
+      if (!spend.ok) {
+        return json({ granted: false, reason: spend.reason });
+      }
     }
 
     const giftConfig = await getGiftConfig(claim.giftBoxId);

@@ -2016,8 +2016,13 @@ export default function TaskBoard({
     );
   };
 
+  const desktopLensOpen = stripOpen || filtersActive;
+
   return (
-    <div className="relative w-full h-full">
+    <div
+      className="relative w-full h-full"
+      style={{ ['--lens' as string]: desktopLensOpen ? '60px' : '0px' }}
+    >
       {/* SCROLLER — layoutScroll keeps card layout animations scroll-aware so
           horizontal scrolling never reads as cards sliding sideways. */}
       <motion.div
@@ -2042,7 +2047,7 @@ export default function TaskBoard({
           scrollBehavior: snapSuppressed ? 'auto' : undefined,
         }}
       >
-        <div className="flex mx-auto gap-3 px-4 pt-[calc(9rem+env(safe-area-inset-top))] md:pt-[108px] pb-[calc(100px+env(safe-area-inset-bottom))] md:pb-[calc(40px+env(safe-area-inset-bottom))]">
+        <div className="flex mx-auto gap-3 px-4 pt-[calc(9rem+env(safe-area-inset-top))] md:pt-[calc(108px+var(--lens))] pb-[calc(100px+env(safe-area-inset-bottom))] md:pb-[calc(40px+env(safe-area-inset-bottom))] md:transition-[padding] md:duration-200">
           {renderEdge('past')}
           {windowDates.map((dk, i) => (
             <div
@@ -2057,19 +2062,9 @@ export default function TaskBoard({
                 count={activeTaskCount(tasksByDate[dk] ?? [])}
                 totalCount={(tasksByDate[dk] ?? []).length}
                 listRef={setListRef(i)}
-                maxHeightClass="max-h-[calc(100svh-315px-var(--safe-bottom)-env(safe-area-inset-top))] md:max-h-[calc(100svh-224px-var(--safe-bottom))]"
+                maxHeightClass="max-h-[calc(100svh-315px-var(--safe-bottom)-env(safe-area-inset-top))] md:max-h-[calc(100svh-224px-var(--lens)-var(--safe-bottom))]"
                 isToday={dk === todayKey}
                 isPast={cmpYmd(dk, todayKey) < 0}
-                headerAction={
-                  <div className="hidden md:block">
-                    <FilterTriggerButton
-                      compact
-                      onClick={() => setStripOpen((v) => !v)}
-                      activeCount={activeFilterCount}
-                      open={stripOpen}
-                    />
-                  </div>
-                }
                 note={
                   filtersActive ? (
                     <FilterStatusLine
@@ -2211,10 +2206,13 @@ export default function TaskBoard({
       </div>
 
       {/* Desktop lens — the chips sit on the board, not over it, so the columns
-          visibly re-filter under each tap. Toggled from any column header. */}
-      {(stripOpen || filtersActive) && (
-        <div className="pointer-events-none fixed inset-x-0 top-[70px] z-[61] hidden items-center px-4 md:flex">
-          <div className="pointer-events-auto min-w-0 flex-1">
+          visibly re-filter under each tap. Toggled from the bottom island. */}
+      {desktopLensOpen && (
+        <div className="pointer-events-none fixed inset-x-0 top-[76px] z-[61] hidden justify-center px-6 md:flex lg:px-10">
+          <div
+            style={{ ['--strip-fade' as string]: 'var(--card)' }}
+            className="pointer-events-auto flex min-w-0 max-w-full items-center rounded-[22px] border border-border/50 bg-card/95 px-2 py-1.5 shadow-sm backdrop-blur-xl"
+          >
             <FilterChipStrip
               filters={filters}
               base={baseFilters}
@@ -2223,6 +2221,7 @@ export default function TaskBoard({
               onChange={setFilters}
               onClearAll={resetFilters}
               onOpenMore={() => setFilterSheetOpen(true)}
+              className="min-w-0 flex-1"
             />
           </div>
         </div>
@@ -2370,144 +2369,132 @@ export default function TaskBoard({
         </AnimatePresence>
 
         <div className="pointer-events-auto mx-auto flex w-[88vw] max-w-none flex-col items-center justify-center md:w-full md:max-w-[480px]">
-          {isMobile ? (
-            // One shared surface for the saved-tasks target, the week dots,
-            // and add — previously three independent floating shapes with no
-            // visual relationship to each other. At rest it's a normal row;
-            // the moment a drag starts, that row fades out (kept mounted so
-            // the bar never resizes) and a single drop strip takes over
-            // almost the full bar — no per-item growing/shrinking fight, so
-            // nothing clips or fights for space.
-            <div className="relative flex h-16 w-full max-w-[340px] items-center rounded-[28px] border border-border/50 bg-card px-1.5 shadow-sm">
+          {/* One shared surface for the saved-tasks target, the week dots,
+              and add — previously three independent floating shapes with no
+              visual relationship to each other. At rest it's a normal row;
+              the moment a drag starts, that row fades out (kept mounted so
+              the bar never resizes) and a single drop strip takes over
+              almost the full bar — no per-item growing/shrinking fight, so
+              nothing clips or fights for space. */}
+          <div className="relative flex h-16 w-full max-w-[340px] items-center rounded-[28px] border border-border/50 bg-card px-1.5 shadow-sm md:h-[68px] md:max-w-[360px] md:px-2">
+            <div
+              className={`flex w-full items-center gap-1 transition-opacity duration-150 ${
+                drag?.active ? 'pointer-events-none opacity-0' : 'opacity-100'
+              }`}
+              aria-hidden={!!drag?.active}
+            >
+              <BacklogBox
+                count={backlog.length}
+                isDragOver={false}
+                isDragging={false}
+                isRepeating={draggingRepeating}
+                isDesktop={false}
+                onClick={() => setBacklogOpen(true)}
+              />
+
+              <FilterTriggerButton
+                compact
+                size="lg"
+                onClick={() => setStripOpen((v) => !v)}
+                activeCount={activeFilterCount}
+                open={stripOpen}
+              />
+
+              {/* Below ~380px the bar can't hold these and the controls at a
+                  tappable size — the day is already named up top, so the dots
+                  are what goes. */}
               <div
-                className={`flex w-full items-center gap-1 transition-opacity duration-150 ${
-                  drag?.active ? 'pointer-events-none opacity-0' : 'opacity-100'
-                }`}
-                aria-hidden={!!drag?.active}
+                className="flex min-w-0 flex-1 items-center justify-center gap-1 overflow-hidden narrow:hidden"
+                aria-label={`Visible day: ${windowDates[pageIndex] ?? activeDateKey}`}
               >
-                <BacklogBox
-                  count={backlog.length}
-                  isDragOver={false}
-                  isDragging={false}
-                  isRepeating={draggingRepeating}
-                  isDesktop={false}
-                  onClick={() => setBacklogOpen(true)}
-                />
-
-                <FilterTriggerButton
-                  compact
-                  size="lg"
-                  onClick={() => setStripOpen((v) => !v)}
-                  activeCount={activeFilterCount}
-                  open={stripOpen}
-                />
-
-                {/* Below ~380px the bar can't hold these and the controls at a
-                    tappable size — the day is already named up top, so the dots
-                    are what goes. */}
-                <div
-                  className="flex min-w-0 flex-1 items-center justify-center gap-1 overflow-hidden narrow:hidden"
-                  aria-label={`Visible day: ${windowDates[pageIndex] ?? activeDateKey}`}
-                >
-                  {WEEK_ORDER.map((day) => {
-                    const visibleDate = windowDates[pageIndex] ?? activeDateKey;
-                    const active = parseYmd(visibleDate).getDay() === day;
-                    return (
-                      <span
-                        key={day}
-                        aria-hidden="true"
-                        className={`h-1 shrink-0 rounded-full transition-[width,background-color] ${
-                          active ? 'w-4 bg-primary' : 'w-1.5 bg-primary/20'
-                        }`}
-                      />
-                    );
-                  })}
-                </div>
-                <span className="hidden flex-1 narrow:block" aria-hidden />
-
-                <button
-                  type="button"
-                  aria-label="Select tasks"
-                  title="Select tasks"
-                  disabled={
-                    (tasksByDate[windowDates[pageIndex] ?? activeDateKey] ?? [])
-                      .length === 0
-                  }
-                  onClick={() => selection.enter()}
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-muted-foreground transition-all active:scale-90 disabled:opacity-30 [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground"
-                >
-                  <ListChecks size={20} strokeWidth={2.5} />
-                </button>
-
-                <button
-                  type="button"
-                  aria-label="Add task"
-                  disabled={
-                    scrollLocked ||
-                    backlogOpen ||
-                    !!drag?.active ||
-                    calendarOpen ||
-                    moveCalendarOpen ||
-                    showQuickAdd ||
-                    showTimer
-                  }
-                  onClick={() => {
-                    const visibleDate = windowDates[pageIndex] ?? activeDateKey;
-                    const targetDate =
-                      cmpYmd(visibleDate, todayKey) < 0 ? todayKey : visibleDate;
-                    setQuickText('');
-                    setInitialDateKey(targetDate);
-                    setShowQuickAdd(true);
-                  }}
-                  className="relative grid h-14 w-14 shrink-0 -translate-y-3 place-items-center rounded-full bg-primary text-primary-foreground shadow-[0_8px_18px_-4px_rgba(0,0,0,0.4)] ring-4 ring-card transition-[opacity,transform] active:scale-95 disabled:pointer-events-none disabled:opacity-0"
-                >
-                  <Plus className="h-6 w-6 stroke-[3]" />
-                </button>
+                {WEEK_ORDER.map((day) => {
+                  const visibleDate = windowDates[pageIndex] ?? activeDateKey;
+                  const active = parseYmd(visibleDate).getDay() === day;
+                  return (
+                    <span
+                      key={day}
+                      aria-hidden="true"
+                      className={`h-1 shrink-0 rounded-full transition-[width,background-color] ${
+                        active ? 'w-4 bg-primary' : 'w-1.5 bg-primary/20'
+                      }`}
+                    />
+                  );
+                })}
               </div>
+              <span className="hidden flex-1 narrow:block" aria-hidden />
 
-              <AnimatePresence>
-                {drag?.active && (
-                  <motion.div
-                    ref={backlogBoxRef}
-                    initial={{ opacity: 0, scale: 0.94 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.94 }}
-                    transition={{ type: 'spring', stiffness: 480, damping: 32 }}
-                    className={`absolute inset-1.5 flex items-center justify-center gap-2 rounded-[22px] border-2 transition-colors ${
-                      isDragOverBacklog
-                        ? 'border-primary bg-primary/12 text-primary'
-                        : 'border-dashed border-primary/30 bg-primary/5 text-primary/70'
-                    }`}
-                  >
-                    {draggingRepeating ? (
-                      <EyeOff className="h-5 w-5 shrink-0" />
-                    ) : (
-                      <ArrowDownToLine className="h-5 w-5 shrink-0" />
-                    )}
-                    <span className="text-sm font-bold whitespace-nowrap">
-                      {isDragOverBacklog
-                        ? draggingRepeating
-                          ? 'Release to skip this day'
-                          : 'Release to save for later'
-                        : draggingRepeating
-                          ? 'Drop to skip this day'
-                          : 'Drop to save for later'}
-                    </span>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              <button
+                type="button"
+                aria-label="Select tasks"
+                title="Select tasks"
+                disabled={
+                  (tasksByDate[windowDates[pageIndex] ?? activeDateKey] ?? [])
+                    .length === 0
+                }
+                onClick={() => selection.enter()}
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-muted-foreground transition-all active:scale-90 disabled:opacity-30 [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground"
+              >
+                <ListChecks size={20} strokeWidth={2.5} />
+              </button>
+
+              <button
+                type="button"
+                aria-label="Add task"
+                disabled={
+                  scrollLocked ||
+                  backlogOpen ||
+                  !!drag?.active ||
+                  calendarOpen ||
+                  moveCalendarOpen ||
+                  showQuickAdd ||
+                  showTimer
+                }
+                onClick={() => {
+                  const visibleDate = windowDates[pageIndex] ?? activeDateKey;
+                  const targetDate =
+                    cmpYmd(visibleDate, todayKey) < 0 ? todayKey : visibleDate;
+                  setQuickText('');
+                  setInitialDateKey(targetDate);
+                  setShowQuickAdd(true);
+                }}
+                className="relative grid h-14 w-14 shrink-0 -translate-y-3 place-items-center rounded-full bg-primary text-primary-foreground shadow-[0_8px_18px_-4px_rgba(0,0,0,0.4)] ring-4 ring-card transition-[opacity,transform] active:scale-95 disabled:pointer-events-none disabled:opacity-0"
+              >
+                <Plus className="h-6 w-6 stroke-[3]" />
+              </button>
             </div>
-          ) : (
-            <BacklogBox
-              count={backlog.length}
-              isDragOver={isDragOverBacklog}
-              isDragging={!!drag?.active}
-              isRepeating={draggingRepeating}
-              isDesktop
-              onClick={() => setBacklogOpen(true)}
-              forwardRef={backlogBoxRef}
-            />
-          )}
+
+            <AnimatePresence>
+              {drag?.active && (
+                <motion.div
+                  ref={backlogBoxRef}
+                  initial={{ opacity: 0, scale: 0.94 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.94 }}
+                  transition={{ type: 'spring', stiffness: 480, damping: 32 }}
+                  className={`absolute inset-1.5 flex items-center justify-center gap-2 rounded-[22px] border-2 transition-colors ${
+                    isDragOverBacklog
+                      ? 'border-primary bg-primary/12 text-primary'
+                      : 'border-dashed border-primary/30 bg-primary/5 text-primary/70'
+                  }`}
+                >
+                  {draggingRepeating ? (
+                    <EyeOff className="h-5 w-5 shrink-0" />
+                  ) : (
+                    <ArrowDownToLine className="h-5 w-5 shrink-0" />
+                  )}
+                  <span className="text-sm font-bold whitespace-nowrap">
+                    {isDragOverBacklog
+                      ? draggingRepeating
+                        ? 'Release to skip this day'
+                        : 'Release to save for later'
+                      : draggingRepeating
+                        ? 'Drop to skip this day'
+                        : 'Drop to save for later'}
+                  </span>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
       </div>
 

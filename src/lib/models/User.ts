@@ -73,7 +73,7 @@ const UserSchema = new Schema<UserDoc>(
     plusIntroEligible: { type: Boolean, default: false },
     plusIntroShownAt: { type: Date, default: null },
     adDoubleClaim: { type: Schema.Types.Mixed, default: undefined },
-    adFlyDaily: { type: Schema.Types.Mixed, default: undefined },
+    adBudget: { type: Schema.Types.Mixed, default: undefined },
     timezoneGuard: { type: Schema.Types.Mixed, default: undefined },
     taskStreakQueue: { type: [Schema.Types.Mixed], default: undefined },
     duoWeekGift: { type: Schema.Types.Mixed, default: undefined },

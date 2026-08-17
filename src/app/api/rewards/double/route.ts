@@ -9,6 +9,8 @@ import {
   type AdDoubleClaim,
 } from '@/lib/rewards/adDouble';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
+import { isPremiumActive } from '@/lib/skins/dailyDeal';
+import { consumeAdView, refundAdView } from '@/lib/rewards/adBudget';
 
 export async function POST(req: NextRequest) {
   let userId: string;
@@ -45,6 +47,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ granted: false });
     }
 
+    const premium = isPremiumActive(user.premiumUntil);
+    const spend = await consumeAdView({
+      userId,
+      placement: 'reward_double',
+      premium,
+    });
+    if (!spend.ok) {
+      return NextResponse.json({
+        granted: false,
+        reason: spend.reason,
+        cooldownLeft: spend.cooldownLeft,
+        remaining: spend.remaining,
+      });
+    }
+
     if (!user.wardrobe) {
       user.wardrobe = { equipped: {}, inventory: {}, unseenItems: [], flies: 0 };
     }
@@ -73,12 +90,21 @@ export async function POST(req: NextRequest) {
     (user as any).adDoubleClaim = { ...claim, doubled: true };
     user.markModified('adDoubleClaim');
     user.markModified('wardrobe');
-    await user.save();
+    try {
+      await user.save();
+    } catch (saveErr) {
+      await refundAdView({ userId, placement: 'reward_double' });
+      throw saveErr;
+    }
     if (claim.fliesGranted > 0) {
       await recordAnalyticsEvent({
         userId,
         name: 'fly_earned',
-        properties: { source: 'rewarded_ad_double', fly_amount: claim.fliesGranted, is_premium: false },
+        properties: {
+          source: 'rewarded_ad_double',
+          fly_amount: claim.fliesGranted,
+          is_premium: premium,
+        },
       });
     }
 

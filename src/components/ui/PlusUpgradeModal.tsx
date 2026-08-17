@@ -273,7 +273,7 @@ export function PlusUpgradeModal({
 const PLUS_WELCOME_HIGHLIGHTS = [
   'Double rewards',
   'Every gift opens twice',
-  'Weekly streak rescue',
+  'A free Lily Pad every month',
 ];
 
 export function PlusWelcomeCelebration({ onDone }: { onDone: () => void }) {
@@ -592,7 +592,7 @@ const COMPARISON_ROWS: { label: string; free: boolean }[] = [
   { label: 'Double rewards', free: false },
   { label: 'Every gift opens twice', free: false },
   { label: 'Golden fly companion', free: false },
-  { label: 'Weekly streak rescue', free: false },
+  { label: '10 wishlist slots instead of 4', free: false },
   { label: 'Free trade rerolls', free: false },
   { label: 'Reroll the daily deals without an ad', free: false },
   { label: `${SAVED_LOOKS_PLUS} saved looks`, free: false },

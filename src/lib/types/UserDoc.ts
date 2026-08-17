@@ -145,11 +145,12 @@ export type UserDoc = {
     doubled: boolean;
     createdAt: Date;
   };
-  adFlyDaily?: {
+  /** One rewarded-view budget shared by every ad placement. */
+  adBudget?: {
     date: string;
-    count: number;
-    /** Last granted view, so the cooldown survives a page reload. */
+    views: number;
     lastAt?: Date | string;
+    byPlacement?: Record<string, number>;
   };
   /** The timezone the economy trusts, and how often it has been changed. */
   timezoneGuard?: {

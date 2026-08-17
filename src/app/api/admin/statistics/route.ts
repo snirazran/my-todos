@@ -10,6 +10,7 @@ import FriendshipModel from '@/lib/models/Friendship';
 import FriendRequestModel from '@/lib/models/FriendRequest';
 import ReferralModel from '@/lib/models/Referral';
 import TaskBondModel from '@/lib/models/TaskBond';
+import { readEconomyHealth } from '@/lib/economy/health';
 
 const VALID_RANGES = new Set([7, 30, 90, 365]);
 const RETENTION_EVENT = 'app_opened';
@@ -1032,6 +1033,13 @@ export async function GET(req: NextRequest) {
     };
   });
 
+  // Read off the fly ledger rather than the analytics rollups: the ledger is
+  // the only place a spend and a grant are the same kind of row.
+  const economyHealth = await readEconomyHealth().catch((error) => {
+    console.error('Economy health read failed:', error);
+    return null;
+  });
+
   return NextResponse.json({
     range: { days, start: ymd(start), end: ymd(endDay) },
     coverage: {
@@ -1095,6 +1103,7 @@ export async function GET(req: NextRequest) {
     },
     ads,
     economy: {
+      health: economyHealth,
       flyEarning: { free: earningTier('free'), premium: earningTier('premium') },
       flySources,
       flySpending,

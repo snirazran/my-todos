@@ -109,6 +109,25 @@ type StatisticsData = {
     completionRate: number;
   }>;
   economy: {
+    health: {
+      windowDays: number;
+      from: string;
+      to: string;
+      faucet: number;
+      sink: number;
+      avgDau: number;
+      medianBalance: number | null;
+      metrics: Array<{
+        key: string;
+        label: string;
+        value: number | null;
+        unit: 'ratio' | 'percent' | 'flies' | 'count' | 'days';
+        target: string;
+        status: 'good' | 'watch' | 'bad' | 'unknown';
+        hint?: string;
+      }>;
+      faucetShares: Array<{ source: string; flies: number; share: number; budgetShare: number | null }>;
+    } | null;
     flyEarning: Record<'free' | 'premium', { flies: number; events: number; users: number; averagePerUser: number; averagePerEvent: number }>;
     flySources: Array<{
       source: string;
@@ -1021,11 +1040,80 @@ function SeasonRewardPerformance({ rows }: { rows: StatisticsData['economy']['se
   );
 }
 
+const HEALTH_TONE: Record<string, string> = {
+  good: 'border-emerald-500 bg-emerald-500/5',
+  watch: 'border-amber-500 bg-amber-500/5',
+  bad: 'border-rose-500 bg-rose-500/5',
+  unknown: 'border-border bg-muted/30',
+};
+
+const HEALTH_LABEL: Record<string, string> = {
+  good: 'On target',
+  watch: 'Drifting',
+  bad: 'Off target',
+  unknown: 'No data yet',
+};
+
+function formatHealth(value: number | null, unit: string) {
+  if (value === null) return '—';
+  if (unit === 'ratio') return value.toFixed(2);
+  if (unit === 'percent') return `${value.toFixed(1)}%`;
+  if (unit === 'days') return `${value.toFixed(1)}d`;
+  return integer.format(Math.round(value));
+}
+
+function EconomyHealth({ health }: { health: StatisticsData['economy']['health'] }) {
+  if (!health) {
+    return <p className="text-sm text-muted-foreground">Ledger health is unavailable right now.</p>;
+  }
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Kpi icon={<TrendingUp />} label="Faucet" value={integer.format(health.faucet)} detail={`Flies granted, ${health.windowDays}d`} />
+        <Kpi icon={<CircleDollarSign />} label="Sink" value={integer.format(health.sink)} detail={`Flies spent, ${health.windowDays}d`} />
+        <Kpi icon={<TrendingUp />} label="Avg DAU" value={integer.format(health.avgDau)} detail="Users earning per day" />
+        <Kpi icon={<CircleDollarSign />} label="Median balance" value={health.medianBalance === null ? '—' : integer.format(health.medianBalance)} detail="Flies held" />
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2">
+        {health.metrics.map((m) => (
+          <div key={m.key} className={`rounded-xl border-l-4 p-3 ${HEALTH_TONE[m.status] ?? HEALTH_TONE.unknown}`}>
+            <div className="flex items-baseline justify-between gap-3">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">{m.label}</p>
+              <span className="shrink-0 text-[10px] font-black uppercase tracking-wide text-muted-foreground">{HEALTH_LABEL[m.status]}</span>
+            </div>
+            <p className="mt-1 text-2xl font-black tabular-nums">{formatHealth(m.value, m.unit)}</p>
+            <p className="mt-0.5 text-[11px] font-semibold text-muted-foreground">Target {m.target}</p>
+            {m.hint && m.status !== 'good' && (
+              <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">{m.hint}</p>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <DataTable
+        headers={['Source', 'Flies', 'Share', 'Budget', 'Drift']}
+        rows={health.faucetShares.map((row) => [
+          humanize(row.source),
+          integer.format(row.flies),
+          `${row.share.toFixed(1)}%`,
+          row.budgetShare === null ? '—' : `${row.budgetShare}%`,
+          row.budgetShare === null ? '—' : `${(row.share - row.budgetShare >= 0 ? '+' : '')}${(row.share - row.budgetShare).toFixed(1)}pt`,
+        ])}
+      />
+    </div>
+  );
+}
+
 function Economy({ data }: { data: StatisticsData }) {
   const free = data.economy.flyEarning.free;
   const premium = data.economy.flyEarning.premium;
   return (
     <div className="space-y-5">
+      <Panel title="Economy health" subtitle="The §20 launch dashboard, read from the fly ledger over a rolling 28 days">
+        <EconomyHealth health={data.economy.health} />
+      </Panel>
+
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
         <Kpi icon={<TrendingUp />} label="Free flies / user" value={integer.format(free.averagePerUser)} detail={`${integer.format(free.flies)} gameplay flies earned`} />
         <Kpi icon={<TrendingUp />} label="Plus flies / user" value={integer.format(premium.averagePerUser)} detail={`${integer.format(premium.flies)} gameplay flies earned`} />
