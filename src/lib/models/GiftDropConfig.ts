@@ -22,6 +22,8 @@ export type GiftDropConfigDoc = {
   drops: GiftDropEntryDoc[];
   /** Weights per rarity, used when dropMode === 'rarity'. */
   rarityDrops: GiftRarityDropDoc[];
+  /** Luck this gift's reveal adds to the shared pity counter. */
+  luckPerReveal?: number;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -49,6 +51,7 @@ const GiftDropConfigSchema = new Schema<GiftDropConfigDoc>(
     dropMode: { type: String, enum: ['item', 'rarity'], default: 'item' },
     drops: { type: [GiftDropEntrySchema], default: [] },
     rarityDrops: { type: [GiftRarityDropSchema], default: [] },
+    luckPerReveal: { type: Number, default: undefined, min: 0 },
   },
   { collection: 'giftDropConfigs', timestamps: true },
 );

@@ -4,6 +4,16 @@ import connectMongo from '@/lib/mongoose';
 import CatalogItemModel from '@/lib/models/CatalogItem';
 import GiftDropConfigModel from '@/lib/models/GiftDropConfig';
 import { getGiftConfigs, ensureGiftDropConfigs, loadBackgroundPrizes } from '@/lib/skins/gifts';
+import GiftRulesConfigModel, {
+  GIFT_RULES_CONFIG_ID,
+  ensureGiftRulesConfig,
+} from '@/lib/models/GiftRulesConfig';
+import {
+  DEFAULT_GIFT_RULES,
+  clampGiftRules,
+  luckPerReveal,
+  TIER_BUMP_RARITIES,
+} from '@/lib/skins/giftRules';
 
 const json = (body: unknown, init = 200) =>
   NextResponse.json(body, { status: init });
@@ -63,15 +73,23 @@ export async function GET() {
     await connectMongo();
     await ensureGiftDropConfigs();
 
-    const [gifts, catalog, backgrounds] = await Promise.all([
+    const [gifts, catalog, backgrounds, rules] = await Promise.all([
       getGiftConfigs(true),
       CatalogItemModel.find({ slot: { $ne: 'container' }, hidden: { $ne: true } })
         .sort({ slot: 1, rarity: 1, riveIndex: 1 })
         .lean(),
       loadBackgroundPrizes(),
+      ensureGiftRulesConfig(),
     ]);
 
-    return json({ gifts, catalog, backgrounds });
+    return json({
+      gifts,
+      catalog,
+      backgrounds,
+      rules,
+      rulesDefaults: DEFAULT_GIFT_RULES,
+      tierBumpRarities: TIER_BUMP_RARITIES,
+    });
   } catch {
     return json({ error: 'Unauthorized' }, 401);
   }
@@ -89,6 +107,7 @@ export async function POST(req: NextRequest) {
       dropMode?: string;
       drops?: DropInput[];
       rarityDrops?: RarityDropInput[];
+      luckPerReveal?: number;
     };
     try {
       body = await req.json();
@@ -126,6 +145,7 @@ export async function POST(req: NextRequest) {
       dropMode: normalizeDropMode(body.dropMode),
       drops: sanitizeDrops(body.drops),
       rarityDrops: sanitizeRarityDrops(body.rarityDrops),
+      luckPerReveal: luckPerReveal(body.luckPerReveal, rarity as any),
     });
 
     return json({ ok: true, gift });
@@ -148,6 +168,7 @@ export async function PUT(req: NextRequest) {
       dropMode?: string;
       drops?: DropInput[];
       rarityDrops?: RarityDropInput[];
+      luckPerReveal?: number;
     };
     try {
       body = await req.json();
@@ -178,6 +199,12 @@ export async function PUT(req: NextRequest) {
     if (Array.isArray(body.drops)) configUpdate.drops = sanitizeDrops(body.drops);
     if (Array.isArray(body.rarityDrops))
       configUpdate.rarityDrops = sanitizeRarityDrops(body.rarityDrops);
+    if (body.luckPerReveal !== undefined) {
+      configUpdate.luckPerReveal = luckPerReveal(
+        body.luckPerReveal,
+        gift.rarity as any,
+      );
+    }
 
     if (Object.keys(configUpdate).length > 0) {
       await GiftDropConfigModel.findOneAndUpdate(
@@ -188,6 +215,41 @@ export async function PUT(req: NextRequest) {
     }
 
     return json({ ok: true, gift });
+  } catch {
+    return json({ error: 'Unauthorized' }, 401);
+  }
+}
+
+/** The shared rule set: pity, background share, and the four duplicate rules. */
+export async function PATCH(req: NextRequest) {
+  try {
+    await requireUserId();
+
+    let body: { rules?: unknown };
+    try {
+      body = await req.json();
+    } catch {
+      return json({ error: 'Invalid JSON' }, 400);
+    }
+
+    await connectMongo();
+    const current = await ensureGiftRulesConfig();
+    const rules = clampGiftRules({ ...current, ...(body.rules ?? {}) as object });
+
+    if (rules.hardPityLuck < rules.softPityLuck) {
+      return json(
+        { error: 'Hard pity must be at least as high as soft pity.' },
+        400,
+      );
+    }
+
+    await GiftRulesConfigModel.updateOne(
+      { configId: GIFT_RULES_CONFIG_ID },
+      { $set: { configId: GIFT_RULES_CONFIG_ID, ...rules } },
+      { upsert: true },
+    );
+
+    return json({ ok: true, rules });
   } catch {
     return json({ error: 'Unauthorized' }, 401);
   }

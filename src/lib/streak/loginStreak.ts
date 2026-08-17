@@ -434,7 +434,16 @@ async function rollGuaranteedSkin(
   const inventory = user.wardrobe?.inventory ?? {};
   const unowned = pool.filter((prize) => (inventory[prize.id] ?? 0) <= 0);
   const draw = unowned.length > 0 ? unowned : pool;
-  return draw[Math.floor(Math.random() * draw.length)].id;
+  const prize = draw[Math.floor(Math.random() * draw.length)];
+  // An epic+ from here clears the shared gift Luck counter, same as one won
+  // from a box or a trade-up. Mutated in memory; the caller saves.
+  const { clearGiftLuck, readGiftLuck } = await import('@/lib/skins/giftRules');
+  user.giftLuck = {
+    ...clearGiftLuck(readGiftLuck(user.giftLuck), prize.rarity),
+    updatedAt: new Date(),
+  };
+  user.markModified?.('giftLuck');
+  return prize.id;
 }
 
 function grantQuestRewards(

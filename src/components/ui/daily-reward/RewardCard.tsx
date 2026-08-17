@@ -110,7 +110,7 @@ export function SingleRewardCard({
   hideAction,
   compact,
   hideSingleQuantity = false,
-  lowerItemPreview = false,
+  itemPreviewPosition = 'default',
   giftAnimation,
   rewards,
   rewardCatalog,
@@ -140,8 +140,8 @@ export function SingleRewardCard({
   compact?: boolean;
   /** Hide a redundant ×1 badge while preserving quantities above one. */
   hideSingleQuantity?: boolean;
-  /** Lower cosmetic frogs slightly in constrained preview cards. */
-  lowerItemPreview?: boolean;
+  /** Position cosmetic frogs inside constrained preview cards. */
+  itemPreviewPosition?: 'default' | 'raised' | 'lowered';
   /** Optional gift-box animation override (e.g. 'box_shake'). */
   giftAnimation?: string;
   /** Full reward list for this lane. When it holds more than one, the preview
@@ -317,9 +317,11 @@ export function SingleRewardCard({
               // lower so the frog is centered inside the visible card window.
               (itemDef.slot === 'container'
                 ? '-translate-y-[12%]'
-                : lowerItemPreview
-                  ? 'translate-y-[6%]'
-                  : 'translate-y-[18%]'),
+                : itemPreviewPosition === 'raised'
+                  ? '-translate-y-[4%]'
+                  : itemPreviewPosition === 'lowered'
+                    ? 'translate-y-[6%]'
+                    : 'translate-y-[18%]'),
           )}
           previewTopLeftBadge={
             isClaimed ? (

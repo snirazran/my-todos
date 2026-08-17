@@ -22,6 +22,9 @@ type RewardCardProps = {
   openLaterLabel?: string;
   quantity?: number;
   baseQuantity?: number;
+  /** Copies now owned, when this reveal was a duplicate. Reads as trade fuel,
+   *  never as dust or a refund — a spare is upgrade progress. */
+  spareCount?: number;
   isPremium?: boolean;
   showDoubleUpsell?: boolean;
   rewardAmount?: number;
@@ -76,6 +79,7 @@ export const RewardCard = ({
   openLaterLabel = 'Open Later',
   quantity,
   baseQuantity,
+  spareCount,
   isPremium,
   showDoubleUpsell,
   rewardAmount,
@@ -217,6 +221,11 @@ export const RewardCard = ({
                   baseQuantity={baseQuantity}
                   showContent={showContent}
                 />
+              )}
+
+              {/* Spare badge — a second copy is fuel for a trade-up, not a dud */}
+              {!quantity && spareCount && spareCount > 1 && (
+                <SpareBadge count={spareCount} showContent={showContent} />
               )}
 
               {/* === LAYER 1: CINEMATIC EFFECTS (Centered) === */}
@@ -418,6 +427,30 @@ export const RewardCard = ({
     </motion.div>
   );
 };
+
+function SpareBadge({
+  count,
+  showContent,
+}: {
+  count: number;
+  showContent: boolean;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.7 }}
+      animate={showContent ? { opacity: 1, scale: 1 } : {}}
+      transition={{ type: 'spring', stiffness: 400, damping: 18, delay: 0.5 }}
+      className="absolute right-3 top-3 z-40 flex flex-col items-end gap-0.5"
+    >
+      <span className="rounded-xl border border-white/20 bg-black/45 px-3 py-1 text-sm font-black text-white shadow-sm backdrop-blur-sm">
+        x{count}
+      </span>
+      <span className="rounded-lg bg-amber-400/90 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-slate-900 shadow-sm">
+        Trade fuel
+      </span>
+    </motion.div>
+  );
+}
 
 function QuantityBadge({
   quantity,

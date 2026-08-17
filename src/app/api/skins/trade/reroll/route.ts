@@ -7,6 +7,7 @@ import { ensureTradeModifiersConfig } from '@/lib/models/TradeModifiersConfig';
 import { pickTradeReward } from '@/lib/skins/tradeRewards';
 import { readWishlistPins, wishlistPinKey } from '@/lib/skins/wishlist';
 import { dropFromWishlist } from '@/lib/skins/wishlistServer';
+import { clearGiftLuckForPrizes } from '@/lib/skins/giftLuck';
 import type { Rarity } from '@/lib/skins/catalog';
 import { DOUBLE_CLAIM_WINDOW_MS } from '@/lib/rewards/adDouble';
 
@@ -152,6 +153,7 @@ export async function POST(req: NextRequest) {
     user.markModified('tradeRerollClaim');
     await user.save();
     await dropFromWishlist(userId, user.wardrobe, reward.id, reward.kind);
+    await clearGiftLuckForPrizes(userId, [reward.rarity]);
 
     return NextResponse.json({ granted: true, reward });
   } catch (error) {

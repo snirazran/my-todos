@@ -190,29 +190,21 @@ export const GiftRive = React.memo(
     }, [applyColor]);
 
     useEffect(() => {
-      if (rive) {
-        if (paused) {
-          rive.reset();
-          rive.play();
-          // Re-apply color after reset since reset clears inputs.
-          const raf = requestAnimationFrame(() => {
-            applyColor();
-            rive.pause();
-          });
-          const timers = [50, 150, 300].map((ms) =>
-            setTimeout(() => {
-              applyColor();
-              rive.pause();
-            }, ms),
-          );
-          return () => {
-            cancelAnimationFrame(raf);
-            timers.forEach(clearTimeout);
-          };
-        } else if (!rive.isPlaying) {
-          rive.play();
-        }
+      if (!rive) return;
+      if (!paused) {
+        if (!rive.isPlaying) rive.play();
+        return;
       }
+      rive.play();
+      applyColor();
+      const raf = requestAnimationFrame(applyColor);
+      const timers = [50, 120].map((ms) => setTimeout(applyColor, ms));
+      const freeze = setTimeout(() => rive.pause(), 180);
+      return () => {
+        cancelAnimationFrame(raf);
+        timers.forEach(clearTimeout);
+        clearTimeout(freeze);
+      };
     }, [rive, paused, applyColor]);
 
     useEffect(() => {

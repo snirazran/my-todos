@@ -10,7 +10,10 @@ import {
   Gift,
   Plus,
   Save,
+  Sparkles,
+  SlidersHorizontal,
   Trash2,
+  Wand2,
   X,
   XCircle,
 } from 'lucide-react';
@@ -22,6 +25,14 @@ import {
 } from '@/components/ui/QuestCards';
 import { cn } from '@/lib/utils';
 import type { ItemDef } from '@/lib/skins/catalog';
+import {
+  DEFAULT_GIFT_RULES,
+  DEFAULT_LUCK_PER_REVEAL,
+  GIFT_RULE_LIMITS,
+  RECOMMENDED_RARITY_TABLES,
+  TIER_BUMP_RARITIES,
+  type GiftRules,
+} from '@/lib/skins/giftRules';
 
 type DbItem = ItemDef & {
   hidden?: boolean;
@@ -57,7 +68,23 @@ type GiftConfig = {
   dropMode?: DropMode;
   drops: GiftDrop[];
   rarityDrops?: RarityDrop[];
+  luckPerReveal?: number;
 };
+
+type RuleForm = Record<Exclude<keyof GiftRules, 'tierBumpEnabled'>, string> & {
+  tierBumpEnabled: boolean;
+};
+
+const ruleFormFrom = (rules: GiftRules): RuleForm => ({
+  softPityLuck: String(rules.softPityLuck),
+  softPityBonusPoints: String(rules.softPityBonusPoints),
+  hardPityLuck: String(rules.hardPityLuck),
+  epicPityLuck: String(rules.epicPityLuck),
+  backgroundSharePercent: String(rules.backgroundSharePercent),
+  newFirstWeight: String(rules.newFirstWeight),
+  wishlistRedirectPercent: String(rules.wishlistRedirectPercent),
+  tierBumpEnabled: rules.tierBumpEnabled,
+});
 
 const RARITIES: ItemDef['rarity'][] = [
   'common',
@@ -67,14 +94,20 @@ const RARITIES: ItemDef['rarity'][] = [
   'legendary',
 ];
 
-// Sensible starting weights when an admin first switches a gift to rarity mode.
-const DEFAULT_RARITY_CHANCES: Record<ItemDef['rarity'], string> = {
-  common: '60',
-  uncommon: '25',
-  rare: '10',
-  epic: '4',
-  legendary: '1',
+/** The published table for a gift of this tier, as weight inputs. */
+const recommendedChances = (
+  giftRarity: ItemDef['rarity'],
+): Record<string, string> => {
+  const table =
+    RECOMMENDED_RARITY_TABLES[giftRarity] ?? RECOMMENDED_RARITY_TABLES.common;
+  return Object.fromEntries(
+    RARITIES.map((rarity) => [rarity, String(table[rarity] ?? 0)]),
+  );
 };
+
+// Sensible starting weights when an admin first switches a gift to rarity mode.
+const DEFAULT_RARITY_CHANCES: Record<string, string> =
+  recommendedChances('common');
 
 const RARITY_TEXT: Record<ItemDef['rarity'], string> = {
   common: 'text-muted-foreground',
@@ -106,6 +139,7 @@ export function AdminGiftManagerPopup({
     riveIndex: '0',
     rarity: 'common',
     priceFlies: '100',
+    luckPerReveal: '1',
     hidden: false,
   });
   const [drops, setDrops] = useState<GiftDrop[]>([]);
@@ -113,6 +147,11 @@ export function AdminGiftManagerPopup({
   const [rarityChances, setRarityChances] = useState<Record<string, string>>({
     ...DEFAULT_RARITY_CHANCES,
   });
+  const [view, setView] = useState<'gift' | 'rules'>('gift');
+  const [rules, setRules] = useState<RuleForm>(() =>
+    ruleFormFrom(DEFAULT_GIFT_RULES),
+  );
+  const [savingRules, setSavingRules] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -177,6 +216,7 @@ export function AdminGiftManagerPopup({
       setGifts(nextGifts);
       setCatalog(data.catalog ?? []);
       setBackgrounds(data.backgrounds ?? []);
+      if (data.rules) setRules(ruleFormFrom(data.rules as GiftRules));
       const nextSelected =
         preferredId && nextGifts.some((config) => config.gift.id === preferredId)
           ? preferredId
@@ -200,6 +240,9 @@ export function AdminGiftManagerPopup({
       riveIndex: String(config.gift.riveIndex),
       rarity: config.gift.rarity,
       priceFlies: String(config.gift.priceFlies ?? 100),
+      luckPerReveal: String(
+        config.luckPerReveal ?? DEFAULT_LUCK_PER_REVEAL[config.gift.rarity],
+      ),
       hidden: !!config.gift.hidden,
     });
     setDrops(
@@ -223,6 +266,7 @@ export function AdminGiftManagerPopup({
 
   const startAdd = () => {
     setAddingNew(true);
+    setView('gift');
     setSelectedId(null);
     setConfirmDelete(false);
     setConfirmSave(false);
@@ -232,18 +276,71 @@ export function AdminGiftManagerPopup({
       riveIndex: '0',
       rarity: 'common',
       priceFlies: '100',
+      luckPerReveal: String(DEFAULT_LUCK_PER_REVEAL.common),
       hidden: false,
     });
     setDrops([]);
-    setDropMode('item');
-    setRarityChances({ ...DEFAULT_RARITY_CHANCES });
+    setDropMode('rarity');
+    setRarityChances(recommendedChances('common'));
   };
 
   const selectGift = (config: GiftConfig) => {
     setSelectedId(config.gift.id);
+    setView('gift');
     setResult(null);
     setConfirmSave(false);
     hydrateForm(config);
+  };
+
+  const applyRecommendedTable = () => {
+    setConfirmSave(false);
+    setDropMode('rarity');
+    setRarityChances(recommendedChances(form.rarity as ItemDef['rarity']));
+    setForm((prev) => ({
+      ...prev,
+      luckPerReveal: String(
+        DEFAULT_LUCK_PER_REVEAL[prev.rarity as ItemDef['rarity']] ?? 1,
+      ),
+    }));
+    setResult({
+      type: 'success',
+      message: `Loaded the published ${form.rarity} table. Save to apply it.`,
+    });
+  };
+
+  const saveRules = async () => {
+    setSavingRules(true);
+    setResult(null);
+    try {
+      const res = await fetch('/api/admin/gifts', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          rules: {
+            softPityLuck: Number(rules.softPityLuck) || 0,
+            softPityBonusPoints: Number(rules.softPityBonusPoints) || 0,
+            hardPityLuck: Number(rules.hardPityLuck) || 0,
+            epicPityLuck: Number(rules.epicPityLuck) || 0,
+            backgroundSharePercent: Number(rules.backgroundSharePercent) || 0,
+            newFirstWeight: Number(rules.newFirstWeight) || 1,
+            wishlistRedirectPercent: Number(rules.wishlistRedirectPercent) || 0,
+            tierBumpEnabled: rules.tierBumpEnabled,
+          },
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setResult({ type: 'error', message: data.error || 'Could not save rules' });
+        return;
+      }
+      setRules(ruleFormFrom(data.rules as GiftRules));
+      setResult({ type: 'success', message: 'Reveal rules saved' });
+    } catch {
+      setResult({ type: 'error', message: 'Network error' });
+    } finally {
+      setSavingRules(false);
+    }
   };
 
   const addDrop = () => {
@@ -321,6 +418,7 @@ export function AdminGiftManagerPopup({
         riveIndex: Number(form.riveIndex) || 0,
         rarity: form.rarity,
         priceFlies: Number(form.priceFlies) || 0,
+        luckPerReveal: Number(form.luckPerReveal) || 0,
         hidden: form.hidden,
         dropMode,
         drops: drops.map((drop) => ({
@@ -420,7 +518,7 @@ export function AdminGiftManagerPopup({
                     Gift Manager
                   </h2>
                   <p className="text-xs text-muted-foreground">
-                    Edit gift boxes, Rive colors, prices, and drop chances
+                    Drop tables per gift, plus the shared pity and duplicate rules
                   </p>
                 </div>
               </div>
@@ -435,13 +533,36 @@ export function AdminGiftManagerPopup({
 
           <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[260px_minmax(0,1fr)]">
             <aside className="flex min-h-0 flex-col border-b border-border/50 p-4 md:border-b-0 md:border-r">
-              <Button onClick={startAdd} className="mb-3 h-10 gap-2 font-bold">
+              <Button onClick={startAdd} className="mb-2 h-10 gap-2 font-bold">
                 <Plus className="h-4 w-4" />
                 Add Gift
               </Button>
+              <button
+                type="button"
+                onClick={() => {
+                  setView('rules');
+                  setResult(null);
+                }}
+                className={cn(
+                  'mb-3 flex w-full items-center gap-2.5 rounded-2xl border p-3 text-left transition-all',
+                  view === 'rules'
+                    ? 'border-primary/30 bg-primary/10 ring-1 ring-primary/20'
+                    : 'border-border/50 bg-muted/20 hover:bg-muted/40',
+                )}
+              >
+                <SlidersHorizontal className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <div className="min-w-0">
+                  <div className="text-sm font-black text-foreground">
+                    Reveal Rules
+                  </div>
+                  <div className="text-[10px] font-black uppercase text-muted-foreground">
+                    pity · duplicates · backgrounds
+                  </div>
+                </div>
+              </button>
               <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
                 {gifts.map((config) => {
-                  const active = selectedId === config.gift.id;
+                  const active = view === 'gift' && selectedId === config.gift.id;
                   return (
                     <button
                       key={config.gift.id}
@@ -493,7 +614,17 @@ export function AdminGiftManagerPopup({
                 </motion.div>
               )}
 
-              {!addingNew && !selectedGift ? (
+              {view === 'rules' ? (
+                <RulesPanel
+                  rules={rules}
+                  onChange={(patch) =>
+                    setRules((prev) => ({ ...prev, ...patch }))
+                  }
+                  onReset={() => setRules(ruleFormFrom(DEFAULT_GIFT_RULES))}
+                  onSave={saveRules}
+                  saving={savingRules}
+                />
+              ) : !addingNew && !selectedGift ? (
                 <div className="rounded-3xl border border-dashed border-border p-8 text-center text-sm font-bold text-muted-foreground">
                   Pick a gift or add a new one.
                 </div>
@@ -590,6 +721,25 @@ export function AdminGiftManagerPopup({
                           className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/25"
                         />
                       </Field>
+                      <Field label="Luck per reveal">
+                        <input
+                          type="number"
+                          min={0}
+                          value={form.luckPerReveal}
+                          onChange={(e) => {
+                            setConfirmSave(false);
+                            setForm((prev) => ({
+                              ...prev,
+                              luckPerReveal: e.target.value,
+                            }));
+                          }}
+                          className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/25"
+                        />
+                        <p className="mt-1 text-[10px] font-bold text-muted-foreground">
+                          Added to the shared Luck counter on every open of this
+                          gift, Plus and ad re-opens included.
+                        </p>
+                      </Field>
                     </div>
 
                     <div className="rounded-3xl border border-border/50 bg-card p-4">
@@ -625,10 +775,20 @@ export function AdminGiftManagerPopup({
                               </button>
                             ))}
                           </div>
-                          {dropMode === 'item' && (
+                          {dropMode === 'item' ? (
                             <Button onClick={addDrop} size="sm" variant="outline" className="gap-2">
                               <Plus className="h-4 w-4" />
                               Add Drop
+                            </Button>
+                          ) : (
+                            <Button
+                              onClick={applyRecommendedTable}
+                              size="sm"
+                              variant="outline"
+                              className="gap-2"
+                            >
+                              <Wand2 className="h-4 w-4" />
+                              Published Table
                             </Button>
                           )}
                         </div>
@@ -831,8 +991,10 @@ export function AdminGiftManagerPopup({
                             );
                           })}
                           <p className="px-1 pt-1 text-[11px] text-muted-foreground">
-                            On open, a rarity is rolled by these weights, then a random
-                            non-gift prize (item or background) of that rarity is awarded.
+                            On open, a rarity is rolled by these weights — bent by
+                            the shared pity counter — then one prize of that
+                            rarity is drawn under the Reveal Rules (background
+                            share, wishlist redirect, new-first weighting).
                             Rarities with no prizes are skipped.
                           </p>
                         </div>
@@ -868,6 +1030,175 @@ export function AdminGiftManagerPopup({
       </Fragment>
     </AnimatePresence>,
     document.body,
+  );
+}
+
+type RuleNumberKey = Exclude<keyof GiftRules, 'tierBumpEnabled'>;
+
+const RULE_GROUPS: {
+  title: string;
+  blurb: string;
+  fields: { key: RuleNumberKey; label: string; hint: string }[];
+}[] = [
+  {
+    title: 'Pity — one counter, all gifts',
+    blurb:
+      'Every reveal adds that gift\'s Luck. A legendary from any source clears the legendary counter; any epic or better clears the epic one.',
+    fields: [
+      {
+        key: 'softPityLuck',
+        label: 'Soft pity at',
+        hint: 'Luck at which legendary chance starts climbing',
+      },
+      {
+        key: 'softPityBonusPoints',
+        label: 'Soft pity step',
+        hint: 'Percentage points added per reveal, cumulative',
+      },
+      {
+        key: 'hardPityLuck',
+        label: 'Hard pity at',
+        hint: 'Luck at which the next reveal is a guaranteed legendary',
+      },
+      {
+        key: 'epicPityLuck',
+        label: 'Epic pity at',
+        hint: 'Luck at which the next reveal is a guaranteed epic or better',
+      },
+    ],
+  },
+  {
+    title: 'Duplicates',
+    blurb:
+      'Duplicates still happen — they are the trade fuel — but new items dominate while any remain.',
+    fields: [
+      {
+        key: 'newFirstWeight',
+        label: 'New-first weight',
+        hint: 'How much an un-owned prize outweighs an owned one',
+      },
+      {
+        key: 'wishlistRedirectPercent',
+        label: 'Wishlist redirect %',
+        hint: 'Chance the prize is drawn from un-owned wishlisted items of the rolled rarity',
+      },
+      {
+        key: 'backgroundSharePercent',
+        label: 'Background share %',
+        hint: 'Share of each rarity band that pays a background instead of an item',
+      },
+    ],
+  },
+];
+
+function RulesPanel({
+  rules,
+  onChange,
+  onReset,
+  onSave,
+  saving,
+}: Readonly<{
+  rules: RuleForm;
+  onChange: (patch: Partial<RuleForm>) => void;
+  onReset: () => void;
+  onSave: () => void;
+  saving: boolean;
+}>) {
+  return (
+    <div className="space-y-5">
+      <div className="rounded-3xl border border-border/50 bg-card p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="text-sm font-black text-foreground">Reveal Rules</h3>
+            <p className="text-[11px] text-muted-foreground">
+              Shared by every gift. Individual drop tables stay per gift.
+            </p>
+          </div>
+          <Button onClick={onReset} size="sm" variant="outline" className="gap-2">
+            <Sparkles className="h-4 w-4" />
+            Load Defaults
+          </Button>
+        </div>
+      </div>
+
+      {RULE_GROUPS.map((group) => (
+        <div
+          key={group.title}
+          className="rounded-3xl border border-border/50 bg-card p-4"
+        >
+          <h4 className="text-sm font-black text-foreground">{group.title}</h4>
+          <p className="mb-3 text-[11px] text-muted-foreground">{group.blurb}</p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {group.fields.map((field) => (
+              <Field key={field.key} label={field.label}>
+                <input
+                  type="number"
+                  min={GIFT_RULE_LIMITS[field.key].min}
+                  max={GIFT_RULE_LIMITS[field.key].max}
+                  step="0.1"
+                  value={rules[field.key]}
+                  onChange={(e) =>
+                    onChange({ [field.key]: e.target.value } as Partial<RuleForm>)
+                  }
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/25"
+                />
+                <p className="mt-1 text-[10px] font-bold text-muted-foreground">
+                  {field.hint}
+                </p>
+              </Field>
+            ))}
+          </div>
+        </div>
+      ))}
+
+      <div className="rounded-3xl border border-border/50 bg-card p-4">
+        <button
+          type="button"
+          onClick={() => onChange({ tierBumpEnabled: !rules.tierBumpEnabled })}
+          className={cn(
+            'flex w-full items-center justify-between gap-3 rounded-2xl border p-3 text-left transition',
+            rules.tierBumpEnabled
+              ? 'border-emerald-500/30 bg-emerald-500/10'
+              : 'border-border/50 bg-muted/20 hover:bg-muted/40',
+          )}
+        >
+          <div className="min-w-0">
+            <div className="text-sm font-black text-foreground">Tier bump</div>
+            <p className="text-[11px] text-muted-foreground">
+              Owning every prize of a rolled {TIER_BUMP_RARITIES.join(' or ')}{' '}
+              band upgrades the drop one tier.
+            </p>
+          </div>
+          <span
+            className={cn(
+              'shrink-0 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wide',
+              rules.tierBumpEnabled
+                ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
+                : 'bg-muted text-muted-foreground',
+            )}
+          >
+            {rules.tierBumpEnabled ? 'On' : 'Off'}
+          </span>
+        </button>
+        <p className="mt-3 px-1 text-[11px] text-muted-foreground">
+          Spares are never dust: a duplicate stacks as “×N” and reads as trade
+          fuel. Every gift always pays exactly one cosmetic.
+        </p>
+      </div>
+
+      <Button
+        onClick={onSave}
+        disabled={saving}
+        className="h-11 w-full gap-2 font-black"
+      >
+        {saving ? (
+          <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+        ) : (
+          <Save className="h-4 w-4" />
+        )}
+        Save Rules
+      </Button>
+    </div>
   );
 }
 

@@ -21,6 +21,14 @@ import { hapticCelebrate, hapticImpact, hapticTick } from '@/lib/haptics';
 import { GoldenRewardButton, RewardCard } from './RewardCard';
 import { FUNNY_SENTENCES } from './funnySentences';
 
+/** What the server says about a reveal beyond the prize itself. */
+type PrizeMeta = {
+  duplicate: boolean;
+  owned: number;
+  fromWishlist: boolean;
+  tierBumped: boolean;
+};
+
 export default function GiftBoxOpening({
   onClose,
   onWin,
@@ -36,8 +44,10 @@ export default function GiftBoxOpening({
   const router = useRouter();
   const [phase, setPhase] = useState<'idle' | 'shaking' | 'revealed'>('idle');
   const [prize, setPrize] = useState<(ItemDef & { kind?: 'item' | 'background'; imageUrl?: string }) | null>(null);
+  const [prizeMeta, setPrizeMeta] = useState<PrizeMeta | null>(null);
   const [claiming, setClaiming] = useState(false);
   const [bonusPrize, setBonusPrize] = useState<(ItemDef & { kind?: 'item' | 'background'; imageUrl?: string }) | null>(null);
+  const [bonusPrizeMeta, setBonusPrizeMeta] = useState<PrizeMeta | null>(null);
   const [doubleClaimId, setDoubleClaimId] = useState<string | null>(null);
   const [isBonusReveal, setIsBonusReveal] = useState(false);
   const [revealCount, setRevealCount] = useState(0);
@@ -107,7 +117,9 @@ export default function GiftBoxOpening({
 
       if (data.prize) {
         setPrize(data.prize);
+        setPrizeMeta(data.prizeMeta ?? null);
         setBonusPrize(data.bonusPrize ?? null);
+        setBonusPrizeMeta(data.bonusPrizeMeta ?? null);
         setDoubleClaimId(data.doubleClaimId ?? null);
         setRevealCount(1);
         if (onWin) onWin(data.prize); // Notify parent immediately or on claim?
@@ -131,10 +143,13 @@ export default function GiftBoxOpening({
     // Premium bonus: reveal the second roll before closing.
     if (bonusPrize) {
       const next = bonusPrize;
+      const nextMeta = bonusPrizeMeta;
       setBonusPrize(null);
+      setBonusPrizeMeta(null);
       setIsBonusReveal(true);
       setRevealCount((c) => c + 1);
       setPrize(next);
+      setPrizeMeta(nextMeta);
       if (onWin) onWin(next);
       return;
     }
@@ -171,6 +186,7 @@ export default function GiftBoxOpening({
         setIsBonusReveal(true);
         setRevealCount((c) => c + 1);
         setPrize(data.prize);
+        setPrizeMeta(data.prizeMeta ?? null);
         if (onWin) onWin(data.prize);
         if (takePlusOfferAfterAd()) {
           setTimeout(() => setShowPlusOffer(true), 1600);
@@ -271,11 +287,22 @@ export default function GiftBoxOpening({
                   🎁 Bonus gift!
                 </motion.span>
               )}
+              {prizeMeta?.fromWishlist && (
+                <motion.span
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.5 }}
+                  className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-emerald-400 px-3.5 py-1.5 text-[11px] font-black uppercase tracking-wide text-slate-900 shadow-[0_3px_0_rgba(15,23,42,0.3)]"
+                >
+                  ⭐ Off your wishlist
+                </motion.span>
+              )}
               <RewardCard
                 prize={prize}
                 claiming={claiming}
                 onClaim={handleClaim}
                 paused={paused}
+                spareCount={prizeMeta?.duplicate ? prizeMeta.owned : undefined}
               />
               {user && doubleClaimId && (
                 <motion.div

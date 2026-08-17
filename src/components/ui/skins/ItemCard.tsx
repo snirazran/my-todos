@@ -571,13 +571,15 @@ const RARITY_TILE: Record<Rarity, { gradient: string; border: string; text: stri
 };
 
 const formatChance = (pct: number) =>
-  pct >= 1
+  pct >= 10
     ? `${Math.round(pct)}%`
-    : pct >= 0.01
-      ? `${pct.toFixed(2)}%`
-      : pct > 0
-        ? `${pct.toFixed(4)}%`
-        : '0%';
+    : pct >= 1
+      ? `${Number(pct.toFixed(1))}%`
+      : pct >= 0.01
+        ? `${pct.toFixed(2)}%`
+        : pct > 0
+          ? `${pct.toFixed(4)}%`
+          : '0%';
 
 type GiftDropRate = {
   itemId: string;
@@ -588,6 +590,20 @@ type GiftDropRate = {
 type GiftRarityDropRate = {
   rarity: Rarity;
   chance: number;
+};
+
+/** The published mechanics behind the table — randomised rewards must disclose
+ *  them. The player's own counter is deliberately never shown as a number. */
+type GiftMechanics = {
+  luckPerReveal: number;
+  softPityLuck: number;
+  softPityBonusPoints: number;
+  hardPityLuck: number;
+  epicPityLuck: number;
+  backgroundSharePercent: number;
+  newFirstWeight: number;
+  wishlistRedirectPercent: number;
+  tierBumpEnabled: boolean;
 };
 
 function DropRatesButton({ giftId, name }: { giftId: string; name: string }) {
@@ -636,6 +652,7 @@ function DropRatesPopup({
   const [drops, setDrops] = useState<GiftDropRate[]>([]);
   const [rarityDrops, setRarityDrops] = useState<GiftRarityDropRate[]>([]);
   const [dropMode, setDropMode] = useState<'item' | 'rarity'>('item');
+  const [mechanics, setMechanics] = useState<GiftMechanics | null>(null);
   const [loading, setLoading] = useState(true);
   React.useEffect(() => setMounted(true), []);
 
@@ -650,6 +667,7 @@ function DropRatesPopup({
         setDrops(data.drops ?? []);
         setRarityDrops(data.rarityDrops ?? []);
         setDropMode(data.dropMode === 'rarity' ? 'rarity' : 'item');
+        setMechanics(data.mechanics ?? null);
       })
       .catch(() => {
         if (!cancelled) {
@@ -816,9 +834,65 @@ function DropRatesPopup({
               })}
             </div>
           )}
+
+          {!loading && mechanics && <GiftMechanicsNote mechanics={mechanics} />}
         </div>
       </motion.div>
     </motion.div>,
     document.body,
+  );
+}
+
+/**
+ * The rules behind the table, in words. No progress bar and no "37/350" — a
+ * numeric pity counter turns a productivity app into a gacha screen.
+ */
+function GiftMechanicsNote({
+  mechanics,
+}: Readonly<{ mechanics: GiftMechanics }>) {
+  const rows = [
+    ['Every gift', 'Pays exactly one cosmetic — never an empty box'],
+    [
+      'Luck',
+      `This gift adds ${mechanics.luckPerReveal} Luck per open. Legendary chance climbs by ${mechanics.softPityBonusPoints} points a reveal past ${mechanics.softPityLuck} Luck, and is guaranteed at ${mechanics.hardPityLuck}.`,
+    ],
+    [
+      'Epic floor',
+      `An epic or better is guaranteed at ${mechanics.epicPityLuck} Luck. Winning one resets that counter.`,
+    ],
+    [
+      'New first',
+      `Inside the rolled rarity, items you don't own are ${mechanics.newFirstWeight}× more likely than ones you do.`,
+    ],
+    [
+      'Wishlist',
+      `${mechanics.wishlistRedirectPercent}% of reveals are drawn from your un-owned wishlist at the rolled rarity.`,
+    ],
+    [
+      'Backgrounds',
+      `About ${Math.round(mechanics.backgroundSharePercent)}% of each rarity pays a background instead of a wearable.`,
+    ],
+    ['Spares', 'Duplicates stack as ×N and count as trade fuel.'],
+    ...(mechanics.tierBumpEnabled
+      ? [
+          [
+            'Completed sets',
+            'Once you own every common or uncommon, a drop at that tier upgrades one rarity.',
+          ],
+        ]
+      : []),
+  ];
+  return (
+    <div className="mt-4 space-y-2 rounded-2xl border border-border/50 bg-muted/25 p-3.5">
+      <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+        How the draw works
+      </p>
+      {rows.map(([label, body]) => (
+        <div key={label}>
+          <p className="text-[11px] font-black text-foreground">{label}</p>
+          <p className="text-[11px] leading-snug text-muted-foreground">{body}</p>
+        </div>
+      ))}
+    </div>
   );
 }

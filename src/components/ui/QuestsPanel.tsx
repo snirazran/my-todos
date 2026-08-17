@@ -1547,7 +1547,7 @@ function QuestSeasonEventOverlay({
         >
           <X className="h-5 w-5" />
         </button>
-        <div className="pointer-events-none absolute inset-x-14 top-[calc(1.5rem+env(safe-area-inset-top))] flex justify-center px-2 md:inset-x-0 md:top-16 md:px-4 [@media(max-height:820px)]:md:top-10 [@media(max-height:720px)]:md:top-6">
+        <div className="pointer-events-none absolute inset-x-14 top-[calc(1.5rem+env(safe-area-inset-top))] flex justify-center px-2 md:inset-x-[15rem] md:top-16 md:px-4 [@media(max-height:820px)]:md:top-10 [@media(max-height:720px)]:md:top-6">
           <h2
             id="season-pass-title"
             className="max-w-[20rem] text-balance text-center text-3xl uppercase leading-none tracking-wide text-white drop-shadow-[0_4px_0_rgba(15,23,42,0.95)] sm:text-4xl md:text-4xl md:drop-shadow-[0_5px_0_rgba(15,23,42,0.95)] sm:md:text-5xl [@media(max-height:720px)]:md:text-3xl"
@@ -1560,7 +1560,7 @@ function QuestSeasonEventOverlay({
             {season.name}
           </h2>
         </div>
-        <div className="pointer-events-none absolute inset-x-0 bottom-10 mx-auto flex max-w-2xl items-center justify-between gap-2 px-4 md:bottom-12 [@media(min-width:400px)]:gap-3 [@media(min-width:400px)]:px-5">
+        <div className="pointer-events-none absolute inset-x-0 bottom-10 mx-auto flex max-w-2xl items-center justify-between gap-2 px-4 md:inset-x-8 md:bottom-12 md:max-w-none md:px-0 [@media(min-width:400px)]:gap-3 [@media(min-width:400px)]:px-5">
           <div className="pointer-events-auto inline-flex h-10 items-center gap-2.5 rounded-full border border-white/20 bg-black/50 py-1 pl-1.5 pr-4 text-white shadow-[0_6px_20px_rgba(0,0,0,0.35)] backdrop-blur-md">
             <span
               className={cn(
@@ -2005,7 +2005,7 @@ function LockedPlusPreview({
         hideDayLabel
         hideDropRates
         hideSingleQuantity
-        lowerItemPreview
+        itemPreviewPosition={rewards.length > 1 ? 'lowered' : 'raised'}
         forceFullOpacity
         giftAnimation="box_shake"
       />

@@ -173,6 +173,17 @@ export function applyPactRewards(args: {
  * milestone's "guaranteed epic" lands on something the player actually wanted
  * rather than a fourth copy of a hat they own.
  */
+/**
+ * A milestone epic or legendary clears the shared gift Luck counter like any
+ * other source would. Mutated in memory so the caller's save carries it.
+ */
+async function clearGiftLuckInMemory(user: any, rarity: PactRarity) {
+  const { clearGiftLuck, readGiftLuck } = await import('@/lib/skins/giftRules');
+  const next = clearGiftLuck(readGiftLuck(user.giftLuck), rarity);
+  user.giftLuck = { ...next, updatedAt: new Date() };
+  user.markModified('giftLuck');
+}
+
 async function drawRarityItem(user: any, rarity: PactRarity) {
   const [{ getRewardPool }, { pickTradeReward, prizeKey }, wishlist, modifiers] =
     await Promise.all([
@@ -264,6 +275,7 @@ export async function applyPactBonusRewards(args: {
       for (let i = 0; i < copies; i += 1) {
         const prize = await drawRarityItem(user, (reward as any).rarity);
         if (!prize) continue;
+        await clearGiftLuckInMemory(user, prize.rarity);
         if (prize.kind === 'background') {
           const inv = user.wardrobe.backgrounds.inventory;
           inv[prize.id] = (inv[prize.id] ?? 0) + 1;

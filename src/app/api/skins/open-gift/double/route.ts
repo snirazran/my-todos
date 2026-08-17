@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import UserModel, { type UserDoc } from '@/lib/models/User';
-import { getGiftConfig, pickGiftDrop, getRewardPool } from '@/lib/skins/gifts';
+import { getGiftConfig, getRewardPool, rollGiftPrize } from '@/lib/skins/gifts';
+import { ensureGiftRulesConfig } from '@/lib/models/GiftRulesConfig';
+import { giftLuckUpdate, readUserGiftLuck } from '@/lib/skins/giftLuck';
+import { readWishlistPins, wishlistPinKey } from '@/lib/skins/wishlist';
+import { dropFromWishlist } from '@/lib/skins/wishlistServer';
 import { DOUBLE_CLAIM_WINDOW_MS } from '@/lib/rewards/adDouble';
 
 const json = (body: unknown, init = 200) =>
@@ -50,15 +54,36 @@ export async function POST(req: NextRequest) {
 
     const giftConfig = await getGiftConfig(claim.giftBoxId);
     if (!giftConfig) return json({ error: 'Gift is not configured' }, 400);
-    const prizePool = await getRewardPool();
-    const prize = pickGiftDrop(giftConfig, prizePool);
-    if (!prize) return json({ error: 'Gift has no available drops' }, 400);
+    const [prizePool, rules] = await Promise.all([
+      getRewardPool(),
+      ensureGiftRulesConfig(),
+    ]);
+
+    // The ad-funded second open is a full reveal: it feeds Luck and obeys the
+    // same duplicate rules as the first one.
+    const itemInv = user.wardrobe?.inventory ?? {};
+    const bgInv = user.wardrobe?.backgrounds?.inventory ?? {};
+    const ownedOf = (p: { kind: string; id: string }) =>
+      (p.kind === 'background' ? bgInv[p.id] : itemInv[p.id]) ?? 0;
+    const roll = rollGiftPrize({
+      config: giftConfig,
+      prizePool,
+      rules,
+      luck: readUserGiftLuck(user),
+      owns: (p) => ownedOf(p) > 0,
+      wishlistKeys: new Set(
+        readWishlistPins(user.wardrobe).map((pin) => wishlistPinKey(pin)),
+      ),
+    });
+    if (!roll) return json({ error: 'Gift has no available drops' }, 400);
+    const prize = roll.prize;
 
     const currentUnseen = user.wardrobe?.unseenItems || [];
     const nextUnseen = [...currentUnseen];
     const inc: Record<string, number> = {};
     const set: Record<string, unknown> = {
       'giftDoubleClaim.doubled': true,
+      giftLuck: giftLuckUpdate(roll.luck),
     };
     if (prize.kind === 'background') {
       inc[`wardrobe.backgrounds.inventory.${prize.id}`] = 1;
@@ -83,7 +108,19 @@ export async function POST(req: NextRequest) {
       return json({ granted: false });
     }
 
-    return json({ granted: true, ok: true, prize });
+    await dropFromWishlist(userId, user.wardrobe, prize.id, prize.kind);
+
+    return json({
+      granted: true,
+      ok: true,
+      prize,
+      prizeMeta: {
+        duplicate: roll.duplicate,
+        owned: ownedOf(prize) + 1,
+        fromWishlist: roll.viaWishlist,
+        tierBumped: roll.tierBumped,
+      },
+    });
   } catch (err) {
     console.error('Gift double failed:', err);
     return json({ error: 'Double failed' }, 500);

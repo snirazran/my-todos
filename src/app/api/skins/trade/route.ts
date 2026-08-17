@@ -14,6 +14,7 @@ import {
   tradeNewFirstWeight,
 } from '@/lib/skins/tradeModifiers';
 import { aimableTradeTargets, pickTradeReward } from '@/lib/skins/tradeRewards';
+import { clearGiftLuckForPrizes } from '@/lib/skins/giftLuck';
 import { readWishlistPins, wishlistPinKey } from '@/lib/skins/wishlist';
 import { dropFromWishlist } from '@/lib/skins/wishlistServer';
 import { DEFAULT_BACKGROUND_ID } from '@/lib/backgrounds/constants';
@@ -342,6 +343,10 @@ export async function POST(req: NextRequest) {
     for (const prize of rewards) {
       await dropFromWishlist(userId, user.wardrobe, prize.id, prize.kind);
     }
+    await clearGiftLuckForPrizes(
+      userId,
+      rewards.map((prize) => prize.rarity),
+    );
 
     const timezone = typeof body?.timezone === 'string' ? body.timezone : undefined;
     await bumpQuestMetric({ userId, metric: 'trade_completed', timezone });

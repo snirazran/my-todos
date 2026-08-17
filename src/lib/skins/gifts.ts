@@ -3,9 +3,21 @@ import GiftDropConfigModel from '@/lib/models/GiftDropConfig';
 import BackgroundModel from '@/lib/models/Background';
 import connectMongo from '@/lib/mongoose';
 import { DEFAULT_BACKGROUND_ID } from '@/lib/backgrounds/constants';
-import { CATALOG, type ItemDef } from './catalog';
+import { CATALOG, type ItemDef, type Rarity } from './catalog';
 import { filterAvailable, isAvailableAt } from './availability';
 import { getFullCatalog } from './getCatalog';
+import {
+  advanceGiftLuck,
+  applyTierBump,
+  luckPerReveal,
+  pickGiftIdentity,
+  rollGiftRarity,
+  RECOMMENDED_RARITY_TABLES,
+  type BandCandidate,
+  type GiftLuckState,
+  type GiftRules,
+  type PityKind,
+} from './giftRules';
 
 export type GiftDropMode = 'item' | 'rarity';
 
@@ -46,30 +58,8 @@ export type GiftConfigView = {
   dropMode: GiftDropMode;
   drops: GiftDropView[];
   rarityDrops: GiftRarityDrop[];
-};
-
-const DEFAULT_RARITY_DROPS: Record<string, Partial<Record<ItemDef['rarity'], number>>> = {
-  common: {
-    common: 0.9,
-    uncommon: 0.095,
-    rare: 0.0049,
-    epic: 0.0001,
-    legendary: 0.000002,
-  },
-  rare: {
-    common: 0.45,
-    uncommon: 0.35,
-    rare: 0.15,
-    epic: 0.049,
-    legendary: 0.001,
-  },
-  legendary: {
-    common: 0.05,
-    uncommon: 0.15,
-    rare: 0.35,
-    epic: 0.35,
-    legendary: 0.1,
-  },
+  /** Luck this gift's reveal adds to the shared pity counter. */
+  luckPerReveal: number;
 };
 
 function itemToDef(item: {
@@ -169,20 +159,17 @@ async function seedCatalogIfEmpty() {
   ).catch(() => {});
 }
 
-function buildDefaultDrops(gift: ItemDef, catalog: ItemDef[]) {
-  const weights = DEFAULT_RARITY_DROPS[gift.rarity] ?? DEFAULT_RARITY_DROPS.common;
-  const prizeItems = catalog.filter((item) => item.slot !== 'container');
-  const drops: GiftDropEntry[] = [];
-
-  Object.entries(weights).forEach(([rarity, chance]) => {
-    if (!chance || chance <= 0) return;
-    const items = prizeItems.filter((item) => item.rarity === rarity);
-    if (items.length === 0) return;
-    const chancePerItem = chance / items.length;
-    items.forEach((item) => drops.push({ itemId: item.id, chance: chancePerItem }));
-  });
-
-  return drops;
+/**
+ * A new gift starts on the published ladder for its own tier, in rarity mode —
+ * the bands are what the odds sheet quotes and what pity keys off, so a
+ * hand-authored per-item table is the exception now, not the default.
+ */
+export function recommendedRarityDrops(giftRarity: Rarity): GiftRarityDrop[] {
+  const table =
+    RECOMMENDED_RARITY_TABLES[giftRarity] ?? RECOMMENDED_RARITY_TABLES.common;
+  return GIFT_RARITIES.filter((rarity) => (table[rarity] ?? 0) > 0).map(
+    (rarity) => ({ rarity, chance: table[rarity] }),
+  );
 }
 
 export async function ensureGiftDropConfigs() {
@@ -198,7 +185,10 @@ export async function ensureGiftDropConfigs() {
       if (existing) return;
       await GiftDropConfigModel.create({
         giftId: gift.id,
-        drops: buildDefaultDrops(gift, catalog),
+        dropMode: 'rarity',
+        drops: [],
+        rarityDrops: recommendedRarityDrops(gift.rarity),
+        luckPerReveal: luckPerReveal(undefined, gift.rarity),
       });
     }),
   );
@@ -257,6 +247,7 @@ export async function getGiftConfigs(includeHidden = false): Promise<GiftConfigV
             rarity: entry.rarity as ItemDef['rarity'],
             chance: entry.chance,
           })),
+        luckPerReveal: luckPerReveal(config?.luckPerReveal, gift.rarity),
       };
     });
 }
@@ -266,50 +257,129 @@ export async function getGiftConfig(giftId: string): Promise<GiftConfigView | nu
   return configs.find((config) => config.gift.id === giftId) ?? null;
 }
 
-function weightedPick<T>(entries: { value: T; weight: number }[]): T | null {
-  const valid = entries.filter((e) => e.weight > 0);
-  if (valid.length === 0) return null;
-  const total = valid.reduce((sum, e) => sum + e.weight, 0);
-  if (total <= 0) return null;
-  let roll = Math.random() * total;
-  for (const e of valid) {
-    roll -= e.weight;
-    if (roll <= 0) return e.value;
+/**
+ * Split what a gift can award into rarity bands, plus the band weights the
+ * rarity roll runs on.
+ *
+ * Both drop modes collapse to the same shape, which is what lets pity and the
+ * duplicate rules apply to a hand-authored table too: in 'rarity' mode every
+ * prize of a band is an equal candidate and the admin's rarity weights are the
+ * band weights; in 'item' mode each configured prize keeps its own weight and
+ * the band weight is their sum.
+ */
+function buildGiftBands(config: GiftConfigView, prizePool: GiftPrize[]) {
+  const bands = new Map<Rarity, BandCandidate<GiftPrize>[]>();
+  const push = (prize: GiftPrize, weight: number) => {
+    const list = bands.get(prize.rarity) ?? [];
+    list.push({ prize, weight });
+    bands.set(prize.rarity, list);
+  };
+
+  if (config.dropMode === 'rarity') {
+    prizePool
+      .filter((prize) => prize.slot !== 'container' && isAvailableAt(prize))
+      .forEach((prize) => push(prize, 1));
+    const weights: Partial<Record<Rarity, number>> = {};
+    config.rarityDrops.forEach((entry) => {
+      if (entry.chance > 0) {
+        weights[entry.rarity] = (weights[entry.rarity] ?? 0) + entry.chance;
+      }
+    });
+    return { bands, weights, applyBackgroundShare: true };
   }
-  return valid[valid.length - 1].value;
+
+  config.drops.forEach((drop) => {
+    if (!drop.item || drop.chance <= 0) return;
+    if (drop.item.slot === 'container') return;
+    if (!isAvailableAt(drop.item)) return;
+    push(drop.item, drop.chance);
+  });
+  const weights: Partial<Record<Rarity, number>> = {};
+  bands.forEach((list, rarity) => {
+    weights[rarity] = list.reduce((sum, entry) => sum + entry.weight, 0);
+  });
+  return { bands, weights, applyBackgroundShare: false };
 }
 
-/**
- * Pick a prize for a gift.
- * - 'item' mode: weighted pick across the configured item drops.
- * - 'rarity' mode: weighted pick of a rarity bucket, then a uniformly random
- *   prize item of that rarity. `prizePool` (the catalog) is required for this.
- */
-export function pickGiftDrop(
-  config: GiftConfigView,
-  prizePool?: GiftPrize[],
-): GiftPrize | null {
-  if (config.dropMode === 'rarity') {
-    const pool = (prizePool ?? []).filter((item) => item.slot !== 'container');
-    // Only consider rarities that actually have prizes available.
-    const candidates = config.rarityDrops
-      .filter((entry) => entry.chance > 0 && pool.some((i) => i.rarity === entry.rarity))
-      .map((entry) => ({ value: entry.rarity, weight: entry.chance }));
-    const rarity = weightedPick(candidates);
-    if (!rarity) return null;
-    const items = pool.filter((item) => item.rarity === rarity);
-    if (items.length === 0) return null;
-    return items[Math.floor(Math.random() * items.length)];
-  }
+export type GiftRollResult = {
+  prize: GiftPrize;
+  /** Band the table landed on, before a tier bump. */
+  rolledRarity: Rarity;
+  /** Band the prize actually came from. */
+  rarity: Rarity;
+  pity: PityKind;
+  bonusPoints: number;
+  tierBumped: boolean;
+  viaWishlist: boolean;
+  /** The player already owned a copy — a spare, i.e. trade fuel. */
+  duplicate: boolean;
+  /** Counter state to persist after this reveal. */
+  luck: GiftLuckState;
+};
 
-  const validDrops = config.drops.filter(
-    (drop): drop is GiftDropView & { item: GiftPrize } =>
-      !!drop.item &&
-      drop.chance > 0 &&
-      drop.item.slot !== 'container' &&
-      isAvailableAt(drop.item),
+/**
+ * One reveal, start to finish: roll a band under the shared Luck counter, bump
+ * a completed low band one tier, then draw the identity under the wishlist,
+ * background-share and new-first rules. Always returns a cosmetic — there is no
+ * empty box and no fly consolation.
+ */
+export function rollGiftPrize({
+  config,
+  prizePool,
+  rules,
+  luck,
+  owns,
+  wishlistKeys,
+}: {
+  config: GiftConfigView;
+  prizePool: GiftPrize[];
+  rules: GiftRules;
+  luck: GiftLuckState;
+  owns: (prize: GiftPrize) => boolean;
+  wishlistKeys: Set<string>;
+}): GiftRollResult | null {
+  const { bands, weights, applyBackgroundShare } = buildGiftBands(
+    config,
+    prizePool,
   );
-  return weightedPick(validDrops.map((drop) => ({ value: drop.item, weight: drop.chance })));
+  const hasAny = (rarity: Rarity) => (bands.get(rarity)?.length ?? 0) > 0;
+  const hasUnowned = (rarity: Rarity) =>
+    (bands.get(rarity) ?? []).some((candidate) => !owns(candidate.prize));
+
+  const roll = rollGiftRarity({ weights, available: hasAny, luck, rules });
+  if (!roll) return null;
+
+  const rarity = applyTierBump({
+    rarity: roll.rarity,
+    rules,
+    hasUnowned,
+    hasAny,
+  });
+  const picked = pickGiftIdentity({
+    candidates: bands.get(rarity) ?? [],
+    owns,
+    wishlistKeys,
+    rules,
+    applyBackgroundShare,
+  });
+  if (!picked) return null;
+
+  return {
+    prize: picked.prize,
+    rolledRarity: roll.rarity,
+    rarity,
+    pity: roll.pity,
+    bonusPoints: roll.bonusPoints,
+    tierBumped: rarity !== roll.rarity,
+    viaWishlist: picked.viaWishlist,
+    duplicate: owns(picked.prize),
+    luck: advanceGiftLuck({
+      luck,
+      rules,
+      perReveal: config.luckPerReveal,
+      resolved: rarity,
+    }),
+  };
 }
 
 /**

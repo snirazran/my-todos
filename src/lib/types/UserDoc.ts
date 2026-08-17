@@ -182,6 +182,13 @@ export type UserDoc = {
     doubled: boolean;
     createdAt: Date;
   };
+  /** The one weighted Luck counter every cosmetic reveal feeds. */
+  giftLuck?: {
+    luck: number;
+    epicLuck: number;
+    softSteps: number;
+    updatedAt?: Date | string;
+  };
   tradeRerollClaim?: {
     id: string;
     rewardId: string;
