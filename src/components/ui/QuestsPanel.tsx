@@ -1137,8 +1137,8 @@ function SeasonRewardPreview({
       </div>
 
       {!hideQuantityBadge && quantityLabel !== '×1' && (
-        <div className="pointer-events-none absolute -right-2 -top-2 z-30">
-          <span className="flex min-w-5 items-center justify-center rounded-md bg-black/75 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white shadow-md ring-2 ring-background">
+        <div className="pointer-events-none absolute -right-1.5 -top-1.5 z-30 flex justify-center">
+          <span className="flex min-w-5 items-center justify-center rounded-md border border-white/10 bg-black/50 px-1 py-0 text-[9px] font-bold uppercase leading-[16px] tracking-wide text-white shadow-sm backdrop-blur-sm">
             {quantityLabel}
           </span>
         </div>
@@ -1193,7 +1193,6 @@ function SeasonPassRewardCard({
       : 'rare');
   const tone = GIFT_RARITY_CONFIG[rarity] ?? GIFT_RARITY_CONFIG.rare;
   const name = seasonRewardName(reward, rewardCatalog);
-  const quantityLabel = getRewardQuantityLabel(reward, isPremium);
   const actionable = !!onClick;
   const statusLabel =
     status === 'CLAIMED'
@@ -1218,44 +1217,35 @@ function SeasonPassRewardCard({
           rewardCatalog={rewardCatalog}
           isPremium={isPremium}
           paused={paused}
-          hideQuantityBadge
           className="h-full w-full"
         />
       </div>
       <div className="min-w-0 px-1 pb-1 pt-2 text-center">
-        <div className="flex min-w-0 items-center justify-center gap-1.5">
-          <p className="min-w-0 truncate text-[11px] font-black leading-tight text-foreground">
-            {name}
-          </p>
-          {quantityLabel !== '×1' && (
-            <span className="shrink-0 rounded-md bg-foreground/80 px-1.5 py-0.5 text-[8px] font-black uppercase leading-none tracking-wide text-background shadow-sm">
-              {quantityLabel}
-            </span>
-          )}
+        <div className="flex min-h-5 items-center justify-center">
+          <span
+            className={cn(
+              'inline-flex min-h-5 items-center justify-center gap-1 rounded-full px-2 text-[8px] font-black uppercase tracking-[0.13em]',
+              status === 'CLAIMED' &&
+                'bg-emerald-500/12 text-emerald-700 dark:text-emerald-300',
+              status === 'READY' && 'bg-primary text-primary-foreground',
+              status === 'LOCKED_PREMIUM' &&
+                'bg-amber-400/20 text-amber-800 dark:text-amber-200',
+              status === 'LOCKED' && 'bg-muted text-muted-foreground',
+            )}
+          >
+            {status === 'CLAIMED' ? (
+              <Check aria-hidden="true" className="h-3 w-3" strokeWidth={4} />
+            ) : status === 'LOCKED_PREMIUM' ? (
+              <Icon
+                name="frogPlus"
+                className="-my-1 h-5 w-5 drop-shadow-[0_1px_0_rgba(31,98,28,0.25)]"
+              />
+            ) : status === 'LOCKED' ? (
+              <Lock aria-hidden="true" className="h-3 w-3" strokeWidth={3} />
+            ) : null}
+            {statusLabel}
+          </span>
         </div>
-        <span
-          className={cn(
-            'mt-1 inline-flex min-h-5 items-center justify-center gap-1 rounded-full px-2 text-[8px] font-black uppercase tracking-[0.13em]',
-            status === 'CLAIMED' &&
-              'bg-emerald-500/12 text-emerald-700 dark:text-emerald-300',
-            status === 'READY' && 'bg-primary text-primary-foreground',
-            status === 'LOCKED_PREMIUM' &&
-              'bg-amber-400/20 text-amber-800 dark:text-amber-200',
-            status === 'LOCKED' && 'bg-muted text-muted-foreground',
-          )}
-        >
-          {status === 'CLAIMED' ? (
-            <Check aria-hidden="true" className="h-3 w-3" strokeWidth={4} />
-          ) : status === 'LOCKED_PREMIUM' ? (
-            <Icon
-              name="frogPlus"
-              className="-my-1 h-5 w-5 drop-shadow-[0_1px_0_rgba(31,98,28,0.25)]"
-            />
-          ) : status === 'LOCKED' ? (
-            <Lock aria-hidden="true" className="h-3 w-3" strokeWidth={3} />
-          ) : null}
-          {statusLabel}
-        </span>
       </div>
     </>
   );
@@ -1998,15 +1988,10 @@ function LockedPlusPreview({
         hideDayLabel
         hideDropRates
         hideSingleQuantity
+        liftItemPreview
         forceFullOpacity
         giftAnimation="box_shake"
       />
-      <span className="pointer-events-none absolute left-0 top-1 z-40 flex h-9 w-9 items-center justify-center rounded-full bg-amber-300/95 shadow-md ring-2 ring-white dark:ring-background">
-        <Icon
-          name="frogPlus"
-          className="h-9 w-9 drop-shadow-[0_2px_0_rgba(31,98,28,0.3)]"
-        />
-      </span>
     </div>
   );
 
@@ -2069,11 +2054,11 @@ function LockedPlusPreview({
         </button>
 
         {rewards.length > 1 ? (
-          <div className="mt-4 flex items-end justify-center gap-0 md:gap-1">
+          <div className="relative mx-auto mt-4 flex w-full max-w-[22rem] items-end justify-between px-1">
             {rewardCard(rewards[0], 0)}
-            <div className="relative z-10 h-24 w-24 shrink-0 translate-y-2 min-[420px]:h-28 min-[420px]:w-28">
+            <div className="absolute bottom-0 left-1/2 z-10 h-24 w-24 -translate-x-1/2 -translate-y-10 min-[420px]:h-28 min-[420px]:w-28">
               <Frog
-                className="h-full w-full"
+                className="h-full w-full -translate-x-[20%]"
                 width={144}
                 height={144}
                 indices={
@@ -2090,7 +2075,7 @@ function LockedPlusPreview({
           <div className="mt-2 flex items-center justify-center">
             <div
               className={cn(
-                'relative z-10 h-44 w-44 shrink-0 md:h-48 md:w-48',
+                'relative z-10 h-44 w-44 shrink-0 -translate-y-4 md:h-48 md:w-48',
                 frogOnLeft ? '-mr-12 md:-mr-14' : 'order-2 -ml-12 md:-ml-14',
               )}
             >
@@ -2112,7 +2097,7 @@ function LockedPlusPreview({
           </div>
         )}
 
-        <div className="mt-4 text-center">
+        <div className={cn('text-center', rewards.length > 1 ? 'mt-2' : 'mt-4')}>
           <h3
             id="plus-reward-title"
             className="text-xl font-black tracking-tight text-foreground"
