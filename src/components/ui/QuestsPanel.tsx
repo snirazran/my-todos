@@ -32,7 +32,7 @@ import {
   RewardTile,
   sortStreakPrizes,
   StarterQuestCard,
-  type DailyStreakInfo,
+  type DailySweepInfo,
   type MoveToWebInfo,
 } from './QuestCards';
 import { SingleRewardCard } from './daily-reward/RewardCard';
@@ -60,7 +60,7 @@ type QuestsResponse = {
   todoCount?: number;
   frogName?: string | null;
   tags?: Array<{ id: string; name: string; color: string; key?: string }>;
-  dailyStreak?: DailyStreakInfo | null;
+  dailySweep?: DailySweepInfo | null;
   moveToWeb?: MoveToWebInfo | null;
   onboarding: {
     complete: boolean;
@@ -351,6 +351,15 @@ export function QuestsPanel({
       const payload = await res.json();
       if (!res.ok) throw new Error(payload.error || 'Claim failed');
       queueRewardReveal(payload.rewardSummary);
+      // A Lily Pad is not part of the reveal pipeline, so the only place it
+      // would otherwise show up is a silently changed shield count.
+      if ((payload.rewardSummary?.shieldsGranted ?? 0) > 0) {
+        setClaimMessage(
+          payload.rewardSummary.shieldsGranted > 1
+            ? `You rolled ${payload.rewardSummary.shieldsGranted} Lily Pads!`
+            : 'You rolled a Lily Pad!',
+        );
+      }
       await refreshQuestData();
     } catch (err: any) {
       setClaimMessage(err.message || 'Claim failed');
@@ -533,9 +542,9 @@ export function QuestsPanel({
                               isPremium={data.isPremium}
                               claimingObjectiveId={claimingObjectiveId}
                               onClaimObjective={handleClaimObjective}
-                              streak={data.dailyStreak}
-                              claimingStreak={claimingStreak}
-                              onClaimStreak={handleClaimStreak}
+                              sweep={data.dailySweep}
+                              claimingSweep={claimingStreak}
+                              onClaimSweep={handleClaimStreak}
                               paused={false}
                             />
                           );

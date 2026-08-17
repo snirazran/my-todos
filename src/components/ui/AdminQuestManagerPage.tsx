@@ -55,6 +55,10 @@ import {
   type QuestCardLogicBlock,
   type QuestRewardCatalogItem,
   RewardTile,
+  SweepRewardTile,
+  sweepRewardLabel,
+  type SweepRewardInfo,
+  type SweepRollEntryInfo,
 } from './QuestCards';
 
 type AdminQuestTemplate = {
@@ -107,6 +111,22 @@ const SEASON_SIZE_FIELDS: {
 ];
 
 type MetaRewardItem = QuestRewardCatalogItem;
+
+type AdminSweepConfig = {
+  isActive: boolean;
+  cleanSweepFlies: number;
+  goldenEveryDays: number;
+  megaEveryDays: number;
+  megaRewards: SweepRewardInfo[];
+  standardRoll: SweepRollEntryInfo[];
+  goldenRoll: SweepRollEntryInfo[];
+  limits: {
+    goldenMin: number;
+    goldenMax: number;
+    megaMax: number;
+    maxFlies: number;
+  };
+};
 
 type AdminLoginStreakTier = {
   days: number;
@@ -471,15 +491,9 @@ export function AdminQuestManagerPage() {
     coverImageUrl: undefined,
   });
 
-  // Daily streak bonus config
-  const [streakConfig, setStreakConfig] = useState<{
-    isActive: boolean;
-    streakLength: number;
-    rewards: QuestReward[];
-    limits: { min: number; max: number };
-  } | null>(null);
+  // Clean Sweep bonus + Reward Roll tables
+  const [sweepConfig, setSweepConfig] = useState<AdminSweepConfig | null>(null);
   const [savingStreak, setSavingStreak] = useState(false);
-  const [streakRewardPickerOpen, setStreakRewardPickerOpen] = useState(false);
 
   // Automatic monthly season config
   const [seasonAutoConfig, setSeasonAutoConfig] = useState<{
@@ -568,7 +582,7 @@ export function AdminQuestManagerPage() {
       setRewardItems(metaData.rewardsCatalog ?? []);
       setAdminCategories(categoriesData.categories ?? []);
       setAdminRecipes((recipesData.recipes ?? []) as AdminRecipe[]);
-      if (streakRes.ok && streakData.streak) setStreakConfig(streakData.streak);
+      if (streakRes.ok && streakData.sweep) setSweepConfig(streakData.sweep);
       const loginStreakData = await loginStreakRes.json();
       if (loginStreakRes.ok && loginStreakData.loginStreak) {
         setLoginStreakConfig(loginStreakData.loginStreak);
@@ -1192,7 +1206,7 @@ export function AdminQuestManagerPage() {
       </p>
       {adminRecipes.map(renderRecipeCard)}
       {recipeRewardDialog}
-      {renderStreakCard()}
+      {renderSweepCard()}
     </div>
   );
 
@@ -2046,8 +2060,8 @@ export function AdminQuestManagerPage() {
     />
   ) : null;
 
-  const saveStreakConfig = async () => {
-    if (!streakConfig) return;
+  const saveSweepConfig = async () => {
+    if (!sweepConfig) return;
     setSavingStreak(true);
     setResult(null);
     try {
@@ -2056,56 +2070,68 @@ export function AdminQuestManagerPage() {
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          isActive: streakConfig.isActive,
-          streakLength: streakConfig.streakLength,
-          rewards: streakConfig.rewards,
+          isActive: sweepConfig.isActive,
+          cleanSweepFlies: sweepConfig.cleanSweepFlies,
+          goldenEveryDays: sweepConfig.goldenEveryDays,
+          megaEveryDays: sweepConfig.megaEveryDays,
+          megaRewards: sweepConfig.megaRewards,
+          standardRoll: sweepConfig.standardRoll,
+          goldenRoll: sweepConfig.goldenRoll,
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Could not save streak config');
-      setStreakConfig(data.streak);
-      setResult({ type: 'success', message: 'Daily streak saved' });
+      if (!res.ok) throw new Error(data.error || 'Could not save sweep config');
+      setSweepConfig(data.sweep);
+      setResult({ type: 'success', message: 'Clean Sweep saved' });
     } catch (error) {
       setResult({
         type: 'error',
         message:
-          error instanceof Error ? error.message : 'Could not save streak config',
+          error instanceof Error ? error.message : 'Could not save sweep config',
       });
     } finally {
       setSavingStreak(false);
     }
   };
 
-  const renderStreakCard = () => {
-    if (!streakConfig) return null;
+  const setSweepTable = (
+    key: 'standardRoll' | 'goldenRoll',
+    entries: SweepRollEntryInfo[],
+  ) => setSweepConfig((prev) => (prev ? { ...prev, [key]: entries } : prev));
+
+  const renderSweepCard = () => {
+    if (!sweepConfig) return null;
     return (
       <div className="rounded-2xl border border-border/40 bg-card/60 px-4 py-3.5">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-bold text-foreground">Daily streak bonus</p>
+            <p className="text-sm font-bold text-foreground">
+              Clean Sweep &amp; Reward Roll
+            </p>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Finishing every daily quest for N days in a row grants one random
-              prize from the pool below.
+              Finishing all three daily quests pays the Clean Sweep flies and
+              earns one Reward Roll. Every Nth sweep day in a row rolls the
+              golden table instead, and the mega bonus lands on top of that.
             </p>
           </div>
           <button
             type="button"
             role="switch"
-            aria-checked={streakConfig.isActive}
+            aria-checked={sweepConfig.isActive}
             onClick={() =>
-              setStreakConfig((prev) =>
+              setSweepConfig((prev) =>
                 prev ? { ...prev, isActive: !prev.isActive } : prev,
               )
             }
             className={cn(
               'relative h-6 w-11 shrink-0 rounded-full transition-colors',
-              streakConfig.isActive ? 'bg-emerald-500' : 'bg-muted',
+              sweepConfig.isActive ? 'bg-emerald-500' : 'bg-muted',
             )}
           >
             <span
               className={cn(
                 'absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform',
-                streakConfig.isActive ? 'translate-x-[22px]' : 'translate-x-0.5',
+                sweepConfig.isActive ? 'translate-x-[22px]' : 'translate-x-0.5',
               )}
             />
           </button>
@@ -2114,126 +2140,175 @@ export function AdminQuestManagerPage() {
         <div className="mt-4 flex flex-wrap items-end gap-4">
           <label className="block">
             <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-              Streak length (days)
+              Clean Sweep flies
             </span>
             <input
               type="number"
-              min={streakConfig.limits.min}
-              max={streakConfig.limits.max}
-              value={streakConfig.streakLength}
+              min={0}
+              max={sweepConfig.limits.maxFlies}
+              value={sweepConfig.cleanSweepFlies}
               onChange={(e) =>
-                setStreakConfig((prev) =>
+                setSweepConfig((prev) =>
                   prev
                     ? {
                         ...prev,
-                        streakLength: Math.min(
-                          prev.limits.max,
+                        cleanSweepFlies: Math.min(
+                          prev.limits.maxFlies,
+                          Math.max(0, Math.floor(Number(e.target.value) || 0)),
+                        ),
+                      }
+                    : prev,
+                )
+              }
+              className="mt-1 block h-10 w-24 rounded-xl border border-border/50 bg-background px-3 text-sm font-bold text-foreground"
+            />
+          </label>
+          <label className="block">
+            <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+              Golden roll every
+            </span>
+            <input
+              type="number"
+              min={sweepConfig.limits.goldenMin}
+              max={sweepConfig.limits.goldenMax}
+              value={sweepConfig.goldenEveryDays}
+              onChange={(e) =>
+                setSweepConfig((prev) =>
+                  prev
+                    ? {
+                        ...prev,
+                        goldenEveryDays: Math.min(
+                          prev.limits.goldenMax,
                           Math.max(
-                            prev.limits.min,
-                            Math.floor(Number(e.target.value) || prev.limits.min),
+                            prev.limits.goldenMin,
+                            Math.floor(Number(e.target.value) || prev.limits.goldenMin),
                           ),
                         ),
                       }
                     : prev,
                 )
               }
-              className="mt-1 block h-10 w-28 rounded-xl border border-border/50 bg-background px-3 text-sm font-bold text-foreground"
+              className="mt-1 block h-10 w-24 rounded-xl border border-border/50 bg-background px-3 text-sm font-bold text-foreground"
             />
             <span className="mt-1 block text-[10px] text-muted-foreground">
-              {streakConfig.limits.min}–{streakConfig.limits.max} days
+              sweep days in a row
             </span>
           </label>
-
-          <div className="min-w-0 flex-1">
+          <label className="block">
             <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-              Prize pool (one drawn, odds by weight)
+              Mega bonus every
             </span>
-            <div className="mt-1 flex flex-wrap items-center gap-3">
-              {streakConfig.rewards.length === 0 ? (
-                <span className="text-xs text-muted-foreground">
-                  No prizes yet.
-                </span>
-              ) : (
-                (() => {
-                  const totalWeight = streakConfig.rewards.reduce(
-                    (sum, r) => sum + Math.max(1, r.weight ?? 1),
-                    0,
-                  );
-                  return streakConfig.rewards.map((reward, ri) => (
-                    <div
-                      key={`${reward.type}-${reward.itemId ?? reward.backgroundId ?? reward.amount ?? ri}`}
-                      className="flex items-center gap-1.5 leading-[30px]"
-                    >
-                      <RewardTile
-                        reward={reward}
-                        rewardCatalog={rewardCatalog}
-                        isPremium={false}
-                      />
-                      <InlinePillNumber
-                        value={Math.max(1, reward.weight ?? 1)}
-                        onChange={(v) =>
-                          setStreakConfig((prev) =>
-                            prev
-                              ? {
-                                  ...prev,
-                                  rewards: prev.rewards.map((r, i) =>
-                                    i === ri
-                                      ? {
-                                          ...r,
-                                          weight: Math.min(
-                                            100,
-                                            Math.max(1, Math.round(v)),
-                                          ),
-                                        }
-                                      : r,
-                                  ),
-                                }
-                              : prev,
-                          )
-                        }
-                      />
-                      <span className="text-xs font-medium text-muted-foreground">
-                        {Math.round(
-                          (100 * Math.max(1, reward.weight ?? 1)) / totalWeight,
-                        )}
-                        %
-                      </span>
-                    </div>
-                  ));
-                })()
-              )}
-              <button
-                type="button"
-                onClick={() => setStreakRewardPickerOpen(true)}
-                className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-background px-3 py-1.5 text-xs font-bold text-muted-foreground transition hover:border-primary/30 hover:text-foreground"
-              >
-                <Pencil className="h-3 w-3" />
-                Edit prizes
-              </button>
-            </div>
-          </div>
-
+            <input
+              type="number"
+              min={0}
+              max={sweepConfig.limits.megaMax}
+              value={sweepConfig.megaEveryDays}
+              onChange={(e) =>
+                setSweepConfig((prev) =>
+                  prev
+                    ? {
+                        ...prev,
+                        megaEveryDays: Math.min(
+                          prev.limits.megaMax,
+                          Math.max(0, Math.floor(Number(e.target.value) || 0)),
+                        ),
+                      }
+                    : prev,
+                )
+              }
+              className="mt-1 block h-10 w-24 rounded-xl border border-border/50 bg-background px-3 text-sm font-bold text-foreground"
+            />
+            <span className="mt-1 block text-[10px] text-muted-foreground">
+              sweep days · 0 = off
+            </span>
+          </label>
           <Button
             size="sm"
-            className="rounded-xl font-black"
-            onClick={() => void saveStreakConfig()}
+            className="ml-auto rounded-xl font-black"
+            onClick={() => void saveSweepConfig()}
             disabled={savingStreak}
           >
-            {savingStreak ? 'Saving…' : 'Save streak'}
+            {savingStreak ? 'Saving…' : 'Save sweep'}
           </Button>
         </div>
 
-        <RewardPickerDialog
-          open={streakRewardPickerOpen}
-          onOpenChange={setStreakRewardPickerOpen}
-          rewards={streakConfig.rewards}
-          rewardItems={rewardItems}
-          rewardCatalog={rewardCatalog}
-          onSave={(rewards) => {
-            setStreakConfig((prev) => (prev ? { ...prev, rewards } : prev));
-            setStreakRewardPickerOpen(false);
-          }}
-        />
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+          <SweepTableEditor
+            title="Standard roll"
+            hint="Rolled on every Clean Sweep day."
+            entries={sweepConfig.standardRoll}
+            onChange={(entries) => setSweepTable('standardRoll', entries)}
+            rewardItems={rewardItems}
+            rewardCatalog={rewardCatalog}
+          />
+          <SweepTableEditor
+            title="Golden roll"
+            hint={`Replaces the standard roll every ${sweepConfig.goldenEveryDays} sweep days in a row.`}
+            entries={sweepConfig.goldenRoll}
+            onChange={(entries) => setSweepTable('goldenRoll', entries)}
+            rewardItems={rewardItems}
+            rewardCatalog={rewardCatalog}
+            golden
+          />
+        </div>
+
+        <div className="mt-4 rounded-xl border border-amber-400/40 bg-amber-50/60 px-3 py-3 dark:bg-amber-500/5">
+          <p className="text-[11px] font-black uppercase tracking-wide text-amber-700 dark:text-amber-300">
+            Mega bonus
+          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {sweepConfig.megaEveryDays > 0
+              ? `Granted on top of the golden roll every ${sweepConfig.megaEveryDays} sweep days in a row.`
+              : 'Off — set a cadence above to use it.'}
+          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            {sweepConfig.megaRewards.map((reward, index) => (
+              <div
+                key={index}
+                className="flex items-center gap-1.5 rounded-full border border-border/50 bg-background py-1 pl-1 pr-2"
+              >
+                <SweepRewardTile
+                  reward={reward}
+                  rewardCatalog={rewardCatalog}
+                  isPremium={false}
+                  className="h-8 w-8 rounded-lg"
+                />
+                <span className="text-xs font-bold text-foreground">
+                  {sweepRewardLabel(reward, rewardCatalog)}
+                </span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setSweepConfig((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            megaRewards: prev.megaRewards.filter(
+                              (_, i) => i !== index,
+                            ),
+                          }
+                        : prev,
+                    )
+                  }
+                  className="text-muted-foreground transition hover:text-red-500"
+                  aria-label="Remove mega reward"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+          <SweepRewardAdder
+            rewardItems={rewardItems}
+            onAdd={(reward) =>
+              setSweepConfig((prev) =>
+                prev
+                  ? { ...prev, megaRewards: [...prev.megaRewards, reward] }
+                  : prev,
+              )
+            }
+          />
+        </div>
       </div>
     );
   };
@@ -3466,6 +3541,315 @@ function InlinePillSelect({ value, onChange, children, className }: { value: str
       </select>
       <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3 w-3 -translate-y-1/2 text-primary/60" />
     </span>
+  );
+}
+
+type SweepAdderKind = 'FLIES' | 'BOX' | 'ITEM' | 'SHIELD' | 'RARITY_ITEM';
+
+const SWEEP_RARITIES = ['common', 'uncommon', 'rare', 'epic', 'legendary'];
+
+/**
+ * One control for every outcome the roll tables can pay, including the two the
+ * catalog cannot describe: a Lily Pad and a guaranteed-rarity draw.
+ */
+function SweepRewardAdder({
+  rewardItems,
+  onAdd,
+  compact = false,
+}: {
+  rewardItems: MetaRewardItem[];
+  onAdd: (reward: SweepRewardInfo) => void;
+  compact?: boolean;
+}) {
+  const [kind, setKind] = useState<SweepAdderKind>('FLIES');
+  const [amount, setAmount] = useState(15);
+  const [rarity, setRarity] = useState('epic');
+  // '' keeps the outcome a draw of that rarity; an id pins it to one outfit.
+  const [rarityItemId, setRarityItemId] = useState('');
+  const boxes = rewardItems.filter((item) => item.slot === 'container');
+  const items = rewardItems.filter(
+    (item) => item.slot !== 'container' && item.slot !== 'background',
+  );
+  const options = kind === 'BOX' ? boxes : items;
+  const rarityOptions = items.filter((item) => item.rarity === rarity);
+  const [itemId, setItemId] = useState(boxes[0]?.id ?? '');
+
+  const build = (): SweepRewardInfo | null => {
+    if (kind === 'FLIES') {
+      const flies = Math.max(1, Math.floor(amount));
+      return { type: 'FLIES', amountMode: 'fixed', amount: flies };
+    }
+    if (kind === 'SHIELD') return { type: 'SHIELD', amount: 1 };
+    if (kind === 'RARITY_ITEM') {
+      return {
+        type: 'RARITY_ITEM',
+        rarity,
+        amount: 1,
+        ...(rarityItemId ? { itemId: rarityItemId } : {}),
+      };
+    }
+    const id = itemId || options[0]?.id;
+    if (!id) return null;
+    return kind === 'BOX'
+      ? { type: 'BOX', itemId: id, amount: 1 }
+      : { type: 'ITEM', itemId: id };
+  };
+
+  const selectClass =
+    'h-8 rounded-lg border border-border/50 bg-background px-2 text-xs font-bold text-foreground';
+
+  return (
+    <div className={cn('flex flex-wrap items-center gap-1.5', compact ? 'mt-2' : 'mt-3')}>
+      <select
+        value={kind}
+        onChange={(e) => {
+          const next = e.target.value as SweepAdderKind;
+          setKind(next);
+          if (next === 'BOX') setItemId(boxes[0]?.id ?? '');
+          if (next === 'ITEM') setItemId(items[0]?.id ?? '');
+        }}
+        className={selectClass}
+      >
+        <option value="FLIES">Flies</option>
+        <option value="BOX">Gift box</option>
+        <option value="ITEM">Item</option>
+        <option value="SHIELD">Lily Pad</option>
+        <option value="RARITY_ITEM">Guaranteed rarity</option>
+      </select>
+      {kind === 'FLIES' && (
+        <InlinePillNumber value={amount} onChange={(v) => setAmount(v)} />
+      )}
+      {(kind === 'BOX' || kind === 'ITEM') && (
+        <select
+          value={itemId}
+          onChange={(e) => setItemId(e.target.value)}
+          className={cn(selectClass, 'max-w-[180px]')}
+        >
+          {options.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.name}
+            </option>
+          ))}
+        </select>
+      )}
+      {kind === 'RARITY_ITEM' && (
+        <>
+          <select
+            value={rarity}
+            onChange={(e) => {
+              setRarity(e.target.value);
+              setRarityItemId('');
+            }}
+            className={selectClass}
+          >
+            {SWEEP_RARITIES.map((value) => (
+              <option key={value} value={value}>
+                {value}
+              </option>
+            ))}
+          </select>
+          <select
+            value={rarityItemId}
+            onChange={(e) => setRarityItemId(e.target.value)}
+            className={cn(selectClass, 'max-w-[180px]')}
+          >
+            <option value="">Random of this rarity</option>
+            {rarityOptions.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.name}
+              </option>
+            ))}
+          </select>
+        </>
+      )}
+      <button
+        type="button"
+        onClick={() => {
+          const reward = build();
+          if (reward) onAdd(reward);
+        }}
+        className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-background px-2.5 py-1 text-xs font-bold text-muted-foreground transition hover:border-primary/30 hover:text-foreground"
+      >
+        <Plus className="h-3 w-3" />
+        Add outcome
+      </button>
+    </div>
+  );
+}
+
+/**
+ * A roll table: every outcome with the odds it lands at. Chances are entered as
+ * percentages and normalised by their sum at draw time, so a table that does
+ * not add up to 100 still behaves — the header says what it really adds to.
+ */
+function SweepTableEditor({
+  title,
+  hint,
+  entries,
+  onChange,
+  rewardItems,
+  rewardCatalog,
+  golden = false,
+}: {
+  title: string;
+  hint: string;
+  entries: SweepRollEntryInfo[];
+  onChange: (entries: SweepRollEntryInfo[]) => void;
+  rewardItems: MetaRewardItem[];
+  rewardCatalog: Record<string, QuestRewardCatalogItem>;
+  golden?: boolean;
+}) {
+  const total = entries.reduce((sum, entry) => sum + Math.max(0, entry.chance), 0);
+  const flyEV = entries.reduce((sum, entry) => {
+    if (entry.reward.type !== 'FLIES') return sum;
+    const amount = (entry.reward as QuestReward).amount ?? 0;
+    return sum + (Math.max(0, entry.chance) / (total || 1)) * amount;
+  }, 0);
+  const giftEV = entries.reduce(
+    (sum, entry) =>
+      entry.reward.type === 'FLIES'
+        ? sum
+        : sum + Math.max(0, entry.chance) / (total || 1),
+    0,
+  );
+
+  return (
+    <div
+      className={cn(
+        'rounded-xl border px-3 py-3',
+        golden
+          ? 'border-amber-400/50 bg-amber-50/50 dark:bg-amber-500/5'
+          : 'border-border/40 bg-background/60',
+      )}
+    >
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <p className="text-[11px] font-black uppercase tracking-wide text-foreground">
+          {title}
+        </p>
+        <p className="text-[11px] font-bold tabular-nums text-muted-foreground">
+          EV {Math.round(flyEV)} flies + {(Math.round(giftEV * 100) / 100).toFixed(2)} gifts
+        </p>
+      </div>
+      <p className="mt-0.5 text-[11px] text-muted-foreground">{hint}</p>
+      {Math.abs(total - 100) > 0.01 && entries.length > 0 && (
+        <p className="mt-1 text-[11px] font-bold text-amber-600 dark:text-amber-400">
+          Odds add up to {Math.round(total * 100) / 100}% — they are normalised
+          when drawn.
+        </p>
+      )}
+
+      <div className="mt-2 space-y-1.5">
+        {entries.length === 0 && (
+          <p className="text-xs text-muted-foreground">No outcomes yet.</p>
+        )}
+        {entries.map((entry, index) => (
+          <div
+            key={entry.id || index}
+            className="flex items-center gap-2 rounded-lg border border-border/40 bg-card px-2 py-1.5"
+          >
+            <SweepRewardTile
+              reward={entry.reward}
+              rewardCatalog={rewardCatalog}
+              isPremium={false}
+              className="h-9 w-9 shrink-0 rounded-lg"
+            />
+            {entry.reward.type === 'RARITY_ITEM' ? (
+              <select
+                value={(entry.reward as { itemId?: string }).itemId ?? ''}
+                onChange={(e) =>
+                  onChange(
+                    entries.map((current, i) =>
+                      i === index
+                        ? {
+                            ...current,
+                            reward: {
+                              ...(current.reward as {
+                                type: 'RARITY_ITEM';
+                                rarity: string;
+                                amount?: number;
+                              }),
+                              itemId: e.target.value || undefined,
+                            },
+                          }
+                        : current,
+                    ),
+                  )
+                }
+                className="h-8 min-w-0 flex-1 rounded-lg border border-border/50 bg-background px-2 text-xs font-bold text-foreground"
+              >
+                <option value="">
+                  Random{' '}
+                  {(entry.reward as { rarity: string }).rarity} outfit
+                </option>
+                {rewardItems
+                  .filter(
+                    (item) =>
+                      item.slot !== 'container' &&
+                      item.slot !== 'background' &&
+                      item.rarity ===
+                        (entry.reward as { rarity: string }).rarity,
+                  )
+                  .map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name}
+                    </option>
+                  ))}
+              </select>
+            ) : (
+              <span className="min-w-0 flex-1 truncate text-xs font-bold text-foreground">
+                {sweepRewardLabel(entry.reward, rewardCatalog)}
+              </span>
+            )}
+            <input
+              type="number"
+              min={0}
+              step={0.5}
+              value={entry.chance}
+              onChange={(e) =>
+                onChange(
+                  entries.map((current, i) =>
+                    i === index
+                      ? {
+                          ...current,
+                          chance: Math.max(
+                            0,
+                            Math.round((Number(e.target.value) || 0) * 100) / 100,
+                          ),
+                        }
+                      : current,
+                  ),
+                )
+              }
+              className="h-8 w-16 rounded-lg border border-border/50 bg-background px-2 text-right text-xs font-bold text-foreground [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+            />
+            <span className="text-xs font-bold text-muted-foreground">%</span>
+            <button
+              type="button"
+              onClick={() => onChange(entries.filter((_, i) => i !== index))}
+              className="text-muted-foreground transition hover:text-red-500"
+              aria-label="Remove outcome"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <SweepRewardAdder
+        rewardItems={rewardItems}
+        compact
+        onAdd={(reward) =>
+          onChange([
+            ...entries,
+            {
+              id: `entry-${Date.now()}-${entries.length}`,
+              chance: 10,
+              reward,
+            },
+          ])
+        }
+      />
+    </div>
   );
 }
 

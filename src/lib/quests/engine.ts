@@ -33,7 +33,6 @@ import type {
   MacroCategoryDefinition,
   MacroCategoryId,
   QuestLogicBlock,
-  QuestLogicType,
   QuestPlacement,
   QuestProgressView,
   QuestReward,
@@ -333,137 +332,9 @@ function snapToFiveInRange(value: number, min: number, max: number): number {
   return Math.min(hi, Math.max(lo, snapped));
 }
 
-const BASELINE_LOOKBACK_DAYS = 14;
-const BASELINE_MIN_OBSERVED_DAYS = 3;
-// A scale low enough to flatten the ladder defeats the point of having tiers,
-// so the floor stays well above zero and the cold-start case opts out entirely
-// rather than bottoming out.
-const BASELINE_MIN_SCALE = 0.6;
-const BASELINE_MAX_SCALE = 1.6;
-const BASELINE_MIN_COMPLETIONS = 4;
-const BASELINE_MIN_FOCUS_MINUTES = 20;
-
-// Below these an objective stops meaning what its name says: "show up on 1
-// day" is just "complete a task", and a one-minute focus target is noise.
-const TYPE_MIN_TARGET: Partial<Record<QuestLogicType, number>> = {
-  distinct_days: 2,
-  focus_minutes: 10,
-};
-
-// Recipe ladders are authored for a user doing roughly this much in the tagged
-// area each day. A user's own trailing rate is divided by these to get the
-// scale their targets roll at, so the admin's ladder shape survives while the
-// numbers land where that user can actually reach them.
-const BASELINE_REFERENCE = {
-  completionsPerDay: 4,
-  focusMinutesPerDay: 35,
-  activeDayFraction: 0.8,
-} as const;
-
-export type QuestBaseline = {
-  completionsPerDay: number;
-  focusMinutesPerDay: number;
-  activeDayFraction: number;
-};
-
-const NEUTRAL_BASELINE: QuestBaseline = {
-  completionsPerDay: BASELINE_REFERENCE.completionsPerDay,
-  focusMinutesPerDay: BASELINE_REFERENCE.focusMinutesPerDay,
-  activeDayFraction: BASELINE_REFERENCE.activeDayFraction,
-};
-
-// Trailing tagged rate, measured over closed days only so a target cannot
-// shift under the user partway through the day it was rolled on.
-function computeQuestBaseline(args: {
-  tasks: TaskDoc[];
-  timezone: string;
-  todayKey: string;
-  tagIds?: string[];
-  accountCreatedAt?: Date | null;
-}): QuestBaseline {
-  const { tasks, timezone, todayKey, tagIds } = args;
-  const startKey = shiftDateKey(todayKey, -BASELINE_LOOKBACK_DAYS);
-  const endKey = shiftDateKey(todayKey, -1);
-
-  let observedDays = BASELINE_LOOKBACK_DAYS;
-  const createdAt = args.accountCreatedAt;
-  if (createdAt) {
-    const createdKey = getZonedYMD(new Date(createdAt), timezone);
-    if (createdKey > startKey) {
-      let days = 0;
-      let cursor = endKey;
-      while (cursor >= createdKey && days < BASELINE_LOOKBACK_DAYS) {
-        days += 1;
-        cursor = shiftDateKey(cursor, -1);
-      }
-      observedDays = days;
-    }
-  }
-  observedDays = Math.max(BASELINE_MIN_OBSERVED_DAYS, observedDays);
-
-  const matches = (task: TaskDoc) => {
-    if (task.type === 'focus-area') return true;
-    return hasAnyTag(task, tagIds);
-  };
-
-  const activeDays = new Set<string>();
-  let completions = 0;
-  for (const task of tasks) {
-    if (!matches(task)) continue;
-    for (const dateKey of taskCompletionDates(task, timezone)) {
-      if (dateKey < startKey || dateKey > endKey) continue;
-      completions += 1;
-      activeDays.add(dateKey);
-    }
-  }
-
-  const focusMinutes =
-    sumFocusSeconds(tasks, startKey, endKey, matches) / 60;
-
-  // Too thin a sample to personalise from. A brand-new focus area has no
-  // tagged history, and scaling off that would floor every tier of the ladder
-  // at once — the author's numbers are the better guess until there is signal.
-  if (
-    completions < BASELINE_MIN_COMPLETIONS &&
-    focusMinutes < BASELINE_MIN_FOCUS_MINUTES
-  ) {
-    return NEUTRAL_BASELINE;
-  }
-
-  return {
-    completionsPerDay: completions / observedDays,
-    focusMinutesPerDay: focusMinutes / observedDays,
-    activeDayFraction: activeDays.size / observedDays,
-  };
-}
-
-function baselineScaleForBlock(
-  block: QuestLogicBlock,
-  baseline: QuestBaseline,
-): number {
-  // Streak lengths and one-shot app actions are calendar facts, not volume —
-  // scaling them would change what the objective means. A deep session's whole
-  // point is its length, so only its count could scale, and a count of one is
-  // already the floor.
-  if (block.type === 'metric_count' || block.type === 'deep_session') return 1;
-  const ratio =
-    block.type === 'focus_minutes'
-      ? baseline.focusMinutesPerDay / BASELINE_REFERENCE.focusMinutesPerDay
-      : block.type === 'distinct_days'
-        ? baseline.activeDayFraction / BASELINE_REFERENCE.activeDayFraction
-        : baseline.completionsPerDay / BASELINE_REFERENCE.completionsPerDay;
-  if (!Number.isFinite(ratio)) return 1;
-  // A day count is capped by the window, so scaling it up only ever collides
-  // with the ceiling and makes two tiers ask the same thing.
-  const ceiling =
-    block.type === 'distinct_days' ? 1 : BASELINE_MAX_SCALE;
-  return Math.min(ceiling, Math.max(BASELINE_MIN_SCALE, ratio));
-}
-
 function resolveLogicTarget(
   block: QuestLogicBlock,
   seed: string,
-  baseline: QuestBaseline = NEUTRAL_BASELINE,
   windowDays?: number,
 ) {
   if (block.amountMode === 'fixed') {
@@ -474,64 +345,14 @@ function resolveLogicTarget(
   const max = Math.max(min, block.maxAmount ?? min);
   const rng = createSeededRandom(seed);
   const rolled = Math.floor(rng() * (max - min + 1)) + min;
-  const scale = baselineScaleForBlock(block, baseline);
-  const floor = TYPE_MIN_TARGET[block.type] ?? 1;
-  const scaled = Math.max(floor, Math.round(rolled * scale));
   if (block.type === 'focus_minutes') {
-    return Math.max(floor, Math.round(scaled / 5) * 5);
+    return snapToFiveInRange(rolled, min, max);
   }
   // You cannot show up on more days than the window has.
   if (block.type === 'distinct_days' && windowDays) {
-    return Math.min(Math.max(1, Math.floor(windowDays)), scaled);
+    return Math.min(Math.max(1, Math.floor(windowDays)), rolled);
   }
-  return scaled;
-}
-
-// Scaling each tier independently can collapse a ladder: two tiers of the same
-// kind that were authored 2 and 3 both land on 1, and the board shows the same
-// objective twice at different rewards. This restores the authored ordering
-// after scaling, without undoing the scale itself.
-function enforceLadderShape(
-  blocks: ResolvedQuestLogicBlock[],
-  windowDays: number,
-): void {
-  const signature = (block: ResolvedQuestLogicBlock) =>
-    [
-      block.type,
-      block.action ?? '',
-      block.metricKey ?? '',
-      block.sessionMinutes ?? '',
-      block.beforeHour ?? '',
-      block.requiresFollowThrough ? 'follow' : '',
-    ].join('|');
-
-  const groups = new Map<string, ResolvedQuestLogicBlock[]>();
-  for (const block of blocks) {
-    if (block.amountMode !== 'random') continue;
-    const key = signature(block);
-    const group = groups.get(key);
-    if (group) group.push(block);
-    else groups.set(key, [block]);
-  }
-
-  for (const group of Array.from(groups.values())) {
-    if (group.length < 2) continue;
-    const ceiling =
-      group[0].type === 'distinct_days'
-        ? Math.max(1, Math.floor(windowDays))
-        : Number.MAX_SAFE_INTEGER;
-    for (let i = 1; i < group.length; i += 1) {
-      const previous = group[i - 1];
-      const current = group[i];
-      // Only tiers the author meant to escalate are pushed apart.
-      const authoredHigher =
-        (current.minAmount ?? 0) > (previous.minAmount ?? 0);
-      if (!authoredHigher) continue;
-      if (current.target <= previous.target) {
-        current.target = Math.min(ceiling, previous.target + 1);
-      }
-    }
-  }
+  return rolled;
 }
 
 function resolveRewardAmount(reward: QuestReward, seed: string) {
@@ -656,21 +477,6 @@ function isSupportedReward(reward: { type?: string }): reward is QuestReward {
     reward.type === 'BOX' ||
     reward.type === 'BACKGROUND'
   );
-}
-
-// A target scaled up to the user's own rate has to pay for the extra work, or
-// the objective gets harder every week while the payout stays where it was.
-// Only scales up: a smaller target still pays the authored amount.
-function scaleFlyReward(reward: QuestReward, scale: number): QuestReward {
-  if (reward.type !== 'FLIES' || scale <= 1) return reward;
-  const amount = Math.max(1, reward.amount ?? 1);
-  return {
-    ...reward,
-    amount: Math.min(
-      MAX_REWARD_FLIES,
-      Math.max(amount, Math.round(amount * scale)),
-    ),
-  };
 }
 
 function resolveReward(reward: QuestReward, seed: string): QuestReward {
@@ -1173,19 +979,6 @@ async function syncQuestForTemplate(args: {
   );
   const templateLogic = template.logic;
 
-  // Onboarding targets are a hand-authored sequence; only rolled placements
-  // scale to the user. Anchored to the window's start, not today, so a target
-  // cannot drift under the user as they make progress against it.
-  const baseline =
-    template.placement === 'onboarding'
-      ? NEUTRAL_BASELINE
-      : computeQuestBaseline({
-          tasks,
-          timezone,
-          todayKey: startDate,
-          accountCreatedAt: user.createdAt ?? null,
-        });
-
   const resolvedLogic: ResolvedQuestLogicBlock[] = templateLogic.map((block) => {
       const resolvedTag =
         block.tagMode === 'random_user_tag' && userTags.length > 0
@@ -1200,7 +993,6 @@ async function syncQuestForTemplate(args: {
     const target = resolveLogicTarget(
       block,
       `${userId}:${template.templateId}:${windowKey}:${doc.rollKey}:${block.id}`,
-      baseline,
       1,
     );
       const resolvedBlock: ResolvedQuestLogicBlock = {
@@ -1219,17 +1011,13 @@ async function syncQuestForTemplate(args: {
       counters,
     });
     const progress = block.preCredited ? target : Math.max(0, rawProgress);
-    const payScale = Math.max(1, baselineScaleForBlock(block, baseline));
     const authoredRewards = (block.baseRewards ?? block.rewards ?? []).filter(
       (r): r is QuestReward => isSupportedReward(r as { type?: string }),
     );
     const resolvedRewards = authoredRewards.map((r, ri) =>
-      scaleFlyReward(
-        resolveReward(
-          r,
-          `${userId}:${template.templateId}:${windowKey}:${doc.rollKey}:obj-reward:${block.id}:${ri}`,
-        ),
-        payScale,
+      resolveReward(
+        r,
+        `${userId}:${template.templateId}:${windowKey}:${doc.rollKey}:obj-reward:${block.id}:${ri}`,
       ),
     );
     return {
@@ -1240,7 +1028,6 @@ async function syncQuestForTemplate(args: {
     };
   });
 
-  enforceLadderShape(resolvedLogic, 1);
   for (const block of resolvedLogic) {
     if (block.preCredited) block.progress = block.target;
   }

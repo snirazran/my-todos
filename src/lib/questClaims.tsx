@@ -289,7 +289,31 @@ function sortRewardsByRarity(rewards: any[], catalog: Catalog): any[] {
   return [...rewards].sort((a, b) => rank(b) - rank(a));
 }
 
-const MAX_REWARD_TILES = 2;
+// Three fits every row that renders this badge, and a stack of three reads as
+// "here is the haul" where two plus a "+1" reads as truncation.
+const MAX_REWARD_TILES = 3;
+
+/**
+ * The fan a stack of reward tiles sits in. The middle tile of an odd stack is
+ * the one with no rotation, so its flat top reads as sitting lower than the
+ * raised corners either side of it — it gets lifted rather than centred.
+ */
+export function rewardStackTileStyle(
+  index: number,
+  count: number,
+  small?: boolean,
+): React.CSSProperties {
+  const centerOffset = index - (count - 1) / 2;
+  const centred = Math.abs(centerOffset) < 0.01;
+  return {
+    marginLeft: index === 0 ? 0 : small ? -7 : -8,
+    transform:
+      count > 1
+        ? `rotate(${centerOffset * 7}deg) translateY(${centred ? -3 : Math.abs(centerOffset) * 2}px)`
+        : undefined,
+    zIndex: count - index,
+  };
+}
 
 export function QuestRewardTileBadge({
   reward,
@@ -311,22 +335,14 @@ export function QuestRewardTileBadge({
   const sorted = all.length > 1 ? sortRewardsByRarity(all, catalog) : all;
   const shown = sorted.slice(0, MAX_REWARD_TILES);
   const extraCount = sorted.length - shown.length;
-  const stacked = shown.length > 1;
   return (
     <div className="relative flex shrink-0 items-center">
       {shown.map((item, i) => {
-        const centerOffset = i - (shown.length - 1) / 2;
         return (
           <div
             key={`${item.type}-${item.itemId ?? item.backgroundId ?? item.amount ?? i}`}
             className="relative"
-            style={{
-              marginLeft: i === 0 ? 0 : small ? -10 : -12,
-              transform: stacked
-                ? `rotate(${centerOffset * 7}deg) translateY(${Math.abs(centerOffset) * 2}px)`
-                : undefined,
-              zIndex: shown.length - i,
-            }}
+            style={rewardStackTileStyle(i, shown.length, small)}
           >
             <RewardTile
               reward={item}

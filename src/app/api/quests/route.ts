@@ -2,7 +2,12 @@ import { NextResponse } from 'next/server';
 import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import { buildRewardCatalog, syncQuestState } from '@/lib/quests/engine';
-import { loadStreakConfig, previousDayKey, syncDailyStreak } from '@/lib/quests/streak';
+import {
+  loadSweepConfig,
+  previousDayKey,
+  sweepRollRewards,
+  syncDailySweep,
+} from '@/lib/quests/streak';
 import { parseTaskStreakDays } from '@/lib/quests/metrics';
 import { rewardWorth } from '@/lib/quests/priority';
 import { loadMoveToWebConfig, syncMoveToWeb } from '@/lib/quests/moveToWeb';
@@ -371,7 +376,7 @@ export async function GET(req: Request) {
       view === 'home' ||
       searchParams.get('includeCategories') === '1';
 
-    const [dashboard, activeSeason, streakConfig, moveToWebConfig] =
+    const [dashboard, activeSeason, sweepConfig, moveToWebConfig] =
       await Promise.all([
         syncQuestState({
           userId,
@@ -380,13 +385,13 @@ export async function GET(req: Request) {
           includeCategories,
         }),
         getActiveQuestSeasonView({ userId, timezone }),
-        loadStreakConfig(),
+        loadSweepConfig(),
         loadMoveToWebConfig(),
       ]);
 
-    const dailyStreak = await syncDailyStreak({
+    const dailySweep = await syncDailySweep({
       user: dashboard.user,
-      config: streakConfig,
+      config: sweepConfig,
       dailyQuests: dashboard.dailyQuests,
       todayKey: getZonedToday(timezone),
     });
@@ -419,7 +424,7 @@ export async function GET(req: Request) {
     );
     const seasonDailyClaimable =
       activeSeason && activeSeason.claimable && !activeSeason.claimedToday ? 1 : 0;
-    const streakClaimable = dailyStreak?.claimable ? 1 : 0;
+    const streakClaimable = dailySweep?.claimable ? dailySweep.pendingRolls : 0;
     const moveToWebClaimable = moveToWeb?.claimable ? 1 : 0;
     const claimableCount =
       questClaimable + seasonDailyClaimable + streakClaimable + moveToWebClaimable;
@@ -603,7 +608,7 @@ export async function GET(req: Request) {
           trackables,
           claimablesRewardCatalog,
           activeCount,
-          dailyStreak,
+          dailySweep,
           onboarding: {
             complete: !!dashboard.focusProfile.completedAt,
             selectedCategoryIds: dashboard.focusProfile.selectedCategoryIds,
@@ -634,8 +639,14 @@ export async function GET(req: Request) {
           ]),
         )
       : {};
-    const streakRewardCatalog = dailyStreak?.rewards?.length
-      ? buildRewardCatalog(dashboard.catalog, [dailyStreak.rewards])
+    const sweepRewardCatalog = dailySweep
+      ? buildRewardCatalog(dashboard.catalog, [
+          sweepRollRewards(dailySweep.standardRoll),
+          sweepRollRewards(dailySweep.goldenRoll),
+          sweepRollRewards(
+            dailySweep.megaRewards.map((reward) => ({ id: '', chance: 1, reward })),
+          ),
+        ])
       : {};
     const moveToWebRewardCatalog = moveToWeb?.reward
       ? buildRewardCatalog(dashboard.catalog, [[moveToWeb.reward]])
@@ -647,7 +658,7 @@ export async function GET(req: Request) {
         claimableCount,
         activeCount,
         frogName: (dashboard.user as { frogName?: string }).frogName ?? null,
-        dailyStreak,
+        dailySweep,
         moveToWeb,
         onboarding: {
           complete: !!dashboard.focusProfile.completedAt,
@@ -669,7 +680,7 @@ export async function GET(req: Request) {
         rewardCatalog: {
           ...dashboard.rewardCatalog,
           ...seasonRewardCatalog,
-          ...streakRewardCatalog,
+          ...sweepRewardCatalog,
           ...moveToWebRewardCatalog,
         },
       },

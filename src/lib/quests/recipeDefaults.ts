@@ -55,18 +55,12 @@ const flies = (amount: number) => [
   },
 ];
 
-const giftBonus = (chance: number) => [
-  {
-    chance,
-    reward: { type: 'BOX' as const, itemId: 'gift_box_1' },
-  },
-];
-
-// Daily roll: 3 objectives, easy -> medium -> hard. Economy-loop metrics
+// Daily roll: 3 objectives, easy -> medium -> hard, paying 6/12/20 flies.
+// Finishing all three is a Clean Sweep, which pays its own bonus and a Reward
+// Roll on top (see lib/quests/streak.ts). Economy-loop metrics
 // (trade/acquire) are in the pools but the engine only rolls them for
 // users who can actually perform them today (see isPoolEntryEligible), so a
-// day-one user never sees a dead objective. Free payout: 2+3+5 = 10 flies
-// plus a 15% gift roll on the capstone.
+// day-one user never sees a dead objective.
 export async function ensureDefaultDailyRecipe(): Promise<void> {
   const existing = await QuestRecipeModel.findOne({
     placement: 'daily',
@@ -76,7 +70,7 @@ export async function ensureDefaultDailyRecipe(): Promise<void> {
     recipeId: 'default-daily',
     name: 'Daily Roll',
     placement: 'daily',
-    isActive: false,
+    isActive: true,
     slots: [
       slot(
         [
@@ -85,7 +79,7 @@ export async function ensureDefaultDailyRecipe(): Promise<void> {
           { type: 'focus_minutes', minTarget: 10, maxTarget: 15, weight: 2 },
           { type: 'metric_count', metricKey: 'frog_fed_full', minTarget: 1, maxTarget: 1, weight: 1 },
         ],
-        flies(2),
+        flies(6),
       ),
       slot(
         [
@@ -95,7 +89,7 @@ export async function ensureDefaultDailyRecipe(): Promise<void> {
           { type: 'count', action: 'complete', beforeHour: 12, minTarget: 2, maxTarget: 3, weight: 2 },
           { type: 'metric_count', metricKey: 'skin_acquired', minTarget: 1, maxTarget: 1, weight: 1 },
         ],
-        flies(3),
+        flies(12),
       ),
       slot(
         [
@@ -103,8 +97,7 @@ export async function ensureDefaultDailyRecipe(): Promise<void> {
           { type: 'focus_minutes', minTarget: 30, maxTarget: 40, weight: 3 },
           { type: 'metric_count', metricKey: 'trade_completed', minTarget: 1, maxTarget: 1, weight: 1 },
         ],
-        flies(5),
-        giftBonus(0.15),
+        flies(20),
       ),
     ],
   });

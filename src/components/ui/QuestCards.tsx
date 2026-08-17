@@ -10,6 +10,7 @@ import {
   Gift,
   Monitor,
   RefreshCw,
+  Sparkles,
   Sprout,
   TriangleAlert,
   Trophy,
@@ -29,6 +30,7 @@ import type {
 } from '@/lib/quests/types';
 import Fly from './fly';
 import Frog from './frog';
+import { Icon } from './Icon';
 import { GiftRive } from './gift-box/GiftBox';
 import { ItemCard } from './skins/ItemCard';
 import { BaseSheet } from '@/components/ui/BaseSheet';
@@ -36,6 +38,7 @@ import {
   HintButton,
   ObjectiveProgressBar,
   objectiveCardTone,
+  rewardStackTileStyle,
   useCompletionReveal,
 } from '@/lib/questClaims';
 import { guideContextForBlock, guideIdForBlock } from '@/lib/hints/guides';
@@ -121,32 +124,32 @@ const REWARD_TILE_TONE: Record<
   },
   uncommon: {
     border: 'border-emerald-400',
-    bg: 'bg-gradient-to-br from-emerald-100 to-emerald-50 dark:from-emerald-900/40 dark:to-emerald-950/40',
+    bg: 'bg-gradient-to-br from-emerald-100 to-emerald-50 dark:from-emerald-900 dark:to-emerald-950',
     shadow: 'shadow-emerald-900/10',
   },
   rare: {
     border: 'border-sky-400',
-    bg: 'bg-gradient-to-br from-sky-100 to-sky-50 dark:from-sky-900/40 dark:to-sky-950/40',
+    bg: 'bg-gradient-to-br from-sky-100 to-sky-50 dark:from-sky-900 dark:to-sky-950',
     shadow: 'shadow-sky-900/10',
   },
   epic: {
     border: 'border-violet-400',
-    bg: 'bg-gradient-to-br from-violet-100 to-violet-50 dark:from-violet-900/40 dark:to-violet-950/40',
+    bg: 'bg-gradient-to-br from-violet-100 to-violet-50 dark:from-violet-900 dark:to-violet-950',
     shadow: 'shadow-violet-900/20',
   },
   legendary: {
     border: 'border-amber-400',
-    bg: 'bg-gradient-to-br from-amber-100 to-amber-50 dark:from-amber-900/40 dark:to-amber-950/40',
+    bg: 'bg-gradient-to-br from-amber-100 to-amber-50 dark:from-amber-900 dark:to-amber-950',
     shadow: 'shadow-amber-900/30',
   },
   flies: {
     border: 'border-emerald-500',
-    bg: 'bg-gradient-to-br from-emerald-100 to-emerald-50 dark:from-emerald-900/40 dark:to-emerald-950/40',
+    bg: 'bg-gradient-to-br from-emerald-100 to-emerald-50 dark:from-emerald-900 dark:to-emerald-950',
     shadow: 'shadow-emerald-900/10',
   },
   default: {
     border: 'border-border/40',
-    bg: 'bg-muted/30',
+    bg: 'bg-muted',
     shadow: 'shadow-sm',
   },
 };
@@ -557,12 +560,36 @@ export function StarterQuestCard({
   );
 }
 
-export type DailyStreakInfo = {
+/** A Lily Pad and a guaranteed-rarity draw have no catalog id, so the roll
+ * tables carry two outcomes the plain reward type cannot describe. */
+export type SweepRewardInfo =
+  | QuestReward
+  | { type: 'SHIELD'; amount?: number }
+  | { type: 'RARITY_ITEM'; rarity: string; amount?: number; itemId?: string };
+
+export type SweepRollEntryInfo = {
+  id: string;
+  chance: number;
+  reward: SweepRewardInfo;
+};
+
+export type DailySweepInfo = {
   count: number;
-  targetLength: number;
   todayComplete: boolean;
+  objectivesDone: number;
+  objectivesTotal: number;
+  cleanSweepFlies: number;
+  cleanSweepPaidToday: boolean;
+  pendingRolls: number;
   claimable: boolean;
-  rewards?: QuestReward[];
+  nextTier: 'standard' | 'golden';
+  nextMega: boolean;
+  sweepsToGolden: number;
+  goldenEveryDays: number;
+  megaEveryDays: number;
+  standardRoll: SweepRollEntryInfo[];
+  goldenRoll: SweepRollEntryInfo[];
+  megaRewards: SweepRewardInfo[];
 };
 
 export function DailyChecklistCard({
@@ -571,16 +598,16 @@ export function DailyChecklistCard({
   isPremium,
   claimingObjectiveId,
   onClaimObjective,
-  streak,
-  claimingStreak = false,
-  onClaimStreak,
+  sweep,
+  claimingSweep = false,
+  onClaimSweep,
   paused = false,
 }: Omit<BaseCardProps, 'onClaimObjective'> & {
   quests: Array<QuestCardData & { placement: 'daily' }>;
   onClaimObjective?: (questId: string, objectiveId: string) => void;
-  streak?: DailyStreakInfo | null;
-  claimingStreak?: boolean;
-  onClaimStreak?: () => void;
+  sweep?: DailySweepInfo | null;
+  claimingSweep?: boolean;
+  onClaimSweep?: () => void;
 }) {
   const timeLeft = useTimeLeft();
   const [rewardPopup, setRewardPopup] = useState<RewardPopupState | null>(null);
@@ -641,28 +668,25 @@ export function DailyChecklistCard({
             />
           ))
         )}
-        {streak ? (
-          <DailyStreakStrip
-            streak={streak}
-            claiming={claimingStreak}
-            onClaim={onClaimStreak}
-            onShowPrizes={
-              (streak.rewards?.length ?? 0) > 0
-                ? () =>
-                    setRewardPopup({
-                      eyebrow: 'Daily streak',
-                      title: 'Prize pool',
-                      rewards: sortStreakPrizes(
-                        streak.rewards ?? [],
-                        rewardCatalog,
-                      ),
-                    })
-                : undefined
-            }
-            rewardCatalog={rewardCatalog}
-            isPremium={isPremium}
-            paused={paused}
-          />
+        {sweep ? (
+          <>
+            <CleanSweepCard
+              sweep={sweep}
+              claiming={claimingSweep}
+              onClaim={onClaimSweep}
+              rewardCatalog={rewardCatalog}
+              isPremium={isPremium}
+              paused={paused}
+            />
+            {sweep.goldenEveryDays > 0 && sweep.goldenRoll.length > 0 ? (
+              <SweepStreakCard
+                sweep={sweep}
+                rewardCatalog={rewardCatalog}
+                isPremium={isPremium}
+                paused={paused}
+              />
+            ) : null}
+          </>
         ) : null}
       </div>
       <RewardDetailsPopup
@@ -706,110 +730,569 @@ export function sortStreakPrizes(
   );
 }
 
-function DailyStreakStrip({
-  streak,
+// Gradients rather than tints, and fully opaque in dark mode: an alpha fill
+// lets the card show through and reads as a placeholder next to a real tile.
+const SWEEP_RARITY_TONE: Record<string, string> = {
+  legendary:
+    'border-amber-400 bg-gradient-to-br from-amber-100 to-amber-50 text-amber-700 dark:from-amber-900 dark:to-amber-950 dark:text-amber-300',
+  epic: 'border-violet-400 bg-gradient-to-br from-violet-100 to-violet-50 text-violet-700 dark:from-violet-900 dark:to-violet-950 dark:text-violet-300',
+  rare: 'border-sky-400 bg-gradient-to-br from-sky-100 to-sky-50 text-sky-700 dark:from-sky-900 dark:to-sky-950 dark:text-sky-300',
+  uncommon:
+    'border-emerald-400 bg-gradient-to-br from-emerald-100 to-emerald-50 text-emerald-700 dark:from-emerald-900 dark:to-emerald-950 dark:text-emerald-300',
+  common:
+    'border-slate-300 bg-gradient-to-br from-slate-200 to-slate-100 text-slate-600 dark:border-slate-600 dark:from-slate-800 dark:to-slate-900 dark:text-slate-300',
+};
+
+function isCatalogReward(reward: SweepRewardInfo): reward is QuestReward {
+  return (
+    reward.type === 'FLIES' ||
+    reward.type === 'ITEM' ||
+    reward.type === 'BOX' ||
+    reward.type === 'BACKGROUND'
+  );
+}
+
+export function sweepRewardLabel(
+  reward: SweepRewardInfo,
+  rewardCatalog: Record<string, QuestRewardCatalogItem>,
+  isPremium = false,
+) {
+  if (reward.type === 'SHIELD') {
+    const amount = Math.max(1, (reward as { amount?: number }).amount ?? 1);
+    return amount > 1 ? `${amount} Lily Pads` : 'Lily Pad';
+  }
+  if (reward.type === 'RARITY_ITEM') {
+    const { rarity, itemId } = reward as { rarity: string; itemId?: string };
+    const name = itemId ? rewardCatalog[itemId]?.name : undefined;
+    return name ?? `Guaranteed ${rarity} outfit`;
+  }
+  return rewardLabel(reward, rewardCatalog, isPremium);
+}
+
+/** One outcome's art: catalog rewards reuse the shared tile, the two
+ * catalog-less outcomes get their own. */
+export function SweepRewardTile({
+  reward,
+  rewardCatalog,
+  isPremium,
+  paused = false,
+  className,
+  flySize,
+  flyOversample,
+  frogClassName,
+  giftAnimation,
+  hideBadge,
+}: {
+  reward: SweepRewardInfo;
+  rewardCatalog: Record<string, QuestRewardCatalogItem>;
+  isPremium: boolean;
+  paused?: boolean;
+  className?: string;
+  flySize?: number;
+  flyOversample?: number;
+  frogClassName?: string;
+  giftAnimation?: string;
+  hideBadge?: boolean;
+}) {
+  const pinnedItemId =
+    reward.type === 'RARITY_ITEM'
+      ? (reward as { itemId?: string }).itemId
+      : undefined;
+  // RewardTile's default sits the frog 8% low, which crops its feet in a row
+  // this size. Lifted and scaled up a little so the outfit is what you see.
+  const frogPreviewClass = frogClassName ?? 'h-[132%] w-[132%] -translate-y-[14%]';
+  if (isCatalogReward(reward) || pinnedItemId) {
+    return (
+      <RewardTile
+        reward={
+          pinnedItemId
+            ? { type: 'ITEM', itemId: pinnedItemId }
+            : (reward as QuestReward)
+        }
+        rewardCatalog={rewardCatalog}
+        isPremium={isPremium}
+        paused={paused}
+        hideBadge={hideBadge ?? reward.type !== 'FLIES'}
+        flySize={flySize}
+        flyOversample={flyOversample}
+        frogClassName={frogPreviewClass}
+        giftAnimation={giftAnimation}
+        className={className}
+      />
+    );
+  }
+
+  if (reward.type === 'SHIELD') {
+    return (
+      <div
+        className={cn(
+          'flex h-12 w-12 items-center justify-center rounded-xl border-2 border-emerald-400 bg-gradient-to-br from-emerald-100 to-emerald-50 text-emerald-600 shadow-sm dark:from-emerald-900 dark:to-emerald-950 dark:text-emerald-300',
+          className,
+        )}
+      >
+        <Icon name="lilyPad" label="Lily Pad" className="h-6 w-6" />
+      </div>
+    );
+  }
+
+  const rarity = (reward as { rarity: string }).rarity;
+  return (
+    <div
+      className={cn(
+        'flex h-12 w-12 flex-col items-center justify-center rounded-xl border-2 shadow-sm',
+        SWEEP_RARITY_TONE[rarity] ?? SWEEP_RARITY_TONE.common,
+        className,
+      )}
+    >
+      <Sparkles className="h-4 w-4" strokeWidth={2.75} />
+      <span className="mt-0.5 text-[8px] font-black uppercase leading-none tracking-wide">
+        {rarity.slice(0, 4)}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * How good an outcome looks on a card, so a stack of three leads with the
+ * prizes worth chasing. A guaranteed-rarity draw scores below everything: it is
+ * the one outcome with no item to picture, so it belongs in the "+N" rather
+ * than taking a slot with a placeholder tile.
+ */
+function sweepEntryRank(
+  entry: SweepRollEntryInfo,
+  rewardCatalog: Record<string, QuestRewardCatalogItem>,
+) {
+  const reward = entry.reward;
+  if (reward.type === 'RARITY_ITEM') {
+    const { itemId, rarity } = reward as { itemId?: string; rarity: string };
+    if (!itemId) return -1;
+    return STREAK_PRIZE_RARITY_RANK[rewardCatalog[itemId]?.rarity ?? rarity] ?? 4;
+  }
+  // A Lily Pad costs 350 flies in the shop — between a Rare and a Legendary
+  // gift, which is where it belongs in a stack of three.
+  if (reward.type === 'SHIELD') return 2.5;
+  if (reward.type === 'FLIES') {
+    const amount = (reward as QuestReward).amount ?? 0;
+    return Math.min(3, amount / 40);
+  }
+  const lookupId =
+    (reward as QuestReward).itemId ?? (reward as QuestReward).backgroundId;
+  const item = lookupId ? rewardCatalog[lookupId] : null;
+  return item ? STREAK_PRIZE_RARITY_RANK[item.rarity] ?? 1 : 1;
+}
+
+/** The three best outcomes to show, and how many the "+N" stands for. */
+function sweepPrizeStack(
+  table: SweepRollEntryInfo[],
+  rewardCatalog: Record<string, QuestRewardCatalogItem>,
+) {
+  const ranked = [...table]
+    .map((entry) => ({ entry, rank: sweepEntryRank(entry, rewardCatalog) }))
+    .sort((a, b) => b.rank - a.rank);
+  const shown = ranked
+    .filter((row) => row.rank >= 0)
+    .slice(0, 3)
+    .map((row) => row.entry);
+  return { shown, extra: Math.max(0, table.length - shown.length) };
+}
+
+/** A quantity chip per tile, same as the Leap's stack. */
+function sweepQuantityLabel(reward: SweepRewardInfo) {
+  if (reward.type === 'FLIES') {
+    return String(Math.max(0, (reward as QuestReward).amount ?? 0));
+  }
+  const amount = Math.max(1, (reward as { amount?: number }).amount ?? 1);
+  return `x${amount}`;
+}
+
+/**
+ * Laid out like the Leap's reward badge (QuestRewardTileBadge): fanned by a few
+ * degrees, overlapping, quantity chip per tile, and the "+N" tucked into the
+ * bottom-right corner of the whole stack instead of sitting beside it.
+ */
+function SweepPrizeStack({
+  table,
+  rewardCatalog,
+  isPremium,
+  onOpen,
+  label,
+  paused = false,
+}: {
+  table: SweepRollEntryInfo[];
+  rewardCatalog: Record<string, QuestRewardCatalogItem>;
+  isPremium: boolean;
+  onOpen: () => void;
+  label: string;
+  paused?: boolean;
+}) {
+  const { shown, extra } = sweepPrizeStack(table, rewardCatalog);
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-label={label}
+      className="relative my-0.5 flex shrink-0 items-center py-1"
+    >
+      {shown.map((entry, i) => {
+        return (
+          <div
+            key={entry.id || i}
+            className="relative"
+            style={rewardStackTileStyle(i, shown.length)}
+          >
+            <SweepRewardTile
+              reward={entry.reward}
+              rewardCatalog={rewardCatalog}
+              isPremium={isPremium}
+              paused={paused}
+              hideBadge
+              frogClassName="-translate-y-[18%]"
+              flySize={30}
+              flyOversample={1.25}
+              giftAnimation={i === 0 ? 'box_shake' : undefined}
+              className="h-11 w-11 rounded-xl min-[400px]:h-12 min-[400px]:w-12"
+            />
+            <span className="absolute -right-0.5 -top-1 z-20 flex min-w-4 items-center justify-center rounded-sm border border-white/10 bg-black/50 px-1 py-0.5 text-[8px] font-bold uppercase tracking-wide text-white shadow-sm backdrop-blur-sm">
+              {sweepQuantityLabel(entry.reward)}
+            </span>
+          </div>
+        );
+      })}
+      {extra > 0 && (
+        <span className="pointer-events-none absolute -bottom-0.5 -right-1.5 z-30 flex h-4 min-w-4 items-center justify-center rounded-md border border-white/10 bg-black/55 px-1 text-[8px] font-black uppercase tracking-wide text-white shadow-sm backdrop-blur-sm">
+          +{extra}
+        </span>
+      )}
+    </button>
+  );
+}
+
+function SweepOddsPopup({
+  open,
+  sweep,
+  initialTab,
+  rewardCatalog,
+  isPremium,
+  onClose,
+  paused = false,
+}: {
+  open: boolean;
+  sweep: DailySweepInfo;
+  initialTab: 'standard' | 'golden';
+  rewardCatalog: Record<string, QuestRewardCatalogItem>;
+  isPremium: boolean;
+  onClose: () => void;
+  paused?: boolean;
+}) {
+  const [tab, setTab] = useState<'standard' | 'golden'>(initialTab);
+  // The popup stays mounted between opens, so the tab follows whichever table
+  // the caller cares about each time it is reopened.
+  useEffect(() => {
+    if (open) setTab(initialTab);
+  }, [open, initialTab]);
+  const table = tab === 'golden' ? sweep.goldenRoll : sweep.standardRoll;
+  const total = table.reduce((sum, entry) => sum + Math.max(0, entry.chance), 0) || 1;
+
+  if (!open || typeof document === 'undefined') return null;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/45 p-3 sm:p-6"
+      onClick={onClose}
+    >
+      <div
+        className="max-h-[88vh] w-full max-w-md overflow-y-auto rounded-[24px] border border-border bg-card p-4 text-card-foreground shadow-2xl sm:p-5"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-center justify-between gap-4 border-b border-border/40 pb-4">
+          <div>
+            <p className="text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+              Daily prizes
+            </p>
+            <h3 className="mt-1 text-2xl font-black leading-none text-foreground">
+              What you can win
+            </h3>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border/50 bg-background/80 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+            aria-label="Close reward roll odds"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="mt-4 flex gap-1.5 rounded-xl bg-muted/60 p-1">
+          {(['standard', 'golden'] as const).map((key) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setTab(key)}
+              className={cn(
+                'flex-1 rounded-lg px-3 py-1.5 text-[12px] font-black uppercase tracking-wide transition',
+                tab === key
+                  ? key === 'golden'
+                    ? 'bg-amber-400 text-amber-950 shadow-sm'
+                    : 'bg-card text-foreground shadow-sm'
+                  : 'text-muted-foreground',
+              )}
+            >
+              {key === 'golden' ? 'Golden' : 'Every day'}
+            </button>
+          ))}
+        </div>
+        <p className="mt-2 text-[11px] font-bold leading-tight text-muted-foreground">
+          {tab === 'golden'
+            ? `Finish ${sweep.goldenEveryDays} days in a row and you win from here instead.`
+            : 'One prize every day you finish all 3 quests.'}
+        </p>
+
+        <div className="mt-3 divide-y divide-border/40">
+          {table.map((entry, index) => (
+            <div key={entry.id || index} className="flex items-center gap-3 py-2">
+              <SweepRewardTile
+                reward={entry.reward}
+                rewardCatalog={rewardCatalog}
+                isPremium={isPremium}
+                paused={paused}
+                flySize={34}
+                flyOversample={1.25}
+                className="shrink-0"
+              />
+              <span className="min-w-0 flex-1 truncate text-[13px] font-bold text-foreground">
+                {sweepRewardLabel(entry.reward, rewardCatalog, isPremium)}
+              </span>
+              <span className="shrink-0 text-[13px] font-black tabular-nums text-muted-foreground">
+                {formatChance((100 * Math.max(0, entry.chance)) / total)}%
+              </span>
+            </div>
+          ))}
+        </div>
+
+        {sweep.megaEveryDays > 0 && sweep.megaRewards.length > 0 && (
+          <div className="mt-4 rounded-2xl border border-amber-400/50 bg-amber-50 px-3 py-3 dark:bg-amber-500/10">
+            <p className="text-[11px] font-black uppercase tracking-wide text-amber-700 dark:text-amber-300">
+              Every {sweep.megaEveryDays} days in a row
+            </p>
+            <p className="mt-0.5 text-[12px] font-bold text-foreground">
+              Yours for sure, on top of the golden prize.
+            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              {sweep.megaRewards.map((reward, index) => (
+                <div key={index} className="flex items-center gap-1.5">
+                  <SweepRewardTile
+                    reward={reward}
+                    rewardCatalog={rewardCatalog}
+                    isPremium={isPremium}
+                    paused={paused}
+                    flySize={34}
+                    flyOversample={1.25}
+                  />
+                  <span className="text-[12px] font-bold text-foreground">
+                    {sweepRewardLabel(reward, rewardCatalog, isPremium)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+function formatChance(value: number) {
+  if (value >= 10) return String(Math.round(value));
+  return String(Math.round(value * 10) / 10);
+}
+
+/**
+ * The day's payoff moment: the three quests pay their own flies, finishing all
+ * three pays the Clean Sweep bonus and earns one Reward Roll, and every Nth
+ * consecutive sweep day upgrades that roll to the golden table.
+ */
+/**
+ * Today's payoff, and only today's: the three quests pay their own flies, and
+ * finishing all three pays the Clean Sweep bonus plus one Reward Roll. Which
+ * table that roll uses is the streak's business, not this row's — mixing the
+ * two put a multi-day ladder and a same-day checklist in one sentence.
+ */
+function CleanSweepCard({
+  sweep,
   claiming = false,
   onClaim,
-  onShowPrizes,
   rewardCatalog,
   isPremium,
   paused = false,
 }: {
-  streak: DailyStreakInfo;
+  sweep: DailySweepInfo;
   claiming?: boolean;
   onClaim?: () => void;
-  onShowPrizes?: () => void;
   rewardCatalog: Record<string, QuestRewardCatalogItem>;
   isPremium: boolean;
   paused?: boolean;
 }) {
-  const length = Math.max(2, streak.targetLength);
-  const cycleDay =
-    streak.count === 0 ? 0 : ((streak.count - 1) % length) + 1;
-  const prizePool = sortStreakPrizes(streak.rewards ?? [], rewardCatalog);
-  const shownPrizes = prizePool.slice(0, 3);
-  const extraPrizeCount = prizePool.length - shownPrizes.length;
+  const [oddsOpen, setOddsOpen] = useState(false);
+  const golden = sweep.nextTier === 'golden';
+  const remaining = Math.max(0, sweep.objectivesTotal - sweep.objectivesDone);
+  const total = Math.max(1, sweep.objectivesTotal);
 
   return (
-    <div className="rounded-2xl border border-border/50 bg-card px-3 py-3 shadow-sm sm:px-4">
-      <div className="flex items-center gap-2.5">
-        {shownPrizes.length > 0 ? (
-          <button
-            type="button"
-            onClick={onShowPrizes}
-            disabled={!onShowPrizes}
-            aria-label="See streak prizes"
-            className="relative flex shrink-0 items-center py-1 disabled:pointer-events-none"
-          >
-            {shownPrizes.map((reward, i) => {
-              const centerOffset = i - (shownPrizes.length - 1) / 2;
-              return (
-                <div
-                  key={`${reward.type}-${reward.itemId ?? reward.backgroundId ?? reward.amount ?? i}`}
-                  className="relative"
-                  style={{
-                    marginLeft: i === 0 ? 0 : -6,
-                    transform: `rotate(${centerOffset * 7}deg) translateY(${Math.abs(centerOffset) * 3}px)`,
-                    zIndex: shownPrizes.length - i,
-                  }}
-                >
-                  <RewardTile
-                    reward={reward}
-                    rewardCatalog={rewardCatalog}
-                    isPremium={isPremium}
-                    compact
-                    paused={paused}
-                    hideBadge={reward.type !== 'FLIES'}
-                    flySize={22}
-                    hydrateDelayMs={150 + i * 100}
-                    giftAnimation={i === 0 ? 'box_shake' : undefined}
-                    className="h-10 w-10 shrink-0 rounded-xl ring-2 ring-card"
-                  />
-                </div>
-              );
-            })}
-            {extraPrizeCount > 0 && (
-              <span
-                className="absolute rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-black text-muted-foreground ring-2 ring-card"
-                style={{ right: -6, bottom: 0, zIndex: shownPrizes.length + 1 }}
-              >
-                +{extraPrizeCount}
-              </span>
-            )}
-          </button>
-        ) : (
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-400/15 text-amber-500">
-            <Gift className="h-[18px] w-[18px]" strokeWidth={2.5} />
-          </div>
-        )}
+    <div className="rounded-2xl border border-border/50 bg-card px-3.5 py-4 shadow-sm sm:px-4">
+      <div className="flex items-center gap-3.5">
+        <SweepPrizeStack
+          table={golden ? sweep.goldenRoll : sweep.standardRoll}
+          rewardCatalog={rewardCatalog}
+          isPremium={isPremium}
+          onOpen={() => setOddsOpen(true)}
+          label="See what you can win"
+          paused={paused}
+        />
+
         <div className="min-w-0 flex-1">
           <p className="text-[12px] font-black leading-tight text-foreground">
-            {streak.claimable
-              ? 'Streak prize ready!'
-              : `Daily streak · day ${cycleDay} of ${length}`}
+            {sweep.claimable
+              ? sweep.nextMega
+                ? 'Mega prize ready!'
+                : golden
+                  ? 'Golden prize ready!'
+                  : 'Prize ready!'
+              : sweep.todayComplete
+                ? 'All 3 done — nice one!'
+                : `${remaining} quest${remaining === 1 ? '' : 's'} to go`}
           </p>
           <p className="mt-0.5 text-[11px] font-bold leading-tight text-muted-foreground">
-            {streak.claimable
-              ? `You finished every daily quest ${length} days in a row`
-              : streak.todayComplete
-                ? 'Done for today — hop back tomorrow!'
-                : `Finish all daily quests ${length - cycleDay} more day${length - cycleDay > 1 ? 's' : ''} to win${prizePool.length > 1 ? ` one of ${prizePool.length} prizes` : ''}`}
+            {sweep.claimable
+              ? sweep.nextMega
+                ? 'The golden prize, plus a guaranteed gift'
+                : golden
+                  ? 'The rare stuff lives in this one'
+                  : 'Open it and see what you got'
+              : sweep.todayComplete
+                ? 'Fresh quests tomorrow'
+                : `Finish all 3 to win ${sweep.cleanSweepFlies} flies + a prize`}
           </p>
         </div>
-        {streak.claimable && onClaim ? (
+
+        {sweep.claimable && onClaim ? (
           <span className={cn('inline-flex shrink-0', !claiming && 'claim-wobble')}>
             <button
               type="button"
               onClick={onClaim}
               disabled={claiming}
-              className="inline-flex h-9 items-center justify-center rounded-xl bg-amber-500 px-4 text-[13px] font-black text-white shadow-[0_3px_0_0_#b45309] transition-all hover:translate-y-[-1px] hover:shadow-[0_4px_0_0_#b45309] active:translate-y-[2px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60"
+              className={cn(
+                'inline-flex h-9 items-center justify-center rounded-xl px-4 text-[13px] font-black text-white transition-all hover:translate-y-[-1px] active:translate-y-[2px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60',
+                golden
+                  ? 'bg-amber-500 shadow-[0_3px_0_0_#b45309] hover:shadow-[0_4px_0_0_#b45309]'
+                  : 'bg-emerald-500 shadow-[0_3px_0_0_#047857] hover:shadow-[0_4px_0_0_#047857]',
+              )}
             >
-              {claiming ? 'Claiming...' : 'Claim'}
+              {claiming
+                ? 'Opening…'
+                : sweep.pendingRolls > 1
+                  ? `Open (${sweep.pendingRolls})`
+                  : 'Open'}
             </button>
           </span>
-        ) : length <= 7 ? (
-          <div className="flex shrink-0 items-center gap-1">
-            {Array.from({ length }, (_, i) => (
+        ) : (
+          <div className="flex shrink-0 items-center gap-1" aria-hidden>
+            {Array.from({ length: total }, (_, i) => (
+              <span
+                key={i}
+                className={cn(
+                  'h-2 w-4 rounded-full',
+                  i < sweep.objectivesDone
+                    ? 'bg-emerald-500'
+                    : 'border border-border/60 bg-muted',
+                )}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      <SweepOddsPopup
+        open={oddsOpen}
+        sweep={sweep}
+        initialTab={sweep.nextTier}
+        rewardCatalog={rewardCatalog}
+        isPremium={isPremium}
+        onClose={() => setOddsOpen(false)}
+        paused={paused}
+      />
+    </div>
+  );
+}
+
+/**
+ * The multi-day half, kept in its own row: consecutive sweep days, and what
+ * they upgrade the roll to. Nothing here is actionable today — it exists to
+ * show why tomorrow's sweep is worth more than today's.
+ */
+function SweepStreakCard({
+  sweep,
+  rewardCatalog,
+  isPremium,
+  paused = false,
+}: {
+  sweep: DailySweepInfo;
+  rewardCatalog: Record<string, QuestRewardCatalogItem>;
+  isPremium: boolean;
+  paused?: boolean;
+}) {
+  const [oddsOpen, setOddsOpen] = useState(false);
+  const every = Math.max(1, sweep.goldenEveryDays);
+  const cycleDay = sweep.count === 0 ? 0 : ((sweep.count - 1) % every) + 1;
+  const goldenNext = sweep.sweepsToGolden <= 1;
+  const megaNext =
+    sweep.megaEveryDays > 0 &&
+    (sweep.count + 1) % sweep.megaEveryDays === 0;
+
+  return (
+    <div
+      className={cn(
+        'rounded-2xl border px-3.5 py-4 shadow-sm sm:px-4',
+        goldenNext
+          ? 'border-amber-400/70 bg-gradient-to-br from-amber-50 to-card dark:from-amber-500/10'
+          : 'border-border/50 bg-card',
+      )}
+    >
+      <div className="flex items-center gap-3.5">
+        <SweepPrizeStack
+          table={sweep.goldenRoll}
+          rewardCatalog={rewardCatalog}
+          isPremium={isPremium}
+          onOpen={() => setOddsOpen(true)}
+          label="See the golden prizes"
+          paused={paused}
+        />
+
+        <div className="min-w-0 flex-1">
+          <p className="flex items-center gap-1.5 text-[12px] font-black leading-tight text-foreground">
+            {sweep.count === 0
+              ? 'Start a streak'
+              : `${sweep.count}-day streak`}
+            {goldenNext && (
+              <span className="rounded-full bg-amber-400 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-amber-950">
+                {megaNext ? 'Mega next' : 'Golden next'}
+              </span>
+            )}
+          </p>
+          <p className="mt-0.5 text-[11px] font-bold leading-tight text-muted-foreground">
+            {megaNext
+              ? 'Finish today for the mega prize'
+              : goldenNext
+                ? 'Finish today for a golden prize'
+                : `${sweep.sweepsToGolden} days in a row = a golden prize`}
+          </p>
+        </div>
+
+        {every <= 7 ? (
+          <div className="flex shrink-0 items-center gap-1" aria-hidden>
+            {Array.from({ length: every }, (_, i) => (
               <span
                 key={i}
                 className={cn(
@@ -823,10 +1306,20 @@ function DailyStreakStrip({
           </div>
         ) : (
           <span className="shrink-0 text-[11px] font-black tabular-nums text-amber-600 dark:text-amber-400">
-            {cycleDay}/{length}
+            {cycleDay}/{every}
           </span>
         )}
       </div>
+
+      <SweepOddsPopup
+        open={oddsOpen}
+        sweep={sweep}
+        initialTab="golden"
+        rewardCatalog={rewardCatalog}
+        isPremium={isPremium}
+        onClose={() => setOddsOpen(false)}
+        paused={paused}
+      />
     </div>
   );
 }
@@ -1561,8 +2054,11 @@ export const RewardTile = memo(function RewardTile({
             className={cn(
               compact
                 ? 'h-[118%] w-[118%] drop-shadow-lg'
-                : 'h-[120%] w-[120%]',
-              giftAnimation && '-translate-y-1.5',
+                : 'h-[124%] w-[124%]',
+              // The box sits low inside its own rive frame, so every tile gets
+              // the same lift. Applying it only to the animated tile is what
+              // made a stack's lead gift float above its neighbours.
+              '-translate-y-[13%]',
             )}
           >
             <GiftRive className="w-full h-full" color={item.riveIndex} paused={false} animation={giftAnimation} />
