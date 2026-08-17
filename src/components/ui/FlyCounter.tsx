@@ -40,7 +40,6 @@ export function FlyCounter({
   showGoal = false,
 }: Props) {
   const { wishlist, progress } = useWishlist(showGoal);
-  const goalRatio = progress?.ratio ?? 0;
   const goalReached = !!progress?.reached;
   // Held gains celebrate once the screen is clear again (read here, in the
   // leaf, rather than in the layout-level header — subscribing in the header
@@ -135,26 +134,6 @@ export function FlyCounter({
       )}
       animate={pillControls}
     >
-      {/* Goal gradient: the pill fills left-to-right toward the pinned item, so
-          the balance reads as progress instead of a standalone number. Clipping
-          lives on this inner layer — the pill itself must not clip, or the "+"
-          affordance and the floating "+N" badge get cut off. */}
-      {wishlist && (
-        <span
-          aria-hidden
-          className="pointer-events-none absolute inset-0 overflow-hidden rounded-full"
-        >
-          <motion.span
-            className={`absolute inset-y-0 left-0 block ${
-              goalReached ? 'bg-emerald-500/20' : 'bg-primary/15'
-            }`}
-            initial={false}
-            animate={{ width: `${Math.round(goalRatio * 100)}%` }}
-            transition={{ duration: 0.6, ease: [0.32, 0.72, 0, 1] }}
-          />
-        </span>
-      )}
-
       <motion.div
         animate={flyControls}
         className="relative flex items-center"

@@ -52,12 +52,45 @@ export function useWishlist(enabled: boolean = true) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const wishlist = data?.wishlist ?? null;
   const items = data?.wishlistItems ?? EMPTY;
   const slots = data?.wishlistSlots ?? { used: items.length, max: 0 };
   const balance = data?.wardrobe?.flies ?? 0;
-  const pricing = resolveWishlistPricing(wishlist, data?.dailyDeals);
-  const progress = pricing ? wishlistProgress(pricing.price, balance) : null;
+
+  // The goal worth showing is the one within reach, not whichever pin happens
+  // to be first: the goal gradient only pulls when the gap looks closeable.
+  // Affordable pins rank by price (the best thing you can have right now),
+  // everything else by what is still missing.
+  const closest = useMemo(() => {
+    const ranked = items
+      .map((entry) => {
+        const entryPricing = resolveWishlistPricing(entry, data?.dailyDeals);
+        if (!entryPricing) return null;
+        return {
+          entry,
+          pricing: entryPricing,
+          progress: wishlistProgress(entryPricing.price, balance),
+        };
+      })
+      .filter(
+        (row): row is NonNullable<typeof row> => !!row && !row.entry.owned,
+      )
+      .sort((a, b) => {
+        if (a.progress.reached !== b.progress.reached) {
+          return a.progress.reached ? -1 : 1;
+        }
+        return a.progress.reached
+          ? b.pricing.price - a.pricing.price
+          : a.progress.remaining - b.progress.remaining;
+      });
+    return ranked[0] ?? null;
+  }, [items, data?.dailyDeals, balance]);
+
+  const wishlist = closest?.entry ?? data?.wishlist ?? null;
+  const pricing =
+    closest?.pricing ?? resolveWishlistPricing(wishlist, data?.dailyDeals);
+  const progress =
+    closest?.progress ??
+    (pricing ? wishlistProgress(pricing.price, balance) : null);
 
   const keys = useMemo(
     () => new Set(items.map((entry) => wishlistPinKey(entry))),

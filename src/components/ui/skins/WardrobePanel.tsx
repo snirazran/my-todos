@@ -29,7 +29,7 @@ import {
   byId as staticById,
   isTradeOnlyRarity,
 } from '@/lib/skins/catalog';
-import { useReadyTrades } from '@/hooks/useReadyTrades';
+import { useTradeReadiness } from '@/hooks/useReadyTrades';
 import Fly from '@/components/ui/fly';
 import Frog from '@/components/ui/frog';
 import { Icon as AppIcon } from '@/components/ui/Icon';
@@ -230,6 +230,18 @@ type ApiData = {
 };
 
 /* ---------------- Main Panel ---------------- */
+/** The badge is one number for several tiers, so its tooltip names them. */
+function tradeReadyTitle(
+  trades: number,
+  byRarity: Partial<Record<string, number>>,
+) {
+  const label = `${trades} trade${trades === 1 ? '' : 's'} ready`;
+  const parts = Object.entries(byRarity)
+    .filter(([, count]) => (count ?? 0) > 0)
+    .map(([rarity, count]) => `${count}× ${rarity}`);
+  return parts.length > 0 ? `${label} — ${parts.join(', ')}` : label;
+}
+
 export function WardrobePanel({
   open,
   onOpenChange,
@@ -316,7 +328,8 @@ function WardrobeManagerContent({
   const { data, mutate, unseenItems, unseenContainers, markItemSeen } =
     useInventory(open);
 
-  const readyTrades = useReadyTrades(!!user);
+  const tradeReadiness = useTradeReadiness(!!user);
+  const readyTrades = tradeReadiness.trades;
 
   const [activeTab, setActiveTab] = useState<string>(defaultTab);
   useEffect(() => {
@@ -398,7 +411,14 @@ function WardrobeManagerContent({
     const root = document.getElementById('main-scroll');
     if (!sentinel || !root) return;
 
-    const RELEASE_GAP = 120;
+    // Releasing well after the sentinel comes back into view exists only for the
+    // page-bottom clamp: there, the header's own height change re-clamps
+    // scrollTop and flips the state straight back. Anywhere else that dead band
+    // is what made scrolling up hold the stuck header for another 120px and
+    // then snap — so it now applies only when the trigger really is within a
+    // screen of the bottom.
+    const BOTTOM_RELEASE_GAP = 120;
+    const NEAR_BOTTOM = 200;
     const MIN_DWELL_MS = 200;
     let stuck = false;
     let triggerY = 0;
@@ -419,8 +439,11 @@ function WardrobeManagerContent({
           root.getBoundingClientRect().top +
           root.scrollTop;
       }
+      const maxScroll = root.scrollHeight - root.clientHeight;
+      const releaseGap =
+        maxScroll - triggerY < NEAR_BOTTOM ? BOTTOM_RELEASE_GAP : 0;
       const next = stuck
-        ? root.scrollTop >= triggerY - RELEASE_GAP
+        ? root.scrollTop >= triggerY - releaseGap
         : root.scrollTop >= triggerY;
       if (next === stuck) return;
       const now = Date.now();
@@ -581,6 +604,61 @@ function WardrobeManagerContent({
       .getElementById('main-scroll')
       ?.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  // Shop and Trade open on a shelf of content, so the frog above it is just a
+  // screenful to scroll past. Landing on the line where the tab bar sticks puts
+  // the deals (or the trade board) at the top with the tabs still in reach.
+  // The Wardrobe tab keeps the frog — that tab is about looking at him.
+  const scrollPageToContent = () => {
+    if (!embedded) return;
+    const root = document.getElementById('main-scroll');
+    if (!root) return;
+    const sentinel = stickySentinelRef.current;
+    if (!sentinel) {
+      root.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    const top =
+      sentinel.getBoundingClientRect().top -
+      root.getBoundingClientRect().top +
+      root.scrollTop;
+    // A couple of pixels past the line, so it lands stuck rather than balanced
+    // on the threshold the sticky dead band flips at.
+    root.scrollTo({ top: Math.max(0, top + 2), behavior: 'smooth' });
+  };
+
+  // Arriving already on Shop or Trade — from the wardrobe popup, the header
+  // menu or a ?tab= link — should land on the content too, not just a tab tap.
+  // Runs on every switch into those tabs, so it covers both paths.
+  React.useEffect(() => {
+    if (!embedded) return;
+    if (activeTab !== 'shop' && activeTab !== 'trade') return;
+    const root = document.getElementById('main-scroll');
+    if (!root) return;
+    let frame = requestAnimationFrame(() => {
+      frame = 0;
+      scrollPageToContent();
+      // A grid still loading can be shorter than the target, and the browser
+      // clamps the scroll. One retry catches that without fighting a user who
+      // has since scrolled further down themselves.
+      retry = window.setTimeout(() => {
+        retry = 0;
+        const sentinel = stickySentinelRef.current;
+        if (!sentinel) return;
+        const target =
+          sentinel.getBoundingClientRect().top -
+          root.getBoundingClientRect().top +
+          root.scrollTop;
+        if (root.scrollTop < target - 4) scrollPageToContent();
+      }, 320);
+    });
+    let retry = 0;
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      if (retry) clearTimeout(retry);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [embedded, activeTab]);
 
   // Filter change handler to mark category as visited
   const handleFilterChange = (cat: FilterCategory) => {
@@ -1384,7 +1462,7 @@ function WardrobeManagerContent({
                 <TabsTrigger
                   value="shop"
                   className={tabTriggerClass}
-                  onClick={scrollPageToTop}
+                  onClick={scrollPageToContent}
                   data-hint="wardrobe-shop-tab"
                 >
                   <AppIcon name="store" className="w-5 h-5" />
@@ -1393,14 +1471,14 @@ function WardrobeManagerContent({
                 <TabsTrigger
                   value="trade"
                   className={tabTriggerClass}
-                  onClick={scrollPageToTop}
+                  onClick={scrollPageToContent}
                   data-hint="wardrobe-trade-tab"
                 >
                   <AppIcon name="trade" className="w-5 h-5" />
                   <span>Trade</span>
                   {readyTrades > 0 && (
                     <span
-                      title={`${readyTrades} trade${readyTrades === 1 ? '' : 's'} ready`}
+                      title={tradeReadyTitle(readyTrades, tradeReadiness.byRarity)}
                       className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[9px] font-black leading-none text-white shadow-sm"
                     >
                       {readyTrades > 9 ? '9+' : readyTrades}

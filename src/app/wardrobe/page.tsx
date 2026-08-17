@@ -91,7 +91,7 @@ function WardrobePageInner() {
             <div
               ref={frogBoxRef}
               className={cn(
-                'relative z-50 translate-y-[72px] pointer-events-none md:translate-y-[5.15rem]',
+                'relative z-50 translate-y-[73px] pointer-events-none md:translate-y-[5.21rem]',
                 'origin-bottom transition-[opacity,transform] duration-300 ease-out',
                 isStuck && 'opacity-0 scale-95',
               )}

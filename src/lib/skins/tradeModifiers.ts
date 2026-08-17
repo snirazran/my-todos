@@ -229,13 +229,26 @@ export type TradeReadiness = {
   trades: number;
   /** Cheapest tier with a completable contract, for the "start here" cue. */
   startRarity: Rarity | null;
+  /** Contracts per starting tier, so a badge can explain its own number. */
+  byRarity: Partial<Record<Rarity, number>>;
 };
+
+/** A stack of one owned id: how many copies are left, and whether it started
+ * as a spare — the all-spares waiver keys off the original count, exactly as
+ * the panel and the server do. */
+type Stack = { rarity: Rarity; left: number; spare: boolean };
 
 /**
  * Duplicates alone never answered "can I trade?" — a contract needs N copies of
  * *one* rarity plus its fuel, so the count is a greedy spend of the real pool
- * from the cheapest tier up. Fuel waivers that depend on the final picks are
- * ignored, so this under-promises rather than over-promises.
+ * from the cheapest tier up.
+ *
+ * Costs are quoted the way the contract screen quotes them, per id rather than
+ * per tier: deepest stacks are spent first (as Quick Fill does), and a contract
+ * whose every input is a spare earns the duplicate waiver, stacking with the
+ * Plus waiver up to the configured cap. Collapsing the pool to per-rarity
+ * totals is what made the badge quote a number the contract screen disagreed
+ * with — it always charged full fuel.
  */
 export function countReadyTrades({
   candidates,
@@ -246,11 +259,36 @@ export function countReadyTrades({
   modifiers: TradeModifiers;
   isPlus: boolean;
 }): TradeReadiness {
-  const pool = {} as Record<Rarity, number>;
-  for (const candidate of candidates) {
-    pool[candidate.rarity] =
-      (pool[candidate.rarity] ?? 0) + Math.max(0, candidate.owned);
-  }
+  const stacks: Stack[] = candidates
+    .filter((candidate) => candidate.owned > 0)
+    .map((candidate) => ({
+      rarity: candidate.rarity,
+      left: candidate.owned,
+      spare: candidate.owned >= 2,
+    }));
+
+  // Deepest first, so a one-of-a-kind copy is only burned as a last resort and
+  // an all-spares contract is found whenever one exists.
+  const deepestFirst = (rarity: Rarity) =>
+    stacks
+      .filter((stack) => stack.rarity === rarity && stack.left > 0)
+      .sort((a, b) => b.left - a.left);
+
+  /** Takes `need` copies without committing, so a contract that turns out to be
+   * short on fuel doesn't half-spend the pool. */
+  const plan = (rarity: Rarity, need: number) => {
+    const picks: Stack[] = [];
+    if (need <= 0) return picks;
+    const taken = new Map<Stack, number>();
+    for (const stack of deepestFirst(rarity)) {
+      while (picks.length < need && (taken.get(stack) ?? 0) < stack.left) {
+        taken.set(stack, (taken.get(stack) ?? 0) + 1);
+        picks.push(stack);
+      }
+      if (picks.length >= need) break;
+    }
+    return picks.length === need ? picks : null;
+  };
 
   const ladder = [...modifiers.recipes].sort(
     (a, b) => rarityRank[a.from] - rarityRank[b.from],
@@ -258,27 +296,34 @@ export function countReadyTrades({
 
   let trades = 0;
   let startRarity: Rarity | null = null;
+  const byRarity: Partial<Record<Rarity, number>> = {};
 
   for (const recipe of ladder) {
     const itemCount = Math.max(1, recipe.itemCount);
-    const fuel = quoteTradeFuel({
-      modifiers,
-      recipe,
-      allSpares: false,
-      isPlus,
-    });
-    const fuelRarity = fuel.count > 0 ? recipe.fuelRarity : null;
 
-    while ((pool[recipe.from] ?? 0) >= itemCount) {
-      if (fuelRarity) {
-        if ((pool[fuelRarity] ?? 0) < fuel.count) break;
-        pool[fuelRarity] -= fuel.count;
+    for (;;) {
+      const main = plan(recipe.from, itemCount);
+      if (!main) break;
+
+      const allSpares = main.every((stack) => stack.spare);
+      const fuel = quoteTradeFuel({ modifiers, recipe, allSpares, isPlus });
+      let fuelPicks: Stack[] = [];
+      if (recipe.fuelRarity && fuel.count > 0) {
+        // Fuel is planned against the pool the main picks leave behind, which
+        // matters when a tier fuels itself or the same stack serves both rows.
+        for (const stack of main) stack.left -= 1;
+        const planned = plan(recipe.fuelRarity, fuel.count);
+        for (const stack of main) stack.left += 1;
+        if (!planned) break;
+        fuelPicks = planned;
       }
-      pool[recipe.from] -= itemCount;
+
+      for (const stack of [...main, ...fuelPicks]) stack.left -= 1;
       trades += 1;
+      byRarity[recipe.from] = (byRarity[recipe.from] ?? 0) + 1;
       if (!startRarity) startRarity = recipe.from;
     }
   }
 
-  return { trades, startRarity };
+  return { trades, startRarity, byRarity };
 }

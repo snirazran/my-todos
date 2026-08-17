@@ -7,7 +7,11 @@ import { INVENTORY_SUMMARY_KEY } from '@/hooks/useInventory';
 import { BACKGROUNDS_KEY, type BackgroundsApiData } from '@/hooks/useBackgrounds';
 import { useTradeConfig } from '@/hooks/useTradeConfig';
 import { DEFAULT_BACKGROUND_ID } from '@/lib/backgrounds/constants';
-import { countReadyTrades, tradeCandidates } from '@/lib/skins/tradeModifiers';
+import {
+  countReadyTrades,
+  tradeCandidates,
+  type TradeReadiness,
+} from '@/lib/skins/tradeModifiers';
 import type { ItemDef } from '@/lib/skins/catalog';
 
 type SummaryShape = {
@@ -22,7 +26,7 @@ type SummaryShape = {
  * having one source stops the tab, the nav and the wardrobe popup from quoting
  * three different numbers for the same wardrobe.
  */
-export function useReadyTrades(enabled: boolean = true) {
+export function useTradeReadiness(enabled: boolean = true): TradeReadiness {
   const { data } = useSWR<SummaryShape>(
     enabled ? INVENTORY_SUMMARY_KEY : null,
     bootstrapFetcher,
@@ -48,7 +52,7 @@ export function useReadyTrades(enabled: boolean = true) {
         }),
         modifiers,
         isPlus: !!data?.isPremium,
-      }).trades,
+      }),
     [
       data?.catalog,
       data?.wardrobe?.inventory,
@@ -58,4 +62,9 @@ export function useReadyTrades(enabled: boolean = true) {
       modifiers,
     ],
   );
+}
+
+/** Just the number, for the badges that only render a count. */
+export function useReadyTrades(enabled: boolean = true) {
+  return useTradeReadiness(enabled).trades;
 }

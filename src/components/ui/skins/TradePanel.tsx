@@ -1077,6 +1077,9 @@ export function TradePanel({
       count: number,
       onRemove: (index: number) => void,
       keyPrefix: string,
+      // What still has to go in here. An empty slot that only shows its index
+      // makes the player read the sentence above to learn what it wants.
+      expects?: Rarity | null,
     ) => (
       <div
         className="grid gap-1.5 lg:gap-2"
@@ -1092,6 +1095,7 @@ export function TradePanel({
           const arriving = inFlightSlots.has(slotKey);
           const name =
             entry?.item?.name ?? entry?.bg?.name ?? `slot ${i + 1}`;
+          const expectConfig = expects ? RARITY_CONFIG[expects] : null;
 
           return (
             <button
@@ -1100,10 +1104,20 @@ export function TradePanel({
               type="button"
               disabled={!entry}
               onClick={() => entry && onRemove(i)}
-              aria-label={entry ? `Remove ${name}` : `Empty slot ${i + 1}`}
+              aria-label={
+                entry
+                  ? `Remove ${name}`
+                  : expects
+                    ? `Empty slot ${i + 1}, needs a ${expects} item`
+                    : `Empty slot ${i + 1}`
+              }
               className={cn(
                 'aspect-square rounded-xl border-2 flex items-center justify-center relative overflow-hidden transition-colors duration-200',
-                !entry && 'border-dashed border-border bg-muted/40',
+                !entry && 'border-dashed',
+                !entry &&
+                  (expectConfig
+                    ? cn(expectConfig.border, expectConfig.bg, 'opacity-60')
+                    : 'border-border bg-muted/40'),
                 entry && config && cn(config.border, config.bg, 'shadow-sm'),
               )}
             >
@@ -1150,11 +1164,21 @@ export function TradePanel({
                   </motion.div>
                 )}
               </AnimatePresence>
-              {!entry && (
-                <span className="text-[11px] font-black text-muted-foreground/40">
-                  {i + 1}
-                </span>
-              )}
+              {!entry &&
+                (expects ? (
+                  <span
+                    className={cn(
+                      'rounded px-1 py-0.5 text-[9px] font-black uppercase tracking-wide',
+                      RARITY_CONFIG[expects].text,
+                    )}
+                  >
+                    {expects}
+                  </span>
+                ) : (
+                  <span className="text-[11px] font-black text-muted-foreground/40">
+                    {i + 1}
+                  </span>
+                ))}
             </button>
           );
         })}
@@ -1166,8 +1190,22 @@ export function TradePanel({
         <span
           className={`text-[10px] px-2 py-0.5 rounded uppercase font-bold ${getRarityBg(targetRarity)}`}
         >
-          {targetRarity}
+          {countOf(slotCount, targetRarity)}
         </span>
+        {/* Fuel is part of the price, so the ladder says so — reading
+            "epic → legendary" and then being asked for rares is a surprise. */}
+        {fuelRarity && (
+          <>
+            <span className="shrink-0 text-[10px] font-black text-muted-foreground/60">
+              +
+            </span>
+            <span
+              className={`text-[10px] px-2 py-0.5 rounded uppercase font-bold ${getRarityBg(fuelRarity)}`}
+            >
+              {countOf(fuelQuote.count, fuelRarity)}
+            </span>
+          </>
+        )}
         <ArrowRight size={12} className="shrink-0 text-muted-foreground/60" />
         <span
           className={`text-[10px] px-2 py-0.5 rounded uppercase font-bold ${getRarityBg(nextRarity)}`}
@@ -1344,13 +1382,25 @@ export function TradePanel({
             )}
 
             <div className="mb-2 lg:mb-3">
-              {renderSlotGrid(selectedIds, slotCount, handleRemove, 'main')}
+              {renderSlotGrid(
+              selectedIds,
+              slotCount,
+              handleRemove,
+              'main',
+              targetRarity,
+            )}
             </div>
 
             {recipe?.fuelRarity && (
               <div className="mb-2 lg:mb-3">
                 {fuelQuote.count > 0 ? (
-                  renderSlotGrid(fuelIds, fuelQuote.count, handleRemoveFuel, 'fuel')
+                  renderSlotGrid(
+                    fuelIds,
+                    fuelQuote.count,
+                    handleRemoveFuel,
+                    'fuel',
+                    recipe.fuelRarity,
+                  )
                 ) : (
                   <p className="rounded-lg bg-green-500/10 px-2.5 py-1.5 text-[10px] font-bold text-green-700 dark:text-green-400">
                     All {fuelQuote.baseCount} waived — no extras on this one.
@@ -1445,20 +1495,24 @@ export function TradePanel({
               </div>
             )}
 
-            {!desktopMode && totalPicked > 0 && (
-              <button
-                type="button"
-                onClick={handleClear}
-                className="mb-2 flex w-full items-center justify-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-muted-foreground transition-colors active:text-destructive"
-              >
-                <Trash2 className="h-3 w-3" strokeWidth={3} />
-                Clear contract
-              </button>
-            )}
           </div>
         </motion.div>
 
         <div className="sticky bottom-0 z-10 w-full max-w-md mx-auto shrink-0 bg-card px-3 pb-3 pt-1 lg:px-4 lg:pb-4">
+          {/* Inside the sticky footer, not at the end of the scrolling body: a
+              contract with a fuel row is tall enough that the body's last child
+              sits behind this bar, which is how Clear disappeared exactly when
+              a stuck contract needed it most. */}
+          {!desktopMode && totalPicked > 0 && (
+            <button
+              type="button"
+              onClick={handleClear}
+              className="mb-2 flex w-full items-center justify-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-muted-foreground transition-colors active:text-destructive"
+            >
+              <Trash2 className="h-3 w-3" strokeWidth={3} />
+              Clear contract
+            </button>
+          )}
           {primaryButton}
           {contractHint && (
             <p className="mt-1.5 text-center text-[10px] font-bold text-muted-foreground">

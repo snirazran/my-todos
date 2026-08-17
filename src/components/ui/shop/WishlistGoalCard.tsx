@@ -90,9 +90,6 @@ export function WishlistGoalCard({
           >
             {config.label}
           </span>
-          <span className="mt-0.5 block truncate text-[15px] font-black leading-tight text-foreground">
-            {wishlist.name}
-          </span>
           <span className="mt-1 flex items-center gap-1.5">
             {pricing.onDeal && (
               <>
@@ -137,8 +134,8 @@ export function WishlistGoalCard({
             You can afford it — get it now
           </button>
         ) : (
-          <p className="mt-2 flex items-center justify-center gap-1 text-xs font-bold text-muted-foreground">
-            <Fly size={18} paused y={-3} />
+          <p className="mt-2 flex items-center justify-center gap-1.5 text-xs font-bold text-muted-foreground">
+            <Fly size={26} paused y={-3} oversample={1.25} />
             <span className="tabular-nums text-foreground">
               {progress.remaining.toLocaleString()}
             </span>
