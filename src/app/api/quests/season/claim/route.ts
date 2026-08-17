@@ -1,19 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
-import QuestSeasonModel from '@/lib/models/QuestSeason';
 import UserModel from '@/lib/models/User';
 import { getZonedToday } from '@/lib/utils';
 import {
-  getCurrentUserSeasonDay,
+  accrueSeasonSteps,
+  findClaimableSeason,
+  findRunningSeason,
   getUserQuestSeasonState,
-  getSeasonDayCount,
   grantRewardsToUser,
-  normalizeSeasonDayRewards,
   pruneQuestSeasonProgress,
+  readSeasonPassConfig,
+  readSeasonTierRewards,
+  seasonTierFromSteps,
+  tasksCompletedToday,
+  unclaimedSeasonTiers,
 } from '@/lib/quests/seasons';
+import {
+  grantShields,
+  loadShieldConfig,
+  readShieldState,
+  setShieldStateOn,
+} from '@/lib/shields/engine';
 import { recordDoubleableClaim } from '@/lib/rewards/adDouble';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
+import type { QuestRewards, SeasonLane } from '@/lib/quests/types';
 
 export async function POST(req: NextRequest) {
   try {
@@ -24,100 +35,145 @@ export async function POST(req: NextRequest) {
         ? body.seasonId.trim()
         : '';
     const timezone = body?.timezone || 'UTC';
+    const requestedTier = Number.isFinite(Number(body?.tier))
+      ? Math.floor(Number(body.tier))
+      : null;
+    const requestedLane: SeasonLane | null =
+      body?.lane === 'free' || body?.lane === 'plus' ? body.lane : null;
+
     if (!seasonId) {
       return NextResponse.json({ error: 'Missing season id' }, { status: 400 });
     }
 
     await connectMongo();
     const now = new Date();
-    const [season, user] = await Promise.all([
-      QuestSeasonModel.findOne({
-        seasonId,
-        isActive: true,
-        startsAt: { $lte: now },
-        endsAt: { $gt: now },
-      }),
+    const [season, user, runningSeason] = await Promise.all([
+      findClaimableSeason(seasonId, now),
       UserModel.findById(userId),
+      findRunningSeason(now),
     ]);
 
     if (!season) {
-      return NextResponse.json({ error: 'Season not found' }, { status: 404 });
+      return NextResponse.json(
+        { error: 'This season is no longer available' },
+        { status: 404 },
+      );
     }
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
     const today = getZonedToday(timezone);
-    const progressFlies =
-      user.wardrobe?.flyDaily?.date === today
-        ? user.wardrobe.flyDaily.earned ?? 0
-        : 0;
-    if (progressFlies < season.dailyTargetFlies) {
-      return NextResponse.json(
-        { error: 'Season goal is not complete yet' },
-        { status: 400 },
-      );
-    }
+    const config = readSeasonPassConfig(season);
+    const rewardsByTier = readSeasonTierRewards(season);
+    const questsState = pruneQuestSeasonProgress(user.quests, [
+      season.seasonId,
+      runningSeason?.seasonId,
+    ]);
 
-    const questsState = pruneQuestSeasonProgress(user.quests, season.seasonId);
-    const seasonState = getUserQuestSeasonState(
+    const stored = getUserQuestSeasonState(
       { quests: questsState },
       season.seasonId,
+      config.tierCount,
     );
-    const claimedDays = seasonState.claimedDays;
-    if (seasonState.lastClaimedYmd === today) {
-      return NextResponse.json(
-        { error: 'Season reward already claimed today' },
-        { status: 400 },
-      );
-    }
-    const dayCount = getSeasonDayCount(season.startsAt, season.endsAt);
-    const day = getCurrentUserSeasonDay(dayCount, claimedDays);
-    const completedSeasonDays = new Set(
-      claimedDays
-        .filter((claimedDay: unknown): claimedDay is number => typeof claimedDay === 'number')
-        .map((claimedDay: number) => Math.floor(claimedDay))
-        .filter((claimedDay: number) => claimedDay >= 1 && claimedDay <= dayCount),
+    // Fold in anything earned since the last read so a claim never races the
+    // board into showing a tier the server has not banked yet.
+    const stillClimbing =
+      season.endsAt.getTime() > now.getTime() || config.graceMode === 'climb';
+    const { state } = accrueSeasonSteps({
+      state: stored,
+      config,
+      tasksToday: tasksCompletedToday(user, today),
+      todayKey: today,
+      seasonRunning: stillClimbing,
+    });
+
+    const isPremium = new Date(user.premiumUntil ?? 0).getTime() > Date.now();
+    const tier = seasonTierFromSteps(state.steps, config);
+
+    const pendingFree = unclaimedSeasonTiers(
+      tier,
+      state.claimedFreeTiers,
+      rewardsByTier,
+      'free',
     );
-    if (completedSeasonDays.size >= dayCount) {
-      return NextResponse.json(
-        { error: 'Season is already complete' },
-        { status: 400 },
-      );
-    }
-    if (claimedDays.includes(day)) {
-      return NextResponse.json(
-        { error: 'Season reward already claimed' },
-        { status: 400 },
-      );
+    const pendingPlus = isPremium
+      ? unclaimedSeasonTiers(
+          tier,
+          state.claimedPlusTiers,
+          rewardsByTier,
+          'plus',
+        )
+      : [];
+
+    // No tier/lane means "collect everything waiting" — the strip and the
+    // banner both claim that way; the board claims one card at a time.
+    const takeFree =
+      requestedTier === null
+        ? pendingFree
+        : requestedLane === 'plus'
+          ? []
+          : pendingFree.filter((entry) => entry === requestedTier);
+    const takePlus =
+      requestedTier === null
+        ? pendingPlus
+        : requestedLane === 'free'
+          ? []
+          : pendingPlus.filter((entry) => entry === requestedTier);
+
+    if (takeFree.length === 0 && takePlus.length === 0) {
+      const reason =
+        requestedTier !== null && requestedTier > tier
+          ? 'That tier is still locked'
+          : requestedLane === 'plus' && !isPremium
+            ? 'Plus rewards need Frog Plus'
+            : 'Nothing left to claim here';
+      return NextResponse.json({ error: reason }, { status: 400 });
     }
 
-    const dayReward = normalizeSeasonDayRewards(season.dayRewards).find(
-      (entry) => entry.day === day,
-    );
-    const premiumUntil = user.premiumUntil
-      ? new Date(user.premiumUntil).getTime()
-      : 0;
-    const isPremium = premiumUntil > Date.now();
-    const rewards = [
-      ...(dayReward?.freeRewards ?? []),
-      ...(isPremium ? (dayReward?.premiumRewards ?? []) : []),
-    ];
-    if (rewards.length === 0) {
-      return NextResponse.json(
-        { error: 'No reward configured for today' },
-        { status: 400 },
-      );
+    const rewards: QuestRewards = [];
+    const rewardByTier = new Map(rewardsByTier.map((e) => [e.tier, e]));
+    for (const entry of takeFree) {
+      rewards.push(...(rewardByTier.get(entry)?.freeRewards ?? []));
+    }
+    for (const entry of takePlus) {
+      rewards.push(...(rewardByTier.get(entry)?.premiumRewards ?? []));
     }
 
     const rewardSummary = grantRewardsToUser(user, rewards);
-    recordDoubleableClaim(user, rewardSummary as any);
+
+    let shieldsGranted = 0;
+    let nextShieldState: ReturnType<typeof readShieldState> | null = null;
+    if (rewardSummary.shieldsRequested > 0) {
+      const shieldConfig = await loadShieldConfig();
+      const before = readShieldState(user);
+      nextShieldState = grantShields(
+        before,
+        shieldConfig,
+        isPremium,
+        rewardSummary.shieldsRequested,
+      );
+      shieldsGranted = Math.max(0, nextShieldState.count - before.count);
+    }
+
     questsState.seasons[season.seasonId] = {
-      ...seasonState,
-      claimedDays: [...claimedDays, day],
-      lastClaimedYmd: today,
+      ...state,
+      claimedFreeTiers: [...state.claimedFreeTiers, ...takeFree].sort(
+        (a, b) => a - b,
+      ),
+      claimedPlusTiers: [...state.claimedPlusTiers, ...takePlus].sort(
+        (a, b) => a - b,
+      ),
     };
     user.quests = questsState;
+    if (nextShieldState) setShieldStateOn(user, nextShieldState);
+
+    const claimedTiers = Array.from(
+      new Set([...takeFree, ...takePlus]),
+    ).sort((a, b) => a - b);
+    const summary = { ...rewardSummary, shieldsGranted };
+    recordDoubleableClaim(user, summary as any);
+
     user.markModified('quests');
     user.markModified('wardrobe');
     await user.save();
@@ -127,19 +183,24 @@ export async function POST(req: NextRequest) {
       name: 'season_reward_claimed',
       properties: {
         season_id: season.seasonId,
-        season_day: day,
+        season_tier: claimedTiers[claimedTiers.length - 1],
+        season_tiers_claimed: claimedTiers.length,
+        free_lanes_claimed: takeFree.length,
+        plus_lanes_claimed: takePlus.length,
         fly_amount: rewardSummary.fliesGranted,
         reward_amount: rewardSummary.fliesGranted,
         item_count: rewardSummary.grantedItemIds.length,
         reward_count: rewardSummary.grantedItemIds.length,
         reward_type:
-          rewardSummary.grantedItemIds.length > 0 && rewardSummary.fliesGranted > 0
+          rewardSummary.grantedItemIds.length > 0 &&
+          rewardSummary.fliesGranted > 0
             ? 'mixed'
             : rewardSummary.grantedItemIds.length > 0
               ? 'item'
               : 'flies',
-        premium_reward_included: isPremium,
+        premium_reward_included: takePlus.length > 0,
         is_premium: isPremium,
+        in_grace_window: season.endsAt.getTime() <= now.getTime(),
       },
     });
     if (rewardSummary.fliesGranted > 0) {
@@ -154,7 +215,13 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    return NextResponse.json({ ok: true, rewardSummary, claimedDay: day });
+    return NextResponse.json({
+      ok: true,
+      rewardSummary: summary,
+      claimedTiers,
+      claimedFreeTiers: takeFree,
+      claimedPlusTiers: takePlus,
+    });
   } catch (error) {
     return NextResponse.json(
       {

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import useSWR, { preload } from 'swr';
 import { Icon } from '@/components/ui/Icon';
 import { QuestsPageSkeleton } from '@/components/ui/Skeleton';
@@ -35,7 +35,6 @@ import {
   type DailySweepInfo,
   type MoveToWebInfo,
 } from './QuestCards';
-import { SingleRewardCard } from './daily-reward/RewardCard';
 import { RARITY_CONFIG as GIFT_RARITY_CONFIG } from './gift-box/constants';
 import { GiftRive } from './gift-box/GiftBox';
 import Fly from './fly';
@@ -49,10 +48,11 @@ import {
   refreshQuestHomeView,
   takeQuestScrollTarget,
 } from '@/lib/questClaims';
-import { PactAreaPanel } from '@/components/pact/PactAreaPanel';
-import { PlusUpgradeModal } from './PlusUpgradeModal';
+import { SingleRewardCard } from './daily-reward/RewardCard';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import Frog, { type WardrobeSlot } from './frog';
+import { PactAreaPanel } from '@/components/pact/PactAreaPanel';
+import { PlusUpgradeModal } from './PlusUpgradeModal';
 
 type QuestsResponse = {
   isPremium: boolean;
@@ -75,6 +75,7 @@ type QuestsResponse = {
   earlyObjectiveSteps?: number;
   onboardingQuests?: QuestProgressView[];
   activeSeason?: QuestSeasonView | null;
+  graceSeason?: QuestSeasonView | null;
   rewardCatalog: Record<string, ItemDef>;
 };
 
@@ -91,16 +92,30 @@ type QuestSeasonView = {
   images: SeasonImages;
   startsAt: string;
   endsAt: string;
-  dailyTargetFlies: number;
-  currentDay: number;
-  dayCount: number;
-  progressFlies: number;
-  claimedDays: number[];
-  claimedToday: boolean;
-  claimedTodayDay?: number;
+  graceEndsAt: string;
+  ended: boolean;
+  tierCount: number;
+  tier: number;
+  steps: number;
+  stepsPerTier: number;
+  stepsIntoTier: number;
+  tasksPerStep: number;
+  maxStepsPerDay: number;
+  tasksToday: number;
+  stepsToday: number;
+  dailyTaskGoal: number;
+  tierSkipCost: number;
+  flyBalance: number;
+  purchasedTiers: number;
+  isPremium: boolean;
+  claimedFreeTiers: number[];
+  claimedPlusTiers: number[];
+  claimableFreeTiers: number[];
+  claimablePlusTiers: number[];
+  claimableCount: number;
   claimable: boolean;
-  rewardsByDay: Array<{
-    day: number;
+  rewardsByTier: Array<{
+    tier: number;
     freeRewards: QuestReward[];
     premiumRewards: QuestReward[];
   }>;
@@ -128,7 +143,13 @@ function SeasonCoverImage({
         <source media="(min-width: 768px)" srcSet={images.tablet} />
       )}
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={images.mobile || fallback} alt={alt} className={className} />
+      <img
+        src={images.mobile || fallback}
+        alt={alt}
+        width={1920}
+        height={480}
+        className={className}
+      />
     </picture>
   );
 }
@@ -247,7 +268,9 @@ export function QuestsPanel({
   const [claimingObjectiveId, setClaimingObjectiveId] = useState<string | null>(
     null,
   );
-  const [seasonEventOpen, setSeasonEventOpen] = useState(false);
+  const [openSeasonKind, setOpenSeasonKind] = useState<
+    'active' | 'grace' | null
+  >(null);
   const [plusOpen, setPlusOpen] = useState(false);
   const [plusPlacement, setPlusPlacement] = useState('quests');
   const openPlus = (placement: string) => {
@@ -255,6 +278,7 @@ export function QuestsPanel({
     setPlusOpen(true);
   };
   const [claimingSeason, setClaimingSeason] = useState(false);
+  const [skippingTier, setSkippingTier] = useState(false);
   const [claimMessage, setClaimMessage] = useState<string | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const initialTopPinnedRef = useRef(false);
@@ -432,25 +456,59 @@ export function QuestsPanel({
     }
   };
 
-  const handleClaimSeasonDay = async () => {
-    const season = data?.activeSeason;
-    if (!season || claimingSeason) return;
+  const handleClaimSeason = async (
+    seasonId: string | undefined,
+    tier?: number,
+    lane?: 'free' | 'plus',
+  ) => {
+    if (!seasonId || claimingSeason) return;
     setClaimingSeason(true);
     setClaimMessage(null);
     try {
       const res = await fetch('/api/quests/season/claim', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ seasonId: season.id, timezone }),
+        body: JSON.stringify({ seasonId, timezone, tier, lane }),
       });
       const payload = await res.json();
       if (!res.ok) throw new Error(payload.error || 'Claim failed');
       queueRewardReveal(payload.rewardSummary);
+      // A Lily Pad has no reveal art of its own, so the only thing that would
+      // otherwise change is a silent shield count.
+      if ((payload.rewardSummary?.shieldsGranted ?? 0) > 0) {
+        setClaimMessage(
+          payload.rewardSummary.shieldsGranted > 1
+            ? `You earned ${payload.rewardSummary.shieldsGranted} Lily Pads!`
+            : 'You earned a Lily Pad!',
+        );
+      }
       await refreshQuestData();
     } catch (err: any) {
       setClaimMessage(err.message || 'Claim failed');
     } finally {
       setClaimingSeason(false);
+    }
+  };
+
+  const handleSkipTier = async () => {
+    const season = data?.activeSeason;
+    if (!season || skippingTier) return;
+    setSkippingTier(true);
+    setClaimMessage(null);
+    try {
+      const res = await fetch('/api/quests/season/skip', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ seasonId: season.id, timezone }),
+      });
+      const payload = await res.json();
+      if (!res.ok) throw new Error(payload.error || 'Could not skip tier');
+      setClaimMessage(`Tier ${payload.tier} unlocked for ${payload.fliesSpent} flies`);
+      await refreshQuestData();
+    } catch (err: any) {
+      setClaimMessage(err.message || 'Could not skip tier');
+    } finally {
+      setSkippingTier(false);
     }
   };
 
@@ -474,7 +532,11 @@ export function QuestsPanel({
                   <div className="flex flex-col h-full md:h-auto">
                     {claimMessage && (
                       <div className="px-4 pt-4 md:px-6">
-                        <div className="px-4 py-3 text-sm font-medium border rounded-2xl border-primary/20 bg-primary/10 text-foreground">
+                        <div
+                          role="status"
+                          aria-live="polite"
+                          className="px-4 py-3 text-sm font-medium border rounded-2xl border-primary/20 bg-primary/10 text-foreground"
+                        >
                           {claimMessage}
                         </div>
                       </div>
@@ -506,7 +568,7 @@ export function QuestsPanel({
                               rewardCatalog={data.rewardCatalog}
                               isPremium={data.isPremium}
                               flush
-                              onView={() => setSeasonEventOpen(true)}
+                              onView={() => setOpenSeasonKind('active')}
                             />
                           </div>
                         )}
@@ -574,6 +636,16 @@ export function QuestsPanel({
                               paused={false}
                             />
                           );
+                          const graceCard = data.graceSeason ? (
+                            <SeasonGraceCard
+                              season={data.graceSeason}
+                              claiming={claimingSeason}
+                              onOpen={() => setOpenSeasonKind('grace')}
+                              onClaimAll={() =>
+                                void handleClaimSeason(data.graceSeason?.id)
+                              }
+                            />
+                          ) : null;
                           const dailySection = data.moveToWeb ? (
                             <div className="flex flex-col gap-2.5">
                               {dailyGroup}
@@ -598,6 +670,7 @@ export function QuestsPanel({
                             <>
                               {/* Mobile: onboarding, daily checklist, weekly leap */}
                               <div className="flex flex-col gap-8 md:hidden">
+                                {graceCard}
                                 {onboardingQuests.length > 0 && (
                                   <div className="space-y-4">
                                     {onboardingQuests.map(renderOnboardingCard)}
@@ -612,6 +685,7 @@ export function QuestsPanel({
                               <div className="hidden md:flex md:flex-col md:gap-6">
                                 <div className="grid grid-cols-2 items-start gap-4">
                                   <div className="flex flex-col gap-4">
+                                    {graceCard}
                                     {onboardingQuests.map(renderOnboardingCard)}
                                     {dailySection}
                                   </div>
@@ -628,13 +702,29 @@ export function QuestsPanel({
                 )}
               </div>
               <QuestSeasonEventOverlay
-                season={data?.activeSeason ?? null}
-                open={seasonEventOpen}
+                season={
+                  openSeasonKind === 'grace'
+                    ? data?.graceSeason ?? null
+                    : data?.activeSeason ?? null
+                }
+                open={openSeasonKind !== null}
                 rewardCatalog={data?.rewardCatalog ?? {}}
                 isPremium={data?.isPremium ?? false}
                 claiming={claimingSeason}
-                onClose={() => setSeasonEventOpen(false)}
-                onClaim={handleClaimSeasonDay}
+                skipping={skippingTier}
+                onClose={() => setOpenSeasonKind(null)}
+                onClaim={(tier, lane) =>
+                  void handleClaimSeason(
+                    openSeasonKind === 'grace'
+                      ? data?.graceSeason?.id
+                      : data?.activeSeason?.id,
+                    tier,
+                    lane,
+                  )
+                }
+                onSkipTier={
+                  openSeasonKind === 'active' ? handleSkipTier : undefined
+                }
                 onUpgrade={() => openPlus('season_plus_track')}
                 paused={false}
               />
@@ -682,6 +772,88 @@ function useSeasonCountdown(endsAt?: string) {
   return label;
 }
 
+function seasonTierEntry(season: QuestSeasonView, tier: number) {
+  return season.rewardsByTier.find((entry) => entry.tier === tier) ?? null;
+}
+
+/** The rung the board points at: the cheapest thing waiting, else the next one up. */
+function seasonFocusTier(season: QuestSeasonView) {
+  return (
+    season.claimableFreeTiers[0] ??
+    season.claimablePlusTiers[0] ??
+    Math.min(season.tierCount, season.tier + 1)
+  );
+}
+
+function seasonLaneStatus(
+  season: QuestSeasonView,
+  tier: number,
+  lane: 'free' | 'plus',
+): 'CLAIMED' | 'READY' | 'LOCKED' | 'LOCKED_PREMIUM' {
+  const claimed =
+    lane === 'free'
+      ? season.claimedFreeTiers.includes(tier)
+      : season.claimedPlusTiers.includes(tier);
+  if (claimed) return 'CLAIMED';
+  // A Plus rung stays visible-but-locked for free players at every tier: the
+  // sunk progress behind you is the pitch, so it must never read as "missed".
+  if (lane === 'plus' && !season.isPremium) return 'LOCKED_PREMIUM';
+  return tier <= season.tier ? 'READY' : 'LOCKED';
+}
+
+function SeasonStepBar({
+  season,
+  paused = false,
+  className,
+}: {
+  season: QuestSeasonView;
+  paused?: boolean;
+  className?: string;
+}) {
+  const goal = Math.max(1, season.dailyTaskGoal);
+  const done = Math.min(season.tasksToday, goal);
+  const pct = Math.min(100, (done / goal) * 100);
+  const label = `${done} / ${goal}`;
+
+  return (
+    <div
+      role="progressbar"
+      aria-label={`${done} of ${goal} tasks completed today`}
+      aria-valuemin={0}
+      aria-valuemax={goal}
+      aria-valuenow={done}
+      className={cn('relative overflow-hidden rounded-full bg-muted', className)}
+    >
+      <div className="absolute inset-1">
+        <div
+          className="relative h-full overflow-hidden rounded-full bg-amber-400 transition-[width] duration-500"
+          style={{ width: `${pct}%` }}
+        >
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-y-0 left-0 w-1/2 bg-white/30 animate-[bar-shine-idle_2.8s_ease-in-out_infinite] motion-reduce:hidden"
+          />
+        </div>
+      </div>
+      {/* Two copies of the same label, the second clipped to the filled width
+          in the bar's own dark tone — a single muted label sat unreadable on
+          top of the amber in both themes. */}
+      <span className="absolute inset-0 flex items-center justify-center gap-1.5 text-sm font-black tabular-nums text-foreground/70">
+        {label}
+        <Fly size={26} y={-3} paused={paused} interactive={false} />
+      </span>
+      <span
+        aria-hidden
+        className="absolute inset-0 flex items-center justify-center gap-1.5 text-sm font-black tabular-nums text-amber-950"
+        style={{ clipPath: `inset(0 ${100 - pct}% 0 0)` }}
+      >
+        {label}
+        <Fly size={26} y={-3} paused={paused} interactive={false} />
+      </span>
+    </div>
+  );
+}
+
 function QuestSeasonBanner({
   season,
   rewardCatalog,
@@ -696,23 +868,15 @@ function QuestSeasonBanner({
   onView: () => void;
 }) {
   const timeLeft = useSeasonCountdown(season.endsAt);
-  const progress = Math.min(season.progressFlies, season.dailyTargetFlies);
-  const pct = Math.min(100, (progress / Math.max(1, season.dailyTargetFlies)) * 100);
-  const currentReward = season.rewardsByDay.find(
-    (entry) => entry.day === season.currentDay,
-  );
+  const focusTier = seasonFocusTier(season);
+  const focusEntry = seasonTierEntry(season, focusTier);
   const previewReward =
-    currentReward?.freeRewards?.[0] ??
-    currentReward?.premiumRewards?.[0];
-  const claimedToday = season.claimedToday;
-  const completedDay = season.claimedTodayDay ?? season.currentDay;
-  const completedSeasonDays = new Set(
-    season.claimedDays.filter((day) => day >= 1 && day <= season.dayCount),
-  );
-  const seasonComplete = completedSeasonDays.size >= season.dayCount;
-  const nextSeasonDay = Math.min(
-    claimedToday ? season.currentDay : season.currentDay + 1,
-    season.dayCount,
+    focusEntry?.freeRewards?.[0] ?? focusEntry?.premiumRewards?.[0];
+  const seasonComplete =
+    season.tier >= season.tierCount && season.claimableCount === 0;
+  const stepsLeftToday = Math.max(
+    0,
+    season.maxStepsPerDay - season.stepsToday,
   );
 
   return (
@@ -774,20 +938,16 @@ function QuestSeasonBanner({
         </div>
 
         <div className="absolute inset-x-3 bottom-14 z-10 mx-auto flex max-w-xl items-center gap-1.5 rounded-[24px] bg-background p-3 shadow-lg sm:gap-3">
-          {claimedToday ? (
+          {seasonComplete ? (
             <>
               <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white shadow-md">
                 <Check className="h-8 w-8" strokeWidth={4} />
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-base font-black leading-tight text-foreground">
-                  {seasonComplete
-                    ? 'Season complete!'
-                    : `Day ${completedDay} completed`}
+                  Season complete!
                   <br />
-                  {seasonComplete
-                    ? 'All rewards claimed'
-                    : `Return tomorrow for Day ${nextSeasonDay}`}
+                  All {season.tierCount} tiers claimed
                 </p>
               </div>
             </>
@@ -808,37 +968,16 @@ function QuestSeasonBanner({
               </div>
               <div className="min-w-0 flex-1">
                 <p className="whitespace-nowrap font-black text-foreground text-[clamp(0.75rem,calc(5vw_-_0.25rem),1.125rem)] sm:whitespace-normal">
-                  Unlock Day {season.currentDay}!
+                  {season.claimableCount > 0
+                    ? `Tier ${focusTier} unlocked!`
+                    : `Tier ${season.tier} of ${season.tierCount}`}
                 </p>
-                <div className="relative mt-2 h-8 overflow-hidden rounded-full bg-muted sm:mt-3">
-                  <div className="absolute inset-1">
-                    <div
-                      className="relative h-full min-w-7 overflow-hidden rounded-full bg-amber-400 transition-all duration-500"
-                      style={{ width: pct > 0 ? `${pct}%` : '1.75rem' }}
-                    >
-                      <span
-                        aria-hidden
-                        className="pointer-events-none absolute inset-y-0 left-0 w-1/2 bg-white/30 animate-[bar-shine-idle_2.8s_ease-in-out_infinite] motion-reduce:hidden"
-                      />
-                    </div>
-                  </div>
-                  {/* Two copies of the same label, the second clipped to the
-                      filled width in the bar's own dark tone — the objective
-                      bars' trick. A single muted label sat unreadable on top
-                      of the amber in both themes. */}
-                  <span className="absolute inset-0 flex items-center justify-center gap-1.5 text-sm font-black tabular-nums text-foreground/70">
-                    {progress} / {season.dailyTargetFlies}
-                    <Fly size={26} y={-3} paused={false} interactive={false} />
-                  </span>
-                  <span
-                    aria-hidden
-                    className="absolute inset-0 flex items-center justify-center gap-1.5 text-sm font-black tabular-nums text-amber-950"
-                    style={{ clipPath: `inset(0 ${100 - pct}% 0 0)` }}
-                  >
-                    {progress} / {season.dailyTargetFlies}
-                    <Fly size={26} y={-3} paused={false} interactive={false} />
-                  </span>
-                </div>
+                <SeasonStepBar season={season} className="mt-2 h-8 sm:mt-3" />
+                <p className="mt-1 hidden text-[11px] font-bold leading-none text-muted-foreground sm:block">
+                  {stepsLeftToday > 0
+                    ? `${season.tasksPerStep} tasks = 1 step · ${stepsLeftToday} left today`
+                    : 'Both steps banked — back tomorrow'}
+                </p>
               </div>
             </>
           )}
@@ -853,9 +992,79 @@ function QuestSeasonBanner({
                   : 'bg-lime-600 shadow-[0_5px_0_#3f6212]',
               )}
             >
-              {season.claimable ? 'Claim Reward' : 'View Event'}
+              {season.claimable
+                ? 'Claim Rewards'
+                : 'See Rewards'}
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The season just gone, for as long as its grace window runs. In `climb` mode
+ * today's tasks still credit it, so this sits *beside* the new season rather
+ * than delaying it — you climb both at once.
+ */
+function SeasonGraceCard({
+  season,
+  claiming,
+  onOpen,
+  onClaimAll,
+}: {
+  season: QuestSeasonView;
+  claiming: boolean;
+  onOpen: () => void;
+  onClaimAll: () => void;
+}) {
+  const timeLeft = useSeasonCountdown(season.graceEndsAt);
+  const canClimb = season.tier < season.tierCount;
+
+  return (
+    <div>
+      <div className="flex items-center gap-1.5 px-1 pb-2 text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+        <Clock className="h-3.5 w-3.5 text-amber-500" strokeWidth={2.75} />
+        Finish {season.name}
+      </div>
+      <div className="relative overflow-hidden rounded-[24px] border border-amber-400/30 bg-card shadow-sm">
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-amber-400/[0.08] via-transparent to-transparent" />
+        <div className="relative flex items-center gap-3 px-4 py-4">
+          <button
+            type="button"
+            onClick={onOpen}
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border-2 border-amber-400 bg-gradient-to-br from-amber-100 to-amber-50 text-amber-700 shadow-sm dark:from-amber-900/40 dark:to-amber-950/40 dark:text-amber-300"
+            aria-label={`Open ${season.name}`}
+          >
+            <span className="text-lg font-black tabular-nums">
+              {season.tier}
+            </span>
+          </button>
+          <div className="min-w-0 flex-1">
+            <p className="text-[15px] font-black leading-snug text-foreground">
+              {season.claimableCount > 0
+                ? `${season.claimableCount} reward${season.claimableCount > 1 ? 's' : ''} still waiting`
+                : `Tier ${season.tier} of ${season.tierCount}`}
+            </p>
+            <p className="mt-0.5 text-[11px] font-bold leading-snug text-muted-foreground">
+              {canClimb
+                ? `Today's tasks still count here · ${timeLeft} left`
+                : `Collect before it closes · ${timeLeft} left`}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={season.claimableCount > 0 ? onClaimAll : onOpen}
+            disabled={claiming}
+            className="h-11 shrink-0 touch-manipulation rounded-xl bg-amber-500 px-4 text-xs font-black text-white shadow-[0_3px_0_#b45309] transition active:translate-y-1 active:shadow-none disabled:cursor-wait disabled:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
+          >
+            {season.claimableCount > 0
+              ? claiming
+                ? 'Claiming…'
+                : `Claim ${season.claimableCount}`
+              : 'Open'}
+          </button>
         </div>
       </div>
     </div>
@@ -867,18 +1076,20 @@ function SeasonRewardPreview({
   rewardCatalog,
   isPremium,
   paused = false,
+  hideQuantityBadge = false,
   className,
 }: {
   reward: QuestReward;
   rewardCatalog: Record<string, ItemDef>;
   isPremium: boolean;
   paused?: boolean;
+  hideQuantityBadge?: boolean;
   className?: string;
 }) {
-  const item = reward.itemId ? rewardCatalog[reward.itemId] : null;
-  const rarity = item?.rarity ?? (reward.type === 'FLIES' ? 'uncommon' : 'rare');
-  const raysClass = GIFT_RARITY_CONFIG[rarity]?.rays ?? GIFT_RARITY_CONFIG.rare.rays;
+  const catalogId = reward.itemId ?? reward.backgroundId;
+  const item = catalogId ? rewardCatalog[catalogId] : null;
   const isGift = item?.slot === 'container';
+  const quantityLabel = getRewardQuantityLabel(reward, isPremium);
 
   return (
     <div className={cn('relative h-full w-full', className)}>
@@ -886,22 +1097,24 @@ function SeasonRewardPreview({
           clipped here so nothing spills onto the bar, while the count badge
           stays outside this box and rides the corner. */}
       <div className="absolute inset-0 flex items-center justify-center overflow-hidden rounded-2xl bg-card">
-        <div className="absolute inset-0">
-          <SeasonPrizeRays colorClass={raysClass} />
-        </div>
         {isGift ? (
-          <div className="relative z-10 h-[128%] w-[128%]">
+          <div className="relative z-10 h-[136%] w-[136%] -translate-y-[14%]">
             <GiftRive
               className="h-full w-full"
               color={item.riveIndex}
-              paused={false}
+              paused={paused}
             />
           </div>
         ) : (
           <div
             className="relative z-10 flex h-full w-full items-center justify-center"
             style={{
-              transform: reward.type === 'FLIES' ? undefined : 'scale(1.35)',
+              transform:
+                reward.type === 'FLIES'
+                  ? undefined
+                  : reward.type === 'ITEM' && item
+                    ? 'translateY(-9%) scale(1.35)'
+                    : 'scale(1.35)',
             }}
           >
             <RewardTile
@@ -923,29 +1136,156 @@ function SeasonRewardPreview({
         )}
       </div>
 
-      <div className="pointer-events-none absolute -right-2 -top-2 z-30">
-        <span className="flex min-w-5 items-center justify-center rounded-md bg-black/75 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white shadow-md ring-2 ring-background">
-          {getRewardQuantityLabel(reward, isPremium)}
-        </span>
-      </div>
+      {!hideQuantityBadge && quantityLabel !== '×1' && (
+        <div className="pointer-events-none absolute -right-2 -top-2 z-30">
+          <span className="flex min-w-5 items-center justify-center rounded-md bg-black/75 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white shadow-md ring-2 ring-background">
+            {quantityLabel}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
 
-function SeasonPrizeRays({ colorClass }: { colorClass: string }) {
-  return (
-    <div
-      className={cn(
-        'absolute inset-[-65%] animate-[spin_18s_linear_infinite] opacity-100',
-        colorClass,
-      )}
-      style={{
-        background:
-          'repeating-conic-gradient(from 0deg, transparent 0deg 12deg, currentColor 12deg 24deg)',
-      }}
-      aria-hidden
-    />
+type SeasonLaneState = ReturnType<typeof seasonLaneStatus>;
+
+function seasonRewardName(
+  reward: QuestReward,
+  rewardCatalog: Record<string, ItemDef>,
+) {
+  const catalogId = reward.itemId ?? reward.backgroundId;
+  const item = catalogId ? rewardCatalog[catalogId] : null;
+  if (item?.name) return item.name;
+  if (reward.type === 'FLIES') return 'Flies';
+  if (reward.type === 'SHIELD') return 'Lily Pad';
+  if (reward.type === 'BOX') return 'Mystery Box';
+  if (reward.type === 'BACKGROUND') return 'Background';
+  return 'Reward';
+}
+
+/**
+ * A season prize gets its own card, even when a tier awards two things. Status
+ * lives in the footer so the check/lock can never cover rarity or quantity.
+ */
+function SeasonPassRewardCard({
+  reward,
+  rewardCatalog,
+  isPremium,
+  status,
+  paused = false,
+  onClick,
+  className,
+}: {
+  reward: QuestReward;
+  rewardCatalog: Record<string, ItemDef>;
+  isPremium: boolean;
+  status: SeasonLaneState;
+  paused?: boolean;
+  onClick?: () => void;
+  className?: string;
+}) {
+  const catalogId = reward.itemId ?? reward.backgroundId;
+  const item = catalogId ? rewardCatalog[catalogId] : null;
+  const rarity =
+    item?.rarity ??
+    (reward.type === 'FLIES' || reward.type === 'SHIELD'
+      ? 'uncommon'
+      : 'rare');
+  const tone = GIFT_RARITY_CONFIG[rarity] ?? GIFT_RARITY_CONFIG.rare;
+  const name = seasonRewardName(reward, rewardCatalog);
+  const quantityLabel = getRewardQuantityLabel(reward, isPremium);
+  const actionable = !!onClick;
+  const statusLabel =
+    status === 'CLAIMED'
+      ? 'Collected'
+      : status === 'READY'
+        ? 'Claim'
+        : status === 'LOCKED_PREMIUM'
+          ? 'Plus'
+          : 'Locked';
+  const actionLabel =
+    status === 'READY'
+      ? `Claim ${name}`
+      : status === 'LOCKED_PREMIUM'
+        ? `Preview Plus reward: ${name}`
+        : `${statusLabel}: ${name}`;
+
+  const content = (
+    <>
+      <div className="relative h-[74px] w-full overflow-visible rounded-[14px]">
+        <SeasonRewardPreview
+          reward={reward}
+          rewardCatalog={rewardCatalog}
+          isPremium={isPremium}
+          paused={paused}
+          hideQuantityBadge
+          className="h-full w-full"
+        />
+      </div>
+      <div className="min-w-0 px-1 pb-1 pt-2 text-center">
+        <div className="flex min-w-0 items-center justify-center gap-1.5">
+          <p className="min-w-0 truncate text-[11px] font-black leading-tight text-foreground">
+            {name}
+          </p>
+          {quantityLabel !== '×1' && (
+            <span className="shrink-0 rounded-md bg-foreground/80 px-1.5 py-0.5 text-[8px] font-black uppercase leading-none tracking-wide text-background shadow-sm">
+              {quantityLabel}
+            </span>
+          )}
+        </div>
+        <span
+          className={cn(
+            'mt-1 inline-flex min-h-5 items-center justify-center gap-1 rounded-full px-2 text-[8px] font-black uppercase tracking-[0.13em]',
+            status === 'CLAIMED' &&
+              'bg-emerald-500/12 text-emerald-700 dark:text-emerald-300',
+            status === 'READY' && 'bg-primary text-primary-foreground',
+            status === 'LOCKED_PREMIUM' &&
+              'bg-amber-400/20 text-amber-800 dark:text-amber-200',
+            status === 'LOCKED' && 'bg-muted text-muted-foreground',
+          )}
+        >
+          {status === 'CLAIMED' ? (
+            <Check aria-hidden="true" className="h-3 w-3" strokeWidth={4} />
+          ) : status === 'LOCKED_PREMIUM' ? (
+            <Icon
+              name="frogPlus"
+              className="-my-1 h-5 w-5 drop-shadow-[0_1px_0_rgba(31,98,28,0.25)]"
+            />
+          ) : status === 'LOCKED' ? (
+            <Lock aria-hidden="true" className="h-3 w-3" strokeWidth={3} />
+          ) : null}
+          {statusLabel}
+        </span>
+      </div>
+    </>
   );
+
+  const cardClassName = cn(
+    'group relative mx-auto flex min-h-[126px] w-full max-w-[10rem] min-w-0 flex-col rounded-[18px] border-2 bg-card p-1.5 pb-1 shadow-sm',
+    'transition-[transform,box-shadow,border-color,opacity] duration-150',
+    tone.border,
+    status === 'CLAIMED' && 'opacity-65',
+    status === 'LOCKED' && 'opacity-55 grayscale-[0.35]',
+    status === 'LOCKED_PREMIUM' && 'bg-amber-50/50 dark:bg-amber-950/20',
+    actionable &&
+      'touch-manipulation cursor-pointer hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+    className,
+  );
+
+  if (actionable) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        aria-label={actionLabel}
+        className={cardClassName}
+      >
+        {content}
+      </button>
+    );
+  }
+
+  return <div className={cardClassName}>{content}</div>;
 }
 
 function QuestSeasonEventOverlay({
@@ -954,8 +1294,10 @@ function QuestSeasonEventOverlay({
   rewardCatalog,
   isPremium,
   claiming,
+  skipping,
   onClose,
   onClaim,
+  onSkipTier,
   onUpgrade,
   paused = false,
 }: {
@@ -964,29 +1306,33 @@ function QuestSeasonEventOverlay({
   rewardCatalog: Record<string, ItemDef>;
   isPremium: boolean;
   claiming: boolean;
+  skipping?: boolean;
   onClose: () => void;
-  onClaim: () => void;
+  onClaim: (tier?: number, lane?: 'free' | 'plus') => void;
+  onSkipTier?: () => void;
   onUpgrade?: () => void;
   paused?: boolean;
 }) {
-  const timeLeft = useSeasonCountdown(season?.endsAt);
+  const timeLeft = useSeasonCountdown(
+    season?.ended ? season?.graceEndsAt : season?.endsAt,
+  );
   const timelineRef = useRef<HTMLDivElement | null>(null);
   const scrollAreaRef = useRef<HTMLDivElement | null>(null);
-  const currentDayRef = useRef<HTMLDivElement | null>(null);
-  const futureDayRowRef = useRef<HTMLDivElement | null>(null);
+  const currentTierRef = useRef<HTMLDivElement | null>(null);
+  const futureTierRowRef = useRef<HTMLDivElement | null>(null);
   const [greenLineHeight, setGreenLineHeight] = useState<string>('0px');
   const [greenLineWidth, setGreenLineWidth] = useState<string>('0px');
   const [lockedPreview, setLockedPreview] = useState<{
-    day: number;
-    rewardType: 'FLIES' | 'ITEM' | 'BOX' | 'BACKGROUND';
-    amount?: number;
-    itemId?: string;
+    tier: number;
+    rewards: QuestReward[];
   } | null>(null);
   const [todayInView, setTodayInView] = useState(true);
   const [introDone, setIntroDone] = useState(false);
+  const reduceMotion = useReducedMotion();
   const { indices: wardrobeIndices } = useWardrobeIndices(open && !isPremium);
 
-  // Drag-to-scroll state
+  const focusTier = season ? seasonFocusTier(season) : 1;
+
   const isDragging = useRef(false);
   const startX = useRef(0);
   const scrollLeftStart = useRef(0);
@@ -994,14 +1340,12 @@ function QuestSeasonEventOverlay({
   const handlePointerDown = (e: React.PointerEvent) => {
     const scrollArea = scrollAreaRef.current;
     if (!scrollArea || e.pointerType !== 'mouse') return;
-    
-    // Only drag if clicking the container or non-interactive parts
     if ((e.target as HTMLElement).closest('button, a, .interactive-reward')) return;
 
     isDragging.current = true;
     startX.current = e.pageX - scrollArea.offsetLeft;
     scrollLeftStart.current = scrollArea.scrollLeft;
-    
+
     scrollArea.style.cursor = 'grabbing';
     scrollArea.setPointerCapture(e.pointerId);
   };
@@ -1010,7 +1354,7 @@ function QuestSeasonEventOverlay({
     if (!isDragging.current || !scrollAreaRef.current) return;
     e.preventDefault();
     const x = e.pageX - scrollAreaRef.current.offsetLeft;
-    const walk = (x - startX.current) * 1.5; // multiplier for speed
+    const walk = (x - startX.current) * 1.5;
     scrollAreaRef.current.scrollLeft = scrollLeftStart.current - walk;
   };
 
@@ -1023,12 +1367,12 @@ function QuestSeasonEventOverlay({
     }
   };
 
-  const scrollToToday = () => {
+  const scrollToCurrent = () => {
     const isHorizontal = window.innerWidth >= 768;
-    currentDayRef.current?.scrollIntoView({
+    currentTierRef.current?.scrollIntoView({
       block: isHorizontal ? 'nearest' : 'center',
       inline: isHorizontal ? 'center' : 'nearest',
-      behavior: 'smooth',
+      behavior: reduceMotion ? 'auto' : 'smooth',
     });
   };
 
@@ -1036,12 +1380,12 @@ function QuestSeasonEventOverlay({
     if (!open) return;
     const recompute = () => {
       const container = timelineRef.current;
-      const target = currentDayRef.current;
+      const target = currentTierRef.current;
       if (!container || !target) return;
       const containerRect = container.getBoundingClientRect();
       const targetRect = target.getBoundingClientRect();
 
-      const isHorizontal = window.innerWidth >= 768; // md breakpoint
+      const isHorizontal = window.innerWidth >= 768;
 
       if (isHorizontal) {
         const center = targetRect.left + targetRect.width / 2 - containerRect.left;
@@ -1050,7 +1394,7 @@ function QuestSeasonEventOverlay({
       } else {
         const center = targetRect.top + targetRect.height / 2 - containerRect.top;
         setGreenLineHeight(`${Math.max(0, center)}px`);
-        setGreenLineWidth('8px'); // fixed width for vertical line
+        setGreenLineWidth('8px');
       }
     };
     recompute();
@@ -1060,7 +1404,7 @@ function QuestSeasonEventOverlay({
       window.cancelAnimationFrame(raf);
       window.removeEventListener('resize', recompute);
     };
-  }, [open, season?.currentDay, season?.dayCount]);
+  }, [open, focusTier, season?.tierCount]);
 
   useEffect(() => {
     if (!open || !season) return;
@@ -1068,24 +1412,22 @@ function QuestSeasonEventOverlay({
     const scrollArea = scrollAreaRef.current;
     if (!scrollArea) return;
 
-    const current = currentDayRef.current;
-    const future = futureDayRowRef.current;
+    const current = currentTierRef.current;
+    const future = futureTierRowRef.current;
 
     const isHorizontal = window.innerWidth >= 768;
 
-    if (season.currentDay >= season.dayCount) {
-      // Last day: just scroll to it smoothly
+    if (focusTier >= season.tierCount) {
       setTimeout(() => {
         current?.scrollIntoView({
           block: isHorizontal ? 'nearest' : 'center',
           inline: isHorizontal ? 'center' : 'nearest',
-          behavior: 'smooth',
+          behavior: reduceMotion ? 'auto' : 'smooth',
         });
       }, 100);
       return;
     }
 
-    // Immediately jump to the future day row to start the "preview"
     if (future) {
       scrollArea.style.scrollBehavior = 'auto';
       future.scrollIntoView({
@@ -1094,7 +1436,6 @@ function QuestSeasonEventOverlay({
         behavior: 'auto',
       });
     } else {
-      // Fallback to bottom/right if ref isn't ready
       scrollArea.style.scrollBehavior = 'auto';
       if (isHorizontal) {
         scrollArea.scrollLeft = scrollArea.scrollWidth;
@@ -1103,20 +1444,19 @@ function QuestSeasonEventOverlay({
       }
     }
 
-    // Small delay before gliding back to current day
     const timer = setTimeout(() => {
       if (!current) return;
       requestAnimationFrame(() => {
         current.scrollIntoView({
           block: isHorizontal ? 'nearest' : 'center',
           inline: isHorizontal ? 'center' : 'nearest',
-          behavior: 'smooth',
+          behavior: reduceMotion ? 'auto' : 'smooth',
         });
       });
     }, 350);
 
     return () => clearTimeout(timer);
-  }, [open, season?.currentDay, season?.dayCount]);
+  }, [focusTier, open, reduceMotion, season?.tierCount]);
 
   useEffect(() => {
     if (!open) {
@@ -1130,8 +1470,25 @@ function QuestSeasonEventOverlay({
 
   useEffect(() => {
     if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        if (lockedPreview) setLockedPreview(null);
+        else onClose();
+      }
+    };
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [lockedPreview, onClose, open]);
+
+  useEffect(() => {
+    if (!open) return;
     const root = scrollAreaRef.current;
-    const target = currentDayRef.current;
+    const target = currentTierRef.current;
     if (!root || !target) return;
     const observer = new IntersectionObserver(
       ([entry]) => setTodayInView(entry.isIntersecting),
@@ -1139,215 +1496,224 @@ function QuestSeasonEventOverlay({
     );
     observer.observe(target);
     return () => observer.disconnect();
-  }, [open, season?.currentDay, season?.dayCount]);
+  }, [open, focusTier, season?.tierCount]);
 
   if (!open || !season || typeof document === 'undefined') return null;
 
-  const progress = Math.min(season.progressFlies, season.dailyTargetFlies);
-  const pct = Math.min(100, (progress / Math.max(1, season.dailyTargetFlies)) * 100);
-  const endsSoon = new Date(season.endsAt).getTime() - Date.now() < 86_400_000;
-  const currentRewards =
-    season.rewardsByDay.find((entry) => entry.day === season.currentDay) ??
-    null;
-  const currentFreeRewards = currentRewards?.freeRewards ?? [];
-  const currentPremiumRewards = currentRewards?.premiumRewards ?? [];
-  const currentClaimRewards = [
-    ...currentFreeRewards,
-    ...(isPremium ? currentPremiumRewards : []),
-  ];
-  const claimedToday = season.claimedToday;
-  const completedDay = season.claimedTodayDay ?? season.currentDay;
-  const goalReached = season.claimable || claimedToday;
-  const completedSeasonDays = new Set(
-    season.claimedDays.filter((day) => day >= 1 && day <= season.dayCount),
-  );
-  const seasonComplete = completedSeasonDays.size >= season.dayCount;
-  const nextSeasonDay = Math.min(
-    claimedToday ? season.currentDay : season.currentDay + 1,
-    season.dayCount,
-  );
-
-  // Track which day to start the scroll from (preview point)
-  const previewDay = Math.min(season.dayCount, season.currentDay + 10);
+  const endsSoon =
+    new Date(season.ended ? season.graceEndsAt : season.endsAt).getTime() -
+      Date.now() <
+    86_400_000;
+  const seasonComplete =
+    season.tier >= season.tierCount && season.claimableCount === 0;
+  const canSkip =
+    !season.ended &&
+    season.tierSkipCost > 0 &&
+    season.tier < season.tierCount &&
+    !!onSkipTier;
+  const canAffordSkip = season.flyBalance >= season.tierSkipCost;
+  const previewTier = Math.min(season.tierCount, focusTier + 10);
 
   return createPortal(
-    <div className="fixed inset-0 z-[1200] flex flex-col overflow-x-hidden bg-background md:overflow-hidden">
-      <div className="relative h-[230px] shrink-0 overflow-hidden md:h-[220px] [@media(max-height:820px)]:md:h-[180px] [@media(max-height:720px)]:md:h-[140px]">
-          {hasSeasonCover(season.images) ? (
-            <SeasonCoverImage
-              images={season.images}
-              alt={season.name}
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <div className="h-full w-full bg-[linear-gradient(135deg,#22c55e_0%,#14b8a6_55%,#064e3b_100%)]" />
-          )}
-          <div className="absolute inset-0 bg-gradient-to-b from-black/8 via-transparent to-black/12" />
-          <button
-            type="button"
-            onClick={onClose}
-            className="absolute right-4 top-[calc(1rem+env(safe-area-inset-top))] flex h-10 w-10 items-center justify-center rounded-full border border-border/50 bg-background/80 text-foreground shadow-sm backdrop-blur-md"
-            aria-label="Close season event"
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="season-pass-title"
+      className="fixed inset-0 z-[1200] flex flex-col overflow-x-hidden bg-background md:overflow-hidden"
+    >
+      <div className="relative h-[210px] shrink-0 overflow-hidden md:h-[220px] [@media(max-height:820px)]:md:h-[180px] [@media(max-height:720px)]:md:h-[140px]">
+        {hasSeasonCover(season.images) ? (
+          <SeasonCoverImage
+            images={season.images}
+            alt={season.name}
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <div className="h-full w-full bg-[linear-gradient(135deg,#22c55e_0%,#14b8a6_55%,#064e3b_100%)]" />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-b from-black/8 via-transparent to-black/12" />
+        <button
+          type="button"
+          onClick={onClose}
+          className="touch-manipulation absolute right-4 top-[calc(1rem+env(safe-area-inset-top))] flex h-11 w-11 items-center justify-center rounded-full border border-white/25 bg-black/45 text-white shadow-lg backdrop-blur-md transition-[background-color,transform] hover:bg-black/60 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+          aria-label="Close season pass"
+        >
+          <X className="h-5 w-5" />
+        </button>
+        <div className="pointer-events-none absolute inset-x-0 top-14 flex justify-center px-4 md:top-16 [@media(max-height:820px)]:md:top-10 [@media(max-height:720px)]:md:top-6">
+          <h2
+            id="season-pass-title"
+            className="max-w-[20rem] text-balance text-center text-3xl uppercase leading-none tracking-wide text-white drop-shadow-[0_4px_0_rgba(15,23,42,0.95)] sm:text-4xl md:text-4xl md:drop-shadow-[0_5px_0_rgba(15,23,42,0.95)] sm:md:text-5xl [@media(max-height:720px)]:md:text-3xl"
+            style={{
+              fontFamily: 'var(--font-display), "Luckiest Guy", cursive',
+              WebkitTextStroke: '3px rgba(15, 23, 42, 0.95)',
+              paintOrder: 'stroke fill',
+            }}
           >
-            <X className="h-5 w-5" />
-          </button>
-          <div className="pointer-events-none absolute inset-x-0 top-14 flex justify-center px-4 md:top-16 [@media(max-height:820px)]:md:top-10 [@media(max-height:720px)]:md:top-6">
-            <h2
-              className="max-w-[20rem] text-center text-3xl uppercase leading-none tracking-wide text-white drop-shadow-[0_4px_0_rgba(15,23,42,0.95)] sm:text-4xl md:text-4xl md:drop-shadow-[0_5px_0_rgba(15,23,42,0.95)] sm:md:text-5xl [@media(max-height:720px)]:md:text-3xl [@media(max-height:720px)]:md:drop-shadow-[0_3px_0_rgba(15,23,42,0.95)]"
-              style={{
-                fontFamily: 'var(--font-display), "Luckiest Guy", cursive',
-                WebkitTextStroke: '3px rgba(15, 23, 42, 0.95)',
-                paintOrder: 'stroke fill',
-              }}
+            {season.name}
+          </h2>
+        </div>
+        <div className="pointer-events-none absolute inset-x-0 bottom-10 mx-auto flex max-w-2xl items-center justify-between gap-2 px-4 md:bottom-12 [@media(min-width:400px)]:gap-3 [@media(min-width:400px)]:px-5">
+          <div className="pointer-events-auto inline-flex h-10 items-center gap-2.5 rounded-full border border-white/20 bg-black/50 py-1 pl-1.5 pr-4 text-white shadow-[0_6px_20px_rgba(0,0,0,0.35)] backdrop-blur-md">
+            <span
+              className={cn(
+                'flex h-7 w-7 shrink-0 items-center justify-center rounded-full',
+                endsSoon ? 'bg-amber-400 text-amber-950' : 'bg-white/15 text-white/90',
+              )}
             >
-              {season.name}
-            </h2>
-          </div>
-          <div className="pointer-events-none absolute inset-x-0 bottom-10 mx-auto flex max-w-2xl items-center justify-between gap-2 px-4 md:bottom-12 [@media(min-width:400px)]:gap-3 [@media(min-width:400px)]:px-5">
-            <div className="pointer-events-auto inline-flex h-10 items-center gap-2.5 rounded-full border border-white/20 bg-black/50 py-1 pl-1.5 pr-4 text-white shadow-[0_6px_20px_rgba(0,0,0,0.35)] backdrop-blur-md">
-              <span
-                className={cn(
-                  'flex h-7 w-7 shrink-0 items-center justify-center rounded-full',
-                  endsSoon ? 'bg-amber-400 text-amber-950' : 'bg-white/15 text-white/90',
-                )}
-              >
-                <Clock className="h-3.5 w-3.5" strokeWidth={2.75} />
+              <Clock className="h-3.5 w-3.5" strokeWidth={2.75} />
+            </span>
+            <span className="flex flex-col justify-center leading-none">
+              <span className="text-[8px] font-bold uppercase tracking-[0.22em] text-white/60">
+                {season.ended ? 'Closes in' : 'Ends in'}
               </span>
-              <span className="flex flex-col justify-center leading-none">
-                <span className="text-[8px] font-bold uppercase tracking-[0.22em] text-white/60">
-                  Ends in
-                </span>
-                <span className="mt-0.5 text-[13px] font-black leading-none tabular-nums">
-                  {timeLeft}
-                </span>
+              <span className="mt-0.5 text-[13px] font-black leading-none tabular-nums">
+                {timeLeft}
+              </span>
+            </span>
+          </div>
+          {!isPremium && onUpgrade && (
+            <button
+              type="button"
+              onClick={onUpgrade}
+              aria-label="Unlock Frog Plus"
+              className="group pointer-events-auto relative isolate inline-flex h-12 min-w-0 items-center gap-1.5 rounded-2xl pl-2 pr-2 text-emerald-950 shadow-[0_12px_32px_-6px_rgba(217,119,6,0.55)] ring-2 ring-amber-200/80 transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.97] [@media(min-width:400px)]:gap-2.5 [@media(min-width:400px)]:pl-3"
+            >
+              <span
+                aria-hidden
+                className="absolute inset-0 -z-10 rounded-2xl bg-[linear-gradient(125deg,#fde68a_0%,#fbbf24_45%,#f59e0b_75%,#d97706_100%)]"
+              />
+              <span
+                aria-hidden
+                className="animate-shimmer absolute inset-0 -z-10 overflow-hidden rounded-2xl bg-[linear-gradient(110deg,transparent_35%,rgba(255,255,255,0.7)_50%,transparent_65%)] bg-[length:200%_100%] mix-blend-overlay motion-reduce:hidden"
+              />
+              <span aria-hidden className="absolute inset-x-0 top-0 -z-10 h-1/2 rounded-t-2xl bg-gradient-to-b from-white/45 to-transparent" />
+              <span className="-my-8 -ml-2 -translate-y-2 inline-flex shrink-0">
+                <Icon
+                  name="frogPlus"
+                  className="h-16 w-16 drop-shadow-[0_4px_0_rgba(31,98,28,0.35)] animate-wiggle motion-reduce:animate-none [@media(min-width:400px)]:h-20 [@media(min-width:400px)]:w-20"
+                />
+              </span>
+              <span className="hidden text-[12px] font-black uppercase tracking-[0.14em] text-emerald-900 drop-shadow-[0_1px_0_rgba(255,255,255,0.5)] [@media(min-width:360px)]:inline [@media(min-width:400px)]:tracking-[0.22em]">
+                Unlock
+              </span>
+              <span className="ml-0.5 inline-flex shrink-0 items-center rounded-lg bg-gradient-to-b from-emerald-600 to-emerald-800 px-2 py-1.5 text-[11px] font-black uppercase leading-none tracking-[0.18em] text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_2px_4px_rgba(0,0,0,0.25)] ring-1 ring-emerald-900/40">
+                Plus
+              </span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* One control bar: where you are, what's waiting, and the skip. */}
+      <div className="sticky top-0 z-50 -mt-6 bg-transparent md:mt-0 md:shrink-0 md:border-b md:border-border/40 md:bg-muted/40 md:backdrop-blur-md">
+        <div className="mx-auto w-full max-w-2xl rounded-t-[32px] bg-background md:max-w-4xl md:rounded-none md:bg-transparent">
+          <div className="flex items-center gap-2.5 px-4 py-2.5 md:gap-3 md:py-2.5">
+            <div
+              className={cn(
+                'flex h-10 shrink-0 flex-col items-center justify-center rounded-2xl px-2.5 leading-none ring-1 md:h-11 md:px-3',
+                seasonComplete
+                  ? 'bg-emerald-500/10 text-emerald-600 ring-emerald-500/25 dark:text-emerald-400'
+                  : 'bg-primary/10 text-primary ring-primary/20',
+              )}
+            >
+              <span className="text-[7px] font-black uppercase tracking-[0.18em] opacity-80">
+                Tier
+              </span>
+              <span className="text-base font-black tabular-nums md:text-lg">
+                {season.tier}
               </span>
             </div>
-            {!isPremium && onUpgrade && (
+
+            {seasonComplete ? (
+              <p className="min-w-0 flex-1 truncate text-sm font-black text-foreground">
+                Season complete — all {season.tierCount} tiers claimed
+              </p>
+            ) : (
+              <div className="min-w-0 flex-1">
+                <SeasonStepBar
+                  season={season}
+                  paused={paused}
+                  className="h-8 border border-border/60 md:h-9"
+                />
+                <p className="mt-1 hidden truncate text-[11px] font-bold text-muted-foreground sm:block">
+                  {season.tasksPerStep} tasks = 1 step · {season.maxStepsPerDay}{' '}
+                  steps a day max
+                </p>
+              </div>
+            )}
+
+            {canSkip && !season.claimable && (
               <button
                 type="button"
-                onClick={onUpgrade}
-                aria-label="Unlock Frog Plus"
-                className="group pointer-events-auto relative isolate inline-flex h-12 min-w-0 items-center gap-1.5 rounded-2xl pl-2 pr-2 text-emerald-950 shadow-[0_12px_32px_-6px_rgba(217,119,6,0.55)] ring-2 ring-amber-200/80 transition-transform duration-150 hover:-translate-y-0.5 hover:shadow-[0_16px_36px_-6px_rgba(217,119,6,0.7)] active:translate-y-0 active:scale-[0.97] [@media(min-width:400px)]:gap-2.5 [@media(min-width:400px)]:pl-3"
+                onClick={onSkipTier}
+                disabled={skipping || !canAffordSkip}
+                title={
+                  canAffordSkip
+                    ? `Skip to tier ${season.tier + 1}`
+                    : `You need ${season.tierSkipCost - season.flyBalance} more flies`
+                }
+                className={cn(
+                  'inline-flex h-11 shrink-0 touch-manipulation items-center gap-1 rounded-2xl border px-2.5 text-[11px] font-black uppercase tracking-wide transition md:px-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
+                  canAffordSkip
+                    ? 'border-border/60 bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground'
+                    : 'border-border/40 bg-muted/40 text-muted-foreground/50',
+                  'disabled:cursor-not-allowed',
+                )}
               >
-                <span
-                  aria-hidden
-                  className="absolute inset-0 -z-10 rounded-2xl bg-[linear-gradient(125deg,#fde68a_0%,#fbbf24_45%,#f59e0b_75%,#d97706_100%)]"
-                />
-                <span
-                  aria-hidden
-                  className="animate-shimmer absolute inset-0 -z-10 overflow-hidden rounded-2xl bg-[linear-gradient(110deg,transparent_35%,rgba(255,255,255,0.7)_50%,transparent_65%)] bg-[length:200%_100%] mix-blend-overlay"
-                />
-                <span aria-hidden className="absolute inset-x-0 top-0 -z-10 h-1/2 rounded-t-2xl bg-gradient-to-b from-white/45 to-transparent" />
-                <span className="-my-8 -ml-2 -translate-y-2 inline-flex shrink-0">
-                  <Icon
-                    name="frogPlus"
-                    className="h-16 w-16 drop-shadow-[0_4px_0_rgba(31,98,28,0.35)] animate-wiggle [@media(min-width:400px)]:h-20 [@media(min-width:400px)]:w-20"
-                  />
+                <span className="hidden [@media(min-width:420px)]:inline">
+                  {skipping ? 'Skipping…' : 'Skip'}
                 </span>
-                <span className="hidden text-[12px] font-black uppercase tracking-[0.14em] text-emerald-900 drop-shadow-[0_1px_0_rgba(255,255,255,0.5)] [@media(min-width:360px)]:inline [@media(min-width:400px)]:tracking-[0.22em]">
-                  Unlock
-                </span>
-                <span className="ml-0.5 inline-flex shrink-0 items-center rounded-lg bg-gradient-to-b from-emerald-600 to-emerald-800 px-2 py-1.5 text-[11px] font-black uppercase leading-none tracking-[0.18em] text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_2px_4px_rgba(0,0,0,0.25)] ring-1 ring-emerald-900/40">
-                  Plus
-                </span>
+                <span className="tabular-nums">{season.tierSkipCost}</span>
+                <Fly size={18} y={-2} paused={paused} interactive={false} />
+              </button>
+            )}
+
+            {season.claimable && (
+              <button
+                type="button"
+                onClick={() => onClaim()}
+                disabled={claiming}
+                className="inline-flex h-11 shrink-0 touch-manipulation items-center gap-1.5 rounded-2xl bg-lime-600 px-4 text-xs font-black text-white shadow-[0_3px_0_#3f6212] transition active:translate-y-[3px] active:shadow-none disabled:cursor-wait disabled:opacity-70 md:px-5 md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lime-500 focus-visible:ring-offset-2"
+              >
+                <Check className="h-4 w-4" strokeWidth={4} />
+                {claiming ? 'Claiming…' : 'Claim All'}
               </button>
             )}
           </div>
         </div>
+      </div>
 
-        {/* Header section - Sticky on mobile, Fixed on web */}
-        <div className="sticky top-0 z-50 -mt-6 bg-transparent md:mt-0 md:shrink-0 md:border-b md:border-border/40 md:bg-muted/40 md:backdrop-blur-md">
-          <div className="mx-auto w-full max-w-2xl bg-background rounded-t-[32px] md:bg-transparent md:rounded-none">
-            <div className="px-4 pb-3 pt-1 md:py-2 md:pb-3 [@media(max-height:820px)]:md:py-1.5 [@media(max-height:820px)]:md:pb-2">
-              {goalReached ? (
-                <div className="overflow-hidden rounded-[20px] bg-background p-2.5 max-w-md mx-auto md:bg-transparent md:ring-0 md:p-0 md:overflow-visible">
-                  <div className="flex items-center gap-2.5">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
-                      <Check className="h-5 w-5" strokeWidth={4} />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-black leading-tight text-foreground">
-                        {season.currentDay >= season.dayCount && season.claimedToday
-                          ? "Season complete!"
-                          : season.claimable
-                            ? `Day ${season.currentDay} ready!`
-                            : `Day ${completedDay} completed`}
-                      </p>
-                      <p className="mt-0.5 truncate text-xs font-black leading-tight text-muted-foreground">
-                        {seasonComplete
-                          ? 'All rewards claimed'
-                          : season.claimable
-                            ? 'Claim to continue'
-                            : `Return tomorrow for Day ${nextSeasonDay}`}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={season.claimable ? onClaim : onClose}
-                      disabled={season.claimable && claiming}
-                      className="h-10 min-w-[7rem] shrink-0 rounded-xl bg-lime-600 px-6 text-xs font-black text-white shadow-[0_3px_0_#3f6212] transition active:translate-y-1 active:shadow-none disabled:cursor-wait disabled:opacity-70"
-                    >
-                      {season.claimable ? (claiming ? 'Claiming...' : 'Claim') : 'Done'}
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex justify-center px-1 py-1.5 max-w-2xl mx-auto md:px-3 md:py-3 md:bg-transparent md:border-0 md:shadow-none md:p-0 md:overflow-visible">
-                  <div className="flex w-full max-w-md items-center gap-2 md:gap-3">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center md:h-10 md:w-10">
-                      <Fly size={28} y={-4} paused={paused} interactive={false} />
-                    </div>
-                    <div className="relative h-7 flex-1 overflow-hidden rounded-full border border-border/60 bg-muted md:h-8">
-                      <div className="absolute inset-1">
-                        <div
-                          className="h-full min-w-6 rounded-full bg-amber-400 transition-all duration-500 md:min-w-7"
-                          style={{ width: pct > 0 ? `${pct}%` : '1.5rem' }}
-                        />
-                      </div>
-                      <span className="absolute inset-0 flex items-center justify-center text-xs font-black tabular-nums text-foreground/70 md:text-sm">
-                        {progress} / {season.dailyTargetFlies}
-                      </span>
-                      <span
-                        aria-hidden
-                        className="absolute inset-0 flex items-center justify-center text-xs font-black tabular-nums text-amber-950 md:text-sm"
-                        style={{ clipPath: `inset(0 ${100 - pct}% 0 0)` }}
-                      >
-                        {progress} / {season.dailyTargetFlies}
-                      </span>
-                    </div>
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-base font-black text-primary ring-1 ring-primary/20 md:h-10 md:w-10 md:rounded-2xl md:text-lg">
-                      {season.currentDay}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
+      <div
+        className="relative flex min-h-0 flex-1"
+        style={
+          {
+            '--tier-w': 'clamp(6.5rem, 13vw, 10.5rem)',
+            '--tier-gap': 'clamp(0.75rem, 2.2vw, 2.5rem)',
+          } as React.CSSProperties
+        }
+      >
+        <div className="hidden md:z-20 md:flex md:sticky md:left-0 md:top-0 md:w-[5.5rem] md:shrink-0 md:flex-col md:self-stretch md:border-r md:border-border/40 md:bg-background lg:w-24">
+          <div className="flex flex-1 items-center justify-center px-2">
+            <span className="rounded-xl border border-primary/25 bg-primary/10 px-2.5 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-primary">
+              Free
+            </span>
           </div>
-        </div>
-
-        <div className="relative flex flex-1 min-h-0 md:flex md:flex-1 md:min-h-0">
-        {/* Fixed sidebar for FREE / PLUS labels on web */}
-        <div className="hidden md:flex md:sticky md:top-0 md:left-0 md:w-24 md:shrink-0 md:self-stretch md:flex-col md:items-center md:justify-center md:gap-3 md:bg-background md:border-r md:border-border/40 md:px-2 md:py-6 md:z-20">
-          <div className="flex flex-1 w-full items-center justify-center">
-            <div className="flex flex-col items-center rounded-xl border border-primary/25 bg-primary/10 px-3 py-3 text-[11px] font-black uppercase tracking-[0.2em] text-primary">
-              <span>Free</span>
-            </div>
-          </div>
-          <div className="h-px w-10 bg-border/60" aria-hidden="true" />
-          <div className="flex flex-1 w-full items-center justify-center">
+          <div className="mx-auto h-px w-10 bg-border/60" aria-hidden="true" />
+          <div className="flex flex-1 items-center justify-center px-2">
             <button
               type="button"
               onClick={isPremium ? undefined : onUpgrade}
               disabled={isPremium}
-              aria-label="Frog Plus"
-              className="group relative isolate flex flex-col items-center gap-1.5 rounded-xl px-3 py-3 text-[11px] font-black uppercase tracking-[0.2em] text-emerald-900 ring-2 ring-amber-200/80 transition-transform enabled:hover:-translate-y-0.5 enabled:active:translate-y-0 enabled:active:scale-[0.98] disabled:cursor-default"
+              aria-label={isPremium ? 'Frog Plus active' : 'Unlock Frog Plus'}
+              className="group relative isolate flex flex-col items-center gap-1 rounded-xl px-2.5 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-emerald-900 ring-2 ring-amber-200/80 transition-transform enabled:hover:-translate-y-0.5 enabled:active:translate-y-0 enabled:active:scale-[0.98] disabled:cursor-default"
             >
               <span
                 aria-hidden
                 className="absolute inset-0 -z-10 rounded-xl bg-[linear-gradient(150deg,#fde68a_0%,#fbbf24_45%,#f59e0b_75%,#d97706_100%)]"
               />
               <span aria-hidden className="absolute inset-x-0 top-0 -z-10 h-1/2 rounded-t-xl bg-gradient-to-b from-white/45 to-transparent" />
-              <Icon name="frogPlus" className="h-12 w-12 drop-shadow-[0_2px_0_rgba(31,98,28,0.35)]" />
+              <Icon name="frogPlus" className="h-9 w-9 drop-shadow-[0_2px_0_rgba(31,98,28,0.35)]" />
               <span className="drop-shadow-[0_1px_0_rgba(255,255,255,0.5)]">Plus</span>
             </button>
           </div>
@@ -1359,323 +1725,192 @@ function QuestSeasonEventOverlay({
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerUp}
-          className="relative flex-1 min-h-0 select-none overflow-y-auto md:overflow-x-auto md:overflow-y-hidden no-scrollbar cursor-grab active:cursor-grabbing [touch-action:pan-y] md:[touch-action:pan-x]"
+          className="no-scrollbar relative min-h-0 flex-1 cursor-grab select-none overflow-y-auto [touch-action:pan-y] active:cursor-grabbing md:overflow-x-auto md:overflow-y-hidden md:[touch-action:pan-x]"
         >
-          <div className="mx-auto min-h-full max-w-2xl bg-background md:mx-0 md:h-full md:max-w-none md:min-w-full md:bg-transparent md:px-12 md:pt-0 md:pb-0 md:flex md:flex-col md:justify-center [@media(max-height:820px)]:md:px-8 [@media(max-height:720px)]:md:px-6">
-            <div className="relative z-10 mx-auto max-w-2xl bg-background md:mx-0 md:max-w-none md:rounded-t-[48px] md:border-0">
-
-        <div className="px-4 pb-5 pt-5 md:pt-4 [@media(max-width:379px)]:px-2">
-          <div className="text-foreground">
-            <div className="grid h-12 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 md:hidden">
-              <div className="flex h-10 min-w-0 items-center justify-center rounded-xl border border-primary/25 bg-primary/10 px-4 text-[11px] font-black uppercase tracking-[0.18em] text-primary">
-                <span>Free</span>
-              </div>
-              <div className="w-8 [@media(min-width:400px)]:w-10" />
-              <button
-                type="button"
-                onClick={isPremium ? undefined : onUpgrade}
-                disabled={isPremium}
-                aria-label="Frog Plus"
-                className="group relative isolate flex h-10 min-w-0 items-center justify-center gap-1 rounded-xl pl-2 pr-1.5 text-[11px] font-black uppercase tracking-[0.1em] text-emerald-900 ring-2 ring-amber-200/80 transition-transform enabled:hover:-translate-y-0.5 enabled:active:translate-y-0 enabled:active:scale-[0.98] disabled:cursor-default [@media(min-width:400px)]:gap-2 [@media(min-width:400px)]:tracking-[0.18em]"
-              >
-                <span
-                  aria-hidden
-                  className="absolute inset-0 -z-10 rounded-xl bg-[linear-gradient(125deg,#fde68a_0%,#fbbf24_45%,#f59e0b_75%,#d97706_100%)]"
-                />
-                <span aria-hidden className="absolute inset-x-0 top-0 -z-10 h-1/2 rounded-t-xl bg-gradient-to-b from-white/45 to-transparent" />
-                <span className="-my-6 -ml-2 -translate-y-1 inline-flex shrink-0">
-                  <Icon name="frogPlus" className="h-12 w-12 drop-shadow-[0_2px_0_rgba(31,98,28,0.35)] [@media(min-width:400px)]:h-16 [@media(min-width:400px)]:w-16" />
-                </span>
-                <span className="hidden drop-shadow-[0_1px_0_rgba(255,255,255,0.5)] [@media(min-width:360px)]:inline">Frog</span>
-                <span className="ml-0.5 inline-flex shrink-0 items-center rounded-md bg-gradient-to-b from-emerald-600 to-emerald-800 px-1.5 py-1 text-[10px] font-black uppercase leading-none tracking-[0.16em] text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_2px_3px_rgba(0,0,0,0.22)] ring-1 ring-emerald-900/40">
-                  Plus
-                </span>
-              </button>
-            </div>
-
-            <div ref={timelineRef} className="relative mt-4 rounded-[20px] border border-border/40 bg-muted/40 p-3 md:mt-0 md:border-0 md:bg-transparent md:p-0 md:py-12 md:w-fit md:min-w-full [@media(max-width:379px)]:p-1.5 [@media(max-height:820px)]:md:py-8 [@media(max-height:720px)]:md:py-5">
-              <div className="absolute bottom-0 left-1/2 top-0 z-0 w-2 -translate-x-1/2 rounded-full bg-border/60 md:left-0 md:right-0 md:top-1/2 md:h-2 md:w-auto md:-translate-y-1/2 md:translate-x-0" />
-              <div
-                className="absolute left-1/2 top-0 z-0 w-1 -translate-x-1/2 rounded-full bg-primary shadow-[0_0_14px_rgba(34,197,94,0.28)] md:left-0 md:top-1/2 md:h-1 md:-translate-y-1/2 md:translate-x-0"
-                style={{ height: greenLineHeight, width: greenLineWidth }}
-              />
-
-              <div className="relative z-10 flex flex-col gap-y-5 md:flex-row md:gap-x-12 md:gap-y-0 [@media(max-height:820px)]:md:gap-x-8 [@media(max-height:720px)]:md:gap-x-5">
-                {season.rewardsByDay.map((entry) => {
-                  const isCurrent = entry.day === season.currentDay;
-                  const isClaimed = season.claimedDays.includes(entry.day);
-
-                  const isPreviewStart = entry.day === previewDay;
-
-                  return (
-                    <div
-                      key={entry.day}
-                      ref={isPreviewStart ? futureDayRowRef : undefined}
-                      className={cn(
-                        'relative grid grid-cols-[minmax(0,1fr)_3rem_minmax(0,1fr)] items-center rounded-3xl px-1 py-2 transition-all duration-300 [@media(max-width:379px)]:grid-cols-[minmax(0,1fr)_2.5rem_minmax(0,1fr)] [@media(max-width:379px)]:px-0.5 md:flex md:flex-col md:w-[180px] md:shrink-0 md:px-0 md:py-4 [@media(max-height:820px)]:md:w-[150px] [@media(max-height:720px)]:md:w-[124px] [@media(max-height:620px)]:md:w-[104px]',
-                        isCurrent
-                          ? 'bg-primary/5 ring-1 ring-primary/15'
-                          : 'hover:bg-muted/30',
-                      )}
-                    >
-                      <div className="flex w-full justify-center pr-2 sm:pr-3 md:pr-0 md:pb-8 [@media(max-width:379px)]:pr-1 [@media(max-height:820px)]:md:pb-5 [@media(max-height:720px)]:md:pb-3">
-                        <div className="flex w-full max-w-[170px] items-center justify-center md:max-w-none">
-                          {entry.freeRewards.length > 0 ? (
-                            sortStreakPrizes(
-                              entry.freeRewards,
-                              rewardCatalog,
-                            ).map((reward, rewardIndex, laneRewards) => {
-                              const centerOffset =
-                                rewardIndex - (laneRewards.length - 1) / 2;
-                              const widthPct =
-                                laneRewards.length > 1
-                                  ? laneRewards.length === 2
-                                    ? 58
-                                    : 48
-                                  : 100;
-                              const stepPct =
-                                laneRewards.length > 1
-                                  ? (100 - widthPct) /
-                                    (laneRewards.length - 1)
-                                  : 0;
-                              return (
-                                <div
-                                  key={`${entry.day}-free-${rewardIndex}`}
-                                  className="relative"
-                                  style={{
-                                    width: `${widthPct}%`,
-                                    marginLeft:
-                                      rewardIndex === 0
-                                        ? 0
-                                        : `-${widthPct - stepPct}%`,
-                                    transform:
-                                      laneRewards.length > 1
-                                        ? `rotate(${centerOffset * 8}deg) translateY(${centerOffset * -32}%)`
-                                        : undefined,
-                                    zIndex: laneRewards.length - rewardIndex,
-                                  }}
-                                >
-                                  <SingleRewardCard
-                                    day={entry.day}
-                                    rewardType={reward.type}
-                                    amount={reward.amount}
-                                    itemId={reward.itemId}
-                                    rewardCatalog={rewardCatalog}
-                                    giftAnimation="box_shake"
-                                    status={
-                                      isClaimed
-                                        ? 'CLAIMED'
-                                        : isCurrent && season.claimable
-                                          ? 'READY'
-                                          : entry.day < season.currentDay
-                                            ? 'MISSED'
-                                            : 'LOCKED'
-                                    }
-                                    isToday={isCurrent}
-                                    hideDayLabel
-                                    hideDropRates
-                                    forceFullOpacity
-                                    hideAction={rewardIndex > 0}
-                                    compact={laneRewards.length > 1}
-                                    pausePreview={paused || !isCurrent}
-                                    onClick={
-                                      isCurrent &&
-                                      season.claimable &&
-                                      !claimedToday
-                                        ? onClaim
-                                        : undefined
-                                    }
-                                  />
-                                </div>
-                              );
-                            })
-                          ) : (
-                            <div className="h-32 w-full rounded-2xl bg-white/5" />
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="relative z-20 flex justify-center md:h-14 md:w-full md:items-center [@media(max-height:820px)]:md:h-10 [@media(max-height:720px)]:md:h-8">
-                        {isCurrent && (
-                          <span className="absolute left-1/2 top-1/2 h-14 w-14 -translate-x-1/2 -translate-y-1/2 rounded-[20px] bg-primary/20 animate-ping-ring md:h-16 md:w-16 [@media(max-width:379px)]:h-12 [@media(max-width:379px)]:w-12 [@media(max-width:379px)]:rounded-[16px] [@media(max-height:820px)]:md:h-12 [@media(max-height:820px)]:md:w-12" />
-                        )}
-                        <div
-                          ref={isCurrent ? currentDayRef : undefined}
-                          className={cn(
-                            'relative z-10 flex h-12 w-12 flex-col items-center justify-center rounded-[18px] leading-none [@media(max-width:379px)]:h-10 [@media(max-width:379px)]:w-10 [@media(max-width:379px)]:rounded-[14px] [@media(max-height:820px)]:md:h-10 [@media(max-height:820px)]:md:w-10 [@media(max-height:820px)]:md:rounded-[14px] [@media(max-height:720px)]:md:h-8 [@media(max-height:720px)]:md:w-8 [@media(max-height:720px)]:md:rounded-xl',
-                            isCurrent
-                              ? 'bg-primary text-primary-foreground shadow-[0_4px_0_rgba(0,0,0,0.18)] ring-2 ring-background'
-                              : isClaimed
-                                ? 'bg-primary text-primary-foreground shadow-[0_4px_0_rgba(0,0,0,0.12)] ring-1 ring-primary/20'
-                                : 'border-2 border-border bg-background text-muted-foreground shadow-[0_4px_0_rgba(0,0,0,0.06)]',
-                          )}
-                        >
-                          {isClaimed && !isCurrent ? (
-                            <Check className="h-5 w-5" strokeWidth={4} />
-                          ) : (
-                            <>
-                              <span className="text-[9px] font-black uppercase tracking-[0.15em] opacity-95 [@media(max-width:379px)]:text-[8px] [@media(max-width:379px)]:tracking-[0.1em] [@media(max-height:720px)]:md:text-[7px]">
-                                Day
-                              </span>
-                              <span className="text-lg font-black tabular-nums [@media(max-width:379px)]:text-base [@media(max-height:820px)]:md:text-base [@media(max-height:720px)]:md:text-sm">
-                                {entry.day}
-                              </span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="flex w-full justify-center pl-2 sm:pl-3 md:pl-0 md:pt-8 [@media(max-width:379px)]:pl-1 [@media(max-height:820px)]:md:pt-5 [@media(max-height:720px)]:md:pt-3">
-                        <div className="flex w-full max-w-[170px] items-center justify-center md:max-w-none">
-                          {entry.premiumRewards.length > 0 ? (
-                            sortStreakPrizes(
-                              entry.premiumRewards,
-                              rewardCatalog,
-                            ).map((reward, rewardIndex, laneRewards) => {
-                              const centerOffset =
-                                rewardIndex - (laneRewards.length - 1) / 2;
-                              const showUnlock =
-                                rewardIndex === 0 &&
-                                isCurrent &&
-                                season.claimable &&
-                                !claimedToday;
-                              const widthPct =
-                                laneRewards.length > 1
-                                  ? laneRewards.length === 2
-                                    ? 58
-                                    : 48
-                                  : 100;
-                              const stepPct =
-                                laneRewards.length > 1
-                                  ? (100 - widthPct) /
-                                    (laneRewards.length - 1)
-                                  : 0;
-                              return (
-                                <div
-                                  key={`${entry.day}-plus-${rewardIndex}`}
-                                  className="relative"
-                                  style={{
-                                    width: `${widthPct}%`,
-                                    marginLeft:
-                                      rewardIndex === 0
-                                        ? 0
-                                        : `-${widthPct - stepPct}%`,
-                                    transform:
-                                      laneRewards.length > 1
-                                        ? `rotate(${centerOffset * 8}deg) translateY(${centerOffset * -32}%)`
-                                        : undefined,
-                                    zIndex: laneRewards.length - rewardIndex,
-                                  }}
-                                >
-                                  <SingleRewardCard
-                                    day={entry.day}
-                                    rewardType={reward.type}
-                                    amount={reward.amount}
-                                    itemId={reward.itemId}
-                                    rewardCatalog={rewardCatalog}
-                                    giftAnimation="box_shake"
-                                    status={
-                                      !isPremium
-                                        ? entry.day < season.currentDay
-                                          ? 'MISSED'
-                                          : 'LOCKED_PREMIUM'
-                                        : isClaimed
-                                          ? 'CLAIMED'
-                                          : isCurrent && season.claimable
-                                            ? 'READY'
-                                            : entry.day < season.currentDay
-                                              ? 'MISSED'
-                                              : 'LOCKED'
-                                    }
-                                    isPremiumTier
-                                    isToday={isCurrent}
-                                    hideDayLabel
-                                    hideDropRates
-                                    forceFullOpacity
-                                    lockOverlay={!isPremium}
-                                    hideAction={rewardIndex > 0}
-                                    compact={laneRewards.length > 1}
-                                    pausePreview={paused || !isCurrent}
-                                    onClick={
-                                      !isPremium
-                                        ? isCurrent &&
-                                          season.claimable &&
-                                          !claimedToday
-                                          ? onUpgrade
-                                          : undefined
-                                        : isCurrent &&
-                                            season.claimable &&
-                                            !claimedToday
-                                          ? onClaim
-                                          : undefined
-                                    }
-                                  />
-                                  {!isPremium && (
-                                    <button
-                                      type="button"
-                                      aria-label="Preview Plus reward"
-                                      onClick={() =>
-                                        setLockedPreview({
-                                          day: entry.day,
-                                          rewardType: reward.type,
-                                          amount: reward.amount,
-                                          itemId: reward.itemId,
-                                        })
-                                      }
-                                      className={cn(
-                                        'absolute left-0 right-0 top-0 z-30 cursor-pointer rounded-2xl bg-transparent',
-                                        showUnlock ? 'bottom-12' : 'bottom-0',
-                                      )}
-                                    />
-                                  )}
-                                </div>
-                              );
-                            })
-                          ) : (
-                            <div className="h-32 w-full rounded-2xl bg-white/5" />
-                          )}
-                        </div>
-                      </div>
+          <div className="mx-auto min-h-full max-w-2xl bg-background md:mx-0 md:flex md:h-full md:min-w-full md:max-w-none md:flex-col md:justify-center md:bg-transparent md:px-8">
+            <div className="relative z-10 mx-auto max-w-2xl bg-background md:mx-0 md:max-w-none md:bg-transparent">
+              <div className="px-4 pb-5 pt-4 md:p-0 [@media(max-width:379px)]:px-2">
+                <div className="text-foreground">
+                  <div className="grid h-[52px] grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 md:hidden">
+                    <div className="flex h-9 min-w-0 items-center justify-center rounded-xl border border-primary/25 bg-primary/10 px-4 text-[11px] font-black uppercase tracking-[0.18em] text-primary">
+                      Free
                     </div>
-                  );
-                })}
+                    <div className="w-9" />
+                    <button
+                      type="button"
+                      onClick={isPremium ? undefined : onUpgrade}
+                      disabled={isPremium}
+                      aria-label={isPremium ? 'Frog Plus active' : 'Unlock Frog Plus'}
+                      className="group relative isolate flex h-11 min-w-0 touch-manipulation items-center justify-center gap-1.5 rounded-xl px-2.5 text-[11px] font-black uppercase tracking-[0.14em] text-emerald-900 ring-2 ring-amber-200/80 transition-transform enabled:active:scale-[0.98] disabled:cursor-default focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-300"
+                    >
+                      <span
+                        aria-hidden
+                        className="absolute inset-0 -z-10 rounded-xl bg-[linear-gradient(125deg,#fde68a_0%,#fbbf24_45%,#f59e0b_75%,#d97706_100%)]"
+                      />
+                      <span aria-hidden className="absolute inset-x-0 top-0 -z-10 h-1/2 rounded-t-xl bg-gradient-to-b from-white/45 to-transparent" />
+                      <Icon name="frogPlus" className="-my-4 h-9 w-9 shrink-0 drop-shadow-[0_2px_0_rgba(31,98,28,0.35)]" />
+                      <span className="drop-shadow-[0_1px_0_rgba(255,255,255,0.5)]">
+                        Plus
+                      </span>
+                    </button>
+                  </div>
+
+                  <div
+                    ref={timelineRef}
+                    className="relative mt-3 md:mt-0 md:w-fit md:min-w-full md:py-6"
+                  >
+                    <div className="absolute bottom-0 left-1/2 top-0 z-0 w-2 -translate-x-1/2 rounded-full bg-border/60 md:left-0 md:right-0 md:top-1/2 md:h-2 md:w-auto md:-translate-y-1/2 md:translate-x-0" />
+                    <div
+                      className="absolute left-1/2 top-0 z-0 w-1 -translate-x-1/2 rounded-full bg-primary shadow-[0_0_14px_rgba(34,197,94,0.28)] md:left-0 md:top-1/2 md:h-1 md:-translate-y-1/2 md:translate-x-0"
+                      style={{ height: greenLineHeight, width: greenLineWidth }}
+                    />
+
+                    <div className="relative z-10 flex flex-col gap-y-4 md:flex-row md:gap-x-[var(--tier-gap)] md:gap-y-0">
+                      {season.rewardsByTier.map((entry) => {
+                        const isCurrent = entry.tier === focusTier;
+                        const unlocked = entry.tier <= season.tier;
+                        const freeStatus = seasonLaneStatus(season, entry.tier, 'free');
+                        const plusStatus = seasonLaneStatus(season, entry.tier, 'plus');
+                        const isPreviewStart = entry.tier === previewTier;
+                        const hasMultipleRewards =
+                          entry.freeRewards.length > 1 ||
+                          entry.premiumRewards.length > 1;
+
+                        // Every prize owns a real card. The lane shares one
+                        // action/status, but the artwork and quantity never
+                        // collapse into an ambiguous bundle.
+                        const renderLane = (lane: 'free' | 'plus') => {
+                          const laneRewards =
+                            lane === 'free' ? entry.freeRewards : entry.premiumRewards;
+                          if (laneRewards.length === 0) {
+                            return (
+                              <div className="flex h-[126px] w-full items-center justify-center rounded-[18px] border border-dashed border-border/50 px-2 text-center text-[10px] font-bold text-muted-foreground">
+                                No reward
+                              </div>
+                            );
+                          }
+                          const sorted = sortStreakPrizes(laneRewards, rewardCatalog);
+                          const status = lane === 'free' ? freeStatus : plusStatus;
+                          const claimable = status === 'READY';
+                          const canPitchPlus =
+                            lane === 'plus' && status === 'LOCKED_PREMIUM';
+                          const action = claimable
+                            ? () => onClaim(entry.tier, lane)
+                            : canPitchPlus
+                              ? () =>
+                                  setLockedPreview({
+                                    tier: entry.tier,
+                                    rewards: sorted,
+                                  })
+                              : undefined;
+
+                          return (
+                            <div
+                              className={cn(
+                                'relative grid w-full grid-cols-1 gap-2',
+                                sorted.length > 1 &&
+                                  'min-[480px]:grid-cols-2 md:grid-cols-2',
+                              )}
+                            >
+                              {sorted.map((reward, rewardIndex) => (
+                                <SeasonPassRewardCard
+                                  key={`${entry.tier}-${lane}-${rewardIndex}-${reward.type}-${reward.itemId ?? reward.backgroundId ?? ''}`}
+                                  reward={reward}
+                                  rewardCatalog={rewardCatalog}
+                                  isPremium={lane === 'plus'}
+                                  status={status}
+                                  paused={paused || !isCurrent}
+                                  onClick={action}
+                                />
+                              ))}
+                            </div>
+                          );
+                        };
+
+                        return (
+                          <div
+                            key={entry.tier}
+                            ref={isPreviewStart ? futureTierRowRef : undefined}
+                            className={cn(
+                              'relative grid grid-cols-[minmax(0,1fr)_2.75rem_minmax(0,1fr)] items-center gap-x-1 rounded-3xl px-1 py-1.5 transition-colors duration-300',
+                              'md:flex md:shrink-0 md:flex-col md:gap-x-0 md:px-0 md:py-3',
+                              hasMultipleRewards
+                                ? 'md:w-[calc(var(--tier-w)*2+0.5rem)]'
+                                : 'md:w-[var(--tier-w)]',
+                              '[@media(max-width:379px)]:grid-cols-[minmax(0,1fr)_2.25rem_minmax(0,1fr)]',
+                            )}
+                          >
+                            <div className="flex w-full justify-center md:pb-5 [@media(max-height:800px)]:md:pb-3">
+                              {renderLane('free')}
+                            </div>
+
+                            <div className="relative z-20 flex justify-center md:h-12 md:w-full md:items-center [@media(max-height:800px)]:md:h-9">
+                              {isCurrent && (
+                                <span className="absolute left-1/2 top-1/2 h-12 w-12 -translate-x-1/2 -translate-y-1/2 rounded-[18px] bg-primary/20 animate-ping-ring motion-reduce:hidden" />
+                              )}
+                              <div
+                                ref={isCurrent ? currentTierRef : undefined}
+                                className={cn(
+                                  'relative z-10 flex h-11 w-11 flex-col items-center justify-center rounded-2xl leading-none',
+                                  '[@media(max-width:379px)]:h-9 [@media(max-width:379px)]:w-9',
+                                  '[@media(max-height:800px)]:md:h-9 [@media(max-height:800px)]:md:w-9',
+                                  isCurrent
+                                    ? 'bg-primary text-primary-foreground shadow-[0_4px_0_rgba(0,0,0,0.18)] ring-2 ring-background'
+                                    : unlocked
+                                      ? 'bg-primary text-primary-foreground shadow-[0_3px_0_rgba(0,0,0,0.12)]'
+                                      : 'border-2 border-border bg-background text-muted-foreground',
+                                )}
+                              >
+                                <span className="text-[8px] font-black uppercase tracking-[0.12em] opacity-90 [@media(max-height:800px)]:md:hidden">
+                                  Tier
+                                </span>
+                                <span className="text-base font-black tabular-nums [@media(max-width:379px)]:text-sm">
+                                  {entry.tier}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="flex w-full justify-center md:pt-5 [@media(max-height:800px)]:md:pt-3">
+                              {renderLane('plus')}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
-
           </div>
         </div>
-      </div>
-      </div>
+
+        <div className="pointer-events-none absolute inset-x-0 bottom-[calc(1.25rem+env(safe-area-inset-bottom))] z-30 flex justify-center md:bottom-8">
+          <AnimatePresence>
+            {introDone && !todayInView && (
+              <motion.button
+                key="back-to-tier"
+                type="button"
+                initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 12, scale: 0.9 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 12, scale: 0.9 }}
+                whileTap={reduceMotion ? undefined : { scale: 0.94 }}
+                transition={{ type: 'tween', duration: 0.18, ease: 'easeOut' }}
+                onClick={scrollToCurrent}
+                className="pointer-events-auto inline-flex h-11 items-center gap-1.5 rounded-full bg-primary px-5 text-sm font-black text-primary-foreground shadow-[0_4px_0_rgba(0,0,0,0.2),0_12px_28px_-8px_rgba(0,0,0,0.45)] ring-2 ring-background"
+              >
+                Back to Tier {focusTier}
+              </motion.button>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
 
-      <div className="pointer-events-none absolute inset-x-0 bottom-[calc(1.25rem+env(safe-area-inset-bottom))] z-30 flex justify-center md:bottom-8">
-        <AnimatePresence>
-          {introDone && !todayInView && (
-            <motion.button
-              key="back-to-today"
-              type="button"
-              initial={{ opacity: 0, y: 12, scale: 0.9 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 12, scale: 0.9 }}
-              whileTap={{ scale: 0.94 }}
-              transition={{ type: 'tween', duration: 0.18, ease: 'easeOut' }}
-              onClick={scrollToToday}
-              className="pointer-events-auto inline-flex h-11 items-center gap-1.5 rounded-full bg-primary px-5 text-sm font-black text-primary-foreground shadow-[0_4px_0_rgba(0,0,0,0.2),0_12px_28px_-8px_rgba(0,0,0,0.45)] ring-2 ring-background"
-            >
-              Back to Day {season.currentDay}
-            </motion.button>
-          )}
-        </AnimatePresence>
-      </div>
-      </div>
       <AnimatePresence>
         {lockedPreview && (
           <LockedPlusPreview
             key="locked-plus-preview"
-            day={lockedPreview.day}
-            rewardType={lockedPreview.rewardType}
-            amount={lockedPreview.amount}
-            itemId={lockedPreview.itemId}
+            tier={lockedPreview.tier}
+            rewards={lockedPreview.rewards}
             rewardCatalog={rewardCatalog}
             wardrobeIndices={wardrobeIndices}
             onClose={() => setLockedPreview(null)}
@@ -1692,32 +1927,21 @@ function QuestSeasonEventOverlay({
 }
 
 function LockedPlusPreview({
-  day,
-  rewardType,
-  amount,
-  itemId,
+  tier,
+  rewards,
   rewardCatalog,
   wardrobeIndices,
   onClose,
   onUpgrade,
 }: {
-  day: number;
-  rewardType: 'FLIES' | 'ITEM' | 'BOX' | 'BACKGROUND';
-  amount?: number;
-  itemId?: string;
+  tier: number;
+  rewards: QuestReward[];
   rewardCatalog: Record<string, ItemDef>;
   wardrobeIndices: Partial<Record<string, number>>;
   onClose: () => void;
   onUpgrade?: () => void;
 }) {
-  const item = itemId ? rewardCatalog[itemId] : undefined;
-  const itemName =
-    rewardType === 'FLIES'
-      ? `${amount ?? 0} Flies`
-      : rewardType === 'BOX'
-        ? 'Mystery Box'
-        : item?.name ?? 'Plus Reward';
-
+  const reduceMotion = useReducedMotion();
   const { frogOnLeft, rotation } = useMemo(() => {
     const tilts = [-9, -6, -4, 4, 6, 9];
     return {
@@ -1725,10 +1949,6 @@ function LockedPlusPreview({
       rotation: tilts[Math.floor(Math.random() * tilts.length)],
     };
   }, []);
-
-  // On desktop (md+) the panel is centered, so sliding by its own height won't
-  // clear the screen. Use a viewport-relative offset there so it always slides
-  // fully off the bottom on close.
   const [isDesktop, setIsDesktop] = useState(
     () =>
       typeof window !== 'undefined' &&
@@ -1742,6 +1962,53 @@ function LockedPlusPreview({
     return () => window.removeEventListener('resize', check);
   }, []);
   const offscreen = isDesktop ? '100vh' : '100%';
+  const rewardDetailName = (reward: QuestReward) =>
+    reward.type === 'FLIES'
+      ? `${getRewardQuantityLabel(reward, true)} Flies`
+      : reward.type === 'SHIELD' && (reward.amount ?? 1) > 1
+        ? `${reward.amount} Lily Pads`
+        : seasonRewardName(reward, rewardCatalog);
+  const itemName = rewards.length
+    ? rewards.map(rewardDetailName).join(' + ')
+    : 'Plus Reward';
+  const rewardCard = (reward: QuestReward, rewardIndex: number) => (
+    <div
+      key={`${tier}-${rewardIndex}-${reward.type}-${reward.itemId ?? reward.backgroundId ?? ''}`}
+      className={cn(
+        'relative shrink-0',
+        rewards.length > 1
+          ? 'w-28 min-[420px]:w-[7.75rem] md:w-[8.5rem]'
+          : 'w-[9.375rem] md:w-[10rem]',
+      )}
+      style={{
+        transform:
+          rewards.length > 1
+            ? `rotate(${rewardIndex === 0 ? -5 : 5}deg)`
+            : `rotate(${rotation}deg)`,
+      }}
+    >
+      <SingleRewardCard
+        day={tier}
+        rewardType={reward.type}
+        amount={reward.amount}
+        itemId={reward.itemId ?? reward.backgroundId}
+        rewardCatalog={rewardCatalog}
+        status="LOCKED_PREMIUM"
+        isPremiumTier
+        hideDayLabel
+        hideDropRates
+        hideSingleQuantity
+        forceFullOpacity
+        giftAnimation="box_shake"
+      />
+      <span className="pointer-events-none absolute left-0 top-1 z-40 flex h-9 w-9 items-center justify-center rounded-full bg-amber-300/95 shadow-md ring-2 ring-white dark:ring-background">
+        <Icon
+          name="frogPlus"
+          className="h-9 w-9 drop-shadow-[0_2px_0_rgba(31,98,28,0.3)]"
+        />
+      </span>
+    </div>
+  );
 
   return (
     <motion.div
@@ -1749,12 +2016,20 @@ function LockedPlusPreview({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.25 }}
-      className="fixed inset-0 z-[1400] flex items-end justify-center bg-black/55 backdrop-blur-sm md:items-center md:px-5"
-      onClick={onClose}
+      className="fixed inset-0 z-[1400] flex items-end justify-center md:items-center md:px-5"
     >
-      <motion.div
-        onClick={(e) => e.stopPropagation()}
-        drag="y"
+      <button
+        type="button"
+        tabIndex={-1}
+        aria-label="Close Plus reward preview"
+        onClick={onClose}
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+      />
+      <motion.section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="plus-reward-title"
+        drag={reduceMotion || isDesktop ? false : 'y'}
         dragConstraints={{ top: 0, bottom: 0 }}
         dragElastic={{ top: 0, bottom: 0.6 }}
         dragMomentum={false}
@@ -1762,73 +2037,90 @@ function LockedPlusPreview({
           if (info.offset.y + info.velocity.y * 0.15 > 130 || info.velocity.y > 800)
             onClose();
         }}
-        initial={{ y: offscreen }}
+        initial={reduceMotion ? { opacity: 0 } : { y: offscreen }}
         animate={{ y: 0 }}
-        exit={{
-          y: offscreen,
-          transition: { type: 'tween', duration: 0.3, ease: [0.32, 0.72, 0, 1] },
+        exit={
+          reduceMotion
+            ? { opacity: 0 }
+            : {
+                y: offscreen,
+                transition: {
+                  type: 'tween',
+                  duration: 0.3,
+                  ease: [0.32, 0.72, 0, 1],
+                },
+              }
+        }
+        transition={{
+          type: 'tween',
+          ease: [0.32, 0.72, 0, 1],
+          duration: reduceMotion ? 0.12 : 0.4,
         }}
-        transition={{ type: 'tween', ease: [0.32, 0.72, 0, 1], duration: 0.4 }}
-        className="relative w-full rounded-t-3xl bg-background px-5 pb-7 pt-3 shadow-[0_-20px_40px_-10px_rgba(0,0,0,0.35)] md:max-w-md md:rounded-3xl md:px-6 md:pb-7 md:pt-5"
+        className="no-scrollbar relative max-h-[calc(100dvh-env(safe-area-inset-top)-1rem)] w-full overflow-y-auto overscroll-contain rounded-t-3xl bg-background px-5 pb-[calc(1.75rem+env(safe-area-inset-bottom))] pt-3 shadow-[0_-20px_40px_-10px_rgba(0,0,0,0.35)] md:max-w-md md:rounded-3xl md:px-6 md:pb-7 md:pt-5"
       >
         <div className="mx-auto mb-2 h-1.5 w-12 rounded-full bg-muted-foreground/30 md:hidden" />
         <button
           type="button"
           onClick={onClose}
-          aria-label="Close"
-          className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full border border-border/50 bg-background text-muted-foreground hover:text-foreground"
+          aria-label="Close Plus reward preview"
+          className="touch-manipulation absolute right-3 top-3 flex h-11 w-11 items-center justify-center rounded-full border border-border/60 bg-background text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
           <X className="h-5 w-5" />
         </button>
 
-        <div className="mt-2 flex items-center justify-center">
-          <div
-            className={cn(
-              'relative z-10 h-44 w-44 shrink-0 md:h-48 md:w-48',
-              frogOnLeft ? '-mr-12 md:-mr-14' : 'order-2 -ml-12 md:-ml-14',
-            )}
-          >
-            <Frog
-              className="h-full w-full"
-              width={192}
-              height={192}
-              indices={
-                {
-                  ...wardrobeIndices,
-                  mood: 2,
-                } as Partial<Record<WardrobeSlot, number>>
-              }
-            />
+        {rewards.length > 1 ? (
+          <div className="mt-4 flex items-end justify-center gap-0 md:gap-1">
+            {rewardCard(rewards[0], 0)}
+            <div className="relative z-10 h-24 w-24 shrink-0 translate-y-2 min-[420px]:h-28 min-[420px]:w-28">
+              <Frog
+                className="h-full w-full"
+                width={144}
+                height={144}
+                indices={
+                  {
+                    ...wardrobeIndices,
+                    mood: 2,
+                  } as Partial<Record<WardrobeSlot, number>>
+                }
+              />
+            </div>
+            {rewardCard(rewards[1], 1)}
           </div>
-          <div
-            className={cn(
-              'w-[150px] shrink-0 md:w-[160px]',
-              frogOnLeft ? '' : 'order-1',
-            )}
-            style={{ transform: `rotate(${rotation}deg)` }}
-          >
-            <SingleRewardCard
-              day={day}
-              rewardType={rewardType}
-              amount={amount}
-              itemId={itemId}
-              status="LOCKED_PREMIUM"
-              isPremiumTier
-              hideDayLabel
-              hideDropRates
-              forceFullOpacity
-              lockOverlay
-              giftAnimation="box_shake"
-            />
+        ) : (
+          <div className="mt-2 flex items-center justify-center">
+            <div
+              className={cn(
+                'relative z-10 h-44 w-44 shrink-0 md:h-48 md:w-48',
+                frogOnLeft ? '-mr-12 md:-mr-14' : 'order-2 -ml-12 md:-ml-14',
+              )}
+            >
+              <Frog
+                className="h-full w-full"
+                width={192}
+                height={192}
+                indices={
+                  {
+                    ...wardrobeIndices,
+                    mood: 2,
+                  } as Partial<Record<WardrobeSlot, number>>
+                }
+              />
+            </div>
+            <div className={frogOnLeft ? '' : 'order-1'}>
+              {rewards[0] ? rewardCard(rewards[0], 0) : null}
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="mt-4 text-center">
-          <p className="text-xl font-black tracking-tight text-foreground">
+          <h3
+            id="plus-reward-title"
+            className="text-xl font-black tracking-tight text-foreground"
+          >
             {itemName}
-          </p>
+          </h3>
           <p className="mt-1 text-sm font-semibold text-muted-foreground">
-            Unlock on Day {day} with Plus
+            Unlock Tier {tier} with Plus
           </p>
         </div>
 
@@ -1837,7 +2129,7 @@ function LockedPlusPreview({
             type="button"
             onClick={onUpgrade}
             aria-label="Unlock Frog Plus"
-            className="group relative isolate mt-5 flex h-14 w-full items-center justify-center gap-2.5 rounded-2xl px-4 text-emerald-950 ring-2 ring-amber-200/80 transition-transform active:scale-[0.98]"
+            className="group relative isolate mt-5 flex h-14 w-full touch-manipulation items-center justify-center gap-2.5 rounded-2xl px-4 text-emerald-950 ring-2 ring-amber-200/80 transition-transform active:scale-[0.98] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-amber-300"
           >
             <span
               aria-hidden
@@ -1856,7 +2148,7 @@ function LockedPlusPreview({
             </span>
           </button>
         )}
-      </motion.div>
+      </motion.section>
     </motion.div>
   );
 }

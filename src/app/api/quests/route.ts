@@ -11,7 +11,7 @@ import {
 import { parseTaskStreakDays } from '@/lib/quests/metrics';
 import { rewardWorth } from '@/lib/quests/priority';
 import { loadMoveToWebConfig, syncMoveToWeb } from '@/lib/quests/moveToWeb';
-import { getActiveQuestSeasonView } from '@/lib/quests/seasons';
+import { getQuestSeasonViews } from '@/lib/quests/seasons';
 import { getZonedToday } from '@/lib/utils';
 import { getCachedCatalog } from '@/lib/skins/getCatalog';
 import {
@@ -118,7 +118,8 @@ type ClaimableEntry = {
   tags?: ObjectiveTagChip[];
   seasonId?: string;
   seasonName?: string;
-  day?: number;
+  tier?: number;
+  tierCount?: number;
   reward?: any;
   rewards?: any[];
 };
@@ -408,7 +409,7 @@ export async function GET(req: Request) {
       view === 'home' ||
       searchParams.get('includeCategories') === '1';
 
-    const [dashboard, activeSeason, sweepConfig, moveToWebConfig] =
+    const [dashboard, seasonViews, sweepConfig, moveToWebConfig] =
       await Promise.all([
         syncQuestState({
           userId,
@@ -416,10 +417,12 @@ export async function GET(req: Request) {
           includeCatalog: !isSummary,
           includeCategories,
         }),
-        getActiveQuestSeasonView({ userId, timezone }),
+        getQuestSeasonViews({ userId, timezone }),
         loadSweepConfig(),
         loadMoveToWebConfig(),
       ]);
+    const activeSeason = seasonViews.active;
+    const graceSeason = seasonViews.grace;
 
     const dailySweep = await syncDailySweep({
       user: dashboard.user,
@@ -455,7 +458,7 @@ export async function GET(req: Request) {
       0,
     );
     const seasonDailyClaimable =
-      activeSeason && activeSeason.claimable && !activeSeason.claimedToday ? 1 : 0;
+      (activeSeason?.claimableCount ?? 0) + (graceSeason?.claimableCount ?? 0);
     const streakClaimable = dailySweep?.claimable ? dailySweep.pendingRolls : 0;
     const moveToWebClaimable = moveToWeb?.claimable ? 1 : 0;
     const claimableCount =
@@ -604,20 +607,29 @@ export async function GET(req: Request) {
         });
       }
     }
-    if (activeSeason && activeSeason.claimable && !activeSeason.claimedToday) {
-      const dayEntry = activeSeason.rewardsByDay.find(
-        (e) => e.day === activeSeason.currentDay,
+    for (const season of [activeSeason, graceSeason]) {
+      if (!season?.claimable) continue;
+      const rewardByTier = new Map(
+        season.rewardsByTier.map((entry) => [entry.tier, entry]),
       );
       const seasonRewards = [
-        ...(dayEntry?.freeRewards ?? []),
-        ...(dashboard.isPremium ? dayEntry?.premiumRewards ?? [] : []),
+        ...season.claimableFreeTiers.flatMap(
+          (tier) => rewardByTier.get(tier)?.freeRewards ?? [],
+        ),
+        ...season.claimablePlusTiers.flatMap(
+          (tier) => rewardByTier.get(tier)?.premiumRewards ?? [],
+        ),
       ];
+      const topTier = Math.max(
+        ...[...season.claimableFreeTiers, ...season.claimablePlusTiers],
+      );
       claimables.push({
-        id: `season:${activeSeason.id}:${activeSeason.currentDay}`,
+        id: `season:${season.id}:${topTier}`,
         kind: 'season',
-        seasonId: activeSeason.id,
-        seasonName: activeSeason.name,
-        day: activeSeason.currentDay,
+        seasonId: season.id,
+        seasonName: season.name,
+        tier: topTier,
+        tierCount: season.claimableCount,
         reward: seasonRewards[0],
         rewards: seasonRewards.length ? seasonRewards : undefined,
       });
@@ -655,6 +667,7 @@ export async function GET(req: Request) {
             categoryTagMap: dashboard.focusProfile.categoryTagMap,
           },
           activeSeason,
+          graceSeason,
           ...(includeCategories ? { macroCategories: lightMacroCategories } : {}),
         },
         {
@@ -670,15 +683,15 @@ export async function GET(req: Request) {
         normalizeQuestTag(tag, index, dashboard.isPremium),
       )
       .filter(Boolean);
-    const seasonRewardCatalog = activeSeason
-      ? buildRewardCatalog(
-          dashboard.catalog,
-          activeSeason.rewardsByDay.flatMap((entry) => [
-            entry.freeRewards,
-            entry.premiumRewards,
-          ]),
-        )
-      : {};
+    const seasonRewardCatalog = buildRewardCatalog(
+      dashboard.catalog,
+      [activeSeason, graceSeason].flatMap((season) =>
+        (season?.rewardsByTier ?? []).flatMap((entry) => [
+          entry.freeRewards,
+          entry.premiumRewards,
+        ]),
+      ),
+    );
     const sweepRewardCatalog = dailySweep
       ? buildRewardCatalog(dashboard.catalog, [
           sweepRollRewards(dailySweep.standardRoll),
@@ -708,6 +721,7 @@ export async function GET(req: Request) {
         tags,
         macroCategories: lightMacroCategories,
         activeSeason,
+        graceSeason,
         dailyQuests: dashboard.dailyQuests.map((q) =>
           withBlockEffort(withTemplateCover(q, dashboard.templatesWithCover)),
         ),

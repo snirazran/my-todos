@@ -743,6 +743,9 @@ function streakPrizeRank(
   reward: QuestReward,
   rewardCatalog: Record<string, QuestRewardCatalogItem>,
 ) {
+  // A Lily Pad costs 350 flies in the shop — between a Rare and a Legendary
+  // gift, which is where it belongs when a lane fans two prizes.
+  if (reward.type === 'SHIELD') return 2.5;
   const lookupId = reward.itemId ?? reward.backgroundId;
   const item = lookupId ? rewardCatalog[lookupId] : null;
   return item ? STREAK_PRIZE_RARITY_RANK[item.rarity] ?? 0 : 0;
@@ -1775,7 +1778,7 @@ function ObjectiveRow({
               const centerOffset = i - (shownRewards.length - 1) / 2;
               return (
                 <div
-                  key={`${reward.type}-${reward.itemId ?? reward.backgroundId ?? reward.amount ?? i}`}
+                  key={`${i}-${reward.type}-${reward.itemId ?? reward.backgroundId ?? ''}`}
                   className="relative"
                   style={{
                     marginLeft: i === 0 ? 0 : -6,
@@ -2014,11 +2017,14 @@ export const RewardTile = memo(function RewardTile({
   );
   const lookupId = reward.itemId ?? reward.backgroundId;
   const item = lookupId ? rewardCatalog[lookupId] : null;
+  const isShield = reward.type === 'SHIELD';
   const tone = item
     ? REWARD_TILE_TONE[item.rarity]
     : reward.type === 'FLIES'
       ? REWARD_TILE_TONE.flies
-      : REWARD_TILE_TONE.default;
+      : isShield
+        ? REWARD_TILE_TONE.uncommon
+        : REWARD_TILE_TONE.default;
   const quantityLabel = getRewardQuantityLabel(reward, isPremium);
   const previewIndices = item
     ? {
@@ -2065,6 +2071,12 @@ export const RewardTile = memo(function RewardTile({
             oversample={flyOversample}
           />
         </div>
+      ) : isShield ? (
+        <Icon
+          name="lilyPad"
+          label="Lily Pad"
+          className={cn('relative z-10', compact ? 'h-9 w-9' : 'h-7 w-7')}
+        />
       ) : item?.slot === 'background' ? (
         <div className="absolute inset-0 z-10 overflow-hidden rounded-[inherit]">
           {item.imageUrl ? (
@@ -2159,6 +2171,10 @@ function rewardLabel(
 ) {
   if (reward.type === 'FLIES')
     return `${getRewardQuantityLabel(reward, isPremium)} flies`;
+  if (reward.type === 'SHIELD') {
+    const amount = Math.max(1, reward.amount ?? 1);
+    return amount > 1 ? `${amount} Lily Pads` : 'Lily Pad';
+  }
   const id = reward.itemId ?? reward.backgroundId;
   if (id) {
     return rewardCatalog[id]?.name ?? id;

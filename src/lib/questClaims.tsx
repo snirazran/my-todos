@@ -37,7 +37,8 @@ export type Claimable = {
   tags?: ObjectiveTagChip[];
   seasonId?: string;
   seasonName?: string;
-  day?: number;
+  tier?: number;
+  tierCount?: number;
   reward?: any;
   rewards?: any[];
 };
@@ -801,8 +802,8 @@ function ClaimRewardToast({
         ) : (
           <span className="mt-0.5 truncate text-[11px] font-bold text-muted-foreground">
             {claimable.seasonName
-              ? `${claimable.seasonName} · Day ${claimable.day}`
-              : `Day ${claimable.day}`}
+              ? `${claimable.seasonName} · Tier ${claimable.tier}`
+              : `Tier ${claimable.tier}`}
           </span>
         )}
       </div>

@@ -1,6 +1,11 @@
 export type MacroCategoryId = string;
 
-export type QuestRewardType = 'FLIES' | 'ITEM' | 'BOX' | 'BACKGROUND';
+export type QuestRewardType =
+  | 'FLIES'
+  | 'ITEM'
+  | 'BOX'
+  | 'BACKGROUND'
+  | 'SHIELD';
 
 export type QuestReward = {
   type: QuestRewardType;
@@ -16,8 +21,10 @@ export type QuestReward = {
 
 export type QuestRewards = QuestReward[];
 
-/** Max rewards an admin can stack on one lane (free/premium) of a season day. */
+/** Max rewards an admin can stack on one lane (free/plus) of a season tier. */
 export const SEASON_REWARDS_PER_LANE = 2;
+
+export type SeasonLane = 'free' | 'plus';
 
 export type QuestPlacement = 'daily' | 'onboarding';
 export type QuestSubject = 'task' | 'any';

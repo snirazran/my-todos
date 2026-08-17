@@ -365,8 +365,8 @@ export function NextQuestStrip({
               {claimable.kind === 'season' ? (
                 <span className="truncate">
                   {claimable.seasonName
-                    ? `${claimable.seasonName} · Day ${claimable.day}`
-                    : `Season day ${claimable.day}`}
+                    ? `${claimable.seasonName} · Tier ${claimable.tier}`
+                    : `Season tier ${claimable.tier}`}
                 </span>
               ) : (
                 <ObjectiveLabel label={claimable.objectiveLabel} />

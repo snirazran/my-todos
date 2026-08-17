@@ -3,9 +3,9 @@ import { requireAdminUserId as requireUserId } from '@/lib/adminAuth';
 import connectMongo from '@/lib/mongoose';
 import QuestSeasonModel from '@/lib/models/QuestSeason';
 import {
-  buildDefaultSeasonRewards,
+  buildSeasonPassLadder,
   createQuestSeason,
-  getSeasonDayCount,
+  normalizeSeasonPassConfig,
   sanitizeSeasonRewards,
   seasonToAdminView,
 } from '@/lib/quests/seasons';
@@ -20,6 +20,7 @@ const VALID_REWARD_TYPES = new Set<QuestRewardType>([
   'FLIES',
   'ITEM',
   'BOX',
+  'SHIELD',
 ]);
 const VALID_AMOUNT_MODES = new Set<QuestAmountMode>(['fixed', 'random']);
 
@@ -28,6 +29,14 @@ const json = (body: unknown, status = 200) =>
 
 function sanitizeReward(input: any): QuestReward | null {
   if (!input || !VALID_REWARD_TYPES.has(input.type)) return null;
+
+  if (input.type === 'SHIELD') {
+    return {
+      type: 'SHIELD',
+      amountMode: 'fixed',
+      amount: Math.max(1, Math.min(10, Math.floor(Number(input.amount) || 1))),
+    };
+  }
 
   if (input.type === 'FLIES') {
     const amountMode = VALID_AMOUNT_MODES.has(input.amountMode)
@@ -65,13 +74,16 @@ function sanitizeReward(input: any): QuestReward | null {
   return {
     type: input.type,
     itemId: input.itemId.trim(),
-    amount: input.type === 'BOX' ? Math.max(1, Math.floor(Number(input.amount) || 1)) : undefined,
+    amount:
+      input.type === 'BOX'
+        ? Math.max(1, Math.floor(Number(input.amount) || 1))
+        : undefined,
   };
 }
 
-function sanitizeDayRewards(input: unknown) {
-  const normalized = sanitizeSeasonRewards(input).map((entry) => ({
-    day: entry.day,
+function sanitizeTierRewards(input: unknown) {
+  return sanitizeSeasonRewards(input).map((entry) => ({
+    tier: entry.tier,
     freeRewards: entry.freeRewards
       .map(sanitizeReward)
       .filter(Boolean)
@@ -81,31 +93,33 @@ function sanitizeDayRewards(input: unknown) {
       .filter(Boolean)
       .slice(0, SEASON_REWARDS_PER_LANE) as QuestReward[],
   }));
-  return normalized.filter(
-    (entry) => entry.freeRewards.length > 0 || entry.premiumRewards.length > 0,
-  );
 }
 
 function sanitizeBody(body: any) {
   const name = typeof body?.name === 'string' ? body.name.trim() : '';
   const startsAt = new Date(body?.startsAt);
   const endsAt = new Date(body?.endsAt);
-  const dailyTargetFlies = Math.max(1, Math.floor(Number(body?.dailyTargetFlies) || 3));
 
   if (!name) return { error: 'Season name is required' };
   if (!Number.isFinite(startsAt.getTime())) return { error: 'Start date is required' };
   if (!Number.isFinite(endsAt.getTime())) return { error: 'End date is required' };
   if (endsAt <= startsAt) return { error: 'End date must be after start date' };
 
-  const dayCount = getSeasonDayCount(startsAt, endsAt);
-  const rawDayRewards = sanitizeDayRewards(body?.dayRewards);
-  const fallbackDayRewards = buildDefaultSeasonRewards(dayCount);
-  const dayRewards = Array.from({ length: dayCount }, (_, index) => {
-    const day = index + 1;
-    return (
-      rawDayRewards.find((entry) => entry.day === day) ??
-      fallbackDayRewards[index]
-    );
+  const config = normalizeSeasonPassConfig(body);
+  const authored = sanitizeTierRewards(body?.tierRewards ?? body?.dayRewards);
+  const fallback = buildSeasonPassLadder(config.tierCount);
+  // Every rung has to pay something on at least one lane — a dead tier reads as
+  // a bug on the board, so an empty one falls back to the template's rung.
+  const tierRewards = Array.from({ length: config.tierCount }, (_, index) => {
+    const tier = index + 1;
+    const entry = authored.find((candidate) => candidate.tier === tier);
+    if (
+      entry &&
+      (entry.freeRewards.length > 0 || entry.premiumRewards.length > 0)
+    ) {
+      return entry;
+    }
+    return fallback[index];
   });
 
   return {
@@ -113,8 +127,8 @@ function sanitizeBody(body: any) {
       name,
       startsAt,
       endsAt,
-      dailyTargetFlies,
-      dayRewards,
+      ...config,
+      tierRewards,
       isActive: body?.isActive !== false,
     },
   };
@@ -165,7 +179,7 @@ export async function PUT(req: NextRequest) {
     await connectMongo();
     const season = await QuestSeasonModel.findOneAndUpdate(
       { seasonId },
-      { $set: sanitized.payload },
+      { $set: sanitized.payload, $unset: { dayRewards: '', dailyTargetFlies: '' } },
       { new: true },
     );
     if (!season) return json({ error: 'Season not found' }, 404);

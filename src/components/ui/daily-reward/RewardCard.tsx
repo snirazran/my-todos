@@ -2,6 +2,7 @@ import React from 'react';
 import { Check, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Fly from '../fly';
+import { Icon } from '@/components/ui/Icon';
 import { byId, ItemDef } from '@/lib/skins/catalog';
 import { ItemCard } from '../skins/ItemCard';
 import { Button } from '@/components/ui/button';
@@ -10,24 +11,56 @@ import {
   sortStreakPrizes,
   type QuestRewardCatalogItem,
 } from '../QuestCards';
-import type { QuestReward } from '@/lib/quests/types';
+import type { QuestReward, QuestRewardType } from '@/lib/quests/types';
 
 // Helper to create dummy item def for flies/boxes
 const getRewardItemDef = (
-  type: 'FLIES' | 'ITEM' | 'BOX' | 'BACKGROUND',
+  type: QuestRewardType,
   amount?: number,
   itemId?: string,
+  rewardCatalog?: Record<string, QuestRewardCatalogItem>,
 ): ItemDef => {
-  if (type === 'ITEM' && itemId && byId[itemId]) {
-    return byId[itemId];
+  // The server catalog is the source of truth — it carries items the bundled
+  // `byId` map does not, and falling through to the flies default rendered
+  // every season skin as a bare uncommon frog.
+  const catalogItem = itemId
+    ? rewardCatalog?.[itemId] ?? byId[itemId]
+    : undefined;
+
+  if (type === 'ITEM' && catalogItem) {
+    return { priceFlies: 0, icon: '', ...catalogItem } as ItemDef;
+  }
+
+  if (type === 'BACKGROUND' && catalogItem) {
+    // ItemCard supplies the rarity frame while the custom preview below
+    // renders the actual background image.
+    return {
+      priceFlies: 0,
+      icon: '',
+      ...catalogItem,
+      slot: 'hand_item',
+    } as ItemDef;
+  }
+
+  if (type === 'SHIELD') {
+    const count = Math.max(1, amount ?? 1);
+    return {
+      id: 'lily_pad_reward',
+      name: count > 1 ? `${count} Lily Pads` : 'Lily Pad',
+      rarity: 'rare',
+      priceFlies: 0,
+      slot: 'hand_item',
+      riveIndex: 0,
+      icon: '',
+    };
   }
 
   if (type === 'BOX') {
     // Prefer the real catalog entry so the gift's rarity label and visual
     // (riveIndex → 0 green/common, 1 blue/rare, 2 red/legendary) match the
     // actual box being awarded. Fall back to a generic box only if unknown.
-    if (itemId && byId[itemId]) {
-      return byId[itemId];
+    if (catalogItem) {
+      return { priceFlies: 0, icon: '', ...catalogItem } as ItemDef;
     }
 
     return {
@@ -76,12 +109,13 @@ export function SingleRewardCard({
   lockOverlay,
   hideAction,
   compact,
+  hideSingleQuantity = false,
   giftAnimation,
   rewards,
   rewardCatalog,
 }: {
   day: number;
-  rewardType: 'FLIES' | 'ITEM' | 'BOX' | 'BACKGROUND';
+  rewardType: QuestRewardType;
   amount?: number;
   itemId?: string;
   status: 'CLAIMED' | 'READY' | 'LOCKED' | 'MISSED' | 'LOCKED_PREMIUM';
@@ -103,6 +137,8 @@ export function SingleRewardCard({
   /** Render the ItemCard in compact mode — tighter chrome and a taller
    *  preview box, so the inner panel fills more of a small card. */
   compact?: boolean;
+  /** Hide a redundant ×1 badge while preserving quantities above one. */
+  hideSingleQuantity?: boolean;
   /** Optional gift-box animation override (e.g. 'box_shake'). */
   giftAnimation?: string;
   /** Full reward list for this lane. When it holds more than one, the preview
@@ -130,7 +166,13 @@ export function SingleRewardCard({
   const cardAmount = headline ? headline.amount : amount;
   const cardItemId = headline ? headline.itemId : itemId;
 
-  const itemDef = getRewardItemDef(cardType, cardAmount, cardItemId);
+  const itemDef = getRewardItemDef(
+    cardType,
+    cardAmount,
+    cardItemId,
+    rewardCatalog,
+  );
+  const catalogReward = cardItemId ? rewardCatalog?.[cardItemId] : undefined;
 
   const fanPreview = fannedRewards ? (
     <div className="flex h-full w-full items-center justify-center">
@@ -138,7 +180,7 @@ export function SingleRewardCard({
         const centerOffset = i - (fannedRewards.length - 1) / 2;
         return (
           <div
-            key={`${reward.type}-${reward.itemId ?? reward.backgroundId ?? reward.amount ?? i}`}
+            key={`${i}-${reward.type}-${reward.itemId ?? reward.backgroundId ?? ''}`}
             className="relative"
             style={{
               marginLeft: i === 0 ? 0 : -6,
@@ -166,11 +208,28 @@ export function SingleRewardCard({
   // Custom Preview for Flies
   const customPreview =
     fanPreview ??
-    (rewardType === 'FLIES' ? (
+    (cardType === 'BACKGROUND' && catalogReward?.imageUrl ? (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={catalogReward.imageUrl}
+        alt={catalogReward.name}
+        width={320}
+        height={240}
+        className="h-full w-full object-cover"
+      />
+    ) : rewardType === 'FLIES' ? (
       <div className="flex flex-col items-center justify-center gap-1 h-full w-full pb-0">
         <div className="relative">
           <Fly size={60} paused={pausePreview} interactive={false} />
         </div>
+      </div>
+    ) : rewardType === 'SHIELD' ? (
+      <div className="flex h-full w-full items-center justify-center">
+        <Icon
+          name="lilyPad"
+          label="Lily Pad"
+          className="h-16 w-16 drop-shadow-[0_3px_0_rgba(6,78,59,0.25)]"
+        />
       </div>
     ) : undefined);
 
@@ -220,7 +279,13 @@ export function SingleRewardCard({
           // Fanned tiles carry their own badges; a card-level count would
           // double up and only describe one of the two prizes.
           ownedCount={
-            fannedRewards ? 0 : rewardType === 'FLIES' ? amount || 0 : 0
+            fannedRewards
+              ? 0
+              : rewardType === 'FLIES' || rewardType === 'SHIELD'
+                ? hideSingleQuantity && Math.max(1, amount ?? 1) === 1
+                  ? 0
+                  : amount || 0
+                : 0
           }
           isEquipped={false}
           canAfford={false}
@@ -229,9 +294,11 @@ export function SingleRewardCard({
           customAction={customAction}
           customPreview={customPreview}
           hidePrice={true}
-          hideRarity={cardType === 'FLIES'} // Hide rarity for flies
+          hideRarity={cardType === 'FLIES' || cardType === 'SHIELD'}
           hideDropRates={hideDropRates}
-          deferPreview={deferPreview && rewardType !== 'FLIES'}
+          deferPreview={
+            deferPreview && rewardType !== 'FLIES' && rewardType !== 'SHIELD'
+          }
           pausePreview={pausePreview && itemDef.slot !== 'container'}
           previewDelayMs={previewDelayMs}
           previewRootMargin={previewRootMargin}
@@ -240,8 +307,9 @@ export function SingleRewardCard({
           previewClassName={cn(
             // The fan positions its own tiles; the single-preview scale/lift
             // would skew the stack.
-            !fannedRewards && 'scale-110',
+            !fannedRewards && cardType !== 'BACKGROUND' && 'scale-110',
             !fannedRewards &&
+              cardType !== 'BACKGROUND' &&
               // Only lift gift boxes; leave frog skins at their default position.
               (itemDef.slot === 'container'
                 ? '-translate-y-[12%]'

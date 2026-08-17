@@ -51,6 +51,15 @@ import type {
 } from '@/lib/quests/types';
 import { SEASON_REWARDS_PER_LANE } from '@/lib/quests/types';
 import {
+  buildSeasonPassLadder,
+  SEASON_PASS_DEFAULTS,
+  SEASON_PASS_LIMITS,
+  SEASON_SKIN_SLOTS,
+  type SeasonPassConfig,
+  type SeasonSkinIds,
+  type SeasonSkinSlot,
+} from '@/lib/quests/seasonLadder';
+import {
   formatQuestObjective,
   type QuestCardLogicBlock,
   type QuestRewardCatalogItem,
@@ -76,20 +85,26 @@ type AdminQuestTemplate = {
 type SeasonSizeKey = 'mobile' | 'tablet' | 'web' | 'webLarge';
 type SeasonImages = Record<SeasonSizeKey, string>;
 
-type AdminQuestSeason = {
+type SeasonTierRow = {
+  tier: number;
+  freeRewards: QuestRewards;
+  premiumRewards: QuestRewards;
+};
+
+type AdminQuestSeason = SeasonPassConfig & {
   id: string;
   name: string;
   images: SeasonImages;
   startsAt: string;
   endsAt: string;
-  dailyTargetFlies: number;
-  dayRewards: Array<{
-    day: number;
-    freeRewards: QuestRewards;
-    premiumRewards: QuestRewards;
-    rewards?: QuestRewards;
-  }>;
+  tierRewards: SeasonTierRow[];
   isActive: boolean;
+};
+
+type AdminSeasonTemplate = SeasonPassConfig & {
+  skinIds: SeasonSkinIds;
+  limits: typeof SEASON_PASS_LIMITS;
+  defaults: SeasonPassConfig;
 };
 
 const emptySeasonImages = (): SeasonImages => ({
@@ -243,28 +258,30 @@ type FormState = {
   isActive: boolean;
 };
 
-type SeasonFormState = {
+type SeasonFormState = SeasonPassConfig & {
   id?: string;
   name: string;
   images: SeasonImages;
   startsAt: string;
   endsAt: string;
-  dailyTargetFlies: number;
-  dayCount: number;
-  dayRewards: Array<{
-    day: number;
-    freeRewards: QuestRewards;
-    premiumRewards: QuestRewards;
-  }>;
+  tierRewards: SeasonTierRow[];
   isActive: boolean;
 };
 
 type SeasonRewardPickerTarget = {
-  day: number;
-  tier: 'free' | 'premium';
+  tier: number;
+  lane: 'free' | 'premium';
 };
 
-type RewardPickerTab = 'flies' | 'item' | 'box' | 'background';
+type RewardPickerTab = 'flies' | 'shield' | 'item' | 'box' | 'background';
+
+const ALL_REWARD_PICKER_TABS = [
+  'flies',
+  'shield',
+  'item',
+  'box',
+  'background',
+] as const satisfies readonly RewardPickerTab[];
 type ConfirmAction =
   | 'save-quest'
   | 'save-season'
@@ -302,19 +319,15 @@ const emptyForm = (): FormState => ({
 
 const emptySeasonForm = (): SeasonFormState => {
   const now = new Date();
-  const end = new Date(now.getTime() + 7 * 86_400_000);
-  const startsAt = toDateTimeLocalValue(now);
-  const endsAt = toDateTimeLocalValue(end);
-  const dayCount = getSeasonDayCountFromLocalValues(startsAt, endsAt);
+  const end = new Date(now.getTime() + 30 * 86_400_000);
   return {
     name: '',
     images: emptySeasonImages(),
-    startsAt,
-    endsAt,
-    dailyTargetFlies: 3,
-    dayCount,
-    dayRewards: buildSeasonDayRewards([], dayCount),
-    isActive: true,
+    startsAt: toDateTimeLocalValue(now),
+    endsAt: toDateTimeLocalValue(end),
+    ...SEASON_PASS_DEFAULTS,
+    tierRewards: buildSeasonPassLadder(SEASON_PASS_DEFAULTS.tierCount),
+    isActive: false,
   };
 };
 
@@ -346,7 +359,7 @@ function isoFromDateTimeLocalValue(value: string) {
   return Number.isFinite(date.getTime()) ? date.toISOString() : value;
 }
 
-function getSeasonDayCountFromLocalValues(startsAt: string, endsAt: string) {
+function seasonSpanDays(startsAt: string, endsAt: string) {
   const start = new Date(startsAt);
   const end = new Date(endsAt);
   if (
@@ -354,30 +367,18 @@ function getSeasonDayCountFromLocalValues(startsAt: string, endsAt: string) {
     !Number.isFinite(end.getTime()) ||
     end <= start
   ) {
-    return 1;
+    return 0;
   }
   return Math.max(1, Math.ceil((end.getTime() - start.getTime()) / 86_400_000));
 }
 
-function buildDefaultSeasonDayReward(
-  day: number,
-): SeasonFormState['dayRewards'][number] {
-  return {
-    day,
-    freeRewards: [{ type: 'FLIES', amountMode: 'fixed', amount: 50 }],
-    premiumRewards: [{ type: 'FLIES', amountMode: 'fixed', amount: 100 }],
-  };
-}
-
-function buildSeasonDayRewards(
-  existingRewards: SeasonFormState['dayRewards'],
-  dayCount: number,
-) {
-  return Array.from({ length: dayCount }, (_, index) => {
-    const day = index + 1;
+/** Resizes the ladder to `tierCount`, keeping whatever the admin already authored. */
+function fitSeasonTierRewards(existing: SeasonTierRow[], tierCount: number) {
+  const fallback = buildSeasonPassLadder(tierCount);
+  return Array.from({ length: tierCount }, (_, index) => {
+    const tier = index + 1;
     return (
-      existingRewards.find((entry) => entry.day === day) ??
-      buildDefaultSeasonDayReward(day)
+      existing.find((entry) => entry.tier === tier) ?? fallback[index]
     );
   });
 }
@@ -421,6 +422,11 @@ function rewardSummary(
       : `${positiveNumber(reward.amount, 1)} flies`;
   }
 
+  if (reward.type === 'SHIELD') {
+    const amount = positiveNumber(reward.amount, 1);
+    return amount > 1 ? `${amount} Lily Pads` : 'Lily Pad';
+  }
+
   const lookupId = reward.itemId ?? reward.backgroundId;
   if (lookupId) {
     const name = rewardCatalog[lookupId]?.name ?? lookupId;
@@ -435,6 +441,7 @@ function rewardSummary(
 
 function rewardKey(reward: QuestReward) {
   if (reward.type === 'FLIES') return 'FLIES';
+  if (reward.type === 'SHIELD') return 'SHIELD';
   return `${reward.type}:${reward.itemId ?? reward.backgroundId ?? ''}`;
 }
 
@@ -442,12 +449,15 @@ function normalizeRewardList(rewards: QuestReward[]) {
   const flies = rewards
     .filter((reward) => reward.type === 'FLIES')
     .slice(0, 1);
+  const shields = rewards
+    .filter((reward) => reward.type === 'SHIELD')
+    .slice(0, 1);
   const items = rewards.filter((reward) => reward.type === 'ITEM' && reward.itemId);
   const boxes = rewards.filter((reward) => reward.type === 'BOX' && reward.itemId);
   const backgrounds = rewards.filter(
     (reward) => reward.type === 'BACKGROUND' && reward.backgroundId,
   );
-  return [...flies, ...items, ...boxes, ...backgrounds];
+  return [...flies, ...shields, ...items, ...boxes, ...backgrounds];
 }
 
 function normalizeSeasonLaneRewards(rewards: QuestReward[]) {
@@ -458,6 +468,7 @@ function rewardTypeLabel(type: QuestRewardType) {
   if (type === 'FLIES') return 'Flies';
   if (type === 'BOX') return 'Box';
   if (type === 'BACKGROUND') return 'Background';
+  if (type === 'SHIELD') return 'Lily Pad';
   return 'Item';
 }
 
@@ -502,13 +513,23 @@ export function AdminQuestManagerPage() {
   const [sweepConfig, setSweepConfig] = useState<AdminSweepConfig | null>(null);
   const [savingStreak, setSavingStreak] = useState(false);
 
-  // Automatic monthly season config
-  const [seasonAutoConfig, setSeasonAutoConfig] = useState<{
-    isActive: boolean;
-    dailyTargetFlies: number;
-    limits: { min: number; max: number };
-  } | null>(null);
-  const [savingSeasonAuto, setSavingSeasonAuto] = useState(false);
+  // Season generator: saved template defaults + the dates for the next season
+  const [seasonTemplate, setSeasonTemplate] =
+    useState<AdminSeasonTemplate | null>(null);
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  const [seasonSkinSlot, setSeasonSkinSlot] = useState<SeasonSkinSlot | null>(
+    null,
+  );
+  const [generating, setGenerating] = useState(false);
+  const [generatorForm, setGeneratorForm] = useState(() => {
+    const now = new Date();
+    return {
+      name: '',
+      startsAt: toDateTimeLocalValue(now),
+      endsAt: toDateTimeLocalValue(new Date(now.getTime() + 30 * 86_400_000)),
+      isActive: false,
+    };
+  });
 
   // Move to web config
   const [moveToWebConfig, setMoveToWebConfig] = useState<{
@@ -558,7 +579,7 @@ export function AdminQuestManagerPage() {
     setLoading(true);
     setResult(null);
     try {
-      const [templatesRes, metaRes, categoriesRes, seasonsRes, recipesRes, streakRes, loginStreakRes, moveToWebRes, seasonAutoRes, shieldsRes] = await Promise.all([
+      const [templatesRes, metaRes, categoriesRes, seasonsRes, recipesRes, streakRes, loginStreakRes, moveToWebRes, seasonTemplateRes, shieldsRes] = await Promise.all([
         fetch('/api/admin/quests', { credentials: 'include' }),
         fetch('/api/admin/quests/meta', { credentials: 'include' }),
         fetch('/api/admin/quests/categories', { credentials: 'include' }),
@@ -567,7 +588,7 @@ export function AdminQuestManagerPage() {
         fetch('/api/admin/quests/streak', { credentials: 'include' }),
         fetch('/api/admin/streak/login', { credentials: 'include' }),
         fetch('/api/admin/quests/move-to-web', { credentials: 'include' }),
-        fetch('/api/admin/quests/seasons/auto', { credentials: 'include' }),
+        fetch('/api/admin/quests/seasons/template', { credentials: 'include' }),
         fetch('/api/admin/shields', { credentials: 'include' }),
       ]);
       const templatesData = await templatesRes.json();
@@ -598,9 +619,9 @@ export function AdminQuestManagerPage() {
       if (moveToWebRes.ok && moveToWebData.moveToWeb) {
         setMoveToWebConfig(moveToWebData.moveToWeb);
       }
-      const seasonAutoData = await seasonAutoRes.json();
-      if (seasonAutoRes.ok && seasonAutoData.seasonAuto) {
-        setSeasonAutoConfig(seasonAutoData.seasonAuto);
+      const seasonTemplateData = await seasonTemplateRes.json();
+      if (seasonTemplateRes.ok && seasonTemplateData.template) {
+        setSeasonTemplate(seasonTemplateData.template);
       }
       const shieldsData = await shieldsRes.json();
       if (shieldsRes.ok && shieldsData.shields) {
@@ -846,18 +867,28 @@ export function AdminQuestManagerPage() {
     setView('form');
   };
 
-  const setSeasonDateField = (field: 'startsAt' | 'endsAt', value: string) => {
+  const setSeasonPassField = <K extends keyof SeasonPassConfig>(
+    key: K,
+    value: SeasonPassConfig[K],
+  ) => {
     setSeasonForm((prev) => {
-      const startsAt = field === 'startsAt' ? value : prev.startsAt;
-      const endsAt = field === 'endsAt' ? value : prev.endsAt;
-      const dayCount = getSeasonDayCountFromLocalValues(startsAt, endsAt);
-      return {
-        ...prev,
-        [field]: value,
-        dayCount,
-        dayRewards: buildSeasonDayRewards(prev.dayRewards, dayCount),
-      };
+      const next = { ...prev, [key]: value };
+      if (key === 'tierCount') {
+        next.tierRewards = fitSeasonTierRewards(
+          prev.tierRewards,
+          value as number,
+        );
+      }
+      return next;
     });
+  };
+
+  const clampPassNumber = (
+    key: keyof typeof SEASON_PASS_LIMITS,
+    raw: string,
+  ) => {
+    const { min, max } = SEASON_PASS_LIMITS[key];
+    return Math.min(max, Math.max(min, Math.floor(Number(raw) || min)));
   };
 
   const startEditingSeason = (season?: AdminQuestSeason) => {
@@ -866,27 +897,29 @@ export function AdminQuestManagerPage() {
       setView('season');
       return;
     }
-    const startsAt = isoToDateTimeLocalValue(season.startsAt);
-    const endsAt = isoToDateTimeLocalValue(season.endsAt);
-    const dayCount = getSeasonDayCountFromLocalValues(startsAt, endsAt);
-    const dayRewards = buildSeasonDayRewards(
-      season.dayRewards.map((entry) => ({
-        day: entry.day,
-        freeRewards: normalizeRewardList(entry.freeRewards ?? entry.rewards ?? []),
+    const tierRewards = fitSeasonTierRewards(
+      (season.tierRewards ?? []).map((entry) => ({
+        tier: entry.tier,
+        freeRewards: normalizeRewardList(entry.freeRewards ?? []),
         premiumRewards: normalizeRewardList(entry.premiumRewards ?? []),
       })),
-      dayCount,
+      season.tierCount,
     );
 
     setSeasonForm({
       id: season.id,
       name: season.name,
       images: { ...emptySeasonImages(), ...(season.images ?? {}) },
-      startsAt,
-      endsAt,
-      dailyTargetFlies: season.dailyTargetFlies,
-      dayCount,
-      dayRewards,
+      startsAt: isoToDateTimeLocalValue(season.startsAt),
+      endsAt: isoToDateTimeLocalValue(season.endsAt),
+      tierCount: season.tierCount,
+      tasksPerStep: season.tasksPerStep,
+      stepsPerTier: season.stepsPerTier,
+      maxStepsPerDay: season.maxStepsPerDay,
+      tierSkipCost: season.tierSkipCost,
+      graceHours: season.graceHours,
+      graceMode: season.graceMode,
+      tierRewards,
       isActive: season.isActive,
     });
     setResult(null);
@@ -1141,7 +1174,7 @@ export function AdminQuestManagerPage() {
           <ChevronRight className="h-5 w-5 text-muted-foreground/30 transition group-hover:translate-x-0.5 group-hover:text-muted-foreground" />
         </div>
         <p className="mt-5 text-lg font-black text-foreground">Season</p>
-        <p className="mt-1 text-sm text-muted-foreground">Configure the banner, timer, daily goal, and day prizes.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Generate a season pass, tune its pacing, and edit every tier.</p>
         <p className="mt-4 text-3xl font-black text-foreground">{seasons.length}</p>
         <p className="text-xs text-muted-foreground">season{seasons.length !== 1 ? 's' : ''}</p>
       </button>
@@ -2948,120 +2981,451 @@ export function AdminQuestManagerPage() {
   );
 
   // ── Interactive preview-centered quest editor ─────────────────────────────
-  const saveSeasonAutoConfig = async () => {
-    if (!seasonAutoConfig) return;
-    setSavingSeasonAuto(true);
+  const saveSeasonTemplate = async () => {
+    if (!seasonTemplate) return;
+    setSavingTemplate(true);
     setResult(null);
     try {
-      const res = await fetch('/api/admin/quests/seasons/auto', {
+      const res = await fetch('/api/admin/quests/seasons/template', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
+        body: JSON.stringify(seasonTemplate),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not save the template');
+      setSeasonTemplate(data.template);
+      setResult({ type: 'success', message: 'Season template saved' });
+    } catch (error) {
+      setResult({
+        type: 'error',
+        message:
+          error instanceof Error ? error.message : 'Could not save the template',
+      });
+    } finally {
+      setSavingTemplate(false);
+    }
+  };
+
+  const generateSeason = async () => {
+    setGenerating(true);
+    setResult(null);
+    try {
+      const res = await fetch('/api/admin/quests/seasons/template', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
-          isActive: seasonAutoConfig.isActive,
-          dailyTargetFlies: seasonAutoConfig.dailyTargetFlies,
+          ...generatorForm,
+          startsAt: isoFromDateTimeLocalValue(generatorForm.startsAt),
+          endsAt: isoFromDateTimeLocalValue(generatorForm.endsAt),
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Could not save automatic seasons');
-      setSeasonAutoConfig(data.seasonAuto);
-      setResult({ type: 'success', message: 'Automatic seasons saved' });
+      if (!res.ok) throw new Error(data.error || 'Could not generate the season');
+      await loadData();
+      if (data.season) startEditingSeason(data.season);
+      setResult({
+        type: 'success',
+        message: `Generated "${data.season?.name}" — edit any tier below, then save.`,
+      });
     } catch (error) {
       setResult({
         type: 'error',
         message:
           error instanceof Error
             ? error.message
-            : 'Could not save automatic seasons',
+            : 'Could not generate the season',
       });
     } finally {
-      setSavingSeasonAuto(false);
+      setGenerating(false);
     }
   };
 
-  const renderSeasonAutoCard = () => {
-    if (!seasonAutoConfig) return null;
+  const setTemplateNumber = (
+    key: keyof typeof SEASON_PASS_LIMITS,
+    raw: string,
+  ) =>
+    setSeasonTemplate((prev) =>
+      prev ? { ...prev, [key]: clampPassNumber(key, raw) } : prev,
+    );
+
+  const renderSeasonGeneratorCard = () => {
+    if (!seasonTemplate) return null;
+    const span = seasonSpanDays(
+      generatorForm.startsAt,
+      generatorForm.endsAt,
+    );
+    // How long the ladder takes at the honest pace: one step a day, or two if
+    // they double up. Anything shorter than the slow lane and the finale is out
+    // of reach for a daily player.
+    const slowDays = Math.ceil(
+      (seasonTemplate.tierCount * seasonTemplate.stepsPerTier) / 1,
+    );
+    const fastDays = Math.ceil(
+      (seasonTemplate.tierCount * seasonTemplate.stepsPerTier) /
+        seasonTemplate.maxStepsPerDay,
+    );
+
     return (
-      <div className="rounded-2xl border border-border/40 bg-card/60 px-4 py-3.5">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-sm font-bold text-foreground">
-              Automatic monthly seasons
-            </p>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              Every calendar month gets its own season with the standard prize
-              ladder — gifts every 5th day, a finale on the last day. This takes
-              over the dates and prizes, switching off any season you made by
-              hand. You can still edit each month&apos;s prizes after it starts.
-            </p>
-          </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={seasonAutoConfig.isActive}
-            onClick={() =>
-              setSeasonAutoConfig((prev) =>
-                prev ? { ...prev, isActive: !prev.isActive } : prev,
-              )
-            }
-            className={cn(
-              'relative h-6 w-11 shrink-0 rounded-full transition-colors',
-              seasonAutoConfig.isActive ? 'bg-emerald-500' : 'bg-muted',
-            )}
-          >
-            <span
-              className={cn(
-                'absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform',
-                seasonAutoConfig.isActive
-                  ? 'translate-x-[22px]'
-                  : 'translate-x-0.5',
-              )}
-            />
-          </button>
+      <div className="rounded-[28px] border border-border/50 bg-card p-4 shadow-sm">
+        <div className="mb-4">
+          <h2 className="text-lg font-black text-foreground">
+            Generate a season
+          </h2>
+          <p className="text-xs text-muted-foreground">
+            Builds the full {seasonTemplate.tierCount}-tier ladder from the
+            template below on the dates you pick. Nothing goes live until you
+            switch it on.
+          </p>
         </div>
 
-        <div className="mt-4 flex flex-wrap items-end gap-4">
-          <label className="block">
-            <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-              Daily target (flies)
+        <div className="grid gap-3 md:grid-cols-2">
+          <label className="grid gap-1.5 md:col-span-2">
+            <span className="text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+              Season name
             </span>
             <input
-              type="number"
-              min={seasonAutoConfig.limits.min}
-              max={seasonAutoConfig.limits.max}
-              value={seasonAutoConfig.dailyTargetFlies}
-              onChange={(e) =>
-                setSeasonAutoConfig((prev) =>
-                  prev
-                    ? {
-                        ...prev,
-                        dailyTargetFlies: Math.min(
-                          prev.limits.max,
-                          Math.max(
-                            prev.limits.min,
-                            Math.floor(Number(e.target.value) || prev.limits.min),
-                          ),
-                        ),
-                      }
-                    : prev,
-                )
+              value={generatorForm.name}
+              onChange={(event) =>
+                setGeneratorForm((prev) => ({
+                  ...prev,
+                  name: event.target.value,
+                }))
               }
-              className="mt-1 block h-10 w-28 rounded-xl border border-border/50 bg-background px-3 text-sm font-bold text-foreground"
+              placeholder="Autumn Pond"
+              className="h-11 rounded-2xl border border-border bg-background px-4 text-sm"
             />
-            <span className="mt-1 block text-[10px] text-muted-foreground">
-              {seasonAutoConfig.limits.min}–{seasonAutoConfig.limits.max} flies
-            </span>
           </label>
+          <label className="grid gap-1.5">
+            <span className="text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+              Starts at
+            </span>
+            <input
+              type="datetime-local"
+              value={generatorForm.startsAt}
+              onChange={(event) =>
+                setGeneratorForm((prev) => ({
+                  ...prev,
+                  startsAt: event.target.value,
+                }))
+              }
+              className="h-11 rounded-2xl border border-border bg-background px-4 text-sm"
+            />
+          </label>
+          <label className="grid gap-1.5">
+            <span className="text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+              Ends at
+            </span>
+            <input
+              type="datetime-local"
+              value={generatorForm.endsAt}
+              onChange={(event) =>
+                setGeneratorForm((prev) => ({
+                  ...prev,
+                  endsAt: event.target.value,
+                }))
+              }
+              className="h-11 rounded-2xl border border-border bg-background px-4 text-sm"
+            />
+          </label>
+        </div>
 
-          <div className="min-w-0 flex-1" />
-
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <label className="flex flex-1 items-center gap-2 rounded-2xl border border-border/50 bg-background/80 px-4 py-3 text-sm font-bold text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={generatorForm.isActive}
+              onChange={(event) =>
+                setGeneratorForm((prev) => ({
+                  ...prev,
+                  isActive: event.target.checked,
+                }))
+              }
+              className="h-4 w-4"
+            />
+            Go live as soon as the start date passes
+          </label>
           <Button
             size="sm"
-            className="rounded-xl font-black"
-            onClick={() => void saveSeasonAutoConfig()}
-            disabled={savingSeasonAuto}
+            className="h-11 rounded-xl font-black"
+            onClick={() => void generateSeason()}
+            disabled={generating || !generatorForm.name.trim()}
           >
-            {savingSeasonAuto ? 'Saving…' : 'Save automatic seasons'}
+            {generating ? 'Generating…' : 'Generate season'}
+          </Button>
+        </div>
+
+        <p
+          className={cn(
+            'mt-3 rounded-xl px-3 py-2 text-[11px] font-bold',
+            span > 0 && span < fastDays
+              ? 'bg-red-500/10 text-red-600 dark:text-red-400'
+              : span > 0 && span < slowDays
+                ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                : 'bg-muted/50 text-muted-foreground',
+          )}
+        >
+          {span === 0
+            ? 'Pick an end date after the start date.'
+            : `${span} day${span === 1 ? '' : 's'} long · a steady player finishes in ${slowDays}, someone banking both steps every day in ${fastDays}.` +
+              (span < fastDays
+                ? ' Nobody can reach the finale in this window.'
+                : span < slowDays
+                  ? ' Only players who double up daily will finish.'
+                  : '')}
+        </p>
+      </div>
+    );
+  };
+
+  const renderSeasonTemplateCard = () => {
+    if (!seasonTemplate) return null;
+
+    const numberField = (
+      key: keyof typeof SEASON_PASS_LIMITS,
+      label: string,
+      hint: string,
+    ) => (
+      <label key={key} className="grid gap-1.5">
+        <span className="text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+          {label}
+        </span>
+        <input
+          type="number"
+          min={SEASON_PASS_LIMITS[key].min}
+          max={SEASON_PASS_LIMITS[key].max}
+          value={seasonTemplate[key]}
+          onChange={(event) => setTemplateNumber(key, event.target.value)}
+          className="h-11 rounded-2xl border border-border bg-background px-4 text-sm font-bold"
+        />
+        <span className="text-[10px] leading-snug text-muted-foreground">
+          {hint}
+        </span>
+      </label>
+    );
+
+    return (
+      <div className="rounded-[28px] border border-border/50 bg-card p-4 shadow-sm">
+        <div className="mb-4">
+          <h2 className="text-lg font-black text-foreground">
+            Template defaults
+          </h2>
+          <p className="text-xs text-muted-foreground">
+            What the generator starts from. A generated season copies these, so
+            changing them here never rewrites a season already running.
+          </p>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {numberField('tierCount', 'Tiers', 'Rungs on the ladder.')}
+          {numberField(
+            'tasksPerStep',
+            'Tasks per step',
+            'Completed tasks that earn one Season Step.',
+          )}
+          {numberField(
+            'stepsPerTier',
+            'Steps per tier',
+            'Steps needed to advance one tier.',
+          )}
+          {numberField(
+            'maxStepsPerDay',
+            'Steps bankable per day',
+            'The daily ceiling — a huge day cannot burn the whole pass.',
+          )}
+          {numberField(
+            'tierSkipCost',
+            'Tier skip (flies)',
+            'Price of buying one tier. 0 turns the skip off.',
+          )}
+          {numberField(
+            'graceHours',
+            'Grace window (hours)',
+            'How long after the end date an unfinished pass stays open.',
+          )}
+        </div>
+
+        <div className="mt-4 grid gap-2">
+          <span className="text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+            What the grace window allows
+          </span>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {(
+              [
+                {
+                  value: 'climb' as const,
+                  title: 'Keep climbing',
+                  body: 'Tasks credit the old season and the new one at the same time, so someone stuck at tier 27 can finish without falling behind on the next pass.',
+                },
+                {
+                  value: 'claim' as const,
+                  title: 'Collect only',
+                  body: 'The ladder freezes where it stopped; the window exists only to collect tiers already reached.',
+                },
+              ]
+            ).map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() =>
+                  setSeasonTemplate((prev) =>
+                    prev ? { ...prev, graceMode: option.value } : prev,
+                  )
+                }
+                className={cn(
+                  'rounded-2xl border p-3 text-left transition',
+                  seasonTemplate.graceMode === option.value
+                    ? 'border-primary/50 bg-primary/5'
+                    : 'border-border/40 bg-background/70 hover:border-primary/30',
+                )}
+              >
+                <p className="text-xs font-black text-foreground">
+                  {option.title}
+                </p>
+                <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+                  {option.body}
+                </p>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-2">
+          <span className="text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+            Season skins
+          </span>
+          <p className="text-[11px] text-muted-foreground">
+            The six &ldquo;new skin&rdquo; rungs. Leave one empty and that rung
+            pays an Amazing Gift instead.
+          </p>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {SEASON_SKIN_SLOTS.map((slot) => {
+              const itemId = seasonTemplate.skinIds[slot.key];
+              const item = itemId ? rewardCatalog[itemId] : undefined;
+              return (
+                <div
+                  key={slot.key}
+                  className="rounded-2xl border border-border/40 bg-background/70 p-3"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] font-black uppercase tracking-wide text-muted-foreground">
+                      Tier {slot.tier}
+                    </span>
+                    <span
+                      className={cn(
+                        'rounded-md px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide',
+                        slot.lane === 'free'
+                          ? 'bg-primary/10 text-primary'
+                          : 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
+                      )}
+                    >
+                      {slot.lane === 'free' ? 'Free' : 'Plus'}
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setSeasonSkinSlot(slot.key)}
+                    className="mt-2 flex w-full items-center gap-3 rounded-xl border border-border/40 bg-card px-2.5 py-2 text-left transition hover:border-primary/30 hover:bg-primary/5"
+                  >
+                    {item ? (
+                      <RewardTile
+                        reward={{ type: 'ITEM', itemId }}
+                        rewardCatalog={rewardCatalog}
+                        isPremium={false}
+                        compact
+                        className="h-14 w-14 shrink-0 rounded-xl"
+                      />
+                    ) : (
+                      <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border-2 border-dashed border-border text-muted-foreground/60">
+                        <Plus className="h-5 w-5" />
+                      </span>
+                    )}
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-xs font-black text-foreground">
+                        {item?.name ?? 'Amazing Gift instead'}
+                      </span>
+                      <span className="mt-0.5 block truncate text-[11px] font-bold capitalize text-muted-foreground">
+                        {item ? item.rarity : `Suggested: ${slot.rarity}`}
+                      </span>
+                    </span>
+                  </button>
+
+                  {item && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSeasonTemplate((prev) =>
+                          prev
+                            ? {
+                                ...prev,
+                                skinIds: { ...prev.skinIds, [slot.key]: undefined },
+                              }
+                            : prev,
+                        )
+                      }
+                      className="mt-1.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground transition hover:text-red-500"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <RewardPickerDialog
+          open={seasonSkinSlot !== null}
+          onOpenChange={(isOpen) => {
+            if (!isOpen) setSeasonSkinSlot(null);
+          }}
+          title="Pick the season skin"
+          description="One outfit for this rung. Whichever you pick shows on the pass as the season's new skin."
+          tabs={['item']}
+          singleSelect
+          rewards={
+            seasonSkinSlot && seasonTemplate.skinIds[seasonSkinSlot]
+              ? [
+                  {
+                    type: 'ITEM',
+                    itemId: seasonTemplate.skinIds[seasonSkinSlot],
+                  },
+                ]
+              : []
+          }
+          rewardItems={rewardItems}
+          rewardCatalog={rewardCatalog}
+          onSave={(rewards) => {
+            if (!seasonSkinSlot) return;
+            const picked = rewards.find(
+              (reward) => reward.type === 'ITEM' && reward.itemId,
+            );
+            setSeasonTemplate((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    skinIds: {
+                      ...prev.skinIds,
+                      [seasonSkinSlot]: picked?.itemId,
+                    },
+                  }
+                : prev,
+            );
+            setSeasonSkinSlot(null);
+          }}
+        />
+
+        <div className="mt-4 flex justify-end">
+          <Button
+            size="sm"
+            variant="outline"
+            className="rounded-xl font-black"
+            onClick={() => void saveSeasonTemplate()}
+            disabled={savingTemplate}
+          >
+            {savingTemplate ? 'Saving…' : 'Save template'}
           </Button>
         </div>
       </div>
@@ -3069,15 +3433,15 @@ export function AdminQuestManagerPage() {
   };
 
   const renderSeason = () => {
-    const selectedDayRewards =
+    const selectedLaneRewards =
       seasonRewardPickerTarget === null
         ? []
-        : seasonRewardPickerTarget.tier === 'free'
-          ? seasonForm.dayRewards.find(
-              (entry) => entry.day === seasonRewardPickerTarget.day,
+        : seasonRewardPickerTarget.lane === 'free'
+          ? seasonForm.tierRewards.find(
+              (entry) => entry.tier === seasonRewardPickerTarget.tier,
             )?.freeRewards ?? []
-          : seasonForm.dayRewards.find(
-              (entry) => entry.day === seasonRewardPickerTarget.day,
+          : seasonForm.tierRewards.find(
+              (entry) => entry.tier === seasonRewardPickerTarget.tier,
             )?.premiumRewards ?? [];
 
     return (
@@ -3100,7 +3464,8 @@ export function AdminQuestManagerPage() {
           </div>
         )}
 
-        {renderSeasonAutoCard()}
+        {renderSeasonGeneratorCard()}
+        {renderSeasonTemplateCard()}
 
         <div className="overflow-hidden rounded-[28px] border border-border/50 bg-card shadow-sm">
           <div className="relative h-[260px] overflow-hidden">
@@ -3123,7 +3488,7 @@ export function AdminQuestManagerPage() {
             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-transparent" />
             <div className="absolute inset-x-0 top-0 z-20 flex items-center justify-between gap-3 p-4">
               <span className="rounded-full border border-white/20 bg-black/35 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.16em] text-white backdrop-blur-md">
-                {seasonForm.dayCount} days
+                {seasonForm.tierCount} tiers
               </span>
               <span className="rounded-full bg-black/50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-white/80 backdrop-blur-sm">
                 Upload images below
@@ -3139,7 +3504,9 @@ export function AdminQuestManagerPage() {
                 className="w-full bg-transparent text-4xl font-black tracking-tight text-white placeholder-white/50 outline-none drop-shadow-[0_4px_18px_rgba(0,0,0,0.45)]"
               />
               <p className="mt-2 text-sm font-bold uppercase tracking-[0.16em] text-white/75">
-                Unlock Day 1
+                {seasonForm.tasksPerStep} tasks = 1 step ·{' '}
+                {seasonForm.stepsPerTier} step
+                {seasonForm.stepsPerTier === 1 ? '' : 's'} = 1 tier
               </p>
             </div>
           </div>
@@ -3153,7 +3520,10 @@ export function AdminQuestManagerPage() {
                 type="datetime-local"
                 value={seasonForm.startsAt}
                 onChange={(event) =>
-                  setSeasonDateField('startsAt', event.target.value)
+                  setSeasonForm((prev) => ({
+                    ...prev,
+                    startsAt: event.target.value,
+                  }))
                 }
                 className="h-11 rounded-2xl border border-border bg-background px-4 text-sm"
               />
@@ -3166,35 +3536,61 @@ export function AdminQuestManagerPage() {
                 type="datetime-local"
                 value={seasonForm.endsAt}
                 onChange={(event) =>
-                  setSeasonDateField('endsAt', event.target.value)
-                }
-                className="h-11 rounded-2xl border border-border bg-background px-4 text-sm"
-              />
-            </label>
-            <label className="grid gap-2">
-              <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
-                Goal Flies Per Day
-              </span>
-              <input
-                type="number"
-                min={1}
-                value={seasonForm.dailyTargetFlies}
-                onChange={(event) =>
                   setSeasonForm((prev) => ({
                     ...prev,
-                    dailyTargetFlies: Math.max(1, Number(event.target.value) || 1),
+                    endsAt: event.target.value,
                   }))
                 }
                 className="h-11 rounded-2xl border border-border bg-background px-4 text-sm"
               />
             </label>
-            <label className="grid gap-2">
+            {(
+              [
+                ['tierCount', 'Tiers'],
+                ['tasksPerStep', 'Tasks per step'],
+                ['stepsPerTier', 'Steps per tier'],
+                ['maxStepsPerDay', 'Steps bankable per day'],
+                ['tierSkipCost', 'Tier skip (flies)'],
+                ['graceHours', 'Grace window (hours)'],
+              ] as Array<[keyof typeof SEASON_PASS_LIMITS, string]>
+            ).map(([key, label]) => (
+              <label key={key} className="grid gap-2">
+                <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
+                  {label}
+                </span>
+                <input
+                  type="number"
+                  min={SEASON_PASS_LIMITS[key].min}
+                  max={SEASON_PASS_LIMITS[key].max}
+                  value={seasonForm[key]}
+                  onChange={(event) =>
+                    setSeasonPassField(key, clampPassNumber(key, event.target.value))
+                  }
+                  className="h-11 rounded-2xl border border-border bg-background px-4 text-sm"
+                />
+              </label>
+            ))}
+            <label className="grid gap-2 md:col-span-2">
               <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
-                Event Days
+                Grace window behaviour
               </span>
-              <div className="flex h-11 items-center rounded-2xl border border-border bg-muted/40 px-4 text-sm font-bold text-foreground">
-                {seasonForm.dayCount}
-              </div>
+              <select
+                value={seasonForm.graceMode}
+                onChange={(event) =>
+                  setSeasonPassField(
+                    'graceMode',
+                    event.target.value === 'claim' ? 'claim' : 'climb',
+                  )
+                }
+                className="h-11 rounded-2xl border border-border bg-background px-4 text-sm"
+              >
+                <option value="climb">
+                  Keep climbing — tasks credit this season and the next one
+                </option>
+                <option value="claim">
+                  Collect only — the ladder freezes where it stopped
+                </option>
+              </select>
             </label>
             <label className="flex items-center gap-2 rounded-2xl border border-border/50 bg-background/80 px-4 py-3 text-sm font-bold text-muted-foreground md:col-span-2">
               <input
@@ -3234,46 +3630,71 @@ export function AdminQuestManagerPage() {
 
         <div className="rounded-[28px] border border-border/50 bg-card p-4 shadow-sm">
           <div className="mb-4">
-            <h2 className="text-lg font-black text-foreground">Day Prizes</h2>
-            <p className="text-xs text-muted-foreground">
-              Pick the reward shown for each event day.
-            </p>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-black text-foreground">
+                  Tier prizes
+                </h2>
+                <p className="text-xs text-muted-foreground">
+                  Both lanes of every rung. Plus is additional, never a
+                  multiplier on the free column.
+                </p>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="shrink-0 rounded-xl text-xs font-black"
+                onClick={() =>
+                  setSeasonForm((prev) => ({
+                    ...prev,
+                    tierRewards: buildSeasonPassLadder(
+                      prev.tierCount,
+                      seasonTemplate?.skinIds ?? {},
+                    ),
+                  }))
+                }
+              >
+                Reset to template
+              </Button>
+            </div>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            {seasonForm.dayRewards.map((entry) => (
+            {seasonForm.tierRewards.map((entry) => (
               <div
-                key={entry.day}
+                key={entry.tier}
                 className="rounded-2xl border border-border/50 bg-background/70 p-3"
               >
                 <div className="mb-3 flex items-center gap-3">
                   <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-sm font-black text-primary">
-                    D{entry.day}
+                    T{entry.tier}
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-black text-foreground">
-                      Day {entry.day}
+                      Tier {entry.tier}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Free + premium prizes
+                      {entry.tier === seasonForm.tierCount
+                        ? 'Finale'
+                        : `Reached at ${entry.tier * seasonForm.stepsPerTier} step${entry.tier * seasonForm.stepsPerTier === 1 ? '' : 's'}`}
                     </p>
                   </div>
                 </div>
                 <div className="grid gap-2">
-                  {(['free', 'premium'] as const).map((tier) => {
+                  {(['free', 'premium'] as const).map((lane) => {
                     const rewards =
-                      tier === 'free' ? entry.freeRewards : entry.premiumRewards;
+                      lane === 'free' ? entry.freeRewards : entry.premiumRewards;
                     return (
                       <button
-                        key={`${entry.day}-${tier}`}
+                        key={`${entry.tier}-${lane}`}
                         type="button"
                         onClick={() =>
-                          setSeasonRewardPickerTarget({ day: entry.day, tier })
+                          setSeasonRewardPickerTarget({ tier: entry.tier, lane })
                         }
                         className="flex items-center gap-2 rounded-xl border border-border/40 bg-card px-3 py-2 text-left transition hover:border-primary/30 hover:bg-primary/5"
                       >
                         <div className="min-w-0 flex-1">
                           <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">
-                            {tier === 'free' ? 'Free' : 'Premium'}
+                            {lane === 'free' ? 'Free' : 'Plus'}
                           </p>
                           <p className="text-xs text-muted-foreground">
                             {rewards.length === 0
@@ -3284,7 +3705,7 @@ export function AdminQuestManagerPage() {
                         <div className="flex shrink-0 -space-x-2">
                           {rewards.slice(0, SEASON_REWARDS_PER_LANE).map((reward, index) => (
                             <RewardTile
-                              key={`${entry.day}-${tier}-${reward.type}-${reward.itemId ?? reward.amount ?? index}`}
+                              key={`${entry.tier}-${lane}-${index}`}
                               reward={reward}
                               rewardCatalog={rewardCatalog}
                               isPremium={false}
@@ -3326,7 +3747,7 @@ export function AdminQuestManagerPage() {
               setConfirmSeasonPrizeSave(false);
             }
           }}
-          rewards={selectedDayRewards}
+          rewards={selectedLaneRewards}
           rewardItems={rewardItems}
           rewardCatalog={rewardCatalog}
           maxSelect={SEASON_REWARDS_PER_LANE}
@@ -3337,11 +3758,11 @@ export function AdminQuestManagerPage() {
             const nextRewards = normalizeSeasonLaneRewards(rewards);
             setSeasonForm((prev) => ({
               ...prev,
-              dayRewards: prev.dayRewards.map((entry) =>
-                entry.day === seasonRewardPickerTarget.day
+              tierRewards: prev.tierRewards.map((entry) =>
+                entry.tier === seasonRewardPickerTarget.tier
                   ? {
                       ...entry,
-                      [seasonRewardPickerTarget.tier === 'free'
+                      [seasonRewardPickerTarget.lane === 'free'
                         ? 'freeRewards'
                         : 'premiumRewards']: nextRewards,
                     }
@@ -4399,6 +4820,9 @@ function RewardPickerDialog({
   rewardCatalog,
   singleSelect = false,
   maxSelect,
+  tabs = ALL_REWARD_PICKER_TABS,
+  title,
+  description,
   confirmSave = false,
   onRequestConfirmSave,
   onSave,
@@ -4411,6 +4835,10 @@ function RewardPickerDialog({
   singleSelect?: boolean;
   /** Cap the selection at N rewards; picking past the cap replaces the oldest. */
   maxSelect?: number;
+  /** Narrow the picker to specific kinds — a skin slot only wants outfits. */
+  tabs?: readonly RewardPickerTab[];
+  title?: string;
+  description?: string;
   confirmSave?: boolean;
   onRequestConfirmSave?: () => void;
   onSave: (rewards: QuestReward[]) => void;
@@ -4420,7 +4848,9 @@ function RewardPickerDialog({
     Number.isFinite(selectLimit)
       ? normalizeRewardList(list).slice(0, selectLimit)
       : normalizeRewardList(list);
-  const [activeTab, setActiveTab] = useState<RewardPickerTab>('flies');
+  const [activeTab, setActiveTab] = useState<RewardPickerTab>(
+    () => tabs[0] ?? 'flies',
+  );
   const [draft, setDraft] = useState<QuestReward[]>(() =>
     normalizeRewardList(rewards),
   );
@@ -4428,10 +4858,14 @@ function RewardPickerDialog({
   useEffect(() => {
     if (!open) return;
     setDraft(normalizeCapped(rewards));
+    setActiveTab((current) =>
+      tabs.includes(current) ? current : tabs[0] ?? 'flies',
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, rewards, selectLimit]);
 
   const fliesReward = draft.find((reward) => reward.type === 'FLIES');
+  const shieldReward = draft.find((reward) => reward.type === 'SHIELD');
   const itemOptions = rewardItems.filter(
     (item) => item.slot !== 'container' && item.slot !== 'background',
   );
@@ -4456,6 +4890,29 @@ function RewardPickerDialog({
     setDraft((current) =>
       current.map((reward) =>
         reward.type === 'FLIES' ? { ...reward, ...patch } : reward,
+      ),
+    );
+  };
+
+  const toggleShieldReward = () => {
+    setDraft((current) => {
+      if (current.some((reward) => reward.type === 'SHIELD')) {
+        return current.filter((reward) => reward.type !== 'SHIELD');
+      }
+      const next: QuestReward[] = [
+        ...current,
+        { type: 'SHIELD', amount: 1, amountMode: 'fixed' },
+      ];
+      return Number.isFinite(selectLimit)
+        ? next.slice(Math.max(0, next.length - selectLimit))
+        : next;
+    });
+  };
+
+  const patchShieldReward = (amount: number) => {
+    setDraft((current) =>
+      current.map((reward) =>
+        reward.type === 'SHIELD' ? { ...reward, amount } : reward,
       ),
     );
   };
@@ -4529,17 +4986,23 @@ function RewardPickerDialog({
         <div className="border-b border-border/50 bg-card/95 px-6 py-5">
           <DialogHeader className="mb-0">
             <DialogTitle className="text-2xl font-black">
-              Reward Picker
+              {title ?? 'Reward Picker'}
             </DialogTitle>
             <DialogDescription>
-              Select multiple rewards from flies, items, and boxes. Fly and box rewards support amounts. Item rewards grant one copy each.
+              {description ??
+                'Select multiple rewards from flies, items, and boxes. Fly and box rewards support amounts. Item rewards grant one copy each.'}
             </DialogDescription>
           </DialogHeader>
         </div>
 
         <div className="max-h-[75vh] overflow-y-auto px-6 py-5">
-          <div className="mb-5 flex flex-wrap gap-2">
-            {(['flies', 'item', 'box', 'background'] as const).map((tab) => (
+          <div
+            className={cn(
+              'mb-5 flex-wrap gap-2',
+              tabs.length > 1 ? 'flex' : 'hidden',
+            )}
+          >
+            {tabs.map((tab) => (
               <button
                 key={tab}
                 type="button"
@@ -4553,11 +5016,13 @@ function RewardPickerDialog({
               >
                 {tab === 'flies'
                   ? 'Flies'
-                  : tab === 'item'
-                    ? 'Items'
-                    : tab === 'box'
-                      ? 'Boxes'
-                      : 'Backgrounds'}
+                  : tab === 'shield'
+                    ? 'Lily Pads'
+                    : tab === 'item'
+                      ? 'Items'
+                      : tab === 'box'
+                        ? 'Boxes'
+                        : 'Backgrounds'}
               </button>
             ))}
           </div>
@@ -4596,7 +5061,56 @@ function RewardPickerDialog({
             )}
           </div>
 
-          {activeTab === 'flies' ? (
+          {activeTab === 'shield' ? (
+            <div className="space-y-4">
+              <button
+                type="button"
+                onClick={toggleShieldReward}
+                className={cn(
+                  'flex w-full items-center gap-4 rounded-[26px] border p-4 text-left transition',
+                  shieldReward
+                    ? 'border-primary/30 bg-primary/10'
+                    : 'border-border/50 bg-background/70 hover:bg-muted/40',
+                )}
+              >
+                <RewardTile
+                  reward={shieldReward ?? { type: 'SHIELD', amount: 1, amountMode: 'fixed' }}
+                  rewardCatalog={rewardCatalog}
+                  isPremium={false}
+                />
+                <div>
+                  <p className="text-base font-black text-foreground">Lily Pad</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    A streak shield, drawn from the shared pool — a player at
+                    their cap simply keeps the cap.
+                  </p>
+                </div>
+              </button>
+
+              {shieldReward ? (
+                <label className="grid gap-2 rounded-[26px] border border-border/50 bg-background/70 p-4">
+                  <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
+                    How many
+                  </span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={10}
+                    value={shieldReward.amount ?? 1}
+                    onChange={(event) =>
+                      patchShieldReward(
+                        Math.min(
+                          10,
+                          Math.max(1, Math.floor(Number(event.target.value) || 1)),
+                        ),
+                      )
+                    }
+                    className="h-11 w-32 rounded-2xl border border-border bg-background px-4 text-sm font-bold"
+                  />
+                </label>
+              ) : null}
+            </div>
+          ) : activeTab === 'flies' ? (
             <div className="space-y-4">
               <button
                 type="button"
