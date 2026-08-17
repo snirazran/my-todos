@@ -23,7 +23,7 @@ type LeanUser = UserDoc & { _id: string };
 /** What the reveal needs to know about a prize beyond the prize itself. */
 const revealMeta = (roll: GiftRollResult, owned: number) => ({
   duplicate: roll.duplicate,
-  /** Copies owned after this grant — the "×N trade fuel" the card shows. */
+  /** Copies owned after this grant — the "×N spare" the card shows. */
   owned,
   fromWishlist: roll.viaWishlist,
   tierBumped: roll.tierBumped,

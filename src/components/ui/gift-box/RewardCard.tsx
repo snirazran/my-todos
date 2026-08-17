@@ -22,8 +22,8 @@ type RewardCardProps = {
   openLaterLabel?: string;
   quantity?: number;
   baseQuantity?: number;
-  /** Copies now owned, when this reveal was a duplicate. Reads as trade fuel,
-   *  never as dust or a refund — a spare is upgrade progress. */
+  /** Copies now owned, when this reveal was a duplicate. Reads as a spare,
+   *  never as dust or a refund — a spare is trade-up progress. */
   spareCount?: number;
   isPremium?: boolean;
   showDoubleUpsell?: boolean;
@@ -92,6 +92,7 @@ export const RewardCard = ({
   const [showPlus, setShowPlus] = useState(false);
   const config = RARITY_CONFIG[prize.rarity];
   const glowColor = GLOW_COLORS[prize.rarity];
+  const isSpare = !quantity && !!spareCount && spareCount > 1;
 
   useEffect(() => {
     // If the parent says we are done claiming, reset our local loading state
@@ -223,9 +224,9 @@ export const RewardCard = ({
                 />
               )}
 
-              {/* Spare badge — a second copy is fuel for a trade-up, not a dud */}
-              {!quantity && spareCount && spareCount > 1 && (
-                <SpareBadge count={spareCount} showContent={showContent} />
+              {/* Spare badge — a second copy is trade-up progress, not a dud */}
+              {isSpare && (
+                <SpareBadge count={spareCount ?? 0} showContent={showContent} />
               )}
 
               {/* === LAYER 1: CINEMATIC EFFECTS (Centered) === */}
@@ -325,7 +326,7 @@ export const RewardCard = ({
                 : { opacity: 0, y: 10, filter: 'blur(4px)' }
             }
             transition={{ duration: 0.5, delay: 0.2, ease: 'easeOut' }}
-            className="flex flex-col items-center justify-center h-24 p-4 border-t bg-white/50 dark:bg-black/20 backdrop-blur-sm border-black/5 dark:border-white/5"
+            className="flex min-h-24 flex-col items-center justify-center p-4 border-t bg-white/50 dark:bg-black/20 backdrop-blur-sm border-black/5 dark:border-white/5"
           >
             <h3 className="mb-1 text-2xl font-black leading-none text-center text-slate-800 dark:text-white">
               {prize.name}
@@ -336,6 +337,11 @@ export const RewardCard = ({
                   ? 'Background'
                   : prize.slot.replace('_', ' '))}
             </p>
+            {isSpare && (
+              <p className="mt-1.5 text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                Counts toward trade-ups
+              </p>
+            )}
           </motion.div>
         </div>
       </div>
@@ -446,7 +452,7 @@ function SpareBadge({
         x{count}
       </span>
       <span className="rounded-lg bg-amber-400/90 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-slate-900 shadow-sm">
-        Trade fuel
+        Spare
       </span>
     </motion.div>
   );

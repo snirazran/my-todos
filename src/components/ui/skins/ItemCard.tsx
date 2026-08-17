@@ -872,7 +872,7 @@ function GiftMechanicsNote({
       'Backgrounds',
       `About ${Math.round(mechanics.backgroundSharePercent)}% of each rarity pays a background instead of a wearable.`,
     ],
-    ['Spares', 'Duplicates stack as ×N and count as trade fuel.'],
+    ['Spares', 'Duplicates stack as ×N and count toward trade-ups.'],
     ...(mechanics.tierBumpEnabled
       ? [
           [
