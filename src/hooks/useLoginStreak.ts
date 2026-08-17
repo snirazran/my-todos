@@ -99,6 +99,8 @@ export async function rescueStreak(
 export type StreakSheetRequest = {
   celebration?: CheckInResult | null;
   rescue?: LoginStreakRescue | null;
+  /** Open straight on the pledge picker, for the "no commitment yet" invite. */
+  commit?: boolean;
 };
 
 let sheetListener: ((req: StreakSheetRequest) => void) | null = null;

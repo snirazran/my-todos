@@ -331,15 +331,20 @@ export function PactCard({
               <span className="absolute left-3 top-2.5 rounded-lg bg-black/55 px-2 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-white backdrop-blur-sm">
                 This week
               </span>
-              <span
-                className="absolute bottom-2 left-3.5 text-[19px] uppercase leading-none tracking-wide text-white drop-shadow-[0_3px_0_rgba(15,23,42,0.9)]"
-                style={{
-                  fontFamily: 'var(--font-display), "Luckiest Guy", cursive',
-                  WebkitTextStroke: '1.8px rgba(15, 23, 42, 0.95)',
-                  paintOrder: 'stroke fill',
-                }}
-              >
-                Pick your area
+              <span className="absolute bottom-2 left-3.5 right-3 flex flex-col gap-0.5">
+                <span
+                  className="text-[19px] uppercase leading-none tracking-wide text-white drop-shadow-[0_3px_0_rgba(15,23,42,0.9)]"
+                  style={{
+                    fontFamily: 'var(--font-display), "Luckiest Guy", cursive',
+                    WebkitTextStroke: '1.8px rgba(15, 23, 42, 0.95)',
+                    paintOrder: 'stroke fill',
+                  }}
+                >
+                  Take your Leap
+                </span>
+                <span className="text-[11px] font-bold leading-tight text-white/85 drop-shadow-[0_1px_2px_rgba(15,23,42,0.9)]">
+                  One area · one promise · one week
+                </span>
               </span>
               {data.streak.weeks > 0 && (
                 <span className="absolute right-2.5 top-2.5 inline-flex h-7 items-center gap-1 rounded-full bg-black/50 px-2.5 text-[11px] font-black text-white backdrop-blur-sm">
@@ -352,9 +357,12 @@ export function PactCard({
               )}
             </div>
           </button>
-            <div className="flex items-center justify-between gap-3 px-3.5 py-2.5">
-              <span className="min-w-0 flex-1 truncate text-[12px] font-bold text-muted-foreground">
-                {teaser ? `Suggested: ${teaser.name}` : 'Takes about a minute'}
+            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-3.5 py-2.5">
+              {/* Given a floor rather than pure flex-1, so a long area name
+                  pushes the buttons onto their own line instead of shrinking
+                  the label away to an ellipsis. */}
+              <span className="min-w-[7rem] flex-1 truncate text-[12px] font-bold text-muted-foreground">
+                {teaser?.name ?? 'Any area works'}
               </span>
               {/* Paired with Start rather than banished to the far edge: the
                   two are answers to the same question, and separating them
@@ -362,7 +370,7 @@ export function PactCard({
                   a text button beside a filled one is legible as the lesser
                   path without being hidden, which is what keeps the choice
                   real rather than rhetorical. */}
-              <div className="flex shrink-0 items-center gap-1.5">
+              <div className="ml-auto flex shrink-0 items-center gap-1.5">
                 {/* Home only. The quests page is where "later" sends people,
                     so offering to defer again there would be a dead end. */}
                 {variant === 'home' && (
@@ -371,7 +379,7 @@ export function PactCard({
                     onClick={deferWeek}
                     className="rounded-lg px-2 py-1.5 text-[12.5px] font-bold text-muted-foreground transition-colors [@media(hover:hover)]:hover:text-foreground"
                   >
-                    Do later
+                    Not now
                   </button>
                 )}
                 <button
@@ -381,7 +389,7 @@ export function PactCard({
                   className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-amber-500 px-3.5 text-[13px] font-black text-white shadow-[0_3px_0_0_#b45309] transition active:translate-y-[2px] active:shadow-none"
                 >
                   <Play className="h-3.5 w-3.5 fill-current" />
-                  Start
+                  Take the Leap
                 </button>
               </div>
             </div>

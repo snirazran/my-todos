@@ -6,12 +6,39 @@ export type ShieldReward = {
   amount: number;
 };
 
-export type LoginStreakReward = QuestReward | ShieldReward;
+export type SkinRarity =
+  | 'common'
+  | 'uncommon'
+  | 'rare'
+  | 'epic'
+  | 'legendary';
+
+/**
+ * A guaranteed wearable at or above `minRarity`, drawn at grant time. A pledge
+ * rung promising "Rare or better" has to keep that promise, which a gift box
+ * cannot — a box only shifts the odds.
+ */
+export type SkinRollReward = {
+  type: 'SKIN_ROLL';
+  minRarity: SkinRarity;
+};
+
+export type LoginStreakReward = QuestReward | ShieldReward | SkinRollReward;
 
 export type LoginStreakGoal = {
   days: number;
   startCount: number;
   startDayKey: string;
+};
+
+/** Endowed progress: the pledge itself is step one, already filled. */
+export type LoginStreakGoalProgress = LoginStreakGoal & {
+  progress: number;
+  /** days + 1 — the extra step is the pledge the user already made. */
+  stepCount: number;
+  stepsFilled: number;
+  /** Percent of the tier's flies this completion will pay. */
+  payoutPercent: number;
 };
 
 export type LoginStreakNotifState = {
@@ -67,6 +94,10 @@ export type LoginStreakState = {
 export type LoginStreakGoalTierView = {
   days: number;
   rewards: LoginStreakReward[];
+  /** What this rung would pay if pledged right now, after repeat decay. */
+  payoutPercent: number;
+  /** Times this rung has been completed since the user last stepped up. */
+  repeatIndex: number;
 };
 
 export type LoginStreakView = {
@@ -80,8 +111,10 @@ export type LoginStreakView = {
   shieldCap: number;
   shieldedDayKeys: string[];
   protectedDayKeys: string[];
-  goal: (LoginStreakGoal & { progress: number }) | null;
+  goal: LoginStreakGoalProgress | null;
   goalTiers: LoginStreakGoalTierView[];
+  /** The rung to offer next — one above the highest kept so far. */
+  nextTierDays: number | null;
 };
 
 export type LoginStreakRewardSummary = {
@@ -96,6 +129,12 @@ export type LoginStreakRewardSummary = {
 export type LoginStreakRewardEvent = {
   days: number;
   rewardSummary: LoginStreakRewardSummary;
+  /** Percent of the tier's flies this completion actually paid. */
+  payoutPercent: number;
+  /** Non-fly prizes were withheld because this was a repeat of the same rung. */
+  itemsWithheld: boolean;
+  /** The rung to offer straight away, so the ladder never goes quiet. */
+  nextTierDays: number | null;
 };
 
 export type CheckInResult = {

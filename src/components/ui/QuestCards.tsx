@@ -930,7 +930,7 @@ function sweepQuantityLabel(reward: SweepRewardInfo) {
     return String(Math.max(0, (reward as QuestReward).amount ?? 0));
   }
   const amount = Math.max(1, (reward as { amount?: number }).amount ?? 1);
-  return `x${amount}`;
+  return `\u00d7${amount}`;
 }
 
 /**
@@ -2124,15 +2124,15 @@ export const RewardTile = memo(function RewardTile({
       {!hideBadge && hasRewardQuantityBadge(reward) && (
         <div
           className={cn(
-            'absolute z-20 flex justify-center',
-            compact ? '-right-1 -top-1' : '-right-0.5 -top-0.5',
+            'absolute z-30 flex justify-center',
+            compact ? '-right-1.5 -top-1.5' : '-right-1 -top-1',
           )}
         >
           <span
             className={cn(
               'flex items-center justify-center rounded-md border border-white/10 bg-black/50 font-bold uppercase tracking-wide text-white shadow-sm backdrop-blur-sm',
               compact
-                ? 'min-w-5 px-1.5 py-0.5 text-[9px]'
+                ? 'min-w-5 px-1 py-0 text-[9px] leading-[16px]'
                 : 'min-w-4 px-1 py-0.5 text-[8px]',
             )}
           >
@@ -2178,7 +2178,9 @@ export function getRewardQuantityLabel(reward: QuestReward, _isPremium: boolean)
   }
 
   const base = reward.amount && reward.amount > 1 ? reward.amount : 1;
-  return `x${base}`;
+  // Multiplication sign, not a lowercase x: the badge is uppercased in CSS, so
+  // an "x" rendered as "X2" beside a Lily Pad's "×2" read as two conventions.
+  return `\u00d7${base}`;
 }
 
 function getRewardOwnedCount(reward: QuestReward, _isPremium: boolean) {

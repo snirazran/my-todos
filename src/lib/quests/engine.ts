@@ -89,6 +89,9 @@ export function normalizeFocusProfile(user: UserDoc): FocusProfile {
 
 export const DAILY_QUESTS_UNLOCK_STEP_TARGET = 5;
 
+/** The onboarding objective that introduces the weekly Leap. */
+const LEAP_ONBOARDING_METRIC = 'focus_tag_linked';
+
 // One swap a day, matching Fortnite's single daily reroll: enough agency that a
 // rolled objective is never an order, not enough to shop for the cheapest one.
 export const DAILY_QUEST_REROLLS_PER_DAY = 1;
@@ -885,8 +888,8 @@ function midTarget(entry: RecipePoolEntry): number {
   return Math.round((min + max) / 2);
 }
 
-const EFFORT_PRICE_MIN = 0.5;
-const EFFORT_PRICE_MAX = 2;
+const EFFORT_PRICE_MIN = 0.7;
+const EFFORT_PRICE_MAX = 1.5;
 
 function effortPriceMultiplier(args: {
   pool: RecipePoolEntry[];
@@ -902,6 +905,16 @@ function effortPriceMultiplier(args: {
     EFFORT_PRICE_MAX,
     Math.max(EFFORT_PRICE_MIN, rolled / reference),
   );
+}
+
+function flyRewardTotal(rewards: QuestRewards): number {
+  return rewards.reduce((sum, reward) => {
+    if (reward.type !== 'FLIES') return sum;
+    return (
+      sum +
+      Math.max(0, reward.amount ?? reward.minAmount ?? reward.maxAmount ?? 0)
+    );
+  }, 0);
 }
 
 function scaleFlyRewards(
@@ -1147,6 +1160,58 @@ function isQuestDocFullyClaimed(doc: {
   );
 }
 
+/**
+ * The Leap is the reward for reaching its own onboarding step. Before that the
+ * roster is still teaching the basics, and a "pick your area" banner competing
+ * with "finish 1 task" asks a brand-new user to commit to a week before they
+ * have finished anything.
+ *
+ * The step lives inside First Hops rather than being its own quest, so this
+ * resolves at objective granularity using the same rule the UI uses to pick the
+ * active onboarding objective: the first rewarded block not yet claimed.
+ * Reaching it is enough — clearing it is not required, or the very objective
+ * telling you to take a Leap would point at something hidden.
+ */
+export async function hasReachedLeapOnboardingStep(
+  userId: string,
+): Promise<boolean> {
+  const [templates, docs] = await Promise.all([
+    QuestTemplateModel.find({ isActive: true, placement: 'onboarding' })
+      .sort({ createdAt: 1 })
+      .lean<QuestTemplateDoc[]>(),
+    QuestModel.find({ userId, placement: 'onboarding' })
+      .select('templateId logic claimedObjectiveIds')
+      .lean<
+        { templateId: string; logic?: any[]; claimedObjectiveIds?: string[] }[]
+      >(),
+  ]);
+
+  const rewardedBlocks = (template: QuestTemplateDoc) =>
+    (template.logic ?? []).filter((block) => (block.rewards?.length ?? 0) > 0);
+  const isLeapBlock = (block: { type?: string; metricKey?: string }) =>
+    block.type === 'metric_count' && block.metricKey === LEAP_ONBOARDING_METRIC;
+
+  // A roster that never asks for a Leap must not lock it away forever.
+  if (!templates.some((template) => rewardedBlocks(template).some(isLeapBlock))) {
+    return true;
+  }
+
+  const byTemplate = new Map(docs.map((doc) => [doc.templateId, doc]));
+  for (const template of templates) {
+    const blocks = rewardedBlocks(template);
+    const leapIndex = blocks.findIndex(isLeapBlock);
+    const doc = byTemplate.get(template.templateId);
+    if (leapIndex >= 0) {
+      const claimed = doc?.claimedObjectiveIds ?? [];
+      return blocks
+        .slice(0, leapIndex)
+        .every((block) => claimed.includes(block.id));
+    }
+    if (!doc || !isQuestDocFullyClaimed(doc)) return false;
+  }
+  return true;
+}
+
 function comparableQuestValue(value: unknown): unknown {
   if (value instanceof Date) return value.toISOString();
   if (Array.isArray(value)) return value.map(comparableQuestValue);
@@ -1364,6 +1429,7 @@ function rollDailyLogic(args: {
   const usedShapes = new Set<string>();
   const blocks: QuestLogicBlock[] = [];
   const localHour = getZonedHour(new Date(), timezone) ?? undefined;
+  let previousSlotFlies = 0;
 
   (recipe.slots ?? []).forEach((slot, index) => {
     if ((slot.rewards ?? []).length === 0) return;
@@ -1419,16 +1485,29 @@ function rollDailyLogic(args: {
       resolveLogicTarget(base, `${slotSeed}:target`, 1);
     const rewards = rollSlotRewards(slot, slotSeed);
 
+    let priced = rewards;
+    if (recipe.priceByEffort) {
+      const authoredFlies = flyRewardTotal(rewards);
+      let multiplier = effortPriceMultiplier({
+        pool: candidates,
+        entry: pick,
+        target,
+      });
+      // Slot order promises a rising payout, and that promise outranks the
+      // effort adjustment: a cheap roll late in the ladder is held at the
+      // previous slot's amount rather than dropping below it.
+      if (authoredFlies > 0 && previousSlotFlies > 0) {
+        multiplier = Math.max(multiplier, previousSlotFlies / authoredFlies);
+      }
+      priced = scaleFlyRewards(rewards, multiplier);
+    }
+    previousSlotFlies = Math.max(previousSlotFlies, flyRewardTotal(priced));
+
     blocks.push({
       ...base,
       amountMode: 'fixed',
       amount: target,
-      rewards: recipe.priceByEffort
-        ? scaleFlyRewards(
-            rewards,
-            effortPriceMultiplier({ pool: candidates, entry: pick, target }),
-          )
-        : rewards,
+      rewards: priced,
     });
   });
 

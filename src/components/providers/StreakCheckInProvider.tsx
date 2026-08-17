@@ -70,6 +70,32 @@ function queueShieldOffer(offer: ShieldOffer) {
   window.setTimeout(tryOpen, 900);
 }
 
+const PLEDGE_INVITE_KEY = 'frog:pledgeInviteDay';
+const PLEDGE_INVITE_COOLDOWN_DAYS = 3;
+
+/**
+ * True at most once every few days. The pledge is worth asking for, and worth
+ * not nagging about — an invite that reappears every morning is a demand.
+ */
+function takePledgeInvite(): boolean {
+  try {
+    const today = localDayKey();
+    const last = localStorage.getItem(PLEDGE_INVITE_KEY);
+    if (last) {
+      const elapsed =
+        (Date.parse(`${today}T00:00:00`) - Date.parse(`${last}T00:00:00`)) /
+        86_400_000;
+      if (!Number.isFinite(elapsed) || elapsed < PLEDGE_INVITE_COOLDOWN_DAYS) {
+        return false;
+      }
+    }
+    localStorage.setItem(PLEDGE_INVITE_KEY, today);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function StreakCheckInProvider() {
   const { user } = useAuth();
   const { showNotification } = useNotification();
@@ -86,7 +112,12 @@ export function StreakCheckInProvider() {
       const today = localDayKey();
       if (lastChecked?.dayKey === today && lastChecked.userId === userId)
         return;
-      const result = await (takePrewarmedCheckIn() ?? checkInStreak());
+      // The prewarmed check-in is fired from onboarding the moment the account
+      // is created, so it can lose a race with the session cookie and resolve
+      // null. Consuming that null without retrying left a brand-new account
+      // never checked in: streak stuck at 0, and no pledge invite.
+      const prewarmed = await takePrewarmedCheckIn();
+      const result = prewarmed ?? (await checkInStreak());
       if (!result) return;
       lastChecked = { dayKey: today, userId };
       recordAppUsageDay();
@@ -110,6 +141,12 @@ export function StreakCheckInProvider() {
         queueShieldOffer(result.shieldOffer);
       } else if (result.extended) {
         openStreakSheet({ celebration: result });
+      } else if (!result.view?.goal && takePledgeInvite()) {
+        // A pledge is only ever offered, never auto-enrolled — but the offer
+        // used to ride on `extended`, and a new account's first check-in is
+        // consumed by the onboarding prewarm. That left day one with no invite
+        // at all, which is the one day it matters most.
+        openStreakSheet({ commit: true });
       }
       if (result.extended) {
         emitCampaignTrigger('streak_milestone', {
@@ -141,6 +178,7 @@ export function StreakCheckInProvider() {
 function StreakSheetHost() {
   const [open, setOpen] = useState(false);
   const [celebration, setCelebration] = useState<CheckInResult | null>(null);
+  const [commitIntent, setCommitIntent] = useState(false);
   const [rescueOpen, setRescueOpen] = useState(false);
   const [rescue, setRescue] = useState<LoginStreakRescue | null>(null);
   const [shieldOpen, setShieldOpen] = useState(false);
@@ -154,6 +192,7 @@ function StreakSheetHost() {
         return;
       }
       setCelebration(req.celebration ?? null);
+      setCommitIntent(!!req.commit);
       setOpen(true);
     });
   }, []);
@@ -168,10 +207,14 @@ function StreakSheetHost() {
   return (
     <>
       <StreakSheet
+        commitIntent={commitIntent}
         open={open}
         onOpenChange={(v) => {
           setOpen(v);
-          if (!v) setCelebration(null);
+          if (!v) {
+            setCelebration(null);
+            setCommitIntent(false);
+          }
         }}
         celebration={celebration}
       />

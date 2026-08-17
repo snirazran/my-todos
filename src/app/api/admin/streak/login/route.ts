@@ -4,6 +4,8 @@ import connectMongo from '@/lib/mongoose';
 import LoginStreakConfigModel, {
   LOGIN_STREAK_CONFIG_ID,
   DEFAULT_GOAL_TIERS,
+  DEFAULT_REPEAT_PAYOUT_PERCENTS,
+  DEFAULT_REPEAT_PAYOUT_FLOOR_PERCENT,
 } from '@/lib/models/LoginStreakConfig';
 import { loadLoginStreakConfig } from '@/lib/streak/loginStreak';
 import type {
@@ -11,7 +13,24 @@ import type {
   QuestReward,
   QuestRewardType,
 } from '@/lib/quests/types';
-import type { LoginStreakReward } from '@/lib/streak/types';
+import type { LoginStreakReward, SkinRarity } from '@/lib/streak/types';
+
+const VALID_RARITIES = new Set<SkinRarity>([
+  'common',
+  'uncommon',
+  'rare',
+  'epic',
+  'legendary',
+]);
+
+function sanitizeRepeatPercents(input: any): number[] {
+  if (!Array.isArray(input)) return [...DEFAULT_REPEAT_PAYOUT_PERCENTS];
+  const percents = input
+    .map((value) => Math.floor(Number(value)))
+    .filter((value) => Number.isFinite(value) && value >= 1 && value <= 100)
+    .slice(0, 10);
+  return percents.length > 0 ? percents : [...DEFAULT_REPEAT_PAYOUT_PERCENTS];
+}
 
 const VALID_REWARD_TYPES = new Set<QuestRewardType>([
   'FLIES',
@@ -29,6 +48,13 @@ function sanitizeReward(input: any): LoginStreakReward | null {
     const amount = Math.floor(Number(input.amount) || 1);
     if (amount < 1 || amount > 3) return null;
     return { type: 'SHIELD', amount };
+  }
+
+  if (input.type === 'SKIN_ROLL') {
+    const minRarity = VALID_RARITIES.has(input.minRarity)
+      ? (input.minRarity as SkinRarity)
+      : 'rare';
+    return { type: 'SKIN_ROLL', minRarity };
   }
 
   if (!VALID_REWARD_TYPES.has(input.type)) return null;
@@ -106,6 +132,9 @@ export async function GET() {
       loginStreak: {
         isActive: config.isActive,
         saverMinStreak: config.saverMinStreak,
+        repeatPayoutPercents: config.repeatPayoutPercents,
+        repeatPayoutFloorPercent: config.repeatPayoutFloorPercent,
+        repeatItemsAtFullOnly: config.repeatItemsAtFullOnly,
         goalTiers: config.goalTiers,
       },
     });
@@ -134,6 +163,20 @@ export async function PUT(req: NextRequest) {
       Math.max(1, Math.floor(Number(body?.saverMinStreak) || 2)),
     );
     const goalTiers = sanitizeTiers(body?.goalTiers);
+    const repeatPayoutPercents = sanitizeRepeatPercents(
+      body?.repeatPayoutPercents,
+    );
+    const repeatPayoutFloorPercent = Math.min(
+      100,
+      Math.max(
+        1,
+        Math.floor(
+          Number(body?.repeatPayoutFloorPercent) ||
+            DEFAULT_REPEAT_PAYOUT_FLOOR_PERCENT,
+        ),
+      ),
+    );
+    const repeatItemsAtFullOnly = body?.repeatItemsAtFullOnly !== false;
 
     await connectMongo();
     await LoginStreakConfigModel.findOneAndUpdate(
@@ -142,6 +185,9 @@ export async function PUT(req: NextRequest) {
         $set: {
           isActive,
           saverMinStreak,
+          repeatPayoutPercents,
+          repeatPayoutFloorPercent,
+          repeatItemsAtFullOnly,
           goalTiers: goalTiers.length > 0 ? goalTiers : DEFAULT_GOAL_TIERS,
         },
         $unset: { milestones: '', freezePriceFlies: '', freezeCap: '' },
@@ -154,6 +200,9 @@ export async function PUT(req: NextRequest) {
       loginStreak: {
         isActive: config.isActive,
         saverMinStreak: config.saverMinStreak,
+        repeatPayoutPercents: config.repeatPayoutPercents,
+        repeatPayoutFloorPercent: config.repeatPayoutFloorPercent,
+        repeatItemsAtFullOnly: config.repeatItemsAtFullOnly,
         goalTiers: config.goalTiers,
       },
     });

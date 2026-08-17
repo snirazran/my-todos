@@ -23,6 +23,7 @@ import {
   buildRewardCatalog,
   isPremiumUser,
   normalizeFocusProfile,
+  hasReachedLeapOnboardingStep,
 } from '@/lib/quests/engine';
 import { getFullCatalog } from '@/lib/skins/getCatalog';
 import {
@@ -1043,7 +1044,8 @@ export async function getPactView(args: {
   const config = await ensurePactConfig();
   const todayKey = getZonedToday(timezone);
 
-  const [user, tasks, categories] = await Promise.all([
+  const [leapUnlocked, user, tasks, categories] = await Promise.all([
+    hasReachedLeapOnboardingStep(userId),
     UserModel.findById(userId).lean<UserDoc | null>(),
     TaskModel.find(
       { userId, deletedAt: { $exists: false } },
@@ -1306,7 +1308,7 @@ export async function getPactView(args: {
   };
 
   return {
-    enabled: config.isActive,
+    enabled: config.isActive && leapUnlocked,
     weekKey: currentWeek,
     weekLabel: weekLabel(currentWeek),
     pickOpen:

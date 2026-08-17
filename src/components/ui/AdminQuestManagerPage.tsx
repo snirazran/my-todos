@@ -136,6 +136,9 @@ type AdminLoginStreakTier = {
 type AdminLoginStreakConfig = {
   isActive: boolean;
   saverMinStreak: number;
+  repeatPayoutPercents: number[];
+  repeatPayoutFloorPercent: number;
+  repeatItemsAtFullOnly: boolean;
   goalTiers: AdminLoginStreakTier[];
 };
 type AdminCategory = {
@@ -2512,6 +2515,9 @@ export function AdminQuestManagerPage() {
         body: JSON.stringify({
           isActive: loginStreakConfig.isActive,
           saverMinStreak: loginStreakConfig.saverMinStreak,
+          repeatPayoutPercents: loginStreakConfig.repeatPayoutPercents,
+          repeatPayoutFloorPercent: loginStreakConfig.repeatPayoutFloorPercent,
+          repeatItemsAtFullOnly: loginStreakConfig.repeatItemsAtFullOnly,
           goalTiers: loginStreakConfig.goalTiers,
         }),
       });
@@ -2532,8 +2538,15 @@ export function AdminQuestManagerPage() {
 
   const isShieldReward = (reward: LoginStreakReward) =>
     reward.type === 'SHIELD' || (reward.type as string) === 'STREAK_FREEZE';
+  const isSkinRollReward = (r: LoginStreakReward) =>
+    (r as { type?: string }).type === 'SKIN_ROLL';
   const loginQuestRewards = (rewards: LoginStreakReward[]) =>
-    rewards.filter((r) => !isShieldReward(r)) as QuestReward[];
+    rewards.filter(
+      (r) => !isShieldReward(r) && !isSkinRollReward(r),
+    ) as QuestReward[];
+  const loginSkinRarity = (rewards: LoginStreakReward[]) =>
+    (rewards.find(isSkinRollReward) as { minRarity?: string } | undefined)
+      ?.minRarity ?? '';
   const loginShieldCount = (rewards: LoginStreakReward[]) =>
     rewards.reduce(
       (sum, r) => (isShieldReward(r) ? sum + ((r as any).amount ?? 1) : sum),
@@ -2552,10 +2565,17 @@ export function AdminQuestManagerPage() {
       return { ...prev, [list]: tiers };
     });
   };
-  const mergeLoginRewards = (quest: QuestReward[], shields: number) => [
+  const mergeLoginRewards = (
+    quest: QuestReward[],
+    shields: number,
+    skinRarity = '',
+  ) => [
     ...quest,
     ...(shields > 0
       ? [{ type: 'SHIELD', amount: shields } as LoginStreakReward]
+      : []),
+    ...(skinRarity
+      ? [{ type: 'SKIN_ROLL', minRarity: skinRarity } as unknown as LoginStreakReward]
       : []),
   ];
 
@@ -2597,6 +2617,29 @@ export function AdminQuestManagerPage() {
             </button>
           </div>
           <label className="flex items-center gap-1 text-xs font-bold text-muted-foreground">
+            <span className="uppercase tracking-wide">Skin</span>
+            <select
+              value={loginSkinRarity(tier.rewards)}
+              onChange={(e) =>
+                setLoginTier(list, tier.days, (t) => ({
+                  ...t,
+                  rewards: mergeLoginRewards(
+                    loginQuestRewards(t.rewards),
+                    loginShieldCount(t.rewards),
+                    e.target.value,
+                  ),
+                }))
+              }
+              className="h-8 rounded-lg border border-border/50 bg-background px-1.5 text-xs font-bold text-foreground"
+            >
+              <option value="">none</option>
+              <option value="uncommon">Uncommon+</option>
+              <option value="rare">Rare+</option>
+              <option value="epic">Epic+</option>
+              <option value="legendary">Legendary</option>
+            </select>
+          </label>
+          <label className="flex items-center gap-1 text-xs font-bold text-muted-foreground">
             <Icon name="lilyPad" label="Lily Pads" className="h-4 w-4" />
             <input
               type="number"
@@ -2610,7 +2653,11 @@ export function AdminQuestManagerPage() {
                 );
                 setLoginTier(list, tier.days, (t) => ({
                   ...t,
-                  rewards: mergeLoginRewards(loginQuestRewards(t.rewards), shields),
+                  rewards: mergeLoginRewards(
+                    loginQuestRewards(t.rewards),
+                    shields,
+                    loginSkinRarity(t.rewards),
+                  ),
                 }));
               }}
               className="h-8 w-14 rounded-lg border border-border/50 bg-background px-2 text-sm font-bold text-foreground"
@@ -2692,6 +2739,74 @@ export function AdminQuestManagerPage() {
               className="mt-1 block h-10 w-20 rounded-xl border border-border/50 bg-background px-3 text-sm font-bold text-foreground"
             />
           </label>
+          <label className="block">
+            <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+              Repeat payout %
+            </span>
+            <input
+              value={loginStreakConfig.repeatPayoutPercents.join(', ')}
+              onChange={(e) =>
+                setLoginStreakConfig((prev) =>
+                  prev
+                    ? {
+                        ...prev,
+                        repeatPayoutPercents: e.target.value
+                          .split(',')
+                          .map((part) => Math.floor(Number(part.trim())))
+                          .filter((n) => Number.isFinite(n) && n >= 1 && n <= 100),
+                      }
+                    : prev,
+                )
+              }
+              placeholder="100, 85, 70"
+              className="mt-1 block h-10 w-36 rounded-xl border border-border/50 bg-background px-3 text-sm font-bold text-foreground"
+            />
+          </label>
+          <label className="block">
+            <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+              Floor %
+            </span>
+            <input
+              type="number"
+              min={1}
+              max={100}
+              value={loginStreakConfig.repeatPayoutFloorPercent}
+              onChange={(e) =>
+                setLoginStreakConfig((prev) =>
+                  prev
+                    ? {
+                        ...prev,
+                        repeatPayoutFloorPercent: Math.min(
+                          100,
+                          Math.max(1, Math.floor(Number(e.target.value) || 1)),
+                        ),
+                      }
+                    : prev,
+                )
+              }
+              className="mt-1 block h-10 w-20 rounded-xl border border-border/50 bg-background px-3 text-sm font-bold text-foreground"
+            />
+          </label>
+          <button
+            type="button"
+            onClick={() =>
+              setLoginStreakConfig((prev) =>
+                prev
+                  ? { ...prev, repeatItemsAtFullOnly: !prev.repeatItemsAtFullOnly }
+                  : prev,
+              )
+            }
+            className={cn(
+              'h-10 rounded-xl border px-3 text-xs font-bold transition',
+              loginStreakConfig.repeatItemsAtFullOnly
+                ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                : 'border-border/50 bg-background text-muted-foreground hover:text-foreground',
+            )}
+          >
+            {loginStreakConfig.repeatItemsAtFullOnly
+              ? 'Prizes only at 100%'
+              : 'Prizes on every repeat'}
+          </button>
           <Button
             size="sm"
             className="ml-auto rounded-xl font-black"
@@ -2701,6 +2816,14 @@ export function AdminQuestManagerPage() {
             {savingLoginStreak ? 'Saving…' : 'Save login streak'}
           </Button>
         </div>
+
+        <p className="mt-3 text-[11px] font-semibold leading-snug text-muted-foreground">
+          Repeating the same rung pays the list in order, then the floor
+          forever. Stepping up to a longer pledge resets it to the first entry —
+          without that, everyone farms the shortest pledge and the ladder stops
+          pulling upward. Rescues are one Lily Pad per missed day, capped by the
+          rescue cooldown under Shields.
+        </p>
 
         <div className="mt-4">
           <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
@@ -2721,7 +2844,11 @@ export function AdminQuestManagerPage() {
             onSave={(rewards) => {
               setLoginTier(loginRewardTarget.list, loginRewardTarget.days, (t) => ({
                 ...t,
-                rewards: mergeLoginRewards(rewards, loginShieldCount(t.rewards)),
+                rewards: mergeLoginRewards(
+                  rewards,
+                  loginShieldCount(t.rewards),
+                  loginSkinRarity(t.rewards),
+                ),
               }));
               setLoginRewardTarget(null);
             }}

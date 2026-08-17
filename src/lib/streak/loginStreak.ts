@@ -4,6 +4,8 @@ import UserModel from '@/lib/models/User';
 import LoginStreakConfigModel, {
   LOGIN_STREAK_CONFIG_ID,
   DEFAULT_GOAL_TIERS,
+  DEFAULT_REPEAT_PAYOUT_PERCENTS,
+  DEFAULT_REPEAT_PAYOUT_FLOOR_PERCENT,
   type LoginStreakConfigDoc,
 } from '@/lib/models/LoginStreakConfig';
 import {
@@ -25,7 +27,9 @@ import { isPremiumUser } from '@/lib/quests/engine';
 import { getZonedToday } from '@/lib/utils';
 import type { QuestReward } from '@/lib/quests/types';
 import { findTaskStreaksAtRisk } from './taskStreaks';
+import { getRewardPool } from '@/lib/skins/gifts';
 import type {
+  SkinRarity,
   CheckInResult,
   LoginStreakGoal,
   LoginStreakReward,
@@ -120,6 +124,15 @@ export async function loadLoginStreakConfig(): Promise<LoginStreakConfigDoc> {
     configId: LOGIN_STREAK_CONFIG_ID,
     isActive: doc?.isActive ?? true,
     saverMinStreak: Math.max(1, doc?.saverMinStreak ?? 2),
+    repeatPayoutPercents:
+      doc?.repeatPayoutPercents && doc.repeatPayoutPercents.length > 0
+        ? doc.repeatPayoutPercents
+        : [...DEFAULT_REPEAT_PAYOUT_PERCENTS],
+    repeatPayoutFloorPercent:
+      typeof doc?.repeatPayoutFloorPercent === 'number'
+        ? doc.repeatPayoutFloorPercent
+        : DEFAULT_REPEAT_PAYOUT_FLOOR_PERCENT,
+    repeatItemsAtFullOnly: doc?.repeatItemsAtFullOnly !== false,
     goalTiers:
       doc?.goalTiers && doc.goalTiers.length > 0
         ? doc.goalTiers
@@ -282,24 +295,146 @@ export function buildLoginStreakView(
             0,
             Math.min(state.goal.days, state.count - state.goal.startCount),
           ),
+          // Nunes & Drèze: a card with the first stamp already filled gets
+          // finished far more often. Making the pledge IS that stamp, so a
+          // 7-day promise renders as 8 steps with step one already earned.
+          stepCount: state.goal.days + 1,
+          stepsFilled:
+            1 +
+            Math.max(
+              0,
+              Math.min(state.goal.days, state.count - state.goal.startCount),
+            ),
+          payoutPercent: repeatPayoutPercent(
+            config,
+            repeatIndexFor(state.goalsCompleted, state.goal.days),
+          ),
         }
       : null,
-    goalTiers: config.goalTiers,
+    goalTiers: config.goalTiers.map((tier) => {
+      const repeatIndex = repeatIndexFor(state.goalsCompleted, tier.days);
+      return {
+        ...tier,
+        repeatIndex,
+        payoutPercent: repeatPayoutPercent(config, repeatIndex),
+      };
+    }),
+    nextTierDays: nextTierDaysFor(config, state.goalsCompleted),
   };
 }
 
 function splitRewards(rewards: LoginStreakReward[]) {
   const questRewards: QuestReward[] = [];
+  const skinRolls: { minRarity: SkinRarity }[] = [];
   let shields = 0;
   for (const reward of rewards) {
     // `STREAK_FREEZE` is what tiers authored before the merge still say.
     if (reward.type === 'SHIELD' || (reward.type as string) === 'STREAK_FREEZE') {
       shields += Math.max(1, Math.floor((reward as any).amount ?? 1));
+    } else if (reward.type === 'SKIN_ROLL') {
+      skinRolls.push({ minRarity: reward.minRarity });
     } else {
       questRewards.push(reward as QuestReward);
     }
   }
-  return { questRewards, shields };
+  return { questRewards, shields, skinRolls };
+}
+
+/**
+ * Completions of this exact rung since the user last kept a longer one.
+ * Stepping up clears the count, which is what makes the ladder worth climbing.
+ */
+export function repeatIndexFor(
+  goalsCompleted: { days: number; dayKey: string }[],
+  days: number,
+): number {
+  let repeats = 0;
+  for (let i = goalsCompleted.length - 1; i >= 0; i -= 1) {
+    const entry = goalsCompleted[i];
+    if (entry.days > days) break;
+    if (entry.days === days) repeats += 1;
+  }
+  return repeats;
+}
+
+export function repeatPayoutPercent(
+  config: Pick<
+    LoginStreakConfigDoc,
+    'repeatPayoutPercents' | 'repeatPayoutFloorPercent'
+  >,
+  repeatIndex: number,
+): number {
+  const ladder =
+    config.repeatPayoutPercents?.length > 0
+      ? config.repeatPayoutPercents
+      : DEFAULT_REPEAT_PAYOUT_PERCENTS;
+  const floor = Math.max(
+    1,
+    Math.min(100, config.repeatPayoutFloorPercent ?? DEFAULT_REPEAT_PAYOUT_FLOOR_PERCENT),
+  );
+  const raw = repeatIndex < ladder.length ? ladder[repeatIndex] : floor;
+  return Math.max(floor, Math.min(100, Math.round(raw)));
+}
+
+/** The rung to offer next: one above the longest the user has ever kept. */
+export function nextTierDaysFor(
+  config: Pick<LoginStreakConfigDoc, 'goalTiers'>,
+  goalsCompleted: { days: number; dayKey: string }[],
+): number | null {
+  const tiers = [...(config.goalTiers ?? [])].sort((a, b) => a.days - b.days);
+  if (tiers.length === 0) return null;
+  const best = goalsCompleted.reduce((max, entry) => Math.max(max, entry.days), 0);
+  return tiers.find((tier) => tier.days > best)?.days ?? tiers[tiers.length - 1].days;
+}
+
+function scaleFlyRewardsByPercent(
+  rewards: QuestReward[],
+  percent: number,
+): QuestReward[] {
+  if (percent >= 100) return rewards;
+  const factor = percent / 100;
+  return rewards.map((reward) => {
+    if (reward.type !== 'FLIES') return reward;
+    const scale = (value: number | undefined) =>
+      typeof value === 'number' ? Math.max(1, Math.round(value * factor)) : value;
+    return {
+      ...reward,
+      amount: scale(reward.amount),
+      minAmount: scale(reward.minAmount),
+      maxAmount: scale(reward.maxAmount),
+    };
+  });
+}
+
+const RARITY_ORDER: SkinRarity[] = [
+  'common',
+  'uncommon',
+  'rare',
+  'epic',
+  'legendary',
+];
+
+/**
+ * Draws one wearable at or above the promised rarity, preferring something the
+ * user does not already own — a "guaranteed Epic" that hands back a duplicate
+ * keeps the letter of the promise and breaks its spirit.
+ */
+async function rollGuaranteedSkin(
+  user: any,
+  minRarity: SkinRarity,
+): Promise<string | null> {
+  const floor = Math.max(0, RARITY_ORDER.indexOf(minRarity));
+  const pool = (await getRewardPool()).filter(
+    (prize) =>
+      prize.kind === 'item' &&
+      prize.slot !== 'container' &&
+      RARITY_ORDER.indexOf(prize.rarity) >= floor,
+  );
+  if (pool.length === 0) return null;
+  const inventory = user.wardrobe?.inventory ?? {};
+  const unowned = pool.filter((prize) => (inventory[prize.id] ?? 0) <= 0);
+  const draw = unowned.length > 0 ? unowned : pool;
+  return draw[Math.floor(Math.random() * draw.length)].id;
 }
 
 function grantQuestRewards(
@@ -343,7 +478,10 @@ function grantQuestRewards(
       inv[reward.backgroundId] = (inv[reward.backgroundId] ?? 0) + 1;
       summary.grantedBackgroundIds.push(reward.backgroundId);
     } else if (reward.itemId) {
-      const copies = Math.max(1, reward.amount ?? 1);
+      // A pledge rung promises "all of it doubled by Plus", so gifts scale with
+      // the flies. Lily Pads are excluded on purpose — they have their own cap
+      // and monthly grant, and doubling them here would fight both.
+      const copies = Math.max(1, reward.amount ?? 1) * multiplier;
       for (let i = 0; i < copies; i += 1) {
         user.wardrobe.inventory[reward.itemId] =
           (user.wardrobe.inventory[reward.itemId] ?? 0) + 1;
@@ -356,7 +494,7 @@ function grantQuestRewards(
   return summary;
 }
 
-function applyStreakRewardGrants(args: {
+async function applyStreakRewardGrants(args: {
   user: any;
   next: LoginStreakState;
   config: LoginStreakConfigDoc;
@@ -364,31 +502,64 @@ function applyStreakRewardGrants(args: {
   shieldState: ShieldState;
   todayKey: string;
   goalCompleted: LoginStreakGoal | null;
-}): {
+}): Promise<{
   event: LoginStreakRewardEvent | null;
   shieldState: ShieldState;
-} {
+}> {
   const { user, next, config, shieldConfig, todayKey, goalCompleted } = args;
   if (!goalCompleted) return { event: null, shieldState: args.shieldState };
 
   const isPremium = isPremiumUser(user.toObject());
   const multiplier = isPremium ? 2 : 1;
   const tier = config.goalTiers.find((t) => t.days === goalCompleted.days);
-  const { questRewards, shields } = splitRewards(tier?.rewards ?? []);
-  const summary = grantQuestRewards(user, questRewards, multiplier);
-  summary.shieldsGranted = shields;
+
+  // Decay is read from the history BEFORE this completion is appended, so the
+  // first keep of a rung pays full price.
+  const repeatIndex = repeatIndexFor(next.goalsCompleted, goalCompleted.days);
+  const payoutPercent = repeatPayoutPercent(config, repeatIndex);
+  const atFullPrice = payoutPercent >= 100;
+  const itemsWithheld = !atFullPrice && config.repeatItemsAtFullOnly;
+
+  const { questRewards, shields, skinRolls } = splitRewards(tier?.rewards ?? []);
+  const payableQuestRewards = scaleFlyRewardsByPercent(
+    itemsWithheld
+      ? questRewards.filter((reward) => reward.type === 'FLIES')
+      : questRewards,
+    payoutPercent,
+  );
+  const summary = grantQuestRewards(user, payableQuestRewards, multiplier);
+
+  const payableShields = itemsWithheld ? 0 : shields;
+  summary.shieldsGranted = payableShields;
+
+  if (!itemsWithheld) {
+    for (const roll of skinRolls) {
+      const itemId = await rollGuaranteedSkin(user, roll.minRarity);
+      if (!itemId) continue;
+      user.wardrobe.inventory[itemId] = (user.wardrobe.inventory[itemId] ?? 0) + 1;
+      user.wardrobe.unseenItems.push(itemId);
+      summary.grantedItemIds.push(itemId);
+    }
+  }
+
   next.goalsCompleted = [
     ...next.goalsCompleted,
     { days: goalCompleted.days, dayKey: todayKey },
   ];
   next.goal = null;
 
-  const shieldState = shields
-    ? grantShields(args.shieldState, shieldConfig, isPremium, shields)
+  const shieldState = payableShields
+    ? grantShields(args.shieldState, shieldConfig, isPremium, payableShields)
     : args.shieldState;
 
   return {
-    event: { days: goalCompleted.days, rewardSummary: summary },
+    event: {
+      days: goalCompleted.days,
+      rewardSummary: summary,
+      payoutPercent,
+      itemsWithheld,
+      nextTierDays: nextTierDaysFor(config, next.goalsCompleted),
+    },
     shieldState,
   };
 }
@@ -581,7 +752,7 @@ export async function performCheckIn(args: {
   let goalEvent: LoginStreakRewardEvent | null = null;
 
   if (goalCompleted) {
-    const granted = applyStreakRewardGrants({
+    const granted = await applyStreakRewardGrants({
       user,
       next,
       config,
@@ -602,12 +773,19 @@ export async function performCheckIn(args: {
     user.markModified('wardrobe');
     await user.save();
   } else {
+    // The guard is optimistic concurrency: only write if nobody else moved the
+    // streak since it was read. "Never checked in" has three shapes on disk —
+    // subdocument absent, null, or present without a lastDayKey — and matching
+    // on the missing key covers all three, where `$exists: false` on the
+    // subdocument itself missed the last one and stranded the streak at 0.
     const res = await UserModel.updateOne(
       {
         _id: userId,
         $or: [
           { 'quests.loginStreak.lastDayKey': freshState.lastDayKey },
-          { 'quests.loginStreak': { $exists: false } },
+          ...(freshState.lastDayKey
+            ? []
+            : [{ 'quests.loginStreak.lastDayKey': { $exists: false } }]),
         ],
       },
       { $set: { 'quests.loginStreak': next } },
@@ -753,7 +931,7 @@ export async function performRescue(args: {
     loginRestored && next.goal && newCount - next.goal.startCount >= next.goal.days
       ? next.goal
       : null;
-  const granted = applyStreakRewardGrants({
+  const granted = await applyStreakRewardGrants({
     user,
     next,
     config,

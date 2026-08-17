@@ -153,10 +153,14 @@ export async function persistShieldState(userId: string, state: ShieldState) {
   await UserModel.updateOne(
     { _id: userId },
     {
-      $set: {
-        'quests.shields': state,
-        'quests.loginStreak.freezes': 0,
-        'quests.pactStreak.shields': 0,
+      $set: { 'quests.shields': state },
+      // Unset rather than zero. A $set on a missing path CREATES its parent, so
+      // zeroing here fabricated `quests.loginStreak: { freezes: 0 }` on a fresh
+      // account — and a subdocument that exists without a lastDayKey is exactly
+      // what the check-in's own update filter cannot match.
+      $unset: {
+        'quests.loginStreak.freezes': '',
+        'quests.pactStreak.shields': '',
       },
     },
   );

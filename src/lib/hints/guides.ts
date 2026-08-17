@@ -257,7 +257,7 @@ const GUIDES: Record<string, HintGuide> = {
     steps: [
       {
         anchor: 'pact-pick-area',
-        label: 'Pick the one area you want this week',
+        label: 'Take your Leap — pick the one area you want this week',
         timeoutMs: 30_000,
       },
     ],

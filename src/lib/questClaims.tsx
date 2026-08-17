@@ -270,7 +270,7 @@ function rewardQuantityLabel(reward: any): string {
     return Math.max(0, reward.amount ?? 0).toLocaleString();
   }
   const base = reward?.amount && reward.amount > 1 ? reward.amount : 1;
-  return `x${base}`;
+  return `\u00d7${base}`;
 }
 
 const REWARD_RARITY_RANK: Record<string, number> = {
@@ -305,11 +305,15 @@ export function rewardStackTileStyle(
 ): React.CSSProperties {
   const centerOffset = index - (count - 1) / 2;
   const centred = Math.abs(centerOffset) < 0.01;
+  // Four or more tiles need a gentler fan and more room: at a 7deg step the
+  // outer tiles splay, and at -8px each tile's quantity badge lands on the
+  // neighbour behind it. Three or fewer keep the original geometry exactly.
+  const wide = count > 3;
   return {
-    marginLeft: index === 0 ? 0 : -8,
+    marginLeft: index === 0 ? 0 : wide ? -3 : -8,
     transform:
       count > 1
-        ? `rotate(${centerOffset * 7}deg) translateY(${centred ? -3 : Math.abs(centerOffset) * 2}px)`
+        ? `rotate(${centerOffset * (wide ? 5 : 7)}deg) translateY(${centred ? -3 : Math.abs(centerOffset) * 2}px)`
         : undefined,
     zIndex: count - index,
   };

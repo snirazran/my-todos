@@ -7,7 +7,6 @@ import confetti from 'canvas-confetti';
 import { Flame, Snowflake, Trophy, X, ChevronRight } from 'lucide-react';
 import Frog, { type FrogHandle } from '@/components/ui/frog';
 import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
-import Fly from '@/components/ui/fly';
 import { cn } from '@/lib/utils';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
 import { hapticCelebrate, hapticImpact } from '@/lib/haptics';
@@ -21,6 +20,12 @@ import {
 } from '@/hooks/useLoginStreak';
 import { patchInventoryFlies, useInventory } from '@/hooks/useInventory';
 import { Icon } from '@/components/ui/Icon';
+import {
+  RewardTile,
+  type QuestRewardCatalogItem,
+} from '@/components/ui/QuestCards';
+import { rewardStackTileStyle } from '@/lib/questClaims';
+import type { QuestReward } from '@/lib/quests/types';
 import { openShieldSheet } from '@/hooks/useShields';
 import { StreakCelebration } from './StreakCelebration';
 import type {
@@ -48,68 +53,206 @@ const STREAK_REVEAL_MESSAGES = [
 const isShieldReward = (reward: LoginStreakReward) =>
   reward.type === 'SHIELD' || (reward.type as string) === 'STREAK_FREEZE';
 
-function rewardsLabel(rewards: LoginStreakReward[]) {
-  const parts: string[] = [];
-  let flies = 0;
-  let shields = 0;
-  let items = 0;
-  for (const r of rewards) {
-    if (isShieldReward(r)) shields += (r as any).amount ?? 1;
-    else if (r.type === 'FLIES')
-      flies += r.amountMode === 'random' ? (r.maxAmount ?? 0) : (r.amount ?? 0);
-    else items += 1;
-  }
-  if (flies > 0) parts.push(`${flies} flies`);
-  if (shields > 0) parts.push(`${shields} Lily Pad${shields > 1 ? 's' : ''}`);
-  if (items > 0) parts.push(`${items} item${items > 1 ? 's' : ''}`);
-  return parts.join(' + ') || 'Surprise';
+const SKIN_ROLL_RARITY_LABEL: Record<string, string> = {
+  common: 'Common+',
+  uncommon: 'Uncommon+',
+  rare: 'Rare+',
+  epic: 'Epic+',
+  legendary: 'Legendary',
+};
+
+/** Matches REWARD_TILE_TONE, so the chip reads as the tile it is promising. */
+const SKIN_ROLL_RARITY_CHIP: Record<string, string> = {
+  common: 'border-slate-300/60 bg-slate-500/10 text-slate-600 dark:text-slate-300',
+  uncommon:
+    'border-emerald-400/50 bg-emerald-500/12 text-emerald-700 dark:text-emerald-400',
+  rare: 'border-sky-400/50 bg-sky-500/12 text-sky-700 dark:text-sky-400',
+  epic: 'border-violet-400/50 bg-violet-500/12 text-violet-700 dark:text-violet-400',
+  legendary:
+    'border-amber-400/50 bg-amber-500/12 text-amber-700 dark:text-amber-400',
+};
+
+function skinRollFloor(rewards: LoginStreakReward[]): string | null {
+  const roll = rewards.find(
+    (reward) => (reward as { type?: string }).type === 'SKIN_ROLL',
+  ) as { minRarity?: string } | undefined;
+  return roll?.minRarity ?? null;
 }
 
-function RewardVisuals({ rewards }: { rewards: LoginStreakReward[] }) {
-  let flies = 0;
-  let shields = 0;
-  let items = 0;
-  for (const reward of rewards) {
-    if (isShieldReward(reward)) shields += (reward as any).amount ?? 1;
-    else if (reward.type === 'FLIES') {
-      flies +=
-        reward.amountMode === 'random'
-          ? (reward.maxAmount ?? 0)
-          : (reward.amount ?? 0);
-    } else {
-      items += 1;
-    }
+
+const SKIN_ROLL_RARITY_ORDER = [
+  'common',
+  'uncommon',
+  'rare',
+  'epic',
+  'legendary',
+] as const;
+
+const REWARD_TILE_FRAME =
+  'relative flex h-11 w-11 items-center justify-center overflow-visible rounded-xl border-2 shadow-sm';
+
+/** A Lily Pad in the same frame a reward tile uses — it is a prize, not a note. */
+function LilyPadTile({ count }: { count: number }) {
+  return (
+    <span
+      className={cn(
+        REWARD_TILE_FRAME,
+        'border-emerald-400 bg-gradient-to-br from-emerald-100 to-emerald-50 shadow-emerald-900/10 dark:from-emerald-900 dark:to-emerald-950',
+      )}
+      title={`${count} Lily Pad${count === 1 ? '' : 's'}`}
+    >
+      <Icon name="lilyPad" label="Lily Pad" className="h-7 w-7" />
+      {count > 1 && (
+        <span className="absolute -right-1.5 -top-1.5 z-30 flex min-w-5 items-center justify-center rounded-md border border-white/10 bg-black/55 px-1 text-[9px] font-bold leading-[16px] tracking-wide text-white shadow-sm backdrop-blur-sm">
+          ×{count}
+        </span>
+      )}
+    </span>
+  );
+}
+
+/**
+ * A guaranteed skin has no identity until it is drawn, so the tile shows what
+ * the promise covers by cycling through the eligible wearables — the rarity is
+ * fixed, the skin is not.
+ */
+function SkinRollTile({
+  minRarity,
+  rewardCatalog,
+  isPremium,
+}: {
+  minRarity: string;
+  rewardCatalog: Record<string, QuestRewardCatalogItem>;
+  isPremium: boolean;
+}) {
+  const reduceMotion = useReducedMotion();
+  const options = useMemo(() => {
+    const floor = SKIN_ROLL_RARITY_ORDER.indexOf(
+      minRarity as (typeof SKIN_ROLL_RARITY_ORDER)[number],
+    );
+    return Object.values(rewardCatalog)
+      .filter(
+        (item) =>
+          item.slot !== 'container' &&
+          item.slot !== 'background' &&
+          SKIN_ROLL_RARITY_ORDER.indexOf(
+            item.rarity as (typeof SKIN_ROLL_RARITY_ORDER)[number],
+          ) >= Math.max(0, floor),
+      )
+      .map((item) => item.id);
+  }, [rewardCatalog, minRarity]);
+
+  const [shown, setShown] = useState(0);
+  useEffect(() => {
+    if (reduceMotion || options.length <= 1) return;
+    const timer = window.setInterval(() => {
+      setShown((current) => {
+        let next = current;
+        while (next === current) {
+          next = Math.floor(Math.random() * options.length);
+        }
+        return next;
+      });
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [reduceMotion, options.length]);
+
+  const itemId = options[shown % Math.max(1, options.length)];
+  if (!itemId) return null;
+
+  return (
+    <RewardTile
+      reward={{ type: 'ITEM', itemId }}
+      rewardCatalog={rewardCatalog}
+      isPremium={isPremium}
+      compact
+      hideBadge
+      className="h-11 w-11 rounded-xl"
+      frogClassName="h-[142%] w-[142%] -translate-y-[20%]"
+    />
+  );
+}
+
+/**
+ * A pledge's prizes drawn the way an objective's are: one fanned stack of
+ * reward tiles. Lily Pads and guaranteed skins are not catalog items, so they
+ * get purpose-built tiles, but they join the same fan rather than sitting off
+ * to the side. The rarity promise rides beside the stack, never over the art.
+ */
+function PledgeRewardTiles({
+  rewards,
+  rewardCatalog,
+  isPremium,
+}: {
+  rewards: LoginStreakReward[];
+  rewardCatalog: Record<string, QuestRewardCatalogItem>;
+  isPremium: boolean;
+}) {
+  const itemRewards = rewards.filter(
+    (reward) =>
+      !isShieldReward(reward) &&
+      (reward as { type?: string }).type !== 'SKIN_ROLL',
+  ) as QuestReward[];
+  const shields = rewards.reduce(
+    (sum, reward) =>
+      isShieldReward(reward) ? sum + ((reward as any).amount ?? 1) : sum,
+    0,
+  );
+  const skinFloor = skinRollFloor(rewards);
+
+  const tiles: { key: string; node: React.ReactNode }[] = itemRewards
+    .slice(0, 3)
+    .map((reward, index) => ({
+      key: `${reward.type}-${reward.itemId ?? index}`,
+      node: (
+        <RewardTile
+          reward={reward}
+          rewardCatalog={rewardCatalog}
+          isPremium={isPremium}
+          compact
+          className="h-11 w-11 rounded-xl"
+          flySize={30}
+          giftAnimation={index === 0 ? 'box_shake' : undefined}
+        />
+      ),
+    }));
+  if (shields > 0) {
+    tiles.push({ key: 'shield', node: <LilyPadTile count={shields} /> });
+  }
+  if (skinFloor) {
+    tiles.push({
+      key: 'skin',
+      node: (
+        <SkinRollTile
+          minRarity={skinFloor}
+          rewardCatalog={rewardCatalog}
+          isPremium={isPremium}
+        />
+      ),
+    });
   }
 
   return (
-    <span className="inline-flex flex-wrap items-center gap-1.5 short-screen:gap-1">
-      {flies > 0 && (
-        <span className="inline-flex items-center gap-0.5 font-black text-primary">
-          <Fly
-            size={24}
-            y={-3}
-            alwaysPlay
-            interactive={false}
-            className="short-screen:!h-5 short-screen:!w-5"
-          />
-          <span className="tabular-nums">{flies}</span>
-        </span>
-      )}
-      {flies > 0 && (shields > 0 || items > 0) && (
-        <span className="text-muted-foreground/50">+</span>
-      )}
-      {shields > 0 && (
-        <span className="inline-flex items-center gap-1 font-black text-[#4f9149]">
-          <Icon name="lilyPad" label="Lily Pad" className="h-4 w-4" />
-          <span className="tabular-nums">{shields}</span>
-        </span>
-      )}
-      {shields > 0 && items > 0 && (
-        <span className="text-muted-foreground/50">+</span>
-      )}
-      {items > 0 && (
-        <span className="font-black text-amber-500">
-          {items} item{items > 1 ? 's' : ''}
+    <span className="flex items-center gap-2">
+      <span className="relative flex shrink-0 items-center">
+        {tiles.map((tile, index) => (
+          <span
+            key={tile.key}
+            className="relative"
+            style={rewardStackTileStyle(index, tiles.length)}
+          >
+            {tile.node}
+          </span>
+        ))}
+      </span>
+      {skinFloor && (
+        <span
+          className={cn(
+            'shrink-0 rounded-md border px-1.5 py-0.5 text-[9px] font-black uppercase tracking-[0.1em]',
+            SKIN_ROLL_RARITY_CHIP[skinFloor] ?? SKIN_ROLL_RARITY_CHIP.rare,
+          )}
+        >
+          {SKIN_ROLL_RARITY_LABEL[skinFloor] ?? skinFloor} skin
         </span>
       )}
     </span>
@@ -390,16 +533,45 @@ function RevealStep({
 
 function CommitStep({
   view,
+  rewardCatalog,
+  isPremium,
   onPicked,
   onSkip,
 }: {
   view: LoginStreakView;
+  rewardCatalog: Record<string, QuestRewardCatalogItem>;
+  isPremium: boolean;
   onPicked: (view: LoginStreakView) => void;
   onSkip: () => void;
 }) {
   const reduceMotion = useReducedMotion();
   const [busyDays, setBusyDays] = useState<number | null>(null);
   const [selectedDays, setSelectedDays] = useState<number | null>(null);
+  // `nextTierDays` is the rung above the longest pledge ever kept, so on a first
+  // pledge it is simply the lowest rung — badging that says nothing the
+  // pre-selected radio does not already say. It only carries information once
+  // there is a kept rung to step past.
+  const lowestTierDays = view?.goalTiers?.length
+    ? Math.min(...view.goalTiers.map((tier) => tier.days))
+    : null;
+  const stepUpTier = view?.goalTiers?.find(
+    (tier) => tier.days === view.nextTierDays,
+  );
+  const steppingUpTo =
+    stepUpTier &&
+    stepUpTier.days !== lowestTierDays &&
+    // At the top of the ladder `nextTierDays` falls back to the last rung, so
+    // without this it would badge "step up" on a rung already kept.
+    stepUpTier.repeatIndex === 0
+      ? stepUpTier.days
+      : null;
+  // The rung above the longest pledge kept so far arrives pre-selected, so the
+  // ladder offers the next step rather than asking the user to find it.
+  useEffect(() => {
+    if (selectedDays !== null) return;
+    const suggested = view?.nextTierDays ?? null;
+    if (suggested !== null) setSelectedDays(suggested);
+  }, [view?.nextTierDays, selectedDays]);
   const [error, setError] = useState<string | null>(null);
 
   const pickGoal = async (days: number) => {
@@ -525,15 +697,33 @@ function CommitStep({
                               className="w-5 h-5 text-orange-500 shrink-0 fill-orange-400"
                             />
                             <span className="min-w-0 text-sm font-black text-foreground sm:text-base">
-                              {tier.days}-day goal
+                              {tier.days}-day pledge
                             </span>
+                            {tier.days === steppingUpTo && (
+                              <span className="shrink-0 rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-[0.12em] text-emerald-600 dark:text-emerald-400">
+                                Step up
+                              </span>
+                            )}
+                            {tier.payoutPercent < 100 && (
+                              <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[9px] font-black uppercase tracking-[0.12em] text-muted-foreground">
+                                {tier.payoutPercent}%
+                              </span>
+                            )}
                           </span>
                           <span
                             id={rewardId}
                             className="mt-0.5 flex min-w-0 flex-wrap items-center gap-1 text-[11px] font-bold text-muted-foreground sm:text-xs"
                           >
-                            <span>Reward</span>
-                            <RewardVisuals rewards={tier.rewards} />
+                            <PledgeRewardTiles
+                              rewards={tier.rewards}
+                              rewardCatalog={rewardCatalog}
+                              isPremium={isPremium}
+                            />
+                            {tier.payoutPercent < 100 && (
+                              <span className="text-muted-foreground/70">
+                                · repeat rung, step up for full price
+                              </span>
+                            )}
                           </span>
                         </span>
                       </span>
@@ -596,6 +786,8 @@ function HomeStep({
   view,
   indices,
   frogReady,
+  rewardCatalog,
+  isPremium,
   onGetLilyPad,
   onCommit,
   onDone,
@@ -603,6 +795,8 @@ function HomeStep({
   view: LoginStreakView;
   indices: Partial<Record<'skin' | 'hat' | 'body' | 'hand_item', number>>;
   frogReady: boolean;
+  rewardCatalog: Record<string, QuestRewardCatalogItem>;
+  isPremium: boolean;
   onGetLilyPad: () => void;
   onCommit: () => void;
   onDone: () => void;
@@ -694,24 +888,51 @@ function HomeStep({
                     <Trophy className="w-4 h-4 text-amber-500" />
                     {view.goal.days}-day commitment
                   </p>
-                  <div className="mt-2.5 h-3 overflow-hidden rounded-full bg-muted">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{
-                        width: `${Math.min(100, (view.goal.progress / view.goal.days) * 100)}%`,
-                      }}
-                      transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-                      className="h-full rounded-full bg-amber-400"
-                    />
+                  {/* Endowed progress: the pledge itself is step one, already
+                      filled, so the bar never starts at nothing. */}
+                  <div className="mt-2.5 flex gap-1">
+                    {Array.from({ length: view.goal.stepCount }).map((_, step) => (
+                      <motion.span
+                        key={step}
+                        initial={{ opacity: 0.4, scaleY: 0.6 }}
+                        animate={{ opacity: 1, scaleY: 1 }}
+                        transition={{
+                          duration: 0.3,
+                          delay: Math.min(0.4, step * 0.02),
+                        }}
+                        className={cn(
+                          'h-3 min-w-0 flex-1 rounded-full',
+                          step < view.goal!.stepsFilled
+                            ? step === 0
+                              ? 'bg-emerald-400'
+                              : 'bg-amber-400'
+                            : 'bg-muted',
+                        )}
+                      />
+                    ))}
                   </div>
                   <p className="mt-1.5 text-xs font-bold text-muted-foreground">
-                    {view.goal.progress} / {view.goal.days} days ·{' '}
-                    {rewardsLabel(
-                      view.goalTiers.find((t) => t.days === view.goal!.days)
-                        ?.rewards ?? [],
-                    )}{' '}
-                    at the finish
+                    <span className="text-emerald-600 dark:text-emerald-400">
+                      You made the pledge ✓
+                    </span>{' '}
+                    · {view.goal.progress} / {view.goal.days} days
+                    {view.goal.payoutPercent < 100
+                      ? ` · ${view.goal.payoutPercent}% (repeat rung)`
+                      : ''}
                   </p>
+                  <div className="mt-2 flex items-center gap-2">
+                    <PledgeRewardTiles
+                      rewards={
+                        view.goalTiers.find((t) => t.days === view.goal!.days)
+                          ?.rewards ?? []
+                      }
+                      rewardCatalog={rewardCatalog}
+                      isPremium={isPremium}
+                    />
+                    <span className="text-[11px] font-bold text-muted-foreground">
+                      at the finish
+                    </span>
+                  </div>
                 </>
               ) : (
                 <button
@@ -755,14 +976,29 @@ export function StreakSheet({
   open,
   onOpenChange,
   celebration,
+  commitIntent = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   celebration: CheckInResult | null;
+  commitIntent?: boolean;
 }) {
   const { view: liveView } = useLoginStreak(open);
-  const { data: inventoryData } = useInventory(open, true);
+  // Full catalog, not the owned-items summary: reward tiles resolve art by id,
+  // so gift boxes rendered as blank tiles and the guaranteed-skin pool came up
+  // empty for any rarity the user happened not to own yet.
+  const { data: inventoryData } = useInventory(open);
   const flyBalance = inventoryData?.wardrobe?.flies ?? 0;
+  const isPremium = inventoryData?.isPremium ?? false;
+  // Reward tiles resolve item art by id, and the inventory payload already
+  // carries the catalog, so the pledge prizes need no second fetch.
+  const rewardCatalog = useMemo<Record<string, QuestRewardCatalogItem>>(
+    () =>
+      Object.fromEntries(
+        (inventoryData?.catalog ?? []).map((item) => [item.id, item]),
+      ),
+    [inventoryData?.catalog],
+  );
   const { indices } = useWardrobeIndices(open);
 
   const view = liveView ?? celebration?.view ?? null;
@@ -776,7 +1012,13 @@ export function StreakSheet({
 
   useEffect(() => {
     if (!open) return;
-    setStep(celebration?.extended ? 'reveal' : 'home');
+    setStep(
+      commitIntent && !liveView?.goal
+        ? 'commit'
+        : celebration?.extended
+          ? 'reveal'
+          : 'home',
+    );
     const t = window.setTimeout(() => setFrogReady(true), 300);
     document.body.style.overflow = 'hidden';
     return () => {
@@ -784,7 +1026,7 @@ export function StreakSheet({
       setFrogReady(false);
       document.body.style.overflow = '';
     };
-  }, [open, celebration]);
+  }, [open, celebration, commitIntent, liveView?.goal]);
 
   const close = () => onOpenChange(false);
 
@@ -878,6 +1120,8 @@ export function StreakSheet({
                 {step === 'commit' && (
                   <CommitStep
                     view={view}
+                    rewardCatalog={rewardCatalog}
+                    isPremium={isPremium}
                     onPicked={finishCommit}
                     onSkip={finishCommit}
                   />
@@ -887,6 +1131,8 @@ export function StreakSheet({
                     view={view}
                     indices={indices}
                     frogReady={frogReady}
+                    rewardCatalog={rewardCatalog}
+                    isPremium={isPremium}
                     onGetLilyPad={() => openShieldSheet()}
                     onCommit={() => setStep('commit')}
                     onDone={() => onOpenChange(false)}
