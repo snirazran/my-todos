@@ -74,6 +74,7 @@ const UserSchema = new Schema<UserDoc>(
     plusIntroShownAt: { type: Date, default: null },
     adDoubleClaim: { type: Schema.Types.Mixed, default: undefined },
     adFlyDaily: { type: Schema.Types.Mixed, default: undefined },
+    timezoneGuard: { type: Schema.Types.Mixed, default: undefined },
     dailyQuestReroll: { type: Schema.Types.Mixed, default: undefined },
     giftDoubleClaim: { type: Schema.Types.Mixed, default: undefined },
     tradeRerollClaim: { type: Schema.Types.Mixed, default: undefined },

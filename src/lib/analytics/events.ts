@@ -103,6 +103,8 @@ export const ANALYTICS_EVENTS = [
   'pact_retro_claimed',
   'shield_sheet_opened',
   'shield_purchased',
+  'fly_circuit_breaker',
+  'overflow_jar_gift',
 ] as const;
 
 export type AnalyticsEventName = (typeof ANALYTICS_EVENTS)[number];
@@ -216,6 +218,8 @@ const EVENT_CATEGORIES: Record<AnalyticsEventName, string> = {
   pact_retro_claimed: 'monetization',
   shield_sheet_opened: 'monetization',
   shield_purchased: 'monetization',
+  fly_circuit_breaker: 'economy',
+  overflow_jar_gift: 'economy',
 };
 
 export function analyticsCategory(name: AnalyticsEventName) {
@@ -283,6 +287,11 @@ const ALLOWED_PROPERTY_KEYS = new Set([
   'source',
   'is_premium',
   'fly_amount',
+  'day_key',
+  'requested',
+  'granted',
+  'gifts',
+  'gift_item_id',
   'flies_received',
   'flies_spent',
   'item_count',

@@ -5,13 +5,17 @@ import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import UserModel from '@/lib/models/User';
 import { getZonedToday } from '@/lib/utils';
-import {
-  AD_FLY_DAILY_CAP,
-  AD_FLY_REWARD,
-  adFliesRemaining,
-  type AdFlyDaily,
-} from '@/lib/rewards/adFlies';
+import { adFliesRemaining, type AdFlyDaily } from '@/lib/rewards/adFlies';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
+import { loadFlyEconomyConfig } from '@/lib/economy/config';
+import { settleFlyGrant } from '@/lib/economy/ledger';
+import { resolveEconomyTimezone } from '@/lib/economy/guards';
+
+function cooldownLeft(prev: AdFlyDaily | undefined, cooldownSeconds: number) {
+  if (!prev?.lastAt || cooldownSeconds <= 0) return 0;
+  const elapsed = Date.now() - new Date(prev.lastAt).getTime();
+  return Math.max(0, Math.ceil((cooldownSeconds * 1000 - elapsed) / 1000));
+}
 
 export async function GET(req: NextRequest) {
   let userId: string;
@@ -21,19 +25,25 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const tz = req.nextUrl.searchParams.get('timezone') || 'UTC';
-
   try {
     await connectMongo();
+    const config = await loadFlyEconomyConfig();
+    const tz = await resolveEconomyTimezone(
+      userId,
+      req.nextUrl.searchParams.get('timezone'),
+    );
     const user = await UserModel.findById(userId).select('adFlyDaily').lean();
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
     const today = getZonedToday(tz);
+    const prev = (user as any).adFlyDaily as AdFlyDaily | undefined;
     return NextResponse.json({
-      reward: AD_FLY_REWARD,
-      cap: AD_FLY_DAILY_CAP,
-      remaining: adFliesRemaining((user as any).adFlyDaily, today),
+      reward: config.rewardedAds.reward,
+      cap: config.rewardedAds.dailyCap,
+      remaining: adFliesRemaining(prev, today, config.rewardedAds.dailyCap),
+      cooldownSeconds: config.rewardedAds.cooldownSeconds,
+      cooldownLeft: cooldownLeft(prev, config.rewardedAds.cooldownSeconds),
     });
   } catch (err) {
     console.error('Ad fly status failed:', err);
@@ -53,12 +63,13 @@ export async function POST(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    /* empty body → UTC */
+    /* empty body → stored zone */
   }
-  const tz = body.timezone || 'UTC';
 
   try {
     await connectMongo();
+    const config = await loadFlyEconomyConfig();
+    const tz = await resolveEconomyTimezone(userId, body.timezone);
     const user = await UserModel.findById(userId);
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -67,37 +78,73 @@ export async function POST(req: NextRequest) {
     const today = getZonedToday(tz);
     const prev = (user as any).adFlyDaily as AdFlyDaily | undefined;
     const count = prev && prev.date === today ? prev.count : 0;
+    const cap = config.rewardedAds.dailyCap;
+    const waitLeft = cooldownLeft(prev, config.rewardedAds.cooldownSeconds);
 
-    if (count >= AD_FLY_DAILY_CAP) {
+    if (count >= cap || waitLeft > 0) {
       return NextResponse.json({
         granted: false,
-        reward: AD_FLY_REWARD,
-        cap: AD_FLY_DAILY_CAP,
-        remaining: 0,
+        reward: config.rewardedAds.reward,
+        cap,
+        remaining: Math.max(0, cap - count),
+        cooldownLeft: waitLeft,
+        reason: waitLeft > 0 ? 'cooldown' : 'cap',
+      });
+    }
+
+    // The view number is the occurrence: a retried request settles the same row
+    // rather than paying a second time.
+    const settlement = await settleFlyGrant({
+      userId,
+      source: 'rewarded_ad',
+      occurrenceKey: `${today}:${count + 1}`,
+      dayKey: today,
+      targetAmount: config.rewardedAds.reward,
+      meta: { view: count + 1 },
+    });
+
+    if (settlement.delta <= 0) {
+      return NextResponse.json({
+        granted: false,
+        reward: config.rewardedAds.reward,
+        cap,
+        remaining: Math.max(0, cap - count),
+        cooldownLeft: 0,
+        reason: settlement.breakerTripped ? 'breaker' : 'duplicate',
       });
     }
 
     if (!user.wardrobe) {
       user.wardrobe = { equipped: {}, inventory: {}, unseenItems: [], flies: 0 };
     }
-    user.wardrobe.flies = (user.wardrobe.flies ?? 0) + AD_FLY_REWARD;
-    (user as any).adFlyDaily = { date: today, count: count + 1 };
+    user.wardrobe.flies = (user.wardrobe.flies ?? 0) + settlement.delta;
+    (user as any).adFlyDaily = {
+      date: today,
+      count: count + 1,
+      lastAt: new Date(),
+    };
     user.markModified('adFlyDaily');
     user.markModified('wardrobe');
     await user.save();
     await recordAnalyticsEvent({
       userId,
       name: 'fly_earned',
-      properties: { source: 'rewarded_ad', fly_amount: AD_FLY_REWARD, is_premium: false },
+      properties: {
+        source: 'rewarded_ad',
+        fly_amount: settlement.delta,
+        is_premium: false,
+      },
     });
 
     return NextResponse.json({
       granted: true,
-      amount: AD_FLY_REWARD,
+      amount: settlement.delta,
       balance: user.wardrobe.flies,
-      reward: AD_FLY_REWARD,
-      cap: AD_FLY_DAILY_CAP,
-      remaining: AD_FLY_DAILY_CAP - (count + 1),
+      reward: config.rewardedAds.reward,
+      cap,
+      remaining: Math.max(0, cap - (count + 1)),
+      cooldownSeconds: config.rewardedAds.cooldownSeconds,
+      cooldownLeft: config.rewardedAds.cooldownSeconds,
     });
   } catch (err) {
     console.error('Ad fly reward failed:', err);

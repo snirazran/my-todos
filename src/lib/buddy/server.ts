@@ -9,6 +9,12 @@ import {
   buddyPartnerFinishedMessage,
 } from '@/lib/notifications/frogVoice';
 import { bumpQuestMetric } from '@/lib/quests/metrics';
+import { loadFlyEconomyConfig } from '@/lib/economy/config';
+import {
+  fliesGrantedOnDay,
+  fliesGrantedOnDayWhere,
+  settleFlyGrant,
+} from '@/lib/economy/ledger';
 
 function dowYMD(ymd: string): number {
   const [y, m, d] = ymd.split('-').map(Number);
@@ -71,13 +77,55 @@ export function computeStreak(
   return { count, lastDate };
 }
 
-/** Flat bonus each side gets for finishing the same day together. */
-const BUDDY_BONUS_FLIES = 1;
+/**
+ * Pay one side of a shared completion, inside both buddy caps: what this pair
+ * may pay in a day, and what all pairs together may pay in a day. Returns what
+ * actually moved so the balance and the ledger can never disagree.
+ */
+async function settleBuddyBonus(args: {
+  userId: string;
+  bondId: string;
+  date: string;
+  today: string;
+  amount: number;
+}): Promise<number> {
+  const config = await loadFlyEconomyConfig();
+  const target = Math.max(0, Math.min(args.amount, config.buddy.bonusFlies));
+
+  const [dayTotal, pairTotal] = await Promise.all([
+    fliesGrantedOnDay(args.userId, args.today, ['buddy']),
+    fliesGrantedOnDayWhere(args.userId, args.today, 'buddy', {
+      bondId: args.bondId,
+    }),
+  ]);
+
+  const settlement = await settleFlyGrant({
+    userId: args.userId,
+    source: 'buddy',
+    occurrenceKey: `${args.bondId}:${args.date}`,
+    dayKey: args.today,
+    targetAmount: target,
+    capRemaining: Math.min(
+      Math.max(0, config.buddy.dailyCap - dayTotal),
+      Math.max(0, config.buddy.perPairDailyCap - pairTotal),
+    ),
+    skipBreaker: target === 0,
+    meta: { bondId: args.bondId, occurrenceDate: args.date },
+  });
+
+  if (settlement.delta !== 0) {
+    await UserModel.updateOne(
+      { _id: args.userId },
+      { $inc: { 'wardrobe.flies': settlement.delta } },
+    );
+  }
+  return settlement.delta;
+}
 
 /**
  * Mirror a bonded task completion to the bond. When BOTH sides have completed
- * the same occurrence date, grant the shared bonus (bypassing the daily cap) to
- * both; reverse on uncomplete. Recomputes the shared streak and nudges the
+ * the same occurrence date, grant the shared bonus to both, inside the buddy
+ * caps; reverse on uncomplete. Recomputes the shared streak and nudges the
  * partner's client.
  */
 export async function handleBuddyCompletion(opts: {
@@ -116,11 +164,26 @@ export async function handleBuddyCompletion(opts: {
         .lean<{ tags?: string[] } | null>(),
     ]);
 
+  const bonusToday = getZonedToday(tz);
+
   if (completed && bothNow && !alreadyBonused) {
     const [myTask, partnerTask] = await loadBondTaskTags();
+    const config = await loadFlyEconomyConfig();
     await Promise.all([
-      UserModel.updateOne({ _id: userId }, { $inc: { 'wardrobe.flies': BUDDY_BONUS_FLIES } }),
-      UserModel.updateOne({ _id: partnerId }, { $inc: { 'wardrobe.flies': BUDDY_BONUS_FLIES } }),
+      settleBuddyBonus({
+        userId,
+        bondId,
+        date,
+        today: bonusToday,
+        amount: config.buddy.bonusFlies,
+      }),
+      settleBuddyBonus({
+        userId: partnerId,
+        bondId,
+        date,
+        today: bonusToday,
+        amount: config.buddy.bonusFlies,
+      }),
       bumpQuestMetric({ userId, metric: 'buddy_task_completed', timezone: tz, tagIds: myTask?.tags ?? [] }),
       bumpQuestMetric({ userId: partnerId, metric: 'buddy_task_completed', timezone: tz, tagIds: partnerTask?.tags ?? [] }),
     ]);
@@ -128,8 +191,14 @@ export async function handleBuddyCompletion(opts: {
   } else if (!bothNow && alreadyBonused) {
     const [myTask, partnerTask] = await loadBondTaskTags();
     await Promise.all([
-      UserModel.updateOne({ _id: userId }, { $inc: { 'wardrobe.flies': -BUDDY_BONUS_FLIES } }),
-      UserModel.updateOne({ _id: partnerId }, { $inc: { 'wardrobe.flies': -BUDDY_BONUS_FLIES } }),
+      settleBuddyBonus({ userId, bondId, date, today: bonusToday, amount: 0 }),
+      settleBuddyBonus({
+        userId: partnerId,
+        bondId,
+        date,
+        today: bonusToday,
+        amount: 0,
+      }),
       bumpQuestMetric({ userId, metric: 'buddy_task_completed', amount: -1, timezone: tz, tagIds: myTask?.tags ?? [] }),
       bumpQuestMetric({ userId: partnerId, metric: 'buddy_task_completed', amount: -1, timezone: tz, tagIds: partnerTask?.tags ?? [] }),
     ]);

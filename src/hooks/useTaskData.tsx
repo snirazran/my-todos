@@ -76,6 +76,18 @@ export type FlyStatus = {
   limitHit: boolean;
   justHitLimit?: boolean;
   isPremium?: boolean;
+  payingCompletionsLeft?: number;
+  plusLimit?: number;
+  blockedReason?: 'backdated' | 'completions' | 'cap' | 'breaker';
+};
+
+export type JarStatus = {
+  pebbles: number;
+  pebblesAdded: number;
+  giftsEarned: number;
+  giftItemId: string;
+  pebblesToNextGift: number;
+  weeklyGiftLocked: boolean;
 };
 
 export type HungerStatus = {
@@ -368,7 +380,13 @@ export function useTaskData({
             // NOTIFICATIONS
             if (newFlyStatus) {
               if (newFlyStatus.justHitLimit) {
-                if (newFlyStatus.isPremium) {
+                // The Plus pitch only makes sense while Plus actually buys a
+                // bigger day; the caps are admin-tunable and can be equal.
+                if (
+                  newFlyStatus.isPremium ||
+                  !newFlyStatus.plusLimit ||
+                  newFlyStatus.plusLimit <= newFlyStatus.limit
+                ) {
                   showNotification(
                     <div className="flex w-full items-center gap-3">
                       <div className="grid h-12 w-12 shrink-0 place-items-center">
@@ -404,7 +422,8 @@ export function useTaskData({
                           Daily limit reached — {newFlyStatus.limit} flies
                         </span>
                         <span className="mt-0.5 text-[12px] font-bold text-primary">
-                          Go Premium for up to 100 flies a day →
+                          Go Premium for up to {newFlyStatus.plusLimit} flies a
+                          day →
                         </span>
                       </div>
                     </button>,
@@ -413,6 +432,44 @@ export function useTaskData({
                   );
                 }
               }
+            }
+
+            const jar = json.jar as JarStatus | undefined;
+            if (nextCompleted && jar?.giftsEarned) {
+              showNotification(
+                <div className="flex w-full flex-col leading-tight">
+                  <span className="text-[14px] font-black text-foreground">
+                    The jar filled — a gift is waiting
+                  </span>
+                  <span className="mt-0.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Everything you finished past the daily catch
+                  </span>
+                </div>,
+                undefined,
+                { durationMs: 6000 },
+              );
+            } else if (nextCompleted && jar?.pebblesAdded) {
+              showNotification(
+                <div className="flex w-full flex-col leading-tight">
+                  <span className="text-[14px] font-black text-foreground">
+                    Pebble in the jar — {jar.pebblesToNextGift} to a gift
+                  </span>
+                  <span className="mt-0.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Today&apos;s flies are all caught
+                  </span>
+                </div>,
+                undefined,
+                { durationMs: 5000 },
+              );
+            } else if (
+              nextCompleted &&
+              newFlyStatus?.blockedReason === 'backdated'
+            ) {
+              showNotification(
+                <span>Logged for that day — too old to earn flies.</span>,
+                undefined,
+                { durationMs: 5000 },
+              );
             }
 
             if (nextCompleted && !newFlyStatus?.isPremium) {

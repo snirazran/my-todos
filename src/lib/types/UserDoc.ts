@@ -5,6 +5,7 @@ import type { DealReroll } from '@/lib/skins/dailyDeal';
 import type { SavedLook } from '@/lib/skins/looks';
 import type { FocusProfile } from '@/lib/quests/types';
 import type { FrogodoroSettings, PomodoroPhase, SessionStats } from '@/lib/frogodoroStore';
+import type { OverflowJar } from '@/lib/economy/overflowJar';
 
 export type DailyFlyProgress = {
   date: string;
@@ -14,6 +15,12 @@ export type DailyFlyProgress = {
   /** Belly time (ms) each task actually added, so undo refunds exactly that. */
   taskHunger?: Record<string, number>;
   limitNotified?: boolean;
+  /** Completions that have drawn from the paying-completions allowance today. */
+  paidCompletions?: number;
+  /** Tasks that have drawn today's streak-uplift payouts. */
+  streakTaskIds?: string[];
+  /** Tasks whose completion earned pebbles instead of flies. */
+  jarTaskIds?: string[];
 };
 
 export type FocusFlyDaily = {
@@ -81,6 +88,8 @@ export type UserWardrobe = {
   dealReroll?: DealReroll | null;
   /** Outfits the user saved so a good combination isn't lost to a shuffle. */
   looks?: SavedLook[];
+  /** Pebbles earned past the day's paying completions, and the gifts they buy. */
+  overflowJar?: OverflowJar;
 
   // Hunger System
   hunger?: number; // Time remaining in ms (max defined by MAX_HUNGER_MS)
@@ -141,6 +150,14 @@ export type UserDoc = {
   adFlyDaily?: {
     date: string;
     count: number;
+    /** Last granted view, so the cooldown survives a page reload. */
+    lastAt?: Date | string;
+  };
+  /** The timezone the economy trusts, and how often it has been changed. */
+  timezoneGuard?: {
+    zone?: string;
+    windowStartedAt?: Date | string;
+    changesInWindow?: number;
   };
   dailyQuestReroll?: {
     date: string;

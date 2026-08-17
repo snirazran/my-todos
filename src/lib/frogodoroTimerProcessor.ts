@@ -30,6 +30,7 @@ import {
 } from '@/lib/focusFlies';
 import TaskModel from '@/lib/models/Task';
 import { taskAnalyticsProperties } from '@/lib/analytics/engagement';
+import { settleFlyGrant } from '@/lib/economy/ledger';
 
 const DEFAULT_SETTINGS: FrogodoroSettings = {
   focusDuration: 25,
@@ -401,6 +402,28 @@ async function processOneDueTimer(
       },
       { $unset: ['_deepPrev', '_deepGained'] },
     ], { updatePipeline: true });
+
+    const after = await UserModel.findById(userId)
+      .select('wardrobe.deepFocusDaily')
+      .lean<{
+        wardrobe?: { deepFocusDaily?: { date?: string; earned?: number } };
+      } | null>();
+    const earnedToday =
+      after?.wardrobe?.deepFocusDaily?.date === deepDate
+        ? after?.wardrobe?.deepFocusDaily?.earned ?? 0
+        : 0;
+    if (earnedToday > 0) {
+      await settleFlyGrant({
+        userId,
+        source: 'deep_focus',
+        occurrenceKey: `day:${deepDate}`,
+        dayKey: deepDate,
+        targetAmount: earnedToday,
+        skipBreaker: true,
+      }).catch((error) => {
+        console.error('Deep focus ledger failed:', error);
+      });
+    }
   }
 
   if (next.completedPhase === 'focus') {

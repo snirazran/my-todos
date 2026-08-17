@@ -42,6 +42,17 @@ import {
 } from '@/lib/checklist';
 import { streakFlyBonus } from '@/lib/flyValue';
 import {
+  FLY_ECONOMY_DEFAULTS,
+  loadFlyEconomyConfig,
+  taskIncomeCap,
+} from '@/lib/economy/config';
+import { settleFlyGrant } from '@/lib/economy/ledger';
+import {
+  isPayableOccurrenceDate,
+  resolveEconomyTimezone,
+} from '@/lib/economy/guards';
+import { accrueOverflowPebbles } from '@/lib/economy/overflowJar';
+import {
   dowFromYMD,
   domFromYMD,
   addDaysYMD,
@@ -72,6 +83,12 @@ type FlyStatus = {
   limitHit: boolean;
   justHitLimit?: boolean;
   isPremium?: boolean;
+  /** Completions left today that still pay flies rather than pebbles. */
+  payingCompletionsLeft?: number;
+  /** What the Plus cap is, so the upsell only fires when Plus actually pays more. */
+  plusLimit?: number;
+  /** Why this completion paid nothing, when it paid nothing. */
+  blockedReason?: 'backdated' | 'completions' | 'cap' | 'breaker';
 };
 
 type HungerStatus = {
@@ -80,8 +97,17 @@ type HungerStatus = {
   maxHunger: number;
 };
 
-const DAILY_FLY_LIMIT_FREE = 50;
-const DAILY_FLY_LIMIT_PREMIUM = 100;
+type JarStatus = {
+  pebbles: number;
+  pebblesAdded: number;
+  giftsEarned: number;
+  giftItemId: string;
+  pebblesToNextGift: number;
+  weeklyGiftLocked: boolean;
+};
+
+const DAILY_FLY_LIMIT_FREE = FLY_ECONOMY_DEFAULTS.taskIncome.dailyCapFree;
+const DAILY_FLY_LIMIT_PREMIUM = FLY_ECONOMY_DEFAULTS.taskIncome.dailyCapPlus;
 
 const isWeekday = (n: number): n is Weekday =>
   Number.isInteger(n) && n >= 0 && n <= 6;
@@ -214,6 +240,9 @@ const initDailyFly = (date: string): DailyFlyProgress => ({
   taskFlies: {},
   taskHunger: {},
   limitNotified: false,
+  paidCompletions: 0,
+  streakTaskIds: [],
+  jarTaskIds: [],
 });
 
 function normalizeDailyFly(
@@ -227,6 +256,13 @@ function normalizeDailyFly(
       taskFlies: flyDaily.taskFlies ?? {},
       taskHunger: flyDaily.taskHunger ?? {},
       limitNotified: flyDaily.limitNotified ?? false,
+      paidCompletions: Math.max(
+        0,
+        flyDaily.paidCompletions ??
+          Object.values(flyDaily.taskFlies ?? {}).filter((n) => n > 0).length,
+      ),
+      streakTaskIds: flyDaily.streakTaskIds ?? [],
+      jarTaskIds: flyDaily.jarTaskIds ?? [],
     };
   }
   return initDailyFly(today);
@@ -244,14 +280,30 @@ type FlyValueTask = Pick<
  * the markers it never reached. The streak tier adds its bonus on top too, but
  * only for an actual completion.
  */
+function taskFlyBreakdown(
+  task: FlyValueTask,
+  date: string,
+  streak: number = 0,
+  completed: boolean = true,
+): { base: number; checklist: number; streak: number; total: number } {
+  const base = completed ? 1 : 0;
+  const streakUplift = completed ? streakFlyBonus(streak) : 0;
+  const checklist = checklistPayoutForDate(task, date).earned;
+  return {
+    base,
+    checklist,
+    streak: streakUplift,
+    total: base + checklist + streakUplift,
+  };
+}
+
 function taskFlyValue(
   task: FlyValueTask,
   date: string,
   streak: number = 0,
   completed: boolean = true,
 ): number {
-  const base = completed ? 1 + streakFlyBonus(streak) : 0;
-  return base + checklistPayoutForDate(task, date).earned;
+  return taskFlyBreakdown(task, date, streak, completed).total;
 }
 
 /**
@@ -288,6 +340,7 @@ async function currentFlyStatus(
   dailyTasksCount: number;
 }> {
   const today = getZonedToday(tz);
+  const config = await loadFlyEconomyConfig();
   const user = (await UserModel.findById(userId, {
     wardrobe: 1,
     statistics: 1,
@@ -313,7 +366,7 @@ async function currentFlyStatus(
   }
 
   const premium = isPremiumUser(user);
-  const limit = premium ? DAILY_FLY_LIMIT_PREMIUM : DAILY_FLY_LIMIT_FREE;
+  const limit = taskIncomeCap(config, premium);
   const { updates, status: hungerStatus } = calculateHunger(user);
   const wardrobe = user.wardrobe ?? { equipped: {}, inventory: {}, flies: 0 };
   const daily = normalizeDailyFly(
@@ -358,6 +411,7 @@ async function currentFlyStatus(
       limit,
       limitHit: daily.earned >= limit,
       isPremium: premium,
+      plusLimit: config.taskIncome.dailyCapPlus,
     },
     hungerStatus,
     dailyTasksCount,
@@ -378,22 +432,39 @@ function syncGamification(userId: string, timezone: string) {
   ]);
 }
 
+type TaskFlyBreakdown = {
+  base: number;
+  checklist: number;
+  streak: number;
+};
+
 async function awardFlyForTask(
   userId: string,
   taskId: string,
   tz: string,
   countTowardDaily: boolean = true,
-  value: number = 1,
-  opts: { topUp?: boolean; countTask?: boolean } = {},
+  value: TaskFlyBreakdown = { base: 1, checklist: 0, streak: 0 },
+  opts: {
+    topUp?: boolean;
+    countTask?: boolean;
+    occurrenceDate?: string;
+    /** False when the occurrence is too far in the past to earn anything. */
+    payable?: boolean;
+  } = {},
 ): Promise<{
   awarded: boolean;
+  granted: number;
   flyStatus: FlyStatus;
   hungerStatus: HungerStatus;
   dailyTasksCount: number;
+  jar?: JarStatus;
 }> {
   const topUp = opts.topUp ?? false;
   const countTask = opts.countTask ?? countTowardDaily;
+  const payable = opts.payable ?? true;
   const today = getZonedToday(tz);
+  const occurrenceDate = opts.occurrenceDate ?? today;
+  const config = await loadFlyEconomyConfig();
   const user = (await UserModel.findById(userId, {
     wardrobe: 1,
     statistics: 1, // Include statistics
@@ -403,6 +474,7 @@ async function awardFlyForTask(
   if (!user) {
     return {
       awarded: false,
+      granted: 0,
       flyStatus: {
         balance: 0,
         earnedToday: 0,
@@ -420,7 +492,7 @@ async function awardFlyForTask(
   }
 
   const premium = isPremiumUser(user);
-  const limit = premium ? DAILY_FLY_LIMIT_PREMIUM : DAILY_FLY_LIMIT_FREE;
+  const limit = taskIncomeCap(config, premium);
   const { updates: hungerUpdates, status: currentHungerState } =
     calculateHunger(user);
   const wardrobe = user.wardrobe ?? { equipped: {}, inventory: {}, flies: 0 };
@@ -469,13 +541,60 @@ async function awardFlyForTask(
     }
   }
 
-  // A checklist tops its own grant up marker by marker, so the same task can
-  // be paid more than once in a day — never beyond the value it has earned.
-  const desired = Math.max(topUp ? 0 : 1, Math.floor(value));
-  let grant = topUp ? desired - alreadyGranted : desired;
-  if (countTowardDaily) {
-    grant = Math.min(grant, Math.max(0, limit - daily.earned));
-  }
+  // Three gates decide what a completion is worth, in order. Past the day's
+  // paying completions the whole payout — base, checklist and streak alike —
+  // turns into pebbles, so the wall is the count of completions rather than a
+  // rate that quietly halves. A task that has already been paid today is inside
+  // its completion and keeps topping up its markers.
+  const isNewPayingCompletion = !alreadyRewarded && alreadyGranted <= 0;
+  const completionsAllowance = config.taskIncome.payingCompletionsPerDay;
+  const completionsExhausted =
+    isNewPayingCompletion && (daily.paidCompletions ?? 0) >= completionsAllowance;
+  const streakTaskIds = daily.streakTaskIds ?? [];
+  const streakAllowed =
+    streakTaskIds.includes(taskId) ||
+    streakTaskIds.length < config.streakMilestones.dailyCap;
+  const streakPaid = streakAllowed ? Math.max(0, value.streak) : 0;
+
+  const desired =
+    payable && !completionsExhausted
+      ? Math.max(topUp ? 0 : 1, value.base + value.checklist + streakPaid)
+      : 0;
+
+  const capRemaining = countTowardDaily
+    ? Math.max(0, limit - daily.earned)
+    : Number.MAX_SAFE_INTEGER;
+
+  const settlement =
+    desired > alreadyGranted
+      ? await settleFlyGrant({
+          userId,
+          source: 'task',
+          occurrenceKey: `${taskId}:${occurrenceDate}`,
+          dayKey: today,
+          targetAmount: desired,
+          capRemaining,
+          meta: {
+            taskId,
+            occurrenceDate,
+            base: value.base,
+            checklist: value.checklist,
+            streak: streakPaid,
+            premium,
+          },
+        })
+      : null;
+
+  const grant = settlement?.delta ?? 0;
+  const blockedReason: FlyStatus['blockedReason'] = !payable
+    ? 'backdated'
+    : completionsExhausted
+      ? 'completions'
+      : settlement?.breakerTripped
+        ? 'breaker'
+        : settlement?.capped || (desired > 0 && grant <= 0 && capRemaining <= 0)
+          ? 'cap'
+          : undefined;
 
   // Nothing left to pay. A first-time completion still falls through even at
   // the daily cap, so the frog is fed and the task is recorded either way.
@@ -500,12 +619,19 @@ async function awardFlyForTask(
 
     return {
       awarded: false,
+      granted: 0,
       flyStatus: {
         balance: currentBalance,
         earnedToday: daily.earned,
         limit,
         limitHit: atLimit,
         isPremium: premium,
+        plusLimit: config.taskIncome.dailyCapPlus,
+        payingCompletionsLeft: Math.max(
+          0,
+          completionsAllowance - (daily.paidCompletions ?? 0),
+        ),
+        blockedReason,
       },
       hungerStatus: currentHungerState,
       dailyTasksCount: nextDailyTasksCount,
@@ -540,9 +666,20 @@ async function awardFlyForTask(
     setFields['statistics.daily'] = statsUpdates['statistics.daily'];
   }
 
+  const paidAfter = settlement?.paidAfter ?? alreadyGranted;
   const nextEarned = daily.earned + (countTowardDaily ? grant : 0);
   const nextBalance = currentBalance + grant;
   if (grant > 0) setFields['wardrobe.flies'] = nextBalance;
+
+  const startedPayingCompletion = isNewPayingCompletion && grant > 0;
+  const paidStreak = startedPayingCompletion && streakPaid > 0;
+  const goesToJar =
+    payable &&
+    countTowardDaily &&
+    isNewPayingCompletion &&
+    grant <= 0 &&
+    config.overflowJar.enabled &&
+    config.overflowJar.pebblesPerCompletion > 0;
 
   const hitLimit = nextEarned >= limit;
   const nextDaily: DailyFlyProgress = {
@@ -551,7 +688,7 @@ async function awardFlyForTask(
     taskIds: Array.from(new Set([...(daily.taskIds ?? []), taskId])),
     taskFlies: {
       ...(daily.taskFlies ?? {}),
-      [taskId]: alreadyGranted + grant,
+      [taskId]: paidAfter,
     },
     taskHunger: {
       ...(daily.taskHunger ?? {}),
@@ -560,6 +697,14 @@ async function awardFlyForTask(
         : hungerFed,
     },
     limitNotified: limitNotified || hitLimit,
+    paidCompletions:
+      (daily.paidCompletions ?? 0) + (startedPayingCompletion ? 1 : 0),
+    streakTaskIds: paidStreak
+      ? Array.from(new Set([...streakTaskIds, taskId]))
+      : streakTaskIds,
+    jarTaskIds: goesToJar
+      ? Array.from(new Set([...(daily.jarTaskIds ?? []), taskId]))
+      : (daily.jarTaskIds ?? []),
   };
 
   setFields['wardrobe.flyDaily'] = nextDaily;
@@ -578,8 +723,29 @@ async function awardFlyForTask(
 
   await UserModel.updateOne({ _id: user._id }, ops);
 
+  let jar: JarStatus | undefined;
+  if (goesToJar) {
+    const accrual = await accrueOverflowPebbles({
+      userId,
+      dayKey: today,
+      pebbles: config.overflowJar.pebblesPerCompletion,
+      meta: { taskId, occurrenceDate },
+    });
+    if (accrual) {
+      jar = {
+        pebbles: accrual.jar.pebbles,
+        pebblesAdded: accrual.pebblesAdded,
+        giftsEarned: accrual.giftsEarned,
+        giftItemId: accrual.giftItemId,
+        pebblesToNextGift: accrual.pebblesToNextGift,
+        weeklyGiftLocked: accrual.weeklyGiftLocked,
+      };
+    }
+  }
+
   return {
     awarded: grant > 0,
+    granted: grant,
     flyStatus: {
       balance: nextBalance,
       earnedToday: nextEarned,
@@ -588,9 +754,16 @@ async function awardFlyForTask(
       justHitLimit:
         countTowardDaily && hitLimit && !limitNotified ? true : undefined,
       isPremium: premium,
+      plusLimit: config.taskIncome.dailyCapPlus,
+      payingCompletionsLeft: Math.max(
+        0,
+        completionsAllowance - (nextDaily.paidCompletions ?? 0),
+      ),
+      blockedReason,
     },
     hungerStatus: finalHungerStatus,
     dailyTasksCount: nextDailyTasksCount,
+    jar,
   };
 }
 
@@ -599,12 +772,14 @@ async function unawardFlyForTask(
   taskId: string,
   tz: string,
   countTowardDaily: boolean = true,
+  occurrenceDate?: string,
 ): Promise<{
   flyStatus: FlyStatus;
   hungerStatus: HungerStatus;
   dailyTasksCount: number;
 }> {
   const today = getZonedToday(tz);
+  const config = await loadFlyEconomyConfig();
   const user = (await UserModel.findById(userId, {
     wardrobe: 1,
     statistics: 1,
@@ -630,7 +805,7 @@ async function unawardFlyForTask(
   }
 
   const premium = isPremiumUser(user);
-  const limit = premium ? DAILY_FLY_LIMIT_PREMIUM : DAILY_FLY_LIMIT_FREE;
+  const limit = taskIncomeCap(config, premium);
   const { updates: hungerUpdates, status: hungerStatus } = calculateHunger(user);
   const wardrobe = user.wardrobe ?? { equipped: {}, inventory: {}, flies: 0 };
   const daily = normalizeDailyFly(
@@ -666,13 +841,31 @@ async function unawardFlyForTask(
         timezone: tz,
       });
     }
-    const granted = daily.taskFlies?.[taskId] ?? 1;
+
+    // The ledger, not the day summary, is what this occurrence actually got
+    // paid — settling it back to zero refunds exactly that and leaves the row
+    // ready to pay the same amount again if the task is re-completed.
+    const refund = await settleFlyGrant({
+      userId,
+      source: 'task',
+      occurrenceKey: `${taskId}:${occurrenceDate ?? today}`,
+      dayKey: today,
+      targetAmount: 0,
+      skipBreaker: true,
+      meta: { taskId, occurrenceDate: occurrenceDate ?? today, undone: true },
+    });
+    const granted = Math.max(
+      0,
+      refund.paidBefore || daily.taskFlies?.[taskId] || 0,
+    );
+
     if (countTowardDaily) nextEarned = Math.max(0, daily.earned - granted);
     nextBalance = Math.max(0, balance - granted);
     const nextTaskFlies = { ...(daily.taskFlies ?? {}) };
     delete nextTaskFlies[taskId];
     const nextTaskHunger = { ...(daily.taskHunger ?? {}) };
     delete nextTaskHunger[taskId];
+    const wasJarred = (daily.jarTaskIds ?? []).includes(taskId);
     const nextDaily: DailyFlyProgress = {
       date: today,
       earned: nextEarned,
@@ -680,9 +873,24 @@ async function unawardFlyForTask(
       taskFlies: nextTaskFlies,
       taskHunger: nextTaskHunger,
       limitNotified: nextEarned >= limit ? daily.limitNotified : false,
+      paidCompletions: Math.max(
+        0,
+        (daily.paidCompletions ?? 0) - (granted > 0 ? 1 : 0),
+      ),
+      streakTaskIds: (daily.streakTaskIds ?? []).filter((id) => id !== taskId),
+      jarTaskIds: (daily.jarTaskIds ?? []).filter((id) => id !== taskId),
     };
     setFields['wardrobe.flies'] = nextBalance;
     setFields['wardrobe.flyDaily'] = nextDaily;
+
+    if (wasJarred && config.overflowJar.pebblesPerCompletion > 0) {
+      await accrueOverflowPebbles({
+        userId,
+        dayKey: today,
+        pebbles: -config.overflowJar.pebblesPerCompletion,
+        meta: { taskId, undone: true },
+      });
+    }
   }
 
   if (Object.keys(setFields).length > 0) {
@@ -696,6 +904,12 @@ async function unawardFlyForTask(
       limit,
       limitHit: nextEarned >= limit,
       isPremium: premium,
+      plusLimit: config.taskIncome.dailyCapPlus,
+      payingCompletionsLeft: Math.max(
+        0,
+        config.taskIncome.payingCompletionsPerDay -
+          Math.max(0, (daily.paidCompletions ?? 0) - (wasRewarded ? 1 : 0)),
+      ),
     },
     hungerStatus: { ...hungerStatus, hunger: nextHunger },
     dailyTasksCount,
@@ -1945,15 +2159,21 @@ export async function PUT(req: NextRequest) {
     let hungerStatus: HungerStatus | undefined;
     const occurrenceDate = doc.type === 'weekly' ? viewDate : doc.date;
     if (items?.length && occurrenceDate && doc.type !== 'backlog') {
-      const value = taskFlyValue(nextDoc, occurrenceDate, 0, false);
-      if (value > 0) {
+      const economyTz = await resolveEconomyTimezone(uid, tz);
+      const value = taskFlyBreakdown(nextDoc, occurrenceDate, 0, false);
+      const payable = isPayableOccurrenceDate(
+        occurrenceDate,
+        getZonedToday(economyTz),
+        (await loadFlyEconomyConfig()).taskIncome.backdateGraceHours,
+      );
+      if (value.total > 0) {
         const res = await awardFlyForTask(
           uid,
           taskId,
-          tz,
-          occurrenceDate === getZonedToday(tz),
+          economyTz,
+          payable,
           value,
-          { topUp: true, countTask: false },
+          { topUp: true, countTask: false, occurrenceDate, payable },
         );
         flyStatus = res.flyStatus;
         hungerStatus = res.hungerStatus;
@@ -2110,7 +2330,18 @@ export async function PUT(req: NextRequest) {
   let hungerStatus: HungerStatus | undefined;
   let dailyTasksCount: number | undefined;
   let awarded = false;
+  let granted = 0;
+  let jar: JarStatus | undefined;
   const isTodayCompletion = date === getZonedToday(tz);
+  // Fly accounting runs on the zone the server has agreed to, not on whatever
+  // the request happens to claim, so a timezone flip can't reopen the day.
+  const economyTz = await resolveEconomyTimezone(uid, tz);
+  const economyConfig = await loadFlyEconomyConfig();
+  const payable = isPayableOccurrenceDate(
+    date,
+    getZonedToday(economyTz),
+    economyConfig.taskIncome.backdateGraceHours,
+  );
   let freshWeekly: TaskDoc | null = null;
   let streakNow = 0;
   if (doc.type === 'weekly' && isTodayCompletion) {
@@ -2132,27 +2363,30 @@ export async function PUT(req: NextRequest) {
     const res = await awardFlyForTask(
       uid,
       taskId,
-      tz,
-      isTodayCompletion,
-      taskFlyValue(doc, date, streakNow, true),
-      { topUp: true },
+      economyTz,
+      payable,
+      taskFlyBreakdown(doc, date, streakNow, true),
+      { topUp: true, countTask: isTodayCompletion, occurrenceDate: date, payable },
     );
     await lockChecklistBudget(uid, doc, date);
     flyStatus = res.flyStatus;
     hungerStatus = res.hungerStatus;
     dailyTasksCount = res.dailyTasksCount;
     awarded = res.awarded;
+    granted = res.granted;
+    jar = res.jar;
   } else if (!completed) {
     ({ flyStatus, hungerStatus, dailyTasksCount } = await unawardFlyForTask(
       uid,
       taskId,
-      tz,
-      isTodayCompletion,
+      economyTz,
+      payable,
+      date,
     ));
   } else {
     ({ flyStatus, hungerStatus, dailyTasksCount } = await currentFlyStatus(
       uid,
-      tz,
+      economyTz,
     ));
   }
   if (doc.bondId) {
@@ -2205,7 +2439,7 @@ export async function PUT(req: NextRequest) {
       name: 'fly_earned',
       properties: {
         source: doc.bondId ? 'buddy_task' : 'task',
-        fly_amount: taskFlyValue(doc, date, streakNow),
+        fly_amount: granted,
         is_premium: !!flyStatus?.isPremium,
       },
     });
@@ -2213,9 +2447,11 @@ export async function PUT(req: NextRequest) {
   return NextResponse.json({
     ok: true,
     awarded,
+    granted,
     flyStatus,
     hungerStatus,
     dailyTasksCount,
+    jar,
     lateForStreak: lateForStreak && doc.type === 'weekly' ? true : undefined,
   });
 }

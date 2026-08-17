@@ -29,6 +29,7 @@ import {
   BarChart3,
   MessageSquare,
   Sliders,
+  Coins,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -334,6 +335,13 @@ function AdminPageContent() {
               accent="bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"
               title="Trade Modifiers"
               description="Recipe ratios and fees, duplicate and Plus discounts, golden trades, draw weighting, wishlist slots."
+            />
+            <ManagerLinkCard
+              href="/admin/economy"
+              icon={<Coins className="w-5 h-5" />}
+              accent="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+              title="Fly Economy"
+              description="Task income and completion caps, the overflow jar, buddy and friend caps, ad limits, circuit breaker, and the ledger."
             />
           </div>
         </Section>

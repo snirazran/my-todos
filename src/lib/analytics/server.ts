@@ -48,4 +48,22 @@ export async function recordAnalyticsEvent(input: RecordAnalyticsInput) {
   } catch (error) {
     console.error('Analytics event write failed:', error);
   }
+
+  if (input.name === 'fly_earned' || input.name === 'fly_spent') {
+    try {
+      const bridge = await import('@/lib/economy/analyticsBridge');
+      await (input.name === 'fly_earned'
+        ? bridge.bridgeFlyEarnedToLedger({
+            userId: input.userId,
+            properties: input.properties,
+            occurredAt: input.occurredAt,
+          })
+        : bridge.bridgeFlySpentToLedger({
+            userId: input.userId,
+            properties: input.properties,
+          }));
+    } catch (error) {
+      console.error('Fly ledger bridge failed:', error);
+    }
+  }
 }

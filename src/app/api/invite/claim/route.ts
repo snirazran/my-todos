@@ -17,6 +17,8 @@ import { getZonedToday } from '@/lib/utils';
 import { sendBuddyPush, buddyDisplayName } from '@/lib/buddy/push';
 import { bumpQuestMetric } from '@/lib/quests/metrics';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
+import { loadFlyEconomyConfig } from '@/lib/economy/config';
+import { settleFlyGrant } from '@/lib/economy/ledger';
 
 export async function POST(req: NextRequest) {
   try {
@@ -98,6 +100,18 @@ export async function POST(req: NextRequest) {
     const config = await InviteConfigModel.findOne({ key: 'singleton' }).lean();
     const tier = config?.rewards.find((r) => r.tier === claimedCount);
 
+    // Only so many invites a month may pay flies. Items and the friendship are
+    // unaffected — it is the currency faucet that needs the ceiling.
+    const economyConfig = await loadFlyEconomyConfig();
+    const monthStart = new Date();
+    monthStart.setUTCDate(1);
+    monthStart.setUTCHours(0, 0, 0, 0);
+    const claimedThisMonth = await ReferralModel.countDocuments({
+      inviterId: referral.inviterId,
+      claimedAt: { $gte: monthStart },
+    });
+    const invitesPayFlies = claimedThisMonth <= economyConfig.invites.monthlyCap;
+
     if (tier) {
       const inc: Record<string, number> = {};
       const addToSet: Record<string, string> = {};
@@ -121,7 +135,20 @@ export async function POST(req: NextRequest) {
                       1),
                 ) + Math.max(1, reward.minAmount ?? 1)
               : reward.amount ?? 0;
-          if (amount > 0) inc['wardrobe.flies'] = (inc['wardrobe.flies'] ?? 0) + amount;
+          if (amount > 0 && invitesPayFlies) {
+            const settlement = await settleFlyGrant({
+              userId: referral.inviterId,
+              source: 'invite',
+              occurrenceKey: `${referral.code ?? referral._id}:tier${tier.tier}`,
+              dayKey: getZonedToday('UTC'),
+              targetAmount: amount,
+              meta: { tier: tier.tier },
+            });
+            if (settlement.delta > 0) {
+              inc['wardrobe.flies'] =
+                (inc['wardrobe.flies'] ?? 0) + settlement.delta;
+            }
+          }
         }
         if ((reward.type === 'ITEM' || reward.type === 'BOX') && reward.itemId && byId[reward.itemId]) {
           const amount = reward.type === 'BOX' ? Math.max(1, reward.amount ?? 1) : 1;

@@ -6,6 +6,7 @@ import {
   CATCH_LEAD_SECONDS,
 } from '@/lib/focusFlies';
 import { FLY_HUNGER_REWARD_MS, MAX_HUNGER_MS } from '@/lib/hungerLogic';
+import { settleFlyGrant } from '@/lib/economy/ledger';
 
 /** A focus phase still on the clock when this flush was taken. */
 export type RunningFocusPhase = {
@@ -181,6 +182,30 @@ async function awardFocusFlies(
     },
     { $unset: ['_focusFlyPrev', '_focusFlyNext', '_focusFlyGained'] },
   ], { updatePipeline: true });
+
+  // The pipeline pays atomically and keeps no delta, so the ledger is settled
+  // against the day's running total afterwards: the row lands on the same
+  // number however many flushes it took to get there.
+  const after = await UserModel.findById(userId)
+    .select('wardrobe.focusFlyDaily')
+    .lean<{ wardrobe?: { focusFlyDaily?: { date?: string; earned?: number } } } | null>();
+  const earnedToday =
+    after?.wardrobe?.focusFlyDaily?.date === date
+      ? after?.wardrobe?.focusFlyDaily?.earned ?? 0
+      : 0;
+  if (earnedToday > 0) {
+    await settleFlyGrant({
+      userId,
+      source: 'focus',
+      occurrenceKey: `day:${date}`,
+      dayKey: date,
+      targetAmount: earnedToday,
+      skipBreaker: true,
+      meta: { focusSeconds },
+    }).catch((error) => {
+      console.error('Focus fly ledger failed:', error);
+    });
+  }
 }
 
 type FrogodoroSession = { date: string; focusTime: number; breakTime: number };

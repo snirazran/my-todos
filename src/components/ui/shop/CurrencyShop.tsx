@@ -44,6 +44,8 @@ type AdFlyStatus = {
   reward: number;
   cap: number;
   remaining: number;
+  cooldownSeconds?: number;
+  cooldownLeft?: number;
 };
 
 /** BaseSheet's mobile slide-in runs 400ms; give it a frame of headroom. */
@@ -328,15 +330,28 @@ function FreeFliesCard({ open }: { open: boolean }) {
     { revalidateOnFocus: false },
   );
 
+  const [cooldown, setCooldown] = useState(0);
+
+  useEffect(() => {
+    setCooldown(data?.cooldownLeft ?? 0);
+  }, [data?.cooldownLeft]);
+
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const id = setInterval(() => setCooldown((left) => Math.max(0, left - 1)), 1000);
+    return () => clearInterval(id);
+  }, [cooldown]);
+
   if (!available) return null;
 
   const remaining = data?.remaining ?? 0;
   const cap = data?.cap ?? 5;
   const reward = data?.reward ?? 10;
   const exhausted = data ? remaining <= 0 : false;
+  const waiting = cooldown > 0;
 
   const handleWatch = async () => {
-    if (busy || exhausted || !data) return;
+    if (busy || exhausted || waiting || !data) return;
     setBusy(true);
     setError(null);
     try {
@@ -358,9 +373,16 @@ function FreeFliesCard({ open }: { open: boolean }) {
       }
       patchInventoryFlies(payload.balance);
       mutate(
-        { reward: payload.reward, cap: payload.cap, remaining: payload.remaining },
+        {
+          reward: payload.reward,
+          cap: payload.cap,
+          remaining: payload.remaining,
+          cooldownSeconds: payload.cooldownSeconds,
+          cooldownLeft: payload.cooldownLeft,
+        },
         { revalidate: false },
       );
+      setCooldown(payload.cooldownLeft ?? 0);
       confetti({
         particleCount: 50,
         spread: 70,
@@ -383,7 +405,7 @@ function FreeFliesCard({ open }: { open: boolean }) {
       <button
         type="button"
         onClick={handleWatch}
-        disabled={busy || exhausted}
+        disabled={busy || exhausted || waiting}
         className={cn(
           'group relative flex w-full items-center gap-3 rounded-[20px] p-3.5 text-left transition-all sm:rounded-[24px] sm:p-4',
           exhausted
@@ -412,7 +434,11 @@ function FreeFliesCard({ open }: { open: boolean }) {
               exhausted && 'text-muted-foreground',
             )}
           >
-            {exhausted ? 'Free flies — back tomorrow' : 'Free flies'}
+            {exhausted
+              ? 'Free flies — back tomorrow'
+              : waiting
+                ? `Free flies — ready in ${cooldown}s`
+                : 'Free flies'}
           </p>
           <p
             className={cn(
@@ -422,7 +448,9 @@ function FreeFliesCard({ open }: { open: boolean }) {
           >
             {exhausted
               ? `You caught all ${cap} bonus rounds today.`
-              : `Watch a short ad, catch +${reward} flies.`}
+              : waiting
+                ? 'One at a time — the pond needs a moment.'
+                : `Watch a short ad, catch +${reward} flies.`}
           </p>
         </div>
         {!exhausted && (
