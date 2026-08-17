@@ -211,7 +211,7 @@ export function MarketingPactPreview() {
         </div>
       </div>
 
-      <div className="mt-3 flex justify-end gap-1.5" aria-label="Preview a weekly pact">
+      <div className="mt-3 flex justify-end gap-1.5" aria-label="Preview a weekly leap">
         {pactPreviews.map((pact, index) => (
           <button
             key={pact.id}

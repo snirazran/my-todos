@@ -142,6 +142,10 @@ export type UserDoc = {
     date: string;
     count: number;
   };
+  dailyQuestReroll?: {
+    date: string;
+    count: number;
+  };
   giftDoubleClaim?: {
     id: string;
     giftBoxId: string;

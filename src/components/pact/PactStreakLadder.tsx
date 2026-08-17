@@ -4,6 +4,7 @@ import { Flame, Trophy } from 'lucide-react';
 import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/utils';
 import { RewardTile, type QuestRewardCatalogItem } from '@/components/ui/QuestCards';
+import { rewardStackTileStyle } from '@/lib/questClaims';
 import type { PactBonusRewards } from '@/lib/pact/types';
 import {
   formatPactRate,
@@ -191,21 +192,28 @@ export function PactStreakLadder() {
         // device — a tinted surface — is enough to group the prize; the border
         // was the redundant half.
         <div className="mt-3 flex items-center gap-2.5 rounded-2xl bg-muted/40 px-3 py-2.5">
-          {tiles.slice(0, 3).map((reward, index) => (
-            <RewardTile
-              key={`${reward.type}-${reward.itemId ?? index}`}
-              reward={reward}
-              rewardCatalog={rewardCatalog}
-              isPremium={data.isPremium}
-              hideBadge={reward.type !== 'FLIES'}
-              hydrateDelayMs={120}
-              // The fly shares its tile with a four-digit count, so at the
-              // default size it read as a speck next to the number rather than
-              // as the thing the number is counting.
-              flySize={34}
-              giftAnimation={reward.type === 'BOX' ? 'box_shake' : undefined}
-            />
-          ))}
+          <div className="relative flex shrink-0 items-center">
+            {tiles.slice(0, 3).map((reward, index) => (
+              <div
+                key={`${reward.type}-${reward.itemId ?? index}`}
+                className="relative"
+                style={rewardStackTileStyle(index, Math.min(3, tiles.length))}
+              >
+                <RewardTile
+                  reward={reward}
+                  rewardCatalog={rewardCatalog}
+                  isPremium={data.isPremium}
+                  hideBadge={reward.type !== 'FLIES'}
+                  hydrateDelayMs={120}
+                  // The fly shares its tile with a four-digit count, so at the
+                  // default size it read as a speck next to the number rather
+                  // than as the thing the number is counting.
+                  flySize={34}
+                  giftAnimation={reward.type === 'BOX' ? 'box_shake' : undefined}
+                />
+              </div>
+            ))}
+          </div>
           {words.length > 0 && tiles.length > 0 && (
             <span className="text-[15px] font-black text-muted-foreground/60">
               +
@@ -246,7 +254,7 @@ export function PactStreakLadder() {
       <LeapRail
         stops={railStops}
         progress={leapProgress}
-        className="mt-3"
+        className="mt-6"
       />
     </div>
   );

@@ -6,6 +6,7 @@ import { requireUserId } from '@/lib/auth';
 import { Types } from 'mongoose';
 import { v4 as uuid } from 'uuid';
 import connectMongo from '@/lib/mongoose';
+import { syncPactCommitmentText } from '@/lib/pact/renameCommitment';
 import UserModel, { type UserDoc } from '@/lib/models/User';
 import TaskModel, {
   type TaskDoc,
@@ -2062,6 +2063,9 @@ export async function PUT(req: NextRequest) {
   // New: Handle text update
   if (typeof body.text === 'string' && body.text.trim()) {
     await scopeApply({ $set: { text: body.text } });
+    if (body.scope === 'all' && taskId) {
+      await syncPactCommitmentText({ userId: uid, taskId, text: body.text });
+    }
     await syncGamification(uid, tz);
     await notifyTaskChanged(uid);
     return NextResponse.json({ ok: true });

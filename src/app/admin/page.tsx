@@ -398,7 +398,7 @@ function AdminPageContent() {
               description="Delete every Leap, its scheduled tasks, and the streak"
               isConfirming={confirmAction === 'reset-pacts'}
               loading={loading === 'reset-pacts'}
-              warningText="Warning: This deletes every Leap, removes the session tasks they wrote to your list, and clears your pact streak, shields and swaps. Click again to confirm."
+              warningText="Warning: This deletes every Leap, removes the session tasks they wrote to your list, and clears your Leap streak, shields and swaps. Click again to confirm."
               onClick={handleResetPacts}
             />
             <ConfirmActionRow

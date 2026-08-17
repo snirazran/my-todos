@@ -12,7 +12,7 @@ import type { PactWeekResult } from '@/lib/pact/types';
 import { formatPactRate } from '@/lib/pact/format';
 
 /**
- * The one moment the weekly pact never had.
+ * The one moment the weekly leap never had.
  *
  * Settlement is lazy — it runs on the first page load after the week rolls
  * over — so a streak could break, a shield could be spent, and a finished

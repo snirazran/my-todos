@@ -65,28 +65,34 @@ function objectiveSummaryLabel(block: ObjectiveLabelBlock): string {
     return metricObjectiveLabel(block.metricKey, target);
   }
   if (block.type === 'focus_minutes') {
-    return `Focus for ${target} minutes on tasks`;
+    return `Focus ${target} minutes`;
   }
   if (block.type === 'distinct_days') {
-    const days = target === 1 ? 'day' : 'different days';
+    const days = target === 1 ? 'day' : 'days';
     return `Show up ${target} ${days}`;
   }
   if (block.type === 'deep_session') {
     const minutes = block.sessionMinutes ?? 25;
     return target === 1
-      ? `Focus ${minutes} min without a break`
-      : `Focus ${minutes} min without a break, ${target} times`;
+      ? `Focus ${minutes} min in one sitting`
+      : `${target} focus sessions of ${minutes} min`;
+  }
+  if (block.type === 'day_parts') {
+    const parts = Math.min(3, Math.max(1, target));
+    if (parts === 1) return 'Finish a task today';
+    if (parts >= 3) return 'Finish tasks morning, noon and night';
+    return 'Finish tasks in 2 parts of the day';
   }
   const scope = block.subject === 'any' || target !== 1 ? 'tasks' : 'task';
   if (block.action === 'add') {
     return block.requiresFollowThrough
-      ? `Plan ${target} ${scope} and finish ${target === 1 ? 'it' : 'them'}`
+      ? `Plan and finish ${target} ${scope}`
       : `Add ${target} ${scope}`;
   }
   if (typeof block.beforeHour === 'number') {
     return `Finish ${target} ${scope} ${hourCutoffLabel(block.beforeHour)}`;
   }
-  return `Complete ${target} ${scope}`;
+  return `Finish ${target} ${scope}`;
 }
 
 function hourCutoffLabel(hour: number): string {
@@ -158,6 +164,14 @@ const ADD_UNIT_EFFORT_DAYS = 0.01;
 // A day you have to show up on cannot be compressed by working harder today,
 // so each one costs most of a calendar day.
 const DISTINCT_DAY_EFFORT_DAYS = 0.8;
+/** A day-part is a few hours of calendar, not a few hours of work. */
+const DAY_PART_EFFORT_DAYS = 0.2;
+
+function dayPartsElapsed(localHour: number): number {
+  if (localHour < 12) return 1;
+  if (localHour < 17) return 2;
+  return 3;
+}
 
 type EffortTask = {
   type?: string;
@@ -211,6 +225,7 @@ function objectiveEffort(
   },
   tasks: EffortTask[],
   todayKey: string,
+  localHour: number,
   tagIds?: string[],
 ): {
   effortToActNow: number;
@@ -244,6 +259,18 @@ function objectiveEffort(
     const effortToComplete = remainingUnits * DISTINCT_DAY_EFFORT_DAYS;
     return {
       effortToActNow: showedUpToday ? effortToComplete : TASK_UNIT_EFFORT_DAYS,
+      effortToComplete,
+      effortAtRiskDays: 0,
+    };
+  }
+  if (block.type === 'day_parts') {
+    // Once every stretch of the day that has already passed is covered, no
+    // amount of work now buys the next one — it costs the wait for it.
+    const partsElapsed = dayPartsElapsed(localHour);
+    const currentPartDone = Math.max(0, block.progress ?? 0) >= partsElapsed;
+    const effortToComplete = remainingUnits * DAY_PART_EFFORT_DAYS;
+    return {
+      effortToActNow: currentPartDone ? effortToComplete : TASK_UNIT_EFFORT_DAYS,
       effortToComplete,
       effortAtRiskDays: 0,
     };
@@ -292,8 +319,13 @@ function objectiveRemainingLabel(
   if (block.type === 'deep_session') {
     const minutes = block.sessionMinutes ?? 25;
     return remaining === 1
-      ? `One more ${minutes}-min unbroken session`
-      : `${remaining} more ${minutes}-min unbroken sessions`;
+      ? `One more ${minutes}-min sitting`
+      : `${remaining} more ${minutes}-min sittings`;
+  }
+  if (block.type === 'day_parts') {
+    return remaining === 1
+      ? 'Finish a task later today'
+      : `Finish tasks in ${remaining} more parts of the day`;
   }
   const scope = remaining === 1 ? 'task' : 'tasks';
   if (block.action === 'add') {
@@ -492,11 +524,19 @@ export async function GET(req: Request) {
     }
     const trackables: TrackableEntry[] = [];
     const effortTodayKey = getZonedToday(timezone);
+    const effortLocalHour = Number(
+      new Intl.DateTimeFormat('en-GB', {
+        timeZone: timezone,
+        hour: '2-digit',
+        hour12: false,
+      }).format(new Date()),
+    );
+    const effortHour = Number.isFinite(effortLocalHour) ? effortLocalHour : 12;
     const withBlockEffort = <T extends { logic: any[] }>(quest: T): T => ({
       ...quest,
       logic: quest.logic.map((block) => ({
         ...block,
-        ...objectiveEffort(block, dashboard.tasks, effortTodayKey),
+        ...objectiveEffort(block, dashboard.tasks, effortTodayKey, effortHour),
       })),
     });
     for (const quest of [...(dashboard.onboardingQuests ?? []), ...dashboard.dailyQuests]) {
@@ -552,7 +592,7 @@ export async function GET(req: Request) {
           ].join('|'),
           progress: Math.max(0, block.progress),
           target,
-          ...objectiveEffort(block, dashboard.tasks, effortTodayKey),
+          ...objectiveEffort(block, dashboard.tasks, effortTodayKey, effortHour),
           reward: block.rewards?.[0],
           rewards: block.rewards ?? undefined,
           rewardValue: rewardWorth(block.rewards),
@@ -672,6 +712,7 @@ export async function GET(req: Request) {
           withBlockEffort(withTemplateCover(q, dashboard.templatesWithCover)),
         ),
         dailyQuestsGated: dashboard.dailyQuestsGated,
+        dailyRerollsLeft: dashboard.dailyRerollsLeft,
         firstOnboardingComplete: dashboard.firstOnboardingComplete,
         earlyObjectiveSteps: dashboard.earlyObjectiveSteps,
         onboardingQuests: (dashboard.onboardingQuests ?? []).map((q) =>

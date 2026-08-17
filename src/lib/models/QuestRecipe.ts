@@ -9,7 +9,8 @@ export type RecipePoolEntry = {
     | 'focus_minutes'
     | 'metric_count'
     | 'distinct_days'
-    | 'deep_session';
+    | 'deep_session'
+    | 'day_parts';
   action?: 'complete' | 'add';
   metricKey?: string;
   // deep_session only: minutes the single unbroken session must reach.
@@ -22,6 +23,10 @@ export type RecipePoolEntry = {
   // picked from this inclusive range.
   streakDaysMin?: number;
   streakDaysMax?: number;
+  // count/focus_minutes only: derive the target from what this user actually
+  // does on an active day instead of rolling it, clamped to min/maxTarget.
+  scaleFromHistory?: boolean;
+  scaleFactor?: number;
   minTarget: number;
   maxTarget: number;
   weight: number;
@@ -53,6 +58,12 @@ export interface QuestRecipeDoc {
    */
   placement: 'daily';
   isActive: boolean;
+  /**
+   * Scales each slot's fly reward by how much work the rolled objective
+   * actually asks for, relative to the slot's own pool. Off leaves every roll
+   * in a slot paying the same flat amount.
+   */
+  priceByEffort?: boolean;
   coverImageUrl?: string;
   coverImageFile?: QuestCoverImageFile | null;
   slots: RecipeSlot[];
@@ -70,6 +81,7 @@ const QuestRecipeSchema = new Schema<QuestRecipeDoc>(
       default: 'daily',
     },
     isActive: { type: Boolean, default: true },
+    priceByEffort: { type: Boolean, default: false },
     coverImageUrl: { type: String, default: undefined },
     coverImageFile: { type: Schema.Types.Mixed, default: undefined },
     slots: { type: [Schema.Types.Mixed], default: [] } as any,

@@ -108,7 +108,7 @@ const HELP_CATEGORIES: HelpCategory[] = [
         a: 'When an objective is complete, a Claim button appears. Daily rewards can be claimed once their day arrives.',
       },
       {
-        q: 'What is the weekly pact?',
+        q: 'What is the weekly leap?',
         a: 'Each week you pick one life area and one thing you will actually do. We add it to your task list at the times you choose, and you keep a weekly streak for every week you finish it. One area at a time is the point — it is what makes the habit stick.',
       },
     ],
@@ -166,7 +166,7 @@ const HELP_CATEGORIES: HelpCategory[] = [
     items: [
       {
         q: 'What is Frogress Plus?',
-        a: 'Plus is an optional subscription. You write your own weekly pact instead of choosing from three, hold three Lily Pads instead of two and get one free every month, can change your area mid-week without losing your streak, unlock premium reward tracks, and earn double rewards.',
+        a: 'Plus is an optional subscription. You write your own weekly leap instead of choosing from three, hold three Lily Pads instead of two and get one free every month, can change your area mid-week without losing your streak, unlock premium reward tracks, and earn double rewards.',
       },
       {
         q: 'How do I get Plus?',

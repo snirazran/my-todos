@@ -89,6 +89,10 @@ export function normalizeFocusProfile(user: UserDoc): FocusProfile {
 
 export const DAILY_QUESTS_UNLOCK_STEP_TARGET = 5;
 
+// One swap a day, matching Fortnite's single daily reroll: enough agency that a
+// rolled objective is never an order, not enough to shop for the cheapest one.
+export const DAILY_QUEST_REROLLS_PER_DAY = 1;
+
 function getUserTagId(tag: unknown) {
   if (!tag || typeof tag !== 'object') return null;
   const tagRecord = tag as { id?: unknown; name?: unknown };
@@ -259,6 +263,40 @@ function countDeepSessions(
   return count;
 }
 
+export const DAY_PART_COUNT = 3;
+
+function dayPartOfHour(hour: number): number {
+  if (hour < 12) return 0;
+  if (hour < 17) return 1;
+  return 2;
+}
+
+function countDistinctDayParts(
+  tasks: TaskDoc[],
+  timezone: string,
+  startDate: string,
+  endDate: string,
+  predicate: (task: TaskDoc) => boolean,
+) {
+  const parts = new Set<number>();
+  for (const task of tasks) {
+    if (!predicate(task)) continue;
+    const stamps = task.completedAtByDate ?? {};
+    for (const occurrence of task.completedDates ?? []) {
+      const at = stamps[occurrence];
+      if (!at) continue;
+      const parsed = at instanceof Date ? at : new Date(at);
+      if (isNaN(parsed.getTime())) continue;
+      const dateStr = getZonedYMD(parsed, timezone);
+      if (dateStr < startDate || dateStr > endDate) continue;
+      const hour = getZonedHour(parsed, timezone);
+      if (hour !== null) parts.add(dayPartOfHour(hour));
+    }
+    if (parts.size >= DAY_PART_COUNT) break;
+  }
+  return parts.size;
+}
+
 function getZonedHour(at: Date, timezone: string): number | null {
   try {
     const hour = new Intl.DateTimeFormat('en-GB', {
@@ -338,7 +376,10 @@ function resolveLogicTarget(
   windowDays?: number,
 ) {
   if (block.amountMode === 'fixed') {
-    return Math.max(1, block.amount ?? 1);
+    const fixed = Math.max(1, block.amount ?? 1);
+    return block.type === 'day_parts'
+      ? Math.min(DAY_PART_COUNT, fixed)
+      : fixed;
   }
 
   const min = Math.max(1, Math.min(block.minAmount ?? 1, block.maxAmount ?? 1));
@@ -351,6 +392,9 @@ function resolveLogicTarget(
   // You cannot show up on more days than the window has.
   if (block.type === 'distinct_days' && windowDays) {
     return Math.min(Math.max(1, Math.floor(windowDays)), rolled);
+  }
+  if (block.type === 'day_parts') {
+    return Math.min(DAY_PART_COUNT, rolled);
   }
   return rolled;
 }
@@ -412,6 +456,12 @@ function progressForLogicBlock(args: {
         if (task.type !== 'focus-area') return matchesLogicBlock(task, block);
         return true;
       },
+    );
+  }
+
+  if (block.type === 'day_parts') {
+    return countDistinctDayParts(tasks, timezone, startDate, endDate, (task) =>
+      matchesLogicBlock(task, block),
     );
   }
 
@@ -705,6 +755,174 @@ function recipePickModifiers(pick: RecipePoolEntry): Partial<QuestLogicBlock> {
   return modifiers;
 }
 
+function retroactiveBaseline(args: {
+  placement: QuestPlacement;
+  isNewDoc: boolean;
+  rawProgress: number;
+  target: number;
+}): number {
+  if (args.placement !== 'daily' || !args.isNewDoc) return 0;
+  const creditable = Math.max(0, args.target - 1);
+  return Math.max(0, args.rawProgress - creditable);
+}
+
+function poolEntryFamily(entry: RecipePoolEntry): string {
+  if (entry.type === 'metric_count') {
+    return `metric:${entry.metricKey ?? 'unknown'}`;
+  }
+  if (entry.type === 'focus_minutes' || entry.type === 'deep_session') {
+    return 'focus';
+  }
+  return 'tasks';
+}
+
+function poolEntryShape(entry: RecipePoolEntry): string {
+  if (entry.type === 'metric_count') {
+    return `metric:${entry.metricKey ?? 'unknown'}`;
+  }
+  if (entry.type === 'count') {
+    const action = entry.action ?? 'complete';
+    if (action === 'complete' && typeof entry.beforeHour === 'number') {
+      return 'count:complete:early';
+    }
+    return `count:${action}`;
+  }
+  return entry.type;
+}
+
+const ANCHOR_FAMILY = 'tasks';
+
+const HISTORY_WINDOW_DAYS = 14;
+
+function activeDayMedian(values: number[]): number | null {
+  const active = values.filter((value) => value > 0).sort((a, b) => a - b);
+  if (active.length === 0) return null;
+  const mid = Math.floor(active.length / 2);
+  return active.length % 2 === 0
+    ? (active[mid - 1] + active[mid]) / 2
+    : active[mid];
+}
+
+function historyBaseline(args: {
+  entry: RecipePoolEntry;
+  tasks: TaskDoc[];
+  timezone: string;
+  todayKey: string;
+}): number | null {
+  const { entry, tasks, timezone, todayKey } = args;
+  const perDay: number[] = [];
+  for (let offset = 1; offset <= HISTORY_WINDOW_DAYS; offset += 1) {
+    const dateKey = shiftDateKey(todayKey, -offset);
+    if (entry.type === 'focus_minutes') {
+      perDay.push(
+        Math.floor(
+          sumFocusSeconds(tasks, dateKey, dateKey, () => true) / 60,
+        ),
+      );
+    } else if (entry.action === 'add') {
+      perDay.push(
+        countAddedTasks(tasks, timezone, dateKey, dateKey, (task) => !task.isStarter),
+      );
+    } else {
+      perDay.push(countCompletedEvents(tasks, timezone, dateKey, dateKey, () => true));
+    }
+  }
+  return activeDayMedian(perDay);
+}
+
+function supportsHistoryScaling(entry: RecipePoolEntry): boolean {
+  return entry.type === 'count' || entry.type === 'focus_minutes';
+}
+
+function scaledTargetFor(args: {
+  entry: RecipePoolEntry;
+  tasks: TaskDoc[];
+  timezone: string;
+  todayKey: string;
+}): number | null {
+  const { entry } = args;
+  if (!entry.scaleFromHistory || !supportsHistoryScaling(entry)) return null;
+  const min = Math.max(1, Math.floor(entry.minTarget));
+  const max = Math.max(min, Math.floor(entry.maxTarget));
+  const baseline = historyBaseline(args);
+  if (baseline === null) return min;
+  const factor = entry.scaleFactor && entry.scaleFactor > 0 ? entry.scaleFactor : 1;
+  const scaled = Math.round(baseline * factor);
+  const clamped = Math.min(max, Math.max(min, scaled));
+  return entry.type === 'focus_minutes'
+    ? snapToFiveInRange(clamped, min, max)
+    : clamped;
+}
+
+function effortUnits(args: {
+  entry: RecipePoolEntry;
+  target: number;
+}): number {
+  const { entry, target } = args;
+  const amount = Math.max(1, target);
+  switch (entry.type) {
+    case 'focus_minutes':
+      return amount / 5;
+    case 'deep_session':
+      return amount * (Math.max(5, entry.sessionMinutes ?? 25) / 5) * 1.25;
+    case 'day_parts':
+      return amount * 1.6;
+    case 'distinct_days':
+      return amount * 2;
+    case 'metric_count':
+      return amount * 2.5;
+    default:
+      if (entry.action === 'add') {
+        return amount * (entry.requiresFollowThrough ? 1.2 : 0.5);
+      }
+      return amount * (typeof entry.beforeHour === 'number' ? 1.3 : 1);
+  }
+}
+
+function midTarget(entry: RecipePoolEntry): number {
+  const min = Math.max(1, Math.floor(entry.minTarget));
+  const max = Math.max(min, Math.floor(entry.maxTarget));
+  return Math.round((min + max) / 2);
+}
+
+const EFFORT_PRICE_MIN = 0.5;
+const EFFORT_PRICE_MAX = 2;
+
+function effortPriceMultiplier(args: {
+  pool: RecipePoolEntry[];
+  entry: RecipePoolEntry;
+  target: number;
+}): number {
+  const reference = activeDayMedian(
+    args.pool.map((entry) => effortUnits({ entry, target: midTarget(entry) })),
+  );
+  if (!reference) return 1;
+  const rolled = effortUnits({ entry: args.entry, target: args.target });
+  return Math.min(
+    EFFORT_PRICE_MAX,
+    Math.max(EFFORT_PRICE_MIN, rolled / reference),
+  );
+}
+
+function scaleFlyRewards(
+  rewards: QuestRewards,
+  multiplier: number,
+): QuestRewards {
+  if (multiplier === 1) return rewards;
+  const scale = (value: number | undefined) =>
+    typeof value === 'number' ? Math.max(1, Math.round(value * multiplier)) : value;
+  return rewards.map((reward) =>
+    reward.type === 'FLIES'
+      ? {
+          ...reward,
+          amount: scale(reward.amount),
+          minAmount: scale(reward.minAmount),
+          maxAmount: scale(reward.maxAmount),
+        }
+      : reward,
+  );
+}
+
 function shiftDateKey(dateKey: string, deltaDays: number) {
   const base = new Date(`${dateKey}T00:00:00Z`);
   base.setUTCDate(base.getUTCDate() + deltaDays);
@@ -742,6 +960,30 @@ function longestExtendableStreakRun(
 // quest income, so the missing flies are earnable within the quest window.
 const NEARLY_AFFORDABLE_FLIES = 10;
 
+const MIN_CUTOFF_RUNWAY_HOURS = 1;
+
+// Whether enough of the day is left for a time-shaped objective to be winnable
+// at all: a "before noon" ask rolled at 3pm, or two separate stretches of the
+// day rolled in the evening, is dead on arrival.
+function hasRunwayToday(
+  entry: RecipePoolEntry,
+  localHour: number | undefined,
+): boolean {
+  if (typeof localHour !== 'number') return true;
+  if (
+    entry.type === 'count' &&
+    (entry.action ?? 'complete') === 'complete' &&
+    typeof entry.beforeHour === 'number'
+  ) {
+    return entry.beforeHour - localHour >= MIN_CUTOFF_RUNWAY_HOURS;
+  }
+  if (entry.type === 'day_parts') {
+    const partsLeft = DAY_PART_COUNT - dayPartOfHour(localHour);
+    return partsLeft >= Math.max(1, Math.floor(entry.minTarget));
+  }
+  return true;
+}
+
 // Whether the user can act on a rolled pool entry right now: trading needs a
 // full set of same-rarity skins (owned, or buyable with current flies plus a
 // day's earnings), acquiring needs spending power
@@ -757,9 +999,11 @@ function isPoolEntryEligible(args: {
   todayKey: string;
   hasFriends: boolean;
   windowDays: number;
+  localHour?: number;
   tagIds?: string[];
 }): boolean {
   const { entry, user, catalog, tasks, todayKey } = args;
+  if (!hasRunwayToday(entry, args.localHour)) return false;
   if (entry.type !== 'metric_count' || !entry.metricKey) return true;
   const metricKey = entry.metricKey;
   const inventory = user.wardrobe?.inventory ?? {};
@@ -847,10 +1091,14 @@ function buildEligiblePool(args: {
   todayKey: string;
   hasFriends: boolean;
   windowDays: number;
+  localHour?: number;
   tagIds?: string[];
 }): RecipePoolEntry[] {
   const base = (args.slot.pool ?? []).filter(
-    (entry) => entry && Math.floor(entry.minTarget) > 0,
+    (entry) =>
+      entry &&
+      Math.floor(entry.minTarget) > 0 &&
+      hasRunwayToday(entry, args.localHour),
   );
   const eligible = base.filter((entry) =>
     isPoolEntryEligible({ ...args, entry }),
@@ -969,6 +1217,8 @@ async function syncQuestForTemplate(args: {
     doc.rollKey = crypto.randomUUID();
   }
 
+  const isNewDoc = !!(doc as any).isNew;
+
   const startDate =
     template.placement === 'daily'
       ? windowKey
@@ -1010,7 +1260,19 @@ async function syncQuestForTemplate(args: {
       endDate,
       counters,
     });
-    const progress = block.preCredited ? target : Math.max(0, rawProgress);
+    const baselineProgress = block.preCredited
+      ? 0
+      : typeof block.baselineProgress === 'number'
+        ? Math.max(0, block.baselineProgress)
+        : retroactiveBaseline({
+            placement: template.placement,
+            isNewDoc,
+            rawProgress,
+            target,
+          });
+    const progress = block.preCredited
+      ? target
+      : Math.max(0, rawProgress - baselineProgress);
     const authoredRewards = (block.baseRewards ?? block.rewards ?? []).filter(
       (r): r is QuestReward => isSupportedReward(r as { type?: string }),
     );
@@ -1023,6 +1285,7 @@ async function syncQuestForTemplate(args: {
     return {
       ...resolvedBlock,
       progress,
+      baselineProgress,
       baseRewards: authoredRewards.length > 0 ? authoredRewards : undefined,
       rewards: resolvedRewards.length > 0 ? resolvedRewards : undefined,
     };
@@ -1079,6 +1342,97 @@ async function syncQuestForTemplate(args: {
   }
 
   return doc;
+}
+
+function rollDailyLogic(args: {
+  recipe: QuestRecipeDoc;
+  userId: string;
+  templateId: string;
+  selectionSeed?: string;
+  user: UserDoc;
+  catalog: ItemDef[];
+  tasks: TaskDoc[];
+  timezone: string;
+  todayKey: string;
+  hasFriends: boolean;
+}): QuestLogicBlock[] {
+  const { recipe, userId, templateId, tasks, timezone, todayKey } = args;
+  const seedBase = args.selectionSeed
+    ? `${userId}:${templateId}:${args.selectionSeed}`
+    : `${userId}:${templateId}`;
+  const usedFamilies = new Set<string>();
+  const usedShapes = new Set<string>();
+  const blocks: QuestLogicBlock[] = [];
+  const localHour = getZonedHour(new Date(), timezone) ?? undefined;
+
+  (recipe.slots ?? []).forEach((slot, index) => {
+    if ((slot.rewards ?? []).length === 0) return;
+
+    const eligible = buildEligiblePool({
+      slot,
+      placement: 'daily',
+      user: args.user,
+      catalog: args.catalog,
+      tasks,
+      todayKey,
+      hasFriends: args.hasFriends,
+      windowDays: 1,
+      localHour,
+    });
+    const anchorOnly =
+      index === 0
+        ? eligible.filter((entry) => poolEntryFamily(entry) === ANCHOR_FAMILY)
+        : [];
+    const candidates = anchorOnly.length > 0 ? anchorOnly : eligible;
+    const distinct = candidates.filter((entry) => {
+      if (usedShapes.has(poolEntryShape(entry))) return false;
+      const family = poolEntryFamily(entry);
+      return family === ANCHOR_FAMILY || !usedFamilies.has(family);
+    });
+    const pool = distinct.length > 0 ? distinct : candidates;
+
+    const slotSeed = `${seedBase}:slot:${index}`;
+    const pick = pickWeighted(pool, createSeededRandom(slotSeed));
+    if (!pick) return;
+    usedFamilies.add(poolEntryFamily(pick));
+    usedShapes.add(poolEntryShape(pick));
+
+    const minAmount = Math.max(1, Math.floor(pick.minTarget));
+    const base: QuestLogicBlock = {
+      id: `slot-${index + 1}`,
+      type: pick.type,
+      subject: 'task',
+      action: pick.type === 'count' ? pick.action ?? 'complete' : undefined,
+      amountMode: 'random',
+      minAmount,
+      maxAmount: Math.max(minAmount, Math.floor(pick.maxTarget)),
+      tagMode: 'ignore',
+      metricKey:
+        pick.type === 'metric_count'
+          ? resolveRecipeMetricKey(pick, `${slotSeed}:streak`)
+          : undefined,
+      ...recipePickModifiers(pick),
+    };
+
+    const target =
+      scaledTargetFor({ entry: pick, tasks, timezone, todayKey }) ??
+      resolveLogicTarget(base, `${slotSeed}:target`, 1);
+    const rewards = rollSlotRewards(slot, slotSeed);
+
+    blocks.push({
+      ...base,
+      amountMode: 'fixed',
+      amount: target,
+      rewards: recipe.priceByEffort
+        ? scaleFlyRewards(
+            rewards,
+            effortPriceMultiplier({ pool: candidates, entry: pick, target }),
+          )
+        : rewards,
+    });
+  });
+
+  return blocks;
 }
 
 export async function syncQuestState(args: {
@@ -1184,47 +1538,18 @@ export async function syncQuestState(args: {
           userId,
           templateId,
         })
-      : (dailyRecipe.slots as RecipeSlot[])
-      .map((slot, index) => {
-        const pool = buildEligiblePool({
-          slot,
-          placement: 'daily',
+      : rollDailyLogic({
+          recipe: dailyRecipe,
+          userId,
+          templateId,
+          selectionSeed: args.dailySelectionSeed,
           user,
           catalog,
           tasks,
+          timezone,
           todayKey,
           hasFriends,
-          windowDays: 1,
         });
-        const pick = pickWeighted(
-          pool,
-          createSeededRandom(`${userId}:${templateId}:slot:${index}`),
-        );
-        if (!pick || (slot.rewards ?? []).length === 0) return null;
-        const isMetric = pick.type === 'metric_count';
-        const minAmount = Math.max(1, Math.floor(pick.minTarget));
-        const block: QuestLogicBlock = {
-          id: `slot-${index + 1}`,
-          type: pick.type,
-          subject: 'task',
-          action:
-            pick.type === 'count' ? pick.action ?? 'complete' : undefined,
-          amountMode: 'random',
-          minAmount,
-          maxAmount: Math.max(minAmount, Math.floor(pick.maxTarget)),
-          tagMode: 'ignore',
-          metricKey: isMetric
-            ? resolveRecipeMetricKey(pick, `${userId}:${templateId}:slot:${index}:streak`)
-            : undefined,
-          ...recipePickModifiers(pick),
-          rewards: rollSlotRewards(
-            slot,
-            `${userId}:${templateId}:slot:${index}`,
-          ),
-        };
-        return block;
-      })
-      .filter((block): block is QuestLogicBlock => !!block);
     if (rolledLogic.length > 0) {
       selectedDailyTemplates = [
         {
@@ -1424,6 +1749,21 @@ export async function syncQuestState(args: {
   const premium = isPremiumUser(user);
   const rewardBackgrounds = includeCatalog ? await loadBackgroundPrizes() : [];
 
+  const rerollsUsedToday =
+    user.dailyQuestReroll?.date === todayKey
+      ? Math.max(0, user.dailyQuestReroll.count ?? 0)
+      : 0;
+  const claimedAnythingToday = allExistingDocs.some(
+    (doc) =>
+      doc.placement === 'daily' &&
+      doc.windowKey === todayKey &&
+      (!!doc.claimedAt || (doc.claimedObjectiveIds ?? []).length > 0),
+  );
+  const dailyRerollsLeft =
+    dailyQuestsGated || claimedAnythingToday
+      ? 0
+      : Math.max(0, DAILY_QUEST_REROLLS_PER_DAY - rerollsUsedToday);
+
   return {
     user,
     tasks,
@@ -1434,6 +1774,7 @@ export async function syncQuestState(args: {
     templatesWithCover,
     dailyQuests: visibleDailyQuests,
     dailyQuestsGated,
+    dailyRerollsLeft,
     firstOnboardingComplete,
     earlyObjectiveSteps,
     onboardingQuests,

@@ -16,7 +16,8 @@ export type PriorityDebugEntry = {
 
 const REASON_EXPLANATIONS: Record<string, string> = {
   expiring: 'resets within 12h and not done',
-  neglected: 'no progress for 3+ days',
+  'now-or-never': 'the work no longer fits the time or chances left',
+  'last-step': 'one unit from finished',
   'almost-there': '60%+ of the target already done',
   'streak-at-risk': 'an active run is lost if today is skipped',
 };
@@ -84,18 +85,19 @@ export function QuestPriorityDebug({
                   `${input.progress}/${input.target}`,
                 )}
                 {' · '}
-                {formatPart('stale', result.staleness, VALUE_WEIGHTS.neglect, `${result.staleDays}d`)}
-                {' · '}
                 {formatPart(
                   'urgent',
                   result.urgency,
-                  VALUE_WEIGHTS.timeCriticality,
+                  VALUE_WEIGHTS.urgency,
                   result.hoursUntilReset === null
                     ? 'no reset'
                     : `${Math.round(result.hoursUntilReset)}h left`,
                 )}
+                {` (clock ${result.deadlinePressure.toFixed(2)} / fits ${result.feasibility.toFixed(2)})`}
                 {' · '}
                 {formatPart('reward', result.reward, VALUE_WEIGHTS.reward)}
+                {' · '}
+                {formatPart('streak', result.streakRisk, VALUE_WEIGHTS.streak)}
               </div>
               <div>
                 {result.reason

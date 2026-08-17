@@ -273,7 +273,7 @@ export function PlusUpgradeModal({
 const PLUS_WELCOME_HIGHLIGHTS = [
   'Double rewards',
   'Every gift opens twice',
-  'Write your own weekly pact',
+  'Write your own weekly leap',
   'Weekly streak rescue',
 ];
 
@@ -522,7 +522,7 @@ function Step0({
         <Reveal delay={0.12}>
           <FeatureRow
             icon={<Unlock className="h-5 w-5 text-amber-300" />}
-            title="Write your own weekly pact"
+            title="Write your own weekly leap"
             subtitle="Set exactly what you'll do and when, instead of picking from three. Unlimited tags."
           />
         </Reveal>
@@ -594,7 +594,7 @@ function FeatureRow({
 }
 
 const COMPARISON_ROWS: { label: string; free: boolean }[] = [
-  { label: 'Write your own weekly pact', free: false },
+  { label: 'Write your own weekly leap', free: false },
   { label: 'Hold 3 Lily Pads, plus a free one monthly', free: false },
   { label: 'Change your area mid-week', free: false },
   { label: 'Unlimited tags', free: false },

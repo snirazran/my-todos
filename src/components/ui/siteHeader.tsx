@@ -1852,7 +1852,7 @@ function WeekStartRow() {
         <span className="flex flex-col">
           <span className="font-bold text-sm">Week starts on</span>
           <span className="text-[11px] font-semibold text-muted-foreground">
-            Changes your board, planner, streaks and weekly pact
+            Changes your board, planner, streaks and weekly leap
           </span>
         </span>
       </div>

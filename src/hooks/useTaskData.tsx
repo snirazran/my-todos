@@ -1168,6 +1168,13 @@ export function useTaskData({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ taskId, text: newText, scope, timezone: tz }),
         });
+        // Renaming a whole series restates a Leap's commitment, so the card
+        // quoting it has to refetch.
+        if (scope === 'all') {
+          void mutate(
+            (key) => typeof key === 'string' && key.startsWith('/api/pact'),
+          );
+        }
       } catch (e) {
         console.error('Edit failed', e);
         // Rollback

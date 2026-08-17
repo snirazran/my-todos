@@ -12,28 +12,21 @@ function taggedTaskLabel(n: number) {
   return n === 1 ? 'quest task' : 'quest tasks';
 }
 
-function repeatingTaskLabel(n: number, tagScoped?: boolean) {
-  if (tagScoped) {
-    return n === 1 ? 'repeating quest task' : 'repeating quest tasks';
-  }
-  return n === 1 ? 'repeating task' : 'repeating tasks';
-}
-
 export const QUEST_METRIC_COPY: Record<string, MetricCopy> = {
   trade_completed: {
     adminLabel: 'Trades completed',
-    label: (n) => (n === 1 ? 'Complete a trade' : `Complete ${n} trades`),
-    remaining: (n) => `Complete ${n} more ${n === 1 ? 'trade' : 'trades'}`,
+    label: (n) => (n === 1 ? 'Make a trade' : `Make ${n} trades`),
+    remaining: (n) => `${n} more ${n === 1 ? 'trade' : 'trades'} to go`,
   },
   skin_acquired: {
     adminLabel: 'Skins bought or received',
-    label: (n) => (n === 1 ? 'Get a new skin' : `Get ${n} new skins`),
-    remaining: (n) => `Get ${n} more new ${n === 1 ? 'skin' : 'skins'}`,
+    label: (n) => (n === 1 ? 'Get a new outfit' : `Get ${n} new outfits`),
+    remaining: (n) => `${n} more ${n === 1 ? 'outfit' : 'outfits'} to go`,
   },
   friend_invited: {
     adminLabel: 'Friends invited',
     label: (n) => (n === 1 ? 'Invite a friend' : `Invite ${n} friends`),
-    remaining: (n) => `Invite ${n} more ${n === 1 ? 'friend' : 'friends'}`,
+    remaining: (n) => `${n} more ${n === 1 ? 'friend' : 'friends'} to go`,
   },
   buddy_task_completed: {
     adminLabel: 'Buddy tasks (both finished)',
@@ -42,57 +35,45 @@ export const QUEST_METRIC_COPY: Record<string, MetricCopy> = {
         ? `Finish a ${options?.tagScoped ? 'quest task' : 'task'} with your buddy`
         : `Finish ${n} ${options?.tagScoped ? 'quest tasks' : 'tasks'} with your buddy`,
     remaining: (n, options) =>
-      `Finish ${n} more ${options?.tagScoped ? taggedTaskLabel(n) : n === 1 ? 'task' : 'tasks'} with your buddy`,
+      `${n} more buddy ${options?.tagScoped ? taggedTaskLabel(n) : n === 1 ? 'task' : 'tasks'} to go`,
   },
   task_streak_3: {
     adminLabel: 'Task streak reached',
-    label: (n, options) =>
-      n === 1
-        ? `Reach a 3-day streak on a ${repeatingTaskLabel(n, options?.tagScoped)}`
-        : `Reach a 3-day streak on ${n} ${repeatingTaskLabel(n, options?.tagScoped)}`,
-    remaining: (n, options) =>
-      n === 1
-        ? `Reach 1 more 3-day streak on a ${repeatingTaskLabel(n, options?.tagScoped)}`
-        : `Reach ${n} more 3-day streaks on ${repeatingTaskLabel(n, options?.tagScoped)}`,
+    label: (n) =>
+      n === 1 ? 'Hit a 3-day streak' : `Hit 3-day streaks on ${n} tasks`,
+    remaining: (n) =>
+      n === 1 ? '1 more 3-day streak to go' : `${n} more 3-day streaks to go`,
   },
   task_saved_later: {
     adminLabel: 'Tasks saved for later',
     label: (n) =>
       n === 1 ? 'Save a task for later' : `Save ${n} tasks for later`,
-    remaining: (n) =>
-      `Save ${n} more ${n === 1 ? 'task' : 'tasks'} for later`,
+    remaining: (n) => `${n} more ${n === 1 ? 'task' : 'tasks'} to save`,
   },
   skin_equipped: {
     adminLabel: 'Skins equipped',
-    label: (n) => (n === 1 ? 'Equip a skin' : `Equip ${n} skins`),
-    remaining: (n) => `Equip ${n} more ${n === 1 ? 'skin' : 'skins'}`,
+    label: (n) => (n === 1 ? 'Equip an outfit' : `Equip ${n} outfits`),
+    remaining: (n) => `${n} more ${n === 1 ? 'outfit' : 'outfits'} to equip`,
   },
   focus_tag_linked: {
-    adminLabel: 'Weekly pacts started',
-    label: (n) =>
-      n === 1 ? 'Start your weekly pact' : `Start ${n} weekly pacts`,
+    adminLabel: 'Weekly Leaps started',
+    label: (n) => (n === 1 ? "Take this week's Leap" : `Take ${n} Leaps`),
     remaining: (n) =>
-      n === 1 ? 'Start your weekly pact' : `Start ${n} more weekly pacts`,
+      n === 1 ? 'Your Leap is waiting' : `${n} more Leaps to take`,
   },
   focus_started: {
     adminLabel: 'Focus timers started',
     label: (n) =>
       n === 1 ? 'Start a focus timer' : `Start ${n} focus timers`,
     remaining: (n) =>
-      n === 1
-        ? 'Start a focus timer'
-        : `Start ${n} more focus timers`,
+      n === 1 ? '1 more timer to start' : `${n} more timers to start`,
   },
   frog_fed_full: {
     adminLabel: 'Frog fed to full',
     label: (n) =>
-      n === 1
-        ? 'Fill your frog’s belly to the top'
-        : `Fill your frog’s belly to the top ${n} times`,
+      n === 1 ? 'Feed your frog to full' : `Feed your frog to full ${n} times`,
     remaining: (n) =>
-      n === 1
-        ? 'Fill your frog’s belly to the top 1 more time'
-        : `Fill your frog’s belly to the top ${n} more times`,
+      n === 1 ? '1 more full belly to go' : `${n} more full bellies to go`,
   },
 };
 
@@ -104,14 +85,14 @@ function taskStreakCopy(metricKey: string): MetricCopy | undefined {
   const days = Number(match[1]);
   return {
     adminLabel: `${days}-day streaks reached`,
-    label: (n, options) =>
+    label: (n) =>
       n === 1
-        ? `Reach a ${days}-day streak on a ${repeatingTaskLabel(n, options?.tagScoped)}`
-        : `Reach a ${days}-day streak on ${n} ${repeatingTaskLabel(n, options?.tagScoped)}`,
-    remaining: (n, options) =>
+        ? `Hit a ${days}-day streak`
+        : `Hit ${days}-day streaks on ${n} tasks`,
+    remaining: (n) =>
       n === 1
-        ? `Reach 1 more ${days}-day streak on a ${repeatingTaskLabel(n, options?.tagScoped)}`
-        : `Reach ${n} more ${days}-day streaks on ${repeatingTaskLabel(n, options?.tagScoped)}`,
+        ? `1 more ${days}-day streak to go`
+        : `${n} more ${days}-day streaks to go`,
   };
 }
 
@@ -126,26 +107,25 @@ export function metricObjectiveLabel(
   options?: MetricLabelOptions,
 ): string {
   const copy = metricCopyFor(metricKey);
-  if (!copy) return `Complete ${target} ${target === 1 ? 'objective' : 'objectives'}`;
+  if (!copy) return `Finish ${target} ${target === 1 ? 'step' : 'steps'}`;
   return copy.label(Math.max(1, target), options);
 }
 
 const METRIC_HINT_COPY: Record<string, string> = {
   trade_completed:
-    'In the Wardrobe, trade four same-rarity skins for one of a higher rarity.',
-  skin_acquired: 'Buy a skin in the Wardrobe shop, or win one from a gift box.',
+    'In the Wardrobe, swap 4 outfits of the same rarity for 1 better one.',
+  skin_acquired: 'Buy an outfit in the Wardrobe shop, or open a gift box.',
   friend_invited:
-    'Invite a friend from the Friends page — you both get a gift when they join.',
+    'Invite a friend from the Friends page — you both get a gift.',
   buddy_task_completed:
-    'Finish a shared task with your buddy — it counts once you both check it off.',
-  task_saved_later: "Use a task's menu to move it to Saved Tasks.",
-  skin_equipped: 'Equip a skin on your frog in the Wardrobe.',
+    'Share a task with your buddy. It counts once you both tick it off.',
+  task_saved_later: "Open a task's menu and move it to Saved Tasks.",
+  skin_equipped: 'Put an outfit on your frog in the Wardrobe.',
   focus_tag_linked:
-    'Pick this week’s area on the Quests page and commit to one thing in it.',
-  focus_started:
-    'Start the focus timer on any task — any length counts.',
+    'Pick this week’s area on the Quests page and commit to one thing.',
+  focus_started: 'Start the focus timer on any task. Any length counts.',
   frog_fed_full:
-    'Finish tasks on the home screen to feed your frog — this counts once the belly bar is filled all the way to the top.',
+    'Tick off tasks on Home until the belly bar is completely full.',
 };
 
 export function objectiveHintText(
@@ -161,6 +141,7 @@ export function objectiveHintText(
     sessionMinutes?: number;
     requiresFollowThrough?: boolean;
     beforeHour?: number;
+    target?: number;
   },
 ): string {
   // A metric fully determines the action, so its copy outranks helpText:
@@ -182,21 +163,26 @@ export function objectiveHintText(
     tagScoped && tagName ? ` Only tasks tagged “${tagName}” count.` : '';
 
   if (block.type === 'focus_minutes') {
-    return `Start a focus timer on a task — every focused minute counts.${scopeSuffix}`;
+    return `Start the focus timer on any task. Every minute counts.${scopeSuffix}`;
   }
   if (block.type === 'distinct_days') {
-    return `Finish at least one task on separate days — a single busy day only counts once.${scopeSuffix}`;
+    return `Finish a task on separate days. One busy day only counts once.${scopeSuffix}`;
   }
   if (block.type === 'deep_session') {
     const minutes = block.sessionMinutes ?? 25;
-    return `Run the focus timer for ${minutes} minutes in one sitting — stopping early resets it.${scopeSuffix}`;
+    return `Run the focus timer ${minutes} minutes without stopping. Quitting early resets it.${scopeSuffix}`;
+  }
+  if (block.type === 'day_parts') {
+    const parts = Math.min(3, Math.max(1, block.target ?? 2));
+    const label = parts >= 3 ? 'all three' : `${parts} of them`;
+    return `The day splits into morning, noon–5pm and evening. Tick off a task in ${label}.${scopeSuffix}`;
   }
   if (block.type === 'metric_count') {
     const streakMatch = block.metricKey
       ? TASK_STREAK_LABEL_PATTERN.exec(block.metricKey)
       : null;
     const base = streakMatch
-      ? `Complete the same repeating task ${streakMatch[1]} days in a row.`
+      ? `Tick off the same repeating task ${streakMatch[1]} days in a row.`
       : metricCopy ??
         block.helpText ??
         'Keep using the app — this one fills up on its own.';
@@ -204,8 +190,8 @@ export function objectiveHintText(
   }
   if (block.action === 'add') {
     return block.requiresFollowThrough
-      ? `Tap the + button to plan the tasks, then check them off — this one pays out once they are done.${scopeSuffix}`
-      : `Tap the + button to add a new task.${scopeSuffix}`;
+      ? `Tap + to plan them, then tick them off. This one pays out when they are done.${scopeSuffix}`
+      : `Tap + to add a new task.${scopeSuffix}`;
   }
   if (typeof block.beforeHour === 'number') {
     const hour =
@@ -214,9 +200,9 @@ export function objectiveHintText(
         : block.beforeHour < 12
           ? `${block.beforeHour}am`
           : `${block.beforeHour - 12}pm`;
-    return `Check off a task before ${hour} — only completions earlier in the day count.${scopeSuffix}`;
+    return `Tick off a task before ${hour}. Later ones do not count.${scopeSuffix}`;
   }
-  return `Check off a task on your list — your frog snacks on the fly.${scopeSuffix}`;
+  return `Tick off a task on Home. Your frog eats the fly.${scopeSuffix}`;
 }
 
 export function metricRemainingLabel(
@@ -226,6 +212,6 @@ export function metricRemainingLabel(
 ): string {
   const copy = metricCopyFor(metricKey);
   if (!copy)
-    return `Complete ${remaining} more ${remaining === 1 ? 'objective' : 'objectives'}`;
+    return `${remaining} more ${remaining === 1 ? 'step' : 'steps'} to go`;
   return copy.remaining(Math.max(1, remaining), options);
 }

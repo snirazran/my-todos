@@ -70,6 +70,7 @@ type QuestsResponse = {
   macroCategories: MacroCategoryDefinition[];
   dailyQuests: DailyQuestProgressView[];
   dailyQuestsGated?: boolean;
+  dailyRerollsLeft?: number;
   firstOnboardingComplete?: boolean;
   earlyObjectiveSteps?: number;
   onboardingQuests?: QuestProgressView[];
@@ -194,8 +195,9 @@ function DailyQuestsLockedCard({
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-[15px] font-black leading-snug text-foreground">
-                Complete {remaining} more{' '}
-                {remaining === 1 ? 'objective' : 'objectives'}
+                {remaining === 1
+                  ? 'One step from daily quests'
+                  : 'Finish your starter quests'}
               </p>
               <div className="relative mt-2 h-5 overflow-hidden rounded-full bg-muted">
                 <div className="absolute inset-[3px]">
@@ -225,7 +227,7 @@ function DailyQuestsLockedCard({
                 </span>
               </div>
               <p className="mt-2 text-[11px] font-bold leading-snug text-muted-foreground">
-                Finish quest objectives to unlock daily quests
+                Then new quests land every morning
               </p>
             </div>
           </div>
@@ -278,6 +280,26 @@ export function QuestsPanel({
     await mutateQuests();
     await onQuestsChanged?.();
     void refreshQuestHomeView();
+  };
+
+  const handleSwapDailies = async () => {
+    if (swappingDailies) return;
+    setSwappingDailies(true);
+    try {
+      const res = await fetch('/api/quests/refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ timezone }),
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setClaimMessage(payload?.error ?? 'Could not swap today’s quests');
+        return;
+      }
+      await refreshQuestData();
+    } finally {
+      setSwappingDailies(false);
+    }
   };
 
   const queueRewardReveal = (summary?: QuestRewardSummary) =>
@@ -338,6 +360,7 @@ export function QuestsPanel({
   }, [isLoading, data]);
 
   const [claimingStreak, setClaimingStreak] = useState(false);
+  const [swappingDailies, setSwappingDailies] = useState(false);
   const handleClaimStreak = async () => {
     if (claimingStreak) return;
     setClaimingStreak(true);
@@ -545,6 +568,9 @@ export function QuestsPanel({
                               sweep={data.dailySweep}
                               claimingSweep={claimingStreak}
                               onClaimSweep={handleClaimStreak}
+                              swapsLeft={data.dailyRerollsLeft ?? 0}
+                              swapping={swappingDailies}
+                              onSwapQuests={handleSwapDailies}
                               paused={false}
                             />
                           );
@@ -563,14 +589,14 @@ export function QuestsPanel({
                             dailyGroup
                           );
 
-                          // The weekly pact owns "which area am I on" now, so
+                          // The weekly leap owns "which area am I on" now, so
                           // the areas slot is the pact and nothing else.
                           const showAreas =
                             data.firstOnboardingComplete ?? !data.dailyQuestsGated;
 
                           return (
                             <>
-                              {/* Mobile: onboarding, daily checklist, weekly pact */}
+                              {/* Mobile: onboarding, daily checklist, weekly leap */}
                               <div className="flex flex-col gap-8 md:hidden">
                                 {onboardingQuests.length > 0 && (
                                   <div className="space-y-4">

@@ -169,12 +169,15 @@ type AdminRecipePoolEntry = AdminRecipePoolEntryStreak & {
     | 'focus_minutes'
     | 'metric_count'
     | 'distinct_days'
-    | 'deep_session';
+    | 'deep_session'
+    | 'day_parts';
   action?: 'complete' | 'add';
   metricKey?: string;
   sessionMinutes?: number;
   requiresFollowThrough?: boolean;
   beforeHour?: number;
+  scaleFromHistory?: boolean;
+  scaleFactor?: number;
   minTarget: number;
   maxTarget: number;
   weight: number;
@@ -196,6 +199,7 @@ type AdminRecipe = {
   recipeId: string;
   name: string;
   isActive: boolean;
+  priceByEffort?: boolean;
   coverImageUrl?: string;
   slots: AdminRecipeSlot[];
 };
@@ -1097,7 +1101,7 @@ export function AdminQuestManagerPage() {
           </div>
           <ChevronRight className="h-5 w-5 text-muted-foreground/30 transition group-hover:translate-x-0.5 group-hover:text-muted-foreground" />
         </div>
-        <p className="mt-5 text-lg font-black text-foreground">Weekly Pact</p>
+        <p className="mt-5 text-lg font-black text-foreground">Weekly Leap</p>
         <p className="mt-1 text-sm text-muted-foreground">One area a week, written into the user&apos;s real task list.</p>
         <p className="mt-4 text-3xl font-black text-foreground">{adminCategories.length}</p>
         <p className="text-xs text-muted-foreground">
@@ -1320,7 +1324,7 @@ export function AdminQuestManagerPage() {
               </p>
               <p className="mt-0.5 max-w-2xl text-xs text-muted-foreground">
                 Auto-consumes on a miss — never equipped, never armed. Protects
-                the login streak and the weekly pact. It is not sold in the
+                the login streak and the weekly leap. It is not sold in the
                 shop: the only place to buy one is the offer that appears when a
                 user holds none and has something on the line.
               </p>
@@ -1396,9 +1400,9 @@ export function AdminQuestManagerPage() {
               capMax,
             )}
             {shieldField(
-              'Earn every N pact weeks',
+              'Earn every N Leap weeks',
               'earnEveryPactWeeks',
-              'Kept weeks that hand one back. 0 (the default) turns it off — the pact milestones issue Lily Pads now, and against this cap a second faucet oversupplies.',
+              'Kept weeks that hand one back. 0 (the default) turns it off — the Leap milestones issue Lily Pads now, and against this cap a second faucet oversupplies.',
               0,
               52,
             )}
@@ -1702,7 +1706,7 @@ export function AdminQuestManagerPage() {
               </span>
             </p>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              {`One quest · ${r.slots.length} objectives, easiest first`}
+              {`One quest · ${r.slots.length} objectives: start now, come back, close the day`}
             </p>
           </div>
           <span className="text-xs font-bold text-muted-foreground">{open ? 'Hide' : 'Edit'}</span>
@@ -1721,6 +1725,18 @@ export function AdminQuestManagerPage() {
                   )}
                 >
                   {r.isActive ? 'Generated daily quest on' : 'Generated daily quest off'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => updateRecipe(r.recipeId, (prev) => ({ ...prev, priceByEffort: !prev.priceByEffort }))}
+                  className={cn(
+                    'ml-2 inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold transition',
+                    r.priceByEffort
+                      ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                      : 'border-border/50 bg-background text-muted-foreground hover:border-primary/30',
+                  )}
+                >
+                  {r.priceByEffort ? 'Flies priced by effort' : 'Flies flat per slot'}
                 </button>
                 <label className="grid gap-1.5">
                   <span className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">Quest title</span>
@@ -1759,7 +1775,7 @@ export function AdminQuestManagerPage() {
               <div key={slot.id} className="rounded-2xl border border-border/50 bg-muted/30 px-4 py-3.5">
                 <div className="mb-2.5 flex items-center justify-between">
                   <span className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">
-                    Objective {slotIndex + 1}{slotIndex === 0 ? ' · easiest' : slotIndex === r.slots.length - 1 ? ' · hardest' : ''}
+                    Objective {slotIndex + 1} · {recipeSlotRole(slotIndex, r.slots.length)}
                   </span>
                   {r.slots.length > 1 && (
                     <button onClick={() => removeRecipeSlot(r.recipeId, slot.id)} className="rounded-lg p-1 text-muted-foreground/60 transition hover:bg-red-500/10 hover:text-red-500">
@@ -1785,6 +1801,14 @@ export function AdminQuestManagerPage() {
                             sessionMinutes: v === 'deep_session' ? entry.sessionMinutes ?? 25 : undefined,
                             requiresFollowThrough: v === 'count' ? entry.requiresFollowThrough : undefined,
                             beforeHour: v === 'count' ? entry.beforeHour : undefined,
+                            scaleFromHistory:
+                              v === 'count' || v === 'focus_minutes'
+                                ? entry.scaleFromHistory
+                                : undefined,
+                            scaleFactor:
+                              v === 'count' || v === 'focus_minutes'
+                                ? entry.scaleFactor
+                                : undefined,
                           })
                         }
                       >
@@ -1792,6 +1816,7 @@ export function AdminQuestManagerPage() {
                         <option value="focus_minutes">Focus minutes</option>
                         <option value="distinct_days">Days shown up</option>
                         <option value="deep_session">Unbroken sessions</option>
+                        <option value="day_parts">Parts of the day</option>
                         <option value="metric_count">App action</option>
                       </InlinePillSelect>
                       {entry.type === 'count' && (
@@ -1880,6 +1905,45 @@ export function AdminQuestManagerPage() {
                           <span className="text-sm font-medium text-muted-foreground">to</span>
                           <InlinePillNumber value={entry.streakDaysMax ?? entry.streakDaysMin ?? 3} onChange={(v) => updateRecipePoolEntry(r.recipeId, slot.id, entry.id, { streakDaysMax: v })} />
                           <span className="text-sm font-medium text-muted-foreground">days, on</span>
+                        </>
+                      )}
+                      {(entry.type === 'count' || entry.type === 'focus_minutes') && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              updateRecipePoolEntry(r.recipeId, slot.id, entry.id, {
+                                scaleFromHistory: !entry.scaleFromHistory,
+                                scaleFactor: entry.scaleFromHistory
+                                  ? undefined
+                                  : entry.scaleFactor ?? 1,
+                              })
+                            }
+                            className={cn(
+                              'rounded-full border px-2 py-0.5 text-[11px] font-bold transition',
+                              entry.scaleFromHistory
+                                ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                                : 'border-border/50 bg-background text-muted-foreground hover:text-foreground',
+                            )}
+                          >
+                            {entry.scaleFromHistory ? 'scale to user' : 'fixed range'}
+                          </button>
+                          {entry.scaleFromHistory && (
+                            <>
+                              <InlinePillNumber
+                                min={10}
+                                value={Math.round((entry.scaleFactor ?? 1) * 100)}
+                                onChange={(v) =>
+                                  updateRecipePoolEntry(r.recipeId, slot.id, entry.id, {
+                                    scaleFactor: Math.min(3, Math.max(0.1, v / 100)),
+                                  })
+                                }
+                              />
+                              <span className="text-sm font-medium text-muted-foreground">
+                                % of their usual day, clamped
+                              </span>
+                            </>
+                          )}
                         </>
                       )}
                       <InlinePillNumber value={entry.minTarget} onChange={(v) => updateRecipePoolEntry(r.recipeId, slot.id, entry.id, { minTarget: v })} />
@@ -2667,7 +2731,7 @@ export function AdminQuestManagerPage() {
     );
   };
 
-  // Focus areas and the weekly pact are one screen: an area only exists so a
+  // Focus areas and the weekly leap are one screen: an area only exists so a
   // pact can be made in it, so authoring them apart invited them to drift.
   const renderPact = () => (
     <div className="space-y-8">
@@ -3388,7 +3452,7 @@ export function AdminQuestManagerPage() {
           <h1 className="text-2xl font-black tracking-tight text-foreground">
             {view === 'home' && 'Quest Manager'}
             {view === 'daily' && 'Daily Quests'}
-            {view === 'pact' && 'Weekly Pact'}
+            {view === 'pact' && 'Weekly Leap'}
             {view === 'onboarding' && 'Onboarding Quests'}
             {view === 'streaks' && 'Streak Manager'}
             {view === 'shields' && 'Shields'}
@@ -3851,6 +3915,12 @@ function SweepTableEditor({
       />
     </div>
   );
+}
+
+function recipeSlotRole(index: number, total: number) {
+  if (index === 0) return 'start now';
+  if (index === total - 1 && total > 2) return 'close the day';
+  return 'come back later';
 }
 
 function InlinePillNumber({ value, onChange, min = 1, className }: { value: number; onChange: (v: number) => void; min?: number; className?: string }) {

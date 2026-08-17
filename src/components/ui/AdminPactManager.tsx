@@ -615,7 +615,7 @@ export function AdminPactManager() {
       <div className="rounded-2xl border border-border/40 bg-card/60 p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-lg font-black text-foreground">Weekly Pact</p>
+            <p className="text-lg font-black text-foreground">Weekly Leap</p>
             <p className="text-sm text-muted-foreground">
               One area a week. Accepting writes real tasks into the user&apos;s list.
             </p>
@@ -641,7 +641,7 @@ export function AdminPactManager() {
             onChange={(pickHour) => patch({ pickHour })}
           />
           <div className="rounded-xl bg-muted/30 p-3 text-[12px] leading-snug text-muted-foreground">
-            The pick screen is always open — a user can start a pact any day.
+            The pick screen is always open — a user can start a Leap any day.
             The nudge goes out on the first day of{' '}
             <span className="font-bold text-foreground">their own</span> week
             (set per user in Settings → Week starts on), taking that
@@ -653,7 +653,7 @@ export function AdminPactManager() {
       <div className="rounded-2xl border border-border/40 bg-card/60 p-5">
         <p className="text-lg font-black text-foreground">Base payout</p>
         <p className="text-sm text-muted-foreground">
-          One formula: a pact is worth{' '}
+          One formula: a Leap is worth{' '}
           <span className="font-bold text-foreground">
             {config.weekValuePerSession} × (sessions +{' '}
             {config.weekValueBaseSessions})

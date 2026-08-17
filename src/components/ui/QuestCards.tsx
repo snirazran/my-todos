@@ -17,6 +17,7 @@ import {
   X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { hasRewardQuantityBadge } from '@/lib/quests/rewardQuantity';
 import {
   metricObjectiveLabel,
   objectiveHintText,
@@ -294,19 +295,26 @@ export function formatQuestObjective(block: QuestCardLogicBlock) {
   }
 
   if (block.type === 'focus_minutes') {
-    return `Focus for ${targetLabel} minutes on tasks`;
+    return `Focus ${targetLabel} minutes`;
   }
 
   if (block.type === 'distinct_days') {
-    const days = Math.max(1, block.target ?? 1) === 1 ? 'day' : 'different days';
+    const days = Math.max(1, block.target ?? 1) === 1 ? 'day' : 'days';
     return `Show up ${targetLabel} ${days}`;
   }
 
   if (block.type === 'deep_session') {
     const minutes = block.sessionMinutes ?? 25;
     return Math.max(1, block.target ?? 1) === 1
-      ? `Focus ${minutes} min without a break`
-      : `Focus ${minutes} min without a break, ${targetLabel} times`;
+      ? `Focus ${minutes} min in one sitting`
+      : `${targetLabel} focus sessions of ${minutes} min`;
+  }
+
+  if (block.type === 'day_parts') {
+    const parts = Math.min(3, Math.max(1, block.target ?? 1));
+    if (parts === 1) return 'Finish a task today';
+    if (parts >= 3) return 'Finish tasks morning, noon and night';
+    return 'Finish tasks in 2 parts of the day';
   }
 
   const numericTarget = Math.max(0, block.target ?? 0);
@@ -320,15 +328,13 @@ export function formatQuestObjective(block: QuestCardLogicBlock) {
   const scopeLabel = subjectLabel;
   if (block.action === 'add') {
     return block.requiresFollowThrough
-      ? `Plan ${targetLabel} ${scopeLabel} and finish ${
-          numericTarget === 1 && !targetLabel.includes('-') ? 'it' : 'them'
-        }`
+      ? `Plan and finish ${targetLabel} ${scopeLabel}`
       : `Add ${targetLabel} ${scopeLabel}`;
   }
   if (typeof block.beforeHour === 'number') {
     return `Finish ${targetLabel} ${scopeLabel} ${questHourCutoffLabel(block.beforeHour)}`;
   }
-  return `Complete ${targetLabel} ${scopeLabel}`;
+  return `Finish ${targetLabel} ${scopeLabel}`;
 }
 
 export function questHourCutoffLabel(hour: number): string {
@@ -602,12 +608,18 @@ export function DailyChecklistCard({
   claimingSweep = false,
   onClaimSweep,
   paused = false,
+  swapsLeft = 0,
+  swapping = false,
+  onSwapQuests,
 }: Omit<BaseCardProps, 'onClaimObjective'> & {
   quests: Array<QuestCardData & { placement: 'daily' }>;
   onClaimObjective?: (questId: string, objectiveId: string) => void;
   sweep?: DailySweepInfo | null;
   claimingSweep?: boolean;
   onClaimSweep?: () => void;
+  swapsLeft?: number;
+  swapping?: boolean;
+  onSwapQuests?: () => void;
 }) {
   const timeLeft = useTimeLeft();
   const [rewardPopup, setRewardPopup] = useState<RewardPopupState | null>(null);
@@ -630,12 +642,28 @@ export function DailyChecklistCard({
           />
           Daily quests
         </span>
-        {timeLeft ? (
-          <span className="inline-flex items-center gap-1 text-[11px] font-black uppercase tracking-wide text-muted-foreground">
-            <Clock className="h-3.5 w-3.5" strokeWidth={2.75} />
-            Resets in {timeLeft}
-          </span>
-        ) : null}
+        <span className="inline-flex items-center gap-2">
+          {onSwapQuests && swapsLeft > 0 && !allDone ? (
+            <button
+              type="button"
+              onClick={onSwapQuests}
+              disabled={swapping}
+              className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-card px-2 py-0.5 text-[11px] font-black uppercase tracking-wide text-muted-foreground transition-colors hover:border-primary/30 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <RefreshCw
+                className={cn('h-3 w-3', swapping && 'animate-spin')}
+                strokeWidth={2.75}
+              />
+              {swapping ? 'Swapping' : 'Swap today'}
+            </button>
+          ) : null}
+          {timeLeft ? (
+            <span className="inline-flex items-center gap-1 text-[11px] font-black uppercase tracking-wide text-muted-foreground">
+              <Clock className="h-3.5 w-3.5" strokeWidth={2.75} />
+              Resets in {timeLeft}
+            </span>
+          ) : null}
+        </span>
       </div>
 
       <div className="flex flex-col gap-2.5">
@@ -953,9 +981,11 @@ function SweepPrizeStack({
               giftAnimation={i === 0 ? 'box_shake' : undefined}
               className="h-11 w-11 rounded-xl min-[400px]:h-12 min-[400px]:w-12"
             />
-            <span className="absolute -right-0.5 -top-1 z-20 flex min-w-4 items-center justify-center rounded-sm border border-white/10 bg-black/50 px-1 py-0.5 text-[8px] font-bold uppercase tracking-wide text-white shadow-sm backdrop-blur-sm">
-              {sweepQuantityLabel(entry.reward)}
-            </span>
+            {hasRewardQuantityBadge(entry.reward) && (
+              <span className="absolute -right-1 -top-1 z-20 flex min-w-5 items-center justify-center rounded-md border border-white/10 bg-black/55 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white shadow-sm backdrop-blur-sm">
+                {sweepQuantityLabel(entry.reward)}
+              </span>
+            )}
           </div>
         );
       })}
@@ -2091,7 +2121,7 @@ export const RewardTile = memo(function RewardTile({
         />
       )}
 
-      {!hideBadge && (
+      {!hideBadge && hasRewardQuantityBadge(reward) && (
         <div
           className={cn(
             'absolute z-20 flex justify-center',

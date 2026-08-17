@@ -23,7 +23,12 @@ const VALID_POOL_TYPES = new Set([
   'metric_count',
   'distinct_days',
   'deep_session',
+  'day_parts',
 ]);
+
+const SCALABLE_POOL_TYPES = new Set(['count', 'focus_minutes']);
+
+const DAY_PART_LIMIT = 3;
 
 function sanitizePoolEntry(input: any): RecipePoolEntry | null {
   if (!input || !VALID_POOL_TYPES.has(input.type)) return null;
@@ -32,13 +37,14 @@ function sanitizePoolEntry(input: any): RecipePoolEntry | null {
   const rawMax = Math.floor(Number(input.maxTarget));
   const maxTarget =
     Number.isFinite(rawMax) && rawMax >= minTarget ? rawMax : minTarget;
+  const ceiling = input.type === 'day_parts' ? DAY_PART_LIMIT : Infinity;
   const rawWeight = Math.floor(Number(input.weight));
   const entry: RecipePoolEntry = {
     id:
       typeof input.id === 'string' && input.id.trim() ? input.id.trim() : uuid(),
     type: input.type,
-    minTarget,
-    maxTarget,
+    minTarget: Math.min(ceiling, minTarget),
+    maxTarget: Math.min(ceiling, maxTarget),
     weight: Number.isFinite(rawWeight) && rawWeight > 0 ? rawWeight : 1,
   };
   if (entry.type === 'count') {
@@ -52,6 +58,14 @@ function sanitizePoolEntry(input: any): RecipePoolEntry | null {
         entry.beforeHour = rawHour;
       }
     }
+  }
+  if (SCALABLE_POOL_TYPES.has(entry.type) && input.scaleFromHistory === true) {
+    entry.scaleFromHistory = true;
+    const rawFactor = Number(input.scaleFactor);
+    entry.scaleFactor =
+      Number.isFinite(rawFactor) && rawFactor > 0
+        ? Math.min(3, Math.max(0.1, Math.round(rawFactor * 100) / 100))
+        : 1;
   }
   if (entry.type === 'deep_session') {
     const rawMinutes = Math.floor(Number(input.sessionMinutes));
@@ -115,6 +129,7 @@ function recipeToJSON(recipe: QuestRecipeDoc) {
     recipeId: recipe.recipeId,
     name: recipe.name,
     isActive: recipe.isActive,
+    priceByEffort: recipe.priceByEffort === true,
     coverImageUrl: recipe.coverImageUrl,
     slots: recipe.slots ?? [],
   };
@@ -135,6 +150,7 @@ function parseRecipeBody(body: any) {
           : 'Daily Roll',
       placement: 'daily' as const,
       isActive: body?.isActive !== false,
+      priceByEffort: body?.priceByEffort === true,
       slots,
     },
   };

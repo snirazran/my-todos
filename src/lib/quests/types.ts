@@ -28,7 +28,8 @@ export type QuestLogicType =
   | 'focus_minutes'
   | 'metric_count'
   | 'distinct_days'
-  | 'deep_session';
+  | 'deep_session'
+  | 'day_parts';
 export type QuestVisibilityMetric =
   | 'daily_tasks_count'
   | 'tags_count';
@@ -57,6 +58,9 @@ export type QuestLogicBlock = {
   // Granted complete the moment the quest rolls: the head start a ladder
   // carries over from a previous roll that got far enough to earn one.
   preCredited?: boolean;
+  // Work already on the board when the objective rolled that it refuses to
+  // pay for, so a roll can never arrive already finished.
+  baselineProgress?: number;
   rewards?: QuestRewards;
   // The authored reward, before scaling. `rewards` holds the resolved payout.
   baseRewards?: QuestRewards;

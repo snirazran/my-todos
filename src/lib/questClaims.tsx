@@ -2,6 +2,7 @@
 
 import { useEffect, useReducer, useRef, useState, type ReactNode } from 'react';
 import { hapticSuccess, hapticTick } from '@/lib/haptics';
+import { hasRewardQuantityBadge } from '@/lib/quests/rewardQuantity';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { mutate } from 'swr';
@@ -301,12 +302,11 @@ const MAX_REWARD_TILES = 3;
 export function rewardStackTileStyle(
   index: number,
   count: number,
-  small?: boolean,
 ): React.CSSProperties {
   const centerOffset = index - (count - 1) / 2;
   const centred = Math.abs(centerOffset) < 0.01;
   return {
-    marginLeft: index === 0 ? 0 : small ? -7 : -8,
+    marginLeft: index === 0 ? 0 : -8,
     transform:
       count > 1
         ? `rotate(${centerOffset * 7}deg) translateY(${centred ? -3 : Math.abs(centerOffset) * 2}px)`
@@ -342,7 +342,7 @@ export function QuestRewardTileBadge({
           <div
             key={`${item.type}-${item.itemId ?? item.backgroundId ?? item.amount ?? i}`}
             className="relative"
-            style={rewardStackTileStyle(i, shown.length, small)}
+            style={rewardStackTileStyle(i, shown.length)}
           >
             <RewardTile
               reward={item}
@@ -351,17 +351,25 @@ export function QuestRewardTileBadge({
               hideBadge
               className={
                 small
-                  ? 'h-9 w-9 rounded-lg'
+                  ? 'h-11 w-11 rounded-xl'
                   : 'h-11 w-11 rounded-xl min-[400px]:h-12 min-[400px]:w-12'
               }
               frogClassName="-translate-y-[18%]"
-              flySize={small ? 22 : 30}
+              flySize={small ? 28 : 30}
               flyOversample={1.25}
               giftAnimation={i === 0 ? 'box_shake' : undefined}
             />
-            <span className="absolute -right-0.5 -top-1 z-20 flex min-w-4 items-center justify-center rounded-sm border border-white/10 bg-black/50 px-1 py-0.5 text-[8px] font-bold uppercase tracking-wide text-white shadow-sm backdrop-blur-sm">
-              {rewardQuantityLabel(item)}
-            </span>
+            {hasRewardQuantityBadge(item) && (
+              <span
+                className={
+                  small
+                    ? 'absolute -right-1 -top-1 z-20 flex min-w-4 items-center justify-center rounded-md border border-white/10 bg-black/55 px-1 py-0.5 text-[8px] font-bold uppercase tracking-wide text-white shadow-sm backdrop-blur-sm'
+                    : 'absolute -right-1 -top-1 z-20 flex min-w-5 items-center justify-center rounded-md border border-white/10 bg-black/55 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white shadow-sm backdrop-blur-sm'
+                }
+              >
+                {rewardQuantityLabel(item)}
+              </span>
+            )}
           </div>
         );
       })}

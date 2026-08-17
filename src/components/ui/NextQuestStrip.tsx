@@ -25,11 +25,14 @@ import {
 import {
   priorityReasonLabel,
   rankByQuestPriority,
+  scoreQuestPriority,
+  WEEK_WINDOW_HOURS,
   resetCountdownLabel,
 } from '@/lib/quests/priority';
 import { QuestPriorityDebug } from '@/components/ui/QuestPriorityDebug';
 import { usePactView } from '@/components/pact/PactCard';
 import { PactStripRow } from '@/components/pact/PactStripRow';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { useUIStore } from '@/lib/uiStore';
 
 /**
@@ -38,6 +41,9 @@ import { useUIStore } from '@/lib/uiStore';
  * animation off part-way, which is the whole thing this exists to prevent.
  */
 const PACT_ADVANCE_HOLD_MS = 950;
+
+/** A Leap session is a real sitting, not a tick — priced like a focus block. */
+const LEAP_SESSION_EFFORT_DAYS = 0.25;
 
 export function NextQuestStrip({
   claimables,
@@ -53,7 +59,7 @@ export function NextQuestStrip({
   const router = useRouter();
   const reduceMotion = useReducedMotion();
   const startHintGuide = useUIStore((state) => state.startHintGuide);
-  const { data: pactView } = usePactView();
+  const { data: pactView, isLoading: pactLoading } = usePactView();
   const [claiming, setClaiming] = useState(false);
 
   const claimable =
@@ -80,7 +86,12 @@ export function NextQuestStrip({
     });
 
     const rankedAll = undominated.length
-      ? rankByQuestPriority(undominated)
+      ? rankByQuestPriority(
+          undominated.map((t) => ({
+            ...t,
+            streakAtRisk: t.effortAtRiskDays,
+          })),
+        )
       : [];
     const seenQuests = new Set<string>();
     const ranked: typeof rankedAll = [];
@@ -164,13 +175,50 @@ export function NextQuestStrip({
   const onboardingPending = nextUp?.placement === 'onboarding';
   // The slot goes to whatever the user can act on now. A pact with no session
   // today, or today's session already done, is not actionable — holding the
-  // slot then hides the daily quests that are.
-  const pactActionable = !!livePact?.active?.openToday;
+  // slot then hides the daily quests that are. A week that can no longer be
+  // kept, even on near-miss protection, is not worth the slot either.
+  const pactActionable =
+    !!livePact?.active?.openToday &&
+    (livePact.active.canStillFinish || livePact.active.canHoldStreak);
+
+  // Both kinds are scored on the same axes so the slot is won, not assigned.
+  // A Leap earns it when skipping today actually costs something: no slack
+  // left in the week, a streak on the line, or the last session outstanding.
+  const leapRanked = useMemo(() => {
+    const active = pactActionable ? livePact?.active : null;
+    if (!active) return null;
+    const sessionsNeeded = Math.max(
+      0,
+      (active.canStillFinish ? active.target : active.nearMissTarget) -
+        active.progress,
+    );
+    return scoreQuestPriority({
+      kind: 'leap',
+      placement: 'daily',
+      progress: active.progress,
+      target: Math.max(1, active.target),
+      hoursLeftInWindow: Math.max(0, active.daysLeft) * 24,
+      windowHours: WEEK_WINDOW_HOURS,
+      slackDays: Math.max(0, active.daysLeft - sessionsNeeded),
+      effortToActNow: LEAP_SESSION_EFFORT_DAYS,
+      effortToComplete: LEAP_SESSION_EFFORT_DAYS * Math.max(1, sessionsNeeded),
+      streakAtRisk: livePact?.streak.weeks ?? 0,
+      rewardValue: active.sessionFlies + active.weekBonusFlies,
+    });
+  }, [pactActionable, livePact]);
+
+  const leapOutranksQuests =
+    !!leapRanked &&
+    (!rankedNextUp || leapRanked.score >= rankedNextUp.result.score);
+
   const pactWins =
     !!livePact &&
     (pactReady ||
       holdingPactAdvance ||
-      (pactActionable && !claimable && !onboardingPending));
+      (pactActionable &&
+        !claimable &&
+        !onboardingPending &&
+        leapOutranksQuests));
 
   const resolvedCatalog = catalog ?? {};
   const targetQuestId =
@@ -250,15 +298,31 @@ export function NextQuestStrip({
         transition: { duration: 0.22, ease: [0.32, 0.72, 0, 1] as const },
       };
 
-  const slotKey = pactWins
-    ? 'pact'
-    : showClaimable && claimable
-      ? `claim:${claimable.id}`
-      : displayNextUp
-        ? `next:${displayNextUp.id}`
-        : 'empty';
+  // The Leap and the quests arrive from two different requests. Committing the
+  // slot to whichever lands first is what made a refresh show a daily quest and
+  // then visibly swap to the Leap a second later, so the slot waits until both
+  // contenders are known before it picks one.
+  const awaitingPact = pactLoading && !pactView;
 
-  const strip = pactWins && livePact ? (
+  const slotKey = awaitingPact
+    ? 'loading'
+    : pactWins
+      ? 'pact'
+      : showClaimable && claimable
+        ? `claim:${claimable.id}`
+        : displayNextUp
+          ? `next:${displayNextUp.id}`
+          : 'empty';
+
+  const strip = awaitingPact ? (
+    <div className="mx-1.5 mb-1.5 flex w-[calc(100%-0.75rem)] items-center gap-2.5 rounded-xl px-1 py-1 md:mx-4 md:mb-0 md:w-[calc(100%-2rem)] md:gap-3 md:px-4 md:py-1.5">
+      <Skeleton className="h-11 w-11 shrink-0 rounded-xl" />
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+        <Skeleton className="h-3 w-24 rounded-md" />
+        <Skeleton className="h-4 w-2/3 rounded-md" />
+      </div>
+    </div>
+  ) : pactWins && livePact ? (
     <PactStripRow view={livePact} />
   ) : !claimable && !nextUp ? null : (
     <div

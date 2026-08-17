@@ -6,7 +6,7 @@ import UserModel from '@/lib/models/User';
 import { releasePactTasks } from '@/lib/pact/commit';
 
 /**
- * Puts the weekly pact back to never-committed: every pact doc, the tasks any
+ * Puts the weekly leap back to never-committed: every pact doc, the tasks any
  * of them wrote into the list, and the whole streak/shield/swap ledger.
  *
  * The tasks matter — leaving them behind would put a fresh commitment on a
