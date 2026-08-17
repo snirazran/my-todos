@@ -18,6 +18,17 @@ import {
   contributionFrom,
   type FriendSummary,
 } from '@/lib/friends/indices';
+import {
+  pondDailyCap,
+  pondFliesFrom,
+  pondGate,
+  pondOwed,
+  rollPond,
+  type PondState,
+} from '@/lib/friends/pond';
+import { loadFlyEconomyConfig } from '@/lib/economy/config';
+import { fliesGrantedOnDay } from '@/lib/economy/ledger';
+import { resolveEconomyTimezone } from '@/lib/economy/guards';
 import { getZonedToday } from '@/lib/utils';
 import { previousDayKey } from '@/lib/quests/streak';
 import { computeGap, readLoginStreakState } from '@/lib/streak/loginStreak';
@@ -41,11 +52,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const tz = req.nextUrl.searchParams.get('tz') || 'UTC';
-  const today = getZonedToday(tz);
-
   try {
     await connectMongo();
+    const economyConfig = await loadFlyEconomyConfig();
+    const tz = await resolveEconomyTimezone(
+      userId,
+      req.nextUrl.searchParams.get('tz'),
+    );
+    const today = getZonedToday(tz);
 
     const edges = await FriendshipModel.find({
       $or: [{ userA: userId }, { userB: userId }],
@@ -56,12 +70,12 @@ export async function GET(req: NextRequest) {
     const [users, me, catalog] = await Promise.all([
       UserModel.find({ _id: { $in: friendIds } })
         .select(
-          'name frogName premiumUntil quests.loginStreak wardrobe.equipped wardrobe.flyDaily wardrobe.backgrounds.equipped activeFrogodoroTimer.status activeFrogodoroTimer.phase activeFrogodoroTimer.endsAt',
+          'name frogName premiumUntil quests.loginStreak wardrobe.equipped wardrobe.flyDaily wardrobe.backgrounds.equipped statistics.daily activeFrogodoroTimer.status activeFrogodoroTimer.phase activeFrogodoroTimer.endsAt',
         )
         .lean(),
       UserModel.findById(userId)
         .select(
-          'name frogName premiumUntil quests.loginStreak wardrobe.equipped wardrobe.flyDaily wardrobe.friendFlyDaily wardrobe.friendFlyTotals wardrobe.backgrounds.equipped',
+          'name frogName premiumUntil quests.loginStreak wardrobe.equipped wardrobe.flyDaily wardrobe.friendFlyDaily wardrobe.friendFlyTotals wardrobe.backgrounds.equipped statistics.daily',
         )
         .lean(),
       getCachedCatalog(),
@@ -105,6 +119,7 @@ export async function GET(req: NextRequest) {
       name?: string;
       frogName?: string;
       premiumUntil?: Date | string | null;
+      statistics?: { daily?: { date?: string; dailyTasksCount?: number } };
       wardrobe?: {
         equipped?: Partial<Record<string, string | null>>;
         flyDaily?: DailyFlyProgress;
@@ -117,6 +132,10 @@ export async function GET(req: NextRequest) {
       } | null;
     }): FriendSummary => {
       const fliesToday = fliesEarnedOn(u.wardrobe?.flyDaily, today);
+      const tasksToday =
+        u.statistics?.daily?.date === today
+          ? u.statistics.daily.dailyTasksCount ?? 0
+          : 0;
       const equippedItems = equippedToItems(u.wardrobe?.equipped, byId);
       const backgroundId = u.wardrobe?.backgrounds?.equipped ?? null;
       const backgroundRarity = backgroundId
@@ -138,7 +157,8 @@ export async function GET(req: NextRequest) {
         flexRarity: highestRarity(equippedItems, backgroundRarity),
         backgroundRarity,
         fliesToday,
-        givesYou: contributionFrom(fliesToday),
+        tasksToday,
+        givesYou: pondFliesFrom(tasksToday, economyConfig),
         backgroundId,
         streak: aliveStreakOf(u),
         premium: u.premiumUntil ? new Date(u.premiumUntil) > new Date() : false,
@@ -154,16 +174,40 @@ export async function GET(req: NextRequest) {
       sharedTotal: Math.max(0, Math.floor(totals[u._id] ?? 0)),
     }));
 
-    const prior = me?.wardrobe?.friendFlyDaily as FriendFlyDaily | undefined;
-    const credited: Record<string, number> =
-      prior && prior.date === today ? { ...prior.credited } : {};
-
-    let claimable = 0;
+    const prior = me?.wardrobe?.friendFlyDaily as PondState | undefined;
+    const generatedToday: Record<string, number> = {};
     for (const f of friends) {
-      const owed = f.givesYou ?? 0;
-      const already = credited[f.userId] ?? 0;
-      if (owed > already) claimable += owed - already;
+      if ((f.givesYou ?? 0) > 0) generatedToday[f.userId] = f.givesYou ?? 0;
     }
+
+    // Rolling here (not only on claim) is what keeps the 48h window honest for
+    // someone who opens the tab but doesn't claim.
+    const state = rollPond(prior, today, generatedToday, economyConfig);
+    if (!prior || prior.date !== today) {
+      await UserModel.updateOne(
+        { _id: userId },
+        { $set: { 'wardrobe.friendFlyDaily': state } },
+      );
+    }
+
+    const ownTasksToday =
+      me?.statistics?.daily?.date === today
+        ? me.statistics.daily.dailyTasksCount ?? 0
+        : 0;
+    const gate = pondGate(ownTasksToday, economyConfig);
+    const premium =
+      !!me?.premiumUntil && new Date(me.premiumUntil) > new Date();
+    const cap = pondDailyCap(economyConfig, premium);
+    const claimedToday = await fliesGrantedOnDay(userId, today, [
+      'friend_pond',
+      'friend_pond_double',
+    ]);
+
+    const owed = pondOwed(state, generatedToday);
+    const claimable = Math.min(
+      Math.max(0, cap - claimedToday),
+      owed.reduce((sum, entry) => sum + entry.amount, 0),
+    );
 
     const receivedToday = friends.reduce((sum, f) => sum + (f.givesYou ?? 0), 0);
 
@@ -171,6 +215,21 @@ export async function GET(req: NextRequest) {
       friends,
       me: me ? toSummary(me) : null,
       claimable,
+      gate,
+      pond: {
+        cap,
+        claimedToday,
+        perFriendCap: economyConfig.friendsPond.perFriendDailyCap,
+        tasksPerGeneration: economyConfig.friendsPond.tasksPerGeneration,
+        fliesPerGeneration: economyConfig.friendsPond.fliesPerGeneration,
+        expiryHours: economyConfig.friendsPond.expiryHours,
+        carried: owed.reduce((sum, entry) => sum + entry.carried, 0),
+        weekDays: state.weekDays?.length ?? 0,
+        weekFriends: state.weekFriends?.length ?? 0,
+        weeklyBonusDays: economyConfig.friendsPond.weeklyBonusDays,
+        weeklyBonusFriends: economyConfig.friendsPond.weeklyBonusFriends,
+        weeklyBonusGiven: !!state.weekBonusGiven,
+      },
       contribution: { receivedToday },
     });
   } catch (err) {

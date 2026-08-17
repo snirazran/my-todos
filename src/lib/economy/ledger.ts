@@ -92,6 +92,47 @@ export async function fliesGrantedOnDayWhere(
   return row?.total ?? 0;
 }
 
+/** Distinct paid occurrences of a source on a day, narrowed by meta. */
+export async function countPaidOccurrencesWhere(
+  userId: string,
+  dayKey: string,
+  source: FlySource,
+  meta: Record<string, string | number | boolean>,
+): Promise<number> {
+  await connectMongo();
+  const match: Record<string, unknown> = {
+    userId,
+    dayKey,
+    source,
+    amount: { $gt: 0 },
+  };
+  Object.entries(meta).forEach(([key, value]) => {
+    match[`meta.${key}`] = value;
+  });
+  return FlyLedgerModel.countDocuments(match);
+}
+
+/** Distinct paid occurrences of a source inside a day range, narrowed by meta. */
+export async function countPaidOccurrencesInRange(
+  userId: string,
+  fromDayKey: string,
+  toDayKey: string,
+  source: FlySource,
+  meta: Record<string, string | number | boolean> = {},
+): Promise<number> {
+  await connectMongo();
+  const match: Record<string, unknown> = {
+    userId,
+    source,
+    amount: { $gt: 0 },
+    dayKey: { $gte: fromDayKey, $lte: toDayKey },
+  };
+  Object.entries(meta).forEach(([key, value]) => {
+    match[`meta.${key}`] = value;
+  });
+  return FlyLedgerModel.countDocuments(match);
+}
+
 /** How many distinct occurrences of a source paid out on a day. */
 export async function paidOccurrencesOnDay(
   userId: string,

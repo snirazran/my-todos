@@ -157,6 +157,12 @@ export type UserDoc = {
     windowStartedAt?: Date | string;
     changesInWindow?: number;
   };
+  /** Duo Week gifts collected this week, and from which bonds. */
+  duoWeekGift?: {
+    weekKey?: string;
+    count?: number;
+    bondIds?: string[];
+  };
   /** Streak milestones waiting for a day with a payout left. */
   taskStreakQueue?: {
     key: string;

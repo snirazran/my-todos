@@ -105,6 +105,8 @@ export const ANALYTICS_EVENTS = [
   'shield_purchased',
   'fly_circuit_breaker',
   'overflow_jar_gift',
+  'buddy_duo_week',
+  'friends_pond_weekly_bonus',
 ] as const;
 
 export type AnalyticsEventName = (typeof ANALYTICS_EVENTS)[number];
@@ -220,6 +222,8 @@ const EVENT_CATEGORIES: Record<AnalyticsEventName, string> = {
   shield_purchased: 'monetization',
   fly_circuit_breaker: 'economy',
   overflow_jar_gift: 'economy',
+  buddy_duo_week: 'social',
+  friends_pond_weekly_bonus: 'social',
 };
 
 export function analyticsCategory(name: AnalyticsEventName) {

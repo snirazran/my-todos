@@ -9,12 +9,14 @@ import {
   buddyPartnerFinishedMessage,
 } from '@/lib/notifications/frogVoice';
 import { bumpQuestMetric } from '@/lib/quests/metrics';
-import { loadFlyEconomyConfig } from '@/lib/economy/config';
+import { loadFlyEconomyConfig, taskIncomeCap } from '@/lib/economy/config';
 import {
-  fliesGrantedOnDay,
+  countPaidOccurrencesWhere,
   fliesGrantedOnDayWhere,
+  paidOccurrencesOnDay,
   settleFlyGrant,
 } from '@/lib/economy/ledger';
+import { creditDuoWeek } from '@/lib/economy/socialRewards';
 
 function dowYMD(ymd: string): number {
   const [y, m, d] = ymd.split('-').map(Number);
@@ -92,32 +94,69 @@ async function settleBuddyBonus(args: {
   const config = await loadFlyEconomyConfig();
   const target = Math.max(0, Math.min(args.amount, config.buddy.bonusFlies));
 
-  const [dayTotal, pairTotal] = await Promise.all([
-    fliesGrantedOnDay(args.userId, args.today, ['buddy']),
-    fliesGrantedOnDayWhere(args.userId, args.today, 'buddy', {
+  // Both caps count PAYOUTS, not flies: three a day across every pair, two a
+  // day from any one pair. Counting flies would let a raised bonus quietly
+  // raise the number of collusions a day too.
+  const [dayPayouts, pairPayouts] = await Promise.all([
+    paidOccurrencesOnDay(args.userId, args.today, 'buddy'),
+    countPaidOccurrencesWhere(args.userId, args.today, 'buddy', {
       bondId: args.bondId,
     }),
   ]);
+  const alreadyPaidThisOccurrence = await fliesGrantedOnDayWhere(
+    args.userId,
+    args.today,
+    'buddy',
+    { bondId: args.bondId, occurrenceDate: args.date },
+  );
+  const payoutAllowed =
+    alreadyPaidThisOccurrence > 0 ||
+    (dayPayouts < config.buddy.dailyPayouts &&
+      pairPayouts < config.buddy.perPairDailyPayouts);
+
+  // Whether the bonus also draws from the day's task-income budget is a config
+  // call: task income is one shared wall when it's on, and buddy flies live
+  // entirely outside it when it's off.
+  const shared = config.buddy.countsTowardTaskIncome;
+  const user = shared
+    ? await UserModel.findById(args.userId)
+        .select('wardrobe.flyDaily premiumUntil')
+        .lean<{
+          wardrobe?: { flyDaily?: { date?: string; earned?: number } };
+          premiumUntil?: Date | string | null;
+        } | null>()
+    : null;
+  const taskEarnedToday =
+    user?.wardrobe?.flyDaily?.date === args.today
+      ? user?.wardrobe?.flyDaily?.earned ?? 0
+      : 0;
+  const taskCap = shared
+    ? taskIncomeCap(
+        config,
+        !!user?.premiumUntil && new Date(user.premiumUntil) > new Date(),
+      )
+    : Number.MAX_SAFE_INTEGER;
 
   const settlement = await settleFlyGrant({
     userId: args.userId,
     source: 'buddy',
     occurrenceKey: `${args.bondId}:${args.date}`,
     dayKey: args.today,
-    targetAmount: target,
-    capRemaining: Math.min(
-      Math.max(0, config.buddy.dailyCap - dayTotal),
-      Math.max(0, config.buddy.perPairDailyCap - pairTotal),
-    ),
+    targetAmount: payoutAllowed ? target : 0,
+    capRemaining: shared ? Math.max(0, taskCap - taskEarnedToday) : undefined,
     skipBreaker: target === 0,
     meta: { bondId: args.bondId, occurrenceDate: args.date },
   });
 
   if (settlement.delta !== 0) {
-    await UserModel.updateOne(
-      { _id: args.userId },
-      { $inc: { 'wardrobe.flies': settlement.delta } },
-    );
+    const update: Record<string, any> = {
+      $inc: { 'wardrobe.flies': settlement.delta },
+    };
+    if (shared) {
+      update.$inc['wardrobe.flyDaily.earned'] = settlement.delta;
+      update.$set = { 'wardrobe.flyDaily.date': args.today };
+    }
+    await UserModel.updateOne({ _id: args.userId }, update);
   }
   return settlement.delta;
 }
@@ -188,6 +227,12 @@ export async function handleBuddyCompletion(opts: {
       bumpQuestMetric({ userId: partnerId, metric: 'buddy_task_completed', timezone: tz, tagIds: partnerTask?.tags ?? [] }),
     ]);
     bond.bonusAwardedDates = [...bond.bonusAwardedDates, date];
+    await Promise.all([
+      creditDuoWeek({ userId, bondId, dayKey: bonusToday }),
+      creditDuoWeek({ userId: partnerId, bondId, dayKey: bonusToday }),
+    ]).catch((error) => {
+      console.error('Duo Week failed:', error);
+    });
   } else if (!bothNow && alreadyBonused) {
     const [myTask, partnerTask] = await loadBondTaskTags();
     await Promise.all([

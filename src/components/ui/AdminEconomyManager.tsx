@@ -193,7 +193,7 @@ export function AdminEconomyManager() {
     if (!config) return 0;
     return (
       Math.max(config.taskIncome.dailyCapFree, config.taskIncome.dailyCapPlus) +
-      config.buddy.dailyCap +
+      config.buddy.bonusFlies * config.buddy.dailyPayouts +
       Math.max(config.friendsPond.dailyCapFree, config.friendsPond.dailyCapPlus) +
       config.rewardedAds.dailyCap * config.rewardedAds.reward
     );
@@ -364,69 +364,17 @@ export function AdminEconomyManager() {
               />
             </Group>
 
-            <Group
-              title="Buddy bonuses"
-              subtitle="Shared completions, capped per pair and across all pairs."
-            >
-              <NumberField
-                label="Bonus per shared day"
-                suffix="flies"
-                value={config.buddy.bonusFlies}
-                onChange={(bonusFlies) => patch('buddy', { bonusFlies })}
-              />
-              <NumberField
-                label="Daily cap"
-                suffix="flies"
-                value={config.buddy.dailyCap}
-                onChange={(dailyCap) => patch('buddy', { dailyCap })}
-              />
-              <NumberField
-                label="Per pair, per day"
-                suffix="flies"
-                value={config.buddy.perPairDailyCap}
-                onChange={(perPairDailyCap) =>
-                  patch('buddy', { perPairDailyCap })
-                }
-              />
-            </Group>
-
-            <Group
-              title="Friends' pond"
-              subtitle="What a friend graph can send you in a day."
-            >
-              <NumberField
-                label="Daily cap — free"
-                suffix="flies"
-                value={config.friendsPond.dailyCapFree}
-                onChange={(dailyCapFree) =>
-                  patch('friendsPond', { dailyCapFree })
-                }
-              />
-              <NumberField
-                label="Daily cap — Plus"
-                suffix="flies"
-                value={config.friendsPond.dailyCapPlus}
-                onChange={(dailyCapPlus) =>
-                  patch('friendsPond', { dailyCapPlus })
-                }
-              />
-              <NumberField
-                label="Per friend, per day"
-                suffix="flies"
-                value={config.friendsPond.perFriendDailyCap}
-                onChange={(perFriendDailyCap) =>
-                  patch('friendsPond', { perFriendDailyCap })
-                }
-              />
-              <NumberField
-                label="Expiry"
-                suffix="hours"
-                value={config.friendsPond.expiryHours}
-                onChange={(expiryHours) =>
-                  patch('friendsPond', { expiryHours })
-                }
-              />
-            </Group>
+            <div className="rounded-2xl border border-border/40 bg-card/60 p-5 text-sm">
+              <span className="font-black text-foreground">
+                Buddy tasks and the friends&apos; pond
+              </span>
+              <span className="block text-muted-foreground">
+                Both are two-account collusion targets, so both are capped on
+                three axes: per pair, per friend and per day. They live in
+                Modifiers → Social rewards, next to the generation rate, the
+                claim gate and the two weekly bonuses.
+              </span>
+            </div>
 
             <Group
               title="Invites & ads"

@@ -47,15 +47,39 @@ export type FlyEconomyConfig = {
     freeSlipEveryDays: number;
   };
   buddy: {
+    /** Paid to BOTH sides on the second completion of a shared occurrence. */
     bonusFlies: number;
-    dailyCap: number;
-    perPairDailyCap: number;
+    /** Payouts a user may collect a day, across every pair. */
+    dailyPayouts: number;
+    /** Payouts one pair may collect a day — this is the two-account block. */
+    perPairDailyPayouts: number;
+    /** Shared completions with one buddy in a week that earn the Duo Week gift. */
+    duoWeekTasks: number;
+    duoWeekGiftItemId: string;
+    /** Duo Week gifts a user may collect in a week, across every pair. */
+    duoWeekPerWeek: number;
+    /**
+     * Whether the bonus draws from the day's task-income budget as well as its
+     * own caps. Off means buddy flies sit outside the 30/day wall.
+     */
+    countsTowardTaskIncome: boolean;
   };
   friendsPond: {
+    /** Every N tasks a friend completes generates `fliesPerGeneration` for you. */
+    tasksPerGeneration: number;
+    fliesPerGeneration: number;
+    /** Your own completions today needed to open the pond at all. */
+    claimGateTasks: number;
     dailyCapFree: number;
     dailyCapPlus: number;
     perFriendDailyCap: number;
+    /** Unclaimed flies vanish after this long. */
     expiryHours: number;
+    /** Claim from this many different friends... */
+    weeklyBonusFriends: number;
+    /** ...on this many days in a week, and the gift lands. */
+    weeklyBonusDays: number;
+    weeklyBonusGiftItemId: string;
   };
   invites: {
     monthlyCap: number;
@@ -106,15 +130,25 @@ export const FLY_ECONOMY_DEFAULTS: FlyEconomyConfig = {
     freeSlipEveryDays: 30,
   },
   buddy: {
-    bonusFlies: 1,
-    dailyCap: 15,
-    perPairDailyCap: 2,
+    bonusFlies: 5,
+    dailyPayouts: 3,
+    perPairDailyPayouts: 2,
+    duoWeekTasks: 5,
+    duoWeekGiftItemId: 'gift_box_rare',
+    duoWeekPerWeek: 1,
+    countsTowardTaskIncome: false,
   },
   friendsPond: {
+    tasksPerGeneration: 5,
+    fliesPerGeneration: 2,
+    claimGateTasks: 3,
     dailyCapFree: 20,
     dailyCapPlus: 40,
     perFriendDailyCap: 6,
     expiryHours: 48,
+    weeklyBonusFriends: 3,
+    weeklyBonusDays: 5,
+    weeklyBonusGiftItemId: 'gift_box_rare',
   },
   invites: {
     monthlyCap: 10,
@@ -159,14 +193,21 @@ export const FLY_ECONOMY_LIMITS: Record<
   },
   buddy: {
     bonusFlies: { min: 0, max: 100 },
-    dailyCap: { min: 0, max: 500 },
-    perPairDailyCap: { min: 0, max: 50 },
+    dailyPayouts: { min: 0, max: 50 },
+    perPairDailyPayouts: { min: 0, max: 20 },
+    duoWeekTasks: { min: 0, max: 50 },
+    duoWeekPerWeek: { min: 0, max: 10 },
   },
   friendsPond: {
+    tasksPerGeneration: { min: 1, max: 100 },
+    fliesPerGeneration: { min: 0, max: 100 },
+    claimGateTasks: { min: 0, max: 50 },
     dailyCapFree: { min: 0, max: 500 },
     dailyCapPlus: { min: 0, max: 500 },
     perFriendDailyCap: { min: 0, max: 100 },
     expiryHours: { min: 1, max: 24 * 14 },
+    weeklyBonusFriends: { min: 0, max: 50 },
+    weeklyBonusDays: { min: 0, max: 7 },
   },
   invites: {
     monthlyCap: { min: 0, max: 1000 },

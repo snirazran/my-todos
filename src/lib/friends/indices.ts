@@ -30,7 +30,9 @@ export type FriendSummary = {
   frogName: string;
   indices: FrogIndices;
   fliesToday: number;
-  /** Flies this friend contributes to you today (floor of their flies / 2). */
+  /** Tasks this friend has completed today — what generates your pond flies. */
+  tasksToday?: number;
+  /** Flies this friend's work has generated for you today. */
   givesYou?: number;
   /** The friend's equipped background id (resolved to images on the client). */
   backgroundId?: string | null;
@@ -99,7 +101,11 @@ export function highestRarity(
   return top;
 }
 
-/** Flies a friend's daily catch contributes to you: every 2 → 1. */
+/**
+ * @deprecated The pond is generated from a friend's TASK count now, not their
+ * flies. Use `pondFliesFrom` from `@/lib/friends/pond`; this stays only as the
+ * client-side fallback for a summary that predates `givesYou`.
+ */
 export function contributionFrom(fliesToday: number): number {
   return Math.floor(Math.max(0, fliesToday) / 2);
 }

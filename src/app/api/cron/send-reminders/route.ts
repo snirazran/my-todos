@@ -7,7 +7,8 @@ import UserModel from '@/lib/models/User';
 import TaskModel from '@/lib/models/Task';
 import FriendshipModel from '@/lib/models/Friendship';
 import { getAdminMessaging } from '@/lib/firebaseAdmin';
-import { contributionFrom } from '@/lib/friends/indices';
+import { pondFliesFrom, type PondState } from '@/lib/friends/pond';
+import { loadFlyEconomyConfig } from '@/lib/economy/config';
 import { MAX_HUNGER_MS } from '@/lib/hungerLogic';
 import type {
   FriendFlyDaily,
@@ -189,12 +190,12 @@ function isFrogStarving(wardrobe: Partial<UserWardrobe> | undefined): boolean {
 }
 
 /**
- * Flies earned by friends today that the user hasn't claimed yet.
- * These expire at the user's local midnight.
+ * Pond flies a user's friends have generated today and not been claimed yet.
+ * Driven by the friends' task counts, the same way the pond itself is.
  */
 async function countUnclaimedFriendFlies(
   userId: string,
-  friendFlyDaily: FriendFlyDaily | undefined,
+  friendFlyDaily: PondState | undefined,
   todayYMD: string,
 ): Promise<number> {
   const edges = await FriendshipModel.find({
@@ -208,10 +209,11 @@ async function countUnclaimedFriendFlies(
   if (friendIds.length === 0) return 0;
 
   const friends = await UserModel.find({ _id: { $in: friendIds } })
-    .select('wardrobe.flyDaily')
+    .select('statistics.daily')
     .lean()
     .exec();
 
+  const config = await loadFlyEconomyConfig();
   const credited: Record<string, number> =
     friendFlyDaily && friendFlyDaily.date === todayYMD
       ? friendFlyDaily.credited ?? {}
@@ -219,11 +221,11 @@ async function countUnclaimedFriendFlies(
 
   let owed = 0;
   for (const f of friends as any[]) {
-    const earned =
-      f.wardrobe?.flyDaily?.date === todayYMD
-        ? f.wardrobe.flyDaily.earned ?? 0
+    const tasks =
+      f.statistics?.daily?.date === todayYMD
+        ? f.statistics.daily.dailyTasksCount ?? 0
         : 0;
-    const total = contributionFrom(earned);
+    const total = pondFliesFrom(tasks, config);
     owed += Math.max(0, total - (credited[f._id] ?? 0));
   }
   return owed;

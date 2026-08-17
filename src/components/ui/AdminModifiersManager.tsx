@@ -14,6 +14,7 @@ import {
   Save,
   Sliders,
   Trash2,
+  Users,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -32,7 +33,7 @@ import {
   type ChecklistTier,
 } from '@/lib/checklist';
 
-type View = 'home' | 'trade' | 'streak' | 'checklist';
+type View = 'home' | 'trade' | 'streak' | 'checklist' | 'social';
 type TaskStreakConfig = FlyEconomyConfig['taskStreak'];
 type ChecklistConfig = FlyEconomyConfig['checklist'];
 
@@ -165,6 +166,16 @@ export function AdminModifiersManager() {
       prev ? { ...prev, checklist: { ...prev.checklist, ...next } } : prev,
     );
 
+  const patchBuddy = (next: Partial<FlyEconomyConfig['buddy']>) =>
+    setEconomy((prev) =>
+      prev ? { ...prev, buddy: { ...prev.buddy, ...next } } : prev,
+    );
+
+  const patchPond = (next: Partial<FlyEconomyConfig['friendsPond']>) =>
+    setEconomy((prev) =>
+      prev ? { ...prev, friendsPond: { ...prev.friendsPond, ...next } } : prev,
+    );
+
   const saveStreak = async () => {
     if (!economy) return;
     setSaving(true);
@@ -254,6 +265,8 @@ export function AdminModifiersManager() {
                 <Flame className="h-7 w-7" />
               ) : view === 'checklist' ? (
                 <ListChecks className="h-7 w-7" />
+              ) : view === 'social' ? (
+                <Users className="h-7 w-7" />
               ) : (
                 <Sliders className="h-7 w-7" />
               )}
@@ -266,7 +279,9 @@ export function AdminModifiersManager() {
                     ? 'Task streaks'
                     : view === 'checklist'
                       ? 'Checklist rewards'
-                      : 'Modifiers'}
+                      : view === 'social'
+                        ? 'Social rewards'
+                        : 'Modifiers'}
               </h1>
               <p className="text-sm font-medium text-muted-foreground">
                 {view === 'trade'
@@ -275,7 +290,9 @@ export function AdminModifiersManager() {
                     ? 'The per-completion rate, the one-time milestones and the mercy that keeps a long habit alive.'
                     : view === 'checklist'
                       ? 'How much a checklist pays for its length, and where inside the list the flies are pinned.'
-                      : 'The tunable rules behind the economy loops.'}
+                      : view === 'social'
+                        ? 'Buddy payouts and the friends\' pond — capped per pair, per friend and per day.'
+                        : 'The tunable rules behind the economy loops.'}
               </p>
             </div>
           </div>
@@ -350,6 +367,18 @@ export function AdminModifiersManager() {
               }
               onClick={() => setView('checklist')}
             />
+            <CategoryCard
+              icon={<Users className="h-5 w-5" />}
+              accent="bg-sky-500/10 text-sky-600 dark:text-sky-400"
+              title="Social rewards"
+              description="Buddy payouts and Duo Week, plus the friends' pond: generation rate, claim gate, per-friend and daily caps, expiry and the weekly bonus."
+              stat={
+                economy
+                  ? `buddy ${economy.buddy.bonusFlies}×${economy.buddy.dailyPayouts}/day · pond ${economy.friendsPond.dailyCapFree}/${economy.friendsPond.dailyCapPlus}`
+                  : 'Unavailable'
+              }
+              onClick={() => setView('social')}
+            />
           </div>
         ) : view === 'streak' ? (
           <StreakEditor streak={streak} patch={patchStreak} />
@@ -357,6 +386,12 @@ export function AdminModifiersManager() {
           <ChecklistRewardsEditor
             checklist={economy?.checklist ?? null}
             patch={patchChecklist}
+          />
+        ) : view === 'social' ? (
+          <SocialRewardsEditor
+            economy={economy}
+            patchBuddy={patchBuddy}
+            patchPond={patchPond}
           />
         ) : (
           <div className="space-y-4">
@@ -1139,6 +1174,274 @@ function ChecklistRewardsEditor({
               </div>
             );
           })}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function SocialRewardsEditor({
+  economy,
+  patchBuddy,
+  patchPond,
+}: {
+  economy: FlyEconomyConfig | null;
+  patchBuddy: (next: Partial<FlyEconomyConfig['buddy']>) => void;
+  patchPond: (next: Partial<FlyEconomyConfig['friendsPond']>) => void;
+}) {
+  if (!economy) {
+    return (
+      <div className="rounded-2xl bg-red-500/10 p-4 text-sm font-bold text-red-600 dark:text-red-400">
+        Could not load the fly economy config.
+      </div>
+    );
+  }
+
+  const { buddy, friendsPond: pond } = economy;
+  const buddyDailyFlies = buddy.bonusFlies * buddy.dailyPayouts;
+  const friendsToMax =
+    pond.perFriendDailyCap > 0
+      ? Math.ceil(pond.dailyCapFree / pond.perFriendDailyCap)
+      : 0;
+  const perFriendTask =
+    pond.tasksPerGeneration > 0
+      ? (pond.fliesPerGeneration / pond.tasksPerGeneration).toFixed(2)
+      : '0';
+
+  return (
+    <div className="space-y-4">
+      <section className="rounded-2xl border border-border/40 bg-card/60 p-5">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-lg font-black text-foreground">Buddy tasks</p>
+            <p className="text-sm text-muted-foreground">
+              Paid to both sides on the second completion of a shared day. Caps
+              count PAYOUTS, not flies, so raising the bonus never quietly
+              raises how many collusions a day is worth. Task-derived flies are
+              never doubled by Plus.
+            </p>
+          </div>
+          <button
+            onClick={() => patchBuddy({ ...FLY_ECONOMY_DEFAULTS.buddy })}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-muted px-2.5 py-1.5 text-xs font-black text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            Defaults
+          </button>
+        </div>
+
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <NumberField
+            label="Bonus each"
+            suffix="flies"
+            min={0}
+            max={100}
+            value={buddy.bonusFlies}
+            onChange={(bonusFlies) => patchBuddy({ bonusFlies })}
+          />
+          <NumberField
+            label="Payouts per day"
+            hint={`${buddyDailyFlies} flies a day at this bonus.`}
+            min={0}
+            max={50}
+            value={buddy.dailyPayouts}
+            onChange={(dailyPayouts) => patchBuddy({ dailyPayouts })}
+          />
+          <NumberField
+            label="Per pair, per day"
+            suffix="payouts"
+            hint="Blocks the two-account farm."
+            min={0}
+            max={20}
+            value={buddy.perPairDailyPayouts}
+            onChange={(perPairDailyPayouts) =>
+              patchBuddy({ perPairDailyPayouts })
+            }
+          />
+          <NumberField
+            label="Duo Week at"
+            suffix="shared tasks"
+            hint="With the SAME buddy, inside one week."
+            min={0}
+            max={50}
+            value={buddy.duoWeekTasks}
+            onChange={(duoWeekTasks) => patchBuddy({ duoWeekTasks })}
+          />
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-bold text-foreground">
+              Duo Week gift item id
+            </span>
+            <input
+              value={buddy.duoWeekGiftItemId}
+              onChange={(event) =>
+                patchBuddy({ duoWeekGiftItemId: event.target.value })
+              }
+              className={inputClass}
+            />
+            <span className="text-[11px] text-muted-foreground">
+              Granted to both sides. 0 gifts a week disables it.
+            </span>
+          </label>
+          <NumberField
+            label="Duo Week gifts"
+            suffix="per week"
+            hint="Per user, across every pair."
+            min={0}
+            max={10}
+            value={buddy.duoWeekPerWeek}
+            onChange={(duoWeekPerWeek) => patchBuddy({ duoWeekPerWeek })}
+          />
+          <label className="flex items-start gap-3 rounded-xl border border-border/40 bg-background/60 p-3 sm:col-span-2 lg:col-span-3">
+            <input
+              type="checkbox"
+              checked={buddy.countsTowardTaskIncome}
+              onChange={(event) =>
+                patchBuddy({ countsTowardTaskIncome: event.target.checked })
+              }
+              className="mt-1 h-4 w-4"
+            />
+            <span className="min-w-0">
+              <span className="block text-xs font-bold text-foreground">
+                Count buddy flies inside the daily task-income cap
+              </span>
+              <span className="block text-[11px] text-muted-foreground">
+                On: base, streak uplift, checklist markers and buddy bonuses
+                share one {economy.taskIncome.dailyCapFree}/day wall. Off
+                (default): buddy flies sit outside it with only their own
+                payout caps.
+              </span>
+            </span>
+          </label>
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-border/40 bg-card/60 p-5">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-lg font-black text-foreground">
+              The friends&apos; pond
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Your friends&apos; work generates flies you can claim. Not a
+              transfer — they lose nothing — so it never creates a reason to
+              resent a productive friend. Generation is driven by their task
+              count, so their streak and Plus status stay out of your wallet.
+            </p>
+          </div>
+          <button
+            onClick={() => patchPond({ ...FLY_ECONOMY_DEFAULTS.friendsPond })}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-muted px-2.5 py-1.5 text-xs font-black text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            Defaults
+          </button>
+        </div>
+
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <NumberField
+            label="Every N friend tasks"
+            hint={`${perFriendTask} flies per friend-task.`}
+            min={1}
+            max={100}
+            value={pond.tasksPerGeneration}
+            onChange={(tasksPerGeneration) =>
+              patchPond({ tasksPerGeneration })
+            }
+          />
+          <NumberField
+            label="...generates"
+            suffix="flies"
+            min={0}
+            max={100}
+            value={pond.fliesPerGeneration}
+            onChange={(fliesPerGeneration) => patchPond({ fliesPerGeneration })}
+          />
+          <NumberField
+            label="Claim gate"
+            suffix="own tasks"
+            hint="Turns a social pull into self-activation. 0 opens the pond always."
+            min={0}
+            max={50}
+            value={pond.claimGateTasks}
+            onChange={(claimGateTasks) => patchPond({ claimGateTasks })}
+          />
+          <NumberField
+            label="Per friend, per day"
+            suffix="flies"
+            hint={
+              friendsToMax
+                ? `Forces breadth: ${friendsToMax}+ active friends to max out.`
+                : undefined
+            }
+            min={0}
+            max={100}
+            value={pond.perFriendDailyCap}
+            onChange={(perFriendDailyCap) => patchPond({ perFriendDailyCap })}
+          />
+          <NumberField
+            label="Daily cap — free"
+            suffix="flies"
+            min={0}
+            max={500}
+            value={pond.dailyCapFree}
+            onChange={(dailyCapFree) => patchPond({ dailyCapFree })}
+          />
+          <NumberField
+            label="Daily cap — Plus"
+            suffix="flies"
+            min={0}
+            max={500}
+            value={pond.dailyCapPlus}
+            onChange={(dailyCapPlus) => patchPond({ dailyCapPlus })}
+          />
+          <NumberField
+            label="Expiry"
+            suffix="hours"
+            hint="Unclaimed flies vanish; prevents hoarding a month into one purchase."
+            min={1}
+            max={336}
+            value={pond.expiryHours}
+            onChange={(expiryHours) => patchPond({ expiryHours })}
+          />
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-border/40 bg-card/60 p-5">
+        <p className="text-lg font-black text-foreground">
+          Weekly social bonus
+        </p>
+        <p className="mb-4 text-sm text-muted-foreground">
+          Rewards a real friend list over one alt account: claim from several
+          different friends, on several different days.
+        </p>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <NumberField
+            label="Different friends"
+            min={0}
+            max={50}
+            value={pond.weeklyBonusFriends}
+            onChange={(weeklyBonusFriends) => patchPond({ weeklyBonusFriends })}
+          />
+          <NumberField
+            label="Different days"
+            hint="0 days disables the bonus."
+            min={0}
+            max={7}
+            value={pond.weeklyBonusDays}
+            onChange={(weeklyBonusDays) => patchPond({ weeklyBonusDays })}
+          />
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-bold text-foreground">
+              Gift item id
+            </span>
+            <input
+              value={pond.weeklyBonusGiftItemId}
+              onChange={(event) =>
+                patchPond({ weeklyBonusGiftItemId: event.target.value })
+              }
+              className={inputClass}
+            />
+          </label>
         </div>
       </section>
     </div>
