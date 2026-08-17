@@ -110,7 +110,7 @@ export function SingleRewardCard({
   hideAction,
   compact,
   hideSingleQuantity = false,
-  liftItemPreview = false,
+  lowerItemPreview = false,
   giftAnimation,
   rewards,
   rewardCatalog,
@@ -140,8 +140,8 @@ export function SingleRewardCard({
   compact?: boolean;
   /** Hide a redundant ×1 badge while preserving quantities above one. */
   hideSingleQuantity?: boolean;
-  /** Lift cosmetic frogs in constrained preview cards. */
-  liftItemPreview?: boolean;
+  /** Lower cosmetic frogs slightly in constrained preview cards. */
+  lowerItemPreview?: boolean;
   /** Optional gift-box animation override (e.g. 'box_shake'). */
   giftAnimation?: string;
   /** Full reward list for this lane. When it holds more than one, the preview
@@ -308,16 +308,17 @@ export function SingleRewardCard({
           previewUnmountDelayMs={previewUnmountDelayMs}
           giftAnimation={giftAnimation}
           previewClassName={cn(
-            // The fan positions its own tiles; the single-preview scale/lift
+            // The fan positions its own tiles; the single-preview scale/offset
             // would skew the stack.
             !fannedRewards && cardType !== 'BACKGROUND' && 'scale-110',
             !fannedRewards &&
               cardType !== 'BACKGROUND' &&
-              // Only lift gift boxes; leave frog skins at their default position.
+              // Gift boxes stay lifted; compact cosmetic previews sit a little
+              // lower so the frog is centered inside the visible card window.
               (itemDef.slot === 'container'
                 ? '-translate-y-[12%]'
-                : liftItemPreview
-                  ? '-translate-y-[4%]'
+                : lowerItemPreview
+                  ? 'translate-y-[6%]'
                   : 'translate-y-[18%]'),
           )}
           previewTopLeftBadge={

@@ -355,15 +355,15 @@ export function NextQuestStrip({
               />
             </div>
           </div>
-          <div className="flex min-w-0 flex-1 flex-col leading-tight animate-[reward-pop_0.4s_ease-out_0.07s_both] motion-reduce:animate-none">
+          <div className="flex min-w-0 flex-1 flex-col overflow-hidden leading-tight animate-[reward-pop_0.4s_ease-out_0.07s_both] motion-reduce:animate-none">
             <span className="text-[10px] font-black uppercase tracking-[0.14em] text-lime-700 dark:text-lime-400">
               {claimableCount > 1
                 ? `${claimableCount} rewards ready`
                 : 'Reward ready'}
             </span>
-            <span className="mt-0.5 block min-w-0 text-[13px] font-black text-foreground md:truncate">
+            <span className="mt-0.5 block min-w-0 truncate text-[13px] font-black text-foreground">
               {claimable.kind === 'season' ? (
-                <span className="truncate">
+                <span className="block truncate">
                   {claimable.seasonName
                     ? `${claimable.seasonName} · Tier ${claimable.tier}`
                     : `Season tier ${claimable.tier}`}
@@ -382,7 +382,7 @@ export function NextQuestStrip({
                 type="button"
                 disabled={claiming}
                 onClick={() => void handleClaim(claimable)}
-                className="inline-flex h-9 min-w-[7rem] items-center justify-center rounded-xl bg-amber-500 px-4 text-[13px] font-black text-white shadow-[0_3px_0_0_#b45309] transition-[transform,box-shadow,opacity] hover:translate-y-[-1px] hover:shadow-[0_4px_0_0_#b45309] active:translate-y-[2px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-9 min-w-[5.5rem] items-center justify-center rounded-xl bg-amber-500 px-3 text-[13px] font-black text-white shadow-[0_3px_0_0_#b45309] transition-[transform,box-shadow,opacity] hover:translate-y-[-1px] hover:shadow-[0_4px_0_0_#b45309] active:translate-y-[2px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60 min-[380px]:min-w-[7rem] min-[380px]:px-4"
               >
                 {claiming ? 'Claiming…' : 'Claim'}
               </button>

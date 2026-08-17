@@ -900,7 +900,7 @@ function QuestSeasonBanner({
         )}
         {/* Same recessed inset feel as the home background photo. */}
         <div className="pointer-events-none absolute inset-0 shadow-[rgba(0,0,0,0.06)_0px_2px_4px_0px_inset,rgba(0,0,0,0.15)_0px_-2px_5px_0px_inset]" />
-        <div className="absolute inset-x-0 top-24 flex justify-center p-4 md:top-12 lg:top-16 xl:top-20">
+        <div className="absolute inset-x-0 top-16 flex justify-center p-4 md:top-10 lg:top-12 xl:top-14">
           <div className="flex flex-col items-center gap-3 md:gap-2">
             <span
               className="inline-flex items-center gap-1.5 text-base uppercase leading-none tracking-wide text-white drop-shadow-[0_2px_0_rgba(15,23,42,0.9)] sm:text-lg md:text-xl"
@@ -925,7 +925,7 @@ function QuestSeasonBanner({
               {timeLeft}
             </span>
             <h2
-              className="max-w-[20rem] text-center text-4xl uppercase leading-none tracking-wide text-white drop-shadow-[0_5px_0_rgba(15,23,42,0.95)] sm:text-5xl md:text-5xl"
+              className="max-w-[calc(100%-2rem)] text-center text-4xl uppercase leading-none tracking-wide text-white drop-shadow-[0_5px_0_rgba(15,23,42,0.95)] sm:text-5xl md:max-w-[38rem] md:text-5xl"
               style={{
                 fontFamily: 'var(--font-display), "Luckiest Guy", cursive',
                 WebkitTextStroke: '3px rgba(15, 23, 42, 0.95)',
@@ -961,6 +961,7 @@ function QuestSeasonBanner({
                     reward={previewReward}
                     rewardCatalog={rewardCatalog}
                     isPremium={isPremium}
+                    showRays
                   />
                 ) : (
                   <Gift className="h-8 w-8 text-muted-foreground" />
@@ -981,12 +982,12 @@ function QuestSeasonBanner({
               </div>
             </>
           )}
-          <div className="relative flex w-[6.75rem] shrink-0 items-center sm:w-[9.5rem]">
+          <div className="relative flex w-[6.25rem] shrink-0 items-center min-[360px]:w-[6.75rem] sm:w-[9.5rem]">
             <button
               type="button"
               onClick={onView}
               className={cn(
-                'w-full whitespace-nowrap rounded-2xl px-2.5 pb-3.5 pt-[1.125rem] text-[13px] font-black text-white transition active:translate-y-1 active:shadow-none sm:px-5 sm:text-base',
+                'w-full whitespace-nowrap rounded-2xl px-2 pb-3.5 pt-[1.125rem] text-[11px] font-black text-white transition active:translate-y-1 active:shadow-none min-[360px]:px-2.5 min-[360px]:text-[13px] sm:px-5 sm:text-base',
                 season.claimable
                   ? 'bg-amber-500 shadow-[0_5px_0_#b45309]'
                   : 'bg-lime-600 shadow-[0_5px_0_#3f6212]',
@@ -1077,6 +1078,7 @@ function SeasonRewardPreview({
   isPremium,
   paused = false,
   hideQuantityBadge = false,
+  showRays = false,
   className,
 }: {
   reward: QuestReward;
@@ -1084,6 +1086,7 @@ function SeasonRewardPreview({
   isPremium: boolean;
   paused?: boolean;
   hideQuantityBadge?: boolean;
+  showRays?: boolean;
   className?: string;
 }) {
   const catalogId = reward.itemId ?? reward.backgroundId;
@@ -1097,6 +1100,20 @@ function SeasonRewardPreview({
           clipped here so nothing spills onto the bar, while the count badge
           stays outside this box and rides the corner. */}
       <div className="absolute inset-0 flex items-center justify-center overflow-hidden rounded-2xl bg-card">
+        {showRays ? (
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute -inset-8 z-0 animate-[spin_18s_linear_infinite] text-amber-400/55 motion-reduce:animate-none"
+            style={{
+              background:
+                'repeating-conic-gradient(from 0deg, transparent 0deg 14deg, currentColor 14deg 24deg, transparent 24deg 32deg)',
+              maskImage:
+                'radial-gradient(circle at center, black 0 48%, transparent 78%)',
+              WebkitMaskImage:
+                'radial-gradient(circle at center, black 0 48%, transparent 78%)',
+            }}
+          />
+        ) : null}
         {isGift ? (
           <div className="relative z-10 h-[136%] w-[136%] -translate-y-[14%]">
             <GiftRive
@@ -1511,7 +1528,7 @@ function QuestSeasonEventOverlay({
       aria-labelledby="season-pass-title"
       className="fixed inset-0 z-[1200] flex flex-col overflow-x-hidden bg-background md:overflow-hidden"
     >
-      <div className="relative h-[210px] shrink-0 overflow-hidden md:h-[220px] [@media(max-height:820px)]:md:h-[180px] [@media(max-height:720px)]:md:h-[140px]">
+      <div className="relative h-[calc(210px+env(safe-area-inset-top))] shrink-0 overflow-hidden md:h-[220px] [@media(max-height:820px)]:md:h-[180px] [@media(max-height:720px)]:md:h-[140px]">
         {hasSeasonCover(season.images) ? (
           <SeasonCoverImage
             images={season.images}
@@ -1525,12 +1542,12 @@ function QuestSeasonEventOverlay({
         <button
           type="button"
           onClick={onClose}
-          className="touch-manipulation absolute right-4 top-[calc(1rem+env(safe-area-inset-top))] flex h-11 w-11 items-center justify-center rounded-full border border-white/25 bg-black/45 text-white shadow-lg backdrop-blur-md transition-[background-color,transform] hover:bg-black/60 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+          className="touch-manipulation absolute right-4 top-[calc(1rem+env(safe-area-inset-top))] z-20 flex h-11 w-11 items-center justify-center rounded-full border border-white/25 bg-black/45 text-white shadow-lg backdrop-blur-md transition-[background-color,transform] hover:bg-black/60 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
           aria-label="Close season pass"
         >
           <X className="h-5 w-5" />
         </button>
-        <div className="pointer-events-none absolute inset-x-0 top-14 flex justify-center px-4 md:top-16 [@media(max-height:820px)]:md:top-10 [@media(max-height:720px)]:md:top-6">
+        <div className="pointer-events-none absolute inset-x-14 top-[calc(1.5rem+env(safe-area-inset-top))] flex justify-center px-2 md:inset-x-0 md:top-16 md:px-4 [@media(max-height:820px)]:md:top-10 [@media(max-height:720px)]:md:top-6">
           <h2
             id="season-pass-title"
             className="max-w-[20rem] text-balance text-center text-3xl uppercase leading-none tracking-wide text-white drop-shadow-[0_4px_0_rgba(15,23,42,0.95)] sm:text-4xl md:text-4xl md:drop-shadow-[0_5px_0_rgba(15,23,42,0.95)] sm:md:text-5xl [@media(max-height:720px)]:md:text-3xl"
@@ -1988,7 +2005,7 @@ function LockedPlusPreview({
         hideDayLabel
         hideDropRates
         hideSingleQuantity
-        liftItemPreview
+        lowerItemPreview
         forceFullOpacity
         giftAnimation="box_shake"
       />
@@ -2054,7 +2071,7 @@ function LockedPlusPreview({
         </button>
 
         {rewards.length > 1 ? (
-          <div className="relative mx-auto mt-4 flex w-full max-w-[22rem] items-end justify-between px-1">
+          <div className="relative mx-auto mt-10 flex w-full max-w-[22rem] items-end justify-between px-1 md:mt-7">
             {rewardCard(rewards[0], 0)}
             <div className="absolute bottom-0 left-1/2 z-10 h-24 w-24 -translate-x-1/2 -translate-y-10 min-[420px]:h-28 min-[420px]:w-28">
               <Frog
