@@ -45,6 +45,26 @@ const PACT_ADVANCE_HOLD_MS = 950;
 /** A Leap session is a real sitting, not a tick — priced like a focus block. */
 const LEAP_SESSION_EFFORT_DAYS = 0.25;
 
+/**
+ * What survives skipping today once the full week is already out of reach:
+ * the bonus is gone, near-miss protection can still carry the streak.
+ */
+const NEAR_MISS_SALVAGE = 0.5;
+
+function hoursUntilLocalEndOfDay(now: Date): number {
+  const endOfDay = new Date(now);
+  endOfDay.setHours(24, 0, 0, 0);
+  return Math.max(0, (endOfDay.getTime() - now.getTime()) / 3_600_000);
+}
+
+function hoursUntilStartTime(startTime: string, now: Date): number {
+  const [hour, minute] = (startTime || '').split(':').map(Number);
+  if (!Number.isFinite(hour)) return 0;
+  const at = new Date(now);
+  at.setHours(hour, Number.isFinite(minute) ? minute : 0, 0, 0);
+  return (at.getTime() - now.getTime()) / 3_600_000;
+}
+
 export function NextQuestStrip({
   claimables,
   trackables,
@@ -187,23 +207,44 @@ export function NextQuestStrip({
   const leapRanked = useMemo(() => {
     const active = pactActionable ? livePact?.active : null;
     if (!active) return null;
-    const sessionsNeeded = Math.max(
+    const now = new Date();
+    // Chances, not calendar days: a Wednesday is not a spare session unless
+    // the pact is actually scheduled on it.
+    const chancesLeft = active.sessions.filter((s) => s.state === 'open').length;
+    const effectiveTarget = active.canStillFinish
+      ? active.target
+      : active.nearMissTarget;
+    const sessionsNeeded = Math.max(0, effectiveTarget - active.progress);
+    const weekSlack = Math.max(
       0,
-      (active.canStillFinish ? active.target : active.nearMissTarget) -
-        active.progress,
+      chancesLeft - Math.max(0, active.target - active.progress),
     );
+    const streakSlack = Math.max(
+      0,
+      chancesLeft - Math.max(0, active.nearMissTarget - active.progress),
+    );
+    const salvageIfSkipped =
+      weekSlack > 0
+        ? weekSlack / (weekSlack + 1)
+        : streakSlack > 0
+          ? NEAR_MISS_SALVAGE
+          : 0;
     return scoreQuestPriority({
       kind: 'leap',
       placement: 'daily',
       progress: active.progress,
-      target: Math.max(1, active.target),
+      target: Math.max(1, effectiveTarget),
       hoursLeftInWindow: Math.max(0, active.daysLeft) * 24,
       windowHours: WEEK_WINDOW_HOURS,
-      slackDays: Math.max(0, active.daysLeft - sessionsNeeded),
+      salvageIfSkipped,
+      streakSalvageIfSkipped: streakSlack > 0 ? 1 : 0,
+      hoursLeftToday: hoursUntilLocalEndOfDay(now),
+      dueInHours: hoursUntilStartTime(active.startTime, now),
       effortToActNow: LEAP_SESSION_EFFORT_DAYS,
       effortToComplete: LEAP_SESSION_EFFORT_DAYS * Math.max(1, sessionsNeeded),
       streakAtRisk: livePact?.streak.weeks ?? 0,
       rewardValue: active.sessionFlies + active.weekBonusFlies,
+      rewardBankedNow: active.sessionFlies,
     });
   }, [pactActionable, livePact]);
 
@@ -498,7 +539,9 @@ export function NextQuestStrip({
           'order: needs-tag last → score (2 decimals) → lower tier → least work left → fewest remaining → sooner reset',
           'near = 1/(1 + days of work left): streak units cost their day count minus the live run, tasks ~0.1d, focus min ~0.01d',
           'pool: best objective per quest (onboarding + daily + areas)',
-          'urgency: reset sooner than half the pool median, or a streak run at risk today',
+          'urgency = perishability x max(clock, fits-today); score x readiness',
+          'perishability: daily = 1 (gone at reset); leap = what a skipped day burns',
+          'reward = flies the NEXT action banks (leap: session now + bonus/sessions left)',
         ]}
       />
     </div>

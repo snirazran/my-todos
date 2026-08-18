@@ -33,8 +33,24 @@ const MIN_EFFORT_DAYS = 0.05;
  */
 const EFFORT_EXPONENT = 0.85;
 
-/** Flies at which reward pull saturates — roughly a daily's middle payout. */
-const REWARD_REFERENCE_FLIES = 20;
+/**
+ * Flies at which reward pull saturates. Set against the largest payout a
+ * single next action can realistically bank, so neither side clamps and the
+ * term keeps discriminating instead of reading 1.00 for everything.
+ */
+const REWARD_REFERENCE_FLIES = 40;
+
+/**
+ * How long before a scheduled start an item counts as the thing to do now.
+ * Outside that ramp its clock is not the user's clock yet.
+ */
+const SCHEDULE_LEAD_HOURS = 3;
+
+/**
+ * Floor on the schedule discount. A session hours away is not what to do next,
+ * but it is not worthless either — it still outranks an empty slot.
+ */
+const MIN_READINESS = 0.35;
 
 /**
  * Cost-of-delay weights. Score is `value / cost`, so these sit in the
@@ -73,11 +89,21 @@ export type PriorityInput = {
   /** Length of the item's own window, so pressure is a fraction of ITS clock. */
   windowHours?: number;
   /**
-   * Scheduled chances beyond the sessions still needed. 0 means every remaining
-   * chance has to land, so today is mandatory. Leap only; null for a daily,
-   * which has a single window rather than a run of them.
+   * Share of this item's value that survives skipping today, 0–1. 0 is a hard
+   * cliff (a daily is gone at reset); a spare chance later in the window is
+   * what pushes it up.
    */
-  slackDays?: number | null;
+  salvageIfSkipped?: number;
+  /** Hours the user still has today, when that differs from the item's window. */
+  hoursLeftToday?: number;
+  /** Hours until this item's scheduled start. 0 or less once it is open. */
+  dueInHours?: number;
+  /**
+   * Share of the *streak* that survives skipping today, 0–1. Separate from
+   * `salvageIfSkipped` because a run and a payout are rarely lost on the same
+   * day. Defaults to `salvageIfSkipped`.
+   */
+  streakSalvageIfSkipped?: number;
   /** Days of work to make progress *today*. This is the WSJF denominator. */
   effortToActNow?: number;
   /** Days of work to finish the objective outright. Display and tie-breaks. */
@@ -87,8 +113,10 @@ export type PriorityInput = {
    * passes weeks; the curve only needs "more is worse".
    */
   streakAtRisk?: number;
-  /** Absolute reward worth in flies. */
+  /** Absolute reward worth in flies, whole objective or week. */
   rewardValue?: number;
+  /** The part of `rewardValue` a single action banks on the spot. */
+  rewardBankedNow?: number;
 };
 
 export type PriorityResult = {
@@ -102,8 +130,14 @@ export type PriorityResult = {
   deadlinePressure: number;
   /** Whether the work still fits the time or chances left. */
   feasibility: number;
+  /** How much of the value a skipped day destroys. */
+  perishability: number;
+  /** Score multiplier for how close the scheduled moment is. */
+  readiness: number;
   /** The combined time criticality actually used in the score. */
   urgency: number;
+  /** Flies the next single action is actually expected to bank. */
+  marginalReward: number;
   reward: number;
   streakRisk: number;
 };
@@ -165,27 +199,45 @@ export function scoreQuestPriority(
       ? input.effortToActNow
       : (1 - proximity) * MIN_EFFORT_DAYS * 2;
 
-  // Two different questions, depending on what limits the item. A Leap is
-  // limited by how many scheduled days are left relative to the sessions it
-  // still needs; a daily is limited by whether tonight still fits the work.
-  let feasibility = 0;
-  if (input.kind === 'leap' && typeof input.slackDays === 'number') {
-    feasibility = 1 / (1 + Math.max(0, input.slackDays));
-  } else if (hoursUntilReset !== null) {
-    const hoursNeeded = effortNow * REAL_HOURS_PER_EFFORT_DAY;
-    feasibility = clamp01(hoursNeeded / Math.max(0.5, hoursUntilReset));
-  }
+  const hoursAvailable = input.hoursLeftToday ?? hoursUntilReset;
+  const feasibility =
+    hoursAvailable === null
+      ? 0
+      : clamp01(
+          (effortNow * REAL_HOURS_PER_EFFORT_DAY) / Math.max(0.5, hoursAvailable),
+        );
 
+  // A fixed-date job does not lose value linearly: skipping a daily destroys
+  // it, skipping one Leap session with a spare chance behind it costs nothing.
+  // Time pressure is scaled by what a skipped day actually burns.
+  const perishability = 1 - clamp01(input.salvageIfSkipped ?? 0);
+
+  const dueInHours = input.dueInHours ?? 0;
+  const readiness =
+    dueInHours <= 0
+      ? 1
+      : MIN_READINESS +
+        (1 - MIN_READINESS) * clamp01(1 - dueInHours / SCHEDULE_LEAD_HOURS);
+
+  // A run is only on the line when no later chance can still absorb the skip.
+  const streakSalvage = clamp01(
+    input.streakSalvageIfSkipped ?? input.salvageIfSkipped ?? 0,
+  );
   const atRisk = Math.max(0, input.streakAtRisk ?? 0);
-  const streakRisk = atRisk > 0 ? atRisk / (atRisk + 2) : 0;
+  const streakRisk =
+    atRisk > 0 ? (atRisk / (atRisk + 2)) * (1 - streakSalvage) : 0;
 
   // Two measures of the same thing, so the larger stands rather than both
   // stacking — otherwise an item that is merely late reads as unmissable.
-  const urgency = Math.max(deadlinePressure, feasibility);
+  const urgency = perishability * Math.max(deadlinePressure, feasibility);
 
-  const reward = clamp01(
-    Math.max(0, input.rewardValue ?? 0) / REWARD_REFERENCE_FLIES,
-  );
+  // What the next action banks, not what the whole pot is worth: whatever a
+  // single act pays on the spot, plus the share of the held-back part that
+  // this act is responsible for. Puts both kinds on one honest scale.
+  const bankedNow = Math.max(0, input.rewardBankedNow ?? 0);
+  const deferred = Math.max(0, Math.max(0, input.rewardValue ?? 0) - bankedNow);
+  const marginalReward = bankedNow + deferred / Math.max(1, unitsRemaining);
+  const reward = clamp01(marginalReward / REWARD_REFERENCE_FLIES);
 
   // Goal-gradient (Hull; Kivetz, Urminsky & Zheng): pull rises near the goal,
   // and one step from done is the strongest pull there is.
@@ -202,12 +254,16 @@ export function scoreQuestPriority(
     VALUE_WEIGHTS.streak * streakRisk;
 
   const cost = Math.pow(Math.max(MIN_EFFORT_DAYS, effortNow), EFFORT_EXPONENT);
-  const score = value / cost;
+  const score = (value / cost) * readiness;
 
   let reason: PriorityReason = null;
   if (streakRisk > 0 && proximity < 1) {
     reason = 'streak-at-risk';
-  } else if (feasibility >= NOW_OR_NEVER_FEASIBILITY && proximity < 1) {
+  } else if (
+    feasibility >= NOW_OR_NEVER_FEASIBILITY &&
+    perishability >= 0.9 &&
+    proximity < 1
+  ) {
     reason = 'now-or-never';
   } else if (
     hoursUntilReset !== null &&
@@ -231,7 +287,10 @@ export function scoreQuestPriority(
     proximity,
     deadlinePressure,
     feasibility,
+    perishability,
+    readiness,
     urgency,
+    marginalReward,
     reward,
     streakRisk,
   };

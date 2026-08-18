@@ -93,9 +93,18 @@ export function QuestPriorityDebug({
                     ? 'no reset'
                     : `${Math.round(result.hoursUntilReset)}h left`,
                 )}
-                {` (clock ${result.deadlinePressure.toFixed(2)} / fits ${result.feasibility.toFixed(2)})`}
+                {` (clock ${result.deadlinePressure.toFixed(2)} / fits ${result.feasibility.toFixed(
+                  2,
+                )} × perish ${result.perishability.toFixed(2)} × ready ${result.readiness.toFixed(
+                  2,
+                )})`}
                 {' · '}
-                {formatPart('reward', result.reward, VALUE_WEIGHTS.reward)}
+                {formatPart(
+                  'reward',
+                  result.reward,
+                  VALUE_WEIGHTS.reward,
+                  `${result.marginalReward.toFixed(1)}f next act`,
+                )}
                 {' · '}
                 {formatPart('streak', result.streakRisk, VALUE_WEIGHTS.streak)}
               </div>
