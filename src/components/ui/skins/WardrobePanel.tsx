@@ -73,7 +73,11 @@ import {
   type WishlistEntry,
 } from '@/lib/skins/wishlist';
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
-import { showRewardedAd, takePlusOfferAfterAd } from '@/lib/ads';
+import {
+  rewardedAdsAvailable,
+  showRewardedAd,
+  takePlusOfferAfterAd,
+} from '@/lib/ads';
 
 type WardrobeCard =
   | {
@@ -562,6 +566,10 @@ function WardrobeManagerContent({
   const rerollDeals = async () => {
     if (rerolling) return;
     const isPlus = !!data?.isPremium;
+    if (!isPlus && !rewardedAdsAvailable()) {
+      openPlus('premium_daily_deal');
+      return;
+    }
     setRerolling(true);
     hapticImpact();
     try {

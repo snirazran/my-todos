@@ -9,6 +9,7 @@ import UserModel from '@/lib/models/User';
 import { getCachedCatalog, buildById } from '@/lib/skins/getCatalog';
 import { equippedToIndices, type FrogIndices } from '@/lib/friends/indices';
 import { isOneTimeParams } from '@/lib/buddy/bond';
+import { loadFlyEconomyConfig } from '@/lib/economy/config';
 
 export type BuddyTaskState = {
   bondId: string;
@@ -45,7 +46,11 @@ export async function GET() {
       .select('id bondId buddyUserId')
       .lean<{ id: string; bondId: string; buddyUserId?: string }[]>();
 
-    if (bondedTasks.length === 0) return NextResponse.json({ byTaskId: {} });
+    const config = await loadFlyEconomyConfig();
+    const bonusFlies = config.buddy.bonusFlies;
+
+    if (bondedTasks.length === 0)
+      return NextResponse.json({ byTaskId: {}, bonusFlies });
 
     const bondIds = Array.from(new Set(bondedTasks.map((t) => t.bondId)));
     const partnerIds = Array.from(
@@ -101,7 +106,7 @@ export async function GET() {
       };
     }
 
-    return NextResponse.json({ byTaskId });
+    return NextResponse.json({ byTaskId, bonusFlies });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'Failed to load buddy state' },

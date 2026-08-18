@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useRandomReveal } from '@/hooks/useRandomReveal';
+import { useBuddyBonusFlies } from '@/hooks/useBuddyState';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { BuddyStartFlow } from '@/components/ui/BuddyStartFlow';
 import Frog from '@/components/ui/frog';
@@ -27,6 +28,7 @@ export function BuddyNudgeSheet({
   const { show, dismiss } = useRandomReveal('friends_buddy');
   const [open, setOpen] = useState(false);
   const [flowOpen, setFlowOpen] = useState(false);
+  const bonusFlies = useBuddyBonusFlies();
 
   useEffect(() => {
     if (!ready || !show) return;
@@ -97,8 +99,9 @@ export function BuddyNudgeSheet({
               Share a goal with a friend
             </h2>
             <p className="mx-auto mt-1.5 max-w-xs text-[15px] font-medium text-muted-foreground">
-              Pick one thing you both repeat. Every day you both finish it, you
-              both catch double flies — and your shared streak grows.
+              Pick one thing you both repeat. Every day you both finish it,
+              you each catch {bonusFlies} bonus flies — and your shared streak
+              grows.
             </p>
 
             <button

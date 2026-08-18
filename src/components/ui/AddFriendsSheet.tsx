@@ -1,8 +1,13 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import useSWR from 'swr';
+import { useReducedMotion } from 'framer-motion';
 import { Search, QrCode, Gift } from 'lucide-react';
+import {
+  RewardTile,
+  type QuestRewardCatalogItem,
+} from '@/components/ui/QuestCards';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { InviteFriendsModal } from '@/components/ui/InviteFriendsModal';
 import { EnterFriendCodeModal } from '@/components/ui/EnterFriendCodeModal';
@@ -11,6 +16,54 @@ import { FriendSuggestionsRow } from '@/components/ui/FriendSuggestionsRow';
 import Fly from '@/components/ui/fly';
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
+
+type GiftOptionItem = QuestRewardCatalogItem | null;
+
+type InviteConfigResponse = {
+  rewards?: { tier: number; item?: { name?: string } }[];
+  giftOptions?: { id: string; itemId: string; item: GiftOptionItem }[];
+};
+
+/**
+ * The welcome gift has no identity until the sender picks one, so the tile
+ * cycles the outfits that can actually be sent — the promise is real, the
+ * particular outfit is not.
+ */
+function GiftOutfitRoll({ items }: { items: QuestRewardCatalogItem[] }) {
+  const reduceMotion = useReducedMotion();
+  const [shown, setShown] = useState(0);
+
+  useEffect(() => {
+    if (reduceMotion || items.length <= 1) return;
+    const timer = window.setInterval(() => {
+      setShown((current) => {
+        let next = current;
+        while (next === current) next = Math.floor(Math.random() * items.length);
+        return next;
+      });
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [reduceMotion, items.length]);
+
+  const catalog = useMemo(
+    () => Object.fromEntries(items.map((item) => [item.id, item])),
+    [items],
+  );
+  const item = items[shown % Math.max(1, items.length)];
+  if (!item) return <Gift className="h-6 w-6 text-[#4f9149]" strokeWidth={2.25} />;
+
+  return (
+    <RewardTile
+      reward={{ type: 'ITEM', itemId: item.id }}
+      rewardCatalog={catalog}
+      isPremium={false}
+      compact
+      hideBadge
+      className="h-11 w-11 rounded-xl"
+      frogClassName="h-[142%] w-[142%] -translate-y-[20%]"
+    />
+  );
+}
 
 export function AddFriendsSheet({
   open,
@@ -28,13 +81,31 @@ export function AddFriendsSheet({
   // "Show progress and what comes next" is the one thing referral screens are
   // consistently faulted for missing — the ladder already exists, so the sheet
   // states where you are on it instead of asking blind.
-  const { data: inviteConfig } = useSWR<{
-    rewards?: { tier: number; item?: { name?: string } }[];
-  }>(open ? '/api/invite/config' : null, fetcher, { revalidateOnFocus: false });
+  const { data: inviteConfig } = useSWR<InviteConfigResponse>(
+    open ? '/api/invite/config' : null,
+    fetcher,
+    { revalidateOnFocus: false },
+  );
   const { data: inviteStatus } = useSWR<{ claimedCount?: number }>(
     open ? '/api/invite/status' : null,
     fetcher,
     { revalidateOnFocus: false },
+  );
+
+  // The rate is admin-tunable, so the pitch reads it live rather than baking a
+  // number that can quietly stop being true.
+  const { data: friendsData } = useSWR<{
+    pond?: { tasksPerGeneration?: number; fliesPerGeneration?: number };
+  }>(open ? '/api/friends' : null, fetcher, { revalidateOnFocus: false });
+  const perTasks = friendsData?.pond?.tasksPerGeneration ?? 5;
+  const perFlies = friendsData?.pond?.fliesPerGeneration ?? 2;
+
+  const giftItems = useMemo(
+    () =>
+      (inviteConfig?.giftOptions ?? [])
+        .map((g) => g.item)
+        .filter((item): item is QuestRewardCatalogItem => !!item),
+    [inviteConfig],
   );
 
   const joined = inviteStatus?.claimedCount ?? 0;
@@ -82,8 +153,8 @@ export function AddFriendsSheet({
                 Your friends catch flies for you
               </h2>
               <p className="mx-auto mt-2 max-w-[21rem] text-center text-[13px] font-semibold leading-snug text-muted-foreground min-[400px]:text-sm">
-                Add a friend and you each keep half of what the other catches,
-                every single day.
+                Every {perTasks} tasks a friend finishes drops {perFlies} flies
+                in your pond.
               </p>
 
               {/* Both sides of the trade, stated plainly — the practice every
@@ -93,8 +164,10 @@ export function AddFriendsSheet({
                   <span className="text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground">
                     They get
                   </span>
-                  <Gift className="h-6 w-6 text-[#4f9149]" strokeWidth={2.25} />
-                  <span className="text-[13px] font-black leading-tight tracking-tight text-foreground">
+                  <span className="flex h-11 items-center justify-center">
+                    <GiftOutfitRoll items={giftItems} />
+                  </span>
+                  <span className="flex min-h-[2.05rem] items-center text-[13px] font-black leading-tight tracking-tight text-foreground">
                     A free outfit
                   </span>
                 </div>
@@ -102,9 +175,17 @@ export function AddFriendsSheet({
                   <span className="text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground">
                     You get
                   </span>
-                  <Fly size={26} interactive={false} paused />
-                  <span className="text-[13px] font-black leading-tight tracking-tight text-foreground">
-                    Half their catch
+                  <span className="flex h-11 items-center justify-center">
+                    <Fly size={38} interactive={false} paused />
+                    <Fly
+                      size={38}
+                      interactive={false}
+                      paused
+                      className="-ml-3 translate-y-1"
+                    />
+                  </span>
+                  <span className="flex min-h-[2.05rem] items-center text-[13px] font-black leading-tight tracking-tight text-foreground">
+                    {perFlies} flies per {perTasks} tasks
                   </span>
                 </div>
               </div>

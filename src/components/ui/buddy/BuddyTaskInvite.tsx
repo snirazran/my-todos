@@ -8,6 +8,7 @@ import Fly from '@/components/ui/fly';
 import { GiftRive } from '@/components/ui/gift-box/GiftBox';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { mutateFriendsCaches } from '@/hooks/useFriendsSync';
+import { useBuddyBonusFlies } from '@/hooks/useBuddyState';
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
 import { shareLink } from '@/lib/share';
 import type { FriendSummary } from '@/lib/friends/indices';
@@ -38,6 +39,7 @@ export function BuddyTaskInvite({
   taskText: string;
   onClose: () => void;
 }) {
+  const bonusFlies = useBuddyBonusFlies();
   const [sendingTo, setSendingTo] = useState<string | null>(null);
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -185,7 +187,8 @@ export function BuddyTaskInvite({
                   <span className="font-bold text-foreground">
                     waiting for {sentTo}
                   </span>{' '}
-                  until they accept. Then you both catch double flies for it.
+                  until they accept. Then you each catch {bonusFlies} bonus
+                  flies every time you both finish it.
                 </p>
               </>
             ) : view === 'linkReady' ? (
@@ -219,8 +222,8 @@ export function BuddyTaskInvite({
                   {taskText}
                 </p>
                 <p className="relative mt-1.5 text-sm font-medium text-muted-foreground">
-                  Pick who joins you — every time you both finish it, you both
-                  catch double flies.
+                  Pick who joins you — every time you both finish it, you each
+                  catch {bonusFlies} bonus flies.
                 </p>
               </>
             )}

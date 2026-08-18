@@ -905,8 +905,9 @@ export async function performRescue(args: {
     };
   }
 
+  const adsRequired = isPremium ? 0 : rescue.adsRequired;
   const adsWatched = rescue.adsWatched + 1;
-  if (adsWatched < rescue.adsRequired) {
+  if (adsWatched < adsRequired) {
     const updated: StreakRescue = { ...rescue, adsWatched };
     await UserModel.updateOne(
       { _id: userId, 'quests.loginStreak.rescue.id': rescue.id },

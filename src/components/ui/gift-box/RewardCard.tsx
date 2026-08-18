@@ -2,8 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { AnimatePresence, motion, Variants } from 'framer-motion';
 import { Loader2, Crown, Play } from 'lucide-react';
 import Frog from '@/components/ui/frog';
-import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
-import { rewardedAdsAvailable, takePlusOfferAfterAd } from '@/lib/ads';
+import { takePlusOfferAfterAd } from '@/lib/ads';
+import { useRewardGate } from '@/hooks/useRewardGate';
 import { ItemDef } from '@/lib/skins/catalog';
 import { hapticTick } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
@@ -28,10 +28,10 @@ type RewardCardProps = {
   isPremium?: boolean;
   showDoubleUpsell?: boolean;
   rewardAmount?: number;
-  /** Tapping "Double Reward" calls this directly (it should run the rewarded
-   *  ad and grant the double); when ads are unavailable the button opens the
-   *  Plus paywall instead. */
+  /** Grants the double. The card owns the price: a rewarded ad on native, the
+   *  Plus paywall on web, and the action runs once either is paid. */
   onWatchAd?: () => void | Promise<void>;
+  doublePlacement?: string;
   paused?: boolean;
 };
 
@@ -84,12 +84,11 @@ export const RewardCard = ({
   showDoubleUpsell,
   rewardAmount,
   onWatchAd,
+  doublePlacement = 'double_reward',
   paused = false,
 }: RewardCardProps) => {
   const [showContent, setShowContent] = useState(false);
   const [localClaiming, setLocalClaiming] = useState(false);
-  const [watchingAd, setWatchingAd] = useState(false);
-  const [showPlus, setShowPlus] = useState(false);
   const config = RARITY_CONFIG[prize.rarity];
   const glowColor = GLOW_COLORS[prize.rarity];
   const isSpare = !quantity && !!spareCount && spareCount > 1;
@@ -108,23 +107,28 @@ export const RewardCard = ({
     }, 200);
   };
 
-  const canWatchAd = !!onWatchAd && rewardedAdsAvailable();
+  const {
+    mode,
+    run,
+    busy: watchingAd,
+    error: doubleError,
+    plusModal,
+    openPlus,
+  } = useRewardGate(doublePlacement);
+  const canWatchAd = mode === 'ad' && !!onWatchAd;
 
-  const handleDoubleClick = async () => {
+  const handleDoubleClick = () => {
     if (watchingAd) return;
-    if (!canWatchAd) {
-      setShowPlus(true);
+    if (!onWatchAd) {
+      openPlus();
       return;
     }
-    setWatchingAd(true);
-    try {
-      await onWatchAd?.();
-      if (takePlusOfferAfterAd()) {
-        setTimeout(() => setShowPlus(true), 1600);
+    void run(async () => {
+      await onWatchAd();
+      if (canWatchAd && takePlusOfferAfterAd()) {
+        setTimeout(() => openPlus(), 1600);
       }
-    } finally {
-      setWatchingAd(false);
-    }
+    });
   };
 
   const cardVariants: Variants = {
@@ -404,7 +408,7 @@ export const RewardCard = ({
             {watchingAd ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
-                Loading ad...
+                {canWatchAd ? 'Loading ad...' : 'Claiming...'}
               </>
             ) : (
               <>
@@ -425,11 +429,12 @@ export const RewardCard = ({
           </GoldenRewardButton>
         )}
       </div>
-      <PlusUpgradeModal
-        open={showPlus}
-        placement="double_reward"
-        onClose={() => setShowPlus(false)}
-      />
+      {doubleError && (
+        <p className="mt-2 text-center text-xs font-bold text-red-300">
+          {doubleError}
+        </p>
+      )}
+      {plusModal}
     </motion.div>
   );
 };

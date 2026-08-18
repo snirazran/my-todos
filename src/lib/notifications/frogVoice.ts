@@ -259,7 +259,7 @@ export function buddyBothFinishedMessage(
     title: task ? `You both did "${task}"` : `You and ${partnerName} both finished`,
     body: pick([
       "Bonus flies for both of you. I'll pretend I never doubted.",
-      `Double flies. You and ${partnerName} make it look easy.`,
+      `Bonus flies, both sides. You and ${partnerName} make it look easy.`,
     ]),
   };
 }

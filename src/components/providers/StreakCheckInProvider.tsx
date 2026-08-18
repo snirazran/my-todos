@@ -21,7 +21,6 @@ import { ShieldSheet } from '@/components/ui/streak/ShieldSheet';
 import { openShieldSheet, subscribeShieldSheet } from '@/hooks/useShields';
 import { useSheetStore } from '@/lib/sheetStore';
 import { useUIStore } from '@/lib/uiStore';
-import { rewardedAdsAvailable } from '@/lib/ads';
 import { recordAppUsageDay } from '@/lib/rateApp';
 import { emitCampaignTrigger } from '@/lib/campaigns/orchestrator';
 import type { CheckInResult, LoginStreakRescue } from '@/lib/streak/types';
@@ -130,12 +129,11 @@ export function StreakCheckInProvider() {
         );
       }
       const offer = result.rescue;
-      const canAd =
+      const canRescue =
         !!offer &&
         offer.adEligible &&
-        offer.adsWatched < Math.max(1, offer.adsRequired) &&
-        (offer.adsRequired === 0 || rewardedAdsAvailable());
-      if (offer && canAd) {
+        offer.adsWatched < Math.max(1, offer.adsRequired);
+      if (offer && canRescue) {
         openStreakSheet({ rescue: offer });
       } else if (result.shieldOffer) {
         queueShieldOffer(result.shieldOffer);

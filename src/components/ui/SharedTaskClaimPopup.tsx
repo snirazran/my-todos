@@ -7,6 +7,7 @@ import { Check } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import Frog from '@/components/ui/frog';
 import Fly from '@/components/ui/fly';
+import { useBuddyBonusFlies } from '@/hooks/useBuddyState';
 
 export function SharedTaskClaimPopup({
   text,
@@ -18,6 +19,7 @@ export function SharedTaskClaimPopup({
   onClose: () => void;
 }) {
   const btnRef = useRef<HTMLButtonElement>(null);
+  const bonusFlies = useBuddyBonusFlies();
 
   useEffect(() => {
     const rect = btnRef.current?.getBoundingClientRect();
@@ -77,7 +79,8 @@ export function SharedTaskClaimPopup({
             </p>
           </div>
           <p className="mt-3 text-[13px] font-medium text-muted-foreground">
-            Finish it on the same day and you both earn double flies.
+            Finish it on the same day and you each earn {bonusFlies} bonus
+            flies.
           </p>
 
           <button

@@ -9,7 +9,7 @@ import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
 import Fly from '@/components/ui/fly';
 import { Icon } from '@/components/ui/Icon';
 import { byId as catalogById } from '@/lib/skins/catalog';
-import { showRewardedAd } from '@/lib/ads';
+import { useRewardGate } from '@/hooks/useRewardGate';
 import { mutateInventoryCaches } from '@/hooks/useInventory';
 import { markFlyEarn } from '@/lib/flyEarn';
 import type {
@@ -92,19 +92,22 @@ export function StreakCelebration({
   const baseFlies = goal?.rewardSummary.fliesGranted ?? 0;
   const [flies, setFlies] = useState(baseFlies);
   const [doubled, setDoubled] = useState(false);
-  const [doubling, setDoubling] = useState(false);
+  const {
+    mode,
+    run,
+    busy: doubling,
+    error: doubleError,
+    plusModal,
+  } = useRewardGate('streak_commitment_double');
 
   useEffect(() => {
     setFlies(baseFlies);
     setDoubled(false);
   }, [baseFlies, claimId]);
 
-  const handleWatchAd = async () => {
+  const handleDouble = () => {
     if (!claimId || doubled || doubling) return;
-    setDoubling(true);
-    try {
-      const outcome = await showRewardedAd('streak_commitment_double');
-      if (outcome !== 'rewarded') return;
+    void run(async () => {
       const res = await fetch('/api/rewards/double', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -116,9 +119,7 @@ export function StreakCelebration({
       setFlies((current) => current * 2);
       markFlyEarn();
       mutateInventoryCaches();
-    } finally {
-      setDoubling(false);
-    }
+    });
   };
 
   return (
@@ -162,14 +163,27 @@ export function StreakCelebration({
                 <div className="mt-6 space-y-3 short-screen:mt-3 short-screen:space-y-2">
                   <RewardChips summary={goal.rewardSummary} flies={flies} />
                   {claimId && !doubled && baseFlies > 0 && (
-                    <button
-                      type="button"
-                      onClick={handleWatchAd}
-                      disabled={doubling}
-                      className="mx-auto flex h-11 items-center justify-center gap-2 rounded-2xl bg-white/20 px-5 text-xs font-black uppercase tracking-[0.14em] text-white backdrop-blur transition-colors hover:bg-white/30 disabled:opacity-60"
-                    >
-                      {doubling ? 'Loading ad…' : 'Watch an ad — double the flies'}
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        onClick={handleDouble}
+                        disabled={doubling}
+                        className="mx-auto flex h-11 items-center justify-center gap-2 rounded-2xl bg-white/20 px-5 text-xs font-black uppercase tracking-[0.14em] text-white backdrop-blur transition-colors hover:bg-white/30 disabled:opacity-60"
+                      >
+                        {doubling
+                          ? mode === 'ad'
+                            ? 'Loading ad…'
+                            : 'Doubling…'
+                          : mode === 'ad'
+                            ? 'Watch an ad — double the flies'
+                            : 'Double the flies with Plus'}
+                      </button>
+                      {doubleError && (
+                        <p className="text-center text-[11px] font-bold text-white/80">
+                          {doubleError}
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
               </motion.div>
@@ -185,6 +199,7 @@ export function StreakCelebration({
               </button>
             </div>
           </div>
+          {plusModal}
         </motion.div>
       )}
     </AnimatePresence>

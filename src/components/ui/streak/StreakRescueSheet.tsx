@@ -11,7 +11,8 @@ import { cn } from '@/lib/utils';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { rescueStreak } from '@/hooks/useLoginStreak';
-import { showRewardedAd } from '@/lib/ads';
+import { useRewardGate } from '@/hooks/useRewardGate';
+import { Icon } from '@/components/ui/Icon';
 import { hapticCelebrate } from '@/lib/haptics';
 import { StreakCelebration } from './StreakCelebration';
 import type {
@@ -66,18 +67,24 @@ export function StreakRescueSheet({
   const { indices } = useWardrobeIndices(open);
   const frogRef = useRef<FrogHandle>(null);
   const [adsWatched, setAdsWatched] = useState(0);
-  const [busy, setBusy] = useState<RescueMethod | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<RescueResult | null>(null);
   const [showRewards, setShowRewards] = useState(false);
   const [frogReady, setFrogReady] = useState(false);
 
   useRegisterOpenSheet(open);
 
+  const {
+    mode,
+    run,
+    busy,
+    error,
+    setError,
+    plusModal,
+  } = useRewardGate('streak_rescue', { isPlus: offer?.adsRequired === 0 });
+
   useEffect(() => {
     if (!open) return;
     setAdsWatched(offer?.adsWatched ?? 0);
-    setBusy(null);
     setError(null);
     setSaved(null);
     setShowRewards(false);
@@ -114,43 +121,32 @@ export function StreakRescueSheet({
   const largest = rows.reduce((max, r) => Math.max(max, r.count), 0);
   const multi = rows.length > 1;
 
-  const handleSave = async (method: RescueMethod) => {
-    if (busy || saved) return;
-    setBusy(method);
-    setError(null);
-    try {
-      if (method === 'ad' && !isFreeSave) {
-        const adResult = await showRewardedAd('streak_rescue');
-        if (adResult !== 'rewarded') {
-          if (adResult === 'failed') {
-            setError('Ad not available right now — try again in a moment.');
-          }
-          return;
-        }
-      }
-      const result = await rescueStreak(offer.id, method);
-      if (!result || !result.granted) {
-        setError('Could not save your streaks — try again.');
-        return;
-      }
-      if (result.completed) {
-        setSaved(result);
-        frogRef.current?.fireEmote('love');
-        confetti({
-          particleCount: 120,
-          spread: 90,
-          startVelocity: 42,
-          origin: { y: 0.45 },
-          zIndex: 99999,
-          colors: ['#fb923c', '#fbbf24', '#fde68a', '#ffffff'],
-        });
-        hapticCelebrate();
-      } else {
-        setAdsWatched(result.rescue?.adsWatched ?? adsWatched + 1);
-      }
-    } finally {
-      setBusy(null);
+  const performSave = async (method: RescueMethod = 'ad') => {
+    const result = await rescueStreak(offer.id, method);
+    if (!result || !result.granted) {
+      setError('Could not save your streaks — try again.');
+      return;
     }
+    if (result.completed) {
+      setSaved(result);
+      frogRef.current?.fireEmote('love');
+      confetti({
+        particleCount: 120,
+        spread: 90,
+        startVelocity: 42,
+        origin: { y: 0.45 },
+        zIndex: 99999,
+        colors: ['#fb923c', '#fbbf24', '#fde68a', '#ffffff'],
+      });
+      hapticCelebrate();
+    } else {
+      setAdsWatched(result.rescue?.adsWatched ?? adsWatched + 1);
+    }
+  };
+
+  const handleSave = () => {
+    if (busy || saved) return;
+    void run(() => performSave('ad'));
   };
 
   const finish = () => {
@@ -266,7 +262,7 @@ export function StreakRescueSheet({
                     )}
                   </div>
 
-                  {!isFreeSave && canWatchAd && offer.adsRequired > 1 && (
+                  {!isFreeSave && canWatchAd && mode === 'ad' && offer.adsRequired > 1 && (
                     <div className="mt-4 flex items-center gap-2">
                       {Array.from({ length: offer.adsRequired }, (_, i) => (
                         <div
@@ -293,8 +289,8 @@ export function StreakRescueSheet({
                   {isFreeSave ? (
                     <button
                       type="button"
-                      onClick={() => handleSave('ad')}
-                      disabled={!!busy}
+                      onClick={handleSave}
+                      disabled={busy}
                       className={cn(
                         'mt-6 flex w-full max-w-[300px] items-center justify-center gap-2 rounded-2xl bg-amber-400 py-3.5 text-sm font-black uppercase tracking-wide text-slate-900 shadow-[0_5px_0_0_rgba(0,0,0,0.3)] transition-all active:translate-y-1 active:shadow-none',
                         busy && 'opacity-70',
@@ -305,26 +301,44 @@ export function StreakRescueSheet({
                     </button>
                   ) : (
                     <div className="mt-6 flex w-full max-w-[300px] flex-col gap-3">
-                      {canWatchAd && (
-                        <button
-                          type="button"
-                          onClick={() => handleSave('ad')}
-                          disabled={!!busy}
-                          className={cn(
-                            'flex w-full items-center justify-center gap-2 rounded-2xl bg-amber-400 py-3.5 text-sm font-black uppercase tracking-wide text-slate-900 shadow-[0_5px_0_0_rgba(0,0,0,0.3)] transition-all active:translate-y-1 active:shadow-none',
-                            busy && 'opacity-70',
-                          )}
-                        >
-                          <Play className="h-4 w-4 fill-current" />
-                          {busy === 'ad'
-                            ? 'Loading ad…'
-                            : adsWatched > 0
-                              ? `Watch next ad (${adsLeft} left)`
-                              : offer.adsRequired === 1
-                                ? 'Watch ad · save streaks'
-                                : `Watch ${offer.adsRequired} ads · save streaks`}
-                        </button>
-                      )}
+                      {canWatchAd &&
+                        (mode === 'plus' ? (
+                          <button
+                            type="button"
+                            onClick={handleSave}
+                            disabled={busy}
+                            className={cn(
+                              'flex w-full items-center justify-center gap-2 rounded-2xl bg-amber-400 py-3.5 text-sm font-black uppercase tracking-wide text-slate-900 shadow-[0_5px_0_0_rgba(0,0,0,0.3)] transition-all active:translate-y-1 active:shadow-none',
+                              busy && 'opacity-70',
+                            )}
+                          >
+                            <Icon
+                              name="frogPlus"
+                              label="Plus"
+                              className="h-5 w-5"
+                            />
+                            {busy ? 'Saving…' : 'Save my streaks with Plus'}
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={handleSave}
+                            disabled={busy}
+                            className={cn(
+                              'flex w-full items-center justify-center gap-2 rounded-2xl bg-amber-400 py-3.5 text-sm font-black uppercase tracking-wide text-slate-900 shadow-[0_5px_0_0_rgba(0,0,0,0.3)] transition-all active:translate-y-1 active:shadow-none',
+                              busy && 'opacity-70',
+                            )}
+                          >
+                            <Play className="h-4 w-4 fill-current" />
+                            {busy
+                              ? 'Loading ad…'
+                              : adsWatched > 0
+                                ? `Watch next ad (${adsLeft} left)`
+                                : offer.adsRequired === 1
+                                  ? 'Watch ad · save streaks'
+                                  : `Watch ${offer.adsRequired} ads · save streaks`}
+                          </button>
+                        ))}
                     </div>
                   )}
 
@@ -339,6 +353,8 @@ export function StreakRescueSheet({
               )}
             </div>
           </div>
+
+          {plusModal}
 
           {showRewards && saved && (
             <StreakCelebration

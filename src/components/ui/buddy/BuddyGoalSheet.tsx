@@ -14,6 +14,7 @@ import { GiftRive } from '@/components/ui/gift-box/GiftBox';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { BuddyFrogFace } from '@/components/ui/BuddyBadge';
 import { useKeyboardInset } from '@/components/ui/quick-add/useKeyboardInset';
+import { useBuddyBonusFlies } from '@/hooks/useBuddyState';
 import {
   BUDDY_PRESETS,
   buddyRepeatSummary,
@@ -75,6 +76,7 @@ export function BuddyGoalSheet({
   giftLoading?: boolean;
   submitLabel?: string;
 }) {
+  const bonusFlies = useBuddyBonusFlies();
   const [text, setText] = useState('');
   const [choice, setChoice] = useState<BuddyRepeatChoice>('daily');
   const [customDays, setCustomDays] = useState<number[]>([]);
@@ -395,8 +397,8 @@ export function BuddyGoalSheet({
                 <Fly size={30} interactive={false} paused />
               </span>
               <p className="text-[13px] font-semibold leading-snug text-foreground">
-                <span className="font-black">You both check it off</span> → you
-                both catch double flies
+                <span className="font-black">You both check it off</span> →{' '}
+                {bonusFlies} bonus flies each
                 {oneTime ? '.' : ', and your shared streak grows.'}
               </p>
             </div>

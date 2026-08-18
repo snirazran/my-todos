@@ -1232,6 +1232,7 @@ export default function HomeDashboard() {
       <HungerWarningModal
         open={!!user && hungerStatus.stolenFlies > 0}
         stolenFlies={hungerStatus.stolenFlies}
+        isPremium={!!questsData?.isPremium}
         indices={indices}
         onAcknowledge={async () => {
           // Optimistic clear handled in hook? No, exposure should be in hook if commonly used,

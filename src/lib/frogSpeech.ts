@@ -209,7 +209,7 @@ const TAP_RULES: Rule[] = [
       'Yes? Can I help you?',
       '*happy ribbit*',
       'Ribbit! Hi!',
-      'Did that buzz come from above?\nTry swiping me up.',
+      'Did you hear that buzzing?\nTry swiping me down.',
     ],
   },
 ];
@@ -220,7 +220,7 @@ const TAP_RARE_LINES = [
   'The pond speaks to me.\nIt says: do your tasks.',
   "I'm 87% tongue,\nyou know.",
   '{frog} the Great.\nThat is my full name.',
-  'Psst... swipe me upward.\nI can hear a whole swarm.',
+  'Psst... slide me down.\nI can hear a whole swarm.',
 ];
 
 const CATCH_RULES: Rule[] = [

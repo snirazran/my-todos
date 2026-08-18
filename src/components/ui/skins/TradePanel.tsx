@@ -777,12 +777,12 @@ export function TradePanel({
     setRerollError(null);
   };
 
-  const handleReroll = async () => {
+  const handleReroll = async (viaPlus = false) => {
     if (rerollBusy || !rerollClaimId) return;
     setRerollBusy(true);
     setRerollError(null);
     try {
-      if (!isPremium) {
+      if (!isPremium && !viaPlus) {
         const adResult = await showRewardedAd('trade_reroll');
         if (adResult !== 'rewarded') {
           if (adResult === 'failed') {
@@ -1663,6 +1663,9 @@ export function TradePanel({
       <PlusUpgradeModal
         open={showPlusOffer}
         placement="trade_reroll"
+        onStartTrial={async () => {
+          if (rerollClaimId) await handleReroll(true);
+        }}
         onClose={() => setShowPlusOffer(false)}
       />
 

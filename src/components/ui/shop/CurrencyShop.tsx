@@ -8,6 +8,7 @@ import { BaseSheet } from '@/components/ui/BaseSheet';
 import { cn } from '@/lib/utils';
 import Fly from '@/components/ui/fly';
 import { AnimatedNumber } from '@/components/ui/AnimatedNumber';
+import { Icon } from '@/components/ui/Icon';
 import { useUIStore } from '@/lib/uiStore';
 import { useInventory, patchInventoryFlies } from '@/hooks/useInventory';
 import { rewardedAdsAvailable, showRewardedAd } from '@/lib/ads';
@@ -318,6 +319,38 @@ function PackRow({
   );
 }
 
+function PlusFliesCard() {
+  const openPremium = useUIStore((s) => s.setPremiumModalOpen);
+  return (
+    <div>
+      <p className="mb-2 mt-5 px-1 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">
+        Free flies
+      </p>
+      <button
+        type="button"
+        onClick={() => openPremium(true, 'fly_shop_free_flies')}
+        className="group relative flex w-full items-center gap-3 rounded-[20px] bg-amber-500 p-3.5 text-left text-white shadow-lg shadow-amber-500/25 transition-all hover:-translate-y-0.5 active:scale-[0.99] sm:rounded-[24px] sm:p-4 dark:bg-amber-600"
+      >
+        <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/15 sm:h-14 sm:w-14">
+          <Icon name="frogPlus" label="Plus" className="h-7 w-7" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-black tracking-tight sm:text-base">
+            Double every reward
+          </p>
+          <p className="text-xs font-semibold text-white/85">
+            Bonus ad rounds are mobile-only. Plus doubles what you earn
+            everywhere.
+          </p>
+        </div>
+        <span className="flex h-11 shrink-0 items-center justify-center rounded-2xl bg-white px-3 text-xs font-black text-amber-700 shadow-sm">
+          Get Plus
+        </span>
+      </button>
+    </div>
+  );
+}
+
 function FreeFliesCard({ open }: { open: boolean }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -325,9 +358,7 @@ function FreeFliesCard({ open }: { open: boolean }) {
   const available = rewardedAdsAvailable();
 
   const { data, mutate } = useSWR<AdFlyStatus>(
-    available && open
-      ? `/api/rewards/flies?timezone=${encodeURIComponent(timezone)}`
-      : null,
+    open ? `/api/rewards/flies?timezone=${encodeURIComponent(timezone)}` : null,
     bootstrapFetcher,
     { revalidateOnFocus: false },
   );
@@ -344,9 +375,9 @@ function FreeFliesCard({ open }: { open: boolean }) {
     return () => clearInterval(id);
   }, [cooldown]);
 
-  if (!available) return null;
   // Plus pays to not see ads, so the surface is gone rather than merely refused.
   if (data && data.available === false) return null;
+  if (!available) return data ? <PlusFliesCard /> : null;
 
   const remaining = data?.remaining ?? 0;
   const cap = data?.cap ?? 5;

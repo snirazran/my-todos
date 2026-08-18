@@ -18,7 +18,6 @@ import {
 } from '@/hooks/useInventory';
 import { markFlyEarn } from '@/lib/flyEarn';
 import { hapticCelebrate, hapticTick } from '@/lib/haptics';
-import { showRewardedAd } from '@/lib/ads';
 import { maybeRequestAppRating } from '@/lib/rateApp';
 import { useRiveInteractionPause } from '@/lib/riveInteractionPause';
 import { emitCampaignTrigger, setCampaignBusy } from '@/lib/campaigns/orchestrator';
@@ -270,8 +269,6 @@ async function handleWatchAdDouble(entry: QuestRewardRevealEntry) {
   if (!claimId || entry.doubled || doublingClaim) return;
   doublingClaim = true;
   try {
-    const outcome = await showRewardedAd('quest_reward_double');
-    if (outcome !== 'rewarded') return;
     const res = await fetch('/api/rewards/double', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -466,6 +463,7 @@ function QuestRewardRevealOverlay({
                 !entry.doubled
               }
               onWatchAd={() => onWatchAd(entry)}
+              doublePlacement="quest_reward_double"
               rewardAmount={entry.fliesGranted || undefined}
               paused={paused}
               customPreview={

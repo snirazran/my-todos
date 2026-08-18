@@ -158,17 +158,19 @@ export default function GiftBoxOpening({
     onClose();
   };
 
-  const handleDouble = async () => {
+  const handleDouble = async (viaPlus = false) => {
     if (adBusy || !doubleClaimId) return;
     setAdBusy(true);
     setAdError(null);
     try {
-      const adResult = await showRewardedAd('gift_double');
-      if (adResult !== 'rewarded') {
-        if (adResult === 'failed') {
-          setAdError('Ad not available right now — try again in a moment.');
+      if (!viaPlus) {
+        const adResult = await showRewardedAd('gift_double');
+        if (adResult !== 'rewarded') {
+          if (adResult === 'failed') {
+            setAdError('Ad not available right now — try again in a moment.');
+          }
+          return;
         }
-        return;
       }
       const claimId = doubleClaimId;
       setDoubleClaimId(null);
@@ -355,6 +357,9 @@ export default function GiftBoxOpening({
       <PlusUpgradeModal
         open={showPlusOffer}
         placement="gift_double"
+        onStartTrial={async () => {
+          if (doubleClaimId) await handleDouble(true);
+        }}
         onClose={() => setShowPlusOffer(false)}
       />
 

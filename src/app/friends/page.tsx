@@ -58,7 +58,6 @@ import {
 import { MobileMenuCluster } from '@/components/ui/siteHeader';
 import { FlyCatchSwipeLauncher } from '@/components/ui/FlyCatchSwipeLauncher';
 import { useUIStore } from '@/lib/uiStore';
-import { showRewardedAd } from '@/lib/ads';
 import type { ItemDef } from '@/lib/skins/catalog';
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
@@ -660,8 +659,6 @@ function FlyClaimRewardOverlay({
     if (doubledRef.current || doubling) return;
     setDoubling(true);
     try {
-      const outcome = await showRewardedAd('friend_reward_double');
-      if (outcome !== 'rewarded') return;
       const res = await fetch('/api/friends/claim', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -717,6 +714,7 @@ function FlyClaimRewardOverlay({
             showDoubleUpsell={!doubledRef.current}
             rewardAmount={displayAmount}
             onWatchAd={handleWatchAd}
+            doublePlacement="friend_reward_double"
             customPreview={
               <div className="relative flex h-full w-full items-center justify-center">
                 <Fly size={132} interactive={false} />

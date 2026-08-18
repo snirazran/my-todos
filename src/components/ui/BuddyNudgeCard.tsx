@@ -5,6 +5,7 @@ import { X, ChevronRight } from 'lucide-react';
 import useSWR from 'swr';
 import { useAuth } from '@/components/auth/AuthContext';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
+import { useBuddyBonusFlies } from '@/hooks/useBuddyState';
 import { useRandomReveal } from '@/hooks/useRandomReveal';
 import Frog from '@/components/ui/frog';
 import Fly from '@/components/ui/fly';
@@ -17,6 +18,7 @@ export function BuddyNudgeCard() {
   const { user } = useAuth();
   const { indices } = useWardrobeIndices(!!user);
   const { show, dismiss } = useRandomReveal('home_buddy');
+  const bonusFlies = useBuddyBonusFlies(!!user);
   const [flowOpen, setFlowOpen] = useState(false);
 
   // Size the Rive frogs/fly by breakpoint via real dimensions (not CSS scale),
@@ -84,7 +86,7 @@ export function BuddyNudgeCard() {
                   Share a goal with a friend
                 </span>
                 <span className="mt-0.5 block text-[12px] font-semibold leading-snug text-muted-foreground">
-                  Both finish it → you both catch double flies.
+                  Both finish it → {bonusFlies} bonus flies each.
                 </span>
               </span>
               <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
