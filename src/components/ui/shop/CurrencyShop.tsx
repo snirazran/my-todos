@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import useSWR from 'swr';
-import { Clapperboard, Loader2 } from 'lucide-react';
+import { Loader2, SquarePlay } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { cn } from '@/lib/utils';
@@ -458,8 +458,9 @@ function FreeFliesCard({ open }: { open: boolean }) {
           {busy ? (
             <Loader2 className="h-6 w-6 animate-spin" />
           ) : (
-            <Clapperboard
+            <SquarePlay
               className={cn('h-6 w-6 sm:h-7 sm:w-7', exhausted && 'text-muted-foreground')}
+              strokeWidth={2.5}
             />
           )}
         </div>
@@ -486,7 +487,7 @@ function FreeFliesCard({ open }: { open: boolean }) {
               ? `You caught all ${cap} bonus rounds today.`
               : waiting
                 ? 'One at a time — the pond needs a moment.'
-                : `Watch a short ad, catch +${reward} flies.`}
+                : `Catch +${reward} flies.`}
           </p>
         </div>
         {!exhausted && (

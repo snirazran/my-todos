@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import Frog from '@/components/ui/frog';
 import type { WardrobeSlot } from '@/components/ui/frog';
 import Fly from '@/components/ui/fly';
-import { Loader2, Play, Utensils } from 'lucide-react';
+import { Loader2, SquarePlay, Utensils } from 'lucide-react';
 import { Icon } from '@/components/ui/Icon';
 import { useRewardGate } from '@/hooks/useRewardGate';
 
@@ -114,7 +114,7 @@ export function HungerWarningModal({
                   ) : mode === 'plus' ? (
                     <Icon name="frogPlus" label="Plus" className="h-5 w-5" />
                   ) : (
-                    <Play className="h-3.5 w-3.5 fill-current" />
+                    <SquarePlay className="h-4 w-4" strokeWidth={2.5} />
                   )}
                   {recovering
                     ? mode === 'ad'
@@ -125,7 +125,7 @@ export function HungerWarningModal({
                 {!recovering && (
                   <span className="text-[11px] font-bold normal-case tracking-normal text-white/90">
                     {mode === 'ad'
-                      ? `Watch a short ad to recover all ${stolenFlies}`
+                      ? `Recover all ${stolenFlies}`
                       : mode === 'plus'
                         ? `Recover all ${stolenFlies} with Plus`
                         : `Recover all ${stolenFlies} — on the house`}

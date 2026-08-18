@@ -5,9 +5,9 @@ import {
   Bookmark,
   ChevronRight,
   Clock,
-  Play,
   RefreshCw,
   Sparkles,
+  SquarePlay,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Icon } from '@/components/ui/Icon';
@@ -159,7 +159,7 @@ export function DailyDealsShelf({
             ) : adReroll ? (
               <>
                 Reroll
-                <Play className="h-2.5 w-2.5 fill-current" />
+                <SquarePlay className="h-3.5 w-3.5" strokeWidth={2.5} />
               </>
             ) : (
               'Reroll'

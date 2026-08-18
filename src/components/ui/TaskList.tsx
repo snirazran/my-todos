@@ -38,7 +38,7 @@ import {
 } from 'framer-motion';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import useSWR from 'swr';
+import useSWR, { useSWRConfig } from 'swr';
 import {
   DndContext,
   closestCenter,
@@ -69,6 +69,12 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { DeleteDialog } from '@/components/ui/DeleteDialog';
+import {
+  LeapSessionDeleteSheet,
+  useLeapDelete,
+  type LeapDeleteImpact,
+} from '@/components/pact/LeapSessionDeleteSheet';
+import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
 import { AddTaskButton } from '@/components/ui/AddTaskButton';
 import TaskMenu from '../board/TaskMenu';
 import TaskDetailSheet from '../board/TaskDetailSheet';
@@ -1886,7 +1892,41 @@ export default function TaskList({
     return weeklyIds.has(t.id) ? 'weekly' : 'regular';
   };
 
+  // Deleting a Leap session changes a goal, a reward and possibly a streak, so
+  // it asks with those numbers in hand before the ordinary delete runs.
+  const { mutate: mutateSWR } = useSWRConfig();
+  const leap = useLeapDelete();
+  const [leapPending, setLeapPending] = useState<{
+    impact: LeapDeleteImpact;
+    run: () => Promise<void>;
+  } | null>(null);
+  const [leapPlusOpen, setLeapPlusOpen] = useState(false);
+  const askLeap = (taskIds: string[], run: () => Promise<void>) => {
+    const impact = leap.impactFor(taskIds);
+    if (!impact) return false;
+    setLeapPending({ impact, run });
+    return true;
+  };
+
+  // "Skip today" on a Leap session removes that session outright — its only
+  // occurrence is this week — so it asks the same question the dialog does.
+  const requestSkipToday = (taskId: string) => {
+    if (askLeap([taskId], async () => void onDeleteToday(taskId))) return;
+    void onDeleteToday(taskId);
+  };
+
   const confirmDeleteToday = async () => {
+    if (!dialog) return;
+    if (
+      dialogVariant === 'weekly' &&
+      askLeap([dialog.task.id], () => runDeleteToday())
+    ) {
+      return;
+    }
+    await runDeleteToday();
+  };
+
+  const runDeleteToday = async () => {
     if (!dialog) return;
     const taskId = dialog.task.id;
     setBusy(true);
@@ -1900,6 +1940,19 @@ export default function TaskList({
   };
 
   const confirmDeleteWeek = async () => {
+    if (!dialog) return;
+    if (
+      askLeap(
+        leap.seriesIdsFor(dialog.task.id, dialog.task.repeatGroupId),
+        () => runDeleteWeek(),
+      )
+    ) {
+      return;
+    }
+    await runDeleteWeek();
+  };
+
+  const runDeleteWeek = async () => {
     if (!dialog) return;
     const taskId = dialog.task.id;
     setBusy(true);
@@ -2544,7 +2597,7 @@ export default function TaskList({
                           onSkipToday={
                             !isCompleted
                               ? (t) => {
-                                  void onDeleteToday(t.id);
+                                  requestSkipToday(t.id);
                                 }
                               : undefined
                           }
@@ -2825,7 +2878,7 @@ export default function TaskList({
               (isWeekly ||
                 (sheetTask.repeatMode && sheetTask.repeatMode !== 'none')) &&
               !isCompletedTask
-                ? () => onDeleteToday(sheetTask.id)
+                ? () => requestSkipToday(sheetTask.id)
                 : undefined
             }
             onDelete={() =>
@@ -2892,6 +2945,31 @@ export default function TaskList({
           pendingScope?.run(scope);
           setPendingScope(null);
         }}
+      />
+
+      <LeapSessionDeleteSheet
+        open={!!leapPending}
+        impact={leapPending?.impact ?? null}
+        busy={busy}
+        onClose={() => setLeapPending(null)}
+        onConfirm={async () => {
+          const pending = leapPending;
+          setLeapPending(null);
+          await pending?.run();
+          void mutateSWR(
+            (key) => typeof key === 'string' && key.startsWith('/api/pact'),
+          );
+        }}
+        onUpgrade={() => {
+          setLeapPending(null);
+          setLeapPlusOpen(true);
+        }}
+      />
+
+      <PlusUpgradeModal
+        open={leapPlusOpen}
+        onClose={() => setLeapPlusOpen(false)}
+        placement="leap_task_delete"
       />
 
       <DeleteDialog

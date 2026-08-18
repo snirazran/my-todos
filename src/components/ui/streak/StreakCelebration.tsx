@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import { hapticCelebrate } from '@/lib/haptics';
-import { Trophy } from 'lucide-react';
+import { SquarePlay, Trophy } from 'lucide-react';
 import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
 import Fly from '@/components/ui/fly';
 import { Icon } from '@/components/ui/Icon';
@@ -170,12 +170,15 @@ export function StreakCelebration({
                         disabled={doubling}
                         className="mx-auto flex h-11 items-center justify-center gap-2 rounded-2xl bg-white/20 px-5 text-xs font-black uppercase tracking-[0.14em] text-white backdrop-blur transition-colors hover:bg-white/30 disabled:opacity-60"
                       >
+                        {!doubling && mode === 'ad' && (
+                          <SquarePlay className="h-4 w-4" strokeWidth={2.5} />
+                        )}
                         {doubling
                           ? mode === 'ad'
                             ? 'Loading ad…'
                             : 'Doubling…'
                           : mode === 'ad'
-                            ? 'Watch an ad — double the flies'
+                            ? 'Double the flies'
                             : 'Double the flies with Plus'}
                       </button>
                       {doubleError && (

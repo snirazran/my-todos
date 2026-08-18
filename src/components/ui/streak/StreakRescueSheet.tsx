@@ -4,13 +4,13 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import confetti from 'canvas-confetti';
-import { Flame, Play, ShieldCheck } from 'lucide-react';
+import { Flame, ShieldCheck, SquarePlay } from 'lucide-react';
 import Frog, { type FrogHandle } from '@/components/ui/frog';
 import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
 import { cn } from '@/lib/utils';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
-import { rescueStreak } from '@/hooks/useLoginStreak';
+import { dismissStreakRescue, rescueStreak } from '@/hooks/useLoginStreak';
 import { useRewardGate } from '@/hooks/useRewardGate';
 import { Icon } from '@/components/ui/Icon';
 import { hapticCelebrate } from '@/lib/haptics';
@@ -149,6 +149,12 @@ export function StreakRescueSheet({
     void run(() => performSave('ad'));
   };
 
+  const letItGo = () => {
+    if (busy) return;
+    void dismissStreakRescue(offer.id);
+    onOpenChange(false);
+  };
+
   const finish = () => {
     if (saved?.goalEvent) {
       setShowRewards(true);
@@ -274,7 +280,7 @@ export function StreakRescueSheet({
                               : 'bg-white/10 text-white/40',
                           )}
                         >
-                          <Play className="h-4 w-4 fill-current" />
+                          <SquarePlay className="h-[18px] w-[18px]" strokeWidth={2.5} />
                         </div>
                       ))}
                     </div>
@@ -329,14 +335,12 @@ export function StreakRescueSheet({
                               busy && 'opacity-70',
                             )}
                           >
-                            <Play className="h-4 w-4 fill-current" />
+                            <SquarePlay className="h-[18px] w-[18px]" strokeWidth={2.5} />
                             {busy
                               ? 'Loading ad…'
                               : adsWatched > 0
-                                ? `Watch next ad (${adsLeft} left)`
-                                : offer.adsRequired === 1
-                                  ? 'Watch ad · save streaks'
-                                  : `Watch ${offer.adsRequired} ads · save streaks`}
+                                ? `Save my streaks (${adsLeft} left)`
+                                : 'Save my streaks'}
                           </button>
                         ))}
                     </div>
@@ -344,7 +348,7 @@ export function StreakRescueSheet({
 
                   <button
                     type="button"
-                    onClick={() => onOpenChange(false)}
+                    onClick={letItGo}
                     className="mt-5 shrink-0 text-sm font-bold text-white/50 underline-offset-4 hover:underline"
                   >
                     Let it go

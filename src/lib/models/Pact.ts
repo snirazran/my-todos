@@ -19,6 +19,12 @@ export interface PactDoc {
   paidSessions: number;
   /** The comeback bonus is once a week, so it needs its own latch. */
   comebackPaid: boolean;
+  /**
+   * Sessions kept on tasks that no longer exist. Deleting a task you already
+   * ticked must never un-do the work — the count moves here so the ledger,
+   * which can only read live tasks, still sees it.
+   */
+  bankedProgress: number;
   /** The area tag stamped on this pact's tasks. */
   tagId?: string;
   source: 'library' | 'generated' | 'repeat' | 'custom';
@@ -50,6 +56,7 @@ const PactSchema = new Schema<PactDoc>(
     taskIds: { type: [String], default: [] },
     paidSessions: { type: Number, default: 0 },
     comebackPaid: { type: Boolean, default: false },
+    bankedProgress: { type: Number, default: 0 },
     tagId: { type: String },
     source: { type: String, default: 'library' },
     shieldUsed: { type: Boolean, default: false },

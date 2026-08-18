@@ -55,6 +55,7 @@ import {
   type PactLadderView,
   type PactStreakMultiplier,
   type PactOption,
+  type PactSessionView,
   type PactStreakView,
   type PactSuggestion,
   type PactUserTag,
@@ -599,13 +600,21 @@ export function readPactSessions(args: {
 }): PactSessionLedger {
   const { pact, tasks, timezone, weekStartsOn, todayKey } = args;
   const ids = new Set(pact.taskIds ?? []);
+  // Sessions kept on tasks the user has since deleted. They are not readable
+  // from the board any more, so the count rides on the pact itself.
+  const banked = Math.max(0, pact.bankedProgress ?? 0);
   if (ids.size === 0) {
-    return { progress: pact.progress ?? 0, cameBack: false, missed: 0, remaining: 0 };
+    return {
+      progress: Math.min(pact.target, Math.max(pact.progress ?? 0, banked)),
+      cameBack: false,
+      missed: 0,
+      remaining: 0,
+    };
   }
   const weekEnd = shiftYMD(pact.weekKey, 6);
   const order = weekStartsOn === undefined ? null : weekOrder(weekStartsOn);
 
-  let done = 0;
+  let done = banked;
   let missed = 0;
   let remaining = 0;
   let earliestMiss: string | null = null;
@@ -647,6 +656,50 @@ export function readPactSessions(args: {
     missed,
     remaining,
   };
+}
+
+/**
+ * Where each of the week's sessions stands, one entry per live task. The
+ * delete flows price themselves off this: removing a session whose day is
+ * still ahead lowers the week's goal, removing one already gone by does not.
+ */
+export function readPactSessionStates(args: {
+  pact: PactDoc;
+  tasks: TaskDoc[];
+  timezone: string;
+  weekStartsOn: WeekStartDay;
+  todayKey: string;
+}): PactSessionView[] {
+  const { pact, tasks, timezone, weekStartsOn, todayKey } = args;
+  const ids = new Set(pact.taskIds ?? []);
+  if (ids.size === 0) return [];
+  const weekEnd = shiftYMD(pact.weekKey, 6);
+  const order = weekOrder(weekStartsOn);
+
+  const sessions: PactSessionView[] = [];
+  for (const task of tasks) {
+    if (!ids.has(task.id)) continue;
+    const offset = order.indexOf(task.dayOfWeek as 0 | 1 | 2 | 3 | 4 | 5 | 6);
+    const dateKey = offset < 0 ? pact.weekKey : shiftYMD(pact.weekKey, offset);
+    let done = false;
+    for (const occurrence of task.completedDates ?? []) {
+      const stamp = task.completedAtByDate?.[occurrence];
+      const key = stamp
+        ? getZonedYMD(stamp instanceof Date ? stamp : new Date(stamp), timezone)
+        : occurrence;
+      if (key < pact.weekKey || key > weekEnd) continue;
+      done = true;
+      break;
+    }
+    sessions.push({
+      taskId: task.id,
+      dayOfWeek: (task.dayOfWeek ?? dowFromKey(dateKey)) as number,
+      dateKey,
+      state: done ? 'done' : dateKey >= todayKey ? 'open' : 'missed',
+      repeatGroupId: task.repeatGroupId,
+    });
+  }
+  return sessions.sort((a, b) => a.dateKey.localeCompare(b.dateKey));
 }
 
 export async function syncPactProgress(args: {
@@ -1061,6 +1114,7 @@ export async function getPactView(args: {
         focusAreaId: 1,
         startTime: 1,
         dayOfWeek: 1,
+        repeatGroupId: 1,
       },
     ).lean<TaskDoc[]>(),
     loadCategories(),
@@ -1163,7 +1217,12 @@ export async function getPactView(args: {
       status: activeDoc.status,
       claimable: progress >= activeDoc.target && !activeDoc.claimedAt,
       claimed: !!activeDoc.claimedAt,
-      rewardFlies: optionRewardFlies(config, activeDoc.days, weekMultiplier),
+      // Priced on the target, not the day list: a session removed after its
+      // day went by leaves the goal where it was, and the week has to keep
+      // saying what that goal is worth.
+      rewardFlies: Math.round(
+        pactWeekValueFlies(config, activeDoc.target) * Math.max(1, weekMultiplier),
+      ),
       sessionFlies: Math.round(pactSessionFlies(config) * weekMultiplier),
       weekBonusFlies: Math.round(
         pactWeekBonusFlies(config, activeDoc.target) * weekMultiplier,
@@ -1180,6 +1239,13 @@ export async function getPactView(args: {
       daysLeft: Math.max(0, daysBetween(todayKey, weekEnd) + 1),
       shieldUsed: activeDoc.shieldUsed,
       tagId: activeDoc.tagId,
+      sessions: readPactSessionStates({
+        pact: activeDoc,
+        tasks,
+        timezone,
+        weekStartsOn,
+        todayKey,
+      }),
       openToday,
       missedSessions: ledger.missed,
       // Whether the whole week is still reachable. Once it is not, the bonus

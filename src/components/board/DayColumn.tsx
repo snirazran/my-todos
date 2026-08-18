@@ -134,7 +134,7 @@ export default function DayColumn({
         {children}
       </motion.div>
 
-      {footer ? <div className="mt-4">{footer}</div> : null}
+      {footer ? <div className="shrink-0">{footer}</div> : null}
     </section>
   );
 }

@@ -96,6 +96,7 @@ function readRescue(raw: any): StreakRescue | null {
     adsRequired: Math.max(0, Math.floor(raw.adsRequired ?? 0)),
     adsWatched: Math.max(0, Math.floor(raw.adsWatched ?? 0)),
     adEligible: raw.adEligible !== false,
+    dismissed: raw.dismissed === true,
   };
 }
 
@@ -576,11 +577,14 @@ async function applyStreakRewardGrants(args: {
   };
 }
 
-function activeRescueForDay(
+export function activeRescueForDay(
   rescue: StreakRescue | null,
   todayKey: string,
 ): StreakRescue | null {
-  return rescue && rescue.offeredDayKey === todayKey ? rescue : null;
+  if (!rescue || rescue.offeredDayKey !== todayKey || rescue.dismissed) {
+    return null;
+  }
+  return rescue;
 }
 
 /**
@@ -856,6 +860,19 @@ export async function performCheckIn(args: {
     rescue: next.rescue,
     shieldOffer,
   };
+}
+
+export async function dismissRescue(args: {
+  userId: string;
+  rescueId: string;
+}): Promise<{ dismissed: boolean }> {
+  const { userId, rescueId } = args;
+  await connectMongo();
+  const res = await UserModel.updateOne(
+    { _id: userId, 'quests.loginStreak.rescue.id': rescueId },
+    { $set: { 'quests.loginStreak.rescue.dismissed': true } },
+  );
+  return { dismissed: res.matchedCount > 0 };
 }
 
 export async function performRescue(args: {

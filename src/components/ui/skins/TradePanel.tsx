@@ -19,7 +19,7 @@ import {
   ChevronDown,
   Crosshair,
   Dices,
-  Play,
+  SquarePlay,
   Repeat,
   ShoppingBag,
   Trash2,
@@ -1635,14 +1635,14 @@ export function TradePanel({
                         <Dices className="h-5 w-5" strokeWidth={2.75} />
                         <span className="flex flex-col items-start leading-tight">
                           <span>Reroll Reward</span>
-                          <span className="text-[10px] font-bold normal-case tracking-normal text-white/80">
-                            {rewardedAdsAvailable()
-                              ? 'watch a short ad'
-                              : 'with Plus'}
-                          </span>
+                          {!rewardedAdsAvailable() && (
+                            <span className="text-[10px] font-bold normal-case tracking-normal text-white/80">
+                              with Plus
+                            </span>
+                          )}
                         </span>
                         {rewardedAdsAvailable() && (
-                          <Play className="w-4 h-4 fill-current" />
+                          <SquarePlay className="w-[18px] h-[18px]" strokeWidth={2.5} />
                         )}
                       </>
                     )}

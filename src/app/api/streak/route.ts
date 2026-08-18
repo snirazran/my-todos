@@ -4,6 +4,7 @@ import connectMongo from '@/lib/mongoose';
 import UserModel from '@/lib/models/User';
 import { getZonedToday } from '@/lib/utils';
 import {
+  activeRescueForDay,
   buildLoginStreakView,
   loadLoginStreakConfig,
   readLoginStreakState,
@@ -44,10 +45,7 @@ export async function GET(req: NextRequest) {
         count: shieldState.count,
         cap: shieldCapFor(shieldConfig, isPremiumUser(user as any)),
       }),
-      rescue:
-        state.rescue && state.rescue.offeredDayKey === todayKey
-          ? state.rescue
-          : null,
+      rescue: activeRescueForDay(state.rescue, todayKey),
     });
   } catch (error) {
     console.error('Streak fetch failed:', error);

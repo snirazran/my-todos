@@ -183,6 +183,21 @@ export type PactUserTag = {
   linkedAreaName?: string;
 };
 
+/**
+ * One scheduled session of the running week, as the client sees it. Carried so
+ * a delete can state its own consequence before it happens — which session is
+ * about to go, and whether its day is still ahead.
+ */
+export type PactSessionView = {
+  taskId: string;
+  dayOfWeek: number;
+  dateKey: string;
+  /** `open` is today or later and still tickable; `missed` is a day gone by. */
+  state: 'done' | 'open' | 'missed';
+  /** Siblings deleted together by "stop repeating". */
+  repeatGroupId?: string;
+};
+
 export type ActivePactView = {
   id: string;
   weekKey: string;
@@ -220,6 +235,8 @@ export type ActivePactView = {
   canStillFinish: boolean;
   /** Area tag on this pact's tasks, for hint targeting. */
   tagId?: string;
+  /** The week's sessions, one per task, so a delete can price its own damage. */
+  sessions: PactSessionView[];
   /** The gift this week's session count pays at completion. */
   completionRewards: QuestRewards;
   /** Sessions that keep the streak alive without finishing the week. */

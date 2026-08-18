@@ -7,6 +7,10 @@ import { Types } from 'mongoose';
 import { v4 as uuid } from 'uuid';
 import connectMongo from '@/lib/mongoose';
 import { syncPactCommitmentText } from '@/lib/pact/renameCommitment';
+import {
+  applyPactTaskRemoval,
+  type PactTaskRemovalResult,
+} from '@/lib/pact/taskLifecycle';
 import UserModel, { type UserDoc } from '@/lib/models/User';
 import TaskModel, {
   type TaskDoc,
@@ -2649,6 +2653,13 @@ export async function DELETE(req: NextRequest) {
       ? { userId: uid, repeatGroupId: doc.repeatGroupId }
       : { userId: uid, id: body.taskId };
     const seriesDocs = await TaskModel.find(seriesFilter).lean<TaskDoc[]>();
+    // Before anything is removed: a Leap reads its own tasks to decide what
+    // this deletion costs the week, and nothing can be read once they are gone.
+    const pactChange = await applyPactTaskRemoval({
+      userId: uid,
+      timezone: tz,
+      taskIds: seriesDocs.map((s) => s.id),
+    });
     const now = new Date();
     const toInsert: Record<string, unknown>[] = [];
     for (const s of seriesDocs) {
@@ -2705,7 +2716,7 @@ export async function DELETE(req: NextRequest) {
     if (doc?.bondId) await severBond(doc.bondId, uid);
     await syncGamification(uid, tz);
     await notifyTaskChanged(uid);
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, pact: pactChange });
   }
 
   if (body && Object.prototype.hasOwnProperty.call(body, 'day'))
@@ -2723,6 +2734,11 @@ export async function DELETE(req: NextRequest) {
     )
       .lean<TaskDoc>()
       .exec();
+    const pactChange = await applyPactTaskRemoval({
+      userId: uid,
+      timezone: tz,
+      taskIds: [taskId],
+    });
     if (doc?.type === 'regular') {
       await TaskModel.deleteOne({ userId: uid, type: 'regular', id: taskId });
       if (doc.bondId) await severBond(doc.bondId, uid);
@@ -2734,7 +2750,7 @@ export async function DELETE(req: NextRequest) {
     }
     await syncGamification(uid, tz);
     await notifyTaskChanged(uid);
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, pact: pactChange });
   }
   const { date, taskId } = body ?? {};
   if (!date || !taskId)
@@ -2749,13 +2765,18 @@ export async function DELETE(req: NextRequest) {
   if (!doc)
     return NextResponse.json({ error: 'Task not found' }, { status: 404 });
   if (doc.type === 'weekly') {
+    const pactChange = await applyPactTaskRemoval({
+      userId: uid,
+      timezone: tz,
+      taskIds: [taskId],
+    });
     await TaskModel.updateOne(
       { userId: uid, id: taskId },
       { $addToSet: { suppressedDates: date } },
     );
     await syncGamification(uid, tz);
     await notifyTaskChanged(uid);
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, pact: pactChange });
   }
   if (doc.type === 'regular') {
     await TaskModel.deleteOne({ userId: uid, id: taskId, date });
@@ -3946,7 +3967,13 @@ async function handleBoardDelete(
     await notifyTaskChanged(uid);
     return NextResponse.json({ ok: true });
   }
+  let pactChange: PactTaskRemovalResult | undefined;
   if (doc?.type === 'weekly') {
+    pactChange = await applyPactTaskRemoval({
+      userId: uid,
+      timezone: tz,
+      taskIds: [taskId],
+    });
     await TaskModel.updateOne(
       { userId: uid, type: doc.type, id: taskId },
       { $set: { deletedAt: new Date() } },
@@ -3962,7 +3989,7 @@ async function handleBoardDelete(
   if (doc?.bondId) await severBond(doc.bondId, uid);
   await syncGamification(uid, tz);
   await notifyTaskChanged(uid);
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, pact: pactChange });
 }
 
 async function nextOrderForDay(userId: string, weekday: Weekday, date: string) {

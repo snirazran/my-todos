@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/components/auth/AuthContext';
 import { useRouter } from 'next/navigation';
-import { Play, X } from 'lucide-react';
+import { SquarePlay, X } from 'lucide-react';
 import { ItemDef, byId } from '@/lib/skins/catalog';
 import { cn } from '@/lib/utils';
 import {
@@ -330,14 +330,14 @@ export default function GiftBoxOpening({
                         </span>
                         <span className="flex flex-col items-start leading-tight">
                           <span>Open Another</span>
-                          <span className="text-[10px] font-bold normal-case tracking-normal text-white/80">
-                            {rewardedAdsAvailable()
-                              ? 'watch a short ad'
-                              : 'with Plus'}
-                          </span>
+                          {!rewardedAdsAvailable() && (
+                            <span className="text-[10px] font-bold normal-case tracking-normal text-white/80">
+                              with Plus
+                            </span>
+                          )}
                         </span>
                         {rewardedAdsAvailable() && (
-                          <Play className="w-4 h-4 fill-current" />
+                          <SquarePlay className="w-[18px] h-[18px]" strokeWidth={2.5} />
                         )}
                       </>
                     )}

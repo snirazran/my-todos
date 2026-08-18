@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { AnimatePresence, motion, Variants } from 'framer-motion';
-import { Loader2, Crown, Play } from 'lucide-react';
+import { Loader2, Crown, SquarePlay } from 'lucide-react';
 import Frog from '@/components/ui/frog';
 import { takePlusOfferAfterAd } from '@/lib/ads';
 import { useRewardGate } from '@/hooks/useRewardGate';
@@ -419,11 +419,13 @@ export const RewardCard = ({
                   <span>
                     {rewardAmount ? `Claim ${rewardAmount * 2}` : 'Double Reward'}
                   </span>
-                  <span className="text-[10px] font-bold normal-case tracking-normal text-white/80">
-                    {canWatchAd ? 'watch a short ad' : 'with Plus'}
-                  </span>
+                  {!canWatchAd && (
+                    <span className="text-[10px] font-bold normal-case tracking-normal text-white/80">
+                      with Plus
+                    </span>
+                  )}
                 </span>
-                {canWatchAd && <Play className="w-4 h-4 fill-current" />}
+                {canWatchAd && <SquarePlay className="w-[18px] h-[18px]" strokeWidth={2.5} />}
               </>
             )}
           </GoldenRewardButton>

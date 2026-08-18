@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useSWRConfig } from 'swr';
 import { motion } from 'framer-motion';
 import TaskCard, { type SelectModifiers } from './TaskCard';
 import TaskMenu from './TaskMenu';
@@ -17,6 +18,12 @@ import {
   relativeDayLabel,
 } from './helpers';
 import { DeleteDialog } from '@/components/ui/DeleteDialog';
+import {
+  LeapSessionDeleteSheet,
+  useLeapDelete,
+  type LeapDeleteImpact,
+} from '@/components/pact/LeapSessionDeleteSheet';
+import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
 import { EditTaskDialog } from '@/components/ui/EditTaskDialog';
 import TagsPopup from '@/components/ui/TagsPopup';
 import Fly from '@/components/ui/fly';
@@ -457,7 +464,34 @@ export default React.memo(function TaskList({
     ? variantFor(dialog.task)
     : 'regular';
 
+  // Deleting a Leap session changes a goal, a reward and possibly a streak, so
+  // it asks with those numbers in hand before the ordinary delete runs.
+  const { mutate } = useSWRConfig();
+  const leap = useLeapDelete();
+  const [leapPending, setLeapPending] = useState<{
+    impact: LeapDeleteImpact;
+    run: () => Promise<void>;
+  } | null>(null);
+  const [leapPlusOpen, setLeapPlusOpen] = useState(false);
+  const askLeap = (taskIds: string[], run: () => Promise<void>) => {
+    const impact = leap.impactFor(taskIds);
+    if (!impact) return false;
+    setLeapPending({ impact, run });
+    return true;
+  };
+
   const handleDeleteToday = async () => {
+    if (!dialog || busy) return;
+    if (
+      dialogVariant === 'weekly' &&
+      askLeap([dialog.task.id], () => runDeleteToday())
+    ) {
+      return;
+    }
+    await runDeleteToday();
+  };
+
+  const runDeleteToday = async () => {
     if (!dialog || busy) return;
     setBusy(true);
     try {
@@ -483,6 +517,12 @@ export default React.memo(function TaskList({
 
   const handleDeleteAll = async () => {
     if (!dialog || busy) return;
+    if (askLeap([dialog.task.id], () => runDeleteAll())) return;
+    await runDeleteAll();
+  };
+
+  const runDeleteAll = async () => {
+    if (!dialog || busy) return;
     setBusy(true);
     try {
       await removeTask(dialog.day, dialog.task.id);
@@ -496,6 +536,19 @@ export default React.memo(function TaskList({
   // Delete the whole repeat series — the linked group (daily/weekdays) or a
   // lone weekly task across all weeks.
   const handleDeleteSeries = async () => {
+    if (!dialog || busy) return;
+    if (
+      askLeap(
+        leap.seriesIdsFor(dialog.task.id, dialog.task.repeatGroupId),
+        () => runDeleteSeries(),
+      )
+    ) {
+      return;
+    }
+    await runDeleteSeries();
+  };
+
+  const runDeleteSeries = async () => {
     if (!dialog || busy) return;
     setBusy(true);
     try {
@@ -910,6 +963,31 @@ export default React.memo(function TaskList({
               ? handleDeleteToday
               : undefined
         }
+      />
+
+      <LeapSessionDeleteSheet
+        open={!!leapPending}
+        impact={leapPending?.impact ?? null}
+        busy={busy}
+        onClose={() => setLeapPending(null)}
+        onConfirm={async () => {
+          const pending = leapPending;
+          setLeapPending(null);
+          await pending?.run();
+          void mutate(
+            (key) => typeof key === 'string' && key.startsWith('/api/pact'),
+          );
+        }}
+        onUpgrade={() => {
+          setLeapPending(null);
+          setLeapPlusOpen(true);
+        }}
+      />
+
+      <PlusUpgradeModal
+        open={leapPlusOpen}
+        onClose={() => setLeapPlusOpen(false)}
+        placement="leap_task_delete"
       />
 
       <TaskDetailSheet

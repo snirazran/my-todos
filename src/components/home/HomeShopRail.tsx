@@ -196,22 +196,24 @@ export function HomeShopRail() {
                   strokeWidth={3}
                   fill="currentColor"
                 />
-                <span className="text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+                <span className="truncate text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground">
                   Wishlist
-                  {savedCount > 1 ? ` · ${savedCount} saved` : ''}
+                  {savedCount > 1 && !focus.onDeal
+                    ? ` · ${savedCount} saved`
+                    : ''}
                 </span>
                 {focus.onDeal && (
-                  <span className="rounded-full bg-amber-500/15 px-1.5 py-px text-[9px] font-black uppercase tracking-wider text-amber-700 dark:text-amber-400">
+                  <span className="shrink-0 whitespace-nowrap rounded-full bg-amber-500/15 px-1.5 py-px text-[9px] font-black uppercase tracking-wider text-amber-700 dark:text-amber-400">
                     {focus.discountPercent}% off
                   </span>
                 )}
               </span>
               {focus.affordable ? (
-                <span className="shrink-0 text-[10px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                <span className="shrink-0 whitespace-nowrap text-[10px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
                   Ready to buy
                 </span>
               ) : (
-                <span className="flex shrink-0 items-center gap-1 text-[11px] font-black tabular-nums text-muted-foreground">
+                <span className="flex shrink-0 items-center gap-1 whitespace-nowrap text-[11px] font-black tabular-nums text-muted-foreground">
                   <Fly size={26} paused y={-5} x={3} />
                   {focus.remaining.toLocaleString()} to go
                 </span>

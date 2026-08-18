@@ -96,6 +96,24 @@ export async function rescueStreak(
   }
 }
 
+/** Records that the user chose to let the streaks break, retiring the offer. */
+export async function dismissStreakRescue(rescueId: string): Promise<void> {
+  try {
+    await fetch('/api/streak/rescue', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        rescueId,
+        action: 'dismiss',
+        timezone: clientTimezone(),
+      }),
+    });
+  } catch {
+    /* ignored */
+  }
+}
+
 export type StreakSheetRequest = {
   celebration?: CheckInResult | null;
   rescue?: LoginStreakRescue | null;

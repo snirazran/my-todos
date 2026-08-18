@@ -5,13 +5,8 @@ import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import PactModel from '@/lib/models/Pact';
 import UserModel from '@/lib/models/User';
-import { releasePactTasks } from '@/lib/pact/commit';
-import {
-  getPactView,
-  newPactId,
-  normalizePactStreak,
-  weekKeyFor,
-} from '@/lib/pact/engine';
+import { dropPact } from '@/lib/pact/drop';
+import { getPactView, newPactId, weekKeyFor } from '@/lib/pact/engine';
 import { notifyTaskChanged } from '@/lib/taskSync';
 import { getZonedToday } from '@/lib/utils';
 import { normalizeWeekStart } from '@/lib/weekStart';
@@ -79,37 +74,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const user = await UserModel.findById(userId).lean();
-    const streak = normalizePactStreak(user as any);
-    const useToken = streak.swapTokens > 0;
-
-    await releasePactTasks({ userId, pact });
-    await PactModel.deleteOne({ _id: pact._id });
-
-    const nextStreak = {
-      ...streak,
-      swapTokens: useToken ? streak.swapTokens - 1 : streak.swapTokens,
-      weeks: useToken ? streak.weeks : 0,
-    };
-    await UserModel.updateOne(
-      { _id: userId },
-      { $set: { 'quests.pactStreak': nextStreak } },
-    );
+    const { usedToken } = await dropPact({ userId, pact, source: 'swap' });
 
     await notifyTaskChanged(userId);
-    await recordAnalyticsEvent({
-      userId,
-      name: 'pact_dropped',
-      properties: {
-        week_key: weekKey,
-        category_id: pact.categoryId,
-        used_token: useToken,
-        progress: pact.progress,
-      },
-    });
 
     const view = await getPactView({ userId, timezone });
-    return NextResponse.json({ ok: true, usedToken: useToken, view });
+    return NextResponse.json({ ok: true, usedToken, view });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Could not update' },

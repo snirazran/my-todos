@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
-import { performRescue } from '@/lib/streak/loginStreak';
+import { dismissRescue, performRescue } from '@/lib/streak/loginStreak';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,6 +15,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing rescueId' }, { status: 400 });
     }
     await connectMongo();
+    if (body.action === 'dismiss') {
+      return NextResponse.json(await dismissRescue({ userId, rescueId }));
+    }
     const result = await performRescue({
       userId,
       timezone,

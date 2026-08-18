@@ -2075,6 +2075,24 @@ export default function TaskBoard({
                     />
                   ) : undefined
                 }
+                footer={
+                  cmpYmd(dk, todayKey) >= 0 &&
+                  (sortedTasksByDate[dk] ?? []).length > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setQuickText('');
+                        setInitialDateKey(dk);
+                        setPageIndex(i);
+                        setShowQuickAdd(true);
+                      }}
+                      className="mt-1.5 hidden w-full items-center gap-2 rounded-xl px-2.5 py-2 text-[13px] font-bold text-muted-foreground/80 transition-colors md:flex [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground"
+                    >
+                      <Plus className="h-4 w-4" strokeWidth={3} />
+                      <span>Add a task</span>
+                    </button>
+                  ) : undefined
+                }
               >
                 <TaskList
                   day={i as any}
@@ -2132,22 +2150,6 @@ export default function TaskBoard({
                     setMoveCalendarOpen(true);
                   }}
                 />
-                {cmpYmd(dk, todayKey) >= 0 &&
-                  (sortedTasksByDate[dk] ?? []).length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setQuickText('');
-                        setInitialDateKey(dk);
-                        setPageIndex(i);
-                        setShowQuickAdd(true);
-                      }}
-                      className="mt-1.5 hidden w-full items-center gap-2 rounded-xl px-2.5 py-2 text-[13px] font-bold text-muted-foreground/80 transition-colors md:flex [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground"
-                    >
-                      <Plus className="h-4 w-4" strokeWidth={3} />
-                      <span>Add a task</span>
-                    </button>
-                  )}
               </DayColumn>
             </div>
           ))}
