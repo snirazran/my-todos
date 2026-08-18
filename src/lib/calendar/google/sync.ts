@@ -13,10 +13,10 @@ import {
   SYNC_WINDOW_PAST_DAYS,
   type RemoteChange,
 } from '../engine';
+import { INITIAL_SYNC_TIMEOUT_MS, runGuardedSync } from '../health';
 import { instantToZoned, zonedToUtc } from '../time';
 import { googleAdapter } from './adapter';
 import {
-  GoogleAuthError,
   GoogleSyncTokenGoneError,
   ensureAppCalendar,
   listEvents,
@@ -145,26 +145,15 @@ export async function googleInbound(conn: CalendarConnectionDoc): Promise<boolea
 
   let items: GoogleEvent[];
   let nextSyncToken: string | undefined;
-  try {
-    if (conn.syncToken) {
-      try {
-        ({ items, nextSyncToken } = await incrementalList(conn));
-      } catch (err) {
-        if (!(err instanceof GoogleSyncTokenGoneError)) throw err;
-        ({ items, nextSyncToken } = await fullList(conn, tz));
-      }
-    } else {
+  if (conn.syncToken) {
+    try {
+      ({ items, nextSyncToken } = await incrementalList(conn));
+    } catch (err) {
+      if (!(err instanceof GoogleSyncTokenGoneError)) throw err;
       ({ items, nextSyncToken } = await fullList(conn, tz));
     }
-  } catch (err) {
-    if (err instanceof GoogleAuthError) {
-      await CalendarConnectionModel.updateOne(
-        { _id: conn._id },
-        { $set: { status: 'reauth_required', errorMessage: err.message } },
-      );
-      return false;
-    }
-    throw err;
+  } else {
+    ({ items, nextSyncToken } = await fullList(conn, tz));
   }
 
   const changes = await toRemoteChanges(conn, items, tz);
@@ -176,9 +165,7 @@ export async function googleInbound(conn: CalendarConnectionDoc): Promise<boolea
       $set: {
         ...(nextSyncToken ? { syncToken: nextSyncToken } : {}),
         lastIncrementalSyncAt: new Date(),
-        status: 'active',
       },
-      $unset: { errorMessage: 1 },
     },
   );
 
@@ -187,15 +174,22 @@ export async function googleInbound(conn: CalendarConnectionDoc): Promise<boolea
 
 /** Full connect-time sync: seed legacy links, pull events, push app tasks. */
 export async function googleInitialSync(conn: CalendarConnectionDoc): Promise<boolean> {
-  const tz = await getUserTz(conn.userId);
-  const { seedLegacyGoogleLinks } = await import('../engine');
-  await seedLegacyGoogleLinks(conn, tz);
-  await ensureAppCalendar(conn);
-  const appChanged = await googleInbound(conn);
-  await runOutboundSweep(conn.userId, { google: googleAdapter });
-  await CalendarConnectionModel.updateOne(
-    { _id: conn._id },
-    { $set: { lastFullSyncAt: new Date() } },
+  return runGuardedSync(
+    conn,
+    'initial sync',
+    async () => {
+      const tz = await getUserTz(conn.userId);
+      const { seedLegacyGoogleLinks } = await import('../engine');
+      await seedLegacyGoogleLinks(conn, tz);
+      await ensureAppCalendar(conn);
+      const appChanged = await googleInbound(conn);
+      await runOutboundSweep(conn.userId, { google: googleAdapter });
+      await CalendarConnectionModel.updateOne(
+        { _id: conn._id },
+        { $set: { lastFullSyncAt: new Date() } },
+      );
+      return appChanged;
+    },
+    { timeoutMs: INITIAL_SYNC_TIMEOUT_MS },
   );
-  return appChanged;
 }

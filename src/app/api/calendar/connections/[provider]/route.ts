@@ -4,9 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import CalendarConnectionModel from '@/lib/models/CalendarConnection';
-import { deleteConnectionData } from '@/lib/calendar/engine';
-import { invalidateConnectionCache } from '@/lib/calendar/connections';
-import { notifyTaskChanged } from '@/lib/taskSync';
+import { disconnectCalendarConnection } from '@/lib/calendar/disconnect';
 
 export async function DELETE(
   _req: NextRequest,
@@ -27,28 +25,6 @@ export async function DELETE(
   const conn = await CalendarConnectionModel.findOne({ userId: uid, provider });
   if (!conn) return NextResponse.json({ error: 'not connected' }, { status: 404 });
 
-  if (provider === 'google') {
-    if (conn.channelId && conn.resourceId) {
-      const { stopChannel } = await import('@/lib/calendar/google/client');
-      await stopChannel(conn, conn.channelId, conn.resourceId);
-    }
-    try {
-      const { deleteAppCalendar } = await import('@/lib/calendar/google/client');
-      await deleteAppCalendar(conn);
-    } catch (err) {
-      console.error('app calendar cleanup failed (continuing):', err);
-    }
-  } else if (provider === 'apple') {
-    try {
-      const { deleteAppCalendar } = await import('@/lib/calendar/apple/client');
-      await deleteAppCalendar(conn);
-    } catch (err) {
-      console.error('app calendar cleanup failed (continuing):', err);
-    }
-  }
-
-  await deleteConnectionData(conn._id);
-  invalidateConnectionCache(uid);
-  await notifyTaskChanged(uid);
+  await disconnectCalendarConnection(conn);
   return NextResponse.json({ ok: true });
 }

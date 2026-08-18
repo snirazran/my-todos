@@ -17,6 +17,7 @@ import {
   dowFromYMD,
 } from '@/lib/taskOccurrence';
 import { fingerprint } from './fingerprint';
+import { SYNCABLE_STATUSES } from './health';
 import { neutralToAppRepeat, type NeutralToAppResult } from './recurrence';
 import { minutesToReminder } from './reminders';
 import {
@@ -754,7 +755,7 @@ export async function runOutboundSweep(
   await connectMongo();
   const conns = await CalendarConnectionModel.find({
     userId,
-    status: 'active',
+    status: { $in: SYNCABLE_STATUSES },
     'settings.exportEnabled': true,
   }).lean<CalendarConnectionDoc[]>();
   if (conns.length === 0) return;
@@ -847,8 +848,10 @@ export async function runOutboundSweep(
         await CalendarEventLinkModel.deleteOne({ _id: link._id });
       }
     } catch (err) {
+      const { recordSyncFailure } = await import('./health');
+      const { kind, status } = await recordSyncFailure(conn, err);
       console.error(
-        `calendar outbound sweep failed (${conn.provider}):`,
+        `[calendar] outbound sweep failed (${conn.provider}/${userId}) kind=${kind} -> ${status}:`,
         (err as Error)?.message,
       );
     }

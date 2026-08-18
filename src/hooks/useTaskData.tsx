@@ -6,6 +6,7 @@ import { useNotification } from '@/components/providers/NotificationProvider';
 import { useReminderScheduler } from '@/hooks/useReminderScheduler';
 import { INVENTORY_KEY, INVENTORY_SUMMARY_KEY } from '@/hooks/useInventory';
 import { SECTIONS_KEY } from '@/hooks/useSections';
+import { mutateFriendsCaches } from '@/hooks/useFriendsSync';
 import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
 import { markFlyEarn } from '@/lib/flyEarn';
 import { notifyQuestClaims, seedQuestClaims } from '@/lib/questClaims';
@@ -1463,17 +1464,33 @@ export function useTaskData({
         );
       }
 
+      const setRepeat = {
+        mode,
+        dayOfWeek,
+        endDate: endDate ?? null,
+        rule: rule ?? null,
+      };
       try {
-        await fetch('/api/tasks', {
+        const res = await fetch('/api/tasks', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            taskId,
-            date: dateStr,
-            setRepeat: { mode, dayOfWeek, endDate: endDate ?? null, rule: rule ?? null },
-            timezone: tz,
-          }),
+          body: JSON.stringify({ taskId, date: dateStr, setRepeat, timezone: tz }),
         });
+        // A shared buddy task's schedule can only change by mutual approval.
+        if (res.status === 409) {
+          const body = await res.json().catch(() => null);
+          if (body?.error === 'buddy_repeat_needs_approval' && body.bondId) {
+            await fetch(`/api/buddy/${body.bondId}/repeat-request`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ setRepeat, date: dateStr, timezone: tz }),
+            });
+            mutateFriendsCaches();
+            showNotification(
+              'Change requested — waiting for your buddy to approve',
+            );
+          }
+        }
       } catch (e) {
         console.error('Set repeat failed', e);
       } finally {
@@ -1481,7 +1498,15 @@ export function useTaskData({
         if (includeBacklog) mutateBacklog();
       }
     },
-    [todayData, mutateToday, mutateBacklog, dateStr, tz, includeBacklog],
+    [
+      todayData,
+      mutateToday,
+      mutateBacklog,
+      dateStr,
+      tz,
+      includeBacklog,
+      showNotification,
+    ],
   );
 
   /**

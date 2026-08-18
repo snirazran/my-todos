@@ -12,6 +12,7 @@ import {
   enqueueQuestRewardReveal,
   type RevealCatalog,
 } from '@/components/ui/questRewardReveal';
+import { useDismissNotification } from '@/components/providers/NotificationProvider';
 
 const RewardTile = dynamic(
   () => import('@/components/ui/QuestCards').then((m) => m.RewardTile),
@@ -719,6 +720,7 @@ function ClaimRewardToast({
   isPremium: boolean;
 }) {
   const router = useRouter();
+  const dismissToast = useDismissNotification();
   const [claiming, setClaiming] = useState(false);
   const goToQuest = () => {
     if (claimable.kind === 'objective' && claimable.questId) {
@@ -769,6 +771,7 @@ function ClaimRewardToast({
         showFlyGainPill: window.location.pathname !== '/',
       });
       primeQuestsPageCache();
+      dismissToast?.();
       await refreshQuestHomeView();
     } catch {
       primeQuestsPageCache();

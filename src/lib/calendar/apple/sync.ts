@@ -15,10 +15,10 @@ import {
   SYNC_WINDOW_PAST_DAYS,
   type RemoteChange,
 } from '../engine';
+import { INITIAL_SYNC_TIMEOUT_MS, runGuardedSync } from '../health';
 import { zonedToUtc } from '../time';
 import { appleAdapter } from './adapter';
 import {
-  AppleAuthError,
   ensureAppCalendar,
   getClient,
   listSourceCalendars,
@@ -108,78 +108,72 @@ export async function appleInbound(
 ): Promise<boolean> {
   const tz = await getUserTz(conn.userId);
 
-  try {
-    const client = await getClient(conn);
-    const calendars = await listSourceCalendars(client, conn.appCalendarUrl);
+  const client = await getClient(conn);
+  const calendars = await listSourceCalendars(client, conn.appCalendarUrl);
 
-    const today = getZonedToday(tz);
-    const windowStart = addDaysYMD(today, -SYNC_WINDOW_PAST_DAYS);
-    const windowEnd = addDaysYMD(today, SYNC_WINDOW_FUTURE_DAYS);
+  const today = getZonedToday(tz);
+  const windowStart = addDaysYMD(today, -SYNC_WINDOW_PAST_DAYS);
+  const windowEnd = addDaysYMD(today, SYNC_WINDOW_FUTURE_DAYS);
 
-    const links = await CalendarEventLinkModel.find({
-      userId: conn.userId,
-      connectionId: conn._id,
-    }).lean<CalendarEventLinkDoc[]>();
+  const links = await CalendarEventLinkModel.find({
+    userId: conn.userId,
+    connectionId: conn._id,
+  }).lean<CalendarEventLinkDoc[]>();
 
-    const priorCtags = conn.calendarCtags ?? {};
-    const nextCtags: Record<string, string> = { ...priorCtags };
-    const changes: RemoteChange[] = [];
-    let queriedAny = false;
+  const priorCtags = conn.calendarCtags ?? {};
+  const nextCtags: Record<string, string> = { ...priorCtags };
+  const changes: RemoteChange[] = [];
+  let queriedAny = false;
 
-    for (const cal of calendars) {
-      const changed = !!opts?.force || !cal.ctag || priorCtags[cal.url] !== cal.ctag;
-      if (!changed) continue;
-      queriedAny = true;
-      changes.push(
-        ...(await collectCalendarChanges(client, cal, links, windowStart, windowEnd, tz)),
-      );
-      if (cal.ctag) nextCtags[cal.url] = cal.ctag;
-      else delete nextCtags[cal.url];
-    }
+  for (const cal of calendars) {
+    const changed = !!opts?.force || !cal.ctag || priorCtags[cal.url] !== cal.ctag;
+    if (!changed) continue;
+    queriedAny = true;
+    changes.push(
+      ...(await collectCalendarChanges(client, cal, links, windowStart, windowEnd, tz)),
+    );
+    if (cal.ctag) nextCtags[cal.url] = cal.ctag;
+    else delete nextCtags[cal.url];
+  }
 
-    if (!queriedAny) {
-      await CalendarConnectionModel.updateOne(
-        { _id: conn._id },
-        { $set: { lastIncrementalSyncAt: new Date(), status: 'active' } },
-      );
-      return false;
-    }
-
-    const appChanged = await processRemoteChanges(conn, appleAdapter, changes, tz);
-
+  if (!queriedAny) {
     await CalendarConnectionModel.updateOne(
       { _id: conn._id },
-      {
-        $set: {
-          calendarCtags: nextCtags,
-          lastIncrementalSyncAt: new Date(),
-          status: 'active',
-        },
-        $unset: { errorMessage: 1 },
-      },
+      { $set: { lastIncrementalSyncAt: new Date() } },
     );
-
-    return appChanged;
-  } catch (err) {
-    if (err instanceof AppleAuthError) {
-      await CalendarConnectionModel.updateOne(
-        { _id: conn._id },
-        { $set: { status: 'reauth_required', errorMessage: err.message } },
-      );
-      return false;
-    }
-    throw err;
+    return false;
   }
+
+  const appChanged = await processRemoteChanges(conn, appleAdapter, changes, tz);
+
+  await CalendarConnectionModel.updateOne(
+    { _id: conn._id },
+    {
+      $set: {
+        calendarCtags: nextCtags,
+        lastIncrementalSyncAt: new Date(),
+      },
+    },
+  );
+
+  return appChanged;
 }
 
 /** Full connect-time sync: create the app calendar, pull events, push app tasks. */
 export async function appleInitialSync(conn: CalendarConnectionDoc): Promise<boolean> {
-  await ensureAppCalendar(conn);
-  const appChanged = await appleInbound(conn, { force: true });
-  await runOutboundSweep(conn.userId, { apple: appleAdapter });
-  await CalendarConnectionModel.updateOne(
-    { _id: conn._id },
-    { $set: { lastFullSyncAt: new Date() } },
+  return runGuardedSync(
+    conn,
+    'initial sync',
+    async () => {
+      await ensureAppCalendar(conn);
+      const appChanged = await appleInbound(conn, { force: true });
+      await runOutboundSweep(conn.userId, { apple: appleAdapter });
+      await CalendarConnectionModel.updateOne(
+        { _id: conn._id },
+        { $set: { lastFullSyncAt: new Date() } },
+      );
+      return appChanged;
+    },
+    { timeoutMs: INITIAL_SYNC_TIMEOUT_MS },
   );
-  return appChanged;
 }

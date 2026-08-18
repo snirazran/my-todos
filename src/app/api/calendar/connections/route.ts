@@ -5,6 +5,7 @@ import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import CalendarConnectionModel from '@/lib/models/CalendarConnection';
 import { invalidateConnectionCache } from '@/lib/calendar/connections';
+import { resumeConnection } from '@/lib/calendar/health';
 
 export async function GET() {
   let uid: string;
@@ -20,6 +21,10 @@ export async function GET() {
       provider: 1,
       status: 1,
       errorMessage: 1,
+      lastErrorKind: 1,
+      consecutiveFailures: 1,
+      firstFailureAt: 1,
+      pausedReason: 1,
       calendarDisplayName: 1,
       calendarId: 1,
       lastIncrementalSyncAt: 1,
@@ -34,6 +39,10 @@ export async function GET() {
       provider: c.provider,
       status: c.status,
       errorMessage: c.errorMessage,
+      errorKind: c.lastErrorKind,
+      failureCount: c.consecutiveFailures ?? 0,
+      failingSince: c.firstFailureAt ?? null,
+      pausedReason: c.pausedReason,
       calendarDisplayName: c.calendarDisplayName,
       calendarId: c.calendarId,
       appleId: c.appleId,
@@ -54,6 +63,16 @@ export async function PATCH(req: NextRequest) {
   const provider = body.provider;
   if (provider !== 'google' && provider !== 'apple') {
     return NextResponse.json({ error: 'invalid provider' }, { status: 400 });
+  }
+
+  if (body.resume === true) {
+    await connectMongo();
+    const conn = await resumeConnection(uid, provider);
+    if (!conn) return NextResponse.json({ error: 'not connected' }, { status: 404 });
+    if (conn.status === 'disconnected') {
+      return NextResponse.json({ error: 'reconnect required' }, { status: 409 });
+    }
+    return NextResponse.json({ ok: true, status: conn.status });
   }
 
   const set: Record<string, unknown> = {};

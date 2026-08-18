@@ -3,7 +3,8 @@ import CalendarConnectionModel, {
   type CalendarConnectionDoc,
 } from '@/lib/models/CalendarConnection';
 import { hmacSign } from '../crypto';
-import { GoogleAuthError, stopChannel, watchEvents } from './client';
+import { classifySyncError, recordSyncFailure } from '../health';
+import { stopChannel, watchEvents } from './client';
 
 const RENEW_BEFORE_MS = 48 * 60 * 60 * 1000;
 
@@ -38,13 +39,11 @@ export async function ensureChannel(conn: CalendarConnectionDoc): Promise<void> 
       },
     );
   } catch (err) {
-    if (err instanceof GoogleAuthError) {
-      await CalendarConnectionModel.updateOne(
-        { _id: conn._id },
-        { $set: { status: 'reauth_required', errorMessage: err.message } },
-      );
-      return;
-    }
-    console.error('calendar watch failed:', (err as Error)?.message);
+    const { kind } = classifySyncError(err);
+    if (kind === 'auth') await recordSyncFailure(conn, err);
+    console.error(
+      `[calendar] watch channel setup failed (${conn.userId}) kind=${kind}:`,
+      (err as Error)?.message,
+    );
   }
 }

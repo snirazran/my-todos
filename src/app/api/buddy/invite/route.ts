@@ -11,6 +11,7 @@ import { createTasksForUser } from '@/app/api/tasks/route';
 import {
   repeatLabelFor,
   paramsFromTask,
+  isShareableParams,
   type ExistingBuddyTask,
 } from '@/lib/buddy/bond';
 import { sendBuddyPush, buddyDisplayName } from '@/lib/buddy/push';
@@ -20,14 +21,6 @@ import { recordAnalyticsEvent } from '@/lib/analytics/server';
 import { taskAnalyticsProperties } from '@/lib/analytics/engagement';
 
 const INVITE_TTL_MS = 24 * 60 * 60 * 1000;
-
-function isRepeating(params: BuddyCreateParams): boolean {
-  if (params.repeatRule) return true;
-  if (params.repeat === 'monthly') return true;
-  if (params.repeat === 'weekly' && (params.days?.length ?? 0) > 0) return true;
-  return false;
-}
-
 
 export async function POST(req: NextRequest) {
   let userId: string;
@@ -62,9 +55,9 @@ export async function POST(req: NextRequest) {
   if (!fromTaskId) {
     if (!params.text)
       return NextResponse.json({ error: 'text is required' }, { status: 400 });
-    if (!isRepeating(params))
+    if (!isShareableParams(params))
       return NextResponse.json(
-        { error: 'Buddy tasks must repeat — pick a repeat option' },
+        { error: 'Pick when you will both do it' },
         { status: 400 },
       );
   }
@@ -95,9 +88,9 @@ export async function POST(req: NextRequest) {
             .lean<ExistingBuddyTask[]>()
         : [task];
       bondParams = paramsFromTask(task, siblings);
-      if (!isRepeating(bondParams))
+      if (!isShareableParams(bondParams))
         return NextResponse.json(
-          { error: 'Only repeating tasks can be shared with a buddy' },
+          { error: 'Give this task a day first, then share it' },
           { status: 400 },
         );
 
@@ -158,7 +151,7 @@ export async function POST(req: NextRequest) {
     void buddyDisplayName(userId).then((name) =>
       sendBuddyPush(friendId, {
         title: `${name} wants to be your goal buddy`,
-        body: `Team up on "${bondParams.text}" — you'll see each other's progress every day.`,
+        body: `Team up on "${bondParams.text}" — you'll see each other's progress.`,
         path: '/friends',
         type: 'buddy_invite',
       }),

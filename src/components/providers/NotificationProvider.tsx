@@ -50,6 +50,29 @@ const NotificationContext = createContext<NotificationContextType | undefined>(
   undefined,
 );
 
+const NotificationItemContext = createContext<(() => void) | null>(null);
+
+export function useDismissNotification() {
+  return useContext(NotificationItemContext);
+}
+
+const NotificationBody = React.memo(function NotificationBody({
+  id,
+  dismiss,
+  children,
+}: {
+  id: number;
+  dismiss: (id: number) => void;
+  children: React.ReactNode;
+}) {
+  const value = useCallback(() => dismiss(id), [dismiss, id]);
+  return (
+    <NotificationItemContext.Provider value={value}>
+      {children}
+    </NotificationItemContext.Provider>
+  );
+});
+
 export function useNotification() {
   const context = useContext(NotificationContext);
   if (!context) {
@@ -325,7 +348,9 @@ export function NotificationProvider({
                     isMoveToast ? 'font-semibold' : 'font-medium'
                   }`}
                 >
-                  {n.content}
+                  <NotificationBody id={n.id} dismiss={dismiss}>
+                    {n.content}
+                  </NotificationBody>
                 </div>
                 {n.undoAction && (
                   <button

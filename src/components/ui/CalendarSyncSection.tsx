@@ -12,8 +12,12 @@ import AiConnectionsSection from '@/components/ui/AiConnectionsSection';
 
 export type CalendarConnectionInfo = {
   provider: 'google' | 'apple';
-  status: 'active' | 'error' | 'reauth_required';
+  status: 'active' | 'error' | 'paused' | 'reauth_required' | 'disconnected';
   errorMessage?: string;
+  errorKind?: 'auth' | 'gone' | 'rateLimit' | 'transient';
+  failureCount?: number;
+  failingSince?: string | null;
+  pausedReason?: string;
   calendarDisplayName?: string;
   appleId?: string;
   lastSyncedAt?: string | null;
@@ -87,16 +91,20 @@ function timeAgo(iso?: string | null) {
   return `${Math.round(hours / 24)}d ago`;
 }
 
+const STATUS_PILL: Record<
+  CalendarConnectionInfo['status'],
+  { label: string; className: string }
+> = {
+  active: { label: 'Connected', className: 'bg-emerald-500/12 text-emerald-600' },
+  error: { label: 'Retrying', className: 'bg-amber-500/15 text-amber-600' },
+  paused: { label: 'Paused', className: 'bg-amber-500/15 text-amber-600' },
+  reauth_required: { label: 'Reconnect', className: 'bg-red-500/12 text-red-500' },
+  disconnected: { label: 'Disconnected', className: 'bg-red-500/12 text-red-500' },
+};
+
 function StatusPill({ status }: { status?: CalendarConnectionInfo['status'] }) {
   if (!status) return null;
-  const styles =
-    status === 'active'
-      ? 'bg-emerald-500/12 text-emerald-600'
-      : status === 'reauth_required'
-        ? 'bg-amber-500/15 text-amber-600'
-        : 'bg-red-500/12 text-red-500';
-  const label =
-    status === 'active' ? 'Connected' : status === 'reauth_required' ? 'Reconnect' : 'Issue';
+  const { label, className: styles } = STATUS_PILL[status];
   return (
     <span
       className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ${styles}`}
@@ -212,6 +220,28 @@ function TagSelect({
   );
 }
 
+function statusNotice(
+  provider: 'google' | 'apple',
+  connection?: CalendarConnectionInfo,
+): string | null {
+  switch (connection?.status) {
+    case 'error':
+      return 'Syncing hit a snag and is retrying on its own. Nothing to do — we’ll keep trying.';
+    case 'paused':
+      return connection.pausedReason === 'calendar-unavailable'
+        ? 'That calendar is no longer reachable, so syncing is paused. Resume once it’s back, or reconnect.'
+        : 'Syncing kept failing, so it’s paused for now. Resume to try again.';
+    case 'reauth_required':
+      return provider === 'google'
+        ? 'Frogress lost access to this calendar. Reconnect to resume syncing.'
+        : 'Sign-in expired. Reconnect with a new app-specific password.';
+    case 'disconnected':
+      return 'Syncing was turned off after two weeks of failures. Your tasks and events are untouched — reconnect to start again.';
+    default:
+      return null;
+  }
+}
+
 function ProviderCard({
   provider,
   label,
@@ -269,9 +299,23 @@ function ProviderCard({
     }
   }, [onChanged]);
 
-  const connected = connection?.status === 'active';
-  const needsReauth =
-    connection?.status === 'reauth_required' || connection?.status === 'error';
+  const resume = useCallback(async () => {
+    setSyncing(true);
+    try {
+      await patch({ resume: true });
+      await fetch('/api/calendar/sync-now', { method: 'POST' });
+      window.dispatchEvent(new Event('board-refresh'));
+      onChanged();
+    } finally {
+      setSyncing(false);
+    }
+  }, [patch, onChanged]);
+
+  const status = connection?.status;
+  const connected = status === 'active' || status === 'error';
+  const paused = status === 'paused';
+  const needsReauth = status === 'reauth_required' || status === 'disconnected';
+  const notice = statusNotice(provider, connection);
   const lastSynced = timeAgo(connection?.lastSyncedAt);
   const metaLine = connected
     ? [
@@ -310,36 +354,58 @@ function ProviderCard({
         <StatusPill status={connection?.status} />
       </div>
 
-      {needsReauth && (
+      {notice && (
         <div className="mx-4 mb-3 flex items-start gap-2 rounded-xl bg-amber-500/10 px-3 py-2.5">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
           <p className="text-[11px] font-semibold leading-snug text-amber-700 dark:text-amber-400">
-            {provider === 'google'
-              ? 'Frogress lost access to this calendar. Reconnect to resume syncing.'
-              : 'Sign-in expired. Reconnect with a new app-specific password.'}
+            {notice}
           </p>
         </div>
       )}
 
-      {!connection || needsReauth ? (
+      {!connection || needsReauth || paused ? (
         <div className="px-4 pb-4">
-          <button
-            type="button"
-            disabled={connecting}
-            onClick={onConnect}
-            className="w-full flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 py-3 text-sm font-black text-white transition-colors hover:bg-emerald-600 disabled:opacity-60"
-          >
-            {connecting && <Loader2 className="h-4 w-4 animate-spin" />}
-            {connecting ? 'Waiting for Google…' : connection ? 'Reconnect' : 'Connect'}
-          </button>
-          {connection && (
+          {paused ? (
             <button
               type="button"
-              onClick={() => setConfirmOpen(true)}
-              className="mt-2 w-full rounded-2xl py-2 text-xs font-bold text-red-500 transition-colors hover:bg-red-500/10"
+              disabled={syncing}
+              onClick={() => void resume()}
+              className="w-full flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 py-3 text-sm font-black text-white transition-colors hover:bg-emerald-600 disabled:opacity-60"
             >
-              Disconnect
+              {syncing && <Loader2 className="h-4 w-4 animate-spin" />}
+              Resume syncing
             </button>
+          ) : (
+            <button
+              type="button"
+              disabled={connecting}
+              onClick={onConnect}
+              className="w-full flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 py-3 text-sm font-black text-white transition-colors hover:bg-emerald-600 disabled:opacity-60"
+            >
+              {connecting && <Loader2 className="h-4 w-4 animate-spin" />}
+              {connecting ? 'Waiting for Google…' : connection ? 'Reconnect' : 'Connect'}
+            </button>
+          )}
+          {connection && (
+            <>
+              {paused && (
+                <button
+                  type="button"
+                  disabled={connecting}
+                  onClick={onConnect}
+                  className="mt-2 w-full rounded-2xl bg-muted py-2.5 text-xs font-black transition-colors hover:bg-accent disabled:opacity-60"
+                >
+                  Reconnect instead
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setConfirmOpen(true)}
+                className="mt-2 w-full rounded-2xl py-2 text-xs font-bold text-red-500 transition-colors hover:bg-red-500/10"
+              >
+                Disconnect
+              </button>
+            </>
           )}
         </div>
       ) : (

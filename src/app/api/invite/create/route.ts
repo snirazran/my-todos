@@ -6,17 +6,14 @@ import InviteConfigModel from '@/lib/models/InviteConfig';
 import { ensureInviteConfig } from '@/lib/inviteConfig/defaults';
 import type { BuddyCreateParams } from '@/lib/models/TaskBond';
 import TaskModel from '@/lib/models/Task';
-import { paramsFromTask, type ExistingBuddyTask } from '@/lib/buddy/bond';
+import {
+  paramsFromTask,
+  isShareableParams,
+  type ExistingBuddyTask,
+} from '@/lib/buddy/bond';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
 
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-
-function isRepeating(params: BuddyCreateParams): boolean {
-  if (params.repeatRule) return true;
-  if (params.repeat === 'monthly') return true;
-  if (params.repeat === 'weekly' && (params.days?.length ?? 0) > 0) return true;
-  return false;
-}
 
 function parseBuddyTask(raw: any): BuddyCreateParams | null {
   if (!raw || typeof raw !== 'object') return null;
@@ -30,7 +27,7 @@ function parseBuddyTask(raw: any): BuddyCreateParams | null {
     repeatRule: raw.repeatRule,
     repeatEndDate: raw.repeatEndDate,
   };
-  return isRepeating(params) ? params : null;
+  return isShareableParams(params) ? params : null;
 }
 
 function generateCode(length = 8) {
@@ -65,7 +62,7 @@ export async function POST(req: NextRequest) {
     let buddyTask = parseBuddyTask(body.buddyTask);
     if (body.buddyTask && !buddyTask) {
       return NextResponse.json(
-        { error: 'Buddy tasks must repeat — pick a repeat option' },
+        { error: 'Pick when you will both do it' },
         { status: 400 },
       );
     }
@@ -90,9 +87,9 @@ export async function POST(req: NextRequest) {
             .lean<ExistingBuddyTask[]>()
         : [task];
       const derived = paramsFromTask(task, siblings);
-      if (!isRepeating(derived))
+      if (!isShareableParams(derived))
         return NextResponse.json(
-          { error: 'Only repeating tasks can be shared with a buddy' },
+          { error: 'Give this task a day first, then share it' },
           { status: 400 },
         );
       buddyTask = derived;

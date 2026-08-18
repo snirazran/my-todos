@@ -9,6 +9,8 @@ import { Capacitor } from '@capacitor/core';
 import { FirebaseMessaging } from '@capacitor-firebase/messaging';
 import Frog from '@/components/ui/frog';
 import { BuddyGoalSheet, type BuddyGoalDraft } from '@/components/ui/buddy/BuddyGoalSheet';
+import { toBuddyCreateParams } from '@/lib/buddy/presets';
+import { todayYmd } from '@/components/board/helpers';
 import type { FriendSummary } from '@/lib/friends/indices';
 import { mutate as mutateGlobal } from 'swr';
 import { mutateFriendsCaches } from '@/hooks/useFriendsSync';
@@ -96,6 +98,7 @@ export function BuddyUpFlow({
     setError(null);
     trackAnalyticsEvent('buddy_goal_composed', {
       source: 'existing_friend',
+      repeat_choice: draft.choice,
       day_count: draft.days.length,
     });
     try {
@@ -104,9 +107,12 @@ export function BuddyUpFlow({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           friendId: friend.userId,
-          text: draft.text,
-          repeat: 'weekly',
-          days: draft.days,
+          ...toBuddyCreateParams(
+            draft.text,
+            draft.choice,
+            draft.days,
+            todayYmd(),
+          ),
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         }),
       });

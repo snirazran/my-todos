@@ -8,6 +8,7 @@ import TaskBondModel from '@/lib/models/TaskBond';
 import UserModel from '@/lib/models/User';
 import { getCachedCatalog, buildById } from '@/lib/skins/getCatalog';
 import { equippedToIndices, type FrogIndices } from '@/lib/friends/indices';
+import { isOneTimeParams } from '@/lib/buddy/bond';
 
 export type BuddyTaskState = {
   bondId: string;
@@ -20,6 +21,8 @@ export type BuddyTaskState = {
   partnerName: string;
   partnerInitial: string;
   partnerIndices: FrogIndices;
+  /** One-time bonds book their single occurrence under a key, not a date. */
+  oneTime: boolean;
   partnerCompletedDates: string[];
   streak: number;
   pendingRepeatChange: { requestedByMe: boolean } | null;
@@ -89,6 +92,7 @@ export async function GET() {
         partnerName: name,
         partnerInitial: name.charAt(0).toUpperCase() || '?',
         partnerIndices: equippedToIndices(partner?.wardrobe?.equipped, byId),
+        oneTime: isOneTimeParams(bond.createParams),
         partnerCompletedDates: iAmFrom ? bond.completedTo : bond.completedFrom,
         streak: bond.streak?.count ?? 0,
         pendingRepeatChange: bond.pendingRepeatChange

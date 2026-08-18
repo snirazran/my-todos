@@ -73,16 +73,10 @@ export function useBackgroundActions({
     mode: 'inventory' | 'shop',
     sortBy: BackgroundSortOrder,
   ) => {
-    // The default background is granted to everyone as the baseline scene, not
-    // as something they collected — it doesn't belong in the wardrobe grid or
-    // the shop.
-    const collectible = catalog.filter(
-      (b) => b.id !== DEFAULT_BACKGROUND_ID,
-    );
     const list =
       mode === 'inventory'
-        ? collectible.filter((b) => (inventory[b.id] ?? 0) > 0)
-        : collectible;
+        ? catalog.filter((b) => (inventory[b.id] ?? 0) > 0)
+        : catalog.filter((b) => b.id !== DEFAULT_BACKGROUND_ID);
     return [...list].sort((a, b) => {
       switch (sortBy) {
         case 'rarity_asc':

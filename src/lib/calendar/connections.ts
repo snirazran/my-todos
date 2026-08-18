@@ -1,7 +1,5 @@
 import connectMongo from '@/lib/mongoose';
-import CalendarConnectionModel, {
-  type CalendarConnectionDoc,
-} from '@/lib/models/CalendarConnection';
+import CalendarConnectionModel from '@/lib/models/CalendarConnection';
 
 type ConnCache = { value: boolean; expires: number };
 
@@ -23,7 +21,7 @@ export async function userHasCalendarConnections(userId: string): Promise<boolea
   await connectMongo();
   const exists = await CalendarConnectionModel.exists({
     userId,
-    status: { $ne: 'reauth_required' },
+    status: { $in: ['active', 'error'] },
     'settings.exportEnabled': true,
   });
   cache().set(userId, { value: !!exists, expires: Date.now() + CACHE_TTL_MS });
@@ -38,18 +36,6 @@ export async function getActiveConnections(userId: string) {
   await connectMongo();
   return CalendarConnectionModel.find({
     userId,
-    status: { $ne: 'reauth_required' },
+    status: { $in: ['active', 'error'] },
   }).exec();
-}
-
-export async function markConnectionError(
-  connectionId: CalendarConnectionDoc['_id'],
-  status: 'error' | 'reauth_required',
-  message: string,
-) {
-  await connectMongo();
-  await CalendarConnectionModel.updateOne(
-    { _id: connectionId },
-    { $set: { status, errorMessage: message } },
-  );
 }

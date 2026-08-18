@@ -43,12 +43,21 @@ export async function GET(req: NextRequest) {
       {
         $set: {
           status: 'active',
+          consecutiveFailures: 0,
           encRefreshToken: encryptSecret(tokens.refreshToken),
           calendarId: 'primary',
           calendarDisplayName: 'Primary calendar',
           settings: { exportEnabled: true, importEnabled: true },
         },
-        $unset: { errorMessage: 1, syncToken: 1 },
+        $unset: {
+          errorMessage: 1,
+          syncToken: 1,
+          firstFailureAt: 1,
+          lastFailureAt: 1,
+          lastErrorKind: 1,
+          pausedAt: 1,
+          pausedReason: 1,
+        },
       },
       { upsert: true, new: true },
     );

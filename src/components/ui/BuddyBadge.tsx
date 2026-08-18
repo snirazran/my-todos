@@ -92,7 +92,9 @@ export function BuddyBadge({
     );
   }
 
-  const partnerDone = !!date && state.partnerCompletedDates.includes(date);
+  const partnerDone = state.oneTime
+    ? state.partnerCompletedDates.length > 0
+    : !!date && state.partnerCompletedDates.includes(date);
 
   return (
     <span

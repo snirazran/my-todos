@@ -10,6 +10,7 @@ export type BuddyTaskState = {
   partnerName: string;
   partnerInitial: string;
   partnerIndices?: FrogIndices;
+  oneTime?: boolean;
   partnerCompletedDates: string[];
   streak: number;
   pendingRepeatChange: { requestedByMe: boolean } | null;

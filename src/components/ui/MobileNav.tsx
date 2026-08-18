@@ -16,8 +16,7 @@ export default function MobileNav() {
   const pathname = usePathname();
   const router = useRouter();
   const { user } = useAuth();
-  const { inventoryBadge, readyTrades } = useWardrobeBadges();
-  const tradeReady = readyTrades > 0;
+  const { inventoryBadge } = useWardrobeBadges();
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const [wardrobePopupOpen, setWardrobePopupOpen] = useState(false);
   const [pendingHref, setPendingHref] = useState<string | null>(null);
@@ -139,15 +138,9 @@ export default function MobileNav() {
                     label={item.label}
                     className={cn('w-9 h-9', item.label === 'Friends' && 'scale-125')}
                   />
-                  {/* New items outrank spares: unseen loot is the thing you
-                      can only act on here, trading keeps until tomorrow. */}
                   {item.label === 'Wardrobe' && inventoryBadge > 0 ? (
                     <span className="absolute -top-2 -right-3 flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-[10px] font-bold text-white bg-rose-500 rounded-full border-2 border-background animate-in zoom-in duration-300 shadow-sm">
                       {inventoryBadge > 9 ? '9+' : inventoryBadge}
-                    </span>
-                  ) : item.label === 'Wardrobe' && tradeReady ? (
-                    <span className="absolute -top-2 -right-3 flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-[10px] font-bold text-white bg-amber-500 rounded-full border-2 border-background animate-in zoom-in duration-300 shadow-sm">
-                      {readyTrades > 9 ? '9+' : readyTrades}
                     </span>
                   ) : null}
                   {item.label === 'Quests' && questClaimableCount > 0 ? (

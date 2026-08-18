@@ -1,6 +1,6 @@
 import type { BuddyCreateParams } from '@/lib/models/TaskBond';
 
-export type BuddyRepeatChoice = 'daily' | 'weekdays' | 'custom';
+export type BuddyRepeatChoice = 'once' | 'daily' | 'weekdays' | 'custom';
 
 export type BuddyPreset = {
   id: string;
@@ -28,6 +28,7 @@ export function daysForChoice(
   choice: BuddyRepeatChoice,
   customDays: number[],
 ): number[] {
+  if (choice === 'once') return [];
   if (choice === 'daily') return ALL_DAYS;
   if (choice === 'weekdays') return WEEKDAYS;
   return customDays;
@@ -37,6 +38,7 @@ export function buddyRepeatSummary(
   choice: BuddyRepeatChoice,
   customDays: number[],
 ): string {
+  if (choice === 'once') return 'Just once';
   const days = daysForChoice(choice, customDays);
   if (days.length === 7) return 'Every day';
   if (days.length === 5 && WEEKDAYS.every((d) => days.includes(d)))
@@ -56,7 +58,10 @@ export function toBuddyCreateParams(
   text: string,
   choice: BuddyRepeatChoice,
   customDays: number[],
+  today?: string,
 ): BuddyCreateParams {
+  if (choice === 'once')
+    return { text: text.trim(), repeat: 'this-week', dates: today ? [today] : [] };
   return {
     text: text.trim(),
     repeat: 'weekly',

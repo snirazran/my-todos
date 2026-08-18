@@ -28,6 +28,7 @@ const DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
 export type BuddyGoalDraft = {
   text: string;
+  choice: BuddyRepeatChoice;
   days: number[];
   giftOptionId?: string | null;
 };
@@ -137,8 +138,12 @@ export function BuddyGoalSheet({
     () => daysForChoice(choice, customDays),
     [choice, customDays],
   );
+  const oneTime = choice === 'once';
   const canSend =
-    !!text.trim() && days.length > 0 && (!wantsGift || !!giftId) && !sending;
+    !!text.trim() &&
+    (oneTime || days.length > 0) &&
+    (!wantsGift || !!giftId) &&
+    !sending;
 
   const pickPreset = (id: string) => {
     const preset = BUDDY_PRESETS.find((p) => p.id === id);
@@ -300,9 +305,10 @@ export function BuddyGoalSheet({
             <p className="mt-5 text-[11px] font-black uppercase tracking-[0.14em] text-muted-foreground">
               How often
             </p>
-            <div className="mt-2 flex gap-1.5">
+            <div className="mt-2 grid grid-cols-2 gap-1.5">
               {(
                 [
+                  ['once', 'Just once'],
                   ['daily', 'Every day'],
                   ['weekdays', 'Weekdays'],
                   ['custom', 'Pick days'],
@@ -313,7 +319,7 @@ export function BuddyGoalSheet({
                   type="button"
                   onClick={() => setChoice(value)}
                   className={cn(
-                    'h-11 flex-1 rounded-2xl border text-[13px] font-black tracking-tight transition-colors',
+                    'h-11 rounded-2xl border text-[13px] font-black tracking-tight transition-colors',
                     choice === value
                       ? 'border-[#4f9149] bg-[#4f9149]/10 text-[#4f9149]'
                       : 'border-border/60 bg-card text-muted-foreground hover:text-foreground',
@@ -390,7 +396,8 @@ export function BuddyGoalSheet({
               </span>
               <p className="text-[13px] font-semibold leading-snug text-foreground">
                 <span className="font-black">You both check it off</span> → you
-                both catch double flies, and your shared streak grows.
+                both catch double flies
+                {oneTime ? '.' : ', and your shared streak grows.'}
               </p>
             </div>
           </div>
@@ -414,7 +421,7 @@ export function BuddyGoalSheet({
               type="button"
               disabled={!canSend}
               onClick={() =>
-                onSubmit({ text: text.trim(), days, giftOptionId: giftId })
+                onSubmit({ text: text.trim(), choice, days, giftOptionId: giftId })
               }
               className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[#4f9149] text-[17px] font-black tracking-tight text-white shadow-[0_4px_0_#34631f] transition-all active:translate-y-0.5 active:shadow-none disabled:pointer-events-none disabled:opacity-50"
             >

@@ -72,7 +72,7 @@ export function BuddyTaskInvite({
   const shareTaskLink = async (url: string) => {
     const result = await shareLink({
       title: "Let's do this together on Frogress!",
-      text: `I'm doing "${taskText}" every week — join me and grab a gift.`,
+      text: `I'm doing "${taskText}" — join me and grab a gift.`,
       url,
       dialogTitle: 'Invite your goal buddy',
     });

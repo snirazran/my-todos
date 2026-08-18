@@ -7,7 +7,15 @@ const WEEKDAY_SETS: Record<string, number[]> = {
   weekend: [0, 6],
 };
 
+/**
+ * Occurrence key a one-time bond books its completions under. Each side's copy
+ * can sit on a different calendar day (the recipient's lands when they accept),
+ * so the single shared occurrence can't be keyed by date.
+ */
+export const ONE_TIME_OCCURRENCE = 'once';
+
 export function repeatLabelFor(params: BuddyCreateParams): string {
+  if (isOneTimeParams(params)) return 'once';
   if (params.repeatRule) return 'custom';
   if (params.repeat === 'monthly') return 'monthly';
   const days = params.days ?? [];
@@ -61,6 +69,14 @@ export function buildAcceptBody(
     repeatEndDate: params.repeatEndDate,
   };
 
+  if (isOneTimeParams(params)) {
+    const wanted = params.dates?.[0];
+    return {
+      ...base,
+      repeat: 'this-week',
+      dates: [wanted && wanted > today ? wanted : today],
+    };
+  }
   if (params.repeatRule) {
     const anchor = params.dates?.[0] || today;
     return { ...base, repeat: 'this-week', repeatRule: params.repeatRule, dates: [anchor] };
@@ -77,6 +93,7 @@ export function buildAcceptBody(
 export type ExistingBuddyTask = {
   id: string;
   text: string;
+  type?: string;
   bondId?: string;
   repeatMode?: string;
   repeatGroupId?: string;
@@ -93,6 +110,12 @@ export function paramsFromTask(
   siblings: ExistingBuddyTask[],
 ): BuddyCreateParams {
   const base = { text: task.text, repeatEndDate: task.repeatEndDate };
+  if (task.type !== 'weekly' && (!task.repeatMode || task.repeatMode === 'none'))
+    return {
+      ...base,
+      repeat: 'this-week',
+      dates: task.date ? [task.date] : [],
+    };
   if (task.repeatRule)
     return {
       ...base,
@@ -132,6 +155,16 @@ export function isRepeatingParams(params: BuddyCreateParams): boolean {
   return false;
 }
 
+/** A shared task that happens on a single day instead of on a schedule. */
+export function isOneTimeParams(params: BuddyCreateParams): boolean {
+  return !isRepeatingParams(params) && !!params.dates?.[0];
+}
+
+/** Can these params become a bond at all — either a repeat or a single day? */
+export function isShareableParams(params: BuddyCreateParams): boolean {
+  return isRepeatingParams(params) || isOneTimeParams(params);
+}
+
 /** Convert a setRepeat payload (from the repeat picker) into bond createParams. */
 export function createParamsFromSetRepeat(
   setRepeat: any,
@@ -140,6 +173,8 @@ export function createParamsFromSetRepeat(
 ): BuddyCreateParams {
   const mode = setRepeat?.mode ?? (setRepeat?.weekly ? 'weekly' : 'none');
   const repeatEndDate = setRepeat?.endDate;
+  if (mode === 'none')
+    return { text, repeat: 'this-week', dates: date ? [date] : [] };
   if (mode === 'monthly')
     return { text, repeat: 'monthly', dates: date ? [date] : undefined, repeatEndDate };
   if (mode === 'custom')

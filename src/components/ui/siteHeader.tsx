@@ -228,15 +228,9 @@ export default function SiteHeader() {
                   <button onClick={item.onClick} className={buttonClass}>
                     <Icon name={item.iconName} label={item.label} className="w-8 h-8" />
                     <span className="hidden xl:inline">{item.label}</span>
-                    {/* New items outrank spares: unseen loot is the thing you
-                        can only act on here, trading keeps until tomorrow. */}
                     {inventoryBadge > 0 ? (
                       <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white shadow-sm ml-1">
                         {inventoryBadge > 9 ? '9+' : inventoryBadge}
-                      </span>
-                    ) : tradeSparesReady ? (
-                      <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white shadow-sm ml-1">
-                        {readyTrades > 9 ? '9+' : readyTrades}
                       </span>
                     ) : null}
                   </button>

@@ -17,6 +17,7 @@ import {
   settleFlyGrant,
 } from '@/lib/economy/ledger';
 import { creditDuoWeek } from '@/lib/economy/socialRewards';
+import { ONE_TIME_OCCURRENCE, isOneTimeParams } from '@/lib/buddy/bond';
 
 function dowYMD(ymd: string): number {
   const [y, m, d] = ymd.split('-').map(Number);
@@ -57,6 +58,8 @@ export function computeStreak(
   today: string,
   both: Set<string>,
 ): { count: number; lastDate: string | null } {
+  // A one-time goal has a single occurrence — there is no streak to keep.
+  if (isOneTimeParams(params)) return { count: 0, lastDate: null };
   const start = activeSince ?? today;
   if (start > today) return { count: 0, lastDate: null };
 
@@ -181,17 +184,23 @@ export async function handleBuddyCompletion(opts: {
   const isFrom = bond.fromUserId === userId;
   const partnerId = isFrom ? bond.toUserId : bond.fromUserId;
 
+  // A one-time goal's two copies can sit on different days, so both sides book
+  // the single shared occurrence under one key instead of their own date.
+  const occurrence = isOneTimeParams(bond.createParams)
+    ? ONE_TIME_OCCURRENCE
+    : date;
+
   const mine = new Set(isFrom ? bond.completedFrom : bond.completedTo);
-  if (completed) mine.add(date);
-  else mine.delete(date);
+  if (completed) mine.add(occurrence);
+  else mine.delete(occurrence);
   const mineList = Array.from(mine);
   if (isFrom) bond.completedFrom = mineList;
   else bond.completedTo = mineList;
 
   const fromSet = new Set(bond.completedFrom);
   const toSet = new Set(bond.completedTo);
-  const bothNow = fromSet.has(date) && toSet.has(date);
-  const alreadyBonused = bond.bonusAwardedDates.includes(date);
+  const bothNow = fromSet.has(occurrence) && toSet.has(occurrence);
+  const alreadyBonused = bond.bonusAwardedDates.includes(occurrence);
 
   const loadBondTaskTags = () =>
     Promise.all([
@@ -212,21 +221,21 @@ export async function handleBuddyCompletion(opts: {
       settleBuddyBonus({
         userId,
         bondId,
-        date,
+        date: occurrence,
         today: bonusToday,
         amount: config.buddy.bonusFlies,
       }),
       settleBuddyBonus({
         userId: partnerId,
         bondId,
-        date,
+        date: occurrence,
         today: bonusToday,
         amount: config.buddy.bonusFlies,
       }),
       bumpQuestMetric({ userId, metric: 'buddy_task_completed', timezone: tz, tagIds: myTask?.tags ?? [] }),
       bumpQuestMetric({ userId: partnerId, metric: 'buddy_task_completed', timezone: tz, tagIds: partnerTask?.tags ?? [] }),
     ]);
-    bond.bonusAwardedDates = [...bond.bonusAwardedDates, date];
+    bond.bonusAwardedDates = [...bond.bonusAwardedDates, occurrence];
     await Promise.all([
       creditDuoWeek({ userId, bondId, dayKey: bonusToday }),
       creditDuoWeek({ userId: partnerId, bondId, dayKey: bonusToday }),
@@ -236,18 +245,26 @@ export async function handleBuddyCompletion(opts: {
   } else if (!bothNow && alreadyBonused) {
     const [myTask, partnerTask] = await loadBondTaskTags();
     await Promise.all([
-      settleBuddyBonus({ userId, bondId, date, today: bonusToday, amount: 0 }),
+      settleBuddyBonus({
+        userId,
+        bondId,
+        date: occurrence,
+        today: bonusToday,
+        amount: 0,
+      }),
       settleBuddyBonus({
         userId: partnerId,
         bondId,
-        date,
+        date: occurrence,
         today: bonusToday,
         amount: 0,
       }),
       bumpQuestMetric({ userId, metric: 'buddy_task_completed', amount: -1, timezone: tz, tagIds: myTask?.tags ?? [] }),
       bumpQuestMetric({ userId: partnerId, metric: 'buddy_task_completed', amount: -1, timezone: tz, tagIds: partnerTask?.tags ?? [] }),
     ]);
-    bond.bonusAwardedDates = bond.bonusAwardedDates.filter((d) => d !== date);
+    bond.bonusAwardedDates = bond.bonusAwardedDates.filter(
+      (d) => d !== occurrence,
+    );
   }
 
   const both = new Set(Array.from(fromSet).filter((d) => toSet.has(d)));

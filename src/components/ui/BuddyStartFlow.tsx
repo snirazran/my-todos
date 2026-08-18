@@ -15,6 +15,8 @@ import {
   type BuddyGiftOption,
 } from '@/components/ui/buddy/BuddyGoalSheet';
 import { BaseSheet } from '@/components/ui/BaseSheet';
+import { toBuddyCreateParams } from '@/lib/buddy/presets';
+import { todayYmd } from '@/components/board/helpers';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
 import type { FriendSummary } from '@/lib/friends/indices';
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
@@ -162,7 +164,7 @@ function ChooseSheet({
               Who are you doing it with?
             </h2>
             <p className="relative mt-1 text-sm font-medium text-muted-foreground">
-              Next you&apos;ll pick the goal you both repeat.
+              Next you&apos;ll pick what you&apos;ll both do.
             </p>
           </div>
 
@@ -277,6 +279,7 @@ function BuddyInviteFlow({
     trackAnalyticsEvent('buddy_goal_composed', {
       source,
       method: 'invite_link',
+      repeat_choice: draft.choice,
       day_count: draft.days.length,
     });
     try {
@@ -285,7 +288,12 @@ function BuddyInviteFlow({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           giftOptionId: draft.giftOptionId,
-          buddyTask: { text: draft.text, repeat: 'weekly', days: draft.days },
+          buddyTask: toBuddyCreateParams(
+            draft.text,
+            draft.choice,
+            draft.days,
+            todayYmd(),
+          ),
         }),
       });
       const data = await res.json();

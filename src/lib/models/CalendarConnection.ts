@@ -1,7 +1,14 @@
 import mongoose, { Schema, type Model } from 'mongoose';
 import type { CalendarProvider, ConnectionSettings } from '@/lib/calendar/types';
 
-export type CalendarConnectionStatus = 'active' | 'error' | 'reauth_required';
+export type CalendarConnectionStatus =
+  | 'active'
+  | 'error'
+  | 'paused'
+  | 'reauth_required'
+  | 'disconnected';
+
+export type CalendarSyncErrorKind = 'auth' | 'gone' | 'rateLimit' | 'transient';
 
 export interface CalendarConnectionDoc {
   _id?: mongoose.Types.ObjectId;
@@ -9,6 +16,13 @@ export interface CalendarConnectionDoc {
   provider: CalendarProvider;
   status: CalendarConnectionStatus;
   errorMessage?: string;
+  consecutiveFailures?: number;
+  firstFailureAt?: Date;
+  lastFailureAt?: Date;
+  lastErrorKind?: CalendarSyncErrorKind;
+  lastSuccessAt?: Date;
+  pausedAt?: Date;
+  pausedReason?: string;
   encRefreshToken?: string;
   encAppPassword?: string;
   appleId?: string;
@@ -37,10 +51,20 @@ const CalendarConnectionSchema = new Schema<CalendarConnectionDoc>(
     provider: { type: String, enum: ['google', 'apple'], required: true },
     status: {
       type: String,
-      enum: ['active', 'error', 'reauth_required'],
+      enum: ['active', 'error', 'paused', 'reauth_required', 'disconnected'],
       default: 'active',
     },
     errorMessage: { type: String },
+    consecutiveFailures: { type: Number, default: 0 },
+    firstFailureAt: { type: Date },
+    lastFailureAt: { type: Date },
+    lastErrorKind: {
+      type: String,
+      enum: ['auth', 'gone', 'rateLimit', 'transient'],
+    },
+    lastSuccessAt: { type: Date },
+    pausedAt: { type: Date },
+    pausedReason: { type: String },
     encRefreshToken: { type: String },
     encAppPassword: { type: String },
     appleId: { type: String },
@@ -73,6 +97,7 @@ const CalendarConnectionSchema = new Schema<CalendarConnectionDoc>(
 CalendarConnectionSchema.index({ userId: 1, provider: 1 }, { unique: true });
 CalendarConnectionSchema.index({ nextPollAt: 1, status: 1 });
 CalendarConnectionSchema.index({ channelId: 1 });
+CalendarConnectionSchema.index({ status: 1, firstFailureAt: 1 });
 
 if (process.env.NODE_ENV === 'development') {
   delete mongoose.models.CalendarConnection;

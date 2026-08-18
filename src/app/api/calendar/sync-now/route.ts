@@ -5,6 +5,7 @@ import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import CalendarConnectionModel from '@/lib/models/CalendarConnection';
 import { runOutboundSweep } from '@/lib/calendar/engine';
+import { runGuardedSync, SYNCABLE_STATUSES } from '@/lib/calendar/health';
 import { getAdapters } from '@/lib/calendar/adapters';
 import { notifyTaskChanged } from '@/lib/taskSync';
 
@@ -17,7 +18,10 @@ export async function POST() {
   }
 
   await connectMongo();
-  const conns = await CalendarConnectionModel.find({ userId: uid, status: 'active' });
+  const conns = await CalendarConnectionModel.find({
+    userId: uid,
+    status: { $in: [...SYNCABLE_STATUSES, 'paused'] },
+  });
   if (conns.length === 0) {
     return NextResponse.json({ error: 'no connections' }, { status: 404 });
   }
@@ -26,13 +30,15 @@ export async function POST() {
   const results: Record<string, string> = {};
   for (const conn of conns) {
     try {
-      if (conn.provider === 'google') {
-        const { googleInbound } = await import('@/lib/calendar/google/sync');
-        appChanged = (await googleInbound(conn)) || appChanged;
-      } else {
-        const { appleInbound } = await import('@/lib/calendar/apple/sync');
-        appChanged = (await appleInbound(conn, { force: true })) || appChanged;
-      }
+      appChanged =
+        (await runGuardedSync(conn, 'manual sync', async () => {
+          if (conn.provider === 'google') {
+            const { googleInbound } = await import('@/lib/calendar/google/sync');
+            return googleInbound(conn);
+          }
+          const { appleInbound } = await import('@/lib/calendar/apple/sync');
+          return appleInbound(conn, { force: true });
+        })) || appChanged;
       results[conn.provider] = 'ok';
     } catch (err) {
       results[conn.provider] = (err as Error)?.message ?? 'error';

@@ -71,6 +71,7 @@ function AddDetailButton({
 export interface TaskDetailTask {
   id: string;
   text: string;
+  type?: string;
   tags?: string[];
   notes?: string;
   checklist?: ChecklistItem[];
@@ -330,6 +331,8 @@ export default function TaskDetailSheet({
       ? `${repeatBaseLabel} · until ${formatEndDateLabel(displayTask.repeatEndDate)}`
       : repeatBaseLabel;
   const isRepeating = repeatMode !== 'none' || isWeekly;
+  // A saved (backlog) task has no day yet, so there is no occurrence to share.
+  const canShareWithBuddy = displayTask.type !== 'backlog';
   const streak = displayTask.streak ?? 0;
 
   const taskTags = displayTask.tags ?? [];
@@ -734,7 +737,7 @@ export default function TaskDetailSheet({
                     )}
 
                     {/* Goal buddy */}
-                    {!keyboardActive && isRepeating && !buddy && (
+                    {!keyboardActive && canShareWithBuddy && !buddy && (
                       <button
                         type="button"
                         onClick={() => setShowBuddyInvite(true)}

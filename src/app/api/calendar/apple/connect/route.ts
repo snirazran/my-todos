@@ -47,11 +47,21 @@ export async function POST(req: NextRequest) {
       {
         $set: {
           status: 'active',
+          consecutiveFailures: 0,
           appleId,
           encAppPassword: encryptSecret(appPassword),
           settings: { exportEnabled: true, importEnabled: true },
         },
-        $unset: { errorMessage: 1, appCalendarUrl: 1, calendarCtags: 1 },
+        $unset: {
+          errorMessage: 1,
+          appCalendarUrl: 1,
+          calendarCtags: 1,
+          firstFailureAt: 1,
+          lastFailureAt: 1,
+          lastErrorKind: 1,
+          pausedAt: 1,
+          pausedReason: 1,
+        },
       },
       { upsert: true },
     );
