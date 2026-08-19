@@ -75,12 +75,6 @@ export function InviteFriendsModal({
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
-  useEffect(() => {
-    const img = new Image();
-    img.src = '/invitefrog.webp';
-    img.decode?.().catch(() => {});
-  }, []);
-
   const { data: config } = useSWR<InviteConfig>(
     open ? '/api/invite/config' : null,
     fetcher,

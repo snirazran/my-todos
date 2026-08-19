@@ -662,8 +662,10 @@ const sheetTransition = {
   ease: [0.32, 0.72, 0, 1] as [number, number, number, number],
 };
 
-const projectMomentum = (velocity: number, decelerationRate = 0.998) =>
-  ((velocity / 1000) * decelerationRate) / (1 - decelerationRate);
+const SWIPE_PROJECTION = 0.15;
+const SWIPE_MIN_DISTANCE = 48;
+const SWIPE_DISMISS_RATIO = 0.35;
+const SWIPE_FLING_VELOCITY = 800;
 
 const settleSpring = (velocity: number) =>
   ({
@@ -697,8 +699,10 @@ const swipeDragProps = {
 } as const;
 
 const shouldDismissSwipe = (offsetX: number, velocityX: number) => {
+  if (offsetX < SWIPE_MIN_DISTANCE) return false;
   const width = typeof window !== 'undefined' ? window.innerWidth : 390;
-  return offsetX + projectMomentum(velocityX) > width * 0.35;
+  const projected = offsetX + velocityX * SWIPE_PROJECTION;
+  return projected > width * SWIPE_DISMISS_RATIO || velocityX > SWIPE_FLING_VELOCITY;
 };
 
 function MobileSheet({

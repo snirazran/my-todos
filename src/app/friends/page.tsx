@@ -31,6 +31,7 @@ import {
   FriendsLeaderboardSkeleton,
 } from '@/components/ui/Skeleton';
 import { AddFriendsSheet } from '@/components/ui/AddFriendsSheet';
+import { useIdleImageWarmup } from '@/lib/imageWarmup';
 import { InviteFriendsModal } from '@/components/ui/InviteFriendsModal';
 import { FriendRequestsInbox } from '@/components/ui/FriendRequestsInbox';
 import { FriendSuggestionsRow } from '@/components/ui/FriendSuggestionsRow';
@@ -63,6 +64,8 @@ import type { ItemDef } from '@/lib/skins/catalog';
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 type LeaderboardEntry = FriendSummary & { isYou?: boolean };
+
+const FRIENDS_SHEET_ART = ['/friend-share.webp'] as const;
 
 export default function FriendsPage() {
   const router = useRouter();
@@ -105,6 +108,7 @@ export default function FriendsPage() {
   );
 
   const [addOpen, setAddOpen] = useState(false);
+  useIdleImageWarmup(FRIENDS_SHEET_ART);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inboxOpen, setInboxOpen] = useState(false);
   const [claiming, setClaiming] = useState(false);

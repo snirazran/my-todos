@@ -12,6 +12,7 @@ import { RiveIdlePause } from '@/components/ui/RiveIdlePause';
 import { AuthContext } from '@/components/auth/AuthContext';
 import { GlobalPageBackground } from '@/components/ui/GlobalPageBackground';
 import { RiveWarmup } from '@/components/providers/RiveWarmup';
+import { ImageWarmup } from '@/components/providers/ImageWarmup';
 import { CampaignHost } from '@/components/campaigns/CampaignHost';
 import { PremiumModalHost } from '@/components/providers/PremiumModalHost';
 import { RIVE_WASM_VERSION } from '@/lib/riveWasmVersion';
@@ -169,6 +170,7 @@ export default function RootLayout({
               <SheetRivePause />
               <RiveIdlePause />
               <RiveWarmup />
+              <ImageWarmup />
               <CampaignHost />
               <PremiumModalHost />
             </div>

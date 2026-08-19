@@ -53,6 +53,15 @@ const nextConfig = {
           },
         ],
       },
+      {
+        source: '/:file*.:ext(webp|png|jpg|jpeg|svg|avif)',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=3600, stale-while-revalidate=604800',
+          },
+        ],
+      },
     ];
   },
   async rewrites() {
