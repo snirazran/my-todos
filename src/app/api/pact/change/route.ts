@@ -6,6 +6,7 @@ import connectMongo from '@/lib/mongoose';
 import PactModel from '@/lib/models/Pact';
 import UserModel from '@/lib/models/User';
 import { dropPact } from '@/lib/pact/drop';
+import { releasePactTasks } from '@/lib/pact/commit';
 import { getPactView, newPactId, weekKeyFor } from '@/lib/pact/engine';
 import { notifyTaskChanged } from '@/lib/taskSync';
 import { getZonedToday } from '@/lib/utils';
@@ -33,6 +34,12 @@ export async function POST(req: NextRequest) {
     );
 
     if (action === 'skip') {
+      const live = await PactModel.findOne({ userId, weekKey });
+      if (live && live.status !== 'skipped') {
+        await releasePactTasks({ userId, pact: live });
+        live.taskIds = [];
+        await live.save();
+      }
       await PactModel.updateOne(
         { userId, weekKey },
         {
@@ -56,6 +63,7 @@ export async function POST(req: NextRequest) {
         name: 'pact_skipped',
         properties: { week_key: weekKey },
       });
+      await notifyTaskChanged(userId);
       const view = await getPactView({ userId, timezone });
       return NextResponse.json({ ok: true, view });
     }

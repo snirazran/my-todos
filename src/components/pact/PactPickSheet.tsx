@@ -37,7 +37,9 @@ type Step = 'intro' | 'area' | 'commitment' | 'confirm' | 'done';
 // menu a set of pre-priced packages and quietly anchored how much the reader
 // thought they should take on.
 function repeatLabel(option: PactOption) {
-  return `Worked before · ${option.scheduleLabel}`;
+  return option.continuePactId
+    ? `Keep going · ${option.scheduleLabel}`
+    : `Worked before · ${option.scheduleLabel}`;
 }
 
 /**
@@ -116,6 +118,7 @@ export function PactPickSheet({
   const [options, setOptions] = useState<PactOption[] | null>(null);
   const [optionId, setOptionId] = useState<string | null>(null);
   const [customText, setCustomText] = useState('');
+  const [continueText, setContinueText] = useState('');
   const [days, setDays] = useState<number[]>(() => fitDays([1, 3, 5]));
   const [startTime, setStartTime] = useState('19:00');
   const [writingOwn, setWritingOwn] = useState(false);
@@ -130,6 +133,7 @@ export function PactPickSheet({
     scheduleLabel: string;
     rewardFlies: number;
     taskCount: number;
+    continued: boolean;
   } | null>(null);
 
   // Opening the sheet resets it — nothing else may. Committing hands the
@@ -147,6 +151,7 @@ export function PactPickSheet({
     setOptionId(null);
     setWritingOwn(false);
     setCustomText('');
+    setContinueText('');
     setTagId(null);
     setPickingTag(false);
     setError(null);
@@ -161,6 +166,9 @@ export function PactPickSheet({
     () => options?.find((entry) => entry.id === optionId) ?? null,
     [options, optionId],
   );
+  // Last week's tasks are still on the board, so this commitment edits them in
+  // place — same rows, same calendar event — instead of adding a second set.
+  const continuing = !writingOwn && !!option?.continuePactId;
 
   const chooseArea = async (categoryId: string) => {
     setAreaId(categoryId);
@@ -196,7 +204,11 @@ export function PactPickSheet({
 
   const commit = async () => {
     if (!area) return;
-    const text = writingOwn ? customText.trim() : (option?.text ?? '');
+    const text = writingOwn
+      ? customText.trim()
+      : continuing
+        ? continueText.trim()
+        : (option?.text ?? '');
     if (!text) {
       setError('Say what you’ll do');
       return;
@@ -217,6 +229,7 @@ export function PactPickSheet({
           dayTimes: perDayTimes ? dayTimes : undefined,
           tagId: tagId ?? undefined,
           suggestionId: writingOwn ? undefined : option?.id,
+          continueFromPactId: continuing ? option?.continuePactId : undefined,
           source: writingOwn ? 'custom' : option?.source,
         }),
       });
@@ -226,6 +239,7 @@ export function PactPickSheet({
         scheduleLabel: payload.scheduleLabel,
         rewardFlies: payload.rewardFlies,
         taskCount: payload.taskCount,
+        continued: !!payload.continued,
       });
       setStep('done');
       onCommitted(payload.view);
@@ -245,7 +259,11 @@ export function PactPickSheet({
     );
   };
 
-  const previewText = writingOwn ? customText.trim() : (option?.text ?? '');
+  const previewText = writingOwn
+    ? customText.trim()
+    : continuing
+      ? continueText.trim()
+      : (option?.text ?? '');
   const visibleOptions = (options ?? []).slice(0, PRIMARY_OPTIONS);
   const hasFooter = step === 'commitment' || step === 'confirm';
   // Sessions are the only thing that moves the number, and every one of them
@@ -482,6 +500,7 @@ export function PactPickSheet({
                           onClick={() => {
                             setWritingOwn(false);
                             setOptionId(entry.id);
+                            setContinueText(entry.text);
                             // Only a repeat carries a schedule, and it is the
                             // user's own from a week that worked. Everything
                             // else starts blank so the days are chosen, not
@@ -636,9 +655,27 @@ export function PactPickSheet({
                     </span>
                   </div>
                   <div className="px-4 py-3">
-                    <p className="text-[17px] font-black leading-snug text-foreground">
-                      {previewText}
-                    </p>
+                    {continuing ? (
+                      <>
+                        <input
+                          value={continueText}
+                          onChange={(event) =>
+                            setContinueText(event.target.value)
+                          }
+                          maxLength={80}
+                          aria-label="What you’ll do"
+                          className="h-9 w-full rounded-lg border border-border/60 bg-background px-2 text-[16px] font-black leading-snug text-foreground outline-none focus:border-primary"
+                        />
+                        <p className="mt-1.5 text-[12px] font-semibold text-muted-foreground">
+                          This edits last week&rsquo;s task instead of adding a
+                          new one.
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-[17px] font-black leading-snug text-foreground">
+                        {previewText}
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -850,9 +887,11 @@ export function PactPickSheet({
                     Your Leap is set
                   </h2>
                   <p className="mx-auto max-w-[32ch] text-[14px] font-semibold leading-snug text-muted-foreground">
-                    {result
-                      ? `${result.taskCount} task${result.taskCount === 1 ? '' : 's'} added — ${result.scheduleLabel}. We'll remind you each time.`
-                      : "Your tasks are on your list. We'll remind you each time."}
+                    {!result
+                      ? "Your tasks are on your list. We'll remind you each time."
+                      : result.continued
+                        ? `Last week's task carries on — ${result.scheduleLabel}. We'll remind you each time.`
+                        : `${result.taskCount} task${result.taskCount === 1 ? '' : 's'} added — ${result.scheduleLabel}. We'll remind you each time.`}
                   </p>
                 </div>
                 <button

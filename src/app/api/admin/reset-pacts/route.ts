@@ -4,6 +4,7 @@ import connectMongo from '@/lib/mongoose';
 import PactModel, { type PactDoc } from '@/lib/models/Pact';
 import UserModel from '@/lib/models/User';
 import { releasePactTasks } from '@/lib/pact/commit';
+import { notifyTaskChanged } from '@/lib/taskSync';
 
 /**
  * Puts the weekly leap back to never-committed: every pact doc, the tasks any
@@ -27,6 +28,8 @@ export async function POST() {
       PactModel.deleteMany({ userId }),
       UserModel.updateOne({ _id: userId }, { $unset: { 'quests.pactStreak': 1 } }),
     ]);
+
+    await notifyTaskChanged(userId);
 
     return NextResponse.json({
       ok: true,

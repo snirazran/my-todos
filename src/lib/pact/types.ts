@@ -153,6 +153,12 @@ export type PactOption = {
   rewardFlies: number;
   scheduleLabel: string;
   source: 'library' | 'generated' | 'repeat';
+  /**
+   * The settled pact this row repeats, when its tasks are still on the board.
+   * Committing with it carries those same tasks into the new week — the board
+   * row and its calendar event are edited, not replaced.
+   */
+  continuePactId?: string;
 };
 
 export type PactAreaChoice = {

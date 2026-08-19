@@ -95,9 +95,10 @@ export async function getUserTz(userId: string): Promise<string> {
 }
 
 function linkKeyFilter(link: CalendarEventLinkDoc) {
-  return link.repeatGroupId
+  const key = link.repeatGroupId
     ? { repeatGroupId: link.repeatGroupId }
     : { id: link.taskId };
+  return { ...key, deletedAt: { $exists: false } };
 }
 
 async function loadUnitForLink(

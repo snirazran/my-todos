@@ -464,6 +464,8 @@ export function buildOptionsForArea(args: {
   areaName: string;
   weekKey: string;
   lastPact?: PactDoc | null;
+  /** `lastPact`'s tasks are still on the board, so they can be carried forward. */
+  lastPactContinuable?: boolean;
   streakMultiplier?: number;
 }): PactOption[] {
   const { config, categoryId, areaName, weekKey, lastPact } = args;
@@ -491,7 +493,10 @@ export function buildOptionsForArea(args: {
 
   const options = chosen.map((entry) => suggestionToOption(entry));
 
-  if (lastPact && lastPact.status === 'kept') {
+  // A week that ended, kept or missed. A missed one is the case where carrying
+  // the same commitment forward matters most — the schedule is already the
+  // user's own answer, and re-typing it is the friction that ends the area.
+  if (lastPact && lastPact.settledAt && lastPact.status !== 'skipped') {
     // The one option that keeps its schedule: these days and this time are the
     // user's own answer from a week that worked, not an authored guess.
     const repeat: PactOption = {
@@ -504,6 +509,7 @@ export function buildOptionsForArea(args: {
       rewardFlies: optionRewardFlies(config, lastPact.days, streakMultiplier),
       scheduleLabel: scheduleLabel(lastPact.days, lastPact.startTime),
       source: 'repeat',
+      continuePactId: args.lastPactContinuable ? lastPact.pactId : undefined,
     };
     const deduped = options.filter((o) => o.text !== repeat.text);
     return [repeat, ...deduped].slice(0, MAX_OPTIONS);
@@ -1436,8 +1442,23 @@ export async function getAreaOptions(args: {
   const [user, categories, lastPact] = await Promise.all([
     UserModel.findById(userId).select('quests').lean<UserDoc | null>(),
     loadCategories(),
-    PactModel.findOne({ userId, categoryId }).sort({ weekKey: -1 }).lean<PactDoc>(),
+    PactModel.findOne({
+      userId,
+      categoryId,
+      settledAt: { $ne: null },
+      status: { $ne: 'skipped' },
+    })
+      .sort({ weekKey: -1 })
+      .lean<PactDoc>(),
   ]);
+  const lastPactContinuable = !!lastPact?.taskIds?.length
+    ? !!(await TaskModel.exists({
+        userId,
+        id: { $in: lastPact.taskIds },
+        type: 'weekly',
+        deletedAt: { $exists: false },
+      }))
+    : false;
   const category = categories.find((c) => c.categoryId === categoryId);
   const weekStartsOn = normalizeWeekStart((user as any)?.weekStartsOn);
   return buildOptionsForArea({
@@ -1446,6 +1467,7 @@ export async function getAreaOptions(args: {
     areaName: category?.shortLabel || category?.name || 'this area',
     weekKey: weekKeyFor(getZonedToday(timezone), weekStartsOn),
     lastPact,
+    lastPactContinuable,
     streakMultiplier: pactMultiplier(
       config,
       normalizePactStreak(user).weeks + 1,

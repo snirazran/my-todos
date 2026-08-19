@@ -175,12 +175,6 @@ export function PublicHomepage() {
                 <ArrowRight className="h-4 w-4" aria-hidden />
               </Link>
               <Link
-                href="/try"
-                className={`hidden min-h-12 items-center justify-center rounded-2xl px-6 py-3 text-sm font-black sm:inline-flex ${glassButtonClass}`}
-              >
-                Try the frog catch
-              </Link>
-              <Link
                 href="/get-app"
                 className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl px-6 py-3 text-sm font-black sm:hidden ${glassButtonClass}`}
               >

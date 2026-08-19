@@ -44,6 +44,10 @@ export async function POST(req: NextRequest) {
         typeof body.suggestionId === 'string' && !body.suggestionId.startsWith('repeat-')
           ? body.suggestionId
           : undefined,
+      continueFromPactId:
+        typeof body.continueFromPactId === 'string' && body.continueFromPactId
+          ? body.continueFromPactId
+          : undefined,
       source:
         body.source === 'custom' ||
         body.source === 'repeat' ||
@@ -62,6 +66,7 @@ export async function POST(req: NextRequest) {
         days: result.pact.days.length,
         source: result.pact.source,
         has_time: !!result.pact.startTime,
+        continued: result.continued,
       },
     });
 
@@ -71,6 +76,7 @@ export async function POST(req: NextRequest) {
       scheduleLabel: result.scheduleLabel,
       rewardFlies: result.rewardFlies,
       taskCount: result.taskIds.length,
+      continued: result.continued,
       view,
     });
   } catch (error) {

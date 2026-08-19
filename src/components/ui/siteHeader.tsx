@@ -410,6 +410,7 @@ import {
   HelpCircle,
   AlertTriangle,
   ChevronLeft,
+  ArrowRight,
   ShieldAlert,
   Vibrate,
   Volume2,
@@ -659,6 +660,45 @@ const userInfoFetcher = bootstrapFetcher;
 const sheetTransition = {
   duration: 0.3,
   ease: [0.32, 0.72, 0, 1] as [number, number, number, number],
+};
+
+const projectMomentum = (velocity: number, decelerationRate = 0.998) =>
+  ((velocity / 1000) * decelerationRate) / (1 - decelerationRate);
+
+const settleSpring = (velocity: number) =>
+  ({
+    type: 'spring',
+    stiffness: 520,
+    damping: 46,
+    mass: 1,
+    velocity,
+    restDelta: 0.5,
+    restSpeed: 10,
+  }) as const;
+
+const dismissSpring = (velocity: number) =>
+  ({
+    type: 'spring',
+    stiffness: 420,
+    damping: 44,
+    mass: 1,
+    velocity,
+    restDelta: 1,
+    restSpeed: 20,
+  }) as const;
+
+const swipeDragProps = {
+  dragDirectionLock: true,
+  dragConstraints: { left: 0, right: 0 },
+  dragElastic: { left: 0, right: 1 },
+  dragMomentum: false,
+  dragTransition: { bounceStiffness: 520, bounceDamping: 46 },
+  style: { touchAction: 'pan-y' as const },
+} as const;
+
+const shouldDismissSwipe = (offsetX: number, velocityX: number) => {
+  const width = typeof window !== 'undefined' ? window.innerWidth : 390;
+  return offsetX + projectMomentum(velocityX) > width * 0.35;
 };
 
 function MobileSheet({
@@ -1199,26 +1239,26 @@ function MobileSheet({
           exit={{ x: '100%' }}
           transition={sheetTransition}
           drag={isMobile && view === 'main' ? 'x' : false}
-          dragDirectionLock
-          dragConstraints={{ left: 0, right: 0 }}
-          dragElastic={{ left: 0, right: 0.9 }}
-          dragMomentum={false}
-          dragTransition={{ bounceStiffness: 400, bounceDamping: 40 }}
+          {...swipeDragProps}
           onDragEnd={(_e, info) => {
-            if (info.offset.x > 90 || info.velocity.x > 500) {
+            if (shouldDismissSwipe(info.offset.x, info.velocity.x)) {
               sheetControls
-                .start({ x: '100%', transition: sheetTransition })
+                .start({
+                  x: window.innerWidth,
+                  transition: dismissSpring(info.velocity.x),
+                })
                 .then(onClose);
+            } else {
+              sheetControls.start({ x: 0, transition: settleSpring(info.velocity.x) });
             }
           }}
-          style={{ touchAction: 'pan-y' }}
           className="fixed z-[1340] inset-0 h-[100dvh] w-full overflow-hidden bg-slate-100 dark:bg-background will-change-transform"
         >
         <div className="absolute inset-0 overflow-y-auto">
         <div className="w-full">
           {/* Top bar */}
           <div
-            className="sticky top-0 z-10 bg-slate-100/80 backdrop-blur-xl dark:bg-background/80"
+            className="sticky top-0 z-10 bg-slate-100 dark:bg-background"
             style={{ paddingTop: 'env(safe-area-inset-top)' }}
           >
             <div className="px-4 py-3 flex items-center justify-between">
@@ -1227,7 +1267,7 @@ function MobileSheet({
                 className="p-2 -ml-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                 aria-label="Close"
               >
-                <X className="w-6 h-6" />
+                <ArrowRight className="w-6 h-6" />
               </button>
               <div className="w-10 shrink-0" aria-hidden />
             </div>
@@ -1246,29 +1286,29 @@ function MobileSheet({
           exit={{ x: '100%' }}
           transition={sheetTransition}
           drag={isMobile ? 'x' : false}
-          dragDirectionLock
-          dragConstraints={{ left: 0, right: 0 }}
-          dragElastic={{ left: 0, right: 0.9 }}
-          dragMomentum={false}
-          dragTransition={{ bounceStiffness: 400, bounceDamping: 40 }}
+          {...swipeDragProps}
           onDragEnd={(_e, info) => {
-            if (info.offset.x > 90 || info.velocity.x > 500) {
+            if (shouldDismissSwipe(info.offset.x, info.velocity.x)) {
               const target = view === 'contact' ? contactBack : 'main';
               if (target === 'main') {
                 subviewControls
-                  .start({ x: '100%', transition: sheetTransition })
+                  .start({
+                    x: window.innerWidth,
+                    transition: dismissSpring(info.velocity.x),
+                  })
                   .then(() => setView('main'));
               } else {
                 setView(target);
               }
+            } else {
+              subviewControls.start({ x: 0, transition: settleSpring(info.velocity.x) });
             }
           }}
-          style={{ touchAction: 'pan-y' }}
           className="absolute inset-0 z-20 overflow-y-auto bg-slate-100 dark:bg-background will-change-transform"
         >
         <div className="w-full">
           <div
-            className="sticky top-0 z-10 bg-slate-100/80 backdrop-blur-xl dark:bg-background/80"
+            className="sticky top-0 z-10 bg-slate-100 dark:bg-background"
             style={{ paddingTop: 'env(safe-area-inset-top)' }}
           >
             <div className="px-4 py-3 flex items-center justify-between">

@@ -8,6 +8,7 @@ import connectMongo from '@/lib/mongoose';
 import { getZonedToday } from '@/lib/utils';
 import { normalizeWeekStart, weekDatesFor, weekOrder } from '@/lib/weekStart';
 import { normalizeFocusProfile } from '@/lib/quests/engine';
+import { continuePactTasks } from './continueTasks';
 import type { UserDoc } from '@/lib/types/UserDoc';
 import {
   ensurePactConfig,
@@ -31,6 +32,8 @@ export type CommitPactInput = {
   dayTimes?: Record<number, string>;
   tagId?: string;
   suggestionId?: string;
+  /** Settled pact whose tasks this week carries forward rather than replacing. */
+  continueFromPactId?: string;
   source: PactDoc['source'];
 };
 
@@ -40,6 +43,8 @@ export type CommitPactResult = {
   tagId: string;
   scheduleLabel: string;
   rewardFlies: number;
+  /** The week carried last week's tasks forward instead of adding new ones. */
+  continued: boolean;
 };
 
 function sanitizeDays(days: unknown): number[] {
@@ -211,26 +216,42 @@ export async function commitPact(
     byTime.set(at, [...(byTime.get(at) ?? []), day]);
   }
 
-  const { createTasksForUser } = await import('@/app/api/tasks/route');
-  const taskIds: string[] = [];
-  for (const [at, group] of Array.from(byTime.entries())) {
-    const result = await createTasksForUser(
-      userId,
-      {
+  const carriedIds = input.continueFromPactId
+    ? await continuePactTasks({
+        userId,
+        continueFromPactId: input.continueFromPactId,
+        categoryId,
+        weekKey,
+        weekStartsOn,
         text,
-        days: group,
-        tags: [tagId],
-        startTime: at,
-        reminder: 'at_time',
-        repeat: 'weekly',
-        repeatStartDate: weekKey,
-        repeatEndDate: shiftYMD(weekKey, 6),
+        days,
+        timeForDay,
+        tagId,
+      })
+    : null;
+
+  const taskIds: string[] = carriedIds ?? [];
+  if (!carriedIds) {
+    const { createTasksForUser } = await import('@/app/api/tasks/route');
+    for (const [at, group] of Array.from(byTime.entries())) {
+      const result = await createTasksForUser(
+        userId,
+        {
+          text,
+          days: group,
+          tags: [tagId],
+          startTime: at,
+          reminder: 'at_time',
+          repeat: 'weekly',
+          repeatStartDate: weekKey,
+          repeatEndDate: shiftYMD(weekKey, 6),
+          timezone,
+        },
         timezone,
-      },
-      timezone,
-    );
-    if (!result.ok) throw new Error(result.error || 'Could not add the tasks');
-    taskIds.push(...(result.ids ?? []));
+      );
+      if (!result.ok) throw new Error(result.error || 'Could not add the tasks');
+      taskIds.push(...(result.ids ?? []));
+    }
   }
 
   if (existing) await PactModel.deleteOne({ _id: existing._id });
@@ -275,6 +296,7 @@ export async function commitPact(
     tagId,
     scheduleLabel: scheduleLabel(days, startTime),
     rewardFlies: optionRewardFlies(config, days),
+    continued: !!carriedIds,
   };
 }
 
