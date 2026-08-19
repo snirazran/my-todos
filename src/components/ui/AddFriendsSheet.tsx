@@ -138,7 +138,7 @@ export function AddFriendsSheet({
                 fully legible. */}
             <div className="relative shrink-0">
               <img
-                src="/friend-share.png"
+                src="/friend-share.webp"
                 alt="Frogs passing the flies they catch to each other across a pond"
                 className="h-[24dvh] max-h-[230px] w-full object-cover object-center sm:h-[210px] sm:max-h-none"
               />
