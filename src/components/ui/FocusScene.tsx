@@ -45,6 +45,7 @@ export function FocusScene({
   scrollContainerRef,
   trackMovingTarget = false,
   allowCameraFollow = true,
+  localClock = false,
 }: {
   indices?: Partial<Record<WardrobeSlot, number>>;
   running: boolean;
@@ -68,6 +69,9 @@ export function FocusScene({
   scrollContainerRef?: React.RefObject<HTMLElement | null>;
   trackMovingTarget?: boolean;
   allowCameraFollow?: boolean;
+  /** Decorative scenes with no real focus session behind them — drift on wall
+   *  time so the swarm still moves. */
+  localClock?: boolean;
 }) {
   const frogRef = useRef<FrogHandle | null>(null);
   const frogBoxRef = useRef<HTMLDivElement | null>(null);
@@ -265,6 +269,7 @@ export function FocusScene({
                 drift={drift}
                 running={running}
                 hidden={hidden}
+                localClock={localClock}
                 alwaysPlay
                 entryFromX={entrySideFor(drift)}
                 forceEntry={epoch > 0}

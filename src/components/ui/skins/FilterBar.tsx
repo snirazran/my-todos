@@ -48,6 +48,7 @@ export function FilterBar({
   badgeClassName,
   fallbackBadges,
   fallbackBadgeClassName,
+  centerActiveOnMount = true,
 }: {
   active: string;
   onChange: (s: any) => void;
@@ -56,6 +57,7 @@ export function FilterBar({
   badgeClassName?: string;
   fallbackBadges?: Partial<Record<string, number>>;
   fallbackBadgeClassName?: string;
+  centerActiveOnMount?: boolean;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -141,7 +143,11 @@ export function FilterBar({
   };
 
   // Auto-scroll to active item on load
+  const mountedRef = useRef(false);
   React.useEffect(() => {
+    const firstRun = !mountedRef.current;
+    mountedRef.current = true;
+    if (firstRun && !centerActiveOnMount) return;
     if (scrollRef.current) {
       const activeEl = scrollRef.current.querySelector('[data-active="true"]');
       if (activeEl) {
@@ -152,7 +158,7 @@ export function FilterBar({
         });
       }
     }
-  }, [active]);
+  }, [active, centerActiveOnMount]);
 
   return (
     <div className="relative w-full group">

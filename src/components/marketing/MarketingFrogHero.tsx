@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
-import { Check, EllipsisVertical } from 'lucide-react';
+import { CheckCircle2, EllipsisVertical } from 'lucide-react';
 import Frog, {
   FROG_TONGUE_MOUTH_OFFSET,
   type FrogHandle,
@@ -166,33 +166,30 @@ export function MarketingFrogHero() {
                 >
                   {task.label}
                 </span>
-                <span
-                  ref={(element) => {
-                    flyRefs.current[task.id] = element;
-                  }}
-                  className={`relative grid h-10 w-10 shrink-0 place-items-center rounded-full border-2 ${
-                    done
-                      ? 'border-primary bg-primary text-primary-foreground'
-                      : 'border-muted-foreground/20 bg-muted'
-                  }`}
-                >
-                  {done ? (
-                    <Check className="h-5 w-5 stroke-[3]" aria-hidden />
-                  ) : (
-                    <Fly
-                      size={31}
-                      y={-3}
-                      interactive={false}
-                      className="relative"
+                {done ? (
+                  <span key="done" className="relative grid h-10 w-10 shrink-0 place-items-center">
+                    <CheckCircle2
+                      className="h-9 w-9 text-green-500 drop-shadow-sm"
+                      aria-hidden
                     />
-                  )}
-                </span>
+                  </span>
+                ) : (
+                  <span
+                    key="fly"
+                    ref={(element) => {
+                      flyRefs.current[task.id] = element;
+                    }}
+                    className="relative grid h-10 w-10 shrink-0 place-items-center rounded-full border-2 border-muted-foreground/20 bg-muted"
+                  >
+                    <Fly size={31} y={-3} interactive={false} className="relative" />
+                  </span>
+                )}
               </button>
             );
           })}
         </div>
-        <p className="mt-3 text-center text-[10px] font-bold text-muted-foreground">
-          Complete an unfinished task to watch your frog catch its fly.
+        <p className="mt-3 text-center text-[11px] font-bold text-muted-foreground">
+          Tap a task — watch your frog catch its fly.
         </p>
       </div>
 

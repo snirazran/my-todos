@@ -34,17 +34,15 @@ export function MarketingFocusPreview() {
   }, [running]);
 
   return (
-    <div className="grid items-center gap-10 lg:grid-cols-[0.85fr_1.15fr]">
+    <div className="grid grid-cols-[minmax(0,1fr)] items-center gap-10 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
       <div>
-        <p className="text-xs font-black uppercase tracking-[0.2em] text-primary">Focus with a payoff</p>
-        <h2 className="mt-3 text-balance text-3xl font-black tracking-tight sm:text-5xl">
-          Stay with one task. Watch the rewards add up.
+        <p className="text-xs font-black uppercase tracking-[0.2em] text-[#166534] dark:text-[#8ee0a2]">Focus timer</p>
+        <h2 className="mt-3 text-balance text-3xl font-black tracking-tight sm:text-[2.75rem] sm:leading-[1.05]">
+          Set a timer. Sit with one task.
         </h2>
-        <p className="mt-5 max-w-[65ch] text-pretty text-sm font-medium leading-7 text-muted-foreground sm:text-base">
-          Choose a task, set the time, and give it your full attention. Every
-          fifteen focused minutes earns your frog another fly, and those minutes
-          fill any daily quest asking for them. Your session stays in sync
-          across web and mobile, even if you close the tab.
+        <p className="mt-4 max-w-[46ch] text-pretty text-base font-medium leading-7 text-muted-foreground">
+          Decide how long you want to focus, and the timer counts it down with
+          you. Your frog hunts until it hits zero.
         </p>
         <div className="mt-6 flex flex-wrap items-center gap-2 text-[11px] font-black text-muted-foreground">
           <span className="rounded-full border border-border bg-card px-3 py-2">Pick a task</span>
@@ -95,6 +93,7 @@ export function MarketingFocusPreview() {
               scrollContainerRef={mainScrollRef}
               trackMovingTarget
               allowCameraFollow={false}
+              localClock
             />
           </div>
 
@@ -120,9 +119,6 @@ export function MarketingFocusPreview() {
           </div>
         </div>
 
-        <p className="mx-auto mt-3 max-w-sm text-center text-[11px] font-bold leading-5 text-muted-foreground">
-          1 fly every 15 focused minutes · time saved to this task
-        </p>
       </div>
     </div>
   );

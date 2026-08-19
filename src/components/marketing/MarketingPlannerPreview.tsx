@@ -263,12 +263,9 @@ export function MarketingPlannerPreview() {
 
   return (
     <div className="min-w-0 max-w-full rounded-[30px] border border-white/15 bg-background p-3 text-foreground shadow-2xl shadow-black/30 sm:p-5">
-      <div className="mb-4 flex items-center justify-between gap-3 px-1">
-        <div>
-          <p className="text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground">Weekly planner</p>
-          <p className="mt-0.5 text-base font-black">July 20–26</p>
-        </div>
-        <span className="rounded-full bg-[#4d9850] px-3 py-1.5 text-[9px] font-black text-white">+ Add task</span>
+      <div className="mb-4 px-1">
+        <p className="text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground">Weekly planner</p>
+        <p className="mt-0.5 text-base font-black">July 20–26</p>
       </div>
 
       <p className="mb-2 px-1 text-[9px] font-black text-muted-foreground">
