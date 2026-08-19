@@ -111,7 +111,7 @@ type ClaimableEntry = {
   id: string;
   questId?: string;
   objectiveId?: string;
-  kind: 'objective' | 'season';
+  kind: 'objective' | 'season' | 'sweep';
   placement?: 'daily' | 'onboarding';
   categoryName?: string;
   objectiveLabel?: string;
@@ -120,6 +120,9 @@ type ClaimableEntry = {
   seasonName?: string;
   tier?: number;
   tierCount?: number;
+  sweepTier?: 'standard' | 'golden';
+  sweepMega?: boolean;
+  sweepPendingRolls?: number;
   reward?: any;
   rewards?: any[];
 };
@@ -524,6 +527,33 @@ export async function GET(req: Request) {
           });
         }
       }
+    }
+    if (dailySweep && dailySweep.pendingRolls > 0) {
+      const rollTable =
+        dailySweep.nextTier === 'golden'
+          ? dailySweep.goldenRoll
+          : dailySweep.standardRoll;
+      const sweepRewards = [
+        ...sweepRollRewards(rollTable),
+        ...(dailySweep.nextMega
+          ? sweepRollRewards(
+              dailySweep.megaRewards.map((reward) => ({
+                id: '',
+                chance: 1,
+                reward,
+              })),
+            )
+          : []),
+      ];
+      claimables.push({
+        id: `sweep:${dailySweep.nextRollDayKey ?? 'ready'}`,
+        kind: 'sweep',
+        sweepTier: dailySweep.nextTier,
+        sweepMega: dailySweep.nextMega,
+        sweepPendingRolls: dailySweep.pendingRolls,
+        reward: sweepRewards[0],
+        rewards: sweepRewards.length ? sweepRewards : undefined,
+      });
     }
     const trackables: TrackableEntry[] = [];
     const effortTodayKey = getZonedToday(timezone);

@@ -31,7 +31,7 @@ export type Claimable = {
   id: string;
   questId?: string;
   objectiveId?: string;
-  kind: 'objective' | 'season';
+  kind: 'objective' | 'season' | 'sweep';
   placement?: 'daily' | 'onboarding';
   categoryName?: string;
   objectiveLabel?: string;
@@ -40,9 +40,56 @@ export type Claimable = {
   seasonName?: string;
   tier?: number;
   tierCount?: number;
+  sweepTier?: 'standard' | 'golden';
+  sweepMega?: boolean;
+  sweepPendingRolls?: number;
   reward?: any;
   rewards?: any[];
 };
+
+export function claimRequestFor(
+  claimable: Claimable,
+  timezone: string,
+): { url: string; body: Record<string, unknown> } | null {
+  if (claimable.kind === 'objective' && claimable.questId && claimable.objectiveId) {
+    return {
+      url: '/api/quests/claim-objective',
+      body: {
+        questId: claimable.questId,
+        objectiveId: claimable.objectiveId,
+        timezone,
+      },
+    };
+  }
+  if (claimable.kind === 'season' && claimable.seasonId) {
+    return {
+      url: '/api/quests/season/claim',
+      body: { seasonId: claimable.seasonId, timezone },
+    };
+  }
+  if (claimable.kind === 'sweep') {
+    return { url: '/api/quests/streak/claim', body: { timezone } };
+  }
+  return null;
+}
+
+export function sweepClaimLabels(claimable: Claimable) {
+  const pending = Math.max(1, claimable.sweepPendingRolls ?? 1);
+  const eyebrow =
+    pending > 1
+      ? `${pending} prizes ready`
+      : claimable.sweepMega
+        ? 'Mega prize ready'
+        : claimable.sweepTier === 'golden'
+          ? 'Golden prize ready'
+          : 'Prize ready';
+  return {
+    pending,
+    eyebrow,
+    title: pending > 1 ? 'Open your daily quest prizes' : 'Open your daily quest prize',
+    action: pending > 1 ? `Open (${pending})` : 'Open',
+  };
+}
 
 export type Trackable = {
   id: string;
@@ -698,6 +745,7 @@ export function ObjectiveProgressBar({
 
 function toastTitle(c: Claimable): string {
   if (c.kind === 'season') return 'Season reward ready';
+  if (c.kind === 'sweep') return sweepClaimLabels(c).eyebrow;
   if (c.placement === 'onboarding') return 'Starter objective complete';
   return 'Daily objective complete';
 }
@@ -734,24 +782,7 @@ function ClaimRewardToast({
     event.stopPropagation();
     if (claiming) return;
     const timezone = currentTimezone();
-    const request =
-      claimable.kind === 'objective' &&
-      claimable.questId &&
-      claimable.objectiveId
-        ? {
-            url: '/api/quests/claim-objective',
-            body: {
-              questId: claimable.questId,
-              objectiveId: claimable.objectiveId,
-              timezone,
-            },
-          }
-        : claimable.kind === 'season' && claimable.seasonId
-          ? {
-              url: '/api/quests/season/claim',
-              body: { seasonId: claimable.seasonId, timezone },
-            }
-          : null;
+    const request = claimRequestFor(claimable, timezone);
     if (!request) {
       goToQuest();
       return;
@@ -802,6 +833,13 @@ function ClaimRewardToast({
               <ObjectiveLabel label={claimable.objectiveLabel} strikeText />
             </span>
           </span>
+        ) : claimable.kind === 'sweep' ? (
+          <span className="mt-0.5 flex items-center gap-1 text-[11px] font-bold text-muted-foreground">
+            <Check className="h-3 w-3 shrink-0 stroke-[3.5] text-emerald-500" />
+            <span className="min-w-0 flex-1 truncate">
+              {sweepClaimLabels(claimable).title}
+            </span>
+          </span>
         ) : (
           <span className="mt-0.5 truncate text-[11px] font-bold text-muted-foreground">
             {claimable.seasonName
@@ -816,7 +854,13 @@ function ClaimRewardToast({
         onClick={(event) => void handleClaimPress(event)}
         className="inline-flex h-9 min-w-[5.5rem] shrink-0 items-center justify-center rounded-xl bg-amber-500 px-4 text-[10px] font-black uppercase tracking-[0.15em] text-white shadow-[0_3px_0_0_#b45309] transition-all hover:translate-y-[-1px] hover:shadow-[0_4px_0_0_#b45309] active:translate-y-[2px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60"
       >
-        <span className="mr-[-0.15em]">{claiming ? '...' : 'Claim'}</span>
+        <span className="mr-[-0.15em]">
+          {claiming
+            ? '...'
+            : claimable.kind === 'sweep'
+              ? sweepClaimLabels(claimable).action
+              : 'Claim'}
+        </span>
       </button>
     </div>
   );

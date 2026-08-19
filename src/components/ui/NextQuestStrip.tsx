@@ -14,10 +14,12 @@ import {
   ObjectiveLabel,
   ObjectiveProgressBar,
   QuestRewardTileBadge,
+  claimRequestFor,
   objectiveCardTone,
   primeQuestsPageCache,
   refreshQuestHomeView,
   setQuestScrollTarget,
+  sweepClaimLabels,
   useCompletionReveal,
   type Claimable,
   type Trackable,
@@ -30,6 +32,7 @@ import {
   resetCountdownLabel,
 } from '@/lib/quests/priority';
 import { QuestPriorityDebug } from '@/components/ui/QuestPriorityDebug';
+import { useNotification } from '@/components/providers/NotificationProvider';
 import { usePactView } from '@/components/pact/PactCard';
 import { PactStripRow } from '@/components/pact/PactStripRow';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -79,6 +82,7 @@ export function NextQuestStrip({
   const router = useRouter();
   const reduceMotion = useReducedMotion();
   const startHintGuide = useUIStore((state) => state.startHintGuide);
+  const { showNotification } = useNotification();
   const { data: pactView, isLoading: pactLoading } = usePactView();
   const [claiming, setClaiming] = useState(false);
 
@@ -148,6 +152,9 @@ export function NextQuestStrip({
     claimable?.id ?? 'strip:none',
     !!claimable,
   );
+  const goldenClaim =
+    claimable?.kind === 'sweep' &&
+    (claimable.sweepMega || claimable.sweepTier === 'golden');
   const held = heldTrackableRef.current;
   const fillingTrackable =
     claimable && !claimableRevealed && held && held.id === claimable.id
@@ -277,22 +284,7 @@ export function NextQuestStrip({
   const handleClaim = async (target: Claimable) => {
     if (claiming) return;
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const request =
-      target.kind === 'objective' && target.questId && target.objectiveId
-        ? {
-            url: '/api/quests/claim-objective',
-            body: {
-              questId: target.questId,
-              objectiveId: target.objectiveId,
-              timezone,
-            },
-          }
-        : target.kind === 'season' && target.seasonId
-          ? {
-              url: '/api/quests/season/claim',
-              body: { seasonId: target.seasonId, timezone },
-            }
-          : null;
+    const request = claimRequestFor(target, timezone);
     if (!request) {
       goToQuests();
       return;
@@ -311,6 +303,16 @@ export function NextQuestStrip({
         isPremium: !!isPremium,
         showFlyGainPill: false,
       });
+      const shields = payload.rewardSummary?.shieldsGranted ?? 0;
+      if (shields > 0) {
+        showNotification(
+          <span className="text-[13px] font-black text-foreground">
+            {shields > 1
+              ? `You rolled ${shields} Lily Pads!`
+              : 'You rolled a Lily Pad!'}
+          </span>,
+        );
+      }
       primeQuestsPageCache();
       await refreshQuestHomeView();
     } catch {
@@ -378,9 +380,11 @@ export function NextQuestStrip({
       }}
       className={`group relative mx-1.5 flex w-[calc(100%-0.75rem)] cursor-pointer items-center text-left transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 md:mx-4 md:w-[calc(100%-2rem)] ${
         showClaimable
-          ? `mb-2 gap-3 rounded-2xl border p-3 shadow-sm md:mb-3 md:p-3.5 ${objectiveCardTone(
-              true,
-            )} hover:bg-lime-100 dark:hover:bg-lime-500/20`
+          ? `mb-2 gap-3 rounded-2xl border p-3 shadow-sm md:mb-3 md:p-3.5 ${
+              goldenClaim
+                ? 'border-amber-400/70 bg-amber-100/80 hover:bg-amber-100 dark:border-amber-400/40 dark:bg-amber-500/15 dark:hover:bg-amber-500/20'
+                : `${objectiveCardTone(true)} hover:bg-lime-100 dark:hover:bg-lime-500/20`
+            }`
           : 'mb-1.5 gap-2.5 rounded-xl px-1 py-1 hover:bg-muted/30 md:mb-0 md:gap-3 md:rounded-xl md:border-0 md:bg-transparent md:px-4 md:py-1.5 md:shadow-none md:hover:bg-muted/30'
       }`}
     >
@@ -397,10 +401,18 @@ export function NextQuestStrip({
             </div>
           </div>
           <div className="flex min-w-0 flex-1 flex-col overflow-hidden leading-tight animate-[reward-pop_0.4s_ease-out_0.07s_both] motion-reduce:animate-none">
-            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-lime-700 dark:text-lime-400">
-              {claimableCount > 1
-                ? `${claimableCount} rewards ready`
-                : 'Reward ready'}
+            <span
+              className={`text-[10px] font-black uppercase tracking-[0.14em] ${
+                goldenClaim
+                  ? 'text-amber-700 dark:text-amber-400'
+                  : 'text-lime-700 dark:text-lime-400'
+              }`}
+            >
+              {claimable.kind === 'sweep'
+                ? sweepClaimLabels(claimable).eyebrow
+                : claimableCount > 1
+                  ? `${claimableCount} rewards ready`
+                  : 'Reward ready'}
             </span>
             <span className="mt-0.5 block min-w-0 truncate text-[13px] font-black text-foreground">
               {claimable.kind === 'season' ? (
@@ -408,6 +420,10 @@ export function NextQuestStrip({
                   {claimable.seasonName
                     ? `${claimable.seasonName} · Tier ${claimable.tier}`
                     : `Season tier ${claimable.tier}`}
+                </span>
+              ) : claimable.kind === 'sweep' ? (
+                <span className="block truncate">
+                  {sweepClaimLabels(claimable).title}
                 </span>
               ) : (
                 <ObjectiveLabel label={claimable.objectiveLabel} />
@@ -425,7 +441,13 @@ export function NextQuestStrip({
                 onClick={() => void handleClaim(claimable)}
                 className="inline-flex h-9 min-w-[5.5rem] items-center justify-center rounded-xl bg-amber-500 px-3 text-[13px] font-black text-white shadow-[0_3px_0_0_#b45309] transition-[transform,box-shadow,opacity] hover:translate-y-[-1px] hover:shadow-[0_4px_0_0_#b45309] active:translate-y-[2px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60 min-[380px]:min-w-[7rem] min-[380px]:px-4"
               >
-                {claiming ? 'Claiming…' : 'Claim'}
+                {claiming
+                  ? claimable.kind === 'sweep'
+                    ? 'Opening…'
+                    : 'Claiming…'
+                  : claimable.kind === 'sweep'
+                    ? sweepClaimLabels(claimable).action
+                    : 'Claim'}
               </button>
             </span>
           </span>

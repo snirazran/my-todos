@@ -590,6 +590,7 @@ export type DailySweepInfo = {
   claimable: boolean;
   nextTier: 'standard' | 'golden';
   nextMega: boolean;
+  nextRollDayKey?: string | null;
   sweepsToGolden: number;
   goldenEveryDays: number;
   megaEveryDays: number;
@@ -1278,7 +1279,7 @@ function SweepStreakCard({
 }) {
   const [oddsOpen, setOddsOpen] = useState(false);
   const every = Math.max(1, sweep.goldenEveryDays);
-  const cycleDay = sweep.count === 0 ? 0 : ((sweep.count - 1) % every) + 1;
+  const cycleDay = Math.max(0, Math.min(every, every - sweep.sweepsToGolden));
   const goldenNext = sweep.sweepsToGolden <= 1;
   const megaNext =
     sweep.megaEveryDays > 0 &&

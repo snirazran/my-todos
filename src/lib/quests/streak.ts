@@ -58,6 +58,8 @@ export type SweepView = {
   /** Tier of the roll waiting to be spun, or of the one today would earn. */
   nextTier: SweepRollTier;
   nextMega: boolean;
+  /** Day the queued roll was earned. Null when nothing is waiting. */
+  nextRollDayKey: string | null;
   /** Sweeps still to come before a golden roll is earned. 1 = the next one. */
   sweepsToGolden: number;
   goldenEveryDays: number;
@@ -287,6 +289,7 @@ export async function syncDailySweep(args: {
     claimable: next.pendingRolls.length > 0,
     nextTier: upcoming.tier,
     nextMega: upcoming.mega,
+    nextRollDayKey: next.pendingRolls[0]?.dayKey ?? null,
     sweepsToGolden: sweepsUntilGolden(nextEarnDayNumber, config),
     goldenEveryDays: config.goldenEveryDays,
     megaEveryDays: config.megaEveryDays,
