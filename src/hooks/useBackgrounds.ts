@@ -1,5 +1,10 @@
 import useSWR, { mutate as mutateGlobal } from 'swr';
 import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
+import {
+  DEFAULT_BACKGROUND_ID,
+  DEFAULT_BACKGROUND_IMAGES as SHARED_DEFAULT_BACKGROUND_IMAGES,
+  isLegacyLocalBackground,
+} from '@/lib/backgrounds/constants';
 
 export type BackgroundRarity =
   | 'common'
@@ -32,12 +37,8 @@ export type BackgroundsApiData = {
 };
 
 export const BACKGROUNDS_KEY = '/api/backgrounds';
-export const DEFAULT_BACKGROUND_IMAGES: BackgroundImages = {
-  mobile: '/bg-mobile.webp',
-  tablet: '/bg-tablet.webp',
-  web: '/bg-web.webp',
-  webLarge: '/bg-web-large.webp',
-};
+export const DEFAULT_BACKGROUND_IMAGES: BackgroundImages =
+  SHARED_DEFAULT_BACKGROUND_IMAGES;
 
 const LAST_BACKGROUND_KEY = 'frogress.lastEquippedBackground';
 
@@ -63,7 +64,10 @@ export function readCachedBackground(): CachedBackground | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as CachedBackground;
     if (!parsed?.id || !parsed.images?.mobile) return null;
-    if (parsed.id === 'bg_default') {
+    if (
+      parsed.id === DEFAULT_BACKGROUND_ID ||
+      isLegacyLocalBackground(parsed.images.mobile)
+    ) {
       return { id: parsed.id, images: DEFAULT_BACKGROUND_IMAGES };
     }
     return parsed;

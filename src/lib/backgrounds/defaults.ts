@@ -1,8 +1,11 @@
 import BackgroundModel from '@/lib/models/Background';
 import {
+  BACKGROUND_SIZE_KEYS,
   DEFAULT_BACKGROUND_ID,
   DEFAULT_BACKGROUND_IMAGES,
   DEFAULT_BACKGROUND_NAME,
+  isLegacyLocalBackground,
+  stripQuery,
 } from './constants';
 
 export { DEFAULT_BACKGROUND_ID, DEFAULT_BACKGROUND_NAME };
@@ -16,13 +19,13 @@ export async function ensureDefaultBackground() {
       changed = true;
     }
     const images = existing.images ?? {};
-    if (
-      images.mobile !== DEFAULT_BACKGROUND_IMAGES.mobile ||
-      images.tablet !== DEFAULT_BACKGROUND_IMAGES.tablet ||
-      images.web !== DEFAULT_BACKGROUND_IMAGES.web ||
-      images.webLarge !== DEFAULT_BACKGROUND_IMAGES.webLarge
-    ) {
-      existing.images = DEFAULT_BACKGROUND_IMAGES;
+    for (const size of BACKGROUND_SIZE_KEYS) {
+      const current = typeof images[size] === 'string' ? images[size].trim() : '';
+      const canonical = DEFAULT_BACKGROUND_IMAGES[size];
+      if (current === canonical) continue;
+      const servedHere = stripQuery(current) === canonical;
+      if (current && !isLegacyLocalBackground(current) && !servedHere) continue;
+      existing.set(`images.${size}`, canonical);
       changed = true;
     }
     if (changed) await existing.save();

@@ -8,6 +8,7 @@ import { MarketingFrogHero } from '@/components/marketing/MarketingFrogHero';
 import { MarketingFocusPreview } from '@/components/marketing/MarketingFocusPreview';
 import { MarketingPlannerPreview } from '@/components/marketing/MarketingPlannerPreview';
 import { MarketingWardrobePreview } from '@/components/marketing/MarketingWardrobePreview';
+import { DEFAULT_BACKGROUND_IMAGES } from '@/lib/backgrounds/constants';
 
 const navLinks = [
   { href: '#how-it-works', label: 'How it works', visibility: 'hidden sm:inline-flex' },
@@ -101,10 +102,10 @@ export function PublicHomepage() {
       <section className="relative isolate">
         <div aria-hidden className="absolute inset-0 -z-30 overflow-hidden">
           <picture aria-hidden className="absolute inset-0 block h-full w-full">
-            <source media="(min-width: 1920px)" srcSet="/bg-web-large.webp" />
-            <source media="(min-width: 1280px)" srcSet="/bg-web.webp" />
-            <source media="(min-width: 768px)" srcSet="/bg-tablet.webp" />
-            <img src="/bg-mobile.webp" alt="" className="h-full w-full object-cover object-top" />
+            <source media="(min-width: 1920px)" srcSet={DEFAULT_BACKGROUND_IMAGES.webLarge} />
+            <source media="(min-width: 1280px)" srcSet={DEFAULT_BACKGROUND_IMAGES.web} />
+            <source media="(min-width: 768px)" srcSet={DEFAULT_BACKGROUND_IMAGES.tablet} />
+            <img src={DEFAULT_BACKGROUND_IMAGES.mobile} alt="" className="h-full w-full object-cover object-top" />
           </picture>
 
           <div

@@ -12,6 +12,7 @@ import { RiveIdlePause } from '@/components/ui/RiveIdlePause';
 import { AuthContext } from '@/components/auth/AuthContext';
 import { GlobalPageBackground } from '@/components/ui/GlobalPageBackground';
 import { RiveWarmup } from '@/components/providers/RiveWarmup';
+import { DEFAULT_BACKGROUND_IMAGES } from '@/lib/backgrounds/constants';
 import { ImageWarmup } from '@/components/providers/ImageWarmup';
 import { CampaignHost } from '@/components/campaigns/CampaignHost';
 import { PremiumModalHost } from '@/components/providers/PremiumModalHost';
@@ -101,25 +102,25 @@ export default function RootLayout({
         <link
           rel="preload"
           as="image"
-          href="/bg-mobile.webp"
+          href={DEFAULT_BACKGROUND_IMAGES.mobile}
           media="(max-width: 767.98px)"
         />
         <link
           rel="preload"
           as="image"
-          href="/bg-tablet.webp"
+          href={DEFAULT_BACKGROUND_IMAGES.tablet}
           media="(min-width: 768px) and (max-width: 1279.98px)"
         />
         <link
           rel="preload"
           as="image"
-          href="/bg-web.webp"
+          href={DEFAULT_BACKGROUND_IMAGES.web}
           media="(min-width: 1280px) and (max-width: 1919.98px)"
         />
         <link
           rel="preload"
           as="image"
-          href="/bg-web-large.webp"
+          href={DEFAULT_BACKGROUND_IMAGES.webLarge}
           media="(min-width: 1920px)"
         />
         {/* The fly the frog's tongue grabs on task completion — preload so the
