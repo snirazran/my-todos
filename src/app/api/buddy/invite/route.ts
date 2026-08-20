@@ -10,6 +10,7 @@ import { areFriends } from '@/lib/friends/code';
 import { createTasksForUser } from '@/app/api/tasks/route';
 import {
   repeatLabelFor,
+  buddyScheduleSummary,
   paramsFromTask,
   isShareableParams,
   type ExistingBuddyTask,
@@ -21,6 +22,20 @@ import { recordAnalyticsEvent } from '@/lib/analytics/server';
 import { taskAnalyticsProperties } from '@/lib/analytics/engagement';
 
 const INVITE_TTL_MS = 24 * 60 * 60 * 1000;
+
+const GOAL_TEXT_PUSH_MAX = 40;
+
+function invitePushBody(params: BuddyCreateParams): string {
+  const text =
+    params.text.length > GOAL_TEXT_PUSH_MAX
+      ? `${params.text.slice(0, GOAL_TEXT_PUSH_MAX - 1).trimEnd()}…`
+      : params.text;
+  const schedule = buddyScheduleSummary(params);
+  const tail = "you'll see each other's progress.";
+  return schedule
+    ? `"${text}" · ${schedule} — ${tail}`
+    : `Team up on "${text}" — ${tail}`;
+}
 
 export async function POST(req: NextRequest) {
   let userId: string;
@@ -151,7 +166,7 @@ export async function POST(req: NextRequest) {
     void buddyDisplayName(userId).then((name) =>
       sendBuddyPush(friendId, {
         title: `${name} wants to be your goal buddy`,
-        body: `Team up on "${bondParams.text}" — you'll see each other's progress.`,
+        body: invitePushBody(bondParams),
         path: '/friends',
         type: 'buddy_invite',
       }),
@@ -205,6 +220,7 @@ export async function GET() {
         withName: other?.name || other?.frogName || 'Friend',
         text: b.initialText,
         repeatLabel: b.repeatLabel ?? '',
+        scheduleLabel: b.createParams ? buddyScheduleSummary(b.createParams) : '',
         createdAt: b.createdAt,
         expiresAt: b.expiresAt,
       };

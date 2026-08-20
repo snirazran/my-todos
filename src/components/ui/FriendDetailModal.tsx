@@ -63,6 +63,7 @@ type BuddyInvite = {
   withName: string;
   text: string;
   repeatLabel: string;
+  scheduleLabel?: string;
 };
 
 const inviteFetcher = (url: string) => fetch(url).then((r) => r.json());
@@ -462,7 +463,7 @@ export function FriendDetailModal({
                         </p>
                         <p className="truncate text-[13px] font-semibold text-muted-foreground">
                           {inv.text}
-                          {inv.repeatLabel ? ` · ${inv.repeatLabel}` : ''}
+                          {inv.scheduleLabel ? ` — ${inv.scheduleLabel}` : ''}
                         </p>
                         <div className="mt-2.5 flex gap-2">
                           <button
@@ -501,7 +502,7 @@ export function FriendDetailModal({
                           </p>
                           <p className="truncate text-[13px] font-semibold text-muted-foreground">
                             {inv.text}
-                            {inv.repeatLabel ? ` · ${inv.repeatLabel}` : ''}
+                            {inv.scheduleLabel ? ` — ${inv.scheduleLabel}` : ''}
                           </p>
                         </div>
                       </div>

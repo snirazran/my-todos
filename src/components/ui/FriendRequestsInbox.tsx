@@ -21,6 +21,7 @@ type BuddyInvite = {
   withName: string;
   text: string;
   repeatLabel: string;
+  scheduleLabel?: string;
 };
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
@@ -190,7 +191,7 @@ export function FriendRequestsInbox({
                       </p>
                       <p className="truncate text-xs font-medium text-muted-foreground">
                         {inv.text}
-                        {inv.repeatLabel ? ` · ${inv.repeatLabel}` : ''}
+                        {inv.scheduleLabel ? ` — ${inv.scheduleLabel}` : ''}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">

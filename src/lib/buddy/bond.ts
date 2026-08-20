@@ -27,6 +27,47 @@ export function repeatLabelFor(params: BuddyCreateParams): string {
   return 'weekly';
 }
 
+const DAY_ABBR = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+const dayList = (days: number[]) =>
+  days
+    .slice()
+    .sort((a, b) => a - b)
+    .map((d) => DAY_ABBR[d])
+    .filter(Boolean)
+    .join(' · ');
+
+/**
+ * The shared schedule in words, for the copy a recipient reads before
+ * accepting. Empty when the recurrence can't be said in a few words, so
+ * callers can drop the clause instead of printing something vague.
+ */
+export function buddyScheduleSummary(params: BuddyCreateParams): string {
+  if (isOneTimeParams(params)) return 'Just once';
+
+  const rule = params.repeatRule as
+    | { freq?: 'daily' | 'weekly' | 'monthly'; interval?: number; byWeekday?: number[] }
+    | undefined;
+  if (rule?.freq) {
+    const interval = rule.interval ?? 1;
+    if (rule.freq === 'weekly' && interval === 1 && rule.byWeekday?.length)
+      return dayList(rule.byWeekday);
+    const unit = rule.freq === 'daily' ? 'day' : rule.freq === 'weekly' ? 'week' : 'month';
+    return interval > 1 ? `Every ${interval} ${unit}s` : `Every ${unit}`;
+  }
+
+  if (params.repeat === 'monthly') return 'Monthly';
+
+  const days = params.days ?? [];
+  if (days.length === 0) return '';
+  if (days.length === 7) return 'Every day';
+  if (days.length === 5 && WEEKDAY_SETS.weekdays.every((d) => days.includes(d)))
+    return 'Weekdays';
+  if (days.length === 2 && WEEKDAY_SETS.weekend.every((d) => days.includes(d)))
+    return 'Weekends';
+  return dayList(days);
+}
+
 function lastDayOfMonth(year: number, month1: number): number {
   return new Date(Date.UTC(year, month1, 0)).getUTCDate();
 }
