@@ -94,6 +94,17 @@ export async function POST(req: Request) {
     const onboardingResponses = sanitizeOnboardingResponses(body.onboardingResponses);
 
     await connectMongo();
+
+    const existing = await UserModel.findById(uid)
+      .select('onboardingCompleted')
+      .lean();
+    if (!existing) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+    if (existing.onboardingCompleted) {
+      return NextResponse.json({ ok: true, alreadyOnboarded: true });
+    }
+
     await UserModel.updateOne(
       { _id: uid },
       {

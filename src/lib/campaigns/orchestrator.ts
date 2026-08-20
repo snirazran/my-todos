@@ -41,6 +41,7 @@ type Store = {
   schedule: (campaign: CampaignPayload) => void;
   close: (outcome: 'click' | 'dismiss', elementId?: string) => void;
   flushPending: () => void;
+  claimBlockingSlot: () => boolean;
 };
 
 const readLastBlockingAt = () => {
@@ -176,6 +177,17 @@ export const useCampaignStore = create<Store>((set, get) => ({
     });
   },
 
+  claimBlockingSlot: () => {
+    const state = get();
+    if (state.active || state.pending) return false;
+    if (state.blockingShown >= MAX_BLOCKING_PER_SESSION) return false;
+    if (state.busyReasons.length > 0) return false;
+    if (Date.now() - readLastBlockingAt() < CROSS_CAMPAIGN_COOLDOWN_MS) return false;
+    set({ blockingShown: state.blockingShown + 1 });
+    writeLastBlockingAt(Date.now());
+    return true;
+  },
+
   flushPending: () => {
     const state = get();
     if (!state.pending || state.active || state.busyReasons.length > 0) return;
@@ -197,6 +209,14 @@ export const emitCampaignTrigger = (
 ) => {
   useCampaignStore.getState().emit(trigger, context);
 };
+
+/**
+ * Lets a hand-built popup take the session's one blocking slot, so an
+ * in-product nudge and an admin campaign can never both interrupt the same
+ * session.
+ */
+export const claimBlockingSlot = () =>
+  useCampaignStore.getState().claimBlockingSlot();
 
 /** Mark a surface as uninterruptible while it's open. */
 export const setCampaignBusy = (reason: string, busy: boolean) => {

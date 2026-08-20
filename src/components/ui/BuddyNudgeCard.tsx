@@ -5,8 +5,8 @@ import { X, ChevronRight } from 'lucide-react';
 import useSWR from 'swr';
 import { useAuth } from '@/components/auth/AuthContext';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
-import { useBuddyBonusFlies } from '@/hooks/useBuddyState';
-import { useRandomReveal } from '@/hooks/useRandomReveal';
+import { useBuddyBonusFlies, useHasBuddy } from '@/hooks/useBuddyState';
+import { useNudge } from '@/hooks/useNudge';
 import Frog from '@/components/ui/frog';
 import Fly from '@/components/ui/fly';
 import { BuddyStartFlow } from '@/components/ui/BuddyStartFlow';
@@ -17,7 +17,10 @@ const fetcher = (url: string) => fetch(url).then((r) => r.json());
 export function BuddyNudgeCard() {
   const { user } = useAuth();
   const { indices } = useWardrobeIndices(!!user);
-  const { show, dismiss } = useRandomReveal('home_buddy');
+  const hasBuddy = useHasBuddy(!!user);
+  const { show, dismiss, engage } = useNudge('home_buddy', {
+    enabled: hasBuddy === false,
+  });
   const bonusFlies = useBuddyBonusFlies(!!user);
   const [flowOpen, setFlowOpen] = useState(false);
 
@@ -61,7 +64,10 @@ export function BuddyNudgeCard() {
           <div className="relative">
             <button
               type="button"
-              onClick={() => setFlowOpen(true)}
+              onClick={() => {
+                engage();
+                setFlowOpen(true);
+              }}
               className="group relative flex w-full items-center gap-2 rounded-2xl border border-border/50 bg-card py-2.5 pl-1.5 pr-12 text-left shadow-sm transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f9149]/40 sm:gap-3 sm:py-3 sm:pl-2 md:rounded-none md:border-x-0 md:border-b-0 md:border-t md:border-border/50 md:bg-transparent md:py-4 md:shadow-none md:hover:bg-muted/30"
             >
               <span

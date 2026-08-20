@@ -33,3 +33,31 @@ export function createEmailLinkSettings(callbackUrl: string): ActionCodeSettings
     ...(linkDomain ? { linkDomain } : {}),
   };
 }
+
+export const EMAIL_LINK_INTENT_KEY = 'frogress.email-link-intent';
+
+export type EmailLinkIntent = 'new-account' | 'existing-account';
+
+export function setEmailLinkIntent(intent: EmailLinkIntent | null) {
+  if (typeof window === 'undefined') return;
+  try {
+    if (intent) {
+      window.localStorage.setItem(EMAIL_LINK_INTENT_KEY, intent);
+    } else {
+      window.localStorage.removeItem(EMAIL_LINK_INTENT_KEY);
+    }
+  } catch {
+    // ignore
+  }
+}
+
+export function takeEmailLinkIntent(): EmailLinkIntent | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const value = window.localStorage.getItem(EMAIL_LINK_INTENT_KEY);
+    window.localStorage.removeItem(EMAIL_LINK_INTENT_KEY);
+    return value === 'existing-account' || value === 'new-account' ? value : null;
+  } catch {
+    return null;
+  }
+}

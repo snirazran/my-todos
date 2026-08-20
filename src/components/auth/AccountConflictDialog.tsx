@@ -3,6 +3,7 @@
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Loader2 } from 'lucide-react';
+import type { ReactNode } from 'react';
 
 export function AccountConflictDialog({
   open,
@@ -10,14 +11,18 @@ export function AccountConflictDialog({
   title,
   message,
   confirmLabel,
+  cancelLabel = 'Cancel',
+  dismissOnBackdrop = true,
   onConfirm,
   onCancel,
 }: {
   open: boolean;
   busy?: boolean;
   title: string;
-  message: string;
+  message: ReactNode;
   confirmLabel: string;
+  cancelLabel?: string;
+  dismissOnBackdrop?: boolean;
   onConfirm: () => void | Promise<void>;
   onCancel: () => void;
 }) {
@@ -31,7 +36,7 @@ export function AccountConflictDialog({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           className="fixed inset-0 z-[1400] flex items-center justify-center bg-black/60 px-5 backdrop-blur-sm"
-          onClick={busy ? undefined : onCancel}
+          onClick={busy || !dismissOnBackdrop ? undefined : onCancel}
         >
           <motion.div
             initial={{ scale: 0.95, y: 10 }}
@@ -61,7 +66,7 @@ export function AccountConflictDialog({
               onClick={onCancel}
               className="mt-2 h-11 w-full rounded-2xl text-sm font-bold text-muted-foreground transition-colors hover:text-foreground disabled:opacity-60"
             >
-              Cancel
+              {cancelLabel}
             </button>
           </motion.div>
         </motion.div>

@@ -2,8 +2,8 @@
 
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { useRandomReveal } from '@/hooks/useRandomReveal';
-import { useBuddyBonusFlies } from '@/hooks/useBuddyState';
+import { useNudge } from '@/hooks/useNudge';
+import { useBuddyBonusFlies, useHasBuddy } from '@/hooks/useBuddyState';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { BuddyStartFlow } from '@/components/ui/BuddyStartFlow';
 import Frog from '@/components/ui/frog';
@@ -25,33 +25,23 @@ export function BuddyNudgeSheet({
   indices?: WardrobeIndices;
   ready: boolean;
 }) {
-  const { show, dismiss } = useRandomReveal('friends_buddy');
+  const hasBuddy = useHasBuddy();
+  const { show, dismiss, engage } = useNudge('friends_buddy', {
+    enabled: ready && friends.length > 0 && hasBuddy === false,
+    delayMs: 600,
+  });
   const [open, setOpen] = useState(false);
   const [flowOpen, setFlowOpen] = useState(false);
   const bonusFlies = useBuddyBonusFlies();
 
   useEffect(() => {
-    if (!ready || !show) return;
-    let cancelled = false;
-    const openSheet = () => {
-      if (!cancelled) setOpen(true);
-    };
-    const raf = requestAnimationFrame(() => {
-      if ('requestIdleCallback' in window) {
-        window.requestIdleCallback(openSheet, { timeout: 1000 });
-      } else {
-        setTimeout(openSheet, 350);
-      }
-    });
-    return () => {
-      cancelled = true;
-      cancelAnimationFrame(raf);
-    };
-  }, [ready, show]);
+    if (show) setOpen(true);
+  }, [show]);
 
   const closeSheet = (dismissed: boolean) => {
     setOpen(false);
     if (dismissed) dismiss();
+    else engage();
   };
 
   return (

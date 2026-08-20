@@ -12,11 +12,15 @@ import { Loader2 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { auth } from '@/lib/firebase';
 import { establishSessionCookie } from '@/lib/authCookie';
+import { takeEmailLinkIntent } from '@/lib/emailLinkSettings';
+import { clearOnboardingDraft } from '@/lib/onboardingDraft';
 
 const Frog = dynamic(() => import('@/components/ui/frog'), { ssr: false });
 
 const EMAIL_LINK_STORAGE_KEY = 'emailForSignIn';
 const POST_LOGIN_ROUTE_KEY = 'frogress.post-login-route';
+
+type Returning = { name: string | null; frogName: string | null };
 
 export default function EmailCallbackPage() {
   const router = useRouter();
@@ -24,8 +28,10 @@ export default function EmailCallbackPage() {
   const [needEmail, setNeedEmail] = useState(false);
   const [emailInput, setEmailInput] = useState('');
   const [conflictEmail, setConflictEmail] = useState<string | null>(null);
+  const [returning, setReturning] = useState<Returning | null>(null);
   const [switching, setSwitching] = useState(false);
   const ranRef = useRef(false);
+  const intentRef = useRef<ReturnType<typeof takeEmailLinkIntent>>(null);
 
   const finishSignedIn = async () => {
     window.localStorage.removeItem(EMAIL_LINK_STORAGE_KEY);
@@ -44,6 +50,20 @@ export default function EmailCallbackPage() {
     window.localStorage.removeItem(POST_LOGIN_ROUTE_KEY);
     const safeRoute =
       storedRoute?.startsWith('/') && !storedRoute.startsWith('//') ? storedRoute : '/';
+
+    // The link resolved onto an account that already has a frog. Drop the draft
+    // answers from this session and say so, instead of dropping the user into a
+    // flow that would rename that account.
+    if (data?.alreadyOnboarded) {
+      clearOnboardingDraft();
+      setReturning({
+        name: data?.name ?? null,
+        frogName: data?.frogName ?? null,
+      });
+      setSwitching(false);
+      return;
+    }
+
     router.replace(data?.isNewUser ? '/onboarding' : safeRoute);
   };
 
@@ -57,7 +77,11 @@ export default function EmailCallbackPage() {
       }
 
       const current = auth.currentUser;
-      if (current && current.isAnonymous) {
+      // When the user already confirmed they're signing back into an existing
+      // account, don't try to graft this session's guest progress onto it.
+      const wantsExisting = intentRef.current === 'existing-account';
+
+      if (current && current.isAnonymous && !wantsExisting) {
         // Link the email credential to the existing anonymous user so progress carries over.
         const cred = EmailAuthProvider.credentialWithLink(emailForLink, href);
         try {
@@ -93,8 +117,10 @@ export default function EmailCallbackPage() {
   const switchToExisting = async () => {
     if (!conflictEmail || switching) return;
     setSwitching(true);
+    clearOnboardingDraft();
     try {
       await signInWithEmailLink(auth, conflictEmail, window.location.href);
+      setConflictEmail(null);
       await finishSignedIn();
     } catch (err: any) {
       setConflictEmail(null);
@@ -110,6 +136,7 @@ export default function EmailCallbackPage() {
   useEffect(() => {
     if (ranRef.current) return;
     ranRef.current = true;
+    intentRef.current = takeEmailLinkIntent();
     const stored = window.localStorage.getItem(EMAIL_LINK_STORAGE_KEY);
     if (stored) {
       void complete(stored);
@@ -118,6 +145,8 @@ export default function EmailCallbackPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const returningFrogName = returning?.frogName?.trim() || 'Your frog';
 
   return (
     <main className="fixed inset-0 flex items-center justify-center p-6 bg-background">
@@ -130,7 +159,23 @@ export default function EmailCallbackPage() {
           />
         </div>
 
-        {conflictEmail ? (
+        {returning ? (
+          <>
+            <h1 className="mt-2 text-2xl font-black text-center text-foreground">
+              {returning.name ? `Welcome back, ${returning.name}!` : 'Welcome back!'}
+            </h1>
+            <p className="mt-3 text-sm text-center text-muted-foreground">
+              {returningFrogName} is right where you left them — nothing was
+              renamed or reset.
+            </p>
+            <button
+              onClick={() => window.location.replace('/')}
+              className="mt-6 flex h-12 w-full items-center justify-center rounded-2xl bg-primary text-primary-foreground font-black uppercase tracking-wider text-sm"
+            >
+              Continue
+            </button>
+          </>
+        ) : conflictEmail ? (
           <>
             <h1 className="mt-2 text-2xl font-black text-center text-foreground">
               You already have a frog!
@@ -162,7 +207,7 @@ export default function EmailCallbackPage() {
         ) : error ? (
           <>
             <h1 className="mt-2 text-2xl font-black text-center text-foreground">
-              Couldn't sign you in
+              Couldn&apos;t sign you in
             </h1>
             <p className="mt-3 text-sm text-center text-destructive">{error}</p>
             <button

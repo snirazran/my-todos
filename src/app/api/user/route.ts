@@ -106,7 +106,14 @@ export async function POST(req: NextRequest) {
       if (Object.keys(patch).length) {
         await UserModel.updateOne({ _id: uid }, { $set: patch });
       }
-      return NextResponse.json({ ok: true, isNewUser: false, user: { ...existingUser, ...patch } });
+      return NextResponse.json({
+        ok: true,
+        isNewUser: false,
+        alreadyOnboarded: !!existingUser.onboardingCompleted,
+        name: existingUser.name ?? null,
+        frogName: existingUser.frogName ?? null,
+        user: { ...existingUser, ...patch },
+      });
     }
 
     const now = new Date();
@@ -164,7 +171,12 @@ export async function POST(req: NextRequest) {
       properties: { method: isAnonymous ? 'guest' : email ? 'email_or_social' : 'phone' },
     });
 
-    return NextResponse.json({ ok: true, isNewUser: true, user: newUser });
+    return NextResponse.json({
+      ok: true,
+      isNewUser: true,
+      alreadyOnboarded: false,
+      user: newUser,
+    });
   } catch (error) {
     console.error('Error syncing user:', error);
     return NextResponse.json(

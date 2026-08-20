@@ -21,6 +21,14 @@ import { OnboardingBackground } from '@/components/ui/OnboardingBackground';
 import { useAuth } from '@/components/auth/AuthContext';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { prewarmStreakCheckIn } from '@/hooks/useLoginStreak';
+// Answers are drafted before sign-in, so they're persisted locally to survive the
+// email magic-link round trip (which reloads onto a fresh /onboarding). They are
+// dropped the moment the flow lands on an account that already finished onboarding.
+import {
+  clearOnboardingDraft,
+  loadOnboardingDraft,
+  saveOnboardingDraft,
+} from '@/lib/onboardingDraft';
 
 const STEP_IDS = ['name', 'humanName', 'aboutIntro', 'age', 'notifications', 'createAccount'] as const;
 
@@ -32,38 +40,21 @@ const STEP_EMOTES: Partial<Record<(typeof STEP_IDS)[number], FrogEmote>> = {
   age: 'question',
 };
 
-// Persist answers locally so the frog/human names (collected before sign-in)
-// survive the email magic-link round trip, which reloads onto a fresh
-// /onboarding. Without this they're lost and the account keeps its default name.
-const ONBOARDING_SELECTIONS_KEY = 'onboardingSelections';
-
-function loadStoredSelections(): Record<string, string[]> {
-  if (typeof window === 'undefined') return {};
-  try {
-    const raw = window.localStorage.getItem(ONBOARDING_SELECTIONS_KEY);
-    const parsed = raw ? JSON.parse(raw) : {};
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-      ? (parsed as Record<string, string[]>)
-      : {};
-  } catch {
-    return {};
-  }
-}
-
 export default function OnboardingPage() {
   const router = useRouter();
-  const { user: authUser } = useAuth();
+  const { user: authUser, loading: authLoading } = useAuth();
   const hasAccount = !!authUser && !authUser.isAnonymous;
   const { indices: wardrobeIndices } = useWardrobeIndices(hasAccount);
   const [step, setStep] = useState(0);
   const [selections, setSelections] = useState<Record<string, string[]>>(
-    loadStoredSelections,
+    loadOnboardingDraft,
   );
   const [saving, setSaving] = useState(false);
   const [direction, setDirection] = useState(1);
   const [subStep, setSubStep] = useState(0);
   const [celebrating, setCelebrating] = useState(false);
   const mainRef = useRef<HTMLElement | null>(null);
+  const arrivalCheckedRef = useRef(false);
 
   useEffect(() => {
     mainRef.current?.scrollTo({ top: 0 });
@@ -71,15 +62,34 @@ export default function OnboardingPage() {
 
   // Keep the local copy in sync so it can be restored after the magic-link reload.
   useEffect(() => {
-    try {
-      window.localStorage.setItem(
-        ONBOARDING_SELECTIONS_KEY,
-        JSON.stringify(selections),
-      );
-    } catch {
-      // ignore storage failures (private mode, quota)
-    }
+    saveOnboardingDraft(selections);
   }, [selections]);
+
+  // Arriving on /onboarding with an account that already finished the flow must
+  // bounce home — replaying the draft would overwrite its real name and frog
+  // name. Only the arrival state is checked: a sign-in that happens later in the
+  // flow is owned by CreateAccountStep, which shows its own "welcome back" step.
+  useEffect(() => {
+    if (authLoading || arrivalCheckedRef.current) return;
+    arrivalCheckedRef.current = true;
+    if (!authUser || authUser.isAnonymous) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch('/api/user');
+        if (!res.ok) return;
+        const data = await res.json().catch(() => null);
+        if (cancelled || data?.onboardingCompleted !== true) return;
+        clearOnboardingDraft();
+        router.replace('/');
+      } catch {
+        // offline or transient — the save-time guard still protects the account
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [authLoading, authUser, router]);
 
   const stepIds = useMemo(
     () =>
@@ -158,6 +168,20 @@ export default function OnboardingPage() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ timezone }),
           });
+        } else if (!auth.currentUser.isAnonymous) {
+          // The session may have switched to a pre-existing account mid-flow (a
+          // magic link or Google sign-in resolved in another tab). Saving here
+          // would rename that account and its frog, so bail out instead.
+          const res = await fetch('/api/user', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ timezone }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (data?.alreadyOnboarded) {
+            clearOnboardingDraft();
+            return;
+          }
         }
         const [onboardingRes] = await Promise.all([
           fetch('/api/onboarding', {
@@ -189,11 +213,7 @@ export default function OnboardingPage() {
         // save failed (e.g. not yet authenticated), keep them for the retry after
         // the magic-link sign-in.
         if (onboardingRes.ok) {
-          try {
-            window.localStorage.removeItem(ONBOARDING_SELECTIONS_KEY);
-          } catch {
-            // ignore
-          }
+          clearOnboardingDraft();
           await mutate(
             '/api/user',
             (cur: Record<string, unknown> | undefined) =>

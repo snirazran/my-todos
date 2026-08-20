@@ -46,3 +46,17 @@ export function useBuddyBonusFlies(active = true): number {
   );
   return data?.bonusFlies ?? FALLBACK_BONUS_FLIES;
 }
+
+/**
+ * Whether the user already has a live bond, so surfaces that pitch the feature
+ * can stand down. `null` until the answer is known.
+ */
+export function useHasBuddy(active = true): boolean | null {
+  const { data } = useSWR<BuddyStateResponse>(
+    active ? '/api/buddy/state' : null,
+    fetcher,
+    { revalidateOnFocus: false },
+  );
+  if (!data) return null;
+  return Object.keys(data.byTaskId ?? {}).length > 0;
+}

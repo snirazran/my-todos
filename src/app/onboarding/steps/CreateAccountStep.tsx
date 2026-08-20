@@ -3,24 +3,35 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Loader2 } from 'lucide-react';
-import { sendSignInLinkToEmail, type AuthCredential } from 'firebase/auth';
+import { sendSignInLinkToEmail, signOut, type AuthCredential } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
-import { establishSessionCookie } from '@/lib/authCookie';
+import { clearSessionCookie, establishSessionCookie } from '@/lib/authCookie';
 import {
   GoogleAccountExistsError,
   getGoogleAuthErrorMessage,
   initNativeGoogleSignIn,
   signInWithExistingGoogle,
   signInWithGoogle,
+  signOutNativeGoogle,
 } from '@/lib/googleAuth';
 import { AccountConflictDialog } from '@/components/auth/AccountConflictDialog';
-import { createEmailLinkSettings } from '@/lib/emailLinkSettings';
+import {
+  createEmailLinkSettings,
+  setEmailLinkIntent,
+} from '@/lib/emailLinkSettings';
+import { describeSignInMethod, lookupAccountByEmail } from '@/lib/accountLookup';
+import { clearOnboardingDraft } from '@/lib/onboardingDraft';
 import { Input } from '@/components/ui/input';
 import { GoogleIcon } from '@/components/ui/GoogleIcon';
 import type { OnboardingStepProps } from './types';
 import { OnboardingFrogHeader, ONBOARDING_BODY_CLASS } from './OnboardingFrogHeader';
 
 type Step = 'enter' | 'email-sent';
+
+type ReturningAccount = {
+  name: string | null;
+  frogName: string | null;
+};
 
 const EMAIL_LINK_STORAGE_KEY = 'emailForSignIn';
 
@@ -39,6 +50,14 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
   const [conflict, setConflict] = useState<{
     credential: AuthCredential | null;
   } | null>(null);
+  const [existingEmail, setExistingEmail] = useState<{
+    email: string;
+    method: string | null;
+  } | null>(null);
+  const [returning, setReturning] = useState<ReturningAccount | null>(null);
+  const [sentIntent, setSentIntent] = useState<'new-account' | 'existing-account'>(
+    'new-account',
+  );
   const [switching, setSwitching] = useState(false);
 
   useEffect(() => {
@@ -47,22 +66,51 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
     });
   }, []);
 
+  const syncUser = async () => {
+    const user = auth.currentUser;
+    if (!user) throw new Error('Sign-in did not complete');
+    await establishSessionCookie(user);
+    const res = await fetch('/api/user', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      }),
+    });
+    return (await res.json().catch(() => ({}))) as {
+      isNewUser?: boolean;
+      alreadyOnboarded?: boolean;
+      name?: string | null;
+      frogName?: string | null;
+    };
+  };
+
+  // Signing in landed on an account that already exists and already has a frog.
+  // Onboarding must stop here: continuing would overwrite that account's name
+  // and frog name with the answers drafted in this session.
+  const showReturning = (data: {
+    name?: string | null;
+    frogName?: string | null;
+  }) => {
+    clearOnboardingDraft();
+    setReturning({ name: data.name ?? null, frogName: data.frogName ?? null });
+    setConflict(null);
+    setExistingEmail(null);
+    setLoading(false);
+    setSwitching(false);
+  };
+
   const handleGoogle = async () => {
     setLoading(true);
     setError(null);
     try {
       const current = auth.currentUser;
       await signInWithGoogle({ linkTo: current?.isAnonymous ? current : null });
-      const user = auth.currentUser;
-      if (!user) throw new Error('Sign-in did not complete');
-      await establishSessionCookie(user);
-      await fetch('/api/user', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        }),
-      });
+      const data = await syncUser();
+      if (data.alreadyOnboarded) {
+        showReturning(data);
+        return;
+      }
       onNext();
     } catch (signInError: any) {
       if (signInError instanceof GoogleAccountExistsError) {
@@ -79,29 +127,32 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
     setSwitching(true);
     try {
       await signInWithExistingGoogle(conflict.credential);
-      const user = auth.currentUser;
-      if (!user) throw new Error('Sign-in did not complete');
-      await establishSessionCookie(user);
-      const res = await fetch('/api/user', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (data?.isNewUser) {
-        setConflict(null);
-        setSwitching(false);
-        onNext();
-      } else {
-        window.location.replace('/');
+      const data = await syncUser();
+      if (data.alreadyOnboarded) {
+        showReturning(data);
+        return;
       }
+      setConflict(null);
+      setSwitching(false);
+      onNext();
     } catch (switchError: any) {
       setConflict(null);
       setError(getGoogleAuthErrorMessage(switchError));
       setSwitching(false);
     }
+  };
+
+  const sendEmailLink = async (address: string, intent: 'new-account' | 'existing-account') => {
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    await sendSignInLinkToEmail(
+      auth,
+      address,
+      createEmailLinkSettings(`${origin}/auth/email-callback`),
+    );
+    window.localStorage.setItem(EMAIL_LINK_STORAGE_KEY, address);
+    setEmailLinkIntent(intent);
+    setSentIntent(intent);
+    setStep('email-sent');
   };
 
   const handleSendEmailLink = async (event: FormEvent) => {
@@ -112,20 +163,55 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
     setLoading(true);
     setError(null);
     try {
-      const origin = typeof window !== 'undefined' ? window.location.origin : '';
-      await sendSignInLinkToEmail(
-        auth,
-        trimmed,
-        createEmailLinkSettings(`${origin}/auth/email-callback`),
-      );
-      window.localStorage.setItem(EMAIL_LINK_STORAGE_KEY, trimmed);
-      setStep('email-sent');
+      // Firebase removed client-side sign-in-method lookup (email enumeration
+      // protection), so ask the server before sending the link — otherwise the
+      // link silently signs into the existing account with no warning at all.
+      const lookup = await lookupAccountByEmail(trimmed);
+      if (lookup.exists) {
+        setExistingEmail({
+          email: trimmed,
+          method: describeSignInMethod(lookup.providers),
+        });
+        setLoading(false);
+        return;
+      }
+      await sendEmailLink(trimmed, 'new-account');
     } catch (sendError: unknown) {
       setError(sendError instanceof Error ? sendError.message : 'Could not send email link');
     } finally {
       setLoading(false);
     }
   };
+
+  const handleConfirmExistingEmail = async () => {
+    if (!existingEmail || switching) return;
+    setSwitching(true);
+    try {
+      await sendEmailLink(existingEmail.email, 'existing-account');
+      setExistingEmail(null);
+    } catch (sendError: unknown) {
+      setError(
+        sendError instanceof Error ? sendError.message : 'Could not send email link',
+      );
+      setExistingEmail(null);
+    } finally {
+      setSwitching(false);
+    }
+  };
+
+  const handleUseAnotherAccount = async () => {
+    setSwitching(true);
+    await Promise.allSettled([
+      auth ? signOut(auth) : Promise.resolve(),
+      clearSessionCookie(),
+      signOutNativeGoogle(),
+    ]);
+    setReturning(null);
+    setSwitching(false);
+    setStep('enter');
+  };
+
+  const returningFrogName = returning?.frogName?.trim() || 'your frog';
 
   return (
     <div className="relative flex w-full flex-1 flex-col">
@@ -208,22 +294,50 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
               >
                 <p className="text-sm text-foreground">Check your email at</p>
                 <p className="mt-1 text-sm font-bold text-foreground">{email}</p>
-                <p className="mt-3 text-xs text-muted-foreground">
-                  Tap the link to finish signing in. You can hop in meanwhile.
-                </p>
-                <button
-                  type="button"
-                  onClick={onNext}
-                  disabled={saving}
-                  className="mt-6 h-12 rounded-2xl bg-primary px-8 text-sm font-black uppercase tracking-wider text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {saving ? 'Setting up...' : 'Hop in'}
-                </button>
+                {sentIntent === 'existing-account' ? (
+                  <p className="mt-3 text-xs text-muted-foreground">
+                    Tap the link to sign back into your account. Your frog and
+                    progress will be exactly as you left them.
+                  </p>
+                ) : (
+                  <>
+                    <p className="mt-3 text-xs text-muted-foreground">
+                      Tap the link to finish signing in. You can hop in meanwhile.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={onNext}
+                      disabled={saving}
+                      className="mt-6 h-12 rounded-2xl bg-primary px-8 text-sm font-black uppercase tracking-wider text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {saving ? 'Setting up...' : 'Hop in'}
+                    </button>
+                  </>
+                )}
               </motion.div>
             )}
           </AnimatePresence>
         </div>
       </div>
+
+      <AccountConflictDialog
+        open={!!existingEmail}
+        busy={switching}
+        title="You already have a frog!"
+        message={
+          <>
+            <span className="font-bold text-foreground">{existingEmail?.email}</span>{' '}
+            already has a Frogress account
+            {existingEmail?.method ? ` you set up with ${existingEmail.method}` : ''}.
+            We&apos;ll send a link to sign back into it — {frogName} from this
+            session won&apos;t be saved.
+          </>
+        }
+        confirmLabel="Sign in to my account"
+        cancelLabel="Use a different email"
+        onConfirm={handleConfirmExistingEmail}
+        onCancel={() => setExistingEmail(null)}
+      />
 
       <AccountConflictDialog
         open={!!conflict}
@@ -233,6 +347,18 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
         confirmLabel="Switch to my account"
         onConfirm={handleSwitchToExisting}
         onCancel={() => setConflict(null)}
+      />
+
+      <AccountConflictDialog
+        open={!!returning}
+        busy={switching}
+        title={returning?.name ? `Welcome back, ${returning.name}!` : 'Welcome back!'}
+        message={`${returningFrogName} is right where you left them — nothing was renamed or reset. The frog you just set up here wasn't saved.`}
+        confirmLabel={`Go to ${returningFrogName}`}
+        cancelLabel="Use a different account"
+        dismissOnBackdrop={false}
+        onConfirm={() => window.location.replace('/')}
+        onCancel={handleUseAnotherAccount}
       />
     </div>
   );

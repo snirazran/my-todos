@@ -14,7 +14,11 @@ import {
 import { AccountConflictDialog } from '@/components/auth/AccountConflictDialog';
 import { GoogleIcon } from '@/components/ui/GoogleIcon';
 import { establishSessionCookie } from '@/lib/authCookie';
-import { createEmailLinkSettings } from '@/lib/emailLinkSettings';
+import {
+  createEmailLinkSettings,
+  setEmailLinkIntent,
+} from '@/lib/emailLinkSettings';
+import { describeSignInMethod, lookupAccountByEmail } from '@/lib/accountLookup';
 import { useEffect, useRef, useState } from 'react';
 import { Loader2, ArrowRight } from 'lucide-react';
 import {
@@ -107,6 +111,10 @@ function LoginPageInner() {
   const [resendIn, setResendIn] = useState(0);
   const [conflict, setConflict] = useState<{
     credential: AuthCredential | null;
+  } | null>(null);
+  const [existingEmail, setExistingEmail] = useState<{
+    email: string;
+    method: string | null;
   } | null>(null);
   const [switching, setSwitching] = useState(false);
 
@@ -265,6 +273,38 @@ function LoginPageInner() {
     }
   };
 
+  const sendEmailLink = async (
+    address: string,
+    intent: 'new-account' | 'existing-account' | null,
+  ) => {
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    await sendSignInLinkToEmail(
+      auth,
+      address,
+      createEmailLinkSettings(`${origin}/auth/email-callback`),
+    );
+    window.localStorage.setItem(EMAIL_LINK_STORAGE_KEY, address);
+    window.localStorage.setItem(POST_LOGIN_ROUTE_KEY, postLoginRoute);
+    setEmailLinkIntent(intent);
+    setDir(1);
+    setStep('email-sent');
+    setResendIn(30);
+  };
+
+  const handleConfirmExistingEmail = async () => {
+    if (!existingEmail || switching) return;
+    setSwitching(true);
+    try {
+      await sendEmailLink(existingEmail.email, 'existing-account');
+      setExistingEmail(null);
+    } catch (err: any) {
+      setExistingEmail(null);
+      showNotification(err?.message || 'Could not send email link');
+    } finally {
+      setSwitching(false);
+    }
+  };
+
   const handleSendEmailLink = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = email.trim();
@@ -276,18 +316,20 @@ function LoginPageInner() {
       completed: false,
       onPersist: async () => {
         try {
-          const origin =
-            typeof window !== 'undefined' ? window.location.origin : '';
-          await sendSignInLinkToEmail(
-            auth,
-            trimmed,
-            createEmailLinkSettings(`${origin}/auth/email-callback`),
-          );
-          window.localStorage.setItem(EMAIL_LINK_STORAGE_KEY, trimmed);
-          window.localStorage.setItem(POST_LOGIN_ROUTE_KEY, postLoginRoute);
-          setDir(1);
-          setStep('email-sent');
-          setResendIn(30);
+          // A guest upgrading loses this device's progress if the email turns out
+          // to belong to an existing account, so warn before sending the link.
+          if (isUpgrade) {
+            const lookup = await lookupAccountByEmail(trimmed);
+            if (lookup.exists) {
+              setExistingEmail({
+                email: trimmed,
+                method: describeSignInMethod(lookup.providers),
+              });
+              respawnFly();
+              return;
+            }
+          }
+          await sendEmailLink(trimmed, isUpgrade ? 'new-account' : null);
         } catch (err: any) {
           showNotification(err?.message || 'Could not send email link');
           respawnFly();
@@ -318,6 +360,16 @@ function LoginPageInner() {
       showNotification(err?.message || 'Could not resend the link');
     }
   };
+
+  const existingEmailMessage = (
+    <>
+      <span className="font-bold text-foreground">{existingEmail?.email}</span>{' '}
+      already has a Frogress account
+      {existingEmail?.method ? ` you set up with ${existingEmail.method}` : ''}.
+      We&apos;ll send a link to sign back into it — your guest progress on this
+      device will be left behind.
+    </>
+  );
 
   return (
     <main className="fixed inset-0 flex flex-col items-center overflow-x-hidden overflow-y-auto bg-background px-6 py-10">
@@ -541,6 +593,17 @@ function LoginPageInner() {
         confirmLabel="Switch to my account"
         onConfirm={handleSwitchToExisting}
         onCancel={() => setConflict(null)}
+      />
+
+      <AccountConflictDialog
+        open={!!existingEmail}
+        busy={switching}
+        title="You already have a frog!"
+        message={existingEmailMessage}
+        confirmLabel="Sign in to my account"
+        cancelLabel="Use a different email"
+        onConfirm={handleConfirmExistingEmail}
+        onCancel={() => setExistingEmail(null)}
       />
 
       {/* Tongue overlay — driven directly by the RAF loop in useFrogTongue */}
