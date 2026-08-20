@@ -10,6 +10,7 @@ import NotificationStep from './steps/NotificationStep';
 import AboutIntroStep from './steps/AboutIntroStep';
 import ProfileQuestionsStep, { PROFILE_QUESTION_COUNT } from './steps/ProfileQuestionsStep';
 import CreateAccountStep from './steps/CreateAccountStep';
+import StarterPlanStep from './steps/StarterPlanStep';
 import CelebrationStep from './steps/CelebrationStep';
 import { OnboardingTopBar } from './steps/OnboardingTopBar';
 import { OnboardingFrogStage } from './steps/OnboardingFrogHeader';
@@ -30,7 +31,7 @@ import {
   saveOnboardingDraft,
 } from '@/lib/onboardingDraft';
 
-const STEP_IDS = ['name', 'humanName', 'aboutIntro', 'age', 'notifications', 'createAccount'] as const;
+const STEP_IDS = ['name', 'humanName', 'aboutIntro', 'age', 'plan', 'notifications', 'createAccount'] as const;
 
 const CELEBRATION_MS = 2600;
 
@@ -183,6 +184,26 @@ export default function OnboardingPage() {
             return;
           }
         }
+        const starterPlanIds = selections.starterPlan ?? [];
+        let starterCategoryTagMap: Array<{ categoryId: string; tagIds: string[] }> = [];
+        if (focusAreaIds.length > 0 && starterPlanIds.length > 0) {
+          try {
+            const planRes = await fetch('/api/onboarding/starter-plan', {
+              signal: AbortSignal.timeout(15000),
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                itemIds: starterPlanIds,
+                selectedCategoryIds: focusAreaIds,
+                timezone,
+              }),
+            });
+            const planData = await planRes.json().catch(() => null);
+            if (Array.isArray(planData?.categoryTagMap)) {
+              starterCategoryTagMap = planData.categoryTagMap;
+            }
+          } catch {}
+        }
         const [onboardingRes] = await Promise.all([
           fetch('/api/onboarding', {
             method: 'POST',
@@ -202,7 +223,7 @@ export default function OnboardingPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                   selectedCategoryIds: focusAreaIds,
-                  categoryTagMap: [],
+                  categoryTagMap: starterCategoryTagMap,
                   createSuggestions: false,
                   timezone,
                 }),
@@ -317,6 +338,7 @@ export default function OnboardingPage() {
         {currentId === 'name' && <FrogNameStep {...stepProps} />}
         {currentId === 'humanName' && <HumanNameStep {...stepProps} />}
         {currentId === 'createAccount' && <CreateAccountStep {...stepProps} />}
+        {currentId === 'plan' && <StarterPlanStep {...stepProps} />}
         {currentId === 'notifications' && <NotificationStep {...stepProps} />}
         {currentId === 'aboutIntro' && <AboutIntroStep {...stepProps} />}
         {currentId === 'age' && (

@@ -10,6 +10,7 @@ import {
 const CLIENT_EVENTS = new Set([
   'app_opened',
   'page_viewed',
+  'starter_plan_shown',
   'ad_requested',
   'ad_impression',
   'ad_completed',
@@ -88,6 +89,7 @@ export async function POST(req: NextRequest) {
     !authenticated &&
     name !== 'app_opened' &&
     name !== 'page_viewed' &&
+    name !== 'starter_plan_shown' &&
     !name.startsWith('try_') &&
     !name.startsWith('fly_game_') &&
     name !== 'referral_invite_opened' &&

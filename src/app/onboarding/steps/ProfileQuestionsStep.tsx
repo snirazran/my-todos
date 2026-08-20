@@ -67,6 +67,13 @@ const ABOUT_QUESTIONS: AboutQuestion[] = [
 
 const FOCUS_AREAS_QUESTION_ID = 'focusAreas';
 
+// The focus areas are the only question with enough options to scroll on a
+// desktop window. Widening past the phone-width column lets the cover art lead
+// without overflowing; the shell behind is plain `bg-background`, so the
+// breakout reads as seamless below the header artwork. The flex parent centers
+// on the cross axis, so an over-wide child stays centred without an offset.
+const FOCUS_AREAS_WIDTH_CLASS = 'md:w-[min(100vw-4rem,56rem)] md:max-w-none';
+
 export const PROFILE_QUESTION_COUNT = ABOUT_QUESTIONS.length + 1;
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
@@ -114,6 +121,7 @@ export default function ProfileQuestionsStep({
     [focusAreasQuestion],
   );
   const currentQuestion = displayedQuestions[questionIndex];
+  const isFocusAreas = currentQuestion.id === FOCUS_AREAS_QUESTION_ID;
   const selectedValues = selections[currentQuestion.id] ?? [];
   const selected = selectedValues[0];
   const compactGrid =
@@ -168,12 +176,15 @@ export default function ProfileQuestionsStep({
       >
         <div
           className={cn(
-            'flex w-[calc(100%+2rem)] max-w-[calc(100vw-2rem)] flex-col pb-6 md:mx-auto md:w-full md:max-w-md',
+            'flex w-[calc(100%+2rem)] max-w-[calc(100vw-2rem)] flex-col pb-6',
             'mt-1 gap-2.5',
+            isFocusAreas
+              ? FOCUS_AREAS_WIDTH_CLASS
+              : 'md:mx-auto md:w-full md:max-w-md',
           )}
         >
-          {currentQuestion.id === FOCUS_AREAS_QUESTION_ID ? (
-            <div className="flex flex-col gap-3">
+          {isFocusAreas ? (
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
               {focusAreaCategories.map((category, index) => {
                 const isSelected = selectedValues.includes(category.id);
                 return (
@@ -192,14 +203,17 @@ export default function ProfileQuestionsStep({
                     }}
                     whileTap={{ scale: 0.98 }}
                     className={cn(
-                      'flex items-center gap-3 rounded-3xl border-2 bg-background p-2.5 pr-4 text-left shadow-sm transition-colors duration-200',
+                      'relative block h-[104px] overflow-hidden rounded-3xl border-2 bg-background text-left shadow-sm transition-colors duration-200',
+                      // Short banner on phones so the list stays scannable; a
+                      // wider tile once the grid gains columns.
+                      'md:h-auto md:aspect-[16/9]',
                       isSelected
-                        ? 'border-primary/60 bg-primary/10'
-                        : 'border-border/50 hover:border-primary/30 hover:bg-muted/30',
+                        ? 'border-primary'
+                        : 'border-transparent hover:border-white/50',
                       saving && 'cursor-not-allowed opacity-70',
                     )}
                   >
-                    <span className="relative h-16 w-24 shrink-0 overflow-hidden rounded-2xl short:h-14 short:w-[84px]">
+                    <span className="absolute inset-0">
                       {category.coverImageUrl ? (
                         <img
                           src={category.coverImageUrl}
@@ -219,22 +233,18 @@ export default function ProfileQuestionsStep({
                       )}
                     </span>
 
-                    <span className="min-w-0 flex-1">
-                      <span
-                        className={cn(
-                          'block text-base font-black leading-tight tracking-tight',
-                          isSelected ? 'text-primary' : 'text-foreground',
-                        )}
-                      >
+                    {/* Scrim: darkens only the slice behind the text so the art stays vivid. */}
+                    <span
+                      aria-hidden
+                      className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent"
+                    />
+
+                    <span className="absolute inset-x-0 bottom-0 z-10 p-3.5 md:p-4">
+                      <span className="block text-base font-black leading-tight tracking-tight text-white md:text-lg">
                         {category.name}
                       </span>
                       {category.onboardingSentence?.trim() ? (
-                        <span
-                          className={cn(
-                            'mt-0.5 block text-sm font-medium leading-snug line-clamp-2',
-                            isSelected ? 'text-primary/75' : 'text-muted-foreground',
-                          )}
-                        >
+                        <span className="mt-0.5 block text-sm font-medium leading-snug text-white/85 line-clamp-2">
                           {category.onboardingSentence}
                         </span>
                       ) : null}
@@ -242,10 +252,10 @@ export default function ProfileQuestionsStep({
 
                     <span
                       className={cn(
-                        'grid h-7 w-7 shrink-0 place-items-center rounded-full border-2 transition-all duration-200',
+                        'absolute right-3 top-3 z-10 grid h-7 w-7 place-items-center rounded-full border-2 transition-all duration-200 md:h-8 md:w-8',
                         isSelected
                           ? 'border-primary bg-primary text-primary-foreground'
-                          : 'border-border text-transparent',
+                          : 'border-white/80 bg-black/30 text-transparent backdrop-blur-sm',
                       )}
                       aria-hidden
                     >
@@ -357,7 +367,7 @@ export default function ProfileQuestionsStep({
               disabled={selectedValues.length === 0 || saving}
               whileTap={{ scale: 0.97 }}
               className={cn(
-                'h-14 w-full rounded-3xl font-bold text-base tracking-wide transition-all duration-200',
+                'h-14 w-full rounded-3xl font-bold text-base tracking-wide transition-all duration-200 md:w-80',
                 selectedValues.length > 0 && !saving
                   ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/25 hover:brightness-110'
                   : 'bg-muted text-muted-foreground cursor-not-allowed',

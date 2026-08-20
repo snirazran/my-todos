@@ -2,6 +2,7 @@ import mongoose, { Schema, type Model } from 'mongoose';
 
 export type { QuestCoverImageFile } from './QuestTemplate';
 import type { QuestCoverImageFile } from './QuestTemplate';
+import type { StarterTaskTemplate } from '@/lib/quests/starterPlan';
 
 export interface QuestCategoryDoc {
   _id?: mongoose.Types.ObjectId;
@@ -16,6 +17,7 @@ export interface QuestCategoryDoc {
   backgroundFrom: string;
   backgroundTo: string;
   isBuiltIn: boolean;
+  starterTasks?: StarterTaskTemplate[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -33,6 +35,7 @@ const QuestCategorySchema = new Schema<QuestCategoryDoc>(
     backgroundFrom: { type: String, default: '#1e1b4b' },
     backgroundTo: { type: String, default: '#312e81' },
     isBuiltIn: { type: Boolean, default: false },
+    starterTasks: { type: [Schema.Types.Mixed], default: undefined },
   },
   {
     collection: 'quest_categories',

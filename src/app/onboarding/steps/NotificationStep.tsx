@@ -7,7 +7,7 @@ import { FirebaseMessaging } from '@capacitor-firebase/messaging';
 import { enableWebPush } from '@/lib/webPush';
 import { cn } from '@/lib/utils';
 import type { OnboardingStepProps } from './types';
-import { OnboardingFrogHeader, ONBOARDING_BODY_CLASS } from './OnboardingFrogHeader';
+import { OnboardingFrogHeader, ONBOARDING_BODY_CLASS, ONBOARDING_FOOTER_SPACER_CLASS } from './OnboardingFrogHeader';
 
 async function enableNotifications() {
   if (Capacitor.isNativePlatform()) {
@@ -83,7 +83,7 @@ export default function NotificationStep({ selections, onNext, saving, direction
 
       </motion.div>
 
-      <div className="flex-[8]" />
+      <div className={ONBOARDING_FOOTER_SPACER_CLASS} />
 
       <div className="flex flex-col items-center gap-3 pb-[calc(4rem+env(safe-area-inset-bottom))]">
         <motion.button

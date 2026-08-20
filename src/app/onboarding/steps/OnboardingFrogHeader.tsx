@@ -10,6 +10,10 @@ const Frog = dynamic(() => import('@/components/ui/frog'), { ssr: false });
 export const ONBOARDING_BODY_CLASS =
   'pt-[calc(430px+env(safe-area-inset-top))] short:pt-[calc(382px+env(safe-area-inset-top))] md:pt-[398px]';
 
+// Phone viewports are short enough that a bottom-pinned action lands just below
+// the content. A desktop window is far taller, so cap how far the spacer pushes.
+export const ONBOARDING_FOOTER_SPACER_CLASS = 'flex-[8] md:max-h-40';
+
 // Default to the bare frog (no hat/body/hand item) so every onboarding screen
 // shows the same plain frog instead of a random outfit.
 const DEFAULT_FROG_INDICES: Partial<Record<WardrobeSlot, number>> = {

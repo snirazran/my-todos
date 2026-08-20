@@ -3,7 +3,7 @@
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import type { OnboardingStepProps } from './types';
-import { OnboardingFrogHeader } from './OnboardingFrogHeader';
+import { OnboardingFrogHeader, ONBOARDING_FOOTER_SPACER_CLASS } from './OnboardingFrogHeader';
 
 export default function AboutIntroStep({ selections, onNext, saving, direction }: OnboardingStepProps) {
   const humanName = selections.humanName?.[0]?.trim();
@@ -25,7 +25,7 @@ export default function AboutIntroStep({ selections, onNext, saving, direction }
         className="pt-[370px] md:pt-[398px]"
       />
 
-      <div className="flex-[8]" />
+      <div className={ONBOARDING_FOOTER_SPACER_CLASS} />
 
       <div className="flex flex-col items-center pb-[calc(4rem+env(safe-area-inset-bottom))]">
         <p className="mb-3 text-center text-xs font-bold uppercase tracking-widest text-muted-foreground">

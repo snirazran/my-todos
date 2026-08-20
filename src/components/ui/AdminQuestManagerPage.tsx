@@ -28,6 +28,11 @@ import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/Icon';
 import { AdminPactManager } from '@/components/ui/AdminPactManager';
 import {
+  AdminStarterPlanConfigCard,
+  StarterTasksEditor,
+} from '@/components/ui/AdminStarterPlan';
+import type { StarterTaskTemplate } from '@/lib/quests/starterPlan';
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -166,6 +171,7 @@ type AdminCategory = {
   accent: string;
   backgroundFrom: string;
   backgroundTo: string;
+  starterTasks?: StarterTaskTemplate[];
 };
 
 type CategoryFormState = {
@@ -173,6 +179,7 @@ type CategoryFormState = {
   description: string;
   onboardingSentence: string;
   coverImageUrl?: string;
+  starterTasks: StarterTaskTemplate[];
 };
 
 type AdminRecipePoolEntryStreak = {
@@ -507,6 +514,7 @@ export function AdminQuestManagerPage() {
     description: '',
     onboardingSentence: '',
     coverImageUrl: undefined,
+    starterTasks: [],
   });
 
   // Clean Sweep bonus + Reward Roll tables
@@ -750,12 +758,14 @@ export function AdminQuestManagerPage() {
             description: cat.description,
             onboardingSentence: cat.onboardingSentence ?? '',
             coverImageUrl: cat.coverImageUrl,
+            starterTasks: cat.starterTasks ?? [],
           }
         : {
             name: '',
             description: '',
             onboardingSentence: '',
             coverImageUrl: undefined,
+            starterTasks: [],
           },
     );
     setConfirmAction(null);
@@ -2895,6 +2905,8 @@ export function AdminQuestManagerPage() {
   // pact can be made in it, so authoring them apart invited them to drift.
   const renderPact = () => (
     <div className="space-y-8">
+      <AdminStarterPlanConfigCard />
+
       <div className="space-y-4">
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -4124,6 +4136,13 @@ export function AdminQuestManagerPage() {
                   )}
                 </button>
               </div>
+              <StarterTasksEditor
+                categoryName={categoryForm.name}
+                tasks={categoryForm.starterTasks}
+                onChange={(starterTasks) =>
+                  setCategoryForm((prev) => ({ ...prev, starterTasks }))
+                }
+              />
             </div>
             <DialogFooter className="shrink-0 border-t border-border/50 bg-card/95 px-6 py-4 sm:gap-3">
               <Button variant="outline" className="rounded-2xl" onClick={() => { setCategoryDialogOpen(false); setConfirmAction(null); }}>Cancel</Button>

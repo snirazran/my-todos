@@ -7,6 +7,11 @@ import {
   isCoverProxyUrl,
   uploadCoverFromDataUrl,
 } from '@/lib/quests/coverStorage';
+import {
+  normalizeStarterTasks,
+  type StarterTaskTemplate,
+} from '@/lib/quests/starterPlan';
+import { starterTasksForCategory } from '@/lib/quests/starterPlanServer';
 
 function sanitizeCoverImageUrl(value: unknown) {
   // A new data URL, or our existing proxy URL (unchanged edit). Else cleared.
@@ -27,6 +32,7 @@ function categoryToJSON(c: {
   backgroundFrom: string;
   backgroundTo: string;
   isBuiltIn: boolean;
+  starterTasks?: StarterTaskTemplate[];
 }) {
   return {
     id: c.categoryId,
@@ -39,6 +45,8 @@ function categoryToJSON(c: {
     backgroundFrom: c.backgroundFrom,
     backgroundTo: c.backgroundTo,
     isBuiltIn: c.isBuiltIn,
+    starterTasks: starterTasksForCategory(c),
+    hasCustomStarterTasks: normalizeStarterTasks(c.starterTasks).length > 0,
   };
 }
 
@@ -64,6 +72,7 @@ export async function GET() {
           backgroundFrom: c.backgroundFrom,
           backgroundTo: c.backgroundTo,
           isBuiltIn: false,
+          starterTasks: c.starterTasks,
         }),
       ),
     });
@@ -79,6 +88,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { name, shortLabel, description, onboardingSentence, accent, backgroundFrom, backgroundTo } = body;
     const rawCoverImageUrl = sanitizeCoverImageUrl(body.coverImageUrl);
+    const starterTasks = normalizeStarterTasks(body.starterTasks);
 
     if (!name?.trim()) {
       return NextResponse.json({ error: 'Category name is required' }, { status: 400 });
@@ -109,6 +119,7 @@ export async function POST(req: NextRequest) {
       backgroundFrom: backgroundFrom ?? '#1e1b4b',
       backgroundTo: backgroundTo ?? '#312e81',
       isBuiltIn: false,
+      ...(starterTasks.length > 0 ? { starterTasks } : {}),
     });
 
     return NextResponse.json({
@@ -124,6 +135,7 @@ export async function POST(req: NextRequest) {
         backgroundFrom: category.backgroundFrom,
         backgroundTo: category.backgroundTo,
         isBuiltIn: category.isBuiltIn,
+        starterTasks: category.starterTasks,
       }),
     });
   } catch {
@@ -153,6 +165,15 @@ export async function PUT(req: NextRequest) {
       isBuiltIn: false,
     };
     const unsetFields: Record<string, 1> = {};
+
+    if (Object.prototype.hasOwnProperty.call(body, 'starterTasks')) {
+      const starterTasks = normalizeStarterTasks(body.starterTasks);
+      if (starterTasks.length > 0) {
+        updateSet.starterTasks = starterTasks;
+      } else {
+        unsetFields.starterTasks = 1;
+      }
+    }
 
     if (isCoverDataUrl(rawCoverImageUrl)) {
       // New image — upload to Firebase, store proxy URL + metadata.
@@ -191,6 +212,7 @@ export async function PUT(req: NextRequest) {
         backgroundFrom: category.backgroundFrom,
         backgroundTo: category.backgroundTo,
         isBuiltIn: category.isBuiltIn,
+        starterTasks: category.starterTasks,
       }),
     });
   } catch {

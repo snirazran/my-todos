@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { Shuffle, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { OnboardingStepProps } from './types';
-import { OnboardingFrogHeader, ONBOARDING_BODY_CLASS } from './OnboardingFrogHeader';
+import { OnboardingFrogHeader, ONBOARDING_BODY_CLASS, ONBOARDING_FOOTER_SPACER_CLASS } from './OnboardingFrogHeader';
 
 const NAME_OPTIONS = [
   'Cookie',
@@ -127,7 +127,7 @@ export default function FrogNameStep({ selections, onSelect, onNext, saving, dir
         </motion.div>
       </div>
 
-      <div className="flex-[8]" />
+      <div className={ONBOARDING_FOOTER_SPACER_CLASS} />
 
       <div className="flex justify-center pb-[calc(4rem+env(safe-area-inset-bottom))]">
         <motion.button
