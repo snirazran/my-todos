@@ -135,7 +135,7 @@ export default function StarterPlanStep({
         transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
         className={cn('flex flex-col items-center', ONBOARDING_BODY_CLASS)}
       >
-        <div className="flex w-full flex-col gap-2.5 md:mx-auto md:max-w-md">
+        <div className="flex w-full flex-col gap-2.5 pb-2 md:mx-auto md:max-w-md">
           {isLoading || checked === null
             ? [0, 1, 2].map((i) => (
                 <div
@@ -227,7 +227,11 @@ export default function StarterPlanStep({
 
       <div className="flex-1" />
 
-      <div className="sticky bottom-0 z-30 mt-2 flex flex-col items-center gap-2 bg-gradient-to-t from-background via-background/95 to-transparent pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-4">
+      <div className="sticky bottom-0 z-30 mt-2 flex flex-col items-center gap-2 bg-background pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-3">
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 bottom-full h-8 bg-gradient-to-t from-background to-transparent"
+        />
         <motion.button
           type="button"
           onClick={() => commit(selectedIds)}

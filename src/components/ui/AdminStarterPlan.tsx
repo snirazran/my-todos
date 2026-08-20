@@ -361,8 +361,9 @@ export function AdminStarterPlanConfigCard() {
             Tag per area
           </span>
           <span className="text-[11px] text-muted-foreground">
-            Creates the area&apos;s tag and links it, so the plan already counts
-            toward that area.
+            Creates the area&apos;s tag in its own colour and links it, so the plan
+            already counts toward that area. Bounded by the user&apos;s tag limit
+            (10 free / 50 Plus) — any area past it still gets its tasks, untagged.
           </span>
         </label>
       </div>

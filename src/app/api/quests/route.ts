@@ -20,6 +20,7 @@ import {
   objectiveHintText,
 } from '@/lib/quests/metricLabels';
 import { guideContextForBlock, guideIdForBlock } from '@/lib/hints/guides';
+import { FREE_TAG_LIMIT } from '@/lib/tags/limits';
 
 const isDataUrl = (value: unknown): value is string =>
   typeof value === 'string' && value.startsWith('data:');
@@ -30,7 +31,6 @@ const templateCoverRef = (templateId: string) =>
 const categoryCoverRef = (categoryId: string) =>
   `/api/quests/cover?type=category&id=${encodeURIComponent(categoryId)}`;
 
-const FREE_TAG_LIMIT = 6;
 function withTemplateCover<T extends { templateId?: string; coverImageUrl?: string }>(
   quest: T,
   templatesWithCover: Set<string>,

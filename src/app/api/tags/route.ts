@@ -6,6 +6,7 @@ import TaskModel from '@/lib/models/Task';
 import QuestCategoryModel from '@/lib/models/QuestCategory';
 import { getZonedToday } from '@/lib/utils';
 import { v4 as uuid } from 'uuid';
+import { FREE_TAG_LIMIT, PREMIUM_TAG_LIMIT } from '@/lib/tags/limits';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,9 +46,6 @@ function repeatLabel(t: any): string {
       return 'Weekly';
   }
 }
-
-const FREE_TAG_LIMIT = 6;
-const PREMIUM_TAG_LIMIT = 50;
 
 function normalizeUserTag(tag: any, index: number) {
   if (typeof tag === 'string') {

@@ -9,10 +9,12 @@ import QuestCategoryModel from '@/lib/models/QuestCategory';
 import { createTasksForUser } from '@/app/api/tasks/route';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
 import { buildStarterPlanForAreas } from '@/lib/quests/starterPlanServer';
-import type { StarterPlanItem } from '@/lib/quests/starterPlan';
+import {
+  pickStarterTagColor,
+  type StarterPlanItem,
+} from '@/lib/quests/starterPlan';
 
-const FREE_TAG_LIMIT = 6;
-const PREMIUM_TAG_LIMIT = 50;
+import { FREE_TAG_LIMIT, PREMIUM_TAG_LIMIT } from '@/lib/tags/limits';
 
 function parseAreas(value: string | null): string[] {
   if (!value) return [];
@@ -139,6 +141,11 @@ export async function POST(req: NextRequest) {
             accent?: string;
           }>
         >();
+      const takenColors = new Set(
+        existingTags
+          .map((tag) => (tag.color ?? '').trim().toLowerCase())
+          .filter(Boolean),
+      );
       const newTags: Array<{ id: string; name: string; color: string }> = [];
       let slots = limit - existingTags.length;
       for (const categoryId of usedCategoryIds) {
@@ -154,8 +161,9 @@ export async function POST(req: NextRequest) {
         const tag = {
           id: uuid(),
           name: label,
-          color: doc.accent?.trim() || '#22c55e',
+          color: pickStarterTagColor(categoryId, takenColors, doc.accent),
         };
+        takenColors.add(tag.color.toLowerCase());
         newTags.push(tag);
         byName.set(label.toLowerCase(), tag.id);
         tagIdByCategory.set(categoryId, tag.id);
