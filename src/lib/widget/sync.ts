@@ -9,6 +9,7 @@ import {
   type WidgetTask,
 } from './types';
 import { clearWidgetState, drainWidgetQueue, pushWidgetState } from './bridge';
+import { pickFrogLine } from '@/lib/frogSpeech';
 
 const SEEN_GUEST_UIDS_KEY = 'frogress_widget_guest_uids';
 
@@ -84,6 +85,45 @@ export function mayApply(action: PendingAction, currentUid: string): boolean {
   return guestUidsOnThisDevice().includes(action.uid);
 }
 
+let lastMessageKey = '';
+let lastMessage = '';
+
+/**
+ * The frog's line, held stable across pushes.
+ *
+ * pickFrogLine is deliberately random, so recomputing it on every sync would
+ * change the payload signature every time and spend a WidgetKit reload for a
+ * reworded sentence. Keying it to the things the line actually reacts to means
+ * it only changes when the situation does.
+ */
+function widgetMessage(input: {
+  done: number;
+  total: number;
+  fullness: number | null;
+  streak: number;
+}): string {
+  const hungerPercent =
+    input.fullness === null ? null : Math.round(input.fullness * 100);
+  const key = [
+    todayKey(),
+    Math.floor(new Date().getHours() / 3),
+    input.done,
+    input.total,
+    hungerPercent === null ? 'x' : Math.floor(hungerPercent / 20),
+    input.streak,
+  ].join('|');
+
+  if (key === lastMessageKey && lastMessage) return lastMessage;
+  lastMessageKey = key;
+  lastMessage = pickFrogLine('welcome', {
+    done: input.done,
+    total: input.total,
+    hungerPercent,
+    streak: input.streak,
+  }).replace(/\s*\n\s*/g, ' ');
+  return lastMessage;
+}
+
 export function buildPayload(input: {
   uid: string;
   guest: boolean;
@@ -114,6 +154,12 @@ export function buildPayload(input: {
     ),
     doneCount: done.length,
     totalCount: input.tasks.length,
+    message: widgetMessage({
+      done: done.length,
+      total: input.tasks.length,
+      fullness: input.fullness,
+      streak: input.streak,
+    }),
     tasks: rows,
     updatedAt: Date.now(),
   };

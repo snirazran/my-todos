@@ -82,12 +82,16 @@ private let sampleState = WidgetState(
     streak: 12,
     mood: "happy",
     doneCount: 1,
-    totalCount: 4,
+    totalCount: 7,
+    message: "Three left before dinner \u{1F340}",
     tasks: [
         WidgetTask(id: "1", text: "Email the landlord", done: true),
         WidgetTask(id: "2", text: "Gym — legs", done: false),
         WidgetTask(id: "3", text: "Book dentist", done: false),
         WidgetTask(id: "4", text: "Water the plants", done: false),
+        WidgetTask(id: "5", text: "Reply to Maya", done: false),
+        WidgetTask(id: "6", text: "Stretch for ten minutes", done: false),
+        WidgetTask(id: "7", text: "Read a chapter", done: false),
     ],
     updatedAt: 0
 )
@@ -384,21 +388,106 @@ private struct StreakBadge: View {
 
 // MARK: - Widget view
 
+/// "3/7" — the glance-value every good to-do widget leads with.
+private struct CountChip: View {
+    let done: Int
+    let total: Int
+
+    var body: some View {
+        Text("\(done)/\(total)")
+            .font(.system(size: 11, weight: .bold))
+            .monospacedDigit()
+            .foregroundStyle(WidgetPalette.muted)
+            .accessibilityLabel("\(done) of \(total) done")
+    }
+}
+
+private struct ProgressBar: View {
+    let done: Int
+    let total: Int
+
+    private var fraction: Double {
+        total <= 0 ? 0 : min(1, Double(done) / Double(total))
+    }
+
+    var body: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule().fill(WidgetPalette.muted.opacity(0.25))
+                Capsule()
+                    .fill(WidgetPalette.accent)
+                    .frame(width: max(0, geo.size.width * fraction))
+            }
+        }
+        .frame(height: 4)
+        .accessibilityHidden(true)
+    }
+}
+
+/// The rest of the list, acknowledged rather than silently dropped — without
+/// this the widget just looks like it lost your tasks.
+private struct OverflowRow: View {
+    let count: Int
+
+    var body: some View {
+        Text("+\(count) more")
+            .font(.system(size: 12, weight: .semibold))
+            .foregroundStyle(WidgetPalette.muted)
+    }
+}
+
+/// Mascot plus a line of copy — the Duolingo move. The frog is the reason you
+/// look, the sentence is what makes looking worth something.
+private struct SpeechStrip: View {
+    @Environment(\.colorScheme) private var scheme
+    let mood: String
+    let message: String
+    let frogWidth: CGFloat
+
+    var body: some View {
+        HStack(alignment: .bottom, spacing: 8) {
+            FrogView(mood: mood)
+                .frame(width: frogWidth, height: frogWidth * 0.64)
+
+            if !message.isEmpty {
+                Text(message)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(WidgetPalette.text)
+                    .lineLimit(3)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 7)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(scheme == .dark
+                                  ? Color.black.opacity(0.35)
+                                  : Color.white.opacity(0.82))
+                    )
+                Spacer(minLength: 0)
+            }
+        }
+    }
+}
+
 struct FrogWidgetView: View {
     @Environment(\.widgetFamily) private var family
     let entry: FrogWidgetEntry
 
     private var isSmall: Bool { family == .systemSmall }
 
-    /// Medium is ~135pt of content once the header and add bar are taken out —
-    /// room for three rows, not four. A fourth pushed the add bar off the edge.
+    /// What each family physically fits once header, add bar and — on large —
+    /// the speech strip are taken out. Large was showing four rows into space
+    /// that holds six.
     private var rowLimit: Int {
         switch family {
-        case .systemSmall: return 2
-        case .systemLarge: return 4
+        case .systemSmall: return 1
+        case .systemLarge: return 6
         default: return 3
         }
     }
+
+    private var isLarge: Bool { family == .systemLarge }
 
     var body: some View {
         content
@@ -422,7 +511,7 @@ struct FrogWidgetView: View {
     /// The frog art is a wide "peeking over a ledge" sprite, so it gets a wide
     /// box pinned to the bottom of the row area — that way it reads as perched
     /// on the add bar rather than floating in the middle of the widget.
-    private var frogWidth: CGFloat { family == .systemLarge ? 96 : 72 }
+    private var frogWidth: CGFloat { family == .systemLarge ? 104 : 72 }
 
     private var signedOutBody: some View {
         VStack(spacing: 8) {
@@ -436,14 +525,16 @@ struct FrogWidgetView: View {
     }
 
     private func signedInBody(_ state: WidgetState) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text("TODAY")
-                    .font(.system(size: 11, weight: .bold))
-                    .kerning(0.5)
-                    .foregroundStyle(WidgetPalette.muted)
-                Spacer()
-                StreakBadge(streak: state.streak)
+        let shown = min(rowLimit, state.tasks.count)
+        let hidden = max(0, state.totalCount - shown)
+
+        return VStack(alignment: .leading, spacing: isLarge ? 6 : 5) {
+            header(state)
+
+            // Large has the room for a progress bar, and progress is the thing
+            // a to-do widget is actually being glanced at for.
+            if isLarge {
+                ProgressBar(done: state.doneCount, total: state.totalCount)
             }
 
             HStack(alignment: .top, spacing: 8) {
@@ -459,11 +550,14 @@ struct FrogWidgetView: View {
                         ForEach(Array(state.tasks.prefix(rowLimit))) { task in
                             TaskRow(task: task, interactive: !isSmall, compact: isSmall)
                         }
+                        if hidden > 0 && !isSmall { OverflowRow(count: hidden) }
                         Spacer(minLength: 0)
                     }
                 }
 
-                if !isSmall {
+                // On large the frog gets its own strip below; on medium it
+                // tucks in beside the rows.
+                if family == .systemMedium {
                     FrogView(mood: state.mood)
                         .frame(width: frogWidth, height: frogWidth * 0.64)
                         .frame(maxHeight: .infinity, alignment: .bottom)
@@ -471,7 +565,46 @@ struct FrogWidgetView: View {
             }
             .frame(maxHeight: .infinity, alignment: .top)
 
+            if isSmall {
+                FrogView(mood: state.mood)
+                    .frame(width: frogWidth, height: frogWidth * 0.64)
+                    .frame(maxWidth: .infinity, alignment: .center)
+            }
+
+            if isLarge {
+                SpeechStrip(
+                    mood: state.mood,
+                    message: state.message ?? "",
+                    frogWidth: frogWidth
+                )
+            }
+
             addBar.frame(height: 32)
+        }
+    }
+
+    /// Large keeps a plain label because it has a speech strip of its own;
+    /// the smaller families spend the header row on the frog's line instead,
+    /// which costs no extra height.
+    @ViewBuilder
+    private func header(_ state: WidgetState) -> some View {
+        HStack(spacing: 6) {
+            if family == .systemMedium, let line = state.message, !line.isEmpty {
+                Text(line)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(WidgetPalette.text)
+                    .lineLimit(1)
+            } else {
+                Text("TODAY")
+                    .font(.system(size: 11, weight: .bold))
+                    .kerning(0.5)
+                    .foregroundStyle(WidgetPalette.muted)
+            }
+            Spacer(minLength: 4)
+            if state.totalCount > 0 {
+                CountChip(done: state.doneCount, total: state.totalCount)
+            }
+            StreakBadge(streak: state.streak)
         }
     }
 

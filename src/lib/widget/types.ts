@@ -20,6 +20,8 @@ export type WidgetPayload = {
   mood: FrogMood;
   doneCount: number;
   totalCount: number;
+  /** One contextual line from the frog, picked web-side by frogSpeech. */
+  message: string;
   tasks: WidgetTask[];
   updatedAt: number;
 };
@@ -48,4 +50,4 @@ export type PendingAction = PendingAdd | PendingToggle;
 export type WidgetPinState = 'unsupported' | 'available' | 'pinned';
 
 /** How many rows the largest widget size can show. */
-export const WIDGET_TASK_LIMIT = 4;
+export const WIDGET_TASK_LIMIT = 8;
