@@ -129,6 +129,7 @@ struct FrogWidgetProvider: TimelineProvider {
 // from Xcode's widget template.
 
 private struct FrogWidgetBackground: View {
+    @Environment(\.colorScheme) private var scheme
     let family: WidgetFamily
 
     /// Per-size art first, then a single catch-all, then the drawn gradient.
@@ -143,20 +144,26 @@ private struct FrogWidgetBackground: View {
         }
     }
 
-    private var artwork: UIImage? {
-        for name in candidates {
-            if let image = UIImage(named: name) { return image }
-        }
-        return nil
+    /// Existence check only. The image is then rendered *by name* so SwiftUI
+    /// resolves the catalog's light/dark variant from the environment —
+    /// UIImage(named:) picks whatever trait collection happens to be current,
+    /// which in a widget is not dependable.
+    private var artworkName: String? {
+        candidates.first { UIImage(named: $0) != nil }
+    }
+
+    /// Knocks back busy art so text keeps its contrast, in whichever direction
+    /// this theme needs. A fixed black wash would grey out the light plate.
+    private var scrim: Color {
+        scheme == .dark ? Color.black.opacity(0.15) : Color.white.opacity(0.10)
     }
 
     var body: some View {
-        if let image = artwork {
-            Image(uiImage: image)
+        if let name = artworkName {
+            Image(name)
                 .resizable()
                 .scaledToFill()
-                // Photographs need a scrim or the text stops being readable.
-                .overlay(Color.black.opacity(0.18))
+                .overlay(scrim)
         } else {
             LinearGradient(
                 colors: [WidgetPalette.bgTop, WidgetPalette.bgBottom],
@@ -181,8 +188,8 @@ private struct FrogView: View {
 
     var body: some View {
         Group {
-            if let image = UIImage(named: assetName) {
-                accented(Image(uiImage: image))
+            if UIImage(named: assetName) != nil {
+                accented(Image(assetName))
             } else {
                 DrawnFrog(mood: mood)
             }
@@ -412,7 +419,10 @@ struct FrogWidgetView: View {
         }
     }
 
-    private var frogSize: CGFloat { family == .systemLarge ? 60 : 48 }
+    /// The frog art is a wide "peeking over a ledge" sprite, so it gets a wide
+    /// box pinned to the bottom of the row area — that way it reads as perched
+    /// on the add bar rather than floating in the middle of the widget.
+    private var frogWidth: CGFloat { family == .systemLarge ? 96 : 72 }
 
     private var signedOutBody: some View {
         VStack(spacing: 8) {
@@ -455,7 +465,8 @@ struct FrogWidgetView: View {
 
                 if !isSmall {
                     FrogView(mood: state.mood)
-                        .frame(width: frogSize, height: frogSize)
+                        .frame(width: frogWidth, height: frogWidth * 0.64)
+                        .frame(maxHeight: .infinity, alignment: .bottom)
                 }
             }
             .frame(maxHeight: .infinity, alignment: .top)
