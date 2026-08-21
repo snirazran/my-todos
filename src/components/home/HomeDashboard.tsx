@@ -40,6 +40,11 @@ import Fly from '@/components/ui/fly';
 import TaskList from '@/components/ui/TaskList';
 import { GuestAccountBanner } from '@/components/ui/GuestAccountBanner';
 import QuickAddSheet from '@/components/ui/QuickAddSheet';
+import {
+  QUICK_ADD_EVENT,
+  clearQuickAdd,
+  consumeQuickAdd,
+} from '@/lib/widget/quickAdd';
 import FrogodoroSheet from '@/components/ui/FrogodoroSheet';
 import {
   HomeFocusFlies,
@@ -173,20 +178,17 @@ export default function HomeDashboard() {
   const [quickText, setQuickText] = useState('');
   const [showQuickAdd, setShowQuickAdd] = useState(false);
 
-  // The widget's add bar lands here. Opening on mount rather than after data
-  // loads keeps the keyboard-up delay down to the page load itself.
+  // The widget's add bar lands here, via a session flag rather than the URL —
+  // rewriting the address bar fought the deep link handler and reload-looped.
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('quickadd') !== '1') return;
-    setShowQuickAdd(true);
-    params.delete('quickadd');
-    const query = params.toString();
-    window.history.replaceState(
-      null,
-      '',
-      `${window.location.pathname}${query ? `?${query}` : ''}`,
-    );
+    const open = () => {
+      clearQuickAdd();
+      setShowQuickAdd(true);
+    };
+    if (consumeQuickAdd()) open();
+    window.addEventListener(QUICK_ADD_EVENT, open);
+    return () => window.removeEventListener(QUICK_ADD_EVENT, open);
   }, []);
   const [timerTask, setTimerTask] = useState<Task | null>(null);
   const [timerAutoStart, setTimerAutoStart] = useState(false);

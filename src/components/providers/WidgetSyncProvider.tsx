@@ -10,6 +10,7 @@ import { INVENTORY_SUMMARY_KEY } from '@/hooks/useInventory';
 import { todayTasksKey } from '@/hooks/useTaskData';
 import { streakKey } from '@/hooks/useLoginStreak';
 import { MAX_HUNGER_MS } from '@/lib/hungerLogic';
+import { TASK_SYNC_EVENT } from '@/lib/taskSyncClient';
 import { getWidgetPinState } from '@/lib/widget/bridge';
 import {
   TASK_COMPLETED_EVENT,
@@ -36,6 +37,9 @@ type SummaryResponse = {
 };
 
 type StreakResponse = { view?: { count?: number } | null };
+
+const cacheFetcher = (url: string) =>
+  fetch(url, { credentials: 'include' }).then((r) => r.json());
 
 function fullnessFrom(wardrobe: SummaryResponse['wardrobe']): number | null {
   if (
@@ -69,10 +73,16 @@ export function WidgetSyncProvider() {
 
   const tasksKey = enabled ? todayTasksKey(todayKey(), clientTimezone()) : null;
 
-  // revalidateOnMount:false — mirror whatever the app already fetched, never
-  // trigger a request just to feed the widget.
+  // revalidateOnMount:false — read whatever the app already fetched rather than
+  // firing a request just to feed the widget. The tasks key keeps a real
+  // fetcher so the task-sync listener below can refresh it on demand; the other
+  // two are pure cache mirrors.
   const shared = { revalidateOnMount: false, revalidateOnFocus: false };
-  const { data: tasksData } = useSWR<TasksResponse>(tasksKey, null, shared);
+  const { data: tasksData, mutate: refreshTasks } = useSWR<TasksResponse>(
+    tasksKey,
+    cacheFetcher,
+    shared,
+  );
   const { data: summary } = useSWR<SummaryResponse>(
     enabled ? INVENTORY_SUMMARY_KEY : null,
     null,
@@ -148,6 +158,18 @@ export function WidgetSyncProvider() {
       void handle?.remove();
     };
   }, [enabled, drain]);
+
+  // --- follow the app's own task-change broadcast ------------------------
+  // Fires on every successful task mutation (add, tick, edit, delete) plus on
+  // resume, so the widget never sits on a stale list.
+  useEffect(() => {
+    if (!enabled) return;
+    const onTaskSync = () => {
+      void refreshTasks();
+    };
+    window.addEventListener(TASK_SYNC_EVENT, onTaskSync);
+    return () => window.removeEventListener(TASK_SYNC_EVENT, onTaskSync);
+  }, [enabled, refreshTasks]);
 
   // --- the ask ----------------------------------------------------------
   useEffect(() => {

@@ -122,12 +122,36 @@ struct FrogWidgetProvider: TimelineProvider {
 //
 // Both of these prefer an image from the extension's asset catalog and fall
 // back to something drawn in code, so the widget ships and runs before any art
-// exists. Add `WidgetBackground`, `FrogHappy`, `FrogNeutral`, `FrogHungry` and
-// `FrogAsleep` to take over.
+// exists. Add `WidgetBackdropSmall` / `WidgetBackdropMedium` /
+// `WidgetBackdropLarge` (or one `WidgetBackdrop` for all three), plus
+// `FrogHappy`, `FrogNeutral`, `FrogHungry` and `FrogAsleep`, to take over.
+// Not `WidgetBackground` — the catalog already has a colorset by that name
+// from Xcode's widget template.
 
 private struct FrogWidgetBackground: View {
+    let family: WidgetFamily
+
+    /// Per-size art first, then a single catch-all, then the drawn gradient.
+    /// The three families have very different shapes — square, 2:1 wide, and
+    /// nearly square-tall — so one image cropped to fill all of them rarely
+    /// looks right in more than one.
+    private var candidates: [String] {
+        switch family {
+        case .systemSmall: return ["WidgetBackdropSmall", "WidgetBackdrop"]
+        case .systemLarge: return ["WidgetBackdropLarge", "WidgetBackdrop"]
+        default: return ["WidgetBackdropMedium", "WidgetBackdrop"]
+        }
+    }
+
+    private var artwork: UIImage? {
+        for name in candidates {
+            if let image = UIImage(named: name) { return image }
+        }
+        return nil
+    }
+
     var body: some View {
-        if let image = UIImage(named: "WidgetBackground") {
+        if let image = artwork {
             Image(uiImage: image)
                 .resizable()
                 .scaledToFill()
@@ -255,6 +279,9 @@ private struct TaskRow: View {
     let task: WidgetTask
     /// systemSmall cannot host buttons or links, so rows there are display-only.
     let interactive: Bool
+    /// Small is ~120pt of text width, where one line truncates almost every
+    /// task. Wrapping to two reads better than an ellipsis after four words.
+    let compact: Bool
 
     var body: some View {
         HStack(spacing: 8) {
@@ -276,14 +303,15 @@ private struct TaskRow: View {
         HStack(spacing: 8) {
             checkbox
             Text(task.text)
-                .font(.system(size: 14))
-                .lineLimit(1)
+                .font(.system(size: compact ? 12.5 : 14))
+                .lineLimit(compact ? 2 : 1)
+                .multilineTextAlignment(.leading)
                 .strikethrough(task.done, color: WidgetPalette.muted)
                 .foregroundStyle(task.done ? WidgetPalette.muted : WidgetPalette.text)
             Spacer(minLength: 0)
         }
         // The whole row is the tick target, not just the little box.
-        .frame(minHeight: 26)
+        .frame(minHeight: compact ? 22 : 24, alignment: .top)
         .contentShape(Rectangle())
     }
 
@@ -300,7 +328,7 @@ private struct TaskRow: View {
                     .foregroundStyle(.white)
                     .opacity(task.done ? 1 : 0)
             )
-            .frame(width: 18, height: 18)
+            .frame(width: compact ? 16 : 18, height: compact ? 16 : 18)
     }
 }
 
@@ -354,11 +382,20 @@ struct FrogWidgetView: View {
     let entry: FrogWidgetEntry
 
     private var isSmall: Bool { family == .systemSmall }
-    private var rowLimit: Int { isSmall ? 2 : 4 }
+
+    /// Medium is ~135pt of content once the header and add bar are taken out —
+    /// room for three rows, not four. A fourth pushed the add bar off the edge.
+    private var rowLimit: Int {
+        switch family {
+        case .systemSmall: return 2
+        case .systemLarge: return 4
+        default: return 3
+        }
+    }
 
     var body: some View {
         content
-            .frogWidgetBackground()
+            .frogWidgetBackground(family)
             // Small widgets get exactly one tap target, so spend it on capture —
             // the behaviour the widget exists to produce.
             .widgetURL(signedIn ? (isSmall ? FrogLink.quickAdd : FrogLink.home) : FrogLink.login)
@@ -374,6 +411,8 @@ struct FrogWidgetView: View {
             signedOutBody
         }
     }
+
+    private var frogSize: CGFloat { family == .systemLarge ? 60 : 48 }
 
     private var signedOutBody: some View {
         VStack(spacing: 8) {
@@ -408,19 +447,20 @@ struct FrogWidgetView: View {
                             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                     } else {
                         ForEach(Array(state.tasks.prefix(rowLimit))) { task in
-                            TaskRow(task: task, interactive: !isSmall)
+                            TaskRow(task: task, interactive: !isSmall, compact: isSmall)
                         }
                         Spacer(minLength: 0)
                     }
                 }
 
                 if !isSmall {
-                    FrogView(mood: state.mood).frame(width: 52)
+                    FrogView(mood: state.mood)
+                        .frame(width: frogSize, height: frogSize)
                 }
             }
-            .frame(maxHeight: .infinity)
+            .frame(maxHeight: .infinity, alignment: .top)
 
-            addBar
+            addBar.frame(height: 32)
         }
     }
 
@@ -452,11 +492,11 @@ private extension View {
     /// containerBackground arrived in iOS 17 and is required there; on 16 the
     /// widget paints its own background instead.
     @ViewBuilder
-    func frogWidgetBackground() -> some View {
+    func frogWidgetBackground(_ family: WidgetFamily) -> some View {
         if #available(iOS 17.0, *) {
-            containerBackground(for: .widget) { FrogWidgetBackground() }
+            containerBackground(for: .widget) { FrogWidgetBackground(family: family) }
         } else {
-            padding(12).background(FrogWidgetBackground())
+            padding(12).background(FrogWidgetBackground(family: family))
         }
     }
 }

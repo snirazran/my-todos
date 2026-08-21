@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { Capacitor } from '@capacitor/core';
 import type { PluginListenerHandle } from '@capacitor/core';
 import { App } from '@capacitor/app';
+import { isQuickAddLink, requestQuickAdd } from '@/lib/widget/quickAdd';
 
 const APP_HOSTS = ['frogress.com', 'www.frogress.com'];
 const configuredLinkHost = process.env.NEXT_PUBLIC_FIREBASE_AUTH_LINK_DOMAIN
@@ -33,6 +34,12 @@ function applyDeepLink(rawUrl: string) {
     if (!ALLOWED_HOSTS.has(url.hostname)) return;
 
     persistInviteParams(url);
+
+    // A command, not a destination — never navigate to it. See lib/widget/quickAdd.
+    if (isQuickAddLink(url)) {
+      requestQuickAdd();
+      return;
+    }
 
     const target = `${url.pathname}${url.search}${url.hash}`;
     const current = `${window.location.pathname}${window.location.search}${window.location.hash}`;
