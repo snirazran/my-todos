@@ -15,7 +15,7 @@ import { rewardedAdsAvailable, showRewardedAd } from '@/lib/ads';
 import { hapticSuccess } from '@/lib/haptics';
 import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
 import { getFlyPackPrices, purchaseFlyPack } from '@/lib/purchases';
-import type { FlyPackId } from '@/lib/flyPacks';
+import { getFlyPack, type FlyPackId } from '@/lib/flyPacks';
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
 import { prefetchStoreBundleBytes } from '@/lib/riveLoader';
 import { emitCampaignTrigger, markCampaignConverted } from '@/lib/campaigns/orchestrator';
@@ -31,14 +31,19 @@ type Pack = {
   flies: number[];
 };
 
-const PACKS: Pack[] = [
-  { id: 'pinch', amount: 200, price: '$1.99', flies: [30] },
-  { id: 'rare-jar', amount: 650, price: '$4.99', bonus: '+30%', badge: 'popular', flies: [32, 22] },
-  { id: 'swarm', amount: 1500, price: '$9.99', bonus: '+50%', flies: [36, 26] },
-  { id: 'epic-cloud', amount: 3500, price: '$19.99', bonus: '+75%', flies: [36, 28, 20] },
-  { id: 'mega-swarm', amount: 10000, price: '$49.99', bonus: '+100%', flies: [40, 30, 22] },
-  { id: 'legendary-vault', amount: 22000, price: '$99.99', bonus: '+120%', badge: 'best', flies: [44, 34, 26, 20] },
+const PACK_META: Omit<Pack, 'amount'>[] = [
+  { id: 'pinch', price: '$1.99', flies: [30] },
+  { id: 'rare-jar', price: '$4.99', bonus: '+14%', badge: 'popular', flies: [32, 22] },
+  { id: 'swarm', price: '$9.99', bonus: '+37%', flies: [36, 26] },
+  { id: 'epic-cloud', price: '$19.99', bonus: '+48%', flies: [36, 28, 20] },
+  { id: 'mega-swarm', price: '$49.99', bonus: '+59%', flies: [40, 30, 22] },
+  { id: 'legendary-vault', price: '$99.99', bonus: '+71%', badge: 'best', flies: [44, 34, 26, 20] },
 ];
+
+const PACKS: Pack[] = PACK_META.map((meta) => ({
+  ...meta,
+  amount: getFlyPack(meta.id)?.amount ?? 0,
+}));
 
 
 type AdFlyStatus = {
