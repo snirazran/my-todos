@@ -172,6 +172,22 @@ export default function HomeDashboard() {
 
   const [quickText, setQuickText] = useState('');
   const [showQuickAdd, setShowQuickAdd] = useState(false);
+
+  // The widget's add bar lands here. Opening on mount rather than after data
+  // loads keeps the keyboard-up delay down to the page load itself.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('quickadd') !== '1') return;
+    setShowQuickAdd(true);
+    params.delete('quickadd');
+    const query = params.toString();
+    window.history.replaceState(
+      null,
+      '',
+      `${window.location.pathname}${query ? `?${query}` : ''}`,
+    );
+  }, []);
   const [timerTask, setTimerTask] = useState<Task | null>(null);
   const [timerAutoStart, setTimerAutoStart] = useState(false);
   const [showTimer, setShowTimer] = useState(false);

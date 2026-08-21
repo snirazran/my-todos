@@ -7,5 +7,6 @@ import Capacitor
 class MainViewController: CAPBridgeViewController {
     override open func capacitorDidLoad() {
         bridge?.registerPluginInstance(FrogLiveActivityPlugin())
+        bridge?.registerPluginInstance(FrogWidgetPlugin())
     }
 }

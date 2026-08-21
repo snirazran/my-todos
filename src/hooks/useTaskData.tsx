@@ -13,6 +13,7 @@ import { notifyQuestClaims, seedQuestClaims } from '@/lib/questClaims';
 import Fly from '@/components/ui/fly';
 import { useUIStore } from '@/lib/uiStore';
 import { queuePlusIntroOnce } from '@/lib/plusIntro';
+import { recordTaskCompleted } from '@/lib/widget/prompt';
 
 // --- Types ---
 export interface ChecklistItem {
@@ -133,6 +134,11 @@ type UseTaskDataOptions = {
 // --- Fetcher ---
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
+/** SWR key for today's list. Shared so cache readers can't drift from it. */
+export function todayTasksKey(dateStr: string, tz: string) {
+  return `/api/tasks?date=${dateStr}&timezone=${encodeURIComponent(tz)}`;
+}
+
 // --- Helper for Optimistic Updates ---
 const sortTasks = (ts: Task[]) => {
   return [...ts].sort((a, b) => {
@@ -166,9 +172,7 @@ export function useTaskData({
   const [pendingToToday, setPendingToToday] = useState(0);
 
   // --- SWR Keys ---
-  const todayKey = user
-    ? `/api/tasks?date=${dateStr}&timezone=${encodeURIComponent(tz)}`
-    : null;
+  const todayKey = user ? todayTasksKey(dateStr, tz) : null;
   const backlogKey =
     user && includeBacklog ? `/api/tasks?view=board&day=-1` : null;
 
@@ -364,6 +368,7 @@ export function useTaskData({
         const json = await res.json();
 
         if (json.ok) {
+          if (nextCompleted) recordTaskCompleted();
           void notifyQuestClaims(showNotification);
           // Update Fly/Hunger status if returned
           // We use a functional update to ensure we're modifying the LATEST state (which might include the optimistic change)

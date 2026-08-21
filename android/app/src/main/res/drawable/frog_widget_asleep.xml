@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Placeholder frog. Replace with your own art: delete this file and drop
+  frog_widget_asleep.png into res/drawable-nodpi/ (square, transparent background,
+  240x240 or larger).
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="64dp"
+    android:height="64dp"
+    android:viewportWidth="64"
+    android:viewportHeight="64">
+    <path
+        android:pathData="M20,20 m-9.5,0 a9.5,9.5 0 1,0 19,0 a9.5,9.5 0 1,0 -19,0"
+        android:fillColor="#5A8A6C" />
+    <path
+        android:pathData="M44,20 m-9.5,0 a9.5,9.5 0 1,0 19,0 a9.5,9.5 0 1,0 -19,0"
+        android:fillColor="#5A8A6C" />
+    <path
+        android:pathData="M32,40 m-21,0 a21,18 0 1,0 42,0 a21,18 0 1,0 -42,0"
+        android:fillColor="#5A8A6C" />
+    <path
+        android:pathData="M20,20 m-5.5,0 a5.5,5.5 0 1,0 11,0 a5.5,5.5 0 1,0 -11,0"
+        android:fillColor="#FFFFFF" />
+    <path
+        android:pathData="M44,20 m-5.5,0 a5.5,5.5 0 1,0 11,0 a5.5,5.5 0 1,0 -11,0"
+        android:fillColor="#FFFFFF" />
+    <path
+        android:pathData="M21,21 m-0.6,0 a0.6,0.6 0 1,0 1.2,0 a0.6,0.6 0 1,0 -1.2,0"
+        android:fillColor="#13201A" />
+    <path
+        android:pathData="M45,21 m-0.6,0 a0.6,0.6 0 1,0 1.2,0 a0.6,0.6 0 1,0 -1.2,0"
+        android:fillColor="#13201A" />
+    <path
+        android:pathData="M23,46 L41,46"
+        android:strokeWidth="2.6"
+        android:strokeColor="#3E5E4A"
+        android:strokeLineCap="round" />
+</vector>

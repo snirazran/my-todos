@@ -70,6 +70,34 @@
             </intent-filter>
         </receiver>
 
+        <!-- Home screen widget: today's list, tap-to-tick, and quick capture. -->
+        <receiver
+            android:name=".FrogWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="io.frog.tasks.WIDGET_TOGGLE" />
+                <action android:name="io.frog.tasks.WIDGET_REFRESH" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/frog_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".FrogWidgetPinnedReceiver"
+            android:exported="false" />
+
+        <activity
+            android:name=".FrogQuickAddActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:noHistory="true"
+            android:theme="@style/Theme.FrogQuickAdd"
+            android:windowSoftInputMode="stateAlwaysVisible|adjustResize" />
+
         <service
             android:name=".FrogAlarmSoundService"
             android:exported="false"
