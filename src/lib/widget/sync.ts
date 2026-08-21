@@ -9,7 +9,7 @@ import {
   type WidgetTask,
 } from './types';
 import { clearWidgetState, drainWidgetQueue, pushWidgetState } from './bridge';
-import { pickFrogLine } from '@/lib/frogSpeech';
+import { pickWidgetLine, type WidgetUrgency } from '@/lib/widget/widgetSpeech';
 
 const SEEN_GUEST_UIDS_KEY = 'frogress_widget_guest_uids';
 
@@ -86,41 +86,48 @@ export function mayApply(action: PendingAction, currentUid: string): boolean {
 }
 
 let lastMessageKey = '';
-let lastMessage = '';
+let lastMessage = { line: '', urgency: 'calm' as WidgetUrgency };
 
 /**
  * The frog's line, held stable across pushes.
  *
- * pickFrogLine is deliberately random, so recomputing it on every sync would
- * change the payload signature every time and spend a WidgetKit reload for a
- * reworded sentence. Keying it to the things the line actually reacts to means
- * it only changes when the situation does.
+ * Keyed to the things the line actually reacts to, so it only changes when the
+ * situation does — otherwise every sync would reword the same sentence and
+ * spend a WidgetKit reload doing it.
  */
 function widgetMessage(input: {
   done: number;
   total: number;
   fullness: number | null;
   streak: number;
-}): string {
+  checkedInToday: boolean;
+}): { line: string; urgency: WidgetUrgency } {
   const hungerPercent =
     input.fullness === null ? null : Math.round(input.fullness * 100);
+  const hour = new Date().getHours();
   const key = [
     todayKey(),
-    Math.floor(new Date().getHours() / 3),
+    hour,
     input.done,
     input.total,
     hungerPercent === null ? 'x' : Math.floor(hungerPercent / 20),
     input.streak,
+    input.checkedInToday ? 'in' : 'out',
   ].join('|');
 
-  if (key === lastMessageKey && lastMessage) return lastMessage;
+  if (key === lastMessageKey && lastMessage.line) return lastMessage;
   lastMessageKey = key;
-  lastMessage = pickFrogLine('welcome', {
-    done: input.done,
-    total: input.total,
-    hungerPercent,
-    streak: input.streak,
-  }).replace(/\s*\n\s*/g, ' ');
+  lastMessage = pickWidgetLine(
+    {
+      done: input.done,
+      total: input.total,
+      streak: input.streak,
+      checkedInToday: input.checkedInToday,
+      hungerPercent,
+      hour,
+    },
+    key,
+  );
   return lastMessage;
 }
 
@@ -130,6 +137,7 @@ export function buildPayload(input: {
   tasks: { id: string; text: string; completed: boolean }[];
   fullness: number | null;
   streak: number;
+  checkedInToday: boolean;
 }): WidgetPayload {
   const open = input.tasks.filter((t) => !t.completed);
   const done = input.tasks.filter((t) => t.completed);
@@ -140,6 +148,14 @@ export function buildPayload(input: {
     text: t.text.length > 60 ? `${t.text.slice(0, 59)}…` : t.text,
     done: t.completed,
   }));
+
+  const speech = widgetMessage({
+    done: done.length,
+    total: input.tasks.length,
+    fullness: input.fullness,
+    streak: input.streak,
+    checkedInToday: input.checkedInToday,
+  });
 
   return {
     v: WIDGET_PAYLOAD_VERSION,
@@ -154,12 +170,8 @@ export function buildPayload(input: {
     ),
     doneCount: done.length,
     totalCount: input.tasks.length,
-    message: widgetMessage({
-      done: done.length,
-      total: input.tasks.length,
-      fullness: input.fullness,
-      streak: input.streak,
-    }),
+    message: speech.line,
+    urgency: speech.urgency,
     tasks: rows,
     updatedAt: Date.now(),
   };

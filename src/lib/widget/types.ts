@@ -20,8 +20,10 @@ export type WidgetPayload = {
   mood: FrogMood;
   doneCount: number;
   totalCount: number;
-  /** One contextual line from the frog, picked web-side by frogSpeech. */
+  /** One contextual line from the frog, picked web-side by widgetSpeech. */
   message: string;
+  /** How loud that line is, so the widget can style the streak to match. */
+  urgency: 'calm' | 'nudge' | 'urgent';
   tasks: WidgetTask[];
   updatedAt: number;
 };

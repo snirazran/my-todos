@@ -132,8 +132,9 @@ struct WidgetState: Codable {
     let mood: String
     var doneCount: Int
     let totalCount: Int
-    /// Optional so a snapshot written before this field existed still decodes.
+    /// Optional so a snapshot written before these fields existed still decodes.
     let message: String?
+    let urgency: String?
     var tasks: [WidgetTask]
     let updatedAt: Double
 }

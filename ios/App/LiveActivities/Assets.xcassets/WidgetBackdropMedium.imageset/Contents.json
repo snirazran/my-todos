@@ -1,17 +1,7 @@
 {
   "images" : [
     {
-      "filename" : "backdrop-medium-light.png",
-      "idiom" : "universal"
-    },
-    {
-      "appearances" : [
-        {
-          "appearance" : "luminosity",
-          "value" : "dark"
-        }
-      ],
-      "filename" : "backdrop-medium-dark.png",
+      "filename" : "backdrop-medium.png",
       "idiom" : "universal"
     }
   ],

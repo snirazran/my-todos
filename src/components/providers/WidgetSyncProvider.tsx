@@ -36,7 +36,9 @@ type SummaryResponse = {
   wardrobe?: { hunger?: number; lastHungerUpdate?: string | Date };
 };
 
-type StreakResponse = { view?: { count?: number } | null };
+type StreakResponse = {
+  view?: { count?: number; checkedInToday?: boolean } | null;
+};
 
 const cacheFetcher = (url: string) =>
   fetch(url, { credentials: 'include' }).then((r) => r.json());
@@ -99,6 +101,7 @@ export function WidgetSyncProvider() {
   const wasSignedIn = useRef(false);
 
   const streak = streakData?.view?.count ?? 0;
+  const checkedInToday = streakData?.view?.checkedInToday ?? false;
 
   // --- push state out ---------------------------------------------------
   useEffect(() => {
@@ -110,9 +113,10 @@ export function WidgetSyncProvider() {
         tasks: tasksData.tasks,
         fullness: fullnessFrom(summary?.wardrobe),
         streak,
+        checkedInToday,
       }),
     );
-  }, [enabled, tasksData, summary, streak, uid, guest]);
+  }, [enabled, tasksData, summary, streak, checkedInToday, uid, guest]);
 
   // --- sign-out wipes the widget ---------------------------------------
   useEffect(() => {
