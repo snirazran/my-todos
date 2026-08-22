@@ -31,7 +31,7 @@ async function getNativePurchases(uid: string) {
     await Purchases.configure({ apiKey, appUserID: uid });
     nativeConfiguredFor = uid;
   }
-  return Purchases;
+  return { Purchases };
 }
 
 async function getWebPurchases(uid: string) {
@@ -55,7 +55,7 @@ async function syncPremiumWithServer() {
 }
 
 async function purchasePlusNative(uid: string, plan: PlusPlan): Promise<PurchaseOutcome> {
-  const Purchases = await getNativePurchases(uid);
+  const { Purchases } = await getNativePurchases(uid);
   const { PURCHASES_ERROR_CODE } = await import('@revenuecat/purchases-capacitor');
   const offerings = await Purchases.getOfferings();
   const offering = offerings.current;
@@ -128,7 +128,7 @@ export async function purchasePlus(plan: PlusPlan, placement = 'unknown'): Promi
 export async function restorePlusPurchases(): Promise<boolean> {
   if (!Capacitor.isNativePlatform()) return false;
   const uid = requireUid();
-  const Purchases = await getNativePurchases(uid);
+  const { Purchases } = await getNativePurchases(uid);
   const { customerInfo } = await Purchases.restorePurchases();
   await syncPremiumWithServer();
   return !!customerInfo.entitlements.active['plus'];
@@ -154,7 +154,7 @@ export async function purchaseFlyPack(packId: FlyPackId): Promise<PurchaseOutcom
 
   try {
     if (Capacitor.isNativePlatform()) {
-      const Purchases = await getNativePurchases(uid);
+      const { Purchases } = await getNativePurchases(uid);
       const { PURCHASES_ERROR_CODE } = await import('@revenuecat/purchases-capacitor');
       const offerings = await Purchases.getOfferings();
       const pkg = offerings.current?.availablePackages.find(
@@ -213,7 +213,7 @@ export async function getFlyPackPrices(): Promise<Partial<Record<FlyPackId, stri
   const uid = requireUid();
   const prices: Partial<Record<FlyPackId, string>> = {};
   if (Capacitor.isNativePlatform()) {
-    const Purchases = await getNativePurchases(uid);
+    const { Purchases } = await getNativePurchases(uid);
     const offerings = await Purchases.getOfferings();
     for (const pack of FLY_PACKS) {
       const pkg = offerings.current?.availablePackages.find(
