@@ -10,7 +10,7 @@ import Fly from '@/components/ui/fly';
 import { AnimatedNumber } from '@/components/ui/AnimatedNumber';
 import { Icon } from '@/components/ui/Icon';
 import { useUIStore } from '@/lib/uiStore';
-import { useInventory, patchInventoryFlies, mutateInventoryCaches } from '@/hooks/useInventory';
+import { useInventory, patchInventoryFlies } from '@/hooks/useInventory';
 import { rewardedAdsAvailable, showRewardedAd } from '@/lib/ads';
 import { hapticSuccess } from '@/lib/haptics';
 import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
@@ -66,7 +66,7 @@ export function CurrencyShop() {
   const setOpen = useUIStore((s) => s.setFlyShopOpen);
   const need = useUIStore((s) => s.flyShopNeed);
   const focusPackId = useUIStore((s) => s.flyShopFocusPackId);
-  const { data: inventoryData, mutate: mutateInventory } = useInventory(open, true);
+  const { data: inventoryData } = useInventory(open, true);
   const balance = inventoryData?.wardrobe?.flies ?? 0;
   const [artReady, setArtReady] = useState(false);
   const openedRef = useRef(false);
@@ -202,8 +202,7 @@ export function CurrencyShop() {
                         seen = typeof flies === 'number' ? flies : 'undef';
                         if (typeof flies === 'number' && flies > before) {
                           console.log('[flypoll] landed at attempt', attempt, flies);
-                          await mutateInventory();
-                          mutateInventoryCaches();
+                          patchInventoryFlies(flies);
                           void revalidateAll(() => true);
                           return true;
                         }
