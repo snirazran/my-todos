@@ -33,6 +33,7 @@
 		60AE54572FE41ECA00222D18 /* MainViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60AE54562FE41ECA00222D18 /* MainViewController.swift */; };
 		60AE54592FE4336400222D18 /* FrogTimerControlIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60AE54582FE4336400222D18 /* FrogTimerControlIntent.swift */; };
 		60AE545A2FE4336400222D18 /* FrogTimerControlIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60AE54582FE4336400222D18 /* FrogTimerControlIntent.swift */; };
+		60BFE4AC3039B61100E546AA /* StoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 60BFE4AB3039B61100E546AA /* StoreKit.framework */; };
 		60F4FD463005AB4D008C7297 /* FrogAlarmKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60F4FD453005AB4D008C7297 /* FrogAlarmKit.swift */; };
 		60F4FD473005AB4D008C7297 /* FrogAlarmKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60F4FD453005AB4D008C7297 /* FrogAlarmKit.swift */; };
 		60F4FD493005AB74008C7297 /* FrogAppShortcuts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60F4FD483005AB74008C7297 /* FrogAppShortcuts.swift */; };
@@ -101,6 +102,7 @@
 		60AE54542FE4173C00222D18 /* FrogLiveActivityPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = FrogLiveActivityPlugin.swift; path = App/FrogLiveActivityPlugin.swift; sourceTree = SOURCE_ROOT; };
 		60AE54562FE41ECA00222D18 /* MainViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainViewController.swift; sourceTree = "<group>"; };
 		60AE54582FE4336400222D18 /* FrogTimerControlIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrogTimerControlIntent.swift; sourceTree = "<group>"; };
+		60BFE4AB3039B61100E546AA /* StoreKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = StoreKit.framework; path = System/Library/Frameworks/StoreKit.framework; sourceTree = SDKROOT; };
 		60F4FD453005AB4D008C7297 /* FrogAlarmKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrogAlarmKit.swift; sourceTree = "<group>"; };
 		60F4FD483005AB74008C7297 /* FrogAppShortcuts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrogAppShortcuts.swift; sourceTree = "<group>"; };
 		60F4FD4A3005ABF6008C7297 /* FrogControlWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrogControlWidget.swift; sourceTree = "<group>"; };
@@ -119,6 +121,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A084ECDBA7D38E1E42DFC39D /* Pods_App.framework in Frameworks */,
+				60BFE4AC3039B61100E546AA /* StoreKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -138,6 +141,7 @@
 		27E2DDA53C4D2A4D1A88CE4A /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				60BFE4AB3039B61100E546AA /* StoreKit.framework */,
 				AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */,
 				60AE54312FE060ED00222D18 /* WidgetKit.framework */,
 				60AE54332FE060ED00222D18 /* SwiftUI.framework */,
