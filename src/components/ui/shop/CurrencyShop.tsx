@@ -180,20 +180,30 @@ export function CurrencyShop() {
                   pack={pack}
                   covers={pack.id === coversId}
                   showArt={artReady}
-                  onPurchased={async () => {
+                  onPurchased={async (report) => {
                     boughtRef.current = true;
                     markCampaignConverted();
                     emitCampaignTrigger('purchase_completed');
                     const before = inventoryData?.wardrobe?.flies ?? 0;
                     const deadline = Date.now() + 60000;
+                    let attempt = 0;
                     while (Date.now() < deadline) {
                       await new Promise((resolve) => setTimeout(resolve, 1200));
-                      const next = await mutateInventory();
-                      if ((next?.wardrobe?.flies ?? 0) > before) {
-                        mutateInventoryCaches();
-                        void revalidateAll(() => true);
-                        return true;
+                      attempt += 1;
+                      let seen: string | number = 'err';
+                      try {
+                        const next = await mutateInventory();
+                        const flies = next?.wardrobe?.flies;
+                        seen = typeof flies === 'number' ? flies : 'undef';
+                        if (typeof flies === 'number' && flies > before) {
+                          mutateInventoryCaches();
+                          void revalidateAll(() => true);
+                          return true;
+                        }
+                      } catch (error) {
+                        seen = error instanceof Error ? error.name : 'throw';
                       }
+                      report(`#${attempt} base ${before} got ${seen}`);
                     }
                     return false;
                   }}
@@ -223,7 +233,7 @@ function PackRow({
   bundle: number;
   covers: boolean;
   showArt: boolean;
-  onPurchased: () => Promise<boolean>;
+  onPurchased: (report: (info: string) => void) => Promise<boolean>;
 }) {
   const popular = !covers && pack.badge === 'popular';
   const best = pack.badge === 'best';
@@ -237,7 +247,7 @@ function PackRow({
       const result = await purchaseFlyPack(pack.id as FlyPackId);
       if (result === 'purchased') {
         setStatus('Adding flies...');
-        const landed = await onPurchased();
+        const landed = await onPurchased((info) => setStatus(`Adding flies ${info}`));
         setStatus(landed ? null : 'Still processing...');
       }
     } catch (error) {
