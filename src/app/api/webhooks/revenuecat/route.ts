@@ -6,7 +6,6 @@ import connectMongo from '@/lib/mongoose';
 import UserModel from '@/lib/models/User';
 import FlyPurchaseModel from '@/lib/models/FlyPurchase';
 import { getFlyPackForProduct } from '@/lib/flyPacks';
-import mongoose from 'mongoose';
 
 function revenueCatEventName(event: any): AnalyticsEventName | null {
   if (Number(event?.price) < 0) return 'subscription_refunded';
@@ -35,39 +34,36 @@ async function grantFlyPackPurchase(userId: string, event: any) {
   if (!pack || typeof event?.id !== 'string') return null;
 
   await connectMongo();
-  const session = await mongoose.startSession();
   try {
-    await session.withTransaction(async () => {
-      const existing = await FlyPurchaseModel.exists({ eventId: event.id }).session(session);
-      if (existing) return;
-      const grant = await UserModel.updateOne(
-        { _id: userId },
-        { $inc: { 'wardrobe.flies': pack.amount } },
-        { session },
-      );
-      if (grant.modifiedCount !== 1) throw new Error('Fly-pack user not found');
-      await FlyPurchaseModel.create(
-        [{
-          eventId: event.id,
-          transactionId: typeof event?.transaction_id === 'string' ? event.transaction_id : undefined,
-          userId,
-          packId: pack.id,
-          productId: String(event.product_id),
-          flies: pack.amount,
-          revenueUsd: Number.isFinite(Number(event?.price)) ? Number(event.price) : undefined,
-          store: typeof event?.store === 'string' ? event.store : undefined,
-          environment: typeof event?.environment === 'string' ? event.environment : undefined,
-          purchasedAt: Number.isFinite(Number(event?.purchased_at_ms))
-            ? new Date(Number(event.purchased_at_ms))
-            : new Date(),
-          grantedAt: new Date(),
-        }],
-        { session },
-      );
+    await FlyPurchaseModel.create({
+      eventId: event.id,
+      transactionId: typeof event?.transaction_id === 'string' ? event.transaction_id : undefined,
+      userId,
+      packId: pack.id,
+      productId: String(event.product_id),
+      flies: pack.amount,
+      revenueUsd: Number.isFinite(Number(event?.price)) ? Number(event.price) : undefined,
+      store: typeof event?.store === 'string' ? event.store : undefined,
+      environment: typeof event?.environment === 'string' ? event.environment : undefined,
+      purchasedAt: Number.isFinite(Number(event?.purchased_at_ms))
+        ? new Date(Number(event.purchased_at_ms))
+        : new Date(),
+      grantedAt: new Date(),
     });
-  } finally {
-    await session.endSession();
+  } catch (error: any) {
+    if (error?.code === 11000) return pack;
+    throw error;
   }
+
+  const grant = await UserModel.updateOne(
+    { _id: userId },
+    { $inc: { 'wardrobe.flies': pack.amount } },
+  );
+  if (grant.modifiedCount !== 1) {
+    await FlyPurchaseModel.deleteOne({ eventId: event.id });
+    throw new Error('Fly-pack user not found');
+  }
+
   return pack;
 }
 
