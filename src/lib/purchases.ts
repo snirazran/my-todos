@@ -164,7 +164,9 @@ export async function purchaseFlyPack(packId: FlyPackId): Promise<PurchaseOutcom
       );
       if (!pkg) throw new Error(`RevenueCat package ${pack.packageId} is not configured`);
       try {
+        console.log('[flybuy] purchasing', pack.productId);
         await Purchases.purchasePackage({ aPackage: pkg });
+        console.log('[flybuy] purchasePackage resolved');
       } catch (error: any) {
         if (
           error?.code === PURCHASES_ERROR_CODE.PURCHASE_CANCELLED_ERROR ||

@@ -185,6 +185,7 @@ export function CurrencyShop() {
                     markCampaignConverted();
                     emitCampaignTrigger('purchase_completed');
                     const before = inventoryData?.wardrobe?.flies ?? 0;
+                    console.log('[flypoll] start, before =', before);
                     const deadline = Date.now() + 60000;
                     let attempt = 0;
                     while (Date.now() < deadline) {
@@ -196,13 +197,16 @@ export function CurrencyShop() {
                         const flies = next?.wardrobe?.flies;
                         seen = typeof flies === 'number' ? flies : 'undef';
                         if (typeof flies === 'number' && flies > before) {
+                          console.log('[flypoll] landed at attempt', attempt, flies);
                           mutateInventoryCaches();
                           void revalidateAll(() => true);
                           return true;
                         }
                       } catch (error) {
-                        seen = error instanceof Error ? error.name : 'throw';
+                        seen = error instanceof Error ? error.message : 'throw';
+                        console.log('[flypoll] threw', error);
                       }
+                      console.log('[flypoll] attempt', attempt, 'before', before, 'got', seen);
                       report(`#${attempt} base ${before} got ${seen}`);
                     }
                     return false;
