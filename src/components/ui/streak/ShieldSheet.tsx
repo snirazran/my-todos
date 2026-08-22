@@ -192,7 +192,7 @@ export function ShieldSheet({
             <span className="tabular-nums text-foreground">
               {held} / {cap}
             </span>
-            <Icon name="lilyPad" className="h-4 w-4" />
+            <Icon name="lilyPad" className="h-6 w-6" />
           </div>
 
           {phase === 'confirm' && (

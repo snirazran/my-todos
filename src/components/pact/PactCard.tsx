@@ -76,6 +76,7 @@ const badgeCount = (value: number) => (value > 9 ? '9+' : String(value));
 
 function PactHudButton({
   icon: Icon,
+  iconClassName = 'h-[17px] w-[17px]',
   label,
   badge,
   tone = 'have',
@@ -83,6 +84,7 @@ function PactHudButton({
   onClick,
 }: {
   icon: LucideIcon | React.FC<React.SVGProps<SVGSVGElement>>;
+  iconClassName?: string;
   label: string;
   badge: string | null;
   tone?: 'have' | 'action';
@@ -100,7 +102,7 @@ function PactHudButton({
       }}
       className="relative inline-flex h-8 w-8 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition active:scale-95 after:absolute after:-inset-1.5 after:content-[''] [@media(hover:hover)]:hover:bg-black/65"
     >
-      <Icon className="h-[17px] w-[17px]" strokeWidth={2.75} aria-hidden="true" />
+      <Icon className={iconClassName} strokeWidth={2.75} aria-hidden="true" />
       {badge && (
         <span
           aria-hidden="true"
@@ -454,6 +456,7 @@ export function PactCard({
                 )}
                 <PactHudButton
                   icon={LilyPadIcon}
+                  iconClassName="h-[23px] w-[23px]"
                   onClick={() => openShieldSheet()}
                   badge={
                     data.streak.shields > 0

@@ -233,7 +233,7 @@ function PledgeRewardTiles({
   }
 
   return (
-    <span className="flex items-center gap-2">
+    <span className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
       <span className="relative flex shrink-0 items-center">
         {tiles.map((tile, index) => (
           <span
@@ -847,7 +847,7 @@ function HomeStep({
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="flex items-center gap-1.5 text-sm font-black text-foreground">
-                    <Icon name="lilyPad" className="h-4 w-4" />
+                    <Icon name="lilyPad" className="h-5 w-5" />
                     Lily Pads
                   </p>
                   <p className="mt-0.5 text-xs font-medium text-muted-foreground">
@@ -859,13 +859,13 @@ function HomeStep({
                     <div
                       key={i}
                       className={cn(
-                        'grid h-8 w-8 place-items-center rounded-full',
+                        'grid h-10 w-10 place-items-center rounded-full',
                         i < view.shields
                           ? 'bg-emerald-100 dark:bg-emerald-500/15'
                           : 'bg-muted/60 opacity-30 grayscale',
                       )}
                     >
-                      <Icon name="lilyPad" className="h-4 w-4" />
+                      <Icon name="lilyPad" className="h-6 w-6" />
                     </div>
                   ))}
                 </div>
@@ -920,7 +920,7 @@ function HomeStep({
                       ? ` · ${view.goal.payoutPercent}% (repeat rung)`
                       : ''}
                   </p>
-                  <div className="mt-2 flex items-center gap-2">
+                  <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5">
                     <PledgeRewardTiles
                       rewards={
                         view.goalTiers.find((t) => t.days === view.goal!.days)
@@ -929,7 +929,7 @@ function HomeStep({
                       rewardCatalog={rewardCatalog}
                       isPremium={isPremium}
                     />
-                    <span className="text-[11px] font-bold text-muted-foreground">
+                    <span className="whitespace-nowrap text-[11px] font-bold text-muted-foreground">
                       at the finish
                     </span>
                   </div>
