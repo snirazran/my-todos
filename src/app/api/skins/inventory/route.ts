@@ -16,7 +16,10 @@ import { MAX_HUNGER_MS } from '@/lib/hungerLogic';
 import { getZonedToday } from '@/lib/utils';
 
 const json = (body: unknown, init = 200) =>
-  NextResponse.json(body, { status: init });
+  NextResponse.json(body, {
+    status: init,
+    headers: { 'Cache-Control': 'no-store, max-age=0' },
+  });
 
 type LeanUser = UserDoc & { _id: string };
 

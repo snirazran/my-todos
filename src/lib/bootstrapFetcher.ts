@@ -57,7 +57,9 @@ export async function bootstrapFetcher<T = unknown>(url: string): Promise<T> {
       typeof window !== 'undefined' && url.startsWith('/api/skins/inventory')
         ? `${url}${url.includes('?') ? '&' : '?'}timezone=${encodeURIComponent(clientTimezone())}`
         : url;
-    return fetch(directUrl).then((res) => res.json() as Promise<T>);
+    return fetch(directUrl, { cache: 'no-store' }).then(
+      (res) => res.json() as Promise<T>,
+    );
   };
   if (typeof window === 'undefined') return direct();
 
