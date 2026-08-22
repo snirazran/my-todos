@@ -370,7 +370,7 @@ function StatisticsPageContent() {
           </div>
           {comparisonEnabled ? (
             <div className="flex flex-wrap items-end gap-2 border-t border-border pt-3 lg:border-l lg:border-t-0 lg:pl-3 lg:pt-0">
-              <span className="mb-2 text-[10px] font-black uppercase tracking-wider text-muted-foreground">Compared with</span>
+              <span className="mb-2 text-[12px] font-black text-muted-foreground">Compared with</span>
               <DateField label="From" value={comparisonRange.start} onChange={(start) => setComparisonRange((range) => ({ ...range, start }))} />
               <DateField label="To" value={comparisonRange.end} onChange={(end) => setComparisonRange((range) => ({ ...range, end }))} />
             </div>
@@ -402,7 +402,7 @@ function StatisticsPageContent() {
 
 function DateField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
   return (
-    <label className="grid gap-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+    <label className="grid gap-1 text-[12px] font-bold text-muted-foreground">
       {label}
       <span className="relative">
         <CalendarDays className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4" />
@@ -541,7 +541,7 @@ function FeatureAdoption({ rows }: {
   return (
     <div className="overflow-x-auto">
       <div className="min-w-[520px] divide-y divide-border">
-        <div className="grid grid-cols-[minmax(180px,1fr)_80px_80px_100px_28px] gap-2 pb-2 text-[10px] font-bold uppercase text-muted-foreground">
+        <div className="grid grid-cols-[minmax(180px,1fr)_80px_80px_100px_28px] gap-2 pb-2 text-[12px] font-bold text-muted-foreground">
           <span>Feature</span><span className="text-right">Events</span><span className="text-right">Users</span><span className="text-right">Events / user</span><span />
         </div>
         {rows.map((row) => {
@@ -714,7 +714,7 @@ function FeatureDetails({ event, breakdown, questMix }: { event: string; breakdo
             <div className="space-y-4">
               {group.dimensions.map((dimension) => (
                 <div key={dimension.key}>
-                  <p className="mb-1.5 text-[10px] font-bold uppercase text-muted-foreground">{dimension.label}</p>
+                  <p className="mb-1.5 text-[12px] font-bold text-muted-foreground">{dimension.label}</p>
                   <div className="space-y-2">
                     {dimension.rows.map((item) => (
                       <div key={item.value}>
@@ -773,7 +773,7 @@ function QuestObjectivePerformance({ rows }: { rows: StatisticsData['engagement'
       </div>
       <div className="overflow-x-auto">
         <div className="min-w-[820px] divide-y divide-border">
-          <div className="grid grid-cols-[150px_110px_minmax(210px,1fr)_90px_80px_80px_130px] gap-3 pb-2 text-[10px] font-bold uppercase text-muted-foreground">
+          <div className="grid grid-cols-[150px_110px_minmax(210px,1fr)_90px_80px_80px_130px] gap-3 pb-2 text-[12px] font-bold text-muted-foreground">
             <span>Track</span><span>Tier</span><span>Objective</span><span className="text-right">Target</span><span className="text-right">Claims</span><span className="text-right">Users</span><span className="text-right">Avg reward</span>
           </div>
           {rows.map((row, index) => (
@@ -923,7 +923,7 @@ function FlySourceBreakdown({ rows, questRows, seasonRows }: {
   return (
     <div className="overflow-x-auto">
       <div className="min-w-[760px] divide-y divide-border">
-        <div className="grid grid-cols-[minmax(180px,1fr)_90px_90px_80px_100px_100px_100px_28px] gap-2 pb-2 text-[10px] font-bold uppercase text-muted-foreground">
+        <div className="grid grid-cols-[minmax(180px,1fr)_90px_90px_80px_100px_100px_100px_28px] gap-2 pb-2 text-[12px] font-bold text-muted-foreground">
           <span>Source</span><span className="text-right">Flies</span><span className="text-right">Actions</span><span className="text-right">Users</span><span className="text-right">Avg / action</span><span className="text-right">Avg / user</span><span className="text-right">Fly share</span><span />
         </div>
         {rows.map((row) => {
@@ -998,7 +998,7 @@ function SkinMarketBreakdown({ rows }: { rows: StatisticsData['economy']['skins'
       </div>
       <div className="overflow-x-auto">
         <div className="min-w-[660px] divide-y divide-border">
-          <div className="grid grid-cols-[minmax(150px,1fr)_90px_100px_80px_80px_110px] gap-3 pb-2 text-[10px] font-bold uppercase text-muted-foreground">
+          <div className="grid grid-cols-[minmax(150px,1fr)_90px_100px_80px_80px_110px] gap-3 pb-2 text-[12px] font-bold text-muted-foreground">
             <span>Rarity</span><span>Account</span><span className="text-right">Transactions</span><span className="text-right">Items</span><span className="text-right">Users</span><span className="text-right">Flies spent</span>
           </div>
           {[...rows]
@@ -1079,8 +1079,8 @@ function EconomyHealth({ health }: { health: StatisticsData['economy']['health']
         {health.metrics.map((m) => (
           <div key={m.key} className={`rounded-xl border-l-4 p-3 ${HEALTH_TONE[m.status] ?? HEALTH_TONE.unknown}`}>
             <div className="flex items-baseline justify-between gap-3">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">{m.label}</p>
-              <span className="shrink-0 text-[10px] font-black uppercase tracking-wide text-muted-foreground">{HEALTH_LABEL[m.status]}</span>
+              <p className="text-[13px] font-bold tracking-wide text-muted-foreground">{m.label}</p>
+              <span className="shrink-0 text-[12px] font-black tracking-wide text-muted-foreground">{HEALTH_LABEL[m.status]}</span>
             </div>
             <p className="mt-1 text-2xl font-black tabular-nums">{formatHealth(m.value, m.unit)}</p>
             <p className="mt-0.5 text-[11px] font-semibold text-muted-foreground">Target {m.target}</p>
@@ -1180,7 +1180,7 @@ function PaywallTriggerBreakdown({ rows }: { rows: StatisticsData['paywallPlacem
   return (
     <div className="overflow-x-auto">
       <div className="min-w-[820px] divide-y divide-border">
-        <div className="grid grid-cols-[minmax(180px,1fr)_70px_80px_70px_80px_80px_60px_90px_28px] gap-2 pb-2 text-[10px] font-bold uppercase text-muted-foreground">
+        <div className="grid grid-cols-[minmax(180px,1fr)_70px_80px_70px_80px_80px_60px_90px_28px] gap-2 pb-2 text-[12px] font-bold text-muted-foreground">
           <span>Trigger</span><span className="text-right">Views</span><span className="text-right">Viewers</span><span className="text-right">Starts</span><span className="text-right">Completed</span><span className="text-right">Cancelled</span><span className="text-right">Failed</span><span className="text-right">View to buy</span><span />
         </div>
         {rows.map((row) => {
@@ -1353,7 +1353,7 @@ function Kpi({ icon, label, value, detail }: { icon: React.ReactNode; label: str
     <div className="min-w-0 rounded-md border border-border bg-card p-4 shadow-sm">
       <div className="flex items-center gap-2 text-muted-foreground">
         <span className="[&>svg]:h-4 [&>svg]:w-4">{icon}</span>
-        <span className="truncate text-[11px] font-bold uppercase tracking-wider">{label}</span>
+        <span className="truncate text-[13px] font-bold">{label}</span>
       </div>
       <p className="mt-3 text-2xl font-black tabular-nums tracking-tight md:text-3xl">{value}</p>
       <p className="mt-1 truncate text-[11px] text-muted-foreground" title={detail}>{detail}</p>
@@ -1435,7 +1435,7 @@ function DataTable({ headers, rows }: { headers: string[]; rows: Array<Array<str
     <div className="overflow-x-auto">
       <table className="w-full min-w-[520px] border-collapse text-left text-xs">
         <thead>
-          <tr className="border-b border-border text-[10px] uppercase tracking-wider text-muted-foreground">
+          <tr className="border-b border-border text-[12px] text-muted-foreground">
             {headers.map((header, index) => <th key={header} className={`pb-2 font-bold ${index ? 'text-right' : ''}`}>{header}</th>)}
           </tr>
         </thead>

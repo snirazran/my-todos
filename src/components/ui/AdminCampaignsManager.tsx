@@ -702,7 +702,7 @@ export function AdminCampaignsManager() {
                         <span className="truncate text-sm font-black">{row.name}</span>
                         <span
                           className={cn(
-                            'rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wider',
+                            'rounded-full px-2 py-0.5 text-[11px] font-black',
                             STATUS_STYLES[row.status],
                           )}
                         >
@@ -770,7 +770,7 @@ export function AdminCampaignsManager() {
 
               {notes.length ? (
                 <div className="rounded-xl bg-amber-500/10 p-3">
-                  <p className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                  <p className="flex items-center gap-1.5 text-[13px] font-black text-amber-600 dark:text-amber-400">
                     <AlertTriangle className="h-3.5 w-3.5" />
                     Before this goes live
                   </p>
@@ -1464,7 +1464,7 @@ export function AdminCampaignsManager() {
           {draft ? (
             <div className="xl:sticky xl:top-6 xl:self-start">
               <div className="mb-2 flex items-center gap-2">
-                <p className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">
+                <p className="text-[13px] font-black text-muted-foreground">
                   Live preview
                 </p>
                 <div className="ml-auto flex gap-1">
@@ -1693,7 +1693,7 @@ function ElementAnalytics({
 
   return (
     <div className="space-y-1 rounded-xl bg-muted/50 p-3">
-      <p className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">
+      <p className="text-[13px] font-black text-muted-foreground">
         Per element · {impressions} impressions
       </p>
       {clickable.map((element) => {
@@ -1748,7 +1748,7 @@ function Section({
 }) {
   return (
     <details open={defaultOpen} className="rounded-xl bg-muted/30 p-3">
-      <summary className="cursor-pointer select-none text-[11px] font-black uppercase tracking-wider text-muted-foreground">
+      <summary className="cursor-pointer select-none text-[13px] font-black text-muted-foreground">
         {title}
       </summary>
       <div className="mt-3 space-y-3">{children}</div>
@@ -1768,7 +1768,7 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="mb-1 flex items-center gap-1 text-[11px] font-black uppercase tracking-wider text-muted-foreground">
+      <span className="mb-1 flex items-center gap-1 text-[13px] font-black text-muted-foreground">
         {label}
         {help ? (
           <Hint text={help}>

@@ -1246,7 +1246,7 @@ export default function QuickAddSheet({
                         <div className="min-h-0 overflow-hidden">
                           <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 px-1 -mx-1 mask-fade-right">
                             {chipView.notify && (
-                              <span className="shrink-0 inline-flex items-center gap-1.5 rounded-xl border border-primary/20 bg-primary/10 px-3 py-1.5 text-[11px] font-black uppercase tracking-wider text-primary shadow-sm">
+                              <span className="shrink-0 inline-flex items-center gap-1.5 rounded-xl border border-primary/20 bg-primary/10 px-3 py-1.5 text-[13px] font-black text-primary shadow-sm">
                                 <Bell className="h-3 w-3 shrink-0 text-amber-500" />
                                 <span className="tabular-nums">
                                   {chipView.startTime || '09:00'}
@@ -1269,7 +1269,7 @@ export default function QuickAddSheet({
                                     prev.filter((id) => id !== tag.id),
                                   )
                                 }
-                                className="shrink-0 inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-[11px] font-black uppercase tracking-wider shadow-sm transition-all active:scale-95 [@media(hover:hover)]:hover:opacity-75"
+                                className="shrink-0 inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-[13px] font-black shadow-sm transition-all active:scale-95 [@media(hover:hover)]:hover:opacity-75"
                                 style={{
                                   backgroundColor: `${tag.color}20`,
                                   color: tag.color,
@@ -1333,7 +1333,7 @@ export default function QuickAddSheet({
                             <button
                               type="button"
                               {...keyboardSafeTap(applyNlSuggestion)}
-                              className="inline-flex h-9 min-w-0 items-center gap-1.5 rounded-xl border border-primary/20 bg-primary/10 px-3 text-[11px] font-black uppercase tracking-wider text-primary shadow-sm transition-all active:scale-95 [@media(hover:hover)]:hover:bg-primary/15"
+                              className="inline-flex h-9 min-w-0 items-center gap-1.5 rounded-xl border border-primary/20 bg-primary/10 px-3 text-[13px] font-black text-primary shadow-sm transition-all active:scale-95 [@media(hover:hover)]:hover:bg-primary/15"
                             >
                               {nlSuggestion.dateKey ? (
                                 <CalendarDays className="h-3.5 w-3.5 shrink-0" />
@@ -1358,7 +1358,7 @@ export default function QuickAddSheet({
                                       : [...prev, suggestedTag.id],
                                   ),
                                 )}
-                                className="relative inline-flex h-9 min-w-0 items-center gap-1.5 rounded-xl border px-3 text-[11px] font-black uppercase tracking-wider shadow-sm transition-all active:scale-95 [@media(hover:hover)]:hover:opacity-75"
+                                className="relative inline-flex h-9 min-w-0 items-center gap-1.5 rounded-xl border px-3 text-[13px] font-black shadow-sm transition-all active:scale-95 [@media(hover:hover)]:hover:opacity-75"
                                 style={{
                                   backgroundColor: `${suggestedTag.color}20`,
                                   color: suggestedTag.color,
@@ -1472,13 +1472,13 @@ export default function QuickAddSheet({
                                 }
                                 tagManager.toggleTag(tag);
                               })}
-                              className={`relative inline-flex h-9 select-none items-center justify-center gap-1.5 rounded-xl border px-3 text-[11px] font-black uppercase tracking-wider shadow-sm transition-all active:scale-95 [@media(hover:hover)]:hover:opacity-75 ${
-                                tag.disabled
-                                  ? 'border-dashed border-border bg-muted text-muted-foreground/70'
-                                  : selected
-                                    ? 'ring-2 ring-offset-1 ring-offset-popover'
-                                    : ''
-                              }`}
+                              className={`relative inline-flex h-9 select-none items-center justify-center gap-1.5 rounded-xl border px-3 text-[13px] font-black shadow-sm transition-all active:scale-95 [@media(hover:hover)]:hover:opacity-75 ${
+ tag.disabled
+ ? 'border-dashed border-border bg-muted text-muted-foreground/70'
+ : selected
+ ? 'ring-2 ring-offset-1 ring-offset-popover'
+ : ''
+ }`}
                               style={
                                 tag.disabled
                                   ? undefined
@@ -1502,7 +1502,7 @@ export default function QuickAddSheet({
                           type="button"
                           aria-label="Add tag"
                           onClick={tagScroll.guard(() => setActivePicker('tags'))}
-                          className="inline-flex h-9 items-center justify-center gap-1 rounded-xl border border-dashed border-primary/40 bg-primary/5 px-3 text-[11px] font-extrabold uppercase tracking-wider text-primary transition-colors active:scale-95 [@media(hover:hover)]:hover:bg-primary/10"
+                          className="inline-flex h-9 items-center justify-center gap-1 rounded-xl border border-dashed border-primary/40 bg-primary/5 px-3 text-[13px] font-extrabold text-primary transition-colors active:scale-95 [@media(hover:hover)]:hover:bg-primary/10"
                         >
                           <Plus className="h-3.5 w-3.5 shrink-0 stroke-[3]" />
                           {stripTags.length === 0 && (

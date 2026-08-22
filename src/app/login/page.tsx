@@ -498,7 +498,7 @@ function LoginPageInner() {
                   <div className="absolute inset-0 flex items-center">
                     <span className="w-full border-t border-border/60" />
                   </div>
-                  <div className="relative flex justify-center text-xs uppercase">
+                  <div className="relative flex justify-center text-[13px]">
                     <span className="bg-background px-2 font-bold tracking-widest text-muted-foreground">
                       Or
                     </span>
@@ -520,7 +520,7 @@ function LoginPageInner() {
                   <button
                     type="submit"
                     disabled={!email.trim() || loading}
-                    className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary text-sm font-black uppercase tracking-wider text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+                    className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary text-sm font-black text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {loading ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -545,7 +545,7 @@ function LoginPageInner() {
                 transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
                 className="flex flex-col items-center pt-8 text-center"
               >
-                <h1 className="text-xl font-black uppercase tracking-tight text-foreground">
+                <h1 className="text-xl font-black tracking-tight text-foreground">
                   Check your email
                 </h1>
                 <p className="mt-2 text-sm text-muted-foreground">
@@ -573,7 +573,7 @@ function LoginPageInner() {
 
         <motion.p
           variants={ENTER_ITEM}
-          className="mt-8 text-[11px] font-bold uppercase tracking-wider text-muted-foreground"
+          className="mt-8 text-[13px] font-bold text-muted-foreground"
         >
           No frog yet?{' '}
           <Link

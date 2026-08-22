@@ -1168,7 +1168,7 @@ export function TradePanel({
                 (expects ? (
                   <span
                     className={cn(
-                      'rounded px-1 py-0.5 text-[9px] font-black uppercase tracking-wide',
+                      'rounded px-1 py-0.5 text-[11px] font-black tracking-wide',
                       RARITY_CONFIG[expects].text,
                     )}
                   >
@@ -1188,7 +1188,7 @@ export function TradePanel({
     const ladder = targetRarity && nextRarity && (
       <span className="flex items-center gap-1 min-w-0">
         <span
-          className={`text-[10px] px-2 py-0.5 rounded uppercase font-bold ${getRarityBg(targetRarity)}`}
+          className={`text-[12px] px-2 py-0.5 rounded font-bold ${getRarityBg(targetRarity)}`}
         >
           {countOf(slotCount, targetRarity)}
         </span>
@@ -1200,7 +1200,7 @@ export function TradePanel({
               +
             </span>
             <span
-              className={`text-[10px] px-2 py-0.5 rounded uppercase font-bold ${getRarityBg(fuelRarity)}`}
+              className={`text-[12px] px-2 py-0.5 rounded font-bold ${getRarityBg(fuelRarity)}`}
             >
               {countOf(fuelQuote.count, fuelRarity)}
             </span>
@@ -1208,7 +1208,7 @@ export function TradePanel({
         )}
         <ArrowRight size={12} className="shrink-0 text-muted-foreground/60" />
         <span
-          className={`text-[10px] px-2 py-0.5 rounded uppercase font-bold ${getRarityBg(nextRarity)}`}
+          className={`text-[12px] px-2 py-0.5 rounded font-bold ${getRarityBg(nextRarity)}`}
         >
           {nextRarity}
         </span>
@@ -1220,7 +1220,7 @@ export function TradePanel({
         disabled={primaryCta.disabled}
         onClick={primaryCta.onClick}
         className={cn(
-          'relative w-full h-12 lg:h-14 font-black uppercase tracking-wider transition-all overflow-hidden text-sm rounded-xl',
+          'relative w-full h-12 lg:h-14 font-black transition-all overflow-hidden text-sm rounded-xl',
           primaryCta.tone === 'trade' &&
             !primaryCta.disabled &&
             'bg-primary text-primary-foreground shadow-[0_4px_0_0_hsl(var(--primary)/0.55)] active:translate-y-0.5 active:shadow-[0_2px_0_0_hsl(var(--primary)/0.55)]',
@@ -1242,7 +1242,7 @@ export function TradePanel({
       <>
         {desktopMode ? (
           <div className="flex items-center justify-between w-full gap-3 px-4 py-3 border-b border-border bg-muted/30 shrink-0">
-            <h3 className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-black uppercase text-foreground min-w-0">
+            <h3 className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-black text-foreground min-w-0">
               Contract
               {ladder}
             </h3>
@@ -1283,7 +1283,7 @@ export function TradePanel({
               <span className="flex min-w-0 flex-1 flex-col gap-1">
                 <span className="flex items-center gap-2 min-w-0">
                   {ladder ?? (
-                    <span className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">
+                    <span className="text-[13px] font-black text-muted-foreground">
                       Contract
                     </span>
                   )}
@@ -1351,7 +1351,7 @@ export function TradePanel({
 
             {recipe?.fuelRarity && targetRarity && (
               <div className="mb-1.5 flex items-center justify-between gap-2">
-                <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+                <span className="text-[12px] font-black text-muted-foreground">
                   Needs{' '}
                   <span className="text-foreground">
                     {countOf(slotCount, targetRarity)}
@@ -1435,7 +1435,7 @@ export function TradePanel({
                   <Crosshair className="h-4 w-4" strokeWidth={3} />
                 </span>
                 <span className="flex min-w-0 flex-1 flex-col leading-tight">
-                  <span className="text-[11px] font-black uppercase tracking-wider text-foreground">
+                  <span className="text-[13px] font-black text-foreground">
                     Aim
                   </span>
                   <span className="text-[10px] font-bold text-muted-foreground">
@@ -1507,7 +1507,7 @@ export function TradePanel({
             <button
               type="button"
               onClick={handleClear}
-              className="mb-2 flex w-full items-center justify-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-muted-foreground transition-colors active:text-destructive"
+              className="mb-2 flex w-full items-center justify-center gap-1.5 text-[12px] font-black text-muted-foreground transition-colors active:text-destructive"
             >
               <Trash2 className="h-3 w-3" strokeWidth={3} />
               Clear contract
@@ -1591,7 +1591,7 @@ export function TradePanel({
                   initial={{ opacity: 0, y: -10, scale: 0.9 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   transition={{ type: 'spring', stiffness: 380, damping: 22 }}
-                  className="mb-3 flex items-center gap-1.5 rounded-full bg-gradient-to-r from-amber-400 to-yellow-300 px-3.5 py-1.5 text-[11px] font-black uppercase tracking-[0.16em] text-amber-950 shadow-lg shadow-amber-500/30"
+                  className="mb-3 flex items-center gap-1.5 rounded-full bg-gradient-to-r from-amber-400 to-yellow-300 px-3.5 py-1.5 text-[13px] font-black text-amber-950 shadow-lg shadow-amber-500/30"
                 >
                   <Sparkles className="h-3.5 w-3.5" strokeWidth={3} />
                   Golden trade — two items
@@ -1725,7 +1725,7 @@ export function TradePanel({
                 type="button"
                 onClick={handleClear}
                 className={cn(
-                  'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-wider transition-colors',
+                  'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] font-black transition-colors',
                   getRarityBg(targetRarity),
                   'border-transparent',
                 )}
@@ -1736,7 +1736,7 @@ export function TradePanel({
               {fuelRarity && (
                 <span
                   className={cn(
-                    'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wider',
+                    'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-black',
                     getRarityBg(fuelRarity),
                   )}
                 >
@@ -1858,7 +1858,7 @@ export function TradePanel({
                   >
                     <p
                       className={cn(
-                        'mb-2 px-1 text-[10px] font-black uppercase tracking-[0.18em]',
+                        'mb-2 px-1 text-[12px] font-black',
                         RARITY_CONFIG[group.rarity].text,
                       )}
                     >
@@ -2100,7 +2100,7 @@ function RewardSummary({
     >
       <span
         className={cn(
-          'text-[11px] font-black uppercase tracking-[0.16em]',
+          'text-[13px] font-black',
           RARITY_CONFIG[rarity].text,
         )}
       >
@@ -2116,11 +2116,11 @@ function RewardSummary({
           centered && 'justify-center',
         )}
       >
-        <span className="text-[10px] font-black uppercase tracking-wider text-primary underline underline-offset-2">
+        <span className="text-[12px] font-black text-primary underline underline-offset-2">
           See them all
         </span>
         {wishlisted > 0 && (
-          <span className="inline-flex items-center gap-0.5 rounded-full bg-primary/15 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-primary">
+          <span className="inline-flex items-center gap-0.5 rounded-full bg-primary/15 px-1.5 py-0.5 text-[11px] font-black text-primary">
             <Bookmark className="h-2.5 w-2.5" strokeWidth={3.5} fill="currentColor" />
             {wishlisted}
           </span>
@@ -2176,7 +2176,7 @@ function RewardPoolTile({ prize }: { prize: RewardPreview }) {
       </p>
       <p
         className={cn(
-          'px-0.5 text-[9px] font-black uppercase tracking-wider',
+          'px-0.5 text-[11px] font-black',
           prize.owned ? 'text-muted-foreground' : 'text-primary',
         )}
       >
@@ -2223,7 +2223,7 @@ function RewardPoolSheet({
               {rarity && (
                 <span
                   className={cn(
-                    'rounded px-2 py-0.5 text-[10px] font-bold uppercase',
+                    'rounded px-2 py-0.5 text-[12px] font-bold',
                     getRarityBg(rarity),
                   )}
                 >
@@ -2267,7 +2267,7 @@ function RewardPoolSheet({
 
 function WaiverChip({ children }: { children: React.ReactNode }) {
   return (
-    <span className="rounded-full bg-green-500/15 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-green-700 dark:text-green-400">
+    <span className="rounded-full bg-green-500/15 px-2 py-0.5 text-[11px] font-black text-green-700 dark:text-green-400">
       {children}
     </span>
   );
@@ -2276,7 +2276,7 @@ function WaiverChip({ children }: { children: React.ReactNode }) {
 function ScrollMoreCue() {
   return (
     <div className="pointer-events-none sticky bottom-3 z-30 flex justify-center">
-      <div className="flex items-center gap-1.5 rounded-full border border-border/50 bg-background/85 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-muted-foreground shadow-sm backdrop-blur">
+      <div className="flex items-center gap-1.5 rounded-full border border-border/50 bg-background/85 px-3 py-1.5 text-[12px] font-black text-muted-foreground shadow-sm backdrop-blur">
         <ChevronDown className="h-3.5 w-3.5 animate-bounce text-primary" />
         <span>Scroll for more</span>
       </div>

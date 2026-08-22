@@ -119,9 +119,9 @@ function TabButton({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-xl px-6 py-2.5 text-sm font-black uppercase tracking-[0.12em] transition-colors ${
-        active ? 'bg-[#1f7fc0] text-white' : 'bg-white/25 text-white/90'
-      }`}
+      className={`rounded-xl px-6 py-2.5 text-sm font-black transition-colors ${
+ active ? 'bg-[#1f7fc0] text-white' : 'bg-white/25 text-white/90'
+ }`}
     >
       {children}
     </button>

@@ -256,7 +256,7 @@ function FocusTagLimitDialog({
             <button
               type="button"
               onClick={onClose}
-              className="h-12 w-full rounded-2xl bg-primary text-[14px] font-black uppercase tracking-wide text-primary-foreground transition active:translate-y-[2px]"
+              className="h-12 w-full rounded-2xl bg-primary text-[14px] font-black tracking-wide text-primary-foreground transition active:translate-y-[2px]"
             >
               Confirm
             </button>
@@ -278,10 +278,10 @@ function FocusTagLimitDialog({
                 name="frogPlus"
                 className="-my-8 -ml-1 h-20 w-20 drop-shadow-[0_3px_0_rgba(31,98,28,0.4)]"
               />
-              <span className="text-sm font-black uppercase tracking-[0.08em] text-emerald-900 drop-shadow-[0_1px_0_rgba(255,255,255,0.5)]">
+              <span className="text-sm font-black text-emerald-900 drop-shadow-[0_1px_0_rgba(255,255,255,0.5)]">
                 Connect more with
               </span>
-              <span className="inline-flex items-center rounded-lg bg-gradient-to-b from-emerald-600 to-emerald-800 px-2 py-1.5 text-[11px] font-black uppercase leading-none tracking-[0.18em] text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_2px_4px_rgba(0,0,0,0.25)] ring-1 ring-emerald-900/40">
+              <span className="inline-flex items-center rounded-lg bg-gradient-to-b from-emerald-600 to-emerald-800 px-2 py-1.5 text-[13px] font-black leading-none text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_2px_4px_rgba(0,0,0,0.25)] ring-1 ring-emerald-900/40">
                 Plus
               </span>
             </button>
@@ -347,7 +347,7 @@ function SwitchTagFocusDialog({
             <button
               type="button"
               onClick={onConfirm}
-              className="h-12 rounded-2xl bg-primary text-[14px] font-black uppercase tracking-wide text-primary-foreground transition active:translate-y-[2px]"
+              className="h-12 rounded-2xl bg-primary text-[14px] font-black tracking-wide text-primary-foreground transition active:translate-y-[2px]"
             >
               Switch
             </button>

@@ -328,12 +328,12 @@ export function PactCard({
               <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-black/25" />
               {/* On its own the label vanished into the bright top of the
                   art — it needs its own ground, not more opacity. */}
-              <span className="absolute left-3 top-2.5 rounded-lg bg-black/55 px-2 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-white backdrop-blur-sm">
+              <span className="absolute left-3 top-2.5 rounded-lg bg-black/55 px-2 py-1 text-[12px] font-black text-white backdrop-blur-sm">
                 This week
               </span>
               <span className="absolute bottom-2 left-3.5 right-3 flex flex-col gap-0.5">
                 <span
-                  className="text-[19px] uppercase leading-none tracking-wide text-white drop-shadow-[0_3px_0_rgba(15,23,42,0.9)]"
+                  className="text-[19px] leading-none tracking-wide text-white drop-shadow-[0_3px_0_rgba(15,23,42,0.9)]"
                   style={{
                     fontFamily: 'var(--font-display), "Luckiest Guy", cursive',
                     WebkitTextStroke: '1.8px rgba(15, 23, 42, 0.95)',
@@ -426,7 +426,7 @@ export function PactCard({
               )}
               <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-black/55 to-transparent" />
               <span
-                className="absolute bottom-2 left-3.5 text-[19px] uppercase leading-none tracking-wide text-white drop-shadow-[0_3px_0_rgba(15,23,42,0.9)]"
+                className="absolute bottom-2 left-3.5 text-[19px] leading-none tracking-wide text-white drop-shadow-[0_3px_0_rgba(15,23,42,0.9)]"
                 style={{
                   fontFamily: 'var(--font-display), "Luckiest Guy", cursive',
                   WebkitTextStroke: '1.8px rgba(15, 23, 42, 0.95)',
@@ -525,7 +525,7 @@ export function PactCard({
                     // there is nothing left to explain, and leaving the slot
                     // empty made the finished row reflow narrower than the
                     // one it replaced.
-                    <span className="inline-flex h-8 items-center justify-center rounded-xl border border-lime-500/40 bg-lime-500/10 px-3 text-[12px] font-black uppercase tracking-wider text-lime-600 dark:text-lime-400 min-[400px]:px-3.5">
+                    <span className="inline-flex h-8 items-center justify-center rounded-xl border border-lime-500/40 bg-lime-500/10 px-3 text-[13px] font-black text-lime-600 dark:text-lime-400 min-[400px]:px-3.5">
                       Done
                     </span>
                   ) : (

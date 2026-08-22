@@ -45,7 +45,7 @@ export function QuestPriorityDebug({
 
   return (
     <div className="rounded-2xl border border-dashed border-violet-500/50 bg-violet-500/[0.06] p-3 text-left font-mono text-[10px] leading-relaxed text-muted-foreground">
-      <p className="mb-1.5 font-sans text-[10px] font-black uppercase tracking-[0.14em] text-violet-600 dark:text-violet-400">
+      <p className="mb-1.5 font-sans text-[12px] font-black text-violet-600 dark:text-violet-400">
         Priority debug · {title}
       </p>
       <ol className="space-y-1.5">

@@ -416,8 +416,8 @@ export function QuestRewardTileBadge({
               <span
                 className={
                   small
-                    ? 'absolute -right-1 -top-1 z-20 flex min-w-4 items-center justify-center rounded-md border border-white/10 bg-black/55 px-1 py-0.5 text-[8px] font-bold uppercase tracking-wide text-white shadow-sm backdrop-blur-sm'
-                    : 'absolute -right-1 -top-1 z-20 flex min-w-5 items-center justify-center rounded-md border border-white/10 bg-black/55 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white shadow-sm backdrop-blur-sm'
+                    ? 'absolute -right-1 -top-1 z-20 flex min-w-4 items-center justify-center rounded-md border border-white/10 bg-black/55 px-1 py-0.5 text-[10px] font-bold tracking-wide text-white shadow-sm backdrop-blur-sm'
+                    : 'absolute -right-1 -top-1 z-20 flex min-w-5 items-center justify-center rounded-md border border-white/10 bg-black/55 px-1.5 py-0.5 text-[11px] font-bold tracking-wide text-white shadow-sm backdrop-blur-sm'
                 }
               >
                 {rewardQuantityLabel(item)}
@@ -428,7 +428,7 @@ export function QuestRewardTileBadge({
       })}
       {extraCount > 0 && (
         <span
-          className="pointer-events-none absolute -bottom-0.5 -right-1.5 z-30 flex h-4 min-w-4 items-center justify-center rounded-md border border-white/10 bg-black/55 px-1 text-[8px] font-black uppercase tracking-wide text-white shadow-sm backdrop-blur-sm"
+          className="pointer-events-none absolute -bottom-0.5 -right-1.5 z-30 flex h-4 min-w-4 items-center justify-center rounded-md border border-white/10 bg-black/55 px-1 text-[10px] font-black tracking-wide text-white shadow-sm backdrop-blur-sm"
         >
           +{extraCount}
         </span>
@@ -440,7 +440,7 @@ export function QuestRewardTileBadge({
 export function QuestTagPillInline({ tag }: { tag: ObjectiveTagChip }) {
   return (
     <span
-      className="relative inline-block max-w-[8rem] truncate rounded-xl border px-2 py-0.5 align-middle text-[10px] font-black uppercase tracking-wider shadow-sm md:max-w-[10rem] md:px-3 md:py-1 md:text-[11px]"
+      className="relative inline-block max-w-[8rem] truncate rounded-xl border px-2 py-0.5 align-middle text-[12px] font-black shadow-sm md:max-w-[10rem] md:px-3 md:py-1 md:text-[13px]"
       style={{
         backgroundColor: `${tag.color}20`,
         borderColor: `${tag.color}40`,
@@ -572,7 +572,7 @@ export function HintButton({
           className="absolute bottom-full right-0 z-30 mb-2.5 flex w-[17rem] max-w-[calc(100vw-2rem)] flex-col gap-2.5 rounded-2xl border border-border bg-popover p-3.5 text-left normal-case tracking-normal text-popover-foreground shadow-xl ring-1 ring-black/5"
           onClick={(event) => event.stopPropagation()}
         >
-          <span className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+          <span className="flex items-center gap-1.5 text-[12px] font-black text-muted-foreground">
             <Lightbulb className="h-3.5 w-3.5 text-amber-500" strokeWidth={2.75} />
             How to do this
           </span>
@@ -581,7 +581,7 @@ export function HintButton({
           </span>
           {tags?.length ? (
             <span className="flex flex-col gap-1.5 rounded-xl bg-muted/60 px-2.5 py-2">
-              <span className="text-[9.5px] font-black uppercase tracking-[0.12em] text-muted-foreground">
+              <span className="text-[11px] font-black text-muted-foreground">
                 {tags.length > 1 ? 'Only these tags count' : 'Only this tag counts'}
               </span>
               <span className="flex flex-wrap items-center gap-1.5">
@@ -599,7 +599,7 @@ export function HintButton({
                 setOpen(false);
                 onShowMe();
               }}
-              className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-xl bg-amber-500 px-3 text-[12px] font-black uppercase tracking-wide text-white shadow-[0_3px_0_0_#b45309] transition-all hover:translate-y-[-1px] hover:shadow-[0_4px_0_0_#b45309] active:translate-y-[2px] active:shadow-none"
+              className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-xl bg-amber-500 px-3 text-[13px] font-black tracking-wide text-white shadow-[0_3px_0_0_#b45309] transition-all hover:translate-y-[-1px] hover:shadow-[0_4px_0_0_#b45309] active:translate-y-[2px] active:shadow-none"
             >
               <Play className="h-3 w-3 fill-current" />
               Show me
@@ -852,7 +852,7 @@ function ClaimRewardToast({
         type="button"
         disabled={claiming}
         onClick={(event) => void handleClaimPress(event)}
-        className="inline-flex h-9 min-w-[5.5rem] shrink-0 items-center justify-center rounded-xl bg-amber-500 px-4 text-[10px] font-black uppercase tracking-[0.15em] text-white shadow-[0_3px_0_0_#b45309] transition-all hover:translate-y-[-1px] hover:shadow-[0_4px_0_0_#b45309] active:translate-y-[2px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60"
+        className="inline-flex h-9 min-w-[5.5rem] shrink-0 items-center justify-center rounded-xl bg-amber-500 px-4 text-[12px] font-black text-white shadow-[0_3px_0_0_#b45309] transition-all hover:translate-y-[-1px] hover:shadow-[0_4px_0_0_#b45309] active:translate-y-[2px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60"
       >
         <span className="mr-[-0.15em]">
           {claiming
@@ -895,7 +895,7 @@ function QuestProgressToast({
         isPremium={isPremium}
       />
       <div className="flex min-w-0 flex-1 flex-col leading-tight">
-        <span className="text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+        <span className="text-[12px] font-black text-muted-foreground">
           {trackableEyebrow(trackable)}
         </span>
         <span className="mt-0.5 block min-w-0 truncate text-[13px] font-black text-foreground">

@@ -106,7 +106,7 @@ export function SectionEditorSheet({
                 commit();
               }
             }}
-            className="w-full rounded-2xl bg-muted/60 px-4 py-3.5 text-[16px] font-black uppercase tracking-[0.12em] text-foreground ring-1 ring-inset ring-border/60 placeholder:font-bold placeholder:normal-case placeholder:tracking-normal placeholder:text-muted-foreground/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            className="w-full rounded-2xl bg-muted/60 px-4 py-3.5 text-[16px] font-black text-foreground ring-1 ring-inset ring-border/60 placeholder:font-bold placeholder:normal-case placeholder:tracking-normal placeholder:text-muted-foreground/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
           />
 
           <div className="mt-5">
@@ -130,9 +130,9 @@ export function SectionEditorSheet({
                       key={tag.id}
                       type="button"
                       onClick={() => toggleTag(tag.id)}
-                      className={`inline-flex h-9 items-center rounded-xl border px-3 text-[11px] font-black uppercase tracking-wider shadow-sm transition-all active:scale-95 [@media(hover:hover)]:hover:opacity-75 ${
-                        selected ? 'ring-2 ring-offset-1 ring-offset-background' : ''
-                      }`}
+                      className={`inline-flex h-9 items-center rounded-xl border px-3 text-[13px] font-black shadow-sm transition-all active:scale-95 [@media(hover:hover)]:hover:opacity-75 ${
+ selected ? 'ring-2 ring-offset-1 ring-offset-background' : ''
+ }`}
                       style={{
                         backgroundColor: `${tag.color}20`,
                         color: tag.color,
@@ -207,7 +207,7 @@ export function SectionEditorSheet({
                 displayDelete?.();
                 onClose();
               }}
-              className="h-12 rounded-2xl bg-rose-500 text-[14px] font-black uppercase tracking-wide text-white transition active:translate-y-[2px]"
+              className="h-12 rounded-2xl bg-rose-500 text-[14px] font-black tracking-wide text-white transition active:translate-y-[2px]"
             >
               Delete
             </button>

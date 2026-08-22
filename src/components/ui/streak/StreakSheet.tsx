@@ -248,7 +248,7 @@ function PledgeRewardTiles({
       {skinFloor && (
         <span
           className={cn(
-            'shrink-0 rounded-md border px-1.5 py-0.5 text-[9px] font-black uppercase tracking-[0.1em]',
+            'shrink-0 rounded-md border px-1.5 py-0.5 text-[11px] font-black',
             SKIN_ROLL_RARITY_CHIP[skinFloor] ?? SKIN_ROLL_RARITY_CHIP.rare,
           )}
         >
@@ -305,7 +305,7 @@ function WeekStrip({
           >
             <span
               className={cn(
-                'text-[10px] font-black uppercase',
+                'text-[12px] font-black',
                 light
                   ? 'text-white drop-shadow-[0_1px_2px_rgba(124,45,18,0.6)]'
                   : 'text-muted-foreground',
@@ -464,7 +464,7 @@ function RevealStep({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.5 }}
-              className="mt-2 text-lg font-black uppercase tracking-[0.2em] text-white drop-shadow-[0_1px_3px_rgba(124,45,18,0.55)] short-screen:mt-1 short-screen:text-base"
+              className="mt-2 text-lg font-black text-white drop-shadow-[0_1px_3px_rgba(124,45,18,0.55)] short-screen:mt-1 short-screen:text-base"
             >
               day streak
             </motion.p>
@@ -520,7 +520,7 @@ function RevealStep({
             <button
               type="button"
               onClick={onContinue}
-              className="w-full rounded-2xl bg-white py-4 text-base font-black uppercase tracking-wide text-amber-700 shadow-[0_5px_0_0_rgba(0,0,0,0.15)] transition-[transform,box-shadow,background-color] hover:bg-white/95 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-amber-500 active:translate-y-1 active:shadow-none short-screen:py-3.5"
+              className="w-full rounded-2xl bg-white py-4 text-base font-black tracking-wide text-amber-700 shadow-[0_5px_0_0_rgba(0,0,0,0.15)] transition-[transform,box-shadow,background-color] hover:bg-white/95 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-amber-500 active:translate-y-1 active:shadow-none short-screen:py-3.5"
             >
               Continue
             </button>
@@ -700,12 +700,12 @@ function CommitStep({
                               {tier.days}-day pledge
                             </span>
                             {tier.days === steppingUpTo && (
-                              <span className="shrink-0 rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-[0.12em] text-emerald-600 dark:text-emerald-400">
+                              <span className="shrink-0 rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[11px] font-black text-emerald-600 dark:text-emerald-400">
                                 Step up
                               </span>
                             )}
                             {tier.payoutPercent < 100 && (
-                              <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[9px] font-black uppercase tracking-[0.12em] text-muted-foreground">
+                              <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[11px] font-black text-muted-foreground">
                                 {tier.payoutPercent}%
                               </span>
                             )}
@@ -963,7 +963,7 @@ function HomeStep({
         <button
           type="button"
           onClick={onDone}
-          className="mx-auto block w-full max-w-sm rounded-2xl bg-primary py-3.5 text-sm font-black uppercase tracking-wide text-primary-foreground shadow-[0_5px_0_0_rgba(0,0,0,0.15)] transition-all active:translate-y-1 active:shadow-none"
+          className="mx-auto block w-full max-w-sm rounded-2xl bg-primary py-3.5 text-sm font-black tracking-wide text-primary-foreground shadow-[0_5px_0_0_rgba(0,0,0,0.15)] transition-all active:translate-y-1 active:shadow-none"
         >
           Done
         </button>

@@ -168,7 +168,7 @@ export function StreakCelebration({
                         type="button"
                         onClick={handleDouble}
                         disabled={doubling}
-                        className="mx-auto flex h-11 items-center justify-center gap-2 rounded-2xl bg-white/20 px-5 text-xs font-black uppercase tracking-[0.14em] text-white backdrop-blur transition-colors hover:bg-white/30 disabled:opacity-60"
+                        className="mx-auto flex h-11 items-center justify-center gap-2 rounded-2xl bg-white/20 px-5 text-[13px] font-black text-white backdrop-blur transition-colors hover:bg-white/30 disabled:opacity-60"
                       >
                         {!doubling && mode === 'ad' && (
                           <SquarePlay className="h-4 w-4" strokeWidth={2.5} />

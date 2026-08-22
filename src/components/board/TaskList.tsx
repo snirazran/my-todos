@@ -281,7 +281,7 @@ export default React.memo(function TaskList({
           <CalendarClock className="h-6 w-6 shrink-0 text-primary" />
           <div className="flex flex-col leading-none">
             <span className="text-base font-black">Not so fast!</span>
-            <span className="mt-0.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+            <span className="mt-0.5 text-[13px] font-bold text-muted-foreground">
               This task isn&rsquo;t due yet
             </span>
           </div>

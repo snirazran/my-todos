@@ -49,7 +49,7 @@ export default function BulkConfirmDialog({
               onConfirm();
               onClose();
             }}
-            className="h-12 w-full rounded-2xl bg-red-500 text-[14px] font-black uppercase tracking-wide text-white transition active:translate-y-[2px]"
+            className="h-12 w-full rounded-2xl bg-red-500 text-[14px] font-black tracking-wide text-white transition active:translate-y-[2px]"
           >
             {confirmLabel}
           </button>

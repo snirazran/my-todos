@@ -438,7 +438,7 @@ function Inspector({
           placeholder={ELEMENT_LABELS[element.type]}
           className="input flex-1"
         />
-        <span className="rounded-md bg-background px-2 py-1 text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+        <span className="rounded-md bg-background px-2 py-1 text-[12px] font-black text-muted-foreground">
           {ELEMENT_LABELS[element.type]}
         </span>
       </div>
@@ -802,7 +802,7 @@ function Num({
 }) {
   return (
     <label className="block">
-      <span className="mb-0.5 block text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+      <span className="mb-0.5 block text-[12px] font-black text-muted-foreground">
         {label}
       </span>
       <input
@@ -991,7 +991,7 @@ export function CanvasAssets({
               key={asset.id}
               className="flex items-center gap-2 rounded-lg bg-background px-2 py-1.5 ring-1 ring-border"
             >
-              <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-black uppercase text-muted-foreground">
+              <span className="rounded bg-muted px-1.5 py-0.5 text-[12px] font-black text-muted-foreground">
                 {asset.kind}
               </span>
               <span className="min-w-0 flex-1 truncate text-xs font-bold">{asset.name}</span>

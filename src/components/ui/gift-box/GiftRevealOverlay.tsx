@@ -101,7 +101,7 @@ export function GiftRevealOverlay({
               className="flex cursor-pointer flex-col items-center focus:outline-none"
             >
               <div className="mb-2 text-center">
-                <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-300/80">
+                <p className="text-[13px] font-black text-emerald-300/80">
                   {eyebrow}
                 </p>
                 <p className="mt-1 text-2xl font-black tracking-tight text-white">
@@ -116,7 +116,7 @@ export function GiftRevealOverlay({
                   ambient="jump"
                 />
               </div>
-              <p className="mt-3 text-base font-black uppercase tracking-widest text-white/80">
+              <p className="mt-3 text-base font-black text-white/80">
                 {phase === 'opening' ? 'Unwrapping…' : 'Tap to unwrap'}
               </p>
             </motion.button>

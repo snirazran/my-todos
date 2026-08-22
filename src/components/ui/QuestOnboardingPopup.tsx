@@ -186,7 +186,7 @@ export function QuestOnboardingPopup({
               }}
             >
               <div>
-                <p className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+                <p className="flex items-center gap-1.5 text-[13px] font-black text-muted-foreground">
                   <Compass className="h-3.5 w-3.5 text-primary" strokeWidth={2.75} />
                   Your areas
                 </p>
@@ -246,7 +246,7 @@ export function QuestOnboardingPopup({
                           )}
                           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-black/50 to-transparent" />
                           <span
-                            className="absolute bottom-2 left-3 right-3 truncate uppercase leading-none tracking-wide text-white drop-shadow-[0_3px_0_rgba(15,23,42,0.9)] text-[clamp(0.9375rem,calc(0.5rem_+_2vw),1.125rem)]"
+                            className="absolute bottom-2 left-3 right-3 truncate leading-none tracking-wide text-white drop-shadow-[0_3px_0_rgba(15,23,42,0.9)] text-[clamp(0.9375rem,calc(0.5rem_+_2vw),1.125rem)]"
                             style={{
                               fontFamily: 'var(--font-display), "Luckiest Guy", cursive',
                               WebkitTextStroke: '1.5px rgba(15, 23, 42, 0.95)',
@@ -302,7 +302,7 @@ export function QuestOnboardingPopup({
                               {linkedTags.map((tag) => (
                                 <span
                                   key={tag.id}
-                                  className="max-w-full truncate rounded-lg border px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider"
+                                  className="max-w-full truncate rounded-lg border px-1.5 py-0.5 text-[12px] font-black"
                                   style={{
                                     backgroundColor: `${tag.color}20`,
                                     color: tag.color,
@@ -314,7 +314,7 @@ export function QuestOnboardingPopup({
                               ))}
                             </span>
                           ) : (
-                            <span className="flex min-w-0 items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-primary">
+                            <span className="flex min-w-0 items-center gap-1.5 text-[13px] font-black text-primary">
                               <TagIcon className="h-3.5 w-3.5 shrink-0" strokeWidth={2.75} />
                               Connect a tag
                             </span>

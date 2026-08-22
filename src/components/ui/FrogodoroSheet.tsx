@@ -204,14 +204,14 @@ function SessionStatsRow({
       {(focusTime > 0 || (isRunning && phase === 'focus')) && (
         <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-primary/8 dark:bg-primary/15">
           <div className={`w-1.5 h-1.5 rounded-full bg-primary ${isRunning && phase === 'focus' ? 'animate-pulse' : ''}`} />
-          <span className="text-[10px] font-bold text-primary/60 uppercase tracking-wider">Focus</span>
+          <span className="text-[12px] font-bold text-primary/60">Focus</span>
           <span className="text-[11px] font-black text-primary tabular-nums">{formatDuration(focusTime)}</span>
         </div>
       )}
       {(breakTime > 0 || (isRunning && phase === 'break')) && (
         <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-sky-500/8 dark:bg-sky-500/15">
           <div className={`w-1.5 h-1.5 rounded-full bg-sky-500 ${isRunning && phase === 'break' ? 'animate-pulse' : ''}`} />
-          <span className="text-[10px] font-bold text-sky-500/60 uppercase tracking-wider">Break</span>
+          <span className="text-[12px] font-bold text-sky-500/60">Break</span>
           <span className="text-[11px] font-black text-sky-500 tabular-nums">{formatDuration(breakTime)}</span>
         </div>
       )}
@@ -1130,7 +1130,7 @@ export default function FrogodoroSheet({
                                     <Fly size={22} interactive={false} alwaysPlay paused />
                                     {weekFlies}
                                   </p>
-                                  <p className="text-[10px] font-bold uppercase tracking-wider text-primary/70">
+                                  <p className="text-[12px] font-bold text-primary/70">
                                     Flies this week
                                   </p>
                                 </div>
@@ -1138,7 +1138,7 @@ export default function FrogodoroSheet({
                                   <p className="text-lg font-black tabular-nums text-foreground">
                                     {weekMinutes}m
                                   </p>
-                                  <p className="text-[10px] font-bold uppercase tracking-wider text-primary/70">
+                                  <p className="text-[12px] font-bold text-primary/70">
                                     Focused
                                   </p>
                                 </div>
@@ -1295,7 +1295,7 @@ export default function FrogodoroSheet({
                                     className="absolute right-0 top-full z-50 mt-2 w-[212px] origin-top-right overflow-hidden rounded-2xl bg-popover shadow-xl ring-1 ring-black/10"
                                   >
                                     <div className="flex items-baseline justify-between px-3.5 pb-1.5 pt-3">
-                                      <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+                                      <p className="text-[13px] font-bold tracking-wide text-muted-foreground">
                                         Finish sound
                                       </p>
                                       <p className="text-[10px] text-muted-foreground/70">
@@ -1355,7 +1355,7 @@ export default function FrogodoroSheet({
                             mode. Finished: "time's up". */}
                         {awaitingDone ? (
                           <div className="mb-4 text-center">
-                            <p className="text-sm font-black uppercase tracking-widest text-white/90">Time&apos;s up!</p>
+                            <p className="text-sm font-black text-white/90">Time&apos;s up!</p>
                           </div>
                         ) : timerActive ? (
                           <div className="mb-4 flex items-center justify-center">
@@ -1399,11 +1399,11 @@ export default function FrogodoroSheet({
                         ) : splitDone ? (
                           <div className="mb-4 flex items-stretch">
                             <div className="flex-1 text-center">
-                              <p className="text-[11px] font-black uppercase tracking-widest text-white/80">Focus</p>
+                              <p className="text-[13px] font-black text-white/80">Focus</p>
                               <p className="text-[clamp(32px,11vw,44px)] font-black leading-none tracking-tighter text-white drop-shadow-lg tabular-nums">{formatTime(focusSeconds)}</p>
                             </div>
                             <div className="flex-1 text-center">
-                              <p className="text-[11px] font-black uppercase tracking-widest text-white/80">Break</p>
+                              <p className="text-[13px] font-black text-white/80">Break</p>
                               <p className="text-[clamp(32px,11vw,44px)] font-black leading-none tracking-tighter text-white drop-shadow-lg tabular-nums">{formatTime(breakSeconds)}</p>
                             </div>
                           </div>
@@ -1720,7 +1720,7 @@ export default function FrogodoroSheet({
                               {celebrateFocus ? (
                                 <button
                                   onClick={handleStartBreak}
-                                  className="relative flex items-center justify-center rounded-2xl bg-white px-7 py-3 text-[16px] font-black uppercase tracking-widest text-sky-500 shadow-[0_6px_0_rgba(0,0,0,0.15)] transition-all active:translate-y-1.5 active:shadow-[0_0_0_rgba(0,0,0,0.15)] dark:bg-slate-50 dark:text-sky-700 min-[380px]:px-10"
+                                  className="relative flex items-center justify-center rounded-2xl bg-white px-7 py-3 text-[16px] font-black text-sky-500 shadow-[0_6px_0_rgba(0,0,0,0.15)] transition-all active:translate-y-1.5 active:shadow-[0_0_0_rgba(0,0,0,0.15)] dark:bg-slate-50 dark:text-sky-700 min-[380px]:px-10"
                                 >
                                   <Play className="mr-1.5 h-5 w-5 fill-current" />
                                   BREAK {formatDurationSetting(settings.breakDuration)}
@@ -1729,8 +1729,8 @@ export default function FrogodoroSheet({
                                 <button
                                   onClick={handleDone}
                                   className={`relative flex items-center justify-center px-7 min-[380px]:px-10 py-3 bg-white dark:bg-slate-50 text-[16px]
-                                    font-black uppercase tracking-widest rounded-2xl shadow-[0_6px_0_rgba(0,0,0,0.15)]
-                                    active:shadow-[0_0_0_rgba(0,0,0,0.15)] active:translate-y-1.5 transition-all ${getPhaseAccent()}`}
+ font-black rounded-2xl shadow-[0_6px_0_rgba(0,0,0,0.15)]
+ active:shadow-[0_0_0_rgba(0,0,0,0.15)] active:translate-y-1.5 transition-all ${getPhaseAccent()}`}
                                 >
                                   <Check className="w-5 h-5 mr-1.5" />
                                   DONE
@@ -1742,14 +1742,14 @@ export default function FrogodoroSheet({
                               <div className="flex items-center justify-center gap-2.5">
                                 <button
                                   onClick={handleKeepGoing}
-                                  className="flex items-center justify-center rounded-xl bg-white/20 px-3.5 py-2 text-[12px] font-black uppercase tracking-widest text-white transition-all hover:bg-white/30 active:scale-95"
+                                  className="flex items-center justify-center rounded-xl bg-white/20 px-3.5 py-2 text-[13px] font-black text-white transition-all hover:bg-white/30 active:scale-95"
                                 >
                                   <Zap className="mr-1 h-3.5 w-3.5 fill-current" />
                                   +5 MORE
                                 </button>
                                 <button
                                   onClick={handleDone}
-                                  className="flex items-center justify-center rounded-xl bg-white/20 px-3.5 py-2 text-[12px] font-black uppercase tracking-widest text-white transition-all hover:bg-white/30 active:scale-95"
+                                  className="flex items-center justify-center rounded-xl bg-white/20 px-3.5 py-2 text-[13px] font-black text-white transition-all hover:bg-white/30 active:scale-95"
                                 >
                                   <Check className="mr-1 h-3.5 w-3.5" />
                                   DONE
@@ -1776,8 +1776,8 @@ export default function FrogodoroSheet({
                           <button
                             onClick={toggleTimer}
                             className={`relative flex items-center justify-center px-8 py-3 bg-white dark:bg-slate-50 text-[16px]
-                              font-black uppercase tracking-widest rounded-2xl shadow-[0_6px_0_rgba(0,0,0,0.15)]
-                              active:shadow-[0_0_0_rgba(0,0,0,0.15)] active:translate-y-1.5 transition-all ${getPhaseAccent()}`}
+ font-black rounded-2xl shadow-[0_6px_0_rgba(0,0,0,0.15)]
+ active:shadow-[0_0_0_rgba(0,0,0,0.15)] active:translate-y-1.5 transition-all ${getPhaseAccent()}`}
                           >
                             {isRunning ? (
                               <Pause className="w-5 h-5 mr-1.5 fill-current" />
@@ -1873,7 +1873,7 @@ export default function FrogodoroSheet({
                         </p>
                         <button
                           onClick={() => setConfirmStop(false)}
-                          className="mt-4 w-full rounded-2xl bg-primary py-3 text-sm font-black uppercase tracking-widest text-primary-foreground shadow-md shadow-primary/20 transition-all active:scale-[0.98]"
+                          className="mt-4 w-full rounded-2xl bg-primary py-3 text-sm font-black text-primary-foreground shadow-md shadow-primary/20 transition-all active:scale-[0.98]"
                         >
                           Keep going
                         </button>
@@ -1923,7 +1923,7 @@ export default function FrogodoroSheet({
                         </p>
                         <button
                           onClick={() => setConfirmPause(false)}
-                          className="mt-4 w-full rounded-2xl bg-primary py-3 text-sm font-black uppercase tracking-widest text-primary-foreground shadow-md shadow-primary/20 transition-all active:scale-[0.98]"
+                          className="mt-4 w-full rounded-2xl bg-primary py-3 text-sm font-black text-primary-foreground shadow-md shadow-primary/20 transition-all active:scale-[0.98]"
                         >
                           Keep going
                         </button>
@@ -1983,7 +1983,7 @@ export default function FrogodoroSheet({
                             setConfirmTaskSwitch(false);
                             onOpenChange(false);
                           }}
-                          className="mt-4 w-full rounded-2xl bg-primary py-3 text-sm font-black uppercase tracking-widest text-primary-foreground shadow-md shadow-primary/20 transition-all active:scale-[0.98]"
+                          className="mt-4 w-full rounded-2xl bg-primary py-3 text-sm font-black text-primary-foreground shadow-md shadow-primary/20 transition-all active:scale-[0.98]"
                         >
                           Keep current timer
                         </button>

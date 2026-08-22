@@ -468,7 +468,7 @@ function CalendarOverlay({
             </div>
           </div>
 
-          <div className="mb-2 grid grid-cols-7 text-center text-[11px] font-extrabold uppercase tracking-wider text-primary/70">
+          <div className="mb-2 grid grid-cols-7 text-center text-[13px] font-extrabold text-primary/70">
             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
               <div key={day} className="py-1.5">
                 {day.slice(0, 1)}

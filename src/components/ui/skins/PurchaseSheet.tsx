@@ -274,23 +274,23 @@ export function PurchaseSheet({
             <div className="flex items-center gap-2 pr-12 sm:pr-14">
               <span
                 className={cn(
-                  'rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em]',
+                  'rounded-full px-2.5 py-1 text-[12px] font-black',
                   rarity.chip,
                 )}
               >
                 {rarity.label}
               </span>
               {target.slotLabel && (
-                <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                <span className="text-[13px] font-bold text-muted-foreground">
                   {target.slotLabel}
                 </span>
               )}
               {owned ? (
-                <span className="ml-auto rounded-full bg-foreground/5 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+                <span className="ml-auto rounded-full bg-foreground/5 px-2.5 py-1 text-[12px] font-black text-muted-foreground">
                   Owned ×{ownedCount}
                 </span>
               ) : onDeal ? (
-                <span className="ml-auto rounded-full bg-red-500 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-white shadow-sm shadow-red-500/30">
+                <span className="ml-auto rounded-full bg-red-500 px-2.5 py-1 text-[12px] font-black text-white shadow-sm shadow-red-500/30">
                   Deal today
                 </span>
               ) : null}
@@ -387,7 +387,7 @@ export function PurchaseSheet({
                 <button
                   type="button"
                   onClick={() => setTradeInfoOpen((v) => !v)}
-                  className="mx-auto flex items-center gap-1.5 rounded-full bg-amber-500/10 py-1.5 pl-3 pr-2.5 text-[11px] font-black uppercase tracking-[0.12em] text-amber-700 transition-colors hover:bg-amber-500/20 dark:text-amber-400"
+                  className="mx-auto flex items-center gap-1.5 rounded-full bg-amber-500/10 py-1.5 pl-3 pr-2.5 text-[13px] font-black text-amber-700 transition-colors hover:bg-amber-500/20 dark:text-amber-400"
                 >
                   <Repeat className="h-3.5 w-3.5" strokeWidth={3} />
                   Not sold in the shop
@@ -435,7 +435,7 @@ export function PurchaseSheet({
                     <span className="text-sm font-bold leading-none tabular-nums text-muted-foreground line-through decoration-2">
                       {target.originalPrice?.toLocaleString()}
                     </span>
-                    <span className="rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-black uppercase leading-none tracking-wider text-white">
+                    <span className="rounded-full bg-red-500 px-1.5 py-0.5 text-[12px] font-black leading-none text-white">
                       −{savedPercent}%
                     </span>
                   </div>
@@ -443,7 +443,7 @@ export function PurchaseSheet({
 
                 {!canAfford && !isGuest ? (
                   <div className="mt-4">
-                    <div className="mb-1.5 flex items-baseline justify-between text-[11px] font-black uppercase tracking-wider">
+                    <div className="mb-1.5 flex items-baseline justify-between text-[13px] font-black">
                       <span className="text-muted-foreground">Your flies</span>
                       <span className="tabular-nums text-foreground">
                         {balance.toLocaleString()}
@@ -612,7 +612,7 @@ export function PurchaseSheet({
                   ref={primaryRef}
                   type="button"
                   disabled
-                  className="flex h-14 w-full items-center justify-center rounded-2xl bg-muted text-sm font-black uppercase tracking-wide text-muted-foreground"
+                  className="flex h-14 w-full items-center justify-center rounded-2xl bg-muted text-sm font-black tracking-wide text-muted-foreground"
                 >
                   Sign in to buy
                 </button>

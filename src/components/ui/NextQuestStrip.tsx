@@ -402,11 +402,11 @@ export function NextQuestStrip({
           </div>
           <div className="flex min-w-0 flex-1 flex-col overflow-hidden leading-tight animate-[reward-pop_0.4s_ease-out_0.07s_both] motion-reduce:animate-none">
             <span
-              className={`text-[10px] font-black uppercase tracking-[0.14em] ${
-                goldenClaim
-                  ? 'text-amber-700 dark:text-amber-400'
-                  : 'text-lime-700 dark:text-lime-400'
-              }`}
+              className={`text-[12px] font-black ${
+ goldenClaim
+ ? 'text-amber-700 dark:text-amber-400'
+ : 'text-lime-700 dark:text-lime-400'
+ }`}
             >
               {claimable.kind === 'sweep'
                 ? sweepClaimLabels(claimable).eyebrow
@@ -466,14 +466,14 @@ export function NextQuestStrip({
               <span className="min-w-0 flex-1 truncate text-[12px] font-black text-foreground">
                 Pick a tag to start this quest
               </span>
-              <span className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-dashed border-primary/50 bg-primary/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.14em] text-primary">
+              <span className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-dashed border-primary/50 bg-primary/10 px-2 py-0.5 text-[12px] font-black text-primary">
                 <Tags aria-hidden="true" className="h-3 w-3" strokeWidth={2.75} />
                 Pick a tag
               </span>
             </div>
           ) : (
             <div className="flex min-w-0 flex-1 flex-col gap-1 md:gap-1.5">
-              <span className="hidden items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.14em] text-muted-foreground md:flex">
+              <span className="hidden items-center gap-1.5 text-[11px] font-bold text-muted-foreground md:flex">
                 <span
                   aria-hidden="true"
                   className="h-1.5 w-1.5 rounded-full bg-primary"

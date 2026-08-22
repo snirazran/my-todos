@@ -231,7 +231,7 @@ export function ErrorScene({
 
           <div className="my-4 flex items-center gap-3">
             <span className="h-px flex-1 bg-border" />
-            <span className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">
+            <span className="text-[12px] font-black text-muted-foreground">
               {caught > 0 ? `${caught} caught here` : 'Since you stopped by'}
             </span>
             <span className="h-px flex-1 bg-border" />
@@ -253,12 +253,12 @@ export function ErrorScene({
                 <span className="font-display text-base leading-none text-foreground">
                   FLY CATCH
                 </span>
-                <span className="inline-flex items-center gap-1 rounded-full bg-background/80 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-muted-foreground">
+                <span className="inline-flex items-center gap-1 rounded-full bg-background/80 px-1.5 py-0.5 text-[11px] font-black text-muted-foreground">
                   <Timer className="h-2.5 w-2.5" strokeWidth={3} />
                   30s
                 </span>
                 {best > 0 ? (
-                  <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-primary">
+                  <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[11px] font-black text-primary">
                     Best {best}
                   </span>
                 ) : null}
@@ -276,7 +276,7 @@ export function ErrorScene({
           </Link>
 
           {detail ? (
-            <p className="mt-4 text-center text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground/60">
+            <p className="mt-4 text-center text-[12px] font-bold text-muted-foreground/60">
               Reference {detail}
             </p>
           ) : null}

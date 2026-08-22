@@ -115,8 +115,8 @@ export function PactStreakLadder() {
     // the first Leap that is the base rung, which is exactly right: week zero
     // is a real place on this ladder.
     isHere: stop.reached && (index === nextIndex - 1 || nextIndex === -1),
-    // The pads climb through the metals as the rungs do, so how far up the
-    // ladder a stop sits is legible from the artwork alone.
+    // The pads bloom as the rungs climb, so how far up the ladder a stop sits
+    // is legible from the artwork alone.
     art:
       LILY_LADDER_ART[Math.min(index, LILY_LADDER_ART.length - 1)] ?? LILY_PLAIN,
   }));
@@ -152,7 +152,7 @@ export function PactStreakLadder() {
     <div className="mx-1.5 w-[calc(100%-0.75rem)] rounded-[24px] border border-border/50 bg-card px-3.5 py-3 shadow-sm md:mx-4 md:w-[calc(100%-2rem)]">
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
-          <p className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+          <p className="flex items-center gap-1.5 text-[12px] font-black text-muted-foreground">
             <Flame
               className={cn(
                 'h-3.5 w-3.5',

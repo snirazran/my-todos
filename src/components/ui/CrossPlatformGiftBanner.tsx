@@ -135,7 +135,7 @@ export function CrossPlatformGiftBanner() {
               </span>
 
               <div className="flex min-w-0 flex-1 items-center gap-2.5">
-                <span className="shrink-0 text-[10px] font-bold uppercase tracking-[0.14em] text-primary">
+                <span className="shrink-0 text-[12px] font-bold text-primary">
                   App gift
                 </span>
                 <span

@@ -155,7 +155,7 @@ function ProfileSection({
 }) {
   return (
     <div className="space-y-2">
-      <p className="px-1 text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+      <p className="px-1 text-[13px] font-black text-muted-foreground">
         {title}
       </p>
       <div className="overflow-hidden divide-y divide-border/50 rounded-2xl border border-border/50 bg-card">

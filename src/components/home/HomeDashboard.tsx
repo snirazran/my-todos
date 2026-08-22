@@ -1501,7 +1501,7 @@ function OverviewSectionHeader({
         <span className="flex items-center justify-center w-6 h-6 border rounded-full shadow-sm bg-card border-border/60 text-primary">
           {icon}
         </span>
-        <span className="text-[10px] font-black uppercase tracking-[0.16em]">
+        <span className="text-[12px] font-black">
           {title}
         </span>
       </div>

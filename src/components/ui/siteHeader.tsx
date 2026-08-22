@@ -187,7 +187,7 @@ export default function SiteHeader() {
       <header
         data-app-site-header
         className={cn(
-          'absolute inset-x-0 top-0 z-[90] hidden w-full h-16 bg-background/95 backdrop-blur-xl md:block',
+          'absolute inset-x-0 top-0 z-[90] hidden w-full h-16 bg-hero-header backdrop-blur-xl md:block',
           pathname !== '/planner' &&
             pathname !== '/insights' &&
             !pathname?.startsWith('/admin') &&
@@ -246,7 +246,7 @@ export default function SiteHeader() {
                       >
                         <div className="p-3 bg-popover border border-border rounded-2xl shadow-xl ring-1 ring-black/5">
                           <div className="flex items-baseline justify-between px-1 pb-2">
-                            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                            <p className="text-[12px] font-black text-muted-foreground">
                               Dress your frog
                             </p>
                             {typeof flyBalance === 'number' && (
@@ -1116,7 +1116,7 @@ function MobileSheet({
                     <span>{frogName}</span>
                   </p>
                   {userInfo?.isPremium && (
-                    <span className="mt-1.5 inline-flex items-center rounded-md bg-gradient-to-b from-emerald-600 to-emerald-800 px-1.5 py-0.5 text-[10px] font-black uppercase leading-none tracking-[0.18em] text-amber-100 ring-1 ring-emerald-900/40">
+                    <span className="mt-1.5 inline-flex items-center rounded-md bg-gradient-to-b from-emerald-600 to-emerald-800 px-1.5 py-0.5 text-[12px] font-black leading-none text-amber-100 ring-1 ring-emerald-900/40">
                       Plus
                     </span>
                   )}
@@ -1125,7 +1125,7 @@ function MobileSheet({
                 <nav className="min-h-0 flex-1 space-y-4 overflow-y-auto px-3 pb-3">
                   {railGroups.map((group) => (
                     <div key={group.heading}>
-                      <p className="px-2 pb-1 text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground/70">
+                      <p className="px-2 pb-1 text-[12px] font-black text-muted-foreground/70">
                         {group.heading}
                       </p>
                       <div className="space-y-0.5">
@@ -1166,7 +1166,7 @@ function MobileSheet({
 
                   {isAdmin && (
                     <div>
-                      <p className="px-2 pb-1 text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground/70">
+                      <p className="px-2 pb-1 text-[12px] font-black text-muted-foreground/70">
                         Admin
                       </p>
                       <button
@@ -1513,7 +1513,7 @@ function MainView({
           <div className="flex-1 min-w-0">
             <p className="text-base font-black tracking-tight flex items-center gap-2 text-emerald-900 drop-shadow-[0_1px_0_rgba(255,255,255,0.5)]">
               Frogress
-              <span className="inline-flex items-center rounded-md bg-gradient-to-b from-emerald-600 to-emerald-800 px-1.5 py-0.5 text-[10px] font-black uppercase leading-none tracking-[0.18em] text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_2px_3px_rgba(0,0,0,0.22)] ring-1 ring-emerald-900/40">
+              <span className="inline-flex items-center rounded-md bg-gradient-to-b from-emerald-600 to-emerald-800 px-1.5 py-0.5 text-[12px] font-black leading-none text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_2px_3px_rgba(0,0,0,0.22)] ring-1 ring-emerald-900/40">
                 Plus
               </span>
             </p>
@@ -1521,7 +1521,7 @@ function MainView({
           </div>
           <span
             aria-hidden
-            className="hidden min-[380px]:inline-flex shrink-0 items-center rounded-xl bg-gradient-to-b from-emerald-600 to-emerald-800 px-3 py-2 text-xs font-black uppercase tracking-[0.12em] text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_2px_4px_rgba(0,0,0,0.25)] ring-1 ring-emerald-900/40"
+            className="hidden min-[380px]:inline-flex shrink-0 items-center rounded-xl bg-gradient-to-b from-emerald-600 to-emerald-800 px-3 py-2 text-[13px] font-black text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_2px_4px_rgba(0,0,0,0.25)] ring-1 ring-emerald-900/40"
           >
             Try 7 days free
           </span>
@@ -1593,7 +1593,7 @@ function MainView({
           label="Frogress Plus"
           trailing={
             isPremium ? (
-              <span className="inline-flex items-center rounded-md bg-gradient-to-b from-emerald-600 to-emerald-800 px-2 py-1 text-[10px] font-black uppercase leading-none tracking-[0.16em] text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25)] ring-1 ring-emerald-900/40">
+              <span className="inline-flex items-center rounded-md bg-gradient-to-b from-emerald-600 to-emerald-800 px-2 py-1 text-[12px] font-black leading-none text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25)] ring-1 ring-emerald-900/40">
                 Active
               </span>
             ) : undefined
@@ -1637,7 +1637,7 @@ function MainView({
               </div>
               <p className="mt-2 flex items-center justify-center gap-2 text-xl font-black tracking-tight">
                 Frogress
-                <span className="inline-flex items-center rounded-md bg-gradient-to-b from-emerald-600 to-emerald-800 px-1.5 py-0.5 text-[10px] font-black uppercase leading-none tracking-[0.18em] text-amber-100 ring-1 ring-emerald-900/40">
+                <span className="inline-flex items-center rounded-md bg-gradient-to-b from-emerald-600 to-emerald-800 px-1.5 py-0.5 text-[12px] font-black leading-none text-amber-100 ring-1 ring-emerald-900/40">
                   Plus
                 </span>
               </p>
@@ -1649,7 +1649,7 @@ function MainView({
             <div className="px-6 py-5">
               {premiumUntilLabel && (
                 <div className="rounded-2xl border border-border/50 bg-muted/40 px-4 py-3 text-center">
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">
+                  <p className="text-[12px] font-black text-muted-foreground">
                     Renews / Expires
                   </p>
                   <p className="mt-0.5 text-lg font-black tracking-tight text-foreground">
@@ -1765,7 +1765,7 @@ function GuestSignOutConfirm({
         <button
           type="button"
           onClick={onCreateAccount}
-          className="mt-5 h-12 w-full rounded-2xl bg-primary text-sm font-black uppercase tracking-wider text-primary-foreground transition-all hover:brightness-110 active:scale-[0.98]"
+          className="mt-5 h-12 w-full rounded-2xl bg-primary text-sm font-black text-primary-foreground transition-all hover:brightness-110 active:scale-[0.98]"
         >
           Create free account
         </button>
@@ -2051,7 +2051,7 @@ function NotificationsView({
         ) : (
           <span
             className={cn(
-              'text-[11px] font-black uppercase tracking-wider rounded-full px-2.5 py-1',
+              'text-[13px] font-black rounded-full px-2.5 py-1',
               notifsEnabled
                 ? 'bg-emerald-500/12 text-emerald-600'
                 : 'bg-muted text-muted-foreground',
@@ -2325,7 +2325,7 @@ function QuickTilesGrid({
 function MenuSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="space-y-2">
-      <p className="text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground px-1">
+      <p className="text-[13px] font-black text-muted-foreground px-1">
         {title}
       </p>
       <div className="rounded-2xl bg-card border border-border/50 overflow-hidden divide-y divide-border/50">

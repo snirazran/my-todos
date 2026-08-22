@@ -442,7 +442,7 @@ export function AdminEconomyManager() {
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[420px] text-sm">
                     <thead>
-                      <tr className="text-left text-xs font-black uppercase tracking-wider text-muted-foreground">
+                      <tr className="text-left text-[13px] font-black text-muted-foreground">
                         <th className="pb-2">Source</th>
                         <th className="pb-2 text-right">Granted</th>
                         <th className="pb-2 text-right">Spent</th>

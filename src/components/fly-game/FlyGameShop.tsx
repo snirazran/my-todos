@@ -161,7 +161,7 @@ export function FlyGameShop({ open, onClose }: { open: boolean; onClose: () => v
     <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/55 p-0 backdrop-blur-sm sm:items-center sm:p-5" onPointerDown={onClose} data-game-control>
       <div className="flex max-h-[92dvh] w-full max-w-3xl flex-col overflow-hidden rounded-t-[28px] border border-border bg-background shadow-2xl sm:rounded-[28px]" onPointerDown={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-label="Frog shop">
         <div className="flex items-center justify-between border-b border-border bg-card/95 px-4 py-3 sm:px-5">
-          <div><p className="font-display text-2xl text-primary">FROG SHOP</p><p className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">Catch. Unlock. Equip.</p></div>
+          <div><p className="font-display text-2xl text-primary">FROG SHOP</p><p className="text-[12px] font-black text-muted-foreground">Catch. Unlock. Equip.</p></div>
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5 text-sm font-black text-primary"><Fly size={22} paused interactive={false} /> {balance}</div>
             <button type="button" onClick={onClose} className="grid h-10 w-10 place-items-center rounded-full bg-muted text-foreground" aria-label="Close shop"><X className="h-4 w-4" /></button>
@@ -170,7 +170,7 @@ export function FlyGameShop({ open, onClose }: { open: boolean; onClose: () => v
 
         <div className="grid grid-cols-2 gap-1 bg-muted/70 p-1.5">
           {(['shop', 'inventory'] as const).map((value) => (
-            <button key={value} type="button" onClick={() => { setTab(value); setConfirmId(null); hapticTick(); }} className={cn('flex h-12 items-center justify-center gap-2 rounded-xl text-sm font-black uppercase transition', tab === value ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-card')}>
+            <button key={value} type="button" onClick={() => { setTab(value); setConfirmId(null); hapticTick(); }} className={cn('flex h-12 items-center justify-center gap-2 rounded-xl text-sm font-black transition', tab === value ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-card')}>
               {value === 'shop' ? <ShoppingBag className="h-4 w-4" /> : <PackageOpen className="h-4 w-4" />}
               {value}
             </button>
@@ -203,8 +203,8 @@ export function FlyGameShop({ open, onClose }: { open: boolean; onClose: () => v
                       {equipped ? <span className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-primary text-primary-foreground"><Check className="h-4 w-4" /></span> : null}
                     </div>
                     <p className="mt-2 w-full truncate text-sm font-black text-foreground">{entry.name}</p>
-                    <p className="text-[9px] font-black uppercase tracking-wider text-muted-foreground">{entry.kind === 'item' ? entry.item.slot.replace('_', ' ') : 'background'}</p>
-                    <div className={cn('mt-auto flex min-h-8 w-full items-center justify-center rounded-lg px-2 text-[10px] font-black uppercase', tab === 'shop' ? (confirming ? 'bg-amber-400 text-amber-950' : 'bg-primary text-primary-foreground') : (equipped ? 'bg-primary/15 text-primary' : 'bg-muted text-foreground'))}>
+                    <p className="text-[11px] font-black text-muted-foreground">{entry.kind === 'item' ? entry.item.slot.replace('_', ' ') : 'background'}</p>
+                    <div className={cn('mt-auto flex min-h-8 w-full items-center justify-center rounded-lg px-2 text-[12px] font-black', tab === 'shop' ? (confirming ? 'bg-amber-400 text-amber-950' : 'bg-primary text-primary-foreground') : (equipped ? 'bg-primary/15 text-primary' : 'bg-muted text-foreground'))}>
                       {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : tab === 'shop' ? (confirming ? 'Tap again to buy' : <span className="flex items-center gap-1"><Fly size={17} paused interactive={false} />{entry.price}</span>) : (equipped ? 'Equipped' : 'Tap to equip')}
                     </div>
                   </button>

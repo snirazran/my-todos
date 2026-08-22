@@ -205,7 +205,7 @@ export function FilterChipStrip({
           {anyOn && (
             <button
               onClick={onClearAll}
-              className="h-10 shrink-0 px-2 text-[11px] font-black uppercase tracking-widest text-muted-foreground transition-colors narrow:h-9 [@media(hover:hover)]:hover:text-foreground"
+              className="h-10 shrink-0 px-2 text-[13px] font-black text-muted-foreground transition-colors narrow:h-9 [@media(hover:hover)]:hover:text-foreground"
             >
               Clear
             </button>
@@ -305,7 +305,7 @@ export function ViewOptionsButton({
               direction === 'up' ? 'bottom-full mb-2' : 'top-full mt-2'
             }`}
           >
-            <p className="px-2.5 pb-1 pt-1.5 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+            <p className="px-2.5 pb-1 pt-1.5 text-[12px] font-black text-muted-foreground">
               Sort
             </p>
             {SORTS.map((sort) => (

@@ -409,7 +409,7 @@ export function AdminCosmeticsPopup({
                       className="w-full px-3 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/30"
                     />
                     <div className="grid grid-cols-2 gap-2">
-                      <label className="flex flex-col gap-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                      <label className="flex flex-col gap-1 text-[12px] font-bold tracking-wide text-muted-foreground">
                         In shop from
                         <input
                           type="date"
@@ -418,7 +418,7 @@ export function AdminCosmeticsPopup({
                           className="w-full px-2 py-2 rounded-xl border border-border bg-background text-sm font-normal normal-case tracking-normal text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/30"
                         />
                       </label>
-                      <label className="flex flex-col gap-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                      <label className="flex flex-col gap-1 text-[12px] font-bold tracking-wide text-muted-foreground">
                         Until
                         <input
                           type="date"
@@ -612,7 +612,7 @@ function CosmeticCard({
       {/* Rarity tag */}
       <div
         className={cn(
-          'absolute top-0 left-0 px-2 py-0.5 rounded-br-2xl text-[9px] font-black uppercase tracking-wider border-b border-r z-20',
+          'absolute top-0 left-0 px-2 py-0.5 rounded-br-2xl text-[11px] font-black border-b border-r z-20',
           border,
           text,
         )}
@@ -659,7 +659,7 @@ function CosmeticCard({
         {windowLabel ? (
           <span
             className={cn(
-              'text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md',
+              'text-[11px] font-bold tracking-wide px-1.5 py-0.5 rounded-md',
               windowState === 'active'
                 ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10'
                 : windowState === 'scheduled'

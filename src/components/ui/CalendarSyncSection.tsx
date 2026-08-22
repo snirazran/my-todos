@@ -107,7 +107,7 @@ function StatusPill({ status }: { status?: CalendarConnectionInfo['status'] }) {
   const { label, className: styles } = STATUS_PILL[status];
   return (
     <span
-      className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ${styles}`}
+      className={`shrink-0 rounded-full px-2.5 py-1 text-[12px] font-black ${styles}`}
     >
       {label}
     </span>

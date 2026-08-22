@@ -1219,7 +1219,7 @@ export function AdminQuestManagerPage() {
             <div className="flex items-center gap-2.5">
               <p className="truncate text-sm font-bold text-foreground">{template.name}</p>
               <span className={cn(
-                'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.14em]',
+                'shrink-0 rounded-full px-2 py-0.5 text-[12px] font-black',
                 template.isActive
                   ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
                   : 'bg-muted text-muted-foreground',
@@ -1321,7 +1321,7 @@ export function AdminQuestManagerPage() {
     max: number,
   ) => (
     <label key={field} className="block">
-      <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+      <span className="text-[13px] font-bold tracking-wide text-muted-foreground">
         {label}
       </span>
       <input
@@ -1400,7 +1400,7 @@ export function AdminQuestManagerPage() {
             </button>
           </div>
 
-          <p className="mt-5 text-[11px] font-black uppercase tracking-wide text-muted-foreground">
+          <p className="mt-5 text-[13px] font-black tracking-wide text-muted-foreground">
             Price
           </p>
           <div className="mt-2 flex flex-wrap items-start gap-5">
@@ -1420,7 +1420,7 @@ export function AdminQuestManagerPage() {
             )}
           </div>
 
-          <p className="mt-5 text-[11px] font-black uppercase tracking-wide text-muted-foreground">
+          <p className="mt-5 text-[13px] font-black tracking-wide text-muted-foreground">
             Holding
           </p>
           <div className="mt-2 flex flex-wrap items-start gap-5">
@@ -1454,7 +1454,7 @@ export function AdminQuestManagerPage() {
             )}
           </div>
 
-          <p className="mt-5 text-[11px] font-black uppercase tracking-wide text-muted-foreground">
+          <p className="mt-5 text-[13px] font-black tracking-wide text-muted-foreground">
             Rescue limit
           </p>
           <div className="mt-2 flex flex-wrap items-start gap-5">
@@ -1467,7 +1467,7 @@ export function AdminQuestManagerPage() {
             )}
           </div>
 
-          <p className="mt-5 text-[11px] font-black uppercase tracking-wide text-muted-foreground">
+          <p className="mt-5 text-[13px] font-black tracking-wide text-muted-foreground">
             Offer popup
           </p>
           <div className="mt-2 flex flex-wrap items-start gap-5">
@@ -1743,7 +1743,7 @@ export function AdminQuestManagerPage() {
             <p className="flex items-center gap-2 text-sm font-bold text-foreground">
               Generated daily quest
               <span className={cn(
-                'rounded-full border px-2 py-0.5 text-[10px] font-black uppercase tracking-wide',
+                'rounded-full border px-2 py-0.5 text-[12px] font-black tracking-wide',
                 r.isActive
                   ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
                   : 'border-border/50 bg-muted/40 text-muted-foreground',
@@ -1785,7 +1785,7 @@ export function AdminQuestManagerPage() {
                   {r.priceByEffort ? 'Flies priced by effort' : 'Flies flat per slot'}
                 </button>
                 <label className="grid gap-1.5">
-                  <span className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">Quest title</span>
+                  <span className="text-[12px] font-black text-muted-foreground">Quest title</span>
                   <input
                     value={r.name}
                     onChange={(e) => updateRecipe(r.recipeId, (prev) => ({ ...prev, name: e.target.value }))}
@@ -1793,7 +1793,7 @@ export function AdminQuestManagerPage() {
                   />
                 </label>
                 <div className="grid gap-1.5">
-                  <span className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">Cover image</span>
+                  <span className="text-[12px] font-black text-muted-foreground">Cover image</span>
                   <div className="flex items-center gap-3">
                     <div className="h-14 w-24 overflow-hidden rounded-xl border border-border/50 bg-muted/40">
                       {r.coverImageUrl ? (
@@ -1820,7 +1820,7 @@ export function AdminQuestManagerPage() {
             {r.slots.map((slot, slotIndex) => (
               <div key={slot.id} className="rounded-2xl border border-border/50 bg-muted/30 px-4 py-3.5">
                 <div className="mb-2.5 flex items-center justify-between">
-                  <span className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">
+                  <span className="text-[12px] font-black text-muted-foreground">
                     Objective {slotIndex + 1} · {recipeSlotRole(slotIndex, r.slots.length)}
                   </span>
                   {r.slots.length > 1 && (
@@ -2028,7 +2028,7 @@ export function AdminQuestManagerPage() {
                     Reward
                   </button>
                   {slot.rewards.length > 1 && (
-                    <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                    <span className="text-[12px] font-bold tracking-wide text-muted-foreground">
                       rolls one of
                     </span>
                   )}
@@ -2071,7 +2071,7 @@ export function AdminQuestManagerPage() {
                       </div>
                     ))
                   ) : (
-                    <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                    <span className="text-[12px] font-bold tracking-wide text-muted-foreground">
                       lands on top of the reward, at its own odds
                     </span>
                   )}
@@ -2249,7 +2249,7 @@ export function AdminQuestManagerPage() {
 
         <div className="mt-4 flex flex-wrap items-end gap-4">
           <label className="block">
-            <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+            <span className="text-[13px] font-bold tracking-wide text-muted-foreground">
               Clean Sweep flies
             </span>
             <input
@@ -2274,7 +2274,7 @@ export function AdminQuestManagerPage() {
             />
           </label>
           <label className="block">
-            <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+            <span className="text-[13px] font-bold tracking-wide text-muted-foreground">
               Golden roll every
             </span>
             <input
@@ -2305,7 +2305,7 @@ export function AdminQuestManagerPage() {
             </span>
           </label>
           <label className="block">
-            <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+            <span className="text-[13px] font-bold tracking-wide text-muted-foreground">
               Mega bonus every
             </span>
             <input
@@ -2363,7 +2363,7 @@ export function AdminQuestManagerPage() {
         </div>
 
         <div className="mt-4 rounded-xl border border-amber-400/40 bg-amber-50/60 px-3 py-3 dark:bg-amber-500/5">
-          <p className="text-[11px] font-black uppercase tracking-wide text-amber-700 dark:text-amber-300">
+          <p className="text-[13px] font-black tracking-wide text-amber-700 dark:text-amber-300">
             Mega bonus
           </p>
           <p className="mt-0.5 text-xs text-muted-foreground">
@@ -2492,7 +2492,7 @@ export function AdminQuestManagerPage() {
 
         <div className="mt-4 flex flex-wrap items-end gap-4">
           <div className="min-w-0 flex-1">
-            <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+            <span className="text-[13px] font-bold tracking-wide text-muted-foreground">
               Prize (every user gets this one)
             </span>
             <div className="mt-1 flex flex-wrap items-center gap-3">
@@ -2660,7 +2660,7 @@ export function AdminQuestManagerPage() {
             </button>
           </div>
           <label className="flex items-center gap-1 text-xs font-bold text-muted-foreground">
-            <span className="uppercase tracking-wide">Skin</span>
+            <span className="tracking-wide">Skin</span>
             <select
               value={loginSkinRarity(tier.rewards)}
               onChange={(e) =>
@@ -2758,7 +2758,7 @@ export function AdminQuestManagerPage() {
 
         <div className="mt-4 flex flex-wrap items-end gap-4">
           <label className="block">
-            <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+            <span className="text-[13px] font-bold tracking-wide text-muted-foreground">
               Saver push min streak
             </span>
             <input
@@ -2783,7 +2783,7 @@ export function AdminQuestManagerPage() {
             />
           </label>
           <label className="block">
-            <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+            <span className="text-[13px] font-bold tracking-wide text-muted-foreground">
               Repeat payout %
             </span>
             <input
@@ -2806,7 +2806,7 @@ export function AdminQuestManagerPage() {
             />
           </label>
           <label className="block">
-            <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+            <span className="text-[13px] font-bold tracking-wide text-muted-foreground">
               Floor %
             </span>
             <input
@@ -2869,7 +2869,7 @@ export function AdminQuestManagerPage() {
         </p>
 
         <div className="mt-4">
-          <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+          <span className="text-[13px] font-bold tracking-wide text-muted-foreground">
             Commitment goals
           </span>
           {renderLoginTierList('goalTiers', loginStreakConfig.goalTiers)}
@@ -3094,7 +3094,7 @@ export function AdminQuestManagerPage() {
 
         <div className="grid gap-3 md:grid-cols-2">
           <label className="grid gap-1.5 md:col-span-2">
-            <span className="text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+            <span className="text-[13px] font-black text-muted-foreground">
               Season name
             </span>
             <input
@@ -3110,7 +3110,7 @@ export function AdminQuestManagerPage() {
             />
           </label>
           <label className="grid gap-1.5">
-            <span className="text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+            <span className="text-[13px] font-black text-muted-foreground">
               Starts at
             </span>
             <input
@@ -3126,7 +3126,7 @@ export function AdminQuestManagerPage() {
             />
           </label>
           <label className="grid gap-1.5">
-            <span className="text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+            <span className="text-[13px] font-black text-muted-foreground">
               Ends at
             </span>
             <input
@@ -3200,7 +3200,7 @@ export function AdminQuestManagerPage() {
       hint: string,
     ) => (
       <label key={key} className="grid gap-1.5">
-        <span className="text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+        <span className="text-[13px] font-black text-muted-foreground">
           {label}
         </span>
         <input
@@ -3259,7 +3259,7 @@ export function AdminQuestManagerPage() {
         </div>
 
         <div className="mt-4 grid gap-2">
-          <span className="text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+          <span className="text-[13px] font-black text-muted-foreground">
             What the grace window allows
           </span>
           <div className="grid gap-2 sm:grid-cols-2">
@@ -3304,7 +3304,7 @@ export function AdminQuestManagerPage() {
         </div>
 
         <div className="mt-4 grid gap-2">
-          <span className="text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+          <span className="text-[13px] font-black text-muted-foreground">
             Season skins
           </span>
           <p className="text-[11px] text-muted-foreground">
@@ -3321,12 +3321,12 @@ export function AdminQuestManagerPage() {
                   className="rounded-2xl border border-border/40 bg-background/70 p-3"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[10px] font-black uppercase tracking-wide text-muted-foreground">
+                    <span className="text-[12px] font-black tracking-wide text-muted-foreground">
                       Tier {slot.tier}
                     </span>
                     <span
                       className={cn(
-                        'rounded-md px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide',
+                        'rounded-md px-1.5 py-0.5 text-[11px] font-black tracking-wide',
                         slot.lane === 'free'
                           ? 'bg-primary/10 text-primary'
                           : 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
@@ -3377,7 +3377,7 @@ export function AdminQuestManagerPage() {
                             : prev,
                         )
                       }
-                      className="mt-1.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground transition hover:text-red-500"
+                      className="mt-1.5 text-[12px] font-bold tracking-wide text-muted-foreground transition hover:text-red-500"
                     >
                       Clear
                     </button>
@@ -3499,10 +3499,10 @@ export function AdminQuestManagerPage() {
             })()}
             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-transparent" />
             <div className="absolute inset-x-0 top-0 z-20 flex items-center justify-between gap-3 p-4">
-              <span className="rounded-full border border-white/20 bg-black/35 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.16em] text-white backdrop-blur-md">
+              <span className="rounded-full border border-white/20 bg-black/35 px-3 py-1.5 text-[13px] font-black text-white backdrop-blur-md">
                 {seasonForm.tierCount} tiers
               </span>
-              <span className="rounded-full bg-black/50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-white/80 backdrop-blur-sm">
+              <span className="rounded-full bg-black/50 px-3 py-1.5 text-[12px] font-bold text-white/80 backdrop-blur-sm">
                 Upload images below
               </span>
             </div>
@@ -3515,7 +3515,7 @@ export function AdminQuestManagerPage() {
                 placeholder="Season name..."
                 className="w-full bg-transparent text-4xl font-black tracking-tight text-white placeholder-white/50 outline-none drop-shadow-[0_4px_18px_rgba(0,0,0,0.45)]"
               />
-              <p className="mt-2 text-sm font-bold uppercase tracking-[0.16em] text-white/75">
+              <p className="mt-2 text-sm font-bold text-white/75">
                 {seasonForm.tasksPerStep} tasks = 1 step ·{' '}
                 {seasonForm.stepsPerTier} step
                 {seasonForm.stepsPerTier === 1 ? '' : 's'} = 1 tier
@@ -3525,7 +3525,7 @@ export function AdminQuestManagerPage() {
 
           <div className="grid gap-4 p-4 md:grid-cols-2">
             <label className="grid gap-2">
-              <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
+              <span className="text-[13px] font-black text-muted-foreground">
                 Starts At
               </span>
               <input
@@ -3541,7 +3541,7 @@ export function AdminQuestManagerPage() {
               />
             </label>
             <label className="grid gap-2">
-              <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
+              <span className="text-[13px] font-black text-muted-foreground">
                 Ends At
               </span>
               <input
@@ -3567,7 +3567,7 @@ export function AdminQuestManagerPage() {
               ] as Array<[keyof typeof SEASON_PASS_LIMITS, string]>
             ).map(([key, label]) => (
               <label key={key} className="grid gap-2">
-                <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
+                <span className="text-[13px] font-black text-muted-foreground">
                   {label}
                 </span>
                 <input
@@ -3583,7 +3583,7 @@ export function AdminQuestManagerPage() {
               </label>
             ))}
             <label className="grid gap-2 md:col-span-2">
-              <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
+              <span className="text-[13px] font-black text-muted-foreground">
                 Grace window behaviour
               </span>
               <select
@@ -3705,7 +3705,7 @@ export function AdminQuestManagerPage() {
                         className="flex items-center gap-2 rounded-xl border border-border/40 bg-card px-3 py-2 text-left transition hover:border-primary/30 hover:bg-primary/5"
                       >
                         <div className="min-w-0 flex-1">
-                          <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">
+                          <p className="text-[13px] font-black text-muted-foreground">
                             {lane === 'free' ? 'Free' : 'Plus'}
                           </p>
                           <p className="text-xs text-muted-foreground">
@@ -3829,7 +3829,7 @@ export function AdminQuestManagerPage() {
 
           {/* Top bar: badge + cover actions */}
           <div className="absolute inset-x-0 top-0 z-20 flex items-start justify-between p-4">
-            <span className="inline-flex h-7 items-center justify-center gap-1.5 rounded-full border border-white/20 bg-black/35 px-3 text-[11px] font-black uppercase leading-none tracking-[0.18em] text-white backdrop-blur-md">
+            <span className="inline-flex h-7 items-center justify-center gap-1.5 rounded-full border border-white/20 bg-black/35 px-3 text-[13px] font-black leading-none text-white backdrop-blur-md">
               <Clock className="h-3 w-3 shrink-0" />
               <span className="leading-none">{formTimeLabel}</span>
             </span>
@@ -4072,15 +4072,15 @@ export function AdminQuestManagerPage() {
             </div>
             <div className="flex-1 space-y-4 overflow-y-auto px-6 py-5">
               <label className="grid gap-2">
-                <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Name</span>
+                <span className="text-[13px] font-black text-muted-foreground">Name</span>
                 <input value={categoryForm.name} onChange={(e) => setCategoryForm((p) => ({ ...p, name: e.target.value }))} placeholder="e.g. Sport" className="h-11 rounded-2xl border border-border bg-background px-4 text-sm outline-none focus:border-primary/30" />
               </label>
               <label className="grid gap-2">
-                <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Description</span>
+                <span className="text-[13px] font-black text-muted-foreground">Description</span>
                 <textarea rows={3} value={categoryForm.description} onChange={(e) => setCategoryForm((p) => ({ ...p, description: e.target.value }))} placeholder="What this category is about." className="rounded-2xl border border-border bg-background px-4 py-3 text-sm outline-none focus:border-primary/30" />
               </label>
               <label className="grid gap-2">
-                <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Onboarding Sentence</span>
+                <span className="text-[13px] font-black text-muted-foreground">Onboarding Sentence</span>
                 <input
                   value={categoryForm.onboardingSentence}
                   onChange={(e) => setCategoryForm((p) => ({ ...p, onboardingSentence: e.target.value }))}
@@ -4093,7 +4093,7 @@ export function AdminQuestManagerPage() {
               </label>
               <div className="rounded-2xl border border-border/50 bg-background/70 p-3">
                 <div className="mb-2 flex items-center justify-between gap-3">
-                  <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Category Photo</p>
+                  <p className="text-[13px] font-black text-muted-foreground">Category Photo</p>
                   {categoryForm.coverImageUrl && (
                     <button
                       type="button"
@@ -4124,7 +4124,7 @@ export function AdminQuestManagerPage() {
                   {categoryForm.coverImageUrl ? (
                     <>
                       <img src={categoryForm.coverImageUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
-                      <span className="relative rounded-full bg-black/55 px-3 py-1.5 text-xs font-black uppercase tracking-[0.14em] text-white backdrop-blur-sm">
+                      <span className="relative rounded-full bg-black/55 px-3 py-1.5 text-[13px] font-black text-white backdrop-blur-sm">
                         Change Photo
                       </span>
                     </>
@@ -4354,7 +4354,7 @@ function SweepTableEditor({
       )}
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <p className="text-[11px] font-black uppercase tracking-wide text-foreground">
+        <p className="text-[13px] font-black tracking-wide text-foreground">
           {title}
         </p>
         <p className="text-[11px] font-bold tabular-nums text-muted-foreground">
@@ -4548,7 +4548,7 @@ function ObjectivesEditorDialog({
             <div key={block.id} className="rounded-2xl border border-border/50 bg-muted/30 px-4 py-3.5">
               {/* Delete row */}
               <div className="mb-2.5 flex items-center justify-between">
-                <span className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">Objective {index + 1}</span>
+                <span className="text-[12px] font-black text-muted-foreground">Objective {index + 1}</span>
                 {logic.length > 1 && (
                   <button onClick={() => onRemove(block.id)} className="rounded-lg p-1 text-muted-foreground/60 transition hover:bg-red-500/10 hover:text-red-500">
                     <Trash2 className="h-3 w-3" />
@@ -4640,7 +4640,7 @@ function ObjectivesEditorDialog({
                   onClick={() => setRewardPickerForBlockId(block.id)}
                   className="mt-2.5 flex w-full items-center gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 text-left transition hover:bg-emerald-500/10"
                 >
-                  <span className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-600 dark:text-emerald-400 shrink-0">Reward</span>
+                  <span className="text-[12px] font-black text-emerald-600 dark:text-emerald-400 shrink-0">Reward</span>
                   <div className="flex flex-wrap gap-2">
                     {block.rewards!.map((reward, ri) => (
                       <RewardTile
@@ -5027,7 +5027,7 @@ function RewardPickerDialog({
                 type="button"
                 onClick={() => setActiveTab(tab)}
                 className={cn(
-                  'rounded-2xl border px-4 py-2 text-sm font-black uppercase tracking-[0.16em] transition',
+                  'rounded-2xl border px-4 py-2 text-sm font-black transition',
                   activeTab === tab
                     ? 'border-primary/30 bg-primary/10 text-primary'
                     : 'border-border/50 bg-background text-muted-foreground hover:bg-muted/40 hover:text-foreground',
@@ -5047,7 +5047,7 @@ function RewardPickerDialog({
           </div>
 
           <div className="mb-6 rounded-[24px] border border-border/50 bg-background/70 p-4">
-            <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
+            <p className="text-[13px] font-black text-muted-foreground">
               Selected Rewards
             </p>
             {draft.length === 0 ? (
@@ -5108,7 +5108,7 @@ function RewardPickerDialog({
 
               {shieldReward ? (
                 <label className="grid gap-2 rounded-[26px] border border-border/50 bg-background/70 p-4">
-                  <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
+                  <span className="text-[13px] font-black text-muted-foreground">
                     How many
                   </span>
                   <input
@@ -5159,7 +5159,7 @@ function RewardPickerDialog({
               {fliesReward ? (
                 <div className="grid gap-4 rounded-[26px] border border-border/50 bg-background/70 p-4 md:grid-cols-3">
                   <label className="grid gap-2">
-                    <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
+                    <span className="text-[13px] font-black text-muted-foreground">
                       Amount Mode
                     </span>
                     <select
@@ -5195,7 +5195,7 @@ function RewardPickerDialog({
 
                   {(fliesReward.amountMode ?? 'fixed') === 'fixed' ? (
                     <label className="grid gap-2 md:col-span-2">
-                      <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
+                      <span className="text-[13px] font-black text-muted-foreground">
                         Flies Amount
                       </span>
                       <input
@@ -5213,7 +5213,7 @@ function RewardPickerDialog({
                   ) : (
                     <>
                       <label className="grid gap-2">
-                        <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
+                        <span className="text-[13px] font-black text-muted-foreground">
                           Min Flies
                         </span>
                         <input
@@ -5229,7 +5229,7 @@ function RewardPickerDialog({
                         />
                       </label>
                       <label className="grid gap-2">
-                        <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
+                        <span className="text-[13px] font-black text-muted-foreground">
                           Max Flies
                         </span>
                         <input
@@ -5277,7 +5277,7 @@ function RewardPickerDialog({
                       <p className="truncate text-sm font-black text-foreground">
                         {item.name}
                       </p>
-                      <p className="mt-1 text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
+                      <p className="mt-1 text-[13px] font-black text-muted-foreground">
                         {item.rarity}
                       </p>
                       <p className="mt-1 text-xs text-muted-foreground">
@@ -5326,7 +5326,7 @@ function RewardPickerDialog({
                         <p className="truncate text-sm font-black text-foreground">
                           {item.name}
                         </p>
-                        <p className="mt-1 text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
+                        <p className="mt-1 text-[13px] font-black text-muted-foreground">
                           {item.rarity}
                         </p>
                         <p className="mt-1 text-xs text-muted-foreground">
@@ -5345,7 +5345,7 @@ function RewardPickerDialog({
                         className="flex items-center gap-3 rounded-b-[24px] border border-t-0 border-primary/30 bg-primary/5 px-4 py-3"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
+                        <span className="text-[13px] font-black text-muted-foreground">
                           Amount
                         </span>
                         <div className="flex items-center gap-1.5">
@@ -5433,7 +5433,7 @@ function SeasonImageUploader({
   return (
     <div className="rounded-2xl border border-border/60 bg-background/60 p-3">
       <div className="mb-2 flex items-center justify-between gap-2">
-        <span className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">
+        <span className="text-[13px] font-black text-muted-foreground">
           {label}
         </span>
         <span className="text-[10px] font-medium text-muted-foreground/70">

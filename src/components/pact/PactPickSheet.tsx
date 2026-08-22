@@ -351,7 +351,7 @@ export function PactPickSheet({
             {step === 'area' && (
               <div className="flex flex-col gap-4 py-2">
                 <div className="pt-2">
-                  <p className="text-[11px] font-black uppercase tracking-[0.16em] text-primary">
+                  <p className="text-[13px] font-black text-primary">
                     This week
                   </p>
                   <h2 className="mt-1 text-[20px] font-black leading-tight text-foreground">
@@ -403,7 +403,7 @@ export function PactPickSheet({
                           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-black/50 to-transparent" />
                           <span
                             className={cn(
-                              'absolute bottom-2 uppercase leading-none tracking-wide text-white drop-shadow-[0_3px_0_rgba(15,23,42,0.9)]',
+                              'absolute bottom-2 leading-none tracking-wide text-white drop-shadow-[0_3px_0_rgba(15,23,42,0.9)]',
                               compact
                                 ? 'left-3 right-3 truncate text-[15px]'
                                 : 'left-3.5 text-[20px]',
@@ -425,7 +425,7 @@ export function PactPickSheet({
                               the user draw their own conclusion — an
                               instruction buys a pick out of obligation. */}
                           {entry.recommended && (
-                            <span className="absolute right-2.5 top-2.5 rounded-lg bg-amber-500 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-white shadow-[0_2px_0_0_#b45309]">
+                            <span className="absolute right-2.5 top-2.5 rounded-lg bg-amber-500 px-2 py-1 text-[12px] font-black text-white shadow-[0_2px_0_0_#b45309]">
                               Gone quiet
                             </span>
                           )}
@@ -474,7 +474,7 @@ export function PactPickSheet({
                     <ArrowLeft className="h-4 w-4" strokeWidth={2.5} />
                   </button>
                   <div className="min-w-0">
-                    <p className="text-[11px] font-black uppercase tracking-[0.16em] text-primary">
+                    <p className="text-[13px] font-black text-primary">
                       {area.shortLabel}
                     </p>
                     <h2 className="text-[19px] font-black leading-tight text-foreground">
@@ -643,7 +643,7 @@ export function PactPickSheet({
                     )}
                     <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-black/55 to-transparent" />
                     <span
-                      className="absolute bottom-2 left-3.5 text-[19px] uppercase leading-none tracking-wide text-white drop-shadow-[0_3px_0_rgba(15,23,42,0.9)]"
+                      className="absolute bottom-2 left-3.5 text-[19px] leading-none tracking-wide text-white drop-shadow-[0_3px_0_rgba(15,23,42,0.9)]"
                       style={{
                         fontFamily:
                           'var(--font-display), "Luckiest Guy", cursive',
@@ -681,7 +681,7 @@ export function PactPickSheet({
 
                 <div className="flex min-w-0 flex-col gap-3 rounded-2xl border border-border/60 bg-card/60 p-4">
                   <div>
-                    <p className="mb-2 text-[11px] font-black uppercase tracking-wider text-muted-foreground">
+                    <p className="mb-2 text-[13px] font-black text-muted-foreground">
                       Days
                     </p>
                     <div className="flex gap-1.5">
@@ -709,7 +709,7 @@ export function PactPickSheet({
                   </div>
                   <div>
                     <div className="mb-2 flex items-center justify-between gap-2">
-                      <p className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">
+                      <p className="text-[13px] font-black text-muted-foreground">
                         Time
                       </p>
                       {days.length > 1 && (
@@ -773,7 +773,7 @@ export function PactPickSheet({
                     appear, and by then it is already on them. Named here, with
                     the user's own tags one tap away. */}
                 <div className="flex flex-col gap-2">
-                  <p className="text-[11px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+                  <p className="text-[13px] font-black text-muted-foreground">
                     Tag
                   </p>
                   {(() => {
@@ -1043,7 +1043,7 @@ function AreaMarquee({ areas }: { areas: PactAreaChoice[] }) {
           )}
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />
           <span
-            className="absolute bottom-1.5 left-2 right-2 truncate text-[11px] uppercase leading-none tracking-wide text-white drop-shadow-[0_2px_0_rgba(15,23,42,0.9)]"
+            className="absolute bottom-1.5 left-2 right-2 truncate text-[13px] leading-none tracking-wide text-white drop-shadow-[0_2px_0_rgba(15,23,42,0.9)]"
             style={{
               fontFamily: 'var(--font-display), "Luckiest Guy", cursive',
               WebkitTextStroke: '1px rgba(15, 23, 42, 0.95)',

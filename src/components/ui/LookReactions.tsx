@@ -246,7 +246,7 @@ export function LookLikesSheet({
                   )}
                   <div className="min-w-0 flex-1">
                     {group.isCurrentLook && (
-                      <span className="mb-1 inline-block rounded-full bg-emerald-500/12 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.12em] text-emerald-600 dark:text-emerald-400">
+                      <span className="mb-1 inline-block rounded-full bg-emerald-500/12 px-2 py-0.5 text-[11px] font-black text-emerald-600 dark:text-emerald-400">
                         Wearing now
                       </span>
                     )}

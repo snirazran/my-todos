@@ -395,7 +395,7 @@ export default function TryPage() {
                 className="mx-auto flex w-full max-w-sm flex-col gap-3 pt-2"
               >
                 <div className="px-1 pt-1 text-center">
-                  <p className="text-xs font-black uppercase tracking-[0.18em] text-primary">
+                  <p className="text-[13px] font-black text-primary">
                     Free account · 10 seconds
                   </p>
                   <h1 className="mt-1.5 text-[22px] font-black leading-tight tracking-tight text-foreground">
@@ -420,7 +420,7 @@ export default function TryPage() {
                       <p className="text-[15px] font-black leading-tight text-foreground">
                         {FUNNEL_PRIZE?.name ?? 'Legendary skin'}
                       </p>
-                      <span className="mt-1 inline-block rounded-md bg-amber-400/20 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-widest text-amber-700 dark:text-amber-300">
+                      <span className="mt-1 inline-block rounded-md bg-amber-400/20 px-1.5 py-0.5 text-[12px] font-black text-amber-700 dark:text-amber-300">
                         Legendary · Skin
                       </span>
                     </div>
@@ -429,7 +429,7 @@ export default function TryPage() {
                       onClick={handleTryOn}
                       disabled={wearing}
                       className={cn(
-                        'shrink-0 rounded-xl px-4 py-2.5 text-sm font-black uppercase tracking-wide transition-all',
+                        'shrink-0 rounded-xl px-4 py-2.5 text-sm font-black tracking-wide transition-all',
                         wearing
                           ? 'bg-muted text-muted-foreground'
                           : 'bg-gradient-to-r from-[#4f9149] via-[#5ca355] to-[#4f9149] bg-[length:200%_100%] animate-[shimmer_2.5s_ease-in-out_infinite] text-primary-foreground shadow-[0_4px_0_0_#34631f] hover:brightness-110 active:translate-y-[3px] active:shadow-none',
@@ -510,7 +510,7 @@ export default function TryPage() {
                 className="mx-auto flex w-full max-w-sm flex-col gap-3 pt-2"
               >
                 <div className="px-1 pt-2 text-center">
-                  <p className="text-xs font-black uppercase tracking-[0.18em] text-primary">
+                  <p className="text-[13px] font-black text-primary">
                     That felt good, right?
                   </p>
                   <h1 className="mt-1.5 text-[24px] font-black leading-[1.15] tracking-tight text-foreground">
@@ -571,7 +571,7 @@ export default function TryPage() {
                       <GiftRive className="h-full w-full" color={0} />
                     </div>
                     <div className="text-left">
-                      <p className="text-[11px] font-black uppercase tracking-[0.2em] text-emerald-300/90">
+                      <p className="text-[13px] font-black text-emerald-300/90">
                         1 gift waiting
                       </p>
                       <p className="mt-1 text-lg font-black leading-tight text-white">
@@ -594,7 +594,7 @@ export default function TryPage() {
                             os: mobileOS,
                           })
                         }
-                        className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-white text-sm font-black uppercase tracking-wider text-emerald-950 shadow-[0_4px_0_0_rgba(0,0,0,0.35)] transition-all hover:brightness-95 active:translate-y-[3px] active:shadow-none"
+                        className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-white text-sm font-black text-emerald-950 shadow-[0_4px_0_0_rgba(0,0,0,0.35)] transition-all hover:brightness-95 active:translate-y-[3px] active:shadow-none"
                       >
                         <Download className="h-4 w-4" strokeWidth={3} />
                         Get the app — it&apos;s free

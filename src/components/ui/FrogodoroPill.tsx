@@ -211,7 +211,7 @@ export default function FrogodoroPill({ onClick, taskName }: Props) {
               </span>
             ) : (
               <>
-                <span className="text-[10px] font-black uppercase tracking-[0.12em] opacity-80">
+                <span className="text-[12px] font-black opacity-80">
                   {isRunning
                     ? phase === 'focus'
                       ? taskName

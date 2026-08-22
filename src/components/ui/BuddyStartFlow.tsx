@@ -157,7 +157,7 @@ function ChooseSheet({
                 background: `radial-gradient(120% 100% at 50% 0%, ${BUDDY}22 0%, transparent 72%)`,
               }}
             />
-            <p className="relative text-[10px] font-black uppercase tracking-[0.18em] text-[#4f9149]">
+            <p className="relative text-[12px] font-black text-[#4f9149]">
               Goal buddy · Step 1 of 2
             </p>
             <h2 className="relative mt-1 text-xl font-black tracking-tight text-foreground">

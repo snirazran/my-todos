@@ -175,7 +175,7 @@ export function InsightsView({ days }: { days: 7 | 30 | 90 }) {
               <ArrowLeft className="h-5 w-5" aria-hidden="true" />
             </Link>
             <div className="min-w-0 flex-1">
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-primary">Your Patterns</p>
+              <p className="text-[13px] font-black text-primary">Your Patterns</p>
               <h1 className="mt-0.5 text-balance text-2xl font-black tracking-[-0.035em] text-foreground md:text-4xl">
                 See what’s working
               </h1>
@@ -236,7 +236,7 @@ function SummaryHero({ data }: { data: InsightData }) {
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_85%_10%,rgba(134,239,172,0.24),transparent_35%),linear-gradient(135deg,transparent,rgba(255,255,255,0.04))]" aria-hidden="true" />
       <div className="relative grid items-center gap-6 md:grid-cols-[1fr_auto]">
         <div>
-          <div className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] text-emerald-100 ring-1 ring-white/10">
+          <div className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-[13px] font-black text-emerald-100 ring-1 ring-white/10">
             <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
             Your Check-In
           </div>
@@ -259,7 +259,7 @@ function SummaryHero({ data }: { data: InsightData }) {
           <div className="grid h-[116px] w-[116px] place-items-center rounded-full bg-[#4f9149] text-center md:h-[132px] md:w-[132px]">
             <div>
               <span className="block text-4xl font-black tabular-nums tracking-[-0.05em]">{rate}%</span>
-              <span className="mt-0.5 block text-[10px] font-black uppercase tracking-[0.16em] text-emerald-100/70">Completed</span>
+              <span className="mt-0.5 block text-[12px] font-black text-emerald-100/70">Completed</span>
             </div>
           </div>
         </div>
@@ -332,7 +332,7 @@ function MetricCard({
       <div className={cn('grid h-9 w-9 place-items-center rounded-xl lg:h-11 lg:w-11', toneClass)}>{icon}</div>
       <div className="mt-2 min-w-0 lg:mt-0">
         <p className="text-xl font-black tabular-nums tracking-[-0.04em] text-foreground md:text-2xl">{value}</p>
-        <p className="truncate text-[10px] font-black uppercase tracking-[0.1em] text-muted-foreground md:text-[11px]">{label}</p>
+        <p className="truncate text-[12px] font-black text-muted-foreground md:text-[13px]">{label}</p>
         <p className={cn('mt-0.5 hidden text-xs font-medium text-muted-foreground lg:block', compactDetail && 'text-[11px]')}>{detail}</p>
       </div>
     </div>
@@ -382,7 +382,7 @@ function SignalsSection({ signals, patternDays }: { signals: InsightData['signal
     <section aria-labelledby="signals-heading">
       <div className="flex items-end justify-between gap-4 px-1">
         <div>
-          <p className="text-[11px] font-black uppercase tracking-[0.16em] text-primary">Plain-English Insights</p>
+          <p className="text-[13px] font-black text-primary">Plain-English Insights</p>
           <h2 id="signals-heading" className="mt-0.5 text-xl font-black tracking-[-0.025em] text-foreground md:text-2xl">Things worth knowing</h2>
         </div>
         <p className="hidden text-xs font-semibold text-muted-foreground sm:block">Last {patternDays} days</p>
@@ -399,7 +399,7 @@ function SignalsSection({ signals, patternDays }: { signals: InsightData['signal
               <div className={cn('grid h-9 w-9 place-items-center rounded-xl shadow-sm', styles.icon)}>
                 <styles.Icon className="h-5 w-5" aria-hidden="true" />
               </div>
-              <p className="mt-3 text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">{signal.eyebrow}</p>
+              <p className="mt-3 text-[12px] font-black text-muted-foreground">{signal.eyebrow}</p>
               <h3 className="mt-1 text-pretty text-base font-black leading-snug tracking-[-0.02em] text-foreground">{signal.title}</h3>
               <p className="mt-1.5 text-pretty text-xs font-medium leading-relaxed text-muted-foreground">{signal.body}</p>
             </article>
@@ -530,7 +530,7 @@ function NextStepCard({ nextStep }: { nextStep: InsightData['nextStep'] }) {
         <Lightbulb className="h-6 w-6" aria-hidden="true" />
       </div>
       <div className="mt-4 min-w-0 flex-1 md:mt-0">
-        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-primary">Your Next Small Win</p>
+        <p className="text-[12px] font-black text-primary">Your Next Small Win</p>
         <h2 id="next-step-heading" className="mt-1 text-balance text-xl font-black tracking-[-0.025em] text-foreground">{nextStep.title}</h2>
         <p className="mt-1 max-w-2xl text-pretty text-sm font-medium leading-relaxed text-muted-foreground">{nextStep.body}</p>
       </div>
@@ -572,7 +572,7 @@ function DailyHistory({ daily }: { daily: DailyPoint[] }) {
               </div>
               <div className="text-right">
                 <p className="text-sm font-black tabular-nums text-foreground">{day.completed}/{day.planned}</p>
-                <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">Finished</p>
+                <p className="text-[12px] font-bold text-muted-foreground">Finished</p>
               </div>
             </div>
           ))}
@@ -587,7 +587,7 @@ function SectionHeading({ icon, eyebrow, title, description, id }: { icon: React
     <div className="flex items-start gap-3">
       <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[#4f9149]/10 text-primary">{icon}</div>
       <div className="min-w-0">
-        <p className="text-[10px] font-black uppercase tracking-[0.15em] text-primary">{eyebrow}</p>
+        <p className="text-[12px] font-black text-primary">{eyebrow}</p>
         <h2 id={id} className="mt-0.5 text-lg font-black tracking-[-0.025em] text-foreground">{title}</h2>
         <p className="mt-0.5 text-pretty text-xs font-medium leading-relaxed text-muted-foreground">{description}</p>
       </div>

@@ -20,7 +20,7 @@ const SORTS: TaskSort[] = ['manual', 'time', 'flies', 'alpha', 'tag'];
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="mb-2 px-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+    <p className="mb-2 px-1 text-[12px] font-black text-muted-foreground">
       {children}
     </p>
   );
@@ -200,7 +200,7 @@ export function TaskFilterSheet({
                 {filters.tags.length > 0 && (
                   <button
                     onClick={() => onChange({ ...filters, tags: [] })}
-                    className="mb-2 text-[10px] font-black uppercase tracking-widest text-primary"
+                    className="mb-2 text-[12px] font-black text-primary"
                   >
                     Clear
                   </button>
@@ -324,7 +324,7 @@ export function TaskFilterSheet({
             <button
               onClick={() => setShowPresets((v) => !v)}
               aria-expanded={showPresets}
-              className="flex w-full items-center gap-1.5 px-1 py-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground transition-colors [@media(hover:hover)]:hover:text-foreground"
+              className="flex w-full items-center gap-1.5 px-1 py-1 text-[12px] font-black text-muted-foreground transition-colors [@media(hover:hover)]:hover:text-foreground"
             >
               Presets
               {presets.length > 0 && (

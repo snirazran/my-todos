@@ -251,7 +251,7 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
                   <div className="absolute inset-0 flex items-center">
                     <span className="w-full border-t border-border/60" />
                   </div>
-                  <div className="relative flex justify-center text-xs uppercase">
+                  <div className="relative flex justify-center text-[13px]">
                     <span className="bg-background px-2 font-bold tracking-widest text-muted-foreground">
                       Or
                     </span>
@@ -276,7 +276,7 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
                   <button
                     type="submit"
                     disabled={!email.trim() || loading}
-                    className="flex h-12 w-full items-center justify-center rounded-2xl bg-primary text-sm font-black uppercase tracking-wider text-primary-foreground transition-all hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+                    className="flex h-12 w-full items-center justify-center rounded-2xl bg-primary text-sm font-black text-primary-foreground transition-all hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Send sign-in link'}
                   </button>
@@ -308,7 +308,7 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
                       type="button"
                       onClick={onNext}
                       disabled={saving}
-                      className="mt-6 h-12 rounded-2xl bg-primary px-8 text-sm font-black uppercase tracking-wider text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60"
+                      className="mt-6 h-12 rounded-2xl bg-primary px-8 text-sm font-black text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {saving ? 'Setting up...' : 'Hop in'}
                     </button>
@@ -366,7 +366,7 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
 
 function ErrorMsg({ children }: { children: ReactNode }) {
   return (
-    <p className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-center text-[11px] font-black uppercase tracking-wider text-destructive">
+    <p className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-center text-[13px] font-black text-destructive">
       {children}
     </p>
   );

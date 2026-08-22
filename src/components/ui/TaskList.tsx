@@ -773,7 +773,7 @@ const SortableTaskItem = React.forwardRef<
                 style={{ opacity: timerActionOpacity, scale: timerActionScale }}
               >
                 <Icon name="clock" className="-mb-1 h-10 w-10 drop-shadow-sm" />
-                <span className="text-[10px] font-black uppercase tracking-wide">
+                <span className="text-[12px] font-black tracking-wide">
                   Focus
                 </span>
               </motion.span>
@@ -806,7 +806,7 @@ const SortableTaskItem = React.forwardRef<
                 ) : (
                   <Icon name="saved" className="h-8 w-8" />
                 )}
-                <span className="text-[10px] font-black uppercase tracking-wide">
+                <span className="text-[12px] font-black tracking-wide">
                   {secondaryLabel}
                 </span>
               </motion.span>
@@ -963,11 +963,11 @@ const SortableTaskItem = React.forwardRef<
                             exit={{ opacity: 0, scale: 0 }}
                             transition={{ duration: 0.2 }}
                             key={tagId}
-                            className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-normal shadow-sm transition-colors ${
-                              !color
-                                ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-200 border-indigo-100 dark:border-indigo-800/50'
-                                : 'tag-chip'
-                            }`}
+                            className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[13px] font-bold tracking-normal shadow-sm transition-colors ${
+ !color
+ ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-200 border-indigo-100 dark:border-indigo-800/50'
+ : 'tag-chip'
+ }`}
                             style={
                               color
                                 ? ({
@@ -1082,14 +1082,14 @@ const SortableTaskItem = React.forwardRef<
                     {(task.frogodoroSession.focusTime ?? 0) > 0 && (() => { const s = task.frogodoroSession!.focusTime; const m = Math.floor(s / 60); const sec = s % 60; const t = s < 60 ? `${s}s` : sec > 0 ? `${m}m ${sec}s` : `${m}m`; return (
                       <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-primary/8 dark:bg-primary/15">
                         <div className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
-                        <span className="text-[10px] font-bold text-primary/60 uppercase tracking-wider">Focus</span>
+                        <span className="text-[12px] font-bold text-primary/60">Focus</span>
                         <span className="text-[11px] font-black text-primary tabular-nums">{t}</span>
                       </div>
                     ); })()}
                     {(task.frogodoroSession.breakTime ?? 0) > 0 && (() => { const s = task.frogodoroSession!.breakTime ?? 0; const m = Math.floor(s / 60); const sec = s % 60; const t = s < 60 ? `${s}s` : sec > 0 ? `${m}m ${sec}s` : `${m}m`; return (
                       <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-sky-500/8 dark:bg-sky-500/15">
                         <div className="w-1.5 h-1.5 rounded-full bg-sky-500 flex-shrink-0" />
-                        <span className="text-[10px] font-bold text-sky-500/60 uppercase tracking-wider">Break</span>
+                        <span className="text-[12px] font-bold text-sky-500/60">Break</span>
                         <span className="text-[11px] font-black text-sky-500 tabular-nums">{t}</span>
                       </div>
                     ); })()}
@@ -1368,7 +1368,7 @@ function SortableSectionHeader({
           <ChevronDown className="h-4 w-4" strokeWidth={2.75} />
         </motion.span>
 
-        <span className="min-w-0 flex-1 truncate text-[13px] font-black uppercase tracking-[0.12em] text-muted-foreground">
+        <span className="min-w-0 flex-1 truncate text-[13px] font-black text-muted-foreground">
           {section.name}
         </span>
 
@@ -2398,7 +2398,7 @@ export default function TaskList({
     <>
       <div dir="ltr" className="w-full px-1.5 pt-0 pb-3 overflow-visible md:px-4">
         <div
-          className="w-full overflow-hidden rounded-[18px] border border-border/50 bg-[hsl(150_12%_94%)] shadow-sm dark:bg-background md:border-border/35 md:bg-muted/40 md:shadow-none"
+          className="w-full overflow-hidden rounded-[18px] border border-border/50 bg-[hsl(var(--bg-accent-hsl-h)_22%_94%)] shadow-sm dark:bg-background md:border-border/35 md:bg-muted/40 md:shadow-none"
           data-hint="task-list"
         >
         <div
@@ -2525,7 +2525,7 @@ export default function TaskList({
                             key="completed-divider"
                             className="flex items-center gap-2 px-1.5 pb-1.5 pt-3"
                           >
-                            <span className="text-[11px] font-black uppercase tracking-[0.14em] text-muted-foreground/60">
+                            <span className="text-[13px] font-black text-muted-foreground/60">
                               Completed
                             </span>
                             <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-black tabular-nums leading-none text-muted-foreground">

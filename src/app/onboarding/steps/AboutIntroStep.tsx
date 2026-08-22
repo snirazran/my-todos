@@ -28,7 +28,7 @@ export default function AboutIntroStep({ selections, onNext, saving, direction }
       <div className={ONBOARDING_FOOTER_SPACER_CLASS} />
 
       <div className="flex flex-col items-center pb-[calc(4rem+env(safe-area-inset-bottom))]">
-        <p className="mb-3 text-center text-xs font-bold uppercase tracking-widest text-muted-foreground">
+        <p className="mb-3 text-center text-[13px] font-bold text-muted-foreground">
           4 quick questions · under a minute
         </p>
         <motion.button

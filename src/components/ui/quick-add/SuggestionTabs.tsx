@@ -97,7 +97,7 @@ export function SuggestionTabs({ open, className, onPick, onContentChange }: Pro
       )}
     >
       <div className="flex shrink-0 items-center justify-between px-1 pb-2.5">
-        <div className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-widest text-muted-foreground">
+        <div className="flex items-center gap-1.5 text-[13px] font-black text-muted-foreground">
           <AppIcon name="saved" className="h-3.5 w-3.5" />
           <span>Saved</span>
         </div>
@@ -148,7 +148,7 @@ export function SuggestionTabs({ open, className, onPick, onContentChange }: Pro
                         return (
                           <span
                             key={tagId}
-                            className="inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-normal shadow-sm"
+                            className="inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] font-bold tracking-normal shadow-sm"
                             style={{
                               backgroundColor: `${tag.color}20`,
                               color: tag.color,

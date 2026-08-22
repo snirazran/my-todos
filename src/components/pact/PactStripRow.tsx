@@ -88,7 +88,7 @@ export function PactStripRow({ view }: { view: PactView }) {
       <div className="flex min-w-0 flex-1 flex-col gap-1 leading-tight md:gap-1.5">
         <span
           className={cn(
-            'flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.14em]',
+            'flex items-center gap-1.5 text-[11px] font-black',
             ready
               ? 'text-lime-700 dark:text-lime-400'
               : 'text-muted-foreground',

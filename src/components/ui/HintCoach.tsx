@@ -535,7 +535,7 @@ export function HintCoach() {
                 {contextTags.map((tag) => (
                   <span
                     key={tag.id ?? tag.name}
-                    className="inline-flex max-w-[7rem] items-center rounded-md border px-1.5 py-px text-[10px] font-black uppercase tracking-wide"
+                    className="inline-flex max-w-[7rem] items-center rounded-md border px-1.5 py-px text-[12px] font-black tracking-wide"
                     style={{
                       backgroundColor: `${tag.color}20`,
                       borderColor: `${tag.color}55`,

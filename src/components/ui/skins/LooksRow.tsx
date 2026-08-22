@@ -41,7 +41,7 @@ export function SaveFitButton({
 
   if (alreadySaved) {
     return (
-      <span className="ml-auto inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-muted-foreground">
+      <span className="ml-auto inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[12px] font-black tracking-wide text-muted-foreground">
         <Bookmark className="h-3 w-3 fill-current" />
         Saved
       </span>
@@ -54,7 +54,7 @@ export function SaveFitButton({
       <button
         type="button"
         onClick={onUpgrade}
-        className="ml-auto inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-amber-700 dark:bg-amber-950/40 dark:text-amber-400"
+        className="ml-auto inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[12px] font-black tracking-wide text-amber-700 dark:bg-amber-950/40 dark:text-amber-400"
       >
         <Icon name="frogPlus" label="Plus" className="h-3.5 w-3.5" />
         {SAVED_LOOKS_PLUS} look slots
@@ -71,7 +71,7 @@ export function SaveFitButton({
         if (result.ok) onNotify({ msg: 'Look saved!', type: 'success' });
         else if (result.error) onNotify({ msg: result.error, type: 'error' });
       }}
-      className="ml-auto inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-foreground transition-colors hover:bg-muted/70 disabled:opacity-50"
+      className="ml-auto inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[12px] font-black tracking-wide text-foreground transition-colors hover:bg-muted/70 disabled:opacity-50"
     >
       <Plus className="h-3 w-3" strokeWidth={3} />
       Save fit
@@ -133,7 +133,7 @@ export function LooksRow({
   return (
     <div className="pb-2">
       <div className="mb-2 flex items-center gap-2 px-1">
-        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-foreground">
+        <p className="text-[12px] font-black text-foreground">
           Saved looks
         </p>
         <span className="text-[10px] font-bold tabular-nums text-muted-foreground">
@@ -143,7 +143,7 @@ export function LooksRow({
           type="button"
           onClick={() => setRemoving((v) => !v)}
           className={cn(
-            'ml-auto rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide transition-colors',
+            'ml-auto rounded-full px-2 py-0.5 text-[12px] font-black tracking-wide transition-colors',
             removing
               ? 'bg-primary/10 text-primary'
               : 'text-muted-foreground hover:bg-muted',

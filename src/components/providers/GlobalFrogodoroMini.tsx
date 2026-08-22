@@ -174,7 +174,7 @@ export default function GlobalFrogodoroMini() {
                             {selectedTaskName}
                           </p>
                         )}
-                        <p className="mb-4 text-center text-sm font-black uppercase tracking-widest text-white/90">
+                        <p className="mb-4 text-center text-sm font-black text-white/90">
                           Time&apos;s up!
                         </p>
 
@@ -191,13 +191,13 @@ export default function GlobalFrogodoroMini() {
                         ) : splitDone ? (
                           <div className="mb-5 flex">
                             <div className="flex-1 text-center">
-                              <p className="text-[11px] font-black uppercase tracking-widest text-white/80">Focus</p>
+                              <p className="text-[13px] font-black text-white/80">Focus</p>
                               <p className="text-[40px] font-black leading-none tracking-tighter text-white drop-shadow-lg tabular-nums">
                                 {formatTime(lastFocusElapsed)}
                               </p>
                             </div>
                             <div className="flex-1 text-center">
-                              <p className="text-[11px] font-black uppercase tracking-widest text-white/80">Break</p>
+                              <p className="text-[13px] font-black text-white/80">Break</p>
                               <p className="text-[40px] font-black leading-none tracking-tighter text-white drop-shadow-lg tabular-nums">
                                 {formatTime(lastBreakElapsed)}
                               </p>
@@ -213,7 +213,7 @@ export default function GlobalFrogodoroMini() {
                           {celebrateFocus && (
                             <button
                               onClick={handleKeepGoing}
-                              className="flex items-center justify-center gap-1 rounded-2xl bg-white/20 px-4 py-3 text-[13px] font-black uppercase tracking-widest text-white shadow-[0_6px_0_rgba(0,0,0,0.15)] transition-all hover:bg-white/30 active:translate-y-1.5 active:shadow-none"
+                              className="flex items-center justify-center gap-1 rounded-2xl bg-white/20 px-4 py-3 text-[13px] font-black text-white shadow-[0_6px_0_rgba(0,0,0,0.15)] transition-all hover:bg-white/30 active:translate-y-1.5 active:shadow-none"
                             >
                               <Zap className="h-4 w-4 fill-current" />
                               +5 more
@@ -241,7 +241,7 @@ export default function GlobalFrogodoroMini() {
                             </div>
                             <button
                               onClick={handleDone}
-                              className={`relative flex items-center justify-center gap-1.5 rounded-2xl bg-white px-8 py-3 text-[15px] font-black uppercase tracking-widest shadow-[0_6px_0_rgba(0,0,0,0.15)] transition-all active:translate-y-1.5 active:shadow-none ${accent}`}
+                              className={`relative flex items-center justify-center gap-1.5 rounded-2xl bg-white px-8 py-3 text-[15px] font-black shadow-[0_6px_0_rgba(0,0,0,0.15)] transition-all active:translate-y-1.5 active:shadow-none ${accent}`}
                             >
                               <Check className="h-5 w-5" />
                               Done
@@ -257,14 +257,14 @@ export default function GlobalFrogodoroMini() {
                         {sessionStats.focusTime > 0 && (
                           <div className="flex items-center gap-1.5 rounded-xl bg-primary/8 px-2.5 py-1 dark:bg-primary/15">
                             <div className="h-1.5 w-1.5 rounded-full bg-primary" />
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-primary/60">Focus</span>
+                            <span className="text-[12px] font-bold text-primary/60">Focus</span>
                             <span className="text-[11px] font-black tabular-nums text-primary">{formatDuration(sessionStats.focusTime)}</span>
                           </div>
                         )}
                         {sessionStats.breakTime > 0 && (
                           <div className="flex items-center gap-1.5 rounded-xl bg-sky-500/8 px-2.5 py-1 dark:bg-sky-500/15">
                             <div className="h-1.5 w-1.5 rounded-full bg-sky-500" />
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-sky-500/60">Break</span>
+                            <span className="text-[12px] font-bold text-sky-500/60">Break</span>
                             <span className="text-[11px] font-black tabular-nums text-sky-500">{formatDuration(sessionStats.breakTime)}</span>
                           </div>
                         )}

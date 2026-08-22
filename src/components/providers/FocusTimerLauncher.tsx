@@ -88,7 +88,7 @@ export function FocusTimerLauncher() {
                   <Icon name="clock" className="h-10 w-10" />
                 </span>
                 <div className="min-w-0">
-                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-600 dark:text-emerald-400">
+                  <p className="text-[12px] font-black text-emerald-600 dark:text-emerald-400">
                     Focus Timer
                   </p>
                   <h2 className="text-balance text-xl font-black tracking-[-0.03em] text-foreground">

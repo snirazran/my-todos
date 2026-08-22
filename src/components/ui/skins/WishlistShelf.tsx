@@ -30,7 +30,7 @@ export function WishlistShelf({
   return (
     <div className="mb-3">
       <div className="mb-2 flex items-center justify-between gap-2 px-1">
-        <span className="inline-flex min-w-0 items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">
+        <span className="inline-flex min-w-0 items-center gap-1.5 text-[12px] font-black text-muted-foreground">
           <Bookmark
             className="h-3.5 w-3.5 shrink-0 text-primary"
             strokeWidth={3}

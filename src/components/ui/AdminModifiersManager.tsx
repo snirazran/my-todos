@@ -108,7 +108,7 @@ function CategoryCard({
       <div className="min-w-0 flex-1">
         <p className="text-base font-black text-foreground">{title}</p>
         <p className="text-sm text-muted-foreground">{description}</p>
-        <p className="mt-1 text-xs font-black uppercase tracking-wider text-primary">
+        <p className="mt-1 text-[13px] font-black text-primary">
           {stat}
         </p>
       </div>
@@ -483,7 +483,7 @@ export function AdminModifiersManager() {
               <div className="mt-4 overflow-x-auto">
                 <table className="w-full min-w-[620px] border-separate border-spacing-y-2">
                   <thead>
-                    <tr className="text-left text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+                    <tr className="text-left text-[12px] font-black text-muted-foreground">
                       <th className="px-2">Recipe</th>
                       <th className="px-2">Items in</th>
                       <th className="px-2">Fuel tier</th>
@@ -494,7 +494,7 @@ export function AdminModifiersManager() {
                   <tbody>
                     {config.recipes.map((recipe) => (
                       <tr key={recipe.from} className="bg-muted/40">
-                        <td className="rounded-l-xl px-3 py-2 text-xs font-black uppercase tracking-wider text-foreground">
+                        <td className="rounded-l-xl px-3 py-2 text-[13px] font-black text-foreground">
                           {recipe.from} → {recipe.to}
                         </td>
                         <td className="px-2 py-2">
@@ -967,7 +967,7 @@ function ShopSalesEditor({
         <div className="mt-4 overflow-x-auto">
           <table className="w-full min-w-[520px] border-separate border-spacing-y-2">
             <thead>
-              <tr className="text-left text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+              <tr className="text-left text-[12px] font-black text-muted-foreground">
                 <th className="px-2">Tier</th>
                 <th className="px-2">Discount</th>
                 <th className="px-2">Sale days</th>
@@ -979,7 +979,7 @@ function ShopSalesEditor({
                 const days = shop.raritySaleDaysPercent[rarity] ?? 0;
                 return (
                   <tr key={rarity} className="bg-muted/40">
-                    <td className="rounded-l-xl px-3 py-2 text-xs font-black uppercase tracking-wider text-foreground">
+                    <td className="rounded-l-xl px-3 py-2 text-[13px] font-black text-foreground">
                       {rarity}
                     </td>
                     <td className="px-2 py-2">
@@ -1194,7 +1194,7 @@ function StreakEditor({
               key={`${tier.minDays}-${index}`}
               className="flex items-center gap-3 rounded-xl bg-muted/40 px-3 py-2"
             >
-              <span className="w-24 shrink-0 text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+              <span className="w-24 shrink-0 text-[12px] font-black text-muted-foreground">
                 From day
               </span>
               <input
@@ -1206,7 +1206,7 @@ function StreakEditor({
                 }
                 className={cn(inputClass, 'max-w-[90px]')}
               />
-              <span className="text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+              <span className="text-[12px] font-black text-muted-foreground">
                 pays
               </span>
               <input
@@ -1276,7 +1276,7 @@ function StreakEditor({
         <div className="mt-4 overflow-x-auto">
           <table className="w-full min-w-[620px] border-separate border-spacing-y-2">
             <thead>
-              <tr className="text-left text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+              <tr className="text-left text-[12px] font-black text-muted-foreground">
                 <th className="px-2">At day</th>
                 <th className="px-2">Flies</th>
                 <th className="px-2">Gift item id</th>
@@ -1520,7 +1520,7 @@ function ChecklistRewardsEditor({
         <div className="mt-4 overflow-x-auto">
           <table className="w-full min-w-[620px] border-separate border-spacing-y-2">
             <thead>
-              <tr className="text-left text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+              <tr className="text-left text-[12px] font-black text-muted-foreground">
                 <th className="px-2">Band</th>
                 <th className="px-2">From items</th>
                 <th className="px-2">Marker positions</th>
@@ -1531,7 +1531,7 @@ function ChecklistRewardsEditor({
             <tbody>
               {tiers.map((tier, index) => (
                 <tr key={`${tier.minItems}-${index}`} className="bg-muted/40">
-                  <td className="rounded-l-xl px-3 py-2 text-xs font-black uppercase tracking-wider text-foreground">
+                  <td className="rounded-l-xl px-3 py-2 text-[13px] font-black text-foreground">
                     {bandLabel(index)}
                   </td>
                   <td className="px-2 py-2">
@@ -1615,7 +1615,7 @@ function ChecklistRewardsEditor({
                 key={length}
                 className="flex flex-wrap items-center gap-3 rounded-xl bg-muted/40 px-3 py-2"
               >
-                <span className="w-20 shrink-0 text-xs font-black uppercase tracking-wider text-muted-foreground">
+                <span className="w-20 shrink-0 text-[13px] font-black text-muted-foreground">
                   {length} items
                 </span>
                 <span className="flex flex-wrap gap-1">

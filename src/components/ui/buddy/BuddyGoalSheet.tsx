@@ -216,7 +216,7 @@ export function BuddyGoalSheet({
                 </span>
               )}
               <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#4f9149]">
+                <p className="text-[12px] font-black text-[#4f9149]">
                   Goal buddy · Step 2 of 2
                 </p>
                 <p className="truncate text-[15px] font-black tracking-tight text-foreground">
@@ -304,7 +304,7 @@ export function BuddyGoalSheet({
               </div>
             </div>
 
-            <p className="mt-5 text-[11px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+            <p className="mt-5 text-[13px] font-black text-muted-foreground">
               How often
             </p>
             <div className="mt-2 grid grid-cols-2 gap-1.5">
@@ -355,7 +355,7 @@ export function BuddyGoalSheet({
 
             {wantsGift && (
               <>
-                <p className="mt-5 text-[11px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+                <p className="mt-5 text-[13px] font-black text-muted-foreground">
                   Welcome gift
                 </p>
                 <p className="mt-1 text-[13px] font-semibold text-muted-foreground">

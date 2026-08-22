@@ -189,7 +189,7 @@ export function RewardPickerDialog({
                 type="button"
                 onClick={() => setActiveTab(tab)}
                 className={cn(
-                  'rounded-2xl border px-4 py-2 text-sm font-black uppercase tracking-[0.16em] transition',
+                  'rounded-2xl border px-4 py-2 text-sm font-black transition',
                   activeTab === tab
                     ? 'border-primary/30 bg-primary/10 text-primary'
                     : 'border-border/50 bg-background text-muted-foreground hover:bg-muted/40 hover:text-foreground',
@@ -201,7 +201,7 @@ export function RewardPickerDialog({
           </div>
 
           <div className="mb-6 rounded-[24px] border border-border/50 bg-background/70 p-4">
-            <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
+            <p className="text-[13px] font-black text-muted-foreground">
               Selected Rewards
             </p>
             {draft.length === 0 ? (
@@ -258,7 +258,7 @@ export function RewardPickerDialog({
               {fliesReward ? (
                 <div className="grid gap-4 rounded-[26px] border border-border/50 bg-background/70 p-4 md:grid-cols-3">
                   <label className="grid gap-2">
-                    <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
+                    <span className="text-[13px] font-black text-muted-foreground">
                       Amount Mode
                     </span>
                     <select
@@ -294,7 +294,7 @@ export function RewardPickerDialog({
 
                   {(fliesReward.amountMode ?? 'fixed') === 'fixed' ? (
                     <label className="grid gap-2 md:col-span-2">
-                      <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
+                      <span className="text-[13px] font-black text-muted-foreground">
                         Flies Amount
                       </span>
                       <input
@@ -310,7 +310,7 @@ export function RewardPickerDialog({
                   ) : (
                     <>
                       <label className="grid gap-2">
-                        <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
+                        <span className="text-[13px] font-black text-muted-foreground">
                           Min Flies
                         </span>
                         <input
@@ -324,7 +324,7 @@ export function RewardPickerDialog({
                         />
                       </label>
                       <label className="grid gap-2">
-                        <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
+                        <span className="text-[13px] font-black text-muted-foreground">
                           Max Flies
                         </span>
                         <input
@@ -371,7 +371,7 @@ export function RewardPickerDialog({
                       />
                       <div className="min-w-0">
                         <p className="truncate text-sm font-black text-foreground">{item.name}</p>
-                        <p className="mt-1 text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
+                        <p className="mt-1 text-[13px] font-black text-muted-foreground">
                           {item.rarity}
                         </p>
                         <p className="mt-1 text-xs text-muted-foreground">
@@ -390,7 +390,7 @@ export function RewardPickerDialog({
                         className="flex items-center gap-3 rounded-b-[24px] border border-t-0 border-primary/30 bg-primary/5 px-4 py-3"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
+                        <span className="text-[13px] font-black text-muted-foreground">
                           Amount
                         </span>
                         <div className="flex items-center gap-1.5">

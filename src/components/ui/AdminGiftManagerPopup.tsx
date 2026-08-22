@@ -555,7 +555,7 @@ export function AdminGiftManagerPopup({
                   <div className="text-sm font-black text-foreground">
                     Reveal Rules
                   </div>
-                  <div className="text-[10px] font-black uppercase text-muted-foreground">
+                  <div className="text-[12px] font-black text-muted-foreground">
                     pity · duplicates · backgrounds
                   </div>
                 </div>
@@ -583,7 +583,7 @@ export function AdminGiftManagerPopup({
                         <div className="truncate text-sm font-black text-foreground">
                           {config.gift.name}
                         </div>
-                        <div className={cn('text-[10px] font-black uppercase', RARITY_TEXT[config.gift.rarity])}>
+                        <div className={cn('text-[12px] font-black', RARITY_TEXT[config.gift.rarity])}>
                           {config.gift.rarity} · {config.drops.length} drops
                         </div>
                       </div>
@@ -639,7 +639,7 @@ export function AdminGiftManagerPopup({
                           className="h-full w-full rounded-2xl"
                         />
                       </div>
-                      <p className="text-center text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+                      <p className="text-center text-[13px] font-bold text-muted-foreground">
                         Rive color {Number(form.riveIndex) || 0}
                       </p>
                     </div>
@@ -765,7 +765,7 @@ export function AdminGiftManagerPopup({
                                   setDropMode(mode);
                                 }}
                                 className={cn(
-                                  'rounded-lg px-3 py-1.5 text-[11px] font-black uppercase tracking-wide transition',
+                                  'rounded-lg px-3 py-1.5 text-[13px] font-black tracking-wide transition',
                                   dropMode === mode
                                     ? 'bg-primary text-primary-foreground shadow-sm'
                                     : 'text-muted-foreground hover:text-foreground',
@@ -798,7 +798,7 @@ export function AdminGiftManagerPopup({
                       <>
                       <div className="mb-4 rounded-2xl border border-border/50 bg-background/70 p-3">
                         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                          <p className="text-[12px] font-black text-muted-foreground">
                             Pick Items
                           </p>
                           <div className="flex flex-wrap gap-1.5">
@@ -810,7 +810,7 @@ export function AdminGiftManagerPopup({
                                   type="button"
                                   onClick={() => setItemRarityFilter(rarity)}
                                   className={cn(
-                                    'rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-wide transition',
+                                    'rounded-full border px-2.5 py-1 text-[12px] font-black tracking-wide transition',
                                     active
                                       ? 'border-primary/30 bg-primary/10 text-primary'
                                       : 'border-border/50 bg-card text-muted-foreground hover:bg-muted/50',
@@ -846,7 +846,7 @@ export function AdminGiftManagerPopup({
                                   <p className="truncate text-xs font-black text-foreground">
                                     {item.name}
                                   </p>
-                                  <p className={cn('text-[10px] font-black uppercase', RARITY_TEXT[item.rarity])}>
+                                  <p className={cn('text-[12px] font-black', RARITY_TEXT[item.rarity])}>
                                     {item.rarity}
                                   </p>
                                 </div>
@@ -863,7 +863,7 @@ export function AdminGiftManagerPopup({
 
                       {backgrounds.length > 0 && (
                         <div className="mb-4 rounded-2xl border border-border/50 bg-background/70 p-3">
-                          <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                          <p className="mb-3 text-[12px] font-black text-muted-foreground">
                             Pick Backgrounds
                           </p>
                           <div className="grid max-h-64 gap-2 overflow-y-auto pr-1 sm:grid-cols-2 xl:grid-cols-3">
@@ -892,7 +892,7 @@ export function AdminGiftManagerPopup({
                                     <p className="truncate text-xs font-black text-foreground">
                                       {bg.name}
                                     </p>
-                                    <p className={cn('text-[10px] font-black uppercase', RARITY_TEXT[bg.rarity])}>
+                                    <p className={cn('text-[12px] font-black', RARITY_TEXT[bg.rarity])}>
                                       {bg.rarity} · background
                                     </p>
                                   </div>
@@ -932,7 +932,7 @@ export function AdminGiftManagerPopup({
                                     <p className="truncate text-sm font-black text-foreground">
                                       {meta?.name ?? drop.itemId}
                                     </p>
-                                    <p className={cn('text-[10px] font-black uppercase', RARITY_TEXT[meta?.rarity ?? 'common'])}>
+                                    <p className={cn('text-[12px] font-black', RARITY_TEXT[meta?.rarity ?? 'common'])}>
                                       {meta?.rarity ?? 'unknown'}{isBackground ? ' · background' : ''}
                                     </p>
                                   </div>
@@ -973,7 +973,7 @@ export function AdminGiftManagerPopup({
                                 key={rarity}
                                 className="grid grid-cols-[minmax(0,1fr)_88px_56px] items-center gap-2 rounded-2xl border border-border/50 bg-background p-2"
                               >
-                                <div className={cn('px-2 text-sm font-black uppercase', RARITY_TEXT[rarity])}>
+                                <div className={cn('px-2 text-sm font-black', RARITY_TEXT[rarity])}>
                                   {rarity}
                                 </div>
                                 <input
@@ -1171,7 +1171,7 @@ function RulesPanel({
           </div>
           <span
             className={cn(
-              'shrink-0 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wide',
+              'shrink-0 rounded-full px-3 py-1 text-[12px] font-black tracking-wide',
               rules.tierBumpEnabled
                 ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
                 : 'bg-muted text-muted-foreground',
@@ -1211,7 +1211,7 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+      <span className="mb-1 block text-[12px] font-black text-muted-foreground">
         {label}
       </span>
       {children}

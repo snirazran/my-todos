@@ -150,7 +150,7 @@ function BonusRewardLane({
     <div className="rounded-xl border border-border/60 bg-background/40 p-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-xs font-black uppercase tracking-wide text-muted-foreground">
+          <p className="text-[13px] font-black tracking-wide text-muted-foreground">
             {label}
           </p>
           <p className="mt-1 text-sm font-bold text-foreground">
@@ -290,7 +290,7 @@ function PrestigeCycleLane({
       <div className="mt-2.5 rounded-lg bg-muted/30 p-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-xs font-black uppercase tracking-wide text-muted-foreground">
+            <p className="text-[13px] font-black tracking-wide text-muted-foreground">
               Exclusive piece
             </p>
             <p className="mt-1 truncate text-sm font-bold text-foreground">
@@ -299,7 +299,7 @@ function PrestigeCycleLane({
                 : `Random ${rarity} (default)`}
             </p>
             {pieceDef?.rarity && (
-              <span className="mt-1 inline-block rounded-md bg-primary/10 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-primary">
+              <span className="mt-1 inline-block rounded-md bg-primary/10 px-1.5 py-0.5 text-[12px] font-black text-primary">
                 {pieceDef.rarity}
               </span>
             )}
@@ -708,7 +708,7 @@ export function AdminPactManager() {
         <div className="mt-5 overflow-x-auto">
           <table className="w-full min-w-[520px] text-left text-[12px]">
             <thead>
-              <tr className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+              <tr className="text-[12px] font-black text-muted-foreground">
                 <th className="py-1.5 pr-3">Sessions</th>
                 <th className="py-1.5 pr-3">Per session</th>
                 <th className="py-1.5 pr-3">Completion bonus</th>
@@ -974,7 +974,7 @@ export function AdminPactManager() {
         <div className="mt-5 overflow-x-auto">
           <table className="w-full min-w-[520px] text-left text-[12px]">
             <thead>
-              <tr className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+              <tr className="text-[12px] font-black text-muted-foreground">
                 <th className="py-1.5 pr-3">Cycle</th>
                 <th className="py-1.5 pr-3">Weeks</th>
                 <th className="py-1.5 pr-3">Base ×</th>
@@ -991,7 +991,7 @@ export function AdminPactManager() {
                   <td className="py-1.5 pr-3">
                     {row.peak}
                     {row.capped && (
-                      <span className="ml-1 text-[10px] font-black uppercase text-amber-600 dark:text-amber-400">
+                      <span className="ml-1 text-[12px] font-black text-amber-600 dark:text-amber-400">
                         cap
                       </span>
                     )}
@@ -1209,7 +1209,7 @@ export function AdminPactManager() {
                   </span>
                 )}
                 {entry.generated && (
-                  <span className="rounded-md bg-violet-500/15 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-violet-600 dark:text-violet-400">
+                  <span className="rounded-md bg-violet-500/15 px-1.5 py-0.5 text-[12px] font-black text-violet-600 dark:text-violet-400">
                     Draft
                   </span>
                 )}

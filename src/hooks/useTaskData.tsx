@@ -413,7 +413,7 @@ export function useTaskData({
                         <span className="text-[14px] font-black text-foreground">
                           Daily max reached — {newFlyStatus.limit} flies!
                         </span>
-                        <span className="mt-0.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                        <span className="mt-0.5 text-[13px] font-bold text-muted-foreground">
                           Incredible focus today
                         </span>
                       </div>
@@ -466,7 +466,7 @@ export function useTaskData({
                     <span className="text-[14px] font-black text-foreground">
                       {milestone.day}-day streak — +{milestone.flies} flies
                     </span>
-                    <span className="mt-0.5 truncate text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                    <span className="mt-0.5 truncate text-[13px] font-bold text-muted-foreground">
                       {milestone.taskText}
                       {extras.length ? ` · ${extras.join(' + ')}` : ''}
                     </span>
@@ -484,7 +484,7 @@ export function useTaskData({
                   <span className="text-[14px] font-black text-foreground">
                     The jar filled — a gift is waiting
                   </span>
-                  <span className="mt-0.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                  <span className="mt-0.5 text-[13px] font-bold text-muted-foreground">
                     Everything you finished past the daily catch
                   </span>
                 </div>,
@@ -497,7 +497,7 @@ export function useTaskData({
                   <span className="text-[14px] font-black text-foreground">
                     Pebble in the jar — {jar.pebblesToNextGift} to a gift
                   </span>
-                  <span className="mt-0.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                  <span className="mt-0.5 text-[13px] font-bold text-muted-foreground">
                     Today&apos;s flies are all caught
                   </span>
                 </div>,

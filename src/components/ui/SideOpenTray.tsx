@@ -250,7 +250,7 @@ export const SideOpenTray = React.forwardRef<HTMLDivElement, SideOpenTrayProps>(
                       {title}
                     </h3>
                     {subtitle && (
-                      <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mt-0.5 opacity-70">
+                      <p className="text-[13px] font-semibold text-muted-foreground mt-0.5 opacity-70">
                         {subtitle}
                       </p>
                     )}

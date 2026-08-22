@@ -264,7 +264,7 @@ export function MarketingPlannerPreview() {
   return (
     <div className="min-w-0 max-w-full rounded-[30px] border border-white/15 bg-background p-3 text-foreground shadow-2xl shadow-black/30 sm:p-5">
       <div className="mb-4 px-1">
-        <p className="text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground">Weekly planner</p>
+        <p className="text-[11px] font-black text-muted-foreground">Weekly planner</p>
         <p className="mt-0.5 text-base font-black">July 20–26</p>
       </div>
 

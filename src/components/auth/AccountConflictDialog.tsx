@@ -56,7 +56,7 @@ export function AccountConflictDialog({
               type="button"
               disabled={busy}
               onClick={onConfirm}
-              className="mt-5 flex h-12 w-full items-center justify-center rounded-2xl bg-primary text-sm font-black uppercase tracking-wider text-primary-foreground transition-all hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+              className="mt-5 flex h-12 w-full items-center justify-center rounded-2xl bg-primary text-sm font-black text-primary-foreground transition-all hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : confirmLabel}
             </button>

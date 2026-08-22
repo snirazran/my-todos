@@ -313,7 +313,7 @@ function PackRow({
         {(covers || pack.badge) && (
           <span
             className={cn(
-              'mb-1 inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-widest',
+              'mb-1 inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-black',
               covers || popular
                 ? 'bg-primary text-primary-foreground'
                 : 'bg-gradient-to-r from-amber-400 to-amber-500 text-amber-950',
@@ -326,7 +326,7 @@ function PackRow({
           <span className="text-2xl font-black leading-none tabular-nums text-foreground">
             {pack.amount.toLocaleString()}
           </span>
-          <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+          <span className="text-[12px] font-black text-muted-foreground">
             Flies
           </span>
         </span>
@@ -355,7 +355,7 @@ function PlusFliesCard() {
   const openPremium = useUIStore((s) => s.setPremiumModalOpen);
   return (
     <div>
-      <p className="mb-2 mt-5 px-1 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">
+      <p className="mb-2 mt-5 px-1 text-[12px] font-black text-muted-foreground">
         Free flies
       </p>
       <button
@@ -467,7 +467,7 @@ function FreeFliesCard({ open }: { open: boolean }) {
 
   return (
     <div>
-      <p className="mb-2 mt-5 px-1 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">
+      <p className="mb-2 mt-5 px-1 text-[12px] font-black text-muted-foreground">
         Free flies
       </p>
       <button

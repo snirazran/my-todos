@@ -43,10 +43,10 @@ export default function PricingPage() {
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="relative flex flex-col rounded-[28px] border-2 border-primary bg-card p-6 shadow-sm">
-            <span className="absolute right-5 top-5 rounded-lg bg-primary px-2.5 py-1 text-[11px] font-black uppercase tracking-wider text-primary-foreground">
+            <span className="absolute right-5 top-5 rounded-lg bg-primary px-2.5 py-1 text-[13px] font-black text-primary-foreground">
               Best deal
             </span>
-            <p className="text-sm font-black uppercase tracking-[0.18em] text-muted-foreground">
+            <p className="text-sm font-black text-muted-foreground">
               Frogress Plus — Yearly
             </p>
             <p className="mt-3 text-4xl font-black tracking-tight text-foreground">
@@ -64,7 +64,7 @@ export default function PricingPage() {
           </div>
 
           <div className="flex flex-col rounded-[28px] border border-border bg-card p-6 shadow-sm">
-            <p className="text-sm font-black uppercase tracking-[0.18em] text-muted-foreground">
+            <p className="text-sm font-black text-muted-foreground">
               Frogress Plus — Monthly
             </p>
             <p className="mt-3 text-4xl font-black tracking-tight text-foreground">

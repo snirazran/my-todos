@@ -113,7 +113,7 @@ export default function BulkActionBar({
               >
                 {a.icon}
                 {!iconOnly && (
-                  <span className="text-[9px] font-black uppercase tracking-wide">
+                  <span className="text-[11px] font-black tracking-wide">
                     {a.label}
                   </span>
                 )}
@@ -137,7 +137,7 @@ export default function BulkActionBar({
             >
               <MoreHorizontal className="h-5 w-5" />
               {!iconOnly && (
-                <span className="text-[9px] font-black uppercase tracking-wide">
+                <span className="text-[11px] font-black tracking-wide">
                   More
                 </span>
               )}

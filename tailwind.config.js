@@ -117,6 +117,10 @@ module.exports = {
         border: 'hsl(var(--border))',
         ring: 'hsl(var(--ring))',
 
+        'hero-surface': 'var(--hero-surface)',
+        'hero-header': 'var(--hero-header)',
+        'hero-border': 'var(--hero-border)',
+
         chart: {
           1: 'hsl(var(--chart-1))',
           2: 'hsl(var(--chart-2))',

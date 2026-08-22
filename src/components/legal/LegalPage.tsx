@@ -34,7 +34,7 @@ export function LegalPage({
           <p className="mt-3 max-w-2xl text-sm font-medium leading-6 text-muted-foreground sm:text-base">
             {description}
           </p>
-          <p className="mt-4 text-xs font-black uppercase tracking-[0.18em] text-muted-foreground">
+          <p className="mt-4 text-[13px] font-black text-muted-foreground">
             Last updated: {lastUpdated}
           </p>
         </div>

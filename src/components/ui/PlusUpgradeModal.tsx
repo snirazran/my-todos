@@ -32,7 +32,7 @@ const PLAN_DETAILS: Record<
     title: '12 Months',
     price: '$69.99',
     subtitle: 'Try 7 days free',
-    badge: 'BEST DEAL',
+    badge: 'Best deal',
   },
   monthly: {
     title: 'Monthly',
@@ -257,7 +257,7 @@ export function PlusUpgradeModal({
                         onClick={() =>
                           window.location.assign('/login?upgrade=1')
                         }
-                        className="mt-5 h-12 w-full rounded-2xl bg-violet-600 text-sm font-black uppercase tracking-wider text-white transition-all hover:brightness-110 active:scale-[0.98]"
+                        className="mt-5 h-12 w-full rounded-2xl bg-violet-600 text-sm font-black text-white transition-all hover:brightness-110 active:scale-[0.98]"
                       >
                         Create free account
                       </button>

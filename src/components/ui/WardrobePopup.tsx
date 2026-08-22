@@ -186,7 +186,7 @@ export function WardrobePopup({
                   </span>
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[10px] font-black uppercase leading-none tracking-[0.18em] text-muted-foreground">
+                  <p className="text-[12px] font-black leading-none text-muted-foreground">
                     Dress your frog
                   </p>
                   <h2 className="mt-1 text-xl font-black leading-none text-foreground">

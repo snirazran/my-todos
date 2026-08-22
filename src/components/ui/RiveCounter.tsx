@@ -34,7 +34,7 @@ export function RiveCounter() {
         animate={{ opacity: 1, y: 0 }}
         className="bg-background border border-border p-3 rounded-2xl shadow-xl flex flex-col gap-2 min-w-[140px]"
       >
-        <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-muted-foreground border-b border-border/50 pb-1 mb-1">
+        <div className="flex items-center justify-between text-[12px] font-black text-muted-foreground border-b border-border/50 pb-1 mb-1">
           <span>Dev Stats</span>
           <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
         </div>
@@ -44,7 +44,7 @@ export function RiveCounter() {
             <Monitor className="w-4 h-4" />
           </div>
           <div className="flex flex-col">
-            <span className="text-[10px] text-muted-foreground font-bold uppercase">Rendered</span>
+            <span className="text-[12px] text-muted-foreground font-bold">Rendered</span>
             <span className="text-sm font-black text-foreground">{stats.total}</span>
           </div>
         </div>
@@ -54,7 +54,7 @@ export function RiveCounter() {
             <Activity className="w-4 h-4" />
           </div>
           <div className="flex flex-col">
-            <span className="text-[10px] text-muted-foreground font-bold uppercase">Playing</span>
+            <span className="text-[12px] text-muted-foreground font-bold">Playing</span>
             <span className="text-sm font-black text-foreground">{stats.playing}</span>
           </div>
         </div>
@@ -64,7 +64,7 @@ export function RiveCounter() {
             <Pause className="w-4 h-4" />
           </div>
           <div className="flex flex-col">
-            <span className="text-[10px] text-muted-foreground font-bold uppercase">Paused</span>
+            <span className="text-[12px] text-muted-foreground font-bold">Paused</span>
             <span className="text-sm font-black text-foreground">{stats.paused}</span>
           </div>
         </div>

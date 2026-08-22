@@ -326,7 +326,7 @@ export function LeapSessionDeleteSheet({
 
           {active && (
             <div className="mt-4 rounded-2xl border border-border/60 bg-muted/30 px-3.5 py-3">
-              <p className="text-[10.5px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+              <p className="text-[12px] font-black text-muted-foreground">
                 {cancels ? 'Ending' : 'Your Leap'}
               </p>
               <p className="mt-1 text-[14.5px] font-black leading-snug text-foreground">
@@ -341,7 +341,7 @@ export function LeapSessionDeleteSheet({
           {showRewardChange && (
             <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-amber-400/30 bg-amber-400/[0.07] px-3.5 py-2.5">
               <div className="min-w-0">
-                <p className="text-[10.5px] font-black uppercase tracking-[0.14em] text-amber-600 dark:text-amber-400">
+                <p className="text-[12px] font-black text-amber-600 dark:text-amber-400">
                   Week now pays
                 </p>
                 {!view.isPremium && (
@@ -435,7 +435,7 @@ export function LeapSessionDeleteSheet({
             >
               <Icon name="frogPlus" className="h-6 w-6 shrink-0" />
               <span>Plus includes swaps that keep your streak</span>
-              <span className="inline-flex items-center rounded-md bg-gradient-to-b from-emerald-600 to-emerald-800 px-1.5 py-0.5 text-[9px] font-black uppercase leading-none tracking-[0.16em] text-amber-100">
+              <span className="inline-flex items-center rounded-md bg-gradient-to-b from-emerald-600 to-emerald-800 px-1.5 py-0.5 text-[11px] font-black leading-none text-amber-100">
                 Plus
               </span>
             </button>

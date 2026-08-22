@@ -382,7 +382,7 @@ export function FriendDetailModal({
                 {((entry.equippedItems?.length ?? 0) > 0 ||
                   friendBackground) && (
                   <div className="flex flex-col gap-2">
-                    <p className="px-1 text-[11px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+                    <p className="px-1 text-[13px] font-black text-muted-foreground">
                       Their look
                     </p>
                     <DragScrollRow className="gap-2 px-1 pt-1">
@@ -450,7 +450,7 @@ export function FriendDetailModal({
                 {/* Pending buddy invitations with this friend */}
                 {(incoming.length > 0 || outgoing.length > 0) && (
                   <div className="flex flex-col gap-2">
-                    <p className="px-1 text-[11px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+                    <p className="px-1 text-[13px] font-black text-muted-foreground">
                       Buddy invitations
                     </p>
                     {incoming.map((inv) => (
@@ -641,7 +641,7 @@ function ItemPeekSheet({
             className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-5 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-3 sm:px-6 sm:pb-6 sm:pt-7"
           >
             <div className="flex items-center gap-2 pr-12">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+              <span className="text-[13px] font-bold text-muted-foreground">
                 {target.kind === 'bg' ? 'Background' : 'Wardrobe item'}
               </span>
             </div>
@@ -772,7 +772,7 @@ function FlyStat({ label, value }: { label: string; value: number }) {
           {value}
         </span>
       </div>
-      <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
+      <span className="text-[13px] font-bold text-muted-foreground">
         {label}
       </span>
     </div>

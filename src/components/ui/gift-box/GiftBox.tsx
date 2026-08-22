@@ -304,7 +304,7 @@ export const GiftBox = ({
         animate={{ opacity: 1, y: 0, transition: { delay: 0.3 } }}
         className="mt-4 space-y-2 text-center"
       >
-        <h2 className="text-4xl font-black tracking-widest text-white uppercase">
+        <h2 className="text-4xl font-black text-white">
           {phase === 'shaking' ? 'UNWRAPPING...' : 'TAP TO UNWRAP'}
         </h2>
         {phase === 'idle' && (

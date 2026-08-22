@@ -127,7 +127,7 @@ export default function DragOverlay({
               {tags?.map((tag) => (
                 <span
                   key={tag.id}
-                  className="isolate inline-flex items-center gap-1 rounded-md border px-1.5 py-[4px] text-[10px] leading-[1] font-bold uppercase tracking-normal shadow-sm"
+                  className="isolate inline-flex items-center gap-1 rounded-md border px-1.5 py-[4px] text-[12px] leading-[1] font-bold tracking-normal shadow-sm"
                   style={
                     tag.color
                       ? {
@@ -193,14 +193,14 @@ export default function DragOverlay({
                 {(frogodoroSession.focusTime ?? 0) > 0 && (
                   <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-primary/8 dark:bg-primary/15">
                     <div className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
-                    <span className="text-[10px] font-bold text-primary/60 uppercase tracking-wider">Focus</span>
+                    <span className="text-[12px] font-bold text-primary/60">Focus</span>
                     <span className="text-[11px] font-black text-primary tabular-nums">{fmt(frogodoroSession.focusTime)}</span>
                   </div>
                 )}
                 {(frogodoroSession.breakTime ?? 0) > 0 && (
                   <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-sky-500/8 dark:bg-sky-500/15">
                     <div className="w-1.5 h-1.5 rounded-full bg-sky-500 flex-shrink-0" />
-                    <span className="text-[10px] font-bold text-sky-500/60 uppercase tracking-wider">Break</span>
+                    <span className="text-[12px] font-bold text-sky-500/60">Break</span>
                     <span className="text-[11px] font-black text-sky-500 tabular-nums">{fmt(frogodoroSession.breakTime)}</span>
                   </div>
                 )}

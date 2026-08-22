@@ -299,7 +299,7 @@ export function HelpCenterPanel({
                 <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10 text-primary">
                   {cat.icon}
                 </span>
-                <h4 className="text-[13px] font-black uppercase tracking-wider text-muted-foreground">
+                <h4 className="text-[13px] font-black text-muted-foreground">
                   {cat.title}
                 </h4>
               </div>
@@ -360,7 +360,7 @@ export function HelpCenterPanel({
         <button
           type="button"
           onClick={onContact}
-          className="mt-3 w-full rounded-2xl bg-primary py-3 text-sm font-black uppercase tracking-wide text-primary-foreground transition active:scale-[0.98]"
+          className="mt-3 w-full rounded-2xl bg-primary py-3 text-sm font-black tracking-wide text-primary-foreground transition active:scale-[0.98]"
         >
           Contact us
         </button>
@@ -481,7 +481,7 @@ export function ContactPanel({
 
       {/* Topic */}
       <div>
-        <label className="mb-2 block px-1 text-[13px] font-black uppercase tracking-wider text-muted-foreground">
+        <label className="mb-2 block px-1 text-[13px] font-black text-muted-foreground">
           Topic
         </label>
         <div className="flex flex-wrap gap-2">
@@ -505,7 +505,7 @@ export function ContactPanel({
 
       {/* Message */}
       <div>
-        <label className="mb-2 block px-1 text-[13px] font-black uppercase tracking-wider text-muted-foreground">
+        <label className="mb-2 block px-1 text-[13px] font-black text-muted-foreground">
           Message
         </label>
         <textarea
@@ -524,7 +524,7 @@ export function ContactPanel({
         type="button"
         onClick={handleSend}
         disabled={!message.trim()}
-        className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-3.5 text-sm font-black uppercase tracking-wide text-primary-foreground transition active:scale-[0.98] disabled:opacity-50"
+        className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-3.5 text-sm font-black tracking-wide text-primary-foreground transition active:scale-[0.98] disabled:opacity-50"
       >
         <Send className="h-4 w-4" />
         Send message

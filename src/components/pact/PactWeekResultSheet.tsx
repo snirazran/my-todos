@@ -94,7 +94,7 @@ export function PactWeekResultSheet({
               )}
             </span>
             <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+              <p className="text-[13px] font-black text-muted-foreground">
                 Your Leap · {result.categoryName}
               </p>
               <h2 className="mt-1.5 text-[21px] font-black leading-tight text-foreground">
@@ -132,7 +132,7 @@ export function PactWeekResultSheet({
           {/* The streak, stated as a change rather than a final number: what
               the week cost or bought is the whole reason this screen exists. */}
           <div className="flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-card/60 px-4 py-3">
-            <span className="text-[12px] font-black uppercase tracking-wider text-muted-foreground">
+            <span className="text-[13px] font-black text-muted-foreground">
               Streak
             </span>
             <span className="inline-flex items-center gap-2">

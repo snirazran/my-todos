@@ -283,7 +283,7 @@ export default React.memo(function BacklogTray({
           ) : filteredTasks.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center gap-4 opacity-30 min-h-[300px]">
               <Icon name="saved" className="h-16 w-16" />
-              <p className="text-sm font-bold uppercase tracking-widest">
+              <p className="text-sm font-bold">
                 No saved tasks
               </p>
             </div>

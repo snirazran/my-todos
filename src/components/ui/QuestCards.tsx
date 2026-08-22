@@ -3,7 +3,6 @@
 import { memo, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  CalendarDays,
   Check,
   Clock,
   Copy,
@@ -504,7 +503,7 @@ export function StarterQuestCard({
   return (
     <div>
       <div className="flex items-center justify-between gap-2 px-1 pb-2">
-        <span className="inline-flex min-w-0 items-center gap-1.5 text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+        <span className="inline-flex min-w-0 items-center gap-1.5 text-[13px] font-black text-muted-foreground">
           <Sprout className="h-3.5 w-3.5 shrink-0 text-primary" strokeWidth={2.75} />
           <span className="truncate">{quest.title}</span>
         </span>
@@ -636,11 +635,8 @@ export function DailyChecklistCard({
   return (
     <div data-quest-anchor={quests.map((quest) => quest.id).join(' ')}>
       <div className="flex items-center justify-between gap-2 px-1 pb-2">
-        <span className="inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
-          <CalendarDays
-            className="h-3.5 w-3.5 text-primary"
-            strokeWidth={2.75}
-          />
+        <span className="inline-flex items-center gap-1.5 text-[13px] font-black text-muted-foreground">
+          <Icon name="quests" className="-my-2 h-8 w-8 shrink-0" />
           Daily quests
         </span>
         <span className="inline-flex items-center gap-2">
@@ -649,7 +645,7 @@ export function DailyChecklistCard({
               type="button"
               onClick={onSwapQuests}
               disabled={swapping}
-              className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-card px-2 py-0.5 text-[11px] font-black uppercase tracking-wide text-muted-foreground transition-colors hover:border-primary/30 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-card px-2 py-0.5 text-[13px] font-black tracking-wide text-muted-foreground transition-colors hover:border-primary/30 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
             >
               <RefreshCw
                 className={cn('h-3 w-3', swapping && 'animate-spin')}
@@ -659,7 +655,7 @@ export function DailyChecklistCard({
             </button>
           ) : null}
           {timeLeft ? (
-            <span className="inline-flex items-center gap-1 text-[11px] font-black uppercase tracking-wide text-muted-foreground">
+            <span className="inline-flex items-center gap-1 text-[13px] font-black tracking-wide text-muted-foreground">
               <Clock className="h-3.5 w-3.5" strokeWidth={2.75} />
               Resets in {timeLeft}
             </span>
@@ -877,7 +873,7 @@ export function SweepRewardTile({
       )}
     >
       <Sparkles className="h-4 w-4" strokeWidth={2.75} />
-      <span className="mt-0.5 text-[8px] font-black uppercase leading-none tracking-wide">
+      <span className="mt-0.5 text-[10px] font-black leading-none tracking-wide">
         {rarity.slice(0, 4)}
       </span>
     </div>
@@ -986,7 +982,7 @@ function SweepPrizeStack({
               className="h-11 w-11 rounded-xl min-[400px]:h-12 min-[400px]:w-12"
             />
             {hasRewardQuantityBadge(entry.reward) && (
-              <span className="absolute -right-1 -top-1 z-20 flex min-w-5 items-center justify-center rounded-md border border-white/10 bg-black/55 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white shadow-sm backdrop-blur-sm">
+              <span className="absolute -right-1 -top-1 z-20 flex min-w-5 items-center justify-center rounded-md border border-white/10 bg-black/55 px-1.5 py-0.5 text-[11px] font-bold tracking-wide text-white shadow-sm backdrop-blur-sm">
                 {sweepQuantityLabel(entry.reward)}
               </span>
             )}
@@ -994,7 +990,7 @@ function SweepPrizeStack({
         );
       })}
       {extra > 0 && (
-        <span className="pointer-events-none absolute -bottom-0.5 -right-1.5 z-30 flex h-4 min-w-4 items-center justify-center rounded-md border border-white/10 bg-black/55 px-1 text-[8px] font-black uppercase tracking-wide text-white shadow-sm backdrop-blur-sm">
+        <span className="pointer-events-none absolute -bottom-0.5 -right-1.5 z-30 flex h-4 min-w-4 items-center justify-center rounded-md border border-white/10 bg-black/55 px-1 text-[10px] font-black tracking-wide text-white shadow-sm backdrop-blur-sm">
           +{extra}
         </span>
       )}
@@ -1041,7 +1037,7 @@ function SweepOddsPopup({
       >
         <div className="flex items-center justify-between gap-4 border-b border-border/40 pb-4">
           <div>
-            <p className="text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+            <p className="text-[13px] font-black text-muted-foreground">
               Daily prizes
             </p>
             <h3 className="mt-1 text-2xl font-black leading-none text-foreground">
@@ -1065,7 +1061,7 @@ function SweepOddsPopup({
               type="button"
               onClick={() => setTab(key)}
               className={cn(
-                'flex-1 rounded-lg px-3 py-1.5 text-[12px] font-black uppercase tracking-wide transition',
+                'flex-1 rounded-lg px-3 py-1.5 text-[13px] font-black tracking-wide transition',
                 tab === key
                   ? key === 'golden'
                     ? 'bg-amber-400 text-amber-950 shadow-sm'
@@ -1107,7 +1103,7 @@ function SweepOddsPopup({
 
         {sweep.megaEveryDays > 0 && sweep.megaRewards.length > 0 && (
           <div className="mt-4 rounded-2xl border border-amber-400/50 bg-amber-50 px-3 py-3 dark:bg-amber-500/10">
-            <p className="text-[11px] font-black uppercase tracking-wide text-amber-700 dark:text-amber-300">
+            <p className="text-[13px] font-black tracking-wide text-amber-700 dark:text-amber-300">
               Every {sweep.megaEveryDays} days in a row
             </p>
             <p className="mt-0.5 text-[12px] font-bold text-foreground">
@@ -1310,7 +1306,7 @@ function SweepStreakCard({
               ? 'Start a streak'
               : `${sweep.count}-day streak`}
             {goldenNext && (
-              <span className="rounded-full bg-amber-400 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-amber-950">
+              <span className="rounded-full bg-amber-400 px-1.5 py-0.5 text-[11px] font-black tracking-wide text-amber-950">
                 {megaNext ? 'Mega next' : 'Golden next'}
               </span>
             )}
@@ -1458,7 +1454,7 @@ export function MoveToWebCard({
           </span>
           <span
             className={cn(
-              'inline-flex shrink-0 items-center gap-1 text-[10px] font-black uppercase tracking-[0.12em]',
+              'inline-flex shrink-0 items-center gap-1 text-[12px] font-black',
               copied ? 'text-emerald-500' : 'text-muted-foreground',
             )}
           >
@@ -1612,7 +1608,7 @@ export function RemoveTagConfirm({
             <button
               type="button"
               onClick={onClose}
-              className="h-12 rounded-2xl bg-primary text-[14px] font-black uppercase tracking-wide text-primary-foreground transition active:translate-y-[2px]"
+              className="h-12 rounded-2xl bg-primary text-[14px] font-black tracking-wide text-primary-foreground transition active:translate-y-[2px]"
             >
               {switching ? 'Keep current' : 'Keep tag'}
             </button>
@@ -1699,7 +1695,7 @@ function ObjectiveRow({
       return (
         <div className="flex h-8 items-center gap-1.5 rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-2.5 animate-[reward-pop_0.45s_ease-out_both] motion-reduce:animate-none">
           <Check className="w-3 h-3 text-emerald-500" />
-          <span className="text-[10px] font-black uppercase tracking-[0.12em] text-emerald-600/70 dark:text-emerald-400/70">
+          <span className="text-[12px] font-black text-emerald-600/70 dark:text-emerald-400/70">
             {objectiveClaimed ? 'Claimed' : 'Done'}
           </span>
         </div>
@@ -1808,7 +1804,7 @@ function ObjectiveRow({
             })}
             {extraRewardCount > 0 && (
               <span
-                className="pointer-events-none absolute z-30 flex h-5 min-w-[1.25rem] items-center justify-center rounded-md border border-white/10 bg-black/55 px-1 text-[9px] font-black uppercase tracking-wide text-white shadow-sm backdrop-blur-sm"
+                className="pointer-events-none absolute z-30 flex h-5 min-w-[1.25rem] items-center justify-center rounded-md border border-white/10 bg-black/55 px-1 text-[11px] font-black tracking-wide text-white shadow-sm backdrop-blur-sm"
                 style={{ right: -6, bottom: 0 }}
               >
                 +{extraRewardCount}
@@ -1876,7 +1872,7 @@ function RewardDetailsPopup({
       >
         <div className="flex items-center justify-between gap-4 pb-4 border-b border-border/40">
           <div>
-            <p className="text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+            <p className="text-[13px] font-black text-muted-foreground">
               {eyebrow}
             </p>
             <h3 className="mt-1 text-2xl font-black leading-none text-foreground">
@@ -2143,7 +2139,7 @@ export const RewardTile = memo(function RewardTile({
         >
           <span
             className={cn(
-              'flex items-center justify-center rounded-md border border-white/10 bg-black/50 font-bold uppercase tracking-wide text-white shadow-sm backdrop-blur-sm',
+              'flex items-center justify-center rounded-md border border-white/10 bg-black/50 font-bold tracking-wide text-white shadow-sm backdrop-blur-sm',
               compact
                 ? 'min-w-5 px-1 py-0 text-[9px] leading-[16px]'
                 : 'min-w-4 px-1 py-0.5 text-[8px]',
@@ -2195,8 +2191,7 @@ export function getRewardQuantityLabel(reward: QuestReward, _isPremium: boolean)
   }
 
   const base = reward.amount && reward.amount > 1 ? reward.amount : 1;
-  // Multiplication sign, not a lowercase x: the badge is uppercased in CSS, so
-  // an "x" rendered as "X2" beside a Lily Pad's "×2" read as two conventions.
+  // Multiplication sign, not a lowercase x, to match the Lily Pad badge.
   return `\u00d7${base}`;
 }
 

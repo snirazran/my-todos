@@ -245,7 +245,7 @@ export function SingleRewardCard({
           e.stopPropagation();
           onClick?.();
         }}
-        className="w-full h-8 rounded-lg font-black uppercase tracking-wide bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm active:scale-95 transition-all"
+        className="w-full h-8 rounded-lg font-black tracking-wide bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm active:scale-95 transition-all"
       >
         Claim
       </Button>
@@ -257,7 +257,7 @@ export function SingleRewardCard({
           e.stopPropagation();
           onClick?.();
         }}
-        className="w-full h-8 rounded-lg font-black uppercase tracking-wide bg-amber-500 hover:bg-amber-600 text-white shadow-sm active:scale-95 transition-all"
+        className="w-full h-8 rounded-lg font-black tracking-wide bg-amber-500 hover:bg-amber-600 text-white shadow-sm active:scale-95 transition-all"
       >
         Unlock
       </Button>
@@ -341,7 +341,7 @@ export function SingleRewardCard({
       {!hideDayLabel && (
         <span
           className={cn(
-            'text-xs font-bold uppercase tracking-wider',
+            'text-[13px] font-bold',
             isReady
               ? 'text-primary'
               : isLockedPremium && isToday

@@ -724,7 +724,7 @@ export default function FlyCatchGame({
             </Link>
           )}
           <div className={cn('min-w-24 rounded-2xl border border-white/30 bg-card/85 px-5 py-1.5 text-center shadow-sm backdrop-blur-2xl', timeSeconds <= 5 && phase === 'playing' && styles.timerUrgent)}>
-            <p className="text-[8px] font-black uppercase tracking-[0.2em] text-muted-foreground">Time</p>
+            <p className="text-[10px] font-black text-muted-foreground">Time</p>
             <p className="font-display text-3xl leading-none text-foreground">{timeSeconds}</p>
           </div>
           <div className="flex items-center justify-end gap-2">
@@ -792,11 +792,11 @@ export default function FlyCatchGame({
                   </div>
                   <div data-fly-game-card className={cn('relative z-10 grid h-16 grid-cols-2 items-center rounded-[20px] border border-white/30 bg-card/85 px-3 shadow-lg backdrop-blur-2xl', entering && 'opacity-0')}>
                     <div className="border-r border-border/60 px-4 text-left">
-                      <p className="text-[8px] font-black uppercase tracking-[0.18em] text-muted-foreground">Score</p>
+                      <p className="text-[10px] font-black text-muted-foreground">Score</p>
                       <p className="font-display text-2xl leading-none text-foreground">{hud.score}</p>
                     </div>
                     <div className="px-4 text-right">
-                      <p className="text-[8px] font-black uppercase tracking-[0.18em] text-muted-foreground">Combo</p>
+                      <p className="text-[10px] font-black text-muted-foreground">Combo</p>
                       <p className={cn('font-display text-2xl leading-none', hud.combo >= 5 ? 'text-amber-500' : 'text-foreground')}>×{hud.combo}</p>
                     </div>
                   </div>
@@ -829,28 +829,28 @@ export default function FlyCatchGame({
               <div className="rounded-2xl border border-border/60 bg-muted/40 px-1 py-2.5">
                 <div className="mx-auto grid h-9 w-9 place-items-center rounded-full bg-muted"><Fly size={26} interactive={false} /></div>
                 <p className="mt-1.5 text-sm font-black leading-none text-foreground">+1</p>
-                <p className="mt-0.5 text-[9px] font-black uppercase tracking-wider text-muted-foreground">Fly</p>
+                <p className="mt-0.5 text-[11px] font-black text-muted-foreground">Fly</p>
               </div>
               <div className="rounded-2xl border border-amber-400/30 bg-amber-400/10 px-1 py-2.5">
                 <div className="mx-auto grid h-9 w-9 place-items-center rounded-full bg-amber-400/20 shadow-[0_0_10px_rgba(250,204,21,0.5)]"><Fly size={26} interactive={false} /></div>
                 <p className="mt-1.5 text-sm font-black leading-none text-amber-600 dark:text-amber-300">+3</p>
-                <p className="mt-0.5 text-[9px] font-black uppercase tracking-wider text-amber-700/80 dark:text-amber-300/80">Glow</p>
+                <p className="mt-0.5 text-[11px] font-black text-amber-700/80 dark:text-amber-300/80">Glow</p>
               </div>
               <div className="rounded-2xl border border-cyan-400/30 bg-cyan-400/10 px-1 py-2.5">
                 <div className="mx-auto grid h-9 w-9 place-items-center rounded-full bg-cyan-400/20"><Fly size={26} interactive={false} /></div>
                 <p className="mt-1.5 text-sm font-black leading-none text-cyan-600 dark:text-cyan-300">+2s</p>
-                <p className="mt-0.5 text-[9px] font-black uppercase tracking-wider text-cyan-700/80 dark:text-cyan-300/80">Time</p>
+                <p className="mt-0.5 text-[11px] font-black text-cyan-700/80 dark:text-cyan-300/80">Time</p>
               </div>
               <div className="rounded-2xl border border-rose-400/30 bg-rose-400/10 px-1 py-2.5">
                 <div className="mx-auto grid h-9 w-9 place-items-center rounded-full bg-rose-400/20"><Fly size={26} interactive={false} /></div>
                 <p className="mt-1.5 text-sm font-black leading-none text-rose-600 dark:text-rose-300">−4</p>
-                <p className="mt-0.5 text-[9px] font-black uppercase tracking-wider text-rose-700/80 dark:text-rose-300/80">Trap</p>
+                <p className="mt-0.5 text-[11px] font-black text-rose-700/80 dark:text-rose-300/80">Trap</p>
               </div>
             </div>
 
             {!user ? (
               <label className="mx-auto mt-4 block max-w-xs text-left">
-                <span className="mb-1 block text-[10px] font-black uppercase tracking-widest text-muted-foreground">Leaderboard name</span>
+                <span className="mb-1 block text-[12px] font-black text-muted-foreground">Leaderboard name</span>
                 <input value={nickname} onChange={(event) => setNickname(event.target.value.slice(0, 22))} maxLength={22} className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm font-bold text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15" />
               </label>
             ) : null}
@@ -879,14 +879,14 @@ export default function FlyCatchGame({
             </div>
             <div className="flex max-h-full min-h-0 flex-col overflow-hidden rounded-[28px] border border-border bg-card/95 text-center shadow-2xl">
               <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-3 pt-11 sm:px-6">
-              <p className={cn('text-xs font-black uppercase tracking-[0.22em]', personalBest ? 'text-amber-500' : 'text-primary')}>{personalBest ? 'New personal best' : 'Run complete'}</p>
+              <p className={cn('text-[13px] font-black', personalBest ? 'text-amber-500' : 'text-primary')}>{personalBest ? 'New personal best' : 'Run complete'}</p>
               <p className={cn(styles.resultScore, 'mt-1 font-display text-6xl leading-none text-foreground sm:text-7xl')}>{result.score}</p>
               <div className="mt-2.5 flex flex-wrap items-center justify-center gap-2">
-                <div className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/30 bg-amber-400/10 px-3.5 py-1.5 text-xs font-black uppercase tracking-wider text-amber-700 dark:text-amber-300">
+                <div className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/30 bg-amber-400/10 px-3.5 py-1.5 text-[13px] font-black text-amber-700 dark:text-amber-300">
                   <Zap className="h-3.5 w-3.5" /> ×{result.maxCombo} best combo
                 </div>
                 {!personalBest && best > result.score && best - result.score <= 9 ? (
-                  <div className="inline-flex items-center gap-1.5 rounded-full border border-rose-400/30 bg-rose-400/10 px-3.5 py-1.5 text-xs font-black uppercase tracking-wider text-rose-600 dark:text-rose-300">
+                  <div className="inline-flex items-center gap-1.5 rounded-full border border-rose-400/30 bg-rose-400/10 px-3.5 py-1.5 text-[13px] font-black text-rose-600 dark:text-rose-300">
                     {best - result.score} away from your best
                   </div>
                 ) : null}
@@ -894,9 +894,9 @@ export default function FlyCatchGame({
               {statusMessage ? <p className="mt-3 text-xs font-bold text-destructive">{statusMessage}</p> : null}
 
               <div className="mt-5 grid w-full grid-cols-3 gap-2 text-center">
-                <div className="rounded-2xl border border-border/50 bg-muted/50 py-3"><p className="font-display text-2xl leading-none">{best}</p><p className="mt-1 text-[9px] font-black uppercase tracking-wider text-muted-foreground">Best</p></div>
-                <div className="rounded-2xl border border-border/50 bg-muted/50 py-3"><p className="font-display text-2xl leading-none">{result.catches}</p><p className="mt-1 text-[9px] font-black uppercase tracking-wider text-muted-foreground">Caught</p></div>
-                <div className="rounded-2xl border border-border/50 bg-muted/50 py-3"><p className="font-display text-2xl leading-none">{result.misses}</p><p className="mt-1 text-[9px] font-black uppercase tracking-wider text-muted-foreground">Missed</p></div>
+                <div className="rounded-2xl border border-border/50 bg-muted/50 py-3"><p className="font-display text-2xl leading-none">{best}</p><p className="mt-1 text-[11px] font-black text-muted-foreground">Best</p></div>
+                <div className="rounded-2xl border border-border/50 bg-muted/50 py-3"><p className="font-display text-2xl leading-none">{result.catches}</p><p className="mt-1 text-[11px] font-black text-muted-foreground">Caught</p></div>
+                <div className="rounded-2xl border border-border/50 bg-muted/50 py-3"><p className="font-display text-2xl leading-none">{result.misses}</p><p className="mt-1 text-[11px] font-black text-muted-foreground">Missed</p></div>
               </div>
 
               {(() => {
@@ -912,7 +912,7 @@ export default function FlyCatchGame({
                 return (
                   <div className="mt-4 w-full rounded-2xl border border-border bg-muted/45 p-3 text-left">
                     <div className="mb-2 flex items-center justify-between">
-                      <div className="flex items-center gap-2"><Crown className="h-4 w-4 text-amber-500" /><p className="text-xs font-black uppercase tracking-wider">Top catchers</p></div>
+                      <div className="flex items-center gap-2"><Crown className="h-4 w-4 text-amber-500" /><p className="text-[13px] font-black">Top catchers</p></div>
                       {rank ? <span className="text-[10px] font-black text-primary">You&rsquo;re #{rank}</span> : null}
                     </div>
                     <div className="space-y-1">
@@ -941,9 +941,9 @@ export default function FlyCatchGame({
                       ) : null}
                     </div>
                     {rank === 1 ? (
-                      <p className="mt-2.5 rounded-xl bg-amber-400/15 px-3 py-2 text-center text-[11px] font-black uppercase tracking-wide text-amber-700 dark:text-amber-300">You rule the pond 👑</p>
+                      <p className="mt-2.5 rounded-xl bg-amber-400/15 px-3 py-2 text-center text-[13px] font-black tracking-wide text-amber-700 dark:text-amber-300">You rule the pond 👑</p>
                     ) : nextAbove ? (
-                      <p className="mt-2.5 rounded-xl bg-primary/10 px-3 py-2 text-center text-[11px] font-black uppercase tracking-wide text-primary">Catch {gap} more to pass {nextAbove.name}</p>
+                      <p className="mt-2.5 rounded-xl bg-primary/10 px-3 py-2 text-center text-[13px] font-black tracking-wide text-primary">Catch {gap} more to pass {nextAbove.name}</p>
                     ) : !rank && !loadingBoard ? (
                       <p className="mt-2.5 text-center text-[11px] font-bold text-muted-foreground">Submit your score to claim your spot.</p>
                     ) : null}

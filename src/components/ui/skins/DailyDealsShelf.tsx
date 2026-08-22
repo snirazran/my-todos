@@ -61,7 +61,7 @@ export function DailyDealsTeaser({
       className="mt-1 mb-1 flex w-full items-center gap-2 rounded-xl border border-amber-400/40 bg-gradient-to-r from-amber-100/70 to-amber-50/40 px-3 py-2 text-left shadow-sm transition-transform active:scale-[0.99] dark:from-amber-900/30 dark:to-amber-950/20"
     >
       <Sparkles className="h-4 w-4 shrink-0 text-amber-500" />
-      <span className="min-w-0 flex-1 truncate text-xs font-black uppercase tracking-wide text-foreground">
+      <span className="min-w-0 flex-1 truncate text-[13px] font-black tracking-wide text-foreground">
         {saleCount > 0
           ? `${saleCount} on sale at the shop`
           : "Today's shop is up"}
@@ -125,7 +125,7 @@ export function DailyDealsShelf({
   return (
     <div className="mb-3">
       <div className="mb-2 flex items-center justify-between gap-2 px-1">
-        <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">
+        <span className="inline-flex items-center gap-1.5 text-[12px] font-black text-muted-foreground">
           <Sparkles className="h-3.5 w-3.5 text-amber-500" />
           Today at the shop
         </span>
@@ -190,7 +190,7 @@ export function DailyDealsShelf({
               <div className="absolute top-0 left-0 z-20 overflow-hidden rounded-br-2xl bg-background">
                 <div
                   className={cn(
-                    'px-2 py-1 rounded-br-2xl text-[9px] font-black uppercase tracking-wider border-b border-r',
+                    'px-2 py-1 rounded-br-2xl text-[11px] font-black border-b border-r',
                     config.bg,
                     config.text,
                     config.border,
@@ -200,7 +200,7 @@ export function DailyDealsShelf({
                 </div>
               </div>
               {wishlisted && (
-                <span className="absolute right-1.5 top-1.5 z-20 inline-flex items-center gap-1 rounded-full bg-primary px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wider text-primary-foreground shadow-sm">
+                <span className="absolute right-1.5 top-1.5 z-20 inline-flex items-center gap-1 rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-black text-primary-foreground shadow-sm">
                   <Bookmark
                     className="h-2.5 w-2.5"
                     strokeWidth={3.5}
@@ -230,7 +230,7 @@ export function DailyDealsShelf({
               </div>
               {/* Held even when there is no sale, so the cards in a row keep
                   one baseline instead of jumping by a line. */}
-              <span className="mt-0.5 text-center text-[10px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+              <span className="mt-0.5 text-center text-[12px] font-black text-emerald-600 dark:text-emerald-400">
                 {deal.onSale ? `${deal.discountPercent}% off today` : ' '}
               </span>
             </button>

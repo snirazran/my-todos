@@ -180,7 +180,7 @@ export default function StarterPlanStep({
                       <span className="mt-1 flex flex-wrap items-center gap-1.5">
                         <span
                           className={cn(
-                            'rounded-full px-2 py-0.5 text-[11px] font-black uppercase tracking-wide',
+                            'rounded-full px-2 py-0.5 text-[13px] font-black tracking-wide',
                             isChecked
                               ? 'bg-primary/15 text-primary'
                               : 'bg-muted text-muted-foreground',
@@ -189,11 +189,11 @@ export default function StarterPlanStep({
                           {item.cadenceLabel}
                         </span>
                         {item.timeLabel ? (
-                          <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-black uppercase tracking-wide text-muted-foreground">
+                          <span className="rounded-full bg-muted px-2 py-0.5 text-[13px] font-black tracking-wide text-muted-foreground">
                             {item.timeLabel}
                           </span>
                         ) : null}
-                        <span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground/70">
+                        <span className="text-[13px] font-bold tracking-wide text-muted-foreground/70">
                           {item.categoryName}
                         </span>
                       </span>

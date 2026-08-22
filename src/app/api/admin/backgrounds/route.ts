@@ -6,6 +6,7 @@ import BackgroundModel, {
   type BackgroundImages,
 } from '@/lib/models/Background';
 import { getAdminStorage } from '@/lib/firebaseAdmin';
+import { accentFromHex, extractAccent } from '@/lib/backgrounds/accent';
 
 const json = (body: unknown, init = 200) =>
   NextResponse.json(body, { status: init });
@@ -44,6 +45,7 @@ export async function POST(req: NextRequest) {
     await requireUserId();
 
     let body: {
+      action?: string;
       name?: string;
       rarity?: BackgroundRarity;
       priceFlies?: number;
@@ -53,6 +55,27 @@ export async function POST(req: NextRequest) {
       body = await req.json();
     } catch {
       return json({ error: 'Invalid JSON' }, 400);
+    }
+
+    if (body.action === 'backfill-accents') {
+      await connectMongo();
+      const all = await BackgroundModel.find({}).lean();
+      let updated = 0;
+      let skipped = 0;
+      for (const bg of all) {
+        if (bg.accent?.mode === 'manual' || bg.accent) {
+          skipped += 1;
+          continue;
+        }
+        const accent = await recomputeAccent(bg.id);
+        if (!accent) {
+          skipped += 1;
+          continue;
+        }
+        await BackgroundModel.updateOne({ id: bg.id }, { $set: { accent } });
+        updated += 1;
+      }
+      return json({ ok: true, updated, skipped });
     }
 
     const name = body.name?.trim();
@@ -97,6 +120,7 @@ export async function PUT(req: NextRequest) {
       priceFlies?: number;
       images?: Partial<BackgroundImages>;
       hidden?: boolean;
+      accentHex?: string | null;
     };
     try {
       body = await req.json();
@@ -115,6 +139,15 @@ export async function PUT(req: NextRequest) {
     if (body.images) update.images = sanitizeImages(body.images);
     if (typeof body.hidden === 'boolean') update.hidden = body.hidden;
 
+    if (body.accentHex === null) {
+      const recomputed = await recomputeAccent(body.id);
+      update.accent = recomputed ?? undefined;
+    } else if (typeof body.accentHex === 'string') {
+      const manual = accentFromHex(body.accentHex.trim());
+      if (!manual) return json({ error: 'Invalid accent colour' }, 400);
+      update.accent = manual;
+    }
+
     const result = await BackgroundModel.findOneAndUpdate(
       { id: body.id },
       { $set: update },
@@ -126,6 +159,18 @@ export async function PUT(req: NextRequest) {
     return json({ ok: true, item: result });
   } catch {
     return json({ error: 'Unauthorized' }, 401);
+  }
+}
+
+async function recomputeAccent(id: string) {
+  const bg = await BackgroundModel.findOne({ id }).lean();
+  const path = bg?.imageFiles?.mobile?.storagePath;
+  if (!path) return null;
+  try {
+    const [buffer] = await getAdminStorage().file(path).download();
+    return await extractAccent(buffer);
+  } catch {
+    return null;
   }
 }
 

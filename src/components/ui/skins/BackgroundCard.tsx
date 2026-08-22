@@ -145,7 +145,7 @@ export function BackgroundCard({
       <div className="absolute top-0 left-0 z-20 overflow-hidden rounded-br-2xl bg-background">
         <div
           className={cn(
-            'px-2 py-1 md:px-2.5 rounded-br-2xl text-[9px] md:text-[10px] font-black uppercase tracking-wider border-b border-r',
+            'px-2 py-1 md:px-2.5 rounded-br-2xl text-[11px] md:text-[12px] font-black border-b border-r',
             config.bg,
             config.text,
             config.border,
@@ -201,7 +201,7 @@ export function BackgroundCard({
         {mode === 'inventory' && compact ? null : mode === 'inventory' ? (
           <div
             className={cn(
-              'h-7 md:h-8 w-full flex items-center justify-center gap-1 rounded-lg text-[10px] md:text-xs font-black uppercase tracking-wide transition-colors duration-200',
+              'h-7 md:h-8 w-full flex items-center justify-center gap-1 rounded-lg text-[12px] md:text-[13px] font-black tracking-wide transition-colors duration-200',
               isEquipped
                 ? 'bg-green-500 text-white shadow-md'
                 : 'bg-primary/15 text-primary border border-primary/30 group-hover:bg-primary/25',
@@ -221,7 +221,7 @@ export function BackgroundCard({
         ) : mode === 'trade' ? (
           <div
             className={cn(
-              'h-7 md:h-8 w-full flex items-center justify-center rounded-lg text-[10px] md:text-xs font-black uppercase tracking-wide transition-colors',
+              'h-7 md:h-8 w-full flex items-center justify-center rounded-lg text-[12px] md:text-[13px] font-black tracking-wide transition-colors',
               compact && 'mt-1 mb-1.5',
               isSelected
                 ? 'bg-primary text-primary-foreground shadow-md'
@@ -254,9 +254,9 @@ export function BackgroundCard({
             {actionLoading ? (
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : confirming ? (
-              <span>CONFIRM</span>
+              <span>Confirm</span>
             ) : tradeOnly ? (
-              <span className="inline-flex items-center gap-1 text-[10px] md:text-[11px] uppercase tracking-[0.12em]">
+              <span className="inline-flex items-center gap-1 text-[12px] md:text-[13px]">
                 <Repeat className="h-3 w-3 md:h-3.5 md:w-3.5" strokeWidth={3} />
                 Trade only
               </span>

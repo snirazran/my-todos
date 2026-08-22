@@ -162,7 +162,7 @@ export function WishlistSheet({
                     <div key={section.bucket} className="pb-3 last:pb-1">
                       <p
                         className={cn(
-                          'px-1 text-[10px] font-black uppercase tracking-[0.18em]',
+                          'px-1 text-[12px] font-black',
                           section.tone,
                         )}
                       >

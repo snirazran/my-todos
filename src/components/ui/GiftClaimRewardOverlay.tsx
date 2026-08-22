@@ -54,7 +54,7 @@ export function GiftClaimRewardOverlay({
         </div>
         <div className="relative z-10 flex w-full max-w-md flex-col items-center justify-center p-6">
           <div className="mb-5 text-center">
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-300/80">
+            <p className="text-[13px] font-black text-emerald-300/80">
               A gift from
             </p>
             <p className="mt-1 text-2xl font-black tracking-tight text-white">

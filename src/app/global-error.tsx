@@ -86,10 +86,8 @@ body {
   align-items: center;
   gap: 12px;
   margin: 20px 0;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 800;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
   color: var(--e-muted);
 }
 .e-rule::before, .e-rule::after {

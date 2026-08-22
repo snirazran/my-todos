@@ -18,22 +18,39 @@ import { cn } from '@/lib/utils';
  * position, pond green is distance still to cross.
  */
 
-export const LILY_PLAIN = '/icons/lily-plain.png';
+export const LILY_PLAIN = '/leap/leap-1.png';
+
+/** The pads bloom as the ladder climbs — bare pad, bud, then flower on flower. */
+export const LILY_LADDER_ART = [
+  '/leap/leap-1.png',
+  '/leap/leap-2.png',
+  '/leap/leap-3.png',
+  '/leap/leap-4.png',
+  '/leap/leap-5.png',
+];
+
+/** Where each frame's drawing starts, as a fraction of the frame height. */
+export const LILY_ART_TOP = [0.372, 0.344, 0.242, 0.093, 0.019];
+
+/** The shared waterline every frame was cut against, same fraction for all. */
+const LILY_ART_BOTTOM = 0.979;
+
+/** Transparent margin either side of each frame's drawing, as a fraction. */
+const LILY_ART_SIDE = [0.164, 0.164, 0.059, 0.057, 0.018];
 
 /**
- * The pads escalate in material as the ladder climbs — plain, then bronze,
- * silver, gold, and the jewelled pad at the crossing. The rung you are standing
- * on and the one you are climbing toward are told apart by the metal itself, so
- * the rail says "this gets more precious" before a single number is read.
+ * The pad matching a streak, by milestone rungs cleared. `inkShift` is how far
+ * up the frame must move for its drawing to sit centred in its box, and
+ * `sideInset` how much of the box either edge is empty.
  */
-export const LILY_LADDER_ART = [
-  '/icons/lily-plain.png',
-  '/icons/lily-bronze.png',
-  '/icons/lily-silver.png',
-  '/icons/lily-gold.png',
-  '/icons/lily-emerald.png',
-  '/icons/lily-diamond.png',
-];
+export function leapArtForStreak(cleared: number) {
+  const index = Math.min(Math.max(cleared, 0), LILY_LADDER_ART.length - 1);
+  return {
+    src: LILY_LADDER_ART[index],
+    inkShift: (LILY_ART_TOP[index] + LILY_ART_BOTTOM) / 2 - 0.5,
+    sideInset: LILY_ART_SIDE[index],
+  };
+}
 
 export type LeapStop = {
   /** Label under the pad — "Now", "4 wk". */
@@ -60,10 +77,12 @@ const DOTS_PER_GAP = 5;
  * A percentage of the rail is the only basis that tracks the thing the pads
  * have to fit inside.
  *
- * Five pads at 13.2% leave 8.4% for each of the four gaps — a gap:pad ratio of
- * about 0.64, which is what the rail looked like at the width that read best.
- * The cap stops it inflating inside a wide desktop column; past that point the
- * spare space goes to the gaps, which only makes the leaps longer.
+ * Five pads at 15% leave 6.25% for each of the four gaps. The columns are wider
+ * than the pads look, because the artwork reserves headroom above the pad for
+ * the flowers the late rungs grow — the apparent gap between two discs is close
+ * to twice the number below. The cap stops it inflating inside a wide desktop
+ * column; past that point the spare space goes to the gaps, which only makes
+ * the leaps longer.
  *
  * Below the width where the pads hit that cap the rail stops shrinking and
  * scrolls sideways instead. Squeezing it further is what skewed it on a 320px
@@ -73,9 +92,9 @@ const DOTS_PER_GAP = 5;
  * that reads best, so the geometry a 500px screen gets is the geometry every
  * narrower screen gets, just panned.
  */
-const PAD_COL = '13.2%';
-const FLOOR_PAD = 56;
-const FLOOR_GAP = 45;
+const PAD_COL = '15%';
+const FLOOR_PAD = 70;
+const FLOOR_GAP = 44;
 const PAD_COL_MAX = `${FLOOR_PAD}px`;
 /** How much wider the destination pad is drawn than its column, and the bleed
  *  either side that keeps it centred. Insets rather than a translate, so the
@@ -88,20 +107,18 @@ const DEST_BLEED = '-8%';
  * than one asset stamped five times. Fixed angles keyed by position, not random
  * ones: the rail must not re-arrange itself between renders.
  *
- * `spin` is the one that does the work — a rotateY under perspective, so the
- * pad turns about its own vertical axis and its notch swings to face somewhere
- * else. Rotating in the plane of the screen instead would have tipped the
- * ellipse off the waterline, which reads as a pad standing up rather than a pad
- * facing away. `tilt` is a small in-plane lean on top, for the drift a floating
- * thing has.
+ * `spin` is a rotateY under perspective, so the pad turns about its own
+ * vertical axis and its notch swings to face somewhere else; `tilt` is a small
+ * in-plane lean on top, for the drift a floating thing has. Both stay gentle,
+ * because a hard turn shears an upright bloom sideways.
  */
 const PAD_TURN = [
-  { spin: -26, tilt: -5 },
-  { spin: 30, tilt: 4 },
-  { spin: -15, tilt: -6 },
-  { spin: 23, tilt: 6 },
-  { spin: -32, tilt: -3.5 },
-  { spin: 18, tilt: 5 },
+  { spin: -9, tilt: -3 },
+  { spin: 10, tilt: 2.5 },
+  { spin: -6, tilt: -3.5 },
+  { spin: 8, tilt: 3 },
+  { spin: -11, tilt: -2 },
+  { spin: 7, tilt: 3 },
 ];
 /** Close enough to exaggerate the turn at this pad size; further away and a
  *  rotateY just flattens the artwork instead of turning it. */
@@ -118,13 +135,14 @@ const PAD_PERSPECTIVE = '220px';
  */
 function HopTrail({ filled }: { filled: number }) {
   return (
-    // Stretched to the pad row, then the arc is drawn in its top half only, so
-    // the trail's bottom edge lands exactly on the pads' centre line whatever
+    // Stretched to the pad row, then the arc is drawn above the waterline only,
+    // so the trail's bottom edge lands on the pads' own centre line whatever
     // height the pads have resolved to. Percentages against a stretched box
     // resolve reliably; a percentage height on the flex item itself would not,
-    // because the row's height comes from its content.
+    // because the row's height comes from its content. It ends 32% up rather
+    // than half way because the cell reserves its top third for flowers.
     <div className="relative flex-1 self-stretch">
-      <div className="absolute inset-x-0 bottom-1/2 top-0">
+      <div className="absolute inset-x-0 bottom-[32%] top-0">
         {Array.from({ length: DOTS_PER_GAP }, (_, index) => {
         // Quadratic from pad centre to pad centre, peaking halfway up. Its x
         // works out to exactly t, so the dots space evenly across the gap.
@@ -310,7 +328,7 @@ function EdgeFade({ side, shown }: { side: 'left' | 'right'; shown: boolean }) {
         // Fading to `card/0` rather than `transparent`: transparent is
         // transparent BLACK, and a ramp through it lays a grey haze over a
         // light card. The same colour at zero alpha ramps to nothing at all.
-        'pointer-events-none absolute -top-2 bottom-0 z-10 w-7 transition-opacity duration-200',
+        'pointer-events-none absolute -top-3 bottom-0 z-10 w-7 transition-opacity duration-200',
         side === 'left'
           ? '-left-1 bg-gradient-to-r from-card to-card/0'
           : '-right-1 bg-gradient-to-l from-card to-card/0',
@@ -359,7 +377,7 @@ export function LeapRail({
         ref={ref}
         onPointerDown={onPointerDown}
         className={cn(
-          '-mx-1 -mt-2 select-none overflow-x-auto overscroll-x-contain px-1 pb-0.5 pt-2 [-ms-overflow-style:none] [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+          '-mx-1 -mt-3 select-none overflow-x-auto overscroll-x-contain px-1 pb-0.5 pt-3 [-ms-overflow-style:none] [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
           (edges.start || edges.end) && 'cursor-grab active:cursor-grabbing',
         )}
       >
@@ -371,14 +389,16 @@ export function LeapRail({
                 {/* Aspect ratio, not a height: the cell's height follows its
                     own width, so every pad keeps the artwork's proportions at
                     any rail width and all five cells stay exactly as tall as
-                    each other. */}
-                <div className="relative aspect-[280/180] shrink-0" style={cell}>
+                    each other. The art is cut on a shared waterline, so equal
+                    cells put every disc on the same line. */}
+                <div className="relative aspect-[500/430] shrink-0" style={cell}>
                   <Pad stop={stop} turn={PAD_TURN[index % PAD_TURN.length]} />
                   {/* You are here. Without it the only marked pad is the
                       target, which a first-time reader takes for their own
                       position and then reads the whole rail one stop out.
                       Placeholder until the frog token is drawn — he belongs on
-                      this pad.
+                      this pad. Offset from where the pad's own art begins, so
+                      it hangs level over a bare pad and a flowering one.
 
                       Neutral, not amber: amber already means "earned or worth
                       earning" everywhere else on this card, and a marker that
@@ -387,7 +407,14 @@ export function LeapRail({
                   {stop.isHere && (
                     <span
                       aria-label="You are here"
-                      className="absolute -top-[7px] left-1/2 h-0 w-0 -translate-x-1/2 border-x-[5px] border-t-[6px] border-x-transparent border-t-foreground/70"
+                      style={{
+                        top: `calc(${
+                          (LILY_ART_TOP[
+                            Math.max(0, LILY_LADDER_ART.indexOf(stop.art ?? ''))
+                          ] ?? 0) * 100
+                        }% - 8px)`,
+                      }}
+                      className="absolute left-1/2 h-0 w-0 -translate-x-1/2 border-x-[5px] border-t-[6px] border-x-transparent border-t-foreground/70"
                     />
                   )}
                 </div>
@@ -433,7 +460,7 @@ export function LeapRail({
                     </span>
                     <span
                       className={cn(
-                        'mt-1 text-[9.5px] font-black uppercase tracking-wider tabular-nums',
+                        'mt-1 text-[11px] font-black tabular-nums',
                         stop.isDestination
                           ? 'text-amber-600 dark:text-amber-400'
                           : locked

@@ -262,7 +262,7 @@ export function TagsView({
       {savedTags.length > 0 && !showColorPicker && (
         <div>
           <div className="mb-1.5 flex items-center justify-between">
-            <span className="text-[11px] font-extrabold uppercase tracking-wide text-muted-foreground">
+            <span className="text-[13px] font-extrabold tracking-wide text-muted-foreground">
               Saved tags{' '}
               <span className="font-bold text-muted-foreground/60">
                 {counterLabel}
@@ -271,11 +271,11 @@ export function TagsView({
             <button
               type="button"
               onClick={() => setManageTagsMode(!manageTagsMode)}
-              className={`inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-[10px] font-black uppercase tracking-wide transition-colors ${
-                manageTagsMode
-                  ? 'bg-primary/10 text-primary'
-                  : 'text-muted-foreground [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground'
-              }`}
+              className={`inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-[12px] font-black tracking-wide transition-colors ${
+ manageTagsMode
+ ? 'bg-primary/10 text-primary'
+ : 'text-muted-foreground [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground'
+ }`}
             >
               <Pencil className="h-3 w-3" strokeWidth={2.75} />
               {manageTagsMode ? 'Done' : 'Edit'}
@@ -313,11 +313,11 @@ export function TagsView({
                     }
                     handleToggle(st);
                   }}
-                  className={`relative inline-flex max-w-full select-none items-center justify-center gap-1.5 rounded-2xl border px-4 py-2.5 text-[13px] font-black uppercase tracking-wider shadow-sm transition-all [@media(hover:hover)]:hover:opacity-75 active:scale-95 ${
-                    isSelected && !manageTagsMode
-                      ? 'ring-2 ring-offset-1 ring-offset-background'
-                      : ''
-                  }`}
+                  className={`relative inline-flex max-w-full select-none items-center justify-center gap-1.5 rounded-2xl border px-4 py-2.5 text-[13px] font-black shadow-sm transition-all [@media(hover:hover)]:hover:opacity-75 active:scale-95 ${
+ isSelected && !manageTagsMode
+ ? 'ring-2 ring-offset-1 ring-offset-background'
+ : ''
+ }`}
                   style={{
                     backgroundColor: `${st.color}20`,
                     color: st.color,
@@ -359,10 +359,10 @@ export function TagsView({
                   className="h-3 w-3 text-muted-foreground/60"
                   strokeWidth={2.75}
                 />
-                <span className="text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground/60">
+                <span className="text-[12px] font-extrabold tracking-wide text-muted-foreground/60">
                   Locked · unlock with
                 </span>
-                <span className="inline-flex items-center gap-0.5 text-[10px] font-extrabold uppercase tracking-wide text-amber-600 dark:text-amber-400">
+                <span className="inline-flex items-center gap-0.5 text-[12px] font-extrabold tracking-wide text-amber-600 dark:text-amber-400">
                   <Icon name="frogPlus" className="h-7 w-7 shrink-0" />
                   Plus
                 </span>
@@ -373,7 +373,7 @@ export function TagsView({
                     key={st.id}
                     type="button"
                     onClick={() => handleToggle(st)}
-                    className="inline-flex max-w-full select-none items-center gap-1.5 rounded-2xl border border-dashed border-border bg-muted px-3.5 py-2 text-[12px] font-black uppercase tracking-wider text-muted-foreground/70 transition-all active:scale-95"
+                    className="inline-flex max-w-full select-none items-center gap-1.5 rounded-2xl border border-dashed border-border bg-muted px-3.5 py-2 text-[13px] font-black text-muted-foreground/70 transition-all active:scale-95"
                   >
                     <span className="truncate">{st.name}</span>
                     <Lock className="h-3 w-3 shrink-0" />
@@ -409,11 +409,11 @@ export function TagsView({
           >
             <div className="rounded-2xl border border-border bg-muted/20 p-4">
               <div className="mb-3 flex items-center justify-between">
-                <span className="text-[11px] font-extrabold uppercase tracking-wide text-muted-foreground">
+                <span className="text-[13px] font-extrabold tracking-wide text-muted-foreground">
                   New tag
                 </span>
                 <span
-                  className="inline-flex max-w-[180px] items-center justify-center rounded-2xl border px-4 py-2.5 text-[13px] font-black uppercase tracking-wider shadow-sm"
+                  className="inline-flex max-w-[180px] items-center justify-center rounded-2xl border px-4 py-2.5 text-[13px] font-black shadow-sm"
                   style={{
                     backgroundColor: `${newTagColor}20`,
                     borderColor: `${newTagColor}40`,
@@ -423,7 +423,7 @@ export function TagsView({
                   <span className="truncate">{tagInput.trim() || 'Preview'}</span>
                 </span>
               </div>
-              <div className="mb-3 text-[11px] font-extrabold uppercase tracking-wide text-muted-foreground">
+              <div className="mb-3 text-[13px] font-extrabold tracking-wide text-muted-foreground">
                 Pick a color
               </div>
               <div className="flex flex-wrap gap-2.5">
@@ -445,11 +445,11 @@ export function TagsView({
               {showFocusConnect && focusAreas.length > 0 && (
                 <div className="mt-4 border-t border-border/60 pt-3.5">
                   <div className="mb-1 flex items-center justify-between">
-                    <span className="flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wide text-muted-foreground">
+                    <span className="flex items-center gap-1.5 text-[13px] font-extrabold tracking-wide text-muted-foreground">
                       <Sparkles className="h-3.5 w-3.5" />
                       Connect to focus area
                     </span>
-                    <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground/60">
+                    <span className="text-[12px] font-bold tracking-wide text-muted-foreground/60">
                       Optional
                     </span>
                   </div>
@@ -475,11 +475,11 @@ export function TagsView({
                           onClick={() =>
                             setNewTagAreaId(isPicked ? null : area.id)
                           }
-                          className={`inline-flex h-10 items-center gap-1.5 rounded-2xl border px-3 text-[12px] font-black uppercase tracking-wider transition-all active:scale-95 ${
-                            isPicked
-                              ? 'ring-2 ring-offset-1 ring-offset-background'
-                              : ''
-                          }`}
+                          className={`inline-flex h-10 items-center gap-1.5 rounded-2xl border px-3 text-[13px] font-black transition-all active:scale-95 ${
+ isPicked
+ ? 'ring-2 ring-offset-1 ring-offset-background'
+ : ''
+ }`}
                           style={{
                             backgroundColor: `${accent}${isPicked ? '2b' : '14'}`,
                             borderColor: `${accent}40`,

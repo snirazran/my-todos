@@ -80,14 +80,14 @@ export default function DayColumn({
               </span>
             )}
             {isToday ? (
-              <span className="relative z-0 px-1.5 py-0.5 rounded-md text-xs font-bold uppercase tracking-wide bg-gradient-to-r from-primary/20 to-emerald-400/20 text-primary">
+              <span className="relative z-0 px-1.5 py-0.5 rounded-md text-[13px] font-bold tracking-wide bg-gradient-to-r from-primary/20 to-emerald-400/20 text-primary">
                 {displayName}
               </span>
             ) : (
               <span
-                className={`text-xs font-bold uppercase tracking-wide ${
-                  isPast ? 'text-muted-foreground/60' : 'text-muted-foreground'
-                }`}
+                className={`text-[13px] font-bold tracking-wide ${
+ isPast ? 'text-muted-foreground/60' : 'text-muted-foreground'
+ }`}
               >
                 {displayName}
               </span>

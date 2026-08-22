@@ -100,7 +100,7 @@ export function SeenOnFriendsRow({
 
   return (
     <div className="mb-3">
-      <p className="mb-2 px-1 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">
+      <p className="mb-2 px-1 text-[12px] font-black text-muted-foreground">
         Seen on your friends
       </p>
       <DragScrollRow>

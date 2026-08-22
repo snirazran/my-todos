@@ -211,7 +211,7 @@ export function StreakRescueSheet({
                       {offer.previousCount > 0 ? saved.view.count : largest}
                     </motion.span>
                   </div>
-                  <p className="mt-2 text-lg font-black uppercase tracking-[0.2em] text-white/90">
+                  <p className="mt-2 text-lg font-black text-white/90">
                     {multi ? `${rows.length} streaks saved` : 'streak saved'}
                   </p>
                   <p className="mt-4 max-w-xs text-center text-sm font-bold text-white/85">
@@ -221,7 +221,7 @@ export function StreakRescueSheet({
                   <button
                     type="button"
                     onClick={finish}
-                    className="mt-10 w-full max-w-[280px] rounded-2xl bg-white py-3.5 text-sm font-black uppercase tracking-wide text-amber-700 shadow-[0_5px_0_0_rgba(0,0,0,0.15)] transition-all active:translate-y-1 active:shadow-none"
+                    className="mt-10 w-full max-w-[280px] rounded-2xl bg-white py-3.5 text-sm font-black tracking-wide text-amber-700 shadow-[0_5px_0_0_rgba(0,0,0,0.15)] transition-all active:translate-y-1 active:shadow-none"
                   >
                     Continue
                   </button>
@@ -298,7 +298,7 @@ export function StreakRescueSheet({
                       onClick={handleSave}
                       disabled={busy}
                       className={cn(
-                        'mt-6 flex w-full max-w-[300px] items-center justify-center gap-2 rounded-2xl bg-amber-400 py-3.5 text-sm font-black uppercase tracking-wide text-slate-900 shadow-[0_5px_0_0_rgba(0,0,0,0.3)] transition-all active:translate-y-1 active:shadow-none',
+                        'mt-6 flex w-full max-w-[300px] items-center justify-center gap-2 rounded-2xl bg-amber-400 py-3.5 text-sm font-black tracking-wide text-slate-900 shadow-[0_5px_0_0_rgba(0,0,0,0.3)] transition-all active:translate-y-1 active:shadow-none',
                         busy && 'opacity-70',
                       )}
                     >
@@ -314,7 +314,7 @@ export function StreakRescueSheet({
                             onClick={handleSave}
                             disabled={busy}
                             className={cn(
-                              'flex w-full items-center justify-center gap-2 rounded-2xl bg-amber-400 py-3.5 text-sm font-black uppercase tracking-wide text-slate-900 shadow-[0_5px_0_0_rgba(0,0,0,0.3)] transition-all active:translate-y-1 active:shadow-none',
+                              'flex w-full items-center justify-center gap-2 rounded-2xl bg-amber-400 py-3.5 text-sm font-black tracking-wide text-slate-900 shadow-[0_5px_0_0_rgba(0,0,0,0.3)] transition-all active:translate-y-1 active:shadow-none',
                               busy && 'opacity-70',
                             )}
                           >
@@ -331,7 +331,7 @@ export function StreakRescueSheet({
                             onClick={handleSave}
                             disabled={busy}
                             className={cn(
-                              'flex w-full items-center justify-center gap-2 rounded-2xl bg-amber-400 py-3.5 text-sm font-black uppercase tracking-wide text-slate-900 shadow-[0_5px_0_0_rgba(0,0,0,0.3)] transition-all active:translate-y-1 active:shadow-none',
+                              'flex w-full items-center justify-center gap-2 rounded-2xl bg-amber-400 py-3.5 text-sm font-black tracking-wide text-slate-900 shadow-[0_5px_0_0_rgba(0,0,0,0.3)] transition-all active:translate-y-1 active:shadow-none',
                               busy && 'opacity-70',
                             )}
                           >

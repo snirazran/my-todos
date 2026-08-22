@@ -30,7 +30,7 @@ export function BellyMeter({
       {showLabel && (
         <span
           className={cn(
-            'shrink-0 text-[10px] font-black uppercase tracking-[0.08em]',
+            'shrink-0 text-[12px] font-black',
             text,
           )}
         >

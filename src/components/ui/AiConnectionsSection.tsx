@@ -76,7 +76,7 @@ function CopyField({ value, label }: { value: string; label: string }) {
   const { copied, copy } = useCopy();
   return (
     <div>
-      <p className="mb-1 px-1 text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+      <p className="mb-1 px-1 text-[12px] font-black text-muted-foreground">
         {label}
       </p>
       <button

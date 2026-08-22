@@ -128,7 +128,7 @@ export function PactChangeSheet({
 
           {active && (
             <div className="mt-4 rounded-2xl border border-border/60 bg-muted/30 px-3.5 py-3">
-              <p className="text-[10.5px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+              <p className="text-[12px] font-black text-muted-foreground">
                 Dropping
               </p>
               <p className="mt-1 text-[14.5px] font-black leading-snug text-foreground">
@@ -211,7 +211,7 @@ export function PactChangeSheet({
               <span>
                 Plus includes swaps that keep your streak
               </span>
-              <span className="inline-flex items-center rounded-md bg-gradient-to-b from-emerald-600 to-emerald-800 px-1.5 py-0.5 text-[9px] font-black uppercase leading-none tracking-[0.16em] text-amber-100">
+              <span className="inline-flex items-center rounded-md bg-gradient-to-b from-emerald-600 to-emerald-800 px-1.5 py-0.5 text-[11px] font-black leading-none text-amber-100">
                 Plus
               </span>
             </button>

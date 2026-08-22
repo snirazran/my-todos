@@ -491,7 +491,7 @@ export default function TaskDetailSheet({
                           key={tagId}
                           onClick={!minimal && onAddTags ? onAddTags : undefined}
                           disabled={minimal || !onAddTags}
-                          className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-black uppercase tracking-wide leading-4 disabled:pointer-events-none"
+                          className="inline-flex items-center rounded-full border px-2 py-0.5 text-[12px] font-black tracking-wide leading-4 disabled:pointer-events-none"
                           style={{
                             backgroundColor: `${t.color}20`,
                             color: t.color,
@@ -779,7 +779,7 @@ export default function TaskDetailSheet({
             {/* Duplicate options — completed + past tasks */}
             {minimal && onDuplicate && (
               <div className="shrink-0 rounded-[28px] bg-popover p-3 ring-1 ring-border/80 shadow-[0_3px_0_0_rgba(0,0,0,0.18)]">
-                <p className="mb-2 text-center text-[11px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+                <p className="mb-2 text-center text-[13px] font-black text-muted-foreground">
                   Duplicate to
                 </p>
                 <div className="grid grid-cols-2 gap-2">

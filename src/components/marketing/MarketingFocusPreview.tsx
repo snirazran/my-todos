@@ -36,7 +36,7 @@ export function MarketingFocusPreview() {
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] items-center gap-10 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
       <div>
-        <p className="text-xs font-black uppercase tracking-[0.2em] text-[#166534] dark:text-[#8ee0a2]">Focus timer</p>
+        <p className="text-[13px] font-black text-[#166534] dark:text-[#8ee0a2]">Focus timer</p>
         <h2 className="mt-3 text-balance text-3xl font-black tracking-tight sm:text-[2.75rem] sm:leading-[1.05]">
           Set a timer. Sit with one task.
         </h2>
@@ -61,7 +61,7 @@ export function MarketingFocusPreview() {
             <Fly size={24} interactive={false} alwaysPlay />
             <span className="text-[13px] font-black tabular-nums text-white">2/5</span>
             </div>
-            <span className="rounded-full bg-black/20 px-3 py-1.5 text-[10px] font-black uppercase tracking-wide text-white/85">Focus</span>
+            <span className="rounded-full bg-black/20 px-3 py-1.5 text-[12px] font-black tracking-wide text-white/85">Focus</span>
           </div>
 
           <div className="relative z-10 mt-1 text-center">
@@ -110,7 +110,7 @@ export function MarketingFocusPreview() {
               type="button"
               onClick={() => setRunning((value) => !value)}
               aria-label={running ? 'Pause preview timer' : 'Resume preview timer'}
-              className="inline-flex h-12 min-w-32 items-center justify-center gap-2 rounded-2xl bg-white px-6 text-xs font-black uppercase tracking-widest text-emerald-900 shadow-[0_4px_0_rgba(0,0,0,0.15)] transition-transform active:translate-y-1 active:shadow-none"
+              className="inline-flex h-12 min-w-32 items-center justify-center gap-2 rounded-2xl bg-white px-6 text-[13px] font-black text-emerald-900 shadow-[0_4px_0_rgba(0,0,0,0.15)] transition-transform active:translate-y-1 active:shadow-none"
             >
               {running ? <Pause className="h-5 w-5 fill-current" /> : <Play className="h-5 w-5 fill-current" />}
               {running ? 'Pause' : 'Resume'}

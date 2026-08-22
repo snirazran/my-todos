@@ -161,7 +161,7 @@ export function AddFriendsSheet({
                   referral teardown lands on. */}
               <div className="mt-4 grid grid-cols-2 gap-2.5">
                 <div className="flex flex-col items-center gap-1.5 rounded-2xl border border-border/60 bg-muted/40 px-3 py-3.5 text-center">
-                  <span className="text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+                  <span className="text-[11px] font-black text-muted-foreground">
                     They get
                   </span>
                   <span className="flex h-11 items-center justify-center">
@@ -172,7 +172,7 @@ export function AddFriendsSheet({
                   </span>
                 </div>
                 <div className="flex flex-col items-center gap-1.5 rounded-2xl border border-border/60 bg-muted/40 px-3 py-3.5 text-center">
-                  <span className="text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+                  <span className="text-[11px] font-black text-muted-foreground">
                     You get
                   </span>
                   <span className="flex h-11 items-center justify-center">

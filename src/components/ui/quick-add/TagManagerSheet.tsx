@@ -293,7 +293,7 @@ export function TagManagerSheet({ open, tag, onClose, onSave, onDelete }: Props)
             </div>
 
             {/* Name */}
-            <div className="mb-1.5 text-[11px] font-extrabold uppercase tracking-wide text-muted-foreground">
+            <div className="mb-1.5 text-[13px] font-extrabold tracking-wide text-muted-foreground">
               Name
             </div>
             <input
@@ -305,7 +305,7 @@ export function TagManagerSheet({ open, tag, onClose, onSave, onDelete }: Props)
             />
 
             {/* Color */}
-            <div className="mb-2 text-[11px] font-extrabold uppercase tracking-wide text-muted-foreground">
+            <div className="mb-2 text-[13px] font-extrabold tracking-wide text-muted-foreground">
               Color
             </div>
             <div className="mb-4 flex flex-wrap gap-2.5">
@@ -329,11 +329,11 @@ export function TagManagerSheet({ open, tag, onClose, onSave, onDelete }: Props)
 
             {/* Live preview */}
             <div className="mb-5 flex items-center gap-2">
-              <span className="text-[11px] font-extrabold uppercase tracking-wide text-muted-foreground">
+              <span className="text-[13px] font-extrabold tracking-wide text-muted-foreground">
                 Preview
               </span>
               <span
-                className="inline-flex max-w-[60%] items-center rounded-2xl border px-3.5 py-2 text-[13px] font-black uppercase tracking-wider shadow-sm"
+                className="inline-flex max-w-[60%] items-center rounded-2xl border px-3.5 py-2 text-[13px] font-black shadow-sm"
                 style={{
                   backgroundColor: `${color}20`,
                   borderColor: `${color}40`,
@@ -347,7 +347,7 @@ export function TagManagerSheet({ open, tag, onClose, onSave, onDelete }: Props)
             {/* Focus area connection */}
             {(showFocusSection || focusLoading) && (
               <div className="mb-5">
-                <div className="mb-1 flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wide text-muted-foreground">
+                <div className="mb-1 flex items-center gap-1.5 text-[13px] font-extrabold tracking-wide text-muted-foreground">
                   <Sparkles className="h-3.5 w-3.5" />
                   Focus area
                 </div>
@@ -370,11 +370,11 @@ export function TagManagerSheet({ open, tag, onClose, onSave, onDelete }: Props)
                       type="button"
                       disabled={savingFocus}
                       onClick={() => handleAreaTap(null)}
-                      className={`inline-flex h-11 items-center gap-1.5 rounded-2xl border px-3.5 text-[13px] font-black uppercase tracking-wider transition-all active:scale-95 disabled:opacity-60 ${
-                        connectedAreaId === null
-                          ? 'border-foreground/30 bg-muted text-foreground'
-                          : 'border-border bg-background text-muted-foreground'
-                      }`}
+                      className={`inline-flex h-11 items-center gap-1.5 rounded-2xl border px-3.5 text-[13px] font-black transition-all active:scale-95 disabled:opacity-60 ${
+ connectedAreaId === null
+ ? 'border-foreground/30 bg-muted text-foreground'
+ : 'border-border bg-background text-muted-foreground'
+ }`}
                     >
                       {connectedAreaId === null && (
                         <Check className="h-3.5 w-3.5" strokeWidth={3.5} />
@@ -395,9 +395,9 @@ export function TagManagerSheet({ open, tag, onClose, onSave, onDelete }: Props)
                           type="button"
                           disabled={savingFocus}
                           onClick={() => handleAreaTap(area.id)}
-                          className={`relative inline-flex h-11 items-center gap-1.5 rounded-2xl border px-3.5 text-[13px] font-black uppercase tracking-wider transition-all active:scale-95 disabled:opacity-60 ${
-                            isConnected ? 'ring-2 ring-offset-1 ring-offset-background' : ''
-                          }`}
+                          className={`relative inline-flex h-11 items-center gap-1.5 rounded-2xl border px-3.5 text-[13px] font-black transition-all active:scale-95 disabled:opacity-60 ${
+ isConnected ? 'ring-2 ring-offset-1 ring-offset-background' : ''
+ }`}
                           style={{
                             backgroundColor: `${accent}${isConnected ? '2b' : '14'}`,
                             borderColor: `${accent}40`,
@@ -452,7 +452,7 @@ export function TagManagerSheet({ open, tag, onClose, onSave, onDelete }: Props)
             )}
 
             {/* Tasks using this tag */}
-            <div className="mb-2 flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wide text-muted-foreground">
+            <div className="mb-2 flex items-center gap-1.5 text-[13px] font-extrabold tracking-wide text-muted-foreground">
               <ListChecks className="h-3.5 w-3.5" />
               Used in {tasks.length} {tasks.length === 1 ? 'task' : 'tasks'}
             </div>
@@ -576,7 +576,7 @@ export function TagManagerSheet({ open, tag, onClose, onSave, onDelete }: Props)
               <button
                 type="button"
                 onClick={confirmFocusChange}
-                className="h-12 rounded-2xl bg-primary text-[14px] font-black uppercase tracking-wide text-primary-foreground transition active:translate-y-[2px]"
+                className="h-12 rounded-2xl bg-primary text-[14px] font-black tracking-wide text-primary-foreground transition active:translate-y-[2px]"
               >
                 {focusConfirm?.type === 'replace'
                   ? 'Replace'
@@ -607,10 +607,10 @@ export function TagManagerSheet({ open, tag, onClose, onSave, onDelete }: Props)
                   name="frogPlus"
                   className="-my-8 -ml-1 h-20 w-20 drop-shadow-[0_3px_0_rgba(31,98,28,0.4)]"
                 />
-                <span className="text-sm font-black uppercase tracking-[0.08em] text-emerald-900 drop-shadow-[0_1px_0_rgba(255,255,255,0.5)]">
+                <span className="text-sm font-black text-emerald-900 drop-shadow-[0_1px_0_rgba(255,255,255,0.5)]">
                   Keep both with
                 </span>
-                <span className="inline-flex items-center rounded-lg bg-gradient-to-b from-emerald-600 to-emerald-800 px-2 py-1.5 text-[11px] font-black uppercase leading-none tracking-[0.18em] text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_2px_4px_rgba(0,0,0,0.25)] ring-1 ring-emerald-900/40">
+                <span className="inline-flex items-center rounded-lg bg-gradient-to-b from-emerald-600 to-emerald-800 px-2 py-1.5 text-[13px] font-black leading-none text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_2px_4px_rgba(0,0,0,0.25)] ring-1 ring-emerald-900/40">
                   Plus
                 </span>
               </button>
@@ -671,7 +671,7 @@ export function TagManagerSheet({ open, tag, onClose, onSave, onDelete }: Props)
                   setConfirmDelete(false);
                   onDelete();
                 }}
-                className="h-12 rounded-2xl bg-rose-500 text-[14px] font-black uppercase tracking-wide text-white transition active:translate-y-[2px] hover:bg-rose-600"
+                className="h-12 rounded-2xl bg-rose-500 text-[14px] font-black tracking-wide text-white transition active:translate-y-[2px] hover:bg-rose-600"
               >
                 Delete
               </button>

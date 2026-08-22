@@ -20,7 +20,7 @@ export function RarityCornerBadge({
     >
       <div
         className={cn(
-          'rounded-br-2xl border-b border-r px-2 py-1 text-[9px] font-black uppercase tracking-wider md:px-2.5 md:text-[10px]',
+          'rounded-br-2xl border-b border-r px-2 py-1 text-[11px] font-black md:px-2.5 md:text-[12px]',
           config.bg,
           config.text,
           config.border,

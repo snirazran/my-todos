@@ -48,7 +48,7 @@ export function WishlistTile({
         <div className="absolute left-0 top-0 z-20 overflow-hidden rounded-br-2xl bg-background">
           <div
             className={cn(
-              'rounded-br-2xl border-b border-r px-2 py-1 text-[9px] font-black uppercase tracking-wider',
+              'rounded-br-2xl border-b border-r px-2 py-1 text-[11px] font-black',
               config.bg,
               config.text,
               config.border,
@@ -97,7 +97,7 @@ export function WishlistTile({
 
         <div className="mt-0.5 flex h-5 items-center justify-center gap-1.5">
           {entry.tradeOnly ? (
-            <span className="inline-flex items-center gap-1 text-[11px] font-black uppercase tracking-wider text-amber-600 dark:text-amber-400">
+            <span className="inline-flex items-center gap-1 text-[13px] font-black text-amber-600 dark:text-amber-400">
               <Repeat className="h-3 w-3" strokeWidth={3.5} />
               Trade for it
             </span>
@@ -145,28 +145,28 @@ function WishlistTileFooter({
 }) {
   if (bucket === 'trade') {
     return (
-      <span className="text-center text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+      <span className="text-center text-[12px] font-black text-muted-foreground">
         Steers your trade-ups
       </span>
     );
   }
   if (bucket === 'owned') {
     return (
-      <span className="text-center text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+      <span className="text-center text-[12px] font-black text-muted-foreground">
         In your wardrobe
       </span>
     );
   }
   if (bucket === 'deal') {
     return (
-      <span className="text-center text-[10px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+      <span className="text-center text-[12px] font-black text-emerald-600 dark:text-emerald-400">
         {entry.discountPercent}% off today
       </span>
     );
   }
   if (bucket === 'ready') {
     return (
-      <span className="text-center text-[10px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+      <span className="text-center text-[12px] font-black text-emerald-600 dark:text-emerald-400">
         Tap to buy
       </span>
     );

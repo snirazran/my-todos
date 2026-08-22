@@ -89,7 +89,7 @@ export default function CelebrationStep({ frogName, humanName }: Props) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.9 }}
-        className="mt-8 text-xs font-bold uppercase tracking-widest text-muted-foreground/70"
+        className="mt-8 text-[13px] font-bold text-muted-foreground/70"
       >
         Preparing your pond…
       </motion.p>

@@ -263,7 +263,7 @@ export function AdminInviteManager() {
                     className="rounded-2xl border border-border/60 p-4 space-y-3"
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">
+                      <span className="text-[13px] font-black text-muted-foreground">
                         Tier #{reward.tier}
                       </span>
                       <button
@@ -283,7 +283,7 @@ export function AdminInviteManager() {
                     <div className="rounded-2xl border border-border/60 bg-background/60 p-4">
                       <div className="flex items-center justify-between gap-3">
                         <div className="min-w-0">
-                          <p className="text-xs font-black uppercase tracking-wide text-muted-foreground">
+                          <p className="text-[13px] font-black tracking-wide text-muted-foreground">
                             Reward
                           </p>
                           <p className="mt-1 text-sm font-bold text-foreground">
@@ -329,7 +329,7 @@ export function AdminInviteManager() {
                         className="rounded-2xl border border-border/60 p-4 space-y-3"
                       >
                         <div className="flex items-center justify-between gap-2">
-                          <span className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">
+                          <span className="text-[13px] font-black text-muted-foreground">
                             {item?.name || 'Unnamed gift'}
                           </span>
                           <button
@@ -350,7 +350,7 @@ export function AdminInviteManager() {
                         <div className="rounded-2xl border border-border/60 bg-background/60 p-4">
                           <div className="flex items-center justify-between gap-3">
                             <div className="min-w-0">
-                              <p className="text-xs font-black uppercase tracking-wide text-muted-foreground">
+                              <p className="text-[13px] font-black tracking-wide text-muted-foreground">
                                 Gift item
                               </p>
                               <p className="mt-1 truncate text-sm font-bold text-foreground">
@@ -453,7 +453,7 @@ function Field({
 }) {
   return (
     <div>
-      <label className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+      <label className="text-[13px] font-bold tracking-wide text-muted-foreground">
         {label}
       </label>
       <input

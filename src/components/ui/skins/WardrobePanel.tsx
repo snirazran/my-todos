@@ -23,7 +23,7 @@ import {
   Image as ImageIcon,
   Gift,
 } from 'lucide-react';
-import type { ItemDef, WardrobeSlot } from '@/lib/skins/catalog';
+import type { ItemDef, Rarity, WardrobeSlot } from '@/lib/skins/catalog';
 import {
   rarityRank,
   byId as staticById,
@@ -499,7 +499,7 @@ function WardrobeManagerContent({
 
   const tabTriggerClass = cn(
     'flex-1 h-full rounded-2xl relative flex items-center justify-center gap-2',
-    'text-xs md:text-sm font-bold tracking-wide uppercase transition-colors',
+    'text-[13px] md:text-sm font-bold tracking-wide transition-colors',
     embedded
       ? 'data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-sm'
       : 'data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none',
@@ -975,6 +975,64 @@ function WardrobeManagerContent({
     }
   };
 
+  // How much of each rarity the collection actually holds, against everything
+  // that exists under the filter on screen. Counted from the whole catalog
+  // rather than the rendered groups: the grid pages in, pulls worn items and
+  // gifts into their own rows, and counts duplicates as one card — none of
+  // which should move the collection number.
+  const rarityProgress = useMemo(() => {
+    const rows: Record<Rarity, { owned: number; total: number }> = {
+      common: { owned: 0, total: 0 },
+      uncommon: { owned: 0, total: 0 },
+      rare: { owned: 0, total: 0 },
+      epic: { owned: 0, total: 0 },
+      legendary: { owned: 0, total: 0 },
+    };
+    const owned = data?.wardrobe?.inventory ?? {};
+    if (activeFilter !== 'background') {
+      const slot =
+        activeFilter === 'all'
+          ? null
+          : activeFilter === 'held'
+            ? 'hand_item'
+            : activeFilter;
+      for (const item of data?.catalog ?? []) {
+        if (slot && item.slot !== slot) continue;
+        // Gift boxes are opened, not collected, and they get their own row
+        // above the rarity groups — counting them here would credit progress
+        // against things the groups never show.
+        if (!slot && item.slot === 'container') continue;
+        const row = rows[item.rarity];
+        if (!row) continue;
+        row.total += 1;
+        if ((owned[item.id] ?? 0) > 0) row.owned += 1;
+      }
+    }
+    if (showBackgrounds) {
+      for (const item of bg.catalog) {
+        const row = rows[item.rarity];
+        if (!row) continue;
+        row.total += 1;
+        if ((bg.inventory[item.id] ?? 0) > 0) row.owned += 1;
+      }
+    }
+    return rows;
+  }, [data?.catalog, data?.wardrobe?.inventory, activeFilter, showBackgrounds, bg.catalog, bg.inventory]);
+
+  const rarityHeading = (rarity: Rarity) => {
+    const { owned, total } = rarityProgress[rarity];
+    return (
+      <>
+        {RARITY_CONFIG[rarity].label}
+        {total > 0 && (
+          <span className="ml-1.5 font-bold tabular-nums text-muted-foreground">
+            {owned}/{total}
+          </span>
+        )}
+      </>
+    );
+  };
+
   const inventoryItems = useMemo(() => {
     if (!data?.wardrobe?.inventory) return [];
     const ownedIds = Object.keys(data.wardrobe.inventory).filter(
@@ -1391,7 +1449,7 @@ function WardrobeManagerContent({
         >
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-[11px] font-black uppercase tracking-[0.22em] text-muted-foreground">
+              <p className="text-[13px] font-black text-muted-foreground">
                 Style Studio
               </p>
               <div className="min-w-0">
@@ -1483,8 +1541,7 @@ function WardrobeManagerContent({
                   data-hint="wardrobe-inventory-tab"
                 >
                   <AppIcon name="wardrobe" className="w-5 h-5" />
-                  <span className="hidden xs:inline">Wardrobe</span>
-                  <span className="xs:hidden">INV</span>
+                  <span>Inventory</span>
                 </TabsTrigger>
                 <TabsTrigger
                   value="shop"
@@ -1763,7 +1820,7 @@ function WardrobeManagerContent({
                         <div key={key} className="pb-2 last:pb-4">
                           <p
                             className={cn(
-                              'mb-2 px-1 text-[10px] font-black uppercase tracking-[0.18em]',
+                              'mb-2 px-1 text-[12px] font-black',
                               labelClass,
                             )}
                           >
@@ -1796,7 +1853,7 @@ function WardrobeManagerContent({
                       return groupCardsByRarity(merged).map((group) =>
                         section(
                           group.rarity,
-                          RARITY_CONFIG[group.rarity].label,
+                          rarityHeading(group.rarity),
                           RARITY_CONFIG[group.rarity].text,
                           group.cards,
                         ),
@@ -1816,7 +1873,7 @@ function WardrobeManagerContent({
                           <div className="mb-2 flex items-center gap-2 px-1">
                             <p
                               className={cn(
-                                'text-[10px] font-black uppercase tracking-[0.18em]',
+                                'text-[12px] font-black',
                                 labelClass,
                               )}
                             >
@@ -1899,7 +1956,7 @@ function WardrobeManagerContent({
                         {groupCardsByRarity(rest).map((group) =>
                           section(
                             group.rarity,
-                            RARITY_CONFIG[group.rarity].label,
+                            rarityHeading(group.rarity),
                             RARITY_CONFIG[group.rarity].text,
                             group.cards,
                           ),
@@ -2018,7 +2075,7 @@ function WardrobeManagerContent({
                         container: 'Gifts',
                       }[activeFilter] ?? 'All items';
                     const sectionHeader = (
-                      <p className="mb-2 px-1 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">
+                      <p className="mb-2 px-1 text-[12px] font-black text-muted-foreground">
                         {sectionLabel}
                       </p>
                     );
@@ -2051,7 +2108,7 @@ function WardrobeManagerContent({
                       <div key={group.rarity} className="pb-2 last:pb-4">
                         <p
                           className={cn(
-                            'mb-2 px-1 text-[10px] font-black uppercase tracking-[0.18em]',
+                            'mb-2 px-1 text-[12px] font-black',
                             RARITY_CONFIG[group.rarity].text,
                           )}
                         >
@@ -2241,7 +2298,7 @@ function WardrobeRowCard({
           <span className="absolute left-0 top-0 z-20 overflow-hidden rounded-br-2xl bg-background">
             <span
               className={cn(
-                'block rounded-br-2xl border-b border-r px-2 py-1 text-[8px] font-black uppercase tracking-wider',
+                'block rounded-br-2xl border-b border-r px-2 py-1 text-[10px] font-black',
                 config.bg,
                 config.text,
                 config.border,
@@ -2256,7 +2313,7 @@ function WardrobeRowCard({
           {isNew && (
             <span
               className={cn(
-                'absolute left-1 z-20 animate-pulse rounded-md bg-red-500 px-1.5 py-0.5 text-[8px] font-black uppercase text-white shadow-sm',
+                'absolute left-1 z-20 animate-pulse rounded-md bg-red-500 px-1.5 py-0.5 text-[10px] font-black text-white shadow-sm',
                 rarityBadge ? 'bottom-1' : 'top-1',
               )}
             >
@@ -2305,7 +2362,7 @@ function WardrobeRowCard({
 function ScrollMoreCue() {
   return (
     <div className="absolute inset-x-0 bottom-0 z-30 flex justify-center pt-10 pb-4 pointer-events-none bg-gradient-to-t from-background/95 via-background/60 to-transparent">
-      <div className="flex items-center gap-1.5 rounded-full border border-border/50 bg-background/80 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-muted-foreground shadow-sm backdrop-blur">
+      <div className="flex items-center gap-1.5 rounded-full border border-border/50 bg-background/80 px-3 py-1.5 text-[12px] font-black text-muted-foreground shadow-sm backdrop-blur">
         <ChevronDown className="h-3.5 w-3.5 animate-bounce text-primary" />
         <span>Scroll for more</span>
       </div>

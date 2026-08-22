@@ -592,11 +592,11 @@ function PremiumControls() {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <span
-          className={`text-xs font-black uppercase tracking-wide px-2.5 py-1 rounded-lg ${
-            isPremium
-              ? 'bg-indigo-500 text-white'
-              : 'bg-muted text-muted-foreground'
-          }`}
+          className={`text-[13px] font-black tracking-wide px-2.5 py-1 rounded-lg ${
+ isPremium
+ ? 'bg-indigo-500 text-white'
+ : 'bg-muted text-muted-foreground'
+ }`}
         >
           {isPremium ? 'Premium Active' : 'Free Plan'}
         </span>

@@ -65,7 +65,7 @@ export function StarterTasksEditor({
     <div className="rounded-2xl border border-border/50 bg-background/70 p-3">
       <div className="mb-2 flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
+          <p className="text-[13px] font-black text-muted-foreground">
             Starter Plan Tasks
           </p>
           <p className="mt-1 text-[11px] leading-snug text-muted-foreground">

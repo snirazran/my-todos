@@ -139,13 +139,13 @@ export function FocusCelebration({
           className="mt-1.5 flex flex-wrap items-center justify-center gap-1.5"
         >
           {fliesCaught > 0 && (
-            <span className="flex items-center gap-1.5 rounded-full bg-white/25 px-3 py-1 text-xs font-black uppercase tracking-wider text-white">
+            <span className="flex items-center gap-1.5 rounded-full bg-white/25 px-3 py-1 text-[13px] font-black text-white">
               <Fly size={16} interactive={false} paused />
               +{fliesCaught} {fliesCaught === 1 ? 'fly' : 'flies'} caught
             </span>
           )}
           {bonusFly && (
-            <span className="flex items-center gap-1.5 rounded-full bg-white/25 px-3 py-1 text-xs font-black uppercase tracking-wider text-white">
+            <span className="flex items-center gap-1.5 rounded-full bg-white/25 px-3 py-1 text-[13px] font-black text-white">
               <Fly size={16} interactive={false} paused />
               +1 fly · Deep focus
             </span>
@@ -158,7 +158,7 @@ export function FocusCelebration({
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.55 }}
-          className="mt-2 flex items-center gap-1.5 rounded-full bg-amber-300/90 px-3 py-1 text-xs font-black uppercase tracking-wider text-amber-900 shadow"
+          className="mt-2 flex items-center gap-1.5 rounded-full bg-amber-300/90 px-3 py-1 text-[13px] font-black text-amber-900 shadow"
         >
           <Sparkles className="h-3.5 w-3.5" />
           Quest reward ready!

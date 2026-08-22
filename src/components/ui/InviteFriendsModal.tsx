@@ -483,7 +483,7 @@ function RewardProgressTrack({
 
       {nextReward && (
         <div className="mt-2 text-center">
-          <p className="text-xs font-black uppercase tracking-[0.18em] text-muted-foreground/70">
+          <p className="text-[13px] font-black text-muted-foreground/70">
             Your rewards
           </p>
           <p className="mx-auto mt-2 max-w-sm text-base font-medium leading-snug text-foreground">
@@ -602,7 +602,7 @@ function PickStep({
 
           {selected && (
             <div className="mt-3 hidden text-center min-[380px]:block">
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/60">
+              <p className="text-[12px] font-black text-white/60">
                 Selected
               </p>
               <p className="mt-0.5 text-sm font-bold">

@@ -138,7 +138,7 @@ export default function MonthCalendar({
                 <ChevronRight size={18} />
               </button>
             </div>
-            <div className="grid grid-cols-7 gap-1.5 text-[11px] uppercase opacity-80 mb-2">
+            <div className="grid grid-cols-7 gap-1.5 text-[13px] opacity-80 mb-2">
               {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((l, i) => (
                 <div key={i} className="text-center font-bold">{l}</div>
               ))}

@@ -170,7 +170,7 @@ export default function EmailCallbackPage() {
             </p>
             <button
               onClick={() => window.location.replace('/')}
-              className="mt-6 flex h-12 w-full items-center justify-center rounded-2xl bg-primary text-primary-foreground font-black uppercase tracking-wider text-sm"
+              className="mt-6 flex h-12 w-full items-center justify-center rounded-2xl bg-primary text-primary-foreground font-black text-sm"
             >
               Continue
             </button>
@@ -188,7 +188,7 @@ export default function EmailCallbackPage() {
             <button
               onClick={switchToExisting}
               disabled={switching}
-              className="mt-6 flex h-12 w-full items-center justify-center rounded-2xl bg-primary text-primary-foreground font-black uppercase tracking-wider text-sm disabled:opacity-60"
+              className="mt-6 flex h-12 w-full items-center justify-center rounded-2xl bg-primary text-primary-foreground font-black text-sm disabled:opacity-60"
             >
               {switching ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
@@ -212,7 +212,7 @@ export default function EmailCallbackPage() {
             <p className="mt-3 text-sm text-center text-destructive">{error}</p>
             <button
               onClick={() => router.replace('/login')}
-              className="mt-6 px-6 h-12 rounded-2xl bg-primary text-primary-foreground font-black uppercase tracking-wider text-sm"
+              className="mt-6 px-6 h-12 rounded-2xl bg-primary text-primary-foreground font-black text-sm"
             >
               Back to login
             </button>
@@ -243,7 +243,7 @@ export default function EmailCallbackPage() {
               />
               <button
                 type="submit"
-                className="flex items-center justify-center w-full h-12 rounded-2xl bg-primary text-primary-foreground font-black uppercase tracking-wider text-sm"
+                className="flex items-center justify-center w-full h-12 rounded-2xl bg-primary text-primary-foreground font-black text-sm"
               >
                 Continue
               </button>

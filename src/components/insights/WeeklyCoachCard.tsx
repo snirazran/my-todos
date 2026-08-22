@@ -91,7 +91,7 @@ export function WeeklyCoachCard({ facts }: { facts: WeeklyFacts }) {
           <Sparkles className="h-4 w-4" aria-hidden="true" />
         </span>
         <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">
+          <p className="text-[12px] font-black text-muted-foreground">
             Weekly read
           </p>
           <h2 id="coach-heading" className="text-sm font-black text-foreground">
@@ -99,7 +99,7 @@ export function WeeklyCoachCard({ facts }: { facts: WeeklyFacts }) {
           </h2>
         </div>
         {!isPremium && (
-          <span className="ml-auto inline-flex items-center rounded-lg bg-gradient-to-b from-emerald-600 to-emerald-800 px-2 py-1 text-[10px] font-black uppercase leading-none tracking-[0.14em] text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25)] ring-1 ring-emerald-900/40">
+          <span className="ml-auto inline-flex items-center rounded-lg bg-gradient-to-b from-emerald-600 to-emerald-800 px-2 py-1 text-[12px] font-black leading-none text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25)] ring-1 ring-emerald-900/40">
             Plus
           </span>
         )}
@@ -139,7 +139,7 @@ export function WeeklyCoachCard({ facts }: { facts: WeeklyFacts }) {
                 <Target className="h-4 w-4" aria-hidden="true" />
               </span>
               <div className="min-w-0">
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">
+                <p className="text-[12px] font-black text-primary">
                   Try this week
                 </p>
                 <p className="mt-1 text-sm font-bold leading-relaxed text-foreground">
@@ -232,7 +232,7 @@ function LockedPreview({
             A new one every week, from your own numbers
           </span>
         </span>
-        <span className="inline-flex shrink-0 items-center rounded-lg bg-gradient-to-b from-emerald-600 to-emerald-800 px-2 py-1 text-[10px] font-black uppercase leading-none tracking-[0.14em] text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25)] ring-1 ring-emerald-900/40">
+        <span className="inline-flex shrink-0 items-center rounded-lg bg-gradient-to-b from-emerald-600 to-emerald-800 px-2 py-1 text-[12px] font-black leading-none text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25)] ring-1 ring-emerald-900/40">
           Plus
         </span>
       </button>

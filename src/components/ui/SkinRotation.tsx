@@ -302,7 +302,7 @@ export function SkinRotationDialog({
                       onClose();
                       router.push('/wardrobe?tab=shop');
                     }}
-                    className="mt-3 inline-flex h-10 items-center justify-center rounded-xl bg-[#4f9149] px-4 text-xs font-black uppercase tracking-wide text-white shadow-[0_3px_0_0_#34631f] transition-transform active:translate-y-0.5 active:shadow-none"
+                    className="mt-3 inline-flex h-10 items-center justify-center rounded-xl bg-[#4f9149] px-4 text-[13px] font-black tracking-wide text-white shadow-[0_3px_0_0_#34631f] transition-transform active:translate-y-0.5 active:shadow-none"
                   >
                     Browse the shop
                   </button>
@@ -314,7 +314,7 @@ export function SkinRotationDialog({
                       type="button"
                       onClick={shuffleNow}
                       disabled={shuffling || !canShuffle}
-                      className="flex h-11 flex-1 items-center justify-center gap-2 rounded-2xl bg-[#4f9149] text-sm font-black uppercase tracking-wide text-white shadow-[0_4px_0_0_#34631f] transition-all active:translate-y-0.5 active:shadow-none disabled:opacity-50 disabled:shadow-none"
+                      className="flex h-11 flex-1 items-center justify-center gap-2 rounded-2xl bg-[#4f9149] text-sm font-black tracking-wide text-white shadow-[0_4px_0_0_#34631f] transition-all active:translate-y-0.5 active:shadow-none disabled:opacity-50 disabled:shadow-none"
                     >
                       <Shuffle
                         className={cn('h-4 w-4', shuffling && 'animate-spin')}
@@ -350,7 +350,7 @@ export function SkinRotationDialog({
 
                   {/* Lock what you like, shuffle the rest — the difference
                       between a slot machine and a styling tool. */}
-                  <p className="mb-2 mt-5 px-1 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">
+                  <p className="mb-2 mt-5 px-1 text-[12px] font-black text-muted-foreground">
                     Keep these
                   </p>
                   <div className="flex flex-wrap gap-2">
@@ -390,7 +390,7 @@ export function SkinRotationDialog({
                 </>
               )}
 
-              <p className="mb-2 mt-5 px-1 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">
+              <p className="mb-2 mt-5 px-1 text-[12px] font-black text-muted-foreground">
                 Auto-shuffle
               </p>
               <div className="space-y-2">

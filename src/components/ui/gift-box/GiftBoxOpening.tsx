@@ -284,7 +284,7 @@ export default function GiftBoxOpening({
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.4 }}
-                  className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-amber-400 px-3.5 py-1.5 text-[11px] font-black uppercase tracking-wide text-slate-900 shadow-[0_3px_0_rgba(15,23,42,0.3)]"
+                  className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-amber-400 px-3.5 py-1.5 text-[13px] font-black tracking-wide text-slate-900 shadow-[0_3px_0_rgba(15,23,42,0.3)]"
                 >
                   🎁 Bonus gift!
                 </motion.span>
@@ -294,7 +294,7 @@ export default function GiftBoxOpening({
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.5 }}
-                  className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-emerald-400 px-3.5 py-1.5 text-[11px] font-black uppercase tracking-wide text-slate-900 shadow-[0_3px_0_rgba(15,23,42,0.3)]"
+                  className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-emerald-400 px-3.5 py-1.5 text-[13px] font-black tracking-wide text-slate-900 shadow-[0_3px_0_rgba(15,23,42,0.3)]"
                 >
                   ⭐ Off your wishlist
                 </motion.span>

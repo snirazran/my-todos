@@ -62,7 +62,7 @@ export function NotifyView({
       </div>
 
       <div className="mb-5">
-        <div className="mx-auto mb-2 grid max-w-[220px] grid-cols-2 text-center text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground/70">
+        <div className="mx-auto mb-2 grid max-w-[220px] grid-cols-2 text-center text-[12px] font-bold text-muted-foreground/70">
           <span>Hour</span>
           <span>Minute</span>
         </div>
@@ -91,7 +91,7 @@ export function NotifyView({
       </div>
 
       <div className="mb-5">
-        <div className="mb-2 text-center text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground/70">
+        <div className="mb-2 text-center text-[12px] font-bold text-muted-foreground/70">
           Notify before
         </div>
         <div className="grid grid-cols-3 gap-2">

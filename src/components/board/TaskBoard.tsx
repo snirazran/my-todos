@@ -2004,7 +2004,7 @@ export default function TaskBoard({
           </span>
           <span
             className={[
-              'mt-1.5 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wider transition-colors',
+              'mt-1.5 rounded-full px-2.5 py-1 text-[12px] font-black transition-colors',
               armed
                 ? 'bg-primary text-primary-foreground'
                 : 'bg-primary/10 text-primary',

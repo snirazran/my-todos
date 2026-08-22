@@ -481,7 +481,7 @@ export function FlyCatchOverlay() {
         className="pointer-events-none fixed left-0 top-0 z-[118] flex items-center justify-center opacity-0"
         aria-hidden
       >
-        <div className="flex h-full w-full items-center justify-center gap-1.5 rounded-[18px] border border-border/50 bg-card/80 px-4 text-[11px] font-black uppercase tracking-[0.12em] text-primary shadow-sm backdrop-blur-2xl">
+        <div className="flex h-full w-full items-center justify-center gap-1.5 rounded-[18px] border border-border/50 bg-card/80 px-4 text-[13px] font-black text-primary shadow-sm backdrop-blur-2xl">
           <ChevronDown
             className={cn('h-4 w-4', armed && 'animate-bounce')}
             strokeWidth={3}

@@ -356,7 +356,7 @@ export function NotificationProvider({
                   <button
                     onClick={() => handleUndo(n)}
                     disabled={isUndoing}
-                    className="text-sm font-bold text-primary hover:text-primary/80 transition-colors uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    className="text-sm font-bold text-primary hover:text-primary/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                   >
                     {isUndoing ? (
                       <>

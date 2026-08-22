@@ -60,7 +60,7 @@ export function GoldenRewardButton({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        'w-full flex items-center justify-center gap-2.5 rounded-2xl bg-gradient-to-r from-amber-400 via-orange-500 to-amber-400 bg-[length:200%_100%] animate-[shimmer_2s_ease-in-out_infinite] py-3.5 text-[15px] font-black uppercase tracking-[0.14em] text-white shadow-lg shadow-amber-500/30 ring-2 ring-amber-400/40 transition hover:brightness-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60',
+        'w-full flex items-center justify-center gap-2.5 rounded-2xl bg-gradient-to-r from-amber-400 via-orange-500 to-amber-400 bg-[length:200%_100%] animate-[shimmer_2s_ease-in-out_infinite] py-3.5 text-[15px] font-black text-white shadow-lg shadow-amber-500/30 ring-2 ring-amber-400/40 transition hover:brightness-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60',
         className,
       )}
     >
@@ -167,11 +167,11 @@ export const RewardCard = ({
             transition={{ type: 'spring', stiffness: 300, damping: 18, delay: 0.3 }}
             className="absolute left-0 right-0 flex flex-col items-center gap-1 -top-[4.5rem] z-30"
           >
-            <span className="flex items-center gap-1.5 text-xs font-black uppercase tracking-[0.25em] text-white/50">
+            <span className="flex items-center gap-1.5 text-[13px] font-black text-white/50">
               <Crown className="w-3.5 h-3.5 text-amber-400 drop-shadow-[0_0_6px_rgba(251,191,36,0.5)]" />
               Premium
             </span>
-            <span className="flex items-center gap-1.5 text-xs font-black uppercase tracking-[0.25em] text-white/50">
+            <span className="flex items-center gap-1.5 text-[13px] font-black text-white/50">
               <span className="px-2 py-0.5 text-base font-black tracking-wide text-amber-300 rounded-lg bg-amber-500/15 border border-amber-400/25 shadow-[0_0_16px_rgba(251,191,36,0.25)]">
                 x2
               </span>
@@ -199,7 +199,7 @@ export const RewardCard = ({
           {/* Top Badge */}
           <div
             className={cn(
-              'absolute top-4 left-0 z-50 px-4 py-1.5 rounded-r-xl text-xs font-black uppercase tracking-widest shadow-sm border-y border-r',
+              'absolute top-4 left-0 z-50 px-4 py-1.5 rounded-r-xl text-[13px] font-black shadow-sm border-y border-r',
               config.bg,
               config.text,
               config.border
@@ -335,7 +335,7 @@ export const RewardCard = ({
             <h3 className="mb-1 text-2xl font-black leading-none text-center text-slate-800 dark:text-white">
               {prize.name}
             </h3>
-            <p className="text-sm font-bold tracking-wider uppercase text-slate-500 dark:text-slate-400">
+            <p className="text-sm font-bold text-slate-500 dark:text-slate-400">
               {slotLabel ??
                 (prize.kind === 'background'
                   ? 'Background'
@@ -380,7 +380,7 @@ export const RewardCard = ({
             </>
           ) : (
             <>
-              <span className="relative z-20 uppercase tracking-[0.14em]">
+              <span className="relative z-20">
                 {prize.slot === 'container'
                   ? quantity && quantity > 1
                     ? `Open All (${quantity})`
@@ -395,7 +395,7 @@ export const RewardCard = ({
             type="button"
             onClick={onOpenLater}
             disabled={isProcessing || !showContent}
-            className="w-full rounded-2xl border border-white/15 bg-white/10 py-3 text-sm font-black uppercase tracking-[0.14em] text-white shadow-lg transition hover:bg-white/15 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded-2xl border border-white/15 bg-white/10 py-3 text-sm font-black text-white shadow-lg transition hover:bg-white/15 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {openLaterLabel}
           </button>
@@ -458,7 +458,7 @@ function SpareBadge({
       <span className="rounded-xl border border-white/20 bg-black/45 px-3 py-1 text-sm font-black text-white shadow-sm backdrop-blur-sm">
         x{count}
       </span>
-      <span className="rounded-lg bg-amber-400/90 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-slate-900 shadow-sm">
+      <span className="rounded-lg bg-amber-400/90 px-2 py-0.5 text-[11px] font-black tracking-wide text-slate-900 shadow-sm">
         Spare
       </span>
     </motion.div>

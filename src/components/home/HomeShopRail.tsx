@@ -196,20 +196,20 @@ export function HomeShopRail() {
                   strokeWidth={3}
                   fill="currentColor"
                 />
-                <span className="truncate text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+                <span className="truncate text-[11px] font-black text-muted-foreground">
                   Wishlist
                   {savedCount > 1 && !focus.onDeal
                     ? ` · ${savedCount} saved`
                     : ''}
                 </span>
                 {focus.onDeal && (
-                  <span className="shrink-0 whitespace-nowrap rounded-full bg-amber-500/15 px-1.5 py-px text-[9px] font-black uppercase tracking-wider text-amber-700 dark:text-amber-400">
+                  <span className="shrink-0 whitespace-nowrap rounded-full bg-amber-500/15 px-1.5 py-px text-[11px] font-black text-amber-700 dark:text-amber-400">
                     {focus.discountPercent}% off
                   </span>
                 )}
               </span>
               {focus.affordable ? (
-                <span className="shrink-0 whitespace-nowrap text-[10px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                <span className="shrink-0 whitespace-nowrap text-[12px] font-black text-emerald-600 dark:text-emerald-400">
                   Ready to buy
                 </span>
               ) : (
@@ -244,7 +244,7 @@ export function HomeShopRail() {
         onClick={() => open('header')}
         className="mb-2 flex w-full items-center gap-2 px-1 text-left"
       >
-        <span className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">
+        <span className="text-[12px] font-black text-muted-foreground">
           Today at the shop
         </span>
         {countdown && (
@@ -275,7 +275,7 @@ export function HomeShopRail() {
               <span className="absolute left-0 top-0 z-20 overflow-hidden rounded-br-2xl bg-background">
                 <span
                   className={cn(
-                    'block rounded-br-2xl border-b border-r px-2 py-1 text-[9px] font-black uppercase tracking-wider',
+                    'block rounded-br-2xl border-b border-r px-2 py-1 text-[11px] font-black',
                     config.bg,
                     config.text,
                     config.border,
@@ -306,7 +306,7 @@ export function HomeShopRail() {
                 </span>
               </span>
 
-              <span className="mt-0.5 text-center text-[10px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+              <span className="mt-0.5 text-center text-[12px] font-black text-emerald-600 dark:text-emerald-400">
                 {onSale ? `${discountPercent}% off today` : ' '}
               </span>
             </button>

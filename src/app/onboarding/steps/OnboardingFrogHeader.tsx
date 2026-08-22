@@ -83,7 +83,7 @@ export function OnboardingFrogHeader({
           }
         >
           {eyebrow ? (
-            <p className="mb-1 flex h-5 items-center justify-center text-center text-xs font-black uppercase tracking-[0.18em] text-muted-foreground">
+            <p className="mb-1 flex h-5 items-center justify-center text-center text-[13px] font-black text-muted-foreground">
               {eyebrow}
             </p>
           ) : null}

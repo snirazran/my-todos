@@ -84,7 +84,7 @@ export function WishlistGoalCard({
         <span className="min-w-0 flex-1">
           <span
             className={cn(
-              'block text-[10px] font-black uppercase tracking-[0.16em]',
+              'block text-[12px] font-black',
               config.text,
             )}
           >
@@ -93,7 +93,7 @@ export function WishlistGoalCard({
           <span className="mt-1 flex items-center gap-1.5">
             {pricing.onDeal && (
               <>
-                <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-amber-700 dark:text-amber-400">
+                <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[11px] font-black text-amber-700 dark:text-amber-400">
                   {pricing.discountPercent}% off
                 </span>
                 <span className="text-[11px] font-bold tabular-nums text-muted-foreground line-through decoration-2 opacity-70">

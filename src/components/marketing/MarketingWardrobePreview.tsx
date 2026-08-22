@@ -159,7 +159,7 @@ export function MarketingWardrobePreview() {
     <div className="flex max-h-[min(760px,82svh)] flex-col overflow-hidden rounded-[30px] border border-border/60 bg-card shadow-xl shadow-emerald-950/10">
       <div className="flex shrink-0 items-center justify-between gap-4 border-b border-border/60 px-5 py-4">
         <div className="min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">
+          <p className="text-[12px] font-black text-muted-foreground">
             Wardrobe
           </p>
           <p className="mt-0.5 text-sm font-black">Dress your frog, then set the pond</p>
@@ -168,7 +168,7 @@ export function MarketingWardrobePreview() {
           <span className="text-xl font-black leading-none tracking-tight text-primary tabular-nums">
             {lookLabel}
           </span>
-          <span className="max-w-[7ch] text-[8px] font-black uppercase leading-tight tracking-[0.12em] text-foreground/70">
+          <span className="max-w-[7ch] text-[10px] font-black leading-tight text-foreground/70">
             Frog looks
           </span>
         </div>
@@ -192,7 +192,7 @@ export function MarketingWardrobePreview() {
         <button
           type="button"
           onClick={shuffle}
-          className="group absolute left-1/2 top-4 z-40 inline-flex -translate-x-1/2 items-center gap-2 rounded-full bg-white/95 px-5 py-2.5 text-[11px] font-black uppercase tracking-[0.14em] text-[#1f5526] shadow-lg shadow-emerald-950/25 ring-1 ring-black/5 backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:bg-white hover:shadow-xl hover:shadow-emerald-950/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white active:translate-y-0 dark:bg-[#0d2118]/90 dark:text-[#b7e39c] dark:ring-white/10"
+          className="group absolute left-1/2 top-4 z-40 inline-flex -translate-x-1/2 items-center gap-2 rounded-full bg-white/95 px-5 py-2.5 text-[13px] font-black text-[#1f5526] shadow-lg shadow-emerald-950/25 ring-1 ring-black/5 backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:bg-white hover:shadow-xl hover:shadow-emerald-950/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white active:translate-y-0 dark:bg-[#0d2118]/90 dark:text-[#b7e39c] dark:ring-white/10"
         >
           <Shuffle
             className="h-4 w-4 transition-transform duration-500 group-hover:rotate-180"
@@ -226,7 +226,7 @@ export function MarketingWardrobePreview() {
         </div>
 
         <div className="flex shrink-0 items-center justify-between gap-3">
-          <p className="text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+          <p className="text-[11px] font-black text-muted-foreground">
             {filter === 'background'
               ? `${backgrounds.length} ponds`
               : `${visibleItems.length} items`}

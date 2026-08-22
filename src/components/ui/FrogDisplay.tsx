@@ -285,13 +285,13 @@ export function FrogDisplay({
 
               w-[340px] max-w-[min(94vw,100%)] h-[50px] px-2
 
-              bg-card/80
+              bg-hero-surface
 
               backdrop-blur-2xl
 
               rounded-[18px]
 
-              border border-border/50
+              border border-hero-border
 
               shadow-sm"
       >

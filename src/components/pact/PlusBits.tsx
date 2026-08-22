@@ -21,7 +21,7 @@ export function PlusPill({
   return (
     <span
       className={cn(
-        'inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-amber-400/12 py-1 pl-1.5 pr-2.5 text-[12px] font-black uppercase tracking-[0.12em] text-amber-600 ring-1 ring-amber-400/35 dark:text-amber-400',
+        'inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-amber-400/12 py-1 pl-1.5 pr-2.5 text-[13px] font-black text-amber-600 ring-1 ring-amber-400/35 dark:text-amber-400',
         className,
       )}
     >

@@ -391,7 +391,7 @@ function ItemCardComponent({
         {mode === 'trade' && !customAction && (
           <div
             className={cn(
-              'h-7 md:h-8 w-full flex items-center justify-center rounded-lg text-[10px] md:text-xs font-black uppercase tracking-wide transition-colors',
+              'h-7 md:h-8 w-full flex items-center justify-center rounded-lg text-[12px] md:text-[13px] font-black tracking-wide transition-colors',
               compact && 'mt-1 mb-1.5',
               isSelected
                 ? 'bg-primary text-primary-foreground shadow-md'
@@ -437,7 +437,7 @@ function ItemCardComponent({
             ) : actionLabel ? (
               <span>{actionLabel}</span>
             ) : tradeOnly ? (
-              <span className="inline-flex items-center gap-1 text-[10px] md:text-[11px] uppercase tracking-[0.12em]">
+              <span className="inline-flex items-center gap-1 text-[12px] md:text-[13px]">
                 <Repeat
                   className="h-3 w-3 md:h-3.5 md:w-3.5"
                   strokeWidth={3}
@@ -465,7 +465,7 @@ function ItemCardComponent({
           item.slot !== 'container' && (
           <div
             className={cn(
-              'h-7 md:h-8 w-full flex items-center justify-center gap-1 rounded-lg text-[10px] md:text-xs font-black uppercase tracking-wide transition-colors duration-200',
+              'h-7 md:h-8 w-full flex items-center justify-center gap-1 rounded-lg text-[12px] md:text-[13px] font-black tracking-wide transition-colors duration-200',
               isEquipped
                 ? 'bg-green-500 text-white shadow-md'
                 : 'bg-primary/15 text-primary border border-primary/30 group-hover:bg-primary/25',
@@ -829,7 +829,7 @@ function DropRatesPopup({
                     )}
                   >
                     <span className={cn('h-2.5 w-2.5 shrink-0 rounded-full', tile.dot)} />
-                    <span className={cn('text-sm font-black uppercase tracking-wide', tile.text)}>
+                    <span className={cn('text-sm font-black tracking-wide', tile.text)}>
                       {RARITY_LABEL[row.rarity]}
                     </span>
                     <span className={cn('ml-auto text-lg font-black tabular-nums', tile.text)}>
@@ -858,7 +858,7 @@ function DropRatesPopup({
                     {/* Rarity header */}
                     <div className="flex items-center gap-2 px-4 pb-2 pt-2.5">
                       <span className={cn('h-2.5 w-2.5 shrink-0 rounded-full', tile.dot)} />
-                      <span className={cn('text-sm font-black uppercase tracking-wide', tile.text)}>
+                      <span className={cn('text-sm font-black tracking-wide', tile.text)}>
                         {RARITY_LABEL[group.rarity]}
                       </span>
                       <span className={cn('ml-auto text-base font-black tabular-nums', tile.text)}>
@@ -936,7 +936,7 @@ function GiftMechanicsNote({
   ];
   return (
     <div className="mt-4 space-y-2 rounded-2xl border border-border/50 bg-muted/25 p-3.5">
-      <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+      <p className="text-[12px] font-black text-muted-foreground">
         How the draw works
       </p>
       {rows.map(([label, body]) => (

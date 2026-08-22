@@ -108,7 +108,7 @@ export function HungerWarningModal({
                 disabled={recovering}
                 className="flex h-16 w-full flex-col items-center justify-center gap-1 rounded-2xl bg-amber-500 text-white shadow-[0_4px_0_0_#b45309] ring-1 ring-[#b45309]/40 transition-all [@media(hover:hover)]:hover:bg-amber-400 active:translate-y-[2px] active:shadow-none disabled:opacity-60"
               >
-                <span className="flex items-center gap-2 text-[13px] font-black uppercase tracking-[0.11em]">
+                <span className="flex items-center gap-2 text-[13px] font-black">
                   {recovering ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : mode === 'plus' ? (

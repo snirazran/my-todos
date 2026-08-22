@@ -4,7 +4,11 @@ import {
   DEFAULT_BACKGROUND_ID,
   DEFAULT_BACKGROUND_IMAGES as SHARED_DEFAULT_BACKGROUND_IMAGES,
   isLegacyLocalBackground,
+  normalizeAccent,
+  type BackgroundAccent,
 } from '@/lib/backgrounds/constants';
+
+export type { BackgroundAccent };
 
 export type BackgroundRarity =
   | 'common'
@@ -26,6 +30,7 @@ export type BackgroundItem = {
   rarity: BackgroundRarity;
   priceFlies: number;
   images: BackgroundImages;
+  accent?: BackgroundAccent | null;
   hidden?: boolean;
 };
 
@@ -45,6 +50,7 @@ const LAST_BACKGROUND_KEY = 'frogress.lastEquippedBackground';
 export type CachedBackground = {
   id: string;
   images: BackgroundImages;
+  accent?: BackgroundAccent | null;
 };
 
 const fetcher = bootstrapFetcher;
@@ -64,13 +70,14 @@ export function readCachedBackground(): CachedBackground | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as CachedBackground;
     if (!parsed?.id || !parsed.images?.mobile) return null;
+    const accent = normalizeAccent(parsed.accent);
     if (
       parsed.id === DEFAULT_BACKGROUND_ID ||
       isLegacyLocalBackground(parsed.images.mobile)
     ) {
-      return { id: parsed.id, images: DEFAULT_BACKGROUND_IMAGES };
+      return { id: parsed.id, images: DEFAULT_BACKGROUND_IMAGES, accent };
     }
-    return parsed;
+    return { ...parsed, accent };
   } catch {
     return null;
   }

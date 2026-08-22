@@ -77,8 +77,8 @@ const glassButtonClass =
   'border border-[#1c4432]/20 bg-white/85 text-[#153b2b] shadow-sm transition-colors hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary dark:border-white/20 dark:bg-white/10 dark:text-[#e6f3e9] dark:hover:bg-white/20';
 
 const accentClass = 'text-[#166534] dark:text-[#8ee0a2]';
-const eyebrowClass = `text-[11px] font-black uppercase tracking-[0.28em] ${accentClass}`;
-const darkEyebrowClass = 'text-[11px] font-black uppercase tracking-[0.28em] text-[#b7e39c]';
+const eyebrowClass = `text-[13px] font-black ${accentClass}`;
+const darkEyebrowClass = 'text-[13px] font-black text-[#b7e39c]';
 const headingClass =
   'mt-4 text-balance text-[clamp(1.9rem,4.6vw,3.4rem)] font-black leading-[1.04] tracking-[-0.042em]';
 const bodyClass =
@@ -153,7 +153,7 @@ export function PublicHomepage() {
 
         <div className="mx-auto grid w-full max-w-7xl items-center gap-2 px-5 pb-16 pt-8 sm:px-8 sm:pt-12 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] lg:gap-8 lg:px-10 lg:pb-24 lg:pt-14">
           <div className="relative z-20 mx-auto max-w-xl text-center lg:mx-0 lg:text-left">
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#1c4432]/15 bg-white/85 px-3.5 py-1.5 text-[11px] font-black uppercase tracking-[0.14em] text-[#1c5231] shadow-sm dark:border-white/20 dark:bg-white/10 dark:text-[#a9df97]">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#1c4432]/15 bg-white/85 px-3.5 py-1.5 text-[13px] font-black text-[#1c5231] shadow-sm dark:border-white/20 dark:bg-white/10 dark:text-[#a9df97]">
               <span className="h-2 w-2 rounded-full bg-emerald-600 dark:bg-emerald-400" />
               For brains that need a payoff
             </div>
@@ -355,7 +355,7 @@ export function PublicHomepage() {
       <section className="px-5 pb-16 sm:px-8 sm:pb-20 lg:px-10 lg:pb-24">
         <Reveal className="relative mx-auto flex w-full max-w-7xl flex-col gap-8 overflow-hidden rounded-[34px] bg-[#cfe7a1] px-6 py-14 text-[#153b2b] sm:px-10 md:flex-row md:items-center md:justify-between md:gap-10 lg:gap-14 lg:px-14">
           <div className="relative z-10 min-w-0 max-w-xl">
-            <p className="text-[11px] font-black uppercase tracking-[0.28em] text-[#28532c]">
+            <p className="text-[13px] font-black text-[#28532c]">
               Start small
             </p>
             <h2 className="mt-4 text-balance text-[clamp(1.9rem,4.6vw,3.4rem)] font-black leading-[1.04] tracking-[-0.042em]">
