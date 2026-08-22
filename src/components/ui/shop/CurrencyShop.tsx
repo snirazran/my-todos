@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import useSWR from 'swr';
+import useSWR, { mutate as revalidateAll } from 'swr';
 import { Loader2, SquarePlay } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { BaseSheet } from '@/components/ui/BaseSheet';
@@ -191,6 +191,7 @@ export function CurrencyShop() {
                       const next = await mutateInventory();
                       if ((next?.wardrobe?.flies ?? 0) > before) {
                         mutateInventoryCaches();
+                        void revalidateAll(() => true);
                         return true;
                       }
                     }

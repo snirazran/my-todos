@@ -75,7 +75,7 @@ export function PlusUpgradeModal({
   }, [open, placement]);
 
   const refreshPremiumState = async () => {
-    await mutate((key) => typeof key === 'string' && key.startsWith('/api/quests'));
+    await mutate(() => true);
     mutateInventoryCaches();
   };
 
