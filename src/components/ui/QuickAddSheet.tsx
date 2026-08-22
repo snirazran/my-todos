@@ -321,6 +321,7 @@ export default function QuickAddSheet({
   const [bulkInitialTasks, setBulkInitialTasks] = useState<string[] | null>(null);
   const [bulkOmittedCount, setBulkOmittedCount] = useState(0);
   const [nlDismissed, setNlDismissed] = useState('');
+  const [nlApplied, setNlApplied] = useState('');
   const [repeat, setRepeat] = useState<RepeatChoice>(defaultRepeat);
   const [tags, setTags] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -757,13 +758,14 @@ export default function QuickAddSheet({
             })
           : labelForDisplayDay(selectedDay as Exclude<DisplayDay, 7>, daysOrder);
 
-  // "call mom tomorrow at 3pm" → offer to schedule and strip the phrase.
-  // Suggestion only; typing is never rewritten until the chip is tapped.
+  // "call mom tomorrow at 3pm" → offer to schedule it. The chip only fills in
+  // the date/time fields; what was typed stays exactly as typed.
   const nlParsed = useMemo(() => parseNaturalInput(text), [text]);
   const nlSuggestion =
     !isLater &&
     nlParsed &&
     text !== nlDismissed &&
+    text !== nlApplied &&
     ((nlParsed.dateKey && nlParsed.dateKey !== selectedDateKey) ||
       (nlParsed.startTime && nlParsed.startTime !== startTime))
       ? nlParsed
@@ -793,7 +795,7 @@ export default function QuickAddSheet({
       setStartTime(nlSuggestion.startTime);
       setNotifyEnabled(true);
     }
-    setText(nlSuggestion.cleaned);
+    setNlApplied(text);
   };
 
   // Focus areas are user-defined docs with arbitrary ids, so matching goes

@@ -1743,7 +1743,9 @@ export default function TaskList({
 
   const [usesSwipeTrays, setUsesSwipeTrays] = useState(false);
   React.useEffect(() => {
-    const media = window.matchMedia('(max-width: 767px)');
+    const media = window.matchMedia(
+      '(max-width: 767px), (hover: none), (pointer: coarse)',
+    );
     const update = () => setUsesSwipeTrays(media.matches);
     update();
     media.addEventListener('change', update);

@@ -1,6 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  type CSSProperties,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { Check, ListPlus, Plus, Trash2 } from 'lucide-react';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { cn } from '@/lib/utils';
@@ -139,8 +146,8 @@ export default function BulkAddReviewSheet({
   };
 
   const panelMaxHeight = viewportHeight
-    ? Math.max(320, viewportHeight - 12)
-    : undefined;
+    ? `${Math.max(320, viewportHeight - 12)}px`
+    : '100dvh';
 
   return (
     <BaseSheet
@@ -149,8 +156,10 @@ export default function BulkAddReviewSheet({
       zIndex={1600}
       bottomInset={keyboardInset}
       closeAriaLabel="Close bulk add"
-      panelStyle={panelMaxHeight ? { maxHeight: panelMaxHeight } : undefined}
-      className="h-[92dvh] bg-background sm:h-auto sm:max-h-[min(82vh,780px)] sm:max-w-2xl"
+      panelStyle={
+        { '--bulk-panel-max': panelMaxHeight } as CSSProperties
+      }
+      className="h-[92dvh] max-h-[var(--bulk-panel-max)] bg-background sm:h-auto sm:max-h-[min(var(--bulk-panel-max),82vh,780px)] sm:max-w-2xl"
     >
       {({ bindScroll }) => (
         <div
