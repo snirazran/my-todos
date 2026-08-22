@@ -193,11 +193,16 @@ export function CurrencyShop() {
                       attempt += 1;
                       let seen: string | number = 'err';
                       try {
-                        const next = await mutateInventory();
-                        const flies = next?.wardrobe?.flies;
+                        const res = await fetch(
+                          `/api/skins/inventory?view=summary&t=${Date.now()}`,
+                          { cache: 'no-store' },
+                        );
+                        const payload = await res.json();
+                        const flies = payload?.wardrobe?.flies;
                         seen = typeof flies === 'number' ? flies : 'undef';
                         if (typeof flies === 'number' && flies > before) {
                           console.log('[flypoll] landed at attempt', attempt, flies);
+                          await mutateInventory();
                           mutateInventoryCaches();
                           void revalidateAll(() => true);
                           return true;
