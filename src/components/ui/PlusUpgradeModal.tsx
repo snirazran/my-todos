@@ -16,6 +16,7 @@ import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
 import { RARITY_CONFIG } from '@/components/ui/gift-box/constants';
 import { purchasePlus, restorePlusPurchases } from '@/lib/purchases';
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
+import { mutateInventoryCaches } from '@/hooks/useInventory';
 import { auth } from '@/lib/firebase';
 import { ShieldAlert } from 'lucide-react';
 
@@ -73,8 +74,25 @@ export function PlusUpgradeModal({
     }
   }, [open, placement]);
 
-  const refreshPremiumState = () =>
-    mutate((key) => typeof key === 'string' && key.startsWith('/api/quests'));
+  const refreshPremiumState = async () => {
+    await mutate((key) => typeof key === 'string' && key.startsWith('/api/quests'));
+    mutateInventoryCaches();
+  };
+
+  const confirmPremiumActive = async () => {
+    const deadline = Date.now() + 60000;
+    while (Date.now() < deadline) {
+      try {
+        const res = await fetch('/api/purchases/sync', { method: 'POST' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.isPremium) return true;
+        }
+      } catch {}
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+    }
+    return false;
+  };
 
   const startPurchase = async () => {
     if (purchasing) return;
@@ -87,6 +105,7 @@ export function PlusUpgradeModal({
     try {
       const outcome = await purchasePlus(plan, placement);
       if (outcome === 'purchased') {
+        await confirmPremiumActive();
         await refreshPremiumState();
         await onStartTrial?.(plan);
         setCelebrating(true);

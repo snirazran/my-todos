@@ -10,7 +10,7 @@ import Fly from '@/components/ui/fly';
 import { AnimatedNumber } from '@/components/ui/AnimatedNumber';
 import { Icon } from '@/components/ui/Icon';
 import { useUIStore } from '@/lib/uiStore';
-import { useInventory, patchInventoryFlies } from '@/hooks/useInventory';
+import { useInventory, patchInventoryFlies, mutateInventoryCaches } from '@/hooks/useInventory';
 import { rewardedAdsAvailable, showRewardedAd } from '@/lib/ads';
 import { hapticSuccess } from '@/lib/haptics';
 import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
@@ -180,14 +180,21 @@ export function CurrencyShop() {
                   pack={pack}
                   covers={pack.id === coversId}
                   showArt={artReady}
-                  onPurchased={() => {
+                  onPurchased={async () => {
                     boughtRef.current = true;
                     markCampaignConverted();
                     emitCampaignTrigger('purchase_completed');
-                    window.setTimeout(() => void mutateInventory(), 1200);
-                    window.setTimeout(() => void mutateInventory(), 5000);
-                    window.setTimeout(() => void mutateInventory(), 15000);
-                    window.setTimeout(() => void mutateInventory(), 45000);
+                    const before = inventoryData?.wardrobe?.flies ?? 0;
+                    const deadline = Date.now() + 60000;
+                    while (Date.now() < deadline) {
+                      await new Promise((resolve) => setTimeout(resolve, 1200));
+                      const next = await mutateInventory();
+                      if ((next?.wardrobe?.flies ?? 0) > before) {
+                        mutateInventoryCaches();
+                        return true;
+                      }
+                    }
+                    return false;
                   }}
                 />
               ))}
@@ -215,7 +222,7 @@ function PackRow({
   bundle: number;
   covers: boolean;
   showArt: boolean;
-  onPurchased: () => void;
+  onPurchased: () => Promise<boolean>;
 }) {
   const popular = !covers && pack.badge === 'popular';
   const best = pack.badge === 'best';
@@ -229,7 +236,8 @@ function PackRow({
       const result = await purchaseFlyPack(pack.id as FlyPackId);
       if (result === 'purchased') {
         setStatus('Adding flies...');
-        onPurchased();
+        const landed = await onPurchased();
+        setStatus(landed ? null : 'Still processing...');
       }
     } catch (error) {
       setStatus(error instanceof Error && error.message.includes('not configured')
