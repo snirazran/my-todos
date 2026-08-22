@@ -99,22 +99,6 @@ import { useNotification } from '@/components/providers/NotificationProvider';
 import { useUIStore } from '@/lib/uiStore';
 import { guideById } from '@/lib/hints/guides';
 import { format } from 'date-fns';
-import { useFrogFullness } from '@/hooks/useFrogHunger';
-import { HUNGRY_MOOD_THRESHOLD } from '@/lib/hungerLogic';
-import { BellyMeter } from '@/components/ui/BellyMeter';
-
-/**
- * The frog reports on its own belly, in its own voice — and only brags about
- * being full when it actually is. One task is a single belly notch, so a half
- * belly asks for one more fly instead of promising a top-up.
- */
-function bellyLine(fullness: number | null): string {
-  if (fullness === null) return 'Plate clean. My compliments to the chef.';
-  if (fullness >= 0.9) return "Clean plate, full frog. I'm going to lie down.";
-  if (fullness > HUNGRY_MOOD_THRESHOLD)
-    return 'Still room for one more fly. Just saying.';
-  return '*stomach growls* Room for one more fly?';
-}
 
 interface Task {
   id: string;
@@ -1584,7 +1568,6 @@ export default function TaskList({
 
   const vSet = visuallyCompleted ?? new Set<string>();
 
-  const fullness = useFrogFullness(!isGuest);
 
   // Which rows have their steps showing. Held here rather than per-row so a
   // sort drag can collapse them: verticalListSortingStrategy translates rows by
@@ -2417,59 +2400,33 @@ export default function TaskList({
             !exitAction ? (
             /* Empty State: Tasks exist but all filtered/completed */
             allTasksCompleted && !filtersActive ? (
-              <div className="fly-caught-enter relative mb-2 overflow-hidden rounded-2xl border border-border/60 bg-card p-3 shadow-sm">
-                <div
-                  aria-hidden
-                  className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/[0.07] via-transparent to-transparent"
-                />
-                <div
-                  aria-hidden
-                  className="pointer-events-none absolute inset-x-4 top-0 h-px bg-gradient-to-r from-transparent via-white/60 to-transparent opacity-50"
-                />
-                <div className="relative flex items-center gap-3">
-                  <div className="belly-dot flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-background shadow-sm ring-1 ring-primary/20">
-                    <Fly size={30} y={-2} paused={paused} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[14px] font-black leading-tight tracking-tight text-foreground">
-                      Every fly caught!
-                    </p>
-                    {onShowCompleted ? (
-                      <button
-                        type="button"
-                        onClick={onShowCompleted}
-                        className="mt-1 inline-flex items-center gap-1 rounded-lg bg-primary/10 px-1.5 py-1 text-[11px] font-bold leading-none text-primary transition-colors [@media(hover:hover)]:hover:bg-primary/20"
-                      >
-                        <Eye className="h-3.5 w-3.5" />
-                        Show {tasks.length}{' '}
-                        {tasks.length === 1 ? 'task' : 'tasks'} done
-                      </button>
-                    ) : (
-                      <p className="mt-0.5 text-[11px] font-bold leading-none text-primary">
-                        {tasks.length} {tasks.length === 1 ? 'task' : 'tasks'}{' '}
-                        done today
-                      </p>
-                    )}
-                  </div>
+              <div className="fly-caught-enter flex flex-col items-center gap-1.5 px-2 pb-0 pt-6 text-center">
+                <Fly size={34} y={-2} paused={paused} />
+                <p className="mt-1 text-[16px] font-black leading-tight tracking-tight text-foreground">
+                  All caught for today
+                </p>
+                {onShowCompleted ? (
                   <button
                     type="button"
+                    onClick={onShowCompleted}
+                    className="inline-flex items-center gap-1 rounded-lg px-1.5 py-1 text-[12px] font-semibold text-muted-foreground transition-colors [@media(hover:hover)]:hover:text-foreground"
+                  >
+                    <Eye className="h-3.5 w-3.5" />
+                    Show {tasks.length} done
+                  </button>
+                ) : (
+                  <p className="text-[12px] font-semibold text-muted-foreground">
+                    {tasks.length} {tasks.length === 1 ? 'task' : 'tasks'} done
+                  </p>
+                )}
+                <div className="mt-3 w-full">
+                  <EmptyAddRow
+                    label="Add another task"
+                    quickAddOpen={quickAddOpen}
                     onClick={() =>
                       onAddRequested('', null, { preselectToday: true })
                     }
-                    className="flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-[#4f9149] via-[#5ca355] to-[#4f9149] bg-[length:200%_100%] px-3.5 text-[13px] font-black text-white shadow-[0_3px_0_0_#34631f] transition-all hover:brightness-105 active:translate-y-[2px] active:shadow-none disabled:pointer-events-none disabled:opacity-0"
-                    disabled={quickAddOpen}
-                  >
-                    <Plus className="h-4 w-4" strokeWidth={3.5} />
-                    Add
-                  </button>
-                </div>
-                <div className="relative mt-2.5 border-t border-border/60 pt-2.5">
-                  {fullness !== null && (
-                    <BellyMeter percent={fullness * 100} className="mb-1.5" />
-                  )}
-                  <p className="text-[12px] font-semibold leading-snug text-muted-foreground">
-                    {bellyLine(fullness)}
-                  </p>
+                  />
                 </div>
               </div>
             ) : filtersActive ? (
