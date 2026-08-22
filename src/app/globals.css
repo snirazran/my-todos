@@ -5,26 +5,25 @@
 
 @layer base {
   :root {
-    --bg-accent-hsl-h: 142;
-    --background: var(--bg-accent-hsl-h) 55% 97.6%;
+    --background: 0 0% 100%;
     --foreground: 0 0% 3.9%;
-    --card: var(--bg-accent-hsl-h) 50% 99.2%;
+    --card: 0 0% 100%;
     --header-h: 3.5rem; /* h-14 mobile */
     --card-foreground: 0 0% 3.9%;
-    --popover: var(--bg-accent-hsl-h) 50% 99.2%;
+    --popover: 0 0% 100%;
     --popover-foreground: 0 0% 3.9%;
     --primary: 142 76% 36%;
     --primary-foreground: 355 100% 98%;
-    --secondary: var(--bg-accent-hsl-h) 40% 94.4%;
+    --secondary: 0 0% 96.1%;
     --secondary-foreground: 0 0% 9%;
-    --muted: var(--bg-accent-hsl-h) 40% 94.4%;
-    --muted-foreground: var(--bg-accent-hsl-h) 10% 44%;
-    --accent: var(--bg-accent-hsl-h) 45% 93.4%;
+    --muted: 0 0% 96.1%;
+    --muted-foreground: 0 0% 45.1%;
+    --accent: 0 0% 96.1%;
     --accent-foreground: 0 0% 9%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
-    --border: var(--bg-accent-hsl-h) 30% 88%;
-    --input: var(--bg-accent-hsl-h) 30% 88%;
+    --border: 0 0% 89.8%;
+    --input: 0 0% 89.8%;
     --ring: 142 76% 36%;
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
@@ -36,42 +35,29 @@
     --bottom-safe: env(safe-area-inset-bottom, 0px);
     --repeat-icon-grey: #6c6c6c;
     --repeat-icon-green: #1f621c;
-
-    --bg-accent-h: 149.2;
-    --bg-accent-c: 0.062;
-    --hero-surface: oklch(
-      0.985 calc(var(--bg-accent-c) * 0.35) var(--bg-accent-h) / 0.85
-    );
-    --hero-header: oklch(
-      0.98 calc(var(--bg-accent-c) * 0.3) var(--bg-accent-h) / 0.95
-    );
-    --hero-border: oklch(
-      0.9 calc(var(--bg-accent-c) * 0.8) var(--bg-accent-h) / 0.55
-    );
-
     color-scheme: light;
   }
 
   .dark {
     /* Deep, low-glare frog-green neutrals with clearly stepped surfaces. */
-    --background: var(--bg-accent-hsl-h) 22% 7%;
-    --foreground: var(--bg-accent-hsl-h) 14% 93%;
-    --card: var(--bg-accent-hsl-h) 18% 10%;
-    --card-foreground: var(--bg-accent-hsl-h) 14% 93%;
-    --popover: var(--bg-accent-hsl-h) 16% 12%;
-    --popover-foreground: var(--bg-accent-hsl-h) 14% 93%;
+    --background: 150 22% 7%;
+    --foreground: 140 18% 93%;
+    --card: 150 18% 10%;
+    --card-foreground: 140 18% 93%;
+    --popover: 150 16% 12%;
+    --popover-foreground: 140 18% 93%;
     --primary: 142 65% 55%;
     --primary-foreground: 150 32% 8%;
-    --secondary: var(--bg-accent-hsl-h) 14% 16%;
-    --secondary-foreground: var(--bg-accent-hsl-h) 12% 91%;
-    --muted: var(--bg-accent-hsl-h) 12% 15%;
-    --muted-foreground: var(--bg-accent-hsl-h) 10% 68%;
-    --accent: var(--bg-accent-hsl-h) 18% 19%;
-    --accent-foreground: var(--bg-accent-hsl-h) 14% 92%;
+    --secondary: 150 14% 16%;
+    --secondary-foreground: 140 14% 91%;
+    --muted: 150 12% 15%;
+    --muted-foreground: 145 10% 68%;
+    --accent: 146 18% 19%;
+    --accent-foreground: 140 16% 92%;
     --destructive: 0 68% 48%;
     --destructive-foreground: 0 0% 98%;
-    --border: var(--bg-accent-hsl-h) 13% 30%;
-    --input: var(--bg-accent-hsl-h) 13% 36%;
+    --border: 145 13% 30%;
+    --input: 145 13% 36%;
     --ring: 142 70% 56%;
     --chart-1: 206 80% 62%;
     --chart-2: 150 65% 52%;
@@ -83,17 +69,6 @@
        the icon to a single currentColor fill. */
     --repeat-icon-grey: #a3ada6;
     --repeat-icon-green: #3ed66b;
-
-    --hero-surface: oklch(
-      0.25 calc(var(--bg-accent-c) * 0.55) var(--bg-accent-h) / 0.85
-    );
-    --hero-header: oklch(
-      0.22 calc(var(--bg-accent-c) * 0.5) var(--bg-accent-h) / 0.95
-    );
-    --hero-border: oklch(
-      0.42 calc(var(--bg-accent-c) * 0.7) var(--bg-accent-h) / 0.55
-    );
-
     color-scheme: dark;
   }
 }
@@ -127,34 +102,6 @@ body:has([data-public-home]) #main-scroll {
   }
   :focus-visible {
     outline-color: hsl(var(--ring));
-  }
-  body,
-  .bg-background,
-  .bg-card,
-  .bg-popover,
-  .bg-muted,
-  .bg-secondary,
-  .bg-hero-surface,
-  .bg-hero-header,
-  .border-border,
-  .border-hero-border {
-    transition:
-      background-color 600ms ease,
-      border-color 600ms ease;
-  }
-  @media (prefers-reduced-motion: reduce) {
-    body,
-    .bg-background,
-    .bg-card,
-    .bg-popover,
-    .bg-muted,
-    .bg-secondary,
-    .bg-hero-surface,
-    .bg-hero-header,
-    .border-border,
-    .border-hero-border {
-      transition: none;
-    }
   }
 }
 

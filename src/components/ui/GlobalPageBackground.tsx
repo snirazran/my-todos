@@ -46,7 +46,6 @@ export function GlobalPageBackground() {
     const next = {
       id: equippedBackground.id,
       images: equippedBackground.images,
-      accent: equippedBackground.accent ?? null,
     };
     setCachedBackground(next);
     writeCachedBackground(next);

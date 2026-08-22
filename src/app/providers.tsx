@@ -26,7 +26,6 @@ import { FlyGameClaimer } from '@/components/providers/FlyGameClaimer';
 import { FocusTimerLauncher } from '@/components/providers/FocusTimerLauncher';
 import { ErrorReporter } from '@/components/providers/ErrorReporter';
 import { WidgetSyncProvider } from '@/components/providers/WidgetSyncProvider';
-import { BackgroundAccent } from '@/components/providers/BackgroundAccent';
 
 export default function Providers({ children }: { children: ReactNode }) {
   return (
@@ -66,7 +65,6 @@ export default function Providers({ children }: { children: ReactNode }) {
             <HintCoach />
             <QuestRewardRevealHost />
             <WidgetSyncProvider />
-            <BackgroundAccent />
             {children}
           </NotificationProvider>
         </TaskSyncProvider>

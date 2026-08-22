@@ -26,20 +26,12 @@ type SizeKey = 'mobile' | 'tablet' | 'web' | 'webLarge';
 
 type BackgroundImages = Record<SizeKey, string>;
 
-type BackgroundAccent = {
-  hue: number;
-  chroma: number;
-  hex: string;
-  mode: 'auto' | 'manual';
-};
-
 type BackgroundItem = {
   id: string;
   name: string;
   rarity: Rarity;
   priceFlies: number;
   images: BackgroundImages;
-  accent?: BackgroundAccent | null;
   hidden: boolean;
 };
 
@@ -74,7 +66,6 @@ export function AdminBackgroundsManager() {
   const [items, setItems] = useState<BackgroundItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
-  const [backfilling, setBackfilling] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [draft, setDraft] = useState<{ name: string; rarity: Rarity; priceFlies: number }>({
     name: '',
@@ -114,7 +105,6 @@ export function AdminBackgroundsManager() {
         web: item.images?.web ?? '',
         webLarge: item.images?.webLarge ?? '',
       },
-      accent: item.accent ?? null,
       hidden: !!item.hidden,
     };
   }
@@ -154,48 +144,6 @@ export function AdminBackgroundsManager() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Save failed');
       flash('success', `Saved "${item.name}"`);
-    } catch (err) {
-      flash('error', err instanceof Error ? err.message : 'Save failed');
-    } finally {
-      setSavingId(null);
-    }
-  };
-
-  const backfillAccents = async () => {
-    setBackfilling(true);
-    try {
-      const res = await fetch('/api/admin/backgrounds', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'backfill-accents' }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Backfill failed');
-      flash('success', `Generated ${data.updated}, skipped ${data.skipped}`);
-      await load();
-    } catch (err) {
-      flash('error', err instanceof Error ? err.message : 'Backfill failed');
-    } finally {
-      setBackfilling(false);
-    }
-  };
-
-  const saveAccent = async (item: BackgroundItem, accentHex: string | null) => {
-    setSavingId(item.id);
-    try {
-      const res = await fetch('/api/admin/backgrounds', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: item.id, accentHex }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Save failed');
-      setItems((prev) =>
-        prev.map((row) =>
-          row.id === item.id ? { ...row, accent: data.item?.accent ?? null } : row,
-        ),
-      );
-      flash('success', accentHex ? 'Accent locked' : 'Accent recomputed from image');
     } catch (err) {
       flash('error', err instanceof Error ? err.message : 'Save failed');
     } finally {
@@ -355,22 +303,12 @@ export function AdminBackgroundsManager() {
 
         {/* List */}
         <div className="space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-lg font-black tracking-tight">
-              All Backgrounds{' '}
-              {items.length > 0 && (
-                <span className="text-muted-foreground font-bold">({items.length})</span>
-              )}
-            </h2>
-            <button
-              onClick={backfillAccents}
-              disabled={backfilling}
-              className="px-3 py-2 rounded-xl bg-secondary text-secondary-foreground text-xs font-black inline-flex items-center gap-2 transition-opacity hover:opacity-90 disabled:opacity-50"
-            >
-              {backfilling && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-              Generate missing accents
-            </button>
-          </div>
+          <h2 className="text-lg font-black tracking-tight">
+            All Backgrounds{' '}
+            {items.length > 0 && (
+              <span className="text-muted-foreground font-bold">({items.length})</span>
+            )}
+          </h2>
 
           {loading ? (
             <div className="rounded-3xl border border-border bg-card p-6 text-sm text-muted-foreground">
@@ -390,7 +328,6 @@ export function AdminBackgroundsManager() {
                 onImageUrl={(key, value) => setImageUrl(item.id, key, value)}
                 onSave={() => save(item)}
                 onDelete={() => remove(item)}
-                onSaveAccent={(hex) => saveAccent(item, hex)}
                 onFlash={flash}
               />
             ))
@@ -410,64 +347,6 @@ export function AdminBackgroundsManager() {
   );
 }
 
-function AccentEditor({
-  item,
-  saving,
-  onSaveAccent,
-}: {
-  item: BackgroundItem;
-  saving: boolean;
-  onSaveAccent: (hex: string | null) => void;
-}) {
-  const accent = item.accent ?? null;
-  const [hex, setHex] = useState(accent?.hex ?? '#16a249');
-
-  useEffect(() => {
-    if (accent?.hex) setHex(accent.hex);
-  }, [accent?.hex]);
-
-  return (
-    <div className="rounded-2xl border border-border bg-muted/40 p-3">
-      <div className="flex flex-wrap items-center gap-3">
-        <span
-          className="h-10 w-10 shrink-0 rounded-xl border border-border shadow-inner"
-          style={{ background: accent?.hex ?? '#16a249' }}
-        />
-        <div className="min-w-0 flex-1">
-          <div className="text-[13px] font-bold tracking-wide text-muted-foreground">
-            Theme accent
-          </div>
-          <div className="text-xs text-muted-foreground">
-            {accent
-              ? `${accent.mode === 'manual' ? 'Locked' : 'Auto'} · hue ${Math.round(accent.hue)}° · chroma ${accent.chroma.toFixed(3)}`
-              : 'Not set — upload a mobile image to generate one'}
-          </div>
-        </div>
-        <input
-          type="color"
-          value={/^#[0-9a-fA-F]{6}$/.test(hex) ? hex : '#16a249'}
-          onChange={(e) => setHex(e.target.value)}
-          className="h-10 w-12 shrink-0 cursor-pointer rounded-xl border border-border bg-background"
-        />
-        <button
-          onClick={() => onSaveAccent(hex)}
-          disabled={saving}
-          className="px-3 py-2 rounded-xl bg-secondary text-secondary-foreground text-xs font-black transition-opacity hover:opacity-90 disabled:opacity-50"
-        >
-          Lock colour
-        </button>
-        <button
-          onClick={() => onSaveAccent(null)}
-          disabled={saving}
-          className="px-3 py-2 rounded-xl bg-secondary text-secondary-foreground text-xs font-black transition-opacity hover:opacity-90 disabled:opacity-50"
-        >
-          Re-extract
-        </button>
-      </div>
-    </div>
-  );
-}
-
 function BackgroundRow({
   item,
   saving,
@@ -475,7 +354,6 @@ function BackgroundRow({
   onImageUrl,
   onSave,
   onDelete,
-  onSaveAccent,
   onFlash,
 }: {
   item: BackgroundItem;
@@ -484,7 +362,6 @@ function BackgroundRow({
   onImageUrl: (key: SizeKey, value: string) => void;
   onSave: () => void;
   onDelete: () => void;
-  onSaveAccent: (hex: string | null) => void;
   onFlash: (type: 'success' | 'error', text: string) => void;
 }) {
   const preview =
@@ -558,8 +435,6 @@ function BackgroundRow({
           />
         ))}
       </div>
-
-      <AccentEditor item={item} saving={saving} onSaveAccent={onSaveAccent} />
 
       <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
         <button

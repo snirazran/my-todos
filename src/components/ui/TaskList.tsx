@@ -2398,7 +2398,7 @@ export default function TaskList({
     <>
       <div dir="ltr" className="w-full px-1.5 pt-0 pb-3 overflow-visible md:px-4">
         <div
-          className="w-full overflow-hidden rounded-[18px] border border-border/50 bg-[hsl(var(--bg-accent-hsl-h)_22%_94%)] shadow-sm dark:bg-background md:border-border/35 md:bg-muted/40 md:shadow-none"
+          className="w-full overflow-hidden rounded-[18px] border border-border/50 bg-[hsl(150_12%_94%)] shadow-sm dark:bg-background md:border-border/35 md:bg-muted/40 md:shadow-none"
           data-hint="task-list"
         >
         <div

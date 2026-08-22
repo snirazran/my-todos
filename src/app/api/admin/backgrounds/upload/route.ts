@@ -6,7 +6,6 @@ import BackgroundModel, {
 } from '@/lib/models/Background';
 import { getAdminStorage } from '@/lib/firebaseAdmin';
 import { optimizeImage } from '@/lib/imageOptimize';
-import { extractAccent } from '@/lib/backgrounds/accent';
 
 const json = (body: unknown, init = 200) =>
   NextResponse.json(body, { status: init });
@@ -96,12 +95,6 @@ export async function POST(req: NextRequest) {
     const cacheBuster = Date.now();
     const publicUrl = `/api/background-files/${encodeURIComponent(id)}/${size}?v=${cacheBuster}`;
 
-    if (bg.accent?.mode !== 'manual' && (size === 'mobile' || !bg.accent)) {
-      try {
-        bg.set('accent', await extractAccent(rawBytes));
-      } catch {}
-    }
-
     bg.set(`imageFiles.${size}`, {
       storagePath: destPath,
       contentType: storedContentType,
@@ -111,12 +104,7 @@ export async function POST(req: NextRequest) {
     bg.set(`images.${size}`, publicUrl);
     await bg.save();
 
-    return json({
-      ok: true,
-      url: publicUrl,
-      size: bytes.byteLength,
-      accent: bg.accent ?? null,
-    });
+    return json({ ok: true, url: publicUrl, size: bytes.byteLength });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Upload failed';
     return json({ error: message }, 500);

@@ -30,14 +30,6 @@ export type BackgroundImageFiles = {
 
 export type BackgroundSizeKey = keyof BackgroundImages;
 
-export type BackgroundAccentDoc = {
-  hue: number;
-  hslHue: number;
-  chroma: number;
-  hex: string;
-  mode: 'auto' | 'manual';
-};
-
 export type BackgroundDoc = {
   _id: string;
   id: string;
@@ -46,7 +38,6 @@ export type BackgroundDoc = {
   priceFlies: number;
   images: BackgroundImages;
   imageFiles?: BackgroundImageFiles;
-  accent?: BackgroundAccentDoc | null;
   hidden: boolean;
   createdAt: Date;
 };
@@ -70,19 +61,6 @@ const BackgroundSchema = new Schema<BackgroundDoc>(
     },
     imageFiles: {
       type: Schema.Types.Mixed,
-      default: undefined,
-    },
-    accent: {
-      type: new Schema<BackgroundAccentDoc>(
-        {
-          hue: { type: Number, required: true },
-          hslHue: { type: Number, required: true },
-          chroma: { type: Number, required: true },
-          hex: { type: String, required: true },
-          mode: { type: String, enum: ['auto', 'manual'], default: 'auto' },
-        },
-        { _id: false },
-      ),
       default: undefined,
     },
     hidden: { type: Boolean, default: false },

@@ -1541,7 +1541,8 @@ function WardrobeManagerContent({
                   data-hint="wardrobe-inventory-tab"
                 >
                   <AppIcon name="wardrobe" className="w-5 h-5" />
-                  <span>Inventory</span>
+                  <span className="narrow:hidden">Inventory</span>
+                  <span className="hidden narrow:inline">Inv</span>
                 </TabsTrigger>
                 <TabsTrigger
                   value="shop"

@@ -187,7 +187,7 @@ export default function SiteHeader() {
       <header
         data-app-site-header
         className={cn(
-          'absolute inset-x-0 top-0 z-[90] hidden w-full h-16 bg-hero-header backdrop-blur-xl md:block',
+          'absolute inset-x-0 top-0 z-[90] hidden w-full h-16 bg-background/95 backdrop-blur-xl md:block',
           pathname !== '/planner' &&
             pathname !== '/insights' &&
             !pathname?.startsWith('/admin') &&
