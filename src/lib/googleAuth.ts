@@ -45,7 +45,7 @@ let nativeGoogleInitPromise: Promise<void> | null = null;
 async function openNativeGoogleSignIn() {
   return SocialLogin.login({
     provider: 'google',
-    options: { scopes: ['email', 'profile'] },
+    options: {},
   });
 }
 
