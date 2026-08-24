@@ -394,7 +394,6 @@ export function FocusScene({
                 stroke="url(#focus-tongue-grad)"
                 strokeWidth={TONGUE_STROKE}
                 strokeLinecap="round"
-                vectorEffect="non-scaling-stroke"
               />
               <g ref={fxGroupEl} />
               <g ref={tipGroupEl} style={{ visibility: 'hidden' }}>

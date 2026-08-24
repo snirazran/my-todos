@@ -217,7 +217,6 @@ export function MarketingFrogHero() {
               stroke="url(#marketing-tongue-gradient)"
               strokeWidth={TONGUE_STROKE}
               strokeLinecap="round"
-              vectorEffect="non-scaling-stroke"
             />
             <g ref={fxGroupEl} />
             <g ref={tipGroupEl} style={{ visibility: 'hidden' }}>

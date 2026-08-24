@@ -708,7 +708,6 @@ export default function TryPage() {
               stroke="url(#try-tongue-grad)"
               strokeWidth={TONGUE_STROKE}
               strokeLinecap="round"
-              vectorEffect="non-scaling-stroke"
             />
 
             <g ref={fxGroupEl} />

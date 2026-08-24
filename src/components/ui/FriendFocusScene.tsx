@@ -158,7 +158,6 @@ export function FriendFocusScene({
                 stroke="url(#friend-tongue-grad)"
                 strokeWidth={TONGUE_STROKE}
                 strokeLinecap="round"
-                vectorEffect="non-scaling-stroke"
               />
               <g ref={fxGroupEl} />
               <g ref={tipGroupEl} style={{ visibility: 'hidden' }}>

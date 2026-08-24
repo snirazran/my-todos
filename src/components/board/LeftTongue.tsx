@@ -289,7 +289,6 @@ export function LeftTongueProvider({ children }: { children: React.ReactNode }) 
             stroke="url(#left-tongue-grad)"
             strokeWidth={STROKE}
             strokeLinecap="round"
-            vectorEffect="non-scaling-stroke"
           />
 
           <g ref={tipEl} style={{ visibility: 'hidden' }}>

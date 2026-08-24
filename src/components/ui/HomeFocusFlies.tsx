@@ -360,7 +360,6 @@ export function HomeFocusFlies({
                 stroke="url(#home-focus-tongue-grad)"
                 strokeWidth={TONGUE_STROKE}
                 strokeLinecap="round"
-                vectorEffect="non-scaling-stroke"
               />
               <g ref={ownTongue.fxGroupEl} />
               <g ref={ownTongue.tipGroupEl} style={{ visibility: 'hidden' }}>

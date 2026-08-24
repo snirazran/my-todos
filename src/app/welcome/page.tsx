@@ -290,7 +290,6 @@ export default function WelcomePage() {
               stroke="url(#welcome-tongue-grad)"
               strokeWidth={TONGUE_STROKE}
               strokeLinecap="round"
-              vectorEffect="non-scaling-stroke"
             />
 
             <g ref={fxGroupEl} />
