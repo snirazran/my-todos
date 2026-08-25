@@ -1,7 +1,6 @@
 'use client';
 
 import { Capacitor, registerPlugin } from '@capacitor/core';
-import type { PluginListenerHandle } from '@capacitor/core';
 import type { PendingAction, WidgetPayload, WidgetPinState } from './types';
 
 interface FrogWidgetPlugin {
@@ -12,10 +11,6 @@ interface FrogWidgetPlugin {
   getPinState(): Promise<{ state: WidgetPinState }>;
   /** Android only; resolves once the launcher has taken the request. */
   requestPin(): Promise<{ requested: boolean }>;
-  addListener(
-    event: 'widgetQueued',
-    handler: () => void,
-  ): Promise<PluginListenerHandle>;
 }
 
 const native = registerPlugin<FrogWidgetPlugin>('FrogWidget');
@@ -72,30 +67,6 @@ export async function requestWidgetPin(): Promise<boolean> {
   } catch {
     return false;
   }
-}
-
-/**
- * Fires when the native quick-add composer saves something. The app never
- * backgrounds while it is up, so there is no resume for the webview to react
- * to — without this the capture would sit in the queue until the next launch.
- */
-export function onWidgetQueued(handler: () => void): () => void {
-  if (!available()) return () => {};
-  let handle: PluginListenerHandle | undefined;
-  let cancelled = false;
-  void native
-    .addListener('widgetQueued', handler)
-    .then((h) => {
-      if (cancelled) void h.remove();
-      else handle = h;
-    })
-    .catch(() => {
-      /* listener is best-effort */
-    });
-  return () => {
-    cancelled = true;
-    void handle?.remove();
-  };
 }
 
 /** True where the launcher can add the widget for us in one tap (Android 8+). */

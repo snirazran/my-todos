@@ -258,30 +258,14 @@ private struct TaskRow: View {
     /// themselves.
     var reserve: CGFloat = 0
 
-    /// A row captured on the home screen has no server id yet, so it cannot be
-    /// ticked here — it renders inert until the webview's next snapshot
-    /// replaces it with the real one.
-    private var pending: Bool { task.id.hasPrefix(FrogWidgetStore.pendingPrefix) }
-
     var body: some View {
-        Group {
-            if pending {
-                rowBody.opacity(0.6)
-            } else {
-                Button(intent: ToggleFrogTaskIntent(taskId: task.id, done: !task.done)) {
-                    rowBody
-                }
-                .buttonStyle(.plain)
-            }
+        Button(intent: ToggleFrogTaskIntent(taskId: task.id, done: !task.done)) {
+            rowBody
         }
-        .accessibilityLabel(accessibilityText)
-    }
-
-    private var accessibilityText: String {
-        if pending { return "\(task.text), saving." }
-        return task.done
+        .buttonStyle(.plain)
+        .accessibilityLabel(task.done
             ? "\(task.text), done. Tap to undo."
-            : "\(task.text), not done. Tap to complete."
+            : "\(task.text), not done. Tap to complete.")
     }
 
     private var rowBody: some View {
@@ -480,6 +464,7 @@ private struct MediumWidget: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
 
             AddButton(m: m, diameter: Design.addLarge)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                 .offset(y: m.s(6))
         }
     }

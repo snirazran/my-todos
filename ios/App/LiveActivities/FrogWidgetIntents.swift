@@ -44,10 +44,8 @@ struct ToggleFrogTaskIntent: AppIntent {
 }
 
 /// The add button — the one control on the widget that is *meant* to leave the
-/// home screen. It flags the request and opens the app, which puts up a native
-/// composer with the keyboard already raised. Deliberately not the webview's
-/// own sheet: WKWebView ignores focus() unless it can inherit a touch made
-/// inside the webview, and a launch from the home screen has none.
+/// home screen. It records the request and opens the app; the webview drains
+/// the queue on launch and raises its own quick-add sheet.
 @available(iOS 17.0, *)
 struct FrogQuickAddIntent: AppIntent {
     static var title: LocalizedStringResource = "Add a task"
@@ -57,7 +55,7 @@ struct FrogQuickAddIntent: AppIntent {
     init() {}
 
     func perform() async throws -> some IntentResult {
-        FrogWidgetStore.requestQuickAdd()
+        FrogWidgetStore.queueQuickAdd()
         return .result()
     }
 }

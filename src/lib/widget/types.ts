@@ -46,7 +46,19 @@ export type PendingToggle = {
   at: number;
 };
 
-export type PendingAction = PendingAdd | PendingToggle;
+/**
+ * The widget's add button. The extension can't present a composer, so it
+ * records the intent and the webview raises its own quick-add sheet on launch.
+ */
+export type PendingQuickAdd = {
+  kind: 'quickadd';
+  clientId: string;
+  uid: string;
+  guest: boolean;
+  at: number;
+};
+
+export type PendingAction = PendingAdd | PendingToggle | PendingQuickAdd;
 
 export type WidgetPinState = 'unsupported' | 'available' | 'pinned';
 
