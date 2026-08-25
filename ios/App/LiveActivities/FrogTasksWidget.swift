@@ -62,6 +62,14 @@ private enum Design {
     static let artMedium = CGSize(width: 113, height: 82)
     static let addLarge: CGFloat = 31.9
     static let addSmall: CGFloat = 23.58
+    /// The sheet trims its text to cap height; SwiftUI gives a font its whole
+    /// line box. Pinning these to the drawn heights keeps the medium's header
+    /// block at the 46pt the layout is budgeted for instead of ~70pt, which is
+    /// what was squeezing the frog down to two thirds of its size.
+    static let countTrim: CGFloat = 21
+    static let labelTrim: CGFloat = 11
+    /// How far the medium's frog hangs below the padded content box.
+    static let artMediumBleed: CGFloat = 18
     /// The marker's stroke overhangs its 21.5 layout box, so the disc reads a
     /// little wider than the row it sits in — as on the sheet.
     static let markerArt: CGFloat = 23.7396
@@ -239,14 +247,30 @@ private struct TaskRow: View {
     /// themselves.
     var reserve: CGFloat = 0
 
+    /// A row captured on the home screen has no server id yet, so it cannot be
+    /// ticked here — it renders inert until the webview's next snapshot
+    /// replaces it with the real one.
+    private var pending: Bool { task.id.hasPrefix(FrogWidgetStore.pendingPrefix) }
+
     var body: some View {
-        Button(intent: ToggleFrogTaskIntent(taskId: task.id, done: !task.done)) {
-            rowBody
+        Group {
+            if pending {
+                rowBody.opacity(0.6)
+            } else {
+                Button(intent: ToggleFrogTaskIntent(taskId: task.id, done: !task.done)) {
+                    rowBody
+                }
+                .buttonStyle(.plain)
+            }
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel(task.done
+        .accessibilityLabel(accessibilityText)
+    }
+
+    private var accessibilityText: String {
+        if pending { return "\(task.text), saving." }
+        return task.done
             ? "\(task.text), done. Tap to undo."
-            : "\(task.text), not done. Tap to complete.")
+            : "\(task.text), not done. Tap to complete."
     }
 
     private var rowBody: some View {
@@ -398,26 +422,34 @@ private struct MediumWidget: View {
                 VStack(alignment: .leading, spacing: 0) {
                     VStack(alignment: .leading, spacing: m.s(4)) {
                         RemainingCount(m: m, remaining: state.remaining, inline: false)
+                            .frame(height: m.s(Design.countTrim))
                         Text("tasks left")
                             .font(m.font(15.5, .semibold))
                             .tracking(m.s(0.1))
                             .foregroundStyle(Palette.heading)
                             .lineLimit(1)
+                            .frame(height: m.s(Design.labelTrim))
                         ProgressBar(m: m, done: state.doneCount, total: state.totalCount)
                     }
                     .layoutPriority(1)
 
-                    Spacer(minLength: m.s(6))
+                    Spacer(minLength: 0)
 
-                    // Outer frame pins the layout width to the column so the
-                    // wider artwork spills into the gutter instead of pushing
-                    // the task list sideways; the offsets cancel the card
-                    // padding so it still bleeds into the corner.
+                    // Both frames are the sheet's own box model: the artwork
+                    // draws at full size while its *layout* box is narrower and
+                    // shorter, so it spills into the gutter and past the bottom
+                    // padding without pushing anything around. Sized in design
+                    // points that provably fit the column, so it can neither
+                    // shrink nor collide.
                     FrogArt(art: state.art, flipped: true)
-                        .frame(maxWidth: m.s(Design.artMedium.width),
-                               maxHeight: m.s(Design.artMedium.height))
-                        .frame(width: m.s(75), alignment: .leading)
-                        .offset(x: -m.s(18), y: m.s(18))
+                        .frame(width: m.s(Design.artMedium.width),
+                               height: m.s(Design.artMedium.height))
+                        .frame(
+                            width: m.s(75),
+                            height: m.s(Design.artMedium.height - Design.artMediumBleed),
+                            alignment: .topLeading
+                        )
+                        .offset(x: -m.s(18))
                 }
                 .frame(width: m.s(75), alignment: .leading)
 

@@ -139,7 +139,6 @@ type FlushResult = {
   added: number;
   toggled: number;
   dropped: number;
-  quickAdd: boolean;
 };
 
 async function postAdds(
@@ -204,12 +203,7 @@ export async function flushWidgetQueue(
   currentUid: string,
 ): Promise<FlushResult> {
   const actions = await drainWidgetQueue();
-  const result: FlushResult = {
-    added: 0,
-    toggled: 0,
-    dropped: 0,
-    quickAdd: false,
-  };
+  const result: FlushResult = { added: 0, toggled: 0, dropped: 0 };
   if (actions.length === 0) return result;
 
   const tz = clientTimezone();
@@ -235,11 +229,6 @@ export async function flushWidgetQueue(
   for (const action of toggles) {
     if (await putToggle(action, tz, day)) result.toggled += 1;
   }
-
-  // Reported rather than raised here, and collapsed to one however many taps
-  // landed: the caller opens the sheet once the replayed ticks have refreshed
-  // the list, so the composer never appears over stale rows.
-  result.quickAdd = applicable.some((a) => a.kind === 'quickadd');
 
   return result;
 }

@@ -66,9 +66,14 @@ export function recordWidgetAdded(): void {
 }
 
 /**
- * The ask ladder. Two prompts, ever, and never before the user has something
- * worth putting on their home screen — a cold prompt at signup would show an
- * empty box and burn the only good moment we get.
+ * The ask ladder. Two prompts, ever, and never before the user has ticked
+ * something off.
+ *
+ * Accounts now start with tasks already in them, so the old worry — a cold
+ * prompt showing an empty box — no longer applies; the preview looks right from
+ * the first minute. The first completion is still the moment to ask, because it
+ * is the first time the reward loop has actually fired for them, and the pitch
+ * lands as "keep this going" rather than "here is a feature".
  */
 export function shouldAskForWidget(input: {
   pinState: WidgetPinState;

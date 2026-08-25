@@ -25,10 +25,14 @@
             android:clipChildren="false"
             android:orientation="vertical">
 
+            <!-- Fixed heights, not wrap_content: the sheet trims its text to
+                 cap height and budgets 46dp for this block. Left to grow, the
+                 full line boxes eat ~24dp and squeeze the frog below. -->
             <TextView
                 android:id="@+id/widget_count"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="26dp"
+                android:gravity="center_vertical"
                 android:includeFontPadding="false"
                 android:maxLines="1"
                 android:textColor="@color/widget_heading"
@@ -38,8 +42,9 @@
             <TextView
                 android:id="@+id/widget_tasks_left"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="16dp"
                 android:layout_marginTop="4dp"
+                android:gravity="center_vertical"
                 android:includeFontPadding="false"
                 android:text="@string/widget_tasks_left"
                 android:textColor="@color/widget_heading"

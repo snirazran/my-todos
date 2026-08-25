@@ -14,6 +14,9 @@ enum FrogWidgetStore {
 
     private static let stateKey = "widget_state"
     private static let queueKey = "widget_queue"
+    private static let quickAddKey = "widget_quickadd_pending"
+    /// Marks a row the webview has not seen yet; it cannot be ticked.
+    static let pendingPrefix = "pending:"
     private static let maxQueue = 50
     private static let lock = NSLock()
 
@@ -63,6 +66,42 @@ enum FrogWidgetStore {
         defaults?.set(json, forKey: stateKey)
     }
 
+    /// Shows a just-captured task straight away, before the webview has had a
+    /// chance to create it. The id is local-only, so the row renders as pending
+    /// until the real snapshot replaces it.
+    static func applyLocalAdd(text: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard var state = readState() else { return }
+        state.tasks.insert(
+            WidgetTask(id: pendingPrefix + UUID().uuidString, text: text, done: false),
+            at: 0
+        )
+        state.totalCount += 1
+        guard
+            let data = try? JSONEncoder().encode(state),
+            let json = String(data: data, encoding: .utf8)
+        else { return }
+        defaults?.set(json, forKey: stateKey)
+        reload()
+    }
+
+    // MARK: - Quick add (widget -> app)
+
+    /// The add button only raises a flag. Presenting the composer is the app's
+    /// job — the extension cannot show one, and the webview cannot raise the
+    /// keyboard without a touch of its own to inherit.
+    static func requestQuickAdd() {
+        defaults?.set(true, forKey: quickAddKey)
+    }
+
+    /// True once, if a capture is waiting. Clears the flag as it reads it.
+    static func takeQuickAddRequest() -> Bool {
+        guard defaults?.bool(forKey: quickAddKey) == true else { return false }
+        defaults?.removeObject(forKey: quickAddKey)
+        return true
+    }
+
     // MARK: - Queue (widget -> app)
 
     static func queueToggle(taskId: String, done: Bool) {
@@ -79,17 +118,13 @@ enum FrogWidgetStore {
         ))
     }
 
-    /// The add button. The extension can't present the composer itself, so it
-    /// records the request and lets the webview open its own quick-add sheet on
-    /// the next launch — the app's own route, not a URL, which is what keeps
-    /// this off the address bar entirely.
-    static func queueQuickAdd() {
+    static func queueAdd(text: String) {
         let state = readState()
         enqueue(PendingAction(
-            kind: "quickadd",
+            kind: "add",
             clientId: UUID().uuidString,
             taskId: nil,
-            text: nil,
+            text: text,
             done: nil,
             uid: state?.uid ?? "",
             guest: state?.guest ?? false,
@@ -155,7 +190,7 @@ struct WidgetState: Codable {
     let signedIn: Bool
     let day: String
     var doneCount: Int
-    let totalCount: Int
+    var totalCount: Int
     /// Which illustration medium and large draw today, picked webview-side.
     let art: String
     let word: WidgetWord

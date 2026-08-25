@@ -46,19 +46,7 @@ export type PendingToggle = {
   at: number;
 };
 
-/**
- * The widget's add button. The native side can't present the composer, so it
- * records the intent and the webview raises its own quick-add sheet on launch.
- */
-export type PendingQuickAdd = {
-  kind: 'quickadd';
-  clientId: string;
-  uid: string;
-  guest: boolean;
-  at: number;
-};
-
-export type PendingAction = PendingAdd | PendingToggle | PendingQuickAdd;
+export type PendingAction = PendingAdd | PendingToggle;
 
 export type WidgetPinState = 'unsupported' | 'available' | 'pinned';
 

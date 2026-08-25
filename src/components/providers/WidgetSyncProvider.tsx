@@ -10,8 +10,7 @@ import { INVENTORY_SUMMARY_KEY } from '@/hooks/useInventory';
 import { todayTasksKey } from '@/hooks/useTaskData';
 import { streakKey } from '@/hooks/useLoginStreak';
 import { TASK_SYNC_EVENT } from '@/lib/taskSyncClient';
-import { getWidgetPinState } from '@/lib/widget/bridge';
-import { requestQuickAdd } from '@/lib/widget/quickAdd';
+import { getWidgetPinState, onWidgetQueued } from '@/lib/widget/bridge';
 import {
   TASK_COMPLETED_EVENT,
   readCompletedEver,
@@ -109,8 +108,6 @@ export function WidgetSyncProvider() {
         );
         void mutate(INVENTORY_SUMMARY_KEY);
       }
-      // The widget's add button, honoured once today's list is current.
-      if (res.quickAdd) requestQuickAdd();
     });
   }, [enabled, uid]);
 
@@ -125,8 +122,13 @@ export function WidgetSyncProvider() {
       handle = h;
     });
 
+    // The native composer saves without the app ever backgrounding, so its own
+    // signal is the only thing that gets that capture replayed promptly.
+    const stopQueued = onWidgetQueued(drain);
+
     return () => {
       void handle?.remove();
+      stopQueued();
     };
   }, [enabled, drain]);
 
@@ -173,6 +175,7 @@ export function WidgetSyncProvider() {
       open={promptOpen}
       onOpenChange={setPromptOpen}
       streak={streak}
+      tasks={tasksData?.tasks ?? []}
       onPinned={() => setPinState('pinned')}
     />
   );
