@@ -16,12 +16,63 @@ private enum Palette {
     static let heading = Color.black
 }
 
-private enum Metrics {
+// MARK: - Metrics
+//
+// Every number below is a point measurement taken off the sheet, which was
+// drawn against a 158/338pt card — the widget sizes an iPhone 12/13/14/15/16
+// hands out. Other devices hand out different ones (a Pro Max large is
+// 362x382), so each value is scaled by how much bigger this device's card is
+// than the one the design assumes. Without that the contents hold their size
+// while the card grows, and the whole thing reads about 7% small.
+
+private struct Metrics {
+    static let smallReference: CGFloat = 158
+    static let wideReference: CGFloat = 338
+
+    let scale: CGFloat
+
+    init(width: CGFloat, reference: CGFloat) {
+        scale = width > 0 && reference > 0 ? width / reference : 1
+    }
+
+    /// One design point, in this device's actual points.
+    func s(_ value: CGFloat) -> CGFloat { value * scale }
+
+    func font(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
+        .system(size: s(size), weight: weight, design: .rounded)
+    }
+}
+
+/// Design-space geometry, used to decide what overlaps what. Scale cancels out
+/// of that question, so it is answered in the sheet's own units.
+private enum Design {
     static let rowHeight: CGFloat = 21.5
+    static let rowSpacing: CGFloat = 7
+    static let headerHeight: CGFloat = 36
     static let barHeight: CGFloat = 6
+    static let largeHeight: CGFloat = 354
+    static let artLarge = CGSize(width: 169, height: 122)
+    static let artMedium = CGSize(width: 113, height: 82)
+    static let addLarge: CGFloat = 31.9
+    static let addSmall: CGFloat = 23.58
     /// The marker's stroke overhangs its 21.5 layout box, so the disc reads a
-    /// little larger than the row it sits in. Straight off the sheet.
+    /// little wider than the row it sits in — as on the sheet.
     static let markerArt: CGFloat = 23.7396
+
+    /// Room a row gives up on the right so a long title truncates before what
+    /// floats over it, instead of running underneath. The sheet shows this on
+    /// the overflow variant, where the last rows stop short of the frog.
+    static let artReserve: CGFloat = artLarge.width - 17 + 6
+    static let addReserve: CGFloat = addLarge + 8
+
+    /// Large lays its rows out top-down from a fixed offset, so which of them
+    /// reach the frog in the bottom-right corner is arithmetic, not a guess:
+    /// with a full list it comes out as the last two, exactly as drawn.
+    static func rowMeetsArt(_ index: Int) -> Bool {
+        let top = 18 + headerHeight + 14 + barHeight + 14
+        let bottom = top + CGFloat(index) * (rowHeight + rowSpacing) + rowHeight
+        return bottom > largeHeight - artLarge.height
+    }
 }
 
 // MARK: - Timeline
@@ -114,23 +165,23 @@ private struct FrogArt: View {
 }
 
 private struct AddButton: View {
+    let m: Metrics
     let diameter: CGFloat
 
     var body: some View {
-        Button(intent: FrogQuickAddIntent()) { circle }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Add a task")
-    }
-
-    private var circle: some View {
-        Image("WidgetPlus")
-            .resizable()
-            .frame(width: diameter, height: diameter)
-            .contentShape(Circle())
+        Button(intent: FrogQuickAddIntent()) {
+            Image("WidgetPlus")
+                .resizable()
+                .frame(width: m.s(diameter), height: m.s(diameter))
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Add a task")
     }
 }
 
 private struct ProgressBar: View {
+    let m: Metrics
     let done: Int
     let total: Int
 
@@ -146,7 +197,7 @@ private struct ProgressBar: View {
                     .frame(width: max(0, geo.size.width * fraction))
             }
         }
-        .frame(height: Metrics.barHeight)
+        .frame(height: m.s(Design.barHeight))
         .accessibilityHidden(true)
     }
 }
@@ -154,7 +205,12 @@ private struct ProgressBar: View {
 /// A row of today's list. The fly is the target: tapping it feeds the frog and
 /// leaves a tick behind.
 private struct TaskRow: View {
+    let m: Metrics
     let task: WidgetTask
+    /// Design-space width surrendered on the right, so a long title stops short
+    /// of whatever floats over this row. Zero for rows with the card to
+    /// themselves.
+    var reserve: CGFloat = 0
 
     var body: some View {
         Button(intent: ToggleFrogTaskIntent(taskId: task.id, done: !task.done)) {
@@ -167,67 +223,74 @@ private struct TaskRow: View {
     }
 
     private var rowBody: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: m.s(10)) {
             Image(task.done ? "WidgetCheckOn" : "WidgetCheckOff")
                 .resizable()
-                .frame(width: Metrics.markerArt, height: Metrics.markerArt)
-                .frame(width: Metrics.rowHeight, height: Metrics.rowHeight)
+                .frame(width: m.s(Design.markerArt), height: m.s(Design.markerArt))
+                .frame(width: m.s(Design.rowHeight), height: m.s(Design.rowHeight))
             Text(task.text)
-                .font(.system(size: 13, design: .rounded))
-                .tracking(0.5)
+                .font(m.font(13))
+                .tracking(m.s(0.5))
                 .lineLimit(1)
                 .truncationMode(.tail)
                 .strikethrough(task.done, color: Palette.text.opacity(0.45))
                 .foregroundStyle(task.done ? Palette.text.opacity(0.45) : Palette.text)
             Spacer(minLength: 0)
         }
-        .frame(height: Metrics.rowHeight)
+        .padding(.trailing, m.s(reserve))
+        .frame(height: m.s(Design.rowHeight))
         .contentShape(Rectangle())
+    }
+}
+
+/// Rows spread over whatever height is left, the way the design distributes
+/// them on the two smaller sizes.
+private struct SpacedRows: View {
+    let m: Metrics
+    let tasks: [WidgetTask]
+    let limit: Int
+    var reserve: (Int, Int) -> CGFloat = { _, _ in 0 }
+
+    var body: some View {
+        let shown = Array(tasks.prefix(limit))
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(shown.enumerated()), id: \.element.id) { index, task in
+                TaskRow(m: m, task: task, reserve: reserve(index, shown.count))
+                if index < shown.count - 1 { Spacer(minLength: m.s(4)) }
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 }
 
 /// The count, sized to the space it has: large spells the whole sentence on one
 /// line; medium sets its own label underneath, and small shows the figure alone.
 private struct RemainingCount: View {
+    let m: Metrics
     let remaining: Int
     let inline: Bool
 
-    private var number: some View {
-        Text("\(remaining)")
-            .font(.system(size: 30, weight: .bold, design: .rounded))
-            .tracking(0.3)
-            .foregroundStyle(Palette.heading)
-    }
-
     var body: some View {
-        Group {
-            if inline {
-                Text("\(remaining) tasks left")
-                    .font(.system(size: 30, weight: .bold, design: .rounded))
-                    .tracking(0.3)
-                    .foregroundStyle(Palette.heading)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
-            } else {
-                number
-            }
-        }
-        .accessibilityLabel("\(remaining) tasks left")
+        Text(inline ? "\(remaining) tasks left" : "\(remaining)")
+            .font(m.font(30, .bold))
+            .tracking(m.s(0.3))
+            .foregroundStyle(Palette.heading)
+            .lineLimit(1)
+            .minimumScaleFactor(inline ? 0.6 : 1)
+            .accessibilityLabel("\(remaining) tasks left")
     }
 }
 
 private struct WordOfTheDay: View {
+    let m: Metrics
     let word: WidgetWord
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(word.term)
-                .font(.system(size: 13, weight: .bold, design: .rounded))
-                .tracking(0.5)
-            Text(word.meaning)
-                .font(.system(size: 10, design: .rounded))
-                .tracking(0.5)
+            Text(word.term).font(m.font(13, .bold))
+            Text(word.meaning).font(m.font(10))
         }
+        .tracking(m.s(0.5))
         .foregroundStyle(Palette.heading)
         .lineLimit(1)
         .minimumScaleFactor(0.8)
@@ -237,22 +300,26 @@ private struct WordOfTheDay: View {
 }
 
 private struct EmptyRows: View {
+    let m: Metrics
+
     var body: some View {
         Text("Nothing yet. Feed the frog a task.")
-            .font(.system(size: 13, design: .rounded))
+            .font(m.font(13))
             .foregroundStyle(Palette.text.opacity(0.55))
             .lineLimit(2)
     }
 }
 
 private struct SignedOut: View {
+    let m: Metrics
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: m.s(4)) {
             Text("Frogress")
-                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .font(m.font(12, .bold))
                 .foregroundStyle(Palette.text.opacity(0.55))
             Text("Sign in to see today's list.")
-                .font(.system(size: 14, weight: .semibold, design: .rounded))
+                .font(m.font(14, .semibold))
                 .foregroundStyle(Palette.heading)
             Spacer(minLength: 0)
         }
@@ -263,48 +330,32 @@ private struct SignedOut: View {
 // MARK: - Sizes
 
 private struct SmallWidget: View {
+    let m: Metrics
     let state: WidgetState
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: m.s(12)) {
             HStack(alignment: .center) {
-                RemainingCount(remaining: state.remaining, inline: false)
+                RemainingCount(m: m, remaining: state.remaining, inline: false)
                 Spacer(minLength: 0)
-                AddButton(diameter: 23.58)
+                AddButton(m: m, diameter: Design.addSmall)
             }
-            .frame(height: 15)
+            .frame(height: m.s(15))
 
-            ProgressBar(done: state.doneCount, total: state.totalCount)
+            ProgressBar(m: m, done: state.doneCount, total: state.totalCount)
 
             if state.tasks.isEmpty {
-                EmptyRows()
+                EmptyRows(m: m)
                 Spacer(minLength: 0)
             } else {
-                SpacedRows(tasks: state.tasks, limit: 3)
+                SpacedRows(m: m, tasks: state.tasks, limit: 3)
             }
         }
-    }
-}
-
-/// Rows spread over whatever height is left, the way the design distributes
-/// them on the two smaller sizes.
-private struct SpacedRows: View {
-    let tasks: [WidgetTask]
-    let limit: Int
-
-    var body: some View {
-        let shown = Array(tasks.prefix(limit))
-        VStack(alignment: .leading, spacing: 0) {
-            ForEach(Array(shown.enumerated()), id: \.element.id) { index, task in
-                TaskRow(task: task)
-                if index < shown.count - 1 { Spacer(minLength: 4) }
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 }
 
 private struct MediumWidget: View {
+    let m: Metrics
     let state: WidgetState
 
     var body: some View {
@@ -312,67 +363,77 @@ private struct MediumWidget: View {
             // Offsets cancel the card padding so the art bleeds to the corner,
             // exactly as it does on the sheet.
             FrogArt(art: state.art)
-                .frame(width: 113, height: 82)
-                .offset(x: -18, y: 18)
+                .frame(width: m.s(Design.artMedium.width), height: m.s(Design.artMedium.height))
+                .offset(x: -m.s(18), y: m.s(18))
 
-            HStack(alignment: .top, spacing: 28) {
-                VStack(alignment: .leading, spacing: 4) {
-                    RemainingCount(remaining: state.remaining, inline: false)
+            HStack(alignment: .top, spacing: m.s(28)) {
+                VStack(alignment: .leading, spacing: m.s(4)) {
+                    RemainingCount(m: m, remaining: state.remaining, inline: false)
                     Text("tasks left")
-                        .font(.system(size: 15.5, weight: .semibold, design: .rounded))
-                        .tracking(0.1)
+                        .font(m.font(15.5, .semibold))
+                        .tracking(m.s(0.1))
                         .foregroundStyle(Palette.heading)
-                    ProgressBar(done: state.doneCount, total: state.totalCount)
+                    ProgressBar(m: m, done: state.doneCount, total: state.totalCount)
                 }
-                .frame(width: 75, alignment: .leading)
+                .frame(width: m.s(75), alignment: .leading)
 
                 if state.tasks.isEmpty {
-                    EmptyRows()
+                    EmptyRows(m: m)
                     Spacer(minLength: 0)
                 } else {
-                    SpacedRows(tasks: state.tasks, limit: 4)
+                    // Spacers push the last row to the bottom of the card, into
+                    // the add button — but only once there are two to spread.
+                    SpacedRows(m: m, tasks: state.tasks, limit: 4) { index, count in
+                        index == count - 1 && count > 1 ? Design.addReserve : 0
+                    }
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
 
-            AddButton(diameter: 31.9)
+            AddButton(m: m, diameter: Design.addLarge)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-                .offset(y: 6)
+                .offset(y: m.s(6))
         }
     }
 }
 
 private struct LargeWidget: View {
+    let m: Metrics
     let state: WidgetState
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
             FrogArt(art: state.art)
-                .frame(width: 169, height: 122)
-                .offset(x: 17, y: 18)
+                .frame(width: m.s(Design.artLarge.width), height: m.s(Design.artLarge.height))
+                .offset(x: m.s(17), y: m.s(18))
 
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: m.s(14)) {
                 HStack(alignment: .center) {
-                    RemainingCount(remaining: state.remaining, inline: true)
-                    Spacer(minLength: 8)
-                    AddButton(diameter: 31.9)
+                    RemainingCount(m: m, remaining: state.remaining, inline: true)
+                    Spacer(minLength: m.s(8))
+                    AddButton(m: m, diameter: Design.addLarge)
                 }
+                .frame(height: m.s(Design.headerHeight))
 
-                ProgressBar(done: state.doneCount, total: state.totalCount)
+                ProgressBar(m: m, done: state.doneCount, total: state.totalCount)
 
                 if state.tasks.isEmpty {
-                    EmptyRows()
+                    EmptyRows(m: m)
                 } else {
-                    VStack(alignment: .leading, spacing: 7) {
-                        ForEach(Array(state.tasks.prefix(7))) { task in
-                            TaskRow(task: task)
+                    VStack(alignment: .leading, spacing: m.s(Design.rowSpacing)) {
+                        ForEach(Array(state.tasks.prefix(7).enumerated()), id: \.element.id) { index, task in
+                            TaskRow(
+                                m: m,
+                                task: task,
+                                reserve: Design.rowMeetsArt(index) ? Design.artReserve : 0
+                            )
                         }
                     }
                 }
 
-                Spacer(minLength: 4)
+                Spacer(minLength: m.s(4))
 
-                WordOfTheDay(word: state.word)
+                WordOfTheDay(m: m, word: state.word)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
@@ -385,24 +446,31 @@ struct FrogWidgetView: View {
     @Environment(\.widgetFamily) private var family
     let entry: FrogWidgetEntry
 
+    private var reference: CGFloat {
+        family == .systemSmall ? Metrics.smallReference : Metrics.wideReference
+    }
+
     var body: some View {
-        content
-            .padding(.horizontal, family == .systemMedium ? 18 : 17)
-            .padding(.vertical, 18)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .frogCard()
+        GeometryReader { geo in
+            let m = Metrics(width: geo.size.width, reference: reference)
+            content(m)
+                .padding(.horizontal, m.s(family == .systemMedium ? 18 : 17))
+                .padding(.vertical, m.s(18))
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
+        .containerBackground(for: .widget) { Palette.card }
     }
 
     @ViewBuilder
-    private var content: some View {
+    private func content(_ m: Metrics) -> some View {
         if let state = entry.state, state.signedIn {
             switch family {
-            case .systemSmall: SmallWidget(state: state)
-            case .systemLarge: LargeWidget(state: state)
-            default: MediumWidget(state: state)
+            case .systemSmall: SmallWidget(m: m, state: state)
+            case .systemLarge: LargeWidget(m: m, state: state)
+            default: MediumWidget(m: m, state: state)
             }
         } else {
-            SignedOut()
+            SignedOut(m: m)
         }
     }
 }
@@ -421,14 +489,6 @@ struct FrogTasksWidget: Widget {
     }
 }
 
-// MARK: - Helpers
-
 private extension WidgetState {
     var remaining: Int { max(0, totalCount - doneCount) }
-}
-
-private extension View {
-    func frogCard() -> some View {
-        containerBackground(for: .widget) { Palette.card }
-    }
 }

@@ -194,11 +194,16 @@ function WidgetPreview({ art }: { art: string }) {
             className="flex min-w-0 flex-1 flex-col justify-between"
             style={{ marginLeft: u(28) }}
           >
-            {PREVIEW_ROWS.map((row) => (
+            {PREVIEW_ROWS.map((row, i) => (
               <div
                 key={row}
                 className="flex items-center"
-                style={{ gap: u(8.88) }}
+                style={{
+                  gap: u(8.88),
+                  // The add button sits over the bottom row, so its title has
+                  // to truncate before reaching it rather than run underneath.
+                  paddingRight: i === PREVIEW_ROWS.length - 1 ? u(39.9) : 0,
+                }}
               >
                 <span
                   className="flex flex-none items-center justify-center rounded-full border border-[#EFEFEF] bg-[#FAFAFA] dark:border-[#B2EBC7] dark:bg-[#E3F7EB]"

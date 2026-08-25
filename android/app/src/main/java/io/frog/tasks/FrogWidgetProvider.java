@@ -7,7 +7,9 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.util.TypedValue;
 import android.text.SpannableString;
 import android.text.style.StrikethroughSpan;
 import android.view.View;
@@ -142,6 +144,8 @@ public class FrogWidgetProvider extends AppWidgetProvider {
             renderWord(views, state.optJSONObject("word"));
         }
 
+        applyScale(context, views, manager, appWidgetId, layout);
+
         JSONArray tasks = state.optJSONArray("tasks");
         int rows = rowsFor(layout);
         int count = tasks == null ? 0 : Math.min(tasks.length(), rows);
@@ -152,6 +156,84 @@ public class FrogWidgetProvider extends AppWidgetProvider {
                     context.getString(R.string.widget_empty));
         }
         return views;
+    }
+
+    /**
+     * Holds the sheet's proportions on a launcher that hands out a wider cell
+     * than the 158/338dp the design was drawn against — the same reason the
+     * iOS side scales off its measured width. Without it the contents keep
+     * their size while the card grows and the whole card reads small.
+     *
+     * Android 12 is the floor because resizing a view at runtime needs
+     * setViewLayout*, which arrived there. Below it the widget renders at the
+     * sizes the layout was authored with, which is coherent, just not scaled.
+     */
+    private static void applyScale(Context context, RemoteViews views, AppWidgetManager manager,
+                                   int appWidgetId, int layout) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return;
+
+        Bundle options = manager.getAppWidgetOptions(appWidgetId);
+        int width = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0);
+        float reference = layout == R.layout.frog_widget_small ? 158f : 338f;
+        if (width <= 0) return;
+        // Clamped so an unusual launcher grid can't blow the card apart.
+        float scale = Math.max(0.85f, Math.min(1.3f, width / reference));
+        if (Math.abs(scale - 1f) < 0.02f) return;
+
+        text(views, R.id.widget_count, 30f, scale);
+        text(views, R.id.widget_empty, 13f, scale);
+        size(views, R.id.widget_add,
+                layout == R.layout.frog_widget_small ? 23.5f : 31.9f, scale);
+
+        if (layout == R.layout.frog_widget_medium) {
+            text(views, R.id.widget_tasks_left, 15.5f, scale);
+            size(views, R.id.widget_art, 113f, 82f, scale);
+        } else if (layout == R.layout.frog_widget_large) {
+            text(views, R.id.widget_word_term, 13f, scale);
+            text(views, R.id.widget_word_meaning, 10f, scale);
+            size(views, R.id.widget_art, 169f, 122f, scale);
+        }
+
+        for (int i = 0; i < rowsFor(layout); i++) {
+            text(views, ROW_TEXT_IDS[i], 13f, scale);
+            size(views, ROW_CHECK_IDS[i], 23.74f, scale);
+        }
+        scaleReserves(context, views, layout, scale);
+    }
+
+    /** The trailing gaps that keep long titles off the add button and the frog. */
+    private static void scaleReserves(Context context, RemoteViews views, int layout, float scale) {
+        if (layout == R.layout.frog_widget_medium) {
+            padEnd(context, views, ROW_TEXT_IDS[3], 40f, scale);
+        } else if (layout == R.layout.frog_widget_large) {
+            padEnd(context, views, ROW_TEXT_IDS[5], 158f, scale);
+            padEnd(context, views, ROW_TEXT_IDS[6], 158f, scale);
+        }
+    }
+
+    private static void text(RemoteViews views, int id, float sp, float scale) {
+        views.setTextViewTextSize(id, TypedValue.COMPLEX_UNIT_SP, sp * scale);
+    }
+
+    private static void size(RemoteViews views, int id, float dp, float scale) {
+        size(views, id, dp, dp, scale);
+    }
+
+    private static void size(RemoteViews views, int id, float wDp, float hDp, float scale) {
+        views.setViewLayoutWidth(id, wDp * scale, TypedValue.COMPLEX_UNIT_DIP);
+        views.setViewLayoutHeight(id, hDp * scale, TypedValue.COMPLEX_UNIT_DIP);
+    }
+
+    /**
+     * setViewPadding takes pixels and is absolute — there is no relative
+     * variant on RemoteViews — so the side has to be chosen by hand. The app
+     * ships Hebrew, where the reserve belongs on the left.
+     */
+    private static void padEnd(Context context, RemoteViews views, int id, float dp, float scale) {
+        int px = Math.round(dp * scale * context.getResources().getDisplayMetrics().density);
+        boolean rtl = context.getResources().getConfiguration().getLayoutDirection()
+                == View.LAYOUT_DIRECTION_RTL;
+        views.setViewPadding(id, rtl ? px : 0, 0, rtl ? 0 : px, 0);
     }
 
     private static void renderSignedOut(Context context, RemoteViews views, int layout) {

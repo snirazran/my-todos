@@ -250,6 +250,7 @@
                 android:layout_height="wrap_content"
                 android:ellipsize="end"
                 android:maxLines="1"
+                android:paddingEnd="158dp"
                 android:textColor="@color/widget_text"
                 android:textSize="13sp" />
         </LinearLayout>
@@ -278,6 +279,7 @@
                 android:layout_height="wrap_content"
                 android:ellipsize="end"
                 android:maxLines="1"
+                android:paddingEnd="158dp"
                 android:textColor="@color/widget_text"
                 android:textSize="13sp" />
         </LinearLayout>
