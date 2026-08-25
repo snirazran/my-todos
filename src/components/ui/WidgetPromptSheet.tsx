@@ -15,8 +15,6 @@ type Props = {
   streak: number;
   /** Today's real list. The preview is the pitch, so it shows their own work. */
   tasks: PreviewTask[];
-  /** Web testing: render the sheet without spending one of the two real asks. */
-  preview?: boolean;
   onPinned: () => void;
 };
 
@@ -32,7 +30,6 @@ export function WidgetPromptSheet({
   onOpenChange,
   streak,
   tasks,
-  preview = false,
   onPinned,
 }: Props) {
   const [busy, setBusy] = useState(false);
@@ -41,8 +38,8 @@ export function WidgetPromptSheet({
   const stepsRef = useRef<HTMLOListElement | null>(null);
 
   useEffect(() => {
-    if (open && !preview) recordPromptShown();
-  }, [open, preview]);
+    if (open) recordPromptShown();
+  }, [open]);
 
   // The steps open below the fold, so without this the only thing that visibly
   // happens is the button changing its label.
@@ -72,7 +69,7 @@ export function WidgetPromptSheet({
     const requested = await requestWidgetPin();
     setBusy(false);
     if (requested) {
-      if (!preview) recordWidgetAdded();
+      recordWidgetAdded();
       onPinned();
       onOpenChange(false);
     } else {
@@ -81,7 +78,7 @@ export function WidgetPromptSheet({
   };
 
   const handleIosDone = () => {
-    if (!preview) recordWidgetAdded();
+    recordWidgetAdded();
     onPinned();
     onOpenChange(false);
   };
