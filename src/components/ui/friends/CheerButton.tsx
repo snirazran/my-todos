@@ -77,7 +77,7 @@ export function CheerButton({
             initial={{ opacity: 0, y: 0, scale: 0.7 }}
             animate={{ opacity: 1, y: -26, scale: 1 }}
             exit={{ opacity: 0, y: -38 }}
-            className="pointer-events-none absolute left-1/2 top-0 z-30 flex -translate-x-1/2 items-center gap-0.5 whitespace-nowrap rounded-full bg-emerald-500 px-2 py-0.5 text-[11px] font-black text-white shadow-lg"
+            className="pointer-events-none absolute right-0 top-0 z-30 flex items-center gap-0.5 whitespace-nowrap rounded-full bg-emerald-500 px-2 py-0.5 text-[11px] font-black text-white shadow-lg"
           >
             <Fly size={14} y={-1} interactive={false} paused />+{earned}
           </motion.span>
@@ -121,10 +121,19 @@ export function CheerButton({
 export function CheerEarnHint() {
   const { cheerFlies, cheerPaidLeft } = useLookReactions();
   if (cheerFlies <= 0 || cheerPaidLeft <= 0) return null;
+  const friends =
+    cheerPaidLeft === 1 ? '1 more friend' : `${cheerPaidLeft} more friends`;
+  const reward = `${cheerFlies} ${cheerFlies === 1 ? 'fly' : 'flies'}`;
   return (
-    <span className="flex items-center gap-1 whitespace-nowrap text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
-      <Fly size={14} y={-1} interactive={false} paused />+{cheerFlies} each for
-      the next {cheerPaidLeft}
+    <span className="mt-0.5 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+      <Fly size={15} y={-1} interactive={false} paused />
+      <span>
+        Cheer {friends} today to earn{' '}
+        <strong className="font-black text-emerald-600 dark:text-emerald-400">
+          {reward}
+          {cheerPaidLeft > 1 ? ' each' : ''}
+        </strong>
+      </span>
     </span>
   );
 }

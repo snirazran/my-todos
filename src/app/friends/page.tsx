@@ -58,21 +58,6 @@ const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 const FRIENDS_SHEET_ART = ['/friend-share.webp'] as const;
 
-type SortMode = 'activity' | 'ranking';
-
-/**
- * Activity order rewards movement rather than standing: whoever is doing
- * something right now floats up, and a quiet friend is a prompt to cheer them
- * rather than a last place.
- */
-function activityScore(entry: FriendRowEntry): number {
-  if (entry.focusing) return 400;
-  if ((entry.givesYou ?? 0) > 0) return 300 + (entry.givesYou ?? 0);
-  if ((entry.tasksToday ?? 0) > 0) return 200 + (entry.tasksToday ?? 0);
-  if ((entry.streak ?? 0) > 0) return 100;
-  return 0;
-}
-
 export default function FriendsPage() {
   const router = useRouter();
   const { user, loading } = useAuth();
@@ -117,7 +102,6 @@ export default function FriendsPage() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inboxOpen, setInboxOpen] = useState(false);
   const [claiming, setClaiming] = useState(false);
-  const [sortMode, setSortMode] = useState<SortMode>('activity');
   const [claimReward, setClaimReward] = useState<{
     amount: number;
     doubled: boolean;
@@ -184,21 +168,13 @@ export default function FriendsPage() {
       ...friends,
       ...(friendsData?.me ? [{ ...friendsData.me, isYou: true }] : []),
     ];
-    const byName = (a: FriendRowEntry, b: FriendRowEntry) =>
-      (a.name || a.frogName).localeCompare(b.name || b.frogName);
-
-    if (sortMode === 'ranking') {
-      return all.sort(
-        (a, b) =>
-          b.fliesToday - a.fliesToday ||
-          (b.streak ?? 0) - (a.streak ?? 0) ||
-          byName(a, b),
-      );
-    }
     return all.sort(
-      (a, b) => activityScore(b) - activityScore(a) || byName(a, b),
+      (a, b) =>
+        b.fliesToday - a.fliesToday ||
+        (b.streak ?? 0) - (a.streak ?? 0) ||
+        (a.name || a.frogName).localeCompare(b.name || b.frogName),
     );
-  }, [friends, friendsData?.me, sortMode]);
+  }, [friends, friendsData?.me]);
 
   if (loading || !user) return <FriendsPageSkeleton />;
 
@@ -301,14 +277,11 @@ export default function FriendsPage() {
           ) : (
             <>
               <div className="w-full">
-                <div className="mb-3 flex items-end justify-between gap-3 px-1.5">
-                  <div className="min-w-0">
-                    <h2 className="text-lg font-black tracking-tight text-foreground">
-                      Your pond
-                    </h2>
-                    <CheerEarnHint />
-                  </div>
-                  <SortToggle mode={sortMode} onChange={setSortMode} />
+                <div className="mb-3 px-1.5">
+                  <h2 className="text-lg font-black tracking-tight text-foreground">
+                    Your pond
+                  </h2>
+                  <CheerEarnHint />
                 </div>
 
                 {!friendsData ? (
@@ -322,7 +295,7 @@ export default function FriendsPage() {
                       <FriendRow
                         key={entry.userId}
                         entry={entry}
-                        rank={sortMode === 'ranking' ? i + 1 : undefined}
+                        rank={i + 1}
                         animate={i === 0}
                         buddyInvites={
                           entry.isYou
@@ -396,52 +369,6 @@ export default function FriendsPage() {
         ready={!!friendsData}
       />
     </main>
-  );
-}
-
-function SortToggle({
-  mode,
-  onChange,
-}: {
-  mode: SortMode;
-  onChange: (mode: SortMode) => void;
-}) {
-  const options: { id: SortMode; label: string }[] = [
-    { id: 'activity', label: 'Activity' },
-    { id: 'ranking', label: 'Ranking' },
-  ];
-  return (
-    <div
-      role="tablist"
-      aria-label="Sort friends"
-      className="relative flex shrink-0 rounded-full bg-muted p-0.5"
-    >
-      {options.map((option) => {
-        const active = mode === option.id;
-        return (
-          <button
-            key={option.id}
-            type="button"
-            role="tab"
-            aria-selected={active}
-            onClick={() => onChange(option.id)}
-            className={cn(
-              'relative min-h-9 touch-manipulation rounded-full px-3 text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
-              active ? 'text-foreground' : 'text-muted-foreground',
-            )}
-          >
-            {active && (
-              <motion.span
-                layoutId="friends-sort-pill"
-                transition={{ type: 'spring', stiffness: 420, damping: 34 }}
-                className="absolute inset-0 rounded-full bg-card shadow-sm"
-              />
-            )}
-            <span className="relative">{option.label}</span>
-          </button>
-        );
-      })}
-    </div>
   );
 }
 

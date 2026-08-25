@@ -99,14 +99,21 @@ export function PondHero({
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, scale: 0.96 }}
               transition={{ type: 'spring', stiffness: 340, damping: 24 }}
-              className="relative flex min-h-14 w-full touch-manipulation items-center justify-center gap-2.5 rounded-full bg-[#4f9149] px-7 text-white shadow-[0_5px_0_#34631f] transition-[filter,transform,box-shadow] hover:brightness-105 active:translate-y-0.5 active:shadow-none disabled:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#4f9149]"
+              className="relative flex min-h-14 w-full touch-manipulation items-center justify-center rounded-full bg-[#4f9149] px-7 text-white shadow-[0_5px_0_#34631f] transition-[filter,transform,box-shadow] hover:brightness-105 active:translate-y-0.5 active:shadow-none disabled:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#4f9149]"
             >
-              <span className="drop-shadow-sm">
-                <Fly size={30} y={-2} interactive={false} paused={paused} />
-              </span>
               <span className="text-[17px] font-black tracking-tight">
-                {claiming ? 'Catching…' : `Catch ${claimable}`}
+                {claiming ? 'Catching…' : 'Catch'}
               </span>
+              {!claiming && (
+                <span className="absolute right-4 top-1/2 flex -translate-y-1/2 items-center gap-1.5">
+                  <span className="text-xl font-black leading-none tabular-nums">
+                    {claimable}
+                  </span>
+                  <span className="flex items-center drop-shadow-sm">
+                    <Fly size={40} y={-2} interactive={false} paused={paused} />
+                  </span>
+                </span>
+              )}
               <AnimatePresence>
                 {!claiming && (
                   <motion.span
