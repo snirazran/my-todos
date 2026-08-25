@@ -37,11 +37,10 @@ type PreviewMode = PreviewOutcome | 'landed';
  * Settlement runs once, on the first load after a real week rolls over, which
  * makes this sheet all but impossible to look at while it is being worked on.
  *
- * In development it opens on every quests page load. On a deployed build it
- * takes `?leapResult=kept|rescued|near_miss|missed` — the same preview, minus
- * a modal that would sit in front of every user who ever opened the page.
- * Read after mount rather than during render: the URL is not knowable on the
- * server, and reading it in the body would hydrate a different tree.
+ * So it can be summoned by hand — `?leapResult=kept|landed|rescued|near_miss|
+ * missed` — and only by hand. Nothing opens it unasked but a real settled
+ * week. Read after mount rather than during render: the URL is not knowable on
+ * the server, and reading it in the body would hydrate a different tree.
  */
 function useWeekResultPreview(data: PactView | undefined) {
   const [outcome, setOutcome] = useState<PreviewMode | null>(null);
@@ -49,15 +48,12 @@ function useWeekResultPreview(data: PactView | undefined) {
 
   useEffect(() => {
     const raw = new URLSearchParams(window.location.search).get('leapResult');
-    if (raw !== null) {
-      setOutcome(
-        raw === 'landed'
-          ? 'landed'
-          : (PREVIEW_OUTCOMES.find((entry) => entry === raw) ?? 'kept'),
-      );
-      return;
-    }
-    if (process.env.NODE_ENV === 'development') setOutcome('kept');
+    if (raw === null) return;
+    setOutcome(
+      raw === 'landed'
+        ? 'landed'
+        : (PREVIEW_OUTCOMES.find((entry) => entry === raw) ?? 'kept'),
+    );
   }, []);
 
   const dismissPreview = () => setDismissed(true);
