@@ -44,6 +44,23 @@ export function useIsFrogHungry(enabled: boolean) {
  * How full the belly is right now, 0–1, or null while it is unknown. Shares the
  * summary request with `useIsFrogHungry`, so reading it costs no extra fetch.
  */
+export function useFrogBelly(enabled: boolean): {
+  hunger: number | null;
+  maxHunger: number;
+} {
+  const { data } = useSWR<SummaryData>(
+    enabled ? INVENTORY_SUMMARY_KEY : null,
+    bootstrapFetcher,
+    { revalidateOnFocus: false },
+  );
+
+  const fullness = fullnessFrom(data?.wardrobe);
+  return {
+    hunger: fullness === null ? null : fullness * MAX_HUNGER_MS,
+    maxHunger: MAX_HUNGER_MS,
+  };
+}
+
 export function useFrogFullness(enabled: boolean): number | null {
   const { data } = useSWR<SummaryData>(
     enabled ? INVENTORY_SUMMARY_KEY : null,

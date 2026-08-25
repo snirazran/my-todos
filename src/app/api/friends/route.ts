@@ -98,20 +98,20 @@ export async function GET(req: NextRequest) {
       backgroundDocs.map((b) => [b.id, b.rarity as Rarity]),
     );
 
-    const aliveStreakOf = (u: unknown): number => {
+    const aliveStreakOf = (
+      u: unknown,
+    ): { count: number; today: boolean } => {
       const state = readLoginStreakState(u);
-      if (state.count <= 0 || !state.lastDayKey) return 0;
-      if (
-        state.lastDayKey === today ||
-        state.lastDayKey === previousDayKey(today)
-      ) {
-        return state.count;
+      const today_ = !!state.lastDayKey && state.lastDayKey === today;
+      if (state.count <= 0 || !state.lastDayKey) return { count: 0, today: false };
+      if (today_ || state.lastDayKey === previousDayKey(today)) {
+        return { count: state.count, today: today_ };
       }
       // A held Lily Pad only ever covers one day, so anything longer is dead.
       return computeGap(state.lastDayKey, today) === 1 &&
         readShieldState(u).count > 0
-        ? state.count
-        : 0;
+        ? { count: state.count, today: false }
+        : { count: 0, today: false };
     };
 
     const toSummary = (u: {
@@ -141,6 +141,7 @@ export async function GET(req: NextRequest) {
       const backgroundRarity = backgroundId
         ? backgroundRarityById.get(backgroundId) ?? null
         : null;
+      const streak = aliveStreakOf(u);
       const timer = u.activeFrogodoroTimer;
       const focusing =
         timer?.status === 'running' &&
@@ -160,7 +161,8 @@ export async function GET(req: NextRequest) {
         tasksToday,
         givesYou: pondFliesFrom(tasksToday, economyConfig),
         backgroundId,
-        streak: aliveStreakOf(u),
+        streak: streak.count,
+        streakToday: streak.today,
         premium: u.premiumUntil ? new Date(u.premiumUntil) > new Date() : false,
       };
     };

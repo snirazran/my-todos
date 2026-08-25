@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import useSWR from 'swr';
-import { useReducedMotion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { Search, QrCode, Gift } from 'lucide-react';
 import {
   RewardTile,
@@ -29,28 +29,42 @@ type InviteConfigResponse = {
  * cycles the outfits that can actually be sent — the promise is real, the
  * particular outfit is not.
  */
-function GiftOutfitRoll({ items }: { items: QuestRewardCatalogItem[] }) {
+function GiftOutfitRoll({
+  items,
+  active,
+}: {
+  items: QuestRewardCatalogItem[];
+  /** Held false until the sheet has finished opening, so the Rive tile (and
+   *  the WASM runtime behind it) instantiates after the slide, not during. */
+  active: boolean;
+}) {
   const reduceMotion = useReducedMotion();
   const [shown, setShown] = useState(0);
 
   useEffect(() => {
-    if (reduceMotion || items.length <= 1) return;
+    if (!active || reduceMotion || items.length <= 1) return;
     const timer = window.setInterval(() => {
       setShown((current) => {
         let next = current;
-        while (next === current) next = Math.floor(Math.random() * items.length);
+        while (next === current)
+          next = Math.floor(Math.random() * items.length);
         return next;
       });
     }, 1000);
     return () => window.clearInterval(timer);
-  }, [reduceMotion, items.length]);
+  }, [active, reduceMotion, items.length]);
 
   const catalog = useMemo(
     () => Object.fromEntries(items.map((item) => [item.id, item])),
     [items],
   );
   const item = items[shown % Math.max(1, items.length)];
-  if (!item) return <Gift className="h-6 w-6 text-[#4f9149]" strokeWidth={2.25} />;
+  if (!active || !item)
+    return (
+      <span className="flex h-11 w-11 items-center justify-center">
+        <Gift className="h-6 w-6 text-[#4f9149]" strokeWidth={2.25} />
+      </span>
+    );
 
   return (
     <RewardTile
@@ -127,7 +141,7 @@ export function AddFriendsSheet({
         closeAriaLabel="Close add friends"
         hideHandle
       >
-        {({ bindScroll }) => (
+        {({ entered, bindScroll }) => (
           <div
             ref={bindScroll}
             className="flex max-h-[100dvh] flex-col overflow-y-auto overscroll-contain sm:max-h-[calc(100dvh-3rem)]"
@@ -165,7 +179,7 @@ export function AddFriendsSheet({
                     They get
                   </span>
                   <span className="flex h-11 items-center justify-center">
-                    <GiftOutfitRoll items={giftItems} />
+                    <GiftOutfitRoll items={giftItems} active={entered} />
                   </span>
                   <span className="flex min-h-[2.05rem] items-center text-[13px] font-black leading-tight tracking-tight text-foreground">
                     A free outfit
@@ -175,14 +189,23 @@ export function AddFriendsSheet({
                   <span className="text-[11px] font-black text-muted-foreground">
                     You get
                   </span>
-                  <span className="flex h-11 items-center justify-center">
-                    <Fly size={38} interactive={false} paused />
-                    <Fly
-                      size={38}
-                      interactive={false}
-                      paused
-                      className="-ml-3 translate-y-1"
-                    />
+                  <span className="flex h-11 w-[4.3rem] items-center justify-center">
+                    {entered && (
+                      <motion.span
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ duration: 0.25 }}
+                        className="flex items-center"
+                      >
+                        <Fly size={38} interactive={false} paused />
+                        <Fly
+                          size={38}
+                          interactive={false}
+                          paused
+                          className="-ml-3 translate-y-1"
+                        />
+                      </motion.span>
+                    )}
                   </span>
                   <span className="flex min-h-[2.05rem] items-center text-[13px] font-black leading-tight tracking-tight text-foreground">
                     {perFlies} flies per {perTasks} tasks
@@ -223,7 +246,7 @@ export function AddFriendsSheet({
               )}
 
               <FriendSuggestionsRow
-                enabled={open}
+                enabled={open && entered}
                 variant="embedded"
                 className="mt-5"
                 title="Already on Frogress"
@@ -242,7 +265,10 @@ export function AddFriendsSheet({
                     onClick={() => setCodeOpen(true)}
                     className="flex items-center justify-center gap-2 rounded-xl border border-border/60 bg-card px-3 py-2.5 text-[13px] font-black tracking-tight text-foreground transition-transform active:scale-[0.98] [@media(hover:hover)]:hover:bg-muted/60"
                   >
-                    <Search className="h-4 w-4 text-muted-foreground" strokeWidth={2.5} />
+                    <Search
+                      className="h-4 w-4 text-muted-foreground"
+                      strokeWidth={2.5}
+                    />
                     Enter code
                   </button>
                   <button
@@ -250,7 +276,10 @@ export function AddFriendsSheet({
                     onClick={() => setQrOpen(true)}
                     className="flex items-center justify-center gap-2 rounded-xl border border-border/60 bg-card px-3 py-2.5 text-[13px] font-black tracking-tight text-foreground transition-transform active:scale-[0.98] [@media(hover:hover)]:hover:bg-muted/60"
                   >
-                    <QrCode className="h-4 w-4 text-muted-foreground" strokeWidth={2.5} />
+                    <QrCode
+                      className="h-4 w-4 text-muted-foreground"
+                      strokeWidth={2.5}
+                    />
                     QR code
                   </button>
                 </div>
@@ -260,8 +289,14 @@ export function AddFriendsSheet({
         )}
       </BaseSheet>
 
-      <InviteFriendsModal open={inviteOpen} onClose={() => setInviteOpen(false)} />
-      <EnterFriendCodeModal open={codeOpen} onClose={() => setCodeOpen(false)} />
+      <InviteFriendsModal
+        open={inviteOpen}
+        onClose={() => setInviteOpen(false)}
+      />
+      <EnterFriendCodeModal
+        open={codeOpen}
+        onClose={() => setCodeOpen(false)}
+      />
       <QRFriendModal
         open={qrOpen}
         onClose={() => setQrOpen(false)}

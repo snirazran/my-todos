@@ -4,7 +4,15 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MoreVertical, X, UserMinus, Users, Check, Loader2, Clock } from 'lucide-react';
+import {
+  MoreVertical,
+  X,
+  UserMinus,
+  Users,
+  Check,
+  Loader2,
+  Clock,
+} from 'lucide-react';
 import useSWR from 'swr';
 import Frog, { type FrogHandle } from '@/components/ui/frog';
 import { LookReactionRow } from '@/components/ui/LookReactions';
@@ -110,9 +118,13 @@ export function FriendDetailModal({
   const [menuOpen, setMenuOpen] = useState(false);
   const [busyBond, setBusyBond] = useState<string | null>(null);
   const [peekTarget, setPeekTarget] = useState<PeekTarget | null>(null);
+  const [entered, setEntered] = useState(false);
 
   useEffect(() => {
-    if (!entry) setPeekTarget(null);
+    if (!entry) {
+      setPeekTarget(null);
+      setEntered(false);
+    }
   }, [entry]);
 
   const friendBackground = useMemo<BackgroundItem | null>(() => {
@@ -124,7 +136,9 @@ export function FriendDetailModal({
     if (!peekTarget) return false;
     if (peekTarget.kind === 'item')
       return (inventoryData?.wardrobe?.inventory?.[peekTarget.id] ?? 0) > 0;
-    return ((data?.inventory as Record<string, number>)?.[peekTarget.id] ?? 0) > 0;
+    return (
+      ((data?.inventory as Record<string, number>)?.[peekTarget.id] ?? 0) > 0
+    );
   }, [peekTarget, inventoryData?.wardrobe?.inventory, data?.inventory]);
 
   const wearingPeekTarget = useMemo(() => {
@@ -186,7 +200,10 @@ export function FriendDetailModal({
     (i) => i.withUserId === entry?.userId,
   );
 
-  const respondInvite = async (bondId: string, action: 'accept' | 'decline') => {
+  const respondInvite = async (
+    bondId: string,
+    action: 'accept' | 'decline',
+  ) => {
     setBusyBond(bondId);
     try {
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -216,7 +233,8 @@ export function FriendDetailModal({
   }, [entry]);
 
   const images = useMemo(() => {
-    if (!entry?.backgroundId || !data?.catalog) return DEFAULT_BACKGROUND_IMAGES;
+    if (!entry?.backgroundId || !data?.catalog)
+      return DEFAULT_BACKGROUND_IMAGES;
     return (
       data.catalog.find((b) => b.id === entry.backgroundId)?.images ??
       DEFAULT_BACKGROUND_IMAGES
@@ -226,7 +244,7 @@ export function FriendDetailModal({
   if (typeof document === 'undefined') return null;
 
   const today = entry
-    ? entry.givesYou ?? contributionFrom(entry.fliesToday)
+    ? (entry.givesYou ?? contributionFrom(entry.fliesToday))
     : 0;
   const total = entry ? Math.max(entry.sharedTotal ?? 0, today) : 0;
 
@@ -247,6 +265,7 @@ export function FriendDetailModal({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: '100%' }}
               transition={{ type: 'spring', damping: 32, stiffness: 320 }}
+              onAnimationComplete={() => setEntered(true)}
               className="pointer-events-auto relative flex h-[100dvh] w-full flex-col overflow-hidden bg-background md:h-auto md:max-h-[calc(100dvh-3rem)] md:w-[min(100vw-3rem,26rem)] md:rounded-[28px] md:shadow-2xl lg:max-h-[calc(100dvh-4rem)] lg:w-[min(100vw-4rem,40rem)]"
             >
               {/* Banner: friend's background with the frog sitting on it */}
@@ -311,7 +330,7 @@ export function FriendDetailModal({
                 <FriendFocusScene
                   frogRef={friendFrogRef}
                   frogBoxRef={friendFrogBoxRef}
-                  active={!!entry.focusing}
+                  active={entered && !!entry.focusing}
                   onGrabActive={setFriendMouthOpen}
                 />
 
@@ -321,13 +340,21 @@ export function FriendDetailModal({
                     ref={friendFrogBoxRef}
                     className="relative -translate-y-[26px] lg:origin-bottom lg:scale-110"
                   >
-                    <Frog
-                      ref={friendFrogRef}
-                      width={230}
-                      height={210}
-                      indices={entry.indices}
-                      mouthOpen={friendMouthOpen}
-                    />
+                    {entered ? (
+                      <Frog
+                        ref={friendFrogRef}
+                        width={230}
+                        height={210}
+                        indices={entry.indices}
+                        mouthOpen={friendMouthOpen}
+                      />
+                    ) : (
+                      <FrogSnapshot
+                        width={230}
+                        height={210}
+                        indices={entry.indices}
+                      />
+                    )}
                     <PremiumFrogAura show={!!entry.premium} alwaysPlay />
                   </div>
                 </div>
@@ -529,7 +556,6 @@ export function FriendDetailModal({
                     Buddy up
                   </button>
                 </div>
-
               </div>
             </motion.div>
           </div>
@@ -671,9 +697,7 @@ function ItemPeekSheet({
               )}
             </div>
 
-            <h2 className="sr-only">
-              {target.name}
-            </h2>
+            <h2 className="sr-only">{target.name}</h2>
             <p className="mt-4 text-center text-[13px] font-semibold text-muted-foreground">
               {scarcity}
             </p>

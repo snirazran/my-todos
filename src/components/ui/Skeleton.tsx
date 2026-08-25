@@ -330,13 +330,13 @@ export function WardrobePageSkeleton() {
 
 export function FriendsLeaderboardSkeleton({ rows = 4 }: { rows?: number }) {
   return (
-    <ul className="flex flex-col gap-1.5">
+    <ul className="flex flex-col gap-2">
       {Array.from({ length: rows }).map((_, i) => (
         <li
           key={i}
-          className="flex items-center gap-2 rounded-xl border border-border/50 bg-card py-1.5 pl-1.5 pr-3 sm:gap-2.5 sm:py-2"
+          className="flex items-center gap-2 rounded-2xl border border-border/60 bg-card py-1.5 pl-1.5 pr-2 sm:gap-2.5"
         >
-          <div className="h-[78px] w-[96px] shrink-0 min-[360px]:h-[102px] min-[360px]:w-[132px] min-[400px]:h-[124px] min-[400px]:w-[164px] sm:h-[124px] sm:w-48 md:h-[172px] md:w-56" />
+          <div className="aspect-[6/5] w-[30%] min-w-[78px] max-w-[124px] shrink-0" />
           <div className="flex min-w-0 flex-1 flex-col gap-2">
             <Skeleton
               className={cn(
@@ -345,11 +345,10 @@ export function FriendsLeaderboardSkeleton({ rows = 4 }: { rows?: number }) {
               )}
             />
             <Skeleton className="h-3 w-1/3 rounded-full" />
+            <Skeleton className="h-3.5 w-14 rounded-full" />
           </div>
-          <div className="flex shrink-0 items-center gap-1.5">
-            <Skeleton className="h-7 w-7 rounded-full" />
-            <Skeleton className="h-6 w-10 rounded-full" />
-          </div>
+          <Skeleton className="h-6 w-10 shrink-0 rounded-full" />
+          <Skeleton className="h-11 w-11 shrink-0 rounded-full" />
         </li>
       ))}
     </ul>
@@ -364,34 +363,22 @@ export function FriendsPageSkeleton() {
     >
       <div className="relative mx-auto flex w-full flex-col items-center px-4 pt-[calc(env(safe-area-inset-top)+0.5rem)] md:max-w-2xl md:pt-11">
         <div className="h-[270px]" />
-        <Skeleton className="relative z-20 -mt-3 h-[58px] w-[min(20rem,80vw)] rounded-2xl" />
+        <Skeleton className="relative z-20 -mt-2 h-14 w-[min(22rem,88vw)] rounded-full" />
 
-        <div className="relative z-10 -mx-4 mt-8 flex w-[calc(100%+2rem)] flex-col self-stretch rounded-t-[24px] bg-background px-4 pb-12 pt-5 md:mt-24 md:px-8">
-          <div className="mb-5 flex items-center gap-3 rounded-[20px] border border-border/50 bg-card/40 px-4 py-3.5">
-            <Skeleton className="h-11 w-11 shrink-0 rounded-2xl" />
-            <div className="flex min-w-0 flex-1 flex-col gap-2">
-              <Skeleton className="h-3.5 w-2/5 rounded-full" />
-              <Skeleton className="h-3 w-3/5 rounded-full" />
-            </div>
+        <div className="relative z-10 -mx-4 mt-8 flex w-[calc(100%+2rem)] flex-col self-stretch rounded-t-[24px] bg-background px-4 pb-12 pt-6 md:mt-24 md:px-8">
+          <Skeleton className="mb-2.5 ml-1.5 h-3 w-14 rounded-full" />
+          <div className="mb-7 flex flex-col gap-3.5 pl-6">
+            {['w-3/5', 'w-2/5', 'w-1/2'].map((w) => (
+              <Skeleton key={w} className={cn('h-3.5 rounded-full', w)} />
+            ))}
           </div>
 
-          <div className="mb-5 flex items-center gap-3 rounded-[18px] border border-border/50 bg-card/40 px-3.5 py-3">
-            <Skeleton className="h-16 w-16 shrink-0 rounded-2xl" />
-            <div className="flex min-w-0 flex-1 flex-col gap-2">
-              <Skeleton className="h-3 w-24 rounded-full" />
-              <Skeleton className="h-4 w-3/5 rounded-full" />
-            </div>
-            <Skeleton className="h-9 w-9 shrink-0 rounded-full" />
+          <div className="mb-3 flex items-end justify-between gap-3 px-1.5">
+            <Skeleton className="h-5 w-28 rounded-full" />
+            <Skeleton className="h-9 w-36 rounded-full" />
           </div>
 
-          <div className="mb-2.5 flex flex-col gap-2 px-1.5">
-            <Skeleton className="h-5 w-48 rounded-full" />
-            <Skeleton className="h-3 w-36 rounded-full" />
-          </div>
-
-          <div className="w-full overflow-hidden rounded-[18px] border border-border/50 bg-card/40 p-1.5 shadow-sm">
-            <FriendsLeaderboardSkeleton />
-          </div>
+          <FriendsLeaderboardSkeleton />
         </div>
       </div>
     </SkeletonShell>

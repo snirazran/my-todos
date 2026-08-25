@@ -19,16 +19,20 @@ export function FriendSuggestionsRow({
   enabled,
   variant = 'page',
   title = 'People you may know',
-  subtitle = 'Add them and you each earn half of the other’s daily catch',
+  subtitle = 'Add them and you both start filling each other’s pond',
+  tone = 'default',
   className,
 }: {
   enabled: boolean;
   /** `embedded` drops the outer spacing so it can sit inside a sheet. */
   variant?: 'page' | 'embedded';
+  /** `inverted` reads on a dark panel instead of the page background. */
+  tone?: 'default' | 'inverted';
   title?: string;
   subtitle?: string;
   className?: string;
 }) {
+  const inverted = tone === 'inverted';
   const { data, error, isLoading, mutate } = useSWR<{
     suggestions: FriendSuggestion[];
   }>(enabled ? '/api/friends/suggestions' : null, fetcher, {
@@ -49,14 +53,31 @@ export function FriendSuggestionsRow({
           className,
         )}
       >
-        <div className="flex items-center justify-between gap-3 rounded-[18px] border border-border/50 bg-card/40 px-4 py-3">
-          <p className="text-xs font-semibold text-muted-foreground">
+        <div
+          className={cn(
+            'flex items-center justify-between gap-3 rounded-[18px] px-4 py-3',
+            inverted
+              ? 'bg-white/8'
+              : 'border border-border/50 bg-card/40',
+          )}
+        >
+          <p
+            className={cn(
+              'text-xs font-semibold',
+              inverted ? 'text-white/60' : 'text-muted-foreground',
+            )}
+          >
             Couldn&apos;t load suggestions.
           </p>
           <button
             type="button"
             onClick={() => mutate()}
-            className="shrink-0 rounded-lg px-2 py-1 text-xs font-black text-[#4f9149] transition-colors hover:bg-[#4f9149]/10"
+            className={cn(
+              'shrink-0 rounded-lg px-2 py-1 text-xs font-black transition-colors',
+              inverted
+                ? 'text-[#a5d6a7] hover:bg-white/10'
+                : 'text-[#4f9149] hover:bg-[#4f9149]/10',
+            )}
           >
             Retry
           </button>
@@ -123,24 +144,42 @@ export function FriendSuggestionsRow({
       <div className="mb-2.5 px-1.5">
         <h2
           className={cn(
-            'font-black tracking-tight text-foreground',
+            'font-black tracking-tight',
             variant === 'page' ? 'text-lg' : 'text-base',
+            inverted ? 'text-white' : 'text-foreground',
           )}
         >
           {title}
         </h2>
-        <p className="text-[11px] font-bold text-muted-foreground">
+        <p
+          className={cn(
+            'text-[11px] font-bold',
+            inverted ? 'text-white/60' : 'text-muted-foreground',
+          )}
+        >
           {subtitle}
         </p>
       </div>
-      <div className="w-full overflow-hidden rounded-[18px] border border-border/50 bg-card/40 p-1.5 shadow-sm">
+      <div
+        className={cn(
+          'w-full overflow-hidden rounded-[18px] p-1.5',
+          inverted
+            ? 'bg-white/8'
+            : 'border border-border/50 bg-card/40 shadow-sm',
+        )}
+      >
         <ul className="flex flex-col gap-1.5 lg:grid lg:grid-cols-2 lg:gap-2">
           {suggestions.map((s) => {
             const sent = sentTo.has(s.userId);
             return (
               <li
                 key={s.userId}
-                className="relative flex items-center gap-2 rounded-xl border border-border/50 bg-card py-1.5 pl-1.5 pr-2 sm:gap-2.5"
+                className={cn(
+                  'relative flex items-center gap-2 rounded-xl py-1.5 pl-1.5 pr-2 sm:gap-2.5',
+                  inverted
+                    ? 'bg-white/8'
+                    : 'border border-border/50 bg-card',
+                )}
               >
                 <div className="flex h-[64px] w-[80px] shrink-0 items-end justify-center overflow-hidden sm:h-[76px] sm:w-[96px]">
                   <FrogSnapshot
@@ -151,7 +190,12 @@ export function FriendSuggestionsRow({
                   />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="flex items-center gap-1 text-sm font-black leading-tight tracking-tight text-foreground">
+                  <p
+                    className={cn(
+                      'flex items-center gap-1 text-sm font-bold leading-tight tracking-tight',
+                      inverted ? 'text-white' : 'text-foreground',
+                    )}
+                  >
                     <span
                       className={cn(
                         'truncate',
@@ -168,11 +212,13 @@ export function FriendSuggestionsRow({
                       />
                     )}
                   </p>
-                  <p className="truncate text-xs font-semibold text-muted-foreground">
+                  <p
+                    className={cn(
+                      'truncate text-xs font-medium',
+                      inverted ? 'text-white/60' : 'text-muted-foreground',
+                    )}
+                  >
                     {reasonLabel(s)}
-                  </p>
-                  <p className="truncate text-[11px] font-black text-[#4f9149]">
-                    +½ of their daily catch
                   </p>
                 </div>
                 <button
@@ -205,7 +251,12 @@ export function FriendSuggestionsRow({
                   onClick={() => dismiss(s.userId)}
                   aria-label={`Hide ${s.name || s.frogName} for now`}
                   title="Hide for now"
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground"
+                  className={cn(
+                    'flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors',
+                    inverted
+                      ? 'text-white/45 hover:bg-white/10 hover:text-white'
+                      : 'text-muted-foreground/60 hover:bg-muted hover:text-foreground',
+                  )}
                 >
                   <X className="h-4 w-4" />
                 </button>

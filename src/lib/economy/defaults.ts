@@ -80,6 +80,10 @@ export type FlyEconomyConfig = {
     /** ...on this many days in a week, and the gift lands. */
     weeklyBonusDays: number;
     weeklyBonusGiftItemId: string;
+    /** Flies the sender earns per friend cheered, first time each day. */
+    cheerFlies: number;
+    /** Cheers a day that pay the sender; extras still send, just unpaid. */
+    cheerPaidPerDay: number;
   };
   invites: {
     monthlyCap: number;
@@ -156,6 +160,8 @@ export const FLY_ECONOMY_DEFAULTS: FlyEconomyConfig = {
     weeklyBonusFriends: 3,
     weeklyBonusDays: 5,
     weeklyBonusGiftItemId: 'gift_box_rare',
+    cheerFlies: 1,
+    cheerPaidPerDay: 3,
   },
   invites: {
     monthlyCap: 10,
@@ -220,6 +226,8 @@ export const FLY_ECONOMY_LIMITS: Record<
     expiryHours: { min: 1, max: 24 * 14 },
     weeklyBonusFriends: { min: 0, max: 50 },
     weeklyBonusDays: { min: 0, max: 7 },
+    cheerFlies: { min: 0, max: 50 },
+    cheerPaidPerDay: { min: 0, max: 50 },
   },
   invites: {
     monthlyCap: { min: 0, max: 1000 },

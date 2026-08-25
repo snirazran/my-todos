@@ -16,6 +16,8 @@ import { equippedToIndices, equippedToItems } from '@/lib/friends/indices';
 import { getZonedToday } from '@/lib/utils';
 import { notifyFriendUpdate } from '@/lib/taskSync';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
+import { loadFlyEconomyConfig } from '@/lib/economy/config';
+import { settleFlyGrant } from '@/lib/economy/ledger';
 
 const json = (body: unknown, init = 200) =>
   NextResponse.json(body, { status: init });
@@ -32,6 +34,7 @@ export async function GET(req: NextRequest) {
     const tz = req.nextUrl.searchParams.get('tz') || 'UTC';
     const today = getZonedToday(tz);
 
+    const config = await loadFlyEconomyConfig();
     const [received, sentToday, me] = await Promise.all([
       LookReactionModel.find({ toUserId: userId })
         .sort({ createdAt: -1 })
@@ -77,6 +80,11 @@ export async function GET(req: NextRequest) {
       sentToday: Object.fromEntries(
         sentToday.map((r) => [r.toUserId, r.kind]),
       ) as Record<string, LookReactionKind>,
+      cheerFlies: config.friendsPond.cheerFlies,
+      cheerPaidLeft: Math.max(
+        0,
+        config.friendsPond.cheerPaidPerDay - sentToday.length,
+      ),
     });
   } catch {
     return json({ error: 'Unauthorized' }, 401);
@@ -119,7 +127,7 @@ export async function POST(req: NextRequest) {
     }));
 
     const dayKey = getZonedToday(tz);
-    await LookReactionModel.updateOne(
+    const write = await LookReactionModel.updateOne(
       { fromUserId: userId, toUserId, dayKey },
       {
         $set: {
@@ -134,6 +142,40 @@ export async function POST(req: NextRequest) {
       { upsert: true },
     );
 
+    let earned = 0;
+    const isNewCheer = (write.upsertedCount ?? 0) > 0;
+    const config = await loadFlyEconomyConfig();
+    if (isNewCheer && config.friendsPond.cheerFlies > 0) {
+      const cheeredToday = await LookReactionModel.countDocuments({
+        fromUserId: userId,
+        dayKey,
+      });
+      const paidCount = Math.min(
+        cheeredToday,
+        config.friendsPond.cheerPaidPerDay,
+      );
+      const settlement = await settleFlyGrant({
+        userId,
+        source: 'friend_cheer',
+        occurrenceKey: dayKey,
+        dayKey,
+        targetAmount: paidCount * config.friendsPond.cheerFlies,
+        meta: { friends: paidCount },
+      });
+      if (settlement.delta > 0) {
+        earned = settlement.delta;
+        await UserModel.updateOne(
+          { _id: userId },
+          { $inc: { 'wardrobe.flies': earned } },
+        );
+        await recordAnalyticsEvent({
+          userId,
+          name: 'fly_earned',
+          properties: { source: 'friend_cheer', fly_amount: earned },
+        });
+      }
+    }
+
     void notifyFriendUpdate(toUserId);
     await recordAnalyticsEvent({
       userId,
@@ -141,7 +183,7 @@ export async function POST(req: NextRequest) {
       properties: { kind, item_count: lookItems.length },
     });
 
-    return json({ ok: true, kind });
+    return json({ ok: true, kind, earned });
   } catch {
     return json({ error: 'Unauthorized' }, 401);
   }

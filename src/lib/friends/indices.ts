@@ -40,6 +40,8 @@ export type FriendSummary = {
   sharedTotal?: number;
   /** Current alive login-streak count (0 when broken/none). */
   streak?: number;
+  /** Whether that streak was extended today rather than yesterday. */
+  streakToday?: boolean;
   /** Whether this user has an active premium subscription. */
   premium?: boolean;
   /** Whether this friend is in a running focus session right now. */

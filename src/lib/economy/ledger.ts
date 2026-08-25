@@ -9,6 +9,7 @@ export const FLY_SOURCES = [
   'buddy',
   'friend_pond',
   'friend_pond_double',
+  'friend_cheer',
   'focus',
   'deep_focus',
   'quest',

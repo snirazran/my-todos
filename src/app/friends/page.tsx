@@ -4,27 +4,15 @@ import React, { useState, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import {
-  ChevronRight,
-  UserPlus,
-  Bell,
-  UserMinus,
-  Loader2,
-  Flame,
-  Gift,
-} from 'lucide-react';
-import { Icon } from '@/components/ui/Icon';
-import { PremiumFrogAura } from '@/components/ui/PremiumFrogAura';
+import { Bell, UserMinus, UserPlus, Loader2 } from 'lucide-react';
 import { StyleShuffleHeaderButton } from '@/components/ui/SkinRotation';
 import useSWR from 'swr';
 import { useAuth } from '@/components/auth/AuthContext';
 import { mutateFriendsCaches } from '@/hooks/useFriendsSync';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
-import { useIsFrogHungry } from '@/hooks/useFrogHunger';
+import { useFrogBelly, useIsFrogHungry } from '@/hooks/useFrogHunger';
 import { useRegisterOpenSheet, useSheetStore } from '@/lib/sheetStore';
-import { hapticCelebrate, hapticTick } from '@/lib/haptics';
-import Frog, { type FrogHandle } from '@/components/ui/frog';
-import { HomeFocusFlies } from '@/components/ui/HomeFocusFlies';
+import { hapticCelebrate } from '@/lib/haptics';
 import Fly from '@/components/ui/fly';
 import {
   FriendsPageSkeleton,
@@ -34,12 +22,10 @@ import { AddFriendsSheet } from '@/components/ui/AddFriendsSheet';
 import { useIdleImageWarmup } from '@/lib/imageWarmup';
 import { InviteFriendsModal } from '@/components/ui/InviteFriendsModal';
 import { FriendRequestsInbox } from '@/components/ui/FriendRequestsInbox';
-import { FriendSuggestionsRow } from '@/components/ui/FriendSuggestionsRow';
 import { FriendDetailModal } from '@/components/ui/FriendDetailModal';
 import { BuddyUpFlow } from '@/components/ui/BuddyUpFlow';
 import { BuddyNudgeSheet } from '@/components/ui/BuddyNudgeSheet';
-import { contributionFrom, type FriendSummary } from '@/lib/friends/indices';
-import { rarityRank } from '@/lib/skins/catalog';
+import { type FriendSummary } from '@/lib/friends/indices';
 import { cn } from '@/lib/utils';
 import { RewardCard } from '@/components/ui/gift-box/RewardCard';
 import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
@@ -51,7 +37,6 @@ import {
 } from '@/hooks/useInventory';
 import { markFlyEarn } from '@/lib/flyEarn';
 import { FlyCounter } from '@/components/ui/FlyCounter';
-import { LookLovedChip, LookNoticeCard } from '@/components/ui/LookReactions';
 import {
   MobileHeaderActions,
   HEADER_CONTROL_ICON_BUTTON,
@@ -60,12 +45,33 @@ import { MobileMenuCluster } from '@/components/ui/siteHeader';
 import { FlyCatchSwipeLauncher } from '@/components/ui/FlyCatchSwipeLauncher';
 import { useUIStore } from '@/lib/uiStore';
 import type { ItemDef } from '@/lib/skins/catalog';
+import { PondHero } from '@/components/ui/friends/PondHero';
+import { FriendsTodayStrip } from '@/components/ui/friends/FriendsTodayStrip';
+import {
+  FriendRow,
+  type FriendRowEntry,
+} from '@/components/ui/friends/FriendRow';
+import { GrowPondCard } from '@/components/ui/friends/GrowPondCard';
+import { CheerEarnHint } from '@/components/ui/friends/CheerButton';
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
-type LeaderboardEntry = FriendSummary & { isYou?: boolean };
-
 const FRIENDS_SHEET_ART = ['/friend-share.webp'] as const;
+
+type SortMode = 'activity' | 'ranking';
+
+/**
+ * Activity order rewards movement rather than standing: whoever is doing
+ * something right now floats up, and a quiet friend is a prompt to cheer them
+ * rather than a last place.
+ */
+function activityScore(entry: FriendRowEntry): number {
+  if (entry.focusing) return 400;
+  if ((entry.givesYou ?? 0) > 0) return 300 + (entry.givesYou ?? 0);
+  if ((entry.tasksToday ?? 0) > 0) return 200 + (entry.tasksToday ?? 0);
+  if ((entry.streak ?? 0) > 0) return 100;
+  return 0;
+}
 
 export default function FriendsPage() {
   const router = useRouter();
@@ -81,17 +87,16 @@ export default function FriendsPage() {
   const { data: inventorySummary } = useInventory(!!user, true);
   const flyBalance = inventorySummary?.wardrobe?.flies;
   const isFrogHungry = useIsFrogHungry(!!user);
+  const belly = useFrogBelly(!!user);
   const { data: friendsData, mutate: mutateFriends } = useSWR<{
     friends: FriendSummary[];
     me: FriendSummary | null;
     claimable?: number;
     gate?: { required: number; done: number; open: boolean };
     contribution?: { receivedToday: number };
-  }>(
-    user ? `/api/friends?tz=${encodeURIComponent(tz)}` : null,
-    fetcher,
-    { revalidateOnFocus: false },
-  );
+  }>(user ? `/api/friends?tz=${encodeURIComponent(tz)}` : null, fetcher, {
+    revalidateOnFocus: false,
+  });
   const { data: buddyInvitesData } = useSWR<{
     incoming: { bondId: string; withUserId: string }[];
   }>(user ? '/api/buddy/invite' : null, fetcher, { revalidateOnFocus: false });
@@ -112,6 +117,7 @@ export default function FriendsPage() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inboxOpen, setInboxOpen] = useState(false);
   const [claiming, setClaiming] = useState(false);
+  const [sortMode, setSortMode] = useState<SortMode>('activity');
   const [claimReward, setClaimReward] = useState<{
     amount: number;
     doubled: boolean;
@@ -158,40 +164,63 @@ export default function FriendsPage() {
     }
   }, [claiming, claimable, gate?.open, tz, mutateFriends, flyBalance]);
 
+  const openInbox = React.useCallback(() => setInboxOpen(true), []);
+  const openFriend = React.useCallback(
+    (friend: FriendSummary) => setDetailTarget(friend),
+    [],
+  );
+
   React.useEffect(() => {
     if (!loading && !user) router.replace('/login');
   }, [loading, user, router]);
 
+  const friends = React.useMemo(
+    () => friendsData?.friends ?? [],
+    [friendsData?.friends],
+  );
+
+  const rows: FriendRowEntry[] = React.useMemo(() => {
+    const all: FriendRowEntry[] = [
+      ...friends,
+      ...(friendsData?.me ? [{ ...friendsData.me, isYou: true }] : []),
+    ];
+    const byName = (a: FriendRowEntry, b: FriendRowEntry) =>
+      (a.name || a.frogName).localeCompare(b.name || b.frogName);
+
+    if (sortMode === 'ranking') {
+      return all.sort(
+        (a, b) =>
+          b.fliesToday - a.fliesToday ||
+          (b.streak ?? 0) - (a.streak ?? 0) ||
+          byName(a, b),
+      );
+    }
+    return all.sort(
+      (a, b) => activityScore(b) - activityScore(a) || byName(a, b),
+    );
+  }, [friends, friendsData?.me, sortMode]);
+
   if (loading || !user) return <FriendsPageSkeleton />;
 
-  const friends = friendsData?.friends ?? [];
   const hasRealFriends = friends.length > 0;
   const pendingCount = requestsData?.incoming?.length ?? 0;
   const buddyInviteCount = buddyInvitesData?.incoming?.length ?? 0;
   const alertsCount = pendingCount + buddyInviteCount;
 
-  const sharedFrom = (f: FriendSummary) =>
-    f.givesYou ?? contributionFrom(f.fliesToday);
-  const leaderboard: LeaderboardEntry[] = [
-    ...friends,
-    ...(friendsData?.me ? [{ ...friendsData.me, isYou: true }] : []),
-  ].sort(
-    (a, b) =>
-      b.fliesToday - a.fliesToday ||
-      (b.streak ?? 0) - (a.streak ?? 0) ||
-      (a.name || a.frogName).localeCompare(b.name || b.frogName),
+  const growCard = (
+    <GrowPondCard
+      onInvite={() => setInviteOpen(true)}
+      onAdd={() => setAddOpen(true)}
+      enabled={!!user}
+      paused={isAnyPanelOpen}
+    />
   );
-  const receivedToday =
-    friendsData?.contribution?.receivedToday ??
-    friends.reduce((sum, f) => sum + sharedFrom(f), 0);
-  const topStreak = friends.reduce((max, f) => Math.max(max, f.streak ?? 0), 0);
 
   return (
     <main className="relative min-h-[100dvh] overflow-x-hidden pb-24 md:pb-12">
       <h1 className="sr-only">Friends</h1>
       <div className="relative z-10 mx-auto flex w-full flex-col items-center px-4 pt-[calc(env(safe-area-inset-top)+0.5rem)] md:max-w-2xl md:pt-11 lg:max-w-5xl">
         <MobileMenuCluster position="absolute" />
-        {/* Friend invites — persistent, over the winter scene */}
         <MobileHeaderActions
           position="absolute"
           visibleOnDesktop
@@ -200,7 +229,18 @@ export default function FriendsPage() {
           <StyleShuffleHeaderButton className="md:hidden" />
           <button
             type="button"
-            onClick={() => setInboxOpen(true)}
+            onClick={() => setAddOpen(true)}
+            aria-label="Add friends"
+            className={cn(
+              HEADER_CONTROL_ICON_BUTTON,
+              'touch-manipulation text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
+            )}
+          >
+            <UserPlus className="h-6 w-6" />
+          </button>
+          <button
+            type="button"
+            onClick={openInbox}
             aria-label="Friend invites"
             className={cn(
               HEADER_CONTROL_ICON_BUTTON,
@@ -226,204 +266,100 @@ export default function FriendsPage() {
           )}
         </MobileHeaderActions>
 
-        <FlyCatchSwipeLauncher source="friends" className="flex flex-col items-center">
-          {/* Self frog */}
-          <SelfFrog
+        <FlyCatchSwipeLauncher
+          source="friends"
+          className="flex flex-col items-center"
+        >
+          <PondHero
             indices={{ ...indices, mood: isFrogHungry ? 1 : 0 }}
             paused={isAnyPanelOpen}
+            claimable={claimable}
+            claiming={claiming}
+            gate={gate}
+            hasFriends={hasRealFriends}
+            hunger={belly.hunger}
+            maxHunger={belly.maxHunger}
+            onClaim={handleClaim}
           />
-
-          {/* Primary growth action — one solid perch under the frog. */}
-          <button
-            type="button"
-            data-fly-fade
-            onClick={() => setAddOpen(true)}
-            className="relative z-20 -mt-3 flex min-h-14 w-[min(21rem,84vw)] touch-manipulation items-center justify-center gap-3 rounded-[20px] bg-[#4f9149] px-6 py-3 text-left text-white shadow-[0_5px_0_#34631f] transition-[transform,filter,box-shadow] hover:brightness-105 active:translate-y-0.5 active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#4f9149]"
-          >
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/15">
-              <Gift className="h-5 w-5" strokeWidth={2.75} />
-            </span>
-            <span className="min-w-0">
-              <span className="block text-base font-black tracking-tight">
-                Invite friends
-              </span>
-              <span className="block text-[11px] font-bold text-white/80">
-                They get an outfit · you get rewards
-              </span>
-            </span>
-          </button>
         </FlyCatchSwipeLauncher>
 
-        {/* Rising sheet */}
-        <div data-fly-sheet className="relative z-10 -mx-4 mt-8 flex w-[calc(100%+2rem)] flex-col self-stretch rounded-t-[24px] bg-background px-4 pb-12 pt-5 md:mt-28 md:px-8">
-          {/* Friend requests — surfaced inline only when there's something to act on */}
-          {pendingCount > 0 && (
-            <button
-              type="button"
-              onClick={() => setInboxOpen(true)}
-              className="mb-4 flex items-center gap-3 rounded-2xl border border-border/50 bg-card/80 px-3.5 py-2.5 text-left shadow-sm backdrop-blur-xl transition-transform active:scale-[0.99]"
-            >
-              <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#4f9149] text-white">
-                <UserPlus className="h-5 w-5" strokeWidth={2.5} />
-                <span className="absolute -right-1 -top-1 flex h-4 min-w-[1rem] items-center justify-center rounded-full border-2 border-card bg-rose-500 px-1 text-[9px] font-black leading-none text-white">
-                  {pendingCount > 9 ? '9+' : pendingCount}
-                </span>
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-black tracking-tight text-foreground">
-                  {pendingCount === 1 ? '1 friend request' : `${pendingCount} friend requests`}
-                </span>
-                <span className="block text-xs font-semibold text-muted-foreground">
-                  Tap to review
-                </span>
-              </span>
-              <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
-            </button>
-          )}
+        <div
+          data-fly-sheet
+          className="relative z-10 -mx-4 mt-8 flex w-[calc(100%+2rem)] flex-col self-stretch rounded-t-[24px] bg-background px-4 pb-12 pt-6 md:mt-24 md:px-8"
+        >
+          <FriendsTodayStrip
+            friends={friends}
+            pendingCount={pendingCount}
+            buddyInviteCount={buddyInviteCount}
+            onOpenInbox={openInbox}
+            onOpenFriend={openFriend}
+            ready={!!friendsData}
+          />
 
-          {/* Claim flies (the page's main action) and Invite & earn — stacked on
-              phones, side by side once there's desk-width to fill. */}
-          <div className="w-full lg:grid lg:grid-cols-2 lg:items-start lg:gap-4">
-            {hasRealFriends && (
-              <ClaimHeroCard
-                claimable={claimable}
-                gate={gate}
-                claiming={claiming}
-                onClaim={handleClaim}
-                paused={isAnyPanelOpen}
-              />
-            )}
-            <div className="mb-5 w-full" data-hint="invite-friend">
-              <InviteRewardBanner
-                onClick={() => setInviteOpen(true)}
-                paused={isAnyPanelOpen}
-              />
-            </div>
-          </div>
+          {!hasRealFriends && friendsData ? (
+            growCard
+          ) : (
+            <>
+              <div className="w-full">
+                <div className="mb-3 flex items-end justify-between gap-3 px-1.5">
+                  <div className="min-w-0">
+                    <h2 className="text-lg font-black tracking-tight text-foreground">
+                      Your pond
+                    </h2>
+                    <CheerEarnHint />
+                  </div>
+                  <SortToggle mode={sortMode} onChange={setSortMode} />
+                </div>
 
-          {/* Above the leaderboard on purpose: the list grows without limit, and
-              anything under it stops being seen once you have a real pond. */}
-          <FriendSuggestionsRow enabled={!!user} />
-
-          {!!user && (
-            <div className="w-full">
-              <LookNoticeCard />
-            </div>
-          )}
-
-          {/* Leaderboard — visible competition plus each friend's contribution. */}
-          <div className="w-full">
-            <div className="mb-2.5 flex items-center justify-between gap-2 px-1.5 min-[360px]:gap-3">
-              <div className="min-w-0">
-                <h2 className="text-lg font-black tracking-tight text-foreground">
-                  Today&apos;s pond
-                </h2>
-                {hasRealFriends ? (
-                  <p className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] font-bold text-muted-foreground">
-                    <span className="whitespace-nowrap">
-                      {friends.length}{' '}
-                      {friends.length === 1 ? 'friend' : 'friends'}
-                    </span>
-                    <span aria-hidden>·</span>
-                    <span
-                      className={cn(
-                        'whitespace-nowrap',
-                        receivedToday > 0 &&
-                          'text-emerald-600 dark:text-emerald-400',
-                      )}
-                    >
-                      +{receivedToday} to you today
-                    </span>
-                    {topStreak > 0 && (
-                      <>
-                        <span aria-hidden>·</span>
-                        <span className="flex items-center gap-0.5 whitespace-nowrap">
-                          <Flame className="h-3 w-3 fill-orange-400 text-orange-500" />
-                          {topStreak}d best
-                        </span>
-                      </>
-                    )}
-                  </p>
+                {!friendsData ? (
+                  <FriendsLeaderboardSkeleton rows={3} />
                 ) : (
-                  <p className="text-[11px] font-bold text-muted-foreground">
-                    Tap a frog to see their look
-                  </p>
+                  <ul
+                    data-hint="friends-list"
+                    className="flex flex-col gap-2 lg:grid lg:grid-cols-2"
+                  >
+                    {rows.map((entry, i) => (
+                      <FriendRow
+                        key={entry.userId}
+                        entry={entry}
+                        rank={sortMode === 'ranking' ? i + 1 : undefined}
+                        animate={i === 0}
+                        buddyInvites={
+                          entry.isYou
+                            ? 0
+                            : (buddyInviteByFriend.get(entry.userId) ?? 0)
+                        }
+                        onOpen={() =>
+                          entry.isYou
+                            ? router.push('/wardrobe')
+                            : setDetailTarget(entry)
+                        }
+                        paused={isAnyPanelOpen}
+                      />
+                    ))}
+                  </ul>
                 )}
               </div>
-              <button
-                type="button"
-                aria-label="Add friend"
-                onClick={() => setAddOpen(true)}
-                className="flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center gap-1.5 rounded-xl border border-[#4f9149]/25 bg-[#4f9149]/8 px-0 text-xs font-black text-[#4f9149] transition-colors hover:bg-[#4f9149]/14 active:bg-[#4f9149]/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f9149] focus-visible:ring-offset-2 min-[360px]:w-auto min-[360px]:px-3"
-              >
-                <UserPlus className="h-4 w-4" strokeWidth={2.75} />
-                <span className="hidden min-[360px]:inline">Add</span>
-              </button>
-            </div>
 
-            <div
-              className="w-full overflow-hidden rounded-[18px] border border-border/50 bg-card/40 p-1.5 shadow-sm"
-              data-hint="friends-list"
-            >
-              {!friendsData ? (
-                <FriendsLeaderboardSkeleton rows={3} />
-              ) : (
-                <>
-                  {leaderboard.length > 0 && (
-                    <ul className="flex flex-col gap-1.5 lg:grid lg:grid-cols-2 lg:gap-2">
-                      {leaderboard.map((entry, i) => (
-                        <LeaderboardRow
-                          key={entry.userId}
-                          entry={entry}
-                          rank={i + 1}
-                          buddyInvites={
-                            entry.isYou
-                              ? 0
-                              : (buddyInviteByFriend.get(entry.userId) ?? 0)
-                          }
-                          onOpen={() =>
-                            entry.isYou
-                              ? router.push('/wardrobe')
-                              : setDetailTarget(entry)
-                          }
-                          paused={isAnyPanelOpen}
-                        />
-                      ))}
-                    </ul>
-                  )}
-                  {!hasRealFriends && (
-                    <div className="mx-1 mt-1.5 flex items-center gap-3 rounded-xl border border-dashed border-[#4f9149]/30 bg-[#4f9149]/5 px-3 py-3">
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#4f9149]/12 text-[#4f9149]">
-                        <UserPlus className="h-5 w-5" />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-black tracking-tight text-foreground">
-                          Your frog needs a crew
-                        </p>
-                        <p className="text-xs font-semibold text-muted-foreground">
-                          Compare looks · earn half of each friend&apos;s daily
-                          catch
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setInviteOpen(true)}
-                        className="min-h-11 shrink-0 touch-manipulation rounded-xl bg-[#4f9149] px-3 text-xs font-black text-white shadow-[0_3px_0_#34631f] transition-[transform,box-shadow] active:translate-y-0.5 active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f9149] focus-visible:ring-offset-2"
-                      >
-                        Invite
-                      </button>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          </div>
+              <div className="mt-9">{growCard}</div>
+            </>
+          )}
         </div>
       </div>
 
-      <AddFriendsSheet open={addOpen} onClose={() => setAddOpen(false)} indices={indices} />
-      <InviteFriendsModal open={inviteOpen} onClose={() => setInviteOpen(false)} />
-      <FriendRequestsInbox open={inboxOpen} onClose={() => setInboxOpen(false)} />
+      <AddFriendsSheet
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        indices={indices}
+      />
+      <InviteFriendsModal
+        open={inviteOpen}
+        onClose={() => setInviteOpen(false)}
+      />
+      <FriendRequestsInbox
+        open={inboxOpen}
+        onClose={() => setInboxOpen(false)}
+      />
       {claimReward !== null && (
         <FlyClaimRewardOverlay
           amount={claimReward.amount}
@@ -460,6 +396,52 @@ export default function FriendsPage() {
         ready={!!friendsData}
       />
     </main>
+  );
+}
+
+function SortToggle({
+  mode,
+  onChange,
+}: {
+  mode: SortMode;
+  onChange: (mode: SortMode) => void;
+}) {
+  const options: { id: SortMode; label: string }[] = [
+    { id: 'activity', label: 'Activity' },
+    { id: 'ranking', label: 'Ranking' },
+  ];
+  return (
+    <div
+      role="tablist"
+      aria-label="Sort friends"
+      className="relative flex shrink-0 rounded-full bg-muted p-0.5"
+    >
+      {options.map((option) => {
+        const active = mode === option.id;
+        return (
+          <button
+            key={option.id}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            onClick={() => onChange(option.id)}
+            className={cn(
+              'relative min-h-9 touch-manipulation rounded-full px-3 text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+              active ? 'text-foreground' : 'text-muted-foreground',
+            )}
+          >
+            {active && (
+              <motion.span
+                layoutId="friends-sort-pill"
+                transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+                className="absolute inset-0 rounded-full bg-card shadow-sm"
+              />
+            )}
+            <span className="relative">{option.label}</span>
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -546,82 +528,6 @@ function RemoveFriendDialog({
       )}
     </AnimatePresence>,
     document.body,
-  );
-}
-
-function ClaimHeroCard({
-  claimable,
-  claiming,
-  onClaim,
-  gate,
-  paused = false,
-}: {
-  claimable: number;
-  claiming: boolean;
-  onClaim: () => void;
-  gate?: { required: number; done: number; open: boolean };
-  paused?: boolean;
-}) {
-  // The pond opens once you've done a few of your own tasks: the whole point of
-  // the gate is that a friend's work pulls you into your own list, not past it.
-  if (gate && !gate.open && claimable > 0) {
-    const left = Math.max(0, gate.required - gate.done);
-    return (
-      <div className="mb-5 flex w-full items-center gap-3 rounded-[20px] border border-border/50 bg-card/40 px-4 py-3.5">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-muted">
-          <Fly size={30} interactive={false} paused={paused} />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-black tracking-tight text-foreground">
-            {claimable} {claimable === 1 ? 'fly' : 'flies'} waiting in the pond
-          </p>
-          <p className="text-xs font-semibold text-muted-foreground">
-            Finish {left} more of your own {left === 1 ? 'task' : 'tasks'} today
-            to open it
-          </p>
-        </div>
-      </div>
-    );
-  }
-  if (claimable <= 0) {
-    return (
-      <div className="mb-5 flex w-full items-center gap-3 rounded-[20px] border border-border/50 bg-card/40 px-4 py-3.5">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-muted">
-          <Fly size={30} interactive={false} paused={paused} />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-black tracking-tight text-foreground">
-            No flies from friends yet
-          </p>
-          <p className="text-xs font-semibold text-muted-foreground">
-            Every few tasks a friend finishes generates flies for you
-          </p>
-        </div>
-      </div>
-    );
-  }
-  return (
-    <button
-      type="button"
-      onClick={onClaim}
-      disabled={claiming}
-      className="group mb-5 flex w-full touch-manipulation items-center gap-3 overflow-hidden rounded-[20px] border border-primary/30 bg-gradient-to-br from-emerald-50 to-emerald-100/70 px-4 py-3.5 text-left shadow-sm dark:from-primary/15 dark:to-primary/5 disabled:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-    >
-      <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-500/15">
-        <Fly size={36} interactive={false} paused={paused} />
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="text-base font-black tracking-tight text-foreground">
-          {claimable} {claimable === 1 ? 'fly' : 'flies'} ready
-        </p>
-        <p className="text-xs font-semibold text-muted-foreground">
-          Generated by your friends&apos; work today
-        </p>
-      </div>
-      <span className="inline-flex h-10 shrink-0 items-center justify-center rounded-xl bg-amber-500 px-5 text-[13px] font-black text-white shadow-[0_3px_0_0_#b45309] transition-[transform,box-shadow] group-hover:-translate-y-[1px] group-hover:shadow-[0_4px_0_0_#b45309] group-active:translate-y-[2px] group-active:shadow-none">
-        {claiming ? 'Claiming…' : 'Claim'}
-      </span>
-    </button>
   );
 }
 
@@ -732,357 +638,5 @@ function FlyClaimRewardOverlay({
       </motion.div>
     </AnimatePresence>,
     document.body,
-  );
-}
-
-function LeaderboardRow({
-  entry,
-  onOpen,
-  rank,
-  buddyInvites = 0,
-  paused = false,
-}: {
-  entry: LeaderboardEntry;
-  onOpen: () => void;
-  rank?: number;
-  buddyInvites?: number;
-  paused?: boolean;
-}) {
-  const frogBoxRef = useRef<HTMLDivElement>(null);
-  const [frogBoxWidth, setFrogBoxWidth] = useState(0);
-  React.useEffect(() => {
-    const el = frogBoxRef.current;
-    if (!el) return;
-    const observer = new ResizeObserver(() => setFrogBoxWidth(el.clientWidth));
-    observer.observe(el);
-    setFrogBoxWidth(el.clientWidth);
-    return () => observer.disconnect();
-  }, []);
-  const rowFlySize = Math.round(
-    Math.min(34, Math.max(26, 26 + (frogBoxWidth - 96) * 0.0625)),
-  );
-  const shared = entry.givesYou ?? contributionFrom(entry.fliesToday);
-  const look = entry.flexRarity ? RARITY_CONFIG[entry.flexRarity] : null;
-  const flex =
-    entry.flexRarity && rarityRank[entry.flexRarity] >= rarityRank.epic
-      ? RARITY_CONFIG[entry.flexRarity]
-      : null;
-  const medal =
-    entry.fliesToday > 0 && rank && rank <= 3
-      ? [
-          'bg-amber-400 text-amber-950',
-          'bg-slate-300 text-slate-800',
-          'bg-amber-700 text-amber-50',
-        ][rank - 1]
-      : null;
-
-  return (
-    <li className="relative">
-      <button
-        type="button"
-        onClick={() => {
-          hapticTick();
-          onOpen();
-        }}
-        className={cn(
-          'relative flex w-full touch-manipulation items-center gap-1 rounded-xl border bg-card py-1.5 pl-1 pr-1.5 text-left transition-[transform,border-color,box-shadow] hover:-translate-y-0.5 hover:shadow-md active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 min-[360px]:gap-2 min-[360px]:pl-1.5 min-[360px]:pr-2.5 sm:gap-2.5 sm:py-2 sm:pr-3',
-          flex
-            ? cn('border-2', flex.border, 'shadow-md', flex.glow)
-            : 'border-border/50 hover:border-emerald-300',
-        )}
-      >
-        {medal && (
-          <span
-            className={cn(
-              'absolute left-1.5 top-1.5 z-10 flex h-6 w-6 items-center justify-center rounded-full border-2 border-card text-[11px] font-black shadow-sm',
-              medal,
-            )}
-          >
-            {rank}
-          </span>
-        )}
-        {buddyInvites > 0 && (
-          <span className="absolute -left-1 -top-1 z-20 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full border-2 border-background bg-rose-500 px-1 text-[10px] font-black text-white">
-            {buddyInvites > 9 ? '9+' : buddyInvites}
-          </span>
-        )}
-        <div
-          ref={frogBoxRef}
-          className="relative flex aspect-[6/5] w-[34%] min-w-[82px] max-w-[150px] shrink-0 items-end justify-center self-center overflow-hidden min-[360px]:w-[37%] min-[360px]:min-w-[94px] sm:w-[40%] sm:min-w-[110px] sm:max-w-[224px] lg:w-[32%] lg:max-w-[128px]"
-        >
-          <Frog
-            className="translate-y-[15%]"
-            width="145%"
-            height="145%"
-            indices={entry.indices}
-            paused={paused}
-          />
-          <PremiumFrogAura
-            show={!!entry.premium}
-            compact
-            flySize={rowFlySize}
-          />
-        </div>
-
-        <div className="min-w-0 flex-1">
-          <p className="flex min-w-0 items-center gap-1 text-[13px] font-black leading-tight tracking-tight text-foreground min-[360px]:text-sm sm:text-base">
-            <span
-              className={cn('truncate', entry.premium && 'plus-name-shimmer')}
-            >
-              {entry.name || entry.frogName}
-            </span>
-            {entry.isYou && (
-              <span className="rounded-full bg-[#4f9149]/12 px-1.5 py-0.5 text-[11px] font-black text-[#4f9149]">
-                You
-              </span>
-            )}
-            {entry.premium && (
-              <Icon
-                name="frogPlus"
-                label="Frogress Plus"
-                className="h-5 w-5 shrink-0 min-[360px]:h-6 min-[360px]:w-6 sm:h-8 sm:w-8"
-              />
-            )}
-          </p>
-          {entry.name && entry.frogName && entry.name !== entry.frogName && (
-            <p className="truncate text-xs font-semibold text-muted-foreground">
-              {entry.frogName}
-            </p>
-          )}
-          <div className="mt-1 flex flex-col items-start gap-1 min-[360px]:flex-row min-[360px]:flex-wrap min-[360px]:items-center">
-            {entry.isYou && <LookLovedChip />}
-            {(entry.streak ?? 0) > 0 && (
-              <span className="flex items-center gap-0.5 rounded-full bg-orange-500/10 px-1.5 py-0.5 text-[10px] font-black text-orange-500">
-                <Flame className="h-3 w-3 fill-orange-400" />
-                {entry.streak}d
-              </span>
-            )}
-            {look &&
-              ((entry.equippedItems?.length ?? 0) > 0 ||
-                !!entry.backgroundRarity) && (
-                <span
-                  className={cn(
-                    'max-w-full truncate whitespace-nowrap rounded-full px-1.5 py-0.5 text-[10px] font-black',
-                    look.bg,
-                    look.text,
-                  )}
-                >
-                  {look.label}
-                  <span className="hidden min-[360px]:inline"> look</span>
-                </span>
-              )}
-          </div>
-          {entry.focusing && (
-            <p className="mt-0.5 flex items-center gap-1.5 text-xs font-black text-primary">
-              <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-60" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
-              </span>
-              Focusing now
-            </p>
-          )}
-        </div>
-
-        <div className="flex shrink-0 items-center gap-1 min-[360px]:gap-1.5">
-          <span
-            className={cn(
-              'flex min-w-[46px] flex-col items-center rounded-xl px-1 py-1 min-[360px]:min-w-[58px] min-[360px]:px-2',
-              entry.fliesToday > 0
-                ? 'bg-emerald-500/10'
-                : 'bg-muted/60 opacity-70',
-            )}
-          >
-            <span className="flex items-center gap-0.5">
-              <span className={cn(entry.fliesToday <= 0 && 'grayscale')}>
-                <Fly size={20} y={-2} interactive={false} paused={paused} />
-              </span>
-              <span
-                className={cn(
-                  'text-sm font-black tabular-nums leading-none min-[360px]:text-base sm:text-lg',
-                  entry.fliesToday > 0
-                    ? 'text-emerald-600 dark:text-emerald-400'
-                    : 'text-muted-foreground',
-                )}
-              >
-                {entry.fliesToday}
-              </span>
-            </span>
-            <span className="mt-0.5 whitespace-nowrap text-[9px] font-black text-muted-foreground min-[360px]:text-[8px] min-[360px]:tracking-[0.08em]">
-              {entry.isYou
-                ? 'your catch'
-                : shared > 0
-                  ? `+${shared} to you`
-                  : 'caught'}
-            </span>
-          </span>
-          <ChevronRight className="hidden h-5 w-5 text-muted-foreground/60 min-[380px]:block" />
-        </div>
-      </button>
-    </li>
-  );
-}
-
-type RewardItem = {
-  id: string;
-  name: string;
-  slot: 'skin' | 'hat' | 'body' | 'hand_item' | 'container';
-  riveIndex: number;
-  icon?: string;
-};
-type RewardTier = { tier: number; label: string; item?: RewardItem | null };
-type GiftOption = { id: string; item?: RewardItem | null };
-type InviteConfig = { rewards: RewardTier[]; giftOptions?: GiftOption[] };
-type InviteStatus = { claimedCount: number; pendingCount: number };
-
-function rewardItemToIndices(
-  item: RewardItem,
-): Partial<Record<'skin' | 'hat' | 'body' | 'hand_item', number>> {
-  if (item.slot === 'skin') return { skin: item.riveIndex };
-  if (item.slot === 'hat') return { hat: item.riveIndex };
-  if (item.slot === 'body') return { body: item.riveIndex };
-  if (item.slot === 'hand_item') return { hand_item: item.riveIndex };
-  return {};
-}
-
-function InviteRewardBanner({
-  onClick,
-  paused = false,
-}: {
-  onClick: () => void;
-  paused?: boolean;
-}) {
-  const { data: config } = useSWR<InviteConfig>('/api/invite/config', fetcher, {
-    revalidateOnFocus: false,
-  });
-  const { data: status } = useSWR<InviteStatus>('/api/invite/status', fetcher, {
-    revalidateOnFocus: false,
-  });
-
-  const rewards = config?.rewards ?? [];
-  const claimed = status?.claimedCount ?? 0;
-  const nextReward = rewards.find((r) => r.tier > claimed) ?? null;
-  const previewReward = nextReward ?? rewards[rewards.length - 1] ?? null;
-  const completedAllRewards = rewards.length > 0 && !nextReward;
-
-  // Nothing left to earn, so the card stops advertising a reward and starts
-  // advertising the gift — a different sendable outfit each visit.
-  const giftItems = React.useMemo(
-    () =>
-      (config?.giftOptions ?? [])
-        .map((g) => g.item)
-        .filter((i): i is RewardItem => !!i && i.slot !== 'container'),
-    [config?.giftOptions],
-  );
-  const randomGift = React.useMemo(
-    () =>
-      giftItems.length
-        ? giftItems[Math.floor(Math.random() * giftItems.length)]
-        : null,
-    [giftItems],
-  );
-
-  const item =
-    (completedAllRewards ? randomGift : null) ?? previewReward?.item ?? null;
-  const isOutfit = !!item && item.slot !== 'container';
-  const target =
-    nextReward?.tier ?? previewReward?.tier ?? Math.max(1, claimed);
-  const needed = Math.max(0, target - claimed);
-  const progress = completedAllRewards
-    ? 100
-    : Math.min(100, Math.round((claimed / Math.max(1, target)) * 100));
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="group flex w-full touch-manipulation items-center gap-2 rounded-[18px] border border-[#4f9149]/25 bg-[#4f9149]/5 px-2.5 py-3 text-left shadow-sm transition-[transform,border-color,box-shadow] hover:border-[#4f9149]/45 hover:shadow-md active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f9149] focus-visible:ring-offset-2 min-[360px]:gap-3 min-[360px]:px-3.5"
-    >
-      <span className="relative flex h-14 w-14 shrink-0 items-center justify-center self-center overflow-hidden rounded-2xl bg-emerald-500/10 ring-1 ring-emerald-500/15 min-[360px]:h-16 min-[360px]:w-16">
-        {isOutfit && item ? (
-          <Frog
-            className="-translate-y-[14px]"
-            width={94}
-            height={80}
-            indices={rewardItemToIndices(item)}
-            paused={paused}
-          />
-        ) : item?.icon ? (
-          <img src={item.icon} alt="" className="h-12 w-12 object-contain" />
-        ) : (
-          <Fly size={44} y={-2} paused />
-        )}
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="text-[11px] font-black text-[#4f9149] min-[360px]:text-[11px] min-[360px]:tracking-[0.14em]">
-          {completedAllRewards ? 'Gift a friend' : 'Friend rewards'}
-        </p>
-        <p className="text-xs font-black leading-tight tracking-tight text-foreground min-[360px]:text-sm sm:text-base">
-          {nextReward
-            ? `${needed} more ${needed === 1 ? 'friend' : 'friends'} unlocks ${item?.name ?? 'your next reward'}`
-            : 'Invite a friend and gift them a free outfit'}
-        </p>
-        {/* A rail that can never move again is dead weight — once every tier
-            is earned the card drops it and leads with the gift instead. */}
-        {!completedAllRewards && (
-          <div className="mt-2 flex items-center gap-2">
-            <span
-              role="progressbar"
-              aria-label="Invite reward progress"
-              aria-valuemin={0}
-              aria-valuemax={target}
-              aria-valuenow={Math.min(claimed, target)}
-              className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-[#4f9149]/15"
-            >
-              <span
-                className="block h-full w-full origin-left rounded-full bg-[#4f9149] transition-transform duration-300"
-                style={{ transform: `scaleX(${progress / 100})` }}
-              />
-            </span>
-            <span className="shrink-0 text-[10px] font-black tabular-nums text-muted-foreground">
-              {claimed}/{target} joined
-            </span>
-          </div>
-        )}
-      </div>
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#4f9149] text-white shadow-sm transition-transform group-hover:translate-x-0.5 min-[360px]:h-9 min-[360px]:w-9">
-        <ChevronRight className="h-4 w-4 min-[360px]:h-5 min-[360px]:w-5" strokeWidth={2.5} />
-      </span>
-    </button>
-  );
-}
-
-function SelfFrog({
-  indices,
-  paused = false,
-}: {
-  indices: Partial<Record<'skin' | 'hat' | 'body' | 'hand_item' | 'mood', number>>;
-  paused?: boolean;
-}) {
-  const frogRef = useRef<FrogHandle | null>(null);
-  const frogBoxRef = useRef<HTMLDivElement | null>(null);
-  const [mouthOpen, setMouthOpen] = useState(false);
-  return (
-    <div
-      ref={frogBoxRef}
-      data-fly-hero
-      className="pointer-events-none relative z-30 flex shrink-0 origin-bottom flex-col items-center md:scale-110 lg:scale-100"
-    >
-      <HomeFocusFlies
-        frogRef={frogRef}
-        frogBoxRef={frogBoxRef}
-        onGrabActive={setMouthOpen}
-      />
-      <div data-fly-hero-frog>
-        <Frog
-          ref={frogRef}
-          width={240}
-          height={270}
-          indices={indices}
-          paused={paused}
-          mouthOpen={mouthOpen}
-        />
-      </div>
-      <PremiumFrogAura />
-    </div>
   );
 }
