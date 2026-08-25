@@ -3,6 +3,16 @@
     {
       "filename": "widget_check_off.png",
       "idiom": "universal"
+    },
+    {
+      "appearances": [
+        {
+          "appearance": "luminosity",
+          "value": "dark"
+        }
+      ],
+      "filename": "widget_check_off_dark.png",
+      "idiom": "universal"
     }
   ],
   "info": {

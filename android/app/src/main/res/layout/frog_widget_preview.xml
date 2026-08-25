@@ -73,9 +73,12 @@
             android:orientation="horizontal">
 
             <ImageView
-                android:layout_width="21.5dp"
-                android:layout_height="21.5dp"
-                android:layout_marginEnd="10dp"
+                android:layout_width="23.74dp"
+                android:layout_height="23.74dp"
+                android:layout_marginStart="-1.12dp"
+                android:layout_marginTop="-1.12dp"
+                android:layout_marginEnd="8.88dp"
+                android:layout_marginBottom="-1.12dp"
                 android:importantForAccessibility="no"
                 android:src="@drawable/widget_check_off" />
 
@@ -96,9 +99,12 @@
             android:orientation="horizontal">
 
             <ImageView
-                android:layout_width="21.5dp"
-                android:layout_height="21.5dp"
-                android:layout_marginEnd="10dp"
+                android:layout_width="23.74dp"
+                android:layout_height="23.74dp"
+                android:layout_marginStart="-1.12dp"
+                android:layout_marginTop="-1.12dp"
+                android:layout_marginEnd="8.88dp"
+                android:layout_marginBottom="-1.12dp"
                 android:importantForAccessibility="no"
                 android:src="@drawable/widget_check_off" />
 
@@ -119,9 +125,12 @@
             android:orientation="horizontal">
 
             <ImageView
-                android:layout_width="21.5dp"
-                android:layout_height="21.5dp"
-                android:layout_marginEnd="10dp"
+                android:layout_width="23.74dp"
+                android:layout_height="23.74dp"
+                android:layout_marginStart="-1.12dp"
+                android:layout_marginTop="-1.12dp"
+                android:layout_marginEnd="8.88dp"
+                android:layout_marginBottom="-1.12dp"
                 android:importantForAccessibility="no"
                 android:src="@drawable/widget_check_off" />
 
@@ -142,9 +151,12 @@
             android:orientation="horizontal">
 
             <ImageView
-                android:layout_width="21.5dp"
-                android:layout_height="21.5dp"
-                android:layout_marginEnd="10dp"
+                android:layout_width="23.74dp"
+                android:layout_height="23.74dp"
+                android:layout_marginStart="-1.12dp"
+                android:layout_marginTop="-1.12dp"
+                android:layout_marginEnd="8.88dp"
+                android:layout_marginBottom="-1.12dp"
                 android:importantForAccessibility="no"
                 android:src="@drawable/widget_check_off" />
 

@@ -1,52 +1,5 @@
-import AppIntents
 import SwiftUI
 import WidgetKit
-
-// MARK: - Interactivity
-
-/// Ticking a row without opening the app. The intent only writes to the shared
-/// container and queues the change; the webview replays it through the normal
-/// task endpoints next time it runs, so fly caps, the ledger, quest counters
-/// and undo all stay on their usual path.
-struct ToggleFrogTaskIntent: AppIntent {
-    static var title: LocalizedStringResource = "Complete task"
-    static var description = IntentDescription("Ticks a task off today's list.")
-
-    @Parameter(title: "Task ID")
-    var taskId: String
-
-    @Parameter(title: "Done")
-    var done: Bool
-
-    init() {}
-
-    init(taskId: String, done: Bool) {
-        self.taskId = taskId
-        self.done = done
-    }
-
-    func perform() async throws -> some IntentResult {
-        FrogWidgetStore.applyLocalToggle(taskId: taskId, done: done)
-        FrogWidgetStore.queueToggle(taskId: taskId, done: done)
-        return .result()
-    }
-}
-
-/// The add button — the one control on the widget that is *meant* to leave the
-/// home screen. It records the request and opens the app; the webview drains
-/// the queue on launch and raises its own quick-add sheet.
-struct FrogQuickAddIntent: AppIntent {
-    static var title: LocalizedStringResource = "Add a task"
-    static var description = IntentDescription("Opens Frogress ready to add a task.")
-    static var openAppWhenRun: Bool = true
-
-    init() {}
-
-    func perform() async throws -> some IntentResult {
-        FrogWidgetStore.queueQuickAdd()
-        return .result()
-    }
-}
 
 // MARK: - Palette
 //
@@ -65,6 +18,9 @@ private enum Palette {
 private enum Metrics {
     static let rowHeight: CGFloat = 21.5
     static let barHeight: CGFloat = 6
+    /// The marker's stroke overhangs its 21.5 layout box, so the disc reads a
+    /// little larger than the row it sits in. Straight off the sheet.
+    static let markerArt: CGFloat = 23.7396
 }
 
 // MARK: - Timeline
@@ -213,6 +169,7 @@ private struct TaskRow: View {
         HStack(spacing: 10) {
             Image(task.done ? "WidgetCheckOn" : "WidgetCheckOff")
                 .resizable()
+                .frame(width: Metrics.markerArt, height: Metrics.markerArt)
                 .frame(width: Metrics.rowHeight, height: Metrics.rowHeight)
             Text(task.text)
                 .font(.system(size: 13, design: .rounded))

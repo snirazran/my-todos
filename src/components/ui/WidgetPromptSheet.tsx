@@ -198,11 +198,11 @@ function WidgetPreview({ art }: { art: string }) {
               <div
                 key={row}
                 className="flex items-center"
-                style={{ gap: u(10) }}
+                style={{ gap: u(8.88) }}
               >
                 <span
-                  className="flex flex-none items-center justify-center rounded-full border border-[#EFEFEF] bg-[#FAFAFA]"
-                  style={{ width: u(21.5), height: u(21.5) }}
+                  className="flex flex-none items-center justify-center rounded-full border border-[#EFEFEF] bg-[#FAFAFA] dark:border-[#B2EBC7] dark:bg-[#E3F7EB]"
+                  style={{ width: u(23.74), height: u(23.74) }}
                 >
                   <img
                     src="/widgets/Fly.svg"

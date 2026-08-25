@@ -33,6 +33,8 @@
 		60AE54572FE41ECA00222D18 /* MainViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60AE54562FE41ECA00222D18 /* MainViewController.swift */; };
 		60AE54592FE4336400222D18 /* FrogTimerControlIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60AE54582FE4336400222D18 /* FrogTimerControlIntent.swift */; };
 		60AE545A2FE4336400222D18 /* FrogTimerControlIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60AE54582FE4336400222D18 /* FrogTimerControlIntent.swift */; };
+		60AE54712FE4336400222E01 /* FrogWidgetIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60AE54702FE4336400222E01 /* FrogWidgetIntents.swift */; };
+		60AE54722FE4336400222E01 /* FrogWidgetIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60AE54702FE4336400222E01 /* FrogWidgetIntents.swift */; };
 		60BFE4AC3039B61100E546AA /* StoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 60BFE4AB3039B61100E546AA /* StoreKit.framework */; };
 		60F4FD463005AB4D008C7297 /* FrogAlarmKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60F4FD453005AB4D008C7297 /* FrogAlarmKit.swift */; };
 		60F4FD473005AB4D008C7297 /* FrogAlarmKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60F4FD453005AB4D008C7297 /* FrogAlarmKit.swift */; };
@@ -102,6 +104,7 @@
 		60AE54542FE4173C00222D18 /* FrogLiveActivityPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = FrogLiveActivityPlugin.swift; path = App/FrogLiveActivityPlugin.swift; sourceTree = SOURCE_ROOT; };
 		60AE54562FE41ECA00222D18 /* MainViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainViewController.swift; sourceTree = "<group>"; };
 		60AE54582FE4336400222D18 /* FrogTimerControlIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrogTimerControlIntent.swift; sourceTree = "<group>"; };
+		60AE54702FE4336400222E01 /* FrogWidgetIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrogWidgetIntents.swift; sourceTree = "<group>"; };
 		60BFE4AB3039B61100E546AA /* StoreKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = StoreKit.framework; path = System/Library/Frameworks/StoreKit.framework; sourceTree = SDKROOT; };
 		60F4FD453005AB4D008C7297 /* FrogAlarmKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrogAlarmKit.swift; sourceTree = "<group>"; };
 		60F4FD483005AB74008C7297 /* FrogAppShortcuts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrogAppShortcuts.swift; sourceTree = "<group>"; };
@@ -211,6 +214,7 @@
 				60AE544F2FE4161A00222D18 /* FrogTimerAttributes.swift */,
 				60AE54522FE416F800222D18 /* FrogTimerLiveActivity.swift */,
 				60AE54582FE4336400222D18 /* FrogTimerControlIntent.swift */,
+				60AE54702FE4336400222E01 /* FrogWidgetIntents.swift */,
 			);
 			path = LiveActivities;
 			sourceTree = "<group>";
@@ -419,6 +423,7 @@
 				FA0100023100AAAA00000002 /* FrogWidgetStore.swift in Sources */,
 				FA0100073100AAAA00000007 /* FrogWidgetPlugin.swift in Sources */,
 				60AE545A2FE4336400222D18 /* FrogTimerControlIntent.swift in Sources */,
+				60AE54722FE4336400222E01 /* FrogWidgetIntents.swift in Sources */,
 				60AE54512FE4161A00222D18 /* FrogTimerAttributes.swift in Sources */,
 				60F4FD473005AB4D008C7297 /* FrogAlarmKit.swift in Sources */,
 				60F4FD493005AB74008C7297 /* FrogAppShortcuts.swift in Sources */,
@@ -435,6 +440,7 @@
 				FA0100033100AAAA00000003 /* FrogWidgetStore.swift in Sources */,
 				FA0100053100AAAA00000005 /* FrogTasksWidget.swift in Sources */,
 				60AE54592FE4336400222D18 /* FrogTimerControlIntent.swift in Sources */,
+				60AE54712FE4336400222E01 /* FrogWidgetIntents.swift in Sources */,
 				60AE544A2FE0612600222D18 /* LiveActivities.swift in Sources */,
 				60F4FD463005AB4D008C7297 /* FrogAlarmKit.swift in Sources */,
 				60AE54502FE4161A00222D18 /* FrogTimerAttributes.swift in Sources */,
@@ -589,7 +595,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 18;
+				CURRENT_PROJECT_VERSION = 21;
 				DEVELOPMENT_TEAM = M7BKYJ6U55;
 				INFOPLIST_FILE = App/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Frogress;
@@ -613,7 +619,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 18;
+				CURRENT_PROJECT_VERSION = 21;
 				DEVELOPMENT_TEAM = M7BKYJ6U55;
 				INFOPLIST_FILE = App/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Frogress;
