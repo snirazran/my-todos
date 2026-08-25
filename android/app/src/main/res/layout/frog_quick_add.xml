@@ -11,7 +11,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="@string/widget_quick_add_title"
-        android:textColor="@color/widget_text"
+        android:textColor="@color/quick_add_text"
         android:textSize="18sp"
         android:textStyle="bold" />
 
@@ -29,8 +29,8 @@
         android:minHeight="48dp"
         android:paddingStart="14dp"
         android:paddingEnd="14dp"
-        android:textColor="@color/widget_text"
-        android:textColorHint="@color/widget_text_muted"
+        android:textColor="@color/quick_add_text"
+        android:textColorHint="@color/quick_add_text_muted"
         android:textSize="17sp" />
 
     <LinearLayout
@@ -46,7 +46,7 @@
             android:layout_width="wrap_content"
             android:layout_height="48dp"
             android:text="@string/widget_quick_add_cancel"
-            android:textColor="@color/widget_text_muted" />
+            android:textColor="@color/quick_add_text_muted" />
 
         <Button
             android:id="@+id/quick_add_save"

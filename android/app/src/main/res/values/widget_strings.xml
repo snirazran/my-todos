@@ -1,16 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="widget_name">Today</string>
-    <string name="widget_description">Today\'s tasks and your frog, with one tap to add whatever just came to mind.</string>
-    <string name="widget_today">Today</string>
-    <string name="widget_add">What\'s next?</string>
-    <string name="widget_add_short">Add</string>
+    <string name="widget_description">Today\'s tasks and your frog. Tap a fly to tick one off.</string>
+    <string name="widget_tasks_left">tasks left</string>
+    <string name="widget_tasks_left_count">%1$d tasks left</string>
+    <string name="widget_add">Add a task</string>
     <string name="widget_empty">Nothing yet. Feed the frog a task.</string>
     <string name="widget_signed_out">Sign in to see today\'s list.</string>
     <string name="widget_row_todo">%1$s, not done. Tap to complete.</string>
     <string name="widget_row_done">%1$s, done. Tap to undo.</string>
-    <string name="widget_frog_desc">Your frog. Tap to open Frogress.</string>
-    <string name="widget_streak_desc">Day streak</string>
     <string name="widget_quick_add_title">Add a task</string>
     <string name="widget_quick_add_hint">What needs doing?</string>
     <string name="widget_quick_add_saved">Added to today</string>

@@ -3,13 +3,13 @@
 import {
   WIDGET_PAYLOAD_VERSION,
   WIDGET_TASK_LIMIT,
-  type FrogMood,
   type PendingAction,
   type WidgetPayload,
   type WidgetTask,
 } from './types';
 import { clearWidgetState, drainWidgetQueue, pushWidgetState } from './bridge';
-import { pickWidgetLine, type WidgetUrgency } from '@/lib/widget/widgetSpeech';
+import { artForDay } from './art';
+import { wordForDay } from './words';
 
 const SEEN_GUEST_UIDS_KEY = 'frogress_widget_guest_uids';
 
@@ -28,13 +28,6 @@ export function todayKey(tz = clientTimezone()): string {
     month: '2-digit',
     day: '2-digit',
   }).format(new Date());
-}
-
-export function moodFrom(fullness: number | null, allDone: boolean): FrogMood {
-  if (fullness !== null && fullness <= 0.2) return 'hungry';
-  if (allDone) return 'happy';
-  if (fullness !== null && fullness >= 0.7) return 'happy';
-  return 'neutral';
 }
 
 /**
@@ -85,59 +78,10 @@ export function mayApply(action: PendingAction, currentUid: string): boolean {
   return guestUidsOnThisDevice().includes(action.uid);
 }
 
-let lastMessageKey = '';
-let lastMessage = { line: '', urgency: 'calm' as WidgetUrgency };
-
-/**
- * The frog's line, held stable across pushes.
- *
- * Keyed to the things the line actually reacts to, so it only changes when the
- * situation does — otherwise every sync would reword the same sentence and
- * spend a WidgetKit reload doing it.
- */
-function widgetMessage(input: {
-  done: number;
-  total: number;
-  fullness: number | null;
-  streak: number;
-  checkedInToday: boolean;
-}): { line: string; urgency: WidgetUrgency } {
-  const hungerPercent =
-    input.fullness === null ? null : Math.round(input.fullness * 100);
-  const hour = new Date().getHours();
-  const key = [
-    todayKey(),
-    hour,
-    input.done,
-    input.total,
-    hungerPercent === null ? 'x' : Math.floor(hungerPercent / 20),
-    input.streak,
-    input.checkedInToday ? 'in' : 'out',
-  ].join('|');
-
-  if (key === lastMessageKey && lastMessage.line) return lastMessage;
-  lastMessageKey = key;
-  lastMessage = pickWidgetLine(
-    {
-      done: input.done,
-      total: input.total,
-      streak: input.streak,
-      checkedInToday: input.checkedInToday,
-      hungerPercent,
-      hour,
-    },
-    key,
-  );
-  return lastMessage;
-}
-
 export function buildPayload(input: {
   uid: string;
   guest: boolean;
   tasks: { id: string; text: string; completed: boolean }[];
-  fullness: number | null;
-  streak: number;
-  checkedInToday: boolean;
 }): WidgetPayload {
   const open = input.tasks.filter((t) => !t.completed);
   const done = input.tasks.filter((t) => t.completed);
@@ -149,29 +93,18 @@ export function buildPayload(input: {
     done: t.completed,
   }));
 
-  const speech = widgetMessage({
-    done: done.length,
-    total: input.tasks.length,
-    fullness: input.fullness,
-    streak: input.streak,
-    checkedInToday: input.checkedInToday,
-  });
+  const day = todayKey();
 
   return {
     v: WIDGET_PAYLOAD_VERSION,
     uid: input.uid,
     guest: input.guest,
     signedIn: Boolean(input.uid),
-    day: todayKey(),
-    streak: input.streak,
-    mood: moodFrom(
-      input.fullness,
-      input.tasks.length > 0 && open.length === 0,
-    ),
+    day,
     doneCount: done.length,
     totalCount: input.tasks.length,
-    message: speech.line,
-    urgency: speech.urgency,
+    art: artForDay(day),
+    word: wordForDay(day),
     tasks: rows,
     updatedAt: Date.now(),
   };
@@ -206,6 +139,7 @@ type FlushResult = {
   added: number;
   toggled: number;
   dropped: number;
+  quickAdd: boolean;
 };
 
 async function postAdds(
@@ -270,7 +204,12 @@ export async function flushWidgetQueue(
   currentUid: string,
 ): Promise<FlushResult> {
   const actions = await drainWidgetQueue();
-  const result: FlushResult = { added: 0, toggled: 0, dropped: 0 };
+  const result: FlushResult = {
+    added: 0,
+    toggled: 0,
+    dropped: 0,
+    quickAdd: false,
+  };
   if (actions.length === 0) return result;
 
   const tz = clientTimezone();
@@ -296,6 +235,11 @@ export async function flushWidgetQueue(
   for (const action of toggles) {
     if (await putToggle(action, tz, day)) result.toggled += 1;
   }
+
+  // Reported rather than raised here, and collapsed to one however many taps
+  // landed: the caller opens the sheet once the replayed ticks have refreshed
+  // the list, so the composer never appears over stale rows.
+  result.quickAdd = applicable.some((a) => a.kind === 'quickadd');
 
   return result;
 }

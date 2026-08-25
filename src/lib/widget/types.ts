@@ -1,6 +1,7 @@
-export const WIDGET_PAYLOAD_VERSION = 1;
+import type { WidgetArt } from './art';
+import type { WidgetWord } from './words';
 
-export type FrogMood = 'happy' | 'neutral' | 'hungry' | 'asleep';
+export const WIDGET_PAYLOAD_VERSION = 1;
 
 export type WidgetTask = {
   id: string;
@@ -16,14 +17,12 @@ export type WidgetPayload = {
   signedIn: boolean;
   /** YYYY-MM-DD in the user's timezone, so the widget can detect a stale day. */
   day: string;
-  streak: number;
-  mood: FrogMood;
   doneCount: number;
   totalCount: number;
-  /** One contextual line from the frog, picked web-side by widgetSpeech. */
-  message: string;
-  /** How loud that line is, so the widget can style the streak to match. */
-  urgency: 'calm' | 'nudge' | 'urgent';
+  /** Which frog illustration medium and large draw today. */
+  art: WidgetArt;
+  /** The word of the day shown in the large widget's footer. */
+  word: WidgetWord;
   tasks: WidgetTask[];
   updatedAt: number;
 };
@@ -47,7 +46,19 @@ export type PendingToggle = {
   at: number;
 };
 
-export type PendingAction = PendingAdd | PendingToggle;
+/**
+ * The widget's add button. The native side can't present the composer, so it
+ * records the intent and the webview raises its own quick-add sheet on launch.
+ */
+export type PendingQuickAdd = {
+  kind: 'quickadd';
+  clientId: string;
+  uid: string;
+  guest: boolean;
+  at: number;
+};
+
+export type PendingAction = PendingAdd | PendingToggle | PendingQuickAdd;
 
 export type WidgetPinState = 'unsupported' | 'available' | 'pinned';
 

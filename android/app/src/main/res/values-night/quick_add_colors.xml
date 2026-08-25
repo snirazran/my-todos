@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="quick_add_surface">#1C2B23</color>
+    <color name="quick_add_field">#12201A</color>
+    <color name="quick_add_border">#7FA8C0B0</color>
+    <color name="quick_add_accent">#63CC8F</color>
+    <color name="quick_add_text">#E7F0E9</color>
+    <color name="quick_add_text_muted">#8CA595</color>
+</resources>

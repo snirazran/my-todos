@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The native capture dialog. Its own palette: unlike the widget it is a
+     normal app surface, so it follows the system theme all the way to dark. -->
+<resources>
+    <color name="quick_add_surface">#FFFFFF</color>
+    <color name="quick_add_field">#F2F5F0</color>
+    <color name="quick_add_border">#7F3E5E4A</color>
+    <color name="quick_add_accent">#1F7A45</color>
+    <color name="quick_add_text">#12251B</color>
+    <color name="quick_add_text_muted">#5C7566</color>
+</resources>

@@ -17,14 +17,15 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 /**
- * Today's list on the home screen: up to four rows, a tap-to-tick target on
- * each, a permanent add bar, and the frog reacting to hunger and streak.
+ * Today's list on the home screen, in three sizes: the count and today's
+ * progress, a fly to tap on every row, the frog of the day, and — on the
+ * largest — a word of the day.
  *
  * Built with RemoteViews rather than Glance on purpose — this module is
  * otherwise pure Java, and pulling Kotlin plus the Compose compiler into a
- * Capacitor app to draw eight views would cost more than it returns. The
- * quality bar Google publishes is about the output (grid fill, contrast,
- * previews, themes, zero states), all of which this hits.
+ * Capacitor app to draw a dozen views would cost more than it returns. Light
+ * and dark come from res/values and res/values-night, so the launcher's theme
+ * picks the card colour without any of it being decided here.
  */
 public class FrogWidgetProvider extends AppWidgetProvider {
 
@@ -33,15 +34,17 @@ public class FrogWidgetProvider extends AppWidgetProvider {
     public static final String EXTRA_TASK_ID = "taskId";
     public static final String EXTRA_DONE = "done";
 
-    private static final int MAX_ROWS = 4;
     private static final int[] ROW_IDS = {
-            R.id.widget_row_0, R.id.widget_row_1, R.id.widget_row_2, R.id.widget_row_3
+            R.id.widget_row_0, R.id.widget_row_1, R.id.widget_row_2, R.id.widget_row_3,
+            R.id.widget_row_4, R.id.widget_row_5, R.id.widget_row_6
     };
     private static final int[] ROW_CHECK_IDS = {
-            R.id.widget_check_0, R.id.widget_check_1, R.id.widget_check_2, R.id.widget_check_3
+            R.id.widget_check_0, R.id.widget_check_1, R.id.widget_check_2, R.id.widget_check_3,
+            R.id.widget_check_4, R.id.widget_check_5, R.id.widget_check_6
     };
     private static final int[] ROW_TEXT_IDS = {
-            R.id.widget_text_0, R.id.widget_text_1, R.id.widget_text_2, R.id.widget_text_3
+            R.id.widget_text_0, R.id.widget_text_1, R.id.widget_text_2, R.id.widget_text_3,
+            R.id.widget_text_4, R.id.widget_text_5, R.id.widget_text_6
     };
 
     /** Repaints every placed widget. */
@@ -104,15 +107,16 @@ public class FrogWidgetProvider extends AppWidgetProvider {
         Bundle options = manager.getAppWidgetOptions(appWidgetId);
         int minWidth = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 250);
         int minHeight = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 110);
-        if (minHeight < 100) return R.layout.frog_widget_bar;
         if (minWidth < 220) return R.layout.frog_widget_small;
-        return R.layout.frog_widget;
+        // Tall enough for the list to be worth the word of the day underneath.
+        if (minHeight >= 220) return R.layout.frog_widget_large;
+        return R.layout.frog_widget_medium;
     }
 
     private static int rowsFor(int layout) {
-        if (layout == R.layout.frog_widget_bar) return 0;
-        if (layout == R.layout.frog_widget_small) return 2;
-        return MAX_ROWS;
+        if (layout == R.layout.frog_widget_small) return 3;
+        if (layout == R.layout.frog_widget_large) return 7;
+        return 4;
     }
 
     private static RemoteViews build(Context context, AppWidgetManager manager, int appWidgetId) {
@@ -121,20 +125,25 @@ public class FrogWidgetProvider extends AppWidgetProvider {
         JSONObject state = FrogWidgetStore.state(context);
 
         views.setOnClickPendingIntent(R.id.widget_add, quickAddIntent(context));
-        views.setOnClickPendingIntent(R.id.widget_frog, openAppIntent(context, "/"));
 
         if (state == null || !state.optBoolean("signedIn", false)) {
             renderSignedOut(context, views, layout);
             return views;
         }
 
-        renderFrog(views, state.optString("mood", "neutral"));
-        renderStreak(views, state.optInt("streak", 0));
-
-        int rows = rowsFor(layout);
-        if (rows == 0) return views;
+        int total = state.optInt("totalCount", 0);
+        int done = state.optInt("doneCount", 0);
+        renderCount(context, views, layout, total - done);
+        renderProgress(views, done, total);
+        if (layout != R.layout.frog_widget_small) {
+            renderArt(views, state.optString("art", "skater"));
+        }
+        if (layout == R.layout.frog_widget_large) {
+            renderWord(views, state.optJSONObject("word"));
+        }
 
         JSONArray tasks = state.optJSONArray("tasks");
+        int rows = rowsFor(layout);
         int count = tasks == null ? 0 : Math.min(tasks.length(), rows);
         renderRows(context, views, tasks, count, rows);
         views.setViewVisibility(R.id.widget_empty, count == 0 ? View.VISIBLE : View.GONE);
@@ -146,50 +155,69 @@ public class FrogWidgetProvider extends AppWidgetProvider {
     }
 
     private static void renderSignedOut(Context context, RemoteViews views, int layout) {
-        views.setViewVisibility(R.id.widget_streak, View.GONE);
-        views.setImageViewResource(R.id.widget_frog, R.drawable.frog_widget_neutral);
-        int rows = rowsFor(layout);
-        if (rows > 0) {
-            views.setViewVisibility(R.id.widget_empty, View.VISIBLE);
-            views.setTextViewText(R.id.widget_empty,
-                    context.getString(R.string.widget_signed_out));
-            for (int i = 0; i < rows; i++) {
-                views.setViewVisibility(ROW_IDS[i], View.GONE);
-            }
+        views.setTextViewText(R.id.widget_count, "");
+        if (layout == R.layout.frog_widget_large) {
+            views.setViewVisibility(R.id.widget_word_term, View.GONE);
+            views.setViewVisibility(R.id.widget_word_meaning, View.GONE);
+        }
+        views.setViewVisibility(R.id.widget_empty, View.VISIBLE);
+        views.setTextViewText(R.id.widget_empty,
+                context.getString(R.string.widget_signed_out));
+        for (int i = 0; i < rowsFor(layout); i++) {
+            views.setViewVisibility(ROW_IDS[i], View.GONE);
         }
         // Never leave a signed-out widget pointing at a personal view.
         PendingIntent signIn = openAppIntent(context, "/login");
         views.setOnClickPendingIntent(R.id.widget_add, signIn);
         views.setOnClickPendingIntent(R.id.widget_root, signIn);
-        views.setOnClickPendingIntent(R.id.widget_frog, signIn);
     }
 
-    private static void renderFrog(RemoteViews views, String mood) {
+    /**
+     * Large has room to spell the whole sentence on one line. Medium carries a
+     * static "tasks left" label under the number, and small shows the number
+     * alone — so both of those only need the figure.
+     */
+    private static void renderCount(Context context, RemoteViews views, int layout, int remaining) {
+        int safe = Math.max(0, remaining);
+        if (layout == R.layout.frog_widget_large) {
+            views.setTextViewText(R.id.widget_count,
+                    context.getString(R.string.widget_tasks_left_count, safe));
+        } else {
+            views.setTextViewText(R.id.widget_count, String.valueOf(safe));
+        }
+    }
+
+    private static void renderProgress(RemoteViews views, int done, int total) {
+        int percent = total <= 0 ? 0 : Math.round((done * 100f) / total);
+        views.setProgressBar(R.id.widget_progress, 100, Math.min(100, percent), false);
+    }
+
+    private static void renderArt(RemoteViews views, String art) {
         int drawable;
-        switch (mood) {
-            case "hungry":
-                drawable = R.drawable.frog_widget_hungry;
+        switch (art) {
+            case "astronaut":
+                drawable = R.drawable.frog_art_astronaut;
                 break;
-            case "happy":
-                drawable = R.drawable.frog_widget_happy;
-                break;
-            case "asleep":
-                drawable = R.drawable.frog_widget_asleep;
+            case "laptop":
+                drawable = R.drawable.frog_art_laptop;
                 break;
             default:
-                drawable = R.drawable.frog_widget_neutral;
+                drawable = R.drawable.frog_art_skater;
                 break;
         }
-        views.setImageViewResource(R.id.widget_frog, drawable);
+        views.setImageViewResource(R.id.widget_art, drawable);
     }
 
-    private static void renderStreak(RemoteViews views, int streak) {
-        if (streak > 0) {
-            views.setViewVisibility(R.id.widget_streak, View.VISIBLE);
-            views.setTextViewText(R.id.widget_streak, String.valueOf(streak));
-        } else {
-            views.setViewVisibility(R.id.widget_streak, View.GONE);
+    private static void renderWord(RemoteViews views, JSONObject word) {
+        if (word == null) {
+            views.setViewVisibility(R.id.widget_word_term, View.GONE);
+            views.setViewVisibility(R.id.widget_word_meaning, View.GONE);
+            return;
         }
+        views.setViewVisibility(R.id.widget_word_term, View.VISIBLE);
+        views.setViewVisibility(R.id.widget_word_meaning, View.VISIBLE);
+        views.setTextViewText(R.id.widget_word_term, word.optString("term"));
+        views.setTextViewText(R.id.widget_word_meaning, word.optString("meaning"));
     }
 
     private static void renderRows(Context context, RemoteViews views, JSONArray tasks,

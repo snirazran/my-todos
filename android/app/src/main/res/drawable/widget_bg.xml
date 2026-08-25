@@ -1,15 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-  Widget backdrop. Swap this for your own art by deleting this file and dropping
-  a pre-rounded widget_bg.png into drawable-nodpi/ — the corners must already be
-  transparent in the image, since RemoteViews cannot clip an ImageView.
--->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
+    <solid android:color="@color/widget_card" />
     <corners android:radius="@dimen/widget_corner_radius" />
-    <gradient
-        android:angle="290"
-        android:startColor="@color/widget_bg_top"
-        android:endColor="@color/widget_bg_bottom"
-        android:type="linear" />
 </shape>

@@ -66,10 +66,8 @@ enum FrogWidgetStore {
     // MARK: - Queue (widget -> app)
 
     static func queueToggle(taskId: String, done: Bool) {
-        lock.lock()
-        defer { lock.unlock() }
         let state = readState()
-        let action = PendingAction(
+        enqueue(PendingAction(
             kind: "toggle",
             clientId: UUID().uuidString,
             taskId: taskId,
@@ -78,7 +76,30 @@ enum FrogWidgetStore {
             uid: state?.uid ?? "",
             guest: state?.guest ?? false,
             at: Date().timeIntervalSince1970 * 1000
-        )
+        ))
+    }
+
+    /// The add button. The extension can't present the composer itself, so it
+    /// records the request and lets the webview open its own quick-add sheet on
+    /// the next launch — the app's own route, not a URL, which is what keeps
+    /// this off the address bar entirely.
+    static func queueQuickAdd() {
+        let state = readState()
+        enqueue(PendingAction(
+            kind: "quickadd",
+            clientId: UUID().uuidString,
+            taskId: nil,
+            text: nil,
+            done: nil,
+            uid: state?.uid ?? "",
+            guest: state?.guest ?? false,
+            at: Date().timeIntervalSince1970 * 1000
+        ))
+    }
+
+    private static func enqueue(_ action: PendingAction) {
+        lock.lock()
+        defer { lock.unlock() }
         var queue = readQueue()
         queue.append(action)
         if queue.count > maxQueue {
@@ -122,19 +143,22 @@ struct WidgetTask: Codable, Identifiable, Hashable {
     var done: Bool
 }
 
+struct WidgetWord: Codable, Hashable {
+    let term: String
+    let meaning: String
+}
+
 struct WidgetState: Codable {
     let v: Int
     let uid: String
     let guest: Bool
     let signedIn: Bool
     let day: String
-    let streak: Int
-    let mood: String
     var doneCount: Int
     let totalCount: Int
-    /// Optional so a snapshot written before these fields existed still decodes.
-    let message: String?
-    let urgency: String?
+    /// Which illustration medium and large draw today, picked webview-side.
+    let art: String
+    let word: WidgetWord
     var tasks: [WidgetTask]
     let updatedAt: Double
 }

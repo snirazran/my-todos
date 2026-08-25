@@ -9,9 +9,9 @@ import { useAuth } from '@/components/auth/AuthContext';
 import { INVENTORY_SUMMARY_KEY } from '@/hooks/useInventory';
 import { todayTasksKey } from '@/hooks/useTaskData';
 import { streakKey } from '@/hooks/useLoginStreak';
-import { MAX_HUNGER_MS } from '@/lib/hungerLogic';
 import { TASK_SYNC_EVENT } from '@/lib/taskSyncClient';
 import { getWidgetPinState } from '@/lib/widget/bridge';
+import { requestQuickAdd } from '@/lib/widget/quickAdd';
 import {
   TASK_COMPLETED_EVENT,
   readCompletedEver,
@@ -32,35 +32,16 @@ type TasksResponse = {
   tasks?: { id: string; text: string; completed: boolean }[];
 };
 
-type SummaryResponse = {
-  wardrobe?: { hunger?: number; lastHungerUpdate?: string | Date };
-};
-
 type StreakResponse = {
-  view?: { count?: number; checkedInToday?: boolean } | null;
+  view?: { count?: number } | null;
 };
 
 const cacheFetcher = (url: string) =>
   fetch(url, { credentials: 'include' }).then((r) => r.json());
 
-function fullnessFrom(wardrobe: SummaryResponse['wardrobe']): number | null {
-  if (
-    !wardrobe ||
-    typeof wardrobe.hunger !== 'number' ||
-    Number.isNaN(wardrobe.hunger) ||
-    !wardrobe.lastHungerUpdate
-  ) {
-    return null;
-  }
-  const last = new Date(wardrobe.lastHungerUpdate).getTime();
-  if (Number.isNaN(last)) return null;
-  const remaining = wardrobe.hunger - (Date.now() - last);
-  return Math.max(0, Math.min(1, remaining / MAX_HUNGER_MS));
-}
-
 /**
- * Mirrors today's list, the frog's mood and the streak into the home screen
- * widget, and replays anything the widget queued while the webview was closed.
+ * Mirrors today's list into the home screen widget, and replays anything the
+ * widget queued while the webview was closed.
  *
  * Everything here reads from SWR caches the app already fills — the widget
  * never causes a fetch of its own.
@@ -77,17 +58,12 @@ export function WidgetSyncProvider() {
 
   // revalidateOnMount:false — read whatever the app already fetched rather than
   // firing a request just to feed the widget. The tasks key keeps a real
-  // fetcher so the task-sync listener below can refresh it on demand; the other
-  // two are pure cache mirrors.
+  // fetcher so the task-sync listener below can refresh it on demand; the
+  // streak key is a pure cache mirror, read only by the widget ask.
   const shared = { revalidateOnMount: false, revalidateOnFocus: false };
   const { data: tasksData, mutate: refreshTasks } = useSWR<TasksResponse>(
     tasksKey,
     cacheFetcher,
-    shared,
-  );
-  const { data: summary } = useSWR<SummaryResponse>(
-    enabled ? INVENTORY_SUMMARY_KEY : null,
-    null,
     shared,
   );
   const { data: streakData } = useSWR<StreakResponse>(
@@ -101,22 +77,12 @@ export function WidgetSyncProvider() {
   const wasSignedIn = useRef(false);
 
   const streak = streakData?.view?.count ?? 0;
-  const checkedInToday = streakData?.view?.checkedInToday ?? false;
 
   // --- push state out ---------------------------------------------------
   useEffect(() => {
     if (!enabled || !tasksData?.tasks) return;
-    void syncWidget(
-      buildPayload({
-        uid,
-        guest,
-        tasks: tasksData.tasks,
-        fullness: fullnessFrom(summary?.wardrobe),
-        streak,
-        checkedInToday,
-      }),
-    );
-  }, [enabled, tasksData, summary, streak, checkedInToday, uid, guest]);
+    void syncWidget(buildPayload({ uid, guest, tasks: tasksData.tasks }));
+  }, [enabled, tasksData, uid, guest]);
 
   // --- sign-out wipes the widget ---------------------------------------
   useEffect(() => {
@@ -134,16 +100,17 @@ export function WidgetSyncProvider() {
   // --- replay the native queue -----------------------------------------
   const drain = useCallback(() => {
     if (!enabled || !uid) return;
-    void flushWidgetQueue(uid).then((res) => {
+    void flushWidgetQueue(uid).then(async (res) => {
       if (res.added > 0 || res.toggled > 0) {
         // Cheapest correct refresh: let SWR refetch the keys the app owns.
-        void import('swr').then(({ mutate }) => {
-          void mutate(
-            (key) => typeof key === 'string' && key.startsWith('/api/tasks'),
-          );
-          void mutate(INVENTORY_SUMMARY_KEY);
-        });
+        const { mutate } = await import('swr');
+        await mutate(
+          (key) => typeof key === 'string' && key.startsWith('/api/tasks'),
+        );
+        void mutate(INVENTORY_SUMMARY_KEY);
       }
+      // The widget's add button, honoured once today's list is current.
+      if (res.quickAdd) requestQuickAdd();
     });
   }, [enabled, uid]);
 

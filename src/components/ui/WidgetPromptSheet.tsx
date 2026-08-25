@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Capacitor } from '@capacitor/core';
 import { BaseSheet } from '@/components/ui/BaseSheet';
+import { artForDay } from '@/lib/widget/art';
 import { canPinWidget, requestWidgetPin } from '@/lib/widget/bridge';
 import { recordPromptShown, recordWidgetAdded } from '@/lib/widget/prompt';
+import { todayKey } from '@/lib/widget/sync';
 
 type Props = {
   open: boolean;
@@ -71,15 +72,16 @@ export function WidgetPromptSheet({
     >
       {() => (
         <div className="flex flex-col gap-5 px-5 pb-6 pt-2">
-          <WidgetPreview streak={streak} />
+          <WidgetPreview art={artForDay(todayKey())} />
 
           <div className="flex flex-col gap-2 text-center">
             <h2 className="text-2xl font-bold leading-tight text-gray-900 dark:text-white">
               {headline}
             </h2>
             <p className="text-[15px] leading-snug text-gray-600 dark:text-gray-300">
-              Your frog gets hungry whether or not you open the app. Keep today
-              on your home screen and add what&apos;s on your mind in one tap.
+              Today&apos;s list, on your home screen. Tap a fly to tick a task
+              off without opening anything, or the + to add what just came to
+              mind.
             </p>
           </div>
 
@@ -129,72 +131,108 @@ export function WidgetPromptSheet({
   );
 }
 
-/** A flat mock of the real 4x2 widget, so the ask shows what it's asking for. */
-function WidgetPreview({ streak }: { streak: number }) {
-  const platform = Capacitor.getPlatform();
+const PREVIEW_ROWS = [
+  'Pick up arts & crafts supplies',
+  'Send cookie recipe to Rigo',
+  'Book club prep',
+  'Hike with Darla',
+];
+
+/**
+ * The real 4x2 widget at reduced scale.
+ *
+ * Sized in `cqw` off a 338pt container so every measurement is the one from the
+ * design rather than a hand-tuned approximation, and the whole thing still
+ * shrinks to fit a narrow phone. The art and the fly are the same files the
+ * native widgets ship, so what the ask shows is what the user gets.
+ */
+function WidgetPreview({ art }: { art: string }) {
+  const u = (px: number) => `${(px / 338) * 100}cqw`;
+
   return (
     <div
-      className="mx-auto w-full max-w-[280px] rounded-[22px] p-3 shadow-lg"
-      style={{
-        background:
-          'linear-gradient(150deg, rgba(215,235,220,0.95), rgba(170,205,185,0.95))',
-      }}
+      className="mx-auto w-full max-w-[338px] [container-type:inline-size]"
       aria-hidden="true"
     >
-      <div className="mb-2 flex items-center gap-1.5">
-        <span className="text-xs font-semibold text-green-900/70">Today</span>
-        {streak > 0 && (
-          <span className="ml-auto text-xs font-bold text-amber-700">
-            🔥 {streak}
-          </span>
-        )}
-      </div>
-      <div className="flex gap-2">
-        <div className="flex flex-1 flex-col gap-1.5">
-          {['Email the landlord', 'Gym — legs'].map((t, i) => (
-            <div key={t} className="flex items-center gap-2">
-              <span
-                className={`h-3.5 w-3.5 flex-none rounded-[5px] border-[1.5px] ${
-                  i === 0
-                    ? 'border-green-700 bg-green-700'
-                    : 'border-green-900/30'
-                }`}
-              />
-              <span
-                className={`truncate text-[13px] ${
-                  i === 0
-                    ? 'text-green-900/40 line-through'
-                    : 'text-green-950/90'
-                }`}
-              >
-                {t}
-              </span>
+      <div
+        className="relative w-full overflow-hidden bg-white dark:bg-[#E3F7EB]"
+        style={{ aspectRatio: '338 / 158', borderRadius: u(27) }}
+      >
+        <img
+          src={`/widgets/frog-${art}.svg`}
+          alt=""
+          className="absolute bottom-0 left-0"
+          style={{ width: u(113), height: u(82) }}
+        />
+
+        <div className="absolute inset-0 flex" style={{ padding: u(18) }}>
+          <div
+            className="flex flex-col"
+            style={{ width: u(75), gap: u(4) }}
+          >
+            <span
+              className="font-bold leading-none tracking-[0.3px] text-black"
+              style={{ fontSize: u(30) }}
+            >
+              26
+            </span>
+            <span
+              className="font-semibold leading-none tracking-[0.1px] text-black"
+              style={{ fontSize: u(15.5) }}
+            >
+              tasks left
+            </span>
+            <div
+              className="w-full overflow-hidden bg-[#D9D9D9] dark:bg-[#B2EBC7]"
+              style={{ height: u(6), borderRadius: u(27) }}
+            >
+              <div className="h-full w-[32%] rounded-full bg-[#96D367]" />
             </div>
-          ))}
-          <div className="mt-0.5 flex items-center gap-1.5 rounded-full border-[1.5px] border-dashed border-green-700/50 bg-white/50 px-2.5 py-1 text-[12px] font-medium text-green-800">
-            + What&apos;s next?
+          </div>
+
+          <div
+            className="flex min-w-0 flex-1 flex-col justify-between"
+            style={{ marginLeft: u(28) }}
+          >
+            {PREVIEW_ROWS.map((row) => (
+              <div
+                key={row}
+                className="flex items-center"
+                style={{ gap: u(10) }}
+              >
+                <span
+                  className="flex flex-none items-center justify-center rounded-full border border-[#EFEFEF] bg-[#FAFAFA]"
+                  style={{ width: u(21.5), height: u(21.5) }}
+                >
+                  <img
+                    src="/widgets/Fly.svg"
+                    alt=""
+                    style={{ width: u(12.5), height: u(11.2) }}
+                  />
+                </span>
+                <span
+                  className="truncate tracking-[0.5px] text-[#0A0A0A]"
+                  style={{ fontSize: u(13) }}
+                >
+                  {row}
+                </span>
+              </div>
+            ))}
           </div>
         </div>
-        <div className="flex w-12 flex-none items-center justify-center">
-          <svg width="42" height="42" viewBox="0 0 64 64">
-            <ellipse cx="32" cy="40" rx="21" ry="18" fill="#3f9c63" />
-            <circle cx="20" cy="20" r="9.5" fill="#3f9c63" />
-            <circle cx="44" cy="20" r="9.5" fill="#3f9c63" />
-            <circle cx="20" cy="20" r="5.5" fill="#fff" />
-            <circle cx="44" cy="20" r="5.5" fill="#fff" />
-            <circle cx="21" cy="21" r="2.6" fill="#13201A" />
-            <circle cx="45" cy="21" r="2.6" fill="#13201A" />
-            <path
-              d="M23 46 Q32 41 41 46"
-              stroke="#1d5c39"
-              strokeWidth="2.6"
-              fill="none"
-              strokeLinecap="round"
-            />
-          </svg>
-        </div>
+
+        <img
+          src="/widgets/plus.svg"
+          alt=""
+          className="absolute"
+          style={{
+            width: u(31.9),
+            height: u(31.9),
+            right: u(18),
+            bottom: u(12),
+          }}
+        />
       </div>
-      <p className="sr-only">{platform} widget preview</p>
     </div>
   );
 }

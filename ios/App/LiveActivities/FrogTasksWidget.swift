@@ -1,6 +1,5 @@
 import AppIntents
 import SwiftUI
-import UIKit
 import WidgetKit
 
 // MARK: - Interactivity
@@ -9,7 +8,6 @@ import WidgetKit
 /// container and queues the change; the webview replays it through the normal
 /// task endpoints next time it runs, so fly caps, the ledger, quest counters
 /// and undo all stay on their usual path.
-@available(iOS 17.0, *)
 struct ToggleFrogTaskIntent: AppIntent {
     static var title: LocalizedStringResource = "Complete task"
     static var description = IntentDescription("Ticks a task off today's list.")
@@ -34,28 +32,39 @@ struct ToggleFrogTaskIntent: AppIntent {
     }
 }
 
-// MARK: - Links
+/// The add button — the one control on the widget that is *meant* to leave the
+/// home screen. It records the request and opens the app; the webview drains
+/// the queue on launch and raises its own quick-add sheet.
+struct FrogQuickAddIntent: AppIntent {
+    static var title: LocalizedStringResource = "Add a task"
+    static var description = IntentDescription("Opens Frogress ready to add a task.")
+    static var openAppWhenRun: Bool = true
 
-private enum FrogLink {
-    static let home = URL(string: "https://frogress.com/")!
-    static let quickAdd = URL(string: "https://frogress.com/?quickadd=1")!
-    static let login = URL(string: "https://frogress.com/login")!
+    init() {}
+
+    func perform() async throws -> some IntentResult {
+        FrogWidgetStore.queueQuickAdd()
+        return .result()
+    }
 }
 
 // MARK: - Palette
 //
-// The artwork is a single dark forest-green field on every size, so the palette
-// is fixed light-on-dark rather than following the system theme. An adaptive
-// palette would put near-black text on near-black art for light-mode users.
+// Straight from the Figma widget sheet. Light is a white card; dark swaps to
+// the mint field rather than going dark — the frog art is drawn on light
+// ground, and a near-black card would leave it floating in a bright hole.
 
-private enum WidgetPalette {
-    static let field = Color(red: 0.094, green: 0.251, blue: 0.157)   // #184028
-    static let text = Color.white
-    static let muted = Color(red: 0.659, green: 0.784, blue: 0.706)   // #A8C8B4
-    static let accent = Color(red: 0.565, green: 0.847, blue: 0.439)  // #90D870, the mascot green
-    static let streak = Color(red: 0.949, green: 0.757, blue: 0.306)  // #F2C14E
-    static let alarm = Color(red: 0.973, green: 0.443, blue: 0.380)   // #F87161
-    static let panel = Color.white.opacity(0.10)
+private enum Palette {
+    static let card = Color("WidgetCard")
+    static let track = Color("WidgetTrack")
+    static let fill = Color(red: 0.588, green: 0.827, blue: 0.404)   // #96D367
+    static let text = Color(red: 0.039, green: 0.039, blue: 0.039)   // #0A0A0A
+    static let heading = Color.black
+}
+
+private enum Metrics {
+    static let rowHeight: CGFloat = 21.5
+    static let barHeight: CGFloat = 6
 }
 
 // MARK: - Timeline
@@ -70,21 +79,16 @@ private let sampleState = WidgetState(
     uid: "sample",
     guest: false,
     signedIn: true,
-    day: "2026-08-21",
-    streak: 12,
-    mood: "happy",
-    doneCount: 1,
-    totalCount: 7,
-    message: "2 left. Finish the plate?",
-    urgency: "nudge",
+    day: "2026-08-25",
+    doneCount: 2,
+    totalCount: 26,
+    art: "skater",
+    word: WidgetWord(term: "Robustious", meaning: "rough, rude, or boisterous."),
     tasks: [
-        WidgetTask(id: "1", text: "Email the landlord", done: true),
-        WidgetTask(id: "2", text: "Gym — legs", done: false),
-        WidgetTask(id: "3", text: "Book dentist", done: false),
-        WidgetTask(id: "4", text: "Water the plants", done: false),
-        WidgetTask(id: "5", text: "Reply to Maya", done: false),
-        WidgetTask(id: "6", text: "Stretch for ten minutes", done: false),
-        WidgetTask(id: "7", text: "Read a chapter", done: false),
+        WidgetTask(id: "1", text: "Pick up arts & crafts supplies", done: false),
+        WidgetTask(id: "2", text: "Send cookie recipe to Rigo", done: false),
+        WidgetTask(id: "3", text: "Book club prep", done: false),
+        WidgetTask(id: "4", text: "Hike with Darla", done: false),
     ],
     updatedAt: 0
 )
@@ -102,10 +106,11 @@ struct FrogWidgetProvider: TimelineProvider {
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<FrogWidgetEntry>) -> Void) {
         let entry = FrogWidgetEntry(date: Date(), state: FrogWidgetStore.readState())
-        // .after(midnight) rather than .atEnd: the only thing that goes stale on
-        // its own is the day rollover. Everything else arrives as an explicit
-        // reloadTimelines from the app, which keeps us well inside the daily
-        // refresh budget we share with the Frogodoro Live Activity.
+        // .after(midnight) rather than .atEnd: the only things that go stale on
+        // their own are the day rollover and, with it, the art and the word.
+        // Everything else arrives as an explicit reloadTimelines from the app,
+        // which keeps us well inside the daily refresh budget we share with the
+        // Frogodoro Live Activity.
         let midnight = Calendar.current.nextDate(
             after: Date(),
             matching: DateComponents(hour: 0, minute: 1),
@@ -115,144 +120,56 @@ struct FrogWidgetProvider: TimelineProvider {
     }
 }
 
-// MARK: - Art
-//
-// One illustration per size, frog included. Swap the images in
-// Assets.xcassets (WidgetBackdropSmall / Medium / Large) to restyle the widget;
-// no code change needed. Each one reserves flat empty field where the UI sits.
-
-private struct FrogWidgetBackground: View {
-    let family: WidgetFamily
-
-    private var assetName: String {
-        switch family {
-        case .systemSmall: return "WidgetBackdropSmall"
-        case .systemLarge: return "WidgetBackdropLarge"
-        default: return "WidgetBackdropMedium"
-        }
-    }
-
-    var body: some View {
-        if UIImage(named: assetName) != nil {
-            Image(assetName).resizable().scaledToFill()
-        } else {
-            WidgetPalette.field
-        }
-    }
-}
-
 // MARK: - Pieces
 
-private struct TaskRow: View {
-    let task: WidgetTask
-    let interactive: Bool
-    let compact: Bool
+/// The frog of the day. Chosen webview-side so it turns over at the user's own
+/// midnight and holds still for the rest of the day.
+private struct FrogArt: View {
+    let art: String
 
-    var body: some View {
-        Group {
-            if #available(iOS 17.0, *), interactive {
-                Button(intent: ToggleFrogTaskIntent(taskId: task.id, done: !task.done)) {
-                    rowBody
-                }
-                .buttonStyle(.plain)
-            } else {
-                rowBody
-            }
+    private var assetName: String {
+        switch art {
+        case "astronaut": return "FrogArtAstronaut"
+        case "laptop": return "FrogArtLaptop"
+        default: return "FrogArtSkater"
         }
-        .accessibilityLabel(task.done
-            ? "\(task.text), done. Tap to undo."
-            : "\(task.text), not done. Tap to complete.")
-    }
-
-    private var rowBody: some View {
-        HStack(spacing: 8) {
-            checkbox
-            Text(task.text)
-                .font(.system(size: compact ? 13 : 14, weight: .medium))
-                .lineLimit(compact ? 2 : 1)
-                .strikethrough(task.done, color: WidgetPalette.muted)
-                .foregroundStyle(task.done ? WidgetPalette.muted : WidgetPalette.text)
-            Spacer(minLength: 0)
-        }
-        .frame(minHeight: compact ? 22 : 24, alignment: .top)
-        .contentShape(Rectangle())
-    }
-
-    private var checkbox: some View {
-        RoundedRectangle(cornerRadius: 5, style: .continuous)
-            .fill(task.done ? WidgetPalette.accent : Color.clear)
-            .overlay(
-                RoundedRectangle(cornerRadius: 5, style: .continuous)
-                    .strokeBorder(task.done ? Color.clear : WidgetPalette.muted, lineWidth: 1.5)
-            )
-            .overlay(
-                Image(systemName: "checkmark")
-                    .font(.system(size: 9, weight: .black))
-                    .foregroundStyle(WidgetPalette.field)
-                    .opacity(task.done ? 1 : 0)
-            )
-            .frame(width: 17, height: 17)
-    }
-}
-
-private struct AddBar: View {
-    let compact: Bool
-    /// An empty list needs a different ask than a half-finished one. Naming the
-    /// actual next action beats a generic label.
-    let empty: Bool
-
-    private var label: String {
-        if compact { return "Add" }
-        return empty ? "Give me a task" : "What's next?"
     }
 
     var body: some View {
-        HStack(spacing: 5) {
-            Image(systemName: "plus").font(.system(size: 11, weight: .black))
-            Text(label)
-                .font(.system(size: 13, weight: .bold))
-                .lineLimit(1)
-            if !compact { Spacer(minLength: 0) }
-        }
-        .foregroundStyle(WidgetPalette.field)
-        .padding(.horizontal, 12)
-        .frame(maxWidth: .infinity, minHeight: 30)
-        .background(Capsule().fill(WidgetPalette.accent))
-        .accessibilityLabel("Add a task")
+        artwork.accessibilityHidden(true)
     }
-}
 
-private struct StreakBadge: View {
-    let streak: Int
-    /// The streak turns alarm-coloured only when it is genuinely at risk, so
-    /// the colour keeps meaning something. A permanently red flame is wallpaper.
-    let atRisk: Bool
-
-    var body: some View {
-        if streak > 0 {
-            HStack(spacing: 2) {
-                Image(systemName: atRisk ? "flame.circle.fill" : "flame.fill")
-                    .font(.system(size: atRisk ? 12 : 10))
-                Text("\(streak)").font(.system(size: 12, weight: .bold))
-            }
-            .foregroundStyle(atRisk ? WidgetPalette.alarm : WidgetPalette.streak)
-            .accessibilityLabel(atRisk
-                ? "\(streak) day streak, at risk"
-                : "\(streak) day streak")
+    /// Keeps the illustration in colour when the home screen is tinted, rather
+    /// than letting it flatten into a white slab.
+    @ViewBuilder
+    private var artwork: some View {
+        if #available(iOS 18.0, *) {
+            Image(assetName)
+                .resizable()
+                .widgetAccentedRenderingMode(.fullColor)
+                .scaledToFit()
+        } else {
+            Image(assetName)
+                .resizable()
+                .scaledToFit()
         }
     }
 }
 
-private struct CountChip: View {
-    let done: Int
-    let total: Int
+private struct AddButton: View {
+    let diameter: CGFloat
 
     var body: some View {
-        Text("\(done)/\(total)")
-            .font(.system(size: 11, weight: .bold))
-            .monospacedDigit()
-            .foregroundStyle(WidgetPalette.muted)
-            .accessibilityLabel("\(done) of \(total) done")
+        Button(intent: FrogQuickAddIntent()) { circle }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Add a task")
+    }
+
+    private var circle: some View {
+        Image("WidgetPlus")
+            .resizable()
+            .frame(width: diameter, height: diameter)
+            .contentShape(Circle())
     }
 }
 
@@ -267,39 +184,240 @@ private struct ProgressBar: View {
     var body: some View {
         GeometryReader { geo in
             ZStack(alignment: .leading) {
-                Capsule().fill(WidgetPalette.panel)
-                Capsule().fill(WidgetPalette.accent)
+                Capsule().fill(Palette.track)
+                Capsule().fill(Palette.fill)
                     .frame(width: max(0, geo.size.width * fraction))
             }
         }
-        .frame(height: 4)
+        .frame(height: Metrics.barHeight)
         .accessibilityHidden(true)
     }
 }
 
-private struct OverflowRow: View {
-    let count: Int
+/// A row of today's list. The fly is the target: tapping it feeds the frog and
+/// leaves a tick behind.
+private struct TaskRow: View {
+    let task: WidgetTask
 
     var body: some View {
-        Text("+\(count) more")
-            .font(.system(size: 12, weight: .semibold))
-            .foregroundStyle(WidgetPalette.muted)
+        Button(intent: ToggleFrogTaskIntent(taskId: task.id, done: !task.done)) {
+            rowBody
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(task.done
+            ? "\(task.text), done. Tap to undo."
+            : "\(task.text), not done. Tap to complete.")
+    }
+
+    private var rowBody: some View {
+        HStack(spacing: 10) {
+            Image(task.done ? "WidgetCheckOn" : "WidgetCheckOff")
+                .resizable()
+                .frame(width: Metrics.rowHeight, height: Metrics.rowHeight)
+            Text(task.text)
+                .font(.system(size: 13, design: .rounded))
+                .tracking(0.5)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .strikethrough(task.done, color: Palette.text.opacity(0.45))
+                .foregroundStyle(task.done ? Palette.text.opacity(0.45) : Palette.text)
+            Spacer(minLength: 0)
+        }
+        .frame(height: Metrics.rowHeight)
+        .contentShape(Rectangle())
     }
 }
 
-/// The frog's line. It sits over flat field, not over the frog, so it needs no
-/// bubble on large — only the smaller sizes borrow the header row for it.
-private struct SpeechLine: View {
-    let message: String
-    let urgent: Bool
+/// The count, sized to the space it has: large spells the whole sentence on one
+/// line; medium sets its own label underneath, and small shows the figure alone.
+private struct RemainingCount: View {
+    let remaining: Int
+    let inline: Bool
+
+    private var number: some View {
+        Text("\(remaining)")
+            .font(.system(size: 30, weight: .bold, design: .rounded))
+            .tracking(0.3)
+            .foregroundStyle(Palette.heading)
+    }
 
     var body: some View {
-        Text(message)
-            .font(.system(size: 13, weight: urgent ? .heavy : .semibold))
-            .foregroundStyle(urgent ? WidgetPalette.alarm : WidgetPalette.text)
+        Group {
+            if inline {
+                Text("\(remaining) tasks left")
+                    .font(.system(size: 30, weight: .bold, design: .rounded))
+                    .tracking(0.3)
+                    .foregroundStyle(Palette.heading)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+            } else {
+                number
+            }
+        }
+        .accessibilityLabel("\(remaining) tasks left")
+    }
+}
+
+private struct WordOfTheDay: View {
+    let word: WidgetWord
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(word.term)
+                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .tracking(0.5)
+            Text(word.meaning)
+                .font(.system(size: 10, design: .rounded))
+                .tracking(0.5)
+        }
+        .foregroundStyle(Palette.heading)
+        .lineLimit(1)
+        .minimumScaleFactor(0.8)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Word of the day: \(word.term), \(word.meaning)")
+    }
+}
+
+private struct EmptyRows: View {
+    var body: some View {
+        Text("Nothing yet. Feed the frog a task.")
+            .font(.system(size: 13, design: .rounded))
+            .foregroundStyle(Palette.text.opacity(0.55))
             .lineLimit(2)
-            .multilineTextAlignment(.leading)
-            .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+private struct SignedOut: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Frogress")
+                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .foregroundStyle(Palette.text.opacity(0.55))
+            Text("Sign in to see today's list.")
+                .font(.system(size: 14, weight: .semibold, design: .rounded))
+                .foregroundStyle(Palette.heading)
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+}
+
+// MARK: - Sizes
+
+private struct SmallWidget: View {
+    let state: WidgetState
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .center) {
+                RemainingCount(remaining: state.remaining, inline: false)
+                Spacer(minLength: 0)
+                AddButton(diameter: 23.58)
+            }
+            .frame(height: 15)
+
+            ProgressBar(done: state.doneCount, total: state.totalCount)
+
+            if state.tasks.isEmpty {
+                EmptyRows()
+                Spacer(minLength: 0)
+            } else {
+                SpacedRows(tasks: state.tasks, limit: 3)
+            }
+        }
+    }
+}
+
+/// Rows spread over whatever height is left, the way the design distributes
+/// them on the two smaller sizes.
+private struct SpacedRows: View {
+    let tasks: [WidgetTask]
+    let limit: Int
+
+    var body: some View {
+        let shown = Array(tasks.prefix(limit))
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(shown.enumerated()), id: \.element.id) { index, task in
+                TaskRow(task: task)
+                if index < shown.count - 1 { Spacer(minLength: 4) }
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+}
+
+private struct MediumWidget: View {
+    let state: WidgetState
+
+    var body: some View {
+        ZStack(alignment: .bottomLeading) {
+            // Offsets cancel the card padding so the art bleeds to the corner,
+            // exactly as it does on the sheet.
+            FrogArt(art: state.art)
+                .frame(width: 113, height: 82)
+                .offset(x: -18, y: 18)
+
+            HStack(alignment: .top, spacing: 28) {
+                VStack(alignment: .leading, spacing: 4) {
+                    RemainingCount(remaining: state.remaining, inline: false)
+                    Text("tasks left")
+                        .font(.system(size: 15.5, weight: .semibold, design: .rounded))
+                        .tracking(0.1)
+                        .foregroundStyle(Palette.heading)
+                    ProgressBar(done: state.doneCount, total: state.totalCount)
+                }
+                .frame(width: 75, alignment: .leading)
+
+                if state.tasks.isEmpty {
+                    EmptyRows()
+                    Spacer(minLength: 0)
+                } else {
+                    SpacedRows(tasks: state.tasks, limit: 4)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+
+            AddButton(diameter: 31.9)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                .offset(y: 6)
+        }
+    }
+}
+
+private struct LargeWidget: View {
+    let state: WidgetState
+
+    var body: some View {
+        ZStack(alignment: .bottomTrailing) {
+            FrogArt(art: state.art)
+                .frame(width: 169, height: 122)
+                .offset(x: 17, y: 18)
+
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .center) {
+                    RemainingCount(remaining: state.remaining, inline: true)
+                    Spacer(minLength: 8)
+                    AddButton(diameter: 31.9)
+                }
+
+                ProgressBar(done: state.doneCount, total: state.totalCount)
+
+                if state.tasks.isEmpty {
+                    EmptyRows()
+                } else {
+                    VStack(alignment: .leading, spacing: 7) {
+                        ForEach(Array(state.tasks.prefix(7))) { task in
+                            TaskRow(task: task)
+                        }
+                    }
+                }
+
+                Spacer(minLength: 4)
+
+                WordOfTheDay(word: state.word)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
     }
 }
 
@@ -309,119 +427,24 @@ struct FrogWidgetView: View {
     @Environment(\.widgetFamily) private var family
     let entry: FrogWidgetEntry
 
-    private var isSmall: Bool { family == .systemSmall }
-    private var isLarge: Bool { family == .systemLarge }
-
-    /// Rows each size fits once the header, the add bar, and the part of the
-    /// artwork the frog occupies are all accounted for.
-    private var rowLimit: Int {
-        switch family {
-        case .systemSmall: return 2
-        case .systemLarge: return 6
-        default: return 3
-        }
-    }
-
-    /// Horizontal room the frog takes in the medium artwork — the add bar stops
-    /// short of it rather than running underneath.
-    private var frogInset: CGFloat { family == .systemMedium ? 104 : 0 }
-
     var body: some View {
         content
-            .frogWidgetBackground(family)
-            .widgetURL(signedIn ? (isSmall ? FrogLink.quickAdd : FrogLink.home) : FrogLink.login)
+            .padding(.horizontal, family == .systemMedium ? 18 : 17)
+            .padding(.vertical, 18)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .frogCard()
     }
-
-    private var signedIn: Bool { entry.state?.signedIn ?? false }
 
     @ViewBuilder
     private var content: some View {
         if let state = entry.state, state.signedIn {
-            signedInBody(state)
+            switch family {
+            case .systemSmall: SmallWidget(state: state)
+            case .systemLarge: LargeWidget(state: state)
+            default: MediumWidget(state: state)
+            }
         } else {
-            signedOutBody
-        }
-    }
-
-    private var signedOutBody: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Frogress")
-                .font(.system(size: 12, weight: .bold))
-                .foregroundStyle(WidgetPalette.muted)
-            Text("Sign in to see today's list.")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(WidgetPalette.text)
-            Spacer(minLength: 0)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    }
-
-    private func signedInBody(_ state: WidgetState) -> some View {
-        let shown = min(rowLimit, state.tasks.count)
-        let hidden = max(0, state.totalCount - shown)
-        let line = state.message ?? ""
-        let urgent = state.urgency == "urgent"
-
-        return VStack(alignment: .leading, spacing: isLarge ? 6 : 5) {
-            header(state, line: line, urgent: urgent)
-
-            if isLarge {
-                ProgressBar(done: state.doneCount, total: state.totalCount)
-                    .padding(.bottom, 2)
-            }
-
-            if state.tasks.isEmpty {
-                Text("Nothing yet. Feed the frog a task.")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(WidgetPalette.muted)
-                    .padding(.top, 2)
-            } else {
-                VStack(alignment: .leading, spacing: 4) {
-                    ForEach(Array(state.tasks.prefix(rowLimit))) { task in
-                        TaskRow(task: task, interactive: !isSmall, compact: isSmall)
-                    }
-                    if hidden > 0 && !isSmall { OverflowRow(count: hidden) }
-                }
-            }
-
-            // On large the line gets its own row under the list; the smaller
-            // sizes put it in the header, where it costs no extra height.
-            if isLarge && !line.isEmpty {
-                Spacer(minLength: 4)
-                SpeechLine(message: line, urgent: urgent)
-            }
-
-            Spacer(minLength: 4)
-
-            // Small spends its single tap target on capture (see widgetURL), so
-            // it shows no button — the artwork's frog fills that space instead.
-            if !isSmall {
-                AddBar(compact: false, empty: state.tasks.isEmpty)
-                    .padding(.trailing, frogInset)
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    }
-
-    @ViewBuilder
-    private func header(_ state: WidgetState, line: String, urgent: Bool) -> some View {
-        HStack(spacing: 6) {
-            if family == .systemMedium && !line.isEmpty {
-                Text(line)
-                    .font(.system(size: 11, weight: urgent ? .heavy : .bold))
-                    .foregroundStyle(urgent ? WidgetPalette.alarm : WidgetPalette.text)
-                    .lineLimit(1)
-            } else {
-                Text("TODAY")
-                    .font(.system(size: 11, weight: .bold))
-                    .kerning(0.5)
-                    .foregroundStyle(WidgetPalette.muted)
-            }
-            Spacer(minLength: 4)
-            if state.totalCount > 0 {
-                CountChip(done: state.doneCount, total: state.totalCount)
-            }
-            StreakBadge(streak: state.streak, atRisk: urgent)
+            SignedOut()
         }
     }
 }
@@ -434,20 +457,20 @@ struct FrogTasksWidget: Widget {
             FrogWidgetView(entry: entry)
         }
         .configurationDisplayName("Today")
-        .description("Today's tasks and your frog, with one tap to add whatever just came to mind.")
+        .description("Today's tasks and your frog. Tap a fly to tick one off.")
         .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
+        .contentMarginsDisabled()
     }
 }
 
+// MARK: - Helpers
+
+private extension WidgetState {
+    var remaining: Int { max(0, totalCount - doneCount) }
+}
+
 private extension View {
-    /// containerBackground arrived in iOS 17 and is required there; on 16 the
-    /// widget paints its own background instead.
-    @ViewBuilder
-    func frogWidgetBackground(_ family: WidgetFamily) -> some View {
-        if #available(iOS 17.0, *) {
-            containerBackground(for: .widget) { FrogWidgetBackground(family: family) }
-        } else {
-            padding(12).background(FrogWidgetBackground(family: family))
-        }
+    func frogCard() -> some View {
+        containerBackground(for: .widget) { Palette.card }
     }
 }
