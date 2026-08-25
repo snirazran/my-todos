@@ -161,7 +161,7 @@ function WidgetPreview({ art }: { art: string }) {
         <img
           src={`/widgets/frog-${art}.svg`}
           alt=""
-          className="absolute bottom-0 left-0"
+          className="absolute bottom-0 left-0 -scale-x-100"
           style={{ width: u(113), height: u(82) }}
         />
 

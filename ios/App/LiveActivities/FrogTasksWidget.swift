@@ -26,13 +26,20 @@ private enum Palette {
 // while the card grows, and the whole thing reads about 7% small.
 
 private struct Metrics {
-    static let smallReference: CGFloat = 158
-    static let wideReference: CGFloat = 338
+    static let small = CGSize(width: 158, height: 158)
+    static let medium = CGSize(width: 338, height: 158)
+    static let large = CGSize(width: 338, height: 354)
 
     let scale: CGFloat
 
-    init(width: CGFloat, reference: CGFloat) {
-        scale = width > 0 && reference > 0 ? width / reference : 1
+    /// The smaller of the two axis ratios, so the design's box always fits the
+    /// card. Scaling on width alone overflows vertically the moment a device
+    /// hands out a card that is proportionally shorter than the sheet.
+    init(size: CGSize, reference: CGSize) {
+        guard size.width > 0, size.height > 0,
+              reference.width > 0, reference.height > 0
+        else { scale = 1; return }
+        scale = min(size.width / reference.width, size.height / reference.height)
     }
 
     /// One design point, in this device's actual points.
@@ -59,10 +66,25 @@ private enum Design {
     /// little wider than the row it sits in — as on the sheet.
     static let markerArt: CGFloat = 23.7396
 
+    /// Share of the artwork canvas that is empty on its leading edge, measured
+    /// off the PNGs. The three illustrations are padded very differently — the
+    /// skater floats in nearly 19% of blank canvas — so a reserve measured to
+    /// the image frame strands 20-30pt of text width on most of them.
+    static func artLeadingPad(_ art: String) -> CGFloat {
+        switch art {
+        case "astronaut": return 0.010
+        case "laptop": return 0.115
+        default: return 0.188
+        }
+    }
+
     /// Room a row gives up on the right so a long title truncates before what
     /// floats over it, instead of running underneath. The sheet shows this on
     /// the overflow variant, where the last rows stop short of the frog.
-    static let artReserve: CGFloat = artLarge.width - 17 + 6
+    static func artReserve(_ art: String) -> CGFloat {
+        artLarge.width * (1 - artLeadingPad(art)) - 17 + 6
+    }
+
     static let addReserve: CGFloat = addLarge + 8
 
     /// Large lays its rows out top-down from a fixed offset, so which of them
@@ -134,6 +156,9 @@ struct FrogWidgetProvider: TimelineProvider {
 /// midnight and holds still for the rest of the day.
 private struct FrogArt: View {
     let art: String
+    /// Medium sits the frog in the leading corner, so it is mirrored to face
+    /// into the card rather than off the edge of it.
+    var flipped: Bool = false
 
     private var assetName: String {
         switch art {
@@ -144,7 +169,9 @@ private struct FrogArt: View {
     }
 
     var body: some View {
-        artwork.accessibilityHidden(true)
+        artwork
+            .scaleEffect(x: flipped ? -1 : 1, y: 1)
+            .accessibilityHidden(true)
     }
 
     /// Keeps the illustration in colour when the home screen is tinted, rather
@@ -359,21 +386,38 @@ private struct MediumWidget: View {
     let state: WidgetState
 
     var body: some View {
-        ZStack(alignment: .bottomLeading) {
-            // Offsets cancel the card padding so the art bleeds to the corner,
-            // exactly as it does on the sheet.
-            FrogArt(art: state.art)
-                .frame(width: m.s(Design.artMedium.width), height: m.s(Design.artMedium.height))
-                .offset(x: -m.s(18), y: m.s(18))
-
+        ZStack(alignment: .bottomTrailing) {
             HStack(alignment: .top, spacing: m.s(28)) {
-                VStack(alignment: .leading, spacing: m.s(4)) {
-                    RemainingCount(m: m, remaining: state.remaining, inline: false)
-                    Text("tasks left")
-                        .font(m.font(15.5, .semibold))
-                        .tracking(m.s(0.1))
-                        .foregroundStyle(Palette.heading)
-                    ProgressBar(m: m, done: state.doneCount, total: state.totalCount)
+                // The frog is a sibling below the header rather than a layer
+                // floating over it. Overlap is then impossible on any card,
+                // whatever height the device hands out: the header takes the
+                // room it needs and the frog gets what is left. Free-floating
+                // it collided even on the reference card, because SwiftUI
+                // gives text a full line box where the sheet trims to cap
+                // height — about 24pt taller over the three lines.
+                VStack(alignment: .leading, spacing: 0) {
+                    VStack(alignment: .leading, spacing: m.s(4)) {
+                        RemainingCount(m: m, remaining: state.remaining, inline: false)
+                        Text("tasks left")
+                            .font(m.font(15.5, .semibold))
+                            .tracking(m.s(0.1))
+                            .foregroundStyle(Palette.heading)
+                            .lineLimit(1)
+                        ProgressBar(m: m, done: state.doneCount, total: state.totalCount)
+                    }
+                    .layoutPriority(1)
+
+                    Spacer(minLength: m.s(6))
+
+                    // Outer frame pins the layout width to the column so the
+                    // wider artwork spills into the gutter instead of pushing
+                    // the task list sideways; the offsets cancel the card
+                    // padding so it still bleeds into the corner.
+                    FrogArt(art: state.art, flipped: true)
+                        .frame(maxWidth: m.s(Design.artMedium.width),
+                               maxHeight: m.s(Design.artMedium.height))
+                        .frame(width: m.s(75), alignment: .leading)
+                        .offset(x: -m.s(18), y: m.s(18))
                 }
                 .frame(width: m.s(75), alignment: .leading)
 
@@ -391,7 +435,6 @@ private struct MediumWidget: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
 
             AddButton(m: m, diameter: Design.addLarge)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                 .offset(y: m.s(6))
         }
     }
@@ -425,7 +468,9 @@ private struct LargeWidget: View {
                             TaskRow(
                                 m: m,
                                 task: task,
-                                reserve: Design.rowMeetsArt(index) ? Design.artReserve : 0
+                                reserve: Design.rowMeetsArt(index)
+                                    ? Design.artReserve(state.art)
+                                    : 0
                             )
                         }
                     }
@@ -446,13 +491,17 @@ struct FrogWidgetView: View {
     @Environment(\.widgetFamily) private var family
     let entry: FrogWidgetEntry
 
-    private var reference: CGFloat {
-        family == .systemSmall ? Metrics.smallReference : Metrics.wideReference
+    private var reference: CGSize {
+        switch family {
+        case .systemSmall: return Metrics.small
+        case .systemLarge: return Metrics.large
+        default: return Metrics.medium
+        }
     }
 
     var body: some View {
         GeometryReader { geo in
-            let m = Metrics(width: geo.size.width, reference: reference)
+            let m = Metrics(size: geo.size, reference: reference)
             content(m)
                 .padding(.horizontal, m.s(family == .systemMedium ? 18 : 17))
                 .padding(.vertical, m.s(18))

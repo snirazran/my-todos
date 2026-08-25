@@ -144,7 +144,8 @@ public class FrogWidgetProvider extends AppWidgetProvider {
             renderWord(views, state.optJSONObject("word"));
         }
 
-        applyScale(context, views, manager, appWidgetId, layout);
+        float scale = applyScale(context, views, manager, appWidgetId, layout);
+        applyReserves(context, views, layout, state.optString("art", "skater"), scale);
 
         JSONArray tasks = state.optJSONArray("tasks");
         int rows = rowsFor(layout);
@@ -168,17 +169,24 @@ public class FrogWidgetProvider extends AppWidgetProvider {
      * setViewLayout*, which arrived there. Below it the widget renders at the
      * sizes the layout was authored with, which is coherent, just not scaled.
      */
-    private static void applyScale(Context context, RemoteViews views, AppWidgetManager manager,
-                                   int appWidgetId, int layout) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return;
+    private static float applyScale(Context context, RemoteViews views, AppWidgetManager manager,
+                                    int appWidgetId, int layout) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return 1f;
 
         Bundle options = manager.getAppWidgetOptions(appWidgetId);
         int width = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0);
-        float reference = layout == R.layout.frog_widget_small ? 158f : 338f;
-        if (width <= 0) return;
-        // Clamped so an unusual launcher grid can't blow the card apart.
-        float scale = Math.max(0.85f, Math.min(1.3f, width / reference));
-        if (Math.abs(scale - 1f) < 0.02f) return;
+        int height = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0);
+        boolean small = layout == R.layout.frog_widget_small;
+        float refW = small ? 158f : 338f;
+        float refH = layout == R.layout.frog_widget_large ? 354f : 158f;
+        if (width <= 0) return 1f;
+        // The smaller of the two axis ratios, so the design's box always fits
+        // the cell — scaling on width alone overflows a proportionally shorter
+        // one. Clamped so an unusual launcher grid can't blow the card apart.
+        float ratio = width / refW;
+        if (height > 0) ratio = Math.min(ratio, height / refH);
+        float scale = Math.max(0.85f, Math.min(1.3f, ratio));
+        if (Math.abs(scale - 1f) < 0.02f) return 1f;
 
         text(views, R.id.widget_count, 30f, scale);
         text(views, R.id.widget_empty, 13f, scale);
@@ -198,16 +206,37 @@ public class FrogWidgetProvider extends AppWidgetProvider {
             text(views, ROW_TEXT_IDS[i], 13f, scale);
             size(views, ROW_CHECK_IDS[i], 23.74f, scale);
         }
-        scaleReserves(context, views, layout, scale);
+        return scale;
     }
 
-    /** The trailing gaps that keep long titles off the add button and the frog. */
-    private static void scaleReserves(Context context, RemoteViews views, int layout, float scale) {
+    /**
+     * The trailing gaps that keep long titles off the add button and the frog.
+     *
+     * Measured to the frog's visible edge rather than its image frame: the
+     * three illustrations carry very different amounts of blank canvas (the
+     * skater nearly 19% on its leading side), so a single frame-based figure
+     * strands 20-30dp of text width on most of them.
+     */
+    private static void applyReserves(Context context, RemoteViews views, int layout,
+                                      String art, float scale) {
         if (layout == R.layout.frog_widget_medium) {
             padEnd(context, views, ROW_TEXT_IDS[3], 40f, scale);
         } else if (layout == R.layout.frog_widget_large) {
-            padEnd(context, views, ROW_TEXT_IDS[5], 158f, scale);
-            padEnd(context, views, ROW_TEXT_IDS[6], 158f, scale);
+            float reserve = 169f * (1f - artLeadingPad(art)) - 17f + 6f;
+            padEnd(context, views, ROW_TEXT_IDS[5], reserve, scale);
+            padEnd(context, views, ROW_TEXT_IDS[6], reserve, scale);
+        }
+    }
+
+    /** Share of the artwork canvas that is empty on its leading edge. */
+    private static float artLeadingPad(String art) {
+        switch (art) {
+            case "astronaut":
+                return 0.010f;
+            case "laptop":
+                return 0.115f;
+            default:
+                return 0.188f;
         }
     }
 
