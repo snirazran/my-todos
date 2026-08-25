@@ -1,6 +1,7 @@
 import { v4 as uuid } from 'uuid';
 import PactModel, { type PactDoc } from '@/lib/models/Pact';
 import PactConfigModel, {
+  DEFAULT_PACT_STREAK_MULTIPLIERS,
   PACT_CONFIG_ID,
   PACT_PAYOUT,
   PACT_PAYOUT_VERSION,
@@ -238,6 +239,15 @@ export async function ensurePactConfig(): Promise<PactConfigDoc> {
   // tell: the payout always writes it, and no admin action can remove it.
   if (typeof existing.weekValuePerSession !== 'number') {
     Object.assign(backfill, PACT_PAYOUT);
+  }
+  // The rung weeks moved (4/7/10 → 2/5/8) and a live doc keeps whatever it was
+  // seeded with, so the ladder has to be re-applied once rather than waiting
+  // for someone to retype it in the admin screen. Version-gated, so an admin
+  // who tunes the rungs afterwards is never overwritten again. In-flight
+  // streaks self-heal: `milestonesPaid` only ever holds the highest rung paid,
+  // so the next kept week collects any rung the new spacing put behind them.
+  if ((existing.payoutVersion ?? 0) < 6) {
+    backfill.streakMultipliers = DEFAULT_PACT_STREAK_MULTIPLIERS;
   }
   if (existing.payoutVersion !== PACT_PAYOUT_VERSION) {
     backfill.payoutVersion = PACT_PAYOUT_VERSION;

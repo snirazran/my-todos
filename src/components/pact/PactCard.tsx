@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import useSWR from 'swr';
 import {
   ArrowLeftRight,
@@ -17,7 +17,7 @@ import {
   QuestRewardTileBadge,
 } from '@/lib/questClaims';
 import { useUIStore } from '@/lib/uiStore';
-import type { PactView } from '@/lib/pact/types';
+import type { PactView, PactWeekResult } from '@/lib/pact/types';
 import { formatPactRate } from '@/lib/pact/format';
 import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
 import { PactChangeSheet } from './PactChangeSheet';
@@ -27,6 +27,108 @@ import { PactWeekResultSheet } from './PactWeekResultSheet';
 import { PactPickSheet } from './PactPickSheet';
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
+
+const PREVIEW_OUTCOMES = ['kept', 'rescued', 'near_miss', 'missed'] as const;
+type PreviewOutcome = (typeof PREVIEW_OUTCOMES)[number];
+/** Not an outcome — a kept week aimed at the first rung, to see the landing. */
+type PreviewMode = PreviewOutcome | 'landed';
+
+/**
+ * Settlement runs once, on the first load after a real week rolls over, which
+ * makes this sheet all but impossible to look at while it is being worked on.
+ *
+ * In development it opens on every quests page load. On a deployed build it
+ * takes `?leapResult=kept|rescued|near_miss|missed` — the same preview, minus
+ * a modal that would sit in front of every user who ever opened the page.
+ * Read after mount rather than during render: the URL is not knowable on the
+ * server, and reading it in the body would hydrate a different tree.
+ */
+function useWeekResultPreview(data: PactView | undefined) {
+  const [outcome, setOutcome] = useState<PreviewMode | null>(null);
+  const [dismissed, setDismissed] = useState(false);
+
+  useEffect(() => {
+    const raw = new URLSearchParams(window.location.search).get('leapResult');
+    if (raw !== null) {
+      setOutcome(
+        raw === 'landed'
+          ? 'landed'
+          : (PREVIEW_OUTCOMES.find((entry) => entry === raw) ?? 'kept'),
+      );
+      return;
+    }
+    if (process.env.NODE_ENV === 'development') setOutcome('kept');
+  }, []);
+
+  const dismissPreview = () => setDismissed(true);
+
+  if (!outcome || dismissed || !data) return { preview: null, dismissPreview };
+
+  const target = data.active?.target ?? 2;
+  // `landed` walks the streak up to the first rung, which is the only way to
+  // see the pad-to-pad hop without waiting out four real weeks.
+  const firstRung =
+    data.ladder.rungs.find((rung) => rung.weeks > 0)?.weeks ?? 4;
+  const streakBefore =
+    outcome === 'landed' ? Math.max(0, firstRung - 1) : data.streak.weeks;
+  const preview: PactWeekResult = {
+    weekKey: `preview-${outcome}`,
+    categoryName:
+      data.active?.categoryName ?? data.areas[0]?.name ?? 'Mindfulness',
+    outcome: outcome === 'landed' ? 'kept' : outcome,
+    progress:
+      outcome === 'kept' || outcome === 'landed'
+        ? target
+        : Math.max(0, target - 1),
+    target,
+    streakBefore,
+    streakAfter:
+      outcome === 'kept' || outcome === 'landed'
+        ? streakBefore + 1
+        : outcome === 'missed'
+          ? 0
+          : streakBefore,
+    milestoneWeeks:
+      outcome === 'kept' || outcome === 'landed' ? streakBefore + 1 : undefined,
+    fliesGranted: outcome === 'missed' ? 0 : 24,
+    shieldsLeft: outcome === 'missed' ? 0 : data.streak.shields,
+  };
+  return { preview, dismissPreview };
+}
+
+/** A preview sheet must never post a real settlement dismissal. */
+function isPreviewResult(result: PactWeekResult) {
+  return result.weekKey.startsWith('preview-');
+}
+
+/**
+ * One settlement sheet, whichever surface gets there first.
+ *
+ * The week that ended is reported on home AND on the quests page, because
+ * gating it to one of them let a payoff the user earned sit unseen for days if
+ * they never opened that tab. But it is a modal: two PactCards alive at once
+ * would stack two of them, which is exactly the bug that shipped when the
+ * quests page mounted a mobile and a desktop copy of the same panel. So the
+ * right to render it is claimed by one card and released when that card goes.
+ */
+let weekResultOwner: symbol | null = null;
+
+function useOwnsWeekResult() {
+  const idRef = useRef<symbol>(null as unknown as symbol);
+  idRef.current ??= Symbol('pact-week-result');
+  const [owns, setOwns] = useState(false);
+
+  useEffect(() => {
+    const id = idRef.current;
+    if (weekResultOwner === null) weekResultOwner = id;
+    setOwns(weekResultOwner === id);
+    return () => {
+      if (weekResultOwner === id) weekResultOwner = null;
+    };
+  }, []);
+
+  return owns;
+}
 
 export function pactViewKey(timezone?: string) {
   const tz =
@@ -139,6 +241,8 @@ export function PactCard({
   // Shown in the card's place right after deferring, so the escape hatch is
   // learned at the one moment the user is looking for it.
   const [justDeferred, setJustDeferred] = useState(false);
+  const { preview, dismissPreview } = useWeekResultPreview(data);
+  const ownsWeekResult = useOwnsWeekResult();
 
   useEffect(() => {
     try {
@@ -155,6 +259,8 @@ export function PactCard({
   }, [justDeferred]);
 
   if (!data || !data.enabled || data.needsAreas) return null;
+
+  const shownWeekResult = data.weekResult ?? preview;
 
   const dismissWeekResult = async () => {
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -625,17 +731,27 @@ export function PactCard({
         onUpgrade={() => setPlusOpen(true)}
       />
 
-      {/* Only the quests page reports the week that ended: the home card is
-          hidden while a pact runs, and a settlement sheet that can appear on
-          either surface would race itself into showing twice. */}
-      {variant === 'panel' && data.weekResult && (
+      {ownsWeekResult && shownWeekResult && (
         <PactWeekResultSheet
-          key={data.weekResult.weekKey}
-          result={data.weekResult}
-          onClose={() => void dismissWeekResult()}
-          onGetShield={() => {
+          key={shownWeekResult.weekKey}
+          view={data}
+          result={shownWeekResult}
+          onClose={() => {
+            if (isPreviewResult(shownWeekResult)) return dismissPreview();
             void dismissWeekResult();
+          }}
+          onGetShield={() => {
+            if (isPreviewResult(shownWeekResult)) dismissPreview();
+            else void dismissWeekResult();
             openShieldSheet();
+          }}
+          // Straight into the pick, from whichever surface reported the week.
+          // The settlement is dismissed on the way through, so backing out of
+          // the pick lands on the page rather than on the sheet again.
+          onStartLeap={() => {
+            if (isPreviewResult(shownWeekResult)) dismissPreview();
+            else void dismissWeekResult();
+            setPickOpen(true);
           }}
         />
       )}

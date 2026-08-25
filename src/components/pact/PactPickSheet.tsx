@@ -63,9 +63,9 @@ function areaStatus(area: PactAreaChoice): {
       tone: 'good',
     };
   }
-  // No tag means there is nothing to measure. Saying "not started" would be a
-  // guess; the useful thing to say is what would make it measurable.
-  if (!area.hasTag) return { label: 'Add a tag to track this', tone: 'plain' };
+  // No tag means there is nothing to measure yet. The card's job here is to be
+  // picked, not to hand out setup homework for a thing the user has not chosen.
+  if (!area.hasTag) return { label: 'Not started yet', tone: 'plain' };
   if (area.quietDays === null) {
     return { label: 'Nothing finished here yet', tone: 'urgent' };
   }

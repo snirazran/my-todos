@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 import { Clock } from 'lucide-react';
 import { PactCard, usePactView } from './PactCard';
 import { PactStreakLadder } from './PactStreakLadder';
-import { leapArtForStreak } from './LeapRail';
+import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/utils';
 
 /**
@@ -31,43 +31,28 @@ export function PactAreaPanel() {
   // without this the section heading would sit above an empty slot.
   if (!data || !data.enabled || data.needsAreas) return null;
 
-  const clearedRungs = data.ladder.rungs.filter(
-    (rung) => rung.weeks > 0 && (rung.paid || rung.reached),
-  ).length;
-  const leapArt = leapArtForStreak(clearedRungs);
-
   return (
-    <div ref={ref} id="pact" className="flex flex-col gap-2 pb-6">
+    <div ref={ref} id="pact" className="flex flex-col gap-2 pb-6 md:pb-0">
       <div className="px-1">
         {/* Section label left, the week's clock right — the same row shape the
             daily quests use for "Resets in 8h". A countdown belongs to the
             section, not to one line inside the card, and down there it was
             competing with the next session for the same glance. */}
-        <div className="flex items-center justify-between gap-2">
-          <p className="flex items-center gap-1.5 text-[13px] font-black text-muted-foreground">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={leapArt.src}
-              alt=""
-              aria-hidden="true"
-              style={{
-                transform: `translateY(${-leapArt.inkShift * 100}%)`,
-                marginRight: `${-Math.round(leapArt.sideInset * 42)}px`,
-              }}
-              className="-my-2.5 h-9 w-[42px] shrink-0 object-contain"
-            />
+        <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+          <p className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-[13px] font-black text-muted-foreground">
+            <Icon name="leap" className="-my-1.5 h-7 w-7 shrink-0" />
             This week&apos;s Leap
           </p>
           {data.active && !data.active.claimed && (
             <span
               className={cn(
-                'inline-flex items-center gap-1 text-[13px] font-black tracking-wide',
+                'inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[13px] font-black tracking-wide',
                 data.streak.atRisk
                   ? 'text-amber-600 dark:text-amber-400'
                   : 'text-muted-foreground',
               )}
             >
-              <Clock className="h-3.5 w-3.5" strokeWidth={2.75} />
+              <Clock className="h-3.5 w-3.5 shrink-0" strokeWidth={2.75} />
               {data.streak.atRisk
                 ? 'Streak at risk'
                 : `${data.active.daysLeft} day${data.active.daysLeft === 1 ? '' : 's'} left`}

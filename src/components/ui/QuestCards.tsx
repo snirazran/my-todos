@@ -634,30 +634,31 @@ export function DailyChecklistCard({
 
   return (
     <div data-quest-anchor={quests.map((quest) => quest.id).join(' ')}>
-      <div className="flex items-center justify-between gap-2 px-1 pb-2">
-        <span className="inline-flex items-center gap-1.5 text-[13px] font-black text-muted-foreground">
+      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 px-1 pb-2">
+        <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap text-[13px] font-black text-muted-foreground">
           <Icon name="quests" className="-my-2 h-8 w-8 shrink-0" />
           Daily quests
         </span>
-        <span className="inline-flex items-center gap-2">
+        <span className="inline-flex shrink-0 items-center gap-2">
           {onSwapQuests && swapsLeft > 0 && !allDone ? (
             <button
               type="button"
               onClick={onSwapQuests}
               disabled={swapping}
-              className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-card px-2 py-0.5 text-[13px] font-black tracking-wide text-muted-foreground transition-colors hover:border-primary/30 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-border/50 bg-card px-2 py-0.5 text-[13px] font-black tracking-wide text-muted-foreground transition-colors hover:border-primary/30 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
             >
               <RefreshCw
-                className={cn('h-3 w-3', swapping && 'animate-spin')}
+                className={cn('h-3 w-3 shrink-0', swapping && 'animate-spin')}
                 strokeWidth={2.75}
               />
               {swapping ? 'Swapping' : 'Swap today'}
             </button>
           ) : null}
           {timeLeft ? (
-            <span className="inline-flex items-center gap-1 text-[13px] font-black tracking-wide text-muted-foreground">
-              <Clock className="h-3.5 w-3.5" strokeWidth={2.75} />
-              Resets in {timeLeft}
+            <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[13px] font-black tracking-wide text-muted-foreground">
+              <Clock className="h-3.5 w-3.5 shrink-0" strokeWidth={2.75} />
+              <span className="narrow:hidden">Resets in&nbsp;</span>
+              {timeLeft}
             </span>
           ) : null}
         </span>

@@ -734,3 +734,37 @@ body.dragging {
     transform: translate3d(-50%, 0, 0);
   }
 }
+
+/* Weekly Leap trail. The dot the week landed on pops and throws a ring, and a
+   bead runs the arc ahead of it — a hop has to be seen travelling or the trail
+   is just a progress bar with gaps. Transform/opacity only, so it all stays on
+   the compositor. The translate is baked into every frame because the dots are
+   centred with Tailwind's -translate-1/2, and an animated `transform` replaces
+   that whole declaration for as long as it runs. */
+@keyframes leap-dot-land {
+  0% {
+    transform: translate(-50%, -50%) scale(0.5);
+  }
+  55% {
+    transform: translate(-50%, -50%) scale(1.55);
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+@keyframes leap-dot-ring {
+  0% {
+    transform: translate(-50%, -50%) scale(0.5);
+    opacity: 0.7;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(3.4);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .leap-dot-land,
+  .leap-dot-ring {
+    animation: none;
+  }
+}

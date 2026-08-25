@@ -63,7 +63,7 @@ export const PACT_CONFIG_ID = 'weekly-pact';
  * it is not, and a ladder of historical `if (version < n)` blocks made it
  * impossible to read what the app actually pays today.
  */
-export const PACT_PAYOUT_VERSION = 5;
+export const PACT_PAYOUT_VERSION = 6;
 
 /**
  * Fields earlier payout models wrote that nothing reads any more. Removed from
@@ -108,10 +108,14 @@ export const DEFAULT_PACT_COMPLETION_GIFT_TIERS: PactCompletionGiftTier[] = [
 ];
 
 /**
- * Milestones every three weeks: two feels unearned, four is too far to see.
- * The multiplier applies to the whole payout, sessions and bonus alike, and a
- * rung's rewards are paid ONCE, the first time the streak reaches it — the
- * week's own gift comes from the session-count tiers instead.
+ * Milestones at 2, 5, 8 and 12 — gaps of 2, 3, 3, 4, widening as the run goes
+ * on. Even spacing asked for the hardest thing first: four unbroken weeks from
+ * a standing start, before the user has any evidence the ladder pays at all.
+ * The first rung is the one that has to be reachable, and the last is the one
+ * that can afford to be a climb, because by then three payouts have already
+ * landed. The multiplier applies to the whole payout, sessions and bonus alike,
+ * and a rung's rewards are paid ONCE, the first time the streak reaches it —
+ * the week's own gift comes from the session-count tiers instead.
  *
  * Fractional steps rather than whole numbers. A ladder that has to reach x4 in
  * three stops prices the twelfth week at four times the first, which is what
@@ -121,7 +125,7 @@ export const DEFAULT_PACT_COMPLETION_GIFT_TIERS: PactCompletionGiftTier[] = [
  */
 export const DEFAULT_PACT_STREAK_MULTIPLIERS: PactStreakMultiplier[] = [
   {
-    weeks: 4,
+    weeks: 2,
     multiplier: 1.25,
     rewards: [
       { type: 'FLIES', amount: 120 },
@@ -129,7 +133,7 @@ export const DEFAULT_PACT_STREAK_MULTIPLIERS: PactStreakMultiplier[] = [
     ],
   },
   {
-    weeks: 7,
+    weeks: 5,
     multiplier: 1.5,
     rewards: [
       { type: 'FLIES', amount: 250 },
@@ -138,7 +142,7 @@ export const DEFAULT_PACT_STREAK_MULTIPLIERS: PactStreakMultiplier[] = [
     ],
   },
   {
-    weeks: 10,
+    weeks: 8,
     multiplier: 1.8,
     rewards: [
       { type: 'FLIES', amount: 400 },

@@ -666,10 +666,14 @@ export function QuestsPanel({
                           const showAreas =
                             data.firstOnboardingComplete ?? !data.dailyQuestsGated;
 
+                          // One tree, laid out by CSS — never a mobile copy
+                          // beside a desktop copy. `md:hidden` only hides:
+                          // both branches still mounted, so the pact ran two
+                          // PactCards and its settlement sheet, which portals
+                          // out of the hidden subtree, opened twice.
                           return (
-                            <>
-                              {/* Mobile: onboarding, daily checklist, weekly leap */}
-                              <div className="flex flex-col gap-8 md:hidden">
+                            <div className="flex flex-col gap-8 md:grid md:grid-cols-2 md:items-start md:gap-6 lg:gap-8">
+                              <div className="flex flex-col gap-8 md:gap-4">
                                 {graceCard}
                                 {onboardingQuests.length > 0 && (
                                   <div className="space-y-4">
@@ -677,22 +681,9 @@ export function QuestsPanel({
                                   </div>
                                 )}
                                 <div>{dailySection}</div>
-                                {showAreas && <PactAreaPanel />}
                               </div>
-
-                              {/* Desktop: left column stacks starter + daily,
-                                  the pact fills the right column */}
-                              <div className="hidden md:flex md:flex-col md:gap-6">
-                                <div className="grid grid-cols-2 items-start gap-4">
-                                  <div className="flex flex-col gap-4">
-                                    {graceCard}
-                                    {onboardingQuests.map(renderOnboardingCard)}
-                                    {dailySection}
-                                  </div>
-                                  {showAreas && <PactAreaPanel />}
-                                </div>
-                              </div>
-                            </>
+                              {showAreas && <PactAreaPanel />}
+                            </div>
                           );
                         })()}
                         </div>

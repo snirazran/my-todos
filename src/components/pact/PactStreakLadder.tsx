@@ -1,6 +1,6 @@
 'use client';
 
-import { Flame, Trophy } from 'lucide-react';
+import { Trophy } from 'lucide-react';
 import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/utils';
 import { RewardTile, type QuestRewardCatalogItem } from '@/components/ui/QuestCards';
@@ -108,6 +108,7 @@ export function PactStreakLadder() {
 
   const railStops: LeapStop[] = stops.map((stop, index) => ({
     label: stop.weeks === 0 ? 'Now' : `${stop.weeks} wk`,
+    weeks: stop.weeks,
     rate: formatPactRate(stop.effective),
     state: stop.reached ? 'reached' : index === nextIndex ? 'next' : 'locked',
     isDestination: stop.isPrestige,
@@ -153,16 +154,14 @@ export function PactStreakLadder() {
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
           <p className="flex items-center gap-1.5 text-[12px] font-black text-muted-foreground">
-            <Flame
+            <Icon
+              name="leap"
               className={cn(
-                'h-3.5 w-3.5',
-                weeks > 0
-                  ? 'fill-amber-400 text-amber-500'
-                  : 'text-muted-foreground/50',
+                '-my-1 h-[18px] w-[18px] shrink-0',
+                weeks > 0 ? '' : 'opacity-50 grayscale',
               )}
-              strokeWidth={2.25}
             />
-            {/* What the flame is for: the run itself, and what it is worth
+            {/* What the pad is for: the run itself, and what it is worth
                 right now. The target it is heading for belongs to the headline
                 and the rail — repeating it here as a fraction only made the
                 reader check two numbers against each other. */}

@@ -55,6 +55,8 @@ export function leapArtForStreak(cleared: number) {
 export type LeapStop = {
   /** Label under the pad — "Now", "4 wk". */
   label: string;
+  /** Which week of the run this pad sits on. Drives the hop's dot count. */
+  weeks?: number;
   /** Rate the pad pays. The destination shows a trophy instead. */
   rate?: string;
   state: 'reached' | 'next' | 'locked';
@@ -66,7 +68,16 @@ export type LeapStop = {
   isHere?: boolean;
 };
 
-const DOTS_PER_GAP = 5;
+/** One dot per week actually crossed, so a hop reads as the wait it is. */
+const MAX_DOTS_PER_GAP = 6;
+const FALLBACK_DOTS_PER_GAP = 3;
+
+/** How much of the trail's box a full-width arc climbs, and the dot taper. */
+const ARC_HEIGHT = 0.46;
+const DOT_MIN = 2.8;
+const DOT_MAX = 6;
+/** Share of the gap one dot claims, so pitch is the same in every hop. */
+const DOT_PITCH = 0.34;
 
 /**
  * Pads take a fixed SHARE OF THE RAIL, never a fixed pixel size and never a
@@ -133,7 +144,7 @@ const PAD_PERSPECTIVE = '220px';
  * SVG stretched to fill one squashes its own stroke and turns round dots into
  * ellipses. A dot placed by percentage stays a dot at every width.
  */
-function HopTrail({ filled }: { filled: number }) {
+function HopTrail({ count, filled }: { count: number; filled: number }) {
   return (
     // Stretched to the pad row, then the arc is drawn above the waterline only,
     // so the trail's bottom edge lands on the pads' own centre line whatever
@@ -143,36 +154,53 @@ function HopTrail({ filled }: { filled: number }) {
     // than half way because the cell reserves its top third for flowers.
     <div className="relative flex-1 self-stretch">
       <div className="absolute inset-x-0 bottom-[32%] top-0">
-        {Array.from({ length: DOTS_PER_GAP }, (_, index) => {
-        // Quadratic from pad centre to pad centre, peaking halfway up. Its x
-        // works out to exactly t, so the dots space evenly across the gap.
-        const t = (index + 0.5) / DOTS_PER_GAP;
-        const y = 1 - 2 * t + 2 * t * t;
-        // Dots swell toward the top of the arc. A leap is fastest and highest
-        // in the middle, and an evenly-weighted dotted line reads as a dashed
-        // border — the taper is what makes it a trajectory.
-        const size = 3 + (1 - y) * 3.5;
-        const landed = index < filled;
-        return (
-          <span
-            key={index}
-            // Vertical position as a percentage of the box, not pixels: the box
-            // is now fluid, and a px offset would drift off the pad centre at
-            // every width but one.
-            style={{
-              left: `${t * 100}%`,
-              top: `${y * 100}%`,
-              width: `${size}px`,
-              height: `${size}px`,
-            }}
-            className={cn(
-              'absolute -translate-x-1/2 -translate-y-1/2 rounded-full transition-colors duration-500',
-              // Pond green for water yet to be crossed, warm gold for the part
-              // already behind you — the two colours the rest of the feature
-              // already runs on.
+        {Array.from({ length: count }, (_, index) => {
+          // A short hop is drawn as a SHORT hop: the dots hold the same pitch
+          // in every gap and the cluster is centred, so a one-week trail is a
+          // low bead near the waterline rather than a lone dot stranded at the
+          // top of a full-width arc, and a three-week trail spans the gap.
+          const spread = Math.min(1, count * DOT_PITCH);
+          const along = (index + 0.5) / count;
+          const t = 0.5 + (along - 0.5) * spread;
+          // A full parabola — waterline, apex, waterline — scaled by the same
+          // spread, so height and length grow together the way a real leap's
+          // do. The old half-height curve had nothing left to read as an arc
+          // once a gap could hold one or two dots.
+          const rise = (1 - (2 * along - 1) ** 2) * spread;
+          const y = 1 - rise * ARC_HEIGHT;
+          // Dots swell and brighten toward the top of the arc. A leap is
+          // fastest and highest in the middle, and an evenly-weighted dotted
+          // line reads as a border — the taper is what makes it a trajectory.
+          const size =
+            DOT_MIN + (rise / Math.max(spread, 0.001)) * (DOT_MAX - DOT_MIN) *
+              (0.6 + 0.4 * spread);
+          const landed = index < filled;
+          return (
+            <span
+              key={index}
+              // Vertical position as a percentage of the box, not pixels: the
+              // box is fluid, and a px offset would drift off the pad centre at
+              // every width but one.
+              //
+              // The stagger runs left to right, so a streak that just advanced
+              // lights its trail as a wave travelling toward the next pad
+              // instead of the whole gap flicking gold at once.
+              style={{
+                left: `${t * 100}%`,
+                top: `${y * 100}%`,
+                width: `${size}px`,
+                height: `${size}px`,
+                opacity: landed ? 1 : 0.36 + (rise / Math.max(spread, 0.001)) * 0.32,
+                transitionDelay: `${index * 70}ms`,
+              }}
+              className={cn(
+                'absolute -translate-x-1/2 -translate-y-1/2 rounded-full transition-all duration-500',
+                // Pond green for water yet to be crossed, warm gold for the
+                // part already behind you — the two colours the rest of the
+                // feature already runs on.
                 landed
-                  ? 'bg-amber-400 shadow-[0_0_4px_rgba(245,179,1,0.55)]'
-                  : 'bg-[#6FBF5F]/45',
+                  ? 'bg-amber-400 shadow-[0_0_5px_rgba(245,179,1,0.6)]'
+                  : 'bg-[#6FBF5F]',
               )}
             />
           );
@@ -355,11 +383,20 @@ export function LeapRail({
 
   const cell = { width: PAD_COL, maxWidth: PAD_COL_MAX };
   const railFloor = stops.length * FLOOR_PAD + (stops.length - 1) * FLOOR_GAP;
-  const filledInto = (index: number) =>
+  // The weeks a hop actually spans, minus the two pads at its ends: four
+  // weeks from "Now" to "4 wk" is three waits in between, not five decorative
+  // beads. Falls back to a fixed count when a rail is built without weeks.
+  const dotsInto = (index: number) => {
+    const from = stops[index - 1]?.weeks;
+    const to = stops[index]?.weeks;
+    if (from === undefined || to === undefined) return FALLBACK_DOTS_PER_GAP;
+    return Math.min(MAX_DOTS_PER_GAP, Math.max(1, to - from - 1));
+  };
+  const filledInto = (index: number, dots: number) =>
     stops[index].state === 'reached'
-      ? DOTS_PER_GAP
+      ? dots
       : index === nextIndex
-        ? Math.round(Math.min(1, Math.max(0, progress)) * DOTS_PER_GAP)
+        ? Math.round(Math.min(1, Math.max(0, progress)) * dots)
         : 0;
 
   return (
@@ -385,7 +422,12 @@ export function LeapRail({
           <div className="flex items-end">
             {stops.map((stop, index) => (
               <Fragment key={stop.label}>
-                {index > 0 && <HopTrail filled={filledInto(index)} />}
+                {index > 0 && (
+                  <HopTrail
+                    count={dotsInto(index)}
+                    filled={filledInto(index, dotsInto(index))}
+                  />
+                )}
                 {/* Aspect ratio, not a height: the cell's height follows its
                     own width, so every pad keeps the artwork's proportions at
                     any rail width and all five cells stay exactly as tall as

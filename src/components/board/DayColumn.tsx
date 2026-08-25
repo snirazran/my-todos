@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { CalendarCheck } from 'lucide-react';
+import { Icon } from '@/components/ui/Icon';
 
 export default function DayColumn({
   title,
@@ -103,7 +103,7 @@ export default function DayColumn({
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 -mt-1">
             {count !== undefined && (
               <span className="flex items-center gap-1.5">
-                <CalendarCheck className="w-3.5 h-3.5 text-primary" />
+                <Icon name="planner" className="-my-1 h-5 w-5 shrink-0" />
                 <span
                   className={`text-xs font-bold ${
                     isPast ? 'text-muted-foreground/60' : 'text-muted-foreground'
