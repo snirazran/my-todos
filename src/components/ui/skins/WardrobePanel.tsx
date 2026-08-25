@@ -2215,6 +2215,8 @@ function WardrobeManagerContent({
         onEquip={async () => {
           if (purchaseItem) await equipItemDirect(purchaseItem);
           else if (purchaseBg) await bg.handleEquip(purchaseBg);
+          setActiveTab('inventory');
+          scrollPageToTop();
         }}
         onGoToTrade={() => {
           setActiveTab('trade');
