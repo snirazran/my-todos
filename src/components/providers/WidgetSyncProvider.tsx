@@ -35,6 +35,10 @@ type StreakResponse = {
   view?: { count?: number } | null;
 };
 
+// TESTING ONLY — forces the widget prompt open on web so the sheet can be
+// worked on in a browser. Set back to false before shipping.
+const ALWAYS_SHOW_WIDGET_PROMPT = true;
+
 const cacheFetcher = (url: string) =>
   fetch(url, { credentials: 'include' }).then((r) => r.json());
 
@@ -48,7 +52,8 @@ const cacheFetcher = (url: string) =>
 export function WidgetSyncProvider() {
   const { user, loading } = useAuth();
   const native = Capacitor.isNativePlatform();
-  const enabled = native && !loading && Boolean(user);
+  const forced = ALWAYS_SHOW_WIDGET_PROMPT && !loading && Boolean(user);
+  const enabled = (native || forced) && !loading && Boolean(user);
 
   const uid = user?.uid ?? '';
   const guest = user?.isAnonymous ?? false;
@@ -151,7 +156,11 @@ export function WidgetSyncProvider() {
   }, [enabled]);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (forced) setPromptOpen(true);
+  }, [forced]);
+
+  useEffect(() => {
+    if (!enabled || forced) return;
     const consider = () => {
       if (
         shouldAskForWidget({
@@ -168,7 +177,7 @@ export function WidgetSyncProvider() {
     return () => window.removeEventListener(TASK_COMPLETED_EVENT, consider);
   }, [enabled, pinState, streak]);
 
-  if (!native) return null;
+  if (!native && !forced) return null;
 
   return (
     <WidgetPromptSheet
@@ -176,6 +185,7 @@ export function WidgetSyncProvider() {
       onOpenChange={setPromptOpen}
       streak={streak}
       tasks={tasksData?.tasks ?? []}
+      preview={forced && !native}
       onPinned={() => setPinState('pinned')}
     />
   );

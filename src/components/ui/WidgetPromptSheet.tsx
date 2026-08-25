@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { artForDay } from '@/lib/widget/art';
 import { canPinWidget, requestWidgetPin } from '@/lib/widget/bridge';
@@ -15,6 +15,8 @@ type Props = {
   streak: number;
   /** Today's real list. The preview is the pitch, so it shows their own work. */
   tasks: PreviewTask[];
+  /** Web testing: render the sheet without spending one of the two real asks. */
+  preview?: boolean;
   onPinned: () => void;
 };
 
@@ -30,26 +32,36 @@ export function WidgetPromptSheet({
   onOpenChange,
   streak,
   tasks,
+  preview = false,
   onPinned,
 }: Props) {
   const [busy, setBusy] = useState(false);
   const [showSteps, setShowSteps] = useState(false);
   const pinnable = canPinWidget();
+  const stepsRef = useRef<HTMLOListElement | null>(null);
 
   useEffect(() => {
-    if (open) recordPromptShown();
-  }, [open]);
+    if (open && !preview) recordPromptShown();
+  }, [open, preview]);
+
+  // The steps open below the fold, so without this the only thing that visibly
+  // happens is the button changing its label.
+  useEffect(() => {
+    if (!showSteps) return;
+    const frame = requestAnimationFrame(() => {
+      stepsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [showSteps]);
 
   const remaining = tasks.filter((t) => !t.completed).length;
 
-  // Named after what they'd actually get. A streak is the most concrete thing
-  // we can put on the line, so it wins when there is one.
+  // A streak is the most concrete thing we can put on the line, so it wins
+  // when there is one; otherwise lead with why seeing the list matters at all.
   const headline =
     streak >= 2
-      ? `Keep your ${streak}-day streak in sight`
-      : remaining > 0
-        ? `Your ${remaining} for today, one glance away`
-        : 'Today, without opening the app';
+      ? `Don't let day ${streak} slip`
+      : 'Goals you see are goals you keep';
 
   const handleAdd = async () => {
     if (!pinnable) {
@@ -60,7 +72,7 @@ export function WidgetPromptSheet({
     const requested = await requestWidgetPin();
     setBusy(false);
     if (requested) {
-      recordWidgetAdded();
+      if (!preview) recordWidgetAdded();
       onPinned();
       onOpenChange(false);
     } else {
@@ -69,7 +81,7 @@ export function WidgetPromptSheet({
   };
 
   const handleIosDone = () => {
-    recordWidgetAdded();
+    if (!preview) recordWidgetAdded();
     onPinned();
     onOpenChange(false);
   };
@@ -78,37 +90,46 @@ export function WidgetPromptSheet({
     <BaseSheet
       open={open}
       onOpenChange={onOpenChange}
-      className="max-w-md"
+      className="max-h-[92dvh] max-w-md sm:max-h-[min(92dvh,780px)]"
       closeAriaLabel="Not now"
     >
-      {() => (
-        <div className="flex flex-col gap-5 px-5 pb-6 pt-2">
-          <HomeScreenPreview art={artForDay(todayKey())} tasks={tasks} />
+      {({ bindScroll }) => (
+        <div className="flex min-h-0 w-full flex-1 flex-col">
+          <div className="h-11 shrink-0" />
+          <div
+            ref={bindScroll}
+            className="flex min-h-0 flex-1 touch-pan-y flex-col gap-5 overflow-y-auto overscroll-contain px-5 pb-[calc(env(safe-area-inset-bottom)+24px)] sm:pb-6"
+          >
+            <HomeScreenPreview art={artForDay(todayKey())} tasks={tasks} />
 
-          <div className="flex flex-col gap-2 text-center">
-            <h2 className="text-[22px] font-black leading-tight tracking-tight text-gray-900 dark:text-white">
-              {headline}
-            </h2>
-            <p className="text-[15px] leading-snug text-gray-600 dark:text-gray-300">
-              Tap a fly to tick something off right from the home screen — the
-              app never has to open.
-            </p>
+            <div className="flex shrink-0 flex-col gap-2 text-center">
+              <h2 className="text-[22px] font-black leading-tight tracking-tight text-gray-900 dark:text-white">
+                {headline}
+              </h2>
+              <p className="text-[15px] leading-snug text-gray-600 dark:text-gray-300">
+                You check your phone all day. Now you&apos;ll check your list
+                too — tap a fly and it&apos;s done.
+              </p>
+            </div>
+
+            {showSteps && !pinnable && (
+              <ol
+                ref={stepsRef}
+                className="flex shrink-0 flex-col gap-2 rounded-2xl bg-gray-100 p-4 text-[15px] text-gray-700 dark:bg-white/10 dark:text-gray-200"
+              >
+                {IOS_STEPS.map((step, i) => (
+                  <li key={step} className="flex gap-3">
+                    <span className="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-[#4f9149] text-sm font-bold text-white">
+                      {i + 1}
+                    </span>
+                    <span className="leading-snug">{step}</span>
+                  </li>
+                ))}
+              </ol>
+            )}
           </div>
 
-          {showSteps && !pinnable && (
-            <ol className="flex flex-col gap-2 rounded-2xl bg-gray-100 p-4 text-[15px] text-gray-700 dark:bg-white/10 dark:text-gray-200">
-              {IOS_STEPS.map((step, i) => (
-                <li key={step} className="flex gap-3">
-                  <span className="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-[#4f9149] text-sm font-bold text-white">
-                    {i + 1}
-                  </span>
-                  <span className="leading-snug">{step}</span>
-                </li>
-              ))}
-            </ol>
-          )}
-
-          <div className="flex flex-col gap-1">
+          <div className="shrink-0 border-t border-border/40 bg-card px-5 pb-[calc(env(safe-area-inset-bottom)+16px)] pt-3 sm:pb-5">
             <button
               type="button"
               onClick={showSteps && !pinnable ? handleIosDone : handleAdd}
@@ -168,12 +189,13 @@ function HomeScreenPreview({
 
   return (
     <div
-      className="rounded-[28px] bg-gradient-to-b from-[#cfd8d2] to-[#aab6ae] p-4 dark:from-[#2b332e] dark:to-[#1b211d]"
+      className="relative shrink-0 overflow-hidden rounded-[34px] p-5 ring-1 ring-black/10 dark:ring-white/10"
+      style={{ backgroundImage: WALLPAPER }}
       aria-hidden="true"
     >
       <div className="mx-auto w-full max-w-[338px] [container-type:inline-size]">
         <div
-          className="relative w-full overflow-hidden bg-white shadow-lg dark:bg-[#E3F7EB]"
+          className="relative w-full overflow-hidden bg-white shadow-[0_10px_30px_-6px_rgba(0,0,0,0.45)] dark:bg-[#E3F7EB]"
           style={{ aspectRatio: '338 / 158', borderRadius: u(27) }}
         >
           <img
@@ -186,14 +208,14 @@ function HomeScreenPreview({
           <div className="absolute inset-0 flex" style={{ padding: u(18) }}>
             <div className="flex flex-col" style={{ width: u(75), gap: u(4) }}>
               <span
-                className="font-bold leading-none tracking-[0.3px] text-black"
-                style={{ fontSize: u(30) }}
+                className="font-bold tracking-[0.3px] text-black"
+                style={{ fontSize: u(30), height: u(21), lineHeight: u(21) }}
               >
                 {remaining}
               </span>
               <span
-                className="font-semibold leading-none tracking-[0.1px] text-black"
-                style={{ fontSize: u(15.5) }}
+                className="font-semibold tracking-[0.1px] text-black"
+                style={{ fontSize: u(15.5), height: u(11), lineHeight: u(11) }}
               >
                 tasks left
               </span>
@@ -209,8 +231,8 @@ function HomeScreenPreview({
             </div>
 
             <div
-              className="flex min-w-0 flex-1 flex-col justify-between"
-              style={{ marginLeft: u(28) }}
+              className="flex min-w-0 flex-1 flex-col"
+              style={{ marginLeft: u(28), gap: u(12) }}
             >
               {rows.map((row, i) => (
                 <div
@@ -218,9 +240,9 @@ function HomeScreenPreview({
                   className="flex items-center"
                   style={{
                     gap: u(8.88),
-                    // The add button sits over the bottom row, so its title has
-                    // to truncate before reaching it rather than run underneath.
-                    paddingRight: i === rows.length - 1 ? u(39.9) : 0,
+                    // Only the fourth row reaches the add button, so a shorter
+                    // list gives up no width at all.
+                    paddingRight: i === 3 ? u(39.9) : 0,
                   }}
                 >
                   {row.completed ? (
@@ -283,7 +305,7 @@ function HomeScreenPreview({
         </div>
 
         <p
-          className="pt-2 text-center font-medium text-white/90"
+          className="pt-2 text-center font-medium text-white/95 [text-shadow:0_1px_3px_rgba(0,0,0,0.35)]"
           style={{ fontSize: u(12) }}
         >
           Frogress
@@ -292,6 +314,20 @@ function HomeScreenPreview({
     </div>
   );
 }
+
+/**
+ * Stands in for a home screen wallpaper: soft colour blooms over a deep field,
+ * the way the stock iOS abstracts look. Fixed in both themes on purpose — a
+ * wallpaper does not follow the app's appearance, and holding it still is what
+ * makes the panel read as somebody's phone rather than another app surface.
+ */
+const WALLPAPER = [
+  'radial-gradient(55% 45% at 18% 12%, rgba(134,222,180,0.95) 0%, rgba(134,222,180,0) 60%)',
+  'radial-gradient(50% 40% at 88% 16%, rgba(125,196,255,0.80) 0%, rgba(125,196,255,0) 62%)',
+  'radial-gradient(65% 55% at 74% 96%, rgba(255,205,130,0.70) 0%, rgba(255,205,130,0) 64%)',
+  'radial-gradient(60% 50% at 26% 92%, rgba(163,143,255,0.55) 0%, rgba(163,143,255,0) 62%)',
+  'linear-gradient(165deg, #3f7f66 0%, #2b5a4c 45%, #1c3a31 100%)',
+].join(', ');
 
 /** Only reachable before the first sync; every account starts with tasks. */
 const FALLBACK_ROWS: PreviewTask[] = [

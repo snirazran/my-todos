@@ -70,6 +70,17 @@ private enum Design {
     static let labelTrim: CGFloat = 11
     /// How far the medium's frog hangs below the padded content box.
     static let artMediumBleed: CGFloat = 18
+    /// Gaps that reproduce the sheet at a full list. Fixed rather than spread:
+    /// justifying two rows across the whole column strands them 79pt apart.
+    static let rowGapMedium: CGFloat = 12
+    static let rowGapSmall: CGFloat = 6.25
+
+    /// The medium's add button only reaches the fourth row, so a shorter list
+    /// gives up no width at all.
+    static func rowMeetsAdd(_ index: Int) -> Bool {
+        let bottom = 18 + CGFloat(index) * (rowHeight + rowGapMedium) + rowHeight
+        return bottom > 158 - 12 - addLarge
+    }
     /// The marker's stroke overhangs its 21.5 layout box, so the disc reads a
     /// little wider than the row it sits in — as on the sheet.
     static let markerArt: CGFloat = 23.7396
@@ -294,21 +305,20 @@ private struct TaskRow: View {
     }
 }
 
-/// Rows spread over whatever height is left, the way the design distributes
-/// them on the two smaller sizes.
+/// Today's rows, stacked from the top at the sheet's own spacing.
 private struct SpacedRows: View {
     let m: Metrics
     let tasks: [WidgetTask]
     let limit: Int
-    var reserve: (Int, Int) -> CGFloat = { _, _ in 0 }
+    let gap: CGFloat
+    var reserve: (Int) -> CGFloat = { _ in 0 }
 
     var body: some View {
-        let shown = Array(tasks.prefix(limit))
-        VStack(alignment: .leading, spacing: 0) {
-            ForEach(Array(shown.enumerated()), id: \.element.id) { index, task in
-                TaskRow(m: m, task: task, reserve: reserve(index, shown.count))
-                if index < shown.count - 1 { Spacer(minLength: m.s(4)) }
+        VStack(alignment: .leading, spacing: m.s(gap)) {
+            ForEach(Array(tasks.prefix(limit).enumerated()), id: \.element.id) { index, task in
+                TaskRow(m: m, task: task, reserve: reserve(index))
             }
+            Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
@@ -399,7 +409,7 @@ private struct SmallWidget: View {
                 EmptyRows(m: m)
                 Spacer(minLength: 0)
             } else {
-                SpacedRows(m: m, tasks: state.tasks, limit: 3)
+                SpacedRows(m: m, tasks: state.tasks, limit: 3, gap: Design.rowGapSmall)
             }
         }
     }
@@ -457,10 +467,13 @@ private struct MediumWidget: View {
                     EmptyRows(m: m)
                     Spacer(minLength: 0)
                 } else {
-                    // Spacers push the last row to the bottom of the card, into
-                    // the add button — but only once there are two to spread.
-                    SpacedRows(m: m, tasks: state.tasks, limit: 4) { index, count in
-                        index == count - 1 && count > 1 ? Design.addReserve : 0
+                    SpacedRows(
+                        m: m,
+                        tasks: state.tasks,
+                        limit: 4,
+                        gap: Design.rowGapMedium
+                    ) { index in
+                        Design.rowMeetsAdd(index) ? Design.addReserve : 0
                     }
                 }
             }
