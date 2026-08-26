@@ -13,6 +13,7 @@ import {
   showRewardedAd,
   takePlusOfferAfterAd,
 } from '@/lib/ads';
+import { useRewardedAdPreload } from '@/hooks/useRewardedAdPreload';
 import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
 import { RARITY_CONFIG } from './constants';
 import { RotatingRays } from './RotatingRays';
@@ -63,6 +64,8 @@ export default function GiftBoxOpening({
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useRewardedAdPreload('gift_double', phase !== 'idle');
 
   useEffect(() => {
     if (phase === 'shaking') {

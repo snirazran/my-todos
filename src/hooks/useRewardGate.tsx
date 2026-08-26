@@ -3,6 +3,7 @@
 import React, { useCallback, useState } from 'react';
 import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
 import { rewardedAdsAvailable, showRewardedAd } from '@/lib/ads';
+import { useRewardedAdPreload } from '@/hooks/useRewardedAdPreload';
 
 export type RewardGateMode = 'free' | 'ad' | 'plus';
 
@@ -27,6 +28,8 @@ export function useRewardGate(
     : rewardedAdsAvailable()
       ? 'ad'
       : 'plus';
+
+  useRewardedAdPreload(placement, mode === 'ad');
 
   const execute = useCallback(async (action: () => Promise<void>) => {
     setBusy(true);

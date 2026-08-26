@@ -78,6 +78,7 @@ import {
   showRewardedAd,
   takePlusOfferAfterAd,
 } from '@/lib/ads';
+import { useRewardedAdPreload } from '@/hooks/useRewardedAdPreload';
 
 type WardrobeCard =
   | {
@@ -563,6 +564,9 @@ function WardrobeManagerContent({
   };
 
   const [rerolling, setRerolling] = useState(false);
+
+  useRewardedAdPreload('shop_reroll', !data?.isPremium);
+
   const rerollDeals = async () => {
     if (rerolling) return;
     const isPlus = !!data?.isPremium;

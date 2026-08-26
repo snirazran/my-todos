@@ -32,6 +32,7 @@ import {
   showRewardedAd,
   takePlusOfferAfterAd,
 } from '@/lib/ads';
+import { useRewardedAdPreload } from '@/hooks/useRewardedAdPreload';
 import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { cn } from '@/lib/utils';
@@ -230,6 +231,8 @@ export function TradePanel({
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const [inventoryHasScrolled, setInventoryHasScrolled] = useState(false);
+
+  useRewardedAdPreload('trade_reroll', !isPremium && !!tradeResult);
   const [gridInitialSize, setGridInitialSize] = useState(4);
   const [gridBatchSize, setGridBatchSize] = useState(6);
   const inventoryScrollRef = useRef<HTMLDivElement | null>(null);

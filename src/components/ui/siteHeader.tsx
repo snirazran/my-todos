@@ -35,7 +35,8 @@ import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
 import useSWR, { mutate as swrMutate } from 'swr';
 import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
 import { motion, AnimatePresence, useAnimationControls } from 'framer-motion';
-import { ChevronRight, CalendarDays } from 'lucide-react';
+import { ChevronRight, CalendarDays, ShieldCheck } from 'lucide-react';
+import { openPrivacyOptions, privacyOptionsAvailable } from '@/lib/ads';
 import Fly from '@/components/ui/fly';
 import { FlyCounter } from '@/components/ui/FlyCounter';
 import {
@@ -1845,7 +1846,30 @@ function PreferencesView({
       <MenuSection title="Wardrobe">
         <SkinRotationRow />
       </MenuSection>
+
+      <AdPrivacySection />
     </div>
+  );
+}
+
+function AdPrivacySection() {
+  const [available] = useState(() => privacyOptionsAvailable());
+  const [busy, setBusy] = useState(false);
+
+  if (!available) return null;
+
+  return (
+    <MenuSection title="Privacy">
+      <MenuRow
+        icon={<ShieldCheck className="w-7 h-7 text-emerald-500" />}
+        label="Ad privacy settings"
+        onClick={() => {
+          if (busy) return;
+          setBusy(true);
+          void openPrivacyOptions().finally(() => setBusy(false));
+        }}
+      />
+    </MenuSection>
   );
 }
 

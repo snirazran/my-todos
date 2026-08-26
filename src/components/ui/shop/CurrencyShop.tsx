@@ -12,6 +12,7 @@ import { Icon } from '@/components/ui/Icon';
 import { useUIStore } from '@/lib/uiStore';
 import { useInventory, patchInventoryFlies } from '@/hooks/useInventory';
 import { rewardedAdsAvailable, showRewardedAd } from '@/lib/ads';
+import { useRewardedAdPreload } from '@/hooks/useRewardedAdPreload';
 import { hapticSuccess } from '@/lib/haptics';
 import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
 import { getFlyPackPrices, purchaseFlyPack } from '@/lib/purchases';
@@ -388,6 +389,8 @@ function FreeFliesCard({ open }: { open: boolean }) {
   const [error, setError] = useState<string | null>(null);
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const available = rewardedAdsAvailable();
+
+  useRewardedAdPreload('daily_flies', open && available);
 
   const { data, mutate } = useSWR<AdFlyStatus>(
     open ? `/api/rewards/flies?timezone=${encodeURIComponent(timezone)}` : null,

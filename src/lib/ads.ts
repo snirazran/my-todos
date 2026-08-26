@@ -2,11 +2,42 @@
 
 import { Capacitor } from '@capacitor/core';
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
-
-const TEST_REWARDED_IOS = 'ca-app-pub-3940256099942544/1712485313';
-const TEST_REWARDED_ANDROID = 'ca-app-pub-3940256099942544/5224354917';
+import type { AdMobPlugin } from '@capacitor-community/admob';
 
 export type RewardedAdResult = 'rewarded' | 'dismissed' | 'failed';
+
+type AdUnitKey =
+  | 'daily_flies'
+  | 'gift_double'
+  | 'reward_double'
+  | 'shop_reroll'
+  | 'trade_reroll';
+
+const REWARDED_AD_UNITS: Record<'ios' | 'android', Record<AdUnitKey, string>> = {
+  ios: {
+    daily_flies: 'ca-app-pub-9295411240414755/6724678646',
+    gift_double: 'ca-app-pub-9295411240414755/1788424034',
+    reward_double: 'ca-app-pub-9295411240414755/5727669049',
+    shop_reroll: 'ca-app-pub-9295411240414755/2638471275',
+    trade_reroll: 'ca-app-pub-9295411240414755/5411596977',
+  },
+  android: {
+    daily_flies: 'ca-app-pub-9295411240414755/5536097357',
+    gift_double: 'ca-app-pub-9295411240414755/5073062929',
+    reward_double: 'ca-app-pub-9295411240414755/1284649700',
+    shop_reroll: 'ca-app-pub-9295411240414755/8971568030',
+    trade_reroll: 'ca-app-pub-9295411240414755/8846560473',
+  },
+};
+
+/** Placements with a unit of their own. Every other placement is a "double
+ *  your reward" prompt, which the server also budgets as `reward_double`. */
+const PLACEMENT_AD_UNITS: Record<string, AdUnitKey> = {
+  daily_flies: 'daily_flies',
+  gift_double: 'gift_double',
+  shop_reroll: 'shop_reroll',
+  trade_reroll: 'trade_reroll',
+};
 
 const PLUS_OFFER_AD_COUNT_KEY = 'plusOffer.rewardedAdCount';
 const PLUS_OFFER_LAST_SHOWN_KEY = 'plusOffer.lastShownAt';
@@ -51,26 +82,94 @@ export function takePlusOfferAfterAd(): boolean {
   return true;
 }
 
+let consentBlocked = false;
+let privacyOptionsRequired = false;
+
 export function rewardedAdsAvailable() {
-  return Capacitor.isNativePlatform();
+  return Capacitor.isNativePlatform() && !consentBlocked;
 }
 
-function rewardedAdUnitId() {
-  if (Capacitor.getPlatform() === 'ios') {
-    return process.env.NEXT_PUBLIC_ADMOB_REWARDED_AD_UNIT_IOS || TEST_REWARDED_IOS;
-  }
-  return (
-    process.env.NEXT_PUBLIC_ADMOB_REWARDED_AD_UNIT_ANDROID || TEST_REWARDED_ANDROID
+/** True once the UMP flow has told us this user is entitled to a "Privacy
+ *  options" entry point, which Google requires us to surface for them. */
+export function privacyOptionsAvailable() {
+  return Capacitor.isNativePlatform() && privacyOptionsRequired;
+}
+
+function testDeviceIdentifiers() {
+  return (process.env.NEXT_PUBLIC_ADMOB_TEST_DEVICE_IDS || '')
+    .split(',')
+    .map((id) => id.trim())
+    .filter(Boolean);
+}
+
+function rewardedAdUnitId(placement: string) {
+  const platform = Capacitor.getPlatform() === 'ios' ? 'ios' : 'android';
+  const key = PLACEMENT_AD_UNITS[placement] ?? 'reward_double';
+  return REWARDED_AD_UNITS[platform][key];
+}
+
+async function runConsentFlow(AdMob: AdMobPlugin) {
+  const { AdmobConsentStatus, AdmobConsentDebugGeography } = await import(
+    '@capacitor-community/admob'
   );
+  const testDevices = testDeviceIdentifiers();
+
+  try {
+    let info = await AdMob.requestConsentInfo(
+      testDevices.length
+        ? {
+            debugGeography: AdmobConsentDebugGeography.EEA,
+            testDeviceIdentifiers: testDevices,
+          }
+        : undefined,
+    );
+
+    if (
+      info.status === AdmobConsentStatus.REQUIRED &&
+      info.isConsentFormAvailable
+    ) {
+      info = await AdMob.showConsentForm();
+    }
+
+    privacyOptionsRequired =
+      String(info.privacyOptionsRequirementStatus) === 'REQUIRED';
+    consentBlocked = info.canRequestAds === false;
+
+    trackAnalyticsEvent('ad_consent_resolved', {
+      status: info.status,
+      can_request_ads: info.canRequestAds,
+    });
+  } catch (err) {
+    console.error('AdMob consent flow failed', err);
+    trackAnalyticsEvent('ad_consent_failed', {});
+  }
 }
 
-let initPromise: Promise<void> | null = null;
+/** Re-opens the UMP privacy options form so a user can change their choice.
+ *  Consent state may flip either way, so ad availability is re-read after. */
+export async function openPrivacyOptions(): Promise<boolean> {
+  if (!Capacitor.isNativePlatform()) return false;
+  try {
+    const AdMob = await ensureInitialized();
+    await AdMob.showPrivacyOptionsForm();
+    const info = await AdMob.requestConsentInfo();
+    consentBlocked = info.canRequestAds === false;
+    if (consentBlocked) resetPreload();
+    return true;
+  } catch (err) {
+    console.error('Privacy options form failed', err);
+    return false;
+  }
+}
 
-async function ensureInitialized() {
+let initPromise: Promise<AdMobPlugin> | null = null;
+
+async function ensureInitialized(): Promise<AdMobPlugin> {
   const { AdMob } = await import('@capacitor-community/admob');
   if (!initPromise) {
     initPromise = (async () => {
-      await AdMob.initialize();
+      await runConsentFlow(AdMob);
+
       if (Capacitor.getPlatform() === 'ios') {
         try {
           const info = await AdMob.trackingAuthorizationStatus();
@@ -81,20 +180,76 @@ async function ensureInitialized() {
           /* tracking prompt is best-effort */
         }
       }
+
+      const testDevices = testDeviceIdentifiers();
+      await AdMob.initialize(
+        testDevices.length
+          ? { testingDevices: testDevices, initializeForTesting: true }
+          : {},
+      );
+      return AdMob;
     })();
   }
-  await initPromise;
-  return AdMob;
+  return initPromise;
+}
+
+let preloadPromise: Promise<boolean> | null = null;
+let preloadedUnit: string | null = null;
+
+function resetPreload() {
+  preloadedUnit = null;
+  preloadPromise = null;
+}
+
+/** Loads a rewarded ad ahead of the tap that spends it. Safe to call often —
+ *  concurrent callers share one load and an already-loaded ad resolves at once.
+ *  Only one ad can be pending, so a different placement's unit replaces it. */
+export function preloadRewardedAd(placement: string): Promise<boolean> {
+  if (!rewardedAdsAvailable()) return Promise.resolve(false);
+
+  const unitId = rewardedAdUnitId(placement);
+  if (preloadedUnit === unitId) return Promise.resolve(true);
+  if (preloadPromise) return preloadPromise;
+
+  preloadPromise = (async () => {
+    try {
+      const AdMob = await ensureInitialized();
+      if (consentBlocked) return false;
+      await AdMob.prepareRewardVideoAd({ adId: unitId });
+      preloadedUnit = unitId;
+      return true;
+    } catch (err) {
+      console.error('Rewarded ad preload failed', err);
+      preloadedUnit = null;
+      return false;
+    } finally {
+      preloadPromise = null;
+    }
+  })();
+
+  return preloadPromise;
 }
 
 export async function showRewardedAd(placement = 'unknown'): Promise<RewardedAdResult> {
   trackAnalyticsEvent('ad_requested', { placement });
-  if (!rewardedAdsAvailable()) {
+  if (!Capacitor.isNativePlatform()) {
     trackAnalyticsEvent('ad_failed', { placement, reason: 'unsupported_platform' });
     return 'failed';
   }
   try {
     const AdMob = await ensureInitialized();
+    if (consentBlocked) {
+      trackAnalyticsEvent('ad_failed', { placement, reason: 'consent' });
+      return 'failed';
+    }
+
+    const wasPreloaded = preloadedUnit === rewardedAdUnitId(placement);
+    if (!(await preloadRewardedAd(placement))) {
+      trackAnalyticsEvent('ad_failed', { placement, reason: 'load' });
+      return 'failed';
+    }
+    trackAnalyticsEvent('ad_ready', { placement, preloaded: wasPreloaded });
+
     const { RewardAdPluginEvents } = await import('@capacitor-community/admob');
 
     return await new Promise<RewardedAdResult>((resolve) => {
@@ -105,6 +260,7 @@ export async function showRewardedAd(placement = 'unknown'): Promise<RewardedAdR
       const finish = (result: RewardedAdResult) => {
         if (settled) return;
         settled = true;
+        resetPreload();
         if (result === 'rewarded') recordRewardedAdCompleted();
         trackAnalyticsEvent(
           result === 'rewarded'
@@ -116,6 +272,7 @@ export async function showRewardedAd(placement = 'unknown'): Promise<RewardedAdR
         );
         for (const h of handles) void h.remove();
         resolve(result);
+        void preloadRewardedAd(placement);
       };
 
       void (async () => {
@@ -136,7 +293,6 @@ export async function showRewardedAd(placement = 'unknown'): Promise<RewardedAdR
               finish('failed');
             }),
           );
-          await AdMob.prepareRewardVideoAd({ adId: rewardedAdUnitId() });
           await AdMob.showRewardVideoAd();
         } catch (err) {
           console.error('Rewarded ad failed', err);
