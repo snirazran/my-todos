@@ -59,10 +59,13 @@ function hasOwnHighlight(node: HTMLElement) {
 function edgeFallback(from: AnchorRect, target: string): AnchorRect | null {
   if (typeof window === 'undefined') return null;
   if (target === 'tour-next-day') {
+    // Just to the right of the card itself, which is the next column on a wide
+    // board and the auto-panning screen edge on a narrow one. Aiming at the
+    // viewport edge instead sent the trail across the whole desktop board.
     return {
       top: from.top,
-      left: window.innerWidth - 72,
-      width: 48,
+      left: Math.min(from.left + from.width + 28, window.innerWidth - 76),
+      width: 52,
       height: Math.max(48, from.height),
     };
   }
@@ -246,6 +249,15 @@ export default function PlannerTour({
 
   const ghostTarget = useMemo(() => {
     if (!beat?.dragTo || !rect) return null;
+    if (beat.dragTo === 'tour-next-day') {
+      // A day column is full-height, so its centre sits far below the row being
+      // dragged. Aim level with the card itself and only borrow the column's
+      // horizontal position; without one, the auto-panning screen edge.
+      const left = dragToRect
+        ? dragToRect.left + Math.min(64, dragToRect.width / 2)
+        : Math.min(rect.left + rect.width + 28, window.innerWidth - 76);
+      return { top: rect.top, left, width: 52, height: rect.height };
+    }
     return dragToRect ?? edgeFallback(rect, beat.dragTo);
   }, [beat?.dragTo, rect, dragToRect]);
 

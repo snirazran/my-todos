@@ -31,6 +31,12 @@ export default function GhostHand({
   const midY = a.y + dy / 2 - bow;
 
   const half = DOT / 2;
+  // Looping keyframe arrays are captured when the animation starts, so a rect
+  // that moves afterwards leaves the fingertip running the old path until
+  // something remounts it. Keying on the geometry restarts it in place.
+  const pathKey = `${Math.round(a.x)},${Math.round(a.y)},${Math.round(
+    b.x,
+  )},${Math.round(b.y)}`;
 
   return (
     <div className="pointer-events-none fixed inset-0 z-[2001]" aria-hidden>
@@ -53,6 +59,7 @@ export default function GhostHand({
       ) : (
         <>
         <motion.span
+          key={`ripple-${pathKey}`}
           className="absolute rounded-full border-2 border-primary"
           style={{
             left: a.x - half,
@@ -70,6 +77,7 @@ export default function GhostHand({
           }}
         />
         <motion.span
+          key={`dot-${pathKey}`}
           className="absolute rounded-full border-[3px] border-primary bg-primary/30 shadow-lg shadow-primary/30"
           style={{ width: DOT, height: DOT }}
           initial={false}

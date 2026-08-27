@@ -2158,7 +2158,7 @@ export default function TaskBoard({
 
       {/* Top header + dot strip (mobile + desktop) */}
       <div
-        className={`absolute top-[calc(0.5rem+env(safe-area-inset-top))] left-0 right-0 flex flex-col items-center gap-2 pointer-events-none px-3 ${
+        className={`absolute top-[calc(0.5rem+env(safe-area-inset-top))] left-0 right-0 flex flex-col items-center gap-2 pointer-events-none px-3 md:top-[68px] ${
           calendarOpen ? 'z-[97]' : 'z-[60]'
         } ${moveCalendarOpen ? 'hidden' : ''}`}
       >
