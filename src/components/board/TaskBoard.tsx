@@ -67,6 +67,7 @@ import FrogodoroSheet from '@/components/ui/FrogodoroSheet';
 import FrogodoroPill from '@/components/ui/FrogodoroPill';
 import BacklogBox from './BacklogBox';
 import BacklogTray from './BacklogTray';
+import { TOUR_EVENT, emitTourEvent } from '@/lib/tour/plannerTour';
 import { useNotification } from '@/components/providers/NotificationProvider';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import { useFrogodoroUiStore } from '@/lib/frogodoroUiStore';
@@ -946,6 +947,10 @@ export default function TaskBoard({
   // columns — "sweep up what's left across Mon/Wed/Fri and move it to Saturday"
   // is the whole point, and each TaskList only ever sees its own column.
   const selection = useTaskSelection();
+  const selectionCount = selection.stats.count;
+  useEffect(() => {
+    emitTourEvent(TOUR_EVENT.selection, { count: selectionCount });
+  }, [selectionCount]);
   const tz =
     typeof window !== 'undefined'
       ? Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -1107,8 +1112,6 @@ export default function TaskBoard({
       placement?: { atIndex: number; refs: SelectionRef[] },
     ) => {
       const snapshot = (placement?.refs ?? selection.refs).slice();
-      const undoable = snapshot.every((r) => !r.isRepeating);
-      const count = snapshot.length;
       selection.exit();
       await runBulk(
         {
@@ -1121,30 +1124,8 @@ export default function TaskBoard({
           fromDate: r.dateKey === BACKLOG_KEY ? undefined : r.dateKey,
         })),
       );
-      showNotification(
-        `Moved ${count} ${count === 1 ? 'task' : 'tasks'} to ${relativeDayLabel(target)}`,
-        undoable
-          ? async () => {
-              const byDate = new Map<string, string[]>();
-              for (const r of snapshot) {
-                const list = byDate.get(r.dateKey) ?? [];
-                list.push(r.taskId);
-                byDate.set(r.dateKey, list);
-              }
-              for (const [dateKey, taskIds] of Array.from(byDate)) {
-                await runBulk(
-                  dateKey === BACKLOG_KEY
-                    ? { op: 'backlog' }
-                    : { op: 'move', date: dateKey },
-                  taskIds.map((taskId) => ({ taskId, fromDate: target })),
-                );
-              }
-            }
-          : undefined,
-        { durationMs: 6000 },
-      );
     },
-    [selection, runBulk, showNotification],
+    [selection, runBulk],
   );
 
   const applyScoped = useCallback(
@@ -1788,6 +1769,19 @@ export default function TaskBoard({
         finalToDay !== drag.fromDay || finalToIndex !== drag.fromIndex;
       if (draggedWasSelected && landedSomewhereNew) selection.exit();
 
+      const fromBacklog = drag.fromDay === BACKLOG_IDX;
+      const toBacklog = finalToDay === BACKLOG_IDX;
+      const changedDay = finalToDay !== drag.fromDay;
+      if (toBacklog && !fromBacklog) {
+        emitTourEvent(TOUR_EVENT.parked);
+      } else if (fromBacklog && !toBacklog) {
+        emitTourEvent(TOUR_EVENT.unparked);
+      } else if (changedDay && !toBacklog) {
+        emitTourEvent(
+          bundled ? TOUR_EVENT.bulkDropped : TOUR_EVENT.movedDay,
+        );
+      }
+
       endDrag();
       setIsDragOverBacklog(false);
       setTrayCloseProgress(0);
@@ -2056,6 +2050,11 @@ export default function TaskBoard({
               ref={setSlideRef(i)}
               data-col="true"
               data-date-key={dk}
+              data-hint={
+                windowDates[pageIndex] && dk === addDays(windowDates[pageIndex], 1)
+                  ? 'tour-next-day'
+                  : undefined
+              }
               className="shrink-0 snap-center snap-always w-[88vw] sm:w-[360px] md:w-[330px] lg:w-[310px] xl:w-[292px] h-full"
             >
               <DayColumn
@@ -2268,6 +2267,7 @@ export default function TaskBoard({
             // jump outside the window — rebuild centered on the picked date
             onJumpToDate?.(d);
           }
+          emitTourEvent(TOUR_EVENT.calendarJumped, { date: d });
         }}
         onClose={() => setCalendarOpen(false)}
       />
@@ -2430,6 +2430,7 @@ export default function TaskBoard({
                 type="button"
                 aria-label="Select tasks"
                 title="Select tasks"
+                data-hint="planner-select"
                 disabled={
                   (tasksByDate[windowDates[pageIndex] ?? activeDateKey] ?? [])
                     .length === 0

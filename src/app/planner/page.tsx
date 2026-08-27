@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import TaskBoard from '@/components/board/TaskBoard';
+import PlannerTour from '@/components/board/tour/PlannerTour';
 import { LeftTongueProvider } from '@/components/board/LeftTongue';
 import { FlyGainPopup } from '@/components/ui/FlyGainPopup';
 import { notifyQuestClaims, seedQuestClaims } from '@/lib/questClaims';
@@ -167,12 +168,19 @@ export default function ManageTasksPage() {
     async <T,>(run: () => Promise<T>): Promise<T> => {
       pendingWritesRef.current += 1;
       writeActivityRef.current += 1;
+      // Published so dependent writers (the planner tour's card seeding) can
+      // wait for the board to settle. Issuing a delete while a column PUT is
+      // still in flight lets that PUT re-insert what was just removed.
+      document.body.dataset.boardWriting = '1';
       try {
         return await run();
       } finally {
         pendingWritesRef.current = Math.max(0, pendingWritesRef.current - 1);
         writeActivityRef.current += 1;
-        if (pendingWritesRef.current === 0) scheduleRefetch();
+        if (pendingWritesRef.current === 0) {
+          document.body.dataset.boardWriting = '0';
+          scheduleRefetch();
+        }
       }
     },
     [scheduleRefetch],
@@ -608,6 +616,12 @@ export default function ManageTasksPage() {
           onScheduleTask={onScheduleTask}
         />
       </div>
+      <PlannerTour
+        enabled={!loading}
+        activeDateKey={activeDateKey}
+        timezone={tz}
+        onBoardChanged={refetchAll}
+      />
       </LeftTongueProvider>
 
       <style jsx global>{`

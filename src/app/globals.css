@@ -182,6 +182,26 @@ body:has([data-public-home]) #main-scroll {
 .hint-row-glow {
   box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.9), 0 0 16px 4px rgba(251, 191, 36, 0.5);
 }
+/* Planner tour target: a soft state layer instead of an outline. The inset
+   shadow tints the whole surface and paints below the row's own content, so
+   the text stays crisp and the card never gains a second border. */
+.tour-target {
+  border-color: hsl(var(--primary) / 0.45) !important;
+  animation: tour-target-breathe 2.8s ease-in-out infinite;
+}
+@keyframes tour-target-breathe {
+  0%,
+  100% {
+    box-shadow:
+      inset 0 0 0 999px hsl(var(--primary) / 0.06),
+      0 4px 14px -8px hsl(var(--primary) / 0.5);
+  }
+  50% {
+    box-shadow:
+      inset 0 0 0 999px hsl(var(--primary) / 0.13),
+      0 8px 20px -8px hsl(var(--primary) / 0.65);
+  }
+}
 @keyframes fly-bob {
   0%,
   100% {

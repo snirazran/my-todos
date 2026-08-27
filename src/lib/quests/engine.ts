@@ -94,8 +94,11 @@ export const DAILY_QUESTS_UNLOCK_STEP_TARGET = 5;
  * starter plan. "Add a task" objectives skip these; completing them still
  * counts, because on day one they are the whole list.
  */
-const isSeededForUser = (task: { isStarter?: boolean; isSeededPlan?: boolean }) =>
-  !!task.isStarter || !!task.isSeededPlan;
+const isSeededForUser = (task: {
+  isStarter?: boolean;
+  isSeededPlan?: boolean;
+  isTutorial?: boolean;
+}) => !!task.isStarter || !!task.isSeededPlan || !!task.isTutorial;
 
 /** The onboarding objective that introduces the weekly Leap. */
 const LEAP_ONBOARDING_METRIC = 'focus_tag_linked';
@@ -1551,6 +1554,7 @@ export async function syncQuestState(args: {
         frogodoroSessions: 1,
         isStarter: 1,
         isSeededPlan: 1,
+        isTutorial: 1,
       },
     ).lean<TaskDoc[]>(),
     includeCatalog

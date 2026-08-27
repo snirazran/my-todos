@@ -3,7 +3,12 @@ import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import UserModel from '@/lib/models/User';
 
-const INTRO_KEYS = new Set(['bellyFull', 'frogodoro', 'savedTask']);
+const INTRO_KEYS = new Set([
+  'bellyFull',
+  'frogodoro',
+  'savedTask',
+  'plannerTour',
+]);
 
 export async function GET() {
   try {

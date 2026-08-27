@@ -310,6 +310,9 @@ function taskFlyBreakdown(
   tiers?: readonly StreakTier[],
   checklistTiers?: readonly ChecklistTier[],
 ): { base: number; checklist: number; streak: number; total: number } {
+  if ((task as { isTutorial?: boolean }).isTutorial) {
+    return { base: 0, checklist: 0, streak: 0, total: 0 };
+  }
   const base = completed ? 1 : 0;
   const streakUplift = completed ? streakFlyBonus(streak, tiers) : 0;
   const checklist = checklistPayoutForDate(task, date, checklistTiers).earned;
@@ -1133,6 +1136,8 @@ export async function createTasksForUser(
     creationBatchId?: string;
     /** Seeded for the user rather than typed by them, so "add a task" objectives skip it. */
     isSeededPlan?: boolean;
+    /** Practice card for the planner tour: earns nothing and is deleted when the tour ends. */
+    isTutorial?: boolean;
   },
 ): Promise<CreateTasksResult> {
   const buddyFields = opts?.bondId
@@ -1143,6 +1148,7 @@ export async function createTasksForUser(
       ? { creationBatchId: opts.creationBatchId }
       : {}),
     ...(opts?.isSeededPlan ? { isSeededPlan: true } : {}),
+    ...(opts?.isTutorial ? { isTutorial: true } : {}),
   };
   const sectionFields =
     typeof body?.sectionId === 'string' && body.sectionId
@@ -3219,6 +3225,7 @@ async function handleDateRangeGet(req: NextRequest, uid: string, tz: string) {
         startTime: doc.startTime,
         endTime: doc.endTime,
         reminder: doc.reminder,
+        isTutorial: doc.isTutorial,
       });
       continue;
     }
@@ -3243,6 +3250,7 @@ async function handleDateRangeGet(req: NextRequest, uid: string, tz: string) {
         startTime: doc.startTime,
         endTime: doc.endTime,
         reminder: doc.reminder,
+        isTutorial: doc.isTutorial,
       });
       continue;
     }
@@ -3482,7 +3490,7 @@ async function handleBoardPut(
     });
     const docs: TaskDoc[] = await TaskModel.find(
       { userId: uid, id: { $in: ids } },
-      { id: 1, text: 1, type: 1, tags: 1, notes: 1, checklist: 1, calendarEventId: 1, startTime: 1, endTime: 1, reminder: 1 },
+      { id: 1, text: 1, type: 1, tags: 1, notes: 1, checklist: 1, calendarEventId: 1, startTime: 1, endTime: 1, reminder: 1, isTutorial: 1 },
     )
       .lean<TaskDoc[]>()
       .exec();
@@ -3506,8 +3514,10 @@ async function handleBoardPut(
     const startById = new Map<string, string | undefined>();
     const endById = new Map<string, string | undefined>();
     const reminderById = new Map<string, string | undefined>();
+    const tutorialById = new Map<string, boolean | undefined>();
 
     for (const d of docs) {
+      tutorialById.set(d.id, d.isTutorial);
       textById.set(d.id, d.text ?? '');
       tagsById.set(d.id, d.tags ?? []);
       notesById.set(d.id, d.notes);
@@ -3541,6 +3551,10 @@ async function handleBoardPut(
               startTime: t?.startTime ?? startById.get(id),
               endTime: t?.endTime ?? endById.get(id),
               reminder: t?.reminder ?? reminderById.get(id),
+              // A fresh backlog doc is inserted and the regular one deleted, so
+              // the flag has to be carried across or the practice card is
+              // orphaned and can never be cleaned up.
+              ...(tutorialById.get(id) ? { isTutorial: true } : {}),
             },
             $setOnInsert: {
               userId: uid,
@@ -3755,10 +3769,22 @@ async function handleBoardPutByDate(
       repeatStartDate: 1,
       repeatGroupId: 1,
       frogodoroSessions: 1,
+      isTutorial: 1,
     },
   )
     .lean<TaskDoc[]>()
     .exec();
+  // A cross-day move deletes the task from the source column before the
+  // destination column upserts it, so the destination write is an insert and
+  // anything not in the payload is lost. The client round-trips this flag.
+  const tutorialById = new Map<string, boolean>(
+    (tasks as Array<{ id: string; isTutorial?: boolean }>).map((t) => [
+      t.id,
+      !!t.isTutorial,
+    ]),
+  );
+  const tutorialFields = (id: string, srcDoc?: TaskDoc) =>
+    tutorialById.get(id) || srcDoc?.isTutorial ? { isTutorial: true } : {};
   const typeById = new Map(docs.map((d) => [d.id, d.type]));
   const docById = new Map(docs.map((d) => [d.id, d]));
   const textById = new Map(docs.map((d) => [d.id, d.text]));
@@ -3881,6 +3907,10 @@ async function handleBoardPutByDate(
                 order: i + 1,
                 completed: false,
                 updatedAt: now,
+                // The backlog doc is deleted and a fresh regular one inserted,
+                // so anything not carried across here is lost — and a practice
+                // card that loses this flag can never be cleaned up.
+                ...tutorialFields(t.id, srcDoc),
               },
               $setOnInsert: { userId: uid, type: 'regular', createdAt: now },
             },
@@ -3902,6 +3932,7 @@ async function handleBoardPutByDate(
             order: i + 1,
             updatedAt: now,
             ...sec.set,
+            ...tutorialFields(t.id, srcDoc),
           },
           ...(Object.keys(sec.unset).length ? { $unset: sec.unset } : {}),
           $setOnInsert: {

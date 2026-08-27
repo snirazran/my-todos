@@ -104,7 +104,7 @@ export default function MonthCalendar({
           transition={{ type: 'spring', stiffness: 300, damping: 30 }}
           className="absolute left-0 right-0 top-0 z-[96] px-3 pt-14 pointer-events-none"
         >
-          <div className="mx-auto w-[min(96vw,560px)] rounded-3xl bg-primary text-primary-foreground p-4 md:p-5 shadow-2xl pointer-events-auto" onClick={(e) => e.stopPropagation()}>
+          <div data-hint="month-calendar" className="mx-auto w-[min(96vw,560px)] rounded-3xl bg-primary text-primary-foreground p-4 md:p-5 shadow-2xl pointer-events-auto" onClick={(e) => e.stopPropagation()}>
             <div className="mb-3 flex items-center gap-2">
               {heading && (
                 <div className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-white/15 px-3 py-2 text-center text-[13px] font-bold leading-snug">

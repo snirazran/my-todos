@@ -389,6 +389,7 @@ export default function TaskCard({
     <div
       ref={setRefs}
       data-card-id={dragId}
+      data-hint={task.isTutorial ? 'tutorial-card' : undefined}
       draggable={false}
       onDragStart={(e) => e.preventDefault()}
       style={{
@@ -562,6 +563,11 @@ export default function TaskCard({
               >
                 {task.text}
               </span>
+              {task.isTutorial && (
+                <span className="inline-flex flex-shrink-0 items-center rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wide text-primary no-underline">
+                  Practice
+                </span>
+              )}
               {isRepeating && (
                 <Icon name="repeat" label="Repeating" className="w-5 h-5 flex-shrink-0" />
               )}

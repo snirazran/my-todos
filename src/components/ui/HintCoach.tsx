@@ -6,29 +6,15 @@ import { usePathname, useRouter } from 'next/navigation';
 import { ChevronsLeft, ChevronsRight, X } from 'lucide-react';
 import { useUIStore } from '@/lib/uiStore';
 import { formatHintLabel, guideById } from '@/lib/hints/guides';
+import {
+  ANCHOR_FIND_TIMEOUT_MS,
+  isUsableAnchor,
+  measure,
+  useAnchorTracker,
+  type AnchorRect as Rect,
+} from '@/lib/hints/useAnchorTracker';
 
-const FIND_TIMEOUT_MS = 12_000;
-// Grace window for re-acquiring a lost anchor (list re-renders) before the
-// loss is treated as the user abandoning the guide.
-const REACQUIRE_TIMEOUT_MS = 1600;
 const RING_PADDING = 5;
-
-type Rect = { top: number; left: number; width: number; height: number };
-
-function rectsEqual(a: Rect | null, b: Rect | null) {
-  if (!a || !b) return a === b;
-  return (
-    Math.abs(a.top - b.top) < 1 &&
-    Math.abs(a.left - b.left) < 1 &&
-    Math.abs(a.width - b.width) < 1 &&
-    Math.abs(a.height - b.height) < 1
-  );
-}
-
-function measure(el: HTMLElement): Rect {
-  const r = el.getBoundingClientRect();
-  return { top: r.top, left: r.left, width: r.width, height: r.height };
-}
 
 function elementTagIds(el: HTMLElement): string[] {
   const raw = el.dataset.tagIds ?? el.dataset.tagId ?? '';
@@ -42,48 +28,6 @@ function tagCondition(
 ): boolean {
   const overlap = elementTagIds(el).some((id) => contextTagIds.includes(id));
   return match === 'hit' ? overlap : !overlap;
-}
-
-// True when the element is genuinely on screen for the user: rendered,
-// non-hidden, and (only when acquiring — checkCover) the top-most content at
-// its center. The cover check keeps the finder from latching onto a closed
-// sheet's still-mounted, painted-over controls, but must NOT run during
-// tracking: open sheets legitimately float transparent gesture layers over
-// their content, which would read as "covered" and kill a valid highlight.
-function isUsableAnchor(
-  el: HTMLElement,
-  rect: Rect,
-  checkCover: boolean,
-): boolean {
-  if (!el.isConnected || rect.width < 1 || rect.height < 1) return false;
-  const hidden =
-    typeof (el as any).checkVisibility === 'function'
-      ? !(el as any).checkVisibility({
-          checkOpacity: true,
-          checkVisibilityCSS: true,
-        })
-      : false;
-  if (hidden) return false;
-  if (!checkCover) return true;
-  // Probe several points, not just the center: decorative layers (the frog's
-  // oversized transparent canvas) can overlap part of an anchor without
-  // actually obscuring it. A genuinely buried anchor fails every probe.
-  const cy = rect.top + rect.height / 2;
-  const probes = [0.5, 0.2, 0.8].map(
-    (fraction) => [rect.left + rect.width * fraction, cy] as const,
-  );
-  let sawInViewportProbe = false;
-  for (const [px, py] of probes) {
-    if (px < 0 || py < 0 || px >= window.innerWidth || py >= window.innerHeight) {
-      continue;
-    }
-    sawInViewportProbe = true;
-    const hit = document.elementFromPoint(px, py);
-    if (!hit || hit === el || el.contains(hit) || hit.contains(el)) {
-      return true;
-    }
-  }
-  return !sawInViewportProbe;
 }
 
 export function HintCoach() {
@@ -104,27 +48,12 @@ export function HintCoach() {
 
   const [mounted, setMounted] = useState(false);
   const [mobileWidth, setMobileWidth] = useState(false);
-  const [el, setEl] = useState<HTMLElement | null>(null);
-  const [rect, setRect] = useState<Rect | null>(null);
-  // Bumped when a tracked anchor is lost so the search effect runs again
-  // (with its timeout) instead of leaving a zombie guide with no anchor.
-  const [searchNonce, setSearchNonce] = useState(0);
-  // Hide the overlay while the anchor is animating (sheet opening/closing) —
-  // a ring chasing a sliding control reads as a glitch.
-  const [settled, setSettled] = useState(true);
-  // While the user scrolls, position updates must be instant — the glide
-  // transition (meant for slow layout drifts) reads as the ring lagging
-  // behind its target.
-  const [scrolling, setScrolling] = useState(false);
-  const scrollQuietTimerRef = useRef<number | null>(null);
-  const lastRectRef = useRef<Rect | null>(null);
   const stepNavRef = useRef<{
     key: string | null;
     pushed: boolean;
     arrived: boolean;
     startPath: string;
   }>({ key: null, pushed: false, arrived: false, startPath: '' });
-  const scrolledRef = useRef<string | null>(null);
 
   // Swipe availability is gated by viewport width (TaskList disables the
   // drag at >=768px), so the swipe copy and gestures must key off the same
@@ -228,184 +157,65 @@ export function HintCoach() {
     return () => window.clearInterval(interval);
   }, [stepKey, step, activeHint?.context, goToHintStep]);
 
-  // Once a step has shown its target, losing it means the user backed out of
-  // the surface it lived on (closed the sheet without acting). A short grace
-  // window lets list re-renders re-attach; past that, the guide cancels
-  // instead of lying in wait to re-appear on the next open.
-  const hadAnchorRef = useRef(false);
+  // Steps that only apply to an empty list ("add a task first") skip
+  // themselves when a matching element is already on screen. Evaluated once
+  // per step, before the anchor has ever been acquired.
+  const skipCheckedRef = useRef<string | null>(null);
   useEffect(() => {
-    hadAnchorRef.current = false;
-  }, [stepKey]);
-
-  // Find the anchor element; give up quietly if it never shows.
-  useEffect(() => {
-    setEl(null);
-    setRect(null);
-    if (!step || !stepKey) return;
+    if (!step || !stepKey || !step.skipWhenPresent) return;
+    if (skipCheckedRef.current === stepKey) return;
+    skipCheckedRef.current = stepKey;
     if (step.href && pathname !== step.href) return;
+    const skipTagIds = activeHint?.context?.tagIds ?? [];
+    const alreadyPresent = Array.from(
+      document.querySelectorAll<HTMLElement>(step.skipWhenPresent),
+    ).some((candidate) => {
+      if (
+        step.skipWhenPresentTagMatch &&
+        !tagCondition(candidate, skipTagIds, step.skipWhenPresentTagMatch)
+      ) {
+        return false;
+      }
+      const r = candidate.getBoundingClientRect();
+      return r.width > 0 && r.height > 0;
+    });
+    if (alreadyPresent) advanceHintStep();
+  }, [stepKey, step, pathname, activeHint?.context, advanceHintStep]);
 
-    if (!hadAnchorRef.current && step.skipWhenPresent) {
-      const skipTagIds = activeHint?.context?.tagIds ?? [];
-      const alreadyPresent = Array.from(
-        document.querySelectorAll<HTMLElement>(step.skipWhenPresent),
-      ).some((candidate) => {
-        if (
-          step.skipWhenPresentTagMatch &&
-          !tagCondition(candidate, skipTagIds, step.skipWhenPresentTagMatch)
-        ) {
-          return false;
-        }
-        const r = candidate.getBoundingClientRect();
-        return r.width > 0 && r.height > 0;
-      });
-      if (alreadyPresent) {
-        advanceHintStep();
-        return;
+  // requirePresent holds a step's highlight until its companion element is on
+  // screen, and releases the anchor again if that element disappears.
+  const requireSatisfied = () => {
+    if (!step?.requirePresent) return true;
+    const requireTagIds = activeHint?.context?.tagIds ?? [];
+    return Array.from(
+      document.querySelectorAll<HTMLElement>(step.requirePresent),
+    ).some((candidate) => {
+      if (
+        step.requirePresentTagMatch &&
+        !tagCondition(candidate, requireTagIds, step.requirePresentTagMatch)
+      ) {
+        return false;
       }
-    }
+      const r = candidate.getBoundingClientRect();
+      return r.width > 0 && r.height > 0;
+    });
+  };
 
-    const selector = step.selector ?? `[data-hint="${step.anchor}"]`;
-    const timeoutMs = hadAnchorRef.current
-      ? REACQUIRE_TIMEOUT_MS
-      : step.timeoutMs ?? FIND_TIMEOUT_MS;
-    const startedAt = Date.now();
-    const find = () => {
-      if (step.requirePresent) {
-        const requireTagIds = activeHint?.context?.tagIds ?? [];
-        const present = Array.from(
-          document.querySelectorAll<HTMLElement>(step.requirePresent),
-        ).some((candidate) => {
-          if (
-            step.requirePresentTagMatch &&
-            !tagCondition(candidate, requireTagIds, step.requirePresentTagMatch)
-          ) {
-            return false;
-          }
-          const r = candidate.getBoundingClientRect();
-          return r.width > 0 && r.height > 0;
-        });
-        if (!present) return false;
-      }
-      const contextTagIds = activeHint?.context?.tagIds ?? [];
-      const candidates = Array.from(
-        document.querySelectorAll<HTMLElement>(selector),
-      );
-      for (const candidate of candidates) {
-        if (
-          step.matchTagIds &&
-          !tagCondition(candidate, contextTagIds, 'hit')
-        ) {
-          continue;
-        }
-        const r = measure(candidate);
-        if (isUsableAnchor(candidate, r, step.coverCheck !== false)) {
-          hadAnchorRef.current = true;
-          lastRectRef.current = r;
-          // Start hidden: if the anchor is inside an opening sheet the next
-          // measurements still move, and the ring must not paint mid-slide.
-          // A static anchor settles on the first tracker tick (~150ms).
-          setSettled(false);
-          setEl(candidate);
-          setRect(r);
-          return true;
-        }
-      }
-      return false;
-    };
-
-    if (find()) return;
-    const interval = window.setInterval(() => {
-      if (find()) {
-        window.clearInterval(interval);
-        return;
-      }
-      if (Date.now() - startedAt > timeoutMs) {
-        window.clearInterval(interval);
-        dismissHintGuide();
-      }
-    }, 200);
-    return () => window.clearInterval(interval);
-  }, [stepKey, step, pathname, searchNonce, dismissHintGuide, advanceHintStep]);
-
-  // Keep the spotlight glued to the element; restart the search if it leaves
-  // the DOM (sheet closed, list re-rendered).
-  useEffect(() => {
-    if (!el) return;
-
-    if (scrolledRef.current !== stepKey) {
-      scrolledRef.current = stepKey;
-      // Only scroll when the anchor isn't comfortably in view — a smooth
-      // scroll while the user is already reaching for a visible target makes
-      // their tap land on whatever slides under the finger.
-      const r = el.getBoundingClientRect();
-      const comfortablyVisible =
-        r.top >= 72 && r.bottom <= window.innerHeight - 96;
-      if (!comfortablyVisible) {
-        el.scrollIntoView({ block: 'center', behavior: 'smooth' });
-      }
-    }
-
-    const update = () => {
-      const next = measure(el);
-      const requiredGone =
-        !!step?.requirePresent &&
-        !Array.from(
-          document.querySelectorAll<HTMLElement>(step.requirePresent),
-        ).some((candidate) => {
-          if (
-            step.requirePresentTagMatch &&
-            !tagCondition(
-              candidate,
-              activeHint?.context?.tagIds ?? [],
-              step.requirePresentTagMatch,
-            )
-          ) {
-            return false;
-          }
-          const r = candidate.getBoundingClientRect();
-          return r.width > 0 && r.height > 0;
-        });
-      if (requiredGone || !isUsableAnchor(el, next, false)) {
-        setEl(null);
-        setRect(null);
-        setSearchNonce((n) => n + 1);
-        return;
-      }
-      const previous = lastRectRef.current;
-      lastRectRef.current = next;
-      // Small drifts (a toolbar lifting for a toast) are followed with a CSS
-      // glide on the overlay; only big jumps — sheets sliding, page scrolls —
-      // hide it until the anchor comes to rest.
-      const moved =
-        !!previous &&
-        Math.abs(previous.top - next.top) + Math.abs(previous.left - next.left) >
-          120;
-      setSettled(!moved);
-      setRect((prev) => (rectsEqual(prev, next) ? prev : next));
-    };
-    const onScroll = () => {
-      setScrolling(true);
-      if (scrollQuietTimerRef.current) {
-        window.clearTimeout(scrollQuietTimerRef.current);
-      }
-      scrollQuietTimerRef.current = window.setTimeout(
-        () => setScrolling(false),
-        160,
-      );
-      update();
-    };
-    const interval = window.setInterval(update, 150);
-    window.addEventListener('scroll', onScroll, true);
-    window.addEventListener('resize', update);
-    return () => {
-      window.clearInterval(interval);
-      if (scrollQuietTimerRef.current) {
-        window.clearTimeout(scrollQuietTimerRef.current);
-      }
-      window.removeEventListener('scroll', onScroll, true);
-      window.removeEventListener('resize', update);
-    };
-  }, [el, stepKey, step]);
+  // Losing an acquired anchor means the user backed out of the surface it
+  // lived on; the tracker re-acquires within its grace window and otherwise
+  // times out into dismissHintGuide.
+  const { el, rect, settled, scrolling } = useAnchorTracker({
+    selector: step ? step.selector ?? `[data-hint="${step.anchor}"]` : null,
+    resetKey: stepKey,
+    enabled: !!step && (!step.href || pathname === step.href),
+    coverCheck: step?.coverCheck !== false,
+    timeoutMs: step?.timeoutMs ?? ANCHOR_FIND_TIMEOUT_MS,
+    filter: (candidate) =>
+      !step?.matchTagIds ||
+      tagCondition(candidate, activeHint?.context?.tagIds ?? [], 'hit'),
+    gate: requireSatisfied,
+    onTimeout: dismissHintGuide,
+  });
 
   // Fly-glow steps light up every matching task fly (class-based so the glow
   // rides the elements through scroll/re-renders) instead of ringing the
