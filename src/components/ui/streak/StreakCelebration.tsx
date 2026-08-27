@@ -130,7 +130,7 @@ export function StreakCelebration({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[1400] md:flex md:items-center md:justify-center md:bg-black/60 md:p-6 md:backdrop-blur-sm"
+          className="pointer-events-auto fixed inset-0 z-[1400] overflow-hidden md:flex md:items-center md:justify-center md:bg-black/60 md:p-6 md:backdrop-blur-sm"
         >
           <div
             role="dialog"
@@ -142,7 +142,7 @@ export function StreakCelebration({
               <RotatingRays colorClass="text-white" />
             </div>
 
-            <div className="relative flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-6 pb-4 pt-[calc(env(safe-area-inset-top)+2rem)] short-screen:pt-[calc(env(safe-area-inset-top)+1.25rem)] md:px-8 md:pt-9">
+            <div className="no-scrollbar relative flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-6 pb-4 pt-[calc(env(safe-area-inset-top)+2rem)] short-screen:pt-[calc(env(safe-area-inset-top)+1.25rem)] md:px-8 md:pt-9">
               <motion.div
                 initial={{ scale: 0.6, y: 20 }}
                 animate={{ scale: 1, y: 0 }}

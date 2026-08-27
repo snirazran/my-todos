@@ -195,6 +195,7 @@ export default function OnboardingPage() {
               body: JSON.stringify({
                 itemIds: starterPlanIds,
                 selectedCategoryIds: focusAreaIds,
+                dayStart: selections.starterPlanDayStart?.[0],
                 timezone,
               }),
             });

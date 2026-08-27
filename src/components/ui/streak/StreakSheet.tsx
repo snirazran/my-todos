@@ -28,6 +28,7 @@ import { rewardStackTileStyle } from '@/lib/questClaims';
 import type { QuestReward } from '@/lib/quests/types';
 import { openShieldSheet } from '@/hooks/useShields';
 import { StreakCelebration } from './StreakCelebration';
+import { streakRevealMessage } from '@/lib/streak/revealMessage';
 import type {
   CheckInResult,
   LoginStreakReward,
@@ -35,19 +36,6 @@ import type {
 } from '@/lib/streak/types';
 
 type Step = 'reveal' | 'rewards' | 'commit' | 'home';
-
-const STREAK_REVEAL_MESSAGES = [
-  'You showed up today. That’s how streaks are made.',
-  'You kept it going today. One more day, well earned.',
-  'Another check-in complete. Your streak is growing.',
-  'Small steps add up. Today’s step is complete.',
-  'You made time today. Keep that momentum going.',
-  'Today’s effort counts. Your streak is stronger.',
-  'One more day complete. Keep showing up.',
-  'You followed through today. That’s real progress.',
-  'Today is in the books. Keep the streak alive.',
-  'Consistency starts small. You added another day.',
-] as const;
 
 // `STREAK_FREEZE` is what tiers authored before the shield merge still say.
 const isShieldReward = (reward: LoginStreakReward) =>
@@ -374,10 +362,12 @@ function RevealStep({
   const shortScreen = useMediaQuery('(max-height: 800px)');
   const frogHeight = shortScreen ? 234 : 300;
   const frogWidth = Math.round((frogHeight * 128) / 144);
-  const revealMessage =
-    STREAK_REVEAL_MESSAGES[
-      (Math.max(1, view.count) - 1) % STREAK_REVEAL_MESSAGES.length
-    ];
+  const revealMessage = streakRevealMessage({
+    count: view.count,
+    longestStreak: view.longestStreak,
+    nextTierDays: view.nextTierDays,
+    dayOfWeek: new Date().getDay(),
+  });
 
   useEffect(() => {
     const frogTimer = window.setTimeout(() => setFrogReady(true), 250);
@@ -414,7 +404,7 @@ function RevealStep({
         }}
       />
 
-      <div className="relative flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto overscroll-contain px-6 pb-2 pt-[calc(env(safe-area-inset-top)+2rem)] short-screen:pt-[calc(env(safe-area-inset-top)+1rem)] md:px-8 md:pt-9">
+      <div className="no-scrollbar relative flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto overscroll-contain px-6 pb-2 pt-[calc(env(safe-area-inset-top)+2rem)] short-screen:pt-[calc(env(safe-area-inset-top)+1rem)] md:px-8 md:pt-9">
         <div className="flex flex-col items-center w-full max-w-sm m-auto shrink-0 md:max-w-md">
           <div className="flex flex-col items-center min-w-0">
             <div className="relative flex items-center gap-3 short-screen:gap-2">
@@ -607,7 +597,7 @@ function CommitStep({
 
   return (
     <div className="flex flex-col flex-1 min-h-0 bg-background">
-      <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-3 pb-4 pt-[calc(env(safe-area-inset-top)+3.5rem)] sm:px-6 short-screen:pt-[calc(0.75rem+env(safe-area-inset-top))] md:px-8 md:pt-9">
+      <div className="no-scrollbar min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-3 pb-4 pt-[calc(env(safe-area-inset-top)+3.5rem)] sm:px-6 short-screen:pt-[calc(0.75rem+env(safe-area-inset-top))] md:px-8 md:pt-9">
         <div className="flex flex-col items-center w-full max-w-sm mx-auto md:max-w-xl">
           <motion.div
             initial={reduceMotion ? false : { scale: 0.7, opacity: 0 }}
@@ -803,7 +793,7 @@ function HomeStep({
 }) {
   return (
     <div className="flex flex-col flex-1 min-h-0 bg-background">
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-4 pt-[calc(env(safe-area-inset-top)+3rem)] short-screen:pt-[calc(env(safe-area-inset-top)+1rem)] md:px-8 md:pt-9">
+      <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-4 pt-[calc(env(safe-area-inset-top)+3rem)] short-screen:pt-[calc(env(safe-area-inset-top)+1rem)] md:px-8 md:pt-9">
         <div className="flex flex-col items-center w-full max-w-sm mx-auto md:max-w-xl">
           <div className="flex items-center gap-2">
             <Flame
@@ -1075,7 +1065,7 @@ export function StreakSheet({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.22 }}
-          className="fixed inset-0 z-[1400]"
+          className="pointer-events-auto fixed inset-0 z-[1400] overflow-hidden"
         >
           <div className="absolute inset-0 bg-background md:bg-black/60 md:backdrop-blur-sm" />
 

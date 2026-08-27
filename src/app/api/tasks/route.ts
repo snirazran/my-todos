@@ -1131,14 +1131,19 @@ export async function createTasksForUser(
     bondId?: string;
     buddyUserId?: string;
     creationBatchId?: string;
+    /** Seeded for the user rather than typed by them, so "add a task" objectives skip it. */
+    isSeededPlan?: boolean;
   },
 ): Promise<CreateTasksResult> {
   const buddyFields = opts?.bondId
     ? { bondId: opts.bondId, buddyUserId: opts.buddyUserId }
     : {};
-  const batchFields = opts?.creationBatchId
-    ? { creationBatchId: opts.creationBatchId }
-    : {};
+  const batchFields = {
+    ...(opts?.creationBatchId
+      ? { creationBatchId: opts.creationBatchId }
+      : {}),
+    ...(opts?.isSeededPlan ? { isSeededPlan: true } : {}),
+  };
   const sectionFields =
     typeof body?.sectionId === 'string' && body.sectionId
       ? { sectionId: body.sectionId }

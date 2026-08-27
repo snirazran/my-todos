@@ -28,7 +28,8 @@ export const FIRST_HOPS_QUEST: OnboardingQuestDef = {
       amountMode: 'fixed',
       amount: 1,
       tagMode: 'ignore',
-      helpText: 'Tap the + button on your home screen and add any task.',
+      helpText:
+        'Tap + on your home screen and add a task of your own — the ones already on your list do not count.',
       rewards: fixedFlies(5),
     },
     {

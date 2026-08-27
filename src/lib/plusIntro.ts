@@ -12,9 +12,14 @@ function storageKey(prefix: string, uid: string | null | undefined) {
 }
 
 /**
- * Open the Plus intro pitch once per account. Triggered after the user's first
- * task completion — the core "frog fed" aha moment — with a delay so the catch
- * animation finishes first.
+ * Open the Plus intro pitch once per account, after the user claims their first
+ * gift box — with a delay so the reveal finishes first.
+ *
+ * It used to fire on the first task completion, which was too early to be
+ * legible: every line of the pitch is about flies, gifts and outfits, and a
+ * user who has only ever completed one task has not seen a gift box or the
+ * wardrobe yet. The gift claim is the first moment the offer describes
+ * something they have actually experienced.
  */
 export function queuePlusIntroOnce(delayMs = 2000) {
   const uid = auth?.currentUser?.uid ?? null;
@@ -50,7 +55,7 @@ export function queuePlusIntroOnce(delayMs = 2000) {
       } catch {}
       if (!shouldShow) return;
       window.setTimeout(() => {
-        useUIStore.getState().setPremiumModalOpen(true, 'task_completion_intro');
+        useUIStore.getState().setPremiumModalOpen(true, 'first_gift_claim');
       }, delayMs);
     })
     .catch(() => {

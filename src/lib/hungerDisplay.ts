@@ -9,10 +9,22 @@ export type HungerState = {
   label: string;
 };
 
-/** The frog's belly state for a 0–100 fullness, shared by every belly readout. */
+/**
+ * The frog's belly state for a 0–100 fullness, shared by every belly readout.
+ *
+ * "Full" is reserved for a belly that actually looks full — the last pip has to
+ * be all but filled. Anything short of that reads as a contradiction next to six
+ * pips with a visible gap, so it gets its own rung.
+ */
 export function getHungerState(percent: number): HungerState {
-  if (percent > 80)
+  if (percent >= 97)
     return { bg: 'bg-emerald-500', text: 'text-emerald-600', label: 'Full' };
+  if (percent > 80)
+    return {
+      bg: 'bg-emerald-500',
+      text: 'text-emerald-600',
+      label: 'Nearly full',
+    };
   if (percent > 60)
     return { bg: 'bg-lime-500', text: 'text-lime-600', label: 'Content' };
   if (percent > 40)

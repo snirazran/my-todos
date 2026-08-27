@@ -109,7 +109,7 @@ export function FrogBellyDeck({
           >
             <span
               className={cn(
-                'w-[64px] shrink-0 text-[11px] font-black tracking-[0.06em] whitespace-nowrap transition-colors duration-300',
+                'w-[76px] shrink-0 text-[11px] font-black tracking-[0.04em] whitespace-nowrap transition-colors duration-300',
                 feedPulse ? 'text-emerald-500' : hungerTextColor,
                 hungerPercent <= 20 && !feedPulse && 'animate-pulse',
               )}

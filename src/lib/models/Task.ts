@@ -63,6 +63,7 @@ export interface TaskDoc {
   bondId?: string; // links this task to a shared "buddy" bond (TaskBond)
   buddyUserId?: string; // the friend this task is shared with
   isStarter?: boolean; // seeded "Grab your first fly" onboarding task
+  isSeededPlan?: boolean; // seeded from the onboarding starter plan, not typed by the user
   sectionId?: string; // Today-list section (TaskSection) this task is grouped under
   creationBatchId?: string;
   /** Hidden timer target used when focus time is assigned directly to an area. */
@@ -159,6 +160,7 @@ const TaskSchema = new Schema<TaskDoc>(
     bondId: { type: String, index: true },
     buddyUserId: { type: String },
     isStarter: { type: Boolean, default: undefined },
+    isSeededPlan: { type: Boolean, default: undefined },
     sectionId: { type: String, default: undefined },
     creationBatchId: { type: String, default: undefined, index: true },
     focusAreaId: { type: String, default: undefined, index: true },

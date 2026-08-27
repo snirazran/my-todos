@@ -85,9 +85,12 @@ function objectiveSummaryLabel(block: ObjectiveLabelBlock): string {
   }
   const scope = block.subject === 'any' || target !== 1 ? 'tasks' : 'task';
   if (block.action === 'add') {
+    // The progress bar already reads "0 / 1", so a target of one drops the
+    // numeral. "Of your own" is what separates this from the onboarding plan
+    // already sitting on the list.
     return block.requiresFollowThrough
       ? `Plan and finish ${target} ${scope}`
-      : `Add ${target} ${scope}`;
+      : `Add ${target === 1 ? 'a' : target} ${scope} of your own`;
   }
   if (typeof block.beforeHour === 'number') {
     return `Finish ${target} ${scope} ${hourCutoffLabel(block.beforeHour)}`;
@@ -335,7 +338,7 @@ function objectiveRemainingLabel(
   if (block.action === 'add') {
     return block.requiresFollowThrough
       ? `Finish ${remaining} more planned ${scope}`
-      : `Add ${remaining} more ${scope}`;
+      : `Add ${remaining} more ${scope} of your own`;
   }
   if (typeof block.beforeHour === 'number') {
     return `Finish ${remaining} more ${scope} ${hourCutoffLabel(block.beforeHour)}`;

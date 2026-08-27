@@ -12,7 +12,6 @@ import { markFlyEarn } from '@/lib/flyEarn';
 import { notifyQuestClaims, seedQuestClaims } from '@/lib/questClaims';
 import Fly from '@/components/ui/fly';
 import { useUIStore } from '@/lib/uiStore';
-import { queuePlusIntroOnce } from '@/lib/plusIntro';
 import { recordTaskCompleted } from '@/lib/widget/prompt';
 
 // --- Types ---
@@ -513,10 +512,6 @@ export function useTaskData({
                 undefined,
                 { durationMs: 5000 },
               );
-            }
-
-            if (nextCompleted && !newFlyStatus?.isPremium) {
-              queuePlusIntroOnce();
             }
 
             if (json.lateForStreak) {

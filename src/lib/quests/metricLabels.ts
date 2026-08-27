@@ -20,7 +20,10 @@ export const QUEST_METRIC_COPY: Record<string, MetricCopy> = {
   },
   skin_acquired: {
     adminLabel: 'Skins bought or received',
-    label: (n) => (n === 1 ? 'Get a new outfit' : `Get ${n} new outfits`),
+    label: (n) =>
+      n === 1
+        ? 'Get a new outfit from the shop'
+        : `Get ${n} new outfits from the shop`,
     remaining: (n) => `${n} more ${n === 1 ? 'outfit' : 'outfits'} to go`,
   },
   friend_invited: {
@@ -71,7 +74,9 @@ export const QUEST_METRIC_COPY: Record<string, MetricCopy> = {
   frog_fed_full: {
     adminLabel: 'Frog fed to full',
     label: (n) =>
-      n === 1 ? 'Feed your frog to full' : `Feed your frog to full ${n} times`,
+      n === 1
+        ? 'Finish tasks until your frog is full'
+        : `Fill your frog’s belly ${n} times`,
     remaining: (n) =>
       n === 1 ? '1 more full belly to go' : `${n} more full bellies to go`,
   },
@@ -191,7 +196,7 @@ export function objectiveHintText(
   if (block.action === 'add') {
     return block.requiresFollowThrough
       ? `Tap + to plan them, then tick them off. This one pays out when they are done.${scopeSuffix}`
-      : `Tap + to add a new task.${scopeSuffix}`;
+      : `Tap + and add a task of your own. The ones already on your list do not count.${scopeSuffix}`;
   }
   if (typeof block.beforeHour === 'number') {
     const hour =

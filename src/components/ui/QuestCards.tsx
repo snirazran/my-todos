@@ -326,9 +326,11 @@ export function formatQuestObjective(block: QuestCardLogicBlock) {
 
   const scopeLabel = subjectLabel;
   if (block.action === 'add') {
+    const addTarget =
+      block.targetLabel ?? (numericTarget === 1 ? 'a' : String(numericTarget));
     return block.requiresFollowThrough
       ? `Plan and finish ${targetLabel} ${scopeLabel}`
-      : `Add ${targetLabel} ${scopeLabel}`;
+      : `Add ${addTarget} ${scopeLabel} of your own`;
   }
   if (typeof block.beforeHour === 'number') {
     return `Finish ${targetLabel} ${scopeLabel} ${questHourCutoffLabel(block.beforeHour)}`;

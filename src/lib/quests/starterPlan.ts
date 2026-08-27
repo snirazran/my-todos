@@ -133,6 +133,68 @@ export function starterCadenceLabel(
   return resolved.map((d) => WEEKDAY_SHORT[d]).join(' · ');
 }
 
+export type StarterDayStart = 'early' | 'usual' | 'late';
+
+export const STARTER_DAY_START_DEFAULT: StarterDayStart = 'usual';
+
+export const STARTER_DAY_START_OPTIONS: Array<{
+  id: StarterDayStart;
+  label: string;
+  shiftMinutes: number;
+}> = [
+  { id: 'early', label: 'Early', shiftMinutes: -120 },
+  { id: 'usual', label: 'Usual', shiftMinutes: 0 },
+  { id: 'late', label: 'Late', shiftMinutes: 120 },
+];
+
+const DAY_START_EARLIEST_MINUTES = 4 * 60;
+const DAY_START_LATEST_MINUTES = 23 * 60 + 30;
+
+export function normalizeStarterDayStart(value: unknown): StarterDayStart {
+  return value === 'early' || value === 'late'
+    ? value
+    : STARTER_DAY_START_DEFAULT;
+}
+
+export function shiftStarterTime(
+  startTime: string | undefined,
+  dayStart: StarterDayStart,
+): string | undefined {
+  if (!startTime || !/^\d{2}:\d{2}$/.test(startTime)) return startTime;
+  const shift =
+    STARTER_DAY_START_OPTIONS.find((option) => option.id === dayStart)
+      ?.shiftMinutes ?? 0;
+  if (shift === 0) return startTime;
+  const [hour, minute] = startTime.split(':').map(Number);
+  const total = Math.min(
+    DAY_START_LATEST_MINUTES,
+    Math.max(DAY_START_EARLIEST_MINUTES, hour * 60 + minute + shift),
+  );
+  const hh = String(Math.floor(total / 60)).padStart(2, '0');
+  const mm = String(total % 60).padStart(2, '0');
+  return `${hh}:${mm}`;
+}
+
+export function applyStarterDayStart(
+  items: StarterPlanItem[],
+  dayStart: StarterDayStart,
+): StarterPlanItem[] {
+  if (dayStart === STARTER_DAY_START_DEFAULT) return items;
+  return items.map((item) => {
+    const startTime = shiftStarterTime(item.startTime, dayStart);
+    return { ...item, startTime, timeLabel: starterTimeLabel(startTime) };
+  });
+}
+
+export function earliestStarterTime(items: StarterPlanItem[]): string | undefined {
+  let earliest: string | undefined;
+  for (const item of items) {
+    if (!item.startTime) continue;
+    if (!earliest || item.startTime < earliest) earliest = item.startTime;
+  }
+  return earliest;
+}
+
 export function starterTimeLabel(startTime?: string): string | undefined {
   if (!startTime || !/^\d{2}:\d{2}$/.test(startTime)) return undefined;
   const [hourRaw, minute] = startTime.split(':');

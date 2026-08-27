@@ -43,30 +43,40 @@ const EXCLUDED_PREFIXES = [
 ];
 
 /**
- * Holds the offer until the screen is actually free. The server decides whether
- * the user should ever see it; this decides whether *now* is a moment worth
- * interrupting — never over a cinematic, never stacked on another sheet, and
- * never twice in one session. An offer that can't find a clean moment within a
- * few seconds is dropped rather than queued for later, so it can't surface in
- * the middle of something unrelated.
+ * Runs `show` at the next moment nothing else owns the screen — never over a
+ * cinematic, never stacked on another sheet. Two full-screen popups on top of
+ * each other don't just look wrong: the lower one is usually a Radix dialog,
+ * which parks `pointer-events: none` on the body, so the one painted on top
+ * ends up inert. `dropAfterMs` gives up instead of waiting forever, for
+ * interruptions that are only worth making right now.
  */
-function queueShieldOffer(offer: ShieldOffer) {
-  if (shieldOfferedThisSession) return;
-  shieldOfferedThisSession = true;
-
-  const deadline = Date.now() + 8000;
+function whenScreenIsFree(show: () => void, dropAfterMs?: number) {
+  const deadline =
+    dropAfterMs === undefined ? Infinity : Date.now() + dropAfterMs;
   const tryOpen = () => {
     const busy =
       useSheetStore.getState().count > 0 ||
       useUIStore.getState().isCinematicActive;
     if (!busy) {
-      openShieldSheet(offer);
+      show();
       return;
     }
     if (Date.now() > deadline) return;
     window.setTimeout(tryOpen, 600);
   };
   window.setTimeout(tryOpen, 900);
+}
+
+/**
+ * The server decides whether the user should ever see the offer; this decides
+ * whether *now* is a moment worth interrupting, and never twice in one session.
+ * An offer that can't find a clean moment within a few seconds is dropped
+ * rather than queued, so it can't surface in the middle of something unrelated.
+ */
+function queueShieldOffer(offer: ShieldOffer) {
+  if (shieldOfferedThisSession) return;
+  shieldOfferedThisSession = true;
+  whenScreenIsFree(() => openShieldSheet(offer), 8000);
 }
 
 const PLEDGE_INVITE_KEY = 'frog:pledgeInviteDay';
@@ -134,17 +144,17 @@ export function StreakCheckInProvider() {
         offer.adEligible &&
         offer.adsWatched < Math.max(1, offer.adsRequired);
       if (offer && canRescue) {
-        openStreakSheet({ rescue: offer });
+        whenScreenIsFree(() => openStreakSheet({ rescue: offer }));
       } else if (result.shieldOffer) {
         queueShieldOffer(result.shieldOffer);
       } else if (result.extended) {
-        openStreakSheet({ celebration: result });
+        whenScreenIsFree(() => openStreakSheet({ celebration: result }));
       } else if (!result.view?.goal && takePledgeInvite()) {
         // A pledge is only ever offered, never auto-enrolled — but the offer
         // used to ride on `extended`, and a new account's first check-in is
         // consumed by the onboarding prewarm. That left day one with no invite
         // at all, which is the one day it matters most.
-        openStreakSheet({ commit: true });
+        whenScreenIsFree(() => openStreakSheet({ commit: true }));
       }
       if (result.extended) {
         emitCampaignTrigger('streak_milestone', {

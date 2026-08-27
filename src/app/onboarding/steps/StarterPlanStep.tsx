@@ -6,7 +6,17 @@ import { Check } from 'lucide-react';
 import useSWR from 'swr';
 import { cn } from '@/lib/utils';
 import type { OnboardingStepProps } from './types';
-import type { StarterPlanItem } from '@/lib/quests/starterPlan';
+import {
+  applyStarterDayStart,
+  earliestStarterTime,
+  normalizeStarterDayStart,
+  shiftStarterTime,
+  starterTimeLabel,
+  STARTER_DAY_START_DEFAULT,
+  STARTER_DAY_START_OPTIONS,
+  type StarterDayStart,
+  type StarterPlanItem,
+} from '@/lib/quests/starterPlan';
 import { OnboardingFrogHeader, ONBOARDING_BODY_CLASS } from './OnboardingFrogHeader';
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
 
@@ -56,7 +66,21 @@ export default function StarterPlanStep({
     fetcher,
   );
 
-  const items = useMemo(() => data?.items ?? [], [data]);
+  const baseItems = useMemo(() => data?.items ?? [], [data]);
+  const [dayStart, setDayStart] = useState<StarterDayStart>(() =>
+    normalizeStarterDayStart(selections.starterPlanDayStart?.[0]),
+  );
+  const items = useMemo(
+    () => applyStarterDayStart(baseItems, dayStart),
+    [baseItems, dayStart],
+  );
+  const dayStartChoices = useMemo(() => {
+    const earliest = earliestStarterTime(baseItems);
+    return STARTER_DAY_START_OPTIONS.map((option) => ({
+      ...option,
+      example: starterTimeLabel(shiftStarterTime(earliest, option.id)),
+    }));
+  }, [baseItems]);
   const [checked, setChecked] = useState<string[] | null>(null);
   const skippedRef = useRef(false);
   const seenRef = useRef(false);
@@ -117,9 +141,15 @@ export default function StarterPlanStep({
 
   const commit = (ids: string[]) => {
     onSelect('starterPlanChoice', ids.length > 0 ? 'accept' : 'skip');
+    onSelect('starterPlanDayStart', dayStart);
     onSelect('starterPlan', '__clear__');
     ids.forEach((id) => onSelect('starterPlan', id, true));
     onNext();
+  };
+
+  const pickDayStart = (next: StarterDayStart) => {
+    setDayStart(next);
+    trackAnalyticsEvent('starter_plan_day_start', { dayStart: next });
   };
 
   return (
@@ -136,6 +166,58 @@ export default function StarterPlanStep({
         className={cn('flex flex-col items-center', ONBOARDING_BODY_CLASS)}
       >
         <div className="flex w-full flex-col gap-2.5 pb-2 md:mx-auto md:max-w-md">
+          {!isLoading && checked !== null && dayStartChoices.some((c) => c.example) && (
+            <div className="mb-1 flex flex-col gap-1.5">
+              <span className="px-1 text-[13px] font-black tracking-wide text-muted-foreground">
+                My day starts
+              </span>
+              <div
+                role="radiogroup"
+                aria-label="My day starts"
+                className="flex gap-1.5 rounded-2xl bg-muted/50 p-1.5"
+              >
+                {dayStartChoices.map((choice) => {
+                  const active = choice.id === dayStart;
+                  return (
+                    <motion.button
+                      key={choice.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={active}
+                      onClick={() => pickDayStart(choice.id)}
+                      disabled={saving}
+                      whileTap={{ scale: 0.96 }}
+                      className={cn(
+                        'flex flex-1 flex-col items-center gap-0.5 rounded-xl px-2 py-2 transition-colors duration-200',
+                        active
+                          ? 'bg-background shadow-sm ring-2 ring-primary/60'
+                          : 'text-muted-foreground hover:bg-background/60',
+                        saving && 'cursor-not-allowed opacity-70',
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          'text-sm font-black tracking-tight',
+                          active ? 'text-foreground' : 'text-muted-foreground',
+                        )}
+                      >
+                        {choice.label}
+                      </span>
+                      <span
+                        className={cn(
+                          'text-[12px] font-bold tabular-nums',
+                          active ? 'text-primary' : 'text-muted-foreground/70',
+                        )}
+                      >
+                        {choice.example}
+                      </span>
+                    </motion.button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {isLoading || checked === null
             ? [0, 1, 2].map((i) => (
                 <div
@@ -177,7 +259,12 @@ export default function StarterPlanStep({
                       >
                         {item.text}
                       </span>
-                      <span className="mt-1 flex flex-wrap items-center gap-1.5">
+                      {item.anchor ? (
+                        <span className="mt-0.5 block text-sm font-medium leading-snug text-muted-foreground line-clamp-2">
+                          {item.anchor}
+                        </span>
+                      ) : null}
+                      <span className="mt-1.5 flex items-center gap-1.5">
                         <span
                           className={cn(
                             'rounded-full px-2 py-0.5 text-[13px] font-black tracking-wide',
@@ -188,20 +275,21 @@ export default function StarterPlanStep({
                         >
                           {item.cadenceLabel}
                         </span>
-                        {item.timeLabel ? (
-                          <span className="rounded-full bg-muted px-2 py-0.5 text-[13px] font-black tracking-wide text-muted-foreground">
-                            {item.timeLabel}
-                          </span>
-                        ) : null}
-                        <span className="text-[13px] font-bold tracking-wide text-muted-foreground/70">
+                        <span className="min-w-0 flex-1 truncate text-[13px] font-bold tracking-wide text-muted-foreground/70">
                           {item.categoryName}
                         </span>
+                        {item.timeLabel ? (
+                          <motion.span
+                            key={item.timeLabel}
+                            initial={{ opacity: 0, y: -4 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.2 }}
+                            className="shrink-0 text-[13px] font-black tabular-nums tracking-wide text-muted-foreground"
+                          >
+                            {item.timeLabel}
+                          </motion.span>
+                        ) : null}
                       </span>
-                      {item.anchor ? (
-                        <span className="mt-1 block text-sm font-medium leading-snug text-muted-foreground line-clamp-1">
-                          {item.anchor}
-                        </span>
-                      ) : null}
                     </span>
 
                     <span

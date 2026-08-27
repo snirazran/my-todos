@@ -89,6 +89,14 @@ export function normalizeFocusProfile(user: UserDoc): FocusProfile {
 
 export const DAILY_QUESTS_UNLOCK_STEP_TARGET = 5;
 
+/**
+ * Put on the user's list for them — the tutorial fly task and the onboarding
+ * starter plan. "Add a task" objectives skip these; completing them still
+ * counts, because on day one they are the whole list.
+ */
+const isSeededForUser = (task: { isStarter?: boolean; isSeededPlan?: boolean }) =>
+  !!task.isStarter || !!task.isSeededPlan;
+
 /** The onboarding objective that introduces the weekly Leap. */
 const LEAP_ONBOARDING_METRIC = 'focus_tag_linked';
 
@@ -470,7 +478,7 @@ function progressForLogicBlock(args: {
 
   if (block.action === 'add') {
     const predicate = (task: TaskDoc) =>
-      !task.isStarter && matchesLogicBlock(task, block);
+      !isSeededForUser(task) && matchesLogicBlock(task, block);
     return block.requiresFollowThrough
       ? countFollowedThroughAdds(tasks, timezone, startDate, endDate, predicate)
       : countAddedTasks(tasks, timezone, startDate, endDate, predicate);
@@ -824,7 +832,7 @@ function historyBaseline(args: {
       );
     } else if (entry.action === 'add') {
       perDay.push(
-        countAddedTasks(tasks, timezone, dateKey, dateKey, (task) => !task.isStarter),
+        countAddedTasks(tasks, timezone, dateKey, dateKey, (task) => !isSeededForUser(task)),
       );
     } else {
       perDay.push(countCompletedEvents(tasks, timezone, dateKey, dateKey, () => true));
@@ -1542,6 +1550,7 @@ export async function syncQuestState(args: {
         focusAreaId: 1,
         frogodoroSessions: 1,
         isStarter: 1,
+        isSeededPlan: 1,
       },
     ).lean<TaskDoc[]>(),
     includeCatalog

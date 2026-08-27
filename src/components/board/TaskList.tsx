@@ -35,7 +35,6 @@ import { patchInventoryFlies } from '@/hooks/useInventory';
 import { useBuddyState } from '@/hooks/useBuddyState';
 import { mutateFriendsCaches } from '@/hooks/useFriendsSync';
 import { notifyQuestClaims } from '@/lib/questClaims';
-import { queuePlusIntroOnce } from '@/lib/plusIntro';
 import { useLeftTongue } from './LeftTongue';
 import { hapticSuccess, hapticTick } from '@/lib/haptics';
 import {
@@ -329,9 +328,6 @@ export default React.memo(function TaskList({
               </span>
             </div>,
           );
-        }
-        if (completing && !json?.flyStatus?.isPremium) {
-          queuePlusIntroOnce();
         }
       })
         .catch(refresh);
