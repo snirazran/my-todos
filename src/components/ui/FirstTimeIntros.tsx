@@ -31,10 +31,15 @@ import Frog, {
 } from '@/components/ui/frog';
 import { useFrogTongue, TONGUE_STROKE } from '@/hooks/useFrogTongue';
 
+// Above the notification stack (z-1300): a one-time explainer must never be
+// covered by a toast — an undo prompt was landing on top of the belly intro.
+const INTRO_Z = 1310;
+const INTRO_TONGUE_Z = INTRO_Z + 10;
+
 function IntroShell({
   open,
   onClose,
-  zIndex,
+  zIndex = INTRO_Z,
   scrollRef,
   children,
 }: {
@@ -442,7 +447,7 @@ function BellyStage({
             key={grab.startAt}
             aria-hidden
             className="fixed inset-0 pointer-events-none"
-            style={{ width: vp.w, height: vp.h, zIndex: 1060 }}
+            style={{ width: vp.w, height: vp.h, zIndex: INTRO_TONGUE_Z }}
             width={vp.w}
             height={vp.h}
             viewBox={`0 0 ${vp.w} ${vp.h}`}

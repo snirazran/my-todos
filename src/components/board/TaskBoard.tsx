@@ -2338,9 +2338,10 @@ export default function TaskBoard({
           transition: 'padding 200ms ease',
         }}
         className={`fixed bottom-0 left-0 right-0 px-3 md:px-4 pb-[calc(env(safe-area-inset-bottom)+84px+var(--stack))] md:pb-[calc(env(safe-area-inset-bottom)+32px+var(--stack))] pointer-events-none transition-opacity duration-150 ${
-          // Above the drag ghost (z-[100]) while dragging so the drop-zone
-          // label isn't hidden under the card that's hovering over it.
-          drag?.active ? 'z-[105]' : 'z-[40]'
+          // Below the drag ghost (z-[100]): the card under the finger is the
+          // object being manipulated and has to stay visible. The strip's fill
+          // and border still read as the active target around it.
+          drag?.active ? 'z-[95]' : 'z-[40]'
         } ${
           scrollLocked || (selection.active && !drag?.active)
             ? 'invisible opacity-0'
@@ -2482,25 +2483,48 @@ export default function TaskBoard({
                   }`}
                 >
                   {draggingRepeating ? (
-                    <EyeOff className="h-5 w-5 shrink-0" />
+                    <EyeOff className="h-6 w-6 shrink-0" />
                   ) : (
-                    <ArrowDownToLine className="h-5 w-5 shrink-0" />
+                    <ArrowDownToLine className="h-6 w-6 shrink-0" />
                   )}
-                  <span className="text-sm font-bold whitespace-nowrap">
-                    {isDragOverBacklog
-                      ? draggingRepeating
-                        ? 'Release to skip this day'
-                        : 'Release to save for later'
-                      : draggingRepeating
-                        ? 'Drop to skip this day'
-                        : 'Drop to save for later'}
-                  </span>
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
         </div>
       </div>
+
+      {/* The drop label rides above the toolbar rather than inside it: the card
+          under the finger sits over the strip, and a label printed on the strip
+          disappears underneath it exactly when it matters most. */}
+      <AnimatePresence>
+        {drag?.active && (
+          <motion.div
+            key="drop-hint"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 6 }}
+            transition={{ type: 'spring', stiffness: 480, damping: 32 }}
+            className="pointer-events-none fixed inset-x-0 z-[110] flex justify-center px-4 bottom-[calc(env(safe-area-inset-bottom)+158px)] md:bottom-[calc(env(safe-area-inset-bottom)+110px)]"
+          >
+            <span
+              className={`inline-flex items-center gap-2 whitespace-nowrap rounded-full border px-4 py-2 text-sm font-black shadow-xl backdrop-blur-xl transition-colors ${
+                isDragOverBacklog
+                  ? 'border-primary bg-primary text-primary-foreground'
+                  : 'border-primary/30 bg-card text-primary'
+              }`}
+            >
+              {isDragOverBacklog
+                ? draggingRepeating
+                  ? 'Release to skip this day'
+                  : 'Release to save for later'
+                : draggingRepeating
+                  ? 'Drop to skip this day'
+                  : 'Drop to save for later'}
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <BacklogTray
         isOpen={backlogOpen}

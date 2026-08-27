@@ -5,34 +5,41 @@ import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 
 import { ArrowLeftRight, CalendarDays, ListChecks } from 'lucide-react';
-import Fly from '@/components/ui/fly';
 import { Icon } from '@/components/ui/Icon';
+import { GiftRive } from '@/components/ui/gift-box/GiftBox';
 import {
   measure,
   useAnchorTracker,
   type AnchorRect,
 } from '@/lib/hints/useAnchorTracker';
 import { usePlannerTour } from '@/hooks/usePlannerTour';
-import { TOUR_BEAT_COUNT } from '@/lib/tour/plannerTour';
+import {
+  TOUR_BEAT_COUNT,
+  PLANNER_TOUR_GIFT_ID,
+  PLANNER_TOUR_GIFT_RIVE,
+} from '@/lib/tour/plannerTour';
+import GiftBoxOpening from '@/components/ui/gift-box/GiftBoxOpening';
 import GhostHand, {
   PointerArrow,
   TapPulse,
   TAP_PULSE_MAX_EXTENT,
 } from './GhostHand';
+import TourRewardOverlay from './TourRewardOverlay';
 
 const RING_PADDING = 6;
 const BEAT_REACQUIRE_MS = 60_000;
+const MISSED_PRESS_MS = 4000;
 /** Above this width a target is a row, and gets a tint rather than a halo. */
 const WIDE_TARGET = 200;
 
 const OPENER_MOVES = [
   {
     icon: <ArrowLeftRight className="h-4 w-4" strokeWidth={2.75} />,
-    text: 'Move a task to any day',
+    text: 'Move to any day',
   },
   {
     icon: <Icon name="saved" className="h-5 w-5" />,
-    text: 'Save one for later',
+    text: 'Save for later',
   },
   {
     icon: <ListChecks className="h-4 w-4" strokeWidth={2.75} />,
@@ -273,6 +280,30 @@ export default function PlannerTour({
     return () => document.removeEventListener('pointerdown', onDown, true);
   }, [running, beat, el]);
 
+  // Tap beats have no event to replay, so the last press on a hinted control is
+  // remembered and credited if the beat asking for it arms just afterwards.
+  const lastPressRef = useRef<{ anchor: string; at: number } | null>(null);
+  useEffect(() => {
+    const onDown = (event: PointerEvent) => {
+      if (!(event.target instanceof Element)) return;
+      const hinted = event.target.closest<HTMLElement>('[data-hint]');
+      if (hinted?.dataset.hint) {
+        lastPressRef.current = { anchor: hinted.dataset.hint, at: Date.now() };
+      }
+    };
+    document.addEventListener('pointerdown', onDown, true);
+    return () => document.removeEventListener('pointerdown', onDown, true);
+  }, []);
+
+  useEffect(() => {
+    if (!running || !beat?.onPress) return;
+    const last = lastPressRef.current;
+    if (!last || last.anchor !== beat.anchor) return;
+    if (Date.now() - last.at > MISSED_PRESS_MS) return;
+    lastPressRef.current = null;
+    completeRef.current();
+  }, [running, beat]);
+
   if (!mounted || !enabled) return null;
   if (phase === 'idle' || phase === 'done') return null;
 
@@ -304,19 +335,28 @@ export default function PlannerTour({
   const ringRects = eligible.filter(
     (r) => Math.min(r.width, r.height) > TAP_PULSE_MAX_EXTENT,
   );
-  const isCelebrating = phase === 'payoff' || phase === 'finale';
+  const isCelebrating = phase === 'payoff';
+  // The finale hands over to the reward card, which is its own full-screen
+  // moment — the coach bar would just compete with it.
   const showCoachBar = (running || isCelebrating) && !dragging;
-  const coachText =
-    phase === 'finale'
-      ? 'All yours now. Add a real one?'
-      : phase === 'payoff'
-        ? tour.payoff
-        : label;
+  const coachText = isCelebrating ? tour.payoff : label;
   // Keyed on the text, not the beat: the next chapter's beat is already staged
   // while its payoff is still showing, and keying on it would re-animate the
   // same line mid-celebration.
-  const coachKey =
-    phase === 'finale' ? 'finale' : `${phase}:${coachText ?? ''}`;
+  const coachKey = `${phase}:${coachText ?? ''}`;
+
+  if (phase === 'finale') {
+    return <TourRewardOverlay claiming={tour.claiming} onClaim={tour.claimReward} />;
+  }
+
+  if (phase === 'opening') {
+    return (
+      <GiftBoxOpening
+        giftBoxId={PLANNER_TOUR_GIFT_ID}
+        onClose={tour.closeGift}
+      />
+    );
+  }
 
   return createPortal(
     <>
@@ -330,23 +370,22 @@ export default function PlannerTour({
             transition={{ type: 'spring', stiffness: 320, damping: 30 }}
             className="fixed inset-x-0 bottom-0 z-[2002] flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom)+76px+1rem)] md:pb-[calc(env(safe-area-inset-bottom)+1.25rem)]"
           >
-            <div className="pointer-events-auto w-full max-w-sm rounded-3xl border border-border/60 bg-card/95 p-5 shadow-2xl backdrop-blur-xl">
-              <div className="flex items-center gap-3">
-                <span className="-mt-3 shrink-0">
-                  <Fly size={46} alwaysPlay interactive={false} oversample={1.5} />
-                </span>
-                <h2 className="min-w-0 flex-1 text-[17px] font-black leading-tight text-foreground">
-                  Your week, in four moves
-                </h2>
-                <span className="shrink-0 rounded-full bg-muted px-2 py-1 text-[11px] font-black text-muted-foreground">
-                  1 min
-                </span>
+            <div className="pointer-events-auto w-full max-w-sm rounded-3xl border border-border/60 bg-card/95 p-5 pt-0 shadow-2xl backdrop-blur-xl">
+              <div className="-mt-9 mb-1 flex justify-center">
+                <GiftRive width={92} height={92} color={PLANNER_TOUR_GIFT_RIVE} />
               </div>
 
-              <ul className="mt-4 grid gap-2">
+              <h2 className="text-center text-[19px] font-black leading-tight text-foreground">
+                Finish the tour, get a free gift
+              </h2>
+              <p className="mt-1 text-center text-[12.5px] font-bold text-muted-foreground">
+                Learn these four moves · about a minute
+              </p>
+
+              <ul className="mt-3.5 grid gap-1.5">
                 {OPENER_MOVES.map(({ icon, text }) => (
                   <li key={text} className="flex items-center gap-2.5">
-                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
                       {icon}
                     </span>
                     <span className="text-[13px] font-bold text-foreground">
@@ -356,7 +395,7 @@ export default function PlannerTour({
                 ))}
               </ul>
 
-              <div className="mt-4 flex items-center gap-2">
+              <div className="mt-3 flex items-center gap-2">
                 <button
                   type="button"
                   onClick={tour.start}

@@ -9,6 +9,12 @@ export const TOUR_EVENT = {
 
 export const TUTORIAL_CARD_HINT = 'tutorial-card';
 
+/** Paid once, on genuine completion — skipping the tour earns nothing. */
+export const PLANNER_TOUR_GIFT_ID = 'gift_box_1';
+export const PLANNER_TOUR_GIFT_NAME = 'Common Gift';
+/** riveIndex of gift_box_1 in the catalog, for the box's colour variant. */
+export const PLANNER_TOUR_GIFT_RIVE = 0;
+
 export function emitTourEvent(
   name: string,
   detail?: Record<string, unknown>,
