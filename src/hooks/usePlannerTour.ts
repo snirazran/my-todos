@@ -22,9 +22,6 @@ type Phase =
   | 'opening'
   | 'done';
 
-/** TESTING ONLY — set back to false so the tour runs once per account. */
-const REPLAY_TOUR_EVERY_VISIT = true;
-
 const IDLE_SOFTEN_MS = 45_000;
 /** Long enough to read a short line of praise, short enough to stay snappy. */
 const PAYOFF_HOLD_MS = 1000;
@@ -105,8 +102,6 @@ async function grantReward(): Promise<boolean> {
   try {
     const res = await fetch('/api/user/planner-tour-reward', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ replay: REPLAY_TOUR_EVERY_VISIT }),
     });
     if (!res.ok) return false;
     const data = (await res.json()) as { granted?: boolean };
@@ -196,9 +191,7 @@ export function usePlannerTour({
 
   useEffect(() => {
     if (!enabled || phase !== 'idle') return;
-    if (!REPLAY_TOUR_EVERY_VISIT && (!seenIntros || seenIntros.plannerTour)) {
-      return;
-    }
+    if (!seenIntros || seenIntros.plannerTour) return;
     setPhase('opener');
   }, [enabled, phase, seenIntros]);
 

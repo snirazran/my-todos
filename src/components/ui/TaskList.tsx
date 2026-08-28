@@ -920,17 +920,6 @@ const SortableTaskItem = React.forwardRef<
                             startTime={task.startTime}
                             endTime={task.endTime}
                             reminder={task.reminder}
-                            overdue={(() => {
-                              if (isDone) return false;
-                              const ref = task.endTime || task.startTime;
-                              const [h, m] = ref.split(':').map(Number);
-                              if (!Number.isFinite(h)) return false;
-                              const now = new Date();
-                              return (
-                                now.getHours() * 60 + now.getMinutes() >
-                                h * 60 + (m || 0)
-                              );
-                            })()}
                           />
                         </motion.span>
                       )}
@@ -999,7 +988,7 @@ const SortableTaskItem = React.forwardRef<
                     >
                       <Flame
                         className={`h-4 w-4 ${isDone ? '' : 'motion-safe:animate-pulse'}`}
-                        fill={isDone ? 'currentColor' : 'none'}
+                        fill="currentColor"
                       />
                       <span className="text-[12px] font-black tabular-nums leading-none">
                         ×{task.streak}

@@ -12,14 +12,12 @@ export function TimeTag({
   reminder,
   size = 'sm',
   className,
-  overdue = false,
 }: {
   startTime: string;
   endTime?: string;
   reminder?: string | boolean | null;
   size?: keyof typeof SIZES;
   className?: string;
-  overdue?: boolean;
 }) {
   if (!startTime) return null;
 
@@ -34,9 +32,7 @@ export function TimeTag({
     <span
       className={cn(
         'inline-flex items-center gap-1 rounded-md border font-bold tracking-normal shadow-sm',
-        overdue
-          ? 'border-red-500/25 bg-red-500/10 text-red-600 dark:text-red-400'
-          : 'border-primary/20 bg-primary/10 text-primary',
+        'border-primary/20 bg-primary/10 text-primary',
         SIZES[size],
         className,
       )}
