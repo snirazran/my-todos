@@ -21,6 +21,7 @@ export default function PlannerHeader({
       <button
         type="button"
         data-hint="planner-date"
+        aria-expanded={expanded}
         onClick={onToggle}
         className="pointer-events-auto flex items-center gap-2 px-3 py-2 rounded-2xl bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
       >
@@ -58,6 +59,7 @@ export default function PlannerHeader({
     <button
       type="button"
       data-hint="planner-date"
+      aria-expanded={expanded}
       onClick={onToggle}
       className="pointer-events-auto flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-card/40 backdrop-blur-xl text-foreground"
     >

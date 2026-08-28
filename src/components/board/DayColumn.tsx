@@ -95,7 +95,7 @@ export default function DayColumn({
           </h2>
 
           {headerAction ? (
-            <div className="relative flex items-center gap-2.5">{headerAction}</div>
+            <div className="relative -mr-1 flex items-center gap-1">{headerAction}</div>
           ) : null}
         </div>
 

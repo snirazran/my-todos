@@ -2,10 +2,11 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, useAnimationControls } from 'framer-motion';
 
 import { ArrowLeftRight, CalendarDays, ListChecks } from 'lucide-react';
 import { Icon } from '@/components/ui/Icon';
+import { hapticTick } from '@/lib/haptics';
 import { GiftRive } from '@/components/ui/gift-box/GiftBox';
 import {
   measure,
@@ -20,11 +21,16 @@ import {
 } from '@/lib/tour/plannerTour';
 import GiftBoxOpening from '@/components/ui/gift-box/GiftBoxOpening';
 import GhostHand, {
+  DragEdgeArrows,
   PointerArrow,
   TapPulse,
   TAP_PULSE_MAX_EXTENT,
 } from './GhostHand';
 import TourRewardOverlay from './TourRewardOverlay';
+import TourSpotlight, {
+  radiusValue,
+  type SpotlightHole,
+} from './TourSpotlight';
 
 const RING_PADDING = 6;
 const BEAT_REACQUIRE_MS = 60_000;
@@ -112,6 +118,9 @@ export default function PlannerTour({
   const [desktop, setDesktop] = useState(false);
   const [interacting, setInteracting] = useState(false);
   const [dragging, setDragging] = useState(false);
+  const [nudge, setNudge] = useState(0);
+  const [viewport, setViewport] = useState({ width: 0, height: 0 });
+  const shake = useAnimationControls();
 
   useEffect(() => {
     setMounted(true);
@@ -121,6 +130,31 @@ export default function PlannerTour({
     query.addEventListener('change', update);
     return () => query.removeEventListener('change', update);
   }, []);
+
+  useEffect(() => {
+    const read = () =>
+      setViewport((prev) =>
+        prev.width === window.innerWidth && prev.height === window.innerHeight
+          ? prev
+          : { width: window.innerWidth, height: window.innerHeight },
+      );
+    read();
+    window.addEventListener('resize', read);
+    window.addEventListener('orientationchange', read);
+    return () => {
+      window.removeEventListener('resize', read);
+      window.removeEventListener('orientationchange', read);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (nudge === 0) return;
+    hapticTick();
+    void shake.start({
+      x: [0, -7, 7, -4, 4, 0],
+      transition: { duration: 0.34, ease: 'easeInOut' },
+    });
+  }, [nudge, shake]);
 
   useEffect(() => {
     const scroller = document.querySelector('[data-role="board-scroller"]');
@@ -134,6 +168,35 @@ export default function PlannerTour({
     });
     return () => observer.disconnect();
   }, [phase]);
+
+  // The keep-going arrows have done their job once the board has actually
+  // travelled a column — past that they are pointing at a day the card has
+  // already reached.
+  const [pannedAway, setPannedAway] = useState(false);
+  useEffect(() => {
+    if (!dragging) {
+      setPannedAway(false);
+      return;
+    }
+    const scroller = document.querySelector<HTMLElement>(
+      '[data-role="board-scroller"]',
+    );
+    if (!scroller) return;
+    const from = scroller.scrollLeft;
+    const column = document.querySelector<HTMLElement>('[data-col="true"]');
+    const travelled = (column?.offsetWidth ?? 320) * 0.55;
+    const check = () => {
+      if (Math.abs(scroller.scrollLeft - from) >= travelled) {
+        setPannedAway(true);
+      }
+    };
+    const interval = window.setInterval(check, 100);
+    scroller.addEventListener('scroll', check, { passive: true });
+    return () => {
+      window.clearInterval(interval);
+      scroller.removeEventListener('scroll', check);
+    };
+  }, [dragging]);
 
   useEffect(() => {
     const down = () => setInteracting(true);
@@ -152,6 +215,7 @@ export default function PlannerTour({
     ? beat.selector ?? `[data-hint="${beat.anchor}"]`
     : null;
 
+  const holesRef = useRef<SpotlightHole[]>([]);
   const skipBeatRef = useRef(tour.skipBeat);
   skipBeatRef.current = tour.skipBeat;
   const everAcquiredRef = useRef(false);
@@ -179,6 +243,53 @@ export default function PlannerTour({
   const { rect: dragToRect } = useAnchorTracker({
     selector: dragToSelector,
     resetKey: running && beat?.dragTo ? `${beat.id}:to` : null,
+    scrollIntoView: false,
+  });
+
+  // The control that opened the state this beat lives in. It is cut out of the
+  // dim only while that state is off — the way back in after multi-select
+  // drops itself, never a second highlight beside the real target.
+  const escapeAnchor = useMemo(() => {
+    if (!running || !tour.chapter || !beat) return null;
+    const beats = tour.chapter.beats;
+    const index = beats.findIndex((b) => b.id === beat.id);
+    for (let i = index - 1; i >= 0; i--) {
+      if (beats[i].onPress) return beats[i].anchor;
+    }
+    return null;
+  }, [running, tour.chapter, beat]);
+
+  const { rect: escapeRect } = useAnchorTracker({
+    selector: escapeAnchor ? `[data-hint="${escapeAnchor}"]` : null,
+    resetKey: escapeAnchor && beat ? `${beat.id}:escape` : null,
+    // Only while the mode it opens is off. Once multi-select is on, its button
+    // is neither a target nor a way out, so it goes back under the dim.
+    gate: () => {
+      if (!escapeAnchor) return false;
+      const node = document.querySelector(`[data-hint="${escapeAnchor}"]`);
+      if (!node) return false;
+      return (
+        node.getAttribute('aria-pressed') !== 'true' &&
+        node.getAttribute('aria-expanded') !== 'true'
+      );
+    },
+    // Keep watching for the whole step: the way back in has to reappear the
+    // moment multi-select drops itself, not only in the first seconds.
+    timeoutMs: BEAT_REACQUIRE_MS,
+    reacquireTimeoutMs: BEAT_REACQUIRE_MS,
+    scrollIntoView: false,
+  });
+
+  // The Saved box turns into a full-width drop strip the moment a card is
+  // lifted, so the strip — not the box — is what the hint has to point at.
+  const dropZoneSelector =
+    running && dragging && beat?.dragTo === 'saved-tasks'
+      ? '[data-hint="saved-drop-zone"]'
+      : null;
+  const { rect: dropZoneRect } = useAnchorTracker({
+    selector: dropZoneSelector,
+    resetKey: dropZoneSelector && beat ? `${beat.id}:drop` : null,
+    coverCheck: false,
     scrollIntoView: false,
   });
 
@@ -336,6 +447,56 @@ export default function PlannerTour({
     (r) => Math.min(r.width, r.height) > TAP_PULSE_MAX_EXTENT,
   );
   const isCelebrating = phase === 'payoff';
+  // The step's own target(s) only. A drag beat's destination stays under the
+  // dim — the trail already points at it, and a second cutout out there reads
+  // as a competing target.
+  const liveHoles: SpotlightHole[] = running
+    ? [
+        ...allRects.map((r) => ({
+          top: r.top,
+          left: r.left,
+          width: r.width,
+          height: r.height,
+          radius: radiusValue(r.radius),
+        })),
+        ...(escapeRect ? [{ ...escapeRect, radius: 20 }] : []),
+      ]
+    : [];
+  // A beat completes on pointerdown, so the cutout would otherwise move out
+  // from under a finger that is still pressing — the release then lands on the
+  // scrim and the browser drops the click entirely.
+  if (liveHoles.length > 0 && settled && !interacting) {
+    holesRef.current = liveHoles;
+  }
+  const frozen = interacting && holesRef.current.length > 0;
+  // Between two beats — the celebration, and the card seeding behind it — the
+  // dim closes over the whole board instead of holding the finished step's
+  // cutout open on a row that has already moved or gone.
+  const scrimHoles = !running
+    ? []
+    : frozen
+      ? holesRef.current
+      : settled
+        ? liveHoles
+        : [];
+  // Where the card was picked up from, so the keep-going arrows sit level with
+  // it rather than at some fixed height the card has already left.
+  const grabbedFrom = holesRef.current[0] ?? rect;
+  const showDragArrows =
+    running &&
+    dragging &&
+    !pannedAway &&
+    beat?.dragTo === 'tour-next-day' &&
+    !!grabbedFrom;
+  const showDropArrows =
+    running && dragging && beat?.dragTo === 'saved-tasks' && !!dropZoneRect;
+  // The dim steps out of the way for the whole drag: the card is already the
+  // focus once it is in the air, and dimming the board it is being dropped on
+  // fights the drop zones instead of guiding them.
+  const showScrim =
+    viewport.width > 0 &&
+    !dragging &&
+    (phase === 'opener' || running || isCelebrating);
   // The finale hands over to the reward card, which is its own full-screen
   // moment — the coach bar would just compete with it.
   const showCoachBar = (running || isCelebrating) && !dragging;
@@ -361,6 +522,20 @@ export default function PlannerTour({
   return createPortal(
     <>
       <AnimatePresence>
+        {showScrim && (
+          <TourSpotlight
+            key="scrim"
+            holes={phase === 'opener' ? [] : scrimHoles}
+            blocking={
+              running && !dragging && !interacting && scrimHoles.length > 0
+            }
+            viewport={viewport}
+            onBlockedPress={() => setNudge((n) => n + 1)}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {phase === 'opener' && (
           <motion.div
             key="opener"
@@ -370,9 +545,20 @@ export default function PlannerTour({
             transition={{ type: 'spring', stiffness: 320, damping: 30 }}
             className="fixed inset-x-0 bottom-0 z-[2002] flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom)+76px+1rem)] md:pb-[calc(env(safe-area-inset-bottom)+1.25rem)]"
           >
-            <div className="pointer-events-auto w-full max-w-sm rounded-3xl border border-border/60 bg-card/95 p-5 pt-0 shadow-2xl backdrop-blur-xl">
-              <div className="-mt-9 mb-1 flex justify-center">
-                <GiftRive width={92} height={92} color={PLANNER_TOUR_GIFT_RIVE} />
+            <div className="pointer-events-auto w-full max-w-sm rounded-3xl border border-border/60 bg-card p-5 pt-0 shadow-2xl dark:border-primary/30 dark:shadow-[0_24px_60px_-20px_rgba(0,0,0,0.9)]">
+              {/* The quest page's reward tile, at opener size — a gift the
+                  user has seen there reads as the same object here. */}
+              <div className="-mt-10 mb-2 flex justify-center">
+                <div className="relative flex h-20 w-20 items-center justify-center overflow-visible rounded-[24px] border-2 border-slate-300 bg-gradient-to-br from-slate-200 to-slate-100 shadow-sm shadow-slate-900/10 dark:border-slate-600 dark:from-slate-800 dark:to-slate-900">
+                  <div className="absolute inset-0 z-10 flex items-center justify-center">
+                    <div className="h-[124%] w-[124%] -translate-y-[13%] drop-shadow-lg">
+                      <GiftRive
+                        className="h-full w-full"
+                        color={PLANNER_TOUR_GIFT_RIVE}
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <h2 className="text-center text-[19px] font-black leading-tight text-foreground">
@@ -385,7 +571,7 @@ export default function PlannerTour({
               <ul className="mt-3.5 grid gap-1.5">
                 {OPENER_MOVES.map(({ icon, text }) => (
                   <li key={text} className="flex items-center gap-2.5">
-                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary dark:bg-primary/20 dark:text-white dark:ring-1 dark:ring-primary/40">
                       {icon}
                     </span>
                     <span className="text-[13px] font-bold text-foreground">
@@ -399,7 +585,7 @@ export default function PlannerTour({
                 <button
                   type="button"
                   onClick={tour.start}
-                  className="inline-flex h-12 flex-1 items-center justify-center rounded-2xl bg-primary text-[15px] font-black text-primary-foreground shadow-[0_4px_0_0_#34631f] transition-all hover:brightness-105 active:translate-y-[2px] active:shadow-none"
+                  className="inline-flex h-12 flex-1 items-center justify-center rounded-2xl bg-primary text-[15px] font-black text-primary-foreground shadow-[0_4px_0_0_#34631f] transition-all hover:brightness-105 active:translate-y-[2px] active:shadow-none dark:shadow-[0_4px_0_0_#1b4a16]"
                 >
                   Show me how
                 </button>
@@ -417,6 +603,23 @@ export default function PlannerTour({
       </AnimatePresence>
 
       {showGhost && rect && <GhostHand from={rect} to={ghostTarget} />}
+
+      {showDragArrows && grabbedFrom && (
+        <DragEdgeArrows
+          direction="right"
+          at={{ x: 0, y: grabbedFrom.top + grabbedFrom.height / 2 }}
+        />
+      )}
+
+      {showDropArrows && dropZoneRect && (
+        <DragEdgeArrows
+          direction="down"
+          at={{
+            x: dropZoneRect.left + dropZoneRect.width / 2,
+            y: dropZoneRect.top,
+          }}
+        />
+      )}
 
       {pulseRects.map((r, i) => (
         <TapPulse key={`pulse-${i}`} at={r} />
@@ -442,17 +645,20 @@ export default function PlannerTour({
             className={`absolute inset-0 rounded-2xl ring-[3px] ${
               tour.softened
                 ? 'ring-primary/45'
-                : 'ring-primary shadow-[0_0_18px_5px_rgba(122,183,66,0.35)]'
+                : 'ring-primary shadow-[0_0_18px_5px_hsl(var(--primary)/0.35)] dark:shadow-[0_0_22px_6px_hsl(var(--primary)/0.45)]'
             }`}
           />
         </div>
         ))}
 
       {showCoachBar && (
-        <div className="pointer-events-none fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+176px)] z-[2002] flex justify-center px-4 md:bottom-[calc(env(safe-area-inset-bottom)+124px)]">
+        <motion.div
+          animate={shake}
+          className="pointer-events-none fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+176px)] z-[2002] flex justify-center px-4 md:bottom-[calc(env(safe-area-inset-bottom)+124px)]"
+        >
           <motion.div
             layout
-            className="pointer-events-auto w-full max-w-sm rounded-2xl border border-primary/35 bg-card/95 px-4 py-3 shadow-xl backdrop-blur-xl"
+            className="pointer-events-auto w-full max-w-sm rounded-2xl border border-primary/35 bg-card px-4 py-3 shadow-xl dark:border-primary/50 dark:shadow-[0_18px_44px_-16px_rgba(0,0,0,0.95)]"
           >
             <div className="flex items-start">
               <AnimatePresence mode="wait" initial={false}>
@@ -492,7 +698,7 @@ export default function PlannerTour({
               </button>
             </div>
           </motion.div>
-        </div>
+        </motion.div>
       )}
     </>,
     document.body,

@@ -65,6 +65,9 @@ export function isUsableAnchor(
     if (!hit || hit === el || el.contains(hit) || hit.contains(el)) {
       return true;
     }
+    // The tour's own dim covers the whole viewport by design. Counting it as
+    // cover would make every anchor unacquirable the moment the scrim is up.
+    if (hit.closest('[data-tour-scrim]')) return true;
   }
   return !sawInViewportProbe;
 }

@@ -55,6 +55,7 @@ export default function GiftBoxOpening({
   const [revealCount, setRevealCount] = useState(0);
   const [adBusy, setAdBusy] = useState(false);
   const [adError, setAdError] = useState<string | null>(null);
+  const [openError, setOpenError] = useState<string | null>(null);
   const [showPlusOffer, setShowPlusOffer] = useState(false);
   const [loadingText, setLoadingText] = useState(
     () => FUNNY_SENTENCES[Math.floor(Math.random() * FUNNY_SENTENCES.length)],
@@ -80,6 +81,7 @@ export default function GiftBoxOpening({
   // Handle opening logic
   const handleOpen = async () => {
     if (phase !== 'idle') return;
+    setOpenError(null);
     setPhase('shaking');
 
     // Cycle funny sentences
@@ -111,8 +113,14 @@ export default function GiftBoxOpening({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ giftBoxId }),
-      }).then((res) => {
-        if (!res.ok) throw new Error('Failed to open gift');
+      }).then(async (res) => {
+        if (!res.ok) {
+          const body = await res.json().catch(() => null);
+          throw new Error(
+            (body as { error?: string } | null)?.error ??
+              `Failed to open gift (${res.status})`,
+          );
+        }
         return res.json();
       });
 
@@ -133,7 +141,12 @@ export default function GiftBoxOpening({
       }
     } catch (err) {
       console.error(err);
-      onClose(); // Close on error
+      // Vanishing on failure reads as a dead button and loses the reason;
+      // the box stays put with the server's own message and can be retried.
+      setOpenError(
+        err instanceof Error ? err.message : 'Could not open this gift',
+      );
+      setPhase('idle');
     } finally {
       clearInterval(interval);
     }
@@ -357,6 +370,19 @@ export default function GiftBoxOpening({
             </motion.div>
           )}
         </AnimatePresence>
+
+        {openError && phase === 'idle' && (
+          <div className="mt-4 flex flex-col items-center gap-2 text-center">
+            <p className="text-[13px] font-bold text-red-300">{openError}</p>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-full px-3 py-1 text-[12px] font-bold text-white/70 transition-colors hover:text-white"
+            >
+              Close
+            </button>
+          </div>
+        )}
       </div>
 
       <PlusUpgradeModal

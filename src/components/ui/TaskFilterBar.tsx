@@ -27,35 +27,43 @@ export function FilterTriggerButton({
   activeCount: number;
   open?: boolean;
   compact?: boolean;
-  /** Compact only — 'lg' is the thumb-sized variant for the mobile toolbar. */
-  size?: 'sm' | 'lg';
+  /** Compact only — 'md' fits a column header, 'lg' a thumb-sized toolbar. */
+  size?: 'sm' | 'md' | 'lg';
   label?: string;
   triggerRef?: React.Ref<HTMLButtonElement>;
 }) {
   const on = activeCount > 0 || open;
   if (compact) {
-    const lg = size === 'lg';
+    const box =
+      size === 'lg'
+        ? 'h-11 w-11 rounded-2xl'
+        : size === 'md'
+          ? 'h-9 w-9 rounded-xl'
+          : 'h-7 w-7 rounded-lg';
+    const glyph = size === 'lg' ? 20 : size === 'md' ? 18 : 16;
     return (
       <button
         ref={triggerRef}
+        type="button"
         onClick={onClick}
         aria-label="Filter"
+        aria-pressed={open ?? undefined}
         title="Filter"
-        className={`relative flex items-center justify-center transition-all active:scale-90 ${
-          lg ? 'h-11 w-11 rounded-2xl' : 'h-7 w-7 rounded-lg'
-        } ${
+        className={`relative flex shrink-0 items-center justify-center transition-all active:scale-90 ${box} ${
           on
             ? 'bg-primary/10 text-primary'
             : 'text-muted-foreground [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground'
         }`}
       >
-        <Filter size={lg ? 20 : 16} strokeWidth={lg ? 2.5 : 2} />
+        <Filter size={glyph} strokeWidth={size === 'sm' ? 2 : 2.5} />
         {activeCount > 0 && (
           <span
             className={`absolute grid place-items-center rounded-full bg-primary font-black tabular-nums text-primary-foreground ring-2 ring-card ${
-              lg
+              size === 'lg'
                 ? 'right-0.5 top-0.5 h-[18px] min-w-[18px] px-1 text-[10px]'
-                : '-right-1 -top-1 h-4 min-w-4 px-1 text-[9px]'
+                : size === 'md'
+                  ? '-right-0.5 -top-0.5 h-[16px] min-w-[16px] px-1 text-[9px]'
+                  : '-right-1 -top-1 h-4 min-w-4 px-1 text-[9px]'
             }`}
           >
             {activeCount}

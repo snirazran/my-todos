@@ -111,9 +111,9 @@ export const TOUR_CHAPTERS: TourChapter[] = [
       {
         id: 'bulk.enter',
         anchor: 'planner-select',
-        label: 'Tap here to start picking tasks',
+        label: 'Tap this at the top of the day to start picking',
         onPress: true,
-        pointAt: 'down',
+        pointAt: 'up',
       },
       {
         id: 'bulk.pick',

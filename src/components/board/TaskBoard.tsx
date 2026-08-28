@@ -2011,12 +2011,21 @@ export default function TaskBoard({
     );
   };
 
-  const desktopLensOpen = stripOpen || filtersActive;
+  // A card lifted out of the tray has nowhere to go in the tray, so the whole
+  // save-for-later drop affordance stays out of its way.
+  const showSavedDrop = !!drag?.active && drag.fromDay !== BACKLOG_IDX;
+
+  // One lens for both layouts: the chips sit on the board under the header,
+  // directly below the column-header trigger that opened them.
+  const lensOpen = stripOpen || filtersActive;
 
   return (
     <div
       className="relative w-full h-full"
-      style={{ ['--lens' as string]: desktopLensOpen ? '60px' : '0px' }}
+      style={{
+        ['--lens' as string]: lensOpen ? '60px' : '0px',
+        ['--lens-m' as string]: lensOpen ? '48px' : '0px',
+      }}
     >
       {/* SCROLLER — layoutScroll keeps card layout animations scroll-aware so
           horizontal scrolling never reads as cards sliding sideways. */}
@@ -2042,7 +2051,7 @@ export default function TaskBoard({
           scrollBehavior: snapSuppressed ? 'auto' : undefined,
         }}
       >
-        <div className="flex mx-auto gap-3 px-4 pt-[calc(9rem+env(safe-area-inset-top))] md:pt-[calc(108px+var(--lens))] pb-[calc(100px+env(safe-area-inset-bottom))] md:pb-[calc(40px+env(safe-area-inset-bottom))] md:transition-[padding] md:duration-200">
+        <div className="flex mx-auto gap-3 px-4 pt-[calc(9rem+env(safe-area-inset-top)+var(--lens-m))] md:pt-[calc(108px+var(--lens))] transition-[padding] duration-200 pb-[calc(100px+env(safe-area-inset-bottom))] md:pb-[calc(40px+env(safe-area-inset-bottom))] md:transition-[padding] md:duration-200">
           {renderEdge('past')}
           {windowDates.map((dk, i) => (
             <div
@@ -2062,9 +2071,45 @@ export default function TaskBoard({
                 count={activeTaskCount(tasksByDate[dk] ?? [])}
                 totalCount={(tasksByDate[dk] ?? []).length}
                 listRef={setListRef(i)}
-                maxHeightClass="max-h-[calc(100svh-315px-var(--safe-bottom)-env(safe-area-inset-top))] md:max-h-[calc(100svh-224px-var(--lens)-var(--safe-bottom))]"
+                maxHeightClass="max-h-[calc(100svh-315px-var(--lens-m)-var(--safe-bottom)-env(safe-area-inset-top))] md:max-h-[calc(100svh-224px-var(--lens)-var(--safe-bottom))]"
                 isToday={dk === todayKey}
                 isPast={cmpYmd(dk, todayKey) < 0}
+                headerAction={
+                  <>
+                    <FilterTriggerButton
+                      compact
+                      size="md"
+                      onClick={() => setStripOpen((v) => !v)}
+                      activeCount={activeFilterCount}
+                      open={stripOpen}
+                    />
+                    <button
+                      type="button"
+                      aria-label={
+                        selection.active ? 'Done selecting' : 'Select tasks'
+                      }
+                      aria-pressed={selection.active}
+                      title={
+                        selection.active ? 'Done selecting' : 'Select tasks'
+                      }
+                      data-hint={i === pageIndex ? 'planner-select' : undefined}
+                      disabled={
+                        !selection.active &&
+                        (tasksByDate[dk] ?? []).length === 0
+                      }
+                      onClick={() =>
+                        selection.active ? selection.exit() : selection.enter()
+                      }
+                      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-all active:scale-90 disabled:opacity-25 ${
+                        selection.active
+                          ? 'bg-primary text-primary-foreground'
+                          : 'text-muted-foreground [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground'
+                      }`}
+                    >
+                      <ListChecks size={18} strokeWidth={2.5} />
+                    </button>
+                  </>
+                }
                 note={
                   filtersActive ? (
                     <FilterStatusLine
@@ -2205,11 +2250,37 @@ export default function TaskBoard({
             />
           </div>
         )}
+
+        {/* Mobile lens — drops out of the column header's filter button and
+            pushes the board down, so the chips read as belonging to it. */}
+        <AnimatePresence>
+          {isMobile && lensOpen && !calendarOpen && !drag?.active && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ type: 'spring', stiffness: 460, damping: 34 }}
+              style={{ ['--strip-fade' as string]: 'var(--card)' }}
+              className="pointer-events-auto w-full max-w-[420px] rounded-[22px] border border-border/50 bg-card/95 px-2 py-1.5 shadow-sm backdrop-blur-xl md:hidden"
+            >
+              <FilterChipStrip
+                filters={filters}
+                base={baseFilters}
+                tags={tagsData?.tags || []}
+                tasks={filterPool}
+                onChange={setFilters}
+                onClearAll={resetFilters}
+                onOpenMore={() => setFilterSheetOpen(true)}
+                menuDirection="down"
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Desktop lens — the chips sit on the board, not over it, so the columns
-          visibly re-filter under each tap. Toggled from the bottom island. */}
-      {desktopLensOpen && (
+          visibly re-filter under each tap. Toggled from the column header. */}
+      {lensOpen && (
         <div className="pointer-events-none fixed inset-x-0 top-[76px] z-[61] hidden justify-center px-6 md:flex lg:px-10">
           <div
             style={{ ['--strip-fade' as string]: 'var(--card)' }}
@@ -2348,30 +2419,6 @@ export default function TaskBoard({
             : ''
         }`}
       >
-        <AnimatePresence>
-          {isMobile && (stripOpen || filtersActive) && !drag?.active && (
-            <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 8 }}
-              transition={{ type: 'spring', stiffness: 460, damping: 34 }}
-              style={{ ['--strip-fade' as string]: 'var(--card)' }}
-              className="pointer-events-auto mx-auto mb-2 w-[88vw] max-w-[340px] rounded-[22px] border border-border/50 bg-card/95 px-2 py-1.5 shadow-sm backdrop-blur-xl"
-            >
-              <FilterChipStrip
-                filters={filters}
-                base={baseFilters}
-                tags={tagsData?.tags || []}
-                tasks={filterPool}
-                onChange={setFilters}
-                onClearAll={resetFilters}
-                onOpenMore={() => setFilterSheetOpen(true)}
-                menuDirection="up"
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
-
         <div className="pointer-events-auto mx-auto flex w-[88vw] max-w-none flex-col items-center justify-center md:w-full md:max-w-[480px]">
           {/* One shared surface for the saved-tasks target, the week dots,
               and add — previously three independent floating shapes with no
@@ -2383,9 +2430,9 @@ export default function TaskBoard({
           <div className="relative flex h-16 w-full max-w-[340px] items-center rounded-[28px] border border-border/50 bg-card px-1.5 shadow-sm md:h-[68px] md:max-w-[360px] md:px-2">
             <div
               className={`flex w-full items-center gap-1 transition-opacity duration-150 ${
-                drag?.active ? 'pointer-events-none opacity-0' : 'opacity-100'
+                showSavedDrop ? 'pointer-events-none opacity-0' : 'opacity-100'
               }`}
-              aria-hidden={!!drag?.active}
+              aria-hidden={showSavedDrop}
             >
               <BacklogBox
                 count={backlog.length}
@@ -2396,19 +2443,8 @@ export default function TaskBoard({
                 onClick={() => setBacklogOpen(true)}
               />
 
-              <FilterTriggerButton
-                compact
-                size="lg"
-                onClick={() => setStripOpen((v) => !v)}
-                activeCount={activeFilterCount}
-                open={stripOpen}
-              />
-
-              {/* Below ~380px the bar can't hold these and the controls at a
-                  tappable size — the day is already named up top, so the dots
-                  are what goes. */}
               <div
-                className="flex min-w-0 flex-1 items-center justify-center gap-1 overflow-hidden narrow:hidden"
+                className="flex min-w-0 flex-1 items-center justify-center gap-1 overflow-hidden"
                 aria-label={`Visible day: ${windowDates[pageIndex] ?? activeDateKey}`}
               >
                 {WEEK_ORDER.map((day) => {
@@ -2425,22 +2461,6 @@ export default function TaskBoard({
                   );
                 })}
               </div>
-              <span className="hidden flex-1 narrow:block" aria-hidden />
-
-              <button
-                type="button"
-                aria-label="Select tasks"
-                title="Select tasks"
-                data-hint="planner-select"
-                disabled={
-                  (tasksByDate[windowDates[pageIndex] ?? activeDateKey] ?? [])
-                    .length === 0
-                }
-                onClick={() => selection.enter()}
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-muted-foreground transition-all active:scale-90 disabled:opacity-30 [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground"
-              >
-                <ListChecks size={20} strokeWidth={2.5} />
-              </button>
 
               <button
                 type="button"
@@ -2469,9 +2489,10 @@ export default function TaskBoard({
             </div>
 
             <AnimatePresence>
-              {drag?.active && (
+              {showSavedDrop && (
                 <motion.div
                   ref={backlogBoxRef}
+                  data-hint="saved-drop-zone"
                   initial={{ opacity: 0, scale: 0.94 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.94 }}
@@ -2498,7 +2519,7 @@ export default function TaskBoard({
           under the finger sits over the strip, and a label printed on the strip
           disappears underneath it exactly when it matters most. */}
       <AnimatePresence>
-        {drag?.active && (
+        {showSavedDrop && (
           <motion.div
             key="drop-hint"
             initial={{ opacity: 0, y: 6 }}

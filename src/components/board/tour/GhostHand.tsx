@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, useReducedMotion } from 'framer-motion';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronRight, ChevronUp } from 'lucide-react';
 import type { AnchorRect } from '@/lib/hints/useAnchorTracker';
 
 const CYCLE_S = 2.8;
@@ -41,11 +41,21 @@ export default function GhostHand({
   return (
     <div className="pointer-events-none fixed inset-0 z-[2001]" aria-hidden>
       <svg className="absolute inset-0 h-full w-full" fill="none">
+        {/* Backing stroke: the trail runs across the tour's dim scrim, where a
+            single translucent green line all but disappears. */}
         <path
           d={`M ${a.x} ${a.y} Q ${midX} ${midY} ${b.x} ${b.y}`}
           stroke="currentColor"
-          className="text-primary/40"
-          strokeWidth={3}
+          className="text-white/70 dark:text-black/60"
+          strokeWidth={7}
+          strokeLinecap="round"
+          strokeDasharray="2 10"
+        />
+        <path
+          d={`M ${a.x} ${a.y} Q ${midX} ${midY} ${b.x} ${b.y}`}
+          stroke="currentColor"
+          className="text-primary"
+          strokeWidth={3.5}
           strokeLinecap="round"
           strokeDasharray="2 10"
         />
@@ -135,7 +145,7 @@ export function PointerArrow({
   return (
     <div className="pointer-events-none fixed inset-0 z-[2001]" aria-hidden>
       <motion.span
-        className="absolute flex flex-col items-center text-primary"
+        className="absolute flex flex-col items-center"
         style={{
           left: x - 12,
           top: up ? at.top + at.height + 10 : at.top - 32,
@@ -143,7 +153,18 @@ export function PointerArrow({
         animate={reduceMotion ? undefined : { y: up ? [0, -6, 0] : [0, 6, 0] }}
         transition={{ duration: 1.3, ease: 'easeInOut', repeat: Infinity }}
       >
-        <Chevron className="h-6 w-6" strokeWidth={3.5} />
+        <span className="relative block h-6 w-6">
+          {/* Outlined the same way as the trail — bare green loses its edge
+              against the tour's dim. */}
+          <Chevron
+            className="absolute inset-0 h-6 w-6 text-white/80 dark:text-black/70"
+            strokeWidth={7}
+          />
+          <Chevron
+            className="absolute inset-0 h-6 w-6 text-primary"
+            strokeWidth={3.5}
+          />
+        </span>
       </motion.span>
     </div>
   );
@@ -179,6 +200,66 @@ export function TapPulse({ at }: { at: AnchorRect & { radius?: string } }) {
           repeat: Infinity,
         }}
       />
+    </div>
+  );
+}
+
+/**
+ * Keep-going hint for a drag in flight. The trail and the coach bar both step
+ * aside once a card is in the air, so this is the only thing still saying
+ * which way the card has to travel.
+ */
+export function DragEdgeArrows({
+  at,
+  direction,
+}: {
+  at: { x: number; y: number };
+  direction: 'right' | 'down';
+}) {
+  const reduceMotion = useReducedMotion();
+  const right = direction === 'right';
+  const Chevron = right ? ChevronRight : ChevronDown;
+
+  return (
+    <div className="pointer-events-none fixed inset-0 z-[2001]" aria-hidden>
+      <div
+        className={`absolute flex items-center ${right ? '' : 'flex-col'}`}
+        style={
+          right
+            ? { right: 8, top: at.y - 20, height: 40 }
+            : { left: at.x - 16, top: at.y - 86, width: 32 }
+        }
+      >
+        {[0, 1, 2].map((i) => (
+          <motion.span
+            key={i}
+            className={`relative block h-8 w-8 ${right ? '-ml-2' : '-mt-3'}`}
+            animate={
+              reduceMotion
+                ? { opacity: 0.9 }
+                : right
+                  ? { opacity: [0.15, 1, 0.15], x: [0, 5, 0] }
+                  : { opacity: [0.15, 1, 0.15], y: [0, 5, 0] }
+            }
+            transition={{
+              duration: 1.4,
+              times: [0, 0.45, 1],
+              ease: 'easeInOut',
+              repeat: Infinity,
+              delay: i * 0.16,
+            }}
+          >
+            <Chevron
+              className="absolute inset-0 h-8 w-8 text-white/80 dark:text-black/70"
+              strokeWidth={7}
+            />
+            <Chevron
+              className="absolute inset-0 h-8 w-8 text-primary"
+              strokeWidth={3.5}
+            />
+          </motion.span>
+        ))}
+      </div>
     </div>
   );
 }

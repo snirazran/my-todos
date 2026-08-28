@@ -189,6 +189,18 @@ body:has([data-public-home]) #main-scroll {
   border-color: hsl(var(--primary) / 0.45) !important;
   animation: tour-target-breathe 2.8s ease-in-out infinite;
 }
+/* Planner tour scrim: dims everything the current step does not need, with a
+   clip-path cutout that also lifts the target out of the blocking hit area.
+   Lighter in dark mode's already-dark surfaces would read as fog, so the dim
+   goes deeper there and leans on the target's own tint to separate it. */
+.tour-scrim {
+  background-color: rgba(12, 20, 16, 0.55);
+  transition: background-color 200ms ease;
+}
+.dark .tour-scrim {
+  background-color: rgba(0, 0, 0, 0.7);
+}
+
 @keyframes tour-target-breathe {
   0%,
   100% {
@@ -200,6 +212,25 @@ body:has([data-public-home]) #main-scroll {
     box-shadow:
       inset 0 0 0 999px hsl(var(--primary) / 0.13),
       0 8px 20px -8px hsl(var(--primary) / 0.65);
+  }
+}
+.dark .tour-target {
+  border-color: hsl(var(--primary) / 0.6) !important;
+  animation-name: tour-target-breathe-dark;
+}
+@keyframes tour-target-breathe-dark {
+  0%,
+  100% {
+    box-shadow:
+      inset 0 0 0 999px hsl(var(--primary) / 0.1),
+      0 0 0 1px hsl(var(--primary) / 0.25),
+      0 6px 22px -10px hsl(var(--primary) / 0.75);
+  }
+  50% {
+    box-shadow:
+      inset 0 0 0 999px hsl(var(--primary) / 0.2),
+      0 0 0 1px hsl(var(--primary) / 0.45),
+      0 10px 30px -10px hsl(var(--primary) / 0.95);
   }
 }
 @keyframes fly-bob {
