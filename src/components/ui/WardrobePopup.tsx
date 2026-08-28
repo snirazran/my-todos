@@ -116,10 +116,12 @@ export function WardrobePopup({
   open,
   onClose,
   onSelect,
+  onExitComplete,
 }: {
   open: boolean;
   onClose: () => void;
   onSelect: (tab: WardrobeTab) => void;
+  onExitComplete?: () => void;
 }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -141,7 +143,7 @@ export function WardrobePopup({
   };
 
   return createPortal(
-    <AnimatePresence>
+    <AnimatePresence onExitComplete={onExitComplete}>
       {open && (
         <>
           <motion.div

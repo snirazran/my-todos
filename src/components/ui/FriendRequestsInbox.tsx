@@ -6,6 +6,12 @@ import { Check, X, Loader2, UserPlus, Users } from 'lucide-react';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { mutateFriendsCaches } from '@/hooks/useFriendsSync';
 import { FriendSuggestionsRow } from '@/components/ui/FriendSuggestionsRow';
+import { LookLikesList } from '@/components/ui/LookReactions';
+import { useLookReactions } from '@/hooks/useLookReactions';
+import {
+  LOOK_WINDOW_MS,
+  type ReceivedReaction,
+} from '@/lib/friends/lookReactions';
 
 type IncomingRequest = {
   id: string;
@@ -41,6 +47,26 @@ export function FriendRequestsInbox({
   const { data: buddyData, mutate: mutateBuddy } = useSWR<{
     incoming: BuddyInvite[];
   }>(open ? '/api/buddy/invite' : null, fetcher, { revalidateOnFocus: false });
+
+  const { reactions, unseenCount: unseenLooks, markSeen } = useLookReactions();
+  const [likesBatch, setLikesBatch] = useState<ReceivedReaction[] | null>(null);
+
+  useEffect(() => {
+    if (!open) {
+      setLikesBatch(null);
+      return;
+    }
+    if (likesBatch !== null || unseenLooks === 0) return;
+    const cutoff = Date.now() - LOOK_WINDOW_MS;
+    setLikesBatch(
+      reactions.filter(
+        (r) => !r.seen && new Date(r.createdAt).getTime() >= cutoff,
+      ),
+    );
+    void markSeen();
+  }, [open, likesBatch, unseenLooks, reactions, markSeen]);
+
+  const likesCount = likesBatch?.length ?? unseenLooks;
 
   const [busyId, setBusyId] = useState<string | null>(null);
   // Accepting just widened the graph — the friends of the person you accepted
@@ -99,7 +125,8 @@ export function FriendRequestsInbox({
     (b) => b.direction === 'incoming',
   );
   const loading = !data || !buddyData;
-  const isEmpty = incoming.length === 0 && buddyInvites.length === 0;
+  const isEmpty =
+    incoming.length === 0 && buddyInvites.length === 0 && likesCount === 0;
 
   return (
     <BaseSheet
@@ -108,12 +135,12 @@ export function FriendRequestsInbox({
       closeAriaLabel="Close friend alerts"
       className="sm:max-w-lg"
     >
-      {({ bindScroll }) => (
+      {({ entered, bindScroll }) => (
         <div className="flex max-h-[80dvh] flex-col">
           <div className="px-6 pb-2 pt-5 text-center">
             <h2 className="text-xl font-black tracking-tight">Friend alerts</h2>
             <p className="mt-1 text-sm font-medium text-muted-foreground">
-              Friend &amp; buddy requests
+              Requests, team-ups &amp; love for your look
             </p>
           </div>
 
@@ -135,90 +162,114 @@ export function FriendRequestsInbox({
                 </p>
               </div>
             ) : (
-              <div className="space-y-2">
-                {incoming.map((req) => (
-                  <div
-                    key={req.id}
-                    className="flex items-center gap-3 rounded-2xl border border-border/50 bg-card px-4 py-3"
-                  >
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 text-base font-black text-white">
-                      {(req.name || req.frogName || '?').charAt(0).toUpperCase()}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-black">
-                        {req.name || req.frogName}
-                      </p>
-                      <p className="truncate text-xs font-medium text-muted-foreground">
-                        wants to be your friend
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => respond(req.id, 'decline')}
-                        disabled={busyId === req.id}
-                        aria-label="Decline"
-                        className="flex h-9 w-9 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-muted/70 disabled:opacity-50"
+              <>
+                {(incoming.length > 0 || buddyInvites.length > 0) && (
+                  <div className="space-y-2">
+                    {incoming.map((req) => (
+                      <div
+                        key={req.id}
+                        className="flex items-center gap-3 rounded-2xl border border-border/50 bg-card px-4 py-3"
                       >
-                        <X className="h-4 w-4" strokeWidth={3} />
-                      </button>
-                      <button
-                        onClick={() => respond(req.id, 'accept')}
-                        disabled={busyId === req.id}
-                        aria-label="Accept"
-                        className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500 text-white transition-colors hover:bg-emerald-600 disabled:opacity-50"
-                      >
-                        {busyId === req.id ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Check className="h-4 w-4" strokeWidth={3} />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 text-base font-black text-white">
+                          {(req.name || req.frogName || '?')
+                            .charAt(0)
+                            .toUpperCase()}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-black">
+                            {req.name || req.frogName}
+                          </p>
+                          <p className="truncate text-xs font-medium text-muted-foreground">
+                            wants to be your friend
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => respond(req.id, 'decline')}
+                            disabled={busyId === req.id}
+                            aria-label="Decline"
+                            className="flex h-9 w-9 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-muted/70 disabled:opacity-50"
+                          >
+                            <X className="h-4 w-4" strokeWidth={3} />
+                          </button>
+                          <button
+                            onClick={() => respond(req.id, 'accept')}
+                            disabled={busyId === req.id}
+                            aria-label="Accept"
+                            className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500 text-white transition-colors hover:bg-emerald-600 disabled:opacity-50"
+                          >
+                            {busyId === req.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Check className="h-4 w-4" strokeWidth={3} />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
 
-                {buddyInvites.map((inv) => (
-                  <div
-                    key={inv.bondId}
-                    className="flex items-center gap-3 rounded-2xl border border-[#4f9149]/30 bg-[#4f9149]/8 px-4 py-3"
-                  >
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#4f9149]/15 text-[#4f9149]">
-                      <Users className="h-5 w-5" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-black">
-                        {inv.withName} wants to team up
-                      </p>
-                      <p className="truncate text-xs font-medium text-muted-foreground">
-                        {inv.text}
-                        {inv.scheduleLabel ? ` — ${inv.scheduleLabel}` : ''}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => respondBuddy(inv.bondId, 'decline')}
-                        disabled={busyId === inv.bondId}
-                        aria-label="Decline"
-                        className="flex h-9 w-9 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-muted/70 disabled:opacity-50"
+                    {buddyInvites.map((inv) => (
+                      <div
+                        key={inv.bondId}
+                        className="flex items-center gap-3 rounded-2xl border border-[#4f9149]/30 bg-[#4f9149]/8 px-4 py-3"
                       >
-                        <X className="h-4 w-4" strokeWidth={3} />
-                      </button>
-                      <button
-                        onClick={() => respondBuddy(inv.bondId, 'accept')}
-                        disabled={busyId === inv.bondId}
-                        aria-label="Accept"
-                        className="flex h-9 w-9 items-center justify-center rounded-full bg-[#4f9149] text-white transition-colors hover:bg-[#457f40] disabled:opacity-50"
-                      >
-                        {busyId === inv.bondId ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Check className="h-4 w-4" strokeWidth={3} />
-                        )}
-                      </button>
-                    </div>
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#4f9149]/15 text-[#4f9149]">
+                          <Users className="h-5 w-5" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-black">
+                            {inv.withName} wants to team up
+                          </p>
+                          <p className="truncate text-xs font-medium text-muted-foreground">
+                            {inv.text}
+                            {inv.scheduleLabel ? ` — ${inv.scheduleLabel}` : ''}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => respondBuddy(inv.bondId, 'decline')}
+                            disabled={busyId === inv.bondId}
+                            aria-label="Decline"
+                            className="flex h-9 w-9 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-muted/70 disabled:opacity-50"
+                          >
+                            <X className="h-4 w-4" strokeWidth={3} />
+                          </button>
+                          <button
+                            onClick={() => respondBuddy(inv.bondId, 'accept')}
+                            disabled={busyId === inv.bondId}
+                            aria-label="Accept"
+                            className="flex h-9 w-9 items-center justify-center rounded-full bg-[#4f9149] text-white transition-colors hover:bg-[#457f40] disabled:opacity-50"
+                          >
+                            {busyId === inv.bondId ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Check className="h-4 w-4" strokeWidth={3} />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                )}
+
+                {likesCount > 0 && (
+                  <section
+                    className={
+                      incoming.length > 0 || buddyInvites.length > 0
+                        ? 'mt-5'
+                        : undefined
+                    }
+                  >
+                    <h3 className="mb-2 px-1 text-[11px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+                      Likes on your look
+                    </h3>
+                    <LookLikesList
+                      showFrogs={entered}
+                      reactions={likesBatch ?? []}
+                    />
+                  </section>
+                )}
+              </>
             )}
 
             {justAccepted && (

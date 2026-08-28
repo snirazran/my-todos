@@ -182,15 +182,18 @@ type LookGroup = {
   reactions: ReceivedReaction[];
 };
 
-export function LookLikesSheet({
-  open,
-  onOpenChange,
+export function LookLikesList({
+  showFrogs = true,
+  emptyText = 'No reactions yet. Dress up and check back.',
+  reactions: override,
 }: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+  showFrogs?: boolean;
+  emptyText?: string;
+  reactions?: ReceivedReaction[];
 }) {
   const { reactions } = useLookReactions();
-  const recent = useRecentReactions(reactions);
+  const recentAll = useRecentReactions(reactions);
+  const recent = override ?? recentAll;
 
   const groups = React.useMemo(() => {
     const map = new Map<string, LookGroup>();
@@ -209,6 +212,85 @@ export function LookLikesSheet({
     return Array.from(map.values()).slice(0, 4);
   }, [recent]);
 
+  if (!groups.length) {
+    return (
+      <p className="py-8 text-center text-sm font-semibold text-muted-foreground">
+        {emptyText}
+      </p>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      {groups.map((group) => (
+        <div
+          key={group.key}
+          className="rounded-2xl border border-border/50 bg-card/60 p-3"
+        >
+          <div className="flex items-center gap-3">
+            {group.look && (
+              <div className="relative flex aspect-[6/5] w-[84px] shrink-0 items-end justify-center overflow-hidden">
+                {showFrogs && (
+                  <Frog
+                    className="translate-y-[15%]"
+                    width="145%"
+                    height="145%"
+                    indices={group.look.indices}
+                    paused
+                  />
+                )}
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
+              {group.isCurrentLook && (
+                <span className="mb-1 inline-block rounded-full bg-emerald-500/12 px-2 py-0.5 text-[11px] font-black text-emerald-600 dark:text-emerald-400">
+                  Wearing now
+                </span>
+              )}
+              <p
+                className={cn(
+                  'text-[13px] font-black leading-snug tracking-tight',
+                  group.look ? 'text-foreground' : 'text-muted-foreground',
+                )}
+              >
+                {group.look
+                  ? describeLook(group.look.items)
+                  : 'An earlier look'}
+              </p>
+            </div>
+          </div>
+
+          <ul className="mt-2 flex flex-col gap-1.5 border-t border-border/40 pt-2">
+            {group.reactions.map((r) => (
+              <li key={r.id} className="flex items-center gap-2 text-[13px]">
+                <span className="text-base leading-none">
+                  {REACTION_EMOJI[r.kind]}
+                </span>
+                <span className="min-w-0 flex-1 truncate font-bold text-foreground">
+                  {r.fromName}
+                </span>
+                <span className="shrink-0 text-[11px] font-semibold text-muted-foreground">
+                  {shortTimeAgo(r.createdAt)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function LookLikesSheet({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const { reactions } = useLookReactions();
+  const recent = useRecentReactions(reactions);
+
   return (
     <BaseSheet open={open} onOpenChange={onOpenChange} className="sm:max-w-md">
       {({ entered, bindScroll }) => (
@@ -220,78 +302,13 @@ export function LookLikesSheet({
             Your look, noticed
           </h2>
           <p className="mt-0.5 text-[13px] font-semibold text-muted-foreground">
-            {recent.length}{' '}
-            {recent.length === 1 ? 'reaction' : 'reactions'} in the last 7 days
+            {recent.length} {recent.length === 1 ? 'reaction' : 'reactions'} in
+            the last 7 days
           </p>
 
-          <div className="mt-4 flex flex-col gap-3">
-            {groups.map((group) => (
-              <div
-                key={group.key}
-                className="rounded-2xl border border-border/50 bg-card/60 p-3"
-              >
-                <div className="flex items-center gap-3">
-                  {group.look && (
-                    <div className="relative flex aspect-[6/5] w-[84px] shrink-0 items-end justify-center overflow-hidden">
-                      {entered && (
-                        <Frog
-                          className="translate-y-[15%]"
-                          width="145%"
-                          height="145%"
-                          indices={group.look.indices}
-                          paused
-                        />
-                      )}
-                    </div>
-                  )}
-                  <div className="min-w-0 flex-1">
-                    {group.isCurrentLook && (
-                      <span className="mb-1 inline-block rounded-full bg-emerald-500/12 px-2 py-0.5 text-[11px] font-black text-emerald-600 dark:text-emerald-400">
-                        Wearing now
-                      </span>
-                    )}
-                    <p
-                      className={cn(
-                        'text-[13px] font-black leading-snug tracking-tight',
-                        group.look
-                          ? 'text-foreground'
-                          : 'text-muted-foreground',
-                      )}
-                    >
-                      {group.look
-                        ? describeLook(group.look.items)
-                        : 'An earlier look'}
-                    </p>
-                  </div>
-                </div>
-
-                <ul className="mt-2 flex flex-col gap-1.5 border-t border-border/40 pt-2">
-                  {group.reactions.map((r) => (
-                    <li
-                      key={r.id}
-                      className="flex items-center gap-2 text-[13px]"
-                    >
-                      <span className="text-base leading-none">
-                        {REACTION_EMOJI[r.kind]}
-                      </span>
-                      <span className="min-w-0 flex-1 truncate font-bold text-foreground">
-                        {r.fromName}
-                      </span>
-                      <span className="shrink-0 text-[11px] font-semibold text-muted-foreground">
-                        {shortTimeAgo(r.createdAt)}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
+          <div className="mt-4">
+            <LookLikesList showFrogs={entered} />
           </div>
-
-          {!groups.length && (
-            <p className="py-8 text-center text-sm font-semibold text-muted-foreground">
-              No reactions yet. Dress up and check back.
-            </p>
-          )}
         </div>
       )}
     </BaseSheet>

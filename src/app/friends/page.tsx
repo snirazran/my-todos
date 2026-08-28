@@ -11,6 +11,7 @@ import { useAuth } from '@/components/auth/AuthContext';
 import { mutateFriendsCaches } from '@/hooks/useFriendsSync';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { useFrogBelly, useIsFrogHungry } from '@/hooks/useFrogHunger';
+import { useLookReactions } from '@/hooks/useLookReactions';
 import { useRegisterOpenSheet, useSheetStore } from '@/lib/sheetStore';
 import { hapticCelebrate } from '@/lib/haptics';
 import Fly from '@/components/ui/fly';
@@ -46,7 +47,6 @@ import { FlyCatchSwipeLauncher } from '@/components/ui/FlyCatchSwipeLauncher';
 import { useUIStore } from '@/lib/uiStore';
 import type { ItemDef } from '@/lib/skins/catalog';
 import { PondHero } from '@/components/ui/friends/PondHero';
-import { FriendsTodayStrip } from '@/components/ui/friends/FriendsTodayStrip';
 import {
   FriendRow,
   type FriendRowEntry,
@@ -176,12 +176,14 @@ export default function FriendsPage() {
     );
   }, [friends, friendsData?.me]);
 
+  const { unseenCount: unseenLooks } = useLookReactions(!!user);
+
   if (loading || !user) return <FriendsPageSkeleton />;
 
   const hasRealFriends = friends.length > 0;
   const pendingCount = requestsData?.incoming?.length ?? 0;
   const buddyInviteCount = buddyInvitesData?.incoming?.length ?? 0;
-  const alertsCount = pendingCount + buddyInviteCount;
+  const alertsCount = pendingCount + buddyInviteCount + unseenLooks;
 
   const growCard = (
     <GrowPondCard
@@ -217,7 +219,7 @@ export default function FriendsPage() {
           <button
             type="button"
             onClick={openInbox}
-            aria-label="Friend invites"
+            aria-label="Friend alerts"
             className={cn(
               HEADER_CONTROL_ICON_BUTTON,
               'relative touch-manipulation text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
@@ -263,15 +265,6 @@ export default function FriendsPage() {
           data-fly-sheet
           className="relative z-10 -mx-4 mt-8 flex w-[calc(100%+2rem)] flex-col self-stretch rounded-t-[24px] bg-background px-4 pb-12 pt-6 md:mt-24 md:px-8"
         >
-          <FriendsTodayStrip
-            friends={friends}
-            pendingCount={pendingCount}
-            buddyInviteCount={buddyInviteCount}
-            onOpenInbox={openInbox}
-            onOpenFriend={openFriend}
-            ready={!!friendsData}
-          />
-
           {!hasRealFriends && friendsData ? (
             growCard
           ) : (

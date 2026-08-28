@@ -26,13 +26,14 @@ export default function MobileNav() {
   // nav the moment `open` flips false.
   const [navRaised, setNavRaised] = useState(false);
   useEffect(() => {
-    if (wardrobePopupOpen) {
-      setNavRaised(true);
-      return;
-    }
-    const t = window.setTimeout(() => setNavRaised(false), 300);
-    return () => window.clearTimeout(t);
+    if (!wardrobePopupOpen) return;
+    setNavRaised(true);
   }, [wardrobePopupOpen]);
+  useEffect(() => {
+    if (!navRaised || wardrobePopupOpen) return;
+    const t = window.setTimeout(() => setNavRaised(false), 1200);
+    return () => window.clearTimeout(t);
+  }, [navRaised, wardrobePopupOpen]);
 
   useEffect(() => {
     setPendingHref(null);
@@ -224,6 +225,7 @@ export default function MobileNav() {
       <WardrobePopup
         open={wardrobePopupOpen}
         onClose={() => setWardrobePopupOpen(false)}
+        onExitComplete={() => setNavRaised(false)}
         onSelect={(tab) => {
           setWardrobePopupOpen(false);
           window.setTimeout(() => {
