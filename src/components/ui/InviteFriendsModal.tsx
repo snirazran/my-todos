@@ -93,6 +93,25 @@ export function InviteFriendsModal({
     onClose();
   }, [onClose]);
 
+  // A click is dispatched on the nearest surviving ancestor when the pressed
+  // element is re-rendered away mid-tap, so the scrim only dismisses when the
+  // press started on it too.
+  const scrimPressRef = React.useRef(false);
+  const onScrimPointerDown = React.useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      scrimPressRef.current = event.target === event.currentTarget;
+    },
+    [],
+  );
+  const onScrimClick = React.useCallback(
+    (event: React.MouseEvent<HTMLDivElement>) => {
+      const pressed = scrimPressRef.current;
+      scrimPressRef.current = false;
+      if (pressed && event.target === event.currentTarget) closeInvite();
+    },
+    [closeInvite],
+  );
+
   useEffect(() => {
     if (!open) return;
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -175,7 +194,8 @@ export function InviteFriendsModal({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.25, ease: 'easeOut' }}
-            onClick={closeInvite}
+            onPointerDown={onScrimPointerDown}
+            onClick={onScrimClick}
             className="fixed inset-0 z-[1400] bg-black/60 backdrop-blur-sm"
           />
           <motion.div
@@ -558,7 +578,7 @@ function PickStep({
               className="-translate-y-16 sm:-translate-y-20"
               width={250}
               height={281}
-              paused={!!selectedGiftId}
+              paused={false}
             />
             <div className="absolute right-0 top-16 z-20 rotate-[6deg] rounded-2xl bg-white px-3 py-1.5 text-[13px] font-black tracking-tight text-[#4f8f28] shadow-[0_3px_0_rgba(52,100,31,0.25)] sm:right-[-1rem] sm:top-14">
               Ooh, a gift for me?
@@ -585,8 +605,9 @@ function PickStep({
               return (
                 <button
                   key={gift.id}
+                  type="button"
                   onClick={() => onSelect(gift.id)}
-                  className={`aspect-square w-full overflow-hidden rounded-[18px] border-4 bg-[#8fc36d] p-1 transition-all active:scale-95 min-[380px]:rounded-[22px] ${
+                  className={`aspect-square w-full touch-manipulation overflow-hidden rounded-[18px] border-4 bg-[#8fc36d] p-1 transition-all active:scale-95 min-[380px]:rounded-[22px] ${
                     isSelected
                       ? 'border-white ring-4 ring-inset ring-white/25'
                       : 'border-white/15 hover:border-white/70'
@@ -666,7 +687,17 @@ function CloseButton({
   );
 }
 
-function GiftPreview({ item, active = false }: { item: CatalogItem | null; active?: boolean }) {
+function GiftPreview({
+  item,
+  active = false,
+  animate = false,
+}: {
+  item: CatalogItem | null;
+  active?: boolean;
+  /** Live Rive instead of a stamped frame. Never for a grid the user taps
+   *  through: each toggle builds and tears down a runtime instance. */
+  animate?: boolean;
+}) {
   if (!item) {
     return (
       <div className="flex h-full w-full items-center justify-center text-muted-foreground">
@@ -686,14 +717,14 @@ function GiftPreview({ item, active = false }: { item: CatalogItem | null; activ
   }
 
   const indices = itemToIndices(item);
-  if (!active) {
+  if (animate) {
     return (
       <div className="flex h-full w-full items-center justify-center overflow-visible">
-        <FrogSnapshot
-          className="h-full w-full"
+        <Frog
           width={300}
           height={338}
           indices={indices}
+          paused={false}
           visualOffsetY={0}
         />
       </div>
@@ -701,7 +732,13 @@ function GiftPreview({ item, active = false }: { item: CatalogItem | null; activ
   }
   return (
     <div className="flex h-full w-full items-center justify-center overflow-visible">
-      <Frog width={300} height={338} indices={indices} paused={false} visualOffsetY={0} />
+      <FrogSnapshot
+        className="h-full w-full"
+        width={300}
+        height={338}
+        indices={indices}
+        visualOffsetY={0}
+      />
     </div>
   );
 }
@@ -715,7 +752,8 @@ function RewardPreview({
   fallbackItem: CatalogItem | null;
   active?: boolean;
 }) {
-  if (!reward) return <GiftPreview item={fallbackItem} active={active} />;
+  if (!reward)
+    return <GiftPreview item={fallbackItem} active={active} animate={active} />;
   if (reward.type === 'FLIES') {
     const amount = reward.amountMode === 'random' ? reward.maxAmount : reward.amount;
     return (
@@ -725,7 +763,7 @@ function RewardPreview({
       </div>
     );
   }
-  return <GiftPreview item={fallbackItem} active={active} />;
+  return <GiftPreview item={fallbackItem} active={active} animate={active} />;
 }
 
 function Loading({ onClose }: { onClose: () => void }) {

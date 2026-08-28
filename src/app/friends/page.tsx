@@ -52,6 +52,7 @@ import {
   type FriendRowEntry,
 } from '@/components/ui/friends/FriendRow';
 import { GrowPondCard } from '@/components/ui/friends/GrowPondCard';
+import { EmptyPond } from '@/components/ui/friends/EmptyPond';
 import { CheerEarnHint } from '@/components/ui/friends/CheerButton';
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
@@ -266,7 +267,10 @@ export default function FriendsPage() {
           className="relative z-10 -mx-4 mt-8 flex w-[calc(100%+2rem)] flex-col self-stretch rounded-t-[24px] bg-background px-4 pb-12 pt-6 md:mt-24 md:px-8"
         >
           {!hasRealFriends && friendsData ? (
-            growCard
+            <>
+              {growCard}
+              <EmptyPond onAdd={() => setAddOpen(true)} />
+            </>
           ) : (
             <>
               <div className="w-full">
