@@ -158,6 +158,10 @@ export function snapshotToBrief(
     'Frogress is a gamified task app: users complete tasks, earn a soft currency called flies, feed a pet frog, and spend flies on cosmetics. Every section below answers one product question. Each metric has a definition, the direction that counts as good, and a healthy band where one exists. Signals are pre-computed judgements against those bands, worst first. Tables carry the breakdowns behind the metrics.',
   );
   lines.push('');
+  lines.push(
+    'Sample sizes matter here. A metric annotated `[provisional, n=…]` rests on fewer than 20 observations and is not yet worth a conclusion — say so rather than reading a trend into it. Metrics under that floor are deliberately excluded from the signals list for the same reason.',
+  );
+  lines.push('');
 
   lines.push('## Metric definitions');
   lines.push('');
@@ -213,8 +217,10 @@ export function snapshotToBrief(
       const definition = METRIC_BY_KEY.get(entry.metric);
       const previous =
         entry.previous !== null && entry.previous !== undefined ? ` | previous ${entry.previous}` : '';
+      const provisional =
+        entry.sample !== undefined && entry.sample < 20 ? ` [provisional, n=${entry.sample}]` : '';
       lines.push(
-        `- ${definition?.label ?? entry.metric} (\`${entry.metric}\`): ${entry.value ?? 'no data'}${previous}${entry.detail ? ` — ${entry.detail}` : ''}`,
+        `- ${definition?.label ?? entry.metric} (\`${entry.metric}\`): ${entry.value ?? 'no data'}${previous}${provisional}${entry.detail ? ` — ${entry.detail}` : ''}`,
       );
     }
     lines.push('');

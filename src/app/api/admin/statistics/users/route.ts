@@ -298,6 +298,20 @@ export async function GET(req: NextRequest) {
     })
     .sort((a, b) => (orderIndex.get(a.user_id) ?? 0) - (orderIndex.get(b.user_id) ?? 0));
 
+  // A profile-level filter has to page over users rather than events, so an
+  // activity column cannot be sorted in the database. Re-sort the page in
+  // memory rather than silently ignoring the column the admin clicked.
+  if (useProfileSort && EVENT_SORTS.has(sortKey)) {
+    rows.sort((a, b) => {
+      const left = (a as Record<string, string | number>)[sortKey];
+      const right = (b as Record<string, string | number>)[sortKey];
+      if (typeof left === 'number' && typeof right === 'number') {
+        return (left - right) * direction;
+      }
+      return String(left ?? '').localeCompare(String(right ?? '')) * direction;
+    });
+  }
+
   if (format === 'csv') {
     const csv = toCsv([
       USER_COLUMNS.map((column) => column.label),

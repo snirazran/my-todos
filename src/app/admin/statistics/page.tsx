@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Download, RefreshCw, Users } from 'lucide-react';
+import { ArrowLeft, Download, RefreshCw } from 'lucide-react';
 import { AdminGuard } from '@/components/auth/AdminGuard';
 import {
   METRIC_BY_KEY,
@@ -19,6 +19,7 @@ import {
   Panel,
   formatMetric,
   integer,
+  isProvisional,
 } from '@/components/admin/statistics/primitives';
 import { UsersExplorer } from '@/components/admin/statistics/UsersExplorer';
 
@@ -258,10 +259,11 @@ function StatisticsPageContent() {
   );
 }
 
-function levelFor(metricKey: string, value: number | null): SignalLevel {
-  const definition = METRIC_BY_KEY.get(metricKey);
+function levelFor(entry: { metric: string; value: number | null; sample?: number }): SignalLevel {
+  const definition = METRIC_BY_KEY.get(entry.metric);
   if (!definition?.band) return 'good';
-  return statusForBand(value, definition.band);
+  if (isProvisional(entry)) return 'unknown';
+  return statusForBand(entry.value, definition.band);
 }
 
 function Overview({
@@ -284,7 +286,7 @@ function Overview({
               key={entry.metric}
               entry={entry}
               definition={METRIC_BY_KEY.get(entry.metric)}
-              level={levelFor(entry.metric, entry.value)}
+              level={levelFor(entry)}
             />
           ))}
         </div>
@@ -346,7 +348,7 @@ function Overview({
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {data.sections.map((section) => {
             const worst = section.kpis.reduce<SignalLevel>((current, entry) => {
-              const level = levelFor(entry.metric, entry.value);
+              const level = levelFor(entry);
               if (level === 'bad') return 'bad';
               if (level === 'watch' && current !== 'bad') return 'watch';
               return current;
@@ -410,7 +412,7 @@ function SectionView({
             key={entry.metric}
             entry={entry}
             definition={METRIC_BY_KEY.get(entry.metric)}
-            level={levelFor(entry.metric, entry.value)}
+            level={levelFor(entry)}
           />
         ))}
       </div>

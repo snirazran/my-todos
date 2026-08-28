@@ -123,6 +123,12 @@ export function Delta({ value, previous, direction }: {
   );
 }
 
+export const MIN_SAMPLE = 20;
+
+export function isProvisional(entry: StatKpi) {
+  return entry.sample !== undefined && entry.sample < MIN_SAMPLE;
+}
+
 export function KpiCard({
   entry,
   definition,
@@ -133,7 +139,8 @@ export function KpiCard({
   level: SignalLevel;
 }) {
   const [open, setOpen] = useState(false);
-  const styles = LEVEL_STYLES[level];
+  const provisional = isProvisional(entry);
+  const styles = LEVEL_STYLES[provisional ? 'unknown' : level];
   const banded = !!definition?.band;
 
   return (
@@ -164,13 +171,19 @@ export function KpiCard({
         <p className="mt-1 text-[11px] font-medium text-muted-foreground">{entry.detail}</p>
       ) : null}
 
+      {provisional ? (
+        <p className="mt-1 text-[11px] font-semibold text-amber-600 dark:text-amber-400">
+          Only {entry.sample} observation{entry.sample === 1 ? '' : 's'} — too few to judge yet.
+        </p>
+      ) : null}
+
       {entry.sparkline && entry.sparkline.length > 1 ? (
         <div className="mt-3 text-muted-foreground/40">
           <Sparkline points={entry.sparkline} />
         </div>
       ) : null}
 
-      {banded ? (
+      {banded && !provisional ? (
         <div className="mt-3 flex items-center gap-1.5">
           <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${styles.dot}`} />
           <span className="text-[11px] font-semibold text-muted-foreground">
