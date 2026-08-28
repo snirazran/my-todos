@@ -25,6 +25,7 @@ import { ButtonHaptics } from '@/components/providers/ButtonHaptics';
 import { FlyGameClaimer } from '@/components/providers/FlyGameClaimer';
 import { FocusTimerLauncher } from '@/components/providers/FocusTimerLauncher';
 import { ErrorReporter } from '@/components/providers/ErrorReporter';
+import { VersionWatcher } from '@/components/providers/VersionWatcher';
 import { WidgetSyncProvider } from '@/components/providers/WidgetSyncProvider';
 
 export default function Providers({ children }: { children: ReactNode }) {
@@ -45,6 +46,7 @@ export default function Providers({ children }: { children: ReactNode }) {
         <TaskSyncProvider>
           <NotificationProvider>
             <ErrorReporter />
+            <VersionWatcher />
             <ButtonHaptics />
             <AnalyticsProvider />
             <GlobalTimer />

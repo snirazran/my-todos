@@ -6,11 +6,13 @@ import { Icon } from '@/components/ui/Icon';
 import { useAuth } from '@/components/auth/AuthContext';
 import useSWR from 'swr';
 import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { WardrobePopup, useWardrobeBadges } from '@/components/ui/WardrobePopup';
 import { TRADE_MIN_ITEM_COUNT } from '@/lib/skins/catalog';
 import { hapticTick } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
+
+const NAV_STUCK_MS = 5000;
 
 export default function MobileNav() {
   const pathname = usePathname();
@@ -35,10 +37,34 @@ export default function MobileNav() {
     return () => window.clearTimeout(t);
   }, [navRaised, wardrobePopupOpen]);
 
+  const pathnameRef = useRef(pathname);
+  const stuckTimerRef = useRef<number | null>(null);
+  const clearStuckTimer = useCallback(() => {
+    if (stuckTimerRef.current === null) return;
+    window.clearTimeout(stuckTimerRef.current);
+    stuckTimerRef.current = null;
+  }, []);
+  const watchNavigation = useCallback(
+    (href: string) => {
+      clearStuckTimer();
+      stuckTimerRef.current = window.setTimeout(() => {
+        stuckTimerRef.current = null;
+        if (pathnameRef.current === href.split('?')[0]) return;
+        if (navigator.onLine === false) return;
+        window.location.href = href;
+      }, NAV_STUCK_MS);
+    },
+    [clearStuckTimer],
+  );
+
   useEffect(() => {
+    pathnameRef.current = pathname;
+    clearStuckTimer();
     setPendingHref(null);
     setWardrobePopupOpen(false);
-  }, [pathname]);
+  }, [pathname, clearStuckTimer]);
+
+  useEffect(() => clearStuckTimer, [clearStuckTimer]);
 
   const { data: questsData } = useSWR<{
     claimableCount?: number;
@@ -194,6 +220,7 @@ export default function MobileNav() {
                 prefetch={true}
                 onClick={(e) => {
                   hapticTick();
+                  if (pathname !== target) watchNavigation(target);
                   if (wardrobePopupOpen) {
                     e.preventDefault();
                     setWardrobePopupOpen(false);
@@ -228,6 +255,7 @@ export default function MobileNav() {
         onExitComplete={() => setNavRaised(false)}
         onSelect={(tab) => {
           setWardrobePopupOpen(false);
+          if (pathname !== '/wardrobe') watchNavigation('/wardrobe');
           window.setTimeout(() => {
             router.push(`/wardrobe?tab=${tab}`);
             document

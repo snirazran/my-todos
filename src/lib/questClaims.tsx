@@ -746,8 +746,8 @@ export function ObjectiveProgressBar({
 function toastTitle(c: Claimable): string {
   if (c.kind === 'season') return 'Season reward ready';
   if (c.kind === 'sweep') return sweepClaimLabels(c).eyebrow;
-  if (c.placement === 'onboarding') return 'Starter objective complete';
-  return 'Daily objective complete';
+  if (c.placement === 'onboarding') return 'Starter quest complete';
+  return 'Daily quest complete';
 }
 
 export function trackableEyebrow(t: {
