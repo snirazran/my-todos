@@ -195,10 +195,10 @@ export function LeapSessionDeleteSheet({
   const title = cancels
     ? 'Delete this and your Leap ends'
     : removedOpen > 0
-      ? 'Drop a session from your Leap?'
+      ? 'Drop a day from your Leap?'
       : 'Remove this from your board?';
   const subtitle = cancels
-    ? 'This is the last session of the week.'
+    ? 'This is the last day of the week.'
     : removedOpen > 0
       ? `${sessionLabel(removing)} leaves this week's plan.`
       : 'Your goal for the week stays where it is.';
@@ -212,7 +212,7 @@ export function LeapSessionDeleteSheet({
   if (cancels) {
     consequences.push({
       icon: ListX,
-      text: 'The rest of this week’s sessions leave your list',
+      text: 'The rest of this week’s days leave your list',
       tone: 'plain',
     });
     if (usesToken) {
@@ -246,7 +246,7 @@ export function LeapSessionDeleteSheet({
     } else if (removedOpen > 0) {
       consequences.push({
         icon: Target,
-        text: `This week now asks for ${targetAfter} session${targetAfter === 1 ? '' : 's'}, not ${targetBefore}`,
+        text: `This week now asks for ${targetAfter} day${targetAfter === 1 ? '' : 's'}, not ${targetBefore}`,
         tone: 'plain',
       });
     } else {
@@ -259,7 +259,7 @@ export function LeapSessionDeleteSheet({
     if (removedDone > 0) {
       consequences.push({
         icon: CheckCircle2,
-        text: `The ${removedDone} session${removedDone === 1 ? '' : 's'} you already did still count`,
+        text: `The ${removedDone} day${removedDone === 1 ? '' : 's'} you already did still count`,
         tone: 'good',
       });
     }
@@ -413,7 +413,7 @@ export function LeapSessionDeleteSheet({
                         ? 'Delete anyway'
                         : 'Yes, reset my streak'
                     : removedOpen > 0
-                      ? `Drop to ${targetAfter} session${targetAfter === 1 ? '' : 's'}`
+                      ? `Drop to ${targetAfter} day${targetAfter === 1 ? '' : 's'}`
                       : 'Remove it'}
                 </>
               )}

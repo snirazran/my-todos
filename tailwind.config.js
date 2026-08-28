@@ -17,6 +17,8 @@ module.exports = {
     extend: {
       screens: {
         narrow: { raw: '(max-width: 380px)' },
+        // Wide enough for a label + reward tiles + two buttons on one row.
+        roomy: { raw: '(min-width: 460px)' },
         short: { raw: '(max-width: 767px) and (max-height: 700px)' },
         'short-screen': { raw: '(max-height: 800px)' },
         'roomy-screen': { raw: '(min-height: 700px)' },

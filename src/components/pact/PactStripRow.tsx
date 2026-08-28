@@ -165,10 +165,10 @@ export function PactStripRow({ view }: { view: PactView }) {
           <HintButton
             text={
               sessionToday
-                ? `Today's session is on your list, tagged ${active.categoryName}. Finish all ${active.target} this week.`
+                ? `Today's is on your list, tagged ${active.categoryName}. Finish all ${active.target} days this week.`
                 : active.nextTaskLabel
-                  ? `Next session: ${active.nextTaskLabel}. ${active.progress} of ${active.target} done this week.`
-                  : `No sessions left. ${active.progress} of ${active.target} done this week.`
+                  ? `Next up: ${active.nextTaskLabel}. ${active.progress} of ${active.target} days done this week.`
+                  : `No days left. ${active.progress} of ${active.target} done this week.`
             }
             onShowMe={
               sessionToday

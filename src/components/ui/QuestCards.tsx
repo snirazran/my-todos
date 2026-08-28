@@ -636,34 +636,45 @@ export function DailyChecklistCard({
 
   return (
     <div data-quest-anchor={quests.map((quest) => quest.id).join(' ')}>
-      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 px-1 pb-2">
-        <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap text-[13px] font-black text-muted-foreground">
+      {/* Three items on one wrapping row, ordered per breakpoint rather than
+          grouped. Grouping the two controls made them wrap as a pair, which
+          took the countdown off the heading row along with the button; ordering
+          them lets only the swap drop while the clock stays beside the title. */}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 px-1 pb-2">
+        <span className="order-1 inline-flex min-w-0 items-center gap-1.5 text-[13px] font-black text-muted-foreground">
           <Icon name="quests" className="-my-2 h-8 w-8 shrink-0" />
-          Daily quests
+          <span className="truncate">Daily quests</span>
         </span>
-        <span className="inline-flex shrink-0 items-center gap-2">
-          {onSwapQuests && swapsLeft > 0 && !allDone ? (
-            <button
-              type="button"
-              onClick={onSwapQuests}
-              disabled={swapping}
-              className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-border/50 bg-card px-2 py-0.5 text-[13px] font-black tracking-wide text-muted-foreground transition-colors hover:border-primary/30 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <RefreshCw
-                className={cn('h-3 w-3 shrink-0', swapping && 'animate-spin')}
-                strokeWidth={2.75}
-              />
-              {swapping ? 'Swapping' : 'Swap today'}
-            </button>
-          ) : null}
-          {timeLeft ? (
-            <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[13px] font-black tracking-wide text-muted-foreground">
-              <Clock className="h-3.5 w-3.5 shrink-0" strokeWidth={2.75} />
-              <span className="narrow:hidden">Resets in&nbsp;</span>
-              {timeLeft}
-            </span>
-          ) : null}
-        </span>
+        {onSwapQuests && swapsLeft > 0 && !allDone ? (
+          <>
+            {/* A zero-height break, not `basis-full` on the button itself:
+                a 100% basis forces the line AND stretches the pill across it.
+                Breaking with a separate item leaves the button its own width. */}
+            <span
+              aria-hidden="true"
+              className="order-3 h-0 w-full basis-full roomy:hidden"
+            />
+          <button
+            type="button"
+            onClick={onSwapQuests}
+            disabled={swapping}
+            className="order-3 inline-flex shrink-0 items-center gap-1 self-start whitespace-nowrap rounded-full border border-border/50 bg-card px-2 py-0.5 text-[13px] font-black tracking-wide text-muted-foreground transition-colors hover:border-primary/30 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50 roomy:order-2 roomy:ml-auto"
+          >
+            <RefreshCw
+              className={cn('h-3 w-3 shrink-0', swapping && 'animate-spin')}
+              strokeWidth={2.75}
+            />
+            {swapping ? 'Swapping' : 'Swap today'}
+          </button>
+          </>
+        ) : null}
+        {timeLeft ? (
+          <span className="order-2 ml-auto inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[13px] font-black tracking-wide text-muted-foreground roomy:order-3 roomy:ml-0">
+            <Clock className="h-3.5 w-3.5 shrink-0" strokeWidth={2.75} />
+            <span className="narrow:hidden">Resets in&nbsp;</span>
+            {timeLeft}
+          </span>
+        ) : null}
       </div>
 
       <div className="flex flex-col gap-2.5">

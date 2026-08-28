@@ -36,6 +36,9 @@ export const MAX_OPTIONS = 3;
 
 export const PACT_MAX_SESSIONS = 7;
 
+/** The schedule the pick sheet opens on, and the week the cards price. */
+export const PACT_DEFAULT_DAYS = [1, 3, 5];
+
 /**
  * A gap only reads as neglect after about a week: shorter than that and
  * "quiet" describes an ordinary few days off, which is the kind of claim that

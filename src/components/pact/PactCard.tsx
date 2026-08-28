@@ -5,12 +5,16 @@ import useSWR from 'swr';
 import {
   ArrowLeftRight,
   Flame,
+  HelpCircle,
   Loader2,
   Play,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { FlyWorth } from '@/components/ui/QuestCards';
+import {
+  FlyWorth,
+  type QuestRewardCatalogItem,
+} from '@/components/ui/QuestCards';
 import {
   HintButton,
   ObjectiveProgressBar,
@@ -19,12 +23,14 @@ import {
 import { useUIStore } from '@/lib/uiStore';
 import type { PactView, PactWeekResult } from '@/lib/pact/types';
 import { formatPactRate } from '@/lib/pact/format';
+import { PACT_DEFAULT_DAYS } from '@/lib/pact/types';
 import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
 import { PactChangeSheet } from './PactChangeSheet';
 import { openShieldSheet } from '@/hooks/useShields';
 import LilyPadIcon from '../../../public/icons/LilyPad.svg';
 import { PactWeekResultSheet } from './PactWeekResultSheet';
 import { PactPickSheet } from './PactPickSheet';
+import { RotatingWeekPrice } from './RotatingWeekPrice';
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
@@ -155,6 +161,15 @@ export function usePactView() {
  */
 const DEFERRED_WEEK_KEY = 'frog:pactDeferredWeek';
 
+/**
+ * TESTING ONLY — REVERT BEFORE SHIPPING.
+ *
+ * Set true and "Not now" stops hiding the card, so the home nudge can be
+ * looked at without clearing `frog:pactDeferredWeek` by hand every time.
+ * Leaving this on ships a nudge the user cannot dismiss.
+ */
+const IGNORE_DEFERRAL = true;
+
 const WEEK_START_DAY_NAMES = [
   'Sunday',
   'Monday',
@@ -166,11 +181,54 @@ const WEEK_START_DAY_NAMES = [
 ] as const;
 
 const BANNER_RATIO = {
-  home: { empty: '16 / 4.5', active: '16 / 4' },
-  panel: { empty: '16 / 7', active: '16 / 6' },
+  home: { active: '16 / 4' },
+  // The quests page is where this card is the main event and has the room —
+  // home shares its fold with the frog scene, the quest strip and the list.
+  panel: { active: '16 / 6' },
+} as const;
+
+/**
+ * The empty band's ratio, per variant. A class rather than an inline style so
+ * it can answer the width: at 320px a 16:4.2 band is 84px of art with two
+ * lines of copy over it, which is a caption with a texture behind it.
+ */
+const EMPTY_RATIO_CLASS = {
+  home: 'aspect-[16/5.8] min-[360px]:aspect-[16/4.2]',
+  panel: 'aspect-[16/5.8] min-[360px]:aspect-[16/5]',
 } as const;
 
 const badgeCount = (value: number) => (value > 9 ? '9+' : String(value));
+
+function PactStartButtons({
+  onStart,
+  onDefer,
+}: {
+  onStart: () => void;
+  onDefer: (() => void) | null;
+}) {
+  return (
+    <>
+      {onDefer && (
+        <button
+          type="button"
+          onClick={onDefer}
+          className="rounded-lg px-2 py-2 text-[11px] font-semibold text-muted-foreground/70 transition-colors min-[400px]:px-2.5 min-[400px]:text-[12px] [@media(hover:hover)]:hover:text-foreground"
+        >
+          Not now
+        </button>
+      )}
+      <button
+        type="button"
+        data-hint="pact-pick-area"
+        onClick={onStart}
+        className="inline-flex h-11 flex-1 items-center justify-center gap-1.5 rounded-xl bg-amber-500 px-3.5 text-[13px] font-black text-white shadow-[0_3px_0_0_#b45309] transition active:translate-y-[2px] active:shadow-none roomy:flex-none"
+      >
+        <Play className="h-3.5 w-3.5 fill-current" />
+        Take my Leap
+      </button>
+    </>
+  );
+}
 
 function PactHudButton({
   icon: Icon,
@@ -227,6 +285,7 @@ export function PactCard({
   const ratio = BANNER_RATIO[variant];
   const { data, mutate } = usePactView();
   const [pickOpen, setPickOpen] = useState(false);
+  const [introOnly, setIntroOnly] = useState(false);
   const [claiming, setClaiming] = useState(false);
   const [plusOpen, setPlusOpen] = useState(false);
   const [claimingRetro, setClaimingRetro] = useState(false);
@@ -255,6 +314,11 @@ export function PactCard({
   }, [justDeferred]);
 
   if (!data || !data.enabled || data.needsAreas) return null;
+
+  const openPicker = () => {
+    setIntroOnly(false);
+    setPickOpen(true);
+  };
 
   const shownWeekResult = data.weekResult ?? preview;
 
@@ -320,7 +384,7 @@ export function PactCard({
       if (res.ok) {
         mutate(payload.view, { revalidate: false });
         setConfirmChange(false);
-        setPickOpen(true);
+        openPicker();
       }
     } finally {
       setChanging(false);
@@ -347,7 +411,8 @@ export function PactCard({
   const hideCard = variant === 'home' && !!active;
   // Only the home nudge can be waved off. The quests page is where the user
   // goes looking for this, so it always offers it.
-  const deferredHere = variant === 'home' && deferredWeek === data.weekKey;
+  const deferredHere =
+    !IGNORE_DEFERRAL && variant === 'home' && deferredWeek === data.weekKey;
   const deferWeek = () => {
     try {
       window.localStorage.setItem(DEFERRED_WEEK_KEY, data.weekKey);
@@ -358,6 +423,11 @@ export function PactCard({
     setJustDeferred(true);
   };
   const teaser = data.areas.find((entry) => entry.recommended) ?? data.areas[0];
+  const defaultDays = PACT_DEFAULT_DAYS.length;
+  const startPreview =
+    data.weekPreview.find((entry) => entry.sessions === defaultDays) ??
+    data.weekPreview[Math.floor(data.weekPreview.length / 2)] ??
+    null;
   return (
     <>
       <div
@@ -399,19 +469,48 @@ export function PactCard({
             </div>
           ) : null
         ) : !active ? (
-          <div className="w-full overflow-hidden rounded-[24px] border border-border/50 bg-card text-left shadow-sm">
+          <div className="relative w-full overflow-hidden rounded-[24px] border border-border/50 bg-card text-left shadow-sm">
+          {/* Outside the banner's own button, not inside it: a button nested
+              in a button is invalid, and the browser picks its own winner. */}
+          <button
+            type="button"
+            aria-label="What is a Leap?"
+            onClick={() => {
+              setIntroOnly(true);
+              setPickOpen(true);
+            }}
+            className="absolute right-2.5 top-2.5 z-20 grid h-8 w-8 place-items-center rounded-full bg-black/50 text-white backdrop-blur-sm transition active:scale-95 [@media(hover:hover)]:hover:bg-black/70"
+          >
+            <HelpCircle className="h-[18px] w-[18px]" strokeWidth={2.75} />
+          </button>
           <button
             type="button"
             data-hint="pact-pick-area"
-            onClick={() => setPickOpen(true)}
+            onClick={openPicker}
             className="block w-full text-left transition active:scale-[0.99]"
           >
-            {/* Full-width art on a short band. The crop is biased upward so
-                the frog's head survives a ratio this wide. */}
-            <div
-              className="relative w-full overflow-hidden"
-              style={{ aspectRatio: ratio.empty }}
-            >
+            {/* The art is a backdrop, not a box the text has to fit inside:
+                the ratio is a preferred height, and the copy sits in normal
+                flow so a 320px screen grows the band instead of wrapping the
+                sub-line up over the chip. The crop is biased upward so the
+                frog's head survives a ratio this wide. */}
+            {/* `grid-cols-1` is load-bearing: an `auto` column sizes to its
+                content's max-content width, so the sub-line pushed the column
+                wider than the card and ran off the edge instead of wrapping.
+                Tailwind's `grid-cols-1` is `minmax(0, 1fr)`. */}
+            <div className="relative grid w-full grid-cols-1 overflow-hidden">
+              {/* The ratio as a grid sibling, not as the band's own height.
+                  `aspect-ratio` on a block sets the height outright and lets
+                  content spill past it — which is how a wrapped sub-line ended
+                  up sliced off. Sharing one grid cell, the row takes whichever
+                  is taller: the ratio, or the words. */}
+              <div
+                aria-hidden="true"
+                className={cn(
+                  'col-start-1 row-start-1 w-full',
+                  EMPTY_RATIO_CLASS[variant],
+                )}
+              />
               {teaser?.coverImageUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
@@ -419,82 +518,115 @@ export function PactCard({
                   alt={teaser.name}
                   loading="lazy"
                   decoding="async"
-                  className="h-full w-full object-cover object-[center_40%]"
+                  className="absolute inset-0 h-full w-full object-cover object-[center_40%]"
                 />
               ) : (
                 <div
-                  className="h-full w-full"
+                  className="absolute inset-0"
                   style={{
                     background: `linear-gradient(135deg, ${teaser?.backgroundFrom ?? '#134e4a'}, ${teaser?.backgroundTo ?? '#0f172a'})`,
                   }}
                 />
               )}
-              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-black/25" />
-              {/* On its own the label vanished into the bright top of the
-                  art — it needs its own ground, not more opacity. */}
-              <span className="absolute left-3 top-2.5 rounded-lg bg-black/55 px-2 py-1 text-[12px] font-black text-white backdrop-blur-sm">
-                This week
-              </span>
-              <span className="absolute bottom-2 left-3.5 right-3 flex flex-col gap-0.5">
-                <span
-                  className="text-[19px] leading-none tracking-wide text-white drop-shadow-[0_3px_0_rgba(15,23,42,0.9)]"
-                  style={{
-                    fontFamily: 'var(--font-display), "Luckiest Guy", cursive',
-                    WebkitTextStroke: '1.8px rgba(15, 23, 42, 0.95)',
-                    paintOrder: 'stroke fill',
-                  }}
-                >
-                  Take your Leap
-                </span>
-                <span className="text-[11px] font-bold leading-tight text-white/85 drop-shadow-[0_1px_2px_rgba(15,23,42,0.9)]">
-                  One area · one promise · one week
-                </span>
-              </span>
-              {data.streak.weeks > 0 && (
-                <span className="absolute right-2.5 top-2.5 inline-flex h-7 items-center gap-1 rounded-full bg-black/50 px-2.5 text-[11px] font-black text-white backdrop-blur-sm">
-                  <Flame
-                    className="h-3.5 w-3.5 fill-current text-amber-300"
-                    strokeWidth={2}
-                  />
-                  {data.streak.weeks}w · pays {formatPactRate(data.ladder.multiplier)}
-                </span>
-              )}
+              {/* Two short scrims, not one flat wash: a gradient that darkens
+                  only the slice behind each text block clears the 3:1 large-
+                  text floor where the words are and leaves the middle of the
+                  art — the frog — at full strength. */}
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-[38%] bg-gradient-to-b from-black/22 to-transparent" />
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[62%] bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+
+              <div className="relative col-start-1 row-start-1 flex flex-col justify-between gap-2 px-3 py-2.5">
+                <div className="flex items-start justify-between gap-2 pr-9">
+                  {/* Narrower than 376px the badge is the only thing on the
+                      band besides the headline, so it shrinks rather than
+                      claiming a third of the artwork. */}
+                  <span className="inline-flex min-w-0 items-center gap-2 rounded-lg bg-black/45 px-2.5 py-1 backdrop-blur-sm narrow:gap-1.5 narrow:px-1.5 narrow:py-0.5">
+                    <span className="shrink-0 text-[9.5px] font-black uppercase tracking-[0.14em] text-white/60 narrow:text-[8.5px]">
+                      Suggested
+                    </span>
+                    <span
+                      aria-hidden="true"
+                      className="h-3 w-px shrink-0 rounded-full bg-white/25 narrow:h-2.5"
+                    />
+                    <span className="min-w-0 truncate text-[13px] font-black tracking-[-0.01em] text-white narrow:text-[11px]">
+                      {teaser?.name ?? 'an area'}
+                    </span>
+                  </span>
+                  {data.streak.weeks > 0 && (
+                    <span className="inline-flex h-7 shrink-0 items-center gap-1 rounded-full bg-black/50 px-2.5 text-[11px] font-black text-white backdrop-blur-sm">
+                      <Flame
+                        className="h-3.5 w-3.5 fill-current text-amber-300"
+                        strokeWidth={2}
+                      />
+                      {data.streak.weeks}w · pays{' '}
+                      {formatPactRate(data.ladder.multiplier)}
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex min-w-0 flex-col gap-1">
+                  <span
+                    className="text-[19px] leading-none tracking-[0.03em] text-white drop-shadow-[0_3px_0_rgba(15,23,42,0.9)] min-[360px]:text-[22px]"
+                    style={{
+                      fontFamily: 'var(--font-display), "Luckiest Guy", cursive',
+                      WebkitTextStroke: '2.2px rgba(15, 23, 42, 0.95)',
+                      paintOrder: 'stroke fill',
+                    }}
+                  >
+                    Take your Leap
+                  </span>
+                  {/* Two lines, one slot. Someone who has never landed a Leap
+                      needs to know what the word means; someone who has needs
+                      a reason to start another, and a week turning over is the
+                      reason — new periods reliably restart goal commitment. */}
+                  <span className="block text-[11.5px] font-semibold leading-tight text-white/90 drop-shadow-[0_1px_2px_rgba(15,23,42,0.95)] narrow:hidden">
+                    {data.streak.best === 0
+                      ? 'Pick one thing and your days — we’ll add it to your list'
+                      : 'A new week, a new commitment'}
+                  </span>
+                </div>
+              </div>
             </div>
           </button>
-            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-3.5 py-2.5">
-              {/* Given a floor rather than pure flex-1, so a long area name
-                  pushes the buttons onto their own line instead of shrinking
-                  the label away to an ellipsis. */}
-              <span className="min-w-[7rem] flex-1 truncate text-[12px] font-bold text-muted-foreground">
-                {teaser?.name ?? 'Any area works'}
-              </span>
-              {/* Paired with Start rather than banished to the far edge: the
-                  two are answers to the same question, and separating them
-                  read as an unrelated link. Deliberately quieter than Start —
-                  a text button beside a filled one is legible as the lesser
-                  path without being hidden, which is what keeps the choice
-                  real rather than rhetorical. */}
-              <div className="ml-auto flex shrink-0 items-center gap-1.5">
-                {/* Home only. The quests page is where "later" sends people,
-                    so offering to defer again there would be a dead end. */}
-                {variant === 'home' && (
-                  <button
-                    type="button"
-                    onClick={deferWeek}
-                    className="rounded-lg px-2 py-1.5 text-[12.5px] font-bold text-muted-foreground transition-colors [@media(hover:hover)]:hover:text-foreground"
-                  >
-                    Not now
-                  </button>
-                )}
-                <button
-                  type="button"
-                  data-hint="pact-pick-area"
-                  onClick={() => setPickOpen(true)}
-                  className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-amber-500 px-3.5 text-[13px] font-black text-white shadow-[0_3px_0_0_#b45309] transition active:translate-y-[2px] active:shadow-none"
-                >
-                  <Play className="h-3.5 w-3.5 fill-current" />
-                  Take the Leap
-                </button>
+            {/* One row: the week's price on the left, the only two things to
+                do on the right. The area name lives on the art now, so the
+                footer never repeats what the picture already says. */}
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-2 px-3.5 py-2.5">
+              {/* Never `flex-1 min-w-0`: a flex item shrinks before it wraps,
+                  so the price would silently clip on a narrow phone instead
+                  of dropping the buttons onto their own line. */}
+              {startPreview && (
+                <span className="shrink-0">
+                  <RotatingWeekPrice
+                    previews={data.weekPreview}
+                    startIndex={Math.max(
+                      0,
+                      data.weekPreview.findIndex(
+                        (entry) => entry.sessions === startPreview.sessions,
+                      ),
+                    )}
+                    catalog={
+                      data.rewardCatalog as Record<
+                        string,
+                        QuestRewardCatalogItem
+                      >
+                    }
+                    isPremium={data.isPremium}
+                  />
+                </span>
+              )}
+              {/* Narrow: the price and two buttons cannot share a line, so
+                  the buttons take a full row and the primary stretches to it —
+                  the app's own CTA style, and the easiest thing to hit
+                  one-handed. Wide: back to one row, buttons at natural size.
+                  `roomy` is a named screen in tailwind.config.js, not an
+                  arbitrary `min-[460px]:` — a fresh arbitrary variant value
+                  was not making it into the build. */}
+              <div className="flex w-full items-center justify-end gap-1 roomy:ml-auto roomy:w-auto">
+                <PactStartButtons
+                  onStart={openPicker}
+                  onDefer={variant === 'home' ? deferWeek : null}
+                />
               </div>
             </div>
           </div>
@@ -637,12 +769,12 @@ export function PactCard({
                   <HintButton
                     text={
                       weekFinished
-                        ? `All ${active.target} session${active.target === 1 ? '' : 's'} done. You can take a new Leap when the week rolls over.`
+                        ? `All ${active.target} day${active.target === 1 ? '' : 's'} done. You can take a new Leap when the week rolls over.`
                         : active.openToday
-                          ? `Today's session is on your list, tagged ${active.categoryName}. Finish all ${active.target} this week.`
+                          ? `Today's is on your list, tagged ${active.categoryName}. Finish all ${active.target} days this week.`
                           : active.nextTaskLabel
-                            ? `Next session: ${active.nextTaskLabel}. ${active.progress} of ${active.target} done this week.`
-                            : `No sessions left. ${active.progress} of ${active.target} done this week.`
+                            ? `Next up: ${active.nextTaskLabel}. ${active.progress} of ${active.target} days done this week.`
+                            : `No days left. ${active.progress} of ${active.target} done this week.`
                     }
                     onShowMe={
                       !weekFinished && active.openToday
@@ -686,15 +818,15 @@ export function PactCard({
                         )}
                       >
                         {active.canStillFinish
-                          ? `Missed ${active.missedSessions} session${active.missedSessions === 1 ? '' : 's'} — the rest still count`
+                          ? `Missed ${active.missedSessions} day${active.missedSessions === 1 ? '' : 's'} — the rest still count`
                           : // The bonus is gone, but the streak may not be.
                             // Saying which is the difference between "why
                             // bother" and one more session tonight.
                             !active.canHoldStreak
-                            ? `Missed ${active.missedSessions} session${active.missedSessions === 1 ? '' : 's'} — not finishable this week`
+                            ? `Missed ${active.missedSessions} day${active.missedSessions === 1 ? '' : 's'} — not finishable this week`
                             : active.progress >= active.nearMissTarget
                               ? 'Bonus is gone — your streak is safe'
-                              : `Bonus is gone — ${active.nearMissTarget} sessions still holds your streak`}
+                              : `Bonus is gone — ${active.nearMissTarget} days still holds your streak`}
                       </span>
                     )}
                   </span>
@@ -721,8 +853,12 @@ export function PactCard({
 
       <PactPickSheet
         open={pickOpen}
-        onClose={() => setPickOpen(false)}
+        onClose={() => {
+          setPickOpen(false);
+          setIntroOnly(false);
+        }}
         view={data}
+        forceIntro={introOnly}
         onCommitted={(next) => mutate(next, { revalidate: false })}
         onUpgrade={() => setPlusOpen(true)}
       />
@@ -747,7 +883,7 @@ export function PactCard({
           onStartLeap={() => {
             if (isPreviewResult(shownWeekResult)) dismissPreview();
             else void dismissWeekResult();
-            setPickOpen(true);
+            openPicker();
           }}
         />
       )}

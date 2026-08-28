@@ -5,35 +5,15 @@ import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/utils';
 import { RewardTile, type QuestRewardCatalogItem } from '@/components/ui/QuestCards';
 import { rewardStackTileStyle } from '@/lib/questClaims';
-import type { PactBonusRewards } from '@/lib/pact/types';
 import {
   formatPactRate,
   pactBonusLabel,
   pactRateWord,
   pactTileRewards,
 } from '@/lib/pact/format';
-import {
-  LeapRail,
-  LILY_LADDER_ART,
-  LILY_PLAIN,
-  type LeapStop,
-} from './LeapRail';
+import { LeapRail } from './LeapRail';
+import { buildLeapLadder } from './leapLadder';
 import { usePactView } from './PactCard';
-
-/**
- * One stop on the climb, as the card thinks of it: the three tuned rungs plus
- * the prestige that ends the cycle. Prestige is a rung here rather than a
- * separate banner because it is the twelfth week of the same ladder — split
- * across two components it read as a second, unrelated clock.
- */
-type Stop = {
-  weeks: number;
-  effective: number;
-  rewards: PactBonusRewards;
-  reached: boolean;
-  isPrestige: boolean;
-  label?: string;
-};
 
 export function PactStreakLadder() {
   const { data } = usePactView();
@@ -47,80 +27,15 @@ export function PactStreakLadder() {
   const weeks = streak.weeks;
   const rate = ladder.multiplier;
 
-  const stops: Stop[] = ladder.rungs.map((rung) => ({
-    weeks: rung.weeks,
-    effective: rung.effective,
-    rewards: rung.rewards,
-    // A milestone already collected in this cycle is behind you even if the
-    // streak has since been held rather than advanced.
-    reached: rung.weeks === 0 ? true : rung.paid || rung.reached,
-    isPrestige: false,
-  }));
+  const { stops, nextIndex, next, progress: leapProgress, railStops } =
+    buildLeapLadder(ladder, weeks);
 
-  // Prestige joins the same rail rather than getting its own banner: it is the
-  // twelfth week of this ladder, and split across two components it read as a
-  // second, unrelated clock. A rung tuned to land on the same week merges into
-  // it rather than being dropped, or the payoff would silently disappear.
-  if (ladder.prestigeWeeks > 0) {
-    const collision = stops.findIndex(
-      (stop) => stop.weeks === ladder.prestigeWeeks,
-    );
-    const prestige: Stop = {
-      weeks: ladder.prestigeWeeks,
-      effective: Math.min(
-        ladder.cap,
-        ladder.baseMultiplier *
-          (ladder.rungs[ladder.rungs.length - 1]?.multiplier ?? 1),
-      ),
-      rewards: [
-        ...(collision >= 0 ? stops[collision].rewards : []),
-        ...ladder.prestigeRewards,
-      ],
-      reached: false,
-      isPrestige: true,
-      label: ladder.prestigeLabel,
-    };
-    if (collision >= 0) stops.splice(collision, 1, prestige);
-    else stops.push(prestige);
-    stops.sort((a, b) => a.weeks - b.weeks);
-  }
-
-  if (stops.length === 0) return null;
-
-  const nextIndex = stops.findIndex((stop) => !stop.reached);
-  const next = nextIndex === -1 ? null : stops[nextIndex];
   const toGo = next ? Math.max(1, next.weeks - weeks) : 0;
   const shown = next ?? stops[stops.length - 1];
   const tiles = pactTileRewards(shown.rewards);
   const words = shown.rewards
     .map((reward) => pactBonusLabel(reward))
     .filter((label): label is string => !!label);
-
-  // Stops sit at even spacing rather than true week distance — 4/7/10/12 to
-  // scale crushes the last two together — so how far into the current leap the
-  // user stands is measured in weeks and applied to that one arc.
-  const leapProgress = (() => {
-    if (nextIndex <= 0) return nextIndex === -1 ? 1 : 0;
-    const fromWeeks = stops[nextIndex - 1]?.weeks ?? 0;
-    const span = stops[nextIndex].weeks - fromWeeks;
-    return span > 0 ? Math.min(1, Math.max(0, (weeks - fromWeeks) / span)) : 0;
-  })();
-
-  const railStops: LeapStop[] = stops.map((stop, index) => ({
-    label: stop.weeks === 0 ? 'Now' : `${stop.weeks} wk`,
-    weeks: stop.weeks,
-    rate: formatPactRate(stop.effective),
-    state: stop.reached ? 'reached' : index === nextIndex ? 'next' : 'locked',
-    isDestination: stop.isPrestige,
-    // The last pad already behind you is the one you are standing on. Before
-    // the first Leap that is the base rung, which is exactly right: week zero
-    // is a real place on this ladder.
-    isHere: stop.reached && (index === nextIndex - 1 || nextIndex === -1),
-    // The pads bloom as the rungs climb, so how far up the ladder a stop sits
-    // is legible from the artwork alone.
-    art:
-      LILY_LADDER_ART[Math.min(index, LILY_LADDER_ART.length - 1)] ?? LILY_PLAIN,
-  }));
 
   // How much better the next stop makes every week, stated against what the
   // user is paid right now. A rate is a mechanic; "20% more" is an outcome, and
@@ -168,8 +83,8 @@ export function PactStreakLadder() {
             {weeks > 0
               ? `${leaps(weeks)} in a row${rate > 1 ? ` · paying ${pactRateWord(rate)}` : ''}`
               : ladder.baseMultiplier > 1
-                ? `No Leaps yet · base ${formatPactRate(ladder.baseMultiplier)}`
-                : 'No Leaps yet'}
+                ? `Leap streak · none yet · base ${formatPactRate(ladder.baseMultiplier)}`
+                : 'Leap streak · none yet'}
           </p>
           <p className="mt-1 text-[14px] font-black leading-snug text-foreground">
             {headline}

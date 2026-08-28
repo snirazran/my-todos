@@ -1,22 +1,33 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ArrowLeft,
   Check,
+  ChevronRight,
   Flame,
   Loader2,
   Lock,
   Pencil,
   Play,
+  Sparkles,
 } from 'lucide-react';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { cn } from '@/lib/utils';
 import { normalizeWeekStart, weekDatesFor, weekOrder } from '@/lib/weekStart';
-import { PACT_QUIET_NUDGE_DAYS, PRIMARY_OPTIONS } from '@/lib/pact/types';
+import {
+  PACT_DEFAULT_DAYS,
+  PACT_QUIET_NUDGE_DAYS,
+  PRIMARY_OPTIONS,
+} from '@/lib/pact/types';
 import { formatPactRate } from '@/lib/pact/format';
 import { useReducedMotion } from 'framer-motion';
 import { QuestRewardTileBadge } from '@/lib/questClaims';
+import { Icon } from '@/components/ui/Icon';
+import type { QuestRewardCatalogItem } from '@/components/ui/QuestCards';
+import { RotatingWeekPrice } from './RotatingWeekPrice';
+import { LeapRail } from './LeapRail';
+import { buildLeapLadder } from './leapLadder';
 import { PlusDoubleNote, PlusPill } from './PlusBits';
 import type { PactAreaChoice, PactOption, PactView } from '@/lib/pact/types';
 
@@ -43,35 +54,23 @@ function repeatLabel(option: PactOption) {
 }
 
 /**
- * What the area's own tasks say, and nothing more.
- *
- * One verb — "finished" — across every state, because the card is reporting a
- * single measurement (when a task carrying this area's tag was last completed)
- * and giving that measurement three different names made the reader work out
- * whether "quiet", "not started" and "active" were the same scale. Urgency
- * rides on colour instead of vocabulary, so the wording stays factual: a claim
- * like "you have neglected this" invites action out of guilt, which buys a
- * session now at the cost of the habit later.
+ * What the area's own tasks say, and null when they say nothing. Only a run in
+ * progress or a real gap gets a word; an area with no history gets no line.
  */
 function areaStatus(area: PactAreaChoice): {
   label: string;
   tone: 'good' | 'plain' | 'urgent';
-} {
+} | null {
   if (area.streakWeeks > 0) {
     return {
       label: `${area.streakWeeks} week${area.streakWeeks === 1 ? '' : 's'} strong`,
       tone: 'good',
     };
   }
-  // No tag means there is nothing to measure yet. The card's job here is to be
-  // picked, not to hand out setup homework for a thing the user has not chosen.
-  if (!area.hasTag) return { label: 'Not started yet', tone: 'plain' };
-  if (area.quietDays === null) {
-    return { label: 'Nothing finished here yet', tone: 'urgent' };
-  }
+  if (!area.hasTag || area.quietDays === null) return null;
   if (area.quietDays <= 1) return { label: 'Finished something today', tone: 'good' };
   return {
-    label: `Last finished ${area.quietDays} days ago`,
+    label: `Quiet for ${area.quietDays} days`,
     tone: area.quietDays >= PACT_QUIET_NUDGE_DAYS ? 'urgent' : 'plain',
   };
 }
@@ -80,12 +79,15 @@ export function PactPickSheet({
   open,
   onClose,
   view,
+  forceIntro,
   onCommitted,
   onUpgrade,
 }: {
   open: boolean;
   onClose: () => void;
   view: PactView;
+  /** Open on the explainer even for someone who has already dismissed it. */
+  forceIntro?: boolean;
   onCommitted: (next: PactView) => void;
   onUpgrade: () => void;
 }) {
@@ -119,7 +121,7 @@ export function PactPickSheet({
   const [optionId, setOptionId] = useState<string | null>(null);
   const [customText, setCustomText] = useState('');
   const [continueText, setContinueText] = useState('');
-  const [days, setDays] = useState<number[]>(() => fitDays([1, 3, 5]));
+  const [days, setDays] = useState<number[]>(() => fitDays(PACT_DEFAULT_DAYS));
   const [startTime, setStartTime] = useState('19:00');
   const [writingOwn, setWritingOwn] = useState(false);
   const [perDayTimes, setPerDayTimes] = useState(false);
@@ -137,15 +139,17 @@ export function PactPickSheet({
   } | null>(null);
 
   // Opening the sheet resets it — nothing else may. Committing hands the
-  // fresh view up to the card, and that view carries introSeen flipped true
-  // by the intro step, which re-ran this effect and wiped the success screen
-  // back to the area grid the instant the pact was saved.
-  const introSeenRef = useRef(view.introSeen);
-  introSeenRef.current = view.introSeen;
-
+  // fresh view up to the card, and that view carries a fresh step, which
+  // re-ran this effect and wiped the success screen back to the area grid the
+  // instant the pact was saved.
+  //
+  // The explainer is reached ONLY through the card's help button. Starting a
+  // first-timer on it made the primary action open a page of reading instead
+  // of the thing they tapped for; the card's own sub-line carries the
+  // one-line version, and `?` is there for anyone who wants the rest.
   useEffect(() => {
     if (!open) return;
-    setStep(introSeenRef.current ? 'area' : 'intro');
+    setStep(forceIntro ? 'intro' : 'area');
     setAreaId(null);
     setOptions(null);
     setOptionId(null);
@@ -193,6 +197,9 @@ export function PactPickSheet({
     }
   };
 
+  // Still recorded even though nothing reads it to auto-open any more: the
+  // flag is what a future "first run" treatment would key off, and it costs
+  // one fire-and-forget PATCH.
   const dismissIntro = async () => {
     setStep('area');
     try {
@@ -265,14 +272,27 @@ export function PactPickSheet({
       ? continueText.trim()
       : (option?.text ?? '');
   const visibleOptions = (options ?? []).slice(0, PRIMARY_OPTIONS);
-  const hasFooter = step === 'commitment' || step === 'confirm';
+  // The intro grew a rail; on a short screen that pushed "Let's go" below the
+  // fold, so the one action on the screen sat where nobody could see it.
+  const hasFooter =
+    step === 'intro' || step === 'commitment' || step === 'confirm';
   // Sessions are the only thing that moves the number, and every one of them
   // is a box the app watches get ticked. Priced on the server: the gift climbs
   // with the session count too, so re-deriving it here would drift the moment
   // either the formula or a gift tier is tuned.
   const preview =
     view.weekPreview.find((entry) => entry.sessions === days.length) ?? null;
+  // The intro prices the default week, not whatever the day toggles happen to
+  // hold — nobody has touched them yet on that step.
+  const introStartIndex = Math.max(
+    0,
+    view.weekPreview.findIndex(
+      (entry) => entry.sessions === PACT_DEFAULT_DAYS.length,
+    ),
+  );
   const rewardPreview = preview?.flies ?? 0;
+  const introRail = buildLeapLadder(view.ladder, view.streak.weeks);
+  const anyAreaStatus = view.areas.some((entry) => areaStatus(entry) !== null);
 
   return (
     <BaseSheet
@@ -300,7 +320,12 @@ export function PactPickSheet({
             )}
           >
             {step === 'intro' && (
-              <div className="flex flex-col gap-4 pb-2 pt-1">
+              // The marquee is full-bleed and starts at the top of the scroll
+              // area, which is exactly where BaseSheet pins its close button —
+              // a translucent circle that vanished into the bright artwork.
+              // The offset is the caller's to make: every other step opens
+              // with inset text and never reaches under it.
+              <div className="flex flex-col gap-4 pb-2 pt-9">
                 {/* Every area at once, drifting. A single hero card sold one
                     area; the promise of this feature is the whole set, and a
                     wall of them says "there is somewhere here for whatever
@@ -309,42 +334,58 @@ export function PactPickSheet({
 
                 <div className="text-center">
                   <h2 className="text-[21px] font-black leading-tight text-foreground">
-                    One Leap a week
+                    How a Leap works
                   </h2>
                   {/* The one place the word is taught. A concrete name only
                       costs the reader one exposure, and this is it. */}
-                  <p className="mx-auto mt-1 max-w-[34ch] text-[13.5px] font-semibold leading-snug text-muted-foreground">
-                    A Leap is one area, one promise, one week. Pick something
-                    you&apos;ll actually do — we&apos;ll put it on your list.
+                  <p className="mx-auto mt-1 max-w-[30ch] text-[13.5px] font-semibold leading-snug text-muted-foreground">
+                    Take a Leap in one area, one commitment each week.
                   </p>
                 </div>
 
                 {/* One grouped card with dividers, the shape every other row
                     on this feature uses, instead of three floating lines. */}
                 <ol className="flex flex-col divide-y divide-border/50 overflow-hidden rounded-2xl bg-muted/40">
-                  {[
-                    'Pick your area',
-                    'Choose what you’ll do',
-                    'Set days and times',
-                  ].map((label, index) => (
-                    <li key={label} className="flex items-center gap-3 px-3.5 py-2.5">
-                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-[12px] font-black tabular-nums text-white">
-                        {index + 1}
-                      </span>
-                      <span className="text-[14px] font-bold text-foreground">
-                        {label}
-                      </span>
-                    </li>
-                  ))}
+                  <IntroBeat
+                    index={1}
+                    title="Commit to one thing"
+                    hint="We add it to your list"
+                  />
+                  <IntroBeat
+                    index={2}
+                    title="Finish it this week"
+                    trailing={
+                      view.weekPreview.length > 0 ? (
+                        <RotatingWeekPrice
+                          previews={view.weekPreview}
+                          startIndex={introStartIndex}
+                          catalog={
+                            view.rewardCatalog as Record<
+                              string,
+                              QuestRewardCatalogItem
+                            >
+                          }
+                          isPremium={view.isPremium}
+                          dense
+                        />
+                      ) : undefined
+                    }
+                  />
+                  {introRail.railStops.length > 1 && (
+                    <IntroBeat
+                      index={3}
+                      title="Keep your streak"
+                      hint="Hit a milestone, raise your rate"
+                      below={
+                        <LeapRail
+                          stops={introRail.railStops}
+                          progress={introRail.progress}
+                          className="pb-1 pt-2"
+                        />
+                      }
+                    />
+                  )}
                 </ol>
-
-                <button
-                  type="button"
-                  onClick={dismissIntro}
-                  className="h-12 w-full rounded-2xl bg-[#4f9149] text-[15px] font-black text-white shadow-[0_4px_0_0_#34631f] ring-1 ring-[#34631f]/40 transition-transform active:translate-y-[2px] active:shadow-none"
-                >
-                  Let&apos;s go
-                </button>
               </div>
             )}
 
@@ -355,10 +396,10 @@ export function PactPickSheet({
                     This week
                   </p>
                   <h2 className="mt-1 text-[20px] font-black leading-tight text-foreground">
-                    Which area gets your attention?
+                    Pick your area
                   </h2>
                   <p className="mt-1 text-[13px] font-semibold text-muted-foreground">
-                    Pick one. You can switch next week.
+                    Just one. You&apos;ll choose again next week.
                   </p>
                 </div>
                 {/* Always two columns: a full-width card at 16/9 is enormous on
@@ -366,23 +407,18 @@ export function PactPickSheet({
                   Halving the width fixes both at once. */}
                 <div className="grid grid-cols-2 gap-3">
                   {view.areas.map((entry) => {
-                    const compact = true;
+                    const status = areaStatus(entry);
                     return (
                       <button
                         key={entry.categoryId}
                         type="button"
                         onClick={() => chooseArea(entry.categoryId)}
-                        className="h-full w-full overflow-hidden rounded-[24px] border border-border/50 bg-card text-left shadow-sm transition active:scale-[0.98] [@media(hover:hover)]:hover:shadow-md"
+                        className="w-full overflow-hidden rounded-[24px] border border-border/50 bg-card text-left shadow-sm transition active:scale-[0.98] [@media(hover:hover)]:hover:shadow-md"
                       >
                         {/* An aspect ratio, not a pixel height: a fixed height
                           crops harder the wider the screen, which is why the
                           art lost its frogs on phones. */}
-                        <div
-                          className={cn(
-                            'relative w-full overflow-hidden',
-                            'aspect-[16/9]',
-                          )}
-                        >
+                        <div className="relative aspect-[16/9] w-full overflow-hidden">
                           {entry.coverImageUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img
@@ -400,61 +436,65 @@ export function PactPickSheet({
                               }}
                             />
                           )}
-                          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-black/50 to-transparent" />
-                          <span
-                            className={cn(
-                              'absolute bottom-2 leading-none tracking-wide text-white drop-shadow-[0_3px_0_rgba(15,23,42,0.9)]',
-                              compact
-                                ? 'left-3 right-3 truncate text-[15px]'
-                                : 'left-3.5 text-[20px]',
-                            )}
-                            style={{
-                              fontFamily:
-                                'var(--font-display), "Luckiest Guy", cursive',
-                              WebkitTextStroke: compact
-                                ? '1.4px rgba(15, 23, 42, 0.95)'
-                                : '1.8px rgba(15, 23, 42, 0.95)',
-                              paintOrder: 'stroke fill',
-                            }}
-                          >
-                            {entry.name}
-                          </span>
+                          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/70 via-black/25 to-transparent" />
                           {/* States what was measured, never what to do. The
                               badge is only shown where there is evidence (see
                               PACT_QUIET_NUDGE_DAYS), and an observation lets
                               the user draw their own conclusion — an
                               instruction buys a pick out of obligation. */}
                           {entry.recommended && (
-                            <span className="absolute right-2.5 top-2.5 rounded-lg bg-amber-500 px-2 py-1 text-[12px] font-black text-white shadow-[0_2px_0_0_#b45309]">
-                              Gone quiet
+                            <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-lg bg-amber-500 px-1.5 py-1 text-[11px] font-black text-white shadow-[0_2px_0_0_#b45309]">
+                              <Sparkles
+                                className="h-3 w-3 fill-current"
+                                strokeWidth={2.5}
+                              />
+                              Suggested
                             </span>
                           )}
-                        </div>
-                        <div className="flex flex-col gap-2 px-3 py-2.5">
-                          {(() => {
-                            const status = areaStatus(entry);
-                            return (
-                              <span
-                                className={cn(
-                                  'min-w-0 truncate text-[11px] font-bold',
-                                  status.tone === 'good'
-                                    ? 'text-primary'
-                                    : status.tone === 'urgent'
-                                      ? 'text-amber-600 dark:text-amber-400'
-                                      : 'text-muted-foreground',
-                                )}
-                              >
-                                {status.label}
-                              </span>
-                            );
-                          })()}
-                          {/* A real button, not just a tappable card — the card
-                            alone gave no affordance that it was clickable. */}
-                          <span className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-xl bg-amber-500 text-[13px] font-black text-white shadow-[0_3px_0_0_#b45309]">
-                            <Play className="h-3.5 w-3.5 fill-current" />
-                            Pick
+                          {/* The action rides the artwork instead of claiming
+                              a band of its own. Three full-width buttons in a
+                              grid is the same word three times, and it pushed
+                              every card past the fold; a chip still signifies
+                              the tap without dominating the card it sits on. */}
+                          <span className="absolute inset-x-2.5 bottom-2 flex items-end justify-between gap-2">
+                            <span
+                              className="min-w-0 flex-1 truncate text-[15px] leading-none tracking-wide text-white drop-shadow-[0_3px_0_rgba(15,23,42,0.9)]"
+                              style={{
+                                fontFamily:
+                                  'var(--font-display), "Luckiest Guy", cursive',
+                                WebkitTextStroke: '1.4px rgba(15, 23, 42, 0.95)',
+                                paintOrder: 'stroke fill',
+                              }}
+                            >
+                              {entry.name}
+                            </span>
+                            <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-black/45 text-white backdrop-blur-sm">
+                              <ChevronRight
+                                className="h-4 w-4"
+                                strokeWidth={3}
+                              />
+                            </span>
                           </span>
                         </div>
+                        {/* Reserved across the whole grid or not present at
+                            all. Per-card it made every card a different
+                            height; unconditional it drew an empty white band
+                            under every card, which reads as a card that
+                            failed to load. */}
+                        {anyAreaStatus && (
+                          <span
+                            className={cn(
+                              'flex h-8 items-center truncate px-3 text-[11px] font-bold',
+                              status?.tone === 'good'
+                                ? 'text-primary'
+                                : status?.tone === 'urgent'
+                                  ? 'text-amber-600 dark:text-amber-400'
+                                  : 'text-muted-foreground',
+                            )}
+                          >
+                            {status?.label ?? ''}
+                          </span>
+                        )}
                       </button>
                     );
                   })}
@@ -584,7 +624,7 @@ export function PactPickSheet({
                           className="h-11 w-full rounded-xl border border-border/60 bg-background px-3 text-[16px] font-bold text-foreground outline-none focus:border-primary"
                         />
                         <p className="mt-2 text-[12px] font-semibold text-muted-foreground">
-                          Describe one session. Days and time come next.
+                          Describe one day of it. Days and time come next.
                         </p>
                       </div>
                     )}
@@ -927,8 +967,8 @@ export function PactPickSheet({
                   <span className="flex min-w-0 flex-col gap-1">
                     <span className="truncate text-[12.5px] font-bold text-muted-foreground">
                       {days.length === 1
-                        ? 'If you do it this week'
-                        : `If you do all ${days.length} this week`}
+                        ? 'Finish it this week'
+                        : `Finish all ${days.length} days this week`}
                     </span>
                     {view.ladder.multiplier > 1 && (
                       <span className="inline-flex w-fit items-center gap-1 rounded-full bg-orange-500/12 px-2 py-0.5 text-[11px] font-black text-orange-600 dark:text-orange-400">
@@ -953,7 +993,15 @@ export function PactPickSheet({
                   Pick at least one day.
                 </p>
               )}
-              {step === 'commitment' ? (
+              {step === 'intro' ? (
+                <button
+                  type="button"
+                  onClick={dismissIntro}
+                  className="h-12 w-full rounded-2xl bg-[#4f9149] text-[15px] font-black text-white shadow-[0_4px_0_0_#34631f] ring-1 ring-[#34631f]/40 transition-transform active:translate-y-[2px] active:shadow-none"
+                >
+                  Let&apos;s go
+                </button>
+              ) : step === 'commitment' ? (
                 <button
                   type="button"
                   disabled={!previewText}
@@ -994,6 +1042,62 @@ export function PactPickSheet({
  * Only `transform` animates, so both rows stay on the compositor no matter
  * how many tiles are on screen.
  */
+/**
+ * One beat of the story: what you do, and what it hands back. The trailing
+ * slot is the point — a numbered list of the form's own fields told the reader
+ * how to fill in a screen they were about to see anyway, and never once said
+ * what any of it was worth.
+ */
+function IntroBeat({
+  index,
+  icon,
+  title,
+  hint,
+  trailing,
+  below,
+}: {
+  index?: number;
+  /** Stands in for the step number on a row that is not a step. */
+  icon?: React.ReactNode;
+  title: string;
+  hint?: string;
+  trailing?: React.ReactNode;
+  /** Full-width content under the row, inside the same divider band. */
+  below?: React.ReactNode;
+}) {
+  return (
+    <li className="flex flex-col gap-2.5 px-3.5 py-2.5">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+      {icon ? (
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center">
+          {icon}
+        </span>
+      ) : (
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-[12px] font-black tabular-nums text-white">
+          {index}
+        </span>
+      )}
+      <span className="min-w-0 flex-1 basis-0">
+        <span className="block text-[14px] font-black leading-tight text-foreground">
+          {title}
+        </span>
+        {hint && (
+          <span className="mt-0.5 block text-[11.5px] font-semibold leading-tight text-muted-foreground">
+            {hint}
+          </span>
+        )}
+      </span>
+      {trailing && (
+        <span className="shrink-0 narrow:ml-9 narrow:basis-full">
+          {trailing}
+        </span>
+      )}
+      </div>
+      {below}
+    </li>
+  );
+}
+
 function AreaMarquee({ areas }: { areas: PactAreaChoice[] }) {
   const reduceMotion = useReducedMotion();
   if (areas.length === 0) return null;
@@ -1003,7 +1107,6 @@ function AreaMarquee({ areas }: { areas: PactAreaChoice[] }) {
   const padded: PactAreaChoice[] = [];
   while (padded.length < 8) padded.push(...areas);
   const rowA = padded;
-  const rowB = [...padded.slice(Math.ceil(padded.length / 2)), ...padded.slice(0, Math.ceil(padded.length / 2))];
 
   const renderRow = (row: PactAreaChoice[], reverse: boolean, seconds: number) => (
     <div
@@ -1069,7 +1172,6 @@ function AreaMarquee({ areas }: { areas: PactAreaChoice[] }) {
       }}
     >
       {renderRow(rowA, false, 38)}
-      {renderRow(rowB, true, 46)}
     </div>
   );
 }

@@ -534,8 +534,8 @@ export function PactWeekResultSheet({
                     ? `${weeksWord(result.streakAfter)} straight. The climb starts again — but every week from now pays ${formatPactRate(result.prestigeBase ?? 1)} before your streak is counted, and that never goes away.`
                     : kept
                       ? result.milestoneWeeks
-                        ? `All ${result.target} session${result.target === 1 ? '' : 's'} done — and that is ${weeksWord(result.milestoneWeeks)} running.`
-                        : `All ${result.target} session${result.target === 1 ? '' : 's'} done.`
+                        ? `All ${result.target} day${result.target === 1 ? '' : 's'} done — and that is ${weeksWord(result.milestoneWeeks)} running.`
+                        : `All ${result.target} day${result.target === 1 ? '' : 's'} done.`
                       : rescued
                         ? `You finished ${result.progress} of ${result.target}. A Lily Pad caught the rest, so the streak stands where it is.`
                         : nearMiss
