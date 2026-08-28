@@ -196,7 +196,7 @@ export function InviteFriendsModal({
             transition={{ duration: 0.25, ease: 'easeOut' }}
             onPointerDown={onScrimPointerDown}
             onClick={onScrimClick}
-            className="fixed inset-0 z-[1400] bg-black/60 backdrop-blur-sm"
+            className="fixed inset-0 z-[1400] bg-black/70"
           />
           <motion.div
             initial={{ y: '100%' }}
@@ -244,17 +244,27 @@ export function InviteFriendsModal({
   );
 }
 
+/**
+ * True once the step's entrance is over. Each frog preview costs a short-lived
+ * Rive instance in the stamp engine, and six of them queued against a running
+ * transition is what the drop in frame rate was.
+ */
+function useSettled(delayMs = 220) {
+  const [settled, setSettled] = useState(false);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSettled(true), delayMs);
+    return () => window.clearTimeout(timer);
+  }, [delayMs]);
+  return settled;
+}
+
 function StepShell({ children }: { children: React.ReactNode }) {
   const reduceMotion = useReducedMotion();
   return (
     <motion.div
       initial={reduceMotion ? { opacity: 0 } : { opacity: 0, x: 32 }}
       animate={{ opacity: 1, x: 0 }}
-      exit={
-        reduceMotion
-          ? { opacity: 0 }
-          : { opacity: 0, x: -32, transition: { duration: 0.16, ease: 'easeIn' } }
-      }
+      exit={{ opacity: 0, transition: { duration: 0.09, ease: 'easeIn' } }}
       transition={{ type: 'spring', stiffness: 380, damping: 34, mass: 0.8 }}
       className="relative flex h-full min-h-0 flex-1 flex-col will-change-transform"
     >
@@ -276,14 +286,14 @@ function Reveal({
   if (reduceMotion) return <div className={className}>{children}</div>;
   return (
     <motion.div
-      initial={{ opacity: 0, y: 18, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
+      initial={{ opacity: 0, y: 14 }}
+      animate={{ opacity: 1, y: 0 }}
       transition={{
         type: 'spring',
         stiffness: 400,
         damping: 30,
         mass: 0.7,
-        delay,
+        delay: delay * 0.45,
       }}
       className={className}
     >
@@ -389,6 +399,7 @@ function RewardProgressTrack({
   claimedCount: number;
   totalTiers: number;
 }) {
+  const settled = useSettled();
   const progressPct =
     totalTiers > 0 ? Math.min(100, Math.max(0, (claimedCount / totalTiers) * 100)) : 0;
   const firstPos = milestonePositionPct(0, rewards.length);
@@ -430,11 +441,13 @@ function RewardProgressTrack({
                 }`}
               >
                 <div className="h-full w-full scale-[0.92] min-[380px]:scale-[0.9] sm:scale-95 min-[900px]:scale-100">
-                  <RewardPreview
-                    reward={reward.rewards?.[0] ?? legacyReward(reward)}
-                    fallbackItem={reward.item ?? null}
-                    active={isLastReward}
-                  />
+                  {settled && (
+                    <RewardPreview
+                      reward={reward.rewards?.[0] ?? legacyReward(reward)}
+                      fallbackItem={reward.item ?? null}
+                      active={isLastReward}
+                    />
+                  )}
                 </div>
               </div>
             </div>
@@ -555,6 +568,10 @@ function PickStep({
   onSend: () => void;
   creating: boolean;
 }) {
+  const settled = useSettled();
+  // The six stamps queue behind the hero's own instance, so they start after it
+  // rather than contending with it.
+  const previewsReady = useSettled(320);
   if (!config) return <Loading onClose={onClose} />;
   const selected = config.giftOptions.find((g) => g.id === selectedGiftId) ?? null;
 
@@ -570,21 +587,32 @@ function PickStep({
           delay={0.05}
           className="relative mx-auto mt-4 flex h-44 w-full max-w-md shrink-0 items-center justify-center overflow-visible rounded-[28px] [@media(max-height:620px)]:h-36 sm:mt-10 sm:h-56 sm:[@media(max-height:850px)]:mt-4 sm:[@media(max-height:850px)]:h-40 md:mt-4 md:h-40">
           <div className="pointer-events-none absolute inset-x-[-5rem] bottom-[-5rem] top-[-5rem] transform-gpu bg-[radial-gradient(ellipse_at_center,rgba(225,255,194,0.58)_0%,rgba(190,235,151,0.3)_45%,rgba(133,190,92,0)_76%)]" />
-          <div className="absolute inset-[-72px] transform-gpu opacity-40 will-change-transform [mask-image:radial-gradient(circle_at_center,black_0%,black_22%,rgba(0,0,0,0.35)_54%,transparent_82%)] [webkit-mask-image:radial-gradient(circle_at_center,black_0%,black_22%,rgba(0,0,0,0.35)_54%,transparent_82%)]">
-            <RotatingRays colorClass="text-white/14" />
-          </div>
-          <div className="relative z-10 -translate-y-3 scale-[0.82] sm:scale-100">
-            <Frog
-              className="-translate-y-16 sm:-translate-y-20"
-              width={250}
-              height={281}
-              paused={false}
-            />
-            <div className="absolute right-0 top-16 z-20 rotate-[6deg] rounded-2xl bg-white px-3 py-1.5 text-[13px] font-black tracking-tight text-[#4f8f28] shadow-[0_3px_0_rgba(52,100,31,0.25)] sm:right-[-1rem] sm:top-14">
-              Ooh, a gift for me?
-              <span className="absolute -bottom-1.5 left-4 h-3 w-3 rotate-45 bg-white" />
+          {settled && (
+            <div className="absolute inset-[-72px] transform-gpu opacity-40 will-change-transform [mask-image:radial-gradient(circle_at_center,black_0%,black_22%,rgba(0,0,0,0.35)_54%,transparent_82%)] [webkit-mask-image:radial-gradient(circle_at_center,black_0%,black_22%,rgba(0,0,0,0.35)_54%,transparent_82%)]">
+              <RotatingRays colorClass="text-white/14" />
             </div>
-          </div>
+          )}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: settled ? 1 : 0 }}
+            transition={{ duration: 0.22, ease: 'easeOut' }}
+            className="relative z-10 -translate-y-3 scale-[0.82] sm:scale-100"
+          >
+            {settled && (
+              <>
+                <Frog
+                  className="-translate-y-16 sm:-translate-y-20"
+                  width={250}
+                  height={281}
+                  paused={false}
+                />
+                <div className="absolute right-0 top-16 z-20 rotate-[6deg] rounded-2xl bg-white px-3 py-1.5 text-[13px] font-black tracking-tight text-[#4f8f28] shadow-[0_3px_0_rgba(52,100,31,0.25)] sm:right-[-1rem] sm:top-14">
+                  Ooh, a gift for me?
+                  <span className="absolute -bottom-1.5 left-4 h-3 w-3 rotate-45 bg-white" />
+                </div>
+              </>
+            )}
+          </motion.div>
         </Reveal>
 
         <Reveal delay={0.12}>
@@ -614,7 +642,9 @@ function PickStep({
                   }`}
                 >
                   <span className="pointer-events-none block h-full w-full">
-                    <GiftPreview item={gift.item ?? null} active={isSelected} />
+                    {previewsReady && (
+                      <GiftPreview item={gift.item ?? null} active={isSelected} />
+                    )}
                   </span>
                 </button>
               );
@@ -690,13 +720,9 @@ function CloseButton({
 function GiftPreview({
   item,
   active = false,
-  animate = false,
 }: {
   item: CatalogItem | null;
   active?: boolean;
-  /** Live Rive instead of a stamped frame. Never for a grid the user taps
-   *  through: each toggle builds and tears down a runtime instance. */
-  animate?: boolean;
 }) {
   if (!item) {
     return (
@@ -717,19 +743,6 @@ function GiftPreview({
   }
 
   const indices = itemToIndices(item);
-  if (animate) {
-    return (
-      <div className="flex h-full w-full items-center justify-center overflow-visible">
-        <Frog
-          width={300}
-          height={338}
-          indices={indices}
-          paused={false}
-          visualOffsetY={0}
-        />
-      </div>
-    );
-  }
   return (
     <div className="flex h-full w-full items-center justify-center overflow-visible">
       <FrogSnapshot
@@ -752,8 +765,7 @@ function RewardPreview({
   fallbackItem: CatalogItem | null;
   active?: boolean;
 }) {
-  if (!reward)
-    return <GiftPreview item={fallbackItem} active={active} animate={active} />;
+  if (!reward) return <GiftPreview item={fallbackItem} active={active} />;
   if (reward.type === 'FLIES') {
     const amount = reward.amountMode === 'random' ? reward.maxAmount : reward.amount;
     return (
@@ -763,7 +775,7 @@ function RewardPreview({
       </div>
     );
   }
-  return <GiftPreview item={fallbackItem} active={active} animate={active} />;
+  return <GiftPreview item={fallbackItem} active={active} />;
 }
 
 function Loading({ onClose }: { onClose: () => void }) {

@@ -186,12 +186,13 @@ export default function FriendsPage() {
   const buddyInviteCount = buddyInvitesData?.incoming?.length ?? 0;
   const alertsCount = pendingCount + buddyInviteCount + unseenLooks;
 
-  const growCard = (
+  const growCard = (flushTop = false) => (
     <GrowPondCard
       onInvite={() => setInviteOpen(true)}
       onAdd={() => setAddOpen(true)}
       enabled={!!user}
       paused={isAnyPanelOpen}
+      flushTop={flushTop}
     />
   );
 
@@ -268,7 +269,7 @@ export default function FriendsPage() {
         >
           {!hasRealFriends && friendsData ? (
             <>
-              {growCard}
+              {growCard(true)}
               <EmptyPond onAdd={() => setAddOpen(true)} />
             </>
           ) : (
@@ -311,7 +312,7 @@ export default function FriendsPage() {
                 )}
               </div>
 
-              <div className="mt-9">{growCard}</div>
+              <div className="mt-9">{growCard()}</div>
             </>
           )}
         </div>

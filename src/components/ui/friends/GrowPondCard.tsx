@@ -6,6 +6,7 @@ import { UserPlus } from 'lucide-react';
 import Frog from '@/components/ui/frog';
 import Fly from '@/components/ui/fly';
 import { FriendSuggestionsRow } from '@/components/ui/FriendSuggestionsRow';
+import { cn } from '@/lib/utils';
 
 type RewardItem = {
   id: string;
@@ -36,11 +37,15 @@ export function GrowPondCard({
   onAdd,
   enabled,
   paused = false,
+  flushTop = false,
 }: {
   onInvite: () => void;
   onAdd: () => void;
   enabled: boolean;
   paused?: boolean;
+  /** Card is the sheet's first row: it takes over the sheet's curved top edge
+   *  instead of sitting on a strip of background below it. */
+  flushTop?: boolean;
 }) {
   const { data: config } = useSWR<InviteConfig>('/api/invite/config', fetcher, {
     revalidateOnFocus: false,
@@ -83,7 +88,12 @@ export function GrowPondCard({
   return (
     <section
       data-hint="invite-friend"
-      className="relative -mx-4 mt-2 overflow-hidden bg-[#25482a] px-4 py-7 text-white md:-mx-8 md:rounded-[28px] md:px-8"
+      className={cn(
+        'relative -mx-4 overflow-hidden bg-[#25482a] px-4 py-7 text-white md:-mx-8 md:mt-2 md:rounded-[28px] md:px-8',
+        flushTop
+          ? '-mt-6 rounded-t-[24px] pt-9 md:mt-2 md:rounded-[28px] md:pt-7'
+          : 'mt-2',
+      )}
     >
       <span
         aria-hidden
