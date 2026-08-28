@@ -509,10 +509,10 @@ export function NextQuestStrip({
                 onShowMe={
                   displayNextUp.guideId
                     ? () =>
-                        startHintGuide(
-                          displayNextUp.guideId!,
-                          displayNextUp.guideContext,
-                        )
+                        startHintGuide(displayNextUp.guideId!, {
+                          ...displayNextUp.guideContext,
+                          tags: displayNextUp.tags,
+                        })
                     : undefined
                 }
               />

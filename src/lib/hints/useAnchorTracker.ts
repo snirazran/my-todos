@@ -201,9 +201,12 @@ export function useAnchorTracker({
       // scroll while the user is already reaching for a visible target makes
       // their tap land on whatever slides under the finger.
       const r = el.getBoundingClientRect();
+      // An anchor taller than the viewport is always partly in view; centring
+      // it just yanks the page for no gain.
+      const tallerThanViewport = r.height > window.innerHeight - 168;
       const comfortablyVisible =
         r.top >= 72 && r.bottom <= window.innerHeight - 96;
-      if (!comfortablyVisible) {
+      if (!comfortablyVisible && !tallerThanViewport) {
         el.scrollIntoView({ block: 'center', behavior: 'smooth' });
       }
     }
@@ -229,6 +232,17 @@ export function useAnchorTracker({
       setSettled(!moved);
       setRect((prev) => (rectsEqual(prev, next) ? prev : next));
     };
+    // Scroll fires far more often than the screen refreshes; measuring and
+    // re-rendering per event is what makes a tracked overlay feel heavy.
+    let frame = 0;
+    const scheduleUpdate = () => {
+      if (frame) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = 0;
+        update();
+      });
+    };
+    scheduleUpdate();
     const onScroll = () => {
       setScrolling(true);
       if (scrollQuietTimerRef.current) {
@@ -238,18 +252,23 @@ export function useAnchorTracker({
         () => setScrolling(false),
         160,
       );
+      scheduleUpdate();
+    };
+    const onTick = () => {
+      if (document.hidden) return;
       update();
     };
-    const interval = window.setInterval(update, 150);
+    const interval = window.setInterval(onTick, 250);
     window.addEventListener('scroll', onScroll, true);
-    window.addEventListener('resize', update);
+    window.addEventListener('resize', scheduleUpdate);
     return () => {
       window.clearInterval(interval);
+      if (frame) window.cancelAnimationFrame(frame);
       if (scrollQuietTimerRef.current) {
         window.clearTimeout(scrollQuietTimerRef.current);
       }
       window.removeEventListener('scroll', onScroll, true);
-      window.removeEventListener('resize', update);
+      window.removeEventListener('resize', scheduleUpdate);
     };
   }, [el, resetKey, scrollIntoView]);
 

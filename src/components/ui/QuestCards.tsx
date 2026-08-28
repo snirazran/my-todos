@@ -1735,8 +1735,9 @@ function ObjectiveRow({
           text={objectiveHintText(block)}
           tags={undefined}
           onShowMe={
-            guideId && !needsTag
-              ? () => {
+            needsTag
+              ? undefined
+              : () => {
                   const context = guideContextForBlock(block);
                   const tagNames =
                     context?.tagNames ??
@@ -1755,7 +1756,6 @@ function ObjectiveRow({
                       ) ?? undefined,
                   });
                 }
-              : undefined
           }
         />
       </div>

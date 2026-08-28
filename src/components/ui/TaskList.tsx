@@ -375,21 +375,15 @@ const SortableTaskItem = React.forwardRef<
       (isOpen || isSwiping) && !isDragging && !isSortDragging;
 
     const activeHint = useUIStore((s) => s.activeHint);
-    const hintStep = activeHint
-      ? guideById(activeHint.guideId)?.steps[activeHint.stepIndex] ?? null
+    const hintBeat = activeHint
+      ? (guideById(activeHint.guideId)?.beats[activeHint.beatIndex] ?? null)
       : null;
     const hintStepKey = activeHint
-      ? `${activeHint.runId}:${activeHint.guideId}:${activeHint.stepIndex}`
+      ? `${activeHint.runId}:${activeHint.guideId}:${activeHint.beatIndex}`
       : null;
-    const hintTagIds = activeHint?.context?.tagIds ?? [];
     const hintPeekTarget =
-      !isDone &&
-      (hintStep?.rowPeek === 'tagged'
-        ? (task.tags ?? []).some((id) => hintTagIds.includes(id))
-        : hintStep?.rowPeek === 'first'
-          ? hintPeekPrimary
-          : false);
-    const hintRowGlow = hintPeekTarget && hintStep?.rowPeek === 'tagged';
+      !isDone && hintBeat?.show === 'row-peek' && hintPeekPrimary;
+    const hintRowGlow = hintPeekTarget && hintBeat?.scope === 'tagged';
 
     // Demo nudge: slide the row right with the same motion value the real
     // swipe uses, so the Focus action genuinely peeks out and a user grab at
@@ -2031,6 +2025,20 @@ export default function TaskList({
   // Combined for DnD context and empty-state checks
   const sortedVisibleTasks = [...sortedActiveTasks, ...completedTasks];
 
+  // Exactly one row demos the swipe: the same one the coach has spotlit, so a
+  // tagged guide never nudges rows sitting behind its own dim.
+  const listHint = useUIStore((s) => s.activeHint);
+  const listHintTagIds = listHint?.context?.tagIds ?? [];
+  const listHintTagged =
+    guideById(listHint?.guideId)?.beats[listHint?.beatIndex ?? 0]?.scope ===
+    'tagged';
+  const hintPeekTaskId = sortedActiveTasks.find(
+    (t) =>
+      !(t.completed || vSet.has(t.id)) &&
+      (!listHintTagged ||
+        (t.tags ?? []).some((id) => listHintTagIds.includes(id))),
+  )?.id;
+
   // ---- Sections: group active tasks under their headers ----
   // Unsectioned tasks first (no header), then each section in order. Completed
   // tasks keep sinking to the single bottom pile regardless of section.
@@ -2507,11 +2515,7 @@ export default function TaskList({
                       }
                       const task = row.task;
                       const isCompleted = task.completed || vSet.has(task.id);
-                      const isHintPeekPrimary =
-                        task.id ===
-                        sortedVisibleTasks.find(
-                          (t) => !(t.completed || vSet.has(t.id)),
-                        )?.id;
+                      const isHintPeekPrimary = task.id === hintPeekTaskId;
                       const isMenuOpen = menu?.id === task.id;
                       const isExitingLater =
                         exitAction?.id === task.id &&

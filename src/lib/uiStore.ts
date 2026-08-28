@@ -49,13 +49,13 @@ interface UIState {
 
   activeHint: {
     guideId: string;
-    stepIndex: number;
+    beatIndex: number;
     runId: number;
     context?: HintGuideContext;
   } | null;
   startHintGuide: (guideId: string, context?: HintGuideContext) => void;
-  advanceHintStep: () => void;
-  goToHintStep: (stepIndex: number) => void;
+  advanceHintBeat: () => void;
+  goToHintBeat: (beatIndex: number) => void;
   dismissHintGuide: () => void;
 }
 
@@ -118,23 +118,23 @@ export const useUIStore = create<UIState>()(
       activeHint: null,
       startHintGuide: (guideId, context) =>
         set({
-          activeHint: { guideId, stepIndex: 0, runId: Date.now(), context },
+          activeHint: { guideId, beatIndex: 0, runId: Date.now(), context },
         }),
-      advanceHintStep: () =>
+      advanceHintBeat: () =>
         set((state) =>
           state.activeHint
             ? {
                 activeHint: {
                   ...state.activeHint,
-                  stepIndex: state.activeHint.stepIndex + 1,
+                  beatIndex: state.activeHint.beatIndex + 1,
                 },
               }
             : {},
         ),
-      goToHintStep: (stepIndex: number) =>
+      goToHintBeat: (beatIndex: number) =>
         set((state) =>
           state.activeHint
-            ? { activeHint: { ...state.activeHint, stepIndex } }
+            ? { activeHint: { ...state.activeHint, beatIndex } }
             : {},
         ),
       dismissHintGuide: () => set({ activeHint: null }),

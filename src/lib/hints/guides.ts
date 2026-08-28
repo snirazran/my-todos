@@ -1,13 +1,18 @@
-// Values interpolated into step labels: {tags} → quoted tag names,
-// {days} → streak length. Provided by the surface starting the guide.
-// `tags` (with colors) renders real tag chips inside the label; `tagIds`
-// scopes fly-glow steps to tasks carrying those tags.
 export type HintGuideContext = {
   tagNames?: string[];
-  days?: number;
-  tags?: { id?: string; name: string; color: string }[];
   tagIds?: string[];
+  tags?: { id?: string; name: string; color: string }[];
+  days?: number;
+  minutes?: number;
+  hour?: number;
+  parts?: number;
 };
+
+function hourLabel(hour: number): string {
+  if (hour === 12) return 'noon';
+  if (hour === 0 || hour === 24) return 'midnight';
+  return hour < 12 ? `${hour}am` : `${hour - 12}pm`;
+}
 
 export function formatHintLabel(
   label: string,
@@ -17,495 +22,390 @@ export function formatHintLabel(
   if (next.includes('{tags}')) {
     const names = (context?.tagNames ?? []).filter(Boolean);
     next = next.replace(
-      '{tags}',
-      names.length > 0 ? names.map((name) => `“${name}”`).join(' or ') : 'the quest tag',
+      /\{tags\}/g,
+      names.length > 0
+        ? names.map((name) => `“${name}”`).join(' or ')
+        : 'the quest tag',
     );
   }
-  if (next.includes('{days}')) {
-    next = next.replace('{days}', String(context?.days ?? 2));
-  }
+  next = next.replace(/\{days\}/g, String(context?.days ?? 2));
+  next = next.replace(/\{minutes\}/g, String(context?.minutes ?? 5));
+  next = next.replace(/\{parts\}/g, String(context?.parts ?? 2));
+  next = next.replace(
+    /\{hour\}/g,
+    hourLabel(typeof context?.hour === 'number' ? context.hour : 12),
+  );
   return next;
 }
 
-export type HintStep = {
-  // Route the step lives on; the coach navigates there if needed. Steps
-  // without an href stay wherever the previous step left the user.
+export type HintTagMatch = 'hit' | 'miss';
+
+export type HintBeat = {
+  /** Route the beat lives on; the coach navigates there once if needed. */
   href?: string;
-  // Matches a [data-hint="..."] element in the DOM.
+  /** Matches a [data-hint="..."] element. */
   anchor: string;
-  // Optional CSS selector override when the target needs more than the
-  // data-hint name (attribute filters, multiple fallback targets, ...).
+  /** CSS selector override when the anchor name is not enough. */
   selector?: string;
-  label: string;
-  // Copy for touch devices, when the interaction differs (swipes).
-  labelCoarse?: string;
-  // Animated swipe indicator shown on mobile-width viewports.
+  say: string;
+  /** Copy for mobile-width viewports, where the gesture differs. */
+  sayTouch?: string;
+  /** How the target is marked. */
+  show?: 'ring' | 'row-peek';
+  /** Limit the row-peek nudge to rows carrying the context tag ids. */
+  scope?: 'tagged';
   gesture?: 'swipe-left' | 'swipe-right';
-  // Mobile-width viewports: nudge task rows right (peeking the Focus action
-  // under them) instead of drawing a gesture arrow. 'tagged' peeks and
-  // gold-rings every row carrying the guide context's tagIds; 'first' peeks
-  // the topmost open row while the whole list keeps the regular ring.
-  rowPeek?: 'tagged' | 'first';
-  // Jump to an absolute step index when this window event fires.
-  advanceOnEvent?: { event: string; goTo: number };
-  // Skip this step immediately when an element matching this CSS selector is
-  // already on screen (e.g. "add a task first" steps that only apply to
-  // empty lists).
-  skipWhenPresent?: string;
-  // Hold the step's highlight until an element matching this CSS selector is
-  // on screen — keeps "any task in this list" rings from appearing around an
-  // empty list while the user is still creating the first task.
-  requirePresent?: string;
-  // Narrow skipWhenPresent / requirePresent by the elements' data-tag-id(s)
-  // vs the guide context's tagIds ('hit' = overlap required).
-  skipWhenPresentTagMatch?: 'hit' | 'miss';
-  requirePresentTagMatch?: 'hit' | 'miss';
-  // Touching the anchor advances to the next step (default true).
-  advanceOnAnchorDown?: boolean;
-  // Touching the anchor ends the guide immediately — for steps where
-  // grabbing the target IS the taught action (dragging the saved task) and
-  // advancing would navigate mid-gesture.
-  dismissOnAnchorDown?: boolean;
-  // Pressing an unrelated interactive element cancels the guide (default
-  // true). Steps whose own flow requires such a press (closing the saved
-  // tray) opt out.
-  outsideInteractionCancels?: boolean;
-  // Elements outside the highlighted anchor that still count as doing the
-  // step (CSS selector) — e.g. the floating + button while the task list is
-  // ringed with "or add a new one".
-  alsoAdvanceOn?: string;
-  // Skip the top-most-element test at acquisition (default on). Needed for
-  // always-visible anchors that sit under oversized transparent layers the
-  // hit-test can't see through (the frog's full-width Rive canvas).
-  coverCheck?: boolean;
-  // Glow every task fly instead of ringing the anchor ('tagged' limits the
-  // glow to tasks carrying the guide context's tagIds). Implies hideRing.
-  flyGlow?: 'all' | 'tagged';
-  // Keep the anchor for label placement/advance but don't draw its ring.
-  hideRing?: boolean;
-  // Branch: while this step shows, jump to `goTo` the moment a visible
-  // element matches `selector` (e.g. the user opened the task sheet or the
-  // quick-add). tagMatch filters by data-tag-id(s) vs context.tagIds:
-  // 'hit' requires overlap, 'miss' requires none.
-  presentJumps?: {
-    selector: string;
-    goTo: number;
-    tagMatch?: 'hit' | 'miss';
-  }[];
-  // Restrict the anchor search to elements whose data-tag-id(s) overlap the
-  // guide context's tagIds (glowing the RIGHT tag chip).
+  /** Only acquire an anchor whose data-tag-id(s) overlap the context tag ids. */
   matchTagIds?: boolean;
-  // Touching the anchor jumps to this step instead of advancing by one.
-  goToOnAnchorDown?: number;
-  // How long to wait for the anchor before giving up quietly.
+  /** Beat is already satisfied when a visible element matches this selector. */
+  satisfiedWhen?: string;
+  satisfiedWhenTagMatch?: HintTagMatch;
+  /** Beat advances when a visible element matches this selector. */
+  advanceWhenPresent?: string;
+  advanceWhenPresentTagMatch?: HintTagMatch;
+  /** Beat advances on this window event. */
+  advanceOnEvent?: string;
+  /**
+   * Tapping the anchor advances the beat (default true). Off for container
+   * anchors, where a tap means "I am scrolling this", not "I did the thing".
+   * `alsoAdvanceOn` targets always advance regardless.
+   */
+  advanceOnTap?: boolean;
+  /** Controls outside the ring that still count as doing the beat. */
+  alsoAdvanceOn?: string;
+  /** Skip the top-most-element test at acquisition. */
+  coverCheck?: boolean;
+  /** Nothing to press here — the card carries a Got it button instead. */
+  informational?: boolean;
+  /** How long to wait for the anchor before bowing out. */
   timeoutMs?: number;
 };
 
 export type HintGuide = {
   id: string;
-  steps: HintStep[];
+  /**
+   * What the user is working towards, in their words. Shown in the docked
+   * pill for as long as the guide waits on real progress.
+   */
+  goal: string;
+  beats: HintBeat[];
+  /** App state that means the work is already under way; the guide bows out. */
+  endWhen?: 'focus-running';
+  /** Window event that means the work is done, however the user got there. */
+  endOnEvent?: string;
 };
 
 export const TASK_SAVED_EVENT = 'frogress:task-saved';
 export const BACKLOG_CLOSED_EVENT = 'frogress:backlog-closed';
 
+const ADD_TASK_BEAT: HintBeat = {
+  href: '/',
+  anchor: 'add-task',
+  say: 'Tap + to add a task of your own',
+};
+
+const TAG_IT_BEAT: HintBeat = {
+  anchor: 'quickadd-tag',
+  matchTagIds: true,
+  say: 'Give it this tag',
+  timeoutMs: 60_000,
+};
+
+const NEEDS_A_TASK: Pick<HintBeat, 'satisfiedWhen'> = {
+  satisfiedWhen: '[data-hint="task-row"]',
+};
+
 const GUIDES: Record<string, HintGuide> = {
   'add-task': {
     id: 'add-task',
-    steps: [{ href: '/', anchor: 'add-task', label: 'Add your own task here' }],
+    goal: 'Add a task of your own',
+    beats: [ADD_TASK_BEAT],
+  },
+  'add-task-tagged': {
+    id: 'add-task-tagged',
+    goal: 'Add a task tagged {tags}',
+    beats: [{ ...ADD_TASK_BEAT, say: 'Tap + to add a task' }, TAG_IT_BEAT],
+  },
+  'add-task-follow-through': {
+    id: 'add-task-follow-through',
+    goal: 'Add the tasks, then tick them off',
+    beats: [
+      { ...ADD_TASK_BEAT, say: 'Tap + to plan it' },
+      {
+        anchor: 'task-fly',
+        say: 'Then tap its fly to finish it',
+      },
+    ],
   },
   'complete-task': {
     id: 'complete-task',
-    steps: [
+    goal: 'Finish a task',
+    beats: [
+      { ...ADD_TASK_BEAT, ...NEEDS_A_TASK, say: 'Add a task to finish first' },
       {
-        href: '/',
-        anchor: 'add-task',
-        label: 'Add a task to finish first',
-        skipWhenPresent: '[data-hint="task-fly"]',
+        anchor: 'task-fly',
+        say: 'Tap the fly to finish this task',
       },
+    ],
+  },
+  'complete-task-tagged': {
+    id: 'complete-task-tagged',
+    goal: 'Finish a task tagged {tags}',
+    beats: [
       {
-        anchor: 'task-list',
-        label: 'Tap the fly on any task to finish it',
-        requirePresent: '[data-hint="task-fly"]',
-        flyGlow: 'all',
-        hideRing: true,
-        timeoutMs: 90_000,
+        ...ADD_TASK_BEAT,
+        say: 'No task is tagged {tags} yet — add one',
+        satisfiedWhen: '[data-hint="task-fly"]',
+        satisfiedWhenTagMatch: 'hit',
+      },
+      { ...TAG_IT_BEAT, satisfiedWhen: '[data-hint="task-fly"]', satisfiedWhenTagMatch: 'hit' },
+      {
+        anchor: 'task-fly',
+        matchTagIds: true,
+        say: 'Tap the fly on this {tags} task',
+      },
+    ],
+  },
+  'complete-task-before-hour': {
+    id: 'complete-task-before-hour',
+    goal: 'Finish a task before {hour}',
+    beats: [
+      { ...ADD_TASK_BEAT, ...NEEDS_A_TASK, say: 'Add a task to finish first' },
+      {
+        anchor: 'task-fly',
+        say: 'Tap the fly before {hour} — later ones do not count',
+      },
+    ],
+  },
+  'distinct-days': {
+    id: 'distinct-days',
+    goal: 'Finish a task on {days} separate days',
+    beats: [
+      { ...ADD_TASK_BEAT, ...NEEDS_A_TASK, say: 'Add a task to finish first' },
+      {
+        anchor: 'task-fly',
+        say: 'Finish one today, then come back tomorrow',
+      },
+    ],
+  },
+  'day-parts': {
+    id: 'day-parts',
+    goal: 'Finish a task in {parts} parts of the day',
+    beats: [
+      { ...ADD_TASK_BEAT, ...NEEDS_A_TASK, say: 'Add a task to finish first' },
+      {
+        anchor: 'task-fly',
+        say: 'One now — then again after noon and in the evening',
       },
     ],
   },
   focus: {
     id: 'focus',
-    steps: [
+    goal: 'Run the focus timer for {minutes} minutes',
+    endWhen: 'focus-running',
+    beats: [
+      { ...ADD_TASK_BEAT, ...NEEDS_A_TASK, say: 'Add a task to focus on first' },
       {
-        href: '/',
-        anchor: 'add-task',
-        label: 'Add a task to focus on first',
-        skipWhenPresent: '[data-hint="task-row"]',
+        anchor: 'task-row',
+        say: 'Open this task',
+        sayTouch: 'Swipe it right to focus — or tap to open it',
+        show: 'row-peek',
+        advanceOnTap: false,
+        advanceWhenPresent: '[data-hint="focus-button"]',
       },
-      {
-        anchor: 'task-list',
-        label: 'Open any task and hit Focus timer',
-        labelCoarse: 'Swipe any task right to focus — or tap to open it',
-        rowPeek: 'first',
-        requirePresent: '[data-hint="task-row"]',
-        timeoutMs: 90_000,
-      },
-      {
-        anchor: 'focus-button',
-        label: 'Start the focus timer',
-        timeoutMs: 60_000,
-      },
-    ],
-  },
-  'feed-frog': {
-    id: 'feed-frog',
-    steps: [
-      {
-        href: '/',
-        anchor: 'hunger-bar',
-        label:
-          'Your frog’s belly — every task you finish feeds it. Fill it to the top!',
-        coverCheck: false,
-      },
-    ],
-  },
-  // Ends at the save itself — the first-ever save then pops the one-time
-  // "where saved tasks live" intro sheet (SavedTaskIntroSheet).
-  'save-later': {
-    id: 'save-later',
-    steps: [
-      {
-        href: '/',
-        anchor: 'add-task',
-        label: 'Add a task you won’t need today',
-        skipWhenPresent: '[data-hint="task-row"][data-savable="true"]',
-      },
-      {
-        anchor: 'task-list',
-        label: 'Open any task you won’t need today — or add a new one',
-        labelCoarse:
-          'Swipe left on any task you won’t need today — or add a new one',
-        gesture: 'swipe-left',
-        requirePresent: '[data-hint="task-row"][data-savable="true"]',
-        timeoutMs: 90_000,
-        alsoAdvanceOn: '[data-hint="add-task"]',
-        advanceOnEvent: { event: TASK_SAVED_EVENT, goTo: 3 },
-      },
-      {
-        anchor: 'save-later-button',
-        label: 'Save it for later',
-        timeoutMs: 60_000,
-        // Advance only on the actual save event: advancing on pointerdown
-        // closes the sheet before the button's click handler runs, killing
-        // the save it was supposed to trigger.
-        advanceOnAnchorDown: false,
-        advanceOnEvent: { event: TASK_SAVED_EVENT, goTo: 3 },
-      },
-    ],
-  },
-  'buy-skin': {
-    id: 'buy-skin',
-    steps: [
-      {
-        href: '/wardrobe',
-        anchor: 'wardrobe-shop-tab',
-        label: 'Open the Shop — buy any skin you can afford',
-      },
-    ],
-  },
-  'equip-skin': {
-    id: 'equip-skin',
-    steps: [
-      {
-        href: '/wardrobe',
-        anchor: 'wardrobe-inventory-tab',
-        label: 'Tap a skin you own to wear it',
-      },
-    ],
-  },
-  'trade-skins': {
-    id: 'trade-skins',
-    steps: [
-      {
-        href: '/wardrobe',
-        anchor: 'wardrobe-trade-tab',
-        label: 'Trade five same-rarity skins for a rarer one',
-      },
-    ],
-  },
-  // No href: the "This week" card sits on both surfaces a quest hint can be
-  // opened from (home and quests), so the coach rings it where the user
-  // already is instead of bouncing them to another page.
-  // The sessions already exist on the list, so there is nothing to create —
-  // the guide just points at the ones carrying this pact's area tag.
-  'pact-session': {
-    id: 'pact-session',
-    steps: [
-      {
-        href: '/',
-        anchor: 'task-list',
-        label: 'Tap the fly to finish this week’s session',
-        requirePresent: '[data-hint="task-fly"]',
-        flyGlow: 'tagged',
-        hideRing: true,
-        timeoutMs: 90_000,
-      },
-    ],
-  },
-  'pick-pact-area': {
-    id: 'pick-pact-area',
-    steps: [
-      {
-        anchor: 'pact-pick-area',
-        label: 'Take your Leap — pick the one area you want this week',
-        timeoutMs: 30_000,
-      },
-    ],
-  },
-  'invite-friend': {
-    id: 'invite-friend',
-    steps: [
-      {
-        href: '/friends',
-        anchor: 'invite-friend',
-        label: 'Invite a friend — you both get a gift when they join',
-      },
-    ],
-  },
-  // Tag-scoped variants for area-quest objectives: same flow as their plain
-  // twins, with the quest's tags woven into the copy and a final step on the
-  // tag picker.
-  'add-tagged-task': {
-    id: 'add-tagged-task',
-    steps: [
-      {
-        href: '/',
-        anchor: 'add-task',
-        label: 'Add a task and tag it {tags}',
-      },
-      {
-        anchor: 'quickadd-tag',
-        matchTagIds: true,
-        label: 'Pick this tag',
-        timeoutMs: 90_000,
-      },
-    ],
-  },
-  // Branching flow: glowing flies mark already-tagged tasks; opening an
-  // untagged task detours through its Tags button → the right chip in the
-  // tags popup; the quick-add path glows the right chip in the strip. Both
-  // detours land back on the fly-glow step once the tag is on.
-  'complete-tagged-task': {
-    id: 'complete-tagged-task',
-    steps: [
-      {
-        href: '/',
-        anchor: 'add-task',
-        label: 'Add a task and tag it {tags}',
-        skipWhenPresent: '[data-hint="task-fly"]',
-        outsideInteractionCancels: false,
-        presentJumps: [{
-            selector:
-              '[data-hint="quickadd-tag"]:not([data-selected="true"])',
-            tagMatch: 'hit',
-            goTo: 5,
-          }],
-      },
-      {
-        anchor: 'task-list',
-        label:
-          'No task is tagged {tags} yet — open one and tag it, or add a new one',
-        skipWhenPresent: '[data-hint="task-fly"]',
-        skipWhenPresentTagMatch: 'hit',
-        outsideInteractionCancels: false,
-        advanceOnAnchorDown: false,
-        presentJumps: [
-          {
-            selector: '[data-hint="task-tags-button"]',
-            tagMatch: 'miss',
-            goTo: 3,
-          },
-          {
-            selector:
-              '[data-hint="quickadd-tag"]:not([data-selected="true"])',
-            tagMatch: 'hit',
-            goTo: 5,
-          },
-        ],
-        timeoutMs: 120_000,
-      },
-      {
-        anchor: 'task-list',
-        label: 'Finish any task tagged {tags}',
-        requirePresent: '[data-hint="task-fly"]',
-        requirePresentTagMatch: 'hit',
-        flyGlow: 'tagged',
-        hideRing: true,
-        outsideInteractionCancels: false,
-        presentJumps: [
-          {
-            selector: '[data-hint="task-tags-button"]',
-            tagMatch: 'miss',
-            goTo: 3,
-          },
-          {
-            selector:
-              '[data-hint="quickadd-tag"]:not([data-selected="true"])',
-            tagMatch: 'hit',
-            goTo: 5,
-          },
-        ],
-        timeoutMs: 120_000,
-      },
-      {
-        anchor: 'task-tags-button',
-        label: 'Tag it {tags} first',
-        timeoutMs: 60_000,
-      },
-      {
-        anchor: 'tags-popup-tag',
-        matchTagIds: true,
-        label: 'Pick this tag',
-        goToOnAnchorDown: 2,
-        timeoutMs: 60_000,
-      },
-      {
-        anchor: 'quickadd-tag',
-        matchTagIds: true,
-        label: 'Pick this tag',
-        goToOnAnchorDown: 2,
-        timeoutMs: 90_000,
-      },
+      { anchor: 'focus-button', say: 'Start the focus timer' },
     ],
   },
   'focus-tagged': {
     id: 'focus-tagged',
-    steps: [
+    goal: 'Focus on a task tagged {tags} for {minutes} minutes',
+    endWhen: 'focus-running',
+    beats: [
       {
-        href: '/',
-        anchor: 'add-task',
-        label: 'Add a task tagged {tags} to focus on',
-        skipWhenPresent: '[data-hint="task-row"]',
-        outsideInteractionCancels: false,
-        presentJumps: [{
-            selector:
-              '[data-hint="quickadd-tag"]:not([data-selected="true"])',
-            tagMatch: 'hit',
-            goTo: 5,
-          }],
+        ...ADD_TASK_BEAT,
+        say: 'No task is tagged {tags} yet — add one',
+        satisfiedWhen: '[data-hint="task-row"]',
+        satisfiedWhenTagMatch: 'hit',
       },
       {
-        anchor: 'task-list',
-        label:
-          'No task is tagged {tags} yet — open one and tag it, or add a new one',
-        skipWhenPresent: '[data-hint="task-row"]',
-        skipWhenPresentTagMatch: 'hit',
-        outsideInteractionCancels: false,
-        advanceOnAnchorDown: false,
-        presentJumps: [
-          {
-            selector: '[data-hint="task-tags-button"]',
-            tagMatch: 'miss',
-            goTo: 3,
-          },
-          {
-            selector:
-              '[data-hint="quickadd-tag"]:not([data-selected="true"])',
-            tagMatch: 'hit',
-            goTo: 5,
-          },
-        ],
-        timeoutMs: 120_000,
-      },
-      {
-        anchor: 'task-list',
-        label: 'Open a task tagged {tags} and hit Focus timer',
-        labelCoarse: 'Swipe a task tagged {tags} right — or tap to open it',
-        rowPeek: 'tagged',
-        hideRing: true,
-        requirePresent: '[data-hint="task-row"]',
-        requirePresentTagMatch: 'hit',
-        outsideInteractionCancels: false,
-        advanceOnAnchorDown: false,
-        presentJumps: [
-          {
-            selector: '[data-hint="task-tags-button"]',
-            tagMatch: 'miss',
-            goTo: 3,
-          },
-          {
-            selector: '[data-hint="task-tags-button"]',
-            tagMatch: 'hit',
-            goTo: 6,
-          },
-          {
-            selector:
-              '[data-hint="quickadd-tag"]:not([data-selected="true"])',
-            tagMatch: 'hit',
-            goTo: 5,
-          },
-        ],
-        timeoutMs: 120_000,
-      },
-      {
-        anchor: 'task-tags-button',
-        label: 'Tag it {tags} first',
-        timeoutMs: 60_000,
-      },
-      {
-        anchor: 'tags-popup-tag',
+        anchor: 'task-row',
         matchTagIds: true,
-        label: 'Pick this tag',
-        goToOnAnchorDown: 6,
-        timeoutMs: 60_000,
+        say: 'Open this {tags} task',
+        sayTouch: 'Swipe it right to focus — or tap to open it',
+        show: 'row-peek',
+        scope: 'tagged',
+        advanceOnTap: false,
+        advanceWhenPresent: '[data-hint="focus-button"]',
       },
+      { anchor: 'focus-button', say: 'Start the focus timer' },
+    ],
+  },
+  'deep-session': {
+    id: 'deep-session',
+    goal: '{minutes} unbroken minutes — stopping early resets it',
+    endWhen: 'focus-running',
+    beats: [
+      { ...ADD_TASK_BEAT, ...NEEDS_A_TASK, say: 'Add a task to focus on first' },
       {
-        anchor: 'quickadd-tag',
-        matchTagIds: true,
-        label: 'Pick this tag',
-        goToOnAnchorDown: 2,
-        timeoutMs: 90_000,
+        anchor: 'task-row',
+        say: 'Open the task you can give {minutes} clear minutes',
+        sayTouch: 'Swipe it right to focus — or tap to open it',
+        show: 'row-peek',
+        advanceOnTap: false,
+        advanceWhenPresent: '[data-hint="focus-button"]',
       },
       {
         anchor: 'focus-button',
-        label: 'Start the focus timer',
-        timeoutMs: 60_000,
+        say: 'Start it — and let it run the whole {minutes} minutes',
       },
     ],
   },
   streak: {
     id: 'streak',
-    steps: [
+    goal: 'Finish the same repeating task {days} days in a row',
+    beats: [
       {
         href: '/',
-        anchor: 'task-list',
-        selector: '[data-hint="task-list"], [data-hint="add-task"]',
-        label:
-          'Streaks need a repeating task — open one (or add it), then turn on Repeat',
-        timeoutMs: 90_000,
+        anchor: 'task-row',
+        selector: '[data-hint="task-row"], [data-hint="add-task"]',
+        say: 'Open a task you can do every day — or add one',
         alsoAdvanceOn: '[data-hint="add-task"]',
+        advanceOnTap: false,
+        advanceWhenPresent: '[data-hint="repeat-button"]',
+      },
+      { anchor: 'repeat-button', say: 'Turn on Repeat' },
+      {
+        anchor: 'task-fly',
+        say: 'Now finish it {days} days in a row, starting today',
+      },
+    ],
+  },
+  'save-later': {
+    id: 'save-later',
+    goal: 'Move a task to Saved Tasks',
+    endOnEvent: TASK_SAVED_EVENT,
+    beats: [
+      {
+        ...ADD_TASK_BEAT,
+        satisfiedWhen: '[data-hint="task-row"][data-savable="true"]',
+        say: 'Add a task you will not need today',
       },
       {
-        anchor: 'repeat-button',
-        label: 'Turn on Repeat',
-        timeoutMs: 90_000,
+        anchor: 'task-row',
+        selector: '[data-hint="task-row"][data-savable="true"]',
+        say: 'Open a task you will not need today',
+        sayTouch: 'Swipe it left — or tap to open it',
+        gesture: 'swipe-left',
+        advanceOnTap: false,
+        advanceWhenPresent: '[data-hint="save-later-button"]',
       },
       {
-        anchor: 'task-list',
-        label: 'Now finish it {days} times in a row — starting today',
-        timeoutMs: 30_000,
+        anchor: 'save-later-button',
+        say: 'Save it for later',
+        advanceOnTap: false,
+        advanceOnEvent: TASK_SAVED_EVENT,
+      },
+    ],
+  },
+  'take-leap': {
+    id: 'take-leap',
+    goal: 'Pick this week’s area and commit to one thing',
+    beats: [
+      {
+        anchor: 'pact-pick-area',
+        say: 'Take your Leap — pick the one area you want this week',
+      },
+    ],
+  },
+  'pact-session': {
+    id: 'pact-session',
+    goal: 'Finish this week’s session',
+    beats: [
+      {
+        href: '/',
+        anchor: 'task-fly',
+        matchTagIds: true,
+        say: 'Tap the fly to finish this week’s session',
+      },
+    ],
+  },
+  'feed-frog': {
+    id: 'feed-frog',
+    goal: 'Fill the belly bar to the top',
+    beats: [
+      {
+        href: '/',
+        anchor: 'hunger-bar',
+        say: 'Every task you finish feeds your frog — fill it to the top',
+        coverCheck: false,
+        informational: true,
+      },
+    ],
+  },
+  'buy-skin': {
+    id: 'buy-skin',
+    goal: 'Buy an outfit in the Shop',
+    beats: [
+      {
+        href: '/wardrobe',
+        anchor: 'wardrobe-shop-tab',
+        say: 'Open the Shop — buy any outfit you can afford',
+      },
+    ],
+  },
+  'equip-skin': {
+    id: 'equip-skin',
+    goal: 'Put an outfit on your frog',
+    beats: [
+      {
+        href: '/wardrobe',
+        anchor: 'wardrobe-inventory-tab',
+        say: 'Tap an outfit you own to wear it',
+      },
+    ],
+  },
+  'trade-skins': {
+    id: 'trade-skins',
+    goal: 'Trade up to a rarer outfit',
+    beats: [
+      {
+        href: '/wardrobe',
+        anchor: 'wardrobe-trade-tab',
+        say: 'Trade same-rarity outfits for a rarer one',
+      },
+    ],
+  },
+  'invite-friend': {
+    id: 'invite-friend',
+    goal: 'Invite a friend',
+    beats: [
+      {
+        href: '/friends',
+        anchor: 'invite-friend',
+        say: 'Invite a friend — you both get a gift when they join',
       },
     ],
   },
   buddy: {
     id: 'buddy',
-    steps: [
+    goal: 'Share a task with a buddy and both tick it off',
+    beats: [
       {
         href: '/friends',
         anchor: 'friends-list',
-        label:
-          'Pick a friend and team up on a task — it counts when you both finish it',
-        timeoutMs: 30_000,
+        say: 'Pick a friend and team up on a task',
+      },
+    ],
+  },
+  'keep-going': {
+    id: 'keep-going',
+    goal: 'Keep playing — this one fills up as you go',
+    beats: [
+      {
+        href: '/',
+        anchor: 'task-list',
+        selector: '[data-hint="task-list"], [data-hint="add-task"]',
+        say: 'This one fills up as you use the app',
       },
     ],
   },
@@ -515,7 +415,7 @@ const METRIC_GUIDE_IDS: Record<string, string> = {
   skin_acquired: 'buy-skin',
   skin_equipped: 'equip-skin',
   trade_completed: 'trade-skins',
-  focus_tag_linked: 'pick-pact-area',
+  focus_tag_linked: 'take-leap',
   focus_started: 'focus',
   friend_invited: 'invite-friend',
   task_saved_later: 'save-later',
@@ -525,58 +425,112 @@ const METRIC_GUIDE_IDS: Record<string, string> = {
 
 const TASK_STREAK_GUIDE_PATTERN = /^task_streak_(\d+)$/;
 
+export const FALLBACK_GUIDE_ID = 'keep-going';
+
 export function guideById(guideId: string | undefined): HintGuide | null {
   if (!guideId) return null;
   return GUIDES[guideId] ?? null;
 }
 
-export function guideIdForBlock(block: {
+export type HintBlockShape = {
   type?: string;
   action?: string;
   metricKey?: string;
   tagMode?: string;
-}): string | null {
-  const tagScoped = block.tagMode === 'random_user_tag';
-  if (block.type === 'focus_minutes' || block.type === 'deep_session') {
-    return tagScoped ? 'focus-tagged' : 'focus';
-  }
-  if (block.type === 'distinct_days') {
-    return tagScoped ? 'complete-tagged-task' : 'complete-task';
-  }
-  if (block.type === 'metric_count') {
-    if (TASK_STREAK_GUIDE_PATTERN.test(block.metricKey ?? '')) return 'streak';
-    return METRIC_GUIDE_IDS[block.metricKey ?? ''] ?? null;
-  }
-  if (block.type === 'count') {
-    if (block.action === 'add') {
-      return tagScoped ? 'add-tagged-task' : 'add-task';
+  sessionMinutes?: number;
+  beforeHour?: number;
+  requiresFollowThrough?: boolean;
+  resolvedTagIds?: string[];
+  resolvedTagId?: string;
+};
+
+/**
+ * Every objective a quest can hold resolves to a guide — an objective row must
+ * never be the only one on the list without a "Show me".
+ */
+export function guideIdForBlock(block: HintBlockShape): string {
+  const tagScoped =
+    block.tagMode === 'random_user_tag' ||
+    (block.resolvedTagIds?.length ?? 0) > 0 ||
+    !!block.resolvedTagId;
+
+  switch (block.type) {
+    case 'deep_session':
+      return 'deep-session';
+    case 'focus_minutes':
+      return tagScoped ? 'focus-tagged' : 'focus';
+    case 'distinct_days':
+      return tagScoped ? 'complete-task-tagged' : 'distinct-days';
+    case 'day_parts':
+      return 'day-parts';
+    case 'metric_count': {
+      if (TASK_STREAK_GUIDE_PATTERN.test(block.metricKey ?? '')) return 'streak';
+      return METRIC_GUIDE_IDS[block.metricKey ?? ''] ?? FALLBACK_GUIDE_ID;
     }
-    return tagScoped ? 'complete-tagged-task' : 'complete-task';
+    case 'count':
+    default: {
+      if (block.action === 'add') {
+        if (block.requiresFollowThrough) return 'add-task-follow-through';
+        return tagScoped ? 'add-task-tagged' : 'add-task';
+      }
+      if (tagScoped) return 'complete-task-tagged';
+      if (typeof block.beforeHour === 'number') {
+        return 'complete-task-before-hour';
+      }
+      return 'complete-task';
+    }
   }
-  return null;
 }
 
 export function guideContextForBlock(block: {
   metricKey?: string;
+  type?: string;
+  target?: number;
+  amount?: number;
+  sessionMinutes?: number;
+  beforeHour?: number;
   resolvedTagNames?: string[];
   resolvedTagName?: string;
   resolvedTagIds?: string[];
   resolvedTagId?: string;
 }): HintGuideContext | undefined {
-  const tagNames =
-    block.resolvedTagNames?.length
-      ? block.resolvedTagNames
-      : block.resolvedTagName
-        ? [block.resolvedTagName]
-        : undefined;
-  const tagIds =
-    block.resolvedTagIds?.length
-      ? block.resolvedTagIds
-      : block.resolvedTagId
-        ? [block.resolvedTagId]
-        : undefined;
+  const tagNames = block.resolvedTagNames?.length
+    ? block.resolvedTagNames
+    : block.resolvedTagName
+      ? [block.resolvedTagName]
+      : undefined;
+  const tagIds = block.resolvedTagIds?.length
+    ? block.resolvedTagIds
+    : block.resolvedTagId
+      ? [block.resolvedTagId]
+      : undefined;
   const streakMatch = TASK_STREAK_GUIDE_PATTERN.exec(block.metricKey ?? '');
-  const days = streakMatch ? Number(streakMatch[1]) : undefined;
-  if (!tagNames && !tagIds && days === undefined) return undefined;
-  return { tagNames, tagIds, days };
+  const days = streakMatch
+    ? Number(streakMatch[1])
+    : block.type === 'distinct_days'
+      ? Math.max(2, block.target ?? block.amount ?? 2)
+      : undefined;
+  const minutes =
+    block.type === 'deep_session'
+      ? (block.sessionMinutes ?? 25)
+      : block.type === 'focus_minutes'
+        ? (block.target ?? block.amount ?? 5)
+        : undefined;
+  const parts =
+    block.type === 'day_parts'
+      ? Math.min(3, Math.max(1, block.target ?? block.amount ?? 2))
+      : undefined;
+  const hour = typeof block.beforeHour === 'number' ? block.beforeHour : undefined;
+
+  const context: HintGuideContext = {
+    tagNames,
+    tagIds,
+    days,
+    minutes,
+    parts,
+    hour,
+  };
+  return Object.values(context).some((value) => value !== undefined)
+    ? context
+    : undefined;
 }
