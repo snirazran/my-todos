@@ -229,6 +229,29 @@ export function usePlannerTour({
   // been swiped somewhere else can be spotted and followed.
   const seededDateRef = useRef<string | null>(null);
   const followingRef = useRef(false);
+  // Every seed goes through one chain. Two that overlap let the board's own
+  // writes land between a delete and an insert, which is how a chapter ends
+  // up with both batches of its practice cards on screen.
+  const seedChainRef = useRef<Promise<unknown>>(Promise.resolve());
+
+  const enqueue = useCallback(<T,>(job: () => Promise<T>) => {
+    const next = seedChainRef.current.catch(() => {}).then(job);
+    seedChainRef.current = next.catch(() => {});
+    return next;
+  }, []);
+
+  const runSeed = useCallback(
+    (texts: string[], date: string) =>
+      enqueue(() =>
+        seedCards(texts, date, tzRef.current, seededIdsRef.current),
+      ),
+    [enqueue],
+  );
+
+  const runClear = useCallback(
+    (ids: string[]) => enqueue(() => clearCards(ids)),
+    [enqueue],
+  );
 
   const chapter: TourChapter | null = TOUR_CHAPTERS[chapterIndex] ?? null;
   const beat: TourBeat | null = chapter?.beats[beatIndex] ?? null;
@@ -258,8 +281,8 @@ export function usePlannerTour({
     setPayoff(null);
     markIntroSeen('plannerTour');
     seededDateRef.current = null;
-    void clearCards(seededIdsRef.current).then(() => refreshRef.current());
-  }, [markIntroSeen]);
+    void runClear(seededIdsRef.current).then(() => refreshRef.current());
+  }, [markIntroSeen, runClear]);
 
   // The gift is only ever paid by pressing Claim on the reward card, so the
   // reward is something the user takes rather than something that happens.
@@ -282,40 +305,39 @@ export function usePlannerTour({
    * a chapter's last beat lands so the network round-trip runs underneath the
    * celebration instead of after it.
    */
-  const prepareChapter = useCallback(async (index: number) => {
-    const chapterToOpen = TOUR_CHAPTERS[index];
-    if (!chapterToOpen) return;
-    setSeeding(true);
-    try {
-      await waitForBoardIdle();
-      if (chapterToOpen.cards?.length) {
-        const seeded = await seedCards(
-          chapterToOpen.cards,
-          dateRef.current,
-          tzRef.current,
-          seededIdsRef.current,
-        );
-        seededIdsRef.current = [
-          ...seededIdsRef.current,
-          ...(seeded.taskIds ?? []),
-        ];
-        seededDateRef.current = seeded.date ?? dateRef.current;
-        await refreshRef.current();
-        await waitForCards(chapterToOpen.cards, refreshRef.current);
-        revealCards();
-      } else {
-        // A chapter that needs no practice cards must not inherit the previous
-        // chapter's — their highlight competes with the step's real target.
-        await clearCards(seededIdsRef.current);
-        seededIdsRef.current = [];
-        seededDateRef.current = null;
-        await refreshRef.current();
+  const prepareChapter = useCallback(
+    async (index: number) => {
+      const chapterToOpen = TOUR_CHAPTERS[index];
+      if (!chapterToOpen) return;
+      setSeeding(true);
+      try {
+        await waitForBoardIdle();
+        if (chapterToOpen.cards?.length) {
+          const seeded = await runSeed(chapterToOpen.cards, dateRef.current);
+          seededIdsRef.current = [
+            ...seededIdsRef.current,
+            ...(seeded.taskIds ?? []),
+          ];
+          seededDateRef.current = seeded.date ?? dateRef.current;
+          await refreshRef.current();
+          await waitForCards(chapterToOpen.cards, refreshRef.current);
+          revealCards();
+        } else {
+          // A chapter that needs no practice cards must not inherit the
+          // previous chapter's — their highlight competes with the step's
+          // real target.
+          await runClear(seededIdsRef.current);
+          seededIdsRef.current = [];
+          seededDateRef.current = null;
+          await refreshRef.current();
+        }
+      } catch (error) {
+        console.warn('Planner tour seed failed', error);
       }
-    } catch (error) {
-      console.warn('Planner tour seed failed', error);
-    }
-    setSeeding(false);
-  }, []);
+      setSeeding(false);
+    },
+    [runSeed, runClear],
+  );
 
   const enterChapter = useCallback((index: number) => {
     if (!TOUR_CHAPTERS[index]) return;
@@ -459,12 +481,7 @@ export function usePlannerTour({
       try {
         await waitForBoardIdle(10_000);
         if (cancelled || dateRef.current !== activeDateKey) return;
-        const seeded = await seedCards(
-          followCards,
-          activeDateKey,
-          tzRef.current,
-          seededIdsRef.current,
-        );
+        const seeded = await runSeed(followCards, activeDateKey);
         seededIdsRef.current = [
           ...seededIdsRef.current,
           ...(seeded.taskIds ?? []),
@@ -484,7 +501,7 @@ export function usePlannerTour({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [followCards, activeDateKey]);
+  }, [followCards, activeDateKey, runSeed]);
 
   useEffect(() => {
     if (!running || beat?.anchor !== TUTORIAL_CARD_HINT) return;

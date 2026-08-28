@@ -37,12 +37,6 @@ export async function POST(req: NextRequest) {
     const staleIds: string[] = Array.isArray(body?.ids)
       ? body.ids.map((id: unknown) => String(id)).filter(Boolean)
       : [];
-    await TaskModel.deleteMany({
-      userId: uid,
-      ...(staleIds.length > 0
-        ? { $or: [{ isTutorial: true }, { id: { $in: staleIds } }] }
-        : { isTutorial: true }),
-    });
 
     const now = new Date();
     const docs = texts.map((text, i) => ({
@@ -58,6 +52,19 @@ export async function POST(req: NextRequest) {
       updatedAt: now,
     }));
     await TaskModel.insertMany(docs);
+
+    // Sweeping after the insert rather than before it is what makes two
+    // overlapping seeds safe: whichever finishes last clears every batch but
+    // its own, instead of both surviving because one deleted before the
+    // other inserted.
+    const keepIds = docs.map((doc) => doc.id);
+    await TaskModel.deleteMany({
+      userId: uid,
+      id: { $nin: keepIds },
+      ...(staleIds.length > 0
+        ? { $or: [{ isTutorial: true }, { id: { $in: staleIds } }] }
+        : { isTutorial: true }),
+    });
 
     return NextResponse.json({
       ok: true,
