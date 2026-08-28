@@ -5,10 +5,10 @@
   "packageManager": "pnpm@9.15.4",
   "scripts": {
     "dev": "next dev -H 0.0.0.0",
-    "build": "node scripts/generate-build-id.mjs && next build",
+    "build": "node scripts/generate-build-id.mjs && node scripts/generate-analytics-manifest.mjs && next build",
     "start": "next start",
     "lint": "next lint",
-    "postinstall": "node scripts/copy-rive-wasm.mjs && node scripts/generate-build-id.mjs",
+    "postinstall": "node scripts/copy-rive-wasm.mjs && node scripts/generate-build-id.mjs && node scripts/generate-analytics-manifest.mjs",
     "optimize:images": "node scripts/optimize-images.mjs",
     "android": "npx cap run android",
     "open:android": "npx cap open android",
@@ -16,7 +16,8 @@
     "open:ios": "npx cap open ios",
     "sync": "npx cap sync",
     "sync:dev": "CAP_DEV=true npx cap sync",
-    "sync:prod": "CAP_DEV=false npx cap sync"
+    "sync:prod": "CAP_DEV=false npx cap sync",
+    "analytics:manifest": "node scripts/generate-analytics-manifest.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.91.1",

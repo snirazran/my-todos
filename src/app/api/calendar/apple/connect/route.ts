@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
+import { recordAnalyticsEvent } from '@/lib/analytics/server';
 import CalendarConnectionModel from '@/lib/models/CalendarConnection';
 import {
   AppleAuthError,
@@ -66,6 +67,11 @@ export async function POST(req: NextRequest) {
       { upsert: true },
     );
     invalidateConnectionCache(uid);
+    await recordAnalyticsEvent({
+      userId: uid,
+      name: 'calendar_connected',
+      properties: { provider: 'apple' },
+    });
 
     void (async () => {
       try {

@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import connectMongo from '@/lib/mongoose';
+import { recordAnalyticsEvent } from '@/lib/analytics/server';
 import CalendarConnectionModel from '@/lib/models/CalendarConnection';
 import UserModel from '@/lib/models/User';
 import { encryptSecret, verifyStateToken } from '@/lib/calendar/crypto';
@@ -66,6 +67,11 @@ export async function GET(req: NextRequest) {
       { $set: { calendarSyncEnabled: true }, $unset: { calendarAccessToken: 1 } },
     );
     invalidateConnectionCache(uid);
+    await recordAnalyticsEvent({
+      userId: uid,
+      name: 'calendar_connected',
+      properties: { provider: 'google' },
+    });
 
     void (async () => {
       try {

@@ -11,6 +11,7 @@ import { WardrobePopup, useWardrobeBadges } from '@/components/ui/WardrobePopup'
 import { TRADE_MIN_ITEM_COUNT } from '@/lib/skins/catalog';
 import { hapticTick } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
+import { useSheetStore } from '@/lib/sheetStore';
 
 const NAV_STUCK_MS = 5000;
 
@@ -51,6 +52,9 @@ export default function MobileNav() {
         stuckTimerRef.current = null;
         if (pathnameRef.current === href.split('?')[0]) return;
         if (navigator.onLine === false) return;
+        // A sheet opened since the tap means the user moved on. Reloading out
+        // from under it would throw away whatever they are in the middle of.
+        if (useSheetStore.getState().count > 0) return;
         window.location.href = href;
       }, NAV_STUCK_MS);
     },

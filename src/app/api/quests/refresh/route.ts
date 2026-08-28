@@ -8,6 +8,7 @@ import {
   syncQuestState,
 } from '@/lib/quests/engine';
 import { getZonedToday } from '@/lib/utils';
+import { recordAnalyticsEvent } from '@/lib/analytics/server';
 
 export async function POST(req: NextRequest) {
   try {
@@ -65,6 +66,17 @@ export async function POST(req: NextRequest) {
       timezone,
       refreshDaily: true,
       dailySelectionSeed: `reroll:${todayKey}:${nextCount}`,
+    });
+
+    await recordAnalyticsEvent({
+      userId,
+      name: 'daily_quest_swapped',
+      externalId: `daily_quest_swapped:${userId}:${todayKey}:${nextCount}`,
+      properties: {
+        day_key: todayKey,
+        count: nextCount,
+        is_premium: !!user.premiumUntil && new Date(user.premiumUntil) > new Date(),
+      },
     });
 
     const withCover = <T extends { templateId?: string; coverImageUrl?: string }>(

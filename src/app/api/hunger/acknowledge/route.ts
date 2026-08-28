@@ -3,6 +3,7 @@ import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import UserModel from '@/lib/models/User';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
+import { recordHungerResolved } from '@/lib/analytics/hunger';
 
 export async function POST(req: NextRequest) {
   try {
@@ -17,15 +18,17 @@ export async function POST(req: NextRequest) {
     ).lean();
     const amount = user?.wardrobe?.stolenFlies ?? 0;
     if (amount > 0) {
+      const isPremium = !!user?.premiumUntil && new Date(user.premiumUntil) > new Date();
       await recordAnalyticsEvent({
         userId,
         name: 'fly_spent',
         properties: {
           source: 'frog_hunger',
           fly_amount: amount,
-          is_premium: !!user?.premiumUntil && new Date(user.premiumUntil) > new Date(),
+          is_premium: isPremium,
         },
       });
+      await recordHungerResolved({ userId, method: 'accepted', flies: amount, isPremium });
     }
 
     return NextResponse.json({ ok: true });

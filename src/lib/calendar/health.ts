@@ -1,4 +1,5 @@
 import connectMongo from '@/lib/mongoose';
+import { recordAnalyticsEvent } from '@/lib/analytics/server';
 import CalendarConnectionModel, {
   type CalendarConnectionDoc,
   type CalendarConnectionStatus,
@@ -165,6 +166,21 @@ export async function recordSyncFailure(
   conn.consecutiveFailures = failures;
   conn.firstFailureAt = firstFailureAt;
   if (!SYNCABLE_STATUSES.includes(status)) invalidateConnectionCache(conn.userId);
+
+  // Only the escalations are worth an event: a transient retry that recovers
+  // on the next pass would otherwise flood the collection.
+  if (status !== 'active') {
+    await recordAnalyticsEvent({
+      userId: conn.userId,
+      name: 'calendar_sync_failed',
+      properties: {
+        provider: conn.provider,
+        reason: kind,
+        status,
+        count: failures,
+      },
+    });
+  }
 
   return { kind, status };
 }

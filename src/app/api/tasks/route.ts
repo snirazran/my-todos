@@ -80,6 +80,7 @@ import {
   normalizeRepeatRule,
 } from '@/lib/taskOccurrence';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
+import { recordHungerBite } from '@/lib/analytics/hunger';
 import { taskAnalyticsProperties } from '@/lib/analytics/engagement';
 import {
   computeGroupStreak,
@@ -388,6 +389,13 @@ async function currentFlyStatus(
   const limit = taskIncomeCap(config, premium);
   const { updates, status: hungerStatus } = calculateHunger(user);
   const wardrobe = user.wardrobe ?? { equipped: {}, inventory: {}, flies: 0 };
+  await recordHungerBite({
+    userId,
+    previousStolen: wardrobe.stolenFlies ?? 0,
+    nextStolen: hungerStatus.stolenFlies,
+    isPremium: premium,
+    dayKey: today,
+  });
   const daily = normalizeDailyFly(
     today,
     wardrobe.flyDaily as DailyFlyProgress | undefined,
@@ -822,6 +830,13 @@ async function unawardFlyForTask(
   const limit = taskIncomeCap(config, premium);
   const { updates: hungerUpdates, status: hungerStatus } = calculateHunger(user);
   const wardrobe = user.wardrobe ?? { equipped: {}, inventory: {}, flies: 0 };
+  await recordHungerBite({
+    userId,
+    previousStolen: wardrobe.stolenFlies ?? 0,
+    nextStolen: hungerStatus.stolenFlies,
+    isPremium: premium,
+    dayKey: today,
+  });
   const daily = normalizeDailyFly(
     today,
     wardrobe.flyDaily as DailyFlyProgress | undefined,
@@ -2615,6 +2630,24 @@ export async function PUT(req: NextRequest) {
   });
 }
 
+async function recordTaskDeleted(
+  userId: string,
+  docs: Array<Partial<TaskDoc>>,
+  scope: string,
+) {
+  if (!docs.length) return;
+  const profile = await UserModel.findById(userId).select('focusProfile').lean();
+  const primary = docs[0];
+  await recordAnalyticsEvent({
+    userId,
+    name: 'task_deleted',
+    properties: taskAnalyticsProperties(primary, profile?.focusProfile, {
+      count: docs.length,
+      reason: scope,
+    }),
+  });
+}
+
 export async function DELETE(req: NextRequest) {
   const uid = await currentUserId();
   if (!uid) return unauth();
@@ -2643,7 +2676,11 @@ export async function DELETE(req: NextRequest) {
         { status: 409 },
       );
     }
+    const batchDocs = await TaskModel.find({ userId: uid, creationBatchId })
+      .select('type tags repeatMode bondId checklist startTime endTime reminder')
+      .lean<TaskDoc[]>();
     const deleted = await TaskModel.deleteMany({ userId: uid, creationBatchId });
+    await recordTaskDeleted(uid, batchDocs, 'batch_undo');
     await syncGamification(uid, tz);
     await notifyTaskChanged(uid);
     return NextResponse.json({ ok: true, deletedCount: deleted.deletedCount });
@@ -2725,6 +2762,7 @@ export async function DELETE(req: NextRequest) {
       date: { $gte: today },
     });
     if (doc?.bondId) await severBond(doc.bondId, uid);
+    await recordTaskDeleted(uid, seriesDocs, 'series');
     await syncGamification(uid, tz);
     await notifyTaskChanged(uid);
     return NextResponse.json({ ok: true, pact: pactChange });
@@ -2753,6 +2791,7 @@ export async function DELETE(req: NextRequest) {
     if (doc?.type === 'regular') {
       await TaskModel.deleteOne({ userId: uid, type: 'regular', id: taskId });
       if (doc.bondId) await severBond(doc.bondId, uid);
+      await recordTaskDeleted(uid, [doc], 'single');
     } else if (doc?.type === 'weekly') {
       await TaskModel.updateOne(
         { userId: uid, type: doc.type, id: taskId },
@@ -2785,6 +2824,7 @@ export async function DELETE(req: NextRequest) {
       { userId: uid, id: taskId },
       { $addToSet: { suppressedDates: date } },
     );
+    await recordTaskDeleted(uid, [doc], 'occurrence');
     await syncGamification(uid, tz);
     await notifyTaskChanged(uid);
     return NextResponse.json({ ok: true, pact: pactChange });
@@ -2792,6 +2832,7 @@ export async function DELETE(req: NextRequest) {
   if (doc.type === 'regular') {
     await TaskModel.deleteOne({ userId: uid, id: taskId, date });
     if (doc.bondId) await severBond(doc.bondId, uid);
+    await recordTaskDeleted(uid, [doc], 'single');
     await syncGamification(uid, tz);
     await notifyTaskChanged(uid);
     return NextResponse.json({ ok: true });

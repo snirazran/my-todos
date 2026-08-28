@@ -45,6 +45,23 @@ const CLIENT_EVENTS = new Set([
   'referral_invite_opened',
   'friend_link_shared',
   'friend_link_opened',
+  'notification_opened',
+  'wishlist_opened',
+  'home_shop_rail_viewed',
+  'home_shop_rail_tapped',
+  'shield_sheet_opened',
+  'shield_purchased',
+  'buddy_flow_opened',
+  'buddy_friend_picked',
+  'buddy_goal_composed',
+  'tryon_shown',
+  'tryon_kept',
+  'tryon_dismissed',
+  'look_reaction_seen',
+  'starter_plan_day_start',
+  'ad_ready',
+  'ad_consent_resolved',
+  'ad_consent_failed',
 ]);
 
 function inferPlatform(req: NextRequest): AnalyticsPlatform {

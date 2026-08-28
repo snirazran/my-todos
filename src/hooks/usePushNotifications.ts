@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Capacitor } from '@capacitor/core';
 import { FirebaseMessaging } from '@capacitor-firebase/messaging';
 import { setLiveActivityControlToken, setTimerControlConfig } from '@/lib/liveTimer';
+import { trackAnalyticsEvent } from '@/lib/analytics/client';
 import {
   notifyTaskSync,
   type TaskSyncDetail,
@@ -130,9 +131,13 @@ export function usePushNotifications(userId: string | null | undefined) {
         await FirebaseMessaging.addListener(
           'notificationActionPerformed',
           (event) => {
-            const path = (
-              event.notification.data as Record<string, unknown> | undefined
-            )?.path;
+            const data = event.notification.data as
+              | Record<string, unknown>
+              | undefined;
+            trackAnalyticsEvent('notification_opened', {
+              notification_type: typeof data?.type === 'string' ? data.type : 'unknown',
+            });
+            const path = data?.path;
             if (typeof path === 'string' && path) {
               router.push(path);
             }

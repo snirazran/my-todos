@@ -231,6 +231,20 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    if (earnsWeeklyBonus) {
+      await recordAnalyticsEvent({
+        userId,
+        name: 'friends_pond_weekly_bonus',
+        externalId: `friends_pond_weekly_bonus:${userId}:${weekKey}`,
+        properties: {
+          gift_item_id: bonusGiftId || 'none',
+          count: weekFriends.length,
+          days: weekDays.length,
+          is_premium: premium,
+        },
+      });
+    }
+
     return NextResponse.json({
       granted: settlement.delta,
       gate,

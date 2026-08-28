@@ -1,4 +1,5 @@
 import connectMongo from '@/lib/mongoose';
+import { recordAnalyticsEvent } from '@/lib/analytics/server';
 import CalendarConnectionModel, {
   type CalendarConnectionDoc,
 } from '@/lib/models/CalendarConnection';
@@ -36,6 +37,11 @@ export async function disconnectCalendarConnection(conn: CalendarConnectionDoc) 
   await tearDownRemote(conn, 'disconnect');
   await deleteConnectionData(conn._id!);
   invalidateConnectionCache(conn.userId);
+  await recordAnalyticsEvent({
+    userId: conn.userId,
+    name: 'calendar_disconnected',
+    properties: { provider: conn.provider, reason: 'user' },
+  });
   await notifyTaskChanged(conn.userId);
 }
 
@@ -95,6 +101,11 @@ export async function autoDisconnectConnection(
     },
   );
   invalidateConnectionCache(conn.userId);
+  await recordAnalyticsEvent({
+    userId: conn.userId,
+    name: 'calendar_disconnected',
+    properties: { provider: conn.provider, reason },
+  });
   console.warn(
     `[calendar] auto-disconnected ${conn.provider} for ${conn.userId} (${reason})`,
   );

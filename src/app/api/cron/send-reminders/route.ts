@@ -23,6 +23,7 @@ import {
   morningMessage,
 } from '@/lib/notifications/frogVoice';
 import { runWishlistDealAlerts } from '@/lib/skins/wishlistAlerts';
+import { recordAnalyticsEvent } from '@/lib/analytics/server';
 
 const CRON_SECRET = process.env.CRON_SECRET;
 
@@ -510,6 +511,15 @@ export async function GET(req: NextRequest) {
         { $pull: { 'notificationPrefs.fcmTokens': { $in: invalidTokens } } },
       );
     }
+
+    await recordAnalyticsEvent({
+      userId,
+      name: 'notification_sent',
+      properties: {
+        notification_type: String(message.data.type ?? 'unknown'),
+        slot: isEvening ? 'evening' : 'morning',
+      },
+    });
 
     // Update last notified timestamp; routine nudges also count toward the
     // mute threshold until app activity resets it

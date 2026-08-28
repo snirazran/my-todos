@@ -14,6 +14,7 @@ import { bumpQuestMetric } from '@/lib/quests/metrics';
 import type { UserWardrobe } from '@/lib/types/UserDoc';
 import { MAX_HUNGER_MS } from '@/lib/hungerLogic';
 import { getZonedToday } from '@/lib/utils';
+import { recordAnalyticsEvent } from '@/lib/analytics/server';
 
 const json = (body: unknown, init = 200) =>
   NextResponse.json(body, {
@@ -29,6 +30,37 @@ function wishlistPayload(state: WishlistState) {
     wishlistItems: state.items,
     wishlistSlots: state.slots,
   };
+}
+
+/**
+ * A pinned item becoming affordable is a state, not an action, so it is read
+ * off whatever request happens to notice first. The externalId keeps it to one
+ * row per user and item however many reads see the same thing.
+ */
+async function recordWishlistReached(
+  userId: string,
+  state: WishlistState,
+  balance: number,
+  isPremium: boolean,
+) {
+  const ready = state.items.filter((entry) => !entry.owned && balance >= entry.price);
+  if (!ready.length) return;
+  await Promise.all(
+    ready.map((entry) =>
+      recordAnalyticsEvent({
+        userId,
+        name: 'wishlist_reached',
+        externalId: `wishlist_reached:${userId}:${entry.itemId}:${entry.price}`,
+        properties: {
+          item_id: entry.itemId,
+          price: entry.price,
+          balance,
+          list_size: state.items.length,
+          is_premium: isPremium,
+        },
+      }),
+    ),
+  );
 }
 
 /**
@@ -186,7 +218,11 @@ export async function GET(req: NextRequest) {
               : { date: today, focusSeconds: 0, earned: 0 },
         },
         ...wishlistPayload(
-          await loadWishlistState(wardrobe, fullCatalog, isPremium),
+          await (async () => {
+            const state = await loadWishlistState(wardrobe, fullCatalog, isPremium);
+            await recordWishlistReached(userId, state, wardrobe.flies ?? 0, isPremium);
+            return state;
+          })(),
         ),
         catalog: fullCatalog.filter((item) => summaryIds.has(item.id)),
         isPremium,
@@ -209,7 +245,11 @@ export async function GET(req: NextRequest) {
     return json({
       wardrobe,
       ...wishlistPayload(
-        await loadWishlistState(wardrobe, fullCatalog, isPremium),
+        await (async () => {
+          const state = await loadWishlistState(wardrobe, fullCatalog, isPremium);
+          await recordWishlistReached(userId, state, wardrobe.flies ?? 0, isPremium);
+          return state;
+        })(),
       ),
       catalog: visibleCatalog(fullCatalog, wardrobe, now),
       dailyDeals: rotation.deals,
@@ -263,6 +303,7 @@ export async function PUT(req: NextRequest) {
 
     // Unequip for this slot
     if (itemId === null) {
+      const previousId = wardrobe.equipped?.[slot] ?? null;
       await UserModel.updateOne(
         { _id: user._id },
         { $set: { [`wardrobe.equipped.${slot}`]: null } },
@@ -271,6 +312,16 @@ export async function PUT(req: NextRequest) {
         eventKind: 'wardrobe-equipped',
         slot,
         itemId: null,
+      });
+      await recordAnalyticsEvent({
+        userId,
+        name: 'item_equipped',
+        properties: {
+          action: 'unequip',
+          slot,
+          item_id: previousId ?? 'none',
+          rarity: 'unknown',
+        },
       });
       return json({ ok: true });
     }
@@ -296,6 +347,16 @@ export async function PUT(req: NextRequest) {
       itemId,
     });
     await bumpQuestMetric({ userId, metric: 'skin_equipped' });
+    await recordAnalyticsEvent({
+      userId,
+      name: 'item_equipped',
+      properties: {
+        action: 'equip',
+        slot,
+        item_id: itemId,
+        rarity: def.rarity ?? 'unknown',
+      },
+    });
     return json({ ok: true });
   } catch {
     return json({ error: 'Unauthorized' }, 401);

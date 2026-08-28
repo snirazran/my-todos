@@ -3,6 +3,7 @@ import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import UserModel from '@/lib/models/User';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
+import { recordHungerResolved } from '@/lib/analytics/hunger';
 
 export async function POST() {
   let userId: string;
@@ -70,6 +71,7 @@ export async function POST() {
           is_premium: isPremium,
         },
       }),
+      recordHungerResolved({ userId, method: 'ad_recovery', flies: amount, isPremium }),
     ]);
 
     return NextResponse.json({ granted: true, amount, balance });

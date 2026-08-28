@@ -198,6 +198,18 @@ export async function DELETE(req: NextRequest) {
     catalog,
     isPremiumActive(user?.premiumUntil),
   );
+
+  await recordAnalyticsEvent({
+    userId,
+    name: 'wishlist_cleared',
+    properties: {
+      item_id: itemId ?? 'all',
+      kind,
+      list_size: state.items.length,
+      count: existing.length - pins.length,
+    },
+  });
+
   return json({
     ok: true,
     wishlist: state.goal,

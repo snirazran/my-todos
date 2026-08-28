@@ -356,13 +356,46 @@ export async function DELETE(req: NextRequest) {
     const existing = await UserModel.findById(userId, {
       liveActivity: 1,
       notificationPrefs: 1,
+      activeFrogodoroTimer: 1,
+      focusProfile: 1,
     }).lean();
     const live = (existing as { liveActivity?: LiveActivityRef | null } | null)
       ?.liveActivity;
     const prefs = (existing as { notificationPrefs?: NotificationPrefs } | null)
       ?.notificationPrefs;
+    const cancelled = (
+      existing as { activeFrogodoroTimer?: ActiveFrogodoroTimer | null } | null
+    )?.activeFrogodoroTimer;
 
     const seq = await clearTimerAndFanOut(userId, live, prefs);
+
+    if (cancelled && cancelled.status === 'running') {
+      const task = await TaskModel.findOne({ userId, id: cancelled.taskId }).lean();
+      const elapsedSeconds = cancelled.endsAt
+        ? Math.max(
+            0,
+            Math.round(
+              cancelled.settings.focusDuration * 60 -
+                (new Date(cancelled.endsAt).getTime() - Date.now()) / 1000,
+            ),
+          )
+        : 0;
+      await recordAnalyticsEvent({
+        userId,
+        name: 'timer_cancelled',
+        properties: taskAnalyticsProperties(
+          task ?? {},
+          (existing as { focusProfile?: unknown } | null)?.focusProfile as never,
+          {
+            phase: cancelled.phase,
+            duration_minutes: cancelled.settings.focusDuration,
+            focus_duration_minutes: cancelled.settings.focusDuration,
+            break_duration_minutes: cancelled.settings.breakDuration,
+            seconds_elapsed: elapsedSeconds,
+          },
+        ),
+      });
+    }
 
     return NextResponse.json({ timer: null, serverNow: Date.now(), seq });
   } catch {
