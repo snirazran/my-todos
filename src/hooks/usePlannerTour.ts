@@ -5,6 +5,7 @@ import { mutate as mutateGlobal } from 'swr';
 import { useIntros } from '@/hooks/useIntros';
 import { INVENTORY_KEY, INVENTORY_SUMMARY_KEY } from '@/hooks/useInventory';
 import {
+  TOUR_ALWAYS_SHOW_FOR_TESTING,
   TOUR_BEAT_COUNT,
   TOUR_CHAPTERS,
   TOUR_EVENT,
@@ -29,6 +30,58 @@ const PAYOFF_HOLD_MS = 1000;
 const FINALE_PAYOFF_HOLD_MS = 1800;
 /** How far back a beat will accept an action the user got to before it armed. */
 const MISSED_ACTION_MS = 4000;
+/** How long the board has to sit still on a day before the cards follow it. */
+const FOLLOW_SETTLE_MS = 550;
+const REVEAL_PAD = 10;
+
+function boardIsBusy() {
+  if (document.body.dataset.boardWriting === '1') return true;
+  const scroller = document.querySelector('[data-role="board-scroller"]');
+  return scroller?.getAttribute('data-drag') === '1';
+}
+
+function tutorialCards() {
+  return Array.from(
+    document.querySelectorAll<HTMLElement>(
+      `[data-hint="${TUTORIAL_CARD_HINT}"]`,
+    ),
+  ).filter((node) => node.getBoundingClientRect().height > 1);
+}
+
+function scrollParentOf(node: HTMLElement) {
+  let current = node.parentElement;
+  while (current && current !== document.body) {
+    const overflowY = window.getComputedStyle(current).overflowY;
+    if (
+      (overflowY === 'auto' || overflowY === 'scroll') &&
+      current.scrollHeight - current.clientHeight > 4
+    ) {
+      return current;
+    }
+    current = current.parentElement;
+  }
+  return null;
+}
+
+/**
+ * A practice card seeded below the fold of a long day is a step the user
+ * cannot even see, so the column is scrolled to it rather than the other way
+ * round — the scrim blocks them from scrolling it themselves.
+ */
+function revealCards() {
+  const nodes = tutorialCards();
+  if (nodes.length === 0) return;
+  const list = scrollParentOf(nodes[0]);
+  if (!list) return;
+  const box = list.getBoundingClientRect();
+  const first = nodes[0].getBoundingClientRect();
+  const last = nodes[nodes.length - 1].getBoundingClientRect();
+  const above = first.top - (box.top + REVEAL_PAD);
+  const below = last.bottom - (box.bottom - REVEAL_PAD);
+  const delta = above < 0 ? above : below > 0 ? Math.min(below, above) : 0;
+  if (Math.abs(delta) < 2) return;
+  list.scrollBy({ top: delta, behavior: 'smooth' });
+}
 
 async function seedCards(
   texts: string[],
@@ -89,7 +142,7 @@ async function waitForBoardIdle(budgetMs = 3000) {
   // A write that is about to start has not set the flag yet.
   await new Promise((resolve) => window.setTimeout(resolve, 120));
   while (Date.now() - startedAt < budgetMs) {
-    if (document.body.dataset.boardWriting !== '1') return;
+    if (!boardIsBusy()) return;
     await new Promise((resolve) => window.setTimeout(resolve, 60));
   }
 }
@@ -172,6 +225,10 @@ export function usePlannerTour({
   // Every id the tour has ever seeded. Deleting by flag alone is not enough:
   // a board column write can rebuild a moved card as a fresh doc and drop it.
   const seededIdsRef = useRef<string[]>([]);
+  // The day the practice cards are currently sitting on, so a board that has
+  // been swiped somewhere else can be spotted and followed.
+  const seededDateRef = useRef<string | null>(null);
+  const followingRef = useRef(false);
 
   const chapter: TourChapter | null = TOUR_CHAPTERS[chapterIndex] ?? null;
   const beat: TourBeat | null = chapter?.beats[beatIndex] ?? null;
@@ -191,7 +248,8 @@ export function usePlannerTour({
 
   useEffect(() => {
     if (!enabled || phase !== 'idle') return;
-    if (!seenIntros || seenIntros.plannerTour) return;
+    if (!seenIntros) return;
+    if (seenIntros.plannerTour && !TOUR_ALWAYS_SHOW_FOR_TESTING) return;
     setPhase('opener');
   }, [enabled, phase, seenIntros]);
 
@@ -199,6 +257,7 @@ export function usePlannerTour({
     setPhase('done');
     setPayoff(null);
     markIntroSeen('plannerTour');
+    seededDateRef.current = null;
     void clearCards(seededIdsRef.current).then(() => refreshRef.current());
   }, [markIntroSeen]);
 
@@ -240,13 +299,16 @@ export function usePlannerTour({
           ...seededIdsRef.current,
           ...(seeded.taskIds ?? []),
         ];
+        seededDateRef.current = seeded.date ?? dateRef.current;
         await refreshRef.current();
         await waitForCards(chapterToOpen.cards, refreshRef.current);
+        revealCards();
       } else {
         // A chapter that needs no practice cards must not inherit the previous
         // chapter's — their highlight competes with the step's real target.
         await clearCards(seededIdsRef.current);
         seededIdsRef.current = [];
+        seededDateRef.current = null;
         await refreshRef.current();
       }
     } catch (error) {
@@ -371,6 +433,70 @@ export function usePlannerTour({
     setSoftened(false);
     const timer = window.setTimeout(() => setSoftened(true), IDLE_SOFTEN_MS);
     return () => window.clearTimeout(timer);
+  }, [running, beat]);
+
+  // Steps that ask for a practice card only work where the user is looking, so
+  // the cards ride along to whichever day they swipe to.
+  const followCards =
+    running && beat?.anchor === TUTORIAL_CARD_HINT
+      ? (chapter?.cards ?? null)
+      : null;
+
+  useEffect(() => {
+    if (!followCards || followCards.length === 0) return;
+    if (!seededDateRef.current || seededDateRef.current === activeDateKey) {
+      return;
+    }
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      const queuedAt = Date.now();
+      while (followingRef.current && Date.now() - queuedAt < 8000) {
+        await new Promise((resolve) => window.setTimeout(resolve, 100));
+      }
+      if (cancelled || seededDateRef.current === activeDateKey) return;
+      followingRef.current = true;
+      setSeeding(true);
+      try {
+        await waitForBoardIdle(10_000);
+        if (cancelled || dateRef.current !== activeDateKey) return;
+        const seeded = await seedCards(
+          followCards,
+          activeDateKey,
+          tzRef.current,
+          seededIdsRef.current,
+        );
+        seededIdsRef.current = [
+          ...seededIdsRef.current,
+          ...(seeded.taskIds ?? []),
+        ];
+        seededDateRef.current = seeded.date ?? activeDateKey;
+        await refreshRef.current();
+        await waitForCards(followCards, refreshRef.current);
+        revealCards();
+      } catch (error) {
+        console.warn('Planner tour card follow failed', error);
+      } finally {
+        setSeeding(false);
+        followingRef.current = false;
+      }
+    }, FOLLOW_SETTLE_MS);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [followCards, activeDateKey]);
+
+  useEffect(() => {
+    if (!running || beat?.anchor !== TUTORIAL_CARD_HINT) return;
+    const tick = () => {
+      if (!boardIsBusy()) revealCards();
+    };
+    const timer = window.setTimeout(tick, 150);
+    const interval = window.setInterval(tick, 1500);
+    return () => {
+      window.clearTimeout(timer);
+      window.clearInterval(interval);
+    };
   }, [running, beat]);
 
   return {

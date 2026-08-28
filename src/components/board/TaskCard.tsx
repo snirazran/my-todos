@@ -22,6 +22,7 @@ import { hapticImpact } from '@/lib/haptics';
 import { taskFlyWorthNow } from '@/lib/flyValue';
 import { FlyValueBadge } from '@/components/ui/FlyValueBadge';
 import { useTaskTimerPhase } from '@/hooks/useTaskTimerPhase';
+import { TOUR_BLOCKED_TAP, isPlannerTourLocked } from '@/lib/tour/plannerTour';
 
 type OnGrabParams = {
   clientX: number;
@@ -170,6 +171,12 @@ export default function TaskCard({
     }
   }, [defaultTouchAction]);
 
+  const refuseTap = useCallback(() => {
+    if (!isPlannerTourLocked()) return false;
+    window.dispatchEvent(new Event(TOUR_BLOCKED_TAP));
+    return true;
+  }, []);
+
   // Stable handlers using Refs
   const handlePointerMove = useCallback(
     (e: PointerEvent) => {
@@ -209,8 +216,8 @@ export default function TaskCard({
     cleanupLP();
     if (!wasTap || suppressed) return;
     if (asSelect) onSelectToggleRef.current?.({ shift: false, meta: false });
-    else onTapRef.current?.();
-  }, [cleanupLP]);
+    else if (!refuseTap()) onTapRef.current?.();
+  }, [cleanupLP, refuseTap]);
 
   const handlePointerCancel = useCallback(() => cleanupLP(), [cleanupLP]);
 
@@ -665,7 +672,8 @@ export default function TaskCard({
             disabled={!onToggleComplete}
             onClick={(e) => {
               e.stopPropagation();
-              if (onToggleComplete && !isAnyDragging) onToggleComplete();
+              if (onToggleComplete && !isAnyDragging && !refuseTap())
+                onToggleComplete();
             }}
             aria-label={task.completed ? 'Mark not done' : 'Mark done'}
             className={`relative h-10 w-10 shrink-0 rounded-full transition-transform active:scale-90 ${

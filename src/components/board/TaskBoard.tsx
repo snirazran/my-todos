@@ -2427,7 +2427,10 @@ export default function TaskBoard({
               the bar never resizes) and a single drop strip takes over
               almost the full bar — no per-item growing/shrinking fight, so
               nothing clips or fights for space. */}
-          <div className="relative flex h-16 w-full max-w-[340px] items-center rounded-[28px] border border-border/50 bg-card px-1.5 shadow-sm md:h-[68px] md:max-w-[360px] md:px-2">
+          <div
+            data-hint="saved-drop-target"
+            className="relative flex h-16 w-full max-w-[340px] items-center rounded-[28px] border border-border/50 bg-card px-1.5 shadow-sm md:h-[68px] md:max-w-[360px] md:px-2"
+          >
             <div
               className={`flex w-full items-center gap-1 transition-opacity duration-150 ${
                 showSavedDrop ? 'pointer-events-none opacity-0' : 'opacity-100'

@@ -6,6 +6,9 @@ import type { AnchorRect } from '@/lib/hints/useAnchorTracker';
 
 const CYCLE_S = 2.8;
 const DOT = 28;
+const HOLD_PILL =
+  'whitespace-nowrap rounded-full bg-primary px-2 py-[3px] text-[10px] font-black uppercase tracking-wide text-primary-foreground shadow-lg shadow-primary/30';
+const HOLD_BOX = 160;
 
 function centerOf(rect: AnchorRect) {
   return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
@@ -31,6 +34,11 @@ export default function GhostHand({
   const midY = a.y + dy / 2 - bow;
 
   const half = DOT / 2;
+  const holdStyle = {
+    left: a.x - HOLD_BOX / 2,
+    top: Math.max(8, a.y - 40),
+    width: HOLD_BOX,
+  };
   // Looping keyframe arrays are captured when the animation starts, so a rect
   // that moves afterwards leaves the fingertip running the old path until
   // something remounts it. Keying on the geometry restarts it in place.
@@ -62,12 +70,36 @@ export default function GhostHand({
       </svg>
 
       {reduceMotion ? (
-        <span
-          className="absolute rounded-full border-[3px] border-primary bg-primary/25"
-          style={{ left: b.x - half, top: b.y - half, width: DOT, height: DOT }}
-        />
+        <>
+          <span
+            className="absolute rounded-full border-[3px] border-primary bg-primary/25"
+            style={{ left: b.x - half, top: b.y - half, width: DOT, height: DOT }}
+          />
+          <span
+            className="absolute flex justify-center"
+            style={holdStyle}
+          >
+            <span className={HOLD_PILL}>Hold first</span>
+          </span>
+        </>
       ) : (
         <>
+        <div className="absolute flex justify-center" style={holdStyle}>
+          <motion.span
+            key={`hold-${pathKey}`}
+            className={HOLD_PILL}
+            animate={{ opacity: [0, 1, 1, 0], scale: [0.82, 1, 1, 0.9] }}
+            transition={{
+              duration: CYCLE_S,
+              times: [0, 0.1, 0.32, 0.44],
+              ease: 'easeOut',
+              repeat: Infinity,
+              repeatDelay: 0.5,
+            }}
+          >
+            Hold first
+          </motion.span>
+        </div>
         <motion.span
           key={`ripple-${pathKey}`}
           className="absolute rounded-full border-2 border-primary"
@@ -227,7 +259,7 @@ export function DragEdgeArrows({
         style={
           right
             ? { right: 8, top: at.y - 20, height: 40 }
-            : { left: at.x - 16, top: at.y - 86, width: 32 }
+            : { left: at.x - 16, top: at.y - 4, width: 32 }
         }
       >
         {[0, 1, 2].map((i) => (

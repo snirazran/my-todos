@@ -9,6 +9,22 @@ export const TOUR_EVENT = {
 
 export const TUTORIAL_CARD_HINT = 'tutorial-card';
 
+export const TOUR_ALWAYS_SHOW_FOR_TESTING = true;
+
+export const TOUR_BLOCKED_TAP = 'frogress:tour-blocked-tap';
+
+export const TOUR_SAVED_DROP_EVENT = 'frogress:tour-saved-drop';
+
+export function isSavedDropHidden() {
+  if (typeof document === 'undefined') return false;
+  return document.body.dataset.tourNoSavedDrop === '1';
+}
+
+export function isPlannerTourLocked() {
+  if (typeof document === 'undefined') return false;
+  return document.body.dataset.plannerTour === '1';
+}
+
 /** Paid once, on genuine completion — skipping the tour earns nothing. */
 export const PLANNER_TOUR_GIFT_ID = 'gift_box_1';
 export const PLANNER_TOUR_GIFT_NAME = 'Common Gift';
@@ -43,6 +59,8 @@ export type TourBeat = {
   multi?: boolean;
   /** Bobbing chevron beside the anchor, for targets far from the coach bar. */
   pointAt?: 'up' | 'down';
+  /** Keep the save-for-later drop strip out of this beat's drag entirely. */
+  hideSavedDrop?: boolean;
   coverCheck?: boolean;
   /** Shown for a beat after this one completes. */
   payoff?: string;
@@ -69,6 +87,7 @@ export const TOUR_CHAPTERS: TourChapter[] = [
         labelDesktop: 'Hold me, then drag me to the next column',
         dragTo: 'tour-next-day',
         event: TOUR_EVENT.movedDay,
+        hideSavedDrop: true,
         payoff: 'That’s it. Anything moves, any day.',
       },
     ],
@@ -81,8 +100,8 @@ export const TOUR_CHAPTERS: TourChapter[] = [
       {
         id: 'saved.park',
         anchor: TUTORIAL_CARD_HINT,
-        label: 'No date yet? Drag me down to Saved',
-        dragTo: 'saved-tasks',
+        label: 'Hold me again, then drag me down to Saved',
+        dragTo: 'saved-drop-target',
         event: TOUR_EVENT.parked,
         payoff: 'Saved. No date needed.',
       },
@@ -96,7 +115,7 @@ export const TOUR_CHAPTERS: TourChapter[] = [
       {
         id: 'saved.unpark',
         anchor: 'saved-task-card',
-        label: 'Drag it back onto any day when you’re ready',
+        label: 'Hold it, then drag it back onto any day',
         dragTo: 'tour-day-column',
         event: TOUR_EVENT.unparked,
         payoff: 'And back onto a day whenever you want.',
@@ -126,7 +145,7 @@ export const TOUR_CHAPTERS: TourChapter[] = [
       {
         id: 'bulk.drag',
         anchor: TUTORIAL_CARD_HINT,
-        label: 'Now drag one of us — we both come along',
+        label: 'Now hold one of us and drag — we both come along',
         dragTo: 'tour-next-day',
         event: TOUR_EVENT.bulkDropped,
         payoff: 'Two taps instead of ten.',

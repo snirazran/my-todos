@@ -16,6 +16,7 @@ import {
 import { usePlannerTour } from '@/hooks/usePlannerTour';
 import {
   TOUR_BEAT_COUNT,
+  TOUR_BLOCKED_TAP,
   PLANNER_TOUR_GIFT_ID,
   PLANNER_TOUR_GIFT_RIVE,
 } from '@/lib/tour/plannerTour';
@@ -199,6 +200,23 @@ export default function PlannerTour({
   }, [dragging]);
 
   useEffect(() => {
+    if (phase === 'idle' || phase === 'done') {
+      delete document.body.dataset.plannerTour;
+      return;
+    }
+    document.body.dataset.plannerTour = '1';
+    return () => {
+      delete document.body.dataset.plannerTour;
+    };
+  }, [phase]);
+
+  useEffect(() => {
+    const onBlocked = () => setNudge((n) => n + 1);
+    window.addEventListener(TOUR_BLOCKED_TAP, onBlocked);
+    return () => window.removeEventListener(TOUR_BLOCKED_TAP, onBlocked);
+  }, []);
+
+  useEffect(() => {
     const down = () => setInteracting(true);
     const up = () => setInteracting(false);
     document.addEventListener('pointerdown', down, true);
@@ -283,7 +301,7 @@ export default function PlannerTour({
   // The Saved box turns into a full-width drop strip the moment a card is
   // lifted, so the strip — not the box — is what the hint has to point at.
   const dropZoneSelector =
-    running && dragging && beat?.dragTo === 'saved-tasks'
+    running && dragging && beat?.dragTo === 'saved-drop-target'
       ? '[data-hint="saved-drop-zone"]'
       : null;
   const { rect: dropZoneRect } = useAnchorTracker({
@@ -489,7 +507,10 @@ export default function PlannerTour({
     beat?.dragTo === 'tour-next-day' &&
     !!grabbedFrom;
   const showDropArrows =
-    running && dragging && beat?.dragTo === 'saved-tasks' && !!dropZoneRect;
+    running &&
+    dragging &&
+    beat?.dragTo === 'saved-drop-target' &&
+    !!dropZoneRect;
   // The dim steps out of the way for the whole drag: the card is already the
   // focus once it is in the air, and dimming the board it is being dropped on
   // fights the drop zones instead of guiding them.
