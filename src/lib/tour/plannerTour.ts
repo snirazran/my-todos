@@ -9,8 +9,6 @@ export const TOUR_EVENT = {
 
 export const TUTORIAL_CARD_HINT = 'tutorial-card';
 
-export const TOUR_ALWAYS_SHOW_FOR_TESTING = true;
-
 export const TOUR_BLOCKED_TAP = 'frogress:tour-blocked-tap';
 
 export const TOUR_SAVED_DROP_EVENT = 'frogress:tour-saved-drop';

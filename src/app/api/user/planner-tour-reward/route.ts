@@ -5,10 +5,7 @@ import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import UserModel from '@/lib/models/User';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
-import {
-  PLANNER_TOUR_GIFT_ID,
-  TOUR_ALWAYS_SHOW_FOR_TESTING,
-} from '@/lib/tour/plannerTour';
+import { PLANNER_TOUR_GIFT_ID } from '@/lib/tour/plannerTour';
 
 export async function POST() {
   try {
@@ -20,9 +17,7 @@ export async function POST() {
     const result = await UserModel.updateOne(
       {
         _id: userId,
-        ...(TOUR_ALWAYS_SHOW_FOR_TESTING
-          ? {}
-          : { 'seenIntros.plannerTourRewarded': { $ne: true } }),
+        'seenIntros.plannerTourRewarded': { $ne: true },
       },
       {
         $set: {

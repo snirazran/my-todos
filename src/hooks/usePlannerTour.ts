@@ -5,7 +5,6 @@ import { mutate as mutateGlobal } from 'swr';
 import { useIntros } from '@/hooks/useIntros';
 import { INVENTORY_KEY, INVENTORY_SUMMARY_KEY } from '@/hooks/useInventory';
 import {
-  TOUR_ALWAYS_SHOW_FOR_TESTING,
   TOUR_BEAT_COUNT,
   TOUR_CHAPTERS,
   TOUR_EVENT,
@@ -271,8 +270,7 @@ export function usePlannerTour({
 
   useEffect(() => {
     if (!enabled || phase !== 'idle') return;
-    if (!seenIntros) return;
-    if (seenIntros.plannerTour && !TOUR_ALWAYS_SHOW_FOR_TESTING) return;
+    if (!seenIntros || seenIntros.plannerTour) return;
     setPhase('opener');
   }, [enabled, phase, seenIntros]);
 
