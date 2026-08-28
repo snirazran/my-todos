@@ -67,7 +67,12 @@ import FrogodoroSheet from '@/components/ui/FrogodoroSheet';
 import FrogodoroPill from '@/components/ui/FrogodoroPill';
 import BacklogBox from './BacklogBox';
 import BacklogTray from './BacklogTray';
-import { TOUR_EVENT, emitTourEvent } from '@/lib/tour/plannerTour';
+import {
+  TOUR_EVENT,
+  TOUR_SAVED_DROP_EVENT,
+  emitTourEvent,
+  isSavedDropHidden,
+} from '@/lib/tour/plannerTour';
 import { useNotification } from '@/components/providers/NotificationProvider';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import { useFrogodoroUiStore } from '@/lib/frogodoroUiStore';
@@ -482,7 +487,19 @@ export default function TaskBoard({
   const backlogTrayRef = useRef<HTMLDivElement>(null);
   const [isDragOverBacklog, setIsDragOverBacklog] = useState(false);
   const [trayCloseProgress, setTrayCloseProgress] = useState(0);
+  const [savedDropHidden, setSavedDropHidden] = useState(isSavedDropHidden);
   const [todayInView, setTodayInView] = useState(true);
+
+  useEffect(() => {
+    const onTourSavedDrop = (event: Event) => {
+      const hidden = (event as CustomEvent<{ hidden?: boolean }>).detail
+        ?.hidden;
+      setSavedDropHidden(!!hidden);
+    };
+    window.addEventListener(TOUR_SAVED_DROP_EVENT, onTourSavedDrop);
+    return () =>
+      window.removeEventListener(TOUR_SAVED_DROP_EVENT, onTourSavedDrop);
+  }, []);
 
   const centerColumnSmooth = useCallback(
     (i: number) => {
@@ -2013,7 +2030,8 @@ export default function TaskBoard({
 
   // A card lifted out of the tray has nowhere to go in the tray, so the whole
   // save-for-later drop affordance stays out of its way.
-  const showSavedDrop = !!drag?.active && drag.fromDay !== BACKLOG_IDX;
+  const showSavedDrop =
+    !!drag?.active && drag.fromDay !== BACKLOG_IDX && !savedDropHidden;
 
   // One lens for both layouts: the chips sit on the board under the header,
   // directly below the column-header trigger that opened them.

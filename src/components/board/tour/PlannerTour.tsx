@@ -17,10 +17,13 @@ import { usePlannerTour } from '@/hooks/usePlannerTour';
 import {
   TOUR_BEAT_COUNT,
   TOUR_BLOCKED_TAP,
+  TOUR_SAVED_DROP_EVENT,
   PLANNER_TOUR_GIFT_ID,
   PLANNER_TOUR_GIFT_RIVE,
 } from '@/lib/tour/plannerTour';
 import GiftBoxOpening from '@/components/ui/gift-box/GiftBoxOpening';
+import { mutateInventoryCaches } from '@/hooks/useInventory';
+import { mutateBackgrounds } from '@/hooks/useBackgrounds';
 import GhostHand, {
   DragEdgeArrows,
   PointerArrow,
@@ -215,6 +218,21 @@ export default function PlannerTour({
     window.addEventListener(TOUR_BLOCKED_TAP, onBlocked);
     return () => window.removeEventListener(TOUR_BLOCKED_TAP, onBlocked);
   }, []);
+
+  const hideSavedDrop = running && !!beat?.hideSavedDrop;
+  useEffect(() => {
+    const publish = (hidden: boolean) => {
+      if (hidden) document.body.dataset.tourNoSavedDrop = '1';
+      else delete document.body.dataset.tourNoSavedDrop;
+      window.dispatchEvent(
+        new CustomEvent(TOUR_SAVED_DROP_EVENT, { detail: { hidden } }),
+      );
+    };
+    publish(hideSavedDrop);
+    return () => {
+      if (hideSavedDrop) publish(false);
+    };
+  }, [hideSavedDrop]);
 
   useEffect(() => {
     const down = () => setInteracting(true);
@@ -536,6 +554,10 @@ export default function PlannerTour({
       <GiftBoxOpening
         giftBoxId={PLANNER_TOUR_GIFT_ID}
         onClose={tour.closeGift}
+        onWin={() => {
+          mutateInventoryCaches();
+          mutateBackgrounds();
+        }}
       />
     );
   }
@@ -633,13 +655,27 @@ export default function PlannerTour({
       )}
 
       {showDropArrows && dropZoneRect && (
-        <DragEdgeArrows
-          direction="down"
-          at={{
-            x: dropZoneRect.left + dropZoneRect.width / 2,
-            y: dropZoneRect.top,
-          }}
-        />
+        <>
+          <div
+            aria-hidden
+            className="pointer-events-none fixed z-[2000]"
+            style={{
+              top: dropZoneRect.top - RING_PADDING,
+              left: dropZoneRect.left - RING_PADDING,
+              width: dropZoneRect.width + RING_PADDING * 2,
+              height: dropZoneRect.height + RING_PADDING * 2,
+            }}
+          >
+            <span className="absolute inset-0 rounded-[26px] ring-[3px] ring-primary shadow-[0_0_18px_5px_hsl(var(--primary)/0.35)] dark:shadow-[0_0_22px_6px_hsl(var(--primary)/0.45)]" />
+          </div>
+          <DragEdgeArrows
+            direction="down"
+            at={{
+              x: dropZoneRect.left + dropZoneRect.width / 2,
+              y: dropZoneRect.top,
+            }}
+          />
+        </>
       )}
 
       {pulseRects.map((r, i) => (

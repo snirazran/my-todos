@@ -259,7 +259,7 @@ export function DragEdgeArrows({
         style={
           right
             ? { right: 8, top: at.y - 20, height: 40 }
-            : { left: at.x - 16, top: at.y - 4, width: 32 }
+            : { left: at.x - 16, top: at.y - 120, width: 32 }
         }
       >
         {[0, 1, 2].map((i) => (
