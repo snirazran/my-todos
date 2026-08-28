@@ -321,9 +321,10 @@ export function pactComebackFlies(config: PactConfigDoc) {
 
 /**
  * What a week at this position in the streak pays at. `streakWeeks` is the
- * week's OWN number — the streak it lands on, not the one it started from — so
- * the week that takes a run to four weeks is already paid at the four-week
- * rate. Anything below the first rung pays flat.
+ * streak BANKED when the week began, not the one it is reaching for: a rung is
+ * unlocked by landing it, and pays from the week after. Paying it forward made
+ * the rail's own pads wrong — it marked the four-week pad locked while already
+ * paying its rate. Anything below the first rung pays flat.
  */
 function pactRungFor(config: PactConfigDoc, streakWeeks: number) {
   const rungs = [...(config.streakMultipliers ?? [])].sort(
@@ -817,9 +818,9 @@ export async function settleFinishedWeeks(args: {
         owedSessions,
         comeback: earnsComeback,
         isPremium,
-        // The rate this week was lived under: the streak it was reaching for,
-        // which is what reconcile paid its earlier sessions at.
-        streakWeeks: streakBefore + 1,
+        // The rate this week was lived under: the streak banked when it
+        // began, which is what reconcile paid its earlier sessions at.
+        streakWeeks: streakBefore,
         laps: lapsBefore,
       });
       pact.paidSessions = progress;
@@ -892,7 +893,7 @@ export async function settleFinishedWeeks(args: {
         user: userDoc,
         config: args.config,
         pact,
-        streakWeeks: next.weeks,
+        streakWeeks: streakBefore,
         laps: lapsBefore,
         isPremium,
       });
@@ -1026,7 +1027,7 @@ export async function settleFinishedWeeks(args: {
 function ladderFor(args: {
   config: PactConfigDoc;
   streak: PactStreakState;
-  /** The week the user is playing for — the streak's next number. */
+  /** The streak banked right now — the rate the week in progress pays at. */
   weekStreakNumber: number;
 }): PactLadderView {
   const { config, streak, weekStreakNumber } = args;
@@ -1174,7 +1175,7 @@ export async function getPactView(args: {
   // The rate the week in progress is being paid at — the prestige floor times
   // the streak's step, capped. Every fly number the card shows is already
   // multiplied by it, so the user reads one true number.
-  const weekMultiplier = pactMultiplier(config, streak.weeks + 1, streak.laps);
+  const weekMultiplier = pactMultiplier(config, streak.weeks, streak.laps);
 
   const activeDoc =
     (await PactModel.findOne({ userId, weekKey: currentWeek })) ??
@@ -1422,7 +1423,7 @@ export async function getPactView(args: {
     forgoneFlies: streak.forgoneFlies,
     userTags,
     flyBalance,
-    ladder: ladderFor({ config, streak, weekStreakNumber: streak.weeks + 1 }),
+    ladder: ladderFor({ config, streak, weekStreakNumber: streak.weeks }),
     rewardCatalog: buildRewardCatalog(await getFullCatalog(), [
       config.completionRewards ?? [],
       ...(config.completionGiftTiers ?? []).map((tier) => tier.rewards ?? []),
@@ -1480,7 +1481,7 @@ export async function getAreaOptions(args: {
     lastPactContinuable,
     streakMultiplier: pactMultiplier(
       config,
-      normalizePactStreak(user).weeks + 1,
+      normalizePactStreak(user).weeks,
       normalizePactStreak(user).laps,
     ),
   });

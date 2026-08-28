@@ -49,7 +49,9 @@ export async function claimPactReward(args: {
     user,
     config,
     pact,
-    streakWeeks,
+    // The ordinal above is where the week sits; the rate is what it was played
+    // at, and a rung the week is only now reaching pays from the next one.
+    streakWeeks: streak.weeks,
     laps: streak.laps,
     isPremium,
   });

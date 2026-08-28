@@ -171,13 +171,15 @@ function featuredShopOrder(
   for (const card of shuffled) {
     (rarityRank[card.rarity] >= rarityRank.rare ? hot : rest).push(card);
   }
-  if (!hot.length || !rest.length) return shuffled;
+  if (!hot.length || !rest.length) return interleaveByCategory(shuffled);
 
+  const hotOrdered = interleaveByCategory(hot);
+  const restOrdered = interleaveByCategory(rest);
   const rand = mulberry32(hashSeed(seed) ^ cards.length);
   const total = cards.length;
   const out: (WardrobeCard | undefined)[] = new Array(total);
-  const stride = total / hot.length;
-  hot.forEach((card, i) => {
+  const stride = total / hotOrdered.length;
+  hotOrdered.forEach((card, i) => {
     const width = Math.max(1, Math.floor(stride));
     let slot = Math.floor(i * stride) + Math.floor(rand() * width);
     if (i === 0) slot = Math.min(slot, 5);
@@ -186,8 +188,42 @@ function featuredShopOrder(
     out[slot] = card;
   });
   let r = 0;
-  for (let i = 0; i < total; i++) if (!out[i]) out[i] = rest[r++];
+  for (let i = 0; i < total; i++) if (!out[i]) out[i] = restOrdered[r++];
   return out as WardrobeCard[];
+}
+
+function interleaveByCategory(cards: WardrobeCard[]): WardrobeCard[] {
+  const buckets = new Map<string, WardrobeCard[]>();
+  for (const card of cards) {
+    const key = card.kind === 'bg' ? 'background' : card.item.slot;
+    const bucket = buckets.get(key);
+    if (bucket) bucket.push(card);
+    else buckets.set(key, [card]);
+  }
+  if (buckets.size < 2) return cards;
+
+  const lanes = Array.from(buckets.values())
+    .sort((a, b) => b.length - a.length)
+    .map((laneCards) => ({ cards: laneCards, taken: 0 }));
+
+  const out: WardrobeCard[] = [];
+  while (out.length < cards.length) {
+    let best = -1;
+    let bestScore = Infinity;
+    for (let i = 0; i < lanes.length; i++) {
+      const lane = lanes[i];
+      if (lane.taken >= lane.cards.length) continue;
+      const score = (lane.taken + 0.5) / lane.cards.length;
+      if (score < bestScore - 1e-9) {
+        bestScore = score;
+        best = i;
+      }
+    }
+    if (best < 0) break;
+    const lane = lanes[best];
+    out.push(lane.cards[lane.taken++]);
+  }
+  return out;
 }
 
 function groupCardsByRarity(cards: WardrobeCard[]) {
@@ -2097,11 +2133,13 @@ function WardrobeManagerContent({
                       );
                     }
                     if (sortBy !== 'rarity_asc' && sortBy !== 'rarity_desc') {
+                      const ordered =
+                        sortBy === 'latest' ? interleaveByCategory(cards) : cards;
                       return (
                         <>
                           {sectionHeader}
                           <div className={cn(cardGridClass, 'pb-4')}>
-                            {cards.map((card, index) =>
+                            {ordered.map((card, index) =>
                               renderShopCard(card, index),
                             )}
                           </div>

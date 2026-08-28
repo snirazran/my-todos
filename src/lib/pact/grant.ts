@@ -65,7 +65,7 @@ export function applyPactSessionFlies(args: {
   owedSessions: number;
   comeback: boolean;
   isPremium: boolean;
-  /** The week's own streak number. Constant for a whole week. */
+  /** The streak banked when the week began. Constant for a whole week. */
   streakWeeks: number;
   /** Cycles completed — the permanent floor under the streak's step. */
   laps?: number;

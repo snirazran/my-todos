@@ -91,9 +91,9 @@ export async function reconcilePactSessionFlies(args: {
     owedSessions: sessionsDelta,
     comeback: earnsComeback,
     isPremium,
-    // The week in progress is the next one the streak will reach, so it pays
-    // at that rung from its first session rather than a week behind.
-    streakWeeks: streakState.weeks + 1,
+    // The week in progress pays at the rung the streak has already banked.
+    // The rung it is reaching for is unlocked by landing it, not by starting it.
+    streakWeeks: streakState.weeks,
     laps: streakState.laps,
   });
 

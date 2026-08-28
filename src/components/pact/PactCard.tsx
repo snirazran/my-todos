@@ -161,15 +161,6 @@ export function usePactView() {
  */
 const DEFERRED_WEEK_KEY = 'frog:pactDeferredWeek';
 
-/**
- * TESTING ONLY — REVERT BEFORE SHIPPING.
- *
- * Set true and "Not now" stops hiding the card, so the home nudge can be
- * looked at without clearing `frog:pactDeferredWeek` by hand every time.
- * Leaving this on ships a nudge the user cannot dismiss.
- */
-const IGNORE_DEFERRAL = true;
-
 const WEEK_START_DAY_NAMES = [
   'Sunday',
   'Monday',
@@ -412,7 +403,7 @@ export function PactCard({
   // Only the home nudge can be waved off. The quests page is where the user
   // goes looking for this, so it always offers it.
   const deferredHere =
-    !IGNORE_DEFERRAL && variant === 'home' && deferredWeek === data.weekKey;
+    variant === 'home' && deferredWeek === data.weekKey;
   const deferWeek = () => {
     try {
       window.localStorage.setItem(DEFERRED_WEEK_KEY, data.weekKey);
