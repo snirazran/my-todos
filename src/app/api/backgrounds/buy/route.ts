@@ -7,6 +7,7 @@ import { recordAnalyticsEvent } from '@/lib/analytics/server';
 import { isTradeOnlyRarity } from '@/lib/skins/catalog';
 import { dropFromWishlist } from '@/lib/skins/wishlistServer';
 import { DEFAULT_BACKGROUND_ID } from '@/lib/backgrounds/constants';
+import { bumpQuestMetric } from '@/lib/quests/metrics';
 
 const json = (body: unknown, init = 200) =>
   NextResponse.json(body, { status: init });
@@ -57,6 +58,8 @@ export async function POST(req: NextRequest) {
     if (result.modifiedCount === 0) {
       return json({ error: 'Not enough flies' }, 400);
     }
+
+    await bumpQuestMetric({ userId, metric: 'skin_acquired' });
 
     await dropFromWishlist(userId, user.wardrobe, id, 'background');
 

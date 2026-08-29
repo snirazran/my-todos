@@ -95,7 +95,8 @@ export const EXPLORER_QUEST: OnboardingQuestDef = {
       amount: 1,
       tagMode: 'ignore',
       metricKey: 'skin_acquired',
-      helpText: 'Open the Wardrobe shop and spend your flies on any skin.',
+      helpText:
+        'Open the Wardrobe shop and spend your flies on an outfit or a background.',
       rewards: fixedFlies(10),
     },
     {

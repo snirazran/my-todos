@@ -344,12 +344,12 @@ const GUIDES: Record<string, HintGuide> = {
   },
   'buy-skin': {
     id: 'buy-skin',
-    goal: 'Buy an outfit in the Shop',
+    goal: 'Get a new outfit or background',
     beats: [
       {
         href: '/wardrobe',
         anchor: 'wardrobe-shop-tab',
-        say: 'Open the Shop — buy any outfit you can afford',
+        say: 'Open the Shop — buy any outfit or background you can afford',
       },
     ],
   },

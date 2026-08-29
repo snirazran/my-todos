@@ -19,12 +19,15 @@ export const QUEST_METRIC_COPY: Record<string, MetricCopy> = {
     remaining: (n) => `${n} more ${n === 1 ? 'trade' : 'trades'} to go`,
   },
   skin_acquired: {
-    adminLabel: 'Skins bought or received',
+    adminLabel: 'Outfits or backgrounds acquired',
     label: (n) =>
       n === 1
-        ? 'Get a new outfit from the shop'
-        : `Get ${n} new outfits from the shop`,
-    remaining: (n) => `${n} more ${n === 1 ? 'outfit' : 'outfits'} to go`,
+        ? 'Get a new outfit or background'
+        : `Get ${n} new outfits or backgrounds`,
+    remaining: (n) =>
+      n === 1
+        ? '1 more outfit or background to go'
+        : `${n} more outfits or backgrounds to go`,
   },
   friend_invited: {
     adminLabel: 'Friends invited',
@@ -123,7 +126,8 @@ export function metricObjectiveLabel(
 const METRIC_HINT_COPY: Record<string, string> = {
   trade_completed:
     'In the Wardrobe, swap 4 outfits of the same rarity for 1 better one.',
-  skin_acquired: 'Buy an outfit in the Wardrobe shop, or open a gift box.',
+  skin_acquired:
+    'In the Wardrobe shop, buy an outfit or a background you like.',
   friend_invited:
     'Invite a friend from the Friends page — you both get a gift.',
   buddy_task_completed:
