@@ -375,14 +375,24 @@ export default function QuickAddSheet({
     return () => window.removeEventListener('resize', check);
   }, []);
 
-  // Desktop only: focus the task input when the sheet opens. On mobile this is
-  // skipped so the on-screen keyboard doesn't pop up unprompted.
+  // Focus the task input when the sheet opens, so typing can start straight
+  // away. Mobile waits out the slide-in first: focusing mid-animation raises
+  // the keyboard against a sheet that is still travelling.
   useEffect(() => {
-    if (!open || !isDesktop) return;
-    const id = window.setTimeout(() => {
-      inputRef.current?.focus();
-      inputRef.current?.select();
-    }, 60);
+    if (!open) return;
+    const id = window.setTimeout(
+      () => {
+        const el = inputRef.current;
+        if (!el) return;
+        el.focus();
+        // Selecting the lot is a desktop convention and easy to undo there. On
+        // a phone it would put one stray keystroke between the user and losing
+        // the text they came back to edit, so the caret goes to the end.
+        if (isDesktop) el.select();
+        else el.setSelectionRange(el.value.length, el.value.length);
+      },
+      isDesktop ? 60 : 420,
+    );
     return () => window.clearTimeout(id);
   }, [open, isDesktop]);
 
