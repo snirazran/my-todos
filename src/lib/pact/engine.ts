@@ -1,3 +1,4 @@
+import type { HydratedDocument } from 'mongoose';
 import { v4 as uuid } from 'uuid';
 import PactModel, { type PactDoc } from '@/lib/models/Pact';
 import PactConfigModel, {
@@ -554,6 +555,59 @@ export function planningWeekKey(
 export function isPickWindowOpen() {
   return true;
 }
+
+/**
+ * The pact the user is looking at right now. On the eve of a new week a
+ * commitment is written forward, so the running pact can sit under either key
+ * — the card resolves it this way and every route that acts on that card has
+ * to resolve it the same way, or it acts on a week that holds nothing.
+ */
+export async function findLivePact(args: {
+  userId: string;
+  timezone: string;
+  nowHour?: number;
+}): Promise<{
+  pact: HydratedDocument<PactDoc> | null;
+  weekKey: string;
+  currentWeek: string;
+  weekStartsOn: WeekStartDay;
+}> {
+  const { userId, timezone } = args;
+  const config = await ensurePactConfig();
+  const user = await UserModel.findById(userId)
+    .select('weekStartsOn')
+    .lean<{ weekStartsOn?: unknown } | null>();
+  const weekStartsOn = normalizeWeekStart(user?.weekStartsOn);
+  const todayKey = getZonedToday(timezone);
+  const currentWeek = weekKeyFor(todayKey, weekStartsOn);
+  const nowHour =
+    args.nowHour ??
+    Number(
+      new Intl.DateTimeFormat('en-GB', {
+        timeZone: timezone,
+        hour: '2-digit',
+        hour12: false,
+      }).format(new Date()),
+    );
+  const planningWeek = planningWeekKey(
+    todayKey,
+    weekStartsOn,
+    Number.isFinite(nowHour) ? nowHour : 0,
+    config.pickHour ?? 18,
+  );
+  const pact =
+    (await PactModel.findOne({ userId, weekKey: currentWeek })) ??
+    (planningWeek !== currentWeek
+      ? await PactModel.findOne({ userId, weekKey: planningWeek })
+      : null);
+  return {
+    pact,
+    weekKey: pact?.weekKey ?? currentWeek,
+    currentWeek,
+    weekStartsOn,
+  };
+}
+
 
 async function loadCategories() {
   return QuestCategoryModel.find({}).sort({ createdAt: 1 }).lean();

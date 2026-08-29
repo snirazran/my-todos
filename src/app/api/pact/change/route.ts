@@ -4,13 +4,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import PactModel from '@/lib/models/Pact';
-import UserModel from '@/lib/models/User';
 import { dropPact } from '@/lib/pact/drop';
 import { releasePactTasks } from '@/lib/pact/commit';
-import { getPactView, newPactId, weekKeyFor } from '@/lib/pact/engine';
+import { findLivePact, getPactView, newPactId } from '@/lib/pact/engine';
 import { notifyTaskChanged } from '@/lib/taskSync';
-import { getZonedToday } from '@/lib/utils';
-import { normalizeWeekStart } from '@/lib/weekStart';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
 
 export async function POST(req: NextRequest) {
@@ -27,14 +24,10 @@ export async function POST(req: NextRequest) {
     const action = body.action === 'skip' ? 'skip' : 'drop';
     await connectMongo();
 
-    const userDoc = await UserModel.findById(userId).select('weekStartsOn').lean();
-    const weekKey = weekKeyFor(
-      getZonedToday(timezone),
-      normalizeWeekStart((userDoc as { weekStartsOn?: unknown } | null)?.weekStartsOn),
-    );
+    const { pact: livePact, weekKey } = await findLivePact({ userId, timezone });
 
     if (action === 'skip') {
-      const live = await PactModel.findOne({ userId, weekKey });
+      const live = livePact;
       if (live && live.status !== 'skipped') {
         await releasePactTasks({ userId, pact: live });
         live.taskIds = [];
@@ -68,7 +61,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, view });
     }
 
-    const pact = await PactModel.findOne({ userId, weekKey });
+    const pact = livePact;
     if (!pact || pact.status === 'skipped') {
       return NextResponse.json({ error: 'No pact to change' }, { status: 400 });
     }

@@ -276,6 +276,7 @@ export function PactCard({
   const [claimingRetro, setClaimingRetro] = useState(false);
   const [confirmChange, setConfirmChange] = useState(false);
   const [changing, setChanging] = useState(false);
+  const [changeError, setChangeError] = useState<string | null>(null);
   const startHintGuide = useUIStore((state) => state.startHintGuide);
   const [deferredWeek, setDeferredWeek] = useState<string | null>(null);
   const wasLockedRef = useRef(false);
@@ -376,6 +377,7 @@ export function PactCard({
   const changeCommitment = async () => {
     if (changing) return;
     setChanging(true);
+    setChangeError(null);
     try {
       const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
       const res = await fetch('/api/pact/change', {
@@ -383,12 +385,17 @@ export function PactCard({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ timezone, action: 'drop' }),
       });
-      const payload = await res.json();
-      if (res.ok) {
-        mutate(payload.view, { revalidate: false });
-        setConfirmChange(false);
-        openPicker();
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setChangeError(payload.error || 'Could not swap your Leap');
+        void mutate();
+        return;
       }
+      mutate(payload.view, { revalidate: false });
+      setConfirmChange(false);
+      openPicker();
+    } catch {
+      setChangeError('Could not swap your Leap');
     } finally {
       setChanging(false);
     }
@@ -712,7 +719,10 @@ export function PactCard({
                 {!weekFinished && (
                   <PactHudButton
                     icon={ArrowLeftRight}
-                    onClick={() => setConfirmChange(true)}
+                    onClick={() => {
+                      setChangeError(null);
+                      setConfirmChange(true);
+                    }}
                     badge={
                       data.swapTokens > 0 ? badgeCount(data.swapTokens) : null
                     }
@@ -898,9 +908,13 @@ export function PactCard({
 
       <PactChangeSheet
         open={confirmChange}
-        onClose={() => setConfirmChange(false)}
+        onClose={() => {
+          setConfirmChange(false);
+          setChangeError(null);
+        }}
         view={data}
         changing={changing}
+        error={changeError}
         onConfirm={changeCommitment}
         onUpgrade={() => {
           setConfirmChange(false);

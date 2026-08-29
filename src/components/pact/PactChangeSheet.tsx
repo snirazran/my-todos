@@ -30,6 +30,7 @@ export function PactChangeSheet({
   onConfirm,
   onUpgrade,
   changing,
+  error,
 }: {
   open: boolean;
   onClose: () => void;
@@ -37,6 +38,7 @@ export function PactChangeSheet({
   onConfirm: () => void;
   onUpgrade: () => void;
   changing: boolean;
+  error?: string | null;
 }) {
   const [confirmed, setConfirmed] = useState(false);
   const titleId = useId();
@@ -158,6 +160,15 @@ export function PactChangeSheet({
               </li>
             ))}
           </ul>
+
+          {error && (
+            <p
+              role="alert"
+              className="mt-4 rounded-xl bg-destructive/10 px-3 py-2 text-[13px] font-bold leading-snug text-destructive"
+            >
+              {error}
+            </p>
+          )}
 
           <div className="mt-5 flex flex-col gap-1.5">
             <button

@@ -133,7 +133,6 @@ type HomeData = {
   trackables: Trackable[];
   catalog: Catalog;
   isPremium: boolean;
-  onboardingComplete: boolean | null;
 };
 
 let baseline: Set<string> | null = null;
@@ -201,10 +200,6 @@ async function fetchHome(): Promise<HomeData | null> {
         : [],
       catalog: (data?.claimablesRewardCatalog ?? {}) as Catalog,
       isPremium: !!data?.isPremium,
-      onboardingComplete:
-        typeof data?.onboarding?.complete === 'boolean'
-          ? data.onboarding.complete
-          : null,
     };
   } catch {
     return null;
@@ -225,7 +220,10 @@ export async function seedQuestClaims(): Promise<void> {
 }
 
 function syncLeapUnlock(data: HomeData): void {
-  if (data.onboardingComplete !== false) return;
+  const rosterRunning =
+    data.claimables.some((entry) => entry.placement === 'onboarding') ||
+    data.trackables.some((entry) => entry.placement === 'onboarding');
+  if (!rosterRunning) return;
   void mutate(pactViewKey());
 }
 

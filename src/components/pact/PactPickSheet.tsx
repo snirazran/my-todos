@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { mutate as swrMutate } from 'swr';
 import {
   ArrowLeft,
   Check,
@@ -21,6 +22,7 @@ import {
   PRIMARY_OPTIONS,
 } from '@/lib/pact/types';
 import { formatPactRate } from '@/lib/pact/format';
+import { pactViewKey } from '@/lib/pact/viewKey';
 import { useReducedMotion } from 'framer-motion';
 import { QuestRewardTileBadge } from '@/lib/questClaims';
 import { Icon } from '@/components/ui/Icon';
@@ -118,6 +120,17 @@ export function PactPickSheet({
   };
 
   const [step, setStep] = useState<Step>(view.introSeen ? 'area' : 'intro');
+  const introMarkedRef = useRef(false);
+  const markIntroSeen = () => {
+    if (introMarkedRef.current || view.introSeen) return;
+    introMarkedRef.current = true;
+    void swrMutate(
+      pactViewKey(),
+      (prev?: PactView) => (prev ? { ...prev, introSeen: true } : prev),
+      { revalidate: false },
+    );
+    void fetch('/api/pact', { method: 'PATCH' }).catch(() => {});
+  };
   const [areaId, setAreaId] = useState<string | null>(null);
   const [options, setOptions] = useState<PactOption[] | null>(null);
   const [optionId, setOptionId] = useState<string | null>(null);
@@ -153,13 +166,13 @@ export function PactPickSheet({
   // re-ran this effect and wiped the success screen back to the area grid the
   // instant the pact was saved.
   //
-  // The explainer is reached ONLY through the card's help button. Starting a
-  // first-timer on it made the primary action open a page of reading instead
-  // of the thing they tapped for; the card's own sub-line carries the
-  // one-line version, and `?` is there for anyone who wants the rest.
+  // The explainer runs once — on a first open, or whenever the card's `?` asks
+  // for it — and is marked seen the moment it is shown.
   useEffect(() => {
     if (!open) return;
-    setStep(forceIntro ? 'intro' : 'area');
+    const showIntro = forceIntro || !view.introSeen;
+    if (showIntro) markIntroSeen();
+    setStep(showIntro ? 'intro' : 'area');
     setAreaId(null);
     setOptions(null);
     setOptionId(null);
@@ -218,16 +231,9 @@ export function PactPickSheet({
     }
   };
 
-  // Still recorded even though nothing reads it to auto-open any more: the
-  // flag is what a future "first run" treatment would key off, and it costs
-  // one fire-and-forget PATCH.
-  const dismissIntro = async () => {
+  const dismissIntro = () => {
     setStep('area');
-    try {
-      await fetch('/api/pact', { method: 'PATCH' });
-    } catch {
-      // The intro is cosmetic — a failed write just shows it again next week.
-    }
+    markIntroSeen();
   };
 
   const commit = async () => {
