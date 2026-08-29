@@ -125,7 +125,11 @@ export function PactPickSheet({
   const [continueText, setContinueText] = useState('');
   const [days, setDays] = useState<number[]>(() => fitDays(PACT_DEFAULT_DAYS));
   const [startTime, setStartTime] = useState('19:00');
-  const [writingOwn, setWritingOwn] = useState(false);
+  // Your own words are where the step starts — the card is live and marked
+  // from the first frame, and the ideas below are the detour. The keyboard is
+  // not forced up with it: a sheet that opens onto a keyboard hides the very
+  // ideas someone with a blank mind came here for.
+  const [writingOwn, setWritingOwn] = useState(true);
   const [perDayTimes, setPerDayTimes] = useState(false);
   const [tagId, setTagId] = useState<string | null>(null);
   const [pickingTag, setPickingTag] = useState(false);
@@ -155,7 +159,7 @@ export function PactPickSheet({
     setAreaId(null);
     setOptions(null);
     setOptionId(null);
-    setWritingOwn(false);
+    setWritingOwn(true);
     setCustomText('');
     setContinueText('');
     setTagId(null);
@@ -192,7 +196,7 @@ export function PactPickSheet({
     setStep('commitment');
     setOptions(null);
     setOptionId(null);
-    setWritingOwn(false);
+    setWritingOwn(true);
     setLoading(true);
     setError(null);
     try {
@@ -605,16 +609,13 @@ export function PactPickSheet({
                         placeholder={customPlaceholder}
                         className="mt-2.5 h-11 w-full rounded-xl border border-border/60 bg-background px-3 text-[16px] font-bold text-foreground outline-none focus:border-primary"
                       />
-                      <div className="mt-2 flex items-start gap-2">
-                        <p className="min-w-0 flex-1 text-[12px] font-semibold text-muted-foreground">
-                          It becomes a task on every day you pick.
-                        </p>
-                        {customText.length > 0 && (
-                          <span className="shrink-0 text-[11px] font-bold tabular-nums text-muted-foreground">
+                      {customText.length > 0 && (
+                        <div className="mt-2 flex justify-end">
+                          <span className="text-[11px] font-bold tabular-nums text-muted-foreground">
                             {customText.length}/{CUSTOM_TEXT_MAX}
                           </span>
-                        )}
-                      </div>
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-3 pt-1">
