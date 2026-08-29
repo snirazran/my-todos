@@ -42,6 +42,8 @@ const FLY_PX = 40;
 const FLY_KEY = 'login-fly';
 const LOGIN_TONGUE_MS = 1040;
 const FLY_RESPAWN_DELAY_MS = 1500;
+const CATCH_SWALLOW_HOLD_MS = 320;
+const CATCH_BAILOUT_MS = 3200;
 
 type Step = 'enter' | 'email-sent';
 type FlyState = 'buzzing' | 'hidden' | 'entering';
@@ -60,6 +62,7 @@ function LoginPageInner() {
   const { user: authUser } = useAuth();
   const { showNotification } = useNotification();
   const navigatedRef = useRef(false);
+  const googleFlowRef = useRef(false);
   const isUpgrade = searchParams?.get('upgrade') === '1';
   const requestedNext = searchParams?.get('next');
   const postLoginRoute =
@@ -173,6 +176,33 @@ function LoginPageInner() {
     window.location.replace(route);
   };
 
+  const catchFlyThenNavigate = async (route: string) => {
+    if (!flyRefs.current[FLY_KEY]) {
+      navigateOnce(route);
+      return;
+    }
+    let settled = false;
+    const go = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(bailout);
+      navigateOnce(route);
+    };
+    const bailout = setTimeout(go, CATCH_BAILOUT_MS);
+    await triggerTongue({
+      key: FLY_KEY,
+      completed: false,
+      onPersist: () =>
+        new Promise<void>((resolve) => {
+          setTimeout(() => {
+            setFlyState('hidden');
+            go();
+            resolve();
+          }, CATCH_SWALLOW_HOLD_MS);
+        }),
+    });
+  };
+
   // Safety net: signInWithPopup's promise can hang in the opener even though
   // the sign-in succeeded (AuthContext still gets the user and the session
   // cookie). If a signed-in, non-anonymous user is somehow still parked on
@@ -180,7 +210,7 @@ function LoginPageInner() {
   useEffect(() => {
     if (!authUser || authUser.isAnonymous || navigatedRef.current) return;
     const timer = setTimeout(async () => {
-      if (navigatedRef.current) return;
+      if (navigatedRef.current || googleFlowRef.current) return;
       try {
         navigateOnce(await prepareSignedInRoute(postLoginRoute));
       } catch {
@@ -193,15 +223,15 @@ function LoginPageInner() {
 
   const handleGoogle = async () => {
     setLoading(true);
+    googleFlowRef.current = true;
     try {
       const current = auth.currentUser;
       const shouldLink = isUpgrade && current?.isAnonymous;
       await signInWithGoogle({ linkTo: shouldLink ? current : null });
       const route = await prepareSignedInRoute(postLoginRoute);
-      // The decorative tongue animation uses requestAnimationFrame, which can
-      // pause around a native Google popup. Never gate authentication on it.
-      navigateOnce(route);
+      await catchFlyThenNavigate(route);
     } catch (err: any) {
+      googleFlowRef.current = false;
       if (err instanceof GoogleAccountExistsError) {
         setConflict({ credential: err.credential });
       } else {
