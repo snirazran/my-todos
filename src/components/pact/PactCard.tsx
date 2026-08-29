@@ -19,8 +19,11 @@ import {
   HintButton,
   ObjectiveProgressBar,
   QuestRewardTileBadge,
+  primeQuestsPageCache,
+  refreshQuestHomeView,
 } from '@/lib/questClaims';
 import { useUIStore } from '@/lib/uiStore';
+import { pactViewKey } from '@/lib/pact/viewKey';
 import type { PactView, PactWeekResult } from '@/lib/pact/types';
 import { formatPactRate } from '@/lib/pact/format';
 import { PACT_DEFAULT_DAYS } from '@/lib/pact/types';
@@ -130,15 +133,6 @@ function useOwnsWeekResult() {
   }, []);
 
   return owns;
-}
-
-export function pactViewKey(timezone?: string) {
-  const tz =
-    timezone ??
-    (typeof window === 'undefined'
-      ? 'UTC'
-      : Intl.DateTimeFormat().resolvedOptions().timeZone);
-  return `/api/pact?timezone=${encodeURIComponent(tz)}`;
 }
 
 export function usePactView() {
@@ -284,6 +278,9 @@ export function PactCard({
   const [changing, setChanging] = useState(false);
   const startHintGuide = useUIStore((state) => state.startHintGuide);
   const [deferredWeek, setDeferredWeek] = useState<string | null>(null);
+  const wasLockedRef = useRef(false);
+  const [justUnlocked, setJustUnlocked] = useState(false);
+  const loaded = !!data;
   // Shown in the card's place right after deferring, so the escape hatch is
   // learned at the one moment the user is looking for it.
   const [justDeferred, setJustDeferred] = useState(false);
@@ -304,7 +301,22 @@ export function PactCard({
     return () => window.clearTimeout(timer);
   }, [justDeferred]);
 
-  if (!data || !data.enabled || data.needsAreas) return null;
+  const unlocked = !!data && data.enabled && !data.needsAreas;
+
+  useEffect(() => {
+    if (!loaded) return;
+    if (!unlocked) {
+      wasLockedRef.current = true;
+      return;
+    }
+    if (!wasLockedRef.current) return;
+    wasLockedRef.current = false;
+    setJustUnlocked(true);
+    const timer = window.setTimeout(() => setJustUnlocked(false), 600);
+    return () => window.clearTimeout(timer);
+  }, [loaded, unlocked]);
+
+  if (!unlocked || !data) return null;
 
   const openPicker = () => {
     setIntroOnly(false);
@@ -425,6 +437,7 @@ export function PactCard({
         className={cn(
           'mx-1.5 mb-2 w-[calc(100%-0.75rem)] md:mx-4 md:w-[calc(100%-2rem)]',
           hideCard && 'hidden',
+          justUnlocked && !hideCard && 'leap-card-in',
         )}
       >
         {/* Only ever an owed payout, never a pitch. The gold Plus banner sat
@@ -850,7 +863,11 @@ export function PactCard({
         }}
         view={data}
         forceIntro={introOnly}
-        onCommitted={(next) => mutate(next, { revalidate: false })}
+        onCommitted={(next) => {
+          mutate(next, { revalidate: false });
+          primeQuestsPageCache();
+          void refreshQuestHomeView();
+        }}
         onUpgrade={() => setPlusOpen(true)}
       />
 

@@ -13,6 +13,7 @@ import {
   type RevealCatalog,
 } from '@/components/ui/questRewardReveal';
 import { useDismissNotification } from '@/components/providers/NotificationProvider';
+import { pactViewKey } from '@/lib/pact/viewKey';
 
 const RewardTile = dynamic(
   () => import('@/components/ui/QuestCards').then((m) => m.RewardTile),
@@ -132,6 +133,7 @@ type HomeData = {
   trackables: Trackable[];
   catalog: Catalog;
   isPremium: boolean;
+  onboardingComplete: boolean | null;
 };
 
 let baseline: Set<string> | null = null;
@@ -199,6 +201,10 @@ async function fetchHome(): Promise<HomeData | null> {
         : [],
       catalog: (data?.claimablesRewardCatalog ?? {}) as Catalog,
       isPremium: !!data?.isPremium,
+      onboardingComplete:
+        typeof data?.onboarding?.complete === 'boolean'
+          ? data.onboarding.complete
+          : null,
     };
   } catch {
     return null;
@@ -218,6 +224,11 @@ export async function seedQuestClaims(): Promise<void> {
   }
 }
 
+function syncLeapUnlock(data: HomeData): void {
+  if (data.onboardingComplete !== false) return;
+  void mutate(pactViewKey());
+}
+
 // Silently re-sync the home-view cache and baselines after quest state
 // changed elsewhere (quests-page claims), so returning to the home strip
 // never flashes the stale pre-claim payload — and never toasts.
@@ -226,6 +237,7 @@ export async function refreshQuestHomeView(): Promise<void> {
   if (data) {
     observeClaimables(data.claimables);
     progressBaseline = toProgressMap(data.trackables);
+    syncLeapUnlock(data);
   }
 }
 

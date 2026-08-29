@@ -124,6 +124,10 @@ export function PactPickSheet({
   const [customText, setCustomText] = useState('');
   const [continueText, setContinueText] = useState('');
   const [days, setDays] = useState<number[]>(() => fitDays(PACT_DEFAULT_DAYS));
+  const [pastDayHint, setPastDayHint] = useState<{
+    text: string;
+    id: number;
+  } | null>(null);
   const [startTime, setStartTime] = useState('19:00');
   // Your own words are where the step starts — the card is live and marked
   // from the first frame, and the ideas below are the detour. The keyboard is
@@ -275,7 +279,14 @@ export function PactPickSheet({
   };
 
   const toggleDay = (day: number) => {
-    if (isPastDay(day)) return;
+    if (isPastDay(day)) {
+      setPastDayHint({
+        text: `${DAY_NAMES[day]} has passed \u2014 pick a day still ahead this week.`,
+        id: Date.now(),
+      });
+      return;
+    }
+    setPastDayHint(null);
     setDays((prev) =>
       prev.includes(day)
         ? prev.filter((d) => d !== day)
@@ -808,8 +819,12 @@ export function PactPickSheet({
                           key={day}
                           type="button"
                           onClick={() => toggleDay(day)}
-                          disabled={isPastDay(day)}
-                          aria-label={DAY_NAMES[day]}
+                          aria-disabled={isPastDay(day)}
+                          aria-label={
+                            isPastDay(day)
+                              ? `${DAY_NAMES[day]} \u2014 already passed`
+                              : DAY_NAMES[day]
+                          }
                           aria-pressed={days.includes(day)}
                           className={cn(
                             'h-10 flex-1 rounded-lg text-[13px] font-black transition',
@@ -824,6 +839,15 @@ export function PactPickSheet({
                         </button>
                       ))}
                     </div>
+                    {pastDayHint && (
+                      <p
+                        key={pastDayHint.id}
+                        role="status"
+                        className="leap-hint-in mt-2 text-[12px] font-semibold text-muted-foreground"
+                      >
+                        {pastDayHint.text}
+                      </p>
+                    )}
                   </div>
                   <div>
                     <div className="mb-2 flex items-center justify-between gap-2">

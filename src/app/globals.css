@@ -853,6 +853,43 @@ body.dragging {
   }
 }
 
+@keyframes leap-card-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+.leap-card-in {
+  animation: leap-card-in 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  will-change: transform, opacity;
+  transform-origin: 50% 0;
+}
+
+@keyframes leap-hint-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -4px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+.leap-hint-in {
+  animation: leap-hint-in 180ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .leap-card-in,
+  .leap-hint-in {
+    animation: none;
+  }
+}
+
 /* Auth entrance — login / welcome */
 @keyframes auth-rise {
   from {
