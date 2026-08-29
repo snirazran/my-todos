@@ -8,6 +8,7 @@ import {
   ensureDefaultBackground,
 } from '@/lib/backgrounds/defaults';
 import { notifyUserChanged } from '@/lib/taskSync';
+import { bumpQuestMetric } from '@/lib/quests/metrics';
 
 const json = (body: unknown, init = 200) =>
   NextResponse.json(body, { status: init });
@@ -51,11 +52,16 @@ export async function PUT(req: NextRequest) {
       update[`wardrobe.backgrounds.inventory.${DEFAULT_BACKGROUND_ID}`] = 1;
     }
 
+    const previousId = user.wardrobe?.backgrounds?.equipped ?? null;
+
     await UserModel.updateOne({ _id: user._id }, { $set: update });
     await notifyUserChanged(userId, {
       eventKind: 'background-equipped',
       backgroundId: targetId,
     });
+    if (targetId !== previousId) {
+      await bumpQuestMetric({ userId, metric: 'skin_equipped' });
+    }
     return json({ ok: true, equipped: targetId });
   } catch {
     return json({ error: 'Unauthorized' }, 401);

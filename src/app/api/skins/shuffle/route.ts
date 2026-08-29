@@ -277,13 +277,15 @@ export async function POST(req: NextRequest) {
 
     if (itemsShuffled) {
       await notifyUserChanged(userId, { eventKind: 'wardrobe-equipped' });
-      await bumpQuestMetric({ userId, metric: 'skin_equipped' });
     }
     if (backgroundId) {
       await notifyUserChanged(userId, {
         eventKind: 'background-equipped',
         backgroundId,
       });
+    }
+    if (itemsShuffled || backgroundId) {
+      await bumpQuestMetric({ userId, metric: 'skin_equipped' });
     }
 
     return json({ ok: true, shuffled: true, tryOn });

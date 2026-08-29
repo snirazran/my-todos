@@ -355,12 +355,12 @@ const GUIDES: Record<string, HintGuide> = {
   },
   'equip-skin': {
     id: 'equip-skin',
-    goal: 'Put an outfit on your frog',
+    goal: 'Give your frog a new look',
     beats: [
       {
         href: '/wardrobe',
         anchor: 'wardrobe-inventory-tab',
-        say: 'Tap an outfit you own to wear it',
+        say: 'Tap an outfit or background you own to put it on',
       },
     ],
   },

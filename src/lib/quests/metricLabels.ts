@@ -54,9 +54,13 @@ export const QUEST_METRIC_COPY: Record<string, MetricCopy> = {
     remaining: (n) => `${n} more ${n === 1 ? 'task' : 'tasks'} to save`,
   },
   skin_equipped: {
-    adminLabel: 'Skins equipped',
-    label: (n) => (n === 1 ? 'Equip an outfit' : `Equip ${n} outfits`),
-    remaining: (n) => `${n} more ${n === 1 ? 'outfit' : 'outfits'} to equip`,
+    adminLabel: 'Outfits or backgrounds equipped',
+    label: (n) =>
+      n === 1
+        ? 'Give your frog a new look'
+        : `Change your frog’s look ${n} times`,
+    remaining: (n) =>
+      n === 1 ? '1 more new look to go' : `${n} more new looks to go`,
   },
   focus_tag_linked: {
     adminLabel: 'Weekly Leaps started',
@@ -125,7 +129,8 @@ const METRIC_HINT_COPY: Record<string, string> = {
   buddy_task_completed:
     'Share a task with your buddy. It counts once you both tick it off.',
   task_saved_later: "Open a task's menu and move it to Saved Tasks.",
-  skin_equipped: 'Put an outfit on your frog in the Wardrobe.',
+  skin_equipped:
+    'In the Wardrobe, tap an outfit or a background you own to put it on.',
   focus_tag_linked:
     'Pick this week’s area on the Quests page and commit to one thing.',
   focus_started: 'Start the focus timer on any task. Any length counts.',
