@@ -147,9 +147,11 @@ export function useNudge(
 
   /**
    * Show now because the user just earned the moment, skipping the visit count
-   * and cooldown that pace an unprompted nudge. The ceilings that stop it being
-   * a pest — suppression, dismissals, total impressions — still apply, and the
-   * impression is recorded so the paced path picks up where this leaves off.
+   * and the cooldowns that pace an unprompted nudge — including the session's
+   * blocking-popup budget, which an admin campaign may already have spent. The
+   * ceilings that stop it being a pest — suppression, dismissals, total
+   * impressions — still apply, and the impression is recorded so the paced path
+   * picks up where this leaves off.
    */
   const present = useCallback(() => {
     if (!uid) return false;
@@ -158,7 +160,7 @@ export function useNudge(
     if (record.dismissals >= config.suppressAfterDismissals) return false;
     if (record.impressions >= config.maxImpressions) return false;
     if (sessionClaim && sessionClaim !== key) return false;
-    if (config.blocking && !claimBlockingSlot()) return false;
+    if (config.blocking && !claimBlockingSlot(true)) return false;
     sessionClaim = key;
     writeRecord(key, uid, {
       impressions: record.impressions + 1,

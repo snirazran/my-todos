@@ -45,7 +45,7 @@ type Store = {
   /** Report a tap on a button that stays open — a purchase or a claim. */
   reportClick: (elementId?: string) => void;
   flushPending: () => void;
-  claimBlockingSlot: () => boolean;
+  claimBlockingSlot: (earned?: boolean) => boolean;
 };
 
 const readLastBlockingAt = () => {
@@ -201,12 +201,14 @@ export const useCampaignStore = create<Store>((set, get) => ({
     set({ clickReported: true, lastClick: { id: campaign.id, at: Date.now() } });
   },
 
-  claimBlockingSlot: () => {
+  claimBlockingSlot: (earned = false) => {
     const state = get();
     if (state.active || state.pending) return false;
-    if (state.blockingShown >= MAX_BLOCKING_PER_SESSION) return false;
     if (state.busyReasons.length > 0) return false;
-    if (Date.now() - readLastBlockingAt() < CROSS_CAMPAIGN_COOLDOWN_MS) return false;
+    if (!earned) {
+      if (state.blockingShown >= MAX_BLOCKING_PER_SESSION) return false;
+      if (Date.now() - readLastBlockingAt() < CROSS_CAMPAIGN_COOLDOWN_MS) return false;
+    }
     set({ blockingShown: state.blockingShown + 1 });
     writeLastBlockingAt(Date.now());
     return true;
@@ -239,8 +241,8 @@ export const emitCampaignTrigger = (
  * in-product nudge and an admin campaign can never both interrupt the same
  * session.
  */
-export const claimBlockingSlot = () =>
-  useCampaignStore.getState().claimBlockingSlot();
+export const claimBlockingSlot = (earned = false) =>
+  useCampaignStore.getState().claimBlockingSlot(earned);
 
 /** Mark a surface as uninterruptible while it's open. */
 export const setCampaignBusy = (reason: string, busy: boolean) => {

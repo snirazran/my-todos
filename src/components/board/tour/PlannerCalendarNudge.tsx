@@ -6,18 +6,20 @@ import { useIntros } from '@/hooks/useIntros';
 import { useNudge } from '@/hooks/useNudge';
 import { useCalendarConnections } from '@/hooks/useCalendarSync';
 import CalendarConnectSheet from '@/components/ui/CalendarConnectSheet';
-import { TOUR_COMPLETED_EVENT } from '@/lib/tour/plannerTour';
+import { TOUR_ENDED_EVENT } from '@/lib/tour/plannerTour';
 
 /** Long enough for the gift overlay to clear the screen first. */
 const AFTER_TOUR_DELAY_MS = 1200;
+/** A skip has no gift to wait out, but still deserves a beat of quiet. */
+const AFTER_SKIP_DELAY_MS = 700;
 /** An unprompted ask waits until the board has settled. */
 const PACED_DELAY_MS = 1500;
 
 /**
  * The one moment the app asks for a calendar: straight after the planner tour,
  * where the user has just learned to move work between days and the offer is
- * "now let the days fill themselves". Skipping the tour earns no ask — those
- * users meet the paced path on a later visit instead.
+ * "now let the days fill themselves". A skip lands here too — the tour is off
+ * the screen either way, and this is the ask the first run was building to.
  */
 export default function PlannerCalendarNudge() {
   const { user } = useAuth();
@@ -30,10 +32,9 @@ export default function PlannerCalendarNudge() {
     !!user && loaded && anyProvider && connections.length === 0;
 
   // Whether the tour was already behind the user when this page mounted, frozen
-  // at first load. Finishing or skipping the tour flips the live flag straight
-  // away, and gating on that would arm the paced ask seconds after a skip —
-  // which reads as ignoring it. A skip is answered by waiting for a later
-  // visit; a completion gets its own immediate `present()` instead.
+  // at first load. Ending the tour flips the live flag straight away, and gating
+  // on that would arm the paced ask on top of the one the tour's own end is
+  // about to present.
   const [tourWasSeen, setTourWasSeen] = useState<boolean | null>(null);
   useEffect(() => {
     if (seenIntros && tourWasSeen === null) {
@@ -53,14 +54,19 @@ export default function PlannerCalendarNudge() {
 
   useEffect(() => {
     let timer = 0;
-    const onCompleted = () => {
-      timer = window.setTimeout(() => {
-        if (eligibleRef.current) presentRef.current();
-      }, AFTER_TOUR_DELAY_MS);
+    const onEnded = (event: Event) => {
+      const completed = !!(event as CustomEvent<{ completed?: boolean }>).detail
+        ?.completed;
+      timer = window.setTimeout(
+        () => {
+          if (eligibleRef.current) presentRef.current();
+        },
+        completed ? AFTER_TOUR_DELAY_MS : AFTER_SKIP_DELAY_MS,
+      );
     };
-    window.addEventListener(TOUR_COMPLETED_EVENT, onCompleted);
+    window.addEventListener(TOUR_ENDED_EVENT, onEnded);
     return () => {
-      window.removeEventListener(TOUR_COMPLETED_EVENT, onCompleted);
+      window.removeEventListener(TOUR_ENDED_EVENT, onEnded);
       window.clearTimeout(timer);
     };
   }, []);

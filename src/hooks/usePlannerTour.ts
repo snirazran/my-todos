@@ -6,7 +6,7 @@ import { useIntros } from '@/hooks/useIntros';
 import { INVENTORY_KEY, INVENTORY_SUMMARY_KEY } from '@/hooks/useInventory';
 import {
   TOUR_BEAT_COUNT,
-  TOUR_COMPLETED_EVENT,
+  TOUR_ENDED_EVENT,
   TOUR_CHAPTERS,
   TOUR_EVENT,
   TUTORIAL_CARD_HINT,
@@ -282,9 +282,9 @@ export function usePlannerTour({
       markIntroSeen('plannerTour');
       seededDateRef.current = null;
       void runClear(seededIdsRef.current).then(() => refreshRef.current());
-      // Only a played-through tour has earned the right to ask for anything
-      // else — a skip means the user wanted the board, not another card.
-      if (completed) window.dispatchEvent(new Event(TOUR_COMPLETED_EVENT));
+      window.dispatchEvent(
+        new CustomEvent(TOUR_ENDED_EVENT, { detail: { completed } }),
+      );
     },
     [markIntroSeen, runClear],
   );
