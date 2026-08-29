@@ -31,6 +31,8 @@ import { buildLeapLadder } from './leapLadder';
 import { PlusDoubleNote, PlusPill } from './PlusBits';
 import type { PactAreaChoice, PactOption, PactView } from '@/lib/pact/types';
 
+const CUSTOM_TEXT_MAX = 80;
+
 const DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -174,6 +176,17 @@ export function PactPickSheet({
   // place — same rows, same calendar event — instead of adding a second set.
   const continuing = !writingOwn && !!option?.continuePactId;
 
+  // Typing is the selection — a field you have to arm with a separate tap is a
+  // field people abandon. Switching in drops the idea that was picked, and its
+  // schedule with it: a repeat's days belong to its own sentence, not to a new
+  // one that happens to be typed over it.
+  const startWritingOwn = () => {
+    if (writingOwn) return;
+    setWritingOwn(true);
+    setOptionId(null);
+    setDays([]);
+  };
+
   const chooseArea = async (categoryId: string) => {
     setAreaId(categoryId);
     setStep('commitment');
@@ -217,7 +230,7 @@ export function PactPickSheet({
         ? continueText.trim()
         : (option?.text ?? '');
     if (!text) {
-      setError('Say what you’ll do');
+      setError('Write what you’ll do, or pick an idea below');
       return;
     }
     setSaving(true);
@@ -272,6 +285,16 @@ export function PactPickSheet({
       ? continueText.trim()
       : (option?.text ?? '');
   const visibleOptions = (options ?? []).slice(0, PRIMARY_OPTIONS);
+  // The shortest idea for this area, so the ghost text demonstrates the shape
+  // a good answer has — a verb and a size — in the reader's own subject rather
+  // than a generic walk that has nothing to do with what they just picked.
+  const customPlaceholder = useMemo(() => {
+    const fresh = visibleOptions
+      .filter((entry) => entry.source !== 'repeat')
+      .map((entry) => entry.text)
+      .sort((a, b) => a.length - b.length)[0];
+    return `e.g. ${fresh ?? '20-minute walk'}`;
+  }, [options]);
   // The intro grew a rail; on a short screen that pushed "Let's go" below the
   // fold, so the one action on the screen sat where nobody could see it.
   const hasFooter =
@@ -520,6 +543,9 @@ export function PactPickSheet({
                     <h2 className="text-[19px] font-black leading-tight text-foreground">
                       What will you do?
                     </h2>
+                    <p className="mt-0.5 text-[12.5px] font-bold text-muted-foreground">
+                      The clearer it is, the easier the Leap.
+                    </p>
                   </div>
                 </div>
 
@@ -531,6 +557,74 @@ export function PactPickSheet({
 
                 {!loading && options && (
                   <div className="flex flex-col gap-3">
+                    {/* Never gated, and never last. The pact is the one system
+                        where the user names their own goal, and goal-setting
+                        theory's difficulty effects are conditional on the goal
+                        being self-endorsed — charging for that, or burying it
+                        under a menu of ready-made answers, turns the whole
+                        mechanic into someone else's assignment. The field is
+                        open from the start: the ideas below are a fallback for
+                        a blank mind, not the default path. */}
+                    <div
+                      className={cn(
+                        'rounded-2xl border p-3.5 transition',
+                        writingOwn
+                          ? 'border-primary bg-primary/[0.07]'
+                          : 'border-border/60 bg-card/60',
+                      )}
+                    >
+                      <label
+                        htmlFor="pact-own-words"
+                        className="flex items-center gap-2 text-[15px] font-black text-foreground"
+                      >
+                        <Pencil
+                          className={cn(
+                            'h-[18px] w-[18px] shrink-0',
+                            writingOwn ? 'text-primary' : 'text-muted-foreground',
+                          )}
+                          strokeWidth={2.5}
+                        />
+                        In your own words
+                      </label>
+                      <input
+                        id="pact-own-words"
+                        value={customText}
+                        onFocus={() => {
+                          // Reading the field is not choosing it. A tap that
+                          // silently dropped a picked idea punished anyone who
+                          // opened the keyboard to see what was on offer;
+                          // typing is the commitment, and text already in the
+                          // box means the choice was made earlier.
+                          if (customText.trim()) startWritingOwn();
+                        }}
+                        onChange={(event) => {
+                          startWritingOwn();
+                          setCustomText(event.target.value);
+                        }}
+                        maxLength={CUSTOM_TEXT_MAX}
+                        placeholder={customPlaceholder}
+                        className="mt-2.5 h-11 w-full rounded-xl border border-border/60 bg-background px-3 text-[16px] font-bold text-foreground outline-none focus:border-primary"
+                      />
+                      <div className="mt-2 flex items-start gap-2">
+                        <p className="min-w-0 flex-1 text-[12px] font-semibold text-muted-foreground">
+                          It becomes a task on every day you pick.
+                        </p>
+                        {customText.length > 0 && (
+                          <span className="shrink-0 text-[11px] font-bold tabular-nums text-muted-foreground">
+                            {customText.length}/{CUSTOM_TEXT_MAX}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 pt-1">
+                      <span className="h-px flex-1 bg-border/70" />
+                      <span className="text-[11.5px] font-black uppercase tracking-wide text-muted-foreground">
+                        Or start from an idea
+                      </span>
+                      <span className="h-px flex-1 bg-border/70" />
+                    </div>
+
                     {visibleOptions.map((entry) => {
                       const selected = !writingOwn && optionId === entry.id;
                       return (
@@ -574,59 +668,42 @@ export function PactPickSheet({
                               </span>
                             )}
                           </span>
-                          {selected && (
+                          {selected ? (
                             <Check
                               className="h-5 w-5 shrink-0 text-primary"
                               strokeWidth={3}
+                            />
+                          ) : (
+                            <span
+                              aria-hidden="true"
+                              className="h-5 w-5 shrink-0 rounded-full border-2 border-border"
                             />
                           )}
                         </button>
                       );
                     })}
 
-                    {/* Never gated. The pact is the one system where the user
-                        names their own goal, and goal-setting theory's
-                        difficulty effects are conditional on the goal being
-                        self-endorsed — charging for that turns the whole
-                        mechanic into someone else's assignment. */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setWritingOwn(true);
-                        setOptionId(null);
-                      }}
-                      className={cn(
-                        'flex items-center gap-2.5 rounded-2xl border border-dashed px-3.5 py-3 text-left transition',
-                        writingOwn
-                          ? 'border-primary bg-primary/[0.07]'
-                          : 'border-border/70 hover:border-primary/40',
-                      )}
-                    >
-                      <Pencil
-                        className="h-[18px] w-[18px] shrink-0 text-muted-foreground"
-                        strokeWidth={2.5}
-                      />
-                      <span className="min-w-0 flex-1 text-[15px] font-black text-foreground">
-                        Write my own
-                      </span>
-                    </button>
-
-                    {writingOwn && (
-                      <div className="rounded-2xl border border-border/60 bg-card/60 p-3.5">
-                        <input
-                          value={customText}
-                          onChange={(event) =>
-                            setCustomText(event.target.value)
-                          }
-                          maxLength={80}
-                          placeholder="e.g. 20-minute walk"
-                          autoFocus
-                          className="h-11 w-full rounded-xl border border-border/60 bg-background px-3 text-[16px] font-bold text-foreground outline-none focus:border-primary"
-                        />
-                        <p className="mt-2 text-[12px] font-semibold text-muted-foreground">
-                          Describe one day of it. Days and time come next.
-                        </p>
-                      </div>
+                    {/* A picked idea is still the user's sentence to keep or
+                        change — the words that end up on the task should be
+                        the ones they endorse, and re-typing a suggestion by
+                        hand to adjust it is the kind of friction that makes
+                        people take the canned answer instead. */}
+                    {!writingOwn && option && !option.continuePactId && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCustomText(option.text.slice(0, CUSTOM_TEXT_MAX));
+                          startWritingOwn();
+                          window.requestAnimationFrame(() => {
+                            document
+                              .getElementById('pact-own-words')
+                              ?.focus();
+                          });
+                        }}
+                        className="self-start text-[12.5px] font-black text-primary underline underline-offset-2"
+                      >
+                        Reword this one
+                      </button>
                     )}
                   </div>
                 )}
@@ -1008,7 +1085,7 @@ export function PactPickSheet({
                   onClick={() => setStep('confirm')}
                   className="h-12 w-full rounded-2xl bg-[#4f9149] text-[15px] font-black text-white shadow-[0_4px_0_0_#34631f] ring-1 ring-[#34631f]/40 transition-transform active:translate-y-[2px] active:shadow-none disabled:opacity-50 disabled:shadow-none"
                 >
-                  Continue
+                  Choose days &amp; time
                 </button>
               ) : (
                 <button
