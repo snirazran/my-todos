@@ -12,6 +12,7 @@ import { useRegisterOpenSheet } from '@/lib/sheetStore';
 import { hapticCelebrate, hapticImpact } from '@/lib/haptics';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { useSettled } from '@/hooks/useSettled';
 import {
   useLoginStreak,
   patchStreakView,
@@ -171,10 +172,16 @@ function PledgeRewardTiles({
   rewards,
   rewardCatalog,
   isPremium,
+  hydrateDelayMs = 0,
+  paused = false,
 }: {
   rewards: LoginStreakReward[];
   rewardCatalog: Record<string, QuestRewardCatalogItem>;
   isPremium: boolean;
+  /** Staggered so four tiers' worth of artwork never parses in one frame. */
+  hydrateDelayMs?: number;
+  /** Only the selected tier animates; the rest hold a still frame. */
+  paused?: boolean;
 }) {
   const itemRewards = rewards.filter(
     (reward) =>
@@ -200,6 +207,8 @@ function PledgeRewardTiles({
           compact
           className="h-11 w-11 rounded-xl"
           flySize={30}
+          hydrateDelayMs={hydrateDelayMs + index * 90}
+          paused={paused}
           giftAnimation={index === 0 ? 'box_shake' : undefined}
         />
       ),
@@ -536,6 +545,7 @@ function CommitStep({
 }) {
   const reduceMotion = useReducedMotion();
   const [busyDays, setBusyDays] = useState<number | null>(null);
+  const settled = useSettled();
   const [selectedDays, setSelectedDays] = useState<number | null>(null);
   // `nextTierDays` is the rung above the longest pledge ever kept, so on a first
   // pledge it is simply the lowest rung — badging that says nothing the
@@ -597,13 +607,16 @@ function CommitStep({
 
   return (
     <div className="flex flex-col flex-1 min-h-0 bg-background">
-      <div className="no-scrollbar min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-3 pb-4 pt-[calc(env(safe-area-inset-top)+3.5rem)] sm:px-6 short-screen:pt-[calc(0.75rem+env(safe-area-inset-top))] md:px-8 md:pt-9">
+      <div
+        className="no-scrollbar min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-3 pb-4 pt-[calc(env(safe-area-inset-top)+3.5rem)] sm:px-6 short-screen:pt-[calc(0.75rem+env(safe-area-inset-top))] md:px-8 md:pt-9"
+        style={{ contain: 'paint' }}
+      >
         <div className="flex flex-col items-center w-full max-w-sm mx-auto md:max-w-xl">
           <motion.div
             initial={reduceMotion ? false : { scale: 0.7, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-            className="grid w-20 h-20 rounded-full shrink-0 place-items-center bg-amber-100 dark:bg-amber-500/15 short-screen:h-14 short-screen:w-14"
+            className="grid w-20 h-20 rounded-full shrink-0 place-items-center bg-amber-100 will-change-transform dark:bg-amber-500/15 short-screen:h-14 short-screen:w-14"
             aria-hidden="true"
           >
             <Trophy className="w-10 h-10 text-amber-500 short-screen:h-7 short-screen:w-7" />
@@ -636,14 +649,16 @@ function CommitStep({
                 return (
                   <motion.div
                     key={tier.days}
-                    initial={reduceMotion ? false : { opacity: 0, y: 20 }}
+                    initial={reduceMotion ? false : { opacity: 0, y: 14 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{
-                      delay: 0.08 * i,
                       type: 'spring',
-                      stiffness: 300,
-                      damping: 24,
+                      stiffness: 400,
+                      damping: 30,
+                      mass: 0.7,
+                      delay: i * 0.045,
                     }}
+                    className="will-change-transform"
                   >
                     <label className="block cursor-pointer">
                       <input
@@ -704,11 +719,24 @@ function CommitStep({
                             id={rewardId}
                             className="mt-0.5 flex min-w-0 flex-wrap items-center gap-1 text-[11px] font-bold text-muted-foreground sm:text-xs"
                           >
-                            <PledgeRewardTiles
-                              rewards={tier.rewards}
-                              rewardCatalog={rewardCatalog}
-                              isPremium={isPremium}
-                            />
+                            {settled ? (
+                              <motion.span
+                                initial={reduceMotion ? false : { opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                transition={{ duration: 0.2, ease: 'easeOut' }}
+                                className="flex min-w-0 flex-1 items-center"
+                              >
+                                <PledgeRewardTiles
+                                  rewards={tier.rewards}
+                                  rewardCatalog={rewardCatalog}
+                                  isPremium={isPremium}
+                                  hydrateDelayMs={i * 90}
+                                  paused={!selected}
+                                />
+                              </motion.span>
+                            ) : (
+                              <span aria-hidden className="block h-11" />
+                            )}
                             {tier.payoutPercent < 100 && (
                               <span className="text-muted-foreground/70">
                                 · repeat rung, step up for full price
@@ -1084,7 +1112,7 @@ export function StreakSheet({
                 exit={{ opacity: 0, x: -60 }}
                 transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
                 onClick={(event) => event.stopPropagation()}
-                className="relative mx-auto flex h-full w-full flex-col overflow-hidden md:h-auto md:max-h-[min(40rem,calc(100dvh-3rem))] md:w-[min(100%,40rem)] md:rounded-[32px] md:shadow-2xl"
+                className="relative mx-auto flex h-full w-full transform-gpu flex-col overflow-hidden will-change-transform [backface-visibility:hidden] md:h-auto md:max-h-[min(40rem,calc(100dvh-3rem))] md:w-[min(100%,40rem)] md:rounded-[32px] md:shadow-2xl"
               >
                 {(step === 'home' || step === 'commit') && (
                   <button

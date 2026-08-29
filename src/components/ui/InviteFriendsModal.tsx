@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AppImage } from '@/components/ui/AppImage';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { useSettled } from '@/hooks/useSettled';
 import {
   Check,
   Gift,
@@ -242,20 +243,6 @@ export function InviteFriendsModal({
     </AnimatePresence>,
     document.body,
   );
-}
-
-/**
- * True once the step's entrance is over. Each frog preview costs a short-lived
- * Rive instance in the stamp engine, and six of them queued against a running
- * transition is what the drop in frame rate was.
- */
-function useSettled(delayMs = 220) {
-  const [settled, setSettled] = useState(false);
-  useEffect(() => {
-    const timer = window.setTimeout(() => setSettled(true), delayMs);
-    return () => window.clearTimeout(timer);
-  }, [delayMs]);
-  return settled;
 }
 
 function StepShell({ children }: { children: React.ReactNode }) {

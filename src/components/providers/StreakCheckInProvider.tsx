@@ -50,7 +50,11 @@ const EXCLUDED_PREFIXES = [
  * ends up inert. `dropAfterMs` gives up instead of waiting forever, for
  * interruptions that are only worth making right now.
  */
-function whenScreenIsFree(show: () => void, dropAfterMs?: number) {
+function whenScreenIsFree(
+  show: () => void,
+  dropAfterMs?: number,
+  initialDelayMs = 900,
+) {
   const deadline =
     dropAfterMs === undefined ? Infinity : Date.now() + dropAfterMs;
   const tryOpen = () => {
@@ -64,7 +68,14 @@ function whenScreenIsFree(show: () => void, dropAfterMs?: number) {
     if (Date.now() > deadline) return;
     window.setTimeout(tryOpen, 600);
   };
-  window.setTimeout(tryOpen, 900);
+  if (initialDelayMs <= 0) {
+    // The streak reveal is the payoff for the check-in that just happened, so
+    // it opens on the first free frame instead of landing a beat after the
+    // page it is interrupting. The busy check still keeps it off cinematics.
+    requestAnimationFrame(tryOpen);
+    return;
+  }
+  window.setTimeout(tryOpen, initialDelayMs);
 }
 
 /**
@@ -144,17 +155,21 @@ export function StreakCheckInProvider() {
         offer.adEligible &&
         offer.adsWatched < Math.max(1, offer.adsRequired);
       if (offer && canRescue) {
-        whenScreenIsFree(() => openStreakSheet({ rescue: offer }));
+        whenScreenIsFree(() => openStreakSheet({ rescue: offer }), undefined, 0);
       } else if (result.shieldOffer) {
         queueShieldOffer(result.shieldOffer);
       } else if (result.extended) {
-        whenScreenIsFree(() => openStreakSheet({ celebration: result }));
+        whenScreenIsFree(
+          () => openStreakSheet({ celebration: result }),
+          undefined,
+          0,
+        );
       } else if (!result.view?.goal && takePledgeInvite()) {
         // A pledge is only ever offered, never auto-enrolled — but the offer
         // used to ride on `extended`, and a new account's first check-in is
         // consumed by the onboarding prewarm. That left day one with no invite
         // at all, which is the one day it matters most.
-        whenScreenIsFree(() => openStreakSheet({ commit: true }));
+        whenScreenIsFree(() => openStreakSheet({ commit: true }), undefined, 0);
       }
       if (result.extended) {
         emitCampaignTrigger('streak_milestone', {

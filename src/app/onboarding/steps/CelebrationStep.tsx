@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import { hapticCelebrate } from '@/lib/haptics';
+import { preloadRiveAsset, warmRiveRuntime } from '@/lib/riveLoader';
 
 const Frog = dynamic(() => import('@/components/ui/frog'), { ssr: false });
 
@@ -45,6 +46,11 @@ export default function CelebrationStep({ frogName, humanName }: Props) {
     }, 450);
     hapticCelebrate();
     return () => clearTimeout(encore);
+  }, []);
+
+  useEffect(() => {
+    warmRiveRuntime();
+    void preloadRiveAsset('/idle_gift.riv');
   }, []);
 
   return (

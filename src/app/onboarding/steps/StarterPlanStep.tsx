@@ -258,7 +258,7 @@ export default function StarterPlanStep({
       >
         <div className="flex w-full flex-col gap-2 pb-2 md:mx-auto md:max-w-md">
           {!isLoading && checked !== null && baseEarliest && (
-            <div className="rounded-xl border border-border/60 bg-card px-3.5 py-3 shadow-[0_1px_2px_rgba(0,0,0,0.10)] dark:bg-muted">
+            <div className="rounded-xl border border-border/60 bg-card px-3.5 py-2 shadow-[0_1px_2px_rgba(0,0,0,0.10)] dark:bg-muted">
               <div className="flex items-baseline justify-between gap-2">
                 <span className="text-[13px] font-black tracking-wide text-muted-foreground">
                   My day starts at
@@ -268,66 +268,67 @@ export default function StarterPlanStep({
                   initial={{ opacity: 0.4, y: -3 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.15 }}
-                  className="text-lg font-black tabular-nums tracking-tight text-primary"
+                  className="text-base font-black tabular-nums tracking-tight text-primary"
                 >
                   {starterTimeLabel(starterMinutesToTime(sliderMinutes))}
                 </motion.span>
               </div>
 
-              <div
-                role="slider"
-                tabIndex={saving ? -1 : 0}
-                aria-label="My day starts at"
-                aria-valuemin={STARTER_DAY_START_MIN_MINUTES}
-                aria-valuemax={STARTER_DAY_START_MAX_MINUTES}
-                aria-valuenow={sliderMinutes}
-                aria-valuetext={starterTimeLabel(starterMinutesToTime(sliderMinutes))}
-                aria-disabled={saving || undefined}
-                onPointerDown={handleSliderPointerDown}
-                onPointerMove={handleSliderPointerMove}
-                onPointerUp={endSliderDrag}
-                onPointerCancel={endSliderDrag}
-                onKeyDown={handleSliderKeyDown}
-                className={cn(
-                  'mt-1.5 touch-none select-none py-2.5 outline-none',
-                  saving ? 'cursor-not-allowed opacity-70' : 'cursor-grab',
-                  dragging && 'cursor-grabbing',
-                )}
-              >
-                <div ref={trackRef} className="relative h-2.5 rounded-full bg-muted">
-                  <span
-                    aria-hidden
-                    className="absolute inset-y-0 left-0 rounded-full bg-primary"
-                    style={{ width: `${sliderPercent}%` }}
-                  />
-                  <span
-                    aria-hidden
-                    className="absolute top-1/2 -ml-3.5 -mt-3.5 block h-7 w-7"
-                    style={{ left: `${sliderPercent}%` }}
-                  >
-                    <motion.span
-                      animate={{ scale: dragging ? 1.15 : 1 }}
-                      transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                      className={cn(
-                        'grid h-full w-full place-items-center rounded-full border-[3px] border-primary bg-background shadow-md transition-shadow',
-                        dragging && 'shadow-lg ring-4 ring-primary/20',
-                      )}
+              <div className="flex items-center gap-2">
+                <Moon
+                  aria-hidden
+                  className="h-3.5 w-3.5 shrink-0 text-muted-foreground/50"
+                />
+                <div
+                  role="slider"
+                  tabIndex={saving ? -1 : 0}
+                  aria-label="My day starts at"
+                  aria-valuemin={STARTER_DAY_START_MIN_MINUTES}
+                  aria-valuemax={STARTER_DAY_START_MAX_MINUTES}
+                  aria-valuenow={sliderMinutes}
+                  aria-valuetext={starterTimeLabel(
+                    starterMinutesToTime(sliderMinutes),
+                  )}
+                  aria-disabled={saving || undefined}
+                  onPointerDown={handleSliderPointerDown}
+                  onPointerMove={handleSliderPointerMove}
+                  onPointerUp={endSliderDrag}
+                  onPointerCancel={endSliderDrag}
+                  onKeyDown={handleSliderKeyDown}
+                  className={cn(
+                    'flex-1 touch-none select-none py-2 outline-none',
+                    saving ? 'cursor-not-allowed opacity-70' : 'cursor-grab',
+                    dragging && 'cursor-grabbing',
+                  )}
+                >
+                  <div ref={trackRef} className="relative h-2 rounded-full bg-muted">
+                    <span
+                      aria-hidden
+                      className="absolute inset-y-0 left-0 rounded-full bg-primary"
+                      style={{ width: `${sliderPercent}%` }}
+                    />
+                    <span
+                      aria-hidden
+                      className="absolute top-1/2 -ml-3 -mt-3 block h-6 w-6"
+                      style={{ left: `${sliderPercent}%` }}
                     >
-                      <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-                    </motion.span>
-                  </span>
+                      <motion.span
+                        animate={{ scale: dragging ? 1.15 : 1 }}
+                        transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                        className={cn(
+                          'grid h-full w-full place-items-center rounded-full border-[3px] border-primary bg-background shadow-md transition-shadow',
+                          dragging && 'shadow-lg ring-4 ring-primary/20',
+                        )}
+                      >
+                        <span className="h-1 w-1 rounded-full bg-primary" />
+                      </motion.span>
+                    </span>
+                  </div>
                 </div>
-              </div>
-
-              <div className="mt-0.5 flex items-center justify-between text-[11px] font-bold tracking-wide text-muted-foreground/70">
-                <span className="flex items-center gap-1">
-                  <Moon className="h-3 w-3" />
-                  {starterTimeLabel(starterMinutesToTime(STARTER_DAY_START_MIN_MINUTES))}
-                </span>
-                <span className="flex items-center gap-1">
-                  {starterTimeLabel(starterMinutesToTime(STARTER_DAY_START_MAX_MINUTES))}
-                  <Sun className="h-3 w-3" />
-                </span>
+                <Sun
+                  aria-hidden
+                  className="h-3.5 w-3.5 shrink-0 text-muted-foreground/50"
+                />
               </div>
             </div>
           )}
