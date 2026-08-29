@@ -1249,11 +1249,11 @@ export default function HomeDashboard() {
         isPremium={!!questsData?.isPremium}
         indices={indices}
         onAcknowledge={async () => {
-          // Optimistic clear handled in hook? No, exposure should be in hook if commonly used,
-          // but here we can just do manual fetch or add 'acknowledgeHunger' to hook.
-          // For now, manual fetch + mutate.
-          await fetch('/api/hunger/acknowledge', { method: 'POST' });
-          mutateToday();
+          const res = await fetch('/api/hunger/acknowledge', {
+            method: 'POST',
+          });
+          if (!res.ok) throw new Error('Hunger acknowledge failed');
+          await mutateToday();
         }}
         onRecover={async () => {
           const res = await fetch('/api/hunger/recover', { method: 'POST' });

@@ -1,18 +1,21 @@
 'use client';
 
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import useSWR from 'swr';
+import useSWR, { mutate } from 'swr';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Loader2 } from 'lucide-react';
 import { useUIStore } from '@/lib/uiStore';
 import { useSheetStore } from '@/lib/sheetStore';
 import { useAuth } from '@/components/auth/AuthContext';
 import { hapticTick } from '@/lib/haptics';
 import {
   emitCampaignTrigger,
+  markCampaignConverted,
   setCampaignBusy,
   useCampaignStore,
 } from '@/lib/campaigns/orchestrator';
+import type { FlyPackId } from '@/lib/flyPacks';
 import {
   isBlockingTemplate,
   type CampaignElement,
@@ -31,6 +34,10 @@ const platformHint = () =>
     ?.getPlatform?.() ?? 'web';
 
 const LAST_VISIT_KEY = 'frogress.campaigns.lastVisit';
+
+/** Actions that own their own closing, because they can still fail or be
+ *  cancelled after the tap. */
+const DEFERS_CLOSE: CtaAction[] = ['buy_pack', 'buy_product', 'claim_reward'];
 
 const daysSinceLastVisit = () => {
   try {
@@ -62,6 +69,7 @@ export function CampaignHost() {
   const active = useCampaignStore((s) => s.active);
   const setCampaigns = useCampaignStore((s) => s.setCampaigns);
   const close = useCampaignStore((s) => s.close);
+  const reportClick = useCampaignStore((s) => s.reportClick);
   const flushPending = useCampaignStore((s) => s.flushPending);
   const busyReasons = useCampaignStore((s) => s.busyReasons);
   const pending = useCampaignStore((s) => s.pending);
@@ -75,6 +83,15 @@ export function CampaignHost() {
   const isCinematicActive = useUIStore((s) => s.isCinematicActive);
   const activeHint = useUIStore((s) => s.activeHint);
   const openSheets = useSheetStore((s) => s.count);
+
+  const [buying, setBuying] = useState(false);
+  const [purchaseError, setPurchaseError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!purchaseError) return;
+    const timer = window.setTimeout(() => setPurchaseError(null), 4000);
+    return () => window.clearTimeout(timer);
+  }, [purchaseError]);
 
   const { data } = useSWR<{ campaigns: CampaignPayload[] }>(
     user ? `/api/campaigns?platform=${platformHint()}` : null,
@@ -124,10 +141,97 @@ export function CampaignHost() {
     if (pending && busyReasons.length === 0) flushPending();
   }, [pending, busyReasons, flushPending]);
 
+  /**
+   * A purchase raised from the popup itself. The store's own sheet is the only
+   * confirmation step, so the popup stays up behind it: closing first would
+   * leave someone who cancels staring at the screen they were trying to leave,
+   * with no way back to the offer.
+   */
+  const runDirectPurchase = useCallback(
+    async (
+      kind: 'pack' | 'product',
+      options: {
+        packId?: string;
+        productId?: string;
+        elementId?: string;
+        campaignId: string;
+      },
+    ) => {
+      const id = kind === 'pack' ? options.packId : options.productId;
+      if (!id) return;
+      reportClick(options.elementId);
+      setBuying(true);
+      try {
+        const { purchaseFlyPack, purchaseStoreProduct } = await import('@/lib/purchases');
+        const outcome =
+          kind === 'pack'
+            ? await purchaseFlyPack(id as FlyPackId)
+            : await purchaseStoreProduct(id, `campaign:${options.campaignId}`);
+
+        if (outcome === 'purchased') {
+          markCampaignConverted(options.campaignId);
+          close('click');
+          // Flies land through the store webhook, so the shop is where the new
+          // balance actually appears — and where a "still processing" state is
+          // already handled.
+          if (kind === 'pack') openFlyShop(undefined, id);
+          emitCampaignTrigger('purchase_completed');
+        }
+      } catch (error) {
+        setPurchaseError(
+          error instanceof Error && /does not offer|No web package/.test(error.message)
+            ? 'That offer is not available on this device.'
+            : 'The purchase could not be started.',
+        );
+      } finally {
+        setBuying(false);
+      }
+    },
+    [close, openFlyShop, reportClick],
+  );
+
+  /**
+   * The grant itself is the server's decision; this only reports which button
+   * was pressed. A failure leaves the popup open so the user can try again.
+   */
+  const runClaim = useCallback(
+    async (campaignId: string, elementId?: string) => {
+      reportClick(elementId);
+      setBuying(true);
+      try {
+        const res = await fetch('/api/campaigns/claim', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ campaignId, elementId }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setPurchaseError(data.error ?? 'That reward could not be collected.');
+          return;
+        }
+        markCampaignConverted(campaignId);
+        close('click', elementId);
+        void mutate(() => true, undefined, { revalidate: true });
+      } catch {
+        setPurchaseError('That reward could not be collected.');
+      } finally {
+        setBuying(false);
+      }
+    },
+    [close, reportClick],
+  );
+
   const runAction = useCallback(
     (
       action: CtaAction,
-      options: { path?: string; packId?: string; campaignId: string },
+      options: {
+        path?: string;
+        packId?: string;
+        productId?: string;
+        elementId?: string;
+        campaignId: string;
+      },
     ) => {
       switch (action) {
         case 'open_fly_shop':
@@ -139,6 +243,15 @@ export function CampaignHost() {
         case 'open_premium':
           setPremiumModalOpen(true, `campaign:${options.campaignId}`);
           break;
+        case 'buy_pack':
+          void runDirectPurchase('pack', options);
+          break;
+        case 'buy_product':
+          void runDirectPurchase('product', options);
+          break;
+        case 'claim_reward':
+          void runClaim(options.campaignId, options.elementId);
+          break;
         case 'navigate':
           if (options.path) router.push(options.path);
           break;
@@ -146,17 +259,20 @@ export function CampaignHost() {
           break;
       }
     },
-    [openFlyShop, openWardrobe, router, setPremiumModalOpen],
+    [openFlyShop, openWardrobe, router, runClaim, runDirectPurchase, setPremiumModalOpen],
   );
 
   const runCta = useCallback(() => {
     const campaign = useCampaignStore.getState().active;
     if (!campaign) return;
     hapticTick();
-    close('click');
+    // A purchase or a claim closes itself once it has actually succeeded, so
+    // closing here would hide the popup behind a sheet the user may cancel.
+    if (!DEFERS_CLOSE.includes(campaign.cta.action)) close('click');
     runAction(campaign.cta.action, {
       path: campaign.cta.path,
       packId: campaign.offer.packId,
+      productId: campaign.cta.productId || campaign.offer.productId,
       campaignId: campaign.id,
     });
   }, [close, runAction]);
@@ -175,10 +291,12 @@ export function CampaignHost() {
         close('dismiss', element.id);
         return;
       }
-      close('click', element.id);
+      if (!DEFERS_CLOSE.includes(action)) close('click', element.id);
       runAction(action, {
         path: element.path || campaign.cta.path,
         packId: element.packId || campaign.offer.packId,
+        productId: element.productId || campaign.offer.productId,
+        elementId: element.id,
         campaignId: campaign.id,
       });
     },
@@ -200,10 +318,11 @@ export function CampaignHost() {
       if (!resolved) return;
 
       hapticTick();
-      if (resolved.closes) close('click');
+      if (resolved.closes && !DEFERS_CLOSE.includes(resolved.action)) close('click');
       runAction(resolved.action, {
         path: resolved.path,
         packId: resolved.packId,
+        productId: resolved.productId,
         campaignId: campaign.id,
       });
     },
@@ -212,35 +331,63 @@ export function CampaignHost() {
 
   if (!active) return null;
 
-  const dismiss = () => close('dismiss');
+  // A tap that opened a payment sheet must not be tappable again behind it,
+  // and a claim in flight must not be claimable twice.
+  const dismiss = () => {
+    if (buying) return;
+    close('dismiss');
+  };
+
+  const status = (
+    <>
+      {buying ? (
+        <div className="fixed inset-0 z-[1800] flex items-center justify-center bg-black/30">
+          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-popover shadow-xl">
+            <Loader2 className="h-5 w-5 animate-spin text-foreground" />
+          </span>
+        </div>
+      ) : null}
+      {purchaseError ? (
+        <div className="pointer-events-none fixed inset-x-4 bottom-[calc(env(safe-area-inset-bottom)+6rem)] z-[1850] mx-auto max-w-sm rounded-2xl bg-foreground px-4 py-3 text-center text-xs font-black text-background shadow-xl">
+          {purchaseError}
+        </div>
+      ) : null}
+    </>
+  );
 
   if (!isBlockingTemplate(active.template)) {
     return (
-      <AnimatePresence>
-        <motion.div
-          initial={{ y: 80, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          exit={{ y: 80, opacity: 0 }}
-          transition={{ type: 'tween', duration: 0.3, ease: [0.32, 0.72, 0, 1] }}
-          className="fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] z-[1400] mx-auto max-w-md"
-        >
-          <NudgeBannerCard
-            campaign={active}
-            onCta={runCta}
-            onDismiss={dismiss}
-            onSignal={runSignal}
-          />
-        </motion.div>
-      </AnimatePresence>
+      <>
+        <AnimatePresence>
+          <motion.div
+            initial={{ y: 80, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 80, opacity: 0 }}
+            transition={{ type: 'tween', duration: 0.3, ease: [0.32, 0.72, 0, 1] }}
+            className="fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+5.5rem)] z-[1400] mx-auto max-w-md"
+          >
+            <NudgeBannerCard
+              campaign={active}
+              onCta={runCta}
+              onDismiss={dismiss}
+              onSignal={runSignal}
+            />
+          </motion.div>
+        </AnimatePresence>
+        {status}
+      </>
     );
   }
 
   return (
-    <CampaignModal
-      campaign={active}
-      onActivate={runElement}
-      onDismiss={dismiss}
-      onSignal={runSignal}
-    />
+    <>
+      <CampaignModal
+        campaign={active}
+        onActivate={runElement}
+        onDismiss={dismiss}
+        onSignal={runSignal}
+      />
+      {status}
+    </>
   );
 }

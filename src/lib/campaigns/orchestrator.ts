@@ -34,12 +34,16 @@ type Store = {
   busyReasons: string[];
   /** Last campaign whose button was pressed, for conversion attribution. */
   lastClick: { id: string; at: number } | null;
+  /** True once the open popup's tap has been counted, so closing can't double it. */
+  clickReported: boolean;
   setCampaigns: (campaigns: CampaignPayload[]) => void;
   setBusy: (reason: string, busy: boolean) => void;
   emit: (trigger: CampaignTrigger, context?: TriggerContext) => void;
   show: (campaign: CampaignPayload) => void;
   schedule: (campaign: CampaignPayload) => void;
   close: (outcome: 'click' | 'dismiss', elementId?: string) => void;
+  /** Report a tap on a button that stays open — a purchase or a claim. */
+  reportClick: (elementId?: string) => void;
   flushPending: () => void;
   claimBlockingSlot: () => boolean;
 };
@@ -97,6 +101,7 @@ export const useCampaignStore = create<Store>((set, get) => ({
   shownIds: [],
   busyReasons: [],
   lastClick: null,
+  clickReported: false,
 
   setCampaigns: (campaigns) => set({ campaigns }),
 
@@ -161,6 +166,7 @@ export const useCampaignStore = create<Store>((set, get) => ({
       active: campaign,
       pending: null,
       shownIds: [...state.shownIds, campaign.id],
+      clickReported: false,
       blockingShown: state.blockingShown + (blocking ? 1 : 0),
     });
     if (blocking) writeLastBlockingAt(Date.now());
@@ -170,11 +176,29 @@ export const useCampaignStore = create<Store>((set, get) => ({
   close: (outcome, elementId) => {
     const campaign = get().active;
     if (!campaign) return;
-    reportEvent(campaign.id, outcome === 'click' ? 'click' : 'dismiss', elementId);
+    // A button that already reported its own tap (a purchase, a claim) closes
+    // without reporting a second one.
+    if (!(outcome === 'click' && get().clickReported)) {
+      reportEvent(campaign.id, outcome === 'click' ? 'click' : 'dismiss', elementId);
+    }
     set({
       active: null,
+      clickReported: false,
       lastClick: outcome === 'click' ? { id: campaign.id, at: Date.now() } : get().lastClick,
     });
+  },
+
+  /**
+   * A purchase or a reward claim keeps the popup up until it succeeds, so the
+   * tap has to be counted when it happens. Otherwise a cancelled payment sheet
+   * would leave no trace at all, and the buttons that matter most would look
+   * like the ones nobody presses.
+   */
+  reportClick: (elementId) => {
+    const campaign = get().active;
+    if (!campaign || get().clickReported) return;
+    reportEvent(campaign.id, 'click', elementId);
+    set({ clickReported: true, lastClick: { id: campaign.id, at: Date.now() } });
   },
 
   claimBlockingSlot: () => {

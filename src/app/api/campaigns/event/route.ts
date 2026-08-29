@@ -28,12 +28,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid event' }, { status: 400 });
     }
 
+    await connectMongo();
+
     const now = new Date();
+    const today = now.toISOString().slice(0, 10);
     const inc: Record<string, number> = {};
     const set: Record<string, unknown> = {};
     if (event === 'impression') {
       inc.impressions = 1;
       set.lastShownAt = now;
+      // The per-day cap counts against the user's current day, so the counter
+      // resets by being rewritten rather than by a sweep.
+      const existing = await CampaignUserStateModel.findOne(
+        { userId: decoded.uid, campaignId },
+        { dayKey: 1 },
+      ).lean();
+      if (existing?.dayKey === today) {
+        inc.dayCount = 1;
+      } else {
+        set.dayKey = today;
+        set.dayCount = 1;
+      }
     }
     if (event === 'click') {
       inc.clicks = 1;
@@ -50,7 +65,6 @@ export async function POST(req: NextRequest) {
       set.convertedAt = now;
     }
 
-    await connectMongo();
     await CampaignUserStateModel.updateOne(
       { userId: decoded.uid, campaignId },
       {

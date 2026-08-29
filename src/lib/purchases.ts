@@ -211,6 +211,165 @@ export async function purchaseFlyPack(packId: FlyPackId): Promise<PurchaseOutcom
   }
 }
 
+/**
+ * Buy any store product by its identifier, whether or not the fly shop sells
+ * it — the offer-only SKUs a campaign exists to sell.
+ *
+ * On a device the store is asked for the product directly, so a product that
+ * belongs to no RevenueCat offering still works. On the web there is no such
+ * escape hatch: web billing only sells packages, so every offering is searched
+ * and an unknown identifier is a real error rather than a silent no-op.
+ */
+export async function purchaseStoreProduct(
+  productId: string,
+  placement = 'campaign',
+): Promise<PurchaseOutcome> {
+  const uid = requireUid();
+  const id = productId.trim();
+  if (!id) throw new Error('No product id');
+  const store = Capacitor.isNativePlatform() ? Capacitor.getPlatform() : 'web';
+
+  trackAnalyticsEvent('store_product_purchase_started', {
+    product_id: id,
+    store,
+    placement,
+  });
+
+  try {
+    if (Capacitor.isNativePlatform()) {
+      const { Purchases } = await getNativePurchases(uid);
+      const { PURCHASES_ERROR_CODE, PRODUCT_CATEGORY } = await import(
+        '@revenuecat/purchases-capacitor'
+      );
+
+      // A consumable and a subscription are fetched differently on Android, and
+      // asking for the wrong category returns nothing rather than an error.
+      let product = (
+        await Purchases.getProducts({
+          productIdentifiers: [id],
+          type: PRODUCT_CATEGORY.NON_SUBSCRIPTION,
+        })
+      ).products[0];
+      if (!product) {
+        product = (
+          await Purchases.getProducts({
+            productIdentifiers: [id],
+            type: PRODUCT_CATEGORY.SUBSCRIPTION,
+          })
+        ).products[0];
+      }
+      if (!product) throw new Error(`The store does not offer "${id}"`);
+
+      try {
+        await Purchases.purchaseStoreProduct({ product });
+      } catch (error: any) {
+        if (
+          error?.code === PURCHASES_ERROR_CODE.PURCHASE_CANCELLED_ERROR ||
+          error?.userCancelled
+        ) {
+          trackAnalyticsEvent('store_product_purchase_cancelled', {
+            product_id: id,
+            store,
+            placement,
+          });
+          return 'cancelled';
+        }
+        throw error;
+      }
+    } else {
+      const purchases = await getWebPurchases(uid);
+      const { ErrorCode, PurchasesError } = await import('@revenuecat/purchases-js');
+      const offerings = await purchases.getOfferings();
+      const candidates = [
+        ...(offerings.current ? [offerings.current] : []),
+        ...Object.values(offerings.all ?? {}),
+      ];
+      const pkg = candidates
+        .flatMap((offering) => offering.availablePackages)
+        .find(
+          (entry) =>
+            entry.identifier === id || entry.webBillingProduct.identifier === id,
+        );
+      if (!pkg) throw new Error(`No web package sells "${id}"`);
+      try {
+        await purchases.purchase({
+          rcPackage: pkg,
+          customerEmail: auth?.currentUser?.email ?? undefined,
+        });
+      } catch (error) {
+        if (error instanceof PurchasesError && error.errorCode === ErrorCode.UserCancelledError) {
+          trackAnalyticsEvent('store_product_purchase_cancelled', {
+            product_id: id,
+            store,
+            placement,
+          });
+          return 'cancelled';
+        }
+        throw error;
+      }
+    }
+
+    await syncPremiumWithServer();
+    trackAnalyticsEvent('store_product_purchase_completed', {
+      product_id: id,
+      store,
+      placement,
+    });
+    return 'purchased';
+  } catch (error) {
+    trackAnalyticsEvent('store_product_purchase_failed', {
+      product_id: id,
+      store,
+      placement,
+      reason: error instanceof Error ? error.message.slice(0, 80) : 'unknown',
+    });
+    throw error;
+  }
+}
+
+/**
+ * Every product identifier this build can actually sell, read from the live
+ * store. The admin picker uses it so a campaign can never point at a SKU that
+ * does not exist — the failure mode that only shows up in production.
+ */
+export async function listStoreProducts(): Promise<
+  { id: string; label: string; price: string; offering: string }[]
+> {
+  const uid = requireUid();
+  const rows: { id: string; label: string; price: string; offering: string }[] = [];
+
+  if (Capacitor.isNativePlatform()) {
+    const { Purchases } = await getNativePurchases(uid);
+    const offerings = await Purchases.getOfferings();
+    for (const [key, offering] of Object.entries(offerings.all ?? {})) {
+      for (const pkg of offering.availablePackages) {
+        rows.push({
+          id: pkg.product.identifier,
+          label: pkg.product.title || pkg.identifier,
+          price: pkg.product.priceString,
+          offering: key,
+        });
+      }
+    }
+  } else {
+    const purchases = await getWebPurchases(uid);
+    const offerings = await purchases.getOfferings();
+    for (const [key, offering] of Object.entries(offerings.all ?? {})) {
+      for (const pkg of offering.availablePackages) {
+        rows.push({
+          id: pkg.webBillingProduct.identifier,
+          label: pkg.webBillingProduct.title || pkg.identifier,
+          price: pkg.webBillingProduct.price.formattedPrice,
+          offering: key,
+        });
+      }
+    }
+  }
+
+  const seen = new Set<string>();
+  return rows.filter((row) => !seen.has(row.id) && seen.add(row.id));
+}
+
 export async function getFlyPackPrices(): Promise<Partial<Record<FlyPackId, string>>> {
   const uid = requireUid();
   const prices: Partial<Record<FlyPackId, string>> = {};

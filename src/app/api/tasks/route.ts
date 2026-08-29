@@ -944,14 +944,19 @@ async function unawardFlyForTask(
   };
 }
 
+function noStore(res: NextResponse) {
+  res.headers.set('Cache-Control', 'private, no-store, max-age=0');
+  return res;
+}
+
 export async function GET(req: NextRequest) {
   const uid = await currentUserId();
-  if (!uid) return unauth();
+  if (!uid) return noStore(unauth());
   await connectMongo();
   const tz = req.nextUrl.searchParams.get('timezone') || 'UTC';
-  if (isDateRangeMode(req)) return handleDateRangeGet(req, uid, tz);
-  if (isBoardMode(req)) return handleBoardGet(req, uid, tz);
-  return handleDailyGet(req, uid, tz);
+  if (isDateRangeMode(req)) return noStore(await handleDateRangeGet(req, uid, tz));
+  if (isBoardMode(req)) return noStore(await handleBoardGet(req, uid, tz));
+  return noStore(await handleDailyGet(req, uid, tz));
 }
 
 export async function POST(req: NextRequest) {

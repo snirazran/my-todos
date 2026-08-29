@@ -160,6 +160,9 @@ export const CTA_ACTIONS = [
   'open_fly_shop',
   'open_wardrobe',
   'open_premium',
+  'buy_pack',
+  'buy_product',
+  'claim_reward',
   'navigate',
   'dismiss',
 ] as const;
@@ -169,9 +172,84 @@ export const CTA_LABELS: Record<CtaAction, string> = {
   open_fly_shop: 'Open the fly shop',
   open_wardrobe: 'Open the wardrobe',
   open_premium: 'Open the Plus paywall',
+  buy_pack: 'Buy a fly pack — straight to checkout',
+  buy_product: 'Buy a store product — straight to checkout',
+  claim_reward: 'Give the user something',
   navigate: 'Go to a page',
   dismiss: 'Just close',
 };
+
+export const CTA_HELP: Record<CtaAction, string> = {
+  open_fly_shop:
+    'Closes the popup and opens the fly shop. Pick a pack to scroll it into view and highlight it.',
+  open_wardrobe: 'Closes the popup and opens the wardrobe.',
+  open_premium: 'Closes the popup and opens the Plus paywall, attributed to this campaign.',
+  buy_pack:
+    "Raises the store's own payment sheet on the spot — no shop in between. The fastest path from an offer to a paid purchase, and the reason a popup like this converts.",
+  buy_product:
+    'Same one-tap checkout, but for any product id set up in App Store Connect / Play / RevenueCat — including offer-only products that never appear in the shop.',
+  claim_reward:
+    'Grants flies, cosmetics, backgrounds or Plus days. The server decides what is actually given and will only ever grant it once, so a re-tap or a replayed request cannot double up.',
+  navigate: 'Closes the popup and goes to a page in the app.',
+  dismiss: 'Closes the popup and does nothing else.',
+};
+
+/** The one extra field an action needs before it is fully configured. */
+export type CtaActionNeed = 'path' | 'pack' | 'product' | 'reward' | null;
+
+export const CTA_ACTION_NEEDS: Record<CtaAction, CtaActionNeed> = {
+  open_fly_shop: 'pack',
+  open_wardrobe: null,
+  open_premium: null,
+  buy_pack: 'pack',
+  buy_product: 'product',
+  claim_reward: 'reward',
+  navigate: 'path',
+  dismiss: null,
+};
+
+/** Actions that raise a real payment sheet, so the editor can flag them. */
+export const PURCHASING_ACTIONS: CtaAction[] = ['buy_pack', 'buy_product'];
+
+/**
+ * What a button can hand out. Amounts are never read from the client — the
+ * server re-reads the campaign and grants what the campaign says.
+ */
+export const REWARD_KINDS = ['flies', 'item', 'background', 'plus_days'] as const;
+export type RewardKind = (typeof REWARD_KINDS)[number];
+
+export const REWARD_KIND_LABELS: Record<RewardKind, string> = {
+  flies: 'Flies',
+  item: 'Cosmetic item',
+  background: 'Background',
+  plus_days: 'Plus days',
+};
+
+export type CampaignRewardGrant = {
+  kind: RewardKind;
+  /** Catalog id for `item` and `background`; ignored otherwise. */
+  id?: string;
+  /** Flies, days, or how many copies of the item. */
+  amount: number;
+};
+
+/** How often one user may collect the same reward button. */
+export const REWARD_LIMITS = ['once', 'daily'] as const;
+export type RewardLimit = (typeof REWARD_LIMITS)[number];
+
+export const REWARD_LIMIT_LABELS: Record<RewardLimit, string> = {
+  once: 'Once ever',
+  daily: 'Once a day',
+};
+
+export type CampaignReward = {
+  grants: CampaignRewardGrant[];
+  limit: RewardLimit;
+  /** Shown after a successful claim; blank falls back to a generic line. */
+  successText?: string;
+};
+
+export const DEFAULT_REWARD: CampaignReward = { grants: [], limit: 'once' };
 
 /** What the art slot holds. Rive art can also own the buttons. */
 export const CAMPAIGN_ART_KINDS = ['image', 'rive'] as const;
@@ -222,8 +300,77 @@ export type CampaignRiveButton = {
   path?: string;
   /** Overrides the campaign's pack when this button opens the shop. */
   packId?: string;
+  /** Store product id for `buy_product`. */
+  productId?: string;
   /** Whether firing this signal also closes the popup. */
   closes: boolean;
+};
+
+/**
+ * The two places a value can be written in a .riv file. Modern files expose
+ * data-bind properties on a view model; older state machines expose plain
+ * inputs. The editor reads both off the loaded file, so nothing has to be
+ * typed from memory.
+ */
+export const RIVE_INPUT_TARGETS = ['databind', 'statemachine'] as const;
+export type RiveInputTarget = (typeof RIVE_INPUT_TARGETS)[number];
+
+export const RIVE_INPUT_TARGET_LABELS: Record<RiveInputTarget, string> = {
+  databind: 'Data bind',
+  statemachine: 'State machine input',
+};
+
+export const RIVE_INPUT_TYPES = [
+  'number',
+  'boolean',
+  'string',
+  'enum',
+  'color',
+  'trigger',
+] as const;
+export type RiveInputType = (typeof RIVE_INPUT_TYPES)[number];
+
+/** One value the campaign writes into the animation when it appears. */
+export type RiveInputValue = {
+  name: string;
+  type: RiveInputType;
+  target: RiveInputTarget;
+  value?: number | boolean | string;
+};
+
+/**
+ * A trigger fired on a repeating beat, which is how a looping idle is built
+ * out of a one-shot timeline: a breath every few seconds, a blink, a wing
+ * flap. Jitter keeps it from reading as a metronome.
+ */
+export type RiveTicker = {
+  name: string;
+  target: RiveInputTarget;
+  everyMs: number;
+  jitterMs: number;
+  /** Fire once the moment the popup appears, before the first interval. */
+  onShow: boolean;
+};
+
+export const DEFAULT_TICKER: Omit<RiveTicker, 'name' | 'target'> = {
+  everyMs: 3000,
+  jitterMs: 500,
+  onShow: true,
+};
+
+/** What the editor learns by loading a .riv, so every picker is a real list. */
+export type RiveInputInfo = {
+  name: string;
+  type: RiveInputType;
+  target: RiveInputTarget;
+  /** Allowed values for `enum` properties. */
+  options?: string[];
+};
+
+export type RiveArtboardInfo = {
+  name: string;
+  stateMachines: string[];
+  animations: string[];
 };
 
 /**
@@ -343,12 +490,22 @@ export type CampaignElement = {
   action?: CtaAction;
   path?: string;
   packId?: string;
+  /** Store product id for `buy_product`. */
+  productId?: string;
+  /** What `claim_reward` hands out. */
+  reward?: CampaignReward;
 
   /** image, rive. */
   assetId?: string;
   fit?: 'contain' | 'cover';
+  /** rive: a `/foo.riv` already shipping in public/, instead of an upload. */
+  libraryPath?: string;
   artboard?: string;
   stateMachine?: string;
+  /** rive: values written into the file when the popup appears. */
+  inputs?: RiveInputValue[];
+  /** rive: triggers fired on a repeating beat. */
+  tickers?: RiveTicker[];
   /** Rive signals still map to actions through the campaign's rive.buttons. */
 
   /** discount. */
@@ -387,6 +544,8 @@ export type CampaignRive = {
   /** Aspect ratio of the canvas box, width / height. */
   aspect: number;
   buttons: CampaignRiveButton[];
+  inputs: RiveInputValue[];
+  tickers: RiveTicker[];
 };
 
 export const PAYER_TARGETS = ['any', 'never_paid', 'has_paid'] as const;
@@ -413,11 +572,17 @@ export type CampaignCta = {
   action: CtaAction;
   /** Route for `navigate`; ignored otherwise. */
   path?: string;
+  /** Store product id for `buy_product`. */
+  productId?: string;
+  /** What `claim_reward` hands out. */
+  reward?: CampaignReward;
 };
 
 export type CampaignOffer = {
   /** Highlights this pack when the CTA lands in the fly shop. */
   packId?: string;
+  /** Store product id used by `buy_product` when a button doesn't name one. */
+  productId?: string;
   /** Copy-only badge, e.g. "+100% extra". Grants stay server-authoritative. */
   bonusLabel?: string;
 };
@@ -453,6 +618,8 @@ export type CampaignTargeting = {
 export type CampaignCaps = {
   /** Lifetime impressions per user. 0 = unlimited. */
   perUser: number;
+  /** Impressions per user per day. 0 = unlimited. */
+  perDay: number;
   /** Hours before the same campaign may show again. */
   cooldownHours: number;
   /** Stop showing to a user after this many dismissals. 0 = never suppress. */
@@ -517,6 +684,7 @@ export const DEFAULT_TARGETING: CampaignTargeting = {
 
 export const DEFAULT_CAPS: CampaignCaps = {
   perUser: 3,
+  perDay: 1,
   cooldownHours: 24,
   suppressAfterDismissals: 2,
   delayMs: 650,
@@ -616,7 +784,17 @@ export function createElement(type: ElementType, z: number): CampaignElement {
     case 'image':
       return { ...base, w: 30, h: 20, x: 35, y: 30, fit: 'contain' };
     case 'rive':
-      return { ...base, w: 40, h: 30, x: 30, y: 25, fit: 'contain' };
+      return {
+        ...base,
+        w: 40,
+        h: 30,
+        x: 30,
+        y: 25,
+        fit: 'contain',
+        libraryPath: '',
+        inputs: [],
+        tickers: [],
+      };
     default:
       return { ...base, text: 'New text' };
   }
@@ -630,6 +808,8 @@ export const DEFAULT_RIVE: CampaignRive = {
   fit: 'contain',
   aspect: 1,
   buttons: [],
+  inputs: [],
+  tickers: [],
 };
 
 export const isBlockingTemplate = (template: CampaignTemplate) =>

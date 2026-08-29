@@ -106,6 +106,12 @@ export function evaluateCampaign(
     if (campaign.caps.perUser > 0 && state.impressions >= campaign.caps.perUser) {
       return verdict(false, `Hit the ${campaign.caps.perUser}-impression cap`);
     }
+    const perDay = campaign.caps.perDay ?? 0;
+    if (perDay > 0 && state.dayKey === now.toISOString().slice(0, 10)) {
+      if ((state.dayCount ?? 0) >= perDay) {
+        return verdict(false, `Already shown ${state.dayCount}× today, max ${perDay}`);
+      }
+    }
     if (
       campaign.caps.suppressAfterDismissals > 0 &&
       state.dismissals >= campaign.caps.suppressAfterDismissals
@@ -161,8 +167,11 @@ export function toCampaignPayload(campaign: CampaignDoc): CampaignPayload {
         action: button.action ?? 'cta',
         path: button.path ?? '',
         packId: button.packId ?? '',
+        productId: button.productId ?? '',
         closes: button.closes !== false,
       })),
+      inputs: rive.inputs ?? [],
+      tickers: rive.tickers ?? [],
     },
     canvas,
     assets: (campaign.assets ?? []).map((asset) => ({
@@ -183,9 +192,12 @@ export function toCampaignPayload(campaign: CampaignDoc): CampaignPayload {
     cta: {
       action: campaign.cta?.action ?? 'dismiss',
       path: campaign.cta?.path ?? '',
+      productId: campaign.cta?.productId ?? '',
+      reward: campaign.cta?.reward ?? { grants: [], limit: 'once' },
     },
     offer: {
       packId: campaign.offer?.packId ?? '',
+      productId: campaign.offer?.productId ?? '',
       bonusLabel: campaign.offer?.bonusLabel ?? '',
     },
     triggers: campaign.triggers.map((rule) => ({

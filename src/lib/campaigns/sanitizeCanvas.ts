@@ -2,15 +2,27 @@ import {
   CTA_ACTIONS,
   DISCOUNT_STYLES,
   ELEMENT_TYPES,
+  REWARD_KINDS,
+  REWARD_LIMITS,
+  RIVE_INPUT_TARGETS,
+  RIVE_INPUT_TYPES,
   TEXT_ALIGNMENTS,
   TIMER_EXPIRY,
   TIMER_FORMATS,
   TIMER_MODES,
   type CampaignCanvas,
   type CampaignElement,
+  type CampaignReward,
+  type CampaignRewardGrant,
   type CtaAction,
   type DiscountStyle,
   type ElementType,
+  type RewardKind,
+  type RewardLimit,
+  type RiveInputTarget,
+  type RiveInputType,
+  type RiveInputValue,
+  type RiveTicker,
   type TextAlignment,
   type TimerExpiry,
   type TimerFormat,
@@ -40,6 +52,75 @@ const color = (value: unknown) => {
     ? raw
     : '';
 };
+
+/** A same-origin `/foo.riv` only, so a campaign can't point the runtime at a
+ *  file from somewhere else. */
+export const rivePath = (value: unknown) => {
+  const raw = str(value, 200);
+  return /^\/[\w\-./]+\.riv$/.test(raw) && !raw.includes('..') ? raw : '';
+};
+
+export function sanitizeRiveInputs(raw: unknown): RiveInputValue[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.slice(0, 24).flatMap((entry): RiveInputValue[] => {
+    const item = (entry ?? {}) as Record<string, unknown>;
+    const name = str(item.name, 80);
+    if (!name) return [];
+    const type = oneOf<RiveInputType>(item.type, RIVE_INPUT_TYPES, 'number');
+    const value =
+      type === 'boolean'
+        ? item.value === true || item.value === 'true'
+        : type === 'number'
+          ? (num(item.value) ?? 0)
+          : str(item.value, 120);
+    return [
+      {
+        name,
+        type,
+        target: oneOf<RiveInputTarget>(item.target, RIVE_INPUT_TARGETS, 'databind'),
+        value,
+      },
+    ];
+  });
+}
+
+export function sanitizeRiveTickers(raw: unknown): RiveTicker[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.slice(0, 8).flatMap((entry): RiveTicker[] => {
+    const item = (entry ?? {}) as Record<string, unknown>;
+    const name = str(item.name, 80);
+    if (!name) return [];
+    return [
+      {
+        name,
+        target: oneOf<RiveInputTarget>(item.target, RIVE_INPUT_TARGETS, 'databind'),
+        // A floor of 250ms: anything faster is a repaint loop, not an idle.
+        everyMs: clamp(num(item.everyMs), 250, 600_000, 3000),
+        jitterMs: clamp(num(item.jitterMs), 0, 60_000, 500),
+        onShow: item.onShow !== false,
+      },
+    ];
+  });
+}
+
+export function sanitizeReward(raw: unknown): CampaignReward {
+  const item = (raw ?? {}) as Record<string, unknown>;
+  const grants = Array.isArray(item.grants) ? item.grants : [];
+  return {
+    limit: oneOf<RewardLimit>(item.limit, REWARD_LIMITS, 'once'),
+    successText: str(item.successText, 120),
+    grants: grants.slice(0, 8).flatMap((entry): CampaignRewardGrant[] => {
+      const grant = (entry ?? {}) as Record<string, unknown>;
+      const kind = oneOf<RewardKind>(grant.kind, REWARD_KINDS, 'flies');
+      const id = str(grant.id, 60);
+      if ((kind === 'item' || kind === 'background') && !/^[\w-]+$/.test(id)) return [];
+      // Ceilings an admin cannot type past by accident: a mistyped zero on a
+      // live popup is an economy incident, not a typo.
+      const max = kind === 'flies' ? 100_000 : kind === 'plus_days' ? 3650 : 99;
+      return [{ kind, id, amount: clamp(num(grant.amount), 0, max, 1) }];
+    }),
+  };
+}
 
 /**
  * Canvas geometry comes from a drag-and-drop editor, so every number is bounded
@@ -95,10 +176,15 @@ export function sanitizeCanvas(raw: Record<string, unknown>): CampaignCanvas {
           action: oneOf<CtaAction>(item.action, CTA_ACTIONS, 'dismiss'),
           path: str(item.path, 200),
           packId: str(item.packId, 40),
+          productId: str(item.productId, 120),
+          reward: sanitizeReward(item.reward),
           assetId: str(item.assetId, 40),
           fit: oneOf(item.fit, ['contain', 'cover'] as const, 'contain'),
+          libraryPath: rivePath(item.libraryPath),
           artboard: str(item.artboard, 80),
           stateMachine: str(item.stateMachine, 80),
+          inputs: sanitizeRiveInputs(item.inputs),
+          tickers: sanitizeRiveTickers(item.tickers),
           discountStyle: oneOf<DiscountStyle>(item.discountStyle, DISCOUNT_STYLES, 'strike'),
           timerMode: oneOf<TimerMode>(item.timerMode, TIMER_MODES, 'per_user'),
           timerMinutes: clamp(num(item.timerMinutes), 1, 43200, 30),

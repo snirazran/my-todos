@@ -31,7 +31,14 @@ import {
   type SignalAction,
 } from '@/lib/campaigns/types';
 import { campaignAssetUrl } from '@/lib/campaigns/eligibility';
-import { sanitizeCanvas } from '@/lib/campaigns/sanitizeCanvas';
+import {
+  rivePath,
+  sanitizeCanvas,
+  sanitizeReward,
+  sanitizeRiveInputs,
+  sanitizeRiveTickers,
+} from '@/lib/campaigns/sanitizeCanvas';
+import { blocksGoingLive, reviewCampaign } from '@/lib/campaigns/review';
 
 const json = (body: unknown, status = 200) => NextResponse.json(body, { status });
 
@@ -89,24 +96,25 @@ function sanitize(body: Record<string, unknown>) {
     cta: {
       action: oneOf<CtaAction>(cta.action, CTA_ACTIONS, 'dismiss'),
       path: str(cta.path, 200),
+      productId: str(cta.productId, 120),
+      reward: sanitizeReward(cta.reward),
     },
     offer: {
       packId: str(offer.packId, 40),
+      productId: str(offer.productId, 120),
       bonusLabel: str(offer.bonusLabel, 40),
     },
     art: oneOf<CampaignArtKind>(body.art, CAMPAIGN_ART_KINDS, 'image'),
     canvas: sanitizeCanvas(canvas),
     rive: {
-      // Only a same-origin path, so a campaign can never point the runtime at
-      // a file from somewhere else.
-      libraryPath: /^\/[\w\-./]+\.riv$/.test(str(rive.libraryPath, 200))
-        ? str(rive.libraryPath, 200)
-        : '',
+      libraryPath: rivePath(rive.libraryPath),
       artboard: str(rive.artboard, 80),
       stateMachine: str(rive.stateMachine, 80),
       layout: oneOf<RiveLayout>(rive.layout, RIVE_LAYOUTS, 'inline'),
       fit: oneOf(rive.fit, ['contain', 'cover'] as const, 'contain'),
       aspect: Math.min(3, Math.max(0.3, num(rive.aspect) ?? DEFAULT_RIVE.aspect)),
+      inputs: sanitizeRiveInputs(rive.inputs),
+      tickers: sanitizeRiveTickers(rive.tickers),
       buttons: riveButtons.flatMap((raw) => {
         const button = (raw ?? {}) as Record<string, unknown>;
         const signal = str(button.signal, 80);
@@ -118,6 +126,7 @@ function sanitize(body: Record<string, unknown>) {
             action: oneOf<SignalAction>(button.action, SIGNAL_ACTIONS, 'cta'),
             path: str(button.path, 200),
             packId: str(button.packId, 40),
+            productId: str(button.productId, 120),
             closes: button.closes !== false,
           },
         ];
@@ -148,6 +157,7 @@ function sanitize(body: Record<string, unknown>) {
     },
     caps: {
       perUser: Math.max(0, num(caps.perUser) ?? DEFAULT_CAPS.perUser),
+      perDay: Math.max(0, num(caps.perDay) ?? DEFAULT_CAPS.perDay),
       cooldownHours: Math.max(0, num(caps.cooldownHours) ?? DEFAULT_CAPS.cooldownHours),
       suppressAfterDismissals: Math.max(
         0,
@@ -158,6 +168,39 @@ function sanitize(body: Record<string, unknown>) {
     startAt: date(body.startAt),
     endAt: date(body.endAt),
   };
+}
+
+/**
+ * A campaign only reaches users through `live`, so that is the one transition
+ * worth guarding. Drafts are allowed to be broken — that is what a draft is —
+ * but a popup that can't render or a button that does nothing must not be
+ * publishable, because nothing downstream will catch it.
+ */
+function liveBlockers(
+  clean: ReturnType<typeof sanitize>,
+  existing: { imageFile?: unknown } | null,
+): string[] {
+  if (clean.status !== 'live') return [];
+  const notes = reviewCampaign({
+    name: clean.name,
+    template: clean.template,
+    status: clean.status,
+    imageUrl: existing?.imageFile ? 'stored' : '',
+    copy: clean.copy,
+    cta: clean.cta,
+    offer: clean.offer,
+    rive: clean.rive,
+    canvas: clean.canvas,
+    assets: [],
+    triggers: clean.triggers,
+    targeting: clean.targeting,
+    caps: clean.caps,
+    startAt: clean.startAt ? clean.startAt.toISOString() : null,
+    endAt: clean.endAt ? clean.endAt.toISOString() : null,
+  });
+  return blocksGoingLive(notes)
+    ? notes.filter((note) => note.level === 'error').map((note) => note.message)
+    : [];
 }
 
 export async function GET() {
@@ -282,6 +325,11 @@ export async function POST(req: NextRequest) {
     const clean = sanitize(body);
     if (!clean.name) return json({ error: 'Name is required' }, 400);
 
+    const blockers = liveBlockers(clean, null);
+    if (blockers.length) {
+      return json({ error: `Can't go live yet: ${blockers[0]}`, blockers }, 400);
+    }
+
     const id = await uniqueId(slugify(clean.name));
     const item = await CampaignModel.create({ id, ...clean, imageVersion: 0, riveVersion: 0 });
     return json({ ok: true, item });
@@ -301,6 +349,17 @@ export async function PUT(req: NextRequest) {
     await connectMongo();
     const clean = sanitize(body);
     if (!clean.name) return json({ error: 'Name is required' }, 400);
+
+    const existing = await CampaignModel.findOne({ id }).select('imageFile').lean();
+    if (!existing) return json({ error: 'Campaign not found' }, 404);
+
+    const blockers = liveBlockers(clean, existing);
+    if (blockers.length) {
+      return json(
+        { error: `Can't go live yet: ${blockers[0]}`, blockers },
+        400,
+      );
+    }
 
     const item = await CampaignModel.findOneAndUpdate({ id }, { $set: clean }, { new: true });
     if (!item) return json({ error: 'Campaign not found' }, 404);

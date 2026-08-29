@@ -10,12 +10,13 @@ export type ResolvedSignal = {
   action: CtaAction;
   path?: string;
   packId?: string;
+  productId?: string;
   closes: boolean;
 };
 
 type SignalCampaign = {
-  cta: { action: CtaAction; path?: string };
-  offer: { packId?: string };
+  cta: { action: CtaAction; path?: string; productId?: string };
+  offer: { packId?: string; productId?: string };
   rive: { buttons: CampaignRiveButton[] };
 };
 
@@ -35,12 +36,15 @@ export function resolveRiveSignal(
   );
   if (!button) return null;
 
-  const action = button.action === 'cta' ? campaign.cta.action : button.action;
+  const usesCampaignCta = button.action === 'cta';
   return {
     button,
-    action,
-    path: button.action === 'cta' ? campaign.cta.path : button.path || campaign.cta.path,
-    packId: button.action === 'cta' ? campaign.offer.packId : button.packId || campaign.offer.packId,
-    closes: button.action === 'cta' ? true : button.closes,
+    action: button.action === 'cta' ? campaign.cta.action : button.action,
+    path: usesCampaignCta ? campaign.cta.path : button.path || campaign.cta.path,
+    packId: usesCampaignCta ? campaign.offer.packId : button.packId || campaign.offer.packId,
+    productId: usesCampaignCta
+      ? campaign.cta.productId || campaign.offer.productId
+      : button.productId || campaign.offer.productId,
+    closes: usesCampaignCta ? true : button.closes,
   };
 }

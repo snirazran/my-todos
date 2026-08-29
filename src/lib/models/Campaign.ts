@@ -15,8 +15,12 @@ import {
   PAYER_TARGETS,
   PLATFORM_TARGETS,
   PLUS_TARGETS,
+  RIVE_INPUT_TARGETS,
+  RIVE_INPUT_TYPES,
   RIVE_LAYOUTS,
   RIVE_SIGNAL_SOURCES,
+  REWARD_KINDS,
+  REWARD_LIMITS,
   SIGNAL_ACTIONS,
   type CampaignArtKind,
   type CampaignCanvas,
@@ -25,6 +29,8 @@ import {
   type CampaignCopy,
   type CampaignCta,
   type CampaignOffer,
+  type CampaignReward,
+  type CampaignRewardGrant,
   type CampaignRive,
   type CampaignRiveButton,
   type CampaignStatus,
@@ -32,6 +38,8 @@ import {
   type CampaignTemplate,
   type CampaignTier,
   type CampaignTriggerRule,
+  type RiveInputValue,
+  type RiveTicker,
 } from '@/lib/campaigns/types';
 
 export type CampaignAssetFile = {
@@ -90,6 +98,45 @@ const TriggerSchema = new Schema<CampaignTriggerRule>(
   { _id: false },
 );
 
+const RiveInputSchema = new Schema<RiveInputValue>(
+  {
+    name: { type: String, required: true },
+    type: { type: String, enum: [...RIVE_INPUT_TYPES], default: 'number' },
+    target: { type: String, enum: [...RIVE_INPUT_TARGETS], default: 'databind' },
+    value: { type: Schema.Types.Mixed, default: '' },
+  },
+  { _id: false },
+);
+
+const RiveTickerSchema = new Schema<RiveTicker>(
+  {
+    name: { type: String, required: true },
+    target: { type: String, enum: [...RIVE_INPUT_TARGETS], default: 'databind' },
+    everyMs: { type: Number, default: 3000, min: 250, max: 600000 },
+    jitterMs: { type: Number, default: 500, min: 0, max: 60000 },
+    onShow: { type: Boolean, default: true },
+  },
+  { _id: false },
+);
+
+const RewardGrantSchema = new Schema<CampaignRewardGrant>(
+  {
+    kind: { type: String, enum: [...REWARD_KINDS], required: true },
+    id: { type: String, default: '' },
+    amount: { type: Number, default: 1, min: 0 },
+  },
+  { _id: false },
+);
+
+const RewardSchema = new Schema<CampaignReward>(
+  {
+    grants: { type: [RewardGrantSchema], default: [] },
+    limit: { type: String, enum: [...REWARD_LIMITS], default: 'once' },
+    successText: { type: String, default: '' },
+  },
+  { _id: false },
+);
+
 const ElementSchema = new Schema<CampaignElement>(
   {
     id: { type: String, required: true },
@@ -118,10 +165,15 @@ const ElementSchema = new Schema<CampaignElement>(
     action: { type: String, enum: [...CTA_ACTIONS], default: 'dismiss' },
     path: { type: String, default: '' },
     packId: { type: String, default: '' },
+    productId: { type: String, default: '' },
+    reward: { type: RewardSchema, default: () => ({ grants: [], limit: 'once' }) },
     assetId: { type: String, default: '' },
     fit: { type: String, enum: ['contain', 'cover'], default: 'contain' },
+    libraryPath: { type: String, default: '' },
     artboard: { type: String, default: '' },
     stateMachine: { type: String, default: '' },
+    inputs: { type: [RiveInputSchema], default: [] },
+    tickers: { type: [RiveTickerSchema], default: [] },
     discountStyle: { type: String, enum: [...DISCOUNT_STYLES], default: 'strike' },
     timerMode: { type: String, enum: [...TIMER_MODES], default: 'per_user' },
     timerMinutes: { type: Number, default: 30 },
@@ -152,6 +204,7 @@ const RiveButtonSchema = new Schema<CampaignRiveButton>(
     action: { type: String, enum: [...SIGNAL_ACTIONS], default: 'cta' },
     path: { type: String, default: '' },
     packId: { type: String, default: '' },
+    productId: { type: String, default: '' },
     closes: { type: Boolean, default: true },
   },
   { _id: false },
@@ -175,12 +228,26 @@ const CampaignSchema = new Schema<CampaignDoc>(
     cta: {
       action: { type: String, enum: [...CTA_ACTIONS], default: 'dismiss' },
       path: { type: String, default: '' },
+      productId: { type: String, default: '' },
+      reward: { type: RewardSchema, default: () => ({ grants: [], limit: 'once' }) },
     },
     offer: {
       packId: { type: String, default: '' },
+      productId: { type: String, default: '' },
       bonusLabel: { type: String, default: '' },
     },
     art: { type: String, enum: [...CAMPAIGN_ART_KINDS], default: 'image' },
+    rive: {
+      libraryPath: { type: String, default: '' },
+      artboard: { type: String, default: '' },
+      stateMachine: { type: String, default: '' },
+      layout: { type: String, enum: [...RIVE_LAYOUTS], default: 'inline' },
+      fit: { type: String, enum: ['contain', 'cover'], default: 'contain' },
+      aspect: { type: Number, default: 1, min: 0.3, max: 3 },
+      buttons: { type: [RiveButtonSchema], default: [] },
+      inputs: { type: [RiveInputSchema], default: [] },
+      tickers: { type: [RiveTickerSchema], default: [] },
+    },
     canvas: {
       aspect: { type: Number, default: 0.75, min: 0.3, max: 3 },
       maxWidth: { type: Number, default: 380, min: 240, max: 720 },
@@ -200,6 +267,7 @@ const CampaignSchema = new Schema<CampaignDoc>(
     },
     caps: {
       perUser: { type: Number, default: 3, min: 0 },
+      perDay: { type: Number, default: 1, min: 0 },
       cooldownHours: { type: Number, default: 24, min: 0 },
       suppressAfterDismissals: { type: Number, default: 2, min: 0 },
       delayMs: { type: Number, default: 650, min: 0, max: 20000 },
@@ -214,6 +282,17 @@ const CampaignSchema = new Schema<CampaignDoc>(
   },
   { collection: 'campaigns', timestamps: true },
 );
+
+/**
+ * Mongoose caches compiled models on `mongoose.models`, and that cache outlives
+ * Next's hot reload: after a schema edit the old shape stays registered, and
+ * strict mode then drops every newly added field on save without erroring.
+ * Re-registering in development makes a schema change take effect on the next
+ * request instead of needing a server restart.
+ */
+if (process.env.NODE_ENV !== 'production' && mongoose.models.Campaign) {
+  mongoose.deleteModel('Campaign');
+}
 
 const CampaignModel: Model<CampaignDoc> =
   (mongoose.models.Campaign as Model<CampaignDoc>) ||

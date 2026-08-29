@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import Frog from '@/components/ui/frog';
@@ -14,7 +14,7 @@ import { useUIStore } from '@/lib/uiStore';
 
 interface Props {
   stolenFlies: number;
-  onAcknowledge: () => void;
+  onAcknowledge: () => void | Promise<void>;
   onRecover: () => Promise<void>;
   open: boolean;
   isPremium?: boolean;
@@ -39,20 +39,37 @@ export function HungerWarningModal({
   const screenBusy = useSheetStore((s) => s.count > 0);
   const cinematic = useUIStore((s) => s.isCinematicActive);
   const [visible, setVisible] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
   useEffect(() => {
     if (!open) {
       setVisible(false);
+      setDismissed(false);
       return;
     }
     if (visible || screenBusy || cinematic) return;
     setVisible(true);
   }, [open, visible, screenBusy, cinematic]);
-  useRegisterOpenSheet(visible);
+  useRegisterOpenSheet(visible && !dismissed);
 
   useEffect(() => {
     if (open) return;
     setError(null);
   }, [open, setError]);
+
+  const handleAcknowledge = useCallback(() => {
+    if (recovering || dismissed) return;
+    setError(null);
+    setDismissed(true);
+    void (async () => {
+      try {
+        await onAcknowledge();
+      } catch (err) {
+        console.error('Could not put the hunger warning away', err);
+        setDismissed(false);
+        setError('Could not save that - try again.');
+      }
+    })();
+  }, [dismissed, onAcknowledge, recovering, setError]);
 
   const handleRecover = () => {
     if (recovering) return;
@@ -69,10 +86,10 @@ export function HungerWarningModal({
   return (
     <>
       <Dialog
-        open={visible && !plusOpen}
-        onOpenChange={(val) =>
-          !val && !recovering && !plusOpen && onAcknowledge()
-        }
+        open={visible && !dismissed && !plusOpen}
+        onOpenChange={(val) => {
+          if (!val && !recovering && !plusOpen) handleAcknowledge();
+        }}
       >
         <DialogContent className="no-scrollbar max-h-[88dvh] overflow-y-auto border-none bg-transparent p-0 shadow-none outline-none sm:max-w-[380px] md:max-w-[640px]">
           <DialogTitle className="sr-only">I was Starving!</DialogTitle>
@@ -122,8 +139,8 @@ export function HungerWarningModal({
 
               <div className="mt-5 flex w-full flex-col-reverse gap-3 md:mt-6 md:flex-row md:items-stretch">
                 <Button
-                  onClick={onAcknowledge}
-                  disabled={recovering}
+                  onClick={handleAcknowledge}
+                  disabled={recovering || dismissed}
                   className="h-12 w-full rounded-2xl bg-primary text-base font-bold text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 active:scale-95 md:h-16 md:w-auto md:flex-1 md:text-[15px]"
                 >
                   I&apos;ll Do My Tasks

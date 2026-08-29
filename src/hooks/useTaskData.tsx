@@ -131,7 +131,8 @@ type UseTaskDataOptions = {
 };
 
 // --- Fetcher ---
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
+const fetcher = (url: string) =>
+  fetch(url, { cache: 'no-store' }).then((res) => res.json());
 
 /** SWR key for today's list. Shared so cache readers can't drift from it. */
 export function todayTasksKey(dateStr: string, tz: string) {
