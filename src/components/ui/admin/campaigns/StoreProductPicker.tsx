@@ -11,6 +11,7 @@ export type StoreProductRow = {
   store: 'apple' | 'google' | 'web' | 'all';
   kind: 'consumable' | 'non_consumable' | 'subscription';
   priceHint: string;
+  flies: number;
   note: string;
   source: 'shop' | 'registered';
 };
@@ -54,6 +55,7 @@ export function StoreProductPicker({
     store: StoreProductRow['store'];
     kind: StoreProductRow['kind'];
     priceHint: string;
+    flies: number;
   }) => Promise<void>;
   onArchive: (productId: string) => Promise<void>;
 }) {
@@ -65,6 +67,7 @@ export function StoreProductPicker({
     store: 'all' as StoreProductRow['store'],
     kind: 'consumable' as StoreProductRow['kind'],
     priceHint: '',
+    flies: '',
   });
 
   const shop = products.filter((product) => product.source === 'shop');
@@ -78,9 +81,16 @@ export function StoreProductPicker({
     if (!draft.productId.trim()) return;
     setBusy(true);
     try {
-      await onRegister(draft);
+      await onRegister({ ...draft, flies: Number(draft.flies) || 0 });
       onChange(draft.productId.trim());
-      setDraft({ productId: '', label: '', store: 'all', kind: 'consumable', priceHint: '' });
+      setDraft({
+        productId: '',
+        label: '',
+        store: 'all',
+        kind: 'consumable',
+        priceHint: '',
+        flies: '',
+      });
       setAdding(false);
     } finally {
       setBusy(false);
@@ -137,6 +147,7 @@ export function StoreProductPicker({
             </span>
             <span className="block truncate text-[10px] font-bold text-muted-foreground">
               {STORE_LABELS[selected.store]} · {KIND_LABELS[selected.kind]}
+              {selected.flies ? ` · ${selected.flies.toLocaleString()} flies` : ''}
               {selected.note ? ` · ${selected.note}` : ''}
             </span>
           </span>
@@ -202,9 +213,21 @@ export function StoreProductPicker({
               />
             </Field>
           </div>
+          <Field
+            label="Flies it grants"
+            hint="Credited by the purchase webhook when the store confirms payment. Leave 0 for a product that grants something other than flies."
+          >
+            <TextInput
+              value={draft.flies}
+              placeholder="0"
+              inputMode="numeric"
+              onChange={(flies) => setDraft({ ...draft, flies: flies.replace(/[^0-9]/g, '') })}
+            />
+          </Field>
           <p className="text-[11px] font-medium leading-snug text-muted-foreground">
-            Registering only makes the id pickable here. What a purchase is worth is still
-            decided by the store webhook, exactly as it is for a shop pack.
+            The product itself still has to exist in App Store Connect, Play Console and
+            RevenueCat — registering it here only makes it pickable and tells the webhook what
+            it is worth.
           </p>
           <div className="flex gap-2">
             <button

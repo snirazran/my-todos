@@ -25,6 +25,8 @@ export type StoreProductRow = {
   store: StoreProductStore;
   kind: StoreProductKind;
   priceHint: string;
+  /** Flies credited on purchase; 0 means it grants nothing. */
+  flies: number;
   note: string;
   /** Shop packs are compiled in and cannot be edited or removed here. */
   source: 'shop' | 'registered';
@@ -49,6 +51,7 @@ export async function GET() {
       store: 'all',
       kind: 'consumable',
       priceHint: `$${pack.priceUsd}`,
+      flies: pack.amount,
       note: 'Sold in the fly shop',
       source: 'shop',
     }));
@@ -59,6 +62,7 @@ export async function GET() {
       store: item.store,
       kind: item.kind,
       priceHint: item.priceHint,
+      flies: item.flies ?? 0,
       note: item.note,
       source: 'registered',
     }));
@@ -91,6 +95,8 @@ export async function POST(req: NextRequest) {
           store: oneOf(body.store, STORE_PRODUCT_STORES, 'all'),
           kind: oneOf(body.kind, STORE_PRODUCT_KINDS, 'consumable'),
           priceHint: str(body.priceHint, 24),
+          // Capped so a mistyped zero can't mint an economy-breaking pack.
+          flies: Math.min(1_000_000, Math.max(0, Number(body.flies) || 0)),
           note: str(body.note, 160),
           archived: false,
         },

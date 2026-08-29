@@ -6,6 +6,7 @@ import connectMongo from '@/lib/mongoose';
 import UserModel from '@/lib/models/User';
 import FlyPurchaseModel from '@/lib/models/FlyPurchase';
 import { getFlyPackForProduct } from '@/lib/flyPacks';
+import StoreProductModel from '@/lib/models/StoreProduct';
 
 function revenueCatEventName(event: any): AnalyticsEventName | null {
   if (Number(event?.price) < 0) return 'subscription_refunded';
@@ -28,10 +29,30 @@ function revenueCatPlatform(store: unknown): AnalyticsPlatform {
   return 'unknown';
 }
 
+/**
+ * What a bought product is worth in flies.
+ *
+ * The shop's own packs are compiled in, but a campaign can also sell an
+ * offer-only product registered by an admin — and that has to grant too, or
+ * the popup charges real money and hands back nothing.
+ */
+async function resolvePurchase(productId: string) {
+  const pack = getFlyPackForProduct(productId);
+  if (pack) return { id: pack.id, flies: pack.amount };
+
+  await connectMongo();
+  const registered = await StoreProductModel.findOne({ productId })
+    .select('productId flies')
+    .lean();
+  if (!registered?.flies) return null;
+  return { id: registered.productId, flies: registered.flies };
+}
+
 async function grantFlyPackPurchase(userId: string, event: any) {
   if (event?.type !== 'NON_RENEWING_PURCHASE') return null;
-  const pack = getFlyPackForProduct(String(event?.product_id ?? ''));
-  if (!pack || typeof event?.id !== 'string') return null;
+  if (typeof event?.id !== 'string') return null;
+  const pack = await resolvePurchase(String(event?.product_id ?? ''));
+  if (!pack) return null;
 
   await connectMongo();
   try {
@@ -41,7 +62,7 @@ async function grantFlyPackPurchase(userId: string, event: any) {
       userId,
       packId: pack.id,
       productId: String(event.product_id),
-      flies: pack.amount,
+      flies: pack.flies,
       revenueUsd: Number.isFinite(Number(event?.price)) ? Number(event.price) : undefined,
       store: typeof event?.store === 'string' ? event.store : undefined,
       environment: typeof event?.environment === 'string' ? event.environment : undefined,
@@ -57,7 +78,7 @@ async function grantFlyPackPurchase(userId: string, event: any) {
 
   const grant = await UserModel.updateOne(
     { _id: userId },
-    { $inc: { 'wardrobe.flies': pack.amount } },
+    { $inc: { 'wardrobe.flies': pack.flies } },
   );
   if (grant.modifiedCount !== 1) {
     await FlyPurchaseModel.deleteOne({ eventId: event.id });
@@ -132,7 +153,7 @@ export async function POST(req: NextRequest) {
           is_trial_conversion: event?.is_trial_conversion,
           renewal_number: event?.renewal_number,
           pack_id: flyPack?.id,
-          fly_amount: flyPack?.amount,
+          fly_amount: flyPack?.flies,
           price_usd: Number.isFinite(price) ? price : undefined,
         },
       });
@@ -148,7 +169,7 @@ export async function POST(req: NextRequest) {
             : new Date(),
           properties: {
             source: 'real_money_pack',
-            fly_amount: flyPack.amount,
+            fly_amount: flyPack.flies,
             is_premium: false,
             pack_id: flyPack.id,
             environment: event?.environment,

@@ -22,6 +22,12 @@ export type StoreProductDoc = {
   kind: StoreProductKind;
   /** Display only — the real price always comes from the store at runtime. */
   priceHint: string;
+  /**
+   * Flies credited when this product is bought. The purchase webhook reads it,
+   * so an offer-only pack grants without a deploy. 0 means this product grants
+   * nothing here — a subscription or something settled elsewhere.
+   */
+  flies: number;
   note: string;
   archived: boolean;
   createdAt: Date;
@@ -35,6 +41,7 @@ const StoreProductSchema = new Schema<StoreProductDoc>(
     store: { type: String, enum: [...STORE_PRODUCT_STORES], default: 'all' },
     kind: { type: String, enum: [...STORE_PRODUCT_KINDS], default: 'consumable' },
     priceHint: { type: String, default: '' },
+    flies: { type: Number, default: 0, min: 0 },
     note: { type: String, default: '' },
     archived: { type: Boolean, default: false },
   },
