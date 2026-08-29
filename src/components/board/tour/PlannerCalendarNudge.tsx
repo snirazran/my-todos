@@ -29,8 +29,20 @@ export default function PlannerCalendarNudge() {
   const eligible =
     !!user && loaded && anyProvider && connections.length === 0;
 
+  // Whether the tour was already behind the user when this page mounted, frozen
+  // at first load. Finishing or skipping the tour flips the live flag straight
+  // away, and gating on that would arm the paced ask seconds after a skip —
+  // which reads as ignoring it. A skip is answered by waiting for a later
+  // visit; a completion gets its own immediate `present()` instead.
+  const [tourWasSeen, setTourWasSeen] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (seenIntros && tourWasSeen === null) {
+      setTourWasSeen(!!seenIntros.plannerTour);
+    }
+  }, [seenIntros, tourWasSeen]);
+
   const { show, dismiss, engage, present } = useNudge('planner_calendar', {
-    enabled: eligible && !!seenIntros?.plannerTour,
+    enabled: eligible && tourWasSeen === true,
     delayMs: PACED_DELAY_MS,
   });
 
