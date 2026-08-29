@@ -59,6 +59,7 @@ import PaginationDots from './PaginationDots';
 import DragOverlay from './DragOverlay';
 import PlannerHeader from './PlannerHeader';
 import MonthCalendar from './MonthCalendar';
+import CalendarSyncRow from './CalendarSyncRow';
 import { useDragManager } from './hooks/useDragManager';
 import { usePan } from './hooks/usePan';
 import QuickAddSheet from '@/components/ui/QuickAddSheet';
@@ -2340,6 +2341,7 @@ export default function TaskBoard({
         open={calendarOpen}
         selectedDate={activeDateKey}
         minDate={accountCreatedAt ?? undefined}
+        footer={<CalendarSyncRow />}
         hasTasksOn={
           new Set(
             Object.entries(tasksByDate)

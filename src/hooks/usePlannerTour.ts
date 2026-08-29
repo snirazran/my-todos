@@ -6,6 +6,7 @@ import { useIntros } from '@/hooks/useIntros';
 import { INVENTORY_KEY, INVENTORY_SUMMARY_KEY } from '@/hooks/useInventory';
 import {
   TOUR_BEAT_COUNT,
+  TOUR_COMPLETED_EVENT,
   TOUR_CHAPTERS,
   TOUR_EVENT,
   TUTORIAL_CARD_HINT,
@@ -274,13 +275,21 @@ export function usePlannerTour({
     setPhase('opener');
   }, [enabled, phase, seenIntros]);
 
-  const finish = useCallback(() => {
-    setPhase('done');
-    setPayoff(null);
-    markIntroSeen('plannerTour');
-    seededDateRef.current = null;
-    void runClear(seededIdsRef.current).then(() => refreshRef.current());
-  }, [markIntroSeen, runClear]);
+  const finish = useCallback(
+    (completed: boolean) => {
+      setPhase('done');
+      setPayoff(null);
+      markIntroSeen('plannerTour');
+      seededDateRef.current = null;
+      void runClear(seededIdsRef.current).then(() => refreshRef.current());
+      // Only a played-through tour has earned the right to ask for anything
+      // else — a skip means the user wanted the board, not another card.
+      if (completed) window.dispatchEvent(new Event(TOUR_COMPLETED_EVENT));
+    },
+    [markIntroSeen, runClear],
+  );
+
+  const closeGift = useCallback(() => finish(true), [finish]);
 
   // The gift is only ever paid by pressing Claim on the reward card, so the
   // reward is something the user takes rather than something that happens.
@@ -295,7 +304,7 @@ export function usePlannerTour({
     // same moment it would be from the wardrobe. Without a box in the
     // inventory there is nothing to open, so a repeat claim just closes.
     if (granted) setPhase('opening');
-    else finish();
+    else finish(true);
   }, [finish]);
 
   /**
@@ -350,7 +359,7 @@ export function usePlannerTour({
     void prepareChapter(0).then(() => enterChapter(0));
   }, [prepareChapter, enterChapter]);
 
-  const skip = useCallback(() => finish(), [finish]);
+  const skip = useCallback(() => finish(false), [finish]);
 
   const step = useCallback(
     (withPayoff: string | null) => {
@@ -528,7 +537,7 @@ export function usePlannerTour({
     start,
     skip,
     claimReward,
-    closeGift: finish,
+    closeGift,
     completeBeat,
     skipBeat,
   };

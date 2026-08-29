@@ -29,6 +29,13 @@ const NUDGES = {
     minVisits: 2,
     blocking: true,
   },
+  planner_calendar: {
+    maxImpressions: 3,
+    cooldownHours: 72,
+    suppressAfterDismissals: 2,
+    minVisits: 2,
+    blocking: true,
+  },
 } satisfies Record<string, NudgeConfig>;
 
 export type NudgeKey = keyof typeof NUDGES;
@@ -138,5 +145,28 @@ export function useNudge(
     if (uid) writeRecord(key, uid, { suppressed: true });
   }, [key, uid]);
 
-  return { show, dismiss, engage, suppress };
+  /**
+   * Show now because the user just earned the moment, skipping the visit count
+   * and cooldown that pace an unprompted nudge. The ceilings that stop it being
+   * a pest — suppression, dismissals, total impressions — still apply, and the
+   * impression is recorded so the paced path picks up where this leaves off.
+   */
+  const present = useCallback(() => {
+    if (!uid) return false;
+    const record = readRecord(key, uid);
+    if (record.suppressed) return false;
+    if (record.dismissals >= config.suppressAfterDismissals) return false;
+    if (record.impressions >= config.maxImpressions) return false;
+    if (sessionClaim && sessionClaim !== key) return false;
+    if (config.blocking && !claimBlockingSlot()) return false;
+    sessionClaim = key;
+    writeRecord(key, uid, {
+      impressions: record.impressions + 1,
+      lastShownAt: Date.now(),
+    });
+    setShow(true);
+    return true;
+  }, [key, uid, config]);
+
+  return { show, dismiss, engage, suppress, present };
 }

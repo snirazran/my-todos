@@ -7,6 +7,9 @@ export const TOUR_EVENT = {
   calendarJumped: 'frogress:tour-calendar-jumped',
 } as const;
 
+/** Fired only when the tour is played through, never when it is skipped. */
+export const TOUR_COMPLETED_EVENT = 'frogress:planner-tour-completed';
+
 export const TUTORIAL_CARD_HINT = 'tutorial-card';
 
 export const TOUR_BLOCKED_TAP = 'frogress:tour-blocked-tap';

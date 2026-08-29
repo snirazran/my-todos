@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import TaskBoard from '@/components/board/TaskBoard';
 import PlannerTour from '@/components/board/tour/PlannerTour';
+import PlannerCalendarNudge from '@/components/board/tour/PlannerCalendarNudge';
 import { LeftTongueProvider } from '@/components/board/LeftTongue';
 import { FlyGainPopup } from '@/components/ui/FlyGainPopup';
 import { notifyQuestClaims, seedQuestClaims } from '@/lib/questClaims';
@@ -622,6 +623,7 @@ export default function ManageTasksPage() {
         timezone={tz}
         onBoardChanged={refetchAll}
       />
+      <PlannerCalendarNudge />
       </LeftTongueProvider>
 
       <style jsx global>{`

@@ -3,6 +3,7 @@
 import React, { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight, CalendarCheck, X } from 'lucide-react';
+import { isPlannerTourLocked } from '@/lib/tour/plannerTour';
 import {
   ymd,
   parseYmd,
@@ -22,6 +23,7 @@ export default function MonthCalendar({
   hasTasksOn,
   heading,
   todayLabel = 'Jump back to today',
+  footer,
   onSelect,
   onClose,
 }: {
@@ -34,11 +36,20 @@ export default function MonthCalendar({
   heading?: string;
   /** Label for the bottom shortcut button that selects today. */
   todayLabel?: string;
+  /** Rendered under the grid. Omitted by pickers that are mid-action. */
+  footer?: React.ReactNode;
   onSelect: (dateKey: string) => void;
   onClose: () => void;
 }) {
   const today = todayYmd();
   const [viewMonth, setViewMonth] = useState(() => selectedDate.slice(0, 7));
+  // The planner tour pins a coach bar over the bottom of the screen, which
+  // would otherwise sit on top of the last week and the shortcut below it.
+  const [tourReserve, setTourReserve] = useState('0px');
+
+  React.useEffect(() => {
+    if (open) setTourReserve(isPlannerTourLocked() ? '288px' : '0px');
+  }, [open]);
 
   // re-anchor view month to selected when reopening
   React.useEffect(() => {
@@ -104,7 +115,12 @@ export default function MonthCalendar({
           transition={{ type: 'spring', stiffness: 300, damping: 30 }}
           className="absolute left-0 right-0 top-0 z-[96] px-3 pt-14 pointer-events-none"
         >
-          <div data-hint="month-calendar" className="mx-auto w-[min(96vw,560px)] rounded-3xl bg-primary text-primary-foreground p-4 md:p-5 shadow-2xl pointer-events-auto" onClick={(e) => e.stopPropagation()}>
+          <div
+            data-hint="month-calendar"
+            style={{ ['--cal-reserve' as string]: tourReserve }}
+            className="mx-auto w-[min(96vw,560px)] max-h-[calc(100dvh-9rem-var(--cal-reserve,0px))] overflow-y-auto overscroll-contain rounded-3xl bg-primary text-primary-foreground p-4 md:p-5 shadow-2xl pointer-events-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="mb-3 flex items-center gap-2">
               {heading && (
                 <div className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-white/15 px-3 py-2 text-center text-[13px] font-bold leading-snug">
@@ -191,6 +207,8 @@ export default function MonthCalendar({
                 {todayLabel}
               </button>
             )}
+
+            {footer}
           </div>
         </motion.div>
         </>

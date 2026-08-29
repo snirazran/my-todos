@@ -1,84 +1,26 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { createPortal } from 'react-dom';
 import useSWR from 'swr';
 import { AlertTriangle, Loader2, RefreshCw } from 'lucide-react';
 import { Icon } from '@/components/ui/Icon';
 import { Switch } from '@/components/ui/switch';
-import { useAuth } from '@/components/auth/AuthContext';
 import AppleCalendarSheet from '@/components/ui/AppleCalendarSheet';
 import AiConnectionsSection from '@/components/ui/AiConnectionsSection';
+import {
+  useCalendarConnections,
+  useGoogleConnectFlow,
+  type CalendarConnectionInfo,
+} from '@/hooks/useCalendarSync';
 
-export type CalendarConnectionInfo = {
-  provider: 'google' | 'apple';
-  status: 'active' | 'error' | 'paused' | 'reauth_required' | 'disconnected';
-  errorMessage?: string;
-  errorKind?: 'auth' | 'gone' | 'rateLimit' | 'transient';
-  failureCount?: number;
-  failingSince?: string | null;
-  pausedReason?: string;
-  calendarDisplayName?: string;
-  appleId?: string;
-  lastSyncedAt?: string | null;
-  settings?: {
-    importTagId?: string;
-    exportEnabled?: boolean;
-    importEnabled?: boolean;
-  };
-};
+export {
+  useCalendarConnections,
+  openGoogleCalendarConnect,
+  type CalendarConnectionInfo,
+} from '@/hooks/useCalendarSync';
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
-
-export function useCalendarConnections() {
-  const { user } = useAuth();
-  const { data, mutate, isLoading } = useSWR<{
-    connections: CalendarConnectionInfo[];
-  }>(user ? '/api/calendar/connections' : null, fetcher, {
-    revalidateOnFocus: false,
-  });
-  return { connections: data?.connections ?? [], mutate, isLoading };
-}
-
-export async function openGoogleCalendarConnect(): Promise<
-  { ok: true } | { ok: false; reason: string }
-> {
-  try {
-    const { Capacitor } = await import('@capacitor/core');
-    if (Capacitor.isNativePlatform()) {
-      // Google blocks OAuth consent inside embedded webviews — use the system
-      // browser with a signed state token; the app polls connection status.
-      const res = await fetch('/api/calendar/google/connect-token', { method: 'POST' });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.token) {
-        return {
-          ok: false,
-          reason:
-            res.status === 503
-              ? 'Calendar sync isn’t available on the server yet.'
-              : 'Could not start the Google connection. Try again.',
-        };
-      }
-      const { Browser } = await import('@capacitor/browser');
-      await Browser.open({
-        url: `${window.location.origin}/api/calendar/google/connect?t=${encodeURIComponent(data.token)}`,
-      });
-      return { ok: true };
-    }
-    const popup = window.open(
-      '/api/calendar/google/connect',
-      'gcal-connect',
-      'width=520,height=680,menubar=no,toolbar=no',
-    );
-    if (!popup) {
-      return { ok: false, reason: 'Popup blocked — allow popups for this site.' };
-    }
-    return { ok: true };
-  } catch (err) {
-    console.error('google connect open failed:', (err as Error)?.message);
-    return { ok: false, reason: 'Could not open the Google sign-in. Update the app and try again.' };
-  }
-}
 
 function timeAgo(iso?: string | null) {
   if (!iso) return null;
@@ -450,46 +392,13 @@ function ProviderCard({
 }
 
 export default function IntegrationsPanel() {
-  const { connections, mutate, isLoading } = useCalendarConnections();
-  const [connectingGoogle, setConnectingGoogle] = useState(false);
-  const [connectError, setConnectError] = useState<string | null>(null);
+  const { connections, available, mutate, isLoading } = useCalendarConnections();
   const [appleSheetOpen, setAppleSheetOpen] = useState(false);
-  const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const stopPolling = useCallback(() => {
-    if (pollTimer.current) {
-      clearInterval(pollTimer.current);
-      pollTimer.current = null;
-    }
-    setConnectingGoogle(false);
-  }, []);
-
-  const connectGoogle = useCallback(async () => {
-    setConnectError(null);
-    setConnectingGoogle(true);
-    const opened = await openGoogleCalendarConnect();
-    if (!opened.ok) {
-      setConnectingGoogle(false);
-      setConnectError(opened.reason);
-      return;
-    }
-    let ticks = 0;
-    if (pollTimer.current) clearInterval(pollTimer.current);
-    pollTimer.current = setInterval(async () => {
-      ticks++;
-      const fresh = await mutate();
-      const active = fresh?.connections?.find(
-        (c) => c.provider === 'google' && c.status === 'active',
-      );
-      if (active || ticks > 60) {
-        stopPolling();
-        if (active) window.dispatchEvent(new Event('board-refresh'));
-        else setConnectError('Connection didn’t complete. Try again.');
-      }
-    }, 2000);
-  }, [mutate, stopPolling]);
-
-  useEffect(() => () => stopPolling(), [stopPolling]);
+  const {
+    connecting: connectingGoogle,
+    error: connectError,
+    connect: connectGoogle,
+  } = useGoogleConnectFlow({ mutate });
 
   const google = connections.find((c) => c.provider === 'google');
   const apple = connections.find((c) => c.provider === 'apple');
@@ -502,8 +411,14 @@ export default function IntegrationsPanel() {
     );
   }
 
+  // A provider the server cannot serve is hidden rather than offered — its
+  // connect button would only 503. An existing connection always stays visible.
+  const showGoogle = available?.google !== false || !!google;
+  const showApple = available?.apple !== false || !!apple;
+
   return (
     <div className="space-y-4">
+      {showGoogle && (
       <ProviderCard
         provider="google"
         label="Google Calendar"
@@ -514,9 +429,11 @@ export default function IntegrationsPanel() {
         onConnect={() => void connectGoogle()}
         onChanged={() => void mutate()}
       />
+      )}
       {connectError && (
         <p className="px-1 text-xs font-bold text-red-500">{connectError}</p>
       )}
+      {showApple && (
       <ProviderCard
         provider="apple"
         label="Apple Calendar"
@@ -527,6 +444,7 @@ export default function IntegrationsPanel() {
         onConnect={() => setAppleSheetOpen(true)}
         onChanged={() => void mutate()}
       />
+      )}
 
       <p className="px-1 text-[11px] font-semibold leading-relaxed text-muted-foreground">
         Sync runs automatically in the background. If a task and an event are

@@ -7,6 +7,27 @@ import CalendarConnectionModel from '@/lib/models/CalendarConnection';
 import { invalidateConnectionCache } from '@/lib/calendar/connections';
 import { resumeConnection } from '@/lib/calendar/health';
 
+function credKeyReady() {
+  const raw = process.env.CALENDAR_CRED_KEY;
+  if (!raw) return false;
+  try {
+    return Buffer.from(raw, 'base64').length === 32;
+  } catch {
+    return false;
+  }
+}
+
+function providerAvailability() {
+  const creds = credKeyReady();
+  return {
+    google:
+      creds &&
+      !!process.env.GOOGLE_CALENDAR_CLIENT_ID &&
+      !!process.env.GOOGLE_CALENDAR_CLIENT_SECRET,
+    apple: creds,
+  };
+}
+
 export async function GET() {
   let uid: string;
   try {
@@ -35,6 +56,7 @@ export async function GET() {
   ).lean();
 
   return NextResponse.json({
+    available: providerAvailability(),
     connections: conns.map((c) => ({
       provider: c.provider,
       status: c.status,
