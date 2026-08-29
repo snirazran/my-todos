@@ -307,7 +307,6 @@ export async function POST(req: NextRequest) {
       if (prize.kind === 'background') {
         user.wardrobe.backgrounds.inventory[prize.id] =
           (user.wardrobe.backgrounds.inventory[prize.id] || 0) + 1;
-        user.markModified('wardrobe.backgrounds');
       } else {
         user.wardrobe.inventory[prize.id] = (user.wardrobe.inventory[prize.id] || 0) + 1;
         if (!user.wardrobe.inventoryHistory) user.wardrobe.inventoryHistory = {};
@@ -338,6 +337,7 @@ export async function POST(req: NextRequest) {
     user.markModified('tradeRerollClaim');
 
     user.markModified('wardrobe.inventory');
+    user.markModified('wardrobe.backgrounds');
     await user.save();
 
     for (const prize of rewards) {

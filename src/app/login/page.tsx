@@ -412,7 +412,6 @@ function LoginPageInner() {
               }}
             >
               <div
-                className="auth-fly-bank"
                 ref={(el) => {
                   flyRefs.current[FLY_KEY] = el;
                 }}

@@ -144,7 +144,6 @@ export default function WelcomePage() {
               }}
             >
               <div
-                className="auth-fly-bank"
                 ref={(el) => {
                   flyRefs.current[FLY_KEY] = el;
                 }}

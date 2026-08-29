@@ -147,7 +147,6 @@ export async function POST(req: NextRequest) {
     if (reward.kind === 'background') {
       user.wardrobe.backgrounds.inventory[reward.id] =
         (user.wardrobe.backgrounds.inventory[reward.id] || 0) + 1;
-      user.markModified('wardrobe.backgrounds');
     } else {
       user.wardrobe.inventory[reward.id] =
         (user.wardrobe.inventory[reward.id] || 0) + 1;
@@ -162,6 +161,7 @@ export async function POST(req: NextRequest) {
     }
     user.markModified('wardrobe.unseenItems');
     user.markModified('wardrobe.inventory');
+    user.markModified('wardrobe.backgrounds');
 
     (user as any).tradeRerollClaim = { ...claim, used: true };
     user.markModified('tradeRerollClaim');
