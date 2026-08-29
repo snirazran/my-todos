@@ -38,12 +38,13 @@ export async function buildStarterPlanForAreas(args: {
   if (ids.length === 0 || !config.isActive) return { config, items: [] };
 
   const docs = await QuestCategoryModel.find({ categoryId: { $in: ids } })
-    .select('categoryId name shortLabel starterTasks')
+    .select('categoryId name shortLabel accent starterTasks')
     .lean<
       Array<{
         categoryId: string;
         name: string;
         shortLabel?: string;
+        accent?: string;
         starterTasks?: StarterTaskTemplate[];
       }>
     >();
@@ -51,6 +52,8 @@ export async function buildStarterPlanForAreas(args: {
   const categories = docs.map((doc) => ({
     id: doc.categoryId,
     name: doc.name,
+    shortLabel: doc.shortLabel,
+    accent: doc.accent,
     starterTasks: starterTasksForCategory(doc),
   }));
 

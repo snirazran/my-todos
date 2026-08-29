@@ -236,15 +236,19 @@ export default function ProfileQuestionsStep({
                     {/* Scrim: darkens only the slice behind the text so the art stays vivid. */}
                     <span
                       aria-hidden
-                      className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent"
+                      className="pointer-events-none absolute inset-0"
+                      style={{
+                        background:
+                          'linear-gradient(to top, rgba(0,0,0,0.62) 0%, rgba(0,0,0,0.34) 26%, rgba(0,0,0,0.10) 48%, rgba(0,0,0,0) 68%)',
+                      }}
                     />
 
                     <span className="absolute inset-x-0 bottom-0 z-10 p-3.5 md:p-4">
-                      <span className="block text-base font-black leading-tight tracking-tight text-white md:text-lg">
+                      <span className="block text-base font-black leading-tight tracking-tight text-white [text-shadow:0_1px_6px_rgba(0,0,0,0.7)] md:text-lg">
                         {category.name}
                       </span>
                       {category.onboardingSentence?.trim() ? (
-                        <span className="mt-0.5 block text-sm font-medium leading-snug text-white/85 line-clamp-2">
+                        <span className="mt-0.5 block text-sm font-medium leading-snug text-white/90 [text-shadow:0_1px_5px_rgba(0,0,0,0.7)] line-clamp-2">
                           {category.onboardingSentence}
                         </span>
                       ) : null}
@@ -255,7 +259,7 @@ export default function ProfileQuestionsStep({
                         'absolute right-3 top-3 z-10 grid h-7 w-7 place-items-center rounded-full border-2 transition-all duration-200 md:h-8 md:w-8',
                         isSelected
                           ? 'border-primary bg-primary text-primary-foreground'
-                          : 'border-white/80 bg-black/30 text-transparent backdrop-blur-sm',
+                          : 'border-white/90 bg-white/15 text-transparent shadow-[0_1px_6px_rgba(0,0,0,0.35)] backdrop-blur-sm',
                       )}
                       aria-hidden
                     >

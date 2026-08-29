@@ -17,6 +17,8 @@ export type StarterPlanItem = {
   id: string;
   categoryId: MacroCategoryId;
   categoryName: string;
+  categoryShortLabel?: string;
+  categoryAccent?: string;
   text: string;
   cadence: StarterCadence;
   days: number[];
@@ -133,56 +135,91 @@ export function starterCadenceLabel(
   return resolved.map((d) => WEEKDAY_SHORT[d]).join(' · ');
 }
 
-export type StarterDayStart = 'early' | 'usual' | 'late';
+export type StarterDayStart = string;
 
-export const STARTER_DAY_START_DEFAULT: StarterDayStart = 'usual';
-
-export const STARTER_DAY_START_OPTIONS: Array<{
-  id: StarterDayStart;
-  label: string;
-  shiftMinutes: number;
-}> = [
-  { id: 'early', label: 'Early', shiftMinutes: -120 },
-  { id: 'usual', label: 'Usual', shiftMinutes: 0 },
-  { id: 'late', label: 'Late', shiftMinutes: 120 },
-];
+export const STARTER_DAY_START_MIN_MINUTES = 4 * 60;
+export const STARTER_DAY_START_MAX_MINUTES = 11 * 60;
+export const STARTER_DAY_START_STEP_MINUTES = 15;
 
 const DAY_START_EARLIEST_MINUTES = 4 * 60;
 const DAY_START_LATEST_MINUTES = 23 * 60 + 30;
 
-export function normalizeStarterDayStart(value: unknown): StarterDayStart {
-  return value === 'early' || value === 'late'
-    ? value
-    : STARTER_DAY_START_DEFAULT;
+export function starterTimeToMinutes(value?: string): number | undefined {
+  if (!value || !/^\d{2}:\d{2}$/.test(value)) return undefined;
+  const [hour, minute] = value.split(':').map(Number);
+  if (!Number.isInteger(hour) || !Number.isInteger(minute)) return undefined;
+  return hour * 60 + minute;
 }
 
-export function shiftStarterTime(
-  startTime: string | undefined,
-  dayStart: StarterDayStart,
-): string | undefined {
-  if (!startTime || !/^\d{2}:\d{2}$/.test(startTime)) return startTime;
-  const shift =
-    STARTER_DAY_START_OPTIONS.find((option) => option.id === dayStart)
-      ?.shiftMinutes ?? 0;
-  if (shift === 0) return startTime;
-  const [hour, minute] = startTime.split(':').map(Number);
-  const total = Math.min(
-    DAY_START_LATEST_MINUTES,
-    Math.max(DAY_START_EARLIEST_MINUTES, hour * 60 + minute + shift),
-  );
+export function starterMinutesToTime(minutes: number): string {
+  const total = Math.min(24 * 60 - 1, Math.max(0, Math.round(minutes)));
   const hh = String(Math.floor(total / 60)).padStart(2, '0');
   const mm = String(total % 60).padStart(2, '0');
   return `${hh}:${mm}`;
 }
 
+export function clampStarterDayStartMinutes(minutes: number): number {
+  const snapped =
+    Math.round(minutes / STARTER_DAY_START_STEP_MINUTES) *
+    STARTER_DAY_START_STEP_MINUTES;
+  return Math.min(
+    STARTER_DAY_START_MAX_MINUTES,
+    Math.max(STARTER_DAY_START_MIN_MINUTES, snapped),
+  );
+}
+
+export function normalizeStarterDayStart(
+  value: unknown,
+): StarterDayStart | undefined {
+  if (typeof value !== 'string') return undefined;
+  const minutes = starterTimeToMinutes(value.trim());
+  if (minutes === undefined) return undefined;
+  return starterMinutesToTime(clampStarterDayStartMinutes(minutes));
+}
+
+export function shiftStarterTime(
+  startTime: string | undefined,
+  shiftMinutes: number,
+): string | undefined {
+  const minutes = starterTimeToMinutes(startTime);
+  if (minutes === undefined || shiftMinutes === 0) return startTime;
+  const total = Math.min(
+    DAY_START_LATEST_MINUTES,
+    Math.max(DAY_START_EARLIEST_MINUTES, minutes + shiftMinutes),
+  );
+  return starterMinutesToTime(total);
+}
+
+export function starterDayStartShift(
+  items: StarterPlanItem[],
+  dayStart: StarterDayStart | undefined,
+): number {
+  const target = starterTimeToMinutes(normalizeStarterDayStart(dayStart));
+  const base = starterTimeToMinutes(earliestStarterTime(items));
+  if (target === undefined || base === undefined) return 0;
+  return target - base;
+}
+
 export function applyStarterDayStart(
   items: StarterPlanItem[],
-  dayStart: StarterDayStart,
+  dayStart: StarterDayStart | undefined,
 ): StarterPlanItem[] {
-  if (dayStart === STARTER_DAY_START_DEFAULT) return items;
+  const shift = starterDayStartShift(items, dayStart);
+  if (shift === 0) return items;
   return items.map((item) => {
-    const startTime = shiftStarterTime(item.startTime, dayStart);
+    const startTime = shiftStarterTime(item.startTime, shift);
     return { ...item, startTime, timeLabel: starterTimeLabel(startTime) };
+  });
+}
+
+export function sortStarterPlanItems(items: StarterPlanItem[]): StarterPlanItem[] {
+  return [...items].sort((a, b) => {
+    const aTime = starterTimeToMinutes(a.startTime);
+    const bTime = starterTimeToMinutes(b.startTime);
+    if (aTime === undefined && bTime === undefined) return 0;
+    if (aTime === undefined) return 1;
+    if (bTime === undefined) return -1;
+    return aTime - bTime;
   });
 }
 
@@ -286,6 +323,8 @@ export function buildStarterPlan(args: {
   categories: Array<{
     id: MacroCategoryId;
     name: string;
+    shortLabel?: string;
+    accent?: string;
     starterTasks?: StarterTaskTemplate[];
   }>;
   config: StarterPlanConfig;
@@ -303,7 +342,7 @@ export function buildStarterPlan(args: {
       return { category, tasks };
     })
     .filter(Boolean) as Array<{
-    category: { id: string; name: string };
+    category: { id: string; name: string; shortLabel?: string; accent?: string };
     tasks: StarterTaskTemplate[];
   }>;
 
@@ -322,6 +361,8 @@ export function buildStarterPlan(args: {
         id: `${pool.category.id}:${template.id}`,
         categoryId: pool.category.id,
         categoryName: pool.category.name,
+        categoryShortLabel: pool.category.shortLabel,
+        categoryAccent: pool.category.accent,
         text: template.text,
         cadence: template.cadence,
         days,
