@@ -20,6 +20,7 @@ import {
   Plus,
   Repeat,
   Rows3,
+  Tag,
   X,
 } from 'lucide-react';
 import {
@@ -31,10 +32,13 @@ import {
   type DisplayDay,
 } from '@/components/board/helpers';
 import Fly from '@/components/ui/fly';
+import { useIntros } from '@/hooks/useIntros';
+import { useUIStore } from '@/lib/uiStore';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
 import { hapticTick } from '@/lib/haptics';
 import { PlusUpgradeModal } from './PlusUpgradeModal';
 import { PickerSheet } from './quick-add/PickerSheet';
+import { QuickAddTip } from './quick-add/QuickAddTip';
 import { TagManagerSheet } from './quick-add/TagManagerSheet';
 import { SuggestionTabs } from './quick-add/SuggestionTabs';
 import { useTagManager } from './quick-add/useTagManager';
@@ -103,183 +107,55 @@ function useDragScroll() {
   };
 }
 
-function TagScrollRail({
-  scrollerRef,
-  contentVersion,
-  onVisibilityChange,
-}: {
-  scrollerRef: React.RefObject<HTMLDivElement | null>;
-  contentVersion: unknown;
-  onVisibilityChange: (visible: boolean) => void;
-}) {
-  const [metrics, setMetrics] = useState({
-    canScroll: false,
-    thumbPercent: 100,
-    leftPercent: 0,
-  });
+// Horizontal rails here scroll but must not show a scrollbar, so the only cue
+// that more is off-screen is a soft fade on the trailing edge.
+function useScrollFade(contentVersion: unknown) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [faded, setFaded] = useState(false);
+
+  const update = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    const maxScroll = el.scrollWidth - el.clientWidth;
+    setFaded(maxScroll > 4 && el.scrollLeft < maxScroll - 4);
+  }, []);
 
   useEffect(() => {
-    const scroller = scrollerRef.current;
-    if (!scroller) return;
-    let frame = 0;
-    const update = () => {
-      window.cancelAnimationFrame(frame);
-      frame = window.requestAnimationFrame(() => {
-        const maxScroll = Math.max(
-          0,
-          scroller.scrollWidth - scroller.clientWidth,
-        );
-        const clampedScroll = Math.min(
-          maxScroll,
-          Math.max(0, scroller.scrollLeft),
-        );
-        if (scroller.scrollLeft !== clampedScroll) {
-          scroller.scrollLeft = clampedScroll;
-        }
-        const canScroll = maxScroll > 4;
-        const thumbPercent = canScroll
-          ? Math.max(18, (scroller.clientWidth / scroller.scrollWidth) * 100)
-          : 100;
-        const leftPercent = canScroll
-          ? (clampedScroll / maxScroll) * (100 - thumbPercent)
-          : 0;
-        setMetrics({ canScroll, thumbPercent, leftPercent });
-        onVisibilityChange(canScroll);
-      });
-    };
-
+    const el = ref.current;
+    if (!el) return;
     update();
-    scroller.addEventListener('scroll', update, { passive: true });
     const observer = new ResizeObserver(update);
-    observer.observe(scroller);
-    return () => {
-      window.cancelAnimationFrame(frame);
-      observer.disconnect();
-      scroller.removeEventListener('scroll', update);
-    };
-  }, [contentVersion, onVisibilityChange, scrollerRef]);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [update, contentVersion]);
 
-  if (!metrics.canScroll) return null;
-
-  const scrollFromPointer = (
-    track: HTMLDivElement,
-    clientX: number,
-  ) => {
-    const scroller = scrollerRef.current;
-    if (!scroller) return;
-    const bounds = track.getBoundingClientRect();
-    const thumbWidth = bounds.width * (metrics.thumbPercent / 100);
-    const travel = bounds.width - thumbWidth;
-    const thumbLeft = Math.min(
-      travel,
-      Math.max(0, clientX - bounds.left - thumbWidth / 2),
-    );
-    const maxScroll = scroller.scrollWidth - scroller.clientWidth;
-    scroller.scrollLeft = travel > 0 ? (thumbLeft / travel) * maxScroll : 0;
-  };
-
-  return (
-    <div
-      role="scrollbar"
-      aria-label="Scroll tags"
-      aria-orientation="horizontal"
-      aria-valuemin={0}
-      aria-valuemax={100}
-      aria-valuenow={Math.round(
-        (metrics.leftPercent / Math.max(1, 100 - metrics.thumbPercent)) * 100,
-      )}
-      tabIndex={0}
-      onPointerDown={(event) => {
-        event.preventDefault();
-        event.currentTarget.setPointerCapture(event.pointerId);
-        scrollFromPointer(event.currentTarget, event.clientX);
-      }}
-      onPointerMove={(event) => {
-        if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
-        scrollFromPointer(event.currentTarget, event.clientX);
-      }}
-      onKeyDown={(event) => {
-        const scroller = scrollerRef.current;
-        if (!scroller) return;
-        if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
-          event.preventDefault();
-          scroller.scrollBy({
-            left: event.key === 'ArrowLeft' ? -80 : 80,
-            behavior: 'smooth',
-          });
-        } else if (event.key === 'Home' || event.key === 'End') {
-          event.preventDefault();
-          scroller.scrollTo({
-            left: event.key === 'Home' ? 0 : scroller.scrollWidth,
-            behavior: 'smooth',
-          });
-        }
-      }}
-      className="group absolute inset-x-4 -bottom-2 h-2 touch-none cursor-pointer rounded-full bg-slate-200/60 p-px outline-none transition-colors hover:bg-slate-200/90 focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-popover dark:bg-white/[0.07] dark:ring-1 dark:ring-inset dark:ring-white/10 dark:hover:bg-white/[0.1] dark:focus-visible:ring-2 dark:focus-visible:ring-primary/40"
-    >
-      <div
-        className="absolute bottom-px top-px flex items-center justify-center rounded-full bg-slate-300/70 transition-[width,background-color] duration-150 group-hover:bg-slate-300 dark:bg-white/20 dark:ring-1 dark:ring-inset dark:ring-white/10 dark:group-hover:bg-white/30"
-        style={{
-          width: `${metrics.thumbPercent}%`,
-          left: `${metrics.leftPercent}%`,
-        }}
-      >
-        <span className="pointer-events-none flex items-center gap-0.5" aria-hidden="true">
-          <span className="h-0.5 w-0.5 rounded-full bg-white/90 dark:bg-white/60" />
-          <span className="h-0.5 w-0.5 rounded-full bg-white/90 dark:bg-white/60" />
-          <span className="h-0.5 w-0.5 rounded-full bg-white/90 dark:bg-white/60" />
-        </span>
-      </div>
-    </div>
-  );
+  return { ref, faded, update };
 }
 
-function ToolbarPill({
-  icon,
-  label,
-  onClick,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-primary/10 px-3.5 text-[13px] font-bold text-primary transition-transform active:scale-95"
-    >
-      {icon}
-      <span className="whitespace-nowrap">{label}</span>
-    </button>
-  );
-}
-
-// 44px square keeps every toolbar action inside the platform touch minimum
-// now that the section picker is an icon sitting beside the other two.
-const ToolbarIcon = React.forwardRef<
+const ToolbarChip = React.forwardRef<
   HTMLButtonElement,
   {
     icon: React.ReactNode;
     label: string;
+    ariaLabel?: string;
     active?: boolean;
     onClick: () => void;
   }
->(function ToolbarIcon({ icon, label, active = false, onClick }, ref) {
+>(function ToolbarChip({ icon, label, ariaLabel, active = false, onClick }, ref) {
   return (
     <button
       ref={ref}
       type="button"
-      aria-label={label}
-      title={label}
+      aria-label={ariaLabel ?? label}
       onClick={onClick}
-      className={`grid h-11 w-11 shrink-0 place-items-center rounded-full transition-colors active:scale-95 ${
+      className={`inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-full px-3.5 text-[13px] font-bold transition-transform active:scale-95 ${
         active
           ? 'bg-primary/10 text-primary'
-          : 'text-muted-foreground [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground'
+          : 'text-muted-foreground ring-1 ring-inset ring-border/80 [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground'
       }`}
     >
       {icon}
+      <span className="whitespace-nowrap">{label}</span>
     </button>
   );
 });
@@ -353,7 +229,6 @@ export default function QuickAddSheet({
   const tagInputRef = useRef<HTMLInputElement>(null);
   const tagScroll = useDragScroll();
   const [tagFadeRight, setTagFadeRight] = useState(false);
-  const [tagScrollerVisible, setTagScrollerVisible] = useState(false);
   const updateTagFade = useCallback(() => {
     const el = tagScroll.ref.current;
     if (!el) return;
@@ -453,6 +328,17 @@ export default function QuickAddSheet({
   const [sheetBaseHeight, setSheetBaseHeight] = useState<number | null>(null);
   const [suggestionsReady, setSuggestionsReady] = useState(false);
   const [hasSuggestionContent, setHasSuggestionContent] = useState(false);
+  const { seenIntros, markIntroSeen } = useIntros(open);
+  const markIntroSeenRef = useRef(markIntroSeen);
+  markIntroSeenRef.current = markIntroSeen;
+  // A quest guide can already be pointing into this sheet (the tag beat anchors
+  // `quickadd-tag`). Two coaches on one control is worse than none, so the
+  // first-run material stands down whenever one is running.
+  const questHintActive = useUIStore((state) => state.activeHint !== null);
+  const [tagEditTipOpen, setTagEditTipOpen] = useState(false);
+  // Dismissal has to stick on its own: the seenIntros write is optimistic, so
+  // without this the tip re-arms the moment its condition is still true.
+  const [tagEditTipDismissed, setTagEditTipDismissed] = useState(false);
 
   const { data: questContext } = useSWR<{
     isPremium?: boolean;
@@ -787,8 +673,46 @@ export default function QuickAddSheet({
         .filter(Boolean)
         .join(' · ')
     : '';
+  useEffect(() => {
+    if (open) return;
+    setTagEditTipOpen(false);
+    setTagEditTipDismissed(false);
+  }, [open]);
+
+  // The one control whose behaviour is still invisible after labelling: a tag
+  // chip looks like a toggle, and nothing says it also opens an editor.
+  useEffect(() => {
+    if (!open || questHintActive || tagEditTipDismissed) return;
+    if (!seenIntros || seenIntros.quickAddTagEdit) return;
+    if (tags.length === 0) return;
+    setTagEditTipOpen(true);
+    markIntroSeenRef.current('quickAddTagEdit');
+  }, [
+    open,
+    seenIntros,
+    questHintActive,
+    tagEditTipDismissed,
+    tags.length,
+  ]);
+
+  // Natural-language parsing is the only capability with no control to point
+  // at, so it gets the one line of teaching — and it stays until the user has
+  // actually used it once, not merely been shown it.
+  const showNlHint =
+    !hasTaskText &&
+    !!seenIntros &&
+    !seenIntros.quickAddNl;
+
+  // The reminder wheel resolves clicks against its own container, so a click
+  // that lands where the wheel is about to mount reads as a position outside
+  // it. One frame of delay lets the opening click finish first.
+  const openReminderPicker = useCallback(() => {
+    requestAnimationFrame(() => setShowReminderPicker(true));
+  }, []);
+
   const applyNlSuggestion = () => {
     if (!nlSuggestion) return;
+    markIntroSeenRef.current('quickAddNl');
     if (nlSuggestion.dateKey)
       selectCalendarDate(parseYmdLocal(nlSuggestion.dateKey));
     if (nlSuggestion.startTime) {
@@ -945,6 +869,10 @@ export default function QuickAddSheet({
       none: 'Repeat',
     }[repeatMode] ?? 'Repeat';
 
+  const actionsFade = useScrollFade(
+    `${selectedDateLabel}|${repeatShortLabel}|${repeatsOn}|${notifyEnabled}|${startTime}|${pickedSection?.id ?? ''}|${sections.length}|${stripTags.length}`,
+  );
+
   const selectSingleDay = (day: DisplayDay) => {
     setPickedDays([day]);
     const date = new Date();
@@ -1015,6 +943,7 @@ export default function QuickAddSheet({
     setIsSubmitting(true);
     try {
       await onSubmit(submitData);
+      markIntroSeenRef.current('quickAddNl');
       if (removeSavedTask && pickedBacklogTaskId) {
         const backlogKey = '/api/tasks?view=board&day=-1';
         // Drop it from the SWR cache right away so it doesn't flicker back in
@@ -1329,6 +1258,12 @@ export default function QuickAddSheet({
                         </div>
                       </div>
 
+                      {showNlHint && (
+                        <p className="mt-0.5 px-1 text-[13px] font-medium leading-snug text-muted-foreground/70">
+                          Dates work too — try “gym tomorrow 7am”
+                        </p>
+                      )}
+
                       {(nlSuggestion || showQuestTagSuggestion) && (
                         <div className="mt-3 mb-1 flex flex-wrap items-center gap-x-2 gap-y-3.5 px-1.5">
                           {nlSuggestion && (
@@ -1386,13 +1321,14 @@ export default function QuickAddSheet({
 
                       <div className="mt-1.5 mb-3 h-px bg-border/60" />
 
+                      {/* No rail until tags exist: a dashed "Create tag" button
+                          was the loudest thing on an empty sheet, asking for
+                          taxonomy before the first task. The toolbar's Tag chip
+                          is the way in until then. */}
+                      {stripTags.length > 0 && (
                       <div
                         className={`relative -mx-2 ${
-                          tagScrollerVisible
-                            ? keyboardActive
-                              ? 'mb-3'
-                              : 'mb-4'
-                            : 'mb-1.5'
+                          keyboardActive ? 'mb-2' : 'mb-3'
                         }`}
                       >
                         <div
@@ -1507,62 +1443,86 @@ export default function QuickAddSheet({
                           className="inline-flex h-9 items-center justify-center gap-1 rounded-xl border border-dashed border-primary/40 bg-primary/5 px-3 text-[13px] font-extrabold text-primary transition-colors active:scale-95 [@media(hover:hover)]:hover:bg-primary/10"
                         >
                           <Plus className="h-3.5 w-3.5 shrink-0 stroke-[3]" />
-                          {stripTags.length === 0 && (
-                            <span className="whitespace-nowrap">Create tag</span>
-                          )}
                         </button>
                         </div>
-                        <TagScrollRail
-                          scrollerRef={tagScroll.ref}
-                          contentVersion={stripTags}
-                          onVisibilityChange={setTagScrollerVisible}
-                        />
                       </div>
+                      )}
 
-                      <div className="-mx-1 flex items-center gap-1.5 overflow-x-auto no-scrollbar px-1 pb-0.5">
+                      <QuickAddTip
+                        show={tagEditTipOpen}
+                        text="Hold a tag to rename or recolour it"
+                        onDismiss={() => {
+                          setTagEditTipDismissed(true);
+                          setTagEditTipOpen(false);
+                        }}
+                      />
+
+                      {/* One row that scrolls. Every control keeps its word —
+                          a bare icon in here reads as a puzzle to anyone who
+                          has not already learnt it. */}
+                      <div
+                        ref={actionsFade.ref}
+                        onScroll={actionsFade.update}
+                        className={`-mx-1 flex items-center gap-1.5 overflow-x-auto no-scrollbar px-1 pb-0.5 ${
+                          actionsFade.faded ? 'mask-fade-right' : ''
+                        }`}
+                      >
                         {!hideDayPicker && (
-                          <ToolbarPill
+                          <ToolbarChip
                             icon={<CalendarDays className="h-4 w-4" />}
                             label={selectedDateLabel}
+                            ariaLabel={`When: ${selectedDateLabel}`}
+                            active
                             onClick={() => setActivePicker('date')}
                           />
                         )}
-                        {!hideRepeatPicker && repeatsOn && (
-                          <ToolbarPill
+                        {!hideRepeatPicker && (
+                          <ToolbarChip
                             icon={<Repeat className="h-4 w-4" />}
-                            label={repeatShortLabel}
+                            label={repeatsOn ? repeatShortLabel : 'Repeat'}
+                            ariaLabel={
+                              repeatsOn ? `Repeats ${repeatShortLabel}` : 'Repeat'
+                            }
+                            active={repeatsOn}
                             onClick={() => setActivePicker('repeat')}
                           />
                         )}
-                        <div className="ml-auto flex items-center gap-1">
-                          {sections.length > 0 && !isLater && (
-                            <ToolbarIcon
-                              ref={sectionBtnRef}
-                              icon={<Rows3 className="h-5 w-5" />}
-                              label={pickedSection?.name ?? 'Section'}
-                              active={!!pickedSection}
-                              onClick={toggleSectionPicker}
-                            />
-                          )}
-                          <ToolbarIcon
-                            icon={<ListPlus className="h-5 w-5" />}
-                            label="Add multiple tasks"
-                            onClick={() => openBulkAdd([])}
+                        <ToolbarChip
+                          icon={<Bell className="h-4 w-4" />}
+                          label={
+                            notifyEnabled && startTime ? startTime : 'Reminder'
+                          }
+                          ariaLabel={
+                            notifyEnabled && startTime
+                              ? `Reminder at ${startTime}`
+                              : 'Set a reminder'
+                          }
+                          active={notifyEnabled}
+                          onClick={openReminderPicker}
+                        />
+                        {sections.length > 0 && !isLater && (
+                          <ToolbarChip
+                            ref={sectionBtnRef}
+                            icon={<Rows3 className="h-4 w-4" />}
+                            label={pickedSection?.name ?? 'Section'}
+                            active={!!pickedSection}
+                            onClick={toggleSectionPicker}
                           />
-                          <ToolbarIcon
-                            icon={<Bell className="h-5 w-5" />}
-                            label="Reminder"
-                            active={notifyEnabled}
-                            onClick={() => setShowReminderPicker(true)}
+                        )}
+                        {stripTags.length === 0 && (
+                          <ToolbarChip
+                            icon={<Tag className="h-4 w-4" />}
+                            label="Tag"
+                            ariaLabel="Add a tag"
+                            onClick={() => setActivePicker('tags')}
                           />
-                          {!hideRepeatPicker && !repeatsOn && (
-                            <ToolbarIcon
-                              icon={<Repeat className="h-5 w-5" />}
-                              label="Repeat"
-                              onClick={() => setActivePicker('repeat')}
-                            />
-                          )}
-                        </div>
+                        )}
+                        <ToolbarChip
+                          icon={<ListPlus className="h-4 w-4" />}
+                          label="Multiple"
+                          ariaLabel="Add multiple tasks"
+                          onClick={() => openBulkAdd([])}
+                        />
                       </div>
 
                     </div>
@@ -1725,6 +1685,8 @@ export default function QuickAddSheet({
                   setReminder={setReminder}
                   showReminderPicker={showReminderPicker}
                   setShowReminderPicker={setShowReminderPicker}
+                  repeatsOn={repeatsOn}
+                  repeatShortLabel={repeatShortLabel}
                   repeat={repeat}
                   setRepeat={setRepeat}
                   repeatDay={repeatDay}

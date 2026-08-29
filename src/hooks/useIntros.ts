@@ -6,7 +6,9 @@ export type IntroKey =
   | 'bellyFull'
   | 'frogodoro'
   | 'savedTask'
-  | 'plannerTour';
+  | 'plannerTour'
+  | 'quickAddNl'
+  | 'quickAddTagEdit';
 
 type IntrosResponse = { seenIntros?: Partial<Record<IntroKey, boolean>> };
 

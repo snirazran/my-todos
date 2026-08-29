@@ -2,23 +2,20 @@
 
 import {
   type CSSProperties,
-  useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
 } from 'react';
-import { Check, ListPlus, Plus, Trash2 } from 'lucide-react';
+import { Check, ListPlus } from 'lucide-react';
 import { BaseSheet } from '@/components/ui/BaseSheet';
-import { cn } from '@/lib/utils';
 import { useKeyboardInset } from './useKeyboardInset';
 import {
   MAX_BULK_TASKS,
   MAX_TASK_TEXT_LENGTH,
+  cleanBulkTaskLine,
   parseBulkTasks,
 } from './bulkTasks';
-
-type DraftTask = { id: number; text: string };
 
 type Props = {
   open: boolean;
@@ -30,11 +27,9 @@ type Props = {
   onConfirm: (tasks: string[]) => Promise<void>;
 };
 
-let nextDraftId = 1;
-
-function createDraft(text = ''): DraftTask {
-  return { id: nextDraftId++, text };
-}
+const PLACEHOLDER = ['Buy milk', 'Call the dentist', 'Renew passport'].join(
+  '\n',
+);
 
 export default function BulkAddReviewSheet({
   open,
@@ -45,22 +40,23 @@ export default function BulkAddReviewSheet({
   onOpenChange,
   onConfirm,
 }: Props) {
-  const [drafts, setDrafts] = useState<DraftTask[]>([]);
-  const [omittedCount, setOmittedCount] = useState(0);
+  const [text, setText] = useState('');
   const [error, setError] = useState('');
-  const inputRefs = useRef(new Map<number, HTMLInputElement>());
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const { inset: keyboardInset, height: viewportHeight } = useKeyboardInset(open);
 
   useEffect(() => {
     if (!open) return;
-    setDrafts(
-      (initialTasks.length > 0 ? initialTasks : ['']).map((text) =>
-        createDraft(text),
-      ),
-    );
-    setOmittedCount(initialOmittedCount);
+    setText(initialTasks.join('\n'));
     setError('');
-  }, [initialOmittedCount, initialTasks, open]);
+    // Land the caret at the end so a pasted list is ready to be extended.
+    window.setTimeout(() => {
+      const el = textareaRef.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(el.value.length, el.value.length);
+    }, 60);
+  }, [initialTasks, open]);
 
   useEffect(() => {
     if (!open) return;
@@ -78,64 +74,29 @@ export default function BulkAddReviewSheet({
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [onOpenChange, open]);
 
-  const validTasks = useMemo(
-    () => drafts.map((draft) => draft.text.trim()).filter(Boolean),
-    [drafts],
-  );
-  const tooLongCount = useMemo(
-    () => drafts.filter((draft) => draft.text.trim().length > MAX_TASK_TEXT_LENGTH).length,
-    [drafts],
-  );
-  const canAdd = validTasks.length > 0 && tooLongCount === 0 && !submitting;
+  const parsed = useMemo(() => parseBulkTasks(text, MAX_BULK_TASKS), [text]);
+  const tasks = parsed.tasks;
+  const omittedCount = parsed.omittedCount + initialOmittedCount;
 
-  const updateDraft = useCallback((id: number, text: string) => {
-    setDrafts((current) =>
-      current.map((draft) => (draft.id === id ? { ...draft, text } : draft)),
-    );
-  }, []);
-
-  const removeDraft = useCallback((id: number) => {
-    setDrafts((current) => {
-      const next = current.filter((draft) => draft.id !== id);
-      return next.length > 0 ? next : [createDraft()];
+  // Reported by line number rather than highlighted: in a single textarea there
+  // is no row to outline, so the message has to say which line to look at.
+  const longLines = useMemo(() => {
+    const numbers: number[] = [];
+    text.split(/\r?\n/).forEach((line, index) => {
+      if (cleanBulkTaskLine(line).length > MAX_TASK_TEXT_LENGTH) {
+        numbers.push(index + 1);
+      }
     });
-  }, []);
+    return numbers;
+  }, [text]);
 
-  const addDraft = useCallback(() => {
-    if (drafts.length >= MAX_BULK_TASKS) return;
-    const draft = createDraft();
-    setDrafts([...drafts, draft]);
-    window.setTimeout(() => inputRefs.current.get(draft.id)?.focus(), 30);
-  }, [drafts]);
-
-  const pasteIntoDraft = useCallback(
-    (id: number, event: React.ClipboardEvent<HTMLInputElement>) => {
-      const pasted = event.clipboardData.getData('text/plain');
-      const parsed = parseBulkTasks(pasted, MAX_BULK_TASKS);
-      if (parsed.tasks.length < 2) return;
-      event.preventDefault();
-      const position = drafts.findIndex((draft) => draft.id === id);
-      if (position < 0) return;
-      const available = MAX_BULK_TASKS - drafts.length + 1;
-      const inserted = parsed.tasks
-        .slice(0, available)
-        .map((text) => createDraft(text));
-      const next = drafts.slice();
-      next.splice(position, 1, ...inserted);
-      const newlyOmitted = Math.max(0, parsed.tasks.length - inserted.length);
-      setDrafts(next);
-      setOmittedCount(
-        (count) => count + parsed.omittedCount + newlyOmitted,
-      );
-    },
-    [drafts],
-  );
+  const canAdd = tasks.length > 0 && longLines.length === 0 && !submitting;
 
   const submit = async () => {
     if (!canAdd) return;
     setError('');
     try {
-      await onConfirm(validTasks);
+      await onConfirm(tasks);
     } catch (submitError) {
       setError(
         submitError instanceof Error
@@ -156,12 +117,10 @@ export default function BulkAddReviewSheet({
       zIndex={1600}
       bottomInset={keyboardInset}
       closeAriaLabel="Close bulk add"
-      panelStyle={
-        { '--bulk-panel-max': panelMaxHeight } as CSSProperties
-      }
+      panelStyle={{ '--bulk-panel-max': panelMaxHeight } as CSSProperties}
       className="h-[92dvh] max-h-[var(--bulk-panel-max)] bg-background sm:h-auto sm:max-h-[min(var(--bulk-panel-max),82vh,780px)] sm:max-w-2xl"
     >
-      {({ bindScroll }) => (
+      {() => (
         <div
           role="dialog"
           aria-modal="true"
@@ -181,110 +140,78 @@ export default function BulkAddReviewSheet({
                   Add multiple tasks
                 </h2>
                 <p className="mt-0.5 text-sm font-semibold text-muted-foreground">
-                  Paste a list or edit each task before adding.
+                  One task per line
                 </p>
               </div>
             </div>
 
-            <div className="mt-4 flex flex-wrap gap-2">
-              {summary.map((item) => (
-                <span
-                  key={item}
-                  className="inline-flex h-8 items-center rounded-full bg-primary/10 px-3 text-xs font-extrabold text-primary"
-                >
-                  {item}
-                </span>
-              ))}
-            </div>
+            {summary.length > 0 && (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {summary.map((item) => (
+                  <span
+                    key={item}
+                    className="inline-flex h-8 items-center rounded-full bg-primary/10 px-3 text-xs font-extrabold text-primary"
+                  >
+                    {item}
+                  </span>
+                ))}
+              </div>
+            )}
           </header>
 
-          <div
-            ref={bindScroll}
-            className="min-h-0 flex-1 overflow-y-auto overscroll-contain border-y border-border/60 bg-muted/25 px-4 py-4 sm:px-7"
-          >
-            {omittedCount > 0 ? (
-              <div className="mb-3 rounded-2xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm font-bold text-amber-700 dark:text-amber-300">
+          {/* One textarea rather than a row per task: Enter starts the next
+              task, paste splits itself, and deleting is just deleting a line —
+              no button press per task, and no empty sheet to stare at. */}
+          <div className="flex min-h-0 flex-1 flex-col border-y border-border/60 bg-muted/25 px-4 py-4 sm:px-7">
+            {omittedCount > 0 && (
+              <div className="mb-3 shrink-0 rounded-2xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm font-bold text-amber-700 dark:text-amber-300">
                 The limit is {MAX_BULK_TASKS} tasks per batch. {omittedCount}{' '}
-                {omittedCount === 1 ? 'extra line was' : 'extra lines were'} not included.
+                {omittedCount === 1 ? 'extra line was' : 'extra lines were'} not
+                included.
               </div>
-            ) : null}
+            )}
 
-            <div className="flex flex-col gap-2.5">
-              {drafts.map((draft, index) => {
-                const tooLong = draft.text.trim().length > MAX_TASK_TEXT_LENGTH;
-                return (
-                  <div
-                    key={draft.id}
-                    className={cn(
-                      'flex items-center gap-2 rounded-2xl border bg-card p-2 shadow-sm transition-colors',
-                      tooLong ? 'border-rose-500/60' : 'border-border/70 focus-within:border-primary/50',
-                    )}
-                  >
-                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-muted text-xs font-black tabular-nums text-muted-foreground">
-                      {index + 1}
-                    </span>
-                    <div className="relative min-w-0 flex-1">
-                      <input
-                        ref={(element) => {
-                          if (element) inputRefs.current.set(draft.id, element);
-                          else inputRefs.current.delete(draft.id);
-                        }}
-                        value={draft.text}
-                        onChange={(event) => updateDraft(draft.id, event.target.value)}
-                        onPaste={(event) => pasteIntoDraft(draft.id, event)}
-                        placeholder="Task name"
-                        disabled={submitting}
-                        autoComplete="off"
-                        spellCheck={false}
-                        className="h-11 w-full bg-transparent px-1 pr-12 text-[16px] font-bold text-foreground outline-none placeholder:text-muted-foreground/45"
-                      />
-                      {draft.text.length >= 90 ? (
-                        <span
-                          className={cn(
-                            'pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 text-[10px] font-black tabular-nums',
-                            tooLong ? 'text-rose-500' : 'text-muted-foreground',
-                          )}
-                        >
-                          {draft.text.length}/{MAX_TASK_TEXT_LENGTH}
-                        </span>
-                      ) : null}
-                    </div>
-                    <button
-                      type="button"
-                      aria-label={`Remove task ${index + 1}`}
-                      onClick={() => removeDraft(draft.id)}
-                      disabled={submitting}
-                      className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-muted-foreground transition-colors active:scale-95 hover:bg-rose-500/10 hover:text-rose-500 disabled:opacity-50"
-                    >
-                      <Trash2 className="h-4.5 w-4.5" />
-                    </button>
-                  </div>
-                );
-              })}
+            <textarea
+              ref={textareaRef}
+              value={text}
+              onChange={(event) => setText(event.target.value)}
+              placeholder={PLACEHOLDER}
+              disabled={submitting}
+              spellCheck={false}
+              autoComplete="off"
+              className="min-h-0 w-full flex-1 resize-none overflow-y-auto rounded-2xl border border-border/70 bg-card px-4 py-3.5 text-[16px] font-bold leading-[30px] text-foreground shadow-sm outline-none transition-colors placeholder:text-muted-foreground/40 focus:border-primary/50 disabled:opacity-60"
+            />
+
+            <div className="mt-2.5 flex shrink-0 items-center justify-between gap-3">
+              <p className="text-xs font-bold text-muted-foreground">
+                {tasks.length === 0
+                  ? 'Type or paste your list'
+                  : `${tasks.length} ${tasks.length === 1 ? 'task' : 'tasks'}`}
+              </p>
+              {tasks.length > 0 && (
+                <p className="text-xs font-bold tabular-nums text-muted-foreground/70">
+                  {MAX_BULK_TASKS - tasks.length} left
+                </p>
+              )}
             </div>
-
-            <button
-              type="button"
-              onClick={addDraft}
-              disabled={drafts.length >= MAX_BULK_TASKS || submitting}
-              className="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-primary/35 bg-primary/5 text-sm font-black text-primary transition-colors active:scale-[0.99] hover:bg-primary/10 disabled:opacity-40"
-            >
-              <Plus className="h-4 w-4 stroke-[3]" />
-              Add another task
-            </button>
           </div>
 
           <footer className="shrink-0 px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4 sm:px-7 sm:pb-7">
-            {tooLongCount > 0 ? (
+            {longLines.length > 0 && (
               <p className="mb-3 text-center text-xs font-bold text-rose-500">
-                Shorten {tooLongCount === 1 ? 'the highlighted task' : `${tooLongCount} highlighted tasks`} to {MAX_TASK_TEXT_LENGTH} characters.
+                {longLines.length === 1
+                  ? `Line ${longLines[0]} is over ${MAX_TASK_TEXT_LENGTH} characters — shorten it.`
+                  : `Lines ${longLines.slice(0, 4).join(', ')}${longLines.length > 4 ? '…' : ''} are over ${MAX_TASK_TEXT_LENGTH} characters — shorten them.`}
               </p>
-            ) : null}
-            {error ? (
-              <p role="alert" className="mb-3 text-center text-sm font-bold text-rose-500">
+            )}
+            {error && (
+              <p
+                role="alert"
+                className="mb-3 text-center text-sm font-bold text-rose-500"
+              >
                 {error}
               </p>
-            ) : null}
+            )}
             <button
               id="bulk-add-confirm"
               type="button"
@@ -297,8 +224,8 @@ export default function BulkAddReviewSheet({
               ) : (
                 <>
                   <Check className="h-5 w-5 stroke-[3]" />
-                  Add {validTasks.length || ''}{' '}
-                  {validTasks.length === 1 ? 'task' : 'tasks'}
+                  Add {tasks.length || ''}{' '}
+                  {tasks.length === 1 ? 'task' : 'tasks'}
                 </>
               )}
             </button>

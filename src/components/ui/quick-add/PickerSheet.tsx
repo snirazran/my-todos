@@ -3,10 +3,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import {
+  Bell,
   CalendarCheck,
   Check,
   ChevronDown,
+  ChevronRight,
   Lock,
+  Repeat as RepeatIcon,
   Palette,
   Pencil,
   Plus,
@@ -72,6 +75,8 @@ type Props = {
   setShowReminderPicker: (v: boolean) => void;
 
   // repeat
+  repeatsOn: boolean;
+  repeatShortLabel: string;
   repeat: RepeatChoice;
   setRepeat: (v: RepeatChoice) => void;
   repeatDay: DisplayDay;
@@ -91,6 +96,43 @@ type Props = {
   tagInputRef: React.RefObject<HTMLInputElement | null>;
 };
 
+function WhenRow({
+  icon,
+  label,
+  value,
+  set,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  set: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex h-14 w-full items-center gap-3 rounded-2xl bg-muted/60 px-4 text-left ring-1 ring-inset ring-border/60 transition-transform active:scale-[0.985]"
+    >
+      <span className={set ? 'text-primary' : 'text-muted-foreground'}>
+        {icon}
+      </span>
+      <span className="flex-1 text-[15px] font-extrabold text-foreground">
+        {label}
+      </span>
+      <span
+        className={`text-[14px] font-bold ${
+          set ? 'text-primary' : 'text-muted-foreground'
+        }`}
+      >
+        {value}
+      </span>
+      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/50" />
+    </button>
+  );
+}
+
 export function PickerSheet(props: Props) {
   const reminderSnapshotRef = useRef<{
     notifyEnabled: boolean;
@@ -98,6 +140,8 @@ export function PickerSheet(props: Props) {
     reminder: string;
   } | null>(null);
   const {
+    repeatsOn,
+    repeatShortLabel,
     activePicker,
     setActivePicker,
     daysOrder,
@@ -235,7 +279,7 @@ export function PickerSheet(props: Props) {
               {displayPicker === 'tags'
                 ? 'Tags'
                 : displayPicker === 'date'
-                  ? 'Date and time'
+                  ? 'When'
                   : 'Repeat'}
             </h2>
           </div>
@@ -252,17 +296,40 @@ export function PickerSheet(props: Props) {
           )}
 
           {displayPicker === 'date' && (
-            <DateView
-              isLater={isLater}
-              selectedDay={selectedDay}
-              todayIndex={todayIndex}
-              tomorrowIndex={tomorrowIndex}
-              todayKey={todayKey}
-              tomorrowKey={tomorrowKey}
-              selectedDateKey={selectedDateKey}
-              selectSingleDay={selectSingleDay}
-              openCalendar={() => setShowCalendarPicker(true)}
-            />
+            <>
+              <DateView
+                isLater={isLater}
+                selectedDay={selectedDay}
+                todayIndex={todayIndex}
+                tomorrowIndex={tomorrowIndex}
+                todayKey={todayKey}
+                tomorrowKey={tomorrowKey}
+                selectedDateKey={selectedDateKey}
+                selectSingleDay={selectSingleDay}
+                openCalendar={() => setShowCalendarPicker(true)}
+              />
+              {/* Repeat and reminder are both answers to "when", so they live
+                  here rather than as their own chips — the toolbar could not
+                  hold five labelled controls on one row. */}
+              <div className="mt-6 flex flex-col gap-2">
+                <WhenRow
+                  icon={<RepeatIcon className="h-[18px] w-[18px]" />}
+                  label="Repeat"
+                  value={repeatsOn ? repeatShortLabel : 'Never'}
+                  set={repeatsOn}
+                  onClick={() => setActivePicker('repeat')}
+                />
+                <WhenRow
+                  icon={<Bell className="h-[18px] w-[18px]" />}
+                  label="Reminder"
+                  value={notifyEnabled && startTime ? startTime : 'None'}
+                  set={notifyEnabled}
+                  onClick={() =>
+                    requestAnimationFrame(() => setShowReminderPicker(true))
+                  }
+                />
+              </div>
+            </>
           )}
 
           {displayPicker === 'repeat' && (
@@ -281,13 +348,17 @@ export function PickerSheet(props: Props) {
                 customRule={repeatRule}
                 onOpenCustom={() => setShowCustomSheet(true)}
               />
-              <button
-                type="button"
-                onClick={() => setActivePicker(null)}
-                className="mt-5 h-11 w-full rounded-xl bg-primary text-[15px] font-extrabold text-primary-foreground transition-all hover:brightness-105 active:scale-[0.985]"
-              >
-                Save
-              </button>
+              {/* Sticky: the frequency list is long enough to push Save off
+                  screen, and a save you have to scroll for reads as missing. */}
+              <div className="sticky bottom-0 -mx-5 mt-5 bg-background px-5 pb-1 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setActivePicker(null)}
+                  className="h-11 w-full rounded-xl bg-primary text-[15px] font-extrabold text-primary-foreground transition-all hover:brightness-105 active:scale-[0.985]"
+                >
+                  Save
+                </button>
+              </div>
             </>
           )}
         </div>
@@ -546,7 +617,10 @@ function ReminderOverlay({
       className="bg-background ring-1 ring-border/70 sm:mx-4 sm:max-w-[440px]"
     >
       {() => (
-        <div dir="ltr" className="mx-auto w-full px-5 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-1 sm:pb-6">
+        <div
+          dir="ltr"
+          className="mx-auto max-h-[88dvh] w-full overflow-y-auto overscroll-contain px-5 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-1 sm:pb-6"
+        >
           <NotifyView
             reminderHour24={reminderHour24}
             reminderMinute={reminderMinute}

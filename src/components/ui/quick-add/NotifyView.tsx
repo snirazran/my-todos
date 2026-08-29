@@ -41,30 +41,13 @@ export function NotifyView({
 
   return (
     <>
-      <div className="relative mb-5 flex h-8 items-center justify-center">
-        <h3 className="text-[17px] font-black text-foreground">Notify</h3>
+      <div className="relative mb-4 flex h-8 items-center justify-center">
+        <h3 className="text-[17px] font-black text-foreground">Reminder</h3>
       </div>
 
-      <div className="mb-4 flex items-center justify-center gap-2 text-[13px] font-bold text-muted-foreground">
-        <Bell className="h-4 w-4 text-primary" />
-        <span>
-          Notifies you at{' '}
-          <span className="text-primary">
-            {pad(notifyHour)}:{pad(notifyMinute)}
-          </span>
-          {selectedOffset.minutes > 0 && (
-            <span className="text-muted-foreground/80">
-              {' '}
-              · {selectedOffset.label} before start
-            </span>
-          )}
-        </span>
-      </div>
-
-      <div className="mb-5">
-        <div className="mx-auto mb-2 grid max-w-[220px] grid-cols-2 text-center text-[12px] font-bold text-muted-foreground/70">
-          <span>Hour</span>
-          <span>Minute</span>
+      <div className="mb-4">
+        <div className="mb-1.5 text-center text-[12px] font-bold text-muted-foreground/70">
+          Task time
         </div>
         <div className="relative mx-auto max-w-[220px]">
           <span className="pointer-events-none absolute left-1/2 top-1/2 z-30 -translate-x-1/2 -translate-y-[60%] text-[26px] font-black leading-none text-primary">
@@ -90,9 +73,9 @@ export function NotifyView({
         </div>
       </div>
 
-      <div className="mb-5">
-        <div className="mb-2 text-center text-[12px] font-bold text-muted-foreground/70">
-          Notify before
+      <div className="mb-4">
+        <div className="mb-1.5 text-center text-[12px] font-bold text-muted-foreground/70">
+          Remind me
         </div>
         <div className="grid grid-cols-3 gap-2">
           {REMINDER_OFFSET_OPTIONS.map((opt) => {
@@ -102,17 +85,29 @@ export function NotifyView({
                 key={opt.value}
                 type="button"
                 onClick={() => setReminder(opt.value)}
-                className={`h-10 rounded-xl border text-[13px] font-extrabold transition-all ${
+                className={`h-10 rounded-xl border px-1 text-[12px] font-extrabold transition-all ${
                   selected
                     ? 'border-primary bg-primary/10 text-primary ring-2 ring-primary/30'
                     : 'border-border bg-background text-muted-foreground hover:border-primary/40 hover:bg-primary/5 hover:text-primary'
                 }`}
               >
-                {opt.label}
+                {opt.minutes === 0 ? opt.label : `${opt.label} before`}
               </button>
             );
           })}
         </div>
+      </div>
+
+      {/* The one line that states the actual alert time — kept beside Save,
+          since with an offset it differs from what the wheel reads. */}
+      <div className="mb-3 flex items-center justify-center gap-2 rounded-xl bg-primary/5 px-3 py-2.5 text-[13px] font-bold text-muted-foreground">
+        <Bell className="h-4 w-4 shrink-0 text-primary" />
+        <span>
+          Reminds you at{' '}
+          <span className="text-primary">
+            {pad(notifyHour)}:{pad(notifyMinute)}
+          </span>
+        </span>
       </div>
 
       <button

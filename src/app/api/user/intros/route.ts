@@ -8,6 +8,8 @@ const INTRO_KEYS = new Set([
   'frogodoro',
   'savedTask',
   'plannerTour',
+  'quickAddNl',
+  'quickAddTagEdit',
 ]);
 
 export async function GET() {
