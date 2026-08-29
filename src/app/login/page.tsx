@@ -21,12 +21,7 @@ import {
 import { describeSignInMethod, lookupAccountByEmail } from '@/lib/accountLookup';
 import { useEffect, useRef, useState } from 'react';
 import { Loader2, ArrowRight } from 'lucide-react';
-import {
-  motion,
-  AnimatePresence,
-  useAnimationControls,
-  useReducedMotion,
-} from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Input } from '@/components/ui/input';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
@@ -47,13 +42,6 @@ const FLY_PX = 40;
 const FLY_KEY = 'login-fly';
 const LOGIN_TONGUE_MS = 1040;
 const FLY_RESPAWN_DELAY_MS = 1500;
-const FLY_BUZZ_START = { x: -56, y: 0, rotate: -6 } as const;
-const FLY_BUZZ = {
-  x: [FLY_BUZZ_START.x, 56, -38, 48, FLY_BUZZ_START.x],
-  y: [FLY_BUZZ_START.y, -18, 6, -10, FLY_BUZZ_START.y],
-  rotate: [FLY_BUZZ_START.rotate, 6, -4, 8, FLY_BUZZ_START.rotate],
-  transition: { duration: 6, ease: 'easeInOut', repeat: Infinity },
-} as const;
 
 type Step = 'enter' | 'email-sent';
 type FlyState = 'buzzing' | 'hidden' | 'entering';
@@ -64,29 +52,6 @@ const slide = {
   exit: (dir: number) => ({ x: dir * -50, opacity: 0 }),
 };
 
-const ENTER_CONTAINER = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.09, delayChildren: 0.05 } },
-} as const;
-
-const ENTER_ITEM = {
-  hidden: { opacity: 0, y: 14 },
-  show: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] },
-  },
-} as const;
-
-const ENTER_FROG = {
-  hidden: { opacity: 0, y: 24 },
-  show: {
-    opacity: 1,
-    y: 0,
-    transition: { type: 'spring', stiffness: 220, damping: 17 },
-  },
-} as const;
-
 const EMAIL_LINK_STORAGE_KEY = 'emailForSignIn';
 const POST_LOGIN_ROUTE_KEY = 'frogress.post-login-route';
 
@@ -94,7 +59,6 @@ function LoginPageInner() {
   const searchParams = useSearchParams();
   const { user: authUser } = useAuth();
   const { showNotification } = useNotification();
-  const reduceMotion = useReducedMotion();
   const navigatedRef = useRef(false);
   const isUpgrade = searchParams?.get('upgrade') === '1';
   const requestedNext = searchParams?.get('next');
@@ -137,9 +101,9 @@ function LoginPageInner() {
   const frogRef = useRef<FrogHandle>(null);
   const frogBoxRef = useRef<HTMLDivElement>(null);
   const flyRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  const flyControls = useAnimationControls();
   const flyRespawnTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [flyState, setFlyState] = useState<FlyState>('buzzing');
+  const flyFirstArrivalRef = useRef(true);
+  const [flyState, setFlyState] = useState<FlyState>('entering');
   const {
     vp,
     grab,
@@ -158,13 +122,6 @@ function LoginPageInner() {
     keepTargetHiddenUntilPersist: true,
   });
 
-  // Start or resume buzzing after the fly is rendered in its buzzing state.
-  useEffect(() => {
-    if (flyState === 'buzzing') {
-      void flyControls.start(FLY_BUZZ as any);
-    }
-  }, [flyControls, flyState]);
-
   useEffect(() => {
     return () => {
       if (flyRespawnTimerRef.current) {
@@ -176,7 +133,6 @@ function LoginPageInner() {
   const flyCaught = visuallyDone.has(FLY_KEY);
 
   const respawnFly = () => {
-    flyControls.stop();
     setFlyState('hidden');
     if (flyRespawnTimerRef.current) {
       clearTimeout(flyRespawnTimerRef.current);
@@ -373,14 +329,9 @@ function LoginPageInner() {
 
   return (
     <main className="fixed inset-0 flex flex-col items-center overflow-x-hidden overflow-y-auto bg-background px-6 py-10">
-      <motion.div
-        variants={ENTER_CONTAINER}
-        initial={reduceMotion ? false : 'hidden'}
-        animate="show"
-        className="my-auto flex w-full max-w-sm shrink-0 origin-center flex-col items-center md:scale-110 xl:scale-125"
-      >
+      <div className="my-auto flex w-full max-w-sm shrink-0 origin-center flex-col items-center md:scale-110 xl:scale-125">
         {/* Frogress wordmark — curved, matching the loading screen */}
-        <motion.div variants={ENTER_ITEM}>
+        <div className="auth-enter-brand" style={{ '--auth-i': 0 } as any}>
           <svg
             aria-label="Frogress"
             role="img"
@@ -403,44 +354,42 @@ function LoginPageInner() {
               </textPath>
             </text>
           </svg>
-        </motion.div>
+        </div>
 
         {/* Frog mascot — sits on top of the email input, fly buzzing above. No container. */}
-        <motion.div variants={ENTER_FROG} className="relative z-10 w-full">
+        <div
+          className="auth-enter-frog relative z-10 w-full"
+          style={{ '--auth-i': 1 } as any}
+        >
         <div className="pointer-events-none relative z-10 flex w-full translate-y-[11px] flex-col items-center">
           {!flyCaught && flyState !== 'hidden' && (
-            <motion.div
+            <div
               aria-hidden
-              className="absolute left-1/2 z-10 -translate-x-1/2"
-              style={{ top: '-6%' }}
-              initial={
-                flyState === 'entering'
-                  ? { x: '55vw', y: -16, rotate: 12 }
-                  : false
+              className={`absolute left-1/2 z-10 -translate-x-1/2 ${
+                flyState === 'entering' ? 'auth-fly-arrive' : 'auth-fly-drift'
+              }`}
+              style={
+                {
+                  top: '-6%',
+                  '--auth-i': flyFirstArrivalRef.current ? 8 : 0,
+                } as any
               }
-              animate={
-                flyState === 'entering'
-                  ? FLY_BUZZ_START
-                  : flyControls
-              }
-              transition={
-                flyState === 'entering'
-                  ? { duration: 0.75, ease: [0.22, 1, 0.36, 1] }
-                  : undefined
-              }
-              onAnimationComplete={() => {
-                if (flyState !== 'entering') return;
+              onAnimationEnd={(e) => {
+                if (e.target !== e.currentTarget) return;
+                if (e.animationName !== 'auth-fly-arrive') return;
+                flyFirstArrivalRef.current = false;
                 setFlyState('buzzing');
               }}
             >
               <div
+                className="auth-fly-bank"
                 ref={(el) => {
                   flyRefs.current[FLY_KEY] = el;
                 }}
               >
                 <Fly size={38} interactive={false} />
               </div>
-            </motion.div>
+            </div>
           )}
           <div ref={frogBoxRef}>
             <Frog
@@ -451,12 +400,12 @@ function LoginPageInner() {
             />
           </div>
         </div>
-        </motion.div>
+        </div>
 
         {isUpgrade && (
-          <motion.div
-            variants={ENTER_ITEM}
-            className="mt-5 w-full rounded-2xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-center shadow-sm dark:border-amber-500/30 dark:bg-amber-500/10"
+          <div
+            className="auth-enter mt-5 w-full rounded-2xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-center shadow-sm dark:border-amber-500/30 dark:bg-amber-500/10"
+            style={{ '--auth-i': 2 } as any}
           >
             <p className="text-sm font-black text-amber-900 dark:text-amber-200">
               You&apos;re in Guest Mode
@@ -464,11 +413,14 @@ function LoginPageInner() {
             <p className="mt-0.5 text-xs font-medium text-amber-800/90 dark:text-amber-100/80">
               Create an account to save your progress — your pet and data will be kept.
             </p>
-          </motion.div>
+          </div>
         )}
 
         {/* Step content */}
-        <motion.div variants={ENTER_ITEM} className="relative z-0 w-full">
+        <div
+          className="auth-enter relative z-0 w-full"
+          style={{ '--auth-i': isUpgrade ? 3 : 2 } as any}
+        >
           <AnimatePresence mode="wait" custom={dir}>
             {step === 'enter' && (
               <motion.div
@@ -569,11 +521,11 @@ function LoginPageInner() {
               </motion.div>
             )}
           </AnimatePresence>
-        </motion.div>
+        </div>
 
-        <motion.p
-          variants={ENTER_ITEM}
-          className="mt-8 text-[13px] font-bold text-muted-foreground"
+        <p
+          className="auth-enter mt-8 text-[13px] font-bold text-muted-foreground"
+          style={{ '--auth-i': isUpgrade ? 4 : 3 } as any}
         >
           No frog yet?{' '}
           <Link
@@ -582,8 +534,8 @@ function LoginPageInner() {
           >
             Adopt one
           </Link>
-        </motion.p>
-      </motion.div>
+        </p>
+      </div>
 
       <AccountConflictDialog
         open={!!conflict}

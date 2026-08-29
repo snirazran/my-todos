@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { Loader2 } from 'lucide-react';
-import { motion, useReducedMotion } from 'framer-motion';
 import Frog, {
   FROG_TONGUE_MOUTH_OFFSET,
   FROG_TONGUE_MOUTH_OFFSET_TABLET,
@@ -21,42 +20,13 @@ const Fly = dynamic(() => import('@/components/ui/fly'), { ssr: false });
 
 const FLY_PX = 40;
 const FLY_KEY = 'welcome-fly';
-const FLY_BUZZ = {
-  x: [-56, 56, -38, 48, -56],
-  y: [0, -18, 6, -10, 0],
-  rotate: [-6, 6, -4, 8, -6],
-  transition: { duration: 6, ease: 'easeInOut', repeat: Infinity },
-} as const;
-
-const ENTER_CONTAINER = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.09, delayChildren: 0.05 } },
-} as const;
-
-const ENTER_ITEM = {
-  hidden: { opacity: 0, y: 14 },
-  show: {
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] },
-  },
-} as const;
-
-const ENTER_FROG = {
-  hidden: { opacity: 0, y: 24 },
-  show: {
-    opacity: 1,
-    y: 0,
-    transition: { type: 'spring', stiffness: 220, damping: 17 },
-  },
-} as const;
 
 export default function WelcomePage() {
   const router = useRouter();
   const { showNotification } = useNotification();
-  const reduceMotion = useReducedMotion();
   const [loading, setLoading] = useState(false);
   const [adoptionSucceeded, setAdoptionSucceeded] = useState(false);
+  const [flyArrived, setFlyArrived] = useState(false);
   const isTablet = useMediaQuery('(min-width: 768px)');
   const isDesktop = useMediaQuery('(min-width: 1280px)');
   const tongueMouthOffset = isDesktop
@@ -120,13 +90,8 @@ export default function WelcomePage() {
 
   return (
     <main className="fixed inset-0 flex flex-col items-center overflow-x-hidden overflow-y-auto bg-background px-6 py-10">
-      <motion.div
-        variants={ENTER_CONTAINER}
-        initial={reduceMotion ? false : 'hidden'}
-        animate="show"
-        className="my-auto flex w-full max-w-sm shrink-0 origin-center flex-col items-center md:scale-110 xl:scale-125"
-      >
-        <motion.div variants={ENTER_ITEM}>
+      <div className="my-auto flex w-full max-w-sm shrink-0 origin-center flex-col items-center md:scale-110 xl:scale-125">
+        <div className="auth-enter-brand" style={{ '--auth-i': 0 } as any}>
           <svg
             aria-label="Frogress"
             role="img"
@@ -149,34 +114,44 @@ export default function WelcomePage() {
               </textPath>
             </text>
           </svg>
-        </motion.div>
+        </div>
 
-        <motion.p
-          variants={ENTER_ITEM}
-          className="mb-2 max-w-xs text-center text-sm text-muted-foreground"
+        <p
+          className="auth-enter mb-2 max-w-xs text-center text-sm text-muted-foreground"
+          style={{ '--auth-i': 1 } as any}
         >
           Time{' '}
           <span className="font-black italic text-primary">flies</span>
           {' '}when you&apos;re getting things done.
-        </motion.p>
+        </p>
 
-        <motion.div variants={ENTER_FROG} className="relative z-10 w-full">
+        <div
+          className="auth-enter-frog relative z-10 w-full"
+          style={{ '--auth-i': 2 } as any}
+        >
           <div className="pointer-events-none relative z-10 flex w-full translate-y-3 flex-col items-center">
           {!flyCaught && !adoptionSucceeded && (
-            <motion.div
+            <div
               aria-hidden
-              className="absolute left-1/2 z-10 -translate-x-1/2"
-              style={{ top: '-6%' }}
-              animate={FLY_BUZZ as any}
+              className={`absolute left-1/2 z-10 -translate-x-1/2 ${
+                flyArrived ? 'auth-fly-drift' : 'auth-fly-arrive'
+              }`}
+              style={{ top: '-6%', '--auth-i': 8 } as any}
+              onAnimationEnd={(e) => {
+                if (e.target !== e.currentTarget) return;
+                if (e.animationName !== 'auth-fly-arrive') return;
+                setFlyArrived(true);
+              }}
             >
               <div
+                className="auth-fly-bank"
                 ref={(el) => {
                   flyRefs.current[FLY_KEY] = el;
                 }}
               >
                 <Fly size={38} interactive={false} />
               </div>
-            </motion.div>
+            </div>
           )}
           <div ref={frogBoxRef}>
             <Frog
@@ -187,21 +162,23 @@ export default function WelcomePage() {
             />
           </div>
           </div>
-        </motion.div>
+        </div>
 
-        <motion.div variants={ENTER_ITEM} className="relative z-0 w-full space-y-3">
-          <motion.button
+        <div
+          className="auth-enter relative z-0 w-full space-y-3"
+          style={{ '--auth-i': 3 } as any}
+        >
+          <button
             onClick={handleHatch}
             disabled={loading}
-            whileTap={{ scale: 0.98 }}
-            className="flex h-12 w-full items-center justify-center rounded-2xl bg-primary text-sm font-black text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex h-12 w-full items-center justify-center rounded-2xl bg-primary text-sm font-black text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {loading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               'Adopt your frog'
             )}
-          </motion.button>
+          </button>
 
           <Link
             href="/login"
@@ -209,11 +186,11 @@ export default function WelcomePage() {
           >
             I already have a frog
           </Link>
-        </motion.div>
+        </div>
 
-        <motion.p
-          variants={ENTER_ITEM}
-          className="mt-6 text-center text-[11px] leading-relaxed text-muted-foreground"
+        <p
+          className="auth-enter mt-6 text-center text-[11px] leading-relaxed text-muted-foreground"
+          style={{ '--auth-i': 4 } as any}
         >
           By continuing, you agree to our{' '}
           <Link
@@ -229,11 +206,11 @@ export default function WelcomePage() {
           >
             Privacy Policy
           </Link>
-        </motion.p>
+        </p>
 
-        <motion.p
-          variants={ENTER_ITEM}
-          className="mt-3 text-center text-[11px] leading-relaxed text-muted-foreground/80"
+        <p
+          className="auth-enter mt-3 text-center text-[11px] leading-relaxed text-muted-foreground/80"
+          style={{ '--auth-i': 5 } as any}
         >
           <Link
             href="/pricing"
@@ -256,8 +233,8 @@ export default function WelcomePage() {
             Contact
           </a>
           {' · '}© {new Date().getFullYear()} Frogress
-        </motion.p>
-      </motion.div>
+        </p>
+      </div>
 
       {grab && (
         <svg
