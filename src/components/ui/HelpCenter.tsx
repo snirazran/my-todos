@@ -51,7 +51,7 @@ const HELP_CATEGORIES: HelpCategory[] = [
       },
       {
         q: 'What does "eat the frog" mean?',
-        a: 'It comes from a productivity idea: do your most important or hardest task first. In Frogress you can make a task your focus ("the frog") so it stays front and center until it\'s done.',
+        a: 'It comes from a productivity idea: do your most important or hardest task first, before anything else can distract you. It is where the name Frogress comes from. The closest thing in the app is the focus timer — pick the task you have been avoiding, start a session on it, and your frog waits with you until the timer ends.',
       },
     ],
   },
@@ -383,6 +383,7 @@ export function HelpCenterPanel({
         </div>
         <div className="mt-3 grid grid-cols-2 gap-2">
           {[
+            { href: '/support', label: 'Support' },
             { href: '/pricing', label: 'Pricing' },
             { href: '/terms', label: 'Terms of Service' },
             { href: '/privacy', label: 'Privacy Policy' },
