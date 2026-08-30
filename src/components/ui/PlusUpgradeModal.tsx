@@ -47,6 +47,8 @@ const PLAN_DETAILS: Record<
   },
 };
 
+const APPLE_EULA_URL =
+  'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/';
 const TERMS_URL = 'https://frogress.com/terms';
 const PRIVACY_URL = 'https://frogress.com/privacy';
 
@@ -791,10 +793,12 @@ function Step3({
 }) {
   const reduceMotion = useReducedMotion();
   const isNative = Capacitor.isNativePlatform();
+  const isIos = Capacitor.getPlatform() === 'ios';
+  const termsUrl = isIos ? APPLE_EULA_URL : TERMS_URL;
+  const termsLabel = isIos ? 'Terms of Use (EULA)' : 'Terms of Service';
   const yearly = pricing?.yearly;
   const monthly = pricing?.monthly;
 
-  // Twelve months bought one at a time — the number the yearly price beats.
   const yearlyCompareAt =
     yearly && monthly && monthly.currency === yearly.currency
       ? monthly.amount * 12
@@ -880,12 +884,12 @@ function Step3({
         </p>
         <p className="text-[11px] font-medium text-white/70">
           <a
-            href={TERMS_URL}
+            href={termsUrl}
             target="_blank"
             rel="noreferrer"
             className="underline underline-offset-2 hover:text-white"
           >
-            Terms of Use
+            {termsLabel}
           </a>
           <span className="px-1.5 opacity-60">·</span>
           <a
