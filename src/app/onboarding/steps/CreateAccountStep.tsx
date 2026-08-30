@@ -14,6 +14,14 @@ import {
   signInWithGoogle,
   signOutNativeGoogle,
 } from '@/lib/googleAuth';
+import {
+  AppleAccountExistsError,
+  getAppleAuthErrorMessage,
+  initNativeAppleSignIn,
+  signInWithApple,
+  signInWithExistingApple,
+  signOutNativeApple,
+} from '@/lib/appleAuth';
 import { AccountConflictDialog } from '@/components/auth/AccountConflictDialog';
 import {
   createEmailLinkSettings,
@@ -23,6 +31,7 @@ import { describeSignInMethod, lookupAccountByEmail } from '@/lib/accountLookup'
 import { clearOnboardingDraft } from '@/lib/onboardingDraft';
 import { Input } from '@/components/ui/input';
 import { GoogleIcon } from '@/components/ui/GoogleIcon';
+import { AppleIcon } from '@/components/ui/AppleIcon';
 import type { OnboardingStepProps } from './types';
 import { OnboardingFrogHeader, ONBOARDING_BODY_CLASS } from './OnboardingFrogHeader';
 
@@ -49,6 +58,7 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
   const [loading, setLoading] = useState(false);
   const [conflict, setConflict] = useState<{
     credential: AuthCredential | null;
+    provider: 'google' | 'apple';
   } | null>(null);
   const [existingEmail, setExistingEmail] = useState<{
     email: string;
@@ -63,6 +73,9 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
   useEffect(() => {
     void initNativeGoogleSignIn().catch(() => {
       // The button action retries initialization and surfaces a friendly error.
+    });
+    void initNativeAppleSignIn().catch(() => {
+      // Same here — the button retries and reports its own error.
     });
   }, []);
 
@@ -114,7 +127,7 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
       onNext();
     } catch (signInError: any) {
       if (signInError instanceof GoogleAccountExistsError) {
-        setConflict({ credential: signInError.credential });
+        setConflict({ credential: signInError.credential, provider: 'google' });
       } else {
         setError(getGoogleAuthErrorMessage(signInError));
       }
@@ -122,11 +135,38 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
     }
   };
 
+  const handleApple = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const current = auth.currentUser;
+      await signInWithApple({ linkTo: current?.isAnonymous ? current : null });
+      const data = await syncUser();
+      if (data.alreadyOnboarded) {
+        showReturning(data);
+        return;
+      }
+      onNext();
+    } catch (signInError: any) {
+      if (signInError instanceof AppleAccountExistsError) {
+        setConflict({ credential: signInError.credential, provider: 'apple' });
+      } else {
+        setError(getAppleAuthErrorMessage(signInError));
+      }
+      setLoading(false);
+    }
+  };
+
   const handleSwitchToExisting = async () => {
     if (!conflict || switching) return;
+    const isApple = conflict.provider === 'apple';
     setSwitching(true);
     try {
-      await signInWithExistingGoogle(conflict.credential);
+      if (isApple) {
+        await signInWithExistingApple(conflict.credential);
+      } else {
+        await signInWithExistingGoogle(conflict.credential);
+      }
       const data = await syncUser();
       if (data.alreadyOnboarded) {
         showReturning(data);
@@ -137,7 +177,11 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
       onNext();
     } catch (switchError: any) {
       setConflict(null);
-      setError(getGoogleAuthErrorMessage(switchError));
+      setError(
+        conflict.provider === 'apple'
+          ? getAppleAuthErrorMessage(switchError)
+          : getGoogleAuthErrorMessage(switchError),
+      );
       setSwitching(false);
     }
   };
@@ -205,6 +249,7 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
       auth ? signOut(auth) : Promise.resolve(),
       clearSessionCookie(),
       signOutNativeGoogle(),
+      signOutNativeApple(),
     ]);
     setReturning(null);
     setSwitching(false);
@@ -243,6 +288,21 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
                   ) : (
                     <>
                       <GoogleIcon /> Continue with Google
+                    </>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleApple}
+                  disabled={loading}
+                  className="mt-3 flex h-12 w-full items-center justify-center gap-3 rounded-2xl border border-border bg-card/60 text-sm font-bold tracking-wide transition-all hover:bg-muted/50 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {loading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <>
+                      <AppleIcon /> Continue with Apple
                     </>
                   )}
                 </button>
@@ -343,7 +403,7 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
         open={!!conflict}
         busy={switching}
         title="You already have a frog!"
-        message="That Google account is already connected to a Frogress account. Switch to it? Your progress from this session will be left behind."
+        message={`That ${conflict?.provider === 'apple' ? 'Apple' : 'Google'} account is already connected to a Frogress account. Switch to it? Your progress from this session will be left behind.`}
         confirmLabel="Switch to my account"
         onConfirm={handleSwitchToExisting}
         onCancel={() => setConflict(null)}

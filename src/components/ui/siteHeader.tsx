@@ -18,6 +18,7 @@ import { useUIStore } from '@/lib/uiStore';
 import { WEEK_START_LABEL, type WeekStartDay } from '@/lib/weekStart';
 import { clearSessionCookie } from '@/lib/authCookie';
 import { signOutNativeGoogle } from '@/lib/googleAuth';
+import { signOutNativeApple } from '@/lib/appleAuth';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { useInventory } from '@/hooks/useInventory';
 import IntegrationsPanel, {
@@ -501,6 +502,7 @@ function RightActions({
       auth ? signOut(auth) : Promise.resolve(),
       clearSessionCookie(),
       signOutNativeGoogle(),
+      signOutNativeApple(),
     ]);
     await swrMutate(() => true, undefined, { revalidate: false });
     await onSignOut();

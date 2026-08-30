@@ -22,8 +22,14 @@ import {
   initNativeGoogleSignIn,
   signInWithGoogle,
 } from '@/lib/googleAuth';
+import {
+  getAppleAuthErrorMessage,
+  initNativeAppleSignIn,
+  signInWithApple,
+} from '@/lib/appleAuth';
 import { establishSessionCookie } from '@/lib/authCookie';
 import { GoogleIcon } from '@/components/ui/GoogleIcon';
+import { AppleIcon } from '@/components/ui/AppleIcon';
 import { Icon } from '@/components/ui/Icon';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
 import { FROG_TONGUE_MOUTH_OFFSET, type FrogHandle } from '@/components/ui/frog';
@@ -124,6 +130,9 @@ export default function TryPage() {
   useEffect(() => {
     void initNativeGoogleSignIn().catch(() => {
       // The button action retries initialization and surfaces a friendly error.
+    });
+    void initNativeAppleSignIn().catch(() => {
+      // Same here — the button retries and reports its own error.
     });
     trackGrowthEvent('funnel_view');
   }, []);
@@ -239,12 +248,16 @@ export default function TryPage() {
     }
   };
 
-  const handleGoogle = async () => {
+  const signInThenClaim = async (method: 'google' | 'apple') => {
     if (signingIn) return;
     setSigningIn(true);
-    trackGrowthEvent('funnel_signin_started', { method: 'google' });
+    trackGrowthEvent('funnel_signin_started', { method });
     try {
-      await signInWithGoogle();
+      if (method === 'apple') {
+        await signInWithApple();
+      } else {
+        await signInWithGoogle();
+      }
       const current = auth.currentUser;
       if (!current) throw new Error('Authentication did not complete');
       await establishSessionCookie(current);
@@ -260,13 +273,20 @@ export default function TryPage() {
       trackGrowthEvent('funnel_signup', { isNewUser: !!data?.isNewUser });
       await claimReward();
     } catch (err: any) {
-      showNotification(getGoogleAuthErrorMessage(err), undefined, {
-        durationMs: 5000,
-      });
+      showNotification(
+        method === 'apple'
+          ? getAppleAuthErrorMessage(err)
+          : getGoogleAuthErrorMessage(err),
+        undefined,
+        { durationMs: 5000 },
+      );
     } finally {
       setSigningIn(false);
     }
   };
+
+  const handleGoogle = () => signInThenClaim('google');
+  const handleApple = () => signInThenClaim('apple');
 
   const handleTryOn = () => {
     if (wearing) return;
@@ -469,6 +489,22 @@ export default function TryPage() {
                     <>
                       <GoogleIcon className="h-5 w-5" />
                       Continue with Google
+                    </>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => void handleApple()}
+                  disabled={signingIn}
+                  className="flex h-[52px] w-full items-center justify-center gap-3 rounded-2xl border border-border bg-card text-[15px] font-black tracking-tight text-card-foreground shadow-[0_4px_0_0_rgba(0,0,0,0.12)] transition-all hover:bg-accent active:translate-y-[3px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {signingIn ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (
+                    <>
+                      <AppleIcon className="h-5 w-5" />
+                      Continue with Apple
                     </>
                   )}
                 </button>

@@ -11,8 +11,16 @@ import {
   signInWithExistingGoogle,
   signInWithGoogle,
 } from '@/lib/googleAuth';
+import {
+  AppleAccountExistsError,
+  getAppleAuthErrorMessage,
+  initNativeAppleSignIn,
+  signInWithApple,
+  signInWithExistingApple,
+} from '@/lib/appleAuth';
 import { AccountConflictDialog } from '@/components/auth/AccountConflictDialog';
 import { GoogleIcon } from '@/components/ui/GoogleIcon';
+import { AppleIcon } from '@/components/ui/AppleIcon';
 import { establishSessionCookie } from '@/lib/authCookie';
 import {
   createEmailLinkSettings,
@@ -78,6 +86,7 @@ function LoginPageInner() {
   const [resendIn, setResendIn] = useState(0);
   const [conflict, setConflict] = useState<{
     credential: AuthCredential | null;
+    provider: 'google' | 'apple';
   } | null>(null);
   const [existingEmail, setExistingEmail] = useState<{
     email: string;
@@ -149,6 +158,9 @@ function LoginPageInner() {
   useEffect(() => {
     void initNativeGoogleSignIn().catch(() => {
       // The button action retries initialization and surfaces a friendly error.
+    });
+    void initNativeAppleSignIn().catch(() => {
+      // Same here — the button retries and reports its own error.
     });
   }, []);
 
@@ -233,7 +245,7 @@ function LoginPageInner() {
     } catch (err: any) {
       googleFlowRef.current = false;
       if (err instanceof GoogleAccountExistsError) {
-        setConflict({ credential: err.credential });
+        setConflict({ credential: err.credential, provider: 'google' });
       } else {
         showNotification(getGoogleAuthErrorMessage(err), undefined, {
           durationMs: 5000,
@@ -243,19 +255,50 @@ function LoginPageInner() {
     }
   };
 
+  const handleApple = async () => {
+    setLoading(true);
+    googleFlowRef.current = true;
+    try {
+      const current = auth.currentUser;
+      const shouldLink = isUpgrade && current?.isAnonymous;
+      await signInWithApple({ linkTo: shouldLink ? current : null });
+      const route = await prepareSignedInRoute(postLoginRoute);
+      await catchFlyThenNavigate(route);
+    } catch (err: any) {
+      googleFlowRef.current = false;
+      if (err instanceof AppleAccountExistsError) {
+        setConflict({ credential: err.credential, provider: 'apple' });
+      } else {
+        showNotification(getAppleAuthErrorMessage(err), undefined, {
+          durationMs: 5000,
+        });
+      }
+      setLoading(false);
+    }
+  };
+
   const handleSwitchToExisting = async () => {
     if (!conflict || switching) return;
+    const isApple = conflict.provider === 'apple';
     setSwitching(true);
     try {
-      await signInWithExistingGoogle(conflict.credential);
+      if (isApple) {
+        await signInWithExistingApple(conflict.credential);
+      } else {
+        await signInWithExistingGoogle(conflict.credential);
+      }
       const route = await prepareSignedInRoute(postLoginRoute);
       navigateOnce(route);
     } catch (err: any) {
       setConflict(null);
       setSwitching(false);
-      showNotification(getGoogleAuthErrorMessage(err), undefined, {
-        durationMs: 5000,
-      });
+      showNotification(
+        isApple
+          ? getAppleAuthErrorMessage(err)
+          : getGoogleAuthErrorMessage(err),
+        undefined,
+        { durationMs: 5000 },
+      );
     }
   };
 
@@ -475,6 +518,20 @@ function LoginPageInner() {
                   )}
                 </button>
 
+                <button
+                  onClick={handleApple}
+                  disabled={loading}
+                  className="mt-3 flex h-12 w-full items-center justify-center gap-3 rounded-2xl border border-border bg-card/60 text-sm font-bold tracking-wide transition-all hover:bg-muted/50 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {loading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <>
+                      <AppleIcon /> Continue with Apple
+                    </>
+                  )}
+                </button>
+
                 <div className="relative my-4">
                   <div className="absolute inset-0 flex items-center">
                     <span className="w-full border-t border-border/60" />
@@ -570,7 +627,7 @@ function LoginPageInner() {
         open={!!conflict}
         busy={switching}
         title="You already have a frog!"
-        message="That Google account is already connected to a Frogress account. Switch to it? Your guest progress on this device will be left behind."
+        message={`That ${conflict?.provider === 'apple' ? 'Apple' : 'Google'} account is already connected to a Frogress account. Switch to it? Your guest progress on this device will be left behind.`}
         confirmLabel="Switch to my account"
         onConfirm={handleSwitchToExisting}
         onCancel={() => setConflict(null)}

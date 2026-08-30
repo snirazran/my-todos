@@ -14,7 +14,13 @@ import Frog from '@/components/ui/frog';
 import { PremiumFrogAura } from '@/components/ui/PremiumFrogAura';
 import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
 import { RARITY_CONFIG } from '@/components/ui/gift-box/constants';
-import { purchasePlus, restorePlusPurchases } from '@/lib/purchases';
+import {
+  formatPlusPrice,
+  getPlusPricing,
+  purchasePlus,
+  restorePlusPurchases,
+  type PlusPriceInfo,
+} from '@/lib/purchases';
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
 import { mutateInventoryCaches } from '@/hooks/useInventory';
 import { auth } from '@/lib/firebase';
@@ -26,20 +32,23 @@ type PlanId = 'yearly' | 'monthly';
 
 const PLAN_DETAILS: Record<
   PlanId,
-  { title: string; price: string; subtitle: string; badge?: string }
+  { title: string; subtitle: string; trialDays: number; badge?: string }
 > = {
   yearly: {
     title: '12 Months',
-    price: '$69.99',
     subtitle: 'Try 7 days free',
+    trialDays: 7,
     badge: 'Best deal',
   },
   monthly: {
     title: 'Monthly',
-    price: '$9.99 every month',
     subtitle: 'Try 3 days free',
+    trialDays: 3,
   },
 };
+
+const TERMS_URL = 'https://frogress.com/terms';
+const PRIVACY_URL = 'https://frogress.com/privacy';
 
 export function PlusUpgradeModal({
   open,
@@ -61,6 +70,27 @@ export function PlusUpgradeModal({
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
   const [celebrating, setCelebrating] = useState(false);
   const [needsAccount, setNeedsAccount] = useState(false);
+  const [pricing, setPricing] = useState<Partial<
+    Record<PlanId, PlusPriceInfo>
+  > | null>(null);
+  const [pricingFailed, setPricingFailed] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    setPricingFailed(false);
+    getPlusPricing()
+      .then((prices) => {
+        if (!cancelled) setPricing(prices);
+      })
+      .catch((err) => {
+        console.error('Could not read Plus prices from the store', err);
+        if (!cancelled) setPricingFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
 
   useEffect(() => {
     if (open) {
@@ -220,6 +250,8 @@ export function PlusUpgradeModal({
                       onRestore={restorePurchases}
                       busy={purchasing}
                       error={purchaseError}
+                      pricing={pricing}
+                      pricingFailed={pricingFailed}
                     />
                   </StepShell>
                 )}
@@ -745,6 +777,8 @@ function Step3({
   onRestore,
   busy,
   error,
+  pricing,
+  pricingFailed,
 }: {
   plan: PlanId;
   onSelect: (p: PlanId) => void;
@@ -752,9 +786,25 @@ function Step3({
   onRestore: () => void | Promise<void>;
   busy: boolean;
   error: string | null;
+  pricing: Partial<Record<PlanId, PlusPriceInfo>> | null;
+  pricingFailed: boolean;
 }) {
   const reduceMotion = useReducedMotion();
   const isNative = Capacitor.isNativePlatform();
+  const yearly = pricing?.yearly;
+  const monthly = pricing?.monthly;
+
+  // Twelve months bought one at a time — the number the yearly price beats.
+  const yearlyCompareAt =
+    yearly && monthly && monthly.currency === yearly.currency
+      ? monthly.amount * 12
+      : null;
+
+  const placeholder = pricingFailed ? 'See price at checkout' : '—';
+
+  const selected = pricing?.[plan];
+  const trialDays = PLAN_DETAILS[plan].trialDays;
+  const period = plan === 'yearly' ? 'year' : 'month';
   return (
     <div className="flex min-h-full flex-col px-6 pb-6 pt-[calc(4rem+env(safe-area-inset-top))] md:pb-5 md:pt-12">
       <Reveal>
@@ -773,8 +823,17 @@ function Step3({
             title={PLAN_DETAILS.yearly.title}
             price={
               <>
-                $69.99 <span className="line-through opacity-60">$119.88</span>{' '}
-                ($5.83/month)
+                {yearly?.priceString ?? placeholder}
+                {yearly && yearlyCompareAt !== null && yearlyCompareAt > yearly.amount && (
+                  <span className="ml-1.5 line-through opacity-60">
+                    {formatPlusPrice(yearlyCompareAt, yearly.currency)}
+                  </span>
+                )}
+                {yearly?.pricePerMonthString && (
+                  <span className="ml-1.5">
+                    ({yearly.pricePerMonthString}/month)
+                  </span>
+                )}
               </>
             }
             subtitle={PLAN_DETAILS.yearly.subtitle}
@@ -786,7 +845,9 @@ function Step3({
             selected={plan === 'monthly'}
             onSelect={onSelect}
             title={PLAN_DETAILS.monthly.title}
-            price={PLAN_DETAILS.monthly.price}
+            price={
+              monthly ? `${monthly.priceString} every month` : placeholder
+            }
             subtitle={PLAN_DETAILS.monthly.subtitle}
           />
         </Reveal>
@@ -811,15 +872,33 @@ function Step3({
             {error}
           </p>
         )}
-        <p className="text-xs font-medium text-white/85">
-          Recurring billing — cancel anytime.
+        <p className="text-[11px] font-medium leading-relaxed text-white/85">
+          {trialDays} days free, then{' '}
+          {selected ? selected.priceString : 'the price shown at checkout'} per{' '}
+          {period}. It renews automatically until you cancel, and you can cancel
+          any time before the trial ends.
+        </p>
+        <p className="text-[11px] font-medium text-white/70">
+          <a
+            href={TERMS_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="underline underline-offset-2 hover:text-white"
+          >
+            Terms of Use
+          </a>
+          <span className="px-1.5 opacity-60">·</span>
+          <a
+            href={PRIVACY_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="underline underline-offset-2 hover:text-white"
+          >
+            Privacy Policy
+          </a>
         </p>
         <PrimaryButton onClick={onStart} disabled={busy}>
-          {busy
-            ? 'Processing…'
-            : plan === 'yearly'
-              ? 'Start my 7-day free trial'
-              : 'Start my 3-day free trial'}
+          {busy ? 'Processing…' : `Start my ${trialDays}-day free trial`}
         </PrimaryButton>
         {isNative && (
           <button

@@ -394,3 +394,77 @@ export async function getFlyPackPrices(): Promise<Partial<Record<FlyPackId, stri
   }
   return prices;
 }
+
+export type PlusPriceInfo = {
+  priceString: string;
+  amount: number;
+  currency: string;
+  pricePerMonthString: string | null;
+};
+
+function formatMoney(amount: number, currency: string): string {
+  try {
+    return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(
+      amount,
+    );
+  } catch {
+    return `${amount.toFixed(2)} ${currency}`;
+  }
+}
+
+/**
+ * The live store price for each Plus plan. The paywall must never print a
+ * hardcoded figure: outside the US the store charges something else entirely,
+ * and a price the checkout sheet contradicts is an App Review rejection.
+ */
+export async function getPlusPricing(): Promise<
+  Partial<Record<PlusPlan, PlusPriceInfo>>
+> {
+  const uid = requireUid();
+  const prices: Partial<Record<PlusPlan, PlusPriceInfo>> = {};
+
+  if (Capacitor.isNativePlatform()) {
+    const { Purchases } = await getNativePurchases(uid);
+    const offering = (await Purchases.getOfferings()).current;
+    for (const [plan, pkg] of [
+      ['yearly', offering?.annual],
+      ['monthly', offering?.monthly],
+    ] as const) {
+      if (!pkg) continue;
+      prices[plan] = {
+        priceString: pkg.product.priceString,
+        amount: pkg.product.price,
+        currency: pkg.product.currencyCode,
+        pricePerMonthString:
+          pkg.product.pricePerMonthString ??
+          (typeof pkg.product.pricePerMonth === 'number'
+            ? formatMoney(pkg.product.pricePerMonth, pkg.product.currencyCode)
+            : null),
+      };
+    }
+    return prices;
+  }
+
+  const purchases = await getWebPurchases(uid);
+  const offering = (await purchases.getOfferings()).current;
+  for (const [plan, pkg] of [
+    ['yearly', offering?.annual],
+    ['monthly', offering?.monthly],
+  ] as const) {
+    if (!pkg) continue;
+    const price = pkg.webBillingProduct.price;
+    const amount = price.amountMicros / 1_000_000;
+    prices[plan] = {
+      priceString: price.formattedPrice,
+      amount,
+      currency: price.currency,
+      pricePerMonthString:
+        plan === 'yearly' ? formatMoney(amount / 12, price.currency) : null,
+    };
+  }
+  return prices;
+}
+
+export function formatPlusPrice(amount: number, currency: string): string {
+  return formatMoney(amount, currency);
+}
