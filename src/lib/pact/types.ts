@@ -240,8 +240,19 @@ export type ActivePactView = {
   missedSessions: number;
   /** Of those, the ones still inside the one-day catch-up window. */
   catchableSessions: number;
+  /**
+   * The whole week is still reachable, but only by moving a session first.
+   * The prize tile stays at full price while this holds: telling someone the
+   * week is worth less, in the one moment they can still win all of it, is
+   * the same lie as offering to pay them out early.
+   */
+  canFinishWithMoves: boolean;
   /** Sessions this week may still be moved to another day. */
   movesLeft: number;
+  /** This user's whole weekly allowance, spent or not. */
+  movesPerWeek: number;
+  /** What the allowance would be on Plus, for the pitch when it is bigger. */
+  plusMovesPerWeek: number;
   /** Days a session could be moved onto: still ahead, and free. */
   moveTargets: number[];
   /** False once too few days remain for every session to land. */

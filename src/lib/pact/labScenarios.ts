@@ -91,12 +91,17 @@ function makeActive(base: PactView, shape: WeekShape): ActivePactView {
   );
   const catchable = Math.min(shape.missed, shape.catchable ?? 0);
   const reachable = shape.done + remaining + catchable;
+  const moves = shape.moves ?? 1;
   const nearMissTarget = labNearMissTarget(shape.target);
   // Enough distinct days for every session this shape asks for, seeded from
   // the live pact where it has them.
   const days = Array.from(
     new Set([...(template?.days ?? []), 1, 3, 5, 2, 4, 6, 0]),
   ).slice(0, Math.max(1, shape.target));
+  // Every day of the week not already carrying one of this pact's sessions.
+  // The real view narrows this to days still ahead; a fixture has no real
+  // "today", so it offers the ones the shape leaves free.
+  const freeDays = [1, 2, 3, 4, 5, 6, 0].filter((day) => !days.includes(day));
   const area = base.areas[0];
 
   return {
@@ -128,12 +133,14 @@ function makeActive(base: PactView, shape: WeekShape): ActivePactView {
     openToday: remaining > 0,
     missedSessions: shape.missed,
     catchableSessions: catchable,
-    movesLeft: shape.moves ?? 1,
-    // Every day of the week that is not already carrying one of this pact's
-    // sessions. The real view narrows this to days still ahead; a fixture has
-    // no real "today", so it offers the ones the shape leaves free.
-    moveTargets: [1, 2, 3, 4, 5, 6, 0].filter((day) => !days.includes(day)),
+    movesLeft: moves,
+    movesPerWeek: base.isPremium ? 2 : 1,
+    plusMovesPerWeek: 2,
+    moveTargets: freeDays,
     canStillFinish: reachable >= shape.target,
+    canFinishWithMoves:
+      reachable + Math.min(moves, freeDays.length, shape.missed) >=
+      shape.target,
     tagId: template?.tagId,
     sessions: buildSessions(base, shape, days),
     completionRewards: price.rewards ?? base.completionRewards ?? [],
@@ -310,7 +317,7 @@ export const LEAP_LAB_SCENARIOS: LeapLabScenario[] = [
     id: 'move-spent',
     group: 'Week',
     label: 'Missed a day, move spent',
-    note: 'Same week with the move already used. The line falls back to stating where the streak stands — no second rescue is offered.',
+    note: 'Same week with the move already used. The button stays in the HUD rather than vanishing — opening it explains the week is out of moves, and offers Plus to a free account, which is the one moment that pitch is actually useful.',
     apply: week({ target: 3, done: 1, missed: 1, catchable: 0, moves: 0 }),
   },
   {

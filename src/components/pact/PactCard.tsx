@@ -29,9 +29,10 @@ import { formatPactRate, pactWeekRewardTiles } from '@/lib/pact/format';
 import { PACT_DEFAULT_DAYS } from '@/lib/pact/types';
 import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
 import { PactChangeSheet } from './PactChangeSheet';
-import { LeapMoveSheet, canMoveSession } from './LeapMoveSheet';
+import { LeapMoveSheet, canMoveSession, moveRelevant } from './LeapMoveSheet';
 import { openShieldSheet } from '@/hooks/useShields';
 import LilyPadIcon from '../../../public/icons/LilyPad.svg';
+import DateIcon from '../../../public/icons/Date.svg';
 import { PactWeekResultSheet } from './PactWeekResultSheet';
 import { PactPickSheet } from './PactPickSheet';
 import { RotatingWeekPrice } from './RotatingWeekPrice';
@@ -725,6 +726,21 @@ export function PactCard({
                       : 'Nothing under your week — get a Lily Pad'
                   }
                 />
+                {!weekFinished && moveRelevant(data) && (
+                  <PactHudButton
+                    icon={DateIcon}
+                    iconClassName="h-[22px] w-[22px]"
+                    onClick={() => setMoveOpen(true)}
+                    badge={
+                      active.movesLeft > 0 ? badgeCount(active.movesLeft) : null
+                    }
+                    label={
+                      active.movesLeft > 0
+                        ? `Move a session — ${active.movesLeft} move${active.movesLeft === 1 ? '' : 's'} left this week`
+                        : 'Move a session — none left this week'
+                    }
+                  />
+                )}
                 {!weekFinished && (
                   <PactHudButton
                     icon={ArrowLeftRight}
@@ -951,6 +967,10 @@ export function PactCard({
         open={moveOpen}
         onClose={() => setMoveOpen(false)}
         view={data}
+        onUpgrade={() => {
+          setMoveOpen(false);
+          setPlusOpen(true);
+        }}
       />
 
       <PactChangeSheet

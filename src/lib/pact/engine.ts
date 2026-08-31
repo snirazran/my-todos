@@ -1325,10 +1325,11 @@ export async function getPactView(args: {
       weekStartsOn,
       todayKey,
     });
+    const movesPerWeek = pactMoveAllowance(config, isPremium);
+    const plusMovesPerWeek = pactMoveAllowance(config, true);
     const movesLeft = Math.max(
       0,
-      pactMoveAllowance(config, isPremium) -
-        Math.max(0, activeDoc.movesUsed ?? 0),
+      movesPerWeek - Math.max(0, activeDoc.movesUsed ?? 0),
     );
     const moveTargets = pactMoveTargets({
       pact: activeDoc,
@@ -1341,6 +1342,14 @@ export async function getPactView(args: {
       movesLeft > 0 &&
       moveTargets.length > 0 &&
       sessionStates.some((session) => session.state !== 'done');
+    // Each move turns one missed day back into a day still ahead, so it is
+    // capped by all three: moves held, free days to land on, and misses left
+    // to rescue.
+    const movableMisses = Math.min(
+      movesLeft,
+      moveTargets.length,
+      sessionStates.filter((session) => session.state === 'missed').length,
+    );
     const pactTaskIds = new Set(activeDoc.taskIds ?? []);
     const openToday =
       activeDoc.days.includes(todayDow) &&
@@ -1403,12 +1412,17 @@ export async function getPactView(args: {
       missedSessions: ledger.missed,
       catchableSessions: ledger.catchable,
       movesLeft,
+      movesPerWeek,
+      plusMovesPerWeek,
       moveTargets,
       // Whether the whole week is still reachable. Once it is not, the bonus
       // and the gift are gone no matter what happens next, and saying so is
       // the only way the user finds out before the week quietly ends.
       canStillFinish:
         progress + ledger.remaining + ledger.catchable >= activeDoc.target,
+      canFinishWithMoves:
+        progress + ledger.remaining + ledger.catchable + movableMisses >=
+        activeDoc.target,
       nextTaskLabel:
         upcoming === undefined
           ? null

@@ -1,8 +1,10 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { CalendarDays, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { BaseSheet } from '@/components/ui/BaseSheet';
+import { Icon } from '@/components/ui/Icon';
+import DateIcon from '../../../public/icons/Date.svg';
 import { cn } from '@/lib/utils';
 import { refreshQuestHomeView } from '@/lib/questClaims';
 import type { PactSessionView, PactView } from '@/lib/pact/types';
@@ -54,10 +56,12 @@ export function LeapMoveSheet({
   open,
   onClose,
   view,
+  onUpgrade,
 }: {
   open: boolean;
   onClose: () => void;
   view: PactView;
+  onUpgrade: () => void;
 }) {
   const { mutate } = usePactView();
   const active = view.active;
@@ -88,7 +92,12 @@ export function LeapMoveSheet({
   if (!active) return null;
 
   const chosen = movable.find((session) => session.taskId === taskId);
-  const canSave = !!taskId && toDay !== null && !saving;
+  const spent = active.movesLeft <= 0;
+  const canSave = !!taskId && toDay !== null && !saving && !spent;
+  // Pitched only where it is true and only where it would have helped: a free
+  // account that has just run out, on a week Plus would still have a move for.
+  const pitchPlus =
+    !view.isPremium && active.plusMovesPerWeek > active.movesPerWeek;
 
   const submit = async () => {
     if (!canSave) return;
@@ -134,11 +143,13 @@ export function LeapMoveSheet({
               Move a session
             </h2>
             <p className="mt-1.5 text-[13.5px] font-semibold leading-snug text-muted-foreground">
-              Same work, same reward — only the day changes.
+              {spent
+                ? 'You have already moved a session this week.'
+                : 'Same work, same reward — only the day changes.'}
             </p>
           </div>
 
-          {movable.length > 1 ? (
+          {spent ? null : movable.length > 1 ? (
             <Section label="Move which one">
               <div className="flex flex-col gap-1.5">
                 {movable.map((session) => {
@@ -187,6 +198,7 @@ export function LeapMoveSheet({
             )
           )}
 
+          {!spent && (
           <Section label="To which day">
             {/* A fixed grid rather than a wrapping row: seven ragged chips
                 reflow into a different shape on every pact, and a flex-wrap
@@ -212,6 +224,7 @@ export function LeapMoveSheet({
               })}
             </div>
           </Section>
+          )}
 
           {error && (
             <p className="text-[13px] font-bold text-red-600 dark:text-red-400">
@@ -222,15 +235,17 @@ export function LeapMoveSheet({
           <div className="flex flex-col gap-2">
             <button
               type="button"
-              onClick={submit}
-              disabled={!canSave}
+              onClick={spent ? onClose : submit}
+              disabled={!spent && !canSave}
               className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#4f9149] text-[15px] font-black text-white shadow-[0_4px_0_0_#34631f] transition-transform active:translate-y-[2px] active:shadow-none disabled:opacity-60 disabled:shadow-none"
             >
               {saving ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
+              ) : spent ? (
+                'Got it'
               ) : (
                 <>
-                  <CalendarDays className="h-4 w-4" />
+                  <DateIcon className="h-[21px] w-[21px]" />
                   {chosen && toDay !== null
                     ? `Move ${DAY_SHORT[chosen.dayOfWeek]} to ${DAY_SHORT[toDay]}`
                     : 'Move it'}
@@ -238,11 +253,31 @@ export function LeapMoveSheet({
               )}
             </button>
             {/* The cost of the action, under the button that spends it. */}
-            <p className="text-center text-[12px] font-bold text-muted-foreground">
-              {active.movesLeft === 1
-                ? 'Your one move this week'
-                : `${active.movesLeft} moves left this week`}
-            </p>
+            {!spent && (
+              <p className="text-center text-[12px] font-bold text-muted-foreground">
+                {active.movesLeft === 1
+                  ? 'Your one move this week'
+                  : `${active.movesLeft} moves left this week`}
+              </p>
+            )}
+            {pitchPlus && (
+              // The one moment this pitch is useful rather than noise: the
+              // user wanted a move and has none. It names the number Plus
+              // actually gives rather than promising "more".
+              <button
+                type="button"
+                onClick={onUpgrade}
+                className="mt-1 flex w-full items-center justify-center gap-1.5 border-t border-border/50 pt-3 text-[12px] font-bold text-muted-foreground transition-colors hover:text-foreground"
+              >
+                <Icon name="frogPlus" className="h-6 w-6 shrink-0" />
+                <span>
+                  Plus moves {active.plusMovesPerWeek} sessions a week
+                </span>
+                <span className="inline-flex items-center rounded-md bg-gradient-to-b from-emerald-600 to-emerald-800 px-1.5 py-0.5 text-[11px] font-black leading-none text-amber-100">
+                  Plus
+                </span>
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -250,10 +285,19 @@ export function LeapMoveSheet({
   );
 }
 
-/** Whether the card should offer a move at all. */
+/** A move could be made right now. */
 export function canMoveSession(view: PactView) {
+  return moveRelevant(view) && (view.active?.movesLeft ?? 0) > 0;
+}
+
+/**
+ * The move is worth a button, spent or not. A control that vanishes the
+ * moment it runs out leaves the user with no way to find out why, and takes
+ * the one honest place to mention Plus with it.
+ */
+export function moveRelevant(view: PactView) {
   const active = view.active;
   if (!active || active.claimed) return false;
-  if (active.movesLeft <= 0 || active.moveTargets.length === 0) return false;
+  if (active.moveTargets.length === 0) return false;
   return active.sessions.some((session) => session.state !== 'done');
 }

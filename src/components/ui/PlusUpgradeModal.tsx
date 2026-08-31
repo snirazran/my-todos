@@ -8,7 +8,8 @@ import { Capacitor } from '@capacitor/core';
 import { Icon } from '@/components/ui/Icon';
 import { AppImage } from '@/components/ui/AppImage';
 import { BadgePercent, Check, Heart, Sparkle, X } from 'lucide-react';
-import { SAVED_LOOKS_PLUS } from '@/lib/skins/looks';
+import { SAVED_LOOKS_FREE, SAVED_LOOKS_PLUS } from '@/lib/skins/looks';
+import { FREE_TAG_LIMIT, PREMIUM_TAG_LIMIT } from '@/lib/tags/limits';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import Frog from '@/components/ui/frog';
 import { PremiumFrogAura } from '@/components/ui/PremiumFrogAura';
@@ -580,29 +581,26 @@ function Step0({
         </Reveal>
         <Reveal delay={0.18}>
           <FeatureRow
-            icon={<BadgePercent className="h-5 w-5 text-amber-300" />}
-            title="Reroll the daily deals"
-            subtitle="Don't like today's shelf? Swap it for a fresh one once a day, no ad."
+            icon={<Icon name="lilyPad" className="h-5 w-5" />}
+            title="Keep your streak through a bad week"
+            subtitle="Three Lily Pads instead of two, one free every month, and two session moves a week instead of one."
           />
         </Reveal>
         <Reveal delay={0.24}>
           <FeatureRow
-            icon={<Sparkle className="h-5 w-5 text-amber-300" />}
-            title="Season Plus rewards"
-            subtitle="The Plus track opens — earn it as you play."
-          />
-        </Reveal>
-        <Reveal delay={0.3}>
-          <FeatureRow
-            icon={<Heart className="h-5 w-5 text-rose-300" fill="currentColor" />}
-            title="Support our mission"
-            subtitle="Frogress is built by a tiny team — Plus keeps us going."
+            icon={<BadgePercent className="h-5 w-5 text-amber-300" />}
+            title="Shop on your terms"
+            subtitle="Reroll today's deals with no ad, and keep ten wishlist slots instead of four."
           />
         </Reveal>
       </div>
 
       <Reveal delay={0.38} className="mt-auto space-y-2 pt-6 md:pt-5">
         <PrimaryButton onClick={onContinue}>Try for free</PrimaryButton>
+        <p className="flex items-center justify-center gap-1.5 text-center text-xs font-semibold text-white/75">
+          <Heart className="h-3.5 w-3.5 text-rose-300" fill="currentColor" />
+          Frogress is built by a tiny team — Plus keeps us going
+        </p>
         <button
           type="button"
           onClick={onMaybeLater}
@@ -638,19 +636,41 @@ function FeatureRow({
   );
 }
 
-const COMPARISON_ROWS: { label: string; free: boolean }[] = [
-  { label: 'Hold 3 Lily Pads, plus a free one monthly', free: false },
-  { label: 'Change your area mid-week', free: false },
-  { label: 'Unlimited tags', free: false },
-  { label: 'Double rewards', free: false },
-  { label: 'Every gift opens twice', free: false },
-  { label: 'Golden fly companion', free: false },
-  { label: '10 wishlist slots instead of 4', free: false },
-  { label: 'Free trade rerolls', free: false },
-  { label: 'Reroll the daily deals without an ad', free: false },
-  { label: `${SAVED_LOOKS_PLUS} saved looks`, free: false },
-  { label: 'Season Plus rewards', free: false },
+/**
+ * One row per thing that actually differs, with both sides stated.
+ *
+ * Values are kept to a word or a number: the columns are narrow enough that
+ * anything longer wraps mid-phrase and the table stops scanning as a table.
+ * `null` in a column means "nothing at all" on Free and a tick on Plus — the
+ * shape reserved for what Plus adds outright rather than raises.
+ */
+const COMPARISON_ROWS: {
+  label: string;
+  free: string | null;
+  plus: string | null;
+}[] = [
+  { label: 'Flies from every quest', free: '×1', plus: '×2' },
+  { label: 'Rewards per gift box', free: '1', plus: '2' },
+  // Defaults; both caps are admin-tunable under Shields.
+  { label: 'Lily Pads held', free: '2', plus: '3' },
+  { label: 'Session moves a week', free: '1', plus: '2' },
+  { label: 'Wishlist slots', free: '4', plus: '10' },
+  {
+    label: 'Tags',
+    free: String(FREE_TAG_LIMIT),
+    plus: String(PREMIUM_TAG_LIMIT),
+  },
+  {
+    label: 'Saved looks',
+    free: String(SAVED_LOOKS_FREE),
+    plus: String(SAVED_LOOKS_PLUS),
+  },
+  { label: 'Season Plus track', free: null, plus: null },
 ];
+
+/** The Plus-only extras, as one line rather than five more rows. */
+const PLUS_ONLY =
+  'Plus also adds a free Lily Pad every month, the golden fly companion, free trade rerolls, a mid-week area change, and daily-deal rerolls with no ad.';
 
 
 function Step1({ onContinue }: { onContinue: () => void }) {
@@ -664,7 +684,7 @@ function Step1({ onContinue }: { onContinue: () => void }) {
 
       <Reveal delay={0.1} className="relative mt-8">
         {/* PLUS column highlight */}
-        <div className="absolute -right-3 -top-3 -bottom-3 w-[6.5rem] overflow-hidden rounded-2xl bg-white/15">
+        <div className="pointer-events-none absolute -right-3 -top-3 -bottom-3 w-[6.25rem] overflow-hidden rounded-2xl bg-white/15 opacity-50">
           {/* Three evenly-spaced lanes with staggered timing for a calm, flowing stream */}
           <FloatingSparkle delay={0.0} left="22%" size={14} duration={3.6} spin={180} />
           <FloatingSparkle delay={1.2} left="22%" size={20} duration={3.6} spin={180} />
@@ -680,10 +700,10 @@ function Step1({ onContinue }: { onContinue: () => void }) {
         </div>
 
         <div className="relative">
-          <div className="grid grid-cols-[1fr_5rem_5rem] items-center pb-3 text-sm font-black">
+          <div className="grid grid-cols-[1fr_4rem_5.5rem] items-center pb-3 text-sm font-black">
             <div />
             <div className="text-center text-white/90">Free</div>
-            <div className="flex justify-center">
+            <div className="flex justify-center pl-1.5">
               <span className="rounded-lg bg-white px-2.5 py-1 text-[11px] font-black tracking-wider text-violet-700 dark:text-violet-700">
                 PLUS
               </span>
@@ -691,22 +711,44 @@ function Step1({ onContinue }: { onContinue: () => void }) {
           </div>
           {COMPARISON_ROWS.map((row, i) => (
             <Reveal key={row.label} delay={0.16 + i * 0.05}>
-              <div
-                className={`grid grid-cols-[1fr_5rem_5rem] items-center py-4 text-sm font-bold ${
-                  i < COMPARISON_ROWS.length - 1 ? 'border-b border-white/20' : ''
-                }`}
-              >
-                <span>{row.label}</span>
-                <div className="flex justify-center">
-                  {row.free && <Check className="h-5 w-5 stroke-[3]" />}
+              <div className="grid grid-cols-[1fr_4rem_5.5rem] items-stretch text-sm font-bold">
+                <span
+                  className={`flex items-center py-3.5 pr-4 ${
+                    i < COMPARISON_ROWS.length - 1
+                      ? 'border-b border-white/20'
+                      : ''
+                  }`}
+                >
+                  {row.label}
+                </span>
+                <div
+                  className={`flex items-center justify-center whitespace-nowrap py-3.5 text-white/70 ${
+                    i < COMPARISON_ROWS.length - 1
+                      ? 'border-b border-white/20'
+                      : ''
+                  }`}
+                >
+                  {row.free ?? '—'}
                 </div>
-                <div className="flex justify-center">
-                  <Check className="h-5 w-5 stroke-[3]" />
+                <div
+                  className={`flex items-center justify-center whitespace-nowrap py-3.5 pl-1.5 font-black text-amber-300 ${
+                    i < COMPARISON_ROWS.length - 1
+                      ? 'border-b border-white/20'
+                      : ''
+                  }`}
+                >
+                  {row.plus ?? <Check className="h-5 w-5 stroke-[3]" />}
                 </div>
               </div>
             </Reveal>
           ))}
         </div>
+      </Reveal>
+
+      <Reveal delay={0.55}>
+        <p className="mt-6 text-center text-xs font-semibold leading-relaxed text-white/75">
+          {PLUS_ONLY}
+        </p>
       </Reveal>
 
       {/* Pinned to the bottom of the scroll area — the comparison list grows as

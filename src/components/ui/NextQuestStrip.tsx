@@ -206,7 +206,9 @@ export function NextQuestStrip({
   // kept, even on near-miss protection, is not worth the slot either.
   const pactActionable =
     !!livePact?.active?.openToday &&
-    (livePact.active.canStillFinish || livePact.active.canHoldStreak);
+    (livePact.active.canStillFinish ||
+      livePact.active.canFinishWithMoves ||
+      livePact.active.canHoldStreak);
 
   // Both kinds are scored on the same axes so the slot is won, not assigned.
   // A Leap earns it when skipping today actually costs something: no slack
