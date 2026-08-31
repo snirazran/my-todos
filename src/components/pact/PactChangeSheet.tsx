@@ -48,7 +48,12 @@ export function PactChangeSheet({
   }, [open]);
 
   const active = view.active;
-  const hasSwap = view.swapTokens > 0;
+  // A token buys a change of mind, not an escape from a failure. On a week
+  // that can no longer hold its streak the streak is already gone, so the
+  // token neither protects it nor is spent — and the sheet has to say so
+  // rather than promising a save it will not perform.
+  const pastSaving = !!active && !active.canHoldStreak;
+  const hasSwap = view.swapTokens > 0 && !pastSaving;
   const streakAtStake = hasSwap ? 0 : view.streak.weeks;
   const needsSecondTap = streakAtStake > 0 && !confirmed;
 
@@ -74,6 +79,15 @@ export function PactChangeSheet({
           text: 'Unfinished tasks leave your list',
           danger: false,
         },
+        ...(pastSaving && view.swapTokens > 0
+          ? [
+              {
+                icon: ShieldCheck,
+                text: 'Your swaps are kept — none can save this week',
+                danger: false,
+              },
+            ]
+          : []),
         ...(streakAtStake > 0
           ? [
               {

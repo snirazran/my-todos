@@ -11,7 +11,7 @@ import { RotatingRays } from './gift-box/RotatingRays';
 import { RARITY_CONFIG as GIFT_RARITY_CONFIG } from './gift-box/constants';
 import Fly from './fly';
 import { FlyCounter } from './FlyCounter';
-import type { ItemDef } from '@/lib/skins/catalog';
+import { rarityRank, type ItemDef } from '@/lib/skins/catalog';
 import {
   mutateInventoryCaches,
   patchInventoryFlies,
@@ -85,6 +85,7 @@ let revealIdCounter = 0;
 let toastIdCounter = 0;
 let knownFlyBalance = 0;
 let doublingClaim = false;
+let revealWasDelightful = false;
 
 function createFlyRewardItem(amount: number): ItemDef {
   return {
@@ -230,6 +231,13 @@ function showFlyGainToast(entry: QuestRewardRevealEntry) {
 }
 
 function handleClaim(entry?: QuestRewardRevealEntry) {
+  if (
+    entry &&
+    entry.item.slot !== 'container' &&
+    rarityRank[entry.item.rarity] >= rarityRank.rare
+  ) {
+    revealWasDelightful = true;
+  }
   if (entry?.fliesGranted && !entry.suppressFlyPill) {
     showFlyGainToast(entry);
   }
@@ -304,6 +312,7 @@ async function handleWatchAdDouble(entry: QuestRewardRevealEntry) {
 // (prize claimed or closed). Advance to the next copy, or finish and remove
 // the gift entry from the reveal queue once every box is done.
 function handleGiftBoxClosed() {
+  revealWasDelightful = true;
   markFlyEarn();
   mutateInventoryCaches();
   const current = revealStore.getState().giftOpening;
@@ -347,8 +356,9 @@ export function QuestRewardRevealHost() {
   const prevRevealCountRef = useRef(0);
   useEffect(() => {
     if (prevRevealCountRef.current > 0 && queue.length === 0) {
-      maybeRequestAppRating();
       emitCampaignTrigger('quest_claimed');
+      if (revealWasDelightful) maybeRequestAppRating();
+      revealWasDelightful = false;
     }
     prevRevealCountRef.current = queue.length;
   }, [queue.length]);

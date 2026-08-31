@@ -127,6 +127,8 @@ export type PactConfigView = {
   weekValuePerSession: number;
   weekValueBaseSessions: number;
   partialCreditExponent: number;
+  sessionMovesPerWeek: number;
+  plusSessionMovesPerWeek: number;
   comebackBonusFlies: number;
   completionRewards: QuestRewards;
   completionGiftTiers: PactCompletionGiftTier[];
@@ -238,6 +240,10 @@ export type ActivePactView = {
   missedSessions: number;
   /** Of those, the ones still inside the one-day catch-up window. */
   catchableSessions: number;
+  /** Sessions this week may still be moved to another day. */
+  movesLeft: number;
+  /** Days a session could be moved onto: still ahead, and free. */
+  moveTargets: number[];
   /** False once too few days remain for every session to land. */
   canStillFinish: boolean;
   /** Area tag on this pact's tasks, for hint targeting. */

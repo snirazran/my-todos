@@ -26,6 +26,8 @@ type WeekShape = {
   catchable?: number;
   deleted?: number;
   claimed?: boolean;
+  /** Session moves left this week. Defaults to the free allowance of 1. */
+  moves?: number;
 };
 
 export function labNearMissTarget(target: number) {
@@ -68,7 +70,10 @@ function buildSessions(
           : 'open';
     sessions.push({
       taskId: `lab-session-${index}`,
-      dayOfWeek: days[index % days.length],
+      // One session per day, like the real thing. Cycling a short day list
+      // with `% length` gave a one-day pact three sessions all on the same
+      // weekday, which no real Leap can produce.
+      dayOfWeek: days[index] ?? (index % 7),
       dateKey: shiftYMD(base.weekKey, index),
       state,
     });
@@ -87,9 +92,11 @@ function makeActive(base: PactView, shape: WeekShape): ActivePactView {
   const catchable = Math.min(shape.missed, shape.catchable ?? 0);
   const reachable = shape.done + remaining + catchable;
   const nearMissTarget = labNearMissTarget(shape.target);
-  const days = (template?.days?.length ? template.days : [1, 3, 5, 0, 2, 4, 6])
-    .slice()
-    .sort((a, b) => a - b);
+  // Enough distinct days for every session this shape asks for, seeded from
+  // the live pact where it has them.
+  const days = Array.from(
+    new Set([...(template?.days ?? []), 1, 3, 5, 2, 4, 6, 0]),
+  ).slice(0, Math.max(1, shape.target));
   const area = base.areas[0];
 
   return {
@@ -121,6 +128,11 @@ function makeActive(base: PactView, shape: WeekShape): ActivePactView {
     openToday: remaining > 0,
     missedSessions: shape.missed,
     catchableSessions: catchable,
+    movesLeft: shape.moves ?? 1,
+    // Every day of the week that is not already carrying one of this pact's
+    // sessions. The real view narrows this to days still ahead; a fixture has
+    // no real "today", so it offers the ones the shape leaves free.
+    moveTargets: [1, 2, 3, 4, 5, 6, 0].filter((day) => !days.includes(day)),
     canStillFinish: reachable >= shape.target,
     tagId: template?.tagId,
     sessions: buildSessions(base, shape, days),
@@ -288,11 +300,25 @@ export const LEAP_LAB_SCENARIOS: LeapLabScenario[] = [
     apply: week({ target: 4, done: 1, missed: 0, deleted: 1 }),
   },
   {
+    id: 'move-offered',
+    group: 'Week',
+    label: 'Missed a day, move available',
+    note: 'The window has closed on a missed day, but a move is still in hand. The line becomes a button: relocate the session to a free day and the week is winnable again.',
+    apply: week({ target: 3, done: 1, missed: 1, catchable: 0, moves: 1 }),
+  },
+  {
+    id: 'move-spent',
+    group: 'Week',
+    label: 'Missed a day, move spent',
+    note: 'Same week with the move already used. The line falls back to stating where the streak stands — no second rescue is offered.',
+    apply: week({ target: 3, done: 1, missed: 1, catchable: 0, moves: 0 }),
+  },
+  {
     id: 'week-dead',
     group: 'Week',
     label: 'Week dead, streak unholdable',
-    note: 'Nothing left to reach. This is the dead tail a recovery mechanic would target.',
-    apply: week({ target: 4, done: 0, missed: 1, deleted: 3 }),
+    note: 'Nothing left to reach and no move in hand. The line becomes the way out: it opens the Change sheet so a dead week can be swapped for a fresh Leap. A swap token cannot protect the streak here — the week was already past saving.',
+    apply: week({ target: 4, done: 0, missed: 1, deleted: 3, moves: 0 }),
   },
   {
     id: 'claimable',

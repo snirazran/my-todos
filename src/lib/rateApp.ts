@@ -2,15 +2,22 @@
 
 import { Capacitor } from '@capacitor/core';
 import { InAppReview } from '@capacitor-community/in-app-review';
+import { useCampaignStore } from '@/lib/campaigns/orchestrator';
 
 const USAGE_DAYS_KEY = 'rate-app:usage-days';
 const PROMPTS_KEY = 'rate-app:prompts';
 
 const MIN_USAGE_DAYS = 3;
-const PROMPT_COOLDOWN_MS = 122 * 86_400_000;
-const MAX_PROMPTS_PER_YEAR = 3;
-const YEAR_MS = 365 * 86_400_000;
+const DAY_MS = 86_400_000;
+const YEAR_MS = 365 * DAY_MS;
 const PROMPT_DELAY_MS = 1200;
+
+const PLATFORM_POLICY = {
+  ios: { cooldownMs: 122 * DAY_MS, maxPerYear: 3 },
+  android: { cooldownMs: 30 * DAY_MS, maxPerYear: 6 },
+} as const;
+
+let requestInFlight = false;
 
 function readJson<T>(key: string, fallback: T): T {
   try {
@@ -36,6 +43,23 @@ function localDayKey(date = new Date()) {
   return `${y}-${m}-${d}`;
 }
 
+function policy() {
+  return Capacitor.getPlatform() === 'android'
+    ? PLATFORM_POLICY.android
+    : PLATFORM_POLICY.ios;
+}
+
+function recentPrompts(now: number) {
+  return readJson<number[]>(PROMPTS_KEY, []).filter(
+    (ts) => Number.isFinite(ts) && now - ts < YEAR_MS,
+  );
+}
+
+function interrupted() {
+  const { active, pending, busyReasons } = useCampaignStore.getState();
+  return !!active || !!pending || busyReasons.length > 0;
+}
+
 export function recordAppUsageDay() {
   if (typeof window === 'undefined') return;
   const today = localDayKey();
@@ -47,19 +71,28 @@ export function recordAppUsageDay() {
 export function maybeRequestAppRating() {
   if (typeof window === 'undefined') return;
   if (!Capacitor.isNativePlatform()) return;
+  if (requestInFlight) return;
 
   const usageDays = readJson<string[]>(USAGE_DAYS_KEY, []);
   if (usageDays.length < MIN_USAGE_DAYS) return;
 
+  const { cooldownMs, maxPerYear } = policy();
   const now = Date.now();
-  const prompts = readJson<number[]>(PROMPTS_KEY, []).filter(
-    (ts) => Number.isFinite(ts) && now - ts < YEAR_MS,
-  );
-  if (prompts.length >= MAX_PROMPTS_PER_YEAR) return;
-  if (prompts.some((ts) => now - ts < PROMPT_COOLDOWN_MS)) return;
+  const prompts = recentPrompts(now);
+  if (prompts.length >= maxPerYear) return;
+  if (prompts.some((ts) => now - ts < cooldownMs)) return;
+  if (interrupted()) return;
 
-  writeJson(PROMPTS_KEY, [...prompts, now]);
-  window.setTimeout(() => {
-    void InAppReview.requestReview().catch(() => {});
+  requestInFlight = true;
+  window.setTimeout(async () => {
+    try {
+      if (interrupted()) return;
+      await InAppReview.requestReview();
+      const at = Date.now();
+      writeJson(PROMPTS_KEY, [...recentPrompts(at), at]);
+    } catch {
+    } finally {
+      requestInFlight = false;
+    }
   }, PROMPT_DELAY_MS);
 }

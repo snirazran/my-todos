@@ -9,7 +9,10 @@ import { normalizeWeekStart } from '@/lib/weekStart';
 import {
   ensurePactConfig,
   normalizePactStreak,
+  pactMoveAllowance,
+  pactMoveTargets,
   readPactSessions,
+  readPactSessionStates,
   weekKeyFor,
 } from './engine';
 import { applyPactRewards, type PactRewardSummary } from './grant';
@@ -51,15 +54,26 @@ export async function claimPactReward(args: {
     todayKey,
   });
 
+  const isPremium = isPremiumUser(user.toObject());
   const kept = pact.progress >= pact.target;
   // A short week pays too, but only once it can no longer improve. Claiming a
-  // week that still has a session in it would trade the whole prize for a
-  // fraction of it, which is a trap however clearly it is labelled.
-  const canImprove = ledger.remaining + ledger.catchable > 0;
+  // week that still has a session in it — or a move that could hand one back —
+  // trades the whole prize for a fraction of it, which is a trap however
+  // clearly it is labelled.
+  const rescuableByMove =
+    pactMoveAllowance(config, isPremium) - Math.max(0, pact.movesUsed ?? 0) > 0 &&
+    pactMoveTargets({ pact, weekStartsOn, todayKey }).length > 0 &&
+    readPactSessionStates({
+      pact,
+      tasks,
+      timezone,
+      weekStartsOn,
+      todayKey,
+    }).some((session) => session.state !== 'done');
+  const canImprove = ledger.remaining + ledger.catchable > 0 || rescuableByMove;
   if (pact.progress <= 0) throw new Error('Nothing to claim yet');
   if (!kept && canImprove) throw new Error('Pact is not finished yet');
 
-  const isPremium = isPremiumUser(user.toObject());
   const streak = normalizePactStreak(user.toObject());
 
   // This week has not settled yet, so its position in the streak is the next

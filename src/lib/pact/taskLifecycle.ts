@@ -6,7 +6,12 @@ import { recordAnalyticsEvent } from '@/lib/analytics/server';
 import { getZonedToday } from '@/lib/utils';
 import { normalizeWeekStart } from '@/lib/weekStart';
 import { dropPact } from './drop';
-import { readPactSessionStates } from './engine';
+import {
+  ensurePactConfig,
+  pactNearMissTarget,
+  readPactSessionStates,
+  readPactSessions,
+} from './engine';
 
 export type PactTaskRemovalOutcome =
   | 'none'
@@ -119,6 +124,22 @@ export async function applyPactTaskRemoval(args: {
 
   const nothingLeft = keptIds.length === 0 && progressAfter < target;
   if (!alreadyFinished && (nothingLeft || target <= 0)) {
+    // Asked of the week as it stood BEFORE this deletion, exactly as the swap
+    // flow asks it: a token covers a week the user chose to abandon, never one
+    // that was already lost. Clearing the board is the same escape as tapping
+    // swap, so it has to be priced the same or it becomes the cheaper door.
+    const config = await ensurePactConfig();
+    const ledger = readPactSessions({
+      pact,
+      tasks,
+      timezone,
+      weekStartsOn,
+      todayKey,
+    });
+    const holdable =
+      ledger.progress + ledger.remaining + ledger.catchable >=
+      pactNearMissTarget(config, pact.target);
+
     const drop = await dropPact({
       userId,
       pact,
@@ -126,6 +147,7 @@ export async function applyPactTaskRemoval(args: {
       // The caller is already removing what it named; anything else the week
       // still owns has to come off the board with it.
       keepTasks: keptIds.length === 0,
+      holdable,
     });
     return {
       outcome: 'cancelled',

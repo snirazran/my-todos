@@ -20,6 +20,7 @@ import { getZonedToday, getZonedYMD } from '@/lib/utils';
 import {
   normalizeWeekStart,
   startOfWeekYMD,
+  weekDatesFor,
   weekOrder,
   type WeekStartDay,
 } from '@/lib/weekStart';
@@ -257,6 +258,11 @@ export async function ensurePactConfig(): Promise<PactConfigDoc> {
   if ((existing.payoutVersion ?? 0) < 7) {
     backfill.partialCreditExponent = PACT_PAYOUT_NUMBERS.partialCreditExponent;
   }
+  if ((existing.payoutVersion ?? 0) < 8) {
+    backfill.sessionMovesPerWeek = PACT_PAYOUT_NUMBERS.sessionMovesPerWeek;
+    backfill.plusSessionMovesPerWeek =
+      PACT_PAYOUT_NUMBERS.plusSessionMovesPerWeek;
+  }
   if (existing.payoutVersion !== PACT_PAYOUT_VERSION) {
     backfill.payoutVersion = PACT_PAYOUT_VERSION;
   }
@@ -396,6 +402,47 @@ export function pactMultiplier(
 /** Weeks that complete a cycle. 0 = no prestige. */
 export function pactPrestigeWeeks(config: PactConfigDoc) {
   return Math.max(0, Math.floor(Number(config.prestigeWeeks ?? 0)));
+}
+
+/**
+ * How many sessions this week may still be moved.
+ *
+ * Free rather than paid, and deliberately: moving does not add a fly to the
+ * week — the same session lands on a different day for the same money. What it
+ * removes is a punishment for having a life, which is the thing that actually
+ * ends runs. Charging for it would sell back the flexibility the schedule took
+ * away, and the Lily Pad already occupies the paid-rescue slot.
+ */
+export function pactMoveAllowance(
+  config: Pick<PactConfigDoc, 'sessionMovesPerWeek' | 'plusSessionMovesPerWeek'>,
+  isPremium: boolean,
+) {
+  const free = Math.max(0, Math.floor(Number(config.sessionMovesPerWeek ?? 0)));
+  const plus = Math.max(
+    free,
+    Math.floor(Number(config.plusSessionMovesPerWeek ?? free)),
+  );
+  return isPremium ? plus : free;
+}
+
+/**
+ * Days this week a session could still be moved onto: ahead of the user (today
+ * counts — a session moved to tonight is a session that can still happen) and
+ * not already holding one of this pact's own.
+ */
+export function pactMoveTargets(args: {
+  pact: PactDoc;
+  weekStartsOn: WeekStartDay;
+  todayKey: string;
+}): number[] {
+  const { pact, weekStartsOn, todayKey } = args;
+  const order = weekOrder(weekStartsOn);
+  const dates = weekDatesFor(pact.weekKey, weekStartsOn);
+  const taken = new Set(pact.days ?? []);
+  return order.filter((day, index) => {
+    if (taken.has(day)) return false;
+    return dates[index] >= todayKey;
+  });
 }
 
 /** Sessions that keep a streak alive without finishing the week. */
@@ -1271,6 +1318,29 @@ export async function getPactView(args: {
     const upcoming = Array.from(new Set(activeDoc.days))
       .sort((a, b) => a - b)
       .find((d) => ((d - todayDow + 7) % 7) <= 6);
+    const sessionStates = readPactSessionStates({
+      pact: activeDoc,
+      tasks,
+      timezone,
+      weekStartsOn,
+      todayKey,
+    });
+    const movesLeft = Math.max(
+      0,
+      pactMoveAllowance(config, isPremium) -
+        Math.max(0, activeDoc.movesUsed ?? 0),
+    );
+    const moveTargets = pactMoveTargets({
+      pact: activeDoc,
+      weekStartsOn,
+      todayKey,
+    });
+    // A move can put a session back in front of the user, so a week with one
+    // in hand is not finished being played — however empty its calendar looks.
+    const rescuableByMove =
+      movesLeft > 0 &&
+      moveTargets.length > 0 &&
+      sessionStates.some((session) => session.state !== 'done');
     const pactTaskIds = new Set(activeDoc.taskIds ?? []);
     const openToday =
       activeDoc.days.includes(todayDow) &&
@@ -1299,11 +1369,15 @@ export async function getPactView(args: {
       // A short week is claimable too, but only once no session in it can
       // still be completed — otherwise collecting a fraction early would
       // forfeit the whole week's prize.
+      // A short week is claimable too, but only once nothing can still change
+      // it: no session left to tick, nothing inside the catch-up window, and
+      // no move that could hand one back. Offering Claim while a move is in
+      // hand is a trap — it takes a fraction and forfeits the whole week.
       claimable:
         !activeDoc.claimedAt &&
         progress > 0 &&
         (progress >= activeDoc.target ||
-          ledger.remaining + ledger.catchable === 0),
+          (ledger.remaining + ledger.catchable === 0 && !rescuableByMove)),
       claimed: !!activeDoc.claimedAt,
       // Priced on the target, not the day list: a session removed after its
       // day went by leaves the goal where it was, and the week has to keep
@@ -1324,16 +1398,12 @@ export async function getPactView(args: {
       daysLeft: Math.max(0, daysBetween(todayKey, weekEnd) + 1),
       shieldUsed: activeDoc.shieldUsed,
       tagId: activeDoc.tagId,
-      sessions: readPactSessionStates({
-        pact: activeDoc,
-        tasks,
-        timezone,
-        weekStartsOn,
-        todayKey,
-      }),
+      sessions: sessionStates,
       openToday,
       missedSessions: ledger.missed,
       catchableSessions: ledger.catchable,
+      movesLeft,
+      moveTargets,
       // Whether the whole week is still reachable. Once it is not, the bonus
       // and the gift are gone no matter what happens next, and saying so is
       // the only way the user finds out before the week quietly ends.

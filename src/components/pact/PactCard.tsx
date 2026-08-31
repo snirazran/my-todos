@@ -29,6 +29,7 @@ import { formatPactRate, pactWeekRewardTiles } from '@/lib/pact/format';
 import { PACT_DEFAULT_DAYS } from '@/lib/pact/types';
 import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
 import { PactChangeSheet } from './PactChangeSheet';
+import { LeapMoveSheet, canMoveSession } from './LeapMoveSheet';
 import { openShieldSheet } from '@/hooks/useShields';
 import LilyPadIcon from '../../../public/icons/LilyPad.svg';
 import { PactWeekResultSheet } from './PactWeekResultSheet';
@@ -275,6 +276,7 @@ export function PactCard({
   const [plusOpen, setPlusOpen] = useState(false);
   const [claimingRetro, setClaimingRetro] = useState(false);
   const [confirmChange, setConfirmChange] = useState(false);
+  const [moveOpen, setMoveOpen] = useState(false);
   const [changing, setChanging] = useState(false);
   const [changeError, setChangeError] = useState<string | null>(null);
   const startHintGuide = useUIStore((state) => state.startHintGuide);
@@ -406,6 +408,13 @@ export function PactCard({
   // not the reward has been collected yet — and nothing that implies more is
   // owed ("next session", "to finish", "change commitment") may show again.
   const weekFinished = !!active && active.progress >= active.target;
+  // Offered when the week has actually lost something — a missed day, or a
+  // target it can no longer reach. A week still on track keeps its schedule.
+  const offerMove =
+    !!active &&
+    !weekFinished &&
+    canMoveSession(data) &&
+    (active.missedSessions > 0 || !active.canStillFinish);
   // Named, not "next week": the day a new commitment opens is the user's own
   // week-start setting, and "Sunday" is a date you can plan around in a way
   // that "when the week rolls over" is not.
@@ -822,13 +831,54 @@ export function PactCard({
                   ended and the streak was gone. */}
               {(active.claimed ||
                 (!weekFinished &&
-                  (active.missedSessions > 0 || !active.canStillFinish))) && (
+                  (active.missedSessions > 0 ||
+                    !active.canStillFinish ||
+                    offerMove))) && (
                 <div className="mt-2 flex items-center justify-between gap-2">
                   <span className="flex min-w-0 items-center gap-1.5 text-[12px] font-semibold text-muted-foreground">
                     {active.claimed ? (
                       <span className="truncate">
                         Next Leap opens {weekStartDayName}
                       </span>
+                    ) : active.catchableSessions > 0 ? (
+                      // Ranked above the move on purpose: logging a session
+                      // you actually did costs nothing, and a move spent on a
+                      // day you could still tick is a move wasted. Asked, not
+                      // instructed — "check it off" is an order anyone can
+                      // follow, a question is answered by the person who did
+                      // the work.
+                      <span className="truncate font-bold text-amber-600 dark:text-amber-400">
+                        Did yesterday&apos;s? You can still log it today
+                      </span>
+                    ) : !active.canHoldStreak ? (
+                      // Nothing can save this week, so the only useful thing
+                      // left to say is what happens next.
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setChangeError(null);
+                          setConfirmChange(true);
+                        }}
+                        className="truncate font-black text-muted-foreground underline decoration-muted-foreground/40 underline-offset-2"
+                      >
+                        This Leap won&apos;t land — start a different one
+                      </button>
+                    ) : offerMove ? (
+                      // A state that names a problem and offers nothing is
+                      // what teaches people to stop looking at the card.
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setMoveOpen(true);
+                        }}
+                        className="truncate font-black text-amber-600 underline decoration-amber-600/40 underline-offset-2 dark:text-amber-400 dark:decoration-amber-400/40"
+                      >
+                        {active.missedSessions > 0
+                          ? `Missed ${active.missedSessions} day${active.missedSessions === 1 ? '' : 's'} — move one to a free day`
+                          : 'Move a session to another day'}
+                      </button>
                     ) : (
                       <span
                         className={cn(
@@ -838,23 +888,14 @@ export function PactCard({
                             : 'text-muted-foreground',
                         )}
                       >
-                        {active.catchableSessions > 0
-                          ? // Asked, not instructed. This exists for the
-                            // person who did the session and forgot to log
-                            // it, and a question is answered by them alone —
-                            // "check it off" is an order anyone can follow.
-                            "Did yesterday's? You can still log it today"
-                          : // Past here the week is always out of reach: a day
-                            // outside the catch-up window can never be logged,
-                            // so its session is gone and the target with it.
-                            // The streak may not be, and which of the two it
-                            // is decides between "why bother" and one more
-                            // session tonight.
-                            !active.canHoldStreak
-                            ? "Too many days missed — this Leap won't land"
-                            : active.progress >= active.nearMissTarget
-                              ? 'Short of the target, but your streak holds'
-                              : `${active.nearMissTarget - active.progress} more day${active.nearMissTarget - active.progress === 1 ? '' : 's'} and your streak holds`}
+                        {/* Past here the week is always out of reach: a day
+                            outside the catch-up window can never be logged,
+                            and no move is left to rescue it. The streak may
+                            still be, and which of the two it is decides
+                            between "why bother" and one more session. */}
+                        {active.progress >= active.nearMissTarget
+                          ? 'Short of the target, but your streak holds'
+                          : `${active.nearMissTarget - active.progress} more day${active.nearMissTarget - active.progress === 1 ? '' : 's'} and your streak holds`}
                       </span>
                     )}
                   </span>
@@ -905,6 +946,12 @@ export function PactCard({
           }}
         />
       )}
+
+      <LeapMoveSheet
+        open={moveOpen}
+        onClose={() => setMoveOpen(false)}
+        view={data}
+      />
 
       <PactChangeSheet
         open={confirmChange}

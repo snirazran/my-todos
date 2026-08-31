@@ -21,6 +21,10 @@ export interface PactConfigDoc {
   weekValueBaseSessions: number;
   /** Curve on a partial week's share of the value. Above 1 it is convex. */
   partialCreditExponent: number;
+  /** Sessions a week may be moved to another day. 0 disables moving. */
+  sessionMovesPerWeek: number;
+  /** The same allowance for Plus. */
+  plusSessionMovesPerWeek: number;
   /** Which payout model this doc is on. Bumping it re-seeds the fly numbers. */
   payoutVersion: number;
   /** Gift for a session count below the first tier. */
@@ -64,7 +68,7 @@ export const PACT_CONFIG_ID = 'weekly-pact';
  * it is not, and a ladder of historical `if (version < n)` blocks made it
  * impossible to read what the app actually pays today.
  */
-export const PACT_PAYOUT_VERSION = 7;
+export const PACT_PAYOUT_VERSION = 8;
 
 /**
  * Fields earlier payout models wrote that nothing reads any more. Removed from
@@ -205,6 +209,8 @@ export const PACT_PAYOUT_NUMBERS = {
   weekValuePerSession: 20,
   weekValueBaseSessions: 1,
   partialCreditExponent: 1.7,
+  sessionMovesPerWeek: 1,
+  plusSessionMovesPerWeek: 2,
   comebackBonusFlies: 5,
   prestigeWeeks: 12,
   prestigeBaseStep: 0.15,
@@ -289,6 +295,19 @@ const PactConfigSchema = new Schema<PactConfigDoc>(
     partialCreditExponent: {
       type: Number,
       default: PACT_PAYOUT_NUMBERS.partialCreditExponent,
+    },
+    // Moving a session is free and pays nothing extra: the same work lands on
+    // a different day. What it buys is a week that survives an ordinary
+    // disruption, which is what actually ends most runs. Capped, because the
+    // days picked ARE the commitment — an unlimited move turns the week into
+    // "any two days", which is a weaker promise than the one made on Monday.
+    sessionMovesPerWeek: {
+      type: Number,
+      default: PACT_PAYOUT_NUMBERS.sessionMovesPerWeek,
+    },
+    plusSessionMovesPerWeek: {
+      type: Number,
+      default: PACT_PAYOUT_NUMBERS.plusSessionMovesPerWeek,
     },
     // Paid once a week at settlement, when a scheduled session was missed and
     // a later one was still kept. The largest single effect in the 53-arm gym megastudy came

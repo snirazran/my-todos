@@ -75,12 +75,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { usedToken } = await dropPact({ userId, pact, source: 'swap' });
+    // A week already past saving cannot be swapped out of its own outcome.
+    const view = await getPactView({ userId, timezone });
+    const holdable = view.active?.canHoldStreak ?? true;
+
+    const { usedToken } = await dropPact({
+      userId,
+      pact,
+      source: 'swap',
+      holdable,
+    });
 
     await notifyTaskChanged(userId);
 
-    const view = await getPactView({ userId, timezone });
-    return NextResponse.json({ ok: true, usedToken, view });
+    const next = await getPactView({ userId, timezone });
+    return NextResponse.json({ ok: true, usedToken, view: next });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Could not update' },

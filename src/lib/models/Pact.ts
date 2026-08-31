@@ -25,6 +25,14 @@ export interface PactDoc {
    * which can only read live tasks, still sees it.
    */
   bankedProgress: number;
+  /**
+   * Sessions relocated to another day this week. A rigid week is the thing
+   * that actually breaks a run — miss Monday and the session dies with six
+   * empty days still on the calendar — so one slip is allowed to move. Capped,
+   * because the chosen days ARE the commitment; unlimited moves would turn the
+   * week into "any two days", which is a weaker promise to make.
+   */
+  movesUsed: number;
   /** The area tag stamped on this pact's tasks. */
   tagId?: string;
   source: 'library' | 'generated' | 'repeat' | 'custom';
@@ -57,6 +65,7 @@ const PactSchema = new Schema<PactDoc>(
     paidSessions: { type: Number, default: 0 },
     comebackPaid: { type: Boolean, default: false },
     bankedProgress: { type: Number, default: 0 },
+    movesUsed: { type: Number, default: 0 },
     tagId: { type: String },
     source: { type: String, default: 'library' },
     shieldUsed: { type: Boolean, default: false },

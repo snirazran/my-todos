@@ -701,6 +701,24 @@ export function AdminPactManager() {
             }
           />
           <NumberField
+            label="Session moves / week"
+            hint="Days a session may be shifted to. Free — the work is unchanged, only the calendar."
+            min={0}
+            max={7}
+            value={config.sessionMovesPerWeek}
+            onChange={(sessionMovesPerWeek) => patch({ sessionMovesPerWeek })}
+          />
+          <NumberField
+            label="Session moves / week (Plus)"
+            hint="Never below the free allowance."
+            min={0}
+            max={7}
+            value={config.plusSessionMovesPerWeek}
+            onChange={(plusSessionMovesPerWeek) =>
+              patch({ plusSessionMovesPerWeek })
+            }
+          />
+          <NumberField
             label="Comeback bonus"
             hint="Once a week, when a session was missed and a later one still landed. Sits on top of the formula."
             min={0}
