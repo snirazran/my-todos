@@ -1,4 +1,21 @@
-import type { PactBonusReward } from './types';
+import type { QuestReward } from '@/lib/quests/types';
+import type { ActivePactView, PactBonusReward } from './types';
+
+/**
+ * What the week will actually hand over, as tiles. While every session is
+ * still reachable that is the whole prize; once it is not, the completion
+ * gift and the rest of the flies are gone no matter what happens next, and a
+ * tile still advertising them is the card lying about the only number on it.
+ */
+export function pactWeekRewardTiles(active: ActivePactView): QuestReward[] {
+  if (active.canStillFinish) {
+    return [
+      { type: 'FLIES', amount: active.rewardFlies },
+      ...active.completionRewards,
+    ];
+  }
+  return [{ type: 'FLIES', amount: active.payoutFlies }];
+}
 
 /**
  * The rate as a chip: `×2` while it is whole, `×1.25` once it is not. Trailing

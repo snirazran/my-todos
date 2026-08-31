@@ -146,12 +146,6 @@ export async function applyPactTaskRemoval(args: {
   pact.target = target;
   pact.progress = Math.min(target, progressAfter);
   if (pact.progress >= target && !pact.completedAt) pact.completedAt = new Date();
-  // The session flies already paid stand: banked work is still work. Only the
-  // count of what is left to pay for moves.
-  pact.paidSessions = Math.min(
-    Math.max(0, pact.paidSessions ?? 0),
-    pact.progress,
-  );
   await pact.save();
 
   const outcome: PactTaskRemovalOutcome = removedOpen > 0 ? 'shrunk' : 'unchanged';

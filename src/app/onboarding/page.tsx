@@ -19,6 +19,7 @@ import { signInAnonymously } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { clearSessionCookie, establishSessionCookie } from '@/lib/authCookie';
 import { OnboardingBackground } from '@/components/ui/OnboardingBackground';
+import { resetBootstrapCache } from '@/lib/bootstrapFetcher';
 import { useAuth } from '@/components/auth/AuthContext';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { prewarmStreakCheckIn } from '@/hooks/useLoginStreak';
@@ -82,6 +83,8 @@ export default function OnboardingPage() {
         const data = await res.json().catch(() => null);
         if (cancelled || data?.onboardingCompleted !== true) return;
         clearOnboardingDraft();
+        resetBootstrapCache();
+        await mutate('/api/user', data, { revalidate: false });
         router.replace('/');
       } catch {
         // offline or transient — the save-time guard still protects the account
@@ -236,6 +239,7 @@ export default function OnboardingPage() {
         // the magic-link sign-in.
         if (onboardingRes.ok) {
           clearOnboardingDraft();
+          resetBootstrapCache();
           await mutate(
             '/api/user',
             (cur: Record<string, unknown> | undefined) =>

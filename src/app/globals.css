@@ -846,9 +846,77 @@ body.dragging {
     opacity: 0;
   }
 }
+/* The pad the streak just landed on. Scale alone reads as a resize, so the
+   bloom carries the reward: it overshoots, settles, and the colour arrives
+   with it rather than fading up underneath.
+
+   Every frame carries `--leap-ink` because an animated `transform` replaces
+   the whole declaration — inline style included — for as long as it runs and,
+   under `both`, for good afterwards. Each pad's art sits at its own height in
+   its frame and is pulled up by that variable, so a keyframe that forgets it
+   drops the pad off the waterline the moment it lands. */
+@keyframes leap-pad-land {
+  0% {
+    transform: translateY(calc(var(--leap-ink, 0%) + 6%)) scale(0.86);
+  }
+  45% {
+    transform: translateY(calc(var(--leap-ink, 0%) - 4%)) scale(1.16);
+  }
+  70% {
+    transform: translateY(calc(var(--leap-ink, 0%) + 1%)) scale(0.97);
+  }
+  100% {
+    transform: translateY(var(--leap-ink, 0%)) scale(1);
+  }
+}
+/* The rate chip has no art to align, so it just pops. */
+@keyframes leap-chip-pop {
+  0% {
+    transform: scale(0.8);
+  }
+  45% {
+    transform: scale(1.14);
+  }
+  70% {
+    transform: scale(0.98);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+/* One ring off the pad as it takes the weight. */
+@keyframes leap-pad-burst {
+  0% {
+    transform: scale(0.35);
+    opacity: 0.55;
+  }
+  100% {
+    transform: scale(2.1);
+    opacity: 0;
+  }
+}
+/* The marker drops onto the new pad instead of cross-fading between two. */
+@keyframes leap-marker-drop {
+  0% {
+    transform: translate(-50%, -14px) scale(0.7);
+    opacity: 0;
+  }
+  60% {
+    transform: translate(-50%, 2px) scale(1.15);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, 0) scale(1);
+    opacity: 1;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .leap-dot-land,
-  .leap-dot-ring {
+  .leap-dot-ring,
+  .leap-pad-land,
+  .leap-chip-pop,
+  .leap-pad-burst,
+  .leap-marker-drop {
     animation: none;
   }
 }

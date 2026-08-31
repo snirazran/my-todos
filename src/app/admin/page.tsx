@@ -30,6 +30,7 @@ import {
   MessageSquare,
   Sliders,
   Coins,
+  FlaskConical,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -307,6 +308,13 @@ function AdminPageContent() {
               accent="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
               title="Quest Manager"
               description="Macro-categories, tag mappings, daily and category quests."
+            />
+            <ManagerLinkCard
+              href="/admin/leap-lab"
+              icon={<FlaskConical className="w-5 h-5" />}
+              accent="bg-teal-500/10 text-teal-600 dark:text-teal-400"
+              title="Leap Lab"
+              description="Every Leap state and its popups, rendered by the real card. Read-only."
             />
             <ManagerLinkCard
               href="/admin/popups"

@@ -34,7 +34,6 @@ import {
 } from '@/lib/models/TaskSection';
 import { severBond, handleBuddyCompletion } from '@/lib/buddy/server';
 import { bumpQuestMetric, taskStreakMetric } from '@/lib/quests/metrics';
-import { reconcilePactSessionFlies } from '@/lib/pact/sessions';
 import {
   checklistBonus,
   checklistContent,
@@ -446,17 +445,9 @@ async function currentFlyStatus(
 }
 
 function syncGamification(userId: string, timezone: string) {
-  // The pact reconciles here rather than at each completion call site: ticking
-  // a task arrives from several routes and can be undone, and this is the one
-  // hook all of them already share.
-  return Promise.all([
-    syncQuestState({ userId, timezone }).catch((error) => {
-      console.error('Quest sync failed:', error);
-    }),
-    reconcilePactSessionFlies({ userId, timezone }).catch((error) => {
-      console.error('Pact session sync failed:', error);
-    }),
-  ]);
+  return syncQuestState({ userId, timezone }).catch((error) => {
+    console.error('Quest sync failed:', error);
+  });
 }
 
 type TaskFlyBreakdown = {

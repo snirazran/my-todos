@@ -142,11 +142,12 @@ export async function PUT(req: NextRequest) {
     const update: Record<string, unknown> = {
       isActive: body.isActive !== false,
       pickHour: clampInt(body.pickHour, 0, 23, 18),
-      fliesPerCompletion: clampInt(
-        body.fliesPerCompletion,
-        0,
-        200,
-        PACT_PAYOUT_NUMBERS.fliesPerCompletion,
+      partialCreditExponent: clampFloat(
+        body.partialCreditExponent,
+        1,
+        4,
+        PACT_PAYOUT_NUMBERS.partialCreditExponent,
+        0.1,
       ),
       weekValuePerSession: clampInt(
         body.weekValuePerSession,

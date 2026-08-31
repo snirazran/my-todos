@@ -458,10 +458,17 @@ export function AdminPactManager() {
       const total = Math.round(
         config.weekValuePerSession * (sessions + config.weekValueBaseSessions),
       );
+      const share = (done: number) =>
+        done >= sessions
+          ? total
+          : Math.round(
+              total * (done / sessions) ** Math.max(1, config.partialCreditExponent),
+            );
       return {
         sessions,
         total,
-        bonus: Math.max(0, total - config.fliesPerCompletion * sessions),
+        partialOne: share(1),
+        partialShort: share(sessions - 1),
         gift: giftFor(sessions),
       };
     });
@@ -658,20 +665,21 @@ export function AdminPactManager() {
             {config.weekValuePerSession} × (sessions +{' '}
             {config.weekValueBaseSessions})
           </span>{' '}
-          flies. Of that, {config.fliesPerCompletion} lands on each completed
-          session and the remainder lands at the finish — so most of the value
-          is back-loaded onto the last session, which is where the goal-gradient
-          effect does the most work. Raise the per-session rate and you flatten
-          that gradient; raise the base and every week gets richer at once.
+          flies, and the whole of it settles when the week ends. Nothing is paid
+          in advance: a Leap session is an ordinary task and pays what any task
+          pays. A week short of its target keeps a convex share of the value, so
+          finishing is always the big jump and a broken week is still worth
+          coming back to. Raise the exponent and partial weeks pay less.
         </p>
         <div className="mt-4 grid gap-4 sm:grid-cols-4">
           <NumberField
-            label="Flies per session"
-            hint="Paid as each task is ticked"
-            min={0}
-            max={200}
-            value={config.fliesPerCompletion}
-            onChange={(fliesPerCompletion) => patch({ fliesPerCompletion })}
+            label="Partial credit curve"
+            hint="Exponent on (done ÷ target). 1 is linear; higher pays a short week less."
+            min={1}
+            max={4}
+            step={0.1}
+            value={config.partialCreditExponent}
+            onChange={(partialCreditExponent) => patch({ partialCreditExponent })}
           />
           <NumberField
             label="Week value per session"
@@ -694,7 +702,7 @@ export function AdminPactManager() {
           />
           <NumberField
             label="Comeback bonus"
-            hint="Once a week, for the first session after a miss. Sits on top of the formula."
+            hint="Once a week, when a session was missed and a later one still landed. Sits on top of the formula."
             min={0}
             max={2000}
             value={config.comebackBonusFlies}
@@ -710,9 +718,9 @@ export function AdminPactManager() {
             <thead>
               <tr className="text-[12px] font-black text-muted-foreground">
                 <th className="py-1.5 pr-3">Sessions</th>
-                <th className="py-1.5 pr-3">Per session</th>
-                <th className="py-1.5 pr-3">Completion bonus</th>
-                <th className="py-1.5 pr-3">Week total</th>
+                <th className="py-1.5 pr-3">1 done</th>
+                <th className="py-1.5 pr-3">One short</th>
+                <th className="py-1.5 pr-3">Finished</th>
                 <th className="py-1.5">Gift at completion</th>
               </tr>
             </thead>
@@ -720,8 +728,8 @@ export function AdminPactManager() {
               {payoutRows.map((row) => (
                 <tr key={row.sessions} className="border-t border-border/40">
                   <td className="py-1.5 pr-3">{row.sessions}</td>
-                  <td className="py-1.5 pr-3">{config.fliesPerCompletion}</td>
-                  <td className="py-1.5 pr-3">{row.bonus}</td>
+                  <td className="py-1.5 pr-3">{row.partialOne}</td>
+                  <td className="py-1.5 pr-3">{row.partialShort}</td>
                   <td className="py-1.5 pr-3">{row.total}</td>
                   <td className="py-1.5 font-semibold text-muted-foreground">
                     {row.gift}

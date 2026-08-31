@@ -25,7 +25,7 @@ import {
 import { useUIStore } from '@/lib/uiStore';
 import { pactViewKey } from '@/lib/pact/viewKey';
 import type { PactView, PactWeekResult } from '@/lib/pact/types';
-import { formatPactRate } from '@/lib/pact/format';
+import { formatPactRate, pactWeekRewardTiles } from '@/lib/pact/format';
 import { PACT_DEFAULT_DAYS } from '@/lib/pact/types';
 import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
 import { PactChangeSheet } from './PactChangeSheet';
@@ -744,10 +744,7 @@ export function PactCard({
                   the bar is being read, not in a line underneath it. */}
               <div className="flex items-center gap-2.5">
                 <QuestRewardTileBadge
-                  rewards={[
-                    { type: 'FLIES', amount: active.rewardFlies },
-                    ...active.completionRewards,
-                  ]}
+                  rewards={pactWeekRewardTiles(active)}
                   catalog={data.rewardCatalog as never}
                   isPremium={data.isPremium}
                 />
@@ -771,11 +768,25 @@ export function PactCard({
                   className="shrink-0"
                   onClick={(event) => event.stopPropagation()}
                 >
-                  {weekFinished ? (
-                    // The Hint slot, holding a state rather than an action:
-                    // there is nothing left to explain, and leaving the slot
-                    // empty made the finished row reflow narrower than the
-                    // one it replaced.
+                  {active.claimable && !active.claimed ? (
+                    // The Hint slot, holding the one action left. The tiles to
+                    // the left already say what the week pays, so the reward
+                    // never needs restating in words underneath them.
+                    <button
+                      type="button"
+                      onClick={claim}
+                      disabled={claiming}
+                      className="inline-flex h-8 min-w-[5.5rem] items-center justify-center rounded-xl bg-amber-500 px-3 text-[13px] font-black text-white shadow-[0_3px_0_0_#b45309] transition-transform active:translate-y-[2px] active:shadow-none disabled:opacity-60"
+                    >
+                      {claiming ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        'Claim'
+                      )}
+                    </button>
+                  ) : weekFinished ? (
+                    // Nothing left to explain, and leaving the slot empty made
+                    // the finished row reflow narrower than the one it replaced.
                     <span className="inline-flex h-8 items-center justify-center rounded-xl border border-lime-500/40 bg-lime-500/10 px-3 text-[13px] font-black text-lime-600 dark:text-lime-400 min-[400px]:px-3.5">
                       Done
                     </span>
@@ -804,21 +815,17 @@ export function PactCard({
                 </span>
               </div>
 
-              {/* What the user could not otherwise know. Per-session flies
-                  are paid the moment a task is ticked, so "banked · +39 to
-                  finish" was three unexplained numbers describing money that
-                  had already arrived. What is genuinely invisible is a day
-                  that went by untouched — nothing said so until the week had
-                  quietly ended and the streak was gone. */}
-              {(weekFinished || active.missedSessions > 0) && (
+              {/* Only what the tiles above cannot say. The reward is already
+                  drawn there, so this line carries the two things art cannot:
+                  a day that went by untouched, and what the week is worth now
+                  that it did. Nothing said either until the week had quietly
+                  ended and the streak was gone. */}
+              {(active.claimed ||
+                (!weekFinished &&
+                  (active.missedSessions > 0 || !active.canStillFinish))) && (
                 <div className="mt-2 flex items-center justify-between gap-2">
                   <span className="flex min-w-0 items-center gap-1.5 text-[12px] font-semibold text-muted-foreground">
-                    {active.claimable ? (
-                      <>
-                        <FlyWorth amount={active.weekBonusFlies} />
-                        <span>ready to collect</span>
-                      </>
-                    ) : active.claimed ? (
+                    {active.claimed ? (
                       <span className="truncate">
                         Next Leap opens {weekStartDayName}
                       </span>
@@ -831,33 +838,26 @@ export function PactCard({
                             : 'text-muted-foreground',
                         )}
                       >
-                        {active.canStillFinish
-                          ? `Missed ${active.missedSessions} day${active.missedSessions === 1 ? '' : 's'} — the rest still count`
-                          : // The bonus is gone, but the streak may not be.
-                            // Saying which is the difference between "why
-                            // bother" and one more session tonight.
+                        {active.catchableSessions > 0
+                          ? // Asked, not instructed. This exists for the
+                            // person who did the session and forgot to log
+                            // it, and a question is answered by them alone —
+                            // "check it off" is an order anyone can follow.
+                            "Did yesterday's? You can still log it today"
+                          : // Past here the week is always out of reach: a day
+                            // outside the catch-up window can never be logged,
+                            // so its session is gone and the target with it.
+                            // The streak may not be, and which of the two it
+                            // is decides between "why bother" and one more
+                            // session tonight.
                             !active.canHoldStreak
-                            ? `Missed ${active.missedSessions} day${active.missedSessions === 1 ? '' : 's'} — not finishable this week`
+                            ? "Too many days missed — this Leap won't land"
                             : active.progress >= active.nearMissTarget
-                              ? 'Bonus is gone — your streak is safe'
-                              : `Bonus is gone — ${active.nearMissTarget} days still holds your streak`}
+                              ? 'Short of the target, but your streak holds'
+                              : `${active.nearMissTarget - active.progress} more day${active.nearMissTarget - active.progress === 1 ? '' : 's'} and your streak holds`}
                       </span>
                     )}
                   </span>
-                  {active.claimable && !active.claimed ? (
-                    <button
-                      type="button"
-                      onClick={claim}
-                      disabled={claiming}
-                      className="inline-flex h-8 min-w-[5.5rem] items-center justify-center rounded-xl bg-amber-500 px-3 text-[13px] font-black text-white shadow-[0_3px_0_0_#b45309] transition-transform active:translate-y-[2px] active:shadow-none disabled:opacity-60"
-                    >
-                      {claiming ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        'Claim'
-                      )}
-                    </button>
-                  ) : null}
                 </div>
               )}
             </div>

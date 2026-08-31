@@ -214,6 +214,8 @@ function ProviderCard({
     connection?.direction ?? settingsToDirection(connection?.settings);
   /** The choice a fresh connect (or reconnect) will be made with. */
   const [pendingDirection, setPendingDirection] = useState<SyncDirection>(direction);
+  /** Connect was tapped; the direction step is showing instead of the button. */
+  const [choosingDirection, setChoosingDirection] = useState(false);
 
   const patch = useCallback(
     async (body: Record<string, unknown>) => {
@@ -347,21 +349,7 @@ function ProviderCard({
 
       {!connection || needsReauth || paused ? (
         <div className="px-4 pb-4">
-          {!paused && (
-            <div className="mb-3">
-              <p className="mb-1.5 text-[11px] font-black uppercase tracking-[0.06em] text-muted-foreground">
-                How it syncs
-              </p>
-              <SyncDirectionPicker
-                value={pendingDirection}
-                onChange={setPendingDirection}
-                providerLabel={label}
-                variant="collapsed"
-                disabled={connecting}
-              />
-            </div>
-          )}
-          {paused ? (
+          {paused && !choosingDirection ? (
             <button
               type="button"
               disabled={syncing}
@@ -371,24 +359,57 @@ function ProviderCard({
               {syncing && <Loader2 className="h-4 w-4 animate-spin" />}
               Resume syncing
             </button>
+          ) : choosingDirection ? (
+            <>
+              <p className="mb-1.5 text-[11px] font-black uppercase tracking-[0.06em] text-muted-foreground">
+                How it syncs
+              </p>
+              <SyncDirectionPicker
+                value={pendingDirection}
+                onChange={setPendingDirection}
+                providerLabel={label}
+                disabled={connecting}
+              />
+              <button
+                type="button"
+                disabled={connecting}
+                onClick={() => onConnect(pendingDirection)}
+                className="mt-3 w-full flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 py-3 text-sm font-black text-white transition-colors hover:bg-emerald-600 disabled:opacity-60"
+              >
+                {connecting && <Loader2 className="h-4 w-4 animate-spin" />}
+                {connecting ? 'Waiting for Google…' : `Connect ${label}`}
+              </button>
+              <button
+                type="button"
+                disabled={connecting}
+                onClick={() => setChoosingDirection(false)}
+                className="mt-2 w-full rounded-2xl py-2 text-xs font-bold text-muted-foreground transition-colors hover:text-foreground disabled:opacity-60"
+              >
+                Cancel
+              </button>
+            </>
           ) : (
             <button
               type="button"
-              disabled={connecting}
-              onClick={() => onConnect(pendingDirection)}
-              className="w-full flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 py-3 text-sm font-black text-white transition-colors hover:bg-emerald-600 disabled:opacity-60"
+              onClick={() => {
+                setPendingDirection(direction);
+                setChoosingDirection(true);
+              }}
+              className="w-full flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 py-3 text-sm font-black text-white transition-colors hover:bg-emerald-600"
             >
-              {connecting && <Loader2 className="h-4 w-4 animate-spin" />}
-              {connecting ? 'Waiting for Google…' : connection ? 'Reconnect' : 'Connect'}
+              {connection ? 'Reconnect' : 'Connect'}
             </button>
           )}
-          {connection && (
+          {connection && !choosingDirection && (
             <>
               {paused && (
                 <button
                   type="button"
                   disabled={connecting}
-                  onClick={() => onConnect(pendingDirection)}
+                  onClick={() => {
+                    setPendingDirection(direction);
+                    setChoosingDirection(true);
+                  }}
                   className="mt-2 w-full rounded-2xl bg-muted py-2.5 text-xs font-black transition-colors hover:bg-accent disabled:opacity-60"
                 >
                   Reconnect instead

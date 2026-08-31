@@ -12,6 +12,7 @@ import {
 } from '@/lib/questClaims';
 import { useUIStore } from '@/lib/uiStore';
 import { usePactView } from './PactCard';
+import { pactWeekRewardTiles } from '@/lib/pact/format';
 import type { PactView } from '@/lib/pact/types';
 
 /**
@@ -76,10 +77,7 @@ export function PactStripRow({ view }: { view: PactView }) {
           said where the work happens, which the commitment text already says
           — the reward is the thing this slot exists to answer. */}
       <QuestRewardTileBadge
-        rewards={[
-          { type: 'FLIES', amount: active.rewardFlies },
-          ...active.completionRewards,
-        ]}
+        rewards={pactWeekRewardTiles(active)}
         catalog={view.rewardCatalog as never}
         isPremium={view.isPremium}
         small={!ready}

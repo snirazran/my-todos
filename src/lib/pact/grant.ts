@@ -8,8 +8,7 @@ import {
   pactCompletionRewards,
   pactComebackFlies,
   pactMultiplier,
-  pactSessionFlies,
-  pactWeekBonusFlies,
+  pactWeekPayoutFlies,
 } from './engine';
 
 export type PactRewardSummary = {
@@ -46,58 +45,11 @@ function ensureWardrobe(user: any) {
 }
 
 /**
- * Moves a pact's session flies onto a loaded user document. `owedSessions` is
- * a delta, so an undone completion passes a negative and gets refunded.
- * Returns what actually moved, which a clamped refund makes smaller than asked.
- *
- * The multiplier is fractional now, so the amount is derived as the difference
- * between two rounded RUNNING TOTALS rather than by rounding the delta. Paying
- * three sessions one at a time and paying them at once therefore cost the same,
- * and a refund always gives back exactly what the session paid.
- *
- * Mutates `user`; the caller saves.
- */
-export function applyPactSessionFlies(args: {
-  user: any;
-  config: PactConfigDoc;
-  /** Sessions already paid for, before this reconciliation. */
-  paidSessions: number;
-  owedSessions: number;
-  comeback: boolean;
-  isPremium: boolean;
-  /** The streak banked when the week began. Constant for a whole week. */
-  streakWeeks: number;
-  /** Cycles completed — the permanent floor under the streak's step. */
-  laps?: number;
-}): number {
-  const { user, config, owedSessions, comeback, isPremium } = args;
-  const multiplier =
-    (isPremium ? 2 : 1) *
-    pactMultiplier(config, args.streakWeeks, args.laps ?? 0);
-  const rate = pactSessionFlies(config);
-  const paidBefore = Math.max(0, args.paidSessions);
-  const paidAfter = Math.max(0, paidBefore + owedSessions);
-  const amount =
-    Math.round(paidAfter * rate * multiplier) -
-    Math.round(paidBefore * rate * multiplier) +
-    (comeback ? Math.round(pactComebackFlies(config) * multiplier) : 0);
-  if (amount === 0) return 0;
-
-  ensureWardrobe(user);
-  const before = Math.max(0, Number(user.wardrobe.flies) || 0);
-  // A refund can never dig a hole: flies spent between earning and undoing are
-  // the user's, and a negative balance breaks every price check downstream.
-  const after = Math.max(0, before + amount);
-  user.wardrobe.flies = after;
-  user.markModified('wardrobe');
-  return after - before;
-}
-
-/**
- * Pays out one kept pact onto a loaded user document — the completion bonus and
- * the week's gift, both at the streak's rate. The sessions themselves were
- * already paid as they were ticked (see `reconcilePactSessionFlies`), so this
- * is only what finishing adds.
+ * Pays out one settled pact onto a loaded user document. This is the ONLY
+ * place a Leap pays: the whole week lands here at once, at the streak's rate.
+ * A finished week is worth the formula and its gift; a short one is worth a
+ * convex share and no gift. The tasks a Leap runs on pay what any task pays,
+ * separately and as they are ticked.
  *
  * Deliberately takes the week's streak number as an argument rather than
  * deriving it: the claim path runs before the week is settled (so it projects),
@@ -109,6 +61,10 @@ export function applyPactRewards(args: {
   user: any;
   config: PactConfigDoc;
   pact: PactDoc;
+  /** Sessions kept. Defaults to the target — a week claimed on completion. */
+  progress?: number;
+  /** A session was missed and a later one still landed. */
+  comeback?: boolean;
   streakWeeks: number;
   laps?: number;
   isPremium: boolean;
@@ -157,10 +113,15 @@ export function applyPactRewards(args: {
     }
   };
 
+  const progress = Math.max(0, Math.min(sessions, args.progress ?? sessions));
   applyRewards([
-    { type: 'FLIES', amount: pactWeekBonusFlies(config, sessions) },
+    { type: 'FLIES', amount: pactWeekPayoutFlies(config, sessions, progress) },
   ]);
-  applyRewards(pactCompletionRewards(config, sessions));
+  if (args.comeback) {
+    applyRewards([{ type: 'FLIES', amount: pactComebackFlies(config) }]);
+  }
+  // The gift is for finishing, and only for finishing.
+  if (progress >= sessions) applyRewards(pactCompletionRewards(config, sessions));
 
   summary.flyBalanceAfter = user.wardrobe.flies;
   user.markModified('wardrobe');

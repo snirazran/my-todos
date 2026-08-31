@@ -1,5 +1,6 @@
 'use client';
 
+import type { CSSProperties } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import confetti from 'canvas-confetti';
 import { animate, motion, useMotionValue, useTransform } from 'framer-motion';
@@ -33,6 +34,13 @@ import { leapArtForStreak } from './LeapRail';
  */
 
 /** Beat before anything moves, so the sheet has finished arriving. */
+/**
+ * How long the sheet gets to finish sliding up before anything moves inside
+ * it. Without this the hop starts at mount — while the sheet is still on its
+ * way in — so the pad had already changed hands by the time the user could
+ * look at it, and the one beat the screen exists for happened offscreen.
+ */
+const ENTRANCE_HOLD = 460;
 const HOP_DELAY = 340;
 /** Gap between one dot lighting and the next. */
 const DOT_STAGGER = 90;
@@ -105,10 +113,30 @@ function HopBead({
   );
 }
 
-/** Rungs cleared at a given streak, which is what picks the pad's artwork. */
+/**
+ * Every pad on the ladder, in weeks.
+ *
+ * The rungs are the multiplier steps — but the cycle's end is a pad too, and
+ * the biggest one. Leaving it out made the twelfth week the only milestone in
+ * the system that did not land on anything: the hop found no rung to arrive
+ * at, so the pads never changed hands and the whole climb ended on the same
+ * frame it started.
+ */
+function ladderStops(view: PactView) {
+  const prestige = Math.max(0, Math.floor(view.ladder.prestigeWeeks ?? 0));
+  return Array.from(
+    new Set([
+      0,
+      ...view.ladder.rungs.map((rung) => rung.weeks),
+      ...(prestige > 0 ? [prestige] : []),
+    ]),
+  ).sort((a, b) => a - b);
+}
+
+/** Pads cleared at a given streak, which is what picks the artwork. */
 function padArtFor(view: PactView, weeks: number) {
-  const cleared = view.ladder.rungs.filter(
-    (rung) => rung.weeks > 0 && rung.weeks <= weeks,
+  const cleared = ladderStops(view).filter(
+    (stop) => stop > 0 && stop <= weeks,
   ).length;
   return leapArtForStreak(cleared);
 }
@@ -138,16 +166,16 @@ const clamp = (value: number, max: number) =>
  * the pad itself.
  */
 function hopModel(view: PactView, result: PactWeekResult) {
-  const rungWeeks = Array.from(
-    new Set([0, ...view.ladder.rungs.map((rung) => rung.weeks)]),
-  ).sort((a, b) => a - b);
+  const rungWeeks = ladderStops(view);
 
   const { streakBefore, streakAfter } = result;
-  // A landing is the streak coming to rest exactly on a rung it was below.
+  // A landing is the streak coming to rest exactly on a pad it was below —
+  // or the week that completed a cycle, which is the largest landing there is
+  // even when the config puts no multiplier rung on it.
   const landing =
     streakAfter > 0 &&
     streakAfter > streakBefore &&
-    rungWeeks.includes(streakAfter);
+    (rungWeeks.includes(streakAfter) || !!result.lapCompleted);
 
   const base = landing
     ? Math.max(...rungWeeks.filter((weeks) => weeks < streakAfter))
@@ -211,6 +239,7 @@ function HopPad({
   dim,
   here,
   glow,
+  landed = false,
 }: {
   art: ReturnType<typeof leapArtForStreak>;
   rate: string;
@@ -218,24 +247,46 @@ function HopPad({
   dim: boolean;
   here: boolean;
   glow: boolean;
+  /** This pad is the one the streak just arrived on: give it the beat. */
+  landed?: boolean;
 }) {
   return (
     <div className="flex w-[88px] shrink-0 flex-col items-center">
       {/* Aspect ratio rather than a height, so the artwork keeps its
           proportions and both pads sit on the same waterline. */}
       <div className="relative aspect-[500/430] w-full">
+        {/* The ring reads as the pad taking the weight, so it sits behind the
+            art and is unclipped by it. */}
+        {landed && (
+          <span
+            aria-hidden="true"
+            className="leap-pad-burst pointer-events-none absolute left-1/2 top-[58%] h-16 w-16 -translate-x-1/2 -translate-y-1/2 rounded-full bg-amber-300/60 animate-[leap-pad-burst_680ms_ease-out_both]"
+          />
+        )}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={art.src}
           alt=""
           aria-hidden="true"
           draggable={false}
-          style={{ transform: `translateY(${-art.inkShift * 100}%)` }}
+          style={
+            {
+              // Both, not one: the variable feeds the landing keyframes, the
+              // transform holds the pad in place when nothing is animating.
+              '--leap-ink': `${-art.inkShift * 100}%`,
+              // The recede rides here rather than on a `scale-90` class: an
+              // inline transform outranks Tailwind's, so the class shrank
+              // nothing and the pad being left behind never moved.
+              transform: `translateY(${-art.inkShift * 100}%) scale(${dim ? 0.9 : 1})`,
+            } as CSSProperties
+          }
           className={cn(
             'absolute inset-0 h-full w-full select-none object-contain transition-all duration-500',
-            dim && 'scale-90 opacity-45 grayscale',
+            dim && 'opacity-45 grayscale',
             glow &&
               'drop-shadow-[0_0_7px_rgba(202,138,4,0.85)] dark:drop-shadow-[0_0_6px_rgba(245,179,1,0.6)]',
+            landed &&
+              'leap-pad-land animate-[leap-pad-land_620ms_cubic-bezier(0.22,1,0.36,1)_both]',
           )}
         />
         {/* You are here. The marker moves rather than the pads, because the
@@ -243,8 +294,13 @@ function HopPad({
         <span
           aria-hidden="true"
           className={cn(
-            'absolute left-1/2 top-0 -translate-x-1/2 border-x-[5px] border-t-[7px] border-x-transparent border-t-foreground/70 transition-all duration-300',
-            here ? 'opacity-100' : '-translate-y-1 opacity-0',
+            'absolute left-1/2 top-0 -translate-x-1/2 border-x-[5px] border-t-[7px] border-x-transparent border-t-foreground/70',
+            landed
+              ? 'leap-marker-drop animate-[leap-marker-drop_460ms_cubic-bezier(0.22,1,0.36,1)_both]'
+              : cn(
+                  'transition-all duration-300',
+                  here ? 'opacity-100' : '-translate-y-1 opacity-0',
+                ),
           )}
         />
       </div>
@@ -254,6 +310,8 @@ function HopPad({
           dim
             ? 'bg-muted text-muted-foreground/70'
             : 'bg-foreground/85 text-background',
+          landed &&
+            'leap-chip-pop animate-[leap-chip-pop_520ms_cubic-bezier(0.22,1,0.36,1)_both]',
         )}
       >
         {rate}
@@ -281,14 +339,18 @@ function HopPad({
 function LeapHop({
   view,
   hop,
+  start,
 }: Readonly<{
   view: PactView;
   hop: ReturnType<typeof hopModel>;
+  /** The sheet is up and still: the hop may begin. */
+  start: boolean;
 }>) {
   const [lit, setLit] = useState(hop.filledBefore);
   const [arrived, setArrived] = useState(false);
 
   useEffect(() => {
+    if (!start) return;
     const move = window.setTimeout(() => setLit(hop.filledAfter), HOP_DELAY);
     const land = hop.landing
       ? window.setTimeout(() => setArrived(true), hop.settleAt)
@@ -297,7 +359,7 @@ function LeapHop({
       window.clearTimeout(move);
       if (land) window.clearTimeout(land);
     };
-  }, [hop.filledAfter, hop.landing, hop.settleAt]);
+  }, [start, hop.filledAfter, hop.landing, hop.settleAt]);
 
   const gaining = hop.filledAfter >= hop.filledBefore;
 
@@ -390,6 +452,7 @@ function LeapHop({
         dim={!arrived}
         here={arrived}
         glow={arrived}
+        landed={arrived}
       />
     </div>
   );
@@ -409,10 +472,13 @@ export function PactWeekResultSheet({
   onStartLeap: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [started, setStarted] = useState(false);
   const firedRef = useRef(false);
 
   useEffect(() => {
     setOpen(true);
+    const timer = window.setTimeout(() => setStarted(true), ENTRANCE_HOLD);
+    return () => window.clearTimeout(timer);
   }, []);
 
   const kept = result.outcome === 'kept';
@@ -422,7 +488,7 @@ export function PactWeekResultSheet({
   const hop = hopModel(view, result);
 
   useEffect(() => {
-    if (firedRef.current) return;
+    if (!started || firedRef.current) return;
     firedRef.current = true;
     if (missed) return;
     // Fired on the landing, not on mount. Confetti thrown before the frog has
@@ -438,7 +504,7 @@ export function PactWeekResultSheet({
       });
     }, hop.settleAt);
     return () => window.clearTimeout(timer);
-  }, [missed, kept, hop.settleAt, hop.landing]);
+  }, [started, missed, kept, hop.settleAt, hop.landing]);
 
   const dismiss = () => {
     setOpen(false);
@@ -448,7 +514,7 @@ export function PactWeekResultSheet({
 
   const streakShown = useCountUp(
     result.streakBefore,
-    result.streakAfter,
+    started ? result.streakAfter : result.streakBefore,
     hop.settleAt,
   );
 
@@ -478,6 +544,7 @@ export function PactWeekResultSheet({
   const toGo = nextRung ? nextRung.weeks - result.streakAfter : 0;
 
   const weeksWord = (count: number) => `${count} week${count === 1 ? '' : 's'}`;
+  const daysWord = (count: number) => `${count} day${count === 1 ? '' : 's'}`;
 
   // The one thing to do next, offered only when there is actually a pick to
   // make: the week that just settled is over, and this week's is unclaimed.
@@ -507,7 +574,7 @@ export function PactWeekResultSheet({
             className="min-h-0 flex-1 overflow-y-auto overscroll-none px-5 pt-1"
           >
             <div className="flex flex-col gap-3.5 pb-3">
-              <LeapHop view={view} hop={hop} />
+              <LeapHop view={view} hop={hop} start={started} />
 
               <div className="text-center">
                 <p className="text-[13px] font-black text-muted-foreground">
@@ -521,26 +588,33 @@ export function PactWeekResultSheet({
                     : kept
                       ? 'You kept your word'
                       : rescued
-                        ? 'A Lily Pad caught your streak'
+                        ? 'A Lily Pad saved you'
                         : nearMiss
-                          ? 'Close enough to hold'
+                          ? 'Your streak survived'
                           : 'That week got away'}
                 </h2>
                 {/* Prestige has to explain itself here or nowhere: the streak
                     the user is about to see is zero, and without this screen
                     that reads as the thing they were trying to avoid. */}
                 <p className="mx-auto mt-1.5 max-w-[34ch] text-[13.5px] font-semibold leading-snug text-muted-foreground">
+                  {/* One number per sentence. "You did 3 of 4 days, so it
+                      stays at 3" put two different threes side by side — the
+                      days and the streak — and the reader has to work out that
+                      they mean nothing to each other. The streak's own number
+                      is on the row below, so the words never repeat it. */}
                   {result.lapCompleted
-                    ? `${weeksWord(result.streakAfter)} straight. The climb starts again — but every week from now pays ${formatPactRate(result.prestigeBase ?? 1)} before your streak is counted, and that never goes away.`
+                    ? `${weeksWord(result.streakAfter)} without missing one. From now on every week starts at ${formatPactRate(result.prestigeBase ?? 1)}, and that never resets.`
                     : kept
                       ? result.milestoneWeeks
-                        ? `All ${result.target} day${result.target === 1 ? '' : 's'} done — and that is ${weeksWord(result.milestoneWeeks)} running.`
-                        : `All ${result.target} day${result.target === 1 ? '' : 's'} done.`
+                        ? `You did all ${daysWord(result.target)} — ${weeksWord(result.milestoneWeeks)} in a row now.`
+                        : `You did all ${daysWord(result.target)}.`
                       : rescued
-                        ? `You finished ${result.progress} of ${result.target}. A Lily Pad caught the rest, so the streak stands where it is.`
+                        ? `You did ${result.progress} of the ${daysWord(result.target)}. A Lily Pad covered the rest, so your streak is safe.`
                         : nearMiss
-                          ? `You finished ${result.progress} of ${result.target} — enough to keep the streak. It holds at ${result.streakAfter} rather than moving up, and this week's bonus and gift are gone.`
-                          : `You finished ${result.progress} of ${result.target}. Sessions you did still paid — the bonus needed all of them.`}
+                          ? `You did ${result.progress} of the ${daysWord(result.target)}. That was enough to keep your streak — but only a full week moves it up.`
+                          : result.progress > 0
+                            ? `You did ${result.progress} of the ${daysWord(result.target)} and got paid for them. Your streak starts again next week.`
+                            : `No days landed this week. Your streak starts again next week.`}
                 </p>
               </div>
 
@@ -587,7 +661,11 @@ export function PactWeekResultSheet({
                         // appearing as a single block of stuff.
                         className="animate-[reward-pop_0.42s_ease-out_both] motion-reduce:animate-none"
                         style={{
-                          animationDelay: `${hop.settleAt + index * 110}ms`,
+                          animationDelay: `${
+                            (started ? 0 : ENTRANCE_HOLD) +
+                            hop.settleAt +
+                            index * 110
+                          }ms`,
                         }}
                       >
                         <RewardTile

@@ -124,9 +124,9 @@ export type PactPrestigeCycle = {
 export type PactConfigView = {
   isActive: boolean;
   pickHour: number;
-  fliesPerCompletion: number;
   weekValuePerSession: number;
   weekValueBaseSessions: number;
+  partialCreditExponent: number;
   comebackBonusFlies: number;
   completionRewards: QuestRewards;
   completionGiftTiers: PactCompletionGiftTier[];
@@ -227,12 +227,8 @@ export type ActivePactView = {
   claimed: boolean;
   /** What the whole week is worth if every session lands. */
   rewardFlies: number;
-  /** Flies each session pays the moment it is ticked. */
-  sessionFlies: number;
-  /** Flies still waiting on the last session. */
-  weekBonusFlies: number;
-  /** Flies this pact has already banked — sessions kept, plus any comeback. */
-  earnedFlies: number;
+  /** What the week would settle for at the progress it has right now. */
+  payoutFlies: number;
   daysLeft: number;
   shieldUsed: boolean;
   nextTaskLabel: string | null;
@@ -240,6 +236,8 @@ export type ActivePactView = {
   openToday: boolean;
   /** Scheduled days already gone by with nothing ticked on them. */
   missedSessions: number;
+  /** Of those, the ones still inside the one-day catch-up window. */
+  catchableSessions: number;
   /** False once too few days remain for every session to land. */
   canStillFinish: boolean;
   /** Area tag on this pact's tasks, for hint targeting. */
@@ -317,10 +315,6 @@ export type PactWeekPreview = {
   sessions: number;
   /** The whole week if every session lands. */
   flies: number;
-  /** What one session pays the moment it is ticked. */
-  sessionFlies: number;
-  /** What is held back for finishing. */
-  bonusFlies: number;
   /** The gift at completion for this many sessions. */
   rewards: QuestRewards;
 };
@@ -353,7 +347,6 @@ export type PactView = {
   introSeen: boolean;
   needsAreas: boolean;
   weekStartsOn: number;
-  flyRates: { perTask: number; comeback: number };
   /** Every session count the pick sheet can offer, priced and gifted. */
   weekPreview: PactWeekPreview[];
   /** The gift a week below the first tier pays. */

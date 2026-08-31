@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowLeftRight, Check, ChevronRight, Loader2 } from 'lucide-react';
+import { ArrowLeftRight, Check, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { Icon } from '@/components/ui/Icon';
 import AppleCalendarSheet from '@/components/ui/AppleCalendarSheet';
@@ -105,6 +105,8 @@ export default function CalendarConnectSheet({
   const [appleOpen, setAppleOpen] = useState(false);
   const [connected, setConnected] = useState<CalendarProvider | null>(null);
   const [direction, setDirection] = useState<SyncDirection>('two_way');
+  /** Provider chosen but not yet connected — the step that asks which way it runs. */
+  const [picking, setPicking] = useState<CalendarProvider | null>(null);
 
   const google = connections.find((c) => c.provider === 'google');
   const apple = connections.find((c) => c.provider === 'apple');
@@ -143,6 +145,7 @@ export default function CalendarConnectSheet({
     clearError();
     setConnected(null);
     setDirection('two_way');
+    setPicking(null);
   }, [open, cancelGoogle, clearError]);
 
   const providers = useMemo(
@@ -207,6 +210,78 @@ export default function CalendarConnectSheet({
                       : 'Your events are on their way.'}
                   </p>
                 </motion.div>
+              ) : picking ? (
+                <motion.div
+                  key="direction"
+                  initial={{ opacity: 0, x: 16 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -16 }}
+                  transition={{ duration: 0.22, ease: [0.32, 0.72, 0, 1] }}
+                  className="relative"
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      hapticSelect();
+                      cancelGoogle();
+                      clearError();
+                      setPicking(null);
+                    }}
+                    aria-label="Back to calendar choice"
+                    className="absolute -left-1 -top-1 grid h-9 w-9 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+                  >
+                    <ChevronLeft className="h-5 w-5" />
+                  </button>
+
+                  <div className="flex flex-col items-center pt-1 text-center">
+                    <span className="grid h-14 w-14 place-items-center rounded-[18px] border border-border/60 bg-card shadow-md">
+                      <Icon
+                        name={picking === 'google' ? 'googleCalendar' : 'appleCalendar'}
+                        className="h-8 w-8"
+                      />
+                    </span>
+                    <h2 className="mt-3 text-[22px] font-black leading-[1.1] tracking-tight text-foreground">
+                      How should it sync?
+                    </h2>
+                    <p className="mx-auto mt-1.5 max-w-[19rem] text-[13.5px] font-bold leading-snug text-muted-foreground">
+                      You can change this later in Settings.
+                    </p>
+                  </div>
+
+                  <div className="mt-5">
+                    <SyncDirectionPicker
+                      value={direction}
+                      onChange={setDirection}
+                      providerLabel={providerLabel(picking)}
+                      disabled={connecting}
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={connecting}
+                    onClick={() => {
+                      hapticSelect();
+                      if (picking === 'google') void connectGoogle(direction);
+                      else setAppleOpen(true);
+                    }}
+                    className="mt-5 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary text-[15px] font-black tracking-tight text-primary-foreground shadow-[0_3px_0_#34631f] transition-opacity hover:opacity-95 disabled:opacity-60"
+                  >
+                    {connecting && <Loader2 className="h-4 w-4 animate-spin" />}
+                    Connect {providerLabel(picking)}
+                  </button>
+
+                  <div className="min-h-[1.5rem] pt-2">
+                    {connecting && (
+                      <p className="text-center text-[12px] font-bold text-muted-foreground">
+                        Finish signing in, then come back here.
+                      </p>
+                    )}
+                    {error && (
+                      <p className="text-center text-[12px] font-bold text-red-500">{error}</p>
+                    )}
+                  </div>
+                </motion.div>
               ) : (
                 <motion.div
                   key="offer"
@@ -268,19 +343,7 @@ export default function CalendarConnectSheet({
                     </p>
                   </div>
 
-                  <div className="mt-5">
-                    <p className="mb-1.5 px-0.5 text-[11.5px] font-black uppercase tracking-[0.07em] text-muted-foreground">
-                      How it syncs
-                    </p>
-                    <SyncDirectionPicker
-                      value={direction}
-                      onChange={setDirection}
-                      variant="collapsed"
-                      disabled={connecting}
-                    />
-                  </div>
-
-                  <div className="mt-3 grid gap-2.5">
+                  <div className="mt-6 grid gap-2.5">
                     {providers.length === 0 && (
                       <p className="rounded-2xl bg-muted/60 px-4 py-3 text-center text-[12.5px] font-bold text-muted-foreground">
                         Calendar sync isn’t switched on yet. Check back soon.
@@ -291,12 +354,8 @@ export default function CalendarConnectSheet({
                         key={provider}
                         provider={provider}
                         connection={provider === 'google' ? google : apple}
-                        busy={provider === 'google' && connecting}
-                        onClick={() =>
-                          provider === 'google'
-                            ? void connectGoogle(direction)
-                            : setAppleOpen(true)
-                        }
+                        busy={false}
+                        onClick={() => setPicking(provider)}
                       />
                     ))}
                   </div>

@@ -14,12 +14,13 @@ export interface PactConfigDoc {
   isActive: boolean;
   /** Local hour on the user's own week-start day when the pick nudge fires. */
   pickHour: number;
-  fliesPerCompletion: number;
   comebackBonusFlies: number;
   /** The 20 in `20 × (sessions + 1)`: what one session adds to a week. */
   weekValuePerSession: number;
   /** The `+ 1`: sessions' worth of value that finishing adds on its own. */
   weekValueBaseSessions: number;
+  /** Curve on a partial week's share of the value. Above 1 it is convex. */
+  partialCreditExponent: number;
   /** Which payout model this doc is on. Bumping it re-seeds the fly numbers. */
   payoutVersion: number;
   /** Gift for a session count below the first tier. */
@@ -63,7 +64,7 @@ export const PACT_CONFIG_ID = 'weekly-pact';
  * it is not, and a ladder of historical `if (version < n)` blocks made it
  * impossible to read what the app actually pays today.
  */
-export const PACT_PAYOUT_VERSION = 6;
+export const PACT_PAYOUT_VERSION = 7;
 
 /**
  * Fields earlier payout models wrote that nothing reads any more. Removed from
@@ -71,6 +72,7 @@ export const PACT_PAYOUT_VERSION = 6;
  * about what is paid.
  */
 export const RETIRED_PACT_CONFIG_FIELDS = [
+  'fliesPerCompletion',
   'weekBonusFlies',
   'bigCommitmentBonusFlies',
   'milestoneEveryWeeks',
@@ -200,9 +202,9 @@ export const DEFAULT_PACT_POST_SET_PRESTIGE_REWARDS: PactBonusRewards = [
  * a week from this system alone, which breaks every shop price.
  */
 export const PACT_PAYOUT_NUMBERS = {
-  fliesPerCompletion: 6,
   weekValuePerSession: 20,
   weekValueBaseSessions: 1,
+  partialCreditExponent: 1.7,
   comebackBonusFlies: 5,
   prestigeWeeks: 12,
   prestigeBaseStep: 0.15,
@@ -267,16 +269,11 @@ const PactConfigSchema = new Schema<PactConfigDoc>(
     configId: { type: String, required: true, unique: true, index: true },
     isActive: { type: Boolean, default: true },
     pickHour: { type: Number, default: 18 },
-    // One formula: a week is worth `weekValuePerSession × (sessions + base)`.
-    // Of that, `fliesPerCompletion` lands on each completed session and the
-    // remainder lands at the finish — so roughly three quarters of the value
-    // is back-loaded onto the last session, where the goal-gradient effect
-    // does the most work. At the defaults a 2-session week is 60 flies and a
-    // 7-session week is 160, sub-linear per session by design.
-    fliesPerCompletion: {
-      type: Number,
-      default: PACT_PAYOUT_NUMBERS.fliesPerCompletion,
-    },
+    // One formula: a week is worth `weekValuePerSession × (sessions + base)`,
+    // and the whole of it settles at the end of the week. Nothing is paid in
+    // advance — a session's own task pays what any task pays, and the Leap is
+    // the thing you earn by finishing it. At the defaults a 2-session week is
+    // 60 flies and a 7-session week is 160, sub-linear per session by design.
     weekValuePerSession: {
       type: Number,
       default: PACT_PAYOUT_NUMBERS.weekValuePerSession,
@@ -285,8 +282,16 @@ const PactConfigSchema = new Schema<PactConfigDoc>(
       type: Number,
       default: PACT_PAYOUT_NUMBERS.weekValueBaseSessions,
     },
-    // Paid once a week, on the first session completed after a scheduled one
-    // was missed. The largest single effect in the 53-arm gym megastudy came
+    // A week short of its target still pays, on a convex curve: the share of
+    // the value is `(done / target) ^ partialCreditExponent`. Above 1 the last
+    // session is worth the most, so finishing is always the big jump and a
+    // broken week is still worth coming back to.
+    partialCreditExponent: {
+      type: Number,
+      default: PACT_PAYOUT_NUMBERS.partialCreditExponent,
+    },
+    // Paid once a week at settlement, when a scheduled session was missed and
+    // a later one was still kept. The largest single effect in the 53-arm gym megastudy came
     // from paying for exactly this return, so it is a faucet, not a courtesy.
     comebackBonusFlies: {
       type: Number,

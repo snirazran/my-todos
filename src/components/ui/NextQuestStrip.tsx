@@ -250,8 +250,9 @@ export function NextQuestStrip({
       effortToActNow: LEAP_SESSION_EFFORT_DAYS,
       effortToComplete: LEAP_SESSION_EFFORT_DAYS * Math.max(1, sessionsNeeded),
       streakAtRisk: livePact?.streak.weeks ?? 0,
-      rewardValue: active.sessionFlies + active.weekBonusFlies,
-      rewardBankedNow: active.sessionFlies,
+      rewardValue: active.rewardFlies,
+      // Nothing banks mid-week any more: the Leap pays once, at settlement.
+      rewardBankedNow: 0,
     });
   }, [pactActionable, livePact]);
 

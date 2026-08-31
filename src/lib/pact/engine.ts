@@ -5,6 +5,7 @@ import PactConfigModel, {
   DEFAULT_PACT_STREAK_MULTIPLIERS,
   PACT_CONFIG_ID,
   PACT_PAYOUT,
+  PACT_PAYOUT_NUMBERS,
   PACT_PAYOUT_VERSION,
   RETIRED_PACT_CONFIG_FIELDS,
   seedSuggestions,
@@ -14,6 +15,7 @@ import QuestCategoryModel from '@/lib/models/QuestCategory';
 import TaskModel, { type TaskDoc } from '@/lib/models/Task';
 import UserModel from '@/lib/models/User';
 import connectMongo from '@/lib/mongoose';
+import { isWithinStreakCreditWindow } from '@/lib/streak/taskStreaks';
 import { getZonedToday, getZonedYMD } from '@/lib/utils';
 import {
   normalizeWeekStart,
@@ -31,7 +33,6 @@ import { getFullCatalog } from '@/lib/skins/getCatalog';
 import {
   applyPactBonusRewards,
   applyPactRewards,
-  applyPactSessionFlies,
 } from './grant';
 import {
   canRescue,
@@ -250,6 +251,12 @@ export async function ensurePactConfig(): Promise<PactConfigDoc> {
   if ((existing.payoutVersion ?? 0) < 6) {
     backfill.streakMultipliers = DEFAULT_PACT_STREAK_MULTIPLIERS;
   }
+  // v7 moved the whole payout to settlement and added the partial-credit
+  // curve. A live doc already has `weekValuePerSession`, so the block above
+  // will not re-seed it and the new knob has to be written here.
+  if ((existing.payoutVersion ?? 0) < 7) {
+    backfill.partialCreditExponent = PACT_PAYOUT_NUMBERS.partialCreditExponent;
+  }
   if (existing.payoutVersion !== PACT_PAYOUT_VERSION) {
     backfill.payoutVersion = PACT_PAYOUT_VERSION;
   }
@@ -282,11 +289,6 @@ export async function ensurePactConfig(): Promise<PactConfigDoc> {
  * doing the behaviour, and a beginner's menu that opens with five sessions
  * loses exactly those people — so the ladder is earned, not offered up front.
  */
-/** Flies one kept session pays, the moment its task is ticked. */
-export function pactSessionFlies(config: PactConfigDoc) {
-  return Math.max(0, Number(config.fliesPerCompletion ?? 0));
-}
-
 /**
  * One formula prices the whole system: a pact is worth
  * `weekValuePerSession × (sessions + weekValueBaseSessions)`. Deliberately
@@ -302,20 +304,33 @@ export function pactWeekValueFlies(config: PactConfigDoc, sessions: number) {
   return Math.max(0, Math.round(perSession * (Math.max(0, sessions) + base)));
 }
 
-/**
- * Flies held back for finishing the whole week: the remainder of the formula
- * once every session has been paid for. At the defaults that is roughly three
- * quarters of the week's value, back-loaded onto the last session where the
- * goal gradient does the most work.
- */
-export function pactWeekBonusFlies(config: PactConfigDoc, sessions: number) {
-  return Math.max(
-    0,
-    pactWeekValueFlies(config, sessions) - pactSessionFlies(config) * sessions,
-  );
+/** Curve on a partial week's share. Above 1 the last session is worth most. */
+export function pactPartialExponent(config: PactConfigDoc) {
+  return Math.max(1, Number(config.partialCreditExponent ?? 1.7));
 }
 
-/** Flies for the first session completed after a scheduled one was missed. */
+/**
+ * What a settled week actually pays, before the streak multiplier. A finished
+ * week is worth the whole formula; a short one is worth a convex share of it,
+ * so finishing is always the big jump and abandoning a broken week still
+ * costs more than coming back to it. Nothing is paid before this point — the
+ * tasks a Leap runs on pay what any task pays, and the Leap is the thing you
+ * earn by finishing.
+ */
+export function pactWeekPayoutFlies(
+  config: PactConfigDoc,
+  sessions: number,
+  progress: number,
+) {
+  const target = Math.max(0, sessions);
+  const done = Math.max(0, Math.min(target, progress));
+  if (target <= 0 || done <= 0) return 0;
+  const value = pactWeekValueFlies(config, target);
+  if (done >= target) return value;
+  return Math.round(value * (done / target) ** pactPartialExponent(config));
+}
+
+/** Flies for a week where a session was missed and a later one still landed. */
 export function pactComebackFlies(config: PactConfigDoc) {
   return Math.max(0, Number(config.comebackBonusFlies ?? 0));
 }
@@ -386,8 +401,11 @@ export function pactPrestigeWeeks(config: PactConfigDoc) {
 /** Sessions that keep a streak alive without finishing the week. */
 export function pactNearMissTarget(config: PactConfigDoc, sessions: number) {
   const percent = Math.max(0, Math.min(100, Number(config.nearMissPercent ?? 0)));
-  if (percent <= 0 || sessions <= 0) return sessions;
-  return Math.min(sessions, Math.ceil((sessions * percent) / 100));
+  if (percent <= 0 || percent >= 100 || sessions <= 1) return sessions;
+  return Math.max(
+    1,
+    Math.min(sessions - 1, Math.ceil((sessions * percent) / 100)),
+  );
 }
 
 /** The gift at completion for a week of this many sessions. */
@@ -644,6 +662,8 @@ export type PactSessionLedger = {
   progress: number;
   /** Scheduled days already behind the user with nothing ticked on them. */
   missed: number;
+  /** Of those, the ones still inside the catch-up window. */
+  catchable: number;
   /** Scheduled days still ahead, today included. */
   remaining: number;
   /**
@@ -659,8 +679,11 @@ export type PactSessionLedger = {
  * the user missed one and came back. Pass the week context to get the second
  * answer — progress alone doesn't need it.
  *
- * A session completed late still counts for the day it was scheduled on, so
- * catching up on Wednesday clears Monday rather than burning it.
+ * A session ticked late counts for the day it was scheduled on, but only
+ * inside the same catch-up window task streaks use: the day itself or the one
+ * after. Logging last night's run this morning is the case worth saving;
+ * ticking the whole week on Sunday is not, and an unbounded window let a week
+ * nobody worked pay the same as one they did.
  */
 export function readPactSessions(args: {
   pact: PactDoc;
@@ -679,6 +702,7 @@ export function readPactSessions(args: {
       progress: Math.min(pact.target, Math.max(pact.progress ?? 0, banked)),
       cameBack: false,
       missed: 0,
+      catchable: 0,
       remaining: 0,
     };
   }
@@ -687,6 +711,7 @@ export function readPactSessions(args: {
 
   let done = banked;
   let missed = 0;
+  let catchable = 0;
   let remaining = 0;
   let earliestMiss: string | null = null;
   let latestKept: string | null = null;
@@ -695,13 +720,17 @@ export function readPactSessions(args: {
     if (!ids.has(task.id)) continue;
     let keptOn: string | null = null;
     for (const occurrence of task.completedDates ?? []) {
+      // The week a session belongs to is the day it was scheduled on, not the
+      // day someone got round to ticking it: keying the week off the tick let
+      // last week's leftovers land in this week's count.
+      if (occurrence < pact.weekKey || occurrence > weekEnd) continue;
       const stamp = task.completedAtByDate?.[occurrence];
       const key = stamp
         ? getZonedYMD(stamp instanceof Date ? stamp : new Date(stamp), timezone)
         : occurrence;
-      if (key < pact.weekKey || key > weekEnd) continue;
+      if (!isWithinStreakCreditWindow(occurrence, key)) continue;
       done += 1;
-      if (!keptOn || key < keptOn) keptOn = key;
+      if (!keptOn || occurrence < keptOn) keptOn = occurrence;
     }
     if (keptOn) {
       if (!latestKept || keptOn > latestKept) latestKept = keptOn;
@@ -712,12 +741,14 @@ export function readPactSessions(args: {
     if (offset < 0) continue;
     const scheduled = shiftYMD(pact.weekKey, offset);
     // Today still counts as available: a session is only missed once its day
-    // is behind you, which is also when it stops being something you can fix.
+    // is behind you.
     if (scheduled >= todayKey) {
       remaining += 1;
       continue;
     }
     missed += 1;
+    // Yesterday's is still recoverable all of today; anything older is gone.
+    if (isWithinStreakCreditWindow(scheduled, todayKey)) catchable += 1;
     if (!earliestMiss || scheduled < earliestMiss) earliestMiss = scheduled;
   }
 
@@ -725,6 +756,7 @@ export function readPactSessions(args: {
     progress: Math.min(pact.target, done),
     cameBack: !!earliestMiss && !!latestKept && latestKept > earliestMiss,
     missed,
+    catchable,
     remaining,
   };
 }
@@ -754,11 +786,12 @@ export function readPactSessionStates(args: {
     const dateKey = offset < 0 ? pact.weekKey : shiftYMD(pact.weekKey, offset);
     let done = false;
     for (const occurrence of task.completedDates ?? []) {
+      if (occurrence < pact.weekKey || occurrence > weekEnd) continue;
       const stamp = task.completedAtByDate?.[occurrence];
       const key = stamp
         ? getZonedYMD(stamp instanceof Date ? stamp : new Date(stamp), timezone)
         : occurrence;
-      if (key < pact.weekKey || key > weekEnd) continue;
+      if (!isWithinStreakCreditWindow(occurrence, key)) continue;
       done = true;
       break;
     }
@@ -858,29 +891,6 @@ export async function settleFinishedWeeks(args: {
     const nearMiss = !kept && progress > 0 && progress >= nearMissTarget;
     let usedShield = false;
 
-    // Sessions ticked at the week's edge may never have been reconciled while
-    // the week was still current, and once it rolls over nothing else looks at
-    // them. Settle them here so no kept session goes unpaid.
-    const paidSessions = Math.max(0, pact.paidSessions ?? 0);
-    const owedSessions = progress - paidSessions;
-    const earnsComeback = ledger.cameBack && !pact.comebackPaid;
-    if (userDoc && (owedSessions !== 0 || earnsComeback)) {
-      autoGrantedFlies += applyPactSessionFlies({
-        user: userDoc,
-        config: args.config,
-        paidSessions,
-        owedSessions,
-        comeback: earnsComeback,
-        isPremium,
-        // The rate this week was lived under: the streak banked when it
-        // began, which is what reconcile paid its earlier sessions at.
-        streakWeeks: streakBefore,
-        laps: lapsBefore,
-      });
-      pact.paidSessions = progress;
-      if (earnsComeback) pact.comebackPaid = true;
-    }
-
     // Two rescued weeks in a row would let someone who finishes nothing hold
     // a twelve-week streak, so a rescue always has to be followed by a week
     // actually kept. Zero progress is never rescuable either, and a near miss
@@ -940,13 +950,17 @@ export async function settleFinishedWeeks(args: {
       shieldState = grantShields(shieldState, shieldConfig, isPremium, 1);
     }
 
-    // Only a genuinely finished week pays; a shield rescues the streak, not
-    // the reward — otherwise missing the work would still earn the flies.
-    if (kept && !pact.claimedAt && userDoc) {
+    // The whole payout lands here, once, for the work the week actually did.
+    // A finished week pays the formula and its gift; a short one pays a convex
+    // share and no gift. A shield rescues the streak, not the reward — a
+    // rescued week is paid for its sessions like any other unfinished one.
+    if (!pact.claimedAt && progress > 0 && userDoc) {
       const summary = applyPactRewards({
         user: userDoc,
         config: args.config,
         pact,
+        progress,
+        comeback: ledger.cameBack,
         streakWeeks: streakBefore,
         laps: lapsBefore,
         isPremium,
@@ -1151,10 +1165,6 @@ function weekPreviewFor(
     return {
       sessions,
       flies: Math.round(pactWeekValueFlies(config, sessions) * multiplier),
-      sessionFlies: Math.round(pactSessionFlies(config) * multiplier),
-      bonusFlies: Math.round(
-        pactWeekBonusFlies(config, sessions) * multiplier,
-      ),
       rewards: pactCompletionRewards(config, sessions),
     };
   });
@@ -1286,7 +1296,14 @@ export async function getPactView(args: {
       progress,
       target: activeDoc.target,
       status: activeDoc.status,
-      claimable: progress >= activeDoc.target && !activeDoc.claimedAt,
+      // A short week is claimable too, but only once no session in it can
+      // still be completed — otherwise collecting a fraction early would
+      // forfeit the whole week's prize.
+      claimable:
+        !activeDoc.claimedAt &&
+        progress > 0 &&
+        (progress >= activeDoc.target ||
+          ledger.remaining + ledger.catchable === 0),
       claimed: !!activeDoc.claimedAt,
       // Priced on the target, not the day list: a session removed after its
       // day went by leaves the goal where it was, and the week has to keep
@@ -1294,19 +1311,16 @@ export async function getPactView(args: {
       rewardFlies: Math.round(
         pactWeekValueFlies(config, activeDoc.target) * Math.max(1, weekMultiplier),
       ),
-      sessionFlies: Math.round(pactSessionFlies(config) * weekMultiplier),
-      weekBonusFlies: Math.round(
-        pactWeekBonusFlies(config, activeDoc.target) * weekMultiplier,
-      ),
-      earnedFlies: Math.round(
-        (Math.max(0, activeDoc.paidSessions ?? 0) * pactSessionFlies(config) +
-          (activeDoc.comebackPaid ? pactComebackFlies(config) : 0)) *
-          weekMultiplier,
+      // What this week would settle for at the progress it has right now.
+      payoutFlies: Math.round(
+        pactWeekPayoutFlies(config, activeDoc.target, progress) *
+          Math.max(1, weekMultiplier),
       ),
       completionRewards: pactCompletionRewards(config, activeDoc.target),
       nearMissTarget: pactNearMissTarget(config, activeDoc.target),
       canHoldStreak:
-        progress + ledger.remaining >= pactNearMissTarget(config, activeDoc.target),
+        progress + ledger.remaining + ledger.catchable >=
+        pactNearMissTarget(config, activeDoc.target),
       daysLeft: Math.max(0, daysBetween(todayKey, weekEnd) + 1),
       shieldUsed: activeDoc.shieldUsed,
       tagId: activeDoc.tagId,
@@ -1319,10 +1333,12 @@ export async function getPactView(args: {
       }),
       openToday,
       missedSessions: ledger.missed,
+      catchableSessions: ledger.catchable,
       // Whether the whole week is still reachable. Once it is not, the bonus
       // and the gift are gone no matter what happens next, and saying so is
       // the only way the user finds out before the week quietly ends.
-      canStillFinish: progress + ledger.remaining >= activeDoc.target,
+      canStillFinish:
+        progress + ledger.remaining + ledger.catchable >= activeDoc.target,
       nextTaskLabel:
         upcoming === undefined
           ? null
@@ -1464,13 +1480,6 @@ export async function getPactView(args: {
     introSeen: streak.introSeen,
     needsAreas: areas.length === 0,
     weekStartsOn,
-    // Already at the week's rate, like every other fly number in the view. A
-    // preview that quotes the base while the card quotes the multiplied total
-    // is two prices for one week.
-    flyRates: {
-      perTask: Math.round(pactSessionFlies(config) * weekMultiplier),
-      comeback: Math.round(pactComebackFlies(config) * weekMultiplier),
-    },
     weekPreview: weekPreviewFor(config, weekMultiplier),
     completionRewards: config.completionRewards ?? [],
     weekResult: streak.pendingResult,
