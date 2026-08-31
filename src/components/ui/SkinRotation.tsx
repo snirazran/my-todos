@@ -10,7 +10,6 @@ import {
   ChevronRight,
   Lock,
   LockOpen,
-  Shuffle,
   X,
 } from 'lucide-react';
 import useSWR from 'swr';
@@ -39,6 +38,9 @@ import {
 
 const SHUFFLE_API = '/api/skins/shuffle';
 const LEGACY_STORAGE_KEY = 'skinRotationInterval';
+
+const SHUFFLE_ICON_ON_DARK =
+  'dark:[&_path:first-child]:fill-slate-300 dark:[&_path:not(:first-child)]:fill-emerald-400';
 
 export type { RotationInterval };
 
@@ -276,10 +278,18 @@ export function SkinRotationDialog({
               >
                 <X className="h-4 w-4" />
               </button>
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#4f9149] shadow-lg shadow-[#4f9149]/25">
-                <Shuffle className="h-7 w-7 text-white" />
+              <div className="relative mx-auto mt-1 h-16 w-16">
+                <span
+                  aria-hidden
+                  className="absolute -inset-2.5 rounded-full bg-[#4f9149]/15 blur-xl"
+                />
+                <Icon
+                  name="shuffle"
+                  label="Style Shuffle"
+                  className={cn('relative h-16 w-16', SHUFFLE_ICON_ON_DARK)}
+                />
               </div>
-              <h3 className="mt-3 text-center text-xl font-black tracking-tight text-foreground">
+              <h3 className="mt-3.5 text-center text-xl font-black tracking-tight text-foreground">
                 Style Shuffle
               </h3>
               <p className="mx-auto mt-1 max-w-[290px] text-center text-xs font-medium text-muted-foreground">
@@ -316,8 +326,12 @@ export function SkinRotationDialog({
                       disabled={shuffling || !canShuffle}
                       className="flex h-11 flex-1 items-center justify-center gap-2 rounded-2xl bg-[#4f9149] text-sm font-black tracking-wide text-white shadow-[0_4px_0_0_#34631f] transition-all active:translate-y-0.5 active:shadow-none disabled:opacity-50 disabled:shadow-none"
                     >
-                      <Shuffle
-                        className={cn('h-4 w-4', shuffling && 'animate-spin')}
+                      <Icon
+                        name="shuffle"
+                        className={cn(
+                          'h-6 w-6 shrink-0 [&_path:first-child]:fill-[#a8d98c]',
+                          shuffling && 'animate-spin',
+                        )}
                       />
                       {shuffling ? 'Shuffling…' : 'Shuffle now'}
                     </button>
@@ -560,7 +574,7 @@ export function StyleShuffleHeaderButton({ className }: { className?: string }) 
           <Icon
             name="shuffle"
             label="Style Shuffle"
-            className="h-7 w-7 dark:[&_path:first-child]:fill-slate-300 dark:[&_path:not(:first-child)]:fill-emerald-400"
+            className={cn('h-7 w-7', SHUFFLE_ICON_ON_DARK)}
           />
         </span>
       </button>

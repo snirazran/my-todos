@@ -1,5 +1,6 @@
 import type { CalendarConnectionDoc } from '@/lib/models/CalendarConnection';
 import { decryptSecret } from '../crypto';
+import { GOOGLE_SCOPES, type SyncDirection } from '../direction';
 
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const API_BASE = 'https://www.googleapis.com/calendar/v3';
@@ -42,16 +43,16 @@ export function googleRedirectUri() {
   return `${base.replace(/\/$/, '')}/api/calendar/google/callback`;
 }
 
-export function googleConsentUrl(state: string) {
+export function googleConsentUrl(
+  state: string,
+  direction: SyncDirection = 'two_way',
+) {
   const { clientId } = clientCreds();
   const url = new URL('https://accounts.google.com/o/oauth2/v2/auth');
   url.searchParams.set('client_id', clientId);
   url.searchParams.set('redirect_uri', googleRedirectUri());
   url.searchParams.set('response_type', 'code');
-  url.searchParams.set(
-    'scope',
-    'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.app.created',
-  );
+  url.searchParams.set('scope', GOOGLE_SCOPES[direction].join(' '));
   url.searchParams.set('access_type', 'offline');
   url.searchParams.set('prompt', 'consent');
   url.searchParams.set('state', state);
@@ -81,6 +82,9 @@ export async function exchangeCodeForTokens(code: string) {
     refreshToken: data.refresh_token as string,
     accessToken: data.access_token as string,
     expiresIn: Number(data.expires_in ?? 3600),
+    // What Google actually granted, which is not always what was asked for —
+    // a user can untick a permission on the consent screen.
+    scopes: String(data.scope ?? '').split(' ').filter(Boolean),
   };
 }
 

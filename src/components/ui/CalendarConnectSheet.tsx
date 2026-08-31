@@ -6,11 +6,13 @@ import { ArrowLeftRight, Check, ChevronRight, Loader2 } from 'lucide-react';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { Icon } from '@/components/ui/Icon';
 import AppleCalendarSheet from '@/components/ui/AppleCalendarSheet';
+import { SyncDirectionPicker } from '@/components/ui/SyncDirectionPicker';
 import {
   useCalendarConnections,
   useGoogleConnectFlow,
   type CalendarConnectionInfo,
   type CalendarProvider,
+  type SyncDirection,
 } from '@/hooks/useCalendarSync';
 import { hapticSelect, hapticSuccess } from '@/lib/haptics';
 
@@ -102,6 +104,7 @@ export default function CalendarConnectSheet({
   const { connections, available, mutate } = useCalendarConnections();
   const [appleOpen, setAppleOpen] = useState(false);
   const [connected, setConnected] = useState<CalendarProvider | null>(null);
+  const [direction, setDirection] = useState<SyncDirection>('two_way');
 
   const google = connections.find((c) => c.provider === 'google');
   const apple = connections.find((c) => c.provider === 'apple');
@@ -139,6 +142,7 @@ export default function CalendarConnectSheet({
     cancelGoogle();
     clearError();
     setConnected(null);
+    setDirection('two_way');
   }, [open, cancelGoogle, clearError]);
 
   const providers = useMemo(
@@ -198,7 +202,9 @@ export default function CalendarConnectSheet({
                     {providerLabel(connected)} is in
                   </h2>
                   <p className="mt-1.5 max-w-[17rem] text-[14px] font-bold text-muted-foreground">
-                    Your events are on their way.
+                    {direction === 'export_only'
+                      ? 'Your tasks are on their way over.'
+                      : 'Your events are on their way.'}
                   </p>
                 </motion.div>
               ) : (
@@ -262,7 +268,19 @@ export default function CalendarConnectSheet({
                     </p>
                   </div>
 
-                  <div className="mt-6 grid gap-2.5">
+                  <div className="mt-5">
+                    <p className="mb-1.5 px-0.5 text-[11.5px] font-black uppercase tracking-[0.07em] text-muted-foreground">
+                      How it syncs
+                    </p>
+                    <SyncDirectionPicker
+                      value={direction}
+                      onChange={setDirection}
+                      variant="collapsed"
+                      disabled={connecting}
+                    />
+                  </div>
+
+                  <div className="mt-3 grid gap-2.5">
                     {providers.length === 0 && (
                       <p className="rounded-2xl bg-muted/60 px-4 py-3 text-center text-[12.5px] font-bold text-muted-foreground">
                         Calendar sync isn’t switched on yet. Check back soon.
@@ -275,7 +293,9 @@ export default function CalendarConnectSheet({
                         connection={provider === 'google' ? google : apple}
                         busy={provider === 'google' && connecting}
                         onClick={() =>
-                          provider === 'google' ? void connectGoogle() : setAppleOpen(true)
+                          provider === 'google'
+                            ? void connectGoogle(direction)
+                            : setAppleOpen(true)
                         }
                       />
                     ))}
@@ -310,6 +330,7 @@ export default function CalendarConnectSheet({
       <AppleCalendarSheet
         open={appleOpen}
         onOpenChange={setAppleOpen}
+        direction={direction}
         onConnected={() => {
           void mutate();
           window.dispatchEvent(new Event('board-refresh'));

@@ -11,6 +11,9 @@ const RENEW_BEFORE_MS = 48 * 60 * 60 * 1000;
 /** Create (or renew when close to expiry) the push channel for a connection. */
 export async function ensureChannel(conn: CalendarConnectionDoc): Promise<void> {
   if (!process.env.APP_BASE_URL?.startsWith('https://')) return;
+  // The channel watches the user's events for inbound changes; an export-only
+  // connection is not allowed to read them and has nothing to be told about.
+  if (!conn.settings.importEnabled) return;
 
   const expiresSoon =
     !conn.channelExpiration ||

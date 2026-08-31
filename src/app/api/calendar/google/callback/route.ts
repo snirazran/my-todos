@@ -8,6 +8,7 @@ import UserModel from '@/lib/models/User';
 import { encryptSecret, verifyStateToken } from '@/lib/calendar/crypto';
 import { exchangeCodeForTokens } from '@/lib/calendar/google/client';
 import { invalidateConnectionCache } from '@/lib/calendar/connections';
+import { directionToSettings, isSyncDirection } from '@/lib/calendar/direction';
 import { notifyTaskChanged } from '@/lib/taskSync';
 
 function resultPage(title: string, message: string) {
@@ -30,11 +31,18 @@ export async function GET(req: NextRequest) {
     return resultPage('Something went wrong', 'Missing authorization details. Please try again from the app.');
   }
 
-  const payload = verifyStateToken<{ uid?: string; purpose?: string }>(state);
+  const payload = verifyStateToken<{
+    uid?: string;
+    purpose?: string;
+    direction?: string;
+  }>(state);
   if (payload?.purpose !== 'gcal-callback' || !payload.uid) {
     return resultPage('Something went wrong', 'This connection link expired. Please try again from the app.');
   }
   const uid = payload.uid;
+  const direction = isSyncDirection(payload.direction)
+    ? payload.direction
+    : 'two_way';
 
   try {
     const tokens = await exchangeCodeForTokens(code);
@@ -46,9 +54,10 @@ export async function GET(req: NextRequest) {
           status: 'active',
           consecutiveFailures: 0,
           encRefreshToken: encryptSecret(tokens.refreshToken),
+          grantedScopes: tokens.scopes,
           calendarId: 'primary',
           calendarDisplayName: 'Primary calendar',
-          settings: { exportEnabled: true, importEnabled: true },
+          settings: directionToSettings(direction),
         },
         $unset: {
           errorMessage: 1,
@@ -70,7 +79,7 @@ export async function GET(req: NextRequest) {
     await recordAnalyticsEvent({
       userId: uid,
       name: 'calendar_connected',
-      properties: { provider: 'google' },
+      properties: { provider: 'google', direction },
     });
 
     void (async () => {

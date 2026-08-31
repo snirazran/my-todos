@@ -265,6 +265,22 @@ function AdminPageContent() {
           </div>
         )}
 
+        {/* Players */}
+        <Section
+          title="Players"
+          subtitle="Look up any account and hand it something."
+        >
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <ManagerLinkCard
+              href="/admin/grants"
+              icon={<Gift className="w-5 h-5" />}
+              accent="bg-pink-500/10 text-pink-600 dark:text-pink-400"
+              title="Player Grants"
+              description="Give flies, Plus days, a cosmetic or a background — logged with a reason and reversible."
+            />
+          </div>
+        </Section>
+
         {/* Content Managers */}
         <Section
           title="Content Managers"

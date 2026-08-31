@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import useSWR from 'swr';
 import { useAuth } from '@/components/auth/AuthContext';
+import type { SyncDirection } from '@/lib/calendar/direction';
+
+export type { SyncDirection };
 
 export type CalendarProvider = 'google' | 'apple';
 
@@ -22,6 +25,8 @@ export type CalendarConnectionInfo = {
     exportEnabled?: boolean;
     importEnabled?: boolean;
   };
+  direction?: SyncDirection;
+  grantedScopes?: string[];
 };
 
 export type CalendarAvailability = Record<CalendarProvider, boolean>;
@@ -57,13 +62,19 @@ export type GoogleConnectOpen =
   | { ok: true; closed?: () => boolean }
   | { ok: false; reason: string };
 
-export async function openGoogleCalendarConnect(): Promise<GoogleConnectOpen> {
+export async function openGoogleCalendarConnect(
+  direction: SyncDirection = 'two_way',
+): Promise<GoogleConnectOpen> {
   try {
     const { Capacitor } = await import('@capacitor/core');
     if (Capacitor.isNativePlatform()) {
       // Google blocks OAuth consent inside embedded webviews — use the system
       // browser with a signed state token; the app polls connection status.
-      const res = await fetch('/api/calendar/google/connect-token', { method: 'POST' });
+      const res = await fetch('/api/calendar/google/connect-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ direction }),
+      });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.token) {
         return {
@@ -87,7 +98,7 @@ export async function openGoogleCalendarConnect(): Promise<GoogleConnectOpen> {
       return { ok: true, closed: () => dismissed };
     }
     const popup = window.open(
-      '/api/calendar/google/connect',
+      `/api/calendar/google/connect?direction=${encodeURIComponent(direction)}`,
       'gcal-connect',
       'width=520,height=680,menubar=no,toolbar=no',
     );
@@ -141,10 +152,10 @@ export function useGoogleConnectFlow({
     setConnecting(false);
   }, []);
 
-  const connect = useCallback(async () => {
+  const connect = useCallback(async (direction: SyncDirection = 'two_way') => {
     setError(null);
     setConnecting(true);
-    const opened = await openGoogleCalendarConnect();
+    const opened = await openGoogleCalendarConnect(direction);
     if (!opened.ok) {
       setConnecting(false);
       setError(opened.reason);

@@ -4,15 +4,19 @@ import { useCallback, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { BaseSheet, type BaseSheetRenderProps } from '@/components/ui/BaseSheet';
 import { Icon } from '@/components/ui/Icon';
+import { directionHint } from '@/components/ui/SyncDirectionPicker';
+import type { SyncDirection } from '@/lib/calendar/direction';
 
 export default function AppleCalendarSheet({
   open,
   onOpenChange,
   onConnected,
+  direction = 'two_way',
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onConnected: () => void;
+  direction?: SyncDirection;
 }) {
   const [appleId, setAppleId] = useState('');
   const [appPassword, setAppPassword] = useState('');
@@ -39,7 +43,7 @@ export default function AppleCalendarSheet({
       const res = await fetch('/api/calendar/apple/connect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ appleId, appPassword }),
+        body: JSON.stringify({ appleId, appPassword, direction }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -53,7 +57,7 @@ export default function AppleCalendarSheet({
     } finally {
       setBusy(false);
     }
-  }, [appleId, appPassword, onConnected, close]);
+  }, [appleId, appPassword, direction, onConnected, close]);
 
   return (
     <BaseSheet
@@ -72,11 +76,16 @@ export default function AppleCalendarSheet({
             <h2 className="text-lg font-black">Apple Calendar</h2>
           </div>
 
-          <p className="text-sm text-muted-foreground font-semibold mb-4 leading-relaxed">
-            Sign in with your Apple ID and an app-specific password to sync
-            with iCloud Calendar. Frogress imports events from every calendar
-            you have, and creates a private &ldquo;Frogress&rdquo; calendar
-            for your tasks.
+          <p className="text-sm text-muted-foreground font-semibold mb-3 leading-relaxed">
+            Sign in with your Apple ID and an app-specific password to sync with
+            iCloud Calendar.
+            {direction !== 'export_only' &&
+              ' Frogress reads events from every calendar you have.'}
+            {direction !== 'import_only' &&
+              ' Your tasks go into a private “Frogress” calendar it creates.'}
+          </p>
+          <p className="mb-4 rounded-xl bg-muted/60 px-3 py-2 text-[12px] font-bold leading-snug text-muted-foreground">
+            {directionHint(direction, 'iCloud Calendar')}
           </p>
           <ol className="text-[13px] text-muted-foreground font-semibold mb-4 space-y-1.5 list-decimal pl-4 leading-relaxed">
             <li>

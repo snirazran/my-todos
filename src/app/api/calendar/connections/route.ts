@@ -5,6 +5,12 @@ import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import CalendarConnectionModel from '@/lib/models/CalendarConnection';
 import { invalidateConnectionCache } from '@/lib/calendar/connections';
+import {
+  isSyncDirection,
+  needsReconsent,
+  settingsToDirection,
+  type SyncDirection,
+} from '@/lib/calendar/direction';
 import { resumeConnection } from '@/lib/calendar/health';
 
 function credKeyReady() {
@@ -52,6 +58,7 @@ export async function GET() {
       lastFullSyncAt: 1,
       settings: 1,
       appleId: 1,
+      grantedScopes: 1,
     },
   ).lean();
 
@@ -70,6 +77,8 @@ export async function GET() {
       appleId: c.appleId,
       lastSyncedAt: c.lastIncrementalSyncAt ?? c.lastFullSyncAt ?? null,
       settings: c.settings,
+      direction: settingsToDirection(c.settings),
+      grantedScopes: c.grantedScopes,
     })),
   });
 }
@@ -99,19 +108,74 @@ export async function PATCH(req: NextRequest) {
 
   const set: Record<string, unknown> = {};
   const unset: Record<string, unknown> = {};
-  if (typeof body.exportEnabled === 'boolean')
-    set['settings.exportEnabled'] = body.exportEnabled;
-  if (typeof body.importEnabled === 'boolean')
-    set['settings.importEnabled'] = body.importEnabled;
+
+  if (body.direction !== undefined) {
+    if (!isSyncDirection(body.direction)) {
+      return NextResponse.json({ error: 'invalid direction' }, { status: 400 });
+    }
+  } else if (
+    typeof body.exportEnabled === 'boolean' ||
+    typeof body.importEnabled === 'boolean'
+  ) {
+    // Legacy per-flag callers: fold them into a direction so the pair can
+    // never land on "neither", which reads as connected but syncs nothing.
+    if (typeof body.exportEnabled === 'boolean')
+      set['settings.exportEnabled'] = body.exportEnabled;
+    if (typeof body.importEnabled === 'boolean')
+      set['settings.importEnabled'] = body.importEnabled;
+  }
+
   if (body.importTagId === null) unset['settings.importTagId'] = 1;
   else if (typeof body.importTagId === 'string')
     set['settings.importTagId'] = body.importTagId;
-  if (Object.keys(set).length === 0 && Object.keys(unset).length === 0) {
+
+  const direction: SyncDirection | null = isSyncDirection(body.direction)
+    ? body.direction
+    : null;
+
+  if (!direction && Object.keys(set).length === 0 && Object.keys(unset).length === 0) {
     return NextResponse.json({ error: 'nothing to update' }, { status: 400 });
   }
 
   await connectMongo();
-  const res = await CalendarConnectionModel.updateOne(
+  const conn = await CalendarConnectionModel.findOne({ userId: uid, provider });
+  if (!conn) {
+    return NextResponse.json({ error: 'not connected' }, { status: 404 });
+  }
+
+  if (direction) {
+    // Google consent is scoped to the direction it was granted for, so
+    // widening one needs a fresh trip through the consent screen rather than
+    // a silently broken connection.
+    if (needsReconsent(provider, conn.grantedScopes, direction)) {
+      return NextResponse.json(
+        { error: 'reconsent required', reconsent: true, direction },
+        { status: 409 },
+      );
+    }
+    Object.assign(set, {
+      'settings.importEnabled': direction !== 'export_only',
+      'settings.exportEnabled': direction !== 'import_only',
+    });
+  } else if (
+    typeof set['settings.exportEnabled'] === 'boolean' ||
+    typeof set['settings.importEnabled'] === 'boolean'
+  ) {
+    const nextImport =
+      (set['settings.importEnabled'] as boolean | undefined) ??
+      conn.settings.importEnabled !== false;
+    const nextExport =
+      (set['settings.exportEnabled'] as boolean | undefined) ??
+      conn.settings.exportEnabled !== false;
+    if (!nextImport && !nextExport) {
+      return NextResponse.json(
+        { error: 'sync needs at least one direction' },
+        { status: 400 },
+      );
+    }
+  }
+
+  await CalendarConnectionModel.updateOne(
     { userId: uid, provider },
     {
       ...(Object.keys(set).length ? { $set: set } : {}),
@@ -119,8 +183,5 @@ export async function PATCH(req: NextRequest) {
     },
   );
   invalidateConnectionCache(uid);
-  if (res.matchedCount === 0) {
-    return NextResponse.json({ error: 'not connected' }, { status: 404 });
-  }
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, direction: direction ?? undefined });
 }

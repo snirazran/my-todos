@@ -141,6 +141,9 @@ async function incrementalList(
  * token exists, full otherwise). Returns whether app tasks changed.
  */
 export async function googleInbound(conn: CalendarConnectionDoc): Promise<boolean> {
+  // Export-only consent has no read scope at all, so listing events would 403
+  // — and a user who chose it was told this app never reads their calendar.
+  if (!conn.settings.importEnabled) return false;
   const tz = await getUserTz(conn.userId);
 
   let items: GoogleEvent[];
@@ -181,7 +184,9 @@ export async function googleInitialSync(conn: CalendarConnectionDoc): Promise<bo
       const tz = await getUserTz(conn.userId);
       const { seedLegacyGoogleLinks } = await import('../engine');
       await seedLegacyGoogleLinks(conn, tz);
-      await ensureAppCalendar(conn);
+      // Import-only consent carries no write scope, so creating the app
+      // calendar would 403 and fail the whole connect.
+      if (conn.settings.exportEnabled) await ensureAppCalendar(conn);
       const appChanged = await googleInbound(conn);
       await runOutboundSweep(conn.userId, { google: googleAdapter });
       await CalendarConnectionModel.updateOne(

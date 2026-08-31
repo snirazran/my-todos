@@ -24,6 +24,8 @@ export interface CalendarConnectionDoc {
   pausedAt?: Date;
   pausedReason?: string;
   encRefreshToken?: string;
+  /** Google scopes the stored refresh token was granted; absent on legacy rows. */
+  grantedScopes?: string[];
   encAppPassword?: string;
   appleId?: string;
   calendarId?: string;
@@ -66,6 +68,7 @@ const CalendarConnectionSchema = new Schema<CalendarConnectionDoc>(
     pausedAt: { type: Date },
     pausedReason: { type: String },
     encRefreshToken: { type: String },
+    grantedScopes: { type: [String], default: undefined },
     encAppPassword: { type: String },
     appleId: { type: String },
     calendarId: { type: String },

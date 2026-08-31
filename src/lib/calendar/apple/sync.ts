@@ -106,6 +106,7 @@ export async function appleInbound(
   conn: CalendarConnectionDoc,
   opts?: { force?: boolean },
 ): Promise<boolean> {
+  if (!conn.settings.importEnabled) return false;
   const tz = await getUserTz(conn.userId);
 
   const client = await getClient(conn);
@@ -165,7 +166,7 @@ export async function appleInitialSync(conn: CalendarConnectionDoc): Promise<boo
     conn,
     'initial sync',
     async () => {
-      await ensureAppCalendar(conn);
+      if (conn.settings.exportEnabled) await ensureAppCalendar(conn);
       const appChanged = await appleInbound(conn, { force: true });
       await runOutboundSweep(conn.userId, { apple: appleAdapter });
       await CalendarConnectionModel.updateOne(

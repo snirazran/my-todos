@@ -4,22 +4,31 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireUserId } from '@/lib/auth';
 import { signStateToken, verifyStateToken } from '@/lib/calendar/crypto';
 import { googleConsentUrl } from '@/lib/calendar/google/client';
+import { isSyncDirection, type SyncDirection } from '@/lib/calendar/direction';
 
 const STATE_TTL_MS = 10 * 60 * 1000;
 
 export async function GET(req: NextRequest) {
   let uid: string | null = null;
+  let direction: SyncDirection = 'two_way';
 
   const nativeToken = req.nextUrl.searchParams.get('t');
   if (nativeToken) {
-    const payload = verifyStateToken<{ uid?: string; purpose?: string }>(nativeToken);
+    const payload = verifyStateToken<{
+      uid?: string;
+      purpose?: string;
+      direction?: string;
+    }>(nativeToken);
     if (payload?.purpose === 'gcal-connect' && payload.uid) uid = payload.uid;
+    if (isSyncDirection(payload?.direction)) direction = payload.direction;
   } else {
     try {
       uid = await requireUserId();
     } catch {
       uid = null;
     }
+    const requested = req.nextUrl.searchParams.get('direction');
+    if (isSyncDirection(requested)) direction = requested;
   }
 
   if (!uid) {
@@ -27,8 +36,13 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const state = signStateToken({ uid, purpose: 'gcal-callback' }, STATE_TTL_MS);
-    return NextResponse.redirect(googleConsentUrl(state));
+    // The direction rides in the signed state so the callback writes the
+    // settings the consent screen was actually shown for.
+    const state = signStateToken(
+      { uid, purpose: 'gcal-callback', direction },
+      STATE_TTL_MS,
+    );
+    return NextResponse.redirect(googleConsentUrl(state, direction));
   } catch (err) {
     console.error('calendar connect not configured:', (err as Error)?.message);
     return new NextResponse(

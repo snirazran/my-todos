@@ -1450,7 +1450,9 @@ export async function createTasksForUser(
       ...sectionFields,
     });
   }
-  for (const d of days) {
+  const remainingDays =
+    explicitDates.length > 0 ? days.filter((d) => d === -1) : days;
+  for (const d of remainingDays) {
     const id = uuid();
     createdIds.push(id);
     if (d === -1) {

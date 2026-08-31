@@ -12,6 +12,7 @@ import {
 } from '@/lib/calendar/apple/client';
 import { encryptSecret } from '@/lib/calendar/crypto';
 import { invalidateConnectionCache } from '@/lib/calendar/connections';
+import { directionToSettings, isSyncDirection } from '@/lib/calendar/direction';
 import { notifyTaskChanged } from '@/lib/taskSync';
 
 export async function POST(req: NextRequest) {
@@ -25,6 +26,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const appleId = String(body.appleId ?? '').trim();
   const appPassword = String(body.appPassword ?? '').replace(/\s/g, '');
+  const direction = isSyncDirection(body.direction) ? body.direction : 'two_way';
   if (!appleId || !appPassword) {
     return NextResponse.json(
       { error: 'Apple ID and app-specific password are required' },
@@ -51,7 +53,7 @@ export async function POST(req: NextRequest) {
           consecutiveFailures: 0,
           appleId,
           encAppPassword: encryptSecret(appPassword),
-          settings: { exportEnabled: true, importEnabled: true },
+          settings: directionToSettings(direction),
         },
         $unset: {
           errorMessage: 1,
@@ -70,7 +72,7 @@ export async function POST(req: NextRequest) {
     await recordAnalyticsEvent({
       userId: uid,
       name: 'calendar_connected',
-      properties: { provider: 'apple' },
+      properties: { provider: 'apple', direction },
     });
 
     void (async () => {
