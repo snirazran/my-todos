@@ -3,7 +3,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Alignment,
-  EventType,
   Fit,
   Layout,
   type RiveFile,
@@ -19,27 +18,42 @@ import {
   riveDevicePixelRatio,
 } from '@/lib/riveLoader';
 import { useRiveIdlePause } from '@/lib/riveIdlePause';
+import { cn } from '@/lib/utils';
 
 const STATE_MACHINE = 'State Machine 1';
 const VIEW_MODEL = 'ViewModel1';
 const VIEW_MODEL_INSTANCE = 'Instance';
 const WINGS_TRIGGER = 'wings';
-const WINGS_IDLE_STATE = 'Wings_idle';
-const FLAP_PERIOD_MS = 2600;
 
+/**
+ * Re-arms the wings on every frame, for every mounted pack at once.
+ *
+ * The shared fly engine chains its flaps off StateChange: the moment the
+ * one-shot timeline settles back on Wings_idle it fires the trigger again, so
+ * the next beat begins on that same frame. These artboards emit no
+ * StateChange, so there is nothing to chain from — but a trigger that arrives
+ * mid-flap is absorbed by the running state, which makes re-arming every frame
+ * equivalent: the beat restarts at most one frame after it ended, the same gap
+ * the real fly has. Anything slower leaves dead air between beats, and that
+ * pause is what reads as a twitch rather than a wingbeat.
+ */
 const flapListeners = new Set<() => void>();
-let flapTimer: ReturnType<typeof setInterval> | null = null;
+let flapFrame: number | null = null;
 
 function onSharedFlap(listener: () => void) {
   flapListeners.add(listener);
-  flapTimer ??= setInterval(() => {
-    flapListeners.forEach((fn) => fn());
-  }, FLAP_PERIOD_MS);
+  if (flapFrame === null) {
+    const tick = () => {
+      flapListeners.forEach((fn) => fn());
+      flapFrame = requestAnimationFrame(tick);
+    };
+    flapFrame = requestAnimationFrame(tick);
+  }
   return () => {
     flapListeners.delete(listener);
-    if (flapListeners.size === 0 && flapTimer) {
-      clearInterval(flapTimer);
-      flapTimer = null;
+    if (flapListeners.size === 0 && flapFrame !== null) {
+      cancelAnimationFrame(flapFrame);
+      flapFrame = null;
     }
   };
 }
@@ -48,12 +62,12 @@ function onSharedFlap(listener: () => void) {
  * One fly-pack illustration, drawn from the Bundle1…Bundle6 artboards of the
  * shared store_bundle.riv export (pack 1 is the smallest, pack 6 the largest).
  *
- * The wings are a one-shot data-bound trigger rather than a loop, so JS owns
- * the cadence: one shared interval drives every mounted pack, so the whole
- * shelf flaps and shines on the same beat instead of drifting apart. Between
- * flaps the state machine settles on Wings_idle and the instance pauses
- * itself — six always-advancing artboards in one sheet is exactly the kind of
- * render-loop burn the rest of the app goes out of its way to avoid.
+ * One shared beat drives every mounted pack, so the whole shelf flies on the
+ * same rhythm instead of drifting apart. Six always-advancing artboards is
+ * exactly the kind of render-loop burn the rest of the app avoids, so the beat
+ * only reaches packs that are on screen, and stops entirely once the screen
+ * goes idle — a pack that scrolls out of the sheet is paused, not merely
+ * unwatched.
  */
 export function BundleArt({
   bundle,
@@ -68,7 +82,10 @@ export function BundleArt({
 }) {
   const [file, setFile] = useState<RiveFile | null>(() => getStoreBundleFile());
   const [failed, setFailed] = useState(false);
+  const [visible, setVisible] = useState(true);
+  const hostRef = useRef<HTMLSpanElement>(null);
   const idle = useRiveIdlePause((s) => s.idle);
+  const active = visible && !idle;
 
   useEffect(() => {
     if (file) return;
@@ -117,24 +134,33 @@ export function BundleArt({
   flapRef.current = flap;
 
   useEffect(() => {
-    if (!rive) return;
-    const onStateChange = (event: { data?: unknown }) => {
-      if (!Array.isArray(event.data)) return;
-      if (event.data.includes(WINGS_IDLE_STATE)) rive.pause();
-    };
-    rive.on(EventType.StateChange, onStateChange);
-    return () => rive.off(EventType.StateChange, onStateChange);
-  }, [rive]);
+    const el = hostRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) setVisible(entry.isIntersecting);
+      },
+      { threshold: 0 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
-    if (!rive || idle) return;
-    return onSharedFlap(() => {
-      if (!rive.isPlaying) rive.play();
-      flapRef.current?.();
-    });
-  }, [rive, idle]);
+    if (!rive) return;
+    if (!active) {
+      rive.pause();
+      return;
+    }
+    if (!rive.isPlaying) rive.play();
+    return onSharedFlap(() => flapRef.current?.());
+  }, [rive, active]);
 
   if (failed) return <>{fallback}</>;
 
-  return <RiveComponent className={className} />;
+  return (
+    <span ref={hostRef} className={cn('block', className)}>
+      <RiveComponent className="h-full w-full" />
+    </span>
+  );
 }

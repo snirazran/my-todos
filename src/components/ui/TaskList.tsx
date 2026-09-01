@@ -971,19 +971,14 @@ const SortableTaskItem = React.forwardRef<
                   )}
                   {isWeekly && (task.streak ?? 0) > 0 && (
                     <span
-                      className={`inline-flex flex-shrink-0 items-center gap-0.5 no-underline ${
-                        isDone ? 'text-orange-500' : 'text-orange-400/80'
-                      }`}
+                      className="inline-flex flex-shrink-0 items-center gap-0.5 text-orange-500 no-underline"
                       title={
                         isDone
                           ? `${task.streak} in a row`
                           : `${task.streak} in a row — finish today to keep it`
                       }
                     >
-                      <Flame
-                        className={`h-4 w-4 ${isDone ? '' : 'motion-safe:animate-pulse'}`}
-                        fill="currentColor"
-                      />
+                      <Flame className="h-4 w-4" fill="currentColor" />
                       <span className="text-[12px] font-black tabular-nums leading-none">
                         ×{task.streak}
                       </span>

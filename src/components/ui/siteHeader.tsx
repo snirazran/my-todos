@@ -431,7 +431,7 @@ import {
   playPop,
 } from '@/lib/catchSounds';
 import { useTheme } from 'next-themes';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { auth } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
@@ -669,6 +669,7 @@ const SWIPE_PROJECTION = 0.15;
 const SWIPE_MIN_DISTANCE = 48;
 const SWIPE_DISMISS_RATIO = 0.35;
 const SWIPE_FLING_VELOCITY = 800;
+const SWIPE_AXIS_SLOP = 8;
 
 const settleSpring = (velocity: number) =>
   ({
@@ -700,6 +701,56 @@ const swipeDragProps = {
   dragTransition: { bounceStiffness: 520, bounceDamping: 46 },
   style: { touchAction: 'pan-y' as const },
 } as const;
+
+function useSwipeAxisLock(enabled: boolean) {
+  const detach = useRef<(() => void) | null>(null);
+  const enabledRef = useRef(enabled);
+  enabledRef.current = enabled;
+
+  return useCallback((el: HTMLDivElement | null) => {
+    detach.current?.();
+    detach.current = null;
+    if (!el) return;
+
+    let startX = 0;
+    let startY = 0;
+    let axis: 'x' | 'y' | null = null;
+    let tracking = false;
+
+    const onStart = (e: TouchEvent) => {
+      tracking = e.touches.length === 1;
+      axis = null;
+      if (!tracking) return;
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+    };
+    const onMove = (e: TouchEvent) => {
+      if (!tracking || !enabledRef.current || e.touches.length !== 1) return;
+      const dx = e.touches[0].clientX - startX;
+      const dy = e.touches[0].clientY - startY;
+      if (axis === null) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) < SWIPE_AXIS_SLOP) return;
+        axis = dx > 0 && Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+      }
+      if (axis === 'x' && e.cancelable) e.preventDefault();
+    };
+    const onEnd = () => {
+      tracking = false;
+      axis = null;
+    };
+
+    el.addEventListener('touchstart', onStart, { passive: true });
+    el.addEventListener('touchmove', onMove, { passive: false });
+    el.addEventListener('touchend', onEnd, { passive: true });
+    el.addEventListener('touchcancel', onEnd, { passive: true });
+    detach.current = () => {
+      el.removeEventListener('touchstart', onStart);
+      el.removeEventListener('touchmove', onMove);
+      el.removeEventListener('touchend', onEnd);
+      el.removeEventListener('touchcancel', onEnd);
+    };
+  }, []);
+}
 
 const shouldDismissSwipe = (offsetX: number, velocityX: number) => {
   if (offsetX < SWIPE_MIN_DISTANCE) return false;
@@ -782,6 +833,8 @@ function MobileSheet({
 
   const sheetControls = useAnimationControls();
   const subviewControls = useAnimationControls();
+  const sheetSwipeRef = useSwipeAxisLock(isMobile && view === 'main');
+  const subviewSwipeRef = useSwipeAxisLock(isMobile);
   useEffect(() => {
     if (isOpen) sheetControls.start({ x: 0, transition: sheetTransition });
   }, [isOpen, sheetControls]);
@@ -1245,6 +1298,7 @@ function MobileSheet({
           animate={sheetControls}
           exit={{ x: '100%' }}
           transition={sheetTransition}
+          ref={sheetSwipeRef}
           drag={isMobile && view === 'main' ? 'x' : false}
           {...swipeDragProps}
           onDragEnd={(_e, info) => {
@@ -1292,6 +1346,7 @@ function MobileSheet({
           animate={subviewControls}
           exit={{ x: '100%' }}
           transition={sheetTransition}
+          ref={subviewSwipeRef}
           drag={isMobile ? 'x' : false}
           {...swipeDragProps}
           onDragEnd={(_e, info) => {
@@ -1429,13 +1484,26 @@ function MainView({
   const needsAttention = connections.some((c) => c.status !== 'active');
   const premiumUntilDate = premiumUntil ? new Date(premiumUntil) : null;
   const premiumUntilLabel = premiumUntilDate
-    ? premiumUntilDate.toLocaleDateString(undefined, {
+    ? premiumUntilDate.toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
       })
     : null;
+  const premiumDaysLeft = premiumUntilDate
+    ? Math.max(0, Math.ceil((premiumUntilDate.getTime() - Date.now()) / 86_400_000))
+    : null;
   const isDesktop = layout === 'desktop';
+
+  useEffect(() => {
+    if (!plusInfoOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setPlusInfoOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [plusInfoOpen]);
+
   return (
     <div className="space-y-5">
       {/* User card */}
@@ -1607,62 +1675,84 @@ function MainView({
 
       {plusInfoOpen && createPortal(
         <div
-          className="fixed inset-0 z-[1360] flex items-center justify-center bg-black/60 backdrop-blur-sm px-5"
+          className="fixed inset-0 z-[1360] flex items-center justify-center bg-black/60 px-5 backdrop-blur-sm animate-in fade-in duration-200"
           onClick={() => setPlusInfoOpen(false)}
         >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="plus-info-title"
             onClick={(e) => e.stopPropagation()}
-            className="relative w-full max-w-sm overflow-hidden rounded-[28px] bg-card shadow-2xl ring-1 ring-border/60"
+            className="relative w-full max-w-sm overflow-hidden rounded-[28px] bg-card shadow-[0_24px_60px_-12px_rgba(0,0,0,0.45)] ring-1 ring-border/60 animate-in fade-in zoom-in-95 duration-300"
           >
             <div className="relative isolate px-6 pb-6 pt-7 text-center text-emerald-950">
               <span
                 aria-hidden
-                className="absolute inset-0 -z-10 bg-[linear-gradient(125deg,#fde68a_0%,#fbbf24_45%,#f59e0b_75%,#d97706_100%)]"
+                className="absolute inset-0 -z-10 bg-[linear-gradient(150deg,#fef3c7_0%,#fcd34d_42%,#f59e0b_74%,#d97706_100%)]"
               />
               <span
                 aria-hidden
-                className="absolute inset-x-0 top-0 -z-10 h-1/2 bg-gradient-to-b from-white/45 to-transparent"
+                className="absolute -top-20 left-1/2 -z-10 h-56 w-56 -translate-x-1/2 rounded-full bg-white/50 blur-2xl"
+              />
+              <span
+                aria-hidden
+                className="absolute inset-x-0 bottom-0 -z-10 h-px bg-emerald-950/10"
               />
               <button
                 type="button"
                 onClick={() => setPlusInfoOpen(false)}
                 aria-label="Close"
-                className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-emerald-900/15 text-emerald-900 transition-colors hover:bg-emerald-900/25"
+                className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-emerald-950/10 text-emerald-900/80 transition-colors hover:bg-emerald-950/20 hover:text-emerald-950"
               >
                 <X className="h-4 w-4" />
               </button>
               <div className="relative mx-auto h-24 w-44">
+                <span
+                  aria-hidden
+                  className="absolute left-1/2 top-1/2 h-[86px] w-[86px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)] ring-1 ring-inset ring-white/60"
+                />
                 <Icon
                   name="frogPlus"
-                  className="absolute left-1/2 top-1/2 h-20 w-20 -translate-x-1/2 -translate-y-1/2 drop-shadow-[0_3px_0_rgba(31,98,28,0.35)]"
+                  className="absolute left-1/2 top-1/2 h-[60px] w-[60px] -translate-x-1/2 -translate-y-1/2 drop-shadow-[0_3px_0_rgba(31,98,28,0.3)]"
                 />
                 <PremiumFrogAura show compact alwaysPlay />
               </div>
-              <p className="mt-2 flex items-center justify-center gap-2 text-xl font-black tracking-tight">
+              <h2
+                id="plus-info-title"
+                className="mt-3 flex items-center justify-center gap-2 text-[22px] font-black leading-none tracking-tight"
+              >
                 Frogress
-                <span className="inline-flex items-center rounded-md bg-gradient-to-b from-emerald-600 to-emerald-800 px-1.5 py-0.5 text-[12px] font-black leading-none text-amber-100 ring-1 ring-emerald-900/40">
+                <span className="inline-flex items-center rounded-md bg-gradient-to-b from-emerald-600 to-emerald-800 px-1.5 py-1 text-[12px] font-black leading-none text-amber-100 ring-1 ring-emerald-900/40">
                   Plus
                 </span>
-              </p>
-              <p className="mt-1 text-sm font-bold text-emerald-900/85">
-                Your subscription is active נ‰
+              </h2>
+              <p className="mt-2.5 inline-flex items-center gap-1.5 rounded-full bg-emerald-950/10 px-3 py-1 text-[12px] font-black uppercase tracking-wide text-emerald-900">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-700" />
+                Subscription active
               </p>
             </div>
 
-            <div className="px-6 py-5">
+            <div className="px-6 pb-6 pt-5">
               {premiumUntilLabel && (
-                <div className="rounded-2xl border border-border/50 bg-muted/40 px-4 py-3 text-center">
-                  <p className="text-[12px] font-black text-muted-foreground">
-                    Renews / Expires
+                <div className="rounded-2xl border border-border/50 bg-muted/40 px-4 py-3.5 text-center">
+                  <p className="text-[11px] font-black uppercase tracking-wide text-muted-foreground">
+                    Active until
                   </p>
-                  <p className="mt-0.5 text-lg font-black tracking-tight text-foreground">
+                  <p className="mt-1 text-lg font-black leading-none tracking-tight text-foreground">
                     {premiumUntilLabel}
                   </p>
+                  {premiumDaysLeft !== null && (
+                    <p className="mt-1.5 text-[12px] font-bold text-muted-foreground">
+                      {premiumDaysLeft === 0
+                        ? 'Last day'
+                        : `${premiumDaysLeft} ${premiumDaysLeft === 1 ? 'day' : 'days'} left`}
+                    </p>
+                  )}
                 </div>
               )}
-              <p className="mt-4 text-center text-xs font-semibold text-muted-foreground">
+              <p className="mt-4 text-center text-xs font-semibold leading-relaxed text-muted-foreground">
                 Thanks for supporting Frogress — you&apos;re helping us keep
-                building נ¸
+                building 🐸
               </p>
             </div>
           </div>

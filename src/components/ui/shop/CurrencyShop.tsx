@@ -46,6 +46,53 @@ const PACKS: Pack[] = PACK_META.map((meta) => ({
   amount: getFlyPack(meta.id)?.amount ?? 0,
 }));
 
+/**
+ * A pond, one hour later per tier: dawn mist over the cheapest pack, golden
+ * hour behind the biggest. Escalation lives in the artwork's own scene rather
+ * than in the card chrome, so the ladder reads at a glance without six
+ * competing borders — the only cards that get a coloured edge are the ones
+ * actually being merchandised.
+ *
+ * `sky` is the wash behind the art, `sun` the glow it sits against, `water`
+ * the band it stands on. The packs from the bucket up are objects resting on
+ * something, so they also get a contact shadow; the loose flies do not, since
+ * a fly in flight touching the ground is exactly the wrong read.
+ */
+const TIER_SCENE = [
+  {
+    sky: 'from-slate-100 to-emerald-50 dark:from-slate-800 dark:to-slate-900',
+    sun: 'bg-emerald-200/40 dark:bg-emerald-400/10',
+    water: 'from-slate-300/40 dark:from-slate-950/50',
+  },
+  {
+    sky: 'from-emerald-100 to-lime-50 dark:from-emerald-900/60 dark:to-slate-900',
+    sun: 'bg-lime-300/40 dark:bg-emerald-400/15',
+    water: 'from-emerald-300/40 dark:from-emerald-950/60',
+  },
+  {
+    sky: 'from-teal-100 to-emerald-50 dark:from-teal-900/60 dark:to-slate-900',
+    sun: 'bg-teal-300/40 dark:bg-teal-400/15',
+    water: 'from-teal-300/40 dark:from-teal-950/60',
+  },
+  {
+    sky: 'from-sky-100 to-cyan-50 dark:from-sky-900/60 dark:to-slate-900',
+    sun: 'bg-sky-300/45 dark:bg-sky-400/15',
+    water: 'from-sky-300/45 dark:from-sky-950/60',
+  },
+  {
+    sky: 'from-orange-100 to-amber-50 dark:from-orange-900/50 dark:to-slate-900',
+    sun: 'bg-orange-300/45 dark:bg-orange-400/15',
+    water: 'from-orange-300/45 dark:from-orange-950/60',
+  },
+  {
+    sky: 'from-amber-200 to-yellow-50 dark:from-amber-900/60 dark:to-slate-900',
+    sun: 'bg-amber-300/60 dark:bg-amber-400/20',
+    water: 'from-amber-400/45 dark:from-amber-950/60',
+  },
+];
+
+/** From the bucket up the artwork is an object standing in the scene. */
+const FIRST_GROUNDED_BUNDLE = 4;
 
 type AdFlyStatus = {
   reward: number;
@@ -126,6 +173,44 @@ export function CurrencyShop() {
 
   if (!mounted) return null;
 
+  const handlePurchased = async (report: (info: string) => void) => {
+    boughtRef.current = true;
+    markCampaignConverted();
+    emitCampaignTrigger('purchase_completed');
+    const before = inventoryData?.wardrobe?.flies ?? 0;
+    const deadline = Date.now() + 60000;
+    let attempt = 0;
+    while (Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+      attempt += 1;
+      let seen: string | number = 'err';
+      try {
+        const res = await fetch(
+          `/api/skins/inventory?view=summary&t=${Date.now()}`,
+          { cache: 'no-store' },
+        );
+        const payload = await res.json();
+        const flies = payload?.wardrobe?.flies;
+        seen = typeof flies === 'number' ? flies : 'undef';
+        if (typeof flies === 'number' && flies > before) {
+          patchInventoryFlies(flies);
+          void revalidateAll(() => true);
+          return true;
+        }
+      } catch (error) {
+        seen = error instanceof Error ? error.message : 'throw';
+      }
+      report(`#${attempt} base ${before} got ${seen}`);
+    }
+    return false;
+  };
+
+  const shared = {
+    showArt: artReady,
+    coversId,
+    onPurchased: handlePurchased,
+  };
+
   return (
     <BaseSheet
       open={open}
@@ -173,51 +258,28 @@ export function CurrencyShop() {
 
             <FreeFliesCard open={open} />
 
-            <div className="mt-4 flex flex-col gap-2">
-              {packs.map((pack, index) => (
-                <PackRow
+            <p className="mb-2 mt-5 px-1 text-[12px] font-black text-muted-foreground">
+              Fly packs
+            </p>
+
+            {/* Four small tiers side by side stay comparable at a glance, then
+                the ladder opens up: the top two packs get the width and the
+                stage their artwork was drawn for. */}
+            <div className="grid grid-cols-2 gap-2.5">
+              {packs.slice(0, 4).map((pack, index) => (
+                <PackCard
                   key={pack.id}
-                  bundle={index + 1}
                   pack={pack}
-                  covers={pack.id === coversId}
-                  showArt={artReady}
-                  onPurchased={async (report) => {
-                    boughtRef.current = true;
-                    markCampaignConverted();
-                    emitCampaignTrigger('purchase_completed');
-                    const before = inventoryData?.wardrobe?.flies ?? 0;
-                    console.log('[flypoll] start, before =', before);
-                    const deadline = Date.now() + 60000;
-                    let attempt = 0;
-                    while (Date.now() < deadline) {
-                      await new Promise((resolve) => setTimeout(resolve, 1200));
-                      attempt += 1;
-                      let seen: string | number = 'err';
-                      try {
-                        const res = await fetch(
-                          `/api/skins/inventory?view=summary&t=${Date.now()}`,
-                          { cache: 'no-store' },
-                        );
-                        const payload = await res.json();
-                        const flies = payload?.wardrobe?.flies;
-                        seen = typeof flies === 'number' ? flies : 'undef';
-                        if (typeof flies === 'number' && flies > before) {
-                          console.log('[flypoll] landed at attempt', attempt, flies);
-                          patchInventoryFlies(flies);
-                          void revalidateAll(() => true);
-                          return true;
-                        }
-                      } catch (error) {
-                        seen = error instanceof Error ? error.message : 'throw';
-                        console.log('[flypoll] threw', error);
-                      }
-                      console.log('[flypoll] attempt', attempt, 'before', before, 'got', seen);
-                      report(`#${attempt} base ${before} got ${seen}`);
-                    }
-                    return false;
-                  }}
+                  bundle={index + 1}
+                  variant="grid"
+                  {...shared}
                 />
               ))}
+            </div>
+
+            <div className="mt-2.5 flex flex-col gap-2.5">
+              <PackCard pack={packs[4]} bundle={5} variant="wide" {...shared} />
+              <PackCard pack={packs[5]} bundle={6} variant="hero" {...shared} />
             </div>
 
             <p className="mx-auto mt-6 max-w-[17rem] text-center text-[11px] font-medium leading-relaxed text-muted-foreground/70">
@@ -231,23 +293,98 @@ export function CurrencyShop() {
   );
 }
 
-function PackRow({
+function PackStage({
+  bundle,
+  showArt,
+  fallback,
+  rays = false,
+  className,
+}: {
+  bundle: number;
+  showArt: boolean;
+  fallback: React.ReactNode;
+  rays?: boolean;
+  className?: string;
+}) {
+  const scene = TIER_SCENE[bundle - 1] ?? TIER_SCENE[0];
+  const grounded = bundle >= FIRST_GROUNDED_BUNDLE;
+  return (
+    <span
+      className={cn(
+        'relative flex items-center justify-center overflow-hidden rounded-[18px] bg-gradient-to-b ring-1 ring-inset ring-black/[0.07] dark:ring-white/[0.06]',
+        scene.sky,
+        className,
+      )}
+    >
+      <span
+        aria-hidden
+        className={cn(
+          'pointer-events-none absolute -top-1/4 left-1/2 h-[110%] w-[130%] -translate-x-1/2 rounded-full blur-2xl',
+          scene.sun,
+        )}
+      />
+      {rays && (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute left-1/2 top-1/2 h-[260%] w-[160%] -translate-x-1/2 -translate-y-1/2 animate-[spin_60s_linear_infinite] text-amber-500/20 will-change-transform dark:text-amber-300/15"
+          style={{
+            background:
+              'repeating-conic-gradient(from 0deg, transparent 0deg 13deg, currentColor 13deg 26deg)',
+            maskImage:
+              'radial-gradient(circle at center, black 10%, transparent 68%)',
+            WebkitMaskImage:
+              'radial-gradient(circle at center, black 10%, transparent 68%)',
+          }}
+        />
+      )}
+      <span
+        aria-hidden
+        className={cn(
+          'pointer-events-none absolute inset-x-0 bottom-0 h-[30%] bg-gradient-to-t to-transparent',
+          scene.water,
+        )}
+      />
+      {grounded && (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute bottom-[13%] left-1/2 h-2 w-[42%] -translate-x-1/2 rounded-[50%] bg-black/20 blur-[5px] dark:bg-black/50"
+        />
+      )}
+      <span
+        className={cn(
+          'relative h-full w-full transition-opacity duration-300',
+          showArt ? 'opacity-100' : 'opacity-0',
+        )}
+      >
+        {showArt && (
+          <BundleArt bundle={bundle} className="h-full w-full" fallback={fallback} />
+        )}
+      </span>
+    </span>
+  );
+}
+
+function PackCard({
   pack,
   bundle,
-  covers,
+  variant,
+  coversId,
   showArt,
   onPurchased,
 }: {
   pack: Pack;
   bundle: number;
-  covers: boolean;
+  variant: 'grid' | 'wide' | 'hero';
+  coversId: string | null;
   showArt: boolean;
   onPurchased: (report: (info: string) => void) => Promise<boolean>;
 }) {
+  const covers = pack.id === coversId;
   const popular = !covers && pack.badge === 'popular';
-  const best = pack.badge === 'best';
+  const best = !covers && pack.badge === 'best';
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+
   const buy = async () => {
     if (busy) return;
     setBusy(true);
@@ -267,8 +404,9 @@ function PackRow({
       setBusy(false);
     }
   };
+
   const flyCluster = (
-    <div className="flex h-full items-center justify-center">
+    <span className="flex h-full items-center justify-center">
       {pack.flies.map((size, i) => (
         <span
           key={i}
@@ -278,76 +416,156 @@ function PackRow({
           <Fly size={size} y={-2} alwaysPlay />
         </span>
       ))}
-    </div>
+    </span>
   );
+
+  const badge = (covers || popular || best) && (
+    <span
+      className={cn(
+        'absolute z-10 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-black shadow-sm',
+        variant === 'hero' ? 'left-4 top-4 px-2.5 py-1 text-[11px]' : 'left-3.5 top-3.5',
+        best
+          ? 'bg-gradient-to-r from-amber-400 to-amber-500 text-amber-950'
+          : 'bg-primary text-primary-foreground',
+      )}
+    >
+      {covers ? '✓ Covers it' : popular ? '★ Popular' : '👑 Best value'}
+    </span>
+  );
+
+  const amount = (
+    <span className="flex items-baseline gap-1.5">
+      <span
+        className={cn(
+          'font-black leading-none tabular-nums text-foreground',
+          variant === 'hero'
+            ? 'text-[32px]'
+            : variant === 'wide'
+              ? 'text-2xl'
+              : 'text-xl',
+        )}
+      >
+        {pack.amount.toLocaleString()}
+      </span>
+      <span className="text-[11px] font-black text-muted-foreground">Flies</span>
+    </span>
+  );
+
+  const bonus = pack.bonus && (
+    <span
+      className={cn(
+        'inline-flex rounded-full px-2 py-0.5 text-[10px] font-black leading-none',
+        best
+          ? 'bg-amber-500/20 text-amber-700 dark:text-amber-400'
+          : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400',
+      )}
+    >
+      {pack.bonus} bonus
+    </span>
+  );
+
+  const priceButton = (
+    <span
+      className={cn(
+        'flex shrink-0 items-center justify-center rounded-2xl font-black tracking-wide text-white transition-all group-hover:-translate-y-0.5 group-active:translate-y-1 group-active:shadow-none',
+        best
+          ? 'bg-[#d99215] shadow-[0_4px_0_0_#96610a] group-hover:shadow-[0_5px_0_0_#96610a]'
+          : 'bg-[#4f9149] shadow-[0_4px_0_0_#34631f] group-hover:shadow-[0_5px_0_0_#34631f]',
+        variant === 'grid' ? 'h-10 w-full text-sm' : 'h-12 min-w-[104px] px-4 text-base',
+      )}
+    >
+      {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : pack.price}
+    </span>
+  );
+
+  // The artwork is drawn sticker-style — thick outlines, flat fills — so the
+  // cards carry a real edge rather than a hairline, and the merchandised ones
+  // add a glow instead of a heavier border.
+  const shell = cn(
+    'group relative w-full rounded-[22px] p-2.5 text-left transition-all hover:-translate-y-0.5 active:scale-[0.99] disabled:opacity-70',
+    covers || popular
+      ? 'bg-primary/[0.06] ring-2 ring-primary shadow-lg shadow-primary/15'
+      : best
+        ? 'bg-amber-400/[0.08] ring-2 ring-amber-400 shadow-lg shadow-amber-500/20'
+        : 'bg-card ring-2 ring-border/60 hover:ring-border',
+  );
+
+  const statusLine = status && (
+    <span className="block text-[10px] font-bold leading-none text-muted-foreground">
+      {status}
+    </span>
+  );
+
+  if (variant === 'hero') {
+    return (
+      <button type="button" onClick={buy} disabled={busy} className={cn(shell, 'p-3')}>
+        {badge}
+        <PackStage
+          bundle={bundle}
+          showArt={showArt}
+          fallback={flyCluster}
+          rays
+          className="h-36 w-full sm:h-40"
+        />
+        <span className="mt-3 flex items-center justify-between gap-3 px-1">
+          <span className="flex min-w-0 flex-col items-start gap-1.5">
+            {amount}
+            {bonus}
+            {statusLine}
+          </span>
+          {priceButton}
+        </span>
+      </button>
+    );
+  }
+
+  if (variant === 'wide') {
+    return (
+      <button
+        type="button"
+        onClick={buy}
+        disabled={busy}
+        className={cn(shell, 'flex items-center gap-3')}
+      >
+        {badge}
+        <PackStage
+          bundle={bundle}
+          showArt={showArt}
+          fallback={flyCluster}
+          className="h-24 w-32 shrink-0"
+        />
+        <span className="flex min-w-0 flex-1 flex-col items-start gap-1.5">
+          {amount}
+          {bonus}
+          {statusLine}
+        </span>
+        {priceButton}
+      </button>
+    );
+  }
+
   return (
     <button
       type="button"
       onClick={buy}
       disabled={busy}
-      className={cn(
-        'group relative flex w-full items-center gap-3 rounded-[20px] p-2.5 pr-3 text-left transition-all hover:-translate-y-0.5 active:scale-[0.99]',
-        covers || popular
-          ? 'bg-gradient-to-r from-primary/10 to-card ring-2 ring-primary'
-          : best
-            ? 'bg-gradient-to-r from-amber-400/20 to-card ring-2 ring-amber-400'
-            : 'bg-card ring-1 ring-border/70 hover:ring-border',
-      )}
+      className={cn(shell, 'flex flex-col gap-2')}
     >
-      <span
-        className={cn(
-          'flex shrink-0 items-center justify-center transition-opacity duration-300',
-          best ? 'h-20 w-20' : 'h-16 w-16',
-          showArt ? 'opacity-100' : 'opacity-0',
-        )}
-      >
-        {showArt && (
-          <BundleArt
-            bundle={bundle}
-            className="h-full w-full"
-            fallback={flyCluster}
-          />
-        )}
+      {badge}
+      <PackStage
+        bundle={bundle}
+        showArt={showArt}
+        fallback={flyCluster}
+        className="h-24 w-full"
+      />
+      {/* The cheapest pack carries no bonus chip, so the buttons only line up
+          across a row if the price is pinned to the bottom of the card. */}
+      <span className="flex w-full flex-col items-start gap-1.5 px-0.5">
+        {amount}
+        {bonus}
+        {statusLine}
       </span>
-
-      <span className="flex min-w-0 flex-1 flex-col items-start">
-        {(covers || pack.badge) && (
-          <span
-            className={cn(
-              'mb-1 inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-black',
-              covers || popular
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-gradient-to-r from-amber-400 to-amber-500 text-amber-950',
-            )}
-          >
-            {covers ? '✓ Covers it' : popular ? '★ Popular' : '👑 Best value'}
-          </span>
-        )}
-        <span className="flex items-baseline gap-1.5">
-          <span className="text-2xl font-black leading-none tabular-nums text-foreground">
-            {pack.amount.toLocaleString()}
-          </span>
-          <span className="text-[12px] font-black text-muted-foreground">
-            Flies
-          </span>
-        </span>
-        <span className="mt-1.5 flex flex-wrap items-center gap-1.5">
-          {pack.bonus && (
-            <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-black leading-none text-emerald-600 dark:text-emerald-400">
-              {pack.bonus} bonus
-            </span>
-          )}
-          {status && (
-            <span className="text-[10px] font-bold leading-none text-muted-foreground">
-              {status}
-            </span>
-          )}
-        </span>
-      </span>
-
-      <span className="flex h-11 min-w-[86px] shrink-0 items-center justify-center rounded-2xl bg-[#4f9149] px-3 text-sm font-black tracking-wide text-white shadow-[0_4px_0_0_#34631f] transition-all group-hover:-translate-y-0.5 group-hover:shadow-[0_5px_0_0_#34631f] group-active:translate-y-1 group-active:shadow-none">
-        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : pack.price}
-      </span>
+      <span className="mt-auto w-full">{priceButton}</span>
     </button>
   );
 }

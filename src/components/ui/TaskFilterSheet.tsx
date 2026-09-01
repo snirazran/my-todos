@@ -376,7 +376,7 @@ export function TaskFilterSheet({
                     }}
                     maxLength={24}
                     placeholder="Name"
-                    className="w-24 bg-transparent py-1 text-[12px] font-black text-foreground focus:outline-none"
+                    className="w-24 bg-transparent py-1 text-[16px] font-black leading-5 text-foreground focus:outline-none"
                   />
                   <button
                     onClick={commitPreset}
