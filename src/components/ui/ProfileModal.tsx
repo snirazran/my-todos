@@ -91,7 +91,7 @@ export function ProfilePanel({
           onClick={() => setConfirmingDelete(true)}
           className="h-12 w-full rounded-2xl border border-border/50 bg-card text-sm font-black tracking-tight text-rose-500 transition-colors hover:bg-rose-500/10 active:scale-[0.99] dark:text-rose-400"
         >
-          Delete Data
+          Delete Account
         </button>
       </div>
 
@@ -390,7 +390,7 @@ export function DeleteDataDialog({
               disabled={deleting}
               className="h-12 w-full rounded-2xl bg-rose-500 text-base font-black tracking-tight text-white shadow-[0_4px_0_0_#9b1c1c] ring-1 ring-rose-700/40 transition-all hover:-translate-y-0.5 hover:shadow-[0_5px_0_0_#9b1c1c] active:translate-y-1 active:shadow-none disabled:opacity-60 disabled:pointer-events-none"
             >
-              {deleting ? 'Deleting…' : 'Delete My Data'}
+              {deleting ? 'Deleting…' : 'Delete Account'}
             </button>
             <button
               type="button"

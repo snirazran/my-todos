@@ -18,6 +18,10 @@ import {
   signInWithApple,
   signInWithExistingApple,
 } from '@/lib/appleAuth';
+import {
+  getPasswordAuthErrorMessage,
+  signInWithPassword,
+} from '@/lib/passwordAuth';
 import { AccountConflictDialog } from '@/components/auth/AccountConflictDialog';
 import { GoogleIcon } from '@/components/ui/GoogleIcon';
 import { AppleIcon } from '@/components/ui/AppleIcon';
@@ -81,6 +85,8 @@ function LoginPageInner() {
   const [dir, setDir] = useState(1);
 
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [usePassword, setUsePassword] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [resendIn, setResendIn] = useState(0);
@@ -273,6 +279,25 @@ function LoginPageInner() {
           durationMs: 5000,
         });
       }
+      setLoading(false);
+    }
+  };
+
+  const handlePasswordSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = email.trim();
+    if (!trimmed || !password || loading) return;
+    setLoading(true);
+    googleFlowRef.current = true;
+    try {
+      await signInWithPassword(trimmed, password);
+      const route = await prepareSignedInRoute(postLoginRoute);
+      await catchFlyThenNavigate(route);
+    } catch (err) {
+      googleFlowRef.current = false;
+      showNotification(getPasswordAuthErrorMessage(err), undefined, {
+        durationMs: 5000,
+      });
       setLoading(false);
     }
   };
@@ -543,7 +568,10 @@ function LoginPageInner() {
                   </div>
                 </div>
 
-                <form onSubmit={handleSendEmailLink} className="space-y-3">
+                <form
+                  onSubmit={usePassword ? handlePasswordSignIn : handleSendEmailLink}
+                  className="space-y-3"
+                >
                   <Input
                     ref={emailRef}
                     id="email"
@@ -555,18 +583,43 @@ function LoginPageInner() {
                     className="h-12 rounded-2xl border-border/60 bg-card/60 px-4 text-base focus-visible:ring-primary/30"
                     required
                   />
+                  {usePassword && (
+                    <Input
+                      id="password"
+                      type="password"
+                      aria-label="Password"
+                      placeholder="Password"
+                      autoComplete="current-password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="h-12 rounded-2xl border-border/60 bg-card/60 px-4 text-base focus-visible:ring-primary/30"
+                      required
+                    />
+                  )}
                   <button
                     type="submit"
-                    disabled={!email.trim() || loading}
+                    disabled={
+                      !email.trim() || (usePassword && !password) || loading
+                    }
                     className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary text-sm font-black text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {loading ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
                       <>
-                        Continue with email <ArrowRight className="h-4 w-4" />
+                        {usePassword ? 'Sign in' : 'Continue with email'}{' '}
+                        <ArrowRight className="h-4 w-4" />
                       </>
                     )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setUsePassword((value) => !value)}
+                    className="mx-auto block text-xs font-bold tracking-wide text-primary hover:underline"
+                  >
+                    {usePassword
+                      ? 'Email me a sign-in link instead'
+                      : 'Use a password instead'}
                   </button>
                 </form>
               </motion.div>
