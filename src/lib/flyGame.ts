@@ -1,3 +1,5 @@
+import { containsProfanity } from '@/lib/profanity';
+
 export const FLY_GAME_DURATION_MS = 30_000;
 export const FLY_GAME_MAX_REWARD = 150;
 export const FLY_GAME_STORAGE_KEY = 'frogress.fly-game.v1';
@@ -52,7 +54,8 @@ export function calculateFlyGameScore(stats: Omit<FlyGameStats, 'score' | 'durat
 export function sanitizeFlyGameName(value: unknown) {
   if (typeof value !== 'string') return 'Tiny Frog';
   const clean = value.replace(/[<>\n\r\t]/g, '').replace(/\s+/g, ' ').trim().slice(0, 22);
-  return clean || 'Tiny Frog';
+  if (!clean || containsProfanity(clean)) return 'Tiny Frog';
+  return clean;
 }
 
 export function flyGameReward(score: number) {

@@ -85,6 +85,19 @@ export function takePlusOfferAfterAd(): boolean {
 let consentBlocked = false;
 let privacyOptionsRequired = false;
 
+const consentListeners = new Set<() => void>();
+
+export function subscribeAdConsent(listener: () => void) {
+  consentListeners.add(listener);
+  return () => {
+    consentListeners.delete(listener);
+  };
+}
+
+function notifyAdConsentChanged() {
+  consentListeners.forEach((listener) => listener());
+}
+
 export function rewardedAdsAvailable() {
   return Capacitor.isNativePlatform() && !consentBlocked;
 }
@@ -134,6 +147,7 @@ async function runConsentFlow(AdMob: AdMobPlugin) {
     privacyOptionsRequired =
       String(info.privacyOptionsRequirementStatus) === 'REQUIRED';
     consentBlocked = info.canRequestAds === false;
+    notifyAdConsentChanged();
 
     trackAnalyticsEvent('ad_consent_resolved', {
       status: info.status,
@@ -155,6 +169,7 @@ export async function openPrivacyOptions(): Promise<boolean> {
     const info = await AdMob.requestConsentInfo();
     consentBlocked = info.canRequestAds === false;
     if (consentBlocked) resetPreload();
+    notifyAdConsentChanged();
     return true;
   } catch (err) {
     console.error('Privacy options form failed', err);

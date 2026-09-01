@@ -34,6 +34,7 @@ import {
   type FlyGameKind,
   type FlyGameStats,
 } from '@/lib/flyGame';
+import { containsProfanity } from '@/lib/profanity';
 import { cn } from '@/lib/utils';
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
 import { shareLink } from '@/lib/share';
@@ -174,6 +175,7 @@ export default function FlyCatchGame({
   const [result, setResult] = useState<FlyGameStats | null>(null);
   const [best, setBest] = useState(0);
   const [nickname, setNickname] = useState('Tiny Frog');
+  const nicknameBlocked = !user && containsProfanity(nickname);
   const [flies, setFlies] = useState<FlyState[]>(() =>
     Array.from({ length: MAX_FLIES }, (_, id) => ({ id, kind: 'normal' as const })),
   );
@@ -851,10 +853,11 @@ export default function FlyCatchGame({
             {!user ? (
               <label className="mx-auto mt-4 block max-w-xs text-left">
                 <span className="mb-1 block text-[12px] font-black text-muted-foreground">Leaderboard name</span>
-                <input value={nickname} onChange={(event) => setNickname(event.target.value.slice(0, 22))} maxLength={22} className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm font-bold text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15" />
+                <input value={nickname} onChange={(event) => setNickname(event.target.value.slice(0, 22))} maxLength={22} aria-invalid={nicknameBlocked} className={cn('h-11 w-full rounded-xl border bg-background px-3 text-sm font-bold text-foreground outline-none transition', nicknameBlocked ? 'border-destructive focus:border-destructive focus:ring-2 focus:ring-destructive/15' : 'border-input focus:border-primary focus:ring-2 focus:ring-primary/15')} />
+                {nicknameBlocked ? <span className="mt-1 block text-[11px] font-bold text-destructive">Pick a name the whole pond can see.</span> : null}
               </label>
             ) : null}
-            <button type="button" onClick={() => void startGame()} className="mt-4 flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-primary text-base font-black text-primary-foreground shadow-lg shadow-primary/20 transition hover:brightness-105 active:scale-[.98]" data-game-control>
+            <button type="button" onClick={() => void startGame()} disabled={nicknameBlocked} className="mt-4 flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-primary text-base font-black text-primary-foreground shadow-lg shadow-primary/20 transition hover:brightness-105 active:scale-[.98] disabled:pointer-events-none disabled:opacity-50" data-game-control>
               <Play className="h-5 w-5 fill-current" /> START CATCHING
             </button>
             <p className="mt-2 text-[11px] font-bold text-muted-foreground">Every miss costs 1 — and the red ones bite back.</p>

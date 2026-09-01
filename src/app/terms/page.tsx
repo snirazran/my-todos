@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { LegalPage, type LegalSection } from '@/components/legal/LegalPage';
 
-const lastUpdated = 'August 2, 2026';
+const lastUpdated = 'September 1, 2026';
 
 const sections: LegalSection[] = [
   {
@@ -22,7 +22,8 @@ const sections: LegalSection[] = [
     title: '3. Accounts and eligibility',
     body: [
       'You are responsible for the accuracy of the information you provide and for keeping your account secure. Notify us promptly if you believe your account has been accessed without permission.',
-      'Frogress is not intended for children under 13. If you are under the age of majority where you live, you may use Frogress only with permission from a parent or guardian.',
+      'You must be at least 13 years old to create an account or use Frogress. If you are under the age of majority where you live, you may use Frogress only with permission from a parent or guardian.',
+      'We may suspend or close an account if we learn that the account holder is under 13.',
     ],
   },
   {
@@ -31,6 +32,7 @@ const sections: LegalSection[] = [
       'You keep ownership of the tasks, notes, checklists, tags, names, profile details, calendar-derived tasks, and other content you add to Frogress.',
       'You grant Frogress a limited permission to host, store, process, display, and transmit your content only as needed to provide, maintain, protect, and improve the service, and to transmit it to any third-party application you choose to connect.',
       'Do not upload or share content that is unlawful, harmful, infringing, abusive, or that violates someone else\'s privacy or rights.',
+      'Some things you choose are visible to other people, including your display name, your frog\'s outfit, and the name you enter for the Fly Snack leaderboard. Do not use a name that is offensive, or that impersonates another person or organization. We screen these names automatically and may change or remove any name that breaks these Terms. You can report a name or another user to help@frogress.com.',
     ],
   },
   {

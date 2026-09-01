@@ -37,7 +37,7 @@ import useSWR, { mutate as swrMutate } from 'swr';
 import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
 import { motion, AnimatePresence, useAnimationControls } from 'framer-motion';
 import { ChevronRight, CalendarDays, ShieldCheck } from 'lucide-react';
-import { openPrivacyOptions, privacyOptionsAvailable } from '@/lib/ads';
+import { openPrivacyOptions, privacyOptionsAvailable, subscribeAdConsent } from '@/lib/ads';
 import Fly from '@/components/ui/fly';
 import { FlyCounter } from '@/components/ui/FlyCounter';
 import {
@@ -1945,8 +1945,13 @@ function PreferencesView({
 }
 
 function AdPrivacySection() {
-  const [available] = useState(() => privacyOptionsAvailable());
+  const [available, setAvailable] = useState(() => privacyOptionsAvailable());
   const [busy, setBusy] = useState(false);
+
+  useEffect(
+    () => subscribeAdConsent(() => setAvailable(privacyOptionsAvailable())),
+    [],
+  );
 
   if (!available) return null;
 
