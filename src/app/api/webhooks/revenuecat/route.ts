@@ -92,7 +92,6 @@ async function grantFlyPackPurchase(userId: string, event: any) {
 const WEB_STORES = new Set(['RC_BILLING', 'STRIPE', 'PADDLE']);
 
 async function reportAdConversion(userId: string, event: any, flyPackId?: string) {
-  if (event?.environment === 'SANDBOX' && process.env.NODE_ENV === 'production') return;
   if (typeof event?.id !== 'string') return;
 
   const isTrial =
@@ -103,8 +102,9 @@ async function reportAdConversion(userId: string, event: any, flyPackId?: string
     event?.type === 'NON_RENEWING_PURCHASE';
   if (!isMoney) return;
 
+  const isSandbox = event?.environment === 'SANDBOX';
   const price = Number(event?.price);
-  if (!isTrial && !(Number.isFinite(price) && price > 0)) return;
+  if (!isSandbox && !isTrial && !(Number.isFinite(price) && price > 0)) return;
 
   await connectMongo();
   const user = await UserModel.findById(userId).select('email adIdentity').lean();
@@ -114,7 +114,7 @@ async function reportAdConversion(userId: string, event: any, flyPackId?: string
 
   await sendAdConversion({
     metaEvent: isWebStore ? (isTrial ? 'StartTrial' : 'Purchase') : undefined,
-    tiktokEvent: isTrial ? 'Subscribe' : 'CompletePayment',
+    tiktokEvent: isTrial ? 'Subscribe' : 'Purchase',
     eventId: `${event.id}:${isTrial ? 'trial' : 'purchase'}`,
     eventTime: Number.isFinite(Number(event?.event_timestamp_ms))
       ? new Date(Number(event.event_timestamp_ms))
@@ -123,6 +123,7 @@ async function reportAdConversion(userId: string, event: any, flyPackId?: string
     email: user.email,
     identity: user.adIdentity,
     actionSource: isWebStore ? 'website' : 'other',
+    test: isSandbox,
     value: isTrial ? undefined : price,
     currency: typeof event?.currency === 'string' ? event.currency : 'USD',
     contentId: flyPackId ?? (typeof event?.product_id === 'string' ? event.product_id : undefined),

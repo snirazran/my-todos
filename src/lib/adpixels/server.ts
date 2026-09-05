@@ -9,8 +9,13 @@ const TIKTOK_PIXEL_ID = process.env.NEXT_PUBLIC_TIKTOK_PIXEL_ID ?? '';
 const TIKTOK_EVENTS_TOKEN = process.env.TIKTOK_EVENTS_TOKEN ?? '';
 
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
-const META_TEST_CODE = IS_PRODUCTION ? '' : process.env.META_TEST_EVENT_CODE ?? '';
-const TIKTOK_TEST_CODE = IS_PRODUCTION ? '' : process.env.TIKTOK_TEST_EVENT_CODE ?? '';
+const META_TEST_CODE = process.env.META_TEST_EVENT_CODE ?? '';
+const TIKTOK_TEST_CODE = process.env.TIKTOK_TEST_EVENT_CODE ?? '';
+
+function testCodeFor(configured: string, test?: boolean): string {
+  if (test) return configured;
+  return IS_PRODUCTION ? '' : configured;
+}
 
 function hash(value?: string | null): string | undefined {
   if (!value) return undefined;
@@ -34,6 +39,7 @@ export type AdConversion = {
   email?: string;
   identity?: AdIdentity;
   actionSource: 'website' | 'other';
+  test?: boolean;
   value?: number;
   currency?: string;
   contentId?: string;
@@ -42,6 +48,8 @@ export type AdConversion = {
 async function sendMeta(input: AdConversion) {
   if (!input.metaEvent) return;
   if (!META_PIXEL_ID || !META_CAPI_TOKEN) return;
+  const testCode = testCodeFor(META_TEST_CODE, input.test);
+  if (input.test && !testCode) return;
   const { identity } = input;
   const emailHash = hash(input.email);
   if (!identity?.fbp && !identity?.fbc && !emailHash) return;
@@ -69,7 +77,7 @@ async function sendMeta(input: AdConversion) {
         }),
       }),
     ],
-    ...(META_TEST_CODE ? { test_event_code: META_TEST_CODE } : {}),
+    ...(testCode ? { test_event_code: testCode } : {}),
   };
 
   const res = await fetch(
@@ -89,6 +97,8 @@ async function sendMeta(input: AdConversion) {
 async function sendTikTok(input: AdConversion) {
   if (!input.tiktokEvent) return;
   if (!TIKTOK_PIXEL_ID || !TIKTOK_EVENTS_TOKEN) return;
+  const testCode = testCodeFor(TIKTOK_TEST_CODE, input.test);
+  if (input.test && !testCode) return;
   const { identity } = input;
   const emailHash = hash(input.email);
   if (!identity?.ttp && !identity?.ttclid && !emailHash) return;
@@ -96,7 +106,7 @@ async function sendTikTok(input: AdConversion) {
   const payload = {
     event_source: 'web',
     event_source_id: TIKTOK_PIXEL_ID,
-    ...(TIKTOK_TEST_CODE ? { test_event_code: TIKTOK_TEST_CODE } : {}),
+    ...(testCode ? { test_event_code: testCode } : {}),
     data: [
       prune({
         event: input.tiktokEvent,
