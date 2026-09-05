@@ -30,8 +30,26 @@ async function getNativePurchases(uid: string) {
     }
     await Purchases.configure({ apiKey, appUserID: uid });
     nativeConfiguredFor = uid;
+    try {
+      await Purchases.collectDeviceIdentifiers();
+      const email = auth?.currentUser?.email;
+      if (email) await Purchases.setEmail({ email });
+    } catch (err) {
+      console.error('RevenueCat attribution setup failed', err);
+    }
   }
   return { Purchases };
+}
+
+export async function refreshNativeAttribution() {
+  if (!Capacitor.isNativePlatform()) return;
+  if (!nativeConfiguredFor) return;
+  try {
+    const { Purchases } = await import('@revenuecat/purchases-capacitor');
+    await Purchases.collectDeviceIdentifiers();
+  } catch (err) {
+    console.error('RevenueCat attribution refresh failed', err);
+  }
 }
 
 async function getWebPurchases(uid: string) {

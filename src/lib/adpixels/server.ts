@@ -26,8 +26,8 @@ function prune<T extends Record<string, unknown>>(input: T): T {
 }
 
 export type AdConversion = {
-  metaEvent: string;
-  tiktokEvent: string;
+  metaEvent?: string;
+  tiktokEvent?: string;
   eventId: string;
   eventTime: Date;
   userId: string;
@@ -40,6 +40,7 @@ export type AdConversion = {
 };
 
 async function sendMeta(input: AdConversion) {
+  if (!input.metaEvent) return;
   if (!META_PIXEL_ID || !META_CAPI_TOKEN) return;
   const { identity } = input;
   const emailHash = hash(input.email);
@@ -86,6 +87,7 @@ async function sendMeta(input: AdConversion) {
 }
 
 async function sendTikTok(input: AdConversion) {
+  if (!input.tiktokEvent) return;
   if (!TIKTOK_PIXEL_ID || !TIKTOK_EVENTS_TOKEN) return;
   const { identity } = input;
   const emailHash = hash(input.email);

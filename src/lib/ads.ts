@@ -191,6 +191,8 @@ async function ensureInitialized(): Promise<AdMobPlugin> {
           if (info.status === 'notDetermined') {
             await AdMob.requestTrackingAuthorization();
           }
+          const { refreshNativeAttribution } = await import('@/lib/purchases');
+          void refreshNativeAttribution();
         } catch {
           /* tracking prompt is best-effort */
         }

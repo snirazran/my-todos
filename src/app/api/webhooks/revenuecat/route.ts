@@ -110,8 +110,10 @@ async function reportAdConversion(userId: string, event: any, flyPackId?: string
   const user = await UserModel.findById(userId).select('email adIdentity').lean();
   if (!user) return;
 
+  const isWebStore = WEB_STORES.has(String(event?.store));
+
   await sendAdConversion({
-    metaEvent: isTrial ? 'StartTrial' : 'Purchase',
+    metaEvent: isWebStore ? (isTrial ? 'StartTrial' : 'Purchase') : undefined,
     tiktokEvent: isTrial ? 'Subscribe' : 'CompletePayment',
     eventId: `${event.id}:${isTrial ? 'trial' : 'purchase'}`,
     eventTime: Number.isFinite(Number(event?.event_timestamp_ms))
@@ -120,7 +122,7 @@ async function reportAdConversion(userId: string, event: any, flyPackId?: string
     userId,
     email: user.email,
     identity: user.adIdentity,
-    actionSource: WEB_STORES.has(String(event?.store)) ? 'website' : 'other',
+    actionSource: isWebStore ? 'website' : 'other',
     value: isTrial ? undefined : price,
     currency: typeof event?.currency === 'string' ? event.currency : 'USD',
     contentId: flyPackId ?? (typeof event?.product_id === 'string' ? event.product_id : undefined),
