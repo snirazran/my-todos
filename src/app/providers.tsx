@@ -19,6 +19,8 @@ import { StreakCheckInProvider } from '@/components/providers/StreakCheckInProvi
 import { CrossGiftProvider } from '@/components/providers/CrossGiftProvider';
 import { OnboardingGate } from '@/components/providers/OnboardingGate';
 import { AnalyticsProvider } from '@/components/providers/AnalyticsProvider';
+import { AdPixels } from '@/components/providers/AdPixels';
+import { AdConsentBanner } from '@/components/ui/AdConsentBanner';
 import { HintCoach } from '@/components/ui/HintCoach';
 import { QuestRewardRevealHost } from '@/components/ui/questRewardReveal';
 import { ButtonHaptics } from '@/components/providers/ButtonHaptics';
@@ -48,6 +50,8 @@ export default function Providers({ children }: { children: ReactNode }) {
             <ErrorReporter />
             <VersionWatcher />
             <ButtonHaptics />
+            <AdPixels />
+            <AdConsentBanner />
             <AnalyticsProvider />
             <GlobalTimer />
             <WeekStartSync />

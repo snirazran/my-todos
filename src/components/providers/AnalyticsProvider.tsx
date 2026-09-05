@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { normalizeAnalyticsPage } from '@/lib/analytics/events';
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
+import { captureClickIds } from '@/lib/adpixels/clickIds';
 
 const SESSION_KEY = 'frogress.analytics.session';
 const SESSION_LAST_SEEN_KEY = 'frogress.analytics.lastSeen';
@@ -47,6 +48,7 @@ export function AnalyticsProvider() {
   const pathname = usePathname();
 
   useEffect(() => {
+    captureClickIds();
     trackOpen();
     const keepAlive = window.setInterval(() => {
       if (document.visibilityState === 'visible') ensureSession();

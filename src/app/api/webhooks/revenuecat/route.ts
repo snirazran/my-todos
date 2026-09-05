@@ -7,6 +7,7 @@ import UserModel from '@/lib/models/User';
 import FlyPurchaseModel from '@/lib/models/FlyPurchase';
 import { getFlyPackForProduct } from '@/lib/flyPacks';
 import StoreProductModel from '@/lib/models/StoreProduct';
+import { sendAdConversion } from '@/lib/adpixels/server';
 
 function revenueCatEventName(event: any): AnalyticsEventName | null {
   if (Number(event?.price) < 0) return 'subscription_refunded';
@@ -86,6 +87,44 @@ async function grantFlyPackPurchase(userId: string, event: any) {
   }
 
   return pack;
+}
+
+const WEB_STORES = new Set(['RC_BILLING', 'STRIPE', 'PADDLE']);
+
+async function reportAdConversion(userId: string, event: any, flyPackId?: string) {
+  if (event?.environment === 'SANDBOX' && process.env.NODE_ENV === 'production') return;
+  if (typeof event?.id !== 'string') return;
+
+  const isTrial =
+    event?.type === 'INITIAL_PURCHASE' && event?.period_type === 'TRIAL';
+  const isMoney =
+    event?.type === 'INITIAL_PURCHASE' ||
+    event?.type === 'RENEWAL' ||
+    event?.type === 'NON_RENEWING_PURCHASE';
+  if (!isMoney) return;
+
+  const price = Number(event?.price);
+  if (!isTrial && !(Number.isFinite(price) && price > 0)) return;
+
+  await connectMongo();
+  const user = await UserModel.findById(userId).select('email adIdentity').lean();
+  if (!user) return;
+
+  await sendAdConversion({
+    metaEvent: isTrial ? 'StartTrial' : 'Purchase',
+    tiktokEvent: isTrial ? 'Subscribe' : 'CompletePayment',
+    eventId: `${event.id}:${isTrial ? 'trial' : 'purchase'}`,
+    eventTime: Number.isFinite(Number(event?.event_timestamp_ms))
+      ? new Date(Number(event.event_timestamp_ms))
+      : new Date(),
+    userId,
+    email: user.email,
+    identity: user.adIdentity,
+    actionSource: WEB_STORES.has(String(event?.store)) ? 'website' : 'other',
+    value: isTrial ? undefined : price,
+    currency: typeof event?.currency === 'string' ? event.currency : 'USD',
+    contentId: flyPackId ?? (typeof event?.product_id === 'string' ? event.product_id : undefined),
+  });
 }
 
 export async function POST(req: NextRequest) {
@@ -177,6 +216,9 @@ export async function POST(req: NextRequest) {
         });
       }
     }
+    await reportAdConversion(userId, event, flyPack?.id).catch((error) => {
+      console.error('Ad conversion report failed:', error);
+    });
   } catch (error) {
     console.error('RevenueCat webhook sync failed:', error);
     return NextResponse.json({ error: 'Sync failed' }, { status: 500 });

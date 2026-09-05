@@ -35,6 +35,10 @@ const UserSchema = new Schema<UserDoc>(
       default: [],
     },
     createdAt: { type: Date, default: Date.now },
+    adIdentity: {
+      type: Schema.Types.Mixed,
+      default: undefined,
+    },
     wardrobe: {
       type: Schema.Types.Mixed,
       default: () => ({

@@ -112,6 +112,17 @@ export type UserSkins = {
   flies: number;
 };
 
+export type AdIdentity = {
+  fbp?: string;
+  fbc?: string;
+  ttp?: string;
+  ttclid?: string;
+  ip?: string;
+  userAgent?: string;
+  consent?: 'granted' | 'denied';
+  updatedAt?: Date;
+};
+
 export type UserDoc = {
   _id: string;
   name: string;
@@ -130,6 +141,7 @@ export type UserDoc = {
   suggestionsDismissed?: string[];
   suggestionSnoozes?: { userId: string; until: Date }[];
   createdAt: Date;
+  adIdentity?: AdIdentity;
   wardrobe?: UserWardrobe;
   skins?: UserSkins;
   statistics?: UserStatistics;

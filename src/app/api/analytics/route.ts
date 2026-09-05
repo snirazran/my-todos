@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUserId } from '@/lib/auth';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
+import { readAdIdentity, saveAdIdentity } from '@/lib/adpixels/identity';
 import {
   ANALYTICS_EVENT_SET,
   type AnalyticsEventName,
@@ -113,6 +114,13 @@ export async function POST(req: NextRequest) {
     name !== 'friend_link_opened'
   ) {
     return new NextResponse(null, { status: 204 });
+  }
+
+  if (authenticated) {
+    void saveAdIdentity(
+      userId,
+      readAdIdentity(req, { ttclid: body.ttclid, consent: body.adConsent }),
+    );
   }
 
   await recordAnalyticsEvent({
