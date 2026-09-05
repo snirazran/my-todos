@@ -74,6 +74,9 @@ export const metadata: Metadata = {
     },
   },
   manifest: '/manifest.json',
+  other: {
+    'facebook-domain-verification': 'o1byhp7w7toyiegdgwn10vqptuwqeq',
+  },
 };
 
 export default function RootLayout({
