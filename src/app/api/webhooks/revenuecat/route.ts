@@ -125,7 +125,7 @@ async function reportAdConversion(userId: string, event: any, flyPackId?: string
     actionSource: isWebStore ? 'website' : 'other',
     test: isSandbox,
     value: isTrial ? undefined : price,
-    currency: typeof event?.currency === 'string' ? event.currency : 'USD',
+    currency: 'USD',
     contentId: flyPackId ?? (typeof event?.product_id === 'string' ? event.product_id : undefined),
   });
 }
