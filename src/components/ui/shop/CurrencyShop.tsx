@@ -91,8 +91,8 @@ const TIER_SCENE = [
   },
 ];
 
-/** From the bucket up the artwork is an object standing in the scene. */
-const FIRST_GROUNDED_BUNDLE = 4;
+/** Every pack's artwork is now an object standing in the scene. */
+const FIRST_GROUNDED_BUNDLE = 1;
 
 type AdFlyStatus = {
   reward: number;

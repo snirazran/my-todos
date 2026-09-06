@@ -174,10 +174,19 @@ export type PactAreaChoice = {
   coverImageUrl?: string;
   backgroundFrom?: string;
   backgroundTo?: string;
+  /** Days since the last completion anywhere in this area; null = never. */
   quietDays: number | null;
+  /** Completions in the area over the last 7 and 28 days. */
+  completions7: number;
+  completions28: number;
+  /** Distinct days inside the 28-day window with at least one completion. */
+  activeDays28: number;
+  /** Half-life weighted completions; 0 means the area has gone silent. */
+  activityScore: number;
   streakWeeks: number;
   weeksKept: number;
   recommended: boolean;
+  /** The area's work can be attributed at all — a tag, or a past Leap. */
   hasTag: boolean;
   /** The tag this area's tasks will carry. Absent = one gets created. */
   tagId?: string;

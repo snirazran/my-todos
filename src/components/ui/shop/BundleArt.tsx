@@ -25,41 +25,32 @@ const VIEW_MODEL = 'ViewModel1';
 const VIEW_MODEL_INSTANCE = 'Instance';
 const WINGS_TRIGGER = 'wings';
 
-/**
- * Re-arms the wings on every frame, for every mounted pack at once.
- *
- * The shared fly engine chains its flaps off StateChange: the moment the
- * one-shot timeline settles back on Wings_idle it fires the trigger again, so
- * the next beat begins on that same frame. These artboards emit no
- * StateChange, so there is nothing to chain from — but a trigger that arrives
- * mid-flap is absorbed by the running state, which makes re-arming every frame
- * equivalent: the beat restarts at most one frame after it ended, the same gap
- * the real fly has. Anything slower leaves dead air between beats, and that
- * pause is what reads as a twitch rather than a wingbeat.
- */
+/** One beat every 1.3s, fired for every mounted pack on the same tick. */
+const FLAP_INTERVAL_MS = 1300;
+
 const flapListeners = new Set<() => void>();
-let flapFrame: number | null = null;
+let flapTimer: ReturnType<typeof setInterval> | null = null;
 
 function onSharedFlap(listener: () => void) {
+  const starting = flapListeners.size === 0;
   flapListeners.add(listener);
-  if (flapFrame === null) {
-    const tick = () => {
+  if (starting) {
+    flapListeners.forEach((fn) => fn());
+    flapTimer = setInterval(() => {
       flapListeners.forEach((fn) => fn());
-      flapFrame = requestAnimationFrame(tick);
-    };
-    flapFrame = requestAnimationFrame(tick);
+    }, FLAP_INTERVAL_MS);
   }
   return () => {
     flapListeners.delete(listener);
-    if (flapListeners.size === 0 && flapFrame !== null) {
-      cancelAnimationFrame(flapFrame);
-      flapFrame = null;
+    if (flapListeners.size === 0 && flapTimer !== null) {
+      clearInterval(flapTimer);
+      flapTimer = null;
     }
   };
 }
 
 /**
- * One fly-pack illustration, drawn from the Bundle1…Bundle6 artboards of the
+ * One fly-pack illustration, drawn from the Bundle4…Bundle9 artboards of the
  * shared store_bundle.riv export (pack 1 is the smallest, pack 6 the largest).
  *
  * One shared beat drives every mounted pack, so the whole shelf flies on the
@@ -74,7 +65,7 @@ export function BundleArt({
   className,
   fallback = null,
 }: {
-  /** 1-based pack position, mapped to the Bundle1…Bundle6 artboards. */
+  /** 1-based pack position, mapped to the Bundle4…Bundle9 artboards. */
   bundle: number;
   className?: string;
   /** Rendered instead when the artboard is missing from the export. */

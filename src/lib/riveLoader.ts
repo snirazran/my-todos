@@ -17,9 +17,12 @@ export const urlCache = new Map<string, string>();
 // URLs and retained in memory, so a content version prevents an older export
 // from surviving browser/CDN caches.
 export const FLY_RIVE_ASSET_URL = '/fly_idle.riv?v=60715002';
-// One export holds every fly pack, as artboards Bundle1 … Bundle6.
-export const STORE_BUNDLE_RIVE_URL = '/store_bundle.riv?v=60730001';
-export const storeBundleArtboard = (bundle: number) => `Bundle${bundle}`;
+// One export holds every fly pack, as artboards Bundle4 … Bundle9. The lower
+// artboards are loose-fly art the shop does not use.
+export const STORE_BUNDLE_RIVE_URL = '/store_bundle.riv?v=60906001';
+const STORE_BUNDLE_ARTBOARD_OFFSET = 3;
+export const storeBundleArtboard = (bundle: number) =>
+  `Bundle${bundle + STORE_BUNDLE_ARTBOARD_OFFSET}`;
 
 let storeBundleFile: RiveFile | null = null;
 let storeBundleLoad: Promise<RiveFile | null> | null = null;

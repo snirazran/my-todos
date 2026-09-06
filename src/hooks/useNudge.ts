@@ -3,8 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/components/auth/AuthContext';
 import { claimBlockingSlot } from '@/lib/campaigns/orchestrator';
+import { whenAutoPopupsAllowed } from '@/lib/popupGate';
 
 const HOUR_MS = 3600_000;
+/** A nudge that can't find a quiet moment is dropped, not queued behind one. */
+const WAIT_FOR_QUIET_MS = 25_000;
 
 type NudgeConfig = {
   maxImpressions: number;
@@ -112,18 +115,24 @@ export function useNudge(
     if (record.visits < config.minVisits) return;
     if (Date.now() < readyAt(record, config)) return;
 
-    const timer = window.setTimeout(() => {
-      if (sessionClaim && sessionClaim !== key) return;
-      if (config.blocking && !claimBlockingSlot()) return;
-      sessionClaim = key;
-      writeRecord(key, uid, {
-        impressions: record.impressions + 1,
-        lastShownAt: Date.now(),
-      });
-      setShow(true);
-    }, delayMs);
+    // Waits out anything that owns the screen first — the daily streak flow
+    // above all — so the impression is only ever recorded for a nudge the user
+    // actually saw.
+    const cancel = whenAutoPopupsAllowed(
+      () => {
+        if (sessionClaim && sessionClaim !== key) return;
+        if (config.blocking && !claimBlockingSlot()) return;
+        sessionClaim = key;
+        writeRecord(key, uid, {
+          impressions: record.impressions + 1,
+          lastShownAt: Date.now(),
+        });
+        setShow(true);
+      },
+      { initialDelayMs: delayMs, dropAfterMs: WAIT_FOR_QUIET_MS },
+    );
 
-    return () => window.clearTimeout(timer);
+    return cancel;
   }, [key, uid, enabled, delayMs, config]);
 
   const dismiss = useCallback(() => {
@@ -160,13 +169,19 @@ export function useNudge(
     if (record.dismissals >= config.suppressAfterDismissals) return false;
     if (record.impressions >= config.maxImpressions) return false;
     if (sessionClaim && sessionClaim !== key) return false;
-    if (config.blocking && !claimBlockingSlot(true)) return false;
-    sessionClaim = key;
-    writeRecord(key, uid, {
-      impressions: record.impressions + 1,
-      lastShownAt: Date.now(),
-    });
-    setShow(true);
+    whenAutoPopupsAllowed(
+      () => {
+        if (sessionClaim && sessionClaim !== key) return;
+        if (config.blocking && !claimBlockingSlot(true)) return;
+        sessionClaim = key;
+        writeRecord(key, uid, {
+          impressions: readRecord(key, uid).impressions + 1,
+          lastShownAt: Date.now(),
+        });
+        setShow(true);
+      },
+      { initialDelayMs: 0, dropAfterMs: WAIT_FOR_QUIET_MS },
+    );
     return true;
   }, [key, uid, config]);
 

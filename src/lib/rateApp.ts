@@ -3,6 +3,7 @@
 import { Capacitor } from '@capacitor/core';
 import { InAppReview } from '@capacitor-community/in-app-review';
 import { useCampaignStore } from '@/lib/campaigns/orchestrator';
+import { isScreenBusy } from '@/lib/popupGate';
 
 const USAGE_DAYS_KEY = 'rate-app:usage-days';
 const PROMPTS_KEY = 'rate-app:prompts';
@@ -57,7 +58,7 @@ function recentPrompts(now: number) {
 
 function interrupted() {
   const { active, pending, busyReasons } = useCampaignStore.getState();
-  return !!active || !!pending || busyReasons.length > 0;
+  return !!active || !!pending || busyReasons.length > 0 || isScreenBusy();
 }
 
 export function recordAppUsageDay() {

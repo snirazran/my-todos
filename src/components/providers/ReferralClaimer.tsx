@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useAuth } from '@/components/auth/AuthContext';
 import { mutate as swrMutate } from 'swr';
 import { GiftClaimRewardOverlay } from '@/components/ui/GiftClaimRewardOverlay';
 import { SharedTaskClaimPopup } from '@/components/ui/SharedTaskClaimPopup';
 import type { ItemDef } from '@/lib/skins/catalog';
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
+import { useScreenBusy } from '@/lib/popupGate';
 
 const STORAGE_KEY = 'frogress_referral_code';
 
@@ -115,23 +116,42 @@ export function ReferralClaimer() {
 
   if (claimedGift) {
     return (
-      <GiftClaimRewardOverlay
-        gift={claimedGift.gift}
-        inviterName={claimedGift.inviterName}
-        onClose={() => setClaimedGift(null)}
-      />
+      <WhenFree>
+        <GiftClaimRewardOverlay
+          gift={claimedGift.gift}
+          inviterName={claimedGift.inviterName}
+          onClose={() => setClaimedGift(null)}
+        />
+      </WhenFree>
     );
   }
 
   if (sharedTask) {
     return (
-      <SharedTaskClaimPopup
-        text={sharedTask.text}
-        partnerName={sharedTask.partnerName}
-        onClose={() => setSharedTask(null)}
-      />
+      <WhenFree>
+        <SharedTaskClaimPopup
+          text={sharedTask.text}
+          partnerName={sharedTask.partnerName}
+          onClose={() => setSharedTask(null)}
+        />
+      </WhenFree>
     );
   }
 
   return null;
+}
+
+/**
+ * Holds a claim reward back until nothing else owns the screen — the daily
+ * streak flow included — then keeps it up. The latch matters: these overlays
+ * register themselves as open sheets, so a live busy check would tear down the
+ * thing it just let through.
+ */
+function WhenFree({ children }: { children: ReactNode }) {
+  const busy = useScreenBusy();
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    if (!busy) setShown(true);
+  }, [busy]);
+  return shown ? <>{children}</> : null;
 }

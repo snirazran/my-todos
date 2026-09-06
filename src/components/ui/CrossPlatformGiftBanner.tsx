@@ -12,6 +12,7 @@ import {
 } from '@/components/providers/CrossGiftProvider';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { trackGrowthEvent } from '@/lib/growthTrack';
+import { whenAutoPopupsAllowed } from '@/lib/popupGate';
 import type { CrossGiftStatus } from '@/lib/crossGift';
 
 const DISMISS_KEY_PREFIX = 'frogress_xplat_banner';
@@ -72,11 +73,13 @@ export function CrossPlatformGiftBanner() {
       return;
     }
     if (isSnoozed(readDismissState(dismissKey))) return;
-    const timer = setTimeout(() => {
-      setVisible(true);
-      trackGrowthEvent('xplat_banner_shown', { platform });
-    }, SHOW_DELAY_MS);
-    return () => clearTimeout(timer);
+    return whenAutoPopupsAllowed(
+      () => {
+        setVisible(true);
+        trackGrowthEvent('xplat_banner_shown', { platform });
+      },
+      { initialDelayMs: SHOW_DELAY_MS, dropAfterMs: 60_000 },
+    );
   }, [dismissKey, eligible, platform]);
 
   const dismiss = () => {

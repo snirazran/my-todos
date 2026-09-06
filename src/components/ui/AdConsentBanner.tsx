@@ -11,6 +11,7 @@ import {
   setAdConsent,
   type AdConsent,
 } from '@/lib/adpixels/consent';
+import { whenAutoPopupsAllowed } from '@/lib/popupGate';
 
 export function AdConsentBanner() {
   const [visible, setVisible] = useState(false);
@@ -20,7 +21,10 @@ export function AdConsentBanner() {
     if (Capacitor.isNativePlatform()) return;
     if (!needsAdConsent()) return;
     if (readAdConsent() !== null) return;
-    setVisible(true);
+    // The ask keeps until the streak flow has had its turn — nothing is
+    // tracked while it waits, and it never gives up: consent stays unanswered
+    // until it is asked for.
+    return whenAutoPopupsAllowed(() => setVisible(true), { initialDelayMs: 0 });
   }, []);
 
   const choose = (value: AdConsent) => {

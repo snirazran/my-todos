@@ -32,6 +32,7 @@ import { motion, AnimatePresence, useAnimation } from 'framer-motion';
 import { useShallow } from 'zustand/react/shallow';
 import { useUIStore } from '@/lib/uiStore';
 import { useSheetStore } from '@/lib/sheetStore';
+import { whenScreenIsFree } from '@/lib/popupGate';
 import {
   FROG_TONGUE_MOUTH_OFFSET,
   type FrogHandle,
@@ -286,7 +287,7 @@ export default function HomeDashboard() {
       const seen = seenIntrosRef.current;
       if (!seen || seen.savedTask) return;
       markIntroSeenRef.current('savedTask');
-      window.setTimeout(() => setSavedIntroOpen(true), 900);
+      whenScreenIsFree(() => setSavedIntroOpen(true), { initialDelayMs: 900 });
     };
     window.addEventListener(TASK_SAVED_EVENT, onSaved);
     return () => window.removeEventListener(TASK_SAVED_EVENT, onSaved);
@@ -301,10 +302,13 @@ export default function HomeDashboard() {
     if (!max || hungerStatus.hunger < max) return;
     if (scheduledBellyIntroRef.current) return;
     scheduledBellyIntroRef.current = true;
-    window.setTimeout(() => {
-      setBellyIntroOpen(true);
-      markIntroSeen('bellyFull');
-    }, 1200);
+    whenScreenIsFree(
+      () => {
+        setBellyIntroOpen(true);
+        markIntroSeen('bellyFull');
+      },
+      { initialDelayMs: 1200 },
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     user,

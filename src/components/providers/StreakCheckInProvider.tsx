@@ -19,9 +19,13 @@ import { StreakSheet } from '@/components/ui/streak/StreakSheet';
 import { StreakRescueSheet } from '@/components/ui/streak/StreakRescueSheet';
 import { ShieldSheet } from '@/components/ui/streak/ShieldSheet';
 import { openShieldSheet, subscribeShieldSheet } from '@/hooks/useShields';
-import { useSheetStore } from '@/lib/sheetStore';
-import { useUIStore } from '@/lib/uiStore';
 import { recordAppUsageDay } from '@/lib/rateApp';
+import {
+  LOGIN_STREAK_HOLD,
+  holdAutoPopups,
+  releaseAutoPopups,
+  whenScreenIsFree,
+} from '@/lib/popupGate';
 import { emitCampaignTrigger } from '@/lib/campaigns/orchestrator';
 import type { CheckInResult, LoginStreakRescue } from '@/lib/streak/types';
 import type { ShieldOffer } from '@/lib/shields/types';
@@ -42,41 +46,21 @@ const EXCLUDED_PREFIXES = [
   '/auth',
 ];
 
-/**
- * Runs `show` at the next moment nothing else owns the screen — never over a
- * cinematic, never stacked on another sheet. Two full-screen popups on top of
- * each other don't just look wrong: the lower one is usually a Radix dialog,
- * which parks `pointer-events: none` on the body, so the one painted on top
- * ends up inert. `dropAfterMs` gives up instead of waiting forever, for
- * interruptions that are only worth making right now.
- */
-function whenScreenIsFree(
-  show: () => void,
-  dropAfterMs?: number,
-  initialDelayMs = 900,
-) {
-  const deadline =
-    dropAfterMs === undefined ? Infinity : Date.now() + dropAfterMs;
-  const tryOpen = () => {
-    const busy =
-      useSheetStore.getState().count > 0 ||
-      useUIStore.getState().isCinematicActive;
-    if (!busy) {
-      show();
-      return;
-    }
-    if (Date.now() > deadline) return;
-    window.setTimeout(tryOpen, 600);
-  };
-  if (initialDelayMs <= 0) {
-    // The streak reveal is the payoff for the check-in that just happened, so
-    // it opens on the first free frame instead of landing a beat after the
-    // page it is interrupting. The busy check still keeps it off cinematics.
-    requestAnimationFrame(tryOpen);
-    return;
-  }
-  window.setTimeout(tryOpen, initialDelayMs);
-}
+/** The streak sheet is a real sheet, so it keeps its own claim on the screen
+ *  once open; this only has to outlive a user reading it. */
+const SHEET_HOLD_MS = 5 * 60_000;
+/** Quiet beat after the streak flow before anything else may interrupt. */
+const AFTER_STREAK_GRACE_MS = 1500;
+
+const queueStreakSheet = (show: () => void, dropAfterMs?: number, initialDelayMs = 0) =>
+  // The streak reveal is the payoff for the check-in that just happened, so it
+  // opens on the first free frame instead of landing a beat after the page it
+  // is interrupting. It waits out sheets and cinematics, but not its own hold.
+  whenScreenIsFree(show, {
+    dropAfterMs,
+    initialDelayMs,
+    ownHold: LOGIN_STREAK_HOLD,
+  });
 
 /**
  * The server decides whether the user should ever see the offer; this decides
@@ -85,9 +69,10 @@ function whenScreenIsFree(
  * rather than queued, so it can't surface in the middle of something unrelated.
  */
 function queueShieldOffer(offer: ShieldOffer) {
-  if (shieldOfferedThisSession) return;
+  if (shieldOfferedThisSession) return false;
   shieldOfferedThisSession = true;
-  whenScreenIsFree(() => openShieldSheet(offer), 8000);
+  queueStreakSheet(() => openShieldSheet(offer), 8000, 900);
+  return true;
 }
 
 const PLEDGE_INVITE_KEY = 'frog:pledgeInviteDay';
@@ -132,49 +117,60 @@ export function StreakCheckInProvider() {
       const today = localDayKey();
       if (lastChecked?.dayKey === today && lastChecked.userId === userId)
         return;
-      // The prewarmed check-in is fired from onboarding the moment the account
-      // is created, so it can lose a race with the session cookie and resolve
-      // null. Consuming that null without retrying left a brand-new account
-      // never checked in: streak stuck at 0, and no pledge invite.
-      const prewarmed = await takePrewarmedCheckIn();
-      const result = prewarmed ?? (await checkInStreak());
-      if (!result) return;
-      lastChecked = { dayKey: today, userId };
-      recordAppUsageDay();
-      if (!result.active) return;
-      if (result.shieldConsumedDays.length > 0 && result.view) {
-        showNotification(
-          <span>
-            🪷 A Lily Pad caught your <b>{result.view.count}-day</b> streak!
-          </span>,
-        );
-      }
-      const offer = result.rescue;
-      const canRescue =
-        !!offer &&
-        offer.adEligible &&
-        offer.adsWatched < Math.max(1, offer.adsRequired);
-      if (offer && canRescue) {
-        whenScreenIsFree(() => openStreakSheet({ rescue: offer }), undefined, 0);
-      } else if (result.shieldOffer) {
-        queueShieldOffer(result.shieldOffer);
-      } else if (result.extended) {
-        whenScreenIsFree(
-          () => openStreakSheet({ celebration: result }),
-          undefined,
-          0,
-        );
-      } else if (!result.view?.goal && takePledgeInvite()) {
-        // A pledge is only ever offered, never auto-enrolled — but the offer
-        // used to ride on `extended`, and a new account's first check-in is
-        // consumed by the onboarding prewarm. That left day one with no invite
-        // at all, which is the one day it matters most.
-        whenScreenIsFree(() => openStreakSheet({ commit: true }), undefined, 0);
-      }
-      if (result.extended) {
-        emitCampaignTrigger('streak_milestone', {
-          streak: result.view?.count ?? 0,
-        });
+      // Claimed before the check-in leaves for the server, not after it comes
+      // back: everything else that fires on a launch timer would otherwise win
+      // a race against a popup that hasn't been decided on yet.
+      holdAutoPopups(LOGIN_STREAK_HOLD);
+      let queued = false;
+      try {
+        // The prewarmed check-in is fired from onboarding the moment the account
+        // is created, so it can lose a race with the session cookie and resolve
+        // null. Consuming that null without retrying left a brand-new account
+        // never checked in: streak stuck at 0, and no pledge invite.
+        const prewarmed = await takePrewarmedCheckIn();
+        const result = prewarmed ?? (await checkInStreak());
+        if (!result) return;
+        lastChecked = { dayKey: today, userId };
+        recordAppUsageDay();
+        if (!result.active) return;
+        if (result.shieldConsumedDays.length > 0 && result.view) {
+          showNotification(
+            <span>
+              🪷 A Lily Pad caught your <b>{result.view.count}-day</b> streak!
+            </span>,
+          );
+        }
+        const offer = result.rescue;
+        const canRescue =
+          !!offer &&
+          offer.adEligible &&
+          offer.adsWatched < Math.max(1, offer.adsRequired);
+        if (offer && canRescue) {
+          queueStreakSheet(() => openStreakSheet({ rescue: offer }));
+          queued = true;
+        } else if (result.shieldOffer) {
+          queued = queueShieldOffer(result.shieldOffer);
+        } else if (result.extended) {
+          queueStreakSheet(() => openStreakSheet({ celebration: result }));
+          queued = true;
+        } else if (!result.view?.goal && takePledgeInvite()) {
+          // A pledge is only ever offered, never auto-enrolled — but the offer
+          // used to ride on `extended`, and a new account's first check-in is
+          // consumed by the onboarding prewarm. That left day one with no invite
+          // at all, which is the one day it matters most.
+          queueStreakSheet(() => openStreakSheet({ commit: true }));
+          queued = true;
+        }
+        if (result.extended) {
+          emitCampaignTrigger('streak_milestone', {
+            streak: result.view?.count ?? 0,
+          });
+        }
+      } finally {
+        // Nothing to reveal — a check-in that failed, a day already counted —
+        // so the screen goes back to everyone else immediately. A queued sheet
+        // keeps the hold alive itself until it has been seen and closed.
+        if (!queued) releaseAutoPopups(LOGIN_STREAK_HOLD, 0);
       }
     };
 
@@ -226,6 +222,17 @@ function StreakSheetHost() {
       setShieldOpen(true);
     });
   }, []);
+
+  // The hold outlives the check-in that took it: it belongs to the streak flow
+  // as a whole, and only lifts once the user has closed what they were shown —
+  // plus a beat, so the next popup isn't a jump cut off the closing animation.
+  const streakVisible = open || rescueOpen || shieldOpen;
+  useEffect(() => {
+    if (streakVisible) {
+      holdAutoPopups(LOGIN_STREAK_HOLD, SHEET_HOLD_MS);
+      return () => releaseAutoPopups(LOGIN_STREAK_HOLD, AFTER_STREAK_GRACE_MS);
+    }
+  }, [streakVisible]);
 
   return (
     <>

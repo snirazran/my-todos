@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 import { BUILD_ID } from '@/lib/generated/buildId';
-import { useSheetStore } from '@/lib/sheetStore';
+import { isScreenBusy, whenScreenIsFree } from '@/lib/popupGate';
 
 const CHECK_THROTTLE_MS = 60_000;
 const RELOAD_GUARD_PREFIX = 'build-reload:';
@@ -13,8 +13,8 @@ export function VersionWatcher() {
   const waitingRef = useRef<(() => void) | null>(null);
 
   // A reload throws away everything the user has open — a half-written invite,
-  // a picked gift, a sheet three steps in. The new build can wait until they
-  // close whatever they are in the middle of.
+  // a picked gift, a sheet three steps in, or a check-in whose reveal has not
+  // been painted yet. The new build can wait until they are through it.
   const reloadWhenIdle = useCallback((buildId: string) => {
     const guard = `${RELOAD_GUARD_PREFIX}${buildId}`;
     try {
@@ -23,14 +23,15 @@ export function VersionWatcher() {
       return;
     }
 
-    if (useSheetStore.getState().count > 0) {
+    if (isScreenBusy()) {
       if (waitingRef.current) return;
-      waitingRef.current = useSheetStore.subscribe((state) => {
-        if (state.count > 0) return;
-        waitingRef.current?.();
-        waitingRef.current = null;
-        reloadWhenIdle(buildId);
-      });
+      waitingRef.current = whenScreenIsFree(
+        () => {
+          waitingRef.current = null;
+          reloadWhenIdle(buildId);
+        },
+        { initialDelayMs: 0 },
+      );
       return;
     }
 

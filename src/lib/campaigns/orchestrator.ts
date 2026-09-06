@@ -1,6 +1,7 @@
 'use client';
 
 import { create } from 'zustand';
+import { areAutoPopupsHeld } from '@/lib/popupGate';
 import {
   TIER_WEIGHT,
   isBlockingTemplate,
@@ -88,6 +89,15 @@ const matchesTrigger = (
     return true;
   });
 
+/**
+ * Anything on screen, plus anything that has claimed the screen before it is
+ * on it — the daily streak check-in spends its first second in a network call
+ * with nothing rendered, and a campaign that only read `busyReasons` would
+ * sail straight through that window and land first.
+ */
+const interrupts = () =>
+  useCampaignStore.getState().busyReasons.length > 0 || areAutoPopupsHeld();
+
 /** Tier first, then the admin's priority, then the campaign that was defined
  *  most recently — server order is already newest-last. */
 const rank = (a: CampaignPayload, b: CampaignPayload) =>
@@ -125,16 +135,14 @@ export const useCampaignStore = create<Store>((set, get) => ({
       .sort(rank);
 
     for (const campaign of candidates) {
-      const blocking = isBlockingTemplate(campaign.template);
-      if (!blocking) {
-        get().schedule(campaign);
-        return;
+      if (isBlockingTemplate(campaign.template)) {
+        if (state.blockingShown >= MAX_BLOCKING_PER_SESSION) return;
+        if (Date.now() - readLastBlockingAt() < CROSS_CAMPAIGN_COOLDOWN_MS) return;
       }
-      if (state.blockingShown >= MAX_BLOCKING_PER_SESSION) return;
-      if (Date.now() - readLastBlockingAt() < CROSS_CAMPAIGN_COOLDOWN_MS) return;
       // Interrupting an open sheet or a focus session costs more than the
       // popup could ever earn, so it waits for the next clear moment instead.
-      if (state.busyReasons.length > 0) {
+      // A banner is a smaller interruption, not a free one: it waits too.
+      if (interrupts()) {
         set({ pending: campaign });
         return;
       }
@@ -153,7 +161,9 @@ export const useCampaignStore = create<Store>((set, get) => ({
     window.setTimeout(() => {
       const now = get();
       if (now.active || now.pending?.id !== campaign.id) return;
-      if (isBlockingTemplate(campaign.template) && now.busyReasons.length > 0) return;
+      // Still pending, so `flushPending` picks it up the moment the screen
+      // clears rather than dropping a campaign that only lost its timing.
+      if (interrupts()) return;
       now.show(campaign);
     }, delay);
   },
@@ -204,7 +214,7 @@ export const useCampaignStore = create<Store>((set, get) => ({
   claimBlockingSlot: (earned = false) => {
     const state = get();
     if (state.active || state.pending) return false;
-    if (state.busyReasons.length > 0) return false;
+    if (interrupts()) return false;
     if (!earned) {
       if (state.blockingShown >= MAX_BLOCKING_PER_SESSION) return false;
       if (Date.now() - readLastBlockingAt() < CROSS_CAMPAIGN_COOLDOWN_MS) return false;
@@ -216,11 +226,11 @@ export const useCampaignStore = create<Store>((set, get) => ({
 
   flushPending: () => {
     const state = get();
-    if (!state.pending || state.active || state.busyReasons.length > 0) return;
+    if (!state.pending || state.active || interrupts()) return;
     const campaign = state.pending;
     window.setTimeout(() => {
       const now = get();
-      if (now.active || now.busyReasons.length > 0) return;
+      if (now.active || interrupts()) return;
       if (now.pending?.id !== campaign.id) return;
       now.show(campaign);
     }, campaign.delayMs ?? SHOW_DELAY_MS);

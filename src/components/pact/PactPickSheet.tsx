@@ -58,8 +58,9 @@ function repeatLabel(option: PactOption) {
 }
 
 /**
- * What the area's own tasks say, and null when they say nothing. Only a run in
- * progress or a real gap gets a word; an area with no history gets no line.
+ * What the area's own tasks say. Volume first — how much landed this week is
+ * what "am I on this?" actually asks, and a single last-seen date answered it
+ * the same whether the week held two sessions or twenty.
  */
 function areaStatus(area: PactAreaChoice): {
   label: string;
@@ -71,10 +72,24 @@ function areaStatus(area: PactAreaChoice): {
       tone: 'good',
     };
   }
-  if (!area.hasTag || area.quietDays === null) return null;
-  if (area.quietDays <= 1) return { label: 'Finished something today', tone: 'good' };
+  const done = area.completions7 ?? 0;
+  if (done > 0) {
+    return {
+      label: `${done} done this week`,
+      tone: 'good',
+    };
+  }
+  if (area.quietDays === null) {
+    return {
+      label: area.hasTag ? 'Nothing finished yet' : 'No tasks here yet',
+      tone: 'urgent',
+    };
+  }
   return {
-    label: `Quiet for ${area.quietDays} days`,
+    label:
+      area.quietDays > 30
+        ? 'Quiet for over a month'
+        : `Quiet for ${area.quietDays} days`,
     tone: area.quietDays >= PACT_QUIET_NUDGE_DAYS ? 'urgent' : 'plain',
   };
 }

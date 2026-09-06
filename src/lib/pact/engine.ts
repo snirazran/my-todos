@@ -16,6 +16,12 @@ import TaskModel, { type TaskDoc } from '@/lib/models/Task';
 import UserModel from '@/lib/models/User';
 import connectMongo from '@/lib/mongoose';
 import { isWithinStreakCreditWindow } from '@/lib/streak/taskStreaks';
+import {
+  AREA_ACTIVE_SCORE,
+  buildAreaMembership,
+  compareAreaNeed,
+  readAreaActivity,
+} from './areaActivity';
 import { getZonedToday, getZonedYMD } from '@/lib/utils';
 import {
   normalizeWeekStart,
@@ -52,7 +58,6 @@ import {
   DEFAULT_PACT_START_TIME,
   MAX_OPTIONS,
   PACT_MAX_SESSIONS,
-  PACT_QUIET_NUDGE_DAYS,
   PRIMARY_OPTIONS,
   type ActivePactView,
   type PactAreaChoice,
@@ -678,33 +683,6 @@ async function loadCategories() {
   return QuestCategoryModel.find({}).sort({ createdAt: 1 }).lean();
 }
 
-/**
- * When the user last *finished* something in this area, measured only from
- * completed tasks carrying one of the area's tags. Deliberately blind to
- * whether a pact was ever made here: a promise is not activity, and counting
- * one reset the gap for areas the user had done nothing in.
- */
-function lastActivityKeyForArea(
-  tasks: TaskDoc[],
-  tagIds: string[],
-  timezone: string,
-): string | null {
-  if (tagIds.length === 0) return null;
-  const wanted = new Set(tagIds);
-  let latest: string | null = null;
-  for (const task of tasks) {
-    if (!(task.tags ?? []).some((tagId) => wanted.has(tagId))) continue;
-    for (const occurrence of task.completedDates ?? []) {
-      const stamp = task.completedAtByDate?.[occurrence];
-      const key = stamp
-        ? getZonedYMD(stamp instanceof Date ? stamp : new Date(stamp), timezone)
-        : occurrence;
-      if (!latest || key > latest) latest = key;
-    }
-  }
-  return latest;
-}
-
 export type PactSessionLedger = {
   progress: number;
   /** Scheduled days already behind the user with nothing ticked on them. */
@@ -1227,27 +1205,34 @@ export async function getPactView(args: {
   const config = await ensurePactConfig();
   const todayKey = getZonedToday(timezone);
 
-  const [leapUnlocked, user, tasks, categories] = await Promise.all([
-    hasReachedLeapOnboardingStep(userId),
-    UserModel.findById(userId).lean<UserDoc | null>(),
-    TaskModel.find(
-      { userId, deletedAt: { $exists: false } },
-      {
-        id: 1,
-        type: 1,
-        tags: 1,
-        text: 1,
-        completedDates: 1,
-        completedAtByDate: 1,
-        focusAreaId: 1,
-        startTime: 1,
-        dayOfWeek: 1,
-        repeatGroupId: 1,
-      },
-    ).lean<TaskDoc[]>(),
-    loadCategories(),
-  ]);
+  const [leapUnlocked, user, allTasks, userPacts, categories] =
+    await Promise.all([
+      hasReachedLeapOnboardingStep(userId),
+      UserModel.findById(userId).lean<UserDoc | null>(),
+      TaskModel.find(
+        { userId },
+        {
+          id: 1,
+          type: 1,
+          tags: 1,
+          text: 1,
+          completedDates: 1,
+          completedAtByDate: 1,
+          focusAreaId: 1,
+          startTime: 1,
+          dayOfWeek: 1,
+          repeatGroupId: 1,
+          deletedAt: 1,
+        },
+      ).lean<TaskDoc[]>(),
+      PactModel.find(
+        { userId },
+        { categoryId: 1, taskIds: 1, tagId: 1 },
+      ).lean<Array<Pick<PactDoc, 'categoryId' | 'taskIds' | 'tagId'>>>(),
+      loadCategories(),
+    ]);
   if (!user) throw new Error('User not found');
+  const tasks = allTasks.filter((task) => !task.deletedAt);
 
   const isPremium = isPremiumUser(user);
   const profile = normalizeFocusProfile(user);
@@ -1464,12 +1449,33 @@ export async function getPactView(args: {
     userTags.map((tag) => [tag.id, tag] as const),
   );
 
+  const memberships = buildAreaMembership({
+    categoryIds: selectedIds,
+    categoryLabels: new Map(
+      selectedIds.map((categoryId) => {
+        const category = categories.find((c) => c.categoryId === categoryId);
+        return [
+          categoryId,
+          [category?.name, category?.shortLabel].filter(Boolean) as string[],
+        ] as const;
+      }),
+    ),
+    categoryTagMap: profile.categoryTagMap ?? [],
+    userTags,
+    pacts: userPacts,
+  });
+  const activityByArea = readAreaActivity({
+    memberships,
+    tasks: allTasks,
+    todayKey,
+  });
+
   const areas: PactAreaChoice[] = selectedIds
     .map((categoryId): PactAreaChoice | null => {
       const category = categories.find((c) => c.categoryId === categoryId);
       if (!category) return null;
       const tagIds = tagMap.get(categoryId) ?? [];
-      const lastActivity = lastActivityKeyForArea(tasks, tagIds, timezone);
+      const activity = activityByArea.get(categoryId);
       return {
         categoryId,
         name: category.name,
@@ -1478,13 +1484,15 @@ export async function getPactView(args: {
         coverImageUrl: category.coverImageUrl,
         backgroundFrom: category.backgroundFrom,
         backgroundTo: category.backgroundTo,
-        quietDays: lastActivity
-          ? Math.max(0, daysBetween(lastActivity, todayKey))
-          : null,
+        quietDays: activity?.quietDays ?? null,
+        completions7: activity?.completions7 ?? 0,
+        completions28: activity?.completions28 ?? 0,
+        activeDays28: activity?.activeDays28 ?? 0,
+        activityScore: activity?.score ?? 0,
         streakWeeks: streak.areaWeeks[categoryId] ?? 0,
         weeksKept: streak.areaWeeks[categoryId] ?? 0,
         recommended: false,
-        hasTag: tagIds.length > 0,
+        hasTag: activity?.tracked ?? tagIds.length > 0,
         // Same precedence commitPact uses, read-only: a tag already linked to
         // the area wins, then one named after it. Nothing shown means the
         // pact will have to make one.
@@ -1504,23 +1512,27 @@ export async function getPactView(args: {
     })
     .filter((entry): entry is PactAreaChoice => !!entry);
 
-  // How much attention an area is owed. An area with no tag connected cannot
-  // be measured at all, so it sorts last instead of pretending to be the most
-  // neglected — which is what treating "no data" as a 999-day gap used to do.
-  const needScore = (entry: PactAreaChoice) => {
-    if (!entry.hasTag) return -1;
-    if (entry.quietDays === null) return 10_000;
-    return entry.quietDays;
-  };
-  areas.sort((a, b) => needScore(b) - needScore(a));
+  const needOf = (entry: PactAreaChoice) =>
+    activityByArea.get(entry.categoryId) ?? {
+      categoryId: entry.categoryId,
+      tagIds: [],
+      tracked: false,
+      completions7: 0,
+      completions28: 0,
+      activeDays28: 0,
+      score: 0,
+      lastActivityKey: null,
+      quietDays: null,
+    };
+  areas.sort((a, b) => compareAreaNeed(needOf(a), needOf(b)));
 
-  // "Needs you" is a claim about evidence, so it is only made when there is
-  // some: a tagged area gone quiet for a week, or one never finished in.
   const mostNeglected = areas[0];
   if (
-    mostNeglected?.hasTag &&
-    (mostNeglected.quietDays === null ||
-      mostNeglected.quietDays >= PACT_QUIET_NUDGE_DAYS)
+    mostNeglected &&
+    needOf(mostNeglected).score < AREA_ACTIVE_SCORE &&
+    areas
+      .slice(1)
+      .some((entry) => needOf(entry).score >= AREA_ACTIVE_SCORE)
   ) {
     mostNeglected.recommended = true;
   }

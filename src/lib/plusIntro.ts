@@ -2,6 +2,7 @@
 
 import { auth } from '@/lib/firebase';
 import { useUIStore } from '@/lib/uiStore';
+import { whenScreenIsFree } from '@/lib/popupGate';
 
 const PLUS_INTRO_SHOWN_KEY = 'frogress.plusIntroShown';
 const PLUS_INTRO_SERVER_SYNCED_KEY = 'frogress.plusIntroServerSynced';
@@ -54,9 +55,10 @@ export function queuePlusIntroOnce(delayMs = 2000) {
         window.localStorage.setItem(syncedKey, '1');
       } catch {}
       if (!shouldShow) return;
-      window.setTimeout(() => {
-        useUIStore.getState().setPremiumModalOpen(true, 'first_gift_claim');
-      }, delayMs);
+      whenScreenIsFree(
+        () => useUIStore.getState().setPremiumModalOpen(true, 'first_gift_claim'),
+        { initialDelayMs: delayMs, dropAfterMs: 120_000 },
+      );
     })
     .catch(() => {
       // Do not fall back to opening the modal. If the account-level check is

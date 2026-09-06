@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Loader2 } from 'lucide-react';
 import { useUIStore } from '@/lib/uiStore';
 import { useSheetStore } from '@/lib/sheetStore';
+import { useAutoPopupsHeld } from '@/lib/popupGate';
 import { useAuth } from '@/components/auth/AuthContext';
 import { hapticTick } from '@/lib/haptics';
 import {
@@ -83,6 +84,7 @@ export function CampaignHost() {
   const isCinematicActive = useUIStore((s) => s.isCinematicActive);
   const activeHint = useUIStore((s) => s.activeHint);
   const openSheets = useSheetStore((s) => s.count);
+  const popupsHeld = useAutoPopupsHeld();
 
   const [buying, setBuying] = useState(false);
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
@@ -137,9 +139,11 @@ export function CampaignHost() {
     emitCampaignTrigger('session_start');
   }, [data]);
 
+  // A campaign that lost its moment is re-offered the screen the instant the
+  // screen is free again — including when the streak flow lifts its hold.
   useEffect(() => {
-    if (pending && busyReasons.length === 0) flushPending();
-  }, [pending, busyReasons, flushPending]);
+    if (pending && busyReasons.length === 0 && !popupsHeld) flushPending();
+  }, [pending, busyReasons, popupsHeld, flushPending]);
 
   /**
    * A purchase raised from the popup itself. The store's own sheet is the only

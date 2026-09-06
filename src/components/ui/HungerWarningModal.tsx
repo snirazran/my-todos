@@ -9,8 +9,8 @@ import Fly from '@/components/ui/fly';
 import { Loader2, SquarePlay, Utensils } from 'lucide-react';
 import { Icon } from '@/components/ui/Icon';
 import { useRewardGate } from '@/hooks/useRewardGate';
-import { useRegisterOpenSheet, useSheetStore } from '@/lib/sheetStore';
-import { useUIStore } from '@/lib/uiStore';
+import { useRegisterOpenSheet } from '@/lib/sheetStore';
+import { useScreenBusy } from '@/lib/popupGate';
 
 interface Props {
   stolenFlies: number;
@@ -36,8 +36,7 @@ export function HungerWarningModal({
     });
   const recovering = busy;
 
-  const screenBusy = useSheetStore((s) => s.count > 0);
-  const cinematic = useUIStore((s) => s.isCinematicActive);
+  const screenBusy = useScreenBusy();
   const [visible, setVisible] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   useEffect(() => {
@@ -46,9 +45,11 @@ export function HungerWarningModal({
       setDismissed(false);
       return;
     }
-    if (visible || screenBusy || cinematic) return;
+    // Latched: once it is up, the modal's own sheet registration must not read
+    // as the screen being busy and pull it back down.
+    if (visible || screenBusy) return;
     setVisible(true);
-  }, [open, visible, screenBusy, cinematic]);
+  }, [open, visible, screenBusy]);
   useRegisterOpenSheet(visible && !dismissed);
 
   useEffect(() => {

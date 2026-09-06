@@ -11,6 +11,7 @@ import {
   fliesPrize,
 } from '@/components/ui/gift-box/GiftRevealOverlay';
 import { trackGrowthEvent } from '@/lib/growthTrack';
+import { whenScreenIsFree } from '@/lib/popupGate';
 import { markFlyEarn } from '@/lib/flyEarn';
 import { byId } from '@/lib/skins/catalog';
 import type { CrossGiftStatus } from '@/lib/crossGift';
@@ -106,11 +107,16 @@ export function CrossGiftProvider() {
 
   useEffect(() => {
     if (!status?.claimable || pathname !== '/') return;
-    const timer = setTimeout(() => {
-      setOverlayOpen(true);
-      trackGrowthEvent('xplat_gift_shown', { platform: status.platform });
-    }, 1600);
-    return () => clearTimeout(timer);
+    // The gift keeps until the screen is theirs — it is the same gift in a
+    // minute's time, and a reveal that lands on top of the streak sheet is
+    // both of them wasted.
+    return whenScreenIsFree(
+      () => {
+        setOverlayOpen(true);
+        trackGrowthEvent('xplat_gift_shown', { platform: status.platform });
+      },
+      { initialDelayMs: 1600, dropAfterMs: 60_000 },
+    );
   }, [status, pathname]);
 
   const finish = (claimed: boolean) => {
