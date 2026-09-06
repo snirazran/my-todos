@@ -77,7 +77,7 @@ export function DurationDial({
                 onChange(preset);
               }}
               aria-pressed={active}
-              className={`min-h-9 rounded-full px-3.5 text-[13px] font-black transition-all active:scale-95 ${
+              className={`min-h-9 rounded-full px-3.5 text-[13px] font-black transition-[transform,box-shadow,background-color,color,opacity] active:scale-95 ${
                 active
                   ? 'bg-white text-slate-900 shadow-sm'
                   : 'bg-white/20 text-white hover:bg-white/30'

@@ -200,6 +200,9 @@ export default function HomeDashboard() {
     () => useFrogodoroStore.persist?.hasHydrated?.() ?? false,
   );
   const lastHandledTimerCompletionRef = useRef<number | null>(null);
+  // Latches while the session is ringing, so the popup opens once per ring
+  // rather than on every unrelated re-render that keeps awaitingDone true.
+  const handledRingRef = useRef(false);
   const homeMountTimeRef = useRef<number>(Date.now());
 
   /* State */
@@ -355,6 +358,9 @@ export default function HomeDashboard() {
     stopTimer: frogStopTimer,
     lastCompletionId,
     lastCompletedTaskId,
+    selectedTaskName: frogSubjectName,
+    subjectKind: frogSubjectKind,
+    awaitingDone: frogAwaitingDone,
   } = useFrogodoroStore(
     useShallow((s) => ({
       selectedTaskId: s.selectedTaskId,
@@ -367,8 +373,33 @@ export default function HomeDashboard() {
       stopTimer: s.stopTimer,
       lastCompletionId: s.lastCompletionId,
       lastCompletedTaskId: s.lastCompletedTaskId,
+      selectedTaskName: s.selectedTaskName,
+      subjectKind: s.subjectKind,
+      awaitingDone: s.awaitingDone,
     })),
   );
+
+  // The running session's subject as a task the sheet can bind to. An area /
+  // tag / open session is held by a hidden container task that the day's lists
+  // never carry, so looking it up there finds nothing — which used to leave the
+  // sheet holding the PREVIOUS task and fire the "switch task?" confirm on the
+  // way back into a session the user never left.
+  const runningSubjectTask = React.useCallback((): Task | null => {
+    if (!frogTaskId) return null;
+    if (isContainerTaskId(frogTaskId)) {
+      return {
+        id: frogTaskId,
+        text: frogSubjectName || 'Focus session',
+        completed: false,
+        subjectKind: frogSubjectKind,
+      } as unknown as Task;
+    }
+    return (
+      tasks.find((t) => t.id === frogTaskId) ??
+      backlogTasks.find((t) => t.id === frogTaskId) ??
+      null
+    );
+  }, [frogTaskId, frogSubjectName, frogSubjectKind, tasks, backlogTasks]);
   const frogTimeLeft = useFrogodoroStore((s) =>
     showTimer ? null : s.timeLeft,
   );
@@ -451,11 +482,27 @@ export default function HomeDashboard() {
     frogStopTimer,
   ]);
 
+  // Arm the latch again the moment the session stops ringing, so the NEXT
+  // finished session still opens its popup.
+  useEffect(() => {
+    if (!frogAwaitingDone) handledRingRef.current = false;
+  }, [frogAwaitingDone]);
+
   useEffect(() => {
     if (!frogodoroHydrated) return;
     // Ref is primed in the hydration effect above; null means not yet primed.
     if (lastHandledTimerCompletionRef.current === null) return;
-    if (lastCompletionId === lastHandledTimerCompletionRef.current) return;
+    // A ringing session opens the popup even when no completion id came with it.
+    // applyRemoteTimer mirrors the server's `finished` flag directly when this
+    // device lost the advance race, setting awaitingDone WITHOUT bumping
+    // lastCompletionId — and the global popup stands down on a host page, so
+    // nothing opened at all and the finished session just sat in the pill.
+    // Latched on the ring itself so re-renders can't reopen a dismissed popup.
+    const isNewCompletion =
+      lastCompletionId !== lastHandledTimerCompletionRef.current;
+    const isFreshRing = frogAwaitingDone && !handledRingRef.current;
+    if (frogAwaitingDone) handledRingRef.current = true;
+    if (!isNewCompletion && !isFreshRing) return;
 
     // GlobalTimer rehydrates server-side timer state on mount and may fire a
     // synthetic completion if the persisted endTime had already passed. Treat
@@ -471,13 +518,15 @@ export default function HomeDashboard() {
 
     const completedTask =
       data.find((t) => t.id === lastCompletedTaskId) ??
-      data.find((t) => t.id === frogTaskId);
+      data.find((t) => t.id === frogTaskId) ??
+      runningSubjectTask();
     if (completedTask) setTimerTask(completedTask);
     setShowTimer(true);
   }, [
     data,
     frogTaskId,
     frogodoroHydrated,
+    frogAwaitingDone,
     lastCompletedTaskId,
     lastCompletionId,
   ]);
@@ -1242,13 +1291,15 @@ export default function HomeDashboard() {
       {!showTimer && (
         <FrogodoroPill
           onClick={() => {
-            const t = tasks.find((t) => t.id === frogTaskId);
+            const t = runningSubjectTask();
             if (t) setTimerTask(t);
             setShowTimer(true);
           }}
           taskName={
-            data.find((t) => t.id === frogTaskId)?.text ??
-            backlogTasks.find((t) => t.id === frogTaskId)?.text
+            frogTaskId && isContainerTaskId(frogTaskId)
+              ? frogSubjectName
+              : (data.find((t) => t.id === frogTaskId)?.text ??
+                backlogTasks.find((t) => t.id === frogTaskId)?.text)
           }
         />
       )}

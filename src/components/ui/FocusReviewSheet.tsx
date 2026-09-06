@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Coffee, Play } from 'lucide-react';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import Frog from '@/components/ui/frog';
@@ -47,6 +47,32 @@ export function FocusReviewSheet({
   const [mode, setMode] = useState<'break' | 'focus'>('break');
   const [breakMinutes, setBreakMinutes] = useState(5);
   const [focusMinutes, setFocusMinutes] = useState(25);
+
+  // Snapshot → live-Rive handoff. Swapping the two in one frame left a blank
+  // gap while Rive loaded and dressed, which is the flicker. The stamp stays
+  // FULLY opaque on top until the canvas has faded itself in, and only then
+  // fades out over identical pixels — cross-fading both at once dips the
+  // combined opacity and reads as a flash of its own.
+  const [frogSwap, setFrogSwap] = useState<'snapshot' | 'fading' | 'live'>(
+    'snapshot',
+  );
+  const frogFadeTimersRef = useRef<number[]>([]);
+  const handleFrogReady = useCallback(() => {
+    if (frogFadeTimersRef.current.length > 0) return;
+    frogFadeTimersRef.current.push(
+      window.setTimeout(
+        () => setFrogSwap((v) => (v === 'snapshot' ? 'fading' : v)),
+        200,
+      ),
+      window.setTimeout(() => setFrogSwap('live'), 430),
+    );
+  }, []);
+  useEffect(() => {
+    if (open) return;
+    setFrogSwap('snapshot');
+    for (const t of frogFadeTimersRef.current) window.clearTimeout(t);
+    frogFadeTimersRef.current = [];
+  }, [open]);
 
   const { indices: frogIndices } = useWardrobeIndices(open);
 
@@ -133,7 +159,7 @@ export function FocusReviewSheet({
                       setMode(option);
                     }}
                     aria-pressed={mode === option}
-                    className={`min-h-9 rounded-full px-4 text-[13px] font-black transition-all ${
+                    className={`min-h-9 rounded-full px-4 text-[13px] font-black transition-[transform,box-shadow,background-color,color,opacity] ${
                       mode === option
                         ? 'bg-white text-primary shadow-sm dark:text-green-700'
                         : 'text-white/70 hover:text-white'
@@ -172,15 +198,24 @@ export function FocusReviewSheet({
                 className="pointer-events-none absolute left-1/2 z-30 -translate-x-1/2"
                 style={{ bottom: 'calc(100% - 7px)' }}
               >
-                {entered ? (
+                {entered && (
                   <Frog
                     width={132}
                     height={149}
                     indices={frogIndices}
                     ignoreIdlePause
+                    onDressed={handleFrogReady}
                   />
-                ) : (
-                  <FrogSnapshot indices={frogIndices} width={132} height={149} />
+                )}
+                {frogSwap !== 'live' && (
+                  <div
+                    className={`transition-opacity duration-200 ${
+                      entered ? 'absolute inset-0' : ''
+                    } ${frogSwap === 'fading' ? 'opacity-0' : 'opacity-100'}`}
+                    style={{ willChange: 'opacity' }}
+                  >
+                    <FrogSnapshot indices={frogIndices} width={132} height={149} />
+                  </div>
                 )}
               </div>
 
@@ -193,7 +228,7 @@ export function FocusReviewSheet({
                       : { kind: 'focus', seconds: focusMinutes * 60 },
                   )
                 }
-                className="relative flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary text-[15px] font-black text-primary-foreground shadow-md shadow-primary/20 transition-all active:scale-[0.98]"
+                className="relative flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary text-[15px] font-black text-primary-foreground shadow-md shadow-primary/20 transition-[transform,box-shadow,background-color,color,opacity] active:scale-[0.98]"
               >
                 {mode === 'break' ? (
                   <>

@@ -139,14 +139,18 @@ export function FocusCelebration({
           className="mt-1.5 flex flex-wrap items-center justify-center gap-1.5"
         >
           {fliesCaught > 0 && (
-            <span className="flex items-center gap-1.5 rounded-full bg-white/25 px-3 py-1 text-[13px] font-black text-white">
-              <Fly size={16} interactive={false} paused />
+            <span className="flex items-center gap-1.5 rounded-full bg-white/25 py-1 pl-2 pr-3 text-[13px] font-black text-white">
+              <span className="flex h-6 w-6 -translate-y-[3px] items-center justify-center">
+                <Fly size={28} interactive={false} paused />
+              </span>
               +{fliesCaught} {fliesCaught === 1 ? 'fly' : 'flies'} caught
             </span>
           )}
           {bonusFly && (
-            <span className="flex items-center gap-1.5 rounded-full bg-white/25 px-3 py-1 text-[13px] font-black text-white">
-              <Fly size={16} interactive={false} paused />
+            <span className="flex items-center gap-1.5 rounded-full bg-white/25 py-1 pl-2 pr-3 text-[13px] font-black text-white">
+              <span className="flex h-6 w-6 -translate-y-[3px] items-center justify-center">
+                <Fly size={28} interactive={false} paused />
+              </span>
               +1 fly · Deep focus
             </span>
           )}

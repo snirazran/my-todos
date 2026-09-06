@@ -12,7 +12,6 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
-  Coffee,
 } from 'lucide-react';
 import { motion, AnimatePresence, useDragControls } from 'framer-motion';
 import { useShallow } from 'zustand/react/shallow';
@@ -387,7 +386,6 @@ export default function FrogodoroSheet({
     startTimer,
     pauseTimer,
     stopTimer,
-    switchPhase,
     completePhase,
     updateSessionStats,
     awaitingDone,
@@ -417,7 +415,6 @@ export default function FrogodoroSheet({
       startTimer: s.startTimer,
       pauseTimer: s.pauseTimer,
       stopTimer: s.stopTimer,
-      switchPhase: s.switchPhase,
       completePhase: s.completePhase,
       updateSessionStats: s.updateSessionStats,
       awaitingDone: s.awaitingDone,
@@ -815,19 +812,6 @@ export default function FrogodoroSheet({
     extendFocus(5 * 60);
   };
 
-  // Straight from the finished-focus screen into the break: acknowledging the
-  // alarm and starting the break is one tap, the same continuous session
-  // auto-start breaks would have produced.
-  const handleStartBreak = () => {
-    hapticImpact();
-    setAwaitingDone(false);
-    if (useFrogodoroStore.getState().phase !== 'break') switchPhase('break');
-    startTimer();
-  };
-
-  // Fast-forward: end the current phase now and switch to the other tab. No
-  // Done/alarm — it's a deliberate skip. The next phase only auto-starts if the
-  // matching auto-start setting is on (focus → break uses auto-start breaks).
   // Fast-forward means "I'm done now", not "skip to the break". It ends the
   // phase at the time actually focused and lands on the same wrap-up screen the
   // clock running out would — so the session is still reviewed, and the break
@@ -1195,7 +1179,7 @@ export default function FrogodoroSheet({
 
                       <button
                         onClick={() => setShowPond(false)}
-                        className="mt-4 w-full rounded-2xl bg-primary py-3 text-sm font-black text-primary-foreground shadow-md shadow-primary/20 transition-all active:scale-[0.98]"
+                        className="mt-4 w-full rounded-2xl bg-primary py-3 text-sm font-black text-primary-foreground shadow-md shadow-primary/20 transition-[transform,box-shadow,background-color,color,opacity] active:scale-[0.98]"
                       >
                         Back to timer
                       </button>
@@ -1273,11 +1257,19 @@ export default function FrogodoroSheet({
                                 )}
                                 <AnimatePresence>
                                   {pledgeLive && (
+                                    // Transform + opacity only. This animated
+                                    // width:0→auto, which relayouts the chip on
+                                    // every frame — while the timer ticks and
+                                    // the Rive frog animates. The width now
+                                    // changes once, and the motion rides the
+                                    // compositor.
                                     <motion.span
-                                      initial={{ opacity: 0, width: 0 }}
-                                      animate={{ opacity: 1, width: 'auto' }}
-                                      exit={{ opacity: 0, width: 0 }}
-                                      className="flex items-center gap-0.5 overflow-hidden text-[12px] font-black leading-none text-amber-300"
+                                      initial={{ opacity: 0, scale: 0.6, x: -4 }}
+                                      animate={{ opacity: 1, scale: 1, x: 0 }}
+                                      exit={{ opacity: 0, scale: 0.6, x: -4 }}
+                                      transition={{ duration: 0.18, ease: [0.32, 0.72, 0, 1] }}
+                                      style={{ willChange: 'transform, opacity' }}
+                                      className="flex origin-left items-center gap-0.5 text-[12px] font-black leading-none text-amber-300"
                                     >
                                       <Zap className="h-3 w-3 fill-current" />
                                       +1
@@ -1649,7 +1641,7 @@ export default function FrogodoroSheet({
                               {celebrateFocus ? (
                                 <button
                                   onClick={handleWrapUp}
-                                  className="relative flex items-center justify-center rounded-2xl bg-white px-7 py-3 text-[16px] font-black text-emerald-600 shadow-[0_6px_0_rgba(0,0,0,0.15)] transition-all active:translate-y-1.5 active:shadow-[0_0_0_rgba(0,0,0,0.15)] dark:bg-slate-50 dark:text-emerald-700 min-[380px]:px-10"
+                                  className="relative flex items-center justify-center rounded-2xl bg-white px-7 py-3 text-[16px] font-black text-emerald-600 shadow-[0_6px_0_rgba(0,0,0,0.15)] transition-[transform,box-shadow,background-color,color,opacity] active:translate-y-1.5 active:shadow-[0_0_0_rgba(0,0,0,0.15)] dark:bg-slate-50 dark:text-emerald-700 min-[380px]:px-10"
                                 >
                                   <Check className="mr-1.5 h-5 w-5" />
                                   WRAP UP
@@ -1659,7 +1651,7 @@ export default function FrogodoroSheet({
                                   onClick={handleDone}
                                   className={`relative flex items-center justify-center px-7 min-[380px]:px-10 py-3 bg-white dark:bg-slate-50 text-[16px]
  font-black rounded-2xl shadow-[0_6px_0_rgba(0,0,0,0.15)]
- active:shadow-[0_0_0_rgba(0,0,0,0.15)] active:translate-y-1.5 transition-all ${getPhaseAccent()}`}
+ active:shadow-[0_0_0_rgba(0,0,0,0.15)] active:translate-y-1.5 transition-[transform,box-shadow,background-color,color,opacity] ${getPhaseAccent()}`}
                                 >
                                   <Check className="w-5 h-5 mr-1.5" />
                                   DONE
@@ -1671,17 +1663,10 @@ export default function FrogodoroSheet({
                               <div className="flex items-center justify-center gap-2.5">
                                 <button
                                   onClick={handleKeepGoing}
-                                  className="flex items-center justify-center rounded-xl bg-white/20 px-3.5 py-2 text-[13px] font-black text-white transition-all hover:bg-white/30 active:scale-95"
+                                  className="flex items-center justify-center rounded-xl bg-white/20 px-3.5 py-2 text-[13px] font-black text-white transition-[transform,box-shadow,background-color,color,opacity] hover:bg-white/30 active:scale-95"
                                 >
                                   <Zap className="mr-1 h-3.5 w-3.5 fill-current" />
                                   +5 MORE
-                                </button>
-                                <button
-                                  onClick={handleStartBreak}
-                                  className="flex items-center justify-center rounded-xl bg-white/20 px-3.5 py-2 text-[13px] font-black text-white transition-all hover:bg-white/30 active:scale-95"
-                                >
-                                  <Coffee className="mr-1 h-3.5 w-3.5" />
-                                  BREAK
                                 </button>
                               </div>
                             )}
@@ -1694,7 +1679,7 @@ export default function FrogodoroSheet({
                             <button
                               onClick={handleStopTimer}
                               aria-label="Stop session"
-                              className="p-2.5 bg-white/20 hover:bg-white/30 rounded-xl active:scale-95 text-white transition-all"
+                              className="p-2.5 bg-white/20 hover:bg-white/30 rounded-xl active:scale-95 text-white transition-[transform,box-shadow,background-color,color,opacity]"
                             >
                               <Square className="w-5 h-5 fill-current opacity-90" />
                             </button>
@@ -1707,7 +1692,7 @@ export default function FrogodoroSheet({
                             data-hint={timerActive ? undefined : 'focus-start'}
                             className={`relative flex items-center justify-center px-8 py-3 bg-white dark:bg-slate-50 text-[16px]
  font-black rounded-2xl shadow-[0_6px_0_rgba(0,0,0,0.15)]
- active:shadow-[0_0_0_rgba(0,0,0,0.15)] active:translate-y-1.5 transition-all ${getPhaseAccent()}`}
+ active:shadow-[0_0_0_rgba(0,0,0,0.15)] active:translate-y-1.5 transition-[transform,box-shadow,background-color,color,opacity] ${getPhaseAccent()}`}
                           >
                             {isRunning ? (
                               <Pause className="w-5 h-5 mr-1.5 fill-current" />
@@ -1722,7 +1707,7 @@ export default function FrogodoroSheet({
                             <button
                               onClick={handleManualSkip}
                               aria-label="Skip"
-                              className="p-2.5 bg-white/20 hover:bg-white/30 rounded-xl active:scale-95 text-white transition-all"
+                              className="p-2.5 bg-white/20 hover:bg-white/30 rounded-xl active:scale-95 text-white transition-[transform,box-shadow,background-color,color,opacity]"
                             >
                               <SkipForward className="w-5 h-5 fill-current opacity-90" />
                             </button>
@@ -1803,7 +1788,7 @@ export default function FrogodoroSheet({
                         </p>
                         <button
                           onClick={() => setConfirmStop(false)}
-                          className="mt-4 w-full rounded-2xl bg-primary py-3 text-sm font-black text-primary-foreground shadow-md shadow-primary/20 transition-all active:scale-[0.98]"
+                          className="mt-4 w-full rounded-2xl bg-primary py-3 text-sm font-black text-primary-foreground shadow-md shadow-primary/20 transition-[transform,box-shadow,background-color,color,opacity] active:scale-[0.98]"
                         >
                           Keep going
                         </button>
@@ -1853,7 +1838,7 @@ export default function FrogodoroSheet({
                         </p>
                         <button
                           onClick={() => setConfirmPause(false)}
-                          className="mt-4 w-full rounded-2xl bg-primary py-3 text-sm font-black text-primary-foreground shadow-md shadow-primary/20 transition-all active:scale-[0.98]"
+                          className="mt-4 w-full rounded-2xl bg-primary py-3 text-sm font-black text-primary-foreground shadow-md shadow-primary/20 transition-[transform,box-shadow,background-color,color,opacity] active:scale-[0.98]"
                         >
                           Keep going
                         </button>
@@ -1913,7 +1898,7 @@ export default function FrogodoroSheet({
                             setConfirmTaskSwitch(false);
                             onOpenChange(false);
                           }}
-                          className="mt-4 w-full rounded-2xl bg-primary py-3 text-sm font-black text-primary-foreground shadow-md shadow-primary/20 transition-all active:scale-[0.98]"
+                          className="mt-4 w-full rounded-2xl bg-primary py-3 text-sm font-black text-primary-foreground shadow-md shadow-primary/20 transition-[transform,box-shadow,background-color,color,opacity] active:scale-[0.98]"
                         >
                           Keep current timer
                         </button>

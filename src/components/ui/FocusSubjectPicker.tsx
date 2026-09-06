@@ -240,7 +240,7 @@ export function FocusSubjectPicker({
                       hapticSelect();
                       onPick({ ...task, subjectKind: 'task' });
                     }}
-                    className={`flex min-h-[56px] w-full items-center gap-3 rounded-2xl border px-3.5 py-2.5 text-left transition-all active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                    className={`flex min-h-[56px] w-full items-center gap-3 rounded-2xl border px-3.5 py-2.5 text-left transition-[transform,box-shadow,background-color,color,opacity] active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                       selected
                         ? 'border-primary/60 bg-primary/5'
                         : 'border-border/60 bg-card hover:border-border hover:bg-muted/45'
@@ -285,7 +285,7 @@ export function FocusSubjectPicker({
                     type="button"
                     data-hint="focus-subject"
                     onClick={() => void openContainer('area', area.id, `area:${area.id}`)}
-                    className={`relative flex h-24 flex-col justify-end overflow-hidden rounded-2xl border p-2.5 text-left transition-all active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                    className={`relative flex h-24 flex-col justify-end overflow-hidden rounded-2xl border p-2.5 text-left transition-[transform,box-shadow,background-color,color,opacity] active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                       selected ? 'border-primary' : 'border-border/60'
                     }`}
                     style={{ backgroundColor: area.accent }}
@@ -337,7 +337,7 @@ export function FocusSubjectPicker({
                     data-hint="focus-subject-tag"
                     data-tag-id={tag.id}
                     onClick={() => void openContainer('tag', tag.id, `tag:${tag.id}`)}
-                    className={`inline-flex max-w-full select-none items-center gap-1.5 rounded-2xl border px-4 py-2.5 text-[13px] font-black shadow-sm transition-all active:scale-95 ${
+                    className={`inline-flex max-w-full select-none items-center gap-1.5 rounded-2xl border px-4 py-2.5 text-[13px] font-black shadow-sm transition-[transform,box-shadow,background-color,color,opacity] active:scale-95 ${
                       selected ? 'ring-2 ring-offset-1 ring-offset-background' : ''
                     }`}
                     style={{

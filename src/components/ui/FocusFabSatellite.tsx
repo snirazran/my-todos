@@ -26,7 +26,7 @@ export function FocusFabSatellite({
         hapticSelect();
         openFocusLauncher();
       }}
-      className="fixed right-[1.9rem] z-[40] grid h-11 w-11 place-items-center rounded-full bg-card text-primary shadow-[0_3px_8px_-2px_rgba(0,0,0,0.22)] ring-1 ring-border/70 transition-all hover:brightness-105 active:scale-95 bottom-[var(--focus-fab-bottom)] md:bottom-[var(--focus-fab-bottom-md)] md:right-[max(1.9rem,50vw_-_394px)]"
+      className="fixed right-[1.9rem] z-[40] grid h-11 w-11 place-items-center rounded-full bg-card text-primary shadow-[0_3px_8px_-2px_rgba(0,0,0,0.22)] ring-1 ring-border/70 transition-[transform,box-shadow,background-color,color,opacity] hover:brightness-105 active:scale-95 bottom-[var(--focus-fab-bottom)] md:bottom-[var(--focus-fab-bottom-md)] md:right-[max(1.9rem,50vw_-_394px)]"
       style={
         {
           '--focus-fab-bottom': bottom,

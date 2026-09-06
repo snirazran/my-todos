@@ -158,6 +158,7 @@ export default function GlobalFrogodoroMini() {
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.96 }}
                     transition={{ type: 'tween', duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+                    style={{ willChange: 'transform, opacity' }}
                     onAnimationComplete={() => {
                       if (showDone) setCardEntered(true);
                     }}
@@ -213,7 +214,7 @@ export default function GlobalFrogodoroMini() {
                           {celebrateFocus && (
                             <button
                               onClick={handleKeepGoing}
-                              className="flex items-center justify-center gap-1 rounded-2xl bg-white/20 px-4 py-3 text-[13px] font-black text-white shadow-[0_6px_0_rgba(0,0,0,0.15)] transition-all hover:bg-white/30 active:translate-y-1.5 active:shadow-none"
+                              className="flex items-center justify-center gap-1 rounded-2xl bg-white/20 px-4 py-3 text-[13px] font-black text-white shadow-[0_6px_0_rgba(0,0,0,0.15)] transition-[transform,box-shadow,background-color,color,opacity] hover:bg-white/30 active:translate-y-1.5 active:shadow-none"
                             >
                               <Zap className="h-4 w-4 fill-current" />
                               +5 more
@@ -241,7 +242,7 @@ export default function GlobalFrogodoroMini() {
                             </div>
                             <button
                               onClick={handleDone}
-                              className={`relative flex items-center justify-center gap-1.5 rounded-2xl bg-white px-8 py-3 text-[15px] font-black shadow-[0_6px_0_rgba(0,0,0,0.15)] transition-all active:translate-y-1.5 active:shadow-none ${accent}`}
+                              className={`relative flex items-center justify-center gap-1.5 rounded-2xl bg-white px-8 py-3 text-[15px] font-black shadow-[0_6px_0_rgba(0,0,0,0.15)] transition-[transform,box-shadow,background-color,color,opacity] active:translate-y-1.5 active:shadow-none ${accent}`}
                             >
                               <Check className="h-5 w-5" />
                               Done
