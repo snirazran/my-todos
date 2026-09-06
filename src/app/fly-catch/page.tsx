@@ -1,15 +1,19 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import FlyCatchGame from '@/components/fly-game/FlyCatchGame';
+import { openGraphFor } from '@/lib/seo';
 
 export const metadata: Metadata = {
-  title: 'Frogress — Can you catch one more?',
+  title: 'Fly Catch — the 30-second frog game',
   description:
-    'Catch a chaotic swarm, dodge trap flies, and turn your high score into starter flies for Frogress.',
+    'A free 30-second frog game: catch a chaotic swarm, dodge the trap flies, and turn your high score into starter flies for the Frogress to-do list app.',
+  alternates: { canonical: '/fly-catch' },
   openGraph: {
-    title: 'I set a new Frogress high score. Can you beat me?',
-    description: '30 seconds. One frog. A very chaotic swarm.',
-    type: 'website',
+    ...openGraphFor({
+      title: 'I set a new Frogress high score. Can you beat me?',
+      description: '30 seconds. One frog. A very chaotic swarm.',
+      path: '/fly-catch',
+    }),
   },
   twitter: {
     card: 'summary_large_image',

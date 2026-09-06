@@ -35,6 +35,16 @@ const nextConfig = {
   async headers() {
     return [
       {
+        source:
+          '/:segment(planner|quests|wardrobe|friends|insights|login|register|welcome|onboarding|try|admin|auth|oauth|monitoring)',
+        headers: [{ key: 'X-Robots-Tag', value: 'noindex, follow' }],
+      },
+      {
+        source:
+          '/:segment(planner|quests|wardrobe|friends|insights|login|register|welcome|onboarding|try|admin|auth|oauth|monitoring)/:path*',
+        headers: [{ key: 'X-Robots-Tag', value: 'noindex, follow' }],
+      },
+      {
         source: '/:file(rive|rive_fallback).wasm',
         headers: [
           {

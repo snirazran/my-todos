@@ -1,7 +1,14 @@
 import type { Metadata } from 'next';
 import { LegalPage, type LegalSection } from '@/components/legal/LegalPage';
+import { JsonLd } from '@/components/seo/JsonLd';
+import {
+  LEGAL_LAST_UPDATED,
+  breadcrumbJsonLd,
+  graph,
+  pageMetadata,
+} from '@/lib/seo';
 
-const lastUpdated = 'September 1, 2026';
+const lastUpdated = LEGAL_LAST_UPDATED.terms;
 
 const sections: LegalSection[] = [
   {
@@ -131,18 +138,33 @@ const sections: LegalSection[] = [
   },
 ];
 
-export const metadata: Metadata = {
-  title: 'Terms of Service | Frogress',
-  description: 'Terms of Service for Frogress.',
-};
+const TITLE = 'Terms of Service';
+const DESCRIPTION =
+  'The terms that govern your use of Frogress: accounts, subscriptions and free trials, in-app rewards and flies, acceptable use, and how to cancel.';
+
+export const metadata: Metadata = pageMetadata({
+  title: TITLE,
+  description: DESCRIPTION,
+  path: '/terms',
+});
 
 export default function TermsPage() {
   return (
+    <>
+    <JsonLd
+      data={graph(
+        breadcrumbJsonLd([
+          { name: 'Frogress', path: '/' },
+          { name: 'Terms of Service', path: '/terms' },
+        ]),
+      )}
+    />
     <LegalPage
       title="Terms of Service"
       description="Please read these terms before using Frogress. They explain the rules for using the app, your responsibilities, and how the service is provided."
       lastUpdated={lastUpdated}
       sections={sections}
     />
+    </>
   );
 }

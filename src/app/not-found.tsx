@@ -2,8 +2,9 @@ import type { Metadata } from 'next';
 import { ErrorScene } from '@/components/ui/ErrorScene';
 
 export const metadata: Metadata = {
-  title: 'Lost in the pond · Frogress',
+  title: 'Page not found',
   description: 'That page hopped away. Head back to your quests — or catch a few flies first.',
+  robots: { index: false, follow: true },
 };
 
 export default function NotFound() {

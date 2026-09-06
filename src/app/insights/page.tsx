@@ -1,8 +1,9 @@
 import { InsightsView } from '@/components/insights/InsightsView';
 
 export const metadata = {
-  title: 'Your Patterns · Frogress',
+  title: 'Your Patterns',
   description: 'Understand your habits, focus, and follow-through.',
+  robots: { index: false, follow: true },
 };
 
 export default async function InsightsPage({

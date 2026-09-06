@@ -1,7 +1,14 @@
 import type { Metadata } from 'next';
 import { LegalPage, type LegalSection } from '@/components/legal/LegalPage';
+import { JsonLd } from '@/components/seo/JsonLd';
+import {
+  LEGAL_LAST_UPDATED,
+  breadcrumbJsonLd,
+  graph,
+  pageMetadata,
+} from '@/lib/seo';
 
-const lastUpdated = 'August 30, 2026';
+const lastUpdated = LEGAL_LAST_UPDATED.support;
 
 const sections: LegalSection[] = [
   {
@@ -69,19 +76,33 @@ const sections: LegalSection[] = [
   },
 ];
 
-export const metadata: Metadata = {
-  title: 'Support | Frogress',
-  description:
-    'Help and contact details for Frogress — tasks, planner, focus timer, flies, quests, Frogress Plus, and account questions.',
-};
+const TITLE = 'Help & Support';
+const DESCRIPTION =
+  'How Frogress works: tasks, planner, focus timer, flies, quests, Frogress Plus, notifications, sync and account deletion — plus a real email address.';
+
+export const metadata: Metadata = pageMetadata({
+  title: TITLE,
+  description: DESCRIPTION,
+  path: '/support',
+});
 
 export default function SupportPage() {
   return (
+    <>
+    <JsonLd
+      data={graph(
+        breadcrumbJsonLd([
+          { name: 'Frogress', path: '/' },
+          { name: 'Help & Support', path: '/support' },
+        ]),
+      )}
+    />
     <LegalPage
       title="Support"
       description="Answers to the questions we are asked most, and a real email address if yours is not here."
       lastUpdated={lastUpdated}
       sections={sections}
     />
+    </>
   );
 }

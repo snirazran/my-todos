@@ -1,21 +1,56 @@
 {
-  "name": "Frogress",
+  "id": "/",
+  "name": "Frogress: Your To-Do List Pet",
   "short_name": "Frogress",
-  "description": "Frogress Todo List App",
+  "description": "A to-do list app with a pet frog. Plan your week, run a focus timer, and feed your frog every time you finish a task.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui", "browser"],
+  "orientation": "portrait",
   "background_color": "#ffffff",
-  "theme_color": "#000000",
+  "theme_color": "#ffffff",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["productivity", "lifestyle", "utilities"],
   "icons": [
     {
       "src": "/192x192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
       "src": "/512x512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Today",
+      "short_name": "Today",
+      "url": "/",
+      "description": "Everything you planned for today"
+    },
+    {
+      "name": "Planner",
+      "short_name": "Planner",
+      "url": "/planner",
+      "description": "Plan your week and month"
+    },
+    {
+      "name": "Quests",
+      "short_name": "Quests",
+      "url": "/quests",
+      "description": "Daily quests, streaks and rewards"
+    },
+    {
+      "name": "Wardrobe",
+      "short_name": "Wardrobe",
+      "url": "/wardrobe",
+      "description": "Dress up your frog"
     }
   ]
 }

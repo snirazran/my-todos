@@ -1,7 +1,14 @@
 import type { Metadata } from 'next';
 import { LegalPage, type LegalSection } from '@/components/legal/LegalPage';
+import { JsonLd } from '@/components/seo/JsonLd';
+import {
+  LEGAL_LAST_UPDATED,
+  breadcrumbJsonLd,
+  graph,
+  pageMetadata,
+} from '@/lib/seo';
 
-const lastUpdated = 'August 2, 2026';
+const lastUpdated = LEGAL_LAST_UPDATED.privacy;
 
 const sections: LegalSection[] = [
   {
@@ -133,18 +140,33 @@ const sections: LegalSection[] = [
   },
 ];
 
-export const metadata: Metadata = {
-  title: 'Privacy Policy | Frogress',
-  description: 'Privacy Policy for Frogress.',
-};
+const TITLE = 'Privacy Policy';
+const DESCRIPTION =
+  'How Frogress collects, uses, shares and protects your information across the web and mobile apps — and how to access, export or permanently delete your data.';
+
+export const metadata: Metadata = pageMetadata({
+  title: TITLE,
+  description: DESCRIPTION,
+  path: '/privacy',
+});
 
 export default function PrivacyPage() {
   return (
+    <>
+    <JsonLd
+      data={graph(
+        breadcrumbJsonLd([
+          { name: 'Frogress', path: '/' },
+          { name: 'Privacy Policy', path: '/privacy' },
+        ]),
+      )}
+    />
     <LegalPage
       title="Privacy Policy"
       description="This policy explains what information Frogress collects, how it is used, and the choices you have."
       lastUpdated={lastUpdated}
       sections={sections}
     />
+    </>
   );
 }

@@ -1,7 +1,14 @@
 import type { Metadata } from 'next';
 import { LegalPage, type LegalSection } from '@/components/legal/LegalPage';
+import { JsonLd } from '@/components/seo/JsonLd';
+import {
+  LEGAL_LAST_UPDATED,
+  breadcrumbJsonLd,
+  graph,
+  pageMetadata,
+} from '@/lib/seo';
 
-const lastUpdated = 'July 26, 2026';
+const lastUpdated = LEGAL_LAST_UPDATED.refund;
 
 const sections: LegalSection[] = [
   {
@@ -64,19 +71,33 @@ const sections: LegalSection[] = [
   },
 ];
 
-export const metadata: Metadata = {
-  title: 'Refund Policy | Frogress',
-  description:
-    'How refunds and cancellations work for Frogress Plus purchases made on the web, the App Store, and Google Play.',
-};
+const TITLE = 'Refund Policy';
+const DESCRIPTION =
+  'How refunds and cancellations work for Frogress Plus and fly packs bought on the web, the App Store or Google Play, including the 14-day web window.';
+
+export const metadata: Metadata = pageMetadata({
+  title: TITLE,
+  description: DESCRIPTION,
+  path: '/refund-policy',
+});
 
 export default function RefundPolicyPage() {
   return (
+    <>
+    <JsonLd
+      data={graph(
+        breadcrumbJsonLd([
+          { name: 'Frogress', path: '/' },
+          { name: 'Refund Policy', path: '/refund-policy' },
+        ]),
+      )}
+    />
     <LegalPage
       title="Refund Policy"
       description="How refunds and cancellations work for Frogress Plus, including purchases made on the web, through the Apple App Store, and through Google Play."
       lastUpdated={lastUpdated}
       sections={sections}
     />
+    </>
   );
 }

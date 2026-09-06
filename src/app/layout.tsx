@@ -20,6 +20,22 @@ import { RIVE_WASM_VERSION } from '@/lib/riveWasmVersion';
 import { MainScroll } from '@/components/providers/MainScroll';
 import { FlyCatchOverlay } from '@/components/fly-game/FlyCatchOverlay';
 import { CrossPlatformGiftBanner } from '@/components/ui/CrossPlatformGiftBanner';
+import { JsonLd } from '@/components/seo/JsonLd';
+import {
+  ANDROID_PACKAGE,
+  APP_STORE_ID,
+  FOUNDER_NAME,
+  GOOGLE_SITE_VERIFICATION,
+  SITE_DESCRIPTION,
+  SITE_KEYWORDS,
+  SITE_NAME,
+  SITE_TITLE,
+  SITE_URL,
+  TWITTER_HANDLE,
+  graph,
+  organizationJsonLd,
+  websiteJsonLd,
+} from '@/lib/seo';
 
 const poppins = Poppins({
   subsets: ['latin'],
@@ -58,9 +74,58 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://frogress.com'),
-  title: 'Frogress',
-  description: 'Frogress Todo List App',
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: SITE_TITLE,
+    template: `%s | ${SITE_NAME}`,
+  },
+  description: SITE_DESCRIPTION,
+  keywords: SITE_KEYWORDS,
+  applicationName: SITE_NAME,
+  category: 'productivity',
+  authors: [{ name: FOUNDER_NAME }],
+  creator: FOUNDER_NAME,
+  publisher: SITE_NAME,
+  alternates: { canonical: '/' },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+      'max-video-preview': -1,
+    },
+  },
+  openGraph: {
+    type: 'website',
+    siteName: SITE_NAME,
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    url: '/',
+    locale: 'en_US',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    ...(TWITTER_HANDLE ? { site: TWITTER_HANDLE, creator: TWITTER_HANDLE } : {}),
+  },
+  appleWebApp: {
+    capable: true,
+    title: SITE_NAME,
+    statusBarStyle: 'black-translucent',
+  },
+  ...(APP_STORE_ID ? { itunes: { appId: APP_STORE_ID } } : {}),
+  appLinks: {
+    android: { package: ANDROID_PACKAGE, app_name: SITE_NAME },
+    ...(APP_STORE_ID
+      ? { ios: { url: SITE_URL, app_store_id: APP_STORE_ID } }
+      : {}),
+    web: { url: SITE_URL, should_fallback: true },
+  },
+  formatDetection: { telephone: false, date: false, address: false, email: false },
   icons: {
     icon: [
       { url: '/favicon.ico', sizes: '16x16 32x32 48x48', type: 'image/x-icon' },
@@ -74,6 +139,9 @@ export const metadata: Metadata = {
     },
   },
   manifest: '/manifest.json',
+  ...(GOOGLE_SITE_VERIFICATION
+    ? { verification: { google: GOOGLE_SITE_VERIFICATION } }
+    : {}),
   other: {
     'facebook-domain-verification': 'o1byhp7w7toyiegdgwn10vqptuwqeq',
   },
@@ -155,6 +223,8 @@ export default function RootLayout({
           'pb-[env(safe-area-inset-bottom)]',
         ].join(' ')}
       >
+        <JsonLd data={graph(organizationJsonLd(), websiteJsonLd())} />
+
         {/* Global, fixed background that paints under mobile URL/search bars */}
         <div className="fixed inset-0 -z-10 bg-background [background-attachment:fixed]" />
 

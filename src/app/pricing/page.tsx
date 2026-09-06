@@ -1,12 +1,23 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Check } from 'lucide-react';
+import { JsonLd } from '@/components/seo/JsonLd';
+import {
+  breadcrumbJsonLd,
+  graph,
+  pageMetadata,
+  plusProductJsonLd,
+} from '@/lib/seo';
 
-export const metadata: Metadata = {
-  title: 'Pricing | Frogress',
-  description:
-    'Frogress is free to use. Frogress Plus unlocks unlimited quests and tags, double rewards, season plus rewards, and exclusive skins and backgrounds.',
-};
+const TITLE = 'Pricing — Free Plan & Frogress Plus';
+const DESCRIPTION =
+  'Frogress is free: tasks, planner, focus timer, quests and your frog. Frogress Plus is $9.99 a month or $69.99 a year for double rewards and Plus-only outfits.';
+
+export const metadata: Metadata = pageMetadata({
+  title: TITLE,
+  description: DESCRIPTION,
+  path: '/pricing',
+});
 
 const COMPARISON_ROWS: { label: string; free: boolean }[] = [
   { label: 'Tasks, planner, and focus timer', free: true },
@@ -23,6 +34,15 @@ const COMPARISON_ROWS: { label: string; free: boolean }[] = [
 export default function PricingPage() {
   return (
     <div className="min-h-full bg-background">
+      <JsonLd
+        data={graph(
+          plusProductJsonLd(),
+          breadcrumbJsonLd([
+            { name: 'Frogress', path: '/' },
+            { name: 'Pricing', path: '/pricing' },
+          ]),
+        )}
+      />
       <section className="mx-auto flex w-full max-w-4xl flex-col px-5 py-10 sm:px-8 md:py-14">
         <div className="mb-10 text-center">
           <Link

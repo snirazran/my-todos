@@ -9,11 +9,13 @@ import { MarketingFocusPreview } from '@/components/marketing/MarketingFocusPrev
 import { MarketingPlannerPreview } from '@/components/marketing/MarketingPlannerPreview';
 import { MarketingWardrobePreview } from '@/components/marketing/MarketingWardrobePreview';
 import { DEFAULT_BACKGROUND_IMAGES } from '@/lib/backgrounds/constants';
+import { HOMEPAGE_FAQ } from '@/lib/seo';
 
 const navLinks = [
   { href: '#how-it-works', label: 'How it works', visibility: 'hidden sm:inline-flex' },
   { href: '#planner', label: 'Planner', visibility: 'hidden lg:inline-flex' },
   { href: '#rewards', label: 'Rewards', visibility: 'hidden md:inline-flex' },
+  { href: '#faq', label: 'FAQ', visibility: 'hidden lg:inline-flex' },
   { href: '/pricing', label: 'Pricing', visibility: 'hidden md:inline-flex' },
 ];
 
@@ -352,6 +354,60 @@ export function PublicHomepage() {
         </div>
       </section>
 
+      <section
+        id="faq"
+        className="scroll-mt-20 bg-[#f3f8ef] py-16 dark:bg-[#08190f] sm:py-20 lg:py-24"
+      >
+        <div className="mx-auto w-full max-w-4xl px-5 sm:px-8">
+          <Reveal className="mx-auto max-w-2xl text-center">
+            <p className={eyebrowClass}>Questions</p>
+            <h2 className={`${headingClass} mx-auto`}>
+              Everything people ask before they start.
+            </h2>
+          </Reveal>
+
+          <Reveal
+            delay={80}
+            className="mt-12 divide-y divide-border/60 overflow-hidden rounded-[28px] border border-border/60 bg-card shadow-sm"
+          >
+            {HOMEPAGE_FAQ.map((item, index) => (
+              <details key={item.question} className="group" open={index === 0}>
+                <summary className="cursor-pointer list-none px-5 py-5 [&::-webkit-details-marker]:hidden sm:px-7">
+                  <h3 className="flex items-center justify-between gap-4 text-base font-black text-foreground">
+                    {item.question}
+                    <ChevronDown
+                      className="h-5 w-5 shrink-0 text-muted-foreground transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none"
+                      aria-hidden
+                    />
+                  </h3>
+                </summary>
+                <p className="px-5 pb-6 text-sm font-medium leading-7 text-muted-foreground sm:px-7">
+                  {item.answer}
+                </p>
+              </details>
+            ))}
+          </Reveal>
+
+          <p className="mt-8 text-center text-sm font-bold text-muted-foreground">
+            Still stuck?{' '}
+            <Link
+              href="/support"
+              className="text-foreground underline underline-offset-4 hover:no-underline"
+            >
+              Read the support guide
+            </Link>{' '}
+            or email{' '}
+            <a
+              href="mailto:help@frogress.com"
+              className="text-foreground underline underline-offset-4 hover:no-underline"
+            >
+              help@frogress.com
+            </a>
+            .
+          </p>
+        </div>
+      </section>
+
       <section className="px-5 pb-16 sm:px-8 sm:pb-20 lg:px-10 lg:pb-24">
         <Reveal className="relative mx-auto flex w-full max-w-7xl flex-col gap-8 overflow-hidden rounded-[34px] bg-[#cfe7a1] px-6 py-14 text-[#153b2b] sm:px-10 md:flex-row md:items-center md:justify-between md:gap-10 lg:gap-14 lg:px-14">
           <div className="relative z-10 min-w-0 max-w-xl">
@@ -400,6 +456,12 @@ export function PublicHomepage() {
             <Link href="/pricing" className="hover:text-foreground hover:underline">
               Pricing
             </Link>
+            <Link href="/support" className="hover:text-foreground hover:underline">
+              Support
+            </Link>
+            <Link href="/get-app" className="hover:text-foreground hover:underline">
+              Get the app
+            </Link>
             <Link href="/privacy" className="hover:text-foreground hover:underline">
               Privacy
             </Link>
@@ -409,6 +471,14 @@ export function PublicHomepage() {
             <Link href="/refund-policy" className="hover:text-foreground hover:underline">
               Refunds
             </Link>
+            <a
+              href="https://www.instagram.com/getfrogress"
+              target="_blank"
+              rel="me noopener noreferrer"
+              className="hover:text-foreground hover:underline"
+            >
+              Instagram
+            </a>
             <a href="mailto:help@frogress.com" className="hover:text-foreground hover:underline">
               Contact
             </a>
