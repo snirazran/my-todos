@@ -27,24 +27,40 @@ type Pack = {
   id: string;
   amount: number;
   price: string;
-  bonus?: string;
+  /** How far this pack's flies-per-dollar beats the cheapest one. */
+  bonusPercent: number;
   badge?: 'popular' | 'best';
   flies: number[];
 };
 
-const PACK_META: Omit<Pack, 'amount'>[] = [
+const PACK_META: Omit<Pack, 'amount' | 'bonusPercent'>[] = [
   { id: 'pinch', price: '$1.99', flies: [30] },
-  { id: 'rare-jar', price: '$4.99', bonus: '+14%', badge: 'popular', flies: [32, 22] },
-  { id: 'swarm', price: '$9.99', bonus: '+37%', flies: [36, 26] },
-  { id: 'epic-cloud', price: '$19.99', bonus: '+48%', flies: [36, 28, 20] },
-  { id: 'mega-swarm', price: '$49.99', bonus: '+59%', flies: [40, 30, 22] },
-  { id: 'legendary-vault', price: '$99.99', bonus: '+71%', badge: 'best', flies: [44, 34, 26, 20] },
+  { id: 'rare-jar', price: '$4.99', badge: 'popular', flies: [32, 22] },
+  { id: 'swarm', price: '$9.99', flies: [36, 26] },
+  { id: 'epic-cloud', price: '$19.99', flies: [36, 28, 20] },
+  { id: 'mega-swarm', price: '$49.99', flies: [40, 30, 22] },
+  { id: 'legendary-vault', price: '$99.99', badge: 'best', flies: [44, 34, 26, 20] },
 ];
 
-const PACKS: Pack[] = PACK_META.map((meta) => ({
-  ...meta,
-  amount: getFlyPack(meta.id)?.amount ?? 0,
-}));
+// The ladder's entire argument is flies per dollar, so it is measured off the
+// catalog instead of being written down a second time and drifting.
+const PACKS: Pack[] = (() => {
+  const perDollarOf = (id: string) => {
+    const pack = getFlyPack(id);
+    return pack ? pack.amount / pack.priceUsd : 0;
+  };
+  const base = perDollarOf(PACK_META[0].id);
+  return PACK_META.map((meta) => {
+    const perDollar = perDollarOf(meta.id);
+    return {
+      ...meta,
+      amount: getFlyPack(meta.id)?.amount ?? 0,
+      bonusPercent: base ? Math.round((perDollar / base - 1) * 100) : 0,
+    };
+  });
+})();
+
+
 
 /**
  * A pond, one hour later per tier: dawn mist over the cheapest pack, golden
@@ -54,9 +70,8 @@ const PACKS: Pack[] = PACK_META.map((meta) => ({
  * actually being merchandised.
  *
  * `sky` is the wash behind the art, `sun` the glow it sits against, `water`
- * the band it stands on. The packs from the bucket up are objects resting on
- * something, so they also get a contact shadow; the loose flies do not, since
- * a fly in flight touching the ground is exactly the wrong read.
+ * the band it stands on. Every pack is now a container resting on something —
+ * bucket through chest — so they all get a contact shadow.
  */
 const TIER_SCENE = [
   {
@@ -94,6 +109,10 @@ const TIER_SCENE = [
 /** Every pack's artwork is now an object standing in the scene. */
 const FIRST_GROUNDED_BUNDLE = 1;
 
+/** Which free-flies surface the sheet is showing: an ad round, the Plus
+ *  upsell that replaces it off-device, or nothing at all for Plus members. */
+type FreeMode = 'ads' | 'plus' | 'none';
+
 type AdFlyStatus = {
   reward: number;
   cap: number;
@@ -117,6 +136,7 @@ export function CurrencyShop() {
   const { data: inventoryData } = useInventory(open, true);
   const balance = inventoryData?.wardrobe?.flies ?? 0;
   const [artReady, setArtReady] = useState(false);
+  const [freeMode, setFreeMode] = useState<FreeMode>('none');
   const openedRef = useRef(false);
   const boughtRef = useRef(false);
   const packs = PACKS.map((pack) => ({
@@ -217,7 +237,7 @@ export function CurrencyShop() {
       onOpenChange={setOpen}
       zIndex={1700}
       backdropClassName="bg-black/70 backdrop-blur-sm"
-      className="max-h-[90vh] bg-popover sm:max-h-[85vh] sm:max-w-md"
+      className="max-h-[90vh] bg-popover sm:max-h-[85vh] sm:max-w-2xl"
     >
       {({ bindScroll }) => (
         <>
@@ -256,31 +276,33 @@ export function CurrencyShop() {
               <WishlistGoalCard open={open} onNavigate={() => setOpen(false)} />
             )}
 
-            <FreeFliesCard open={open} />
+            <FreeFliesCard open={open} onMode={setFreeMode} />
 
             <p className="mb-2 mt-5 px-1 text-[12px] font-black text-muted-foreground">
               Fly packs
             </p>
 
-            {/* Four small tiers side by side stay comparable at a glance, then
-                the ladder opens up: the top two packs get the width and the
-                stage their artwork was drawn for. */}
-            <div className="grid grid-cols-2 gap-2.5">
-              {packs.slice(0, 4).map((pack, index) => (
+            {/* One shape for all six, so the only thing that differs between
+                them is the artwork and the number — which is what the shelf is
+                asking them to compare. Two up on a phone, three on a desktop:
+                every pack is auditable without hunting, and the scroll runs
+                along the sheet's long axis. */}
+            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+              {packs.map((pack, index) => (
                 <PackCard
                   key={pack.id}
                   pack={pack}
                   bundle={index + 1}
-                  variant="grid"
                   {...shared}
                 />
               ))}
             </div>
 
-            <div className="mt-2.5 flex flex-col gap-2.5">
-              <PackCard pack={packs[4]} bundle={5} variant="wide" {...shared} />
-              <PackCard pack={packs[5]} bundle={6} variant="hero" {...shared} />
-            </div>
+            {/* The ad round opens the sheet; Plus closes it. Stacking both
+                above the shelf would put three competing calls to action in
+                front of the merchandise, so the upsell waits until they have
+                seen the prices it is measured against. */}
+            {freeMode === 'ads' && <PlusFliesCard variant="closer" />}
 
             <p className="mx-auto mt-6 max-w-[17rem] text-center text-[11px] font-medium leading-relaxed text-muted-foreground/70">
               Built by a tiny team and one very hungry frog. Every pack keeps
@@ -367,14 +389,12 @@ function PackStage({
 function PackCard({
   pack,
   bundle,
-  variant,
   coversId,
   showArt,
   onPurchased,
 }: {
   pack: Pack;
   bundle: number;
-  variant: 'grid' | 'wide' | 'hero';
   coversId: string | null;
   showArt: boolean;
   onPurchased: (report: (info: string) => void) => Promise<boolean>;
@@ -419,182 +439,173 @@ function PackCard({
     </span>
   );
 
-  const badge = (covers || popular || best) && (
-    <span
-      className={cn(
-        'absolute z-10 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-black shadow-sm',
-        variant === 'hero' ? 'left-4 top-4 px-2.5 py-1 text-[11px]' : 'left-3.5 top-3.5',
-        best
-          ? 'bg-gradient-to-r from-amber-400 to-amber-500 text-amber-950'
-          : 'bg-primary text-primary-foreground',
-      )}
-    >
-      {covers ? '✓ Covers it' : popular ? '★ Popular' : '👑 Best value'}
-    </span>
-  );
-
-  const amount = (
-    <span className="flex items-baseline gap-1.5">
-      <span
-        className={cn(
-          'font-black leading-none tabular-nums text-foreground',
-          variant === 'hero'
-            ? 'text-[32px]'
-            : variant === 'wide'
-              ? 'text-2xl'
-              : 'text-xl',
-        )}
-      >
-        {pack.amount.toLocaleString()}
-      </span>
-      <span className="text-[11px] font-black text-muted-foreground">Flies</span>
-    </span>
-  );
-
-  const bonus = pack.bonus && (
-    <span
-      className={cn(
-        'inline-flex rounded-full px-2 py-0.5 text-[10px] font-black leading-none',
-        best
-          ? 'bg-amber-500/20 text-amber-700 dark:text-amber-400'
-          : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400',
-      )}
-    >
-      {pack.bonus} bonus
-    </span>
-  );
-
-  const priceButton = (
-    <span
-      className={cn(
-        'flex shrink-0 items-center justify-center rounded-2xl font-black tracking-wide text-white transition-all group-hover:-translate-y-0.5 group-active:translate-y-1 group-active:shadow-none',
-        best
-          ? 'bg-[#d99215] shadow-[0_4px_0_0_#96610a] group-hover:shadow-[0_5px_0_0_#96610a]'
-          : 'bg-[#4f9149] shadow-[0_4px_0_0_#34631f] group-hover:shadow-[0_5px_0_0_#34631f]',
-        variant === 'grid' ? 'h-10 w-full text-sm' : 'h-12 min-w-[104px] px-4 text-base',
-      )}
-    >
-      {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : pack.price}
-    </span>
-  );
-
-  // The artwork is drawn sticker-style — thick outlines, flat fills — so the
-  // cards carry a real edge rather than a hairline, and the merchandised ones
-  // add a glow instead of a heavier border.
-  const shell = cn(
-    'group relative w-full rounded-[22px] p-2.5 text-left transition-all hover:-translate-y-0.5 active:scale-[0.99] disabled:opacity-70',
-    covers || popular
-      ? 'bg-primary/[0.06] ring-2 ring-primary shadow-lg shadow-primary/15'
-      : best
-        ? 'bg-amber-400/[0.08] ring-2 ring-amber-400 shadow-lg shadow-amber-500/20'
-        : 'bg-card ring-2 ring-border/60 hover:ring-border',
-  );
-
-  const statusLine = status && (
-    <span className="block text-[10px] font-bold leading-none text-muted-foreground">
-      {status}
-    </span>
-  );
-
-  if (variant === 'hero') {
-    return (
-      <button type="button" onClick={buy} disabled={busy} className={cn(shell, 'p-3')}>
-        {badge}
-        <PackStage
-          bundle={bundle}
-          showArt={showArt}
-          fallback={flyCluster}
-          rays
-          className="h-36 w-full sm:h-40"
-        />
-        <span className="mt-3 flex items-center justify-between gap-3 px-1">
-          <span className="flex min-w-0 flex-col items-start gap-1.5">
-            {amount}
-            {bonus}
-            {statusLine}
-          </span>
-          {priceButton}
-        </span>
-      </button>
-    );
-  }
-
-  if (variant === 'wide') {
-    return (
-      <button
-        type="button"
-        onClick={buy}
-        disabled={busy}
-        className={cn(shell, 'flex items-center gap-3')}
-      >
-        {badge}
-        <PackStage
-          bundle={bundle}
-          showArt={showArt}
-          fallback={flyCluster}
-          className="h-24 w-32 shrink-0"
-        />
-        <span className="flex min-w-0 flex-1 flex-col items-start gap-1.5">
-          {amount}
-          {bonus}
-          {statusLine}
-        </span>
-        {priceButton}
-      </button>
-    );
-  }
-
+  // Artwork, amount and price are the only things drawn loud; the badge and
+  // the value chip stay deliberately small so six cards do not turn into
+  // twenty competing shouts.
   return (
     <button
       type="button"
       onClick={buy}
       disabled={busy}
-      className={cn(shell, 'flex flex-col gap-2')}
+      className={cn(
+        'group relative flex w-full flex-col gap-2 rounded-[22px] p-2.5 text-left transition-all hover:-translate-y-0.5 active:scale-[0.99] disabled:opacity-70',
+        covers || popular
+          ? 'bg-primary/[0.06] ring-2 ring-primary shadow-lg shadow-primary/15'
+          : best
+            ? 'bg-amber-400/[0.08] ring-2 ring-amber-400 shadow-lg shadow-amber-500/20'
+            : 'bg-card ring-1 ring-border/70 hover:ring-border',
+      )}
     >
-      {badge}
+      {(covers || popular || best) && (
+        <span
+          className={cn(
+            'absolute left-3 top-3 z-10 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-black shadow-sm',
+            best
+              ? 'bg-gradient-to-r from-amber-400 to-amber-500 text-amber-950'
+              : 'bg-primary text-primary-foreground',
+          )}
+        >
+          {covers ? '✓ Covers it' : popular ? '★ Popular' : '👑 Best value'}
+        </span>
+      )}
+
       <PackStage
         bundle={bundle}
         showArt={showArt}
         fallback={flyCluster}
-        className="h-24 w-full"
+        rays={best}
+        className="h-28 w-full sm:h-32"
       />
-      {/* The cheapest pack carries no bonus chip, so the buttons only line up
-          across a row if the price is pinned to the bottom of the card. */}
-      <span className="flex w-full flex-col items-start gap-1.5 px-0.5">
-        {amount}
-        {bonus}
-        {statusLine}
+
+      <span className="flex w-full flex-col items-start gap-1 px-0.5">
+        <span className="flex w-full flex-wrap items-baseline gap-x-2 gap-y-1">
+          <span className="flex items-baseline gap-1.5">
+            <span className="text-xl font-black leading-none tabular-nums text-foreground">
+              {pack.amount.toLocaleString()}
+            </span>
+            <span className="text-[11px] font-black text-muted-foreground">
+              Flies
+            </span>
+          </span>
+          {pack.bonusPercent > 0 && (
+            <span
+              className={cn(
+                'inline-flex shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black leading-none',
+                best
+                  ? 'bg-amber-500/20 text-amber-700 dark:text-amber-400'
+                  : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400',
+              )}
+            >
+              +{pack.bonusPercent}% value
+            </span>
+          )}
+        </span>
+        {status && (
+          <span className="block text-[10px] font-bold leading-none text-muted-foreground">
+            {status}
+          </span>
+        )}
       </span>
-      <span className="mt-auto w-full">{priceButton}</span>
+
+      <span
+        className={cn(
+          'mt-auto flex h-11 w-full items-center justify-center rounded-2xl text-sm font-black tracking-wide text-white transition-all group-hover:-translate-y-0.5 group-active:translate-y-1 group-active:shadow-none',
+          best
+            ? 'bg-[#d99215] shadow-[0_4px_0_0_#96610a] group-hover:shadow-[0_5px_0_0_#96610a]'
+            : 'bg-[#4f9149] shadow-[0_4px_0_0_#34631f] group-hover:shadow-[0_5px_0_0_#34631f]',
+        )}
+      >
+        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : pack.price}
+      </span>
     </button>
   );
 }
 
-function PlusFliesCard() {
+/**
+ * The Plus upsell, in the two places it earns.
+ *
+ * `primary` stands in for the ad round where rewarded video does not exist
+ * (web), so it keeps the full card. `closer` runs under the shelf on device,
+ * where the ad round already holds the top slot: stacking both above the packs
+ * would put three competing calls to action in front of the merchandise, and
+ * the upsell argues better once the prices it undercuts have been seen.
+ *
+ * Both wear the paywall's own colours — periwinkle ground, amber action — so
+ * the tap lands somewhere that looks like where it came from.
+ */
+function PlusFliesCard({
+  variant = 'primary',
+}: {
+  variant?: 'primary' | 'closer';
+}) {
   const openPremium = useUIStore((s) => s.setPremiumModalOpen);
+  const open = () => openPremium(true, 'fly_shop_free_flies');
+
+  if (variant === 'closer') {
+    return (
+      <button
+        type="button"
+        onClick={open}
+        className="group mt-5 flex w-full items-center gap-3 rounded-[22px] bg-[#6c6fce]/10 p-3 text-left ring-1 ring-[#6c6fce]/30 transition-all hover:-translate-y-0.5 active:scale-[0.99] dark:bg-[#6c6fce]/20"
+      >
+        <span className="-my-3 flex shrink-0 items-center">
+          <Icon
+            name="frogPlus"
+            label="Plus"
+            className="h-[60px] w-[60px] drop-shadow-[0_3px_5px_rgba(0,0,0,0.2)]"
+          />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-black tracking-tight text-foreground">
+            Earn outfits twice as fast
+          </span>
+          <span className="block text-xs font-semibold text-muted-foreground">
+            Double flies on quests and leaps, and reroll the daily deals with no
+            ad.
+          </span>
+        </span>
+        <span className="flex h-10 shrink-0 items-center rounded-xl bg-amber-500 px-3 text-xs font-black text-white shadow-[0_3px_0_0_#b45309] transition-all group-active:translate-y-0.5 group-active:shadow-none">
+          Get Plus
+        </span>
+      </button>
+    );
+  }
+
   return (
     <div>
-      <p className="mb-2 mt-5 px-1 text-[12px] font-black text-muted-foreground">
+      <p className="mb-3.5 mt-5 px-1 text-[12px] font-black text-muted-foreground">
         Free flies
       </p>
       <button
         type="button"
-        onClick={() => openPremium(true, 'fly_shop_free_flies')}
-        className="group relative flex w-full items-center gap-3 rounded-[20px] bg-amber-500 p-3.5 text-left text-white shadow-lg shadow-amber-500/25 transition-all hover:-translate-y-0.5 active:scale-[0.99] sm:rounded-[24px] sm:p-4 dark:bg-amber-600"
+        onClick={open}
+        className="group relative flex w-full items-center gap-3 rounded-[24px] bg-[#6c6fce] p-3.5 pl-2 text-left text-white shadow-[0_4px_0_0_#4c4fa8] transition-all hover:-translate-y-0.5 active:translate-y-1 active:shadow-none sm:gap-4 sm:p-4 sm:pl-2.5"
       >
-        <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/15 sm:h-14 sm:w-14">
-          <Icon name="frogPlus" label="Plus" className="h-7 w-7" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-black tracking-tight sm:text-base">
-            Double every reward
-          </p>
-          <p className="text-xs font-semibold text-white/85">
-            Bonus ad rounds are mobile-only. Plus doubles what you earn
-            everywhere.
-          </p>
-        </div>
-        <span className="flex h-11 shrink-0 items-center justify-center rounded-2xl bg-white px-3 text-xs font-black text-amber-700 shadow-sm">
+        {/* The mark carries the brand on its own — a tile around it just adds
+            another box, so it is sized up and allowed to break the card edge
+            instead. */}
+        <span className="-my-4 flex shrink-0 items-center sm:-my-5">
+          <Icon
+            name="frogPlus"
+            label="Plus"
+            className="h-[76px] w-[76px] drop-shadow-[0_4px_6px_rgba(0,0,0,0.28)] sm:h-[88px] sm:w-[88px]"
+          />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-2">
+            <span className="text-sm font-black tracking-tight sm:text-base">
+              Earn outfits twice as fast
+            </span>
+            <span className="rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-black leading-none text-amber-950">
+              ×2
+            </span>
+          </span>
+          <span className="mt-0.5 block text-xs font-semibold text-white/85">
+            Double flies on daily quests, leaps and commitments — and every gift
+            opens twice.
+          </span>
+        </span>
+        <span className="relative flex h-11 shrink-0 items-center justify-center rounded-2xl bg-amber-500 px-3.5 text-xs font-black text-white shadow-[0_3px_0_0_#b45309]">
           Get Plus
         </span>
       </button>
@@ -602,7 +613,13 @@ function PlusFliesCard() {
   );
 }
 
-function FreeFliesCard({ open }: { open: boolean }) {
+function FreeFliesCard({
+  open,
+  onMode,
+}: {
+  open: boolean;
+  onMode: (mode: FreeMode) => void;
+}) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -627,6 +644,18 @@ function FreeFliesCard({ open }: { open: boolean }) {
     const id = setInterval(() => setCooldown((left) => Math.max(0, left - 1)), 1000);
     return () => clearInterval(id);
   }, [cooldown]);
+
+  const mode: FreeMode = !data
+    ? 'none'
+    : data.available === false
+      ? 'none'
+      : available
+        ? 'ads'
+        : 'plus';
+
+  useEffect(() => {
+    onMode(mode);
+  }, [mode, onMode]);
 
   // Plus pays to not see ads, so the surface is gone rather than merely refused.
   if (data && data.available === false) return null;
@@ -686,72 +715,108 @@ function FreeFliesCard({ open }: { open: boolean }) {
     }
   };
 
+  const idle = !busy && !exhausted && !waiting;
+
   return (
     <div>
-      <p className="mb-2 mt-5 px-1 text-[12px] font-black text-muted-foreground">
-        Free flies
-      </p>
+      <div className="mb-2 mt-5 flex items-baseline justify-between gap-3 px-1">
+        <p className="text-[12px] font-black text-muted-foreground">Free flies</p>
+        {!exhausted && (
+          <p className="text-[11px] font-bold tabular-nums text-muted-foreground/80">
+            {remaining} of {cap} left today
+          </p>
+        )}
+      </div>
       <button
         type="button"
         onClick={handleWatch}
         disabled={busy || exhausted || waiting}
         className={cn(
-          'group relative flex w-full items-center gap-3 rounded-[20px] p-3.5 text-left transition-all sm:rounded-[24px] sm:p-4',
+          'group relative flex w-full items-center gap-3 rounded-[24px] p-3 text-left ring-1 transition-all sm:p-3.5',
           exhausted
-            ? 'bg-muted/50 ring-1 ring-border/60'
-            : 'bg-violet-500 text-white shadow-lg shadow-violet-500/25 hover:-translate-y-0.5 active:scale-[0.99] dark:bg-violet-600',
+            ? 'bg-muted/40 ring-border/60'
+            : 'bg-card ring-border/80 shadow-[0_3px_0_0_rgba(0,0,0,0.10)] dark:shadow-[0_3px_0_0_rgba(0,0,0,0.35)]',
+          idle && 'hover:-translate-y-0.5 active:translate-y-0.5 active:shadow-none',
         )}
       >
-        <div
+        <span
           className={cn(
             'grid h-12 w-12 shrink-0 place-items-center rounded-2xl sm:h-14 sm:w-14',
-            exhausted ? 'bg-muted' : 'bg-white/15',
+            exhausted ? 'bg-muted' : 'bg-primary/10',
           )}
         >
           {busy ? (
-            <Loader2 className="h-6 w-6 animate-spin" />
+            <Loader2 className="h-5 w-5 animate-spin text-primary" />
           ) : (
             <SquarePlay
-              className={cn('h-6 w-6 sm:h-7 sm:w-7', exhausted && 'text-muted-foreground')}
+              className={cn(
+                'h-6 w-6 sm:h-7 sm:w-7',
+                exhausted ? 'text-muted-foreground' : 'text-primary',
+              )}
               strokeWidth={2.5}
             />
           )}
-        </div>
-        <div className="min-w-0 flex-1">
-          <p
+        </span>
+
+        <span className="min-w-0 flex-1">
+          <span
             className={cn(
-              'text-sm font-black tracking-tight sm:text-base',
-              exhausted && 'text-muted-foreground',
+              'block text-sm font-black tracking-tight sm:text-[15px]',
+              exhausted ? 'text-muted-foreground' : 'text-foreground',
             )}
           >
             {exhausted
-              ? 'Free flies — back tomorrow'
+              ? 'Every round caught today'
               : waiting
-                ? `Free flies — ready in ${cooldown}s`
-                : 'Free flies'}
-          </p>
-          <p
+                ? 'Next round is warming up'
+                : `Watch a short clip, catch ${reward} flies`}
+          </span>
+          <span
             className={cn(
-              'text-xs font-semibold',
-              exhausted ? 'text-muted-foreground/70' : 'text-white/85',
+              'mt-0.5 block text-xs font-semibold',
+              exhausted ? 'text-muted-foreground/70' : 'text-muted-foreground',
             )}
           >
             {exhausted
-              ? `You caught all ${cap} bonus rounds today.`
+              ? `All ${cap} bonus rounds are gone — the pond refills tomorrow.`
               : waiting
                 ? 'One at a time — the pond needs a moment.'
-                : `Catch +${reward} flies.`}
-          </p>
-        </div>
+                : 'They land in your jar the second it ends.'}
+          </span>
+          {/* Rounds left is the only honest scarcity in this sheet, so it is
+              drawn as something countable rather than buried in a fraction. */}
+          {!exhausted && cap <= 8 && (
+            <span className="mt-1.5 flex items-center gap-1">
+              {Array.from({ length: cap }, (_, i) => (
+                <span
+                  key={i}
+                  className={cn(
+                    'h-1.5 w-4 rounded-full',
+                    i < remaining ? 'bg-primary' : 'bg-primary/20',
+                  )}
+                />
+              ))}
+            </span>
+          )}
+        </span>
+
         {!exhausted && (
-          <span className="flex shrink-0 flex-col items-center gap-0.5">
-            <span className="flex items-center gap-1 rounded-xl bg-white px-3 py-2 text-xs font-black text-violet-700 shadow-sm">
-              +{reward}
-              <Fly size={16} y={-2} paused />
-            </span>
-            <span className="text-[10px] font-bold text-white/75 tabular-nums">
-              {remaining}/{cap} today
-            </span>
+          <span
+            className={cn(
+              'flex h-11 min-w-[68px] shrink-0 items-center justify-center gap-1 rounded-2xl px-3 text-sm font-black tracking-wide text-white transition-all',
+              waiting
+                ? 'bg-muted-foreground/40'
+                : 'bg-[#4f9149] shadow-[0_4px_0_0_#34631f] ring-1 ring-[#34631f]/40 group-active:translate-y-1 group-active:shadow-none',
+            )}
+          >
+            {waiting ? (
+              <span className="tabular-nums">{cooldown}s</span>
+            ) : (
+              <>
+                +{reward}
+                <Fly size={16} y={-2} paused />
+              </>
+            )}
           </span>
         )}
       </button>
