@@ -104,10 +104,11 @@ export default function CircularTimer() {
     persistUnsaved();
     stopTimer();
   };
+  // Ends the phase at the time actually focused and lands on the wrap-up
+  // screen, same as the sheet's — never straight into a break.
   const handleSkip = () => {
     const liveElapsed = persistUnsaved();
-    const autoStart = phase === 'focus' ? settings.autoStartBreaks : false;
-    completePhase(autoStart, liveElapsed, false);
+    completePhase(false, liveElapsed, true, true);
   };
 
   const ctrlBtn =

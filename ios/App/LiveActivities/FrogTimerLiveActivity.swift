@@ -188,6 +188,30 @@ private struct DoneButton: View {
     }
 }
 
+@available(iOS 17.0, *)
+private struct BreakButton: View {
+    var tint: Color
+
+    var body: some View {
+        Button(intent: FrogTimerControlIntent(action: "break")) {
+            Label("Break", systemImage: "cup.and.saucer.fill")
+                .font(.system(size: 16, weight: .bold))
+                .contentTransition(.identity)
+                .foregroundColor(.white)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+                .padding(.horizontal, 18)
+                .frame(height: 44)
+                .background(Capsule().fill(tint))
+                .contentShape(Capsule())
+                .transaction { transaction in
+                    transaction.animation = nil
+                }
+        }
+        .buttonStyle(TimerControlButtonStyle())
+    }
+}
+
 // The "ringing" finished header: a bell + label, shown left of the Done button.
 @available(iOS 16.1, *)
 private func finishedHeader(_ state: FrogTimerAttributes.ContentState) -> some View {
@@ -220,6 +244,10 @@ private func islandControls(_ state: FrogTimerAttributes.ContentState) -> some V
         let armed = state.confirmPause == true
         HStack(spacing: 8) {
             if state.finished == true {
+                // "What did I finish?" needs a list, which the island can't
+                // show — so out here the choice is only the time one, and the
+                // review waits in the app.
+                CircleControlButton(systemImage: "cup.and.saucer.fill", action: "break", fg: tint, bg: tint.opacity(0.3))
                 CircleControlButton(systemImage: "goforward.plus", action: "more5", fg: tint, bg: tint.opacity(0.3))
                 CircleControlButton(systemImage: "checkmark", action: "done", fg: tint, bg: tint.opacity(0.3))
             } else {
@@ -349,7 +377,13 @@ struct FrogTimerLiveActivity: Widget {
                         fg: Color(hex: state.color),
                         bg: Color(hex: state.color).opacity(0.25)
                     )
-                    DoneButton(tint: Color(hex: state.color))
+                    CircleControlButton(
+                        systemImage: "checkmark",
+                        action: "done",
+                        fg: Color(hex: state.color),
+                        bg: Color(hex: state.color).opacity(0.25)
+                    )
+                    BreakButton(tint: Color(hex: state.color))
                 }
             }
         } else {

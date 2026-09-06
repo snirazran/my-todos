@@ -5,6 +5,7 @@ import type { DealReroll } from '@/lib/skins/dailyDeal';
 import type { SavedLook } from '@/lib/skins/looks';
 import type { FocusProfile } from '@/lib/quests/types';
 import type { FrogodoroSettings, PomodoroPhase, SessionStats } from '@/lib/frogodoroStore';
+import type { FocusSubjectKind } from '@/lib/focusSubject';
 import type { OverflowJar } from '@/lib/economy/overflowJar';
 
 export type DailyFlyProgress = {
@@ -301,6 +302,12 @@ export type ActiveFrogodoroTimer = {
   // completion.
   deepFocus?: boolean;
   deepFocusBroken?: boolean;
+  // The focus-session log row this timer's minutes belong to. `taskId` is the
+  // container that owns the minutes (a real task, or the hidden container for
+  // an area / tag / open session); the subject fields describe it for display.
+  sessionId?: string;
+  subjectKind?: FocusSubjectKind;
+  subjectLabel?: string;
 };
 
 export type NotificationPrefs = {

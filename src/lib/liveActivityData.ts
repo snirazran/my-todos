@@ -14,6 +14,10 @@ export interface LiveTimerSnapshot {
   fliesCaught?: number;
   fliesPotential?: number;
   deepFocus?: boolean;
+  // The break the user has set, so a native "Break" button knows how long to
+  // run without the app. A custom length needs the app, which is also where
+  // the "what did I finish?" review lives.
+  breakSeconds?: number;
   // The user's chosen finish sound id (timerSounds.ts), for native alarms.
   sound?: string;
 }

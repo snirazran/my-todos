@@ -105,6 +105,20 @@ public class FrogTimerActionReceiver extends BroadcastReceiver {
                 FrogTimerNotification.show(ctx, state, false);
                 break;
             }
+            case "break": {
+                // The time half of "what next" — the only half a locked phone
+                // can answer. The "what did I finish?" list waits in the app.
+                state.phase = "break";
+                state.isRunning = true;
+                state.timeLeft = state.breakSeconds > 0 ? state.breakSeconds : 5 * 60;
+                state.endTime = now + (long) state.timeLeft * 1000L;
+                state.deepFocus = false;
+                state.save(ctx);
+                FrogAlarmSoundService.stop(ctx);
+                FrogTimerAlarm.sync(ctx, state.endTime);
+                FrogTimerNotification.show(ctx, state, false);
+                break;
+            }
             case "stop":
             case "done":
                 FrogTimerState.clear(ctx);

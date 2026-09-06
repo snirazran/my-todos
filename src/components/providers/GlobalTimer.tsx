@@ -64,6 +64,7 @@ export function GlobalTimer() {
   const selectedTaskId = useFrogodoroStore((s) => s.selectedTaskId);
   const settings = useFrogodoroStore((s) => s.settings);
   const awaitingDone = useFrogodoroStore((s) => s.awaitingDone);
+  const doneSilent = useFrogodoroStore((s) => s.doneSilent);
   const pendingSync = useFrogodoroStore((s) => s.pendingSync);
   const lastCompletionId = useFrogodoroStore((s) => s.lastCompletionId);
   const lastCompletedPhase = useFrogodoroStore((s) => s.lastCompletedPhase);
@@ -222,17 +223,19 @@ export function GlobalTimer() {
   // On native, the looping web audio would hijack the Dynamic Island as a
   // "Now Playing" media control (and the user picked a one-shot sound anyway),
   // so there the OS notification sound provides the audio instead.
+  // A fast-forward reaches the same wrap-up screen, but the user pressed the
+  // button — they don't need to be alerted to something they just did.
   useEffect(() => {
-    if (awaitingDone) hapticCelebrate();
-  }, [awaitingDone]);
+    if (awaitingDone && !doneSilent) hapticCelebrate();
+  }, [awaitingDone, doneSilent]);
 
   useEffect(() => {
-    if (!awaitingDone || Capacitor.isNativePlatform()) return;
+    if (!awaitingDone || doneSilent || Capacitor.isNativePlatform()) return;
     const stop = playTimerSoundUntilStopped(
       normalizeTimerSound(settingsRef.current.timerSound),
     );
     return stop;
-  }, [awaitingDone]);
+  }, [awaitingDone, doneSilent]);
 
   // Save Progress API Caller. totalPhaseElapsed (when known) tells the server
   // how much of the current phase is now persisted in total, so the
@@ -265,6 +268,8 @@ export function GlobalTimer() {
         body: JSON.stringify({
           session,
           timezone,
+          sessionId: useFrogodoroStore.getState().sessionId || undefined,
+          subjectLabel: useFrogodoroStore.getState().selectedTaskName || undefined,
           ...(typeof totalPhaseElapsed === 'number'
             ? {
                 activePhaseElapsed: Math.max(0, Math.round(totalPhaseElapsed)),
@@ -414,6 +419,9 @@ export function GlobalTimer() {
       rev: s.activeTimerRev ?? undefined,
       deepFocus: s.deepFocus || undefined,
       deepFocusBroken: s.pausedThisPhase || undefined,
+      sessionId: s.sessionId || undefined,
+      subjectKind: s.subjectKind,
+      subjectLabel: s.selectedTaskName || '',
     };
   }, []);
 

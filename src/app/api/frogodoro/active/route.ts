@@ -20,6 +20,9 @@ import type {
 } from '@/lib/types/UserDoc';
 import { advanceUserTimer } from '@/lib/frogodoroTimerProcessor';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
+import { subjectKindOf, type FocusSubjectKind } from '@/lib/focusSubject';
+import { closeFocusSession, sessionRefOf } from '@/lib/frogodoroSessions';
+import { getZonedToday } from '@/lib/utils';
 import TaskModel from '@/lib/models/Task';
 import { taskAnalyticsProperties } from '@/lib/analytics/engagement';
 import { bumpQuestMetric } from '@/lib/quests/metrics';
@@ -28,6 +31,7 @@ export const dynamic = 'force-dynamic';
 
 const phases = new Set<PomodoroPhase>(['focus', 'break']);
 const statuses = new Set(['running', 'paused']);
+const subjectKinds = new Set<FocusSubjectKind>(['task', 'area', 'tag', 'open']);
 const defaultSettings = {
   focusDuration: 25,
   breakDuration: 5,
@@ -75,6 +79,28 @@ function normalizeTimer(input: unknown, serverNow: number): ActiveFrogodoroTimer
   const phase = timer.phase as PomodoroPhase;
   const status = timer.status as 'running' | 'paused';
 
+  // A phase shorter than a minute is always a bug, never a request: it is due
+  // the instant it is stored, so the very next read advances it away and the
+  // user sees a timer that "won't start". Repair the durations rather than
+  // storing a session that cannot survive its own creation.
+  const settings = {
+    ...defaultSettings,
+    ...(timer.settings ?? {}),
+  };
+  const safeMinutes = (value: unknown, fallback: number) => {
+    const minutes = typeof value === 'number' ? value : Number(value);
+    if (!Number.isFinite(minutes) || minutes <= 0) return fallback;
+    return Math.min(180, minutes);
+  };
+  settings.focusDuration = safeMinutes(
+    settings.focusDuration,
+    defaultSettings.focusDuration,
+  );
+  settings.breakDuration = safeMinutes(
+    settings.breakDuration,
+    defaultSettings.breakDuration,
+  );
+
   // endsAt arrives on the publishing device's wall clock, but every consumer
   // (due-processor, alarm pushes, other devices) reads it as server time. Shift
   // it by that device's clock offset, or a phone running a few minutes fast
@@ -98,10 +124,7 @@ function normalizeTimer(input: unknown, serverNow: number): ActiveFrogodoroTimer
     timeLeft: Math.max(0, Math.floor(timer.timeLeft)),
     endsAt,
     finished: timer.finished === true,
-    settings: {
-      ...defaultSettings,
-      ...(timer.settings ?? {}),
-    },
+    settings,
     sessionStats: {
       ...defaultSessionStats,
       ...(timer.sessionStats ?? {}),
@@ -109,6 +132,12 @@ function normalizeTimer(input: unknown, serverNow: number): ActiveFrogodoroTimer
     rev: typeof timer.rev === 'number' ? timer.rev : undefined,
     deepFocus: timer.deepFocus === true,
     deepFocusBroken: timer.deepFocusBroken === true,
+    sessionId: typeof timer.sessionId === 'string' ? timer.sessionId : undefined,
+    subjectKind: subjectKinds.has(timer.subjectKind as FocusSubjectKind)
+      ? (timer.subjectKind as FocusSubjectKind)
+      : subjectKindOf(timer.taskId),
+    subjectLabel:
+      typeof timer.subjectLabel === 'string' ? timer.subjectLabel.slice(0, 120) : '',
     updatedAt: new Date().toISOString(),
   };
 }
@@ -281,23 +310,31 @@ export async function PUT(req: NextRequest) {
     const seq = (updated as { frogodoroSeq?: number } | null)?.frogodoroSeq ?? 0;
     publishTimerEvent(userId, stored, seq);
 
+    // Bookkeeping must not sit in front of the response. Awaited, it held the
+    // reply ~400ms while quest metrics and analytics went to the database —
+    // long enough for a concurrent clear to land first and leave the caller
+    // hydrating a timer the server no longer has.
     if (!existingTimer && stored.phase === 'focus' && stored.status === 'running') {
-      await bumpQuestMetric({
-        userId,
-        metric: 'focus_started',
-        timezone: prefs?.timezone || 'UTC',
-      });
-      const task = await TaskModel.findOne({ userId, id: stored.taskId }).lean();
-      await recordAnalyticsEvent({
-        userId,
-        name: 'timer_started',
-        properties: taskAnalyticsProperties(task ?? {}, existing?.focusProfile, {
-          phase: stored.phase,
-          duration_minutes: stored.settings.focusDuration,
-          focus_duration_minutes: stored.settings.focusDuration,
-          break_duration_minutes: stored.settings.breakDuration,
-          auto_start_breaks: stored.settings.autoStartBreaks,
-        }),
+      void (async () => {
+        await bumpQuestMetric({
+          userId,
+          metric: 'focus_started',
+          timezone: prefs?.timezone || 'UTC',
+        });
+        const task = await TaskModel.findOne({ userId, id: stored.taskId }).lean();
+        await recordAnalyticsEvent({
+          userId,
+          name: 'timer_started',
+          properties: taskAnalyticsProperties(task ?? {}, existing?.focusProfile, {
+            phase: stored.phase,
+            duration_minutes: stored.settings.focusDuration,
+            focus_duration_minutes: stored.settings.focusDuration,
+            break_duration_minutes: stored.settings.breakDuration,
+            auto_start_breaks: stored.settings.autoStartBreaks,
+          }),
+        });
+      })().catch((error) => {
+        console.error('Frogodoro start bookkeeping failed:', error);
       });
     }
 
@@ -368,6 +405,13 @@ export async function DELETE(req: NextRequest) {
     )?.activeFrogodoroTimer;
 
     const seq = await clearTimerAndFanOut(userId, live, prefs);
+
+    if (cancelled?.sessionId) {
+      await closeFocusSession(userId, cancelled.sessionId, {
+        date: getZonedToday(prefs?.timezone || 'UTC'),
+        subject: sessionRefOf(cancelled) ?? undefined,
+      }).catch(() => {});
+    }
 
     if (cancelled && cancelled.status === 'running') {
       const task = await TaskModel.findOne({ userId, id: cancelled.taskId }).lean();

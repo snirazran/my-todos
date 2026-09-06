@@ -19,6 +19,7 @@ interface FrogTimerPlugin {
     fliesCaught?: number;
     fliesPotential?: number;
     deepFocus?: boolean;
+    breakSeconds?: number;
     sound?: string;
   }): Promise<void>;
   stop(): Promise<void>;
@@ -241,6 +242,7 @@ export async function reconcileLiveTimer(snap: LiveTimerSnapshot): Promise<void>
           fliesCaught: snap.fliesCaught ?? 0,
           fliesPotential: snap.fliesPotential ?? 0,
           deepFocus: snap.deepFocus === true,
+          breakSeconds: snap.breakSeconds ?? 0,
           sound: snap.sound ?? '',
         });
       }

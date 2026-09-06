@@ -26,6 +26,7 @@ import { QuestRewardRevealHost } from '@/components/ui/questRewardReveal';
 import { ButtonHaptics } from '@/components/providers/ButtonHaptics';
 import { FlyGameClaimer } from '@/components/providers/FlyGameClaimer';
 import { FocusTimerLauncher } from '@/components/providers/FocusTimerLauncher';
+import { FocusReviewGate } from '@/components/providers/FocusReviewGate';
 import { ErrorReporter } from '@/components/providers/ErrorReporter';
 import { VersionWatcher } from '@/components/providers/VersionWatcher';
 import { WidgetSyncProvider } from '@/components/providers/WidgetSyncProvider';
@@ -57,6 +58,7 @@ export default function Providers({ children }: { children: ReactNode }) {
             <WeekStartSync />
             <GlobalFrogodoroMini />
             <FocusTimerLauncher />
+            <FocusReviewGate />
             <LiveTimerController />
             <GlobalSkinRotation />
             <PushNotificationInit />

@@ -92,6 +92,7 @@ export function LiveTimerController() {
       fliesCaught,
       fliesPotential,
       deepFocus: pledgeLive,
+      breakSeconds: Math.max(60, Math.round(settings.breakDuration * 60)),
       sound: settings.timerSound,
     });
   }, [

@@ -89,6 +89,28 @@ export function FocusScene({
   const speechTimerRef = useRef(0);
   const prevCaughtRef = useRef(caught);
 
+  // Opening mid-session used to attach the frog canvas AND every fly in the
+  // swarm in one frame — the friend sheet only ever pays for one frog, which is
+  // why it opens clean. The frog goes first; the swarm joins a beat later, once
+  // the sheet is settled and there is main thread to spare.
+  const [swarmReady, setSwarmReady] = useState(false);
+  useEffect(() => {
+    if (!showFlies) {
+      setSwarmReady(false);
+      return;
+    }
+    const idle =
+      typeof window.requestIdleCallback === 'function'
+        ? window.requestIdleCallback
+        : (cb: () => void) => window.setTimeout(cb, 260);
+    const cancel =
+      typeof window.cancelIdleCallback === 'function'
+        ? window.cancelIdleCallback
+        : window.clearTimeout;
+    const id = idle(() => setSwarmReady(true));
+    return () => cancel(id as never);
+  }, [showFlies]);
+
   const speakLine = useCallback((line: string) => {
     setSpeech(line);
     window.clearTimeout(speechTimerRef.current);
@@ -254,7 +276,7 @@ export function FocusScene({
   return (
     <div className="relative flex flex-col items-center">
       {/* Ambient flies — an absolute band above the frog */}
-      {showFlies && (
+      {showFlies && swarmReady && (
         <div
           aria-hidden
           className="pointer-events-none absolute -top-24 inset-x-0 h-32"

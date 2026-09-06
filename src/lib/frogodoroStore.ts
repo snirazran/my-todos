@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { v4 as uuid } from 'uuid';
 import { type TimerSound } from './timerSounds';
+import { subjectKindOf, type FocusSubjectKind } from './focusSubject';
 import type { ActiveFrogodoroTimer } from './types/UserDoc';
 
 export type PomodoroPhase = 'focus' | 'break';
@@ -11,6 +13,20 @@ export interface FrogodoroSettings {
   autoStartBreaks: boolean;
   timerSound: TimerSound;
 }
+
+export const SESSION_ENDED_EVENT = 'frogodoro-session-ended';
+
+/** Tells the review gate a sitting just ended, so it can ask what got done. */
+export function announceSessionEnded(): void {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent(SESSION_ENDED_EVENT));
+}
+
+export const TEN_SECOND_MINUTES = 10 / 60;
+export const MAX_DURATION_MINUTES = 180;
+
+export const FOCUS_PRESETS = [15, 25, 45, 60];
+export const BREAK_PRESETS = [5, 10, 15];
 
 export const DEFAULT_SETTINGS: FrogodoroSettings = {
   focusDuration: 25,
@@ -33,6 +49,13 @@ interface FrogodoroState {
   settings: FrogodoroSettings;
   selectedTaskId: string;
   selectedTaskName: string;
+  // What this sitting is about. `selectedTaskId` is the container that owns the
+  // minutes — a real task, or the hidden container for an area / tag / open
+  // session — and `selectedTaskName` is its display label.
+  subjectKind: FocusSubjectKind;
+  // Identifies the focus-session log row the running sitting writes into. A
+  // fresh Start mints one; resuming, extending and taking a break keep it.
+  sessionId: string;
   phase: PomodoroPhase;
   timerActive: boolean;
   isRunning: boolean;
@@ -51,6 +74,10 @@ interface FrogodoroState {
   // True after a phase ends into a non-running (paused) state — the timer
   // alarm keeps sounding until the user acknowledges it by clicking Done.
   awaitingDone: boolean;
+  // The completion was the user's own doing (fast-forward), not the clock
+  // running out. Same wrap-up screen, but nothing rings: they are already
+  // looking at it, and an alarm for an event you caused reads as a fault.
+  doneSilent: boolean;
   activeTimerRev: number | null;
   // Actual seconds spent in each phase of the current/just-finished session
   // (resets when a fresh session starts). Drives the Done screen so a
@@ -77,6 +104,18 @@ interface FrogodoroState {
   // Actions
   setSettings: (settings: FrogodoroSettings) => void;
   setTask: (taskId: string, settings?: FrogodoroSettings) => void;
+  /** Points the timer at a subject without disturbing a running clock. */
+  setSubject: (subject: {
+    id: string;
+    label: string;
+    kind?: FocusSubjectKind;
+  }) => void;
+  setFocusMinutes: (minutes: number) => void;
+  setBreakMinutes: (minutes: number) => void;
+  /** Starts a break of `seconds` inside the current session. */
+  startBreak: (seconds: number) => void;
+  /** Mints a new session id, ending the log row the clock was writing into. */
+  rotateSession: () => string;
   startTimer: () => void;
   pauseTimer: () => void;
   stopTimer: () => void;
@@ -88,6 +127,7 @@ interface FrogodoroState {
     autoStart?: boolean,
     elapsedOverride?: number,
     awaitDone?: boolean,
+    silent?: boolean,
   ) => void;
   // Records a server-driven phase completion (the advance path doesn't go
   // through completePhase) so the UI can react: bump the completion signal that
@@ -118,9 +158,57 @@ interface FrogodoroState {
   setActiveTimerRev: (rev: number | null) => void;
 }
 
+// Stored per-task settings are whatever Mongo last held, which for a
+// freshly-upserted container can be partial or empty. A missing duration used
+// to fall through to Math.max(1, NaN||0) = a ONE SECOND phase, which starts and
+// finishes in the same breath and reads as "the timer won't start".
+function sanitizeMinutes(value: unknown, fallback: number): number {
+  const minutes = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(minutes) || minutes <= 0) return fallback;
+  return Math.min(MAX_DURATION_MINUTES, minutes);
+}
+
+export function sanitizeSettings(
+  settings: Partial<FrogodoroSettings> | null | undefined,
+): FrogodoroSettings {
+  return {
+    ...DEFAULT_SETTINGS,
+    ...(settings ?? {}),
+    focusDuration: sanitizeMinutes(
+      settings?.focusDuration,
+      DEFAULT_SETTINGS.focusDuration,
+    ),
+    breakDuration: sanitizeMinutes(
+      settings?.breakDuration,
+      DEFAULT_SETTINGS.breakDuration,
+    ),
+  };
+}
+
+// A phase whose stored remaining has run down to nothing is spent, not paused:
+// re-selecting the same subject must hand back a full phase rather than a
+// zero-length one that starts and ends in the same tick.
+function livePhaseRemaining(
+  state: { remainingByPhase: Record<PomodoroPhase, number> },
+  phase: PomodoroPhase,
+  settings: FrogodoroSettings,
+): number {
+  const full = getPhaseDuration(phase, settings);
+  const remaining = state.remainingByPhase?.[phase];
+  if (typeof remaining !== 'number' || !Number.isFinite(remaining)) return full;
+  if (remaining <= 0) return full;
+  return Math.min(remaining, full);
+}
+
 function getPhaseDuration(phase: PomodoroPhase, settings: FrogodoroSettings) {
   const minutes = phase === 'focus' ? settings.focusDuration : settings.breakDuration;
-  return Math.max(1, Math.round(minutes * 60));
+  const safe = sanitizeMinutes(
+    minutes,
+    phase === 'focus'
+      ? DEFAULT_SETTINGS.focusDuration
+      : DEFAULT_SETTINGS.breakDuration,
+  );
+  return Math.max(1, Math.round(safe * 60));
 }
 
 // A persisted "running" timer whose endTime has already passed is a corpse: the
@@ -130,12 +218,36 @@ function getPhaseDuration(phase: PomodoroPhase, settings: FrogodoroSettings) {
 // a completion and rings. Restore it as a clean idle timer instead; if the
 // server really does still have a live timer, hydration puts it back.
 function restoreTimerState(state: FrogodoroState): FrogodoroState {
-  if (!state.isRunning) return state;
-  if (state.endTime && state.endTime > Date.now()) return state;
+  // Storage can hold values no current code path would write — a phase left at
+  // zero by an earlier build, a duration that never round-tripped. Repair them
+  // on the way in, or an idle timer restores itself unstartable.
+  const restored: FrogodoroState = {
+    ...state,
+    settings: sanitizeSettings(state.settings),
+  };
+  if (!restored.isRunning) {
+    const safe = restored.settings;
+    return {
+      ...restored,
+      timeLeft:
+        Number.isFinite(restored.timeLeft) && restored.timeLeft > 0
+          ? restored.timeLeft
+          : getPhaseDuration(restored.phase, safe),
+      remainingByPhase: {
+        focus: livePhaseRemaining(restored, 'focus', safe),
+        break: livePhaseRemaining(restored, 'break', safe),
+      },
+    };
+  }
+  if (restored.endTime && restored.endTime > Date.now()) return restored;
 
+  state = restored;
   const settings =
     state.overtimePrevFocusDuration != null
-      ? { ...state.settings, focusDuration: state.overtimePrevFocusDuration }
+      ? sanitizeSettings({
+          ...state.settings,
+          focusDuration: state.overtimePrevFocusDuration,
+        })
       : state.settings;
 
   return {
@@ -164,6 +276,8 @@ export const useFrogodoroStore = create<FrogodoroState>()(
       settings: DEFAULT_SETTINGS,
       selectedTaskId: '',
       selectedTaskName: '',
+      subjectKind: 'task',
+      sessionId: '',
       phase: 'focus',
       timerActive: false,
       isRunning: false,
@@ -181,17 +295,21 @@ export const useFrogodoroStore = create<FrogodoroState>()(
       lastCompletedTaskId: '',
       lastCompletedPhase: null,
       awaitingDone: false,
+      doneSilent: false,
       activeTimerRev: null,
       lastFocusElapsed: 0,
       lastBreakElapsed: 0,
       pendingSync: 0,
-      deepFocus: false,
+      // Armed by default: it is the better session and costs nothing to leave
+      // on — pausing only forfeits the bonus, never the minutes.
+      deepFocus: true,
       pausedThisPhase: false,
       lastPhasePaused: false,
       overtimePrevFocusDuration: null,
 
-      setSettings: (settings) =>
+      setSettings: (raw) =>
         set((state) => {
+          const settings = sanitizeSettings(raw);
           // Adjusting a phase's duration resets that phase's countdown to the
           // new full length (only allowed while it's not running). Phases that
           // are mid-session keep their saved remaining time.
@@ -214,7 +332,7 @@ export const useFrogodoroStore = create<FrogodoroState>()(
         }),
 
       setTask: (taskId, taskSettings) => {
-        const settings = taskSettings || DEFAULT_SETTINGS;
+        const settings = sanitizeSettings(taskSettings);
         set((state) => {
           const isSameTask = state.selectedTaskId === taskId;
           // A fresh task always starts on Focus; only keep the current phase
@@ -222,7 +340,10 @@ export const useFrogodoroStore = create<FrogodoroState>()(
           // switched to Break stays on Break while it's the selected one).
           const phase = isSameTask ? state.phase : 'focus';
           const remainingByPhase: Record<PomodoroPhase, number> = isSameTask
-            ? state.remainingByPhase
+            ? {
+                focus: livePhaseRemaining(state, 'focus', settings),
+                break: livePhaseRemaining(state, 'break', settings),
+              }
             : {
                 focus: getPhaseDuration('focus', settings),
                 break: getPhaseDuration('break', settings),
@@ -255,6 +376,51 @@ export const useFrogodoroStore = create<FrogodoroState>()(
         });
       },
 
+      setSubject: ({ id, label, kind }) =>
+        set({
+          selectedTaskId: id,
+          selectedTaskName: label,
+          subjectKind: kind ?? subjectKindOf(id),
+        }),
+
+      setFocusMinutes: (minutes) => {
+        const value = Math.max(TEN_SECOND_MINUTES, Math.min(MAX_DURATION_MINUTES, minutes));
+        get().setSettings({ ...get().settings, focusDuration: value });
+      },
+
+      setBreakMinutes: (minutes) => {
+        const value = Math.max(TEN_SECOND_MINUTES, Math.min(MAX_DURATION_MINUTES, minutes));
+        get().setSettings({ ...get().settings, breakDuration: value });
+      },
+
+      rotateSession: () => {
+        const id = uuid();
+        set({ sessionId: id });
+        return id;
+      },
+
+      startBreak: (seconds) =>
+        set((state) => {
+          const length = Math.max(10, Math.round(seconds));
+          return {
+            phase: 'break',
+            timerActive: true,
+            isRunning: true,
+            endTime: Date.now() + length * 1000,
+            timeLeft: length,
+            phaseElapsed: 0,
+            awaitingDone: false,
+            pausedThisPhase: false,
+            settings: { ...state.settings, breakDuration: length / 60 },
+            remainingByPhase: {
+              focus: getPhaseDuration('focus', state.settings),
+              break: length,
+            },
+            startedByPhase: { focus: false, break: true },
+            pendingSync: state.pendingSync + 1,
+          };
+        }),
+
       startTimer: () => {
         set((state) => {
           // Starting a phase resets the other one to fresh: once you actually
@@ -264,10 +430,18 @@ export const useFrogodoroStore = create<FrogodoroState>()(
           // A fresh start (not a resume from pause) begins a new session, so
           // clear the previous session's elapsed totals.
           const freshSession = !state.timerActive;
+          // Never start a spent phase. A zero (or junk) countdown ends the
+          // instant it begins, which on screen is indistinguishable from the
+          // Start button doing nothing at all.
+          const timeLeft =
+            Number.isFinite(state.timeLeft) && state.timeLeft > 0
+              ? state.timeLeft
+              : getPhaseDuration(state.phase, state.settings);
           return {
             timerActive: true,
             isRunning: true,
-            endTime: Date.now() + state.timeLeft * 1000,
+            timeLeft,
+            endTime: Date.now() + timeLeft * 1000,
             startedByPhase: {
               ...state.startedByPhase,
               [state.phase]: true,
@@ -275,11 +449,13 @@ export const useFrogodoroStore = create<FrogodoroState>()(
             },
             remainingByPhase: {
               ...state.remainingByPhase,
+              [state.phase]: timeLeft,
               [other]: getPhaseDuration(other, state.settings),
             },
             lastFocusElapsed: freshSession ? 0 : state.lastFocusElapsed,
             lastBreakElapsed: freshSession ? 0 : state.lastBreakElapsed,
             pausedThisPhase: freshSession ? false : state.pausedThisPhase,
+            sessionId: freshSession || !state.sessionId ? uuid() : state.sessionId,
             pendingSync: state.pendingSync + 1,
           };
         });
@@ -311,7 +487,12 @@ export const useFrogodoroStore = create<FrogodoroState>()(
             timerActive: false,
             isRunning: false,
             endTime: null,
-            timeLeft: getPhaseDuration(state.phase, settings),
+            // A stopped session is over, and a break is never something you
+            // pick at setup any more — it is offered when a focus ends. Ending
+            // on the break phase used to persist it, so reopening the same
+            // subject came up as a break instead of a fresh focus.
+            phase: 'focus' as PomodoroPhase,
+            timeLeft: getPhaseDuration('focus', settings),
             phaseElapsed: 0,
             pausedThisPhase: false,
             startedByPhase: { focus: false, break: false },
@@ -338,6 +519,8 @@ export const useFrogodoroStore = create<FrogodoroState>()(
             settings,
             selectedTaskId: '',
             selectedTaskName: '',
+            subjectKind: 'task' as FocusSubjectKind,
+            sessionId: '',
             phase: 'focus',
             timerActive: false,
             isRunning: false,
@@ -398,7 +581,12 @@ export const useFrogodoroStore = create<FrogodoroState>()(
         });
       },
 
-      completePhase: (autoStart = false, elapsedOverride?: number, awaitDone?: boolean) => {
+      completePhase: (
+        autoStart = false,
+        elapsedOverride?: number,
+        awaitDone?: boolean,
+        silent = false,
+      ) => {
         set((state) => {
           const completionFields = {
             lastCompletionId: state.lastCompletionId + 1,
@@ -406,6 +594,7 @@ export const useFrogodoroStore = create<FrogodoroState>()(
             lastCompletedPhase: state.phase,
             lastPhasePaused: state.pausedThisPhase,
             pausedThisPhase: false,
+            doneSilent: silent,
           };
 
           const phaseDuration = getPhaseDuration(state.phase, state.settings);
@@ -479,9 +668,12 @@ export const useFrogodoroStore = create<FrogodoroState>()(
           lastPhasePaused: state.pausedThisPhase,
           pausedThisPhase: false,
           awaitingDone: awaitDone,
+          // A server-driven completion is the clock running out, so it rings.
+          doneSilent: false,
         })),
 
-      setAwaitingDone: (value) => set({ awaitingDone: value }),
+      setAwaitingDone: (value) =>
+        set(value ? { awaitingDone: true } : { awaitingDone: false, doneSilent: false }),
 
       setDeepFocus: (value) => set({ deepFocus: value }),
 
@@ -562,7 +754,8 @@ export const useFrogodoroStore = create<FrogodoroState>()(
             },
           };
         }),
-      hydrateActiveTimer: (timer, serverNow) => {
+      hydrateActiveTimer: (rawTimer, serverNow) => {
+        const timer = { ...rawTimer, settings: sanitizeSettings(rawTimer.settings) };
         const skew = (serverNow ?? Date.now()) - Date.now();
         const serverFrameNow = serverNow ?? Date.now();
         const endsAtMs = timer.endsAt ? new Date(timer.endsAt).getTime() : null;
@@ -636,6 +829,9 @@ export const useFrogodoroStore = create<FrogodoroState>()(
 
         set({
           selectedTaskId: timer.taskId,
+          selectedTaskName: timer.subjectLabel || prev.selectedTaskName,
+          subjectKind: timer.subjectKind ?? subjectKindOf(timer.taskId),
+          sessionId: timer.sessionId || prev.sessionId,
           settings: timer.settings,
           phase: timer.phase,
           timerActive: true,

@@ -217,6 +217,7 @@ export function CustomRepeatSheet({
                           items,
                           value: interval,
                           onChange: (v) => setInterval(v),
+                          label: 'Repeat every',
                         },
                       ]}
                     />

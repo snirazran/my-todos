@@ -1,5 +1,10 @@
 import UserModel from '@/lib/models/User';
-import { addFrogodoroSession } from '@/lib/frogodoroSessions';
+import {
+  addFrogodoroSession,
+  closeFocusSession,
+  sessionRefOf,
+  type FocusSessionRef,
+} from '@/lib/frogodoroSessions';
 import type { FrogodoroSettings, PomodoroPhase, SessionStats } from '@/lib/frogodoroStore';
 import {
   sendLiveActivityUpdate,
@@ -123,12 +128,14 @@ async function saveTimerProgress({
   phase,
   seconds,
   timezone,
+  session,
 }: {
   userId: string;
   taskId: string;
   phase: PomodoroPhase;
   seconds: number;
   timezone: string;
+  session?: FocusSessionRef | null;
 }) {
   const today = getZonedToday(timezone);
   const saved = await addFrogodoroSession(
@@ -137,6 +144,8 @@ async function saveTimerProgress({
     today,
     phase === 'focus' ? seconds : 0,
     phase === 'break' ? seconds : 0,
+    null,
+    session,
   );
   if (!saved) return;
 
@@ -237,6 +246,13 @@ async function expireStaleFinishedTimers(
       (user as any).liveActivity as LiveActivityRef | null | undefined,
       (user as any).notificationPrefs as NotificationPrefs | undefined,
     );
+    const expiredSessionId = ((user as any).activeFrogodoroTimer as
+      | ActiveFrogodoroTimer
+      | null
+      | undefined)?.sessionId;
+    if (expiredSessionId) {
+      await closeFocusSession(userId, expiredSessionId).catch(() => {});
+    }
     results.push({ userId, processed: true, reason: 'ringing_expired' });
     expired += 1;
   }
@@ -317,6 +333,9 @@ async function processOneDueTimer(
       (user as any).liveActivity as LiveActivityRef | null | undefined,
       prefs,
     );
+    if (timer.sessionId) {
+      await closeFocusSession(userId, timer.sessionId).catch(() => {});
+    }
     return { processed: true, result: { userId, processed: true, reason: 'abandoned' } };
   }
 
@@ -358,6 +377,7 @@ async function processOneDueTimer(
       phase: next.completedPhase,
       seconds: remainingSeconds,
       timezone,
+      session: sessionRefOf(timer),
     });
   }
   const deepFocusEarned =

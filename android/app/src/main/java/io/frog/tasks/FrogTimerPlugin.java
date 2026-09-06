@@ -73,6 +73,10 @@ public class FrogTimerPlugin extends Plugin {
         Integer potential = call.getInt("fliesPotential", 0);
         state.fliesPotential = potential == null ? 0 : potential;
         state.deepFocus = Boolean.TRUE.equals(call.getBoolean("deepFocus", false));
+        Integer breakSeconds = call.getInt("breakSeconds", 0);
+        if (breakSeconds != null && breakSeconds > 0) {
+            state.breakSeconds = breakSeconds;
+        }
         String sound = call.getString("sound", "");
         if (sound != null && !sound.isEmpty()) {
             state.sound = sound;

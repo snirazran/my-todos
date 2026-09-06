@@ -1,25 +1,20 @@
 'use client';
 
 import React from 'react';
-import {
-  WheelPicker,
-  WheelPickerWrapper,
-  type WheelPickerOption,
-} from '@ncdai/react-wheel-picker';
-import '@ncdai/react-wheel-picker/style.css';
-import { hapticTick } from '@/lib/haptics';
+import { WheelPicker } from '@/components/ui/WheelPicker';
 
 export type WheelColumnSpec = {
   items: readonly number[];
   value: number;
   onChange: (value: number) => void;
   formatLabel?: (value: number) => string;
+  /** Ranges that read as a scale rather than a dial (e.g. "every N weeks"). */
+  loop?: boolean;
+  label?: string;
 };
 
-const optionItem = 'text-[18px] font-bold text-muted-foreground/40';
-const highlightItem = 'text-[24px] font-extrabold text-primary';
-const maskFill =
-  'bg-[color-mix(in_srgb,hsl(var(--primary))_10%,hsl(var(--background)))]';
+const ITEM_HEIGHT = 44;
+const VISIBLE = 5;
 
 export function Wheel({
   columns,
@@ -30,42 +25,29 @@ export function Wheel({
 }) {
   return (
     <div className={`relative ${className ?? ''}`}>
-      <div className="pointer-events-none absolute inset-x-0 top-1/2 z-0 h-11 -translate-y-1/2 rounded-2xl ring-1 ring-primary/25" />
-      <WheelPickerWrapper className="relative z-10 bg-transparent">
-        {columns.map((col, i) => {
-          const format = col.formatLabel ?? String;
-          const options: WheelPickerOption<number>[] = col.items.map((it) => ({
-            value: it,
-            label: format(it),
-          }));
-          const round =
-            columns.length === 1
-              ? 'rounded-2xl'
-              : i === 0
-                ? 'rounded-l-2xl'
-                : i === columns.length - 1
-                  ? 'rounded-r-2xl'
-                  : '';
-          return (
-            <WheelPicker
-              key={i}
-              options={options}
-              value={col.value}
-              onValueChange={(value) => {
-                if (value !== col.value) hapticTick();
-                col.onChange(value);
-              }}
-              optionItemHeight={44}
-              visibleCount={12}
-              classNames={{
-                optionItem,
-                highlightItem,
-                highlightWrapper: `${maskFill} ${round}`,
-              }}
-            />
-          );
-        })}
-      </WheelPickerWrapper>
+      <div
+        className="pointer-events-none absolute inset-x-0 top-1/2 z-0 -translate-y-1/2 rounded-2xl bg-[color-mix(in_srgb,hsl(var(--primary))_10%,hsl(var(--background)))] ring-1 ring-primary/25"
+        style={{ height: ITEM_HEIGHT }}
+        aria-hidden
+      />
+      <div className="relative z-10 flex items-stretch justify-center">
+        {columns.map((col, i) => (
+          <WheelPicker
+            key={col.label ?? i}
+            values={col.items}
+            value={col.value}
+            onChange={col.onChange}
+            label={col.label ?? `Column ${i + 1}`}
+            formatLabel={col.formatLabel}
+            itemHeight={ITEM_HEIGHT}
+            visibleItems={VISIBLE}
+            loop={col.loop ?? true}
+            className="flex-1"
+            selectedClassName="text-[24px] font-extrabold text-primary"
+            itemClassName="text-[18px] font-bold text-muted-foreground/45"
+          />
+        ))}
+      </div>
     </div>
   );
 }

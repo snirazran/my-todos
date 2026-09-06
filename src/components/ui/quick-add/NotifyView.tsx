@@ -61,12 +61,14 @@ export function NotifyView({
                 value: reminderHour24,
                 onChange: (h) => setReminderTimeParts(h, reminderMinute),
                 formatLabel: pad,
+                label: 'Hour',
               },
               {
                 items: MINUTES_60,
                 value: reminderMinute,
                 onChange: (m) => setReminderTimeParts(reminderHour24, m),
                 formatLabel: pad,
+                label: 'Minute',
               },
             ]}
           />

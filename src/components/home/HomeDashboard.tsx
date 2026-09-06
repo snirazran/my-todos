@@ -47,6 +47,8 @@ import {
   consumeQuickAdd,
 } from '@/lib/widget/quickAdd';
 import FrogodoroSheet from '@/components/ui/FrogodoroSheet';
+import { FocusFabSatellite } from '@/components/ui/FocusFabSatellite';
+import { isContainerTaskId } from '@/lib/focusSubject';
 import {
   HomeFocusFlies,
   HOME_FOCUS_FLY_PREFIX,
@@ -429,6 +431,9 @@ export default function HomeDashboard() {
   useEffect(() => {
     if (!user || isLoading) return;
     if (!frogTimerActive || !frogTaskId) return;
+    // An area / tag / open session is held by a hidden container task, which
+    // the task lists never carry — it isn't a to-do. Only real tasks can dangle.
+    if (isContainerTaskId(frogTaskId)) return;
     const taskStillExists =
       tasks.some((t) => t.id === frogTaskId) ||
       backlogTasks.some((t) => t.id === frogTaskId);
@@ -1295,6 +1300,15 @@ export default function HomeDashboard() {
           mutateQuests();
           mutateToday();
         }}
+      />
+
+      <FocusFabSatellite
+        bottom={`calc(env(safe-area-inset-bottom) + ${
+          notificationStackHeight > 0 ? 144 + notificationStackHeight : 152
+        }px)`}
+        bottomMd={`calc(env(safe-area-inset-bottom) + ${
+          notificationStackHeight > 0 ? 92 + notificationStackHeight : 88
+        }px)`}
       />
 
       {/* Floating Add Task FAB */}

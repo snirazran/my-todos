@@ -1,5 +1,7 @@
 import TaskModel, { type TaskDoc } from '@/lib/models/Task';
 import UserModel from '@/lib/models/User';
+import FocusSessionModel from '@/lib/models/FocusSession';
+import { subjectKindOf, type FocusSubjectKind } from '@/lib/focusSubject';
 import {
   FOCUS_FLY_RATE_SECONDS,
   FOCUS_FLY_DAILY_CAP,
@@ -12,6 +14,14 @@ import { settleFlyGrant } from '@/lib/economy/ledger';
 export type RunningFocusPhase = {
   elapsedSeconds: number;
   fullSeconds: number;
+};
+
+/** Identifies the focus-session log row a flush belongs to. */
+export type FocusSessionRef = {
+  id: string;
+  subjectKind: FocusSubjectKind;
+  subjectId: string;
+  subjectLabel: string;
 };
 
 // Credits flies for focused time: 1 fly per 15 focused minutes, capped per day.
@@ -234,6 +244,96 @@ export function sessionForRow(
   return { date, ...total };
 }
 
+export function sessionRefOf(timer: {
+  taskId?: string;
+  sessionId?: string;
+  subjectKind?: FocusSubjectKind;
+  subjectLabel?: string;
+}): FocusSessionRef | null {
+  if (!timer.sessionId || !timer.taskId) return null;
+  return {
+    id: timer.sessionId,
+    subjectKind: timer.subjectKind ?? subjectKindOf(timer.taskId),
+    subjectId: timer.taskId,
+    subjectLabel: timer.subjectLabel ?? '',
+  };
+}
+
+// The session log is the user-level record of one sitting. Its minutes are the
+// same minutes the container task's row holds — never a second copy for the
+// tasks a session gets linked to, which is what keeps totals from inflating.
+export async function recordFocusSessionTime(
+  userId: string,
+  date: string,
+  focusTime: number,
+  breakTime: number,
+  session: FocusSessionRef,
+): Promise<void> {
+  if (!session.id) return;
+  if (focusTime <= 0 && breakTime <= 0) return;
+  await FocusSessionModel.updateOne(
+    { userId, id: session.id },
+    {
+      $inc: {
+        focusSeconds: Math.max(0, focusTime),
+        breakSeconds: Math.max(0, breakTime),
+      },
+      $setOnInsert: {
+        id: session.id,
+        userId,
+        date,
+        subjectKind: session.subjectKind,
+        subjectId: session.subjectId,
+        subjectLabel: session.subjectLabel,
+        taskIds: [],
+        startedAt: new Date(),
+        reviewState: 'pending',
+      },
+    },
+    { upsert: true },
+  ).catch((error) => {
+    console.error('Focus session log failed:', error);
+  });
+}
+
+// Marks the sitting finished. Deliberately does NOT judge whether it is worth
+// reviewing: closing races the final flush, so at this moment `focusSeconds`
+// may still be 0 for a session that ran for minutes. Reading decides that
+// instead, against the settled number.
+//
+// Upserts, because the same race runs the other way: a session whose row has
+// not been written yet would otherwise never get an `endedAt`, and a row
+// without one is invisible to the review query forever.
+export async function closeFocusSession(
+  userId: string,
+  sessionId: string,
+  seed?: { date: string; subject?: FocusSessionRef },
+): Promise<void> {
+  if (!sessionId) return;
+  await FocusSessionModel.updateOne(
+    { userId, id: sessionId },
+    {
+      $set: { endedAt: new Date() },
+      $setOnInsert: {
+        id: sessionId,
+        userId,
+        date: seed?.date ?? new Date().toISOString().slice(0, 10),
+        subjectKind: seed?.subject?.subjectKind ?? 'task',
+        subjectId: seed?.subject?.subjectId ?? '',
+        subjectLabel: seed?.subject?.subjectLabel ?? '',
+        focusSeconds: 0,
+        breakSeconds: 0,
+        taskIds: [],
+        startedAt: new Date(),
+        reviewState: 'pending',
+      },
+    },
+    { upsert: true },
+  ).catch((error) => {
+    console.error('Focus session close failed:', error);
+  });
+}
+
 export async function addFrogodoroSession(
   userId: string,
   taskId: string,
@@ -241,10 +341,14 @@ export async function addFrogodoroSession(
   focusTime: number,
   breakTime: number,
   runningPhase?: RunningFocusPhase | null,
+  session?: FocusSessionRef | null,
 ): Promise<boolean> {
   await awardFocusFlies(userId, date, focusTime, runningPhase).catch((error) => {
     console.error('Focus fly award failed:', error);
   });
+  if (session) {
+    await recordFocusSessionTime(userId, date, focusTime, breakTime, session);
+  }
   // Settle-only call (a session ending between flushes): the fly ledger above
   // is the point; there is no time to log, so don't touch the task's rows.
   if (focusTime === 0 && breakTime === 0) return true;

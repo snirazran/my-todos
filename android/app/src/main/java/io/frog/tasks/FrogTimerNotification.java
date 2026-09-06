@@ -211,6 +211,7 @@ public final class FrogTimerNotification {
         }
 
         if (isFocus) {
+            b.addAction(0, "Break", actionIntent(ctx, "break", 16));
             b.addAction(0, "+5 more", actionIntent(ctx, "more5", 15));
         }
         b.addAction(0, "Done", actionIntent(ctx, "done", 14));

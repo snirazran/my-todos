@@ -20,6 +20,7 @@ public final class FrogTimerState {
     public int fliesCaught = 0;
     public int fliesPotential = 0;
     public boolean deepFocus = false;
+    public int breakSeconds = 0;
     public long rev = 0L;
     public boolean active = false;
 
@@ -37,6 +38,7 @@ public final class FrogTimerState {
         s.fliesCaught = p.getInt("fliesCaught", 0);
         s.fliesPotential = p.getInt("fliesPotential", 0);
         s.deepFocus = p.getBoolean("deepFocus", false);
+        s.breakSeconds = p.getInt("breakSeconds", 0);
         s.rev = p.getLong("rev", 0L);
         s.active = p.getBoolean("active", false);
         return s;
@@ -53,6 +55,7 @@ public final class FrogTimerState {
                 .putInt("fliesCaught", fliesCaught)
                 .putInt("fliesPotential", fliesPotential)
                 .putBoolean("deepFocus", deepFocus)
+                .putInt("breakSeconds", breakSeconds)
                 .putLong("rev", rev)
                 .putBoolean("active", active)
                 .apply();

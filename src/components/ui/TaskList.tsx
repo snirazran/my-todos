@@ -580,10 +580,12 @@ const SortableTaskItem = React.forwardRef<
 
       // A swipe held past the commit threshold runs the action directly on
       // release — no second tap needed. Short swipes still just reveal.
+      // It opens the timer rather than starting one: how long to focus is a
+      // decision, and a swipe must never commit you to the last length used.
       if (x.get() >= SWIPE_COMMIT_X && onStartTimer && !isDone) {
         blockImmediatePostSwipeClick();
         snapSwipe(null);
-        onStartTimer(task, { autoStart: true });
+        onStartTimer(task);
         return;
       }
       if (x.get() <= -SWIPE_COMMIT_X && secondaryAction && !isDone) {
@@ -633,7 +635,7 @@ const SortableTaskItem = React.forwardRef<
       if (!onStartTimer || isDone) return;
       blockImmediatePostSwipeClick();
       snapSwipe(null);
-      onStartTimer(task, { autoStart: true });
+      onStartTimer(task);
     };
 
     const handleSecondaryAction = (

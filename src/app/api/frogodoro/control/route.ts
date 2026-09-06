@@ -9,7 +9,11 @@ import {
 } from '@/lib/frogodoroDelayedTimer';
 import { fanOutTimerState, clearTimerAndFanOut } from '@/lib/frogodoroSync';
 import { advanceUserTimer } from '@/lib/frogodoroTimerProcessor';
-import { addFrogodoroSession } from '@/lib/frogodoroSessions';
+import {
+  addFrogodoroSession,
+  closeFocusSession,
+  sessionRefOf,
+} from '@/lib/frogodoroSessions';
 import { syncQuestState } from '@/lib/quests/engine';
 import { notifyTaskChanged } from '@/lib/taskSync';
 import { getZonedToday } from '@/lib/utils';
@@ -21,13 +25,21 @@ import type {
 
 export const dynamic = 'force-dynamic';
 
-type Action = 'pause' | 'resume' | 'stop' | 'done' | 'more5' | 'alarmStop';
+type Action =
+  | 'pause'
+  | 'resume'
+  | 'stop'
+  | 'done'
+  | 'more5'
+  | 'break'
+  | 'alarmStop';
 const actions = new Set<Action>([
   'pause',
   'resume',
   'stop',
   'done',
   'more5',
+  'break',
   'alarmStop',
 ]);
 
@@ -124,6 +136,7 @@ async function flushPhaseProgress(
     timer.phase === 'focus' ? unsavedSeconds : 0,
     timer.phase === 'break' ? unsavedSeconds : 0,
     settle || timer.phase !== 'focus' ? null : { elapsedSeconds, fullSeconds },
+    sessionRefOf(timer),
   ).catch((error) => {
     console.error('Frogodoro control: progress flush failed', error);
     return false;
@@ -264,6 +277,12 @@ export async function POST(req: NextRequest) {
       }
 
       await clearTimerAndFanOut(userId, live, prefs);
+
+      const endedSessionId = advanced?.sessionId ?? timer?.sessionId;
+      if (endedSessionId) {
+        await closeFocusSession(userId, endedSessionId).catch(() => {});
+      }
+
       if (controlSeq !== null) {
         await UserModel.updateOne({ _id: userId }, { $max: { frogodoroControlSeq: controlSeq } });
       }
@@ -332,6 +351,36 @@ export async function POST(req: NextRequest) {
         endsAt: new Date(now + timeLeft * 1000).toISOString(),
         finished: false,
         finishedAt: null,
+        rev: (timer.rev ?? 0) + 1,
+        updatedAt: new Date(now).toISOString(),
+      };
+    } else if (action === 'break') {
+      const alreadyOnBreak = timer.phase === 'break';
+      const storedLeft = alreadyOnBreak ? Math.round(timer.timeLeft) : 0;
+      const breakSec =
+        storedLeft > 0
+          ? storedLeft
+          : Math.max(60, Math.round((timer.settings.breakDuration || 5) * 60));
+      // A focus phase the user walks away from here really ends, so its time is
+      // settled (re-priced at what was focused) rather than left on the clock.
+      if (!alreadyOnBreak && timer.status === 'running') {
+        await flushPhaseProgress(
+          userId,
+          timer,
+          prefs?.timezone || 'UTC',
+          true,
+        ).catch(() => false);
+      }
+      next = {
+        ...timer,
+        phase: 'break',
+        status: 'running',
+        timeLeft: breakSec,
+        endsAt: new Date(now + breakSec * 1000).toISOString(),
+        finished: false,
+        finishedAt: null,
+        deepFocusBroken: false,
+        savedElapsed: alreadyOnBreak ? timer.savedElapsed ?? 0 : 0,
         rev: (timer.rev ?? 0) + 1,
         updatedAt: new Date(now).toISOString(),
       };

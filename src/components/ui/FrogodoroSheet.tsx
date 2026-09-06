@@ -8,12 +8,10 @@ import {
   Pause,
   SkipForward,
   X,
-  Plus,
-  Minus,
   Square,
   Check,
+  ChevronDown,
   ChevronRight,
-  Repeat,
   Coffee,
 } from 'lucide-react';
 import { motion, AnimatePresence, useDragControls } from 'framer-motion';
@@ -22,7 +20,16 @@ import {
   useFrogodoroStore,
   PomodoroPhase,
   DEFAULT_SETTINGS,
+  FOCUS_PRESETS,
+  announceSessionEnded,
 } from '@/lib/frogodoroStore';
+import { DurationDial } from '@/components/ui/DurationDial';
+import {
+  isContainerTaskId,
+  subjectHeadline,
+  subjectKindOf,
+  type FocusSubjectKind,
+} from '@/lib/focusSubject';
 import { useSheetOverscrollDrag } from '@/components/ui/useSheetOverscrollDrag';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
 import { useFrogodoroUiStore } from '@/lib/frogodoroUiStore';
@@ -60,7 +67,53 @@ import Fly from '@/components/ui/fly';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import useSWR from 'swr';
 
-const OPTIONS_OPEN_KEY = 'frogodoro:options-open';
+
+// Short enough to feel like a direct response to the tap, eased so it settles
+// rather than stopping dead. Shared by both halves of the stage swap so they
+// cross exactly.
+const STAGE_TRANSITION = {
+  duration: 0.24,
+  ease: [0.32, 0.72, 0, 1] as const,
+};
+
+// Today's catches against the daily cap. A ring reads its remaining distance
+// without a legend, which the old row of identical dots could not.
+function CapRing({ caught, cap }: Readonly<{ caught: number; cap: number }>) {
+  const size = 64;
+  const stroke = 7;
+  const radius = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const pct = cap > 0 ? Math.min(1, caught / cap) : 0;
+
+  return (
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="-rotate-90">
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          strokeWidth={stroke}
+          className="stroke-muted"
+        />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={circumference * (1 - pct)}
+          className="stroke-primary transition-[stroke-dashoffset] duration-700"
+        />
+      </svg>
+      <span className="absolute inset-0 flex items-center justify-center text-[15px] font-black tabular-nums text-foreground">
+        {caught}/{cap}
+      </span>
+    </div>
+  );
+}
 
 interface Task {
   id: string;
@@ -73,10 +126,11 @@ interface Task {
     breakTime: number;
   } | null;
   frogodoroSettings?: Record<string, unknown>;
+  subjectKind?: FocusSubjectKind;
 }
 
 function getTaskDisplayName(task: Pick<Task, 'id' | 'text'>) {
-  return task.id.startsWith('focus-area:')
+  return isContainerTaskId(task.id)
     ? task.text.replace(/^Focus:\s*/i, '')
     : task.text;
 }
@@ -240,6 +294,9 @@ export default function FrogodoroSheet({
 }: Props) {
   useRegisterOpenSheet(open);
   const taskDisplayName = task ? getTaskDisplayName(task) : '';
+  const subjectChipLabel = task
+    ? subjectHeadline(task.subjectKind ?? subjectKindOf(task.id), taskDisplayName)
+    : 'Pick a subject';
   const [mounted, setMounted] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
   // Heavy Rive content (the live frog scene) mounts only after the sheet's
@@ -291,17 +348,6 @@ export default function FrogodoroSheet({
   const [confirmStop, setConfirmStop] = useState(false);
   const [confirmPause, setConfirmPause] = useState(false);
   const [confirmTaskSwitch, setConfirmTaskSwitch] = useState(false);
-  // Nothing renders until `mounted`, so reading storage during init can't
-  // desync hydration.
-  const [optionsOpen, setOptionsOpen] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
-    return window.localStorage.getItem(OPTIONS_OPEN_KEY) === '1';
-  });
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(OPTIONS_OPEN_KEY, optionsOpen ? '1' : '0');
-    } catch {}
-  }, [optionsOpen]);
   const catchChipRef = useRef<HTMLElement | null>(null);
   const [chipPulse, setChipPulse] = useState(0);
   const { seenIntros, markIntroSeen } = useIntros(open);
@@ -337,6 +383,7 @@ export default function FrogodoroSheet({
     phaseElapsed: storeElapsed,
     setSettings,
     setTask,
+    setSubject,
     startTimer,
     pauseTimer,
     stopTimer,
@@ -366,6 +413,7 @@ export default function FrogodoroSheet({
       phaseElapsed: s.phaseElapsed,
       setSettings: s.setSettings,
       setTask: s.setTask,
+      setSubject: s.setSubject,
       startTimer: s.startTimer,
       pauseTimer: s.pauseTimer,
       stopTimer: s.stopTimer,
@@ -473,6 +521,11 @@ export default function FrogodoroSheet({
         ? { ...DEFAULT_SETTINGS, ...(task.frogodoroSettings as Record<string, unknown>) } as typeof DEFAULT_SETTINGS
         : undefined,
     );
+    setSubject({
+      id: task.id,
+      label: getTaskDisplayName(task),
+      kind: task.subjectKind ?? subjectKindOf(task.id),
+    });
     if (task.frogodoroSession) {
       const db = task.frogodoroSession;
       updateSessionStats({
@@ -704,6 +757,18 @@ export default function FrogodoroSheet({
   const handleDone = () => {
     setAwaitingDone(false);
     stopTimer();
+    announceSessionEnded();
+  };
+
+  // The end of a focus session, in the order the two halves belong: the sheet
+  // steps aside so the review can ask what got finished, and the break/keep-
+  // going choice lives on the far side of that.
+  const handleWrapUp = () => {
+    hapticImpact();
+    setAwaitingDone(false);
+    stopTimer();
+    onOpenChange(false);
+    announceSessionEnded();
   };
 
   // Stop ends the current session and stays on the popup (now idle), so you can
@@ -726,6 +791,7 @@ export default function FrogodoroSheet({
     stopTimer();
     setSettleCaught(null);
     if (settled) refreshWalletAfterSettle();
+    announceSessionEnded();
   };
 
   // Ending a focus session with meaningful time on the clock asks first — a
@@ -759,14 +825,14 @@ export default function FrogodoroSheet({
     startTimer();
   };
 
-  const toggleAutoStartBreaks = () => {
-    hapticTick();
-    setSettings({ ...settings, autoStartBreaks: !settings.autoStartBreaks });
-  };
-
   // Fast-forward: end the current phase now and switch to the other tab. No
   // Done/alarm — it's a deliberate skip. The next phase only auto-starts if the
   // matching auto-start setting is on (focus → break uses auto-start breaks).
+  // Fast-forward means "I'm done now", not "skip to the break". It ends the
+  // phase at the time actually focused and lands on the same wrap-up screen the
+  // clock running out would — so the session is still reviewed, and the break
+  // is offered there rather than started behind the user's back. Silent,
+  // because they pressed the button.
   const handleManualSkip = async () => {
     const live = useFrogodoroStore.getState();
     const liveElapsed = liveElapsedSeconds(live);
@@ -775,36 +841,9 @@ export default function FrogodoroSheet({
       await saveSessionToDb(selectedTaskId, phase, unsavedElapsed);
       onMutateToday?.();
     }
-    const autoStart = phase === 'focus' ? settings.autoStartBreaks : false;
-    completePhase(autoStart, liveElapsed, false);
+    hapticImpact();
+    completePhase(false, liveElapsed, true, true);
   };
-
-  const handleTabSwitch = async (newPhase: PomodoroPhase) => {
-    if (newPhase === phase || isRunning) return;
-    // Only fold in the time not already counted for this phase. The phase's
-    // countdown is preserved across tab switches, so adding the full
-    // liveElapsed each time would inflate the stats on repeated switches.
-    const live = useFrogodoroStore.getState();
-    const unsavedElapsed = Math.max(
-      0,
-      liveElapsedSeconds(live) - live.phaseElapsed,
-    );
-    if (selectedTaskId && unsavedElapsed > 0) {
-      const updated = { ...sessionStats };
-      if (phase === 'focus') {
-        updated.focusTime = sessionStats.focusTime + unsavedElapsed;
-      } else {
-        updated.breakTime = sessionStats.breakTime + unsavedElapsed;
-      }
-      updateSessionStats(updated);
-      // Persist the leaving phase's not-yet-saved time so switching tabs (e.g.
-      // after pausing partway) keeps the progress instead of dropping it.
-      await saveSessionToDb(selectedTaskId, phase, unsavedElapsed);
-      onMutateToday?.();
-    }
-    switchPhase(newPhase);
-  };
-
   const persistTaskSettings = async (settingsToSave: typeof DEFAULT_SETTINGS) => {
     if (selectedTaskId) {
       onMutateToday?.();
@@ -825,51 +864,18 @@ export default function FrogodoroSheet({
     }
   };
 
-  const formatDurationSetting = (minutes: number) => {
-    if (minutes < 1) return `${Math.round(minutes * 60)}s`;
-    return `${minutes}m`;
-  };
+  // The dial reports every detent it passes, so the write waits for the wheel
+  // to settle rather than firing once per tick.
+  const persistTimerRef = useRef(0);
+  useEffect(() => () => window.clearTimeout(persistTimerRef.current), []);
 
-  // Duration ladder (minutes): 10s → 1m → 5m → 10m … → 120m. 10 seconds is the
-  // lowest rung (handy for quick tests, but available for normal use too).
-  const TEN_SECONDS = 10 / 60;
-  const DURATION_MAX = 120;
-  const decreaseDuration = (v: number) => {
-    if (v <= 1) return TEN_SECONDS; // 1m (or below) → 10s
-    if (v === 5) return 1; // 5m → 1m
-    return Math.max(1, v - 5);
-  };
-  const increaseDuration = (v: number) => {
-    if (v < 1) return 1; // 10s → 1m
-    if (v === 1) return 5; // 1m → 5m
-    return Math.min(DURATION_MAX, v + 5);
-  };
-
-  const getDurationControl = () => {
-    if (phase === 'focus') {
-      return { key: 'focusDuration' as const, min: TEN_SECONDS, max: DURATION_MAX };
-    }
-    return { key: 'breakDuration' as const, min: TEN_SECONDS, max: DURATION_MAX };
-  };
-
-  const adjustDuration = (
-    key: 'focusDuration' | 'breakDuration',
-    direction: -1 | 1,
-  ) => {
-    const currentValue = settings[key];
-    const nextValue =
-      direction === -1 ? decreaseDuration(currentValue) : increaseDuration(currentValue);
-
-    if (nextValue === currentValue) return;
-
-    const nextSettings = { ...settings, [key]: nextValue };
+  const changeFocusMinutes = (minutes: number) => {
+    const nextSettings = { ...settings, focusDuration: minutes };
     setSettings(nextSettings);
-    void persistTaskSettings(nextSettings);
-  };
-
-  const adjustCurrentDuration = (direction: -1 | 1) => {
-    if (isRunning) return;
-    adjustDuration(getDurationControl().key, direction);
+    window.clearTimeout(persistTimerRef.current);
+    persistTimerRef.current = window.setTimeout(() => {
+      void persistTaskSettings(nextSettings);
+    }, 600);
   };
 
   // While awaiting Done the phase has already advanced to the next one, but the
@@ -959,12 +965,6 @@ export default function FrogodoroSheet({
     [focusFlyDaily],
   );
 
-  // Names what's inside and its current value, so the collapsed row says both
-  // what tapping it changes and what the break is set to right now.
-  const optionsSummary = settings.autoStartBreaks
-    ? `${formatDurationSetting(settings.breakDuration)} break, starts itself`
-    : `${formatDurationSetting(settings.breakDuration)} break after focus`;
-
   const focusFlyCapReached = useFrogodoroStore((s) => {
     const sessionFocus = sessionFocusLiveSeconds(s);
     const dayTotal =
@@ -990,16 +990,32 @@ export default function FrogodoroSheet({
 
           <div className="fixed inset-0 z-[1000] flex items-end justify-center pointer-events-none px-3 pb-4 sm:items-center sm:p-6">
             <motion.div
-              initial={isDesktop ? { opacity: 0, scale: 0.98 } : { y: '100%', opacity: 0 }}
-              animate={isDesktop ? { opacity: 1, scale: 1 } : { y: 0, opacity: 1 }}
-              exit={isDesktop ? { opacity: 0, scale: 0.98 } : { y: '100%', opacity: 0 }}
+              variants={
+                isDesktop
+                  ? {
+                      hidden: { opacity: 0, scale: 0.98 },
+                      visible: { opacity: 1, scale: 1 },
+                    }
+                  : {
+                      hidden: { y: '100%', opacity: 0 },
+                      visible: { y: 0, opacity: 1 },
+                    }
+              }
+              initial="hidden"
+              animate="visible"
+              exit="hidden"
               transition={
                 isDesktop
                   ? { type: 'tween', ease: [0.25, 0.1, 0.25, 1], duration: 0.2 }
                   : { type: 'tween', ease: [0.32, 0.72, 0, 1], duration: 0.4 }
               }
-              onAnimationComplete={() => {
-                if (open) setSheetEntered(true);
+              onAnimationComplete={(definition) => {
+                // Named variant, not a bare callback: onAnimationComplete fires
+                // for EVERY animation this element settles, so an unnamed one
+                // flipped `entered` before the slide-in had finished and the
+                // Rive frog mounted straight into the moving sheet. Same guard
+                // BaseSheet uses, and it covers every phase of the timer.
+                if (definition === 'visible') setSheetEntered(true);
               }}
               drag={!isDesktop ? 'y' : false}
               dragControls={dragControls}
@@ -1037,10 +1053,13 @@ export default function FrogodoroSheet({
                       transition={{ duration: 0.2 }}
                       className="p-5"
                     >
-                      <div className="mb-5 flex items-center justify-between">
-                        <h3 className="text-lg font-black text-foreground">Fly catches</h3>
+                      <div className="mb-4 flex items-center justify-between">
+                        <h3 className="text-lg font-black text-foreground">
+                          Fly catches
+                        </h3>
                         <button
                           onClick={() => setShowPond(false)}
+                          aria-label="Close"
                           className="flex h-8 w-8 items-center justify-center rounded-full bg-muted/60 text-muted-foreground transition-colors hover:bg-muted"
                         >
                           <X className="h-4 w-4" />
@@ -1051,6 +1070,11 @@ export default function FrogodoroSheet({
                         const days = pondData?.days ?? [];
                         const fliesOf = (focusTime: number) =>
                           focusFliesEarnedForDay(focusTime);
+                        const todayRow = days.find((d) => d.date === pondData?.today);
+                        const todayFlies = todayRow ? fliesOf(todayRow.focusTime) : 0;
+                        const todayMinutes = todayRow
+                          ? Math.round(todayRow.focusTime / 60)
+                          : 0;
                         const weekFlies = days.reduce(
                           (sum, d) => sum + fliesOf(d.focusTime),
                           0,
@@ -1062,95 +1086,109 @@ export default function FrogodoroSheet({
                           ['S', 'M', 'T', 'W', 'T', 'F', 'S'][
                             new Date(`${date}T00:00:00`).getDay()
                           ];
+
+                        if (days.length === 0) {
+                          return (
+                            <p className="py-10 text-center text-sm font-bold text-muted-foreground">
+                              Loading your week…
+                            </p>
+                          );
+                        }
+
                         return (
                           <>
-                            <p className="mb-3 text-sm text-muted-foreground">
-                              Your frog catches a fly for every{' '}
-                              <span className="font-bold text-foreground">
-                                {FOCUS_FLY_RATE_SECONDS / 60} focused minutes
-                              </span>
-                              , up to{' '}
-                              <span className="font-bold text-foreground">
-                                {FOCUS_FLY_DAILY_CAP} a day
-                              </span>
-                              . Finish a focus without pausing for{' '}
-                              <span className="font-bold text-foreground">
-                                +{DEEP_FOCUS_BONUS_FLIES} deep focus fly
-                              </span>
-                              .
-                            </p>
-                            <div className="rounded-2xl border border-border/50 bg-primary/5 px-3 pb-3 pt-4">
-                              <div className="flex items-end justify-between gap-1">
-                                {days.map((d) => {
-                                  const flies = fliesOf(d.focusTime);
-                                  const mins = Math.round(d.focusTime / 60);
-                                  const isToday = d.date === pondData?.today;
-                                  return (
-                                    <div
-                                      key={d.date}
-                                      className="flex flex-1 flex-col items-center gap-1.5"
-                                      title={`${mins} min focused`}
-                                    >
-                                      <div className="flex h-12 flex-col items-center justify-end gap-0.5">
-                                        {flies > 0 ? (
-                                          <>
-                                            <Fly size={22} interactive={false} alwaysPlay paused />
-                                            <span className="text-[11px] font-black tabular-nums text-primary">
-                                              ×{flies}
-                                            </span>
-                                          </>
-                                        ) : (
-                                          <span className="mb-1 h-2.5 w-2.5 rounded-full bg-muted-foreground/15" />
-                                        )}
-                                      </div>
-                                      <span
-                                        className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
-                                          isToday
-                                            ? 'bg-primary text-white'
-                                            : 'text-muted-foreground/70'
-                                        }`}
-                                      >
-                                        {dayLetter(d.date)}
-                                      </span>
-                                    </div>
-                                  );
-                                })}
-                                {days.length === 0 && (
-                                  <p className="w-full py-4 text-center text-sm text-muted-foreground">
-                                    Loading your week…
-                                  </p>
-                                )}
+                            {/* Today is the number that can still change, so it
+                                leads — a ring reads its distance to the cap at
+                                a glance, which a row of dots never did. */}
+                            <div className="flex items-center gap-4 rounded-2xl border border-border/50 bg-primary/5 p-4">
+                              <CapRing
+                                caught={todayFlies}
+                                cap={FOCUS_FLY_DAILY_CAP}
+                              />
+                              <div className="min-w-0">
+                                <p className="text-[15px] font-black text-foreground">
+                                  {todayFlies >= FOCUS_FLY_DAILY_CAP
+                                    ? 'Frog is full for today'
+                                    : `${FOCUS_FLY_DAILY_CAP - todayFlies} more to catch today`}
+                                </p>
+                                <p className="text-[12px] font-semibold text-muted-foreground">
+                                  {todayMinutes} min focused today
+                                </p>
                               </div>
                             </div>
 
-                            {weekFlies > 0 ? (
-                              <div className="mt-3 flex gap-2">
-                                <div className="flex-1 rounded-2xl bg-primary/8 px-3 py-2.5 text-center dark:bg-primary/15">
-                                  <p className="flex items-center justify-center gap-1.5 text-lg font-black tabular-nums text-foreground">
-                                    <Fly size={22} interactive={false} alwaysPlay paused />
-                                    {weekFlies}
-                                  </p>
-                                  <p className="text-[12px] font-bold text-primary/70">
-                                    Flies this week
-                                  </p>
-                                </div>
-                                <div className="flex-1 rounded-2xl bg-primary/8 px-3 py-2.5 text-center dark:bg-primary/15">
-                                  <p className="text-lg font-black tabular-nums text-foreground">
-                                    {weekMinutes}m
-                                  </p>
-                                  <p className="text-[12px] font-bold text-primary/70">
-                                    Focused
-                                  </p>
-                                </div>
-                              </div>
-                            ) : (
-                              days.length > 0 && (
-                                <p className="mt-3 text-center text-sm text-muted-foreground">
-                                  No catches yet this week — start a focus and let
-                                  your frog hunt.
+                            {/* The week as a chain of days: bar height is the
+                                catch count, so a good run is a shape you see
+                                rather than a number you have to read. */}
+                            <p className="mb-2 mt-4 text-[12px] font-black uppercase tracking-wide text-muted-foreground">
+                              This week
+                            </p>
+                            <div className="flex items-end justify-between gap-1.5">
+                              {days.map((d) => {
+                                const flies = fliesOf(d.focusTime);
+                                const isToday = d.date === pondData?.today;
+                                const pct = Math.round(
+                                  (flies / FOCUS_FLY_DAILY_CAP) * 100,
+                                );
+                                return (
+                                  <div
+                                    key={d.date}
+                                    className="flex flex-1 flex-col items-center gap-1.5"
+                                    title={`${Math.round(d.focusTime / 60)} min focused`}
+                                  >
+                                    <span className="h-4 text-[11px] font-black tabular-nums text-muted-foreground">
+                                      {flies || ''}
+                                    </span>
+                                    <div className="flex h-16 w-full items-end overflow-hidden rounded-lg bg-muted/60">
+                                      <div
+                                        className={`w-full rounded-lg transition-[height] duration-500 ${
+                                          isToday ? 'bg-primary' : 'bg-primary/45'
+                                        }`}
+                                        style={{
+                                          height: flies > 0 ? `${Math.max(12, pct)}%` : '0%',
+                                        }}
+                                      />
+                                    </div>
+                                    <span
+                                      className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
+                                        isToday
+                                          ? 'bg-primary text-white'
+                                          : 'text-muted-foreground/70'
+                                      }`}
+                                    >
+                                      {dayLetter(d.date)}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+
+                            <div className="mt-4 flex gap-2">
+                              <div className="flex-1 rounded-2xl bg-primary/8 px-3 py-2.5 text-center dark:bg-primary/15">
+                                <p className="text-lg font-black tabular-nums text-foreground">
+                                  {weekFlies}
                                 </p>
-                              )
-                            )}
+                                <p className="text-[12px] font-bold text-primary/70">
+                                  Flies this week
+                                </p>
+                              </div>
+                              <div className="flex-1 rounded-2xl bg-primary/8 px-3 py-2.5 text-center dark:bg-primary/15">
+                                <p className="text-lg font-black tabular-nums text-foreground">
+                                  {weekMinutes}m
+                                </p>
+                                <p className="text-[12px] font-bold text-primary/70">
+                                  Focused
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* The rules are reference, not the headline — they
+                                never change, so they sit at the bottom. */}
+                            <p className="mt-4 text-center text-[12px] leading-relaxed text-muted-foreground">
+                              1 fly per {FOCUS_FLY_RATE_SECONDS / 60} focused minutes,
+                              up to {FOCUS_FLY_DAILY_CAP} a day. Finish without
+                              pausing for +{DEEP_FOCUS_BONUS_FLIES}.
+                            </p>
                           </>
                         );
                       })()}
@@ -1203,18 +1241,35 @@ export default function FrogodoroSheet({
                                   setShowPond(true);
                                 }}
                                 aria-label="Fly catches this week"
-                                className="flex items-center gap-1 rounded-full bg-black/25 py-1 pl-1.5 pr-2.5 shadow-inner transition-colors hover:bg-black/35 active:scale-95"
+                                className="flex h-8 items-center gap-1 rounded-full bg-black/25 pl-1 pr-2.5 shadow-inner transition-colors hover:bg-black/35 active:scale-95"
                               >
-                                <Fly size={24} interactive={false} alwaysPlay paused />
+                                {/* Same handoff as the frog: a flat mark holds
+                                    the slot so no Rive canvas is attached while
+                                    the sheet is still sliding in. Fixed box +
+                                    leading-none on every sibling is what keeps
+                                    the row on one optical centre line. */}
+                                <span className="flex h-8 w-8 shrink-0 -translate-y-1 items-center justify-center">
+                                  {sheetEntered ? (
+                                    <Fly size={34} interactive={false} alwaysPlay paused />
+                                  ) : (
+                                    <img
+                                      src="/fly.svg"
+                                      alt=""
+                                      width={30}
+                                      height={30}
+                                      aria-hidden
+                                    />
+                                  )}
+                                </span>
                                 {timerActive &&
                                 phase === 'focus' &&
                                 fliesPotential > 0 ? (
-                                  <span className="text-[13px] font-black tabular-nums text-white">
+                                  <span className="flex items-center text-[13px] font-black leading-none tabular-nums text-white">
                                     {sceneCaught}/
                                     {Math.max(fliesPotential, sceneCaught)}
                                   </span>
                                 ) : (
-                                  <ChevronRight className="h-3.5 w-3.5 text-white/80" />
+                                  <ChevronRight className="h-3.5 w-3.5 shrink-0 text-white/80" />
                                 )}
                                 <AnimatePresence>
                                   {pledgeLive && (
@@ -1222,7 +1277,7 @@ export default function FrogodoroSheet({
                                       initial={{ opacity: 0, width: 0 }}
                                       animate={{ opacity: 1, width: 'auto' }}
                                       exit={{ opacity: 0, width: 0 }}
-                                      className="flex items-center gap-0.5 overflow-hidden text-[12px] font-black text-amber-300"
+                                      className="flex items-center gap-0.5 overflow-hidden text-[12px] font-black leading-none text-amber-300"
                                     >
                                       <Zap className="h-3 w-3 fill-current" />
                                       +1
@@ -1341,48 +1396,56 @@ export default function FrogodoroSheet({
                           </button>
                         </div>
 
-                        {/* Task name (centered) */}
+                        {/* Subject. While the timer runs it is a plain label;
+                            idle it IS the control that changes what you're
+                            focusing on, so the name isn't printed twice. */}
                         {task && (
                           <div className="mb-3 px-10 text-center">
-                            <p className="break-words text-lg font-black leading-tight text-white">
-                              {taskDisplayName}
-                            </p>
+                            {timerActive || awaitingDone ? (
+                              <p className="break-words text-lg font-black leading-tight text-white">
+                                {taskDisplayName}
+                              </p>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  hapticTick();
+                                  onOpenChange(false);
+                                  window.setTimeout(
+                                    () =>
+                                      useFrogodoroUiStore
+                                        .getState()
+                                        .openFocusLauncher(),
+                                    180,
+                                  );
+                                }}
+                                className="mx-auto flex max-w-full items-center gap-1 rounded-xl px-2 py-1 transition-colors hover:bg-white/10"
+                              >
+                                <span className="truncate text-lg font-black leading-tight text-white">
+                                  {subjectChipLabel}
+                                </span>
+                                <ChevronDown className="h-4 w-4 shrink-0 text-white/60" />
+                              </button>
+                            )}
                           </div>
                         )}
 
-                        {/* Mode row. Idle: switchable Focus/Break tabs (pick what
-                            to start). Mid-session: locked label of the current
-                            mode. Finished: "time's up". */}
+                        {/* Mode row. A break is never something you pick here —
+                            it is offered when a focus session ends — so idle
+                            reads as the subject you are about to focus on, and
+                            tapping it goes back to the picker. */}
                         {awaitingDone ? (
-                          <div className="mb-4 text-center">
-                            <p className="text-sm font-black text-white/90">Time&apos;s up!</p>
-                          </div>
+                          // The celebration right below already says the session
+                          // ended and how long it ran; a "Time's up!" line above
+                          // it was the same news twice.
+                          <div className="mb-1" />
                         ) : timerActive ? (
                           <div className="mb-4 flex items-center justify-center">
                             <span className="rounded-full bg-black/25 px-3 py-1.5 text-xs font-bold text-white shadow-inner">
                               {phase === 'focus' ? 'Focus' : 'Break'}
                             </span>
                           </div>
-                        ) : (
-                          <div className="flex items-center justify-center gap-1 mb-4">
-                            {[
-                              { id: 'focus', label: 'Focus' },
-                              { id: 'break', label: 'Break' },
-                            ].map((p) => (
-                              <button
-                                key={p.id}
-                                onClick={() => handleTabSwitch(p.id as PomodoroPhase)}
-                                className={`px-3 py-1.5 text-xs font-bold rounded-full transition-all ${
-                                  phase === p.id
-                                    ? 'bg-black/25 text-white shadow-inner'
-                                    : 'bg-transparent text-white/70 hover:bg-black/10'
-                                }`}
-                              >
-                                {p.label}
-                              </button>
-                            ))}
-                          </div>
-                        )}
+                        ) : null}
 
                         {/* Time Display — celebration payoff for a finished focus
                             session, split focus/break summary with auto-start
@@ -1408,80 +1471,46 @@ export default function FrogodoroSheet({
                             </div>
                           </div>
                         ) : (
-                        <div className="mb-4 flex items-center justify-center gap-3">
-                          {(() => {
-                            const control = getDurationControl();
-                            const duration = settings[control.key];
-                            const canAdjust = !timerActive && !awaitingDone;
-                            return (
-                              <>
-                                {canAdjust && (
-                                  <button
-                                    type="button"
-                                    onClick={() => adjustCurrentDuration(-1)}
-                                    disabled={duration <= control.min}
-                                    aria-label="Decrease duration"
-                                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/20 text-white transition-all hover:bg-white/30 active:scale-95 disabled:cursor-not-allowed disabled:opacity-35"
-                                  >
-                                    <Minus className="h-4 w-4" />
-                                  </button>
-                                )}
+                        /* Setup and countdown share one fixed-height stage.
+                           Animating height between them was layout work on
+                           every frame — and it ran while the Rive frog was
+                           animating, which is what made Start/Pause stutter.
+                           Stacked absolutely and cross-faded, the whole
+                           transition is transform + opacity, so it stays on
+                           the compositor and the card never reflows. */
+                        <div className="relative mb-3 h-[212px]">
+                          <AnimatePresence initial={false} mode="popLayout">
+                            {!timerActive && !awaitingDone ? (
+                              <motion.div
+                                key="setup"
+                                initial={{ opacity: 0, scale: 0.97, y: 10 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 0.97, y: -10 }}
+                                transition={STAGE_TRANSITION}
+                                style={{ willChange: 'transform, opacity' }}
+                                className="absolute inset-0 flex flex-col items-center justify-center gap-2"
+                              >
+                                <DurationDial
+                                  minutes={settings.focusDuration}
+                                  onChange={changeFocusMinutes}
+                                  presets={FOCUS_PRESETS}
+                                  label="Focus length in minutes"
+                                />
 
-                                <div className="min-w-0 text-center text-[clamp(44px,16vw,72px)] font-black leading-none tracking-tighter text-white drop-shadow-lg tabular-nums min-[420px]:min-w-[210px]">
-                                  <CountdownText
-                                    frozen={awaitingDone ? completedDuration : null}
-                                  />
-                                </div>
-
-                                {canAdjust && (
-                                  <button
-                                    type="button"
-                                    onClick={() => adjustCurrentDuration(1)}
-                                    disabled={duration >= control.max}
-                                    aria-label="Increase duration"
-                                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/20 text-white transition-all hover:bg-white/30 active:scale-95 disabled:cursor-not-allowed disabled:opacity-35"
-                                  >
-                                    <Plus className="h-4 w-4" />
-                                  </button>
-                                )}
-                              </>
-                            );
-                          })()}
-                        </div>
-                        )}
-
-                        {/* One line of why, then everything else folded away:
-                            a first session needs the number and START, not
-                            three decisions. */}
-                        <AnimatePresence initial={false}>
-                          {!awaitingDone && !timerActive && phase === 'focus' && (
-                            <motion.div
-                              initial={{ height: 0, opacity: 0 }}
-                              animate={{ height: 'auto', opacity: 1 }}
-                              exit={{ height: 0, opacity: 0 }}
-                              transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
-                              className="overflow-hidden pt-1.5"
-                            >
-                              <div className="mx-auto mb-2 flex min-h-9 w-full max-w-[300px] items-center justify-center">
-                                <span className="relative text-[13px] font-black leading-tight text-white/90">
-                                  <span className="absolute right-full top-1/2 mr-1.5 flex -translate-y-1/2 items-center">
-                                    <Fly
-                                      size={34}
-                                      y={-6}
-                                      interactive={false}
-                                      alwaysPlay
-                                      oversample={1.5}
-                                    />
-                                  </span>
-                                  {focusFlyCapReached
-                                    ? 'Frog’s full — minutes still count'
-                                    : fliesPotential > 0
-                                      ? `${settings.focusDuration} min catches ${fliesPotential} ${fliesPotential === 1 ? 'fly' : 'flies'}`
+                                <p className="text-center text-[12px] font-bold text-white/75">
+                                  {/* Always lead with what THIS session pays —
+                                      it is already capped, so "full" alone hid
+                                      the number the user came for. The cap is
+                                      an aside, and only when it actually bites. */}
+                                  {fliesPotential > 0
+                                    ? `Catches ${fliesPotential} ${fliesPotential === 1 ? 'fly' : 'flies'}${
+                                        focusFlyCapReached ? ' · daily max' : ''
+                                      }`
+                                    : focusFlyCapReached
+                                      ? 'Daily max caught — minutes still count'
                                       : `Focus ${FOCUS_FLY_RATE_SECONDS / 60} min to catch a fly`}
-                                </span>
-                              </div>
+                                </p>
 
-                              <div className="mx-auto mb-2 w-full max-w-[300px] overflow-hidden rounded-2xl bg-black/20 shadow-inner">
                                 <button
                                   type="button"
                                   role="switch"
@@ -1490,140 +1519,40 @@ export default function FrogodoroSheet({
                                     hapticTick();
                                     setDeepFocus(!deepFocus);
                                   }}
-                                  className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left transition-colors hover:bg-white/5"
-                                >
-                                  <span className="flex min-w-0 items-center gap-2.5">
-                                    <Zap
-                                      className={`h-4 w-4 shrink-0 transition-colors ${
-                                        deepFocus
-                                          ? 'fill-amber-300 text-amber-300'
-                                          : 'text-white/60'
-                                      }`}
-                                    />
-                                    <span className="min-w-0">
-                                      <span className="block text-[12px] font-black leading-tight text-white">
-                                        Deep focus
-                                      </span>
-                                      <span className="block text-[11px] font-semibold leading-tight text-white/70">
-                                        Finish without pausing · +1 fly
-                                      </span>
-                                    </span>
-                                  </span>
-                                  <span
-                                    className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
-                                      deepFocus ? 'bg-white' : 'bg-white/25'
-                                    }`}
-                                  >
-                                    <span
-                                      className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full shadow-sm transition-all ${
-                                        deepFocus
-                                          ? 'translate-x-5 bg-primary'
-                                          : 'translate-x-0 bg-white'
-                                      }`}
-                                    />
-                                  </span>
-                                </button>
-                              </div>
-
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  hapticTick();
-                                  setOptionsOpen((v) => !v);
-                                }}
-                                aria-expanded={optionsOpen}
-                                className="mx-auto mb-2 flex w-fit items-center gap-1 rounded-full px-3 py-1.5 text-[11px] font-bold text-white/70 transition-colors hover:bg-white/10 hover:text-white"
-                              >
-                                <span>{optionsSummary}</span>
-                                <ChevronRight
-                                  className={`h-3.5 w-3.5 transition-transform ${
-                                    optionsOpen ? 'rotate-90' : ''
+                                  className={`flex min-h-9 items-center gap-2 rounded-full px-3.5 text-[12px] font-black transition-colors ${
+                                    deepFocus
+                                      ? 'bg-amber-300 text-amber-950'
+                                      : 'bg-black/20 text-white/80 hover:bg-black/30'
                                   }`}
-                                />
-                              </button>
-
-                              <AnimatePresence initial={false}>
-                                {optionsOpen && (
-                                  <motion.div
-                                    initial={{ height: 0, opacity: 0 }}
-                                    animate={{ height: 'auto', opacity: 1 }}
-                                    exit={{ height: 0, opacity: 0 }}
-                                    transition={{ duration: 0.24, ease: [0.32, 0.72, 0, 1] }}
-                                    className="overflow-hidden"
-                                  >
-                              <div className="mx-auto mb-2 w-full max-w-[300px] divide-y divide-white/10 overflow-hidden rounded-2xl bg-black/20 shadow-inner">
-                                <button
-                                  type="button"
-                                  role="switch"
-                                  aria-checked={settings.autoStartBreaks}
-                                  onClick={toggleAutoStartBreaks}
-                                  className="flex w-full items-center justify-between gap-3 px-4 py-2 text-left transition-colors hover:bg-white/5"
                                 >
-                                  <span className="flex min-w-0 items-center gap-2.5">
-                                    <Repeat
-                                      className={`h-4 w-4 shrink-0 transition-colors ${
-                                        settings.autoStartBreaks
-                                          ? 'text-sky-200'
-                                          : 'text-white/60'
-                                      }`}
-                                    />
-                                    <span className="truncate text-[12px] font-black leading-tight text-white">
-                                      Auto-start break
-                                    </span>
-                                  </span>
-                                  <span
-                                    className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${
-                                      settings.autoStartBreaks ? 'bg-white' : 'bg-white/25'
+                                  <Zap
+                                    className={`h-3.5 w-3.5 shrink-0 ${
+                                      deepFocus ? 'fill-current' : ''
                                     }`}
-                                  >
-                                    <span
-                                      className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full shadow-sm transition-all ${
-                                        settings.autoStartBreaks
-                                          ? 'translate-x-4 bg-primary'
-                                          : 'translate-x-0 bg-white'
-                                      }`}
-                                    />
-                                  </span>
+                                  />
+                                  Deep focus · +1 fly
                                 </button>
-
-                                <div className="flex w-full items-center justify-between gap-3 px-4 py-2">
-                                  <span className="flex min-w-0 items-center gap-2.5">
-                                    <Coffee className="h-4 w-4 shrink-0 text-white/60" />
-                                    <span className="truncate text-[12px] font-black leading-tight text-white">
-                                      Break length
-                                    </span>
-                                  </span>
-                                  <span className="flex shrink-0 items-center gap-1.5">
-                                    <button
-                                      type="button"
-                                      onClick={() => adjustDuration('breakDuration', -1)}
-                                      disabled={settings.breakDuration <= TEN_SECONDS}
-                                      aria-label="Decrease break length"
-                                      className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/20 text-white transition-all hover:bg-white/30 active:scale-95 disabled:cursor-not-allowed disabled:opacity-35"
-                                    >
-                                      <Minus className="h-3.5 w-3.5" />
-                                    </button>
-                                    <span className="min-w-[38px] text-center text-[12px] font-black tabular-nums text-white">
-                                      {formatDurationSetting(settings.breakDuration)}
-                                    </span>
-                                    <button
-                                      type="button"
-                                      onClick={() => adjustDuration('breakDuration', 1)}
-                                      disabled={settings.breakDuration >= DURATION_MAX}
-                                      aria-label="Increase break length"
-                                      className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/20 text-white transition-all hover:bg-white/30 active:scale-95 disabled:cursor-not-allowed disabled:opacity-35"
-                                    >
-                                      <Plus className="h-3.5 w-3.5" />
-                                    </button>
-                                  </span>
+                              </motion.div>
+                            ) : (
+                              <motion.div
+                                key="running"
+                                initial={{ opacity: 0, scale: 0.94 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.94 }}
+                                transition={STAGE_TRANSITION}
+                                style={{ willChange: 'transform, opacity' }}
+                                className="absolute inset-0 flex items-center justify-center"
+                              >
+                                <div className="min-w-0 text-center text-[clamp(44px,16vw,72px)] font-black leading-none tracking-tighter text-white drop-shadow-lg tabular-nums min-[420px]:min-w-[210px]">
+                                  <CountdownText
+                                    frozen={awaitingDone ? completedDuration : null}
+                                  />
                                 </div>
-                              </div>
-                                  </motion.div>
-                                )}
-                              </AnimatePresence>
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+                        )}
 
                         {/* The frog perches on the START/PAUSE button from the
                             moment the sheet opens; when a focus session starts
@@ -1689,7 +1618,7 @@ export default function FrogodoroSheet({
                                   the DONE button instead of floating mid-card. */}
                               <div
                                 className="pointer-events-none absolute left-1/2 z-30 -translate-x-1/2"
-                                style={{ bottom: 'calc(100% - 8px)' }}
+                                style={{ bottom: 'calc(100% - 6px)' }}
                               >
                                 {sheetEntered && (
                                   <Frog
@@ -1719,11 +1648,11 @@ export default function FrogodoroSheet({
                               </div>
                               {celebrateFocus ? (
                                 <button
-                                  onClick={handleStartBreak}
-                                  className="relative flex items-center justify-center rounded-2xl bg-white px-7 py-3 text-[16px] font-black text-sky-500 shadow-[0_6px_0_rgba(0,0,0,0.15)] transition-all active:translate-y-1.5 active:shadow-[0_0_0_rgba(0,0,0,0.15)] dark:bg-slate-50 dark:text-sky-700 min-[380px]:px-10"
+                                  onClick={handleWrapUp}
+                                  className="relative flex items-center justify-center rounded-2xl bg-white px-7 py-3 text-[16px] font-black text-emerald-600 shadow-[0_6px_0_rgba(0,0,0,0.15)] transition-all active:translate-y-1.5 active:shadow-[0_0_0_rgba(0,0,0,0.15)] dark:bg-slate-50 dark:text-emerald-700 min-[380px]:px-10"
                                 >
-                                  <Play className="mr-1.5 h-5 w-5 fill-current" />
-                                  BREAK {formatDurationSetting(settings.breakDuration)}
+                                  <Check className="mr-1.5 h-5 w-5" />
+                                  WRAP UP
                                 </button>
                               ) : (
                                 <button
@@ -1748,11 +1677,11 @@ export default function FrogodoroSheet({
                                   +5 MORE
                                 </button>
                                 <button
-                                  onClick={handleDone}
+                                  onClick={handleStartBreak}
                                   className="flex items-center justify-center rounded-xl bg-white/20 px-3.5 py-2 text-[13px] font-black text-white transition-all hover:bg-white/30 active:scale-95"
                                 >
-                                  <Check className="mr-1 h-3.5 w-3.5" />
-                                  DONE
+                                  <Coffee className="mr-1 h-3.5 w-3.5" />
+                                  BREAK
                                 </button>
                               </div>
                             )}
@@ -1775,6 +1704,7 @@ export default function FrogodoroSheet({
 
                           <button
                             onClick={toggleTimer}
+                            data-hint={timerActive ? undefined : 'focus-start'}
                             className={`relative flex items-center justify-center px-8 py-3 bg-white dark:bg-slate-50 text-[16px]
  font-black rounded-2xl shadow-[0_6px_0_rgba(0,0,0,0.15)]
  active:shadow-[0_0_0_rgba(0,0,0,0.15)] active:translate-y-1.5 transition-all ${getPhaseAccent()}`}

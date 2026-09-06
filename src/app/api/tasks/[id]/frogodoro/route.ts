@@ -3,7 +3,7 @@ import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import TaskModel from '@/lib/models/Task';
 import UserModel from '@/lib/models/User';
-import { addFrogodoroSession } from '@/lib/frogodoroSessions';
+import { addFrogodoroSession, sessionRefOf } from '@/lib/frogodoroSessions';
 import { syncQuestState } from '@/lib/quests/engine';
 import { notifyTaskChanged } from '@/lib/taskSync';
 
@@ -71,6 +71,12 @@ export async function PUT(
         session.focusTime ?? 0,
         session.breakTime ?? 0,
         runningPhase,
+        sessionRefOf({
+          taskId: id,
+          sessionId: typeof body.sessionId === 'string' ? body.sessionId : undefined,
+          subjectLabel:
+            typeof body.subjectLabel === 'string' ? body.subjectLabel : undefined,
+        }),
       );
       isModified = true;
 

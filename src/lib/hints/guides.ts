@@ -115,6 +115,25 @@ const NEEDS_A_TASK: Pick<HintBeat, 'satisfiedWhen'> = {
   satisfiedWhen: '[data-hint="task-row"]',
 };
 
+// The focus flow is now: the timer's own button → pick a subject → start. Both
+// leading beats wait on the next surface appearing rather than on the tap, so
+// a user who opens the picker their own way is still followed correctly.
+const OPEN_FOCUS_BEAT: HintBeat = {
+  href: '/',
+  anchor: 'focus-timer',
+  say: 'Open the focus timer',
+  advanceOnTap: false,
+  advanceWhenPresent: '[data-hint="focus-subject"]',
+};
+
+const PICK_SUBJECT_BEAT: HintBeat = {
+  anchor: 'focus-subject',
+  say: 'Pick anything — or just focus',
+  advanceOnTap: false,
+  advanceWhenPresent: '[data-hint="focus-start"]',
+  timeoutMs: 60_000,
+};
+
 const GUIDES: Record<string, HintGuide> = {
   'add-task': {
     id: 'add-task',
@@ -199,45 +218,34 @@ const GUIDES: Record<string, HintGuide> = {
       },
     ],
   },
+  // The timer has its own button now, and a session no longer needs a task to
+  // hang off — so these route through the focus picker instead of hunting for
+  // a task row and a focus button that no longer exists.
   focus: {
     id: 'focus',
     goal: 'Run the focus timer for {minutes} minutes',
     endWhen: 'focus-running',
     beats: [
-      { ...ADD_TASK_BEAT, ...NEEDS_A_TASK, say: 'Add a task to focus on first' },
-      {
-        anchor: 'task-row',
-        say: 'Open this task',
-        sayTouch: 'Swipe it right to focus — or tap to open it',
-        show: 'row-peek',
-        advanceOnTap: false,
-        advanceWhenPresent: '[data-hint="focus-button"]',
-      },
-      { anchor: 'focus-button', say: 'Start the focus timer' },
+      { ...OPEN_FOCUS_BEAT, say: 'Open the focus timer' },
+      { ...PICK_SUBJECT_BEAT, say: 'Pick anything — or just focus' },
+      { anchor: 'focus-start', say: 'Start the focus timer' },
     ],
   },
   'focus-tagged': {
     id: 'focus-tagged',
-    goal: 'Focus on a task tagged {tags} for {minutes} minutes',
+    goal: 'Focus on {tags} for {minutes} minutes',
     endWhen: 'focus-running',
     beats: [
+      { ...OPEN_FOCUS_BEAT, say: 'Open the focus timer' },
       {
-        ...ADD_TASK_BEAT,
-        say: 'No task is tagged {tags} yet — add one',
-        satisfiedWhen: '[data-hint="task-row"]',
-        satisfiedWhenTagMatch: 'hit',
-      },
-      {
-        anchor: 'task-row',
+        anchor: 'focus-subject-tag',
         matchTagIds: true,
-        say: 'Open this {tags} task',
-        sayTouch: 'Swipe it right to focus — or tap to open it',
-        show: 'row-peek',
-        scope: 'tagged',
+        say: 'Focus on {tags}',
         advanceOnTap: false,
-        advanceWhenPresent: '[data-hint="focus-button"]',
+        advanceWhenPresent: '[data-hint="focus-start"]',
+        timeoutMs: 60_000,
       },
-      { anchor: 'focus-button', say: 'Start the focus timer' },
+      { anchor: 'focus-start', say: 'Start the focus timer' },
     ],
   },
   'deep-session': {
@@ -245,17 +253,10 @@ const GUIDES: Record<string, HintGuide> = {
     goal: '{minutes} unbroken minutes — stopping early resets it',
     endWhen: 'focus-running',
     beats: [
-      { ...ADD_TASK_BEAT, ...NEEDS_A_TASK, say: 'Add a task to focus on first' },
+      { ...OPEN_FOCUS_BEAT, say: 'Open the focus timer' },
+      { ...PICK_SUBJECT_BEAT, say: 'Pick what you can give {minutes} clear minutes' },
       {
-        anchor: 'task-row',
-        say: 'Open the task you can give {minutes} clear minutes',
-        sayTouch: 'Swipe it right to focus — or tap to open it',
-        show: 'row-peek',
-        advanceOnTap: false,
-        advanceWhenPresent: '[data-hint="focus-button"]',
-      },
-      {
-        anchor: 'focus-button',
+        anchor: 'focus-start',
         say: 'Start it — and let it run the whole {minutes} minutes',
       },
     ],

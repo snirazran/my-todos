@@ -203,6 +203,28 @@ struct FrogTimerControlIntent: LiveActivityIntent {
             await activity.update(
                 ActivityContent(state: ns, staleDate: Date(timeIntervalSince1970: end / 1000))
             )
+        case "break":
+            // The time half of "what next", answerable with the phone locked.
+            // Length is the break the user already set — a custom one needs the
+            // app, which is also where the "what did I finish?" list lives.
+            var ns = s
+            let total = max(60, ns.ringTotal > 0 && s.label.lowercased().contains("break") ? ns.ringTotal : 5 * 60)
+            let end = nowMs + total * 1000
+            FrogAlarmKit.sync(endTimeMs: end, phase: "break", soundId: s.sound)
+            ns.paused = false
+            ns.finished = false
+            ns.confirmPause = false
+            ns.label = "Break"
+            ns.subtitle = ""
+            ns.color = "#0ea5e9"
+            ns.endTime = end
+            ns.ringValue = total
+            ns.ringTotal = total
+            ns.ringStart = nowMs
+            ns.ringEnd = end
+            await activity.update(
+                ActivityContent(state: ns, staleDate: Date(timeIntervalSince1970: end / 1000))
+            )
         case "stop", "done":
             FrogAlarmKit.cancel()
             await activity.end(nil, dismissalPolicy: .immediate)
