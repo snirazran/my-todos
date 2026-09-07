@@ -114,6 +114,8 @@ export function FocusReviewSheet({
     [review],
   );
 
+  const breakMode = mode === 'break';
+
   if (!review) return null;
 
   return (
@@ -145,10 +147,17 @@ export function FocusReviewSheet({
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-16 sm:px-6">
-            {/* Wears the timer's own clothes — same green field, same pill
-                toggle, same dial — so this reads as one more beat of the timer
-                rather than a different screen that happens to follow it. */}
-            <div className="rounded-3xl bg-primary px-4 pb-4 pt-3 dark:bg-green-700">
+            {/* Wears the timer's own clothes — the phase's own colour (green
+                focus, blue break), same pill toggle, same dial — so this reads
+                as one more beat of the timer rather than a different screen
+                that happens to follow it. */}
+            <div
+              className={`rounded-3xl px-4 pb-4 pt-3 transition-colors ${
+                breakMode
+                  ? 'bg-sky-500 dark:bg-sky-700'
+                  : 'bg-primary dark:bg-green-700'
+              }`}
+            >
               <div className="mx-auto mb-3 flex w-fit items-center gap-1 rounded-full bg-black/20 p-1">
                 {(['break', 'focus'] as const).map((option) => (
                   <button
@@ -161,7 +170,11 @@ export function FocusReviewSheet({
                     aria-pressed={mode === option}
                     className={`min-h-9 rounded-full px-4 text-[13px] font-black transition-[transform,box-shadow,background-color,color,opacity] ${
                       mode === option
-                        ? 'bg-white text-primary shadow-sm dark:text-green-700'
+                        ? `bg-white shadow-sm ${
+                            option === 'break'
+                              ? 'text-sky-500 dark:text-sky-700'
+                              : 'text-primary dark:text-green-700'
+                          }`
                         : 'text-white/70 hover:text-white'
                     }`}
                   >
@@ -228,7 +241,11 @@ export function FocusReviewSheet({
                       : { kind: 'focus', seconds: focusMinutes * 60 },
                   )
                 }
-                className="relative flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary text-[15px] font-black text-primary-foreground shadow-md shadow-primary/20 transition-[transform,box-shadow,background-color,color,opacity] active:scale-[0.98]"
+                className={`relative flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl text-[15px] font-black shadow-md transition-[transform,box-shadow,background-color,color,opacity] active:scale-[0.98] ${
+                  breakMode
+                    ? 'bg-sky-500 text-white shadow-sky-500/20 dark:bg-sky-700'
+                    : 'bg-primary text-primary-foreground shadow-primary/20'
+                }`}
               >
                 {mode === 'break' ? (
                   <>

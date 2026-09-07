@@ -21,6 +21,7 @@ import {
   DEFAULT_SETTINGS,
   FOCUS_PRESETS,
   announceSessionEnded,
+  endedSessionDetail,
 } from '@/lib/frogodoroStore';
 import { DurationDial } from '@/components/ui/DurationDial';
 import {
@@ -752,9 +753,10 @@ export default function FrogodoroSheet({
   // inactive (not a continuation) — the user starts it anew when ready. Doesn't
   // save progress; the completed phase was already saved when it finished.
   const handleDone = () => {
+    const ended = endedSessionDetail();
     setAwaitingDone(false);
     stopTimer();
-    announceSessionEnded();
+    announceSessionEnded(ended);
   };
 
   // The end of a focus session, in the order the two halves belong: the sheet
@@ -762,10 +764,11 @@ export default function FrogodoroSheet({
   // going choice lives on the far side of that.
   const handleWrapUp = () => {
     hapticImpact();
+    const ended = endedSessionDetail();
     setAwaitingDone(false);
     stopTimer();
     onOpenChange(false);
-    announceSessionEnded();
+    announceSessionEnded(ended);
   };
 
   // Stop ends the current session and stays on the popup (now idle), so you can

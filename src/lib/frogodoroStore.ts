@@ -16,10 +16,24 @@ export interface FrogodoroSettings {
 
 export const SESSION_ENDED_EVENT = 'frogodoro-session-ended';
 
+export type SessionEndedDetail = {
+  id: string;
+  date: string;
+  subjectKind: FocusSubjectKind;
+  subjectId: string;
+  subjectLabel: string;
+  focusSeconds: number;
+  breakSeconds: number;
+};
+
 /** Tells the review gate a sitting just ended, so it can ask what got done. */
-export function announceSessionEnded(): void {
+export function announceSessionEnded(detail?: SessionEndedDetail): void {
   if (typeof window === 'undefined') return;
-  window.dispatchEvent(new CustomEvent(SESSION_ENDED_EVENT));
+  window.dispatchEvent(
+    new CustomEvent<SessionEndedDetail | undefined>(SESSION_ENDED_EVENT, {
+      detail,
+    }),
+  );
 }
 
 export const TEN_SECOND_MINUTES = 10 / 60;
@@ -867,3 +881,20 @@ export const useFrogodoroStore = create<FrogodoroState>()(
     },
   ),
 );
+
+/** Snapshot of the sitting that just ended, from the live store. */
+export function endedSessionDetail(): SessionEndedDetail | undefined {
+  const live = useFrogodoroStore.getState();
+  if (!live.sessionId || !live.selectedTaskId) return undefined;
+  const now = new Date();
+  const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  return {
+    id: live.sessionId,
+    date,
+    subjectKind: live.subjectKind,
+    subjectId: live.selectedTaskId,
+    subjectLabel: live.selectedTaskName,
+    focusSeconds: live.lastFocusElapsed,
+    breakSeconds: live.lastBreakElapsed,
+  };
+}

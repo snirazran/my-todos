@@ -7,10 +7,16 @@ import {
   type PendingReview,
   type ReviewOutcome,
 } from '@/components/ui/FocusReviewSheet';
-import { SESSION_ENDED_EVENT, useFrogodoroStore } from '@/lib/frogodoroStore';
+import {
+  SESSION_ENDED_EVENT,
+  useFrogodoroStore,
+  type SessionEndedDetail,
+} from '@/lib/frogodoroStore';
 import { useFrogodoroUiStore } from '@/lib/frogodoroUiStore';
 
 type ReviewResponse = { session?: PendingReview | null };
+
+const MIN_REVIEWABLE_FOCUS_SECONDS = 60;
 
 // The bookkeeping half of ending a session. The "what next" half is answerable
 // from the island, so a phone user has already chosen break-or-stop out there;
@@ -19,6 +25,7 @@ type ReviewResponse = { session?: PendingReview | null };
 export function FocusReviewGate() {
   const [open, setOpen] = useState(false);
   const [review, setReview] = useState<PendingReview | null>(null);
+  const [endedHere, setEndedHere] = useState<PendingReview | null>(null);
   const dismissedRef = useRef<Set<string>>(new Set());
 
   const timezone = useMemo(
@@ -34,16 +41,25 @@ export function FocusReviewGate() {
   );
 
   useEffect(() => {
-    const pending = data?.session;
+    const pending = endedHere ?? data?.session;
     if (!pending || open) return;
     if (dismissedRef.current.has(pending.id)) return;
     if (openSheets > 0) return;
     setReview(pending);
     setOpen(true);
-  }, [data?.session, open, openSheets]);
+  }, [endedHere, data?.session, open, openSheets]);
 
   useEffect(() => {
-    const onSessionEnded = () => {
+    const onSessionEnded = (event: Event) => {
+      const ended = (event as CustomEvent<SessionEndedDetail | undefined>)
+        .detail;
+      if (
+        ended &&
+        ended.focusSeconds >= MIN_REVIEWABLE_FOCUS_SECONDS &&
+        !dismissedRef.current.has(ended.id)
+      ) {
+        setEndedHere({ ...ended, subjectTags: [] });
+      }
       window.setTimeout(() => void refresh(), 400);
     };
     window.addEventListener(SESSION_ENDED_EVENT, onSessionEnded);
@@ -53,6 +69,7 @@ export function FocusReviewGate() {
   const handleOutcome = useCallback(
     (outcome: ReviewOutcome) => {
       if (review) dismissedRef.current.add(review.id);
+      setEndedHere(null);
       const store = useFrogodoroStore.getState();
       if (outcome.kind === 'break') {
         store.rotateSession();

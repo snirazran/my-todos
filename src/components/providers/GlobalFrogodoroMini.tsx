@@ -5,7 +5,11 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useShallow } from 'zustand/react/shallow';
 import { Check, Zap } from 'lucide-react';
-import { useFrogodoroStore } from '@/lib/frogodoroStore';
+import {
+  announceSessionEnded,
+  endedSessionDetail,
+  useFrogodoroStore,
+} from '@/lib/frogodoroStore';
 import { FocusCelebration } from '@/components/ui/FocusCelebration';
 import { useFrogodoroUiStore } from '@/lib/frogodoroUiStore';
 import { useSheetStore } from '@/lib/sheetStore';
@@ -110,8 +114,10 @@ export default function GlobalFrogodoroMini() {
 
   // Done just acknowledges (silences the alarm) and ends the session.
   const handleDone = () => {
+    const ended = endedSessionDetail();
     setAwaitingDone(false);
     stopTimer();
+    announceSessionEnded(ended);
   };
 
   const handleKeepGoing = () => {
