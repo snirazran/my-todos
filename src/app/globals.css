@@ -1134,3 +1134,16 @@ body.dragging {
   --pond-accent-2-shadow: #27501f;
   --pond-glow: rgba(108, 187, 95, 0.16);
 }
+
+.plus-sheet {
+  --plus-field: #6c6fce;
+  --plus-field-deep: #6c6fce;
+  --plus-field-rgb: 108, 111, 206;
+  --plus-surface: rgba(255, 255, 255, 0.1);
+  --plus-surface-strong: rgba(255, 255, 255, 0.16);
+  --plus-line: rgba(255, 255, 255, 0.2);
+  --plus-gold: #fbbf24;
+  --plus-gold-soft: #fde68a;
+  --plus-gold-ink: #3b2708;
+  background-color: var(--plus-field);
+}

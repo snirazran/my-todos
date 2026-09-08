@@ -227,11 +227,14 @@ export function PlusUpgradeModal({
             }}
             className="pointer-events-none fixed inset-0 z-[10009] flex will-change-transform md:items-center md:justify-center md:p-6"
           >
-            <div className="pointer-events-auto no-scrollbar relative mx-auto flex h-full w-full flex-col overflow-y-auto overflow-x-hidden bg-[#6c6fce] text-white md:h-[min(720px,calc(100dvh-3rem))] md:w-[min(100vw-3rem,28rem)] md:rounded-[32px] md:shadow-2xl">
+            <div className="plus-sheet pointer-events-auto relative mx-auto flex h-full w-full flex-col overflow-hidden text-white md:h-[min(640px,calc(100dvh-3rem))] md:w-[min(100vw-3rem,58rem)] md:flex-row md:rounded-[32px] md:shadow-2xl">
+              <CoverRail />
+
+              <div className="no-scrollbar relative flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden">
               <button
                 type="button"
                 onClick={onClose}
-                className="absolute right-4 top-[calc(1rem+env(safe-area-inset-top))] z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-white transition-colors hover:bg-white/30"
+                className="absolute right-4 top-[calc(1rem+env(safe-area-inset-top))] z-20 flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-white transition-colors hover:bg-white/30 md:top-4"
                 aria-label="Close"
               >
                 <X className="h-5 w-5" />
@@ -268,6 +271,7 @@ export function PlusUpgradeModal({
                   </StepShell>
                 )}
               </AnimatePresence>
+              </div>
 
               <AnimatePresence>
                 {needsAccount && (
@@ -466,6 +470,33 @@ export function PlusWelcomeCelebration({ onDone }: { onDone: () => void }) {
   );
 }
 
+function CoverRail() {
+  return (
+    <aside
+      aria-hidden
+      className="relative hidden shrink-0 overflow-hidden md:block md:w-[45%]"
+    >
+      <AppImage
+        src="/premium-cover.webp"
+        priority
+        className="h-full w-full object-cover object-[52%_32%]"
+      />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-[linear-gradient(180deg,rgba(24,20,64,0)_0%,rgba(24,20,64,0.55)_100%)]" />
+      <div className="pointer-events-none absolute inset-y-0 right-0 w-40 bg-[linear-gradient(90deg,rgba(var(--plus-field-rgb),0)_0%,rgba(var(--plus-field-rgb),0.04)_28%,rgba(var(--plus-field-rgb),0.16)_44%,rgba(var(--plus-field-rgb),0.38)_58%,rgba(var(--plus-field-rgb),0.62)_70%,rgba(var(--plus-field-rgb),0.82)_80%,rgba(var(--plus-field-rgb),0.95)_89%,rgba(var(--plus-field-rgb),1)_95%,rgba(var(--plus-field-rgb),1)_100%)]" />
+      <div className="absolute inset-x-0 bottom-0 p-8 pr-16">
+        <p className="text-[11px] font-black uppercase tracking-[0.22em] text-amber-300">
+          Frogress Plus
+        </p>
+        <p className="mt-1.5 text-lg font-black leading-tight tracking-tight text-white">
+          The whole pond,
+          <br />
+          twice as rewarding.
+        </p>
+      </div>
+    </aside>
+  );
+}
+
 function StepShell({ children }: { children: React.ReactNode }) {
   const reduceMotion = useReducedMotion();
   return (
@@ -495,12 +526,18 @@ function Reveal({
   children,
   delay = 0,
   className,
+  onAnimationComplete,
 }: {
   children: React.ReactNode;
   delay?: number;
   className?: string;
+  onAnimationComplete?: () => void;
 }) {
   const reduceMotion = useReducedMotion();
+  useEffect(() => {
+    if (reduceMotion) onAnimationComplete?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reduceMotion]);
   if (reduceMotion) return <div className={className}>{children}</div>;
   return (
     <motion.div
@@ -513,6 +550,7 @@ function Reveal({
         mass: 0.7,
         delay,
       }}
+      onAnimationComplete={onAnimationComplete}
       className={className}
     >
       {children}
@@ -537,12 +575,20 @@ function PrimaryButton({
       disabled={disabled}
       whileTap={{ scale: 0.97 }}
       transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-      className="relative h-14 w-full overflow-hidden rounded-2xl bg-white text-base font-black tracking-tight text-violet-700 shadow-sm disabled:opacity-60 dark:text-violet-700"
+      className="group relative isolate h-14 w-full overflow-hidden rounded-2xl text-base font-black tracking-tight text-emerald-900 ring-2 ring-amber-200/80 transition-transform disabled:opacity-60"
     >
+      <span
+        aria-hidden
+        className="absolute inset-0 -z-10 rounded-2xl bg-[linear-gradient(125deg,#fde68a_0%,#fbbf24_45%,#f59e0b_75%,#d97706_100%)]"
+      />
+      <span
+        aria-hidden
+        className="absolute inset-x-0 top-0 -z-10 h-1/2 rounded-t-2xl bg-gradient-to-b from-white/45 to-transparent"
+      />
       {!reduceMotion && (
         <motion.span
           aria-hidden
-          className="pointer-events-none absolute inset-y-0 left-0 w-1/3 -skew-x-12 bg-gradient-to-r from-transparent via-amber-200/60 to-transparent will-change-transform"
+          className="pointer-events-none absolute inset-y-0 left-0 w-1/3 -skew-x-12 bg-gradient-to-r from-transparent via-white/55 to-transparent will-change-transform"
           initial={{ x: '-150%' }}
           animate={{ x: '450%' }}
           transition={{
@@ -568,7 +614,7 @@ function Step0({
   const reduceMotion = useReducedMotion();
   return (
     <div className="flex min-h-full flex-col pb-8">
-      <div className="relative -mt-px h-[40vh] min-h-[260px] w-full overflow-hidden md:h-56 md:min-h-0">
+      <div className="relative -mt-px h-[40vh] min-h-[260px] w-full overflow-hidden md:hidden">
         <motion.div
           className="h-full w-full will-change-transform"
           initial={reduceMotion ? undefined : { scale: 1.08 }}
@@ -581,17 +627,17 @@ function Step0({
             className="h-full w-full object-cover object-top"
           />
         </motion.div>
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-b from-transparent to-[#6c6fce]" />
+        <div className="pointer-events-none absolute -inset-x-px -bottom-px top-0 bg-[linear-gradient(180deg,rgba(var(--plus-field-rgb),0)_0%,rgba(var(--plus-field-rgb),0.03)_30%,rgba(var(--plus-field-rgb),0.12)_45%,rgba(var(--plus-field-rgb),0.30)_57%,rgba(var(--plus-field-rgb),0.52)_67%,rgba(var(--plus-field-rgb),0.72)_76%,rgba(var(--plus-field-rgb),0.88)_84%,rgba(var(--plus-field-rgb),0.97)_91%,rgba(var(--plus-field-rgb),1)_96%,rgba(var(--plus-field-rgb),1)_100%)]" />
       </div>
-      <div className="flex flex-1 flex-col px-6 pb-6 md:pb-5">
+      <div className="flex flex-1 flex-col px-6 pb-6 md:justify-center md:px-9 md:pb-9 md:pt-14">
         <Reveal delay={0.05}>
-          <h2 className="mt-2 text-center text-xl font-black tracking-tight md:text-2xl">
+          <h2 className="mt-2 text-center text-xl font-black tracking-tight md:mt-0 md:text-left md:text-[1.7rem] md:leading-[1.15]">
             Become the person who
             <br />
             <span className="text-amber-300">follows through</span>
           </h2>
         </Reveal>
-        <div className="mt-5 space-y-3 rounded-2xl bg-white/10 p-4 md:mt-6">
+        <div className="mt-5 space-y-3 rounded-2xl bg-[color:var(--plus-surface)] p-4 ring-1 ring-inset ring-[color:var(--plus-line)] md:mt-6">
           <Reveal delay={0.12}>
             <FeatureRow
               icon={<Icon name="x2" className="h-10 w-10" />}
@@ -615,7 +661,7 @@ function Step0({
           </Reveal>
         </div>
 
-        <Reveal delay={0.38} className="mt-auto space-y-2 pt-6 md:pt-5">
+        <Reveal delay={0.38} className="mt-auto space-y-2 pt-6 md:mt-0 md:pt-7">
           <PrimaryButton onClick={onContinue}>Try for free</PrimaryButton>
           <p className="flex items-center justify-center gap-1.5 text-center text-xs font-semibold text-white/75">
             <Heart className="h-3.5 w-3.5 text-rose-300" fill="currentColor" />
@@ -645,7 +691,7 @@ function FeatureRow({
 }) {
   return (
     <div className="flex items-start gap-3">
-      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-inset ring-white/15">
+      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[color:var(--plus-surface-strong)] ring-1 ring-inset ring-[color:var(--plus-line)]">
         {icon}
       </div>
       <div className="min-w-0 flex-1">
@@ -694,7 +740,7 @@ const PLUS_ONLY =
 
 function Step1({ onContinue }: { onContinue: () => void }) {
   return (
-    <div className="flex min-h-full flex-col px-6 pb-6 pt-[calc(4rem+env(safe-area-inset-top))] md:pb-5 md:pt-12">
+    <div className="flex min-h-full flex-col px-6 pb-6 pt-[calc(4rem+env(safe-area-inset-top))] md:px-9 md:pb-8 md:pt-12">
       <Reveal>
         <h2 className="text-center text-2xl font-black tracking-tight">
           Everything you unlock with Plus
@@ -703,7 +749,7 @@ function Step1({ onContinue }: { onContinue: () => void }) {
 
       <Reveal delay={0.1} className="relative mt-8">
         {/* PLUS column highlight */}
-        <div className="pointer-events-none absolute -right-3 -top-3 -bottom-3 w-[6.25rem] overflow-hidden rounded-2xl bg-white/15 opacity-50">
+        <div className="pointer-events-none absolute -right-3 -top-3 -bottom-3 w-[6.25rem] overflow-hidden rounded-2xl bg-[color:var(--plus-surface-strong)] ring-1 ring-inset ring-[color:var(--plus-line)]">
           {/* Three evenly-spaced lanes with staggered timing for a calm, flowing stream */}
           <FloatingSparkle
             delay={0.0}
@@ -777,7 +823,7 @@ function Step1({ onContinue }: { onContinue: () => void }) {
             <div />
             <div className="text-center text-white/90">Free</div>
             <div className="flex justify-center pl-1.5">
-              <span className="rounded-lg bg-white px-2.5 py-1 text-[11px] font-black tracking-wider text-violet-700 dark:text-violet-700">
+              <span className="rounded-lg bg-[linear-gradient(125deg,#fde68a_0%,#fbbf24_55%,#f59e0b_100%)] px-2.5 py-1 text-[11px] font-black tracking-wider text-emerald-950">
                 PLUS
               </span>
             </div>
@@ -788,7 +834,7 @@ function Step1({ onContinue }: { onContinue: () => void }) {
                 <span
                   className={`flex items-center py-3.5 pr-4 ${
                     i < COMPARISON_ROWS.length - 1
-                      ? 'border-b border-white/20'
+                      ? 'border-b border-[color:var(--plus-line)]'
                       : ''
                   }`}
                 >
@@ -797,7 +843,7 @@ function Step1({ onContinue }: { onContinue: () => void }) {
                 <div
                   className={`flex items-center justify-center whitespace-nowrap py-3.5 text-white/70 ${
                     i < COMPARISON_ROWS.length - 1
-                      ? 'border-b border-white/20'
+                      ? 'border-b border-[color:var(--plus-line)]'
                       : ''
                   }`}
                 >
@@ -806,7 +852,7 @@ function Step1({ onContinue }: { onContinue: () => void }) {
                 <div
                   className={`flex items-center justify-center whitespace-nowrap py-3.5 pl-1.5 font-black text-amber-300 ${
                     i < COMPARISON_ROWS.length - 1
-                      ? 'border-b border-white/20'
+                      ? 'border-b border-[color:var(--plus-line)]'
                       : ''
                   }`}
                 >
@@ -829,7 +875,7 @@ function Step1({ onContinue }: { onContinue: () => void }) {
           -mx-6/px-6 lets the fade span the full panel width. */}
       <Reveal
         delay={0.3}
-        className="sticky bottom-0 z-10 -mx-6 mt-auto bg-gradient-to-t from-[#6c6fce] via-[#6c6fce] to-transparent px-6 pb-[max(0.25rem,env(safe-area-inset-bottom))] pt-8"
+        className="sticky bottom-0 z-10 -mx-6 -mb-6 mt-auto bg-[linear-gradient(0deg,var(--plus-field-deep)_0%,var(--plus-field-deep)_72%,transparent_100%)] px-6 pb-[max(1rem,env(safe-area-inset-bottom))] pt-10 md:-mx-9 md:-mb-8 md:px-9 md:pb-8"
       >
         <PrimaryButton onClick={onContinue}>Try 7 days free!</PrimaryButton>
       </Reveal>
@@ -844,6 +890,7 @@ function Step2({
   reminderDate: string;
   onContinue: () => void;
 }) {
+  const [entered, setEntered] = useState(false);
   const { indices: wardrobeIndices } = useWardrobeIndices(true);
   const step2Indices = React.useMemo(
     () => ({ ...wardrobeIndices }),
@@ -856,7 +903,7 @@ function Step2({
   );
   const reduceMotion = useReducedMotion();
   return (
-    <div className="flex min-h-full flex-col px-6 pb-6 pt-[calc(4rem+env(safe-area-inset-top))] md:pb-5 md:pt-12">
+    <div className="flex min-h-full flex-col px-6 pb-6 pt-[calc(4rem+env(safe-area-inset-top))] md:px-9 md:pb-8 md:pt-12">
       <Reveal>
         <h2 className="text-center text-2xl font-black tracking-tight">
           We&apos;ll remind you <span className="text-amber-300">2 days</span>{' '}
@@ -869,14 +916,27 @@ function Step2({
         </p>
       </Reveal>
 
-      <Reveal delay={0.16} className="mt-12 flex justify-center">
+      <Reveal
+        delay={0.16}
+        className="mt-12 flex justify-center"
+        onAnimationComplete={() => setEntered(true)}
+      >
         <motion.div
-          className="relative will-change-transform"
+          className="relative h-[240px] w-[240px] will-change-transform"
           animate={reduceMotion ? undefined : { y: [0, -8, 0] }}
           transition={{ duration: 3.4, repeat: Infinity, ease: 'easeInOut' }}
         >
-          <Frog width={240} height={240} indices={step2Indices} emote="love" />
-          <PremiumFrogAura show alwaysPlay />
+          {entered && (
+            <>
+              <Frog
+                width={240}
+                height={240}
+                indices={step2Indices}
+                emote="love"
+              />
+              <PremiumFrogAura show alwaysPlay />
+            </>
+          )}
         </motion.div>
       </Reveal>
 
@@ -925,7 +985,7 @@ function Step3({
   const trialDays = PLAN_DETAILS[plan].trialDays;
   const period = plan === 'yearly' ? 'year' : 'month';
   return (
-    <div className="flex min-h-full flex-col px-6 pb-6 pt-[calc(4rem+env(safe-area-inset-top))] md:pb-5 md:pt-12">
+    <div className="flex min-h-full flex-col px-6 pb-6 pt-[calc(4rem+env(safe-area-inset-top))] md:px-9 md:pb-8 md:pt-12">
       <Reveal>
         <h2 className="text-2xl font-black tracking-tight">
           Choose a plan for after your free trial
@@ -984,7 +1044,7 @@ function Step3({
         >
           <Icon
             name="frogPlus"
-            className="h-44 w-44 drop-shadow-[0_5px_0_rgba(0,0,0,0.3)]"
+            className="h-44 w-44 drop-shadow-[0_5px_0_rgba(0,0,0,0.3)] md:h-28 md:w-28"
           />
         </motion.div>
       </Reveal>
@@ -1106,12 +1166,12 @@ function PlanCard({
       transition={{ type: 'spring', stiffness: 480, damping: 26 }}
       className={`relative w-full rounded-2xl px-5 py-4 text-left transition-colors will-change-transform ${
         selected
-          ? 'bg-white/15 ring-2 ring-white'
-          : 'bg-white/10 ring-1 ring-white/15'
+          ? 'bg-[color:var(--plus-surface-strong)] ring-2 ring-[color:var(--plus-gold)]'
+          : 'bg-[color:var(--plus-surface)] ring-1 ring-[color:var(--plus-line)]'
       }`}
     >
       {badge && (
-        <span className="absolute right-4 top-4 rounded-md bg-white px-2 py-0.5 text-[10px] font-black tracking-wider text-violet-700 dark:text-violet-700">
+        <span className="absolute right-4 top-4 rounded-md bg-[linear-gradient(125deg,#fde68a_0%,#fbbf24_55%,#f59e0b_100%)] px-2 py-0.5 text-[10px] font-black tracking-wider text-emerald-950">
           {badge}
         </span>
       )}
@@ -1125,7 +1185,7 @@ function PlanCard({
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.4 }}
             transition={{ type: 'spring', stiffness: 520, damping: 24 }}
-            className={`absolute ${badge ? 'right-4 top-11' : 'right-4 top-4'} flex h-6 w-6 items-center justify-center rounded-full bg-white text-[#6c6fce]`}
+            className={`absolute ${badge ? 'right-4 top-11' : 'right-4 top-4'} flex h-6 w-6 items-center justify-center rounded-full bg-[color:var(--plus-gold)] text-[color:var(--plus-gold-ink)]`}
           >
             <Check className="h-4 w-4 stroke-[3.5]" />
           </motion.span>
