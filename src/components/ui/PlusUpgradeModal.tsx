@@ -231,46 +231,49 @@ export function PlusUpgradeModal({
               <CoverRail />
 
               <div className="no-scrollbar relative flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden">
-              <button
-                type="button"
-                onClick={onClose}
-                className="absolute right-4 top-[calc(1rem+env(safe-area-inset-top))] z-20 flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-white transition-colors hover:bg-white/30 md:top-4"
-                aria-label="Close"
-              >
-                <X className="h-5 w-5" />
-              </button>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="absolute right-4 top-[calc(1rem+env(safe-area-inset-top))] z-20 flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-white transition-colors hover:bg-white/30 md:top-4"
+                  aria-label="Close"
+                >
+                  <X className="h-5 w-5" />
+                </button>
 
-              <AnimatePresence mode="wait">
-                {step === 0 && (
-                  <StepShell key="step-0">
-                    <Step0 onContinue={next} onMaybeLater={onClose} />
-                  </StepShell>
-                )}
-                {step === 1 && (
-                  <StepShell key="step-1">
-                    <Step1 onContinue={next} />
-                  </StepShell>
-                )}
-                {step === 2 && (
-                  <StepShell key="step-2">
-                    <Step2 reminderDate={trialReminderDate} onContinue={next} />
-                  </StepShell>
-                )}
-                {step === 3 && (
-                  <StepShell key="step-3">
-                    <Step3
-                      plan={plan}
-                      onSelect={setPlan}
-                      onStart={startPurchase}
-                      onRestore={restorePurchases}
-                      busy={purchasing}
-                      error={purchaseError}
-                      pricing={pricing}
-                      pricingFailed={pricingFailed}
-                    />
-                  </StepShell>
-                )}
-              </AnimatePresence>
+                <AnimatePresence mode="wait">
+                  {step === 0 && (
+                    <StepShell key="step-0">
+                      <Step0 onContinue={next} onMaybeLater={onClose} />
+                    </StepShell>
+                  )}
+                  {step === 1 && (
+                    <StepShell key="step-1">
+                      <Step1 onContinue={next} />
+                    </StepShell>
+                  )}
+                  {step === 2 && (
+                    <StepShell key="step-2">
+                      <Step2
+                        reminderDate={trialReminderDate}
+                        onContinue={next}
+                      />
+                    </StepShell>
+                  )}
+                  {step === 3 && (
+                    <StepShell key="step-3">
+                      <Step3
+                        plan={plan}
+                        onSelect={setPlan}
+                        onStart={startPurchase}
+                        onRestore={restorePurchases}
+                        busy={purchasing}
+                        error={purchaseError}
+                        pricing={pricing}
+                        pricingFailed={pricingFailed}
+                      />
+                    </StepShell>
+                  )}
+                </AnimatePresence>
               </div>
 
               <AnimatePresence>
