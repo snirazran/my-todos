@@ -5,7 +5,8 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/components/auth/AuthContext';
 import { useRouter } from 'next/navigation';
-import { SquarePlay, X } from 'lucide-react';
+import { X } from 'lucide-react';
+import { AdPlayIcon } from '@/components/ui/AdPlayIcon';
 import { ItemDef, byId } from '@/lib/skins/catalog';
 import { cn } from '@/lib/utils';
 import {
@@ -355,7 +356,7 @@ export default function GiftBoxOpening({
                           )}
                         </span>
                         {rewardedAdsAvailable() && (
-                          <SquarePlay className="w-[18px] h-[18px]" strokeWidth={2.5} />
+                          <AdPlayIcon className="w-[18px] h-[18px]" strokeWidth={2.5} />
                         )}
                       </>
                     )}

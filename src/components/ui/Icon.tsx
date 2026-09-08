@@ -9,6 +9,7 @@ import Community from '../../../public/icons/Community.svg';
 import Compass from '../../../public/icons/Compass.svg';
 import DarkMode from '../../../public/icons/DarkMode.svg';
 import DateIcon from '../../../public/icons/Date.svg';
+import Discount from '../../../public/icons/Discount.svg';
 import Filter from '../../../public/icons/Filter.svg';
 import FrogPlus from '../../../public/frogPlus.svg';
 import GoogleCalendar from '../../../public/icons/GoogleCalendar.svg';
@@ -25,6 +26,7 @@ import Shuffle from '../../../public/icons/Shuffle.svg';
 import Store from '../../../public/icons/Store.svg';
 import Trade from '../../../public/icons/Trade.svg';
 import Wardrobe from '../../../public/icons/Wardrobe.svg';
+import X2 from '../../../public/icons/x2.svg';
 
 const ICONS = {
   appleCalendar: AppleCalendar,
@@ -33,6 +35,7 @@ const ICONS = {
   compass: Compass,
   darkMode: DarkMode,
   date: DateIcon,
+  discount: Discount,
   filter: Filter,
   frogPlus: FrogPlus,
   googleCalendar: GoogleCalendar,
@@ -49,6 +52,7 @@ const ICONS = {
   store: Store,
   trade: Trade,
   wardrobe: Wardrobe,
+  x2: X2,
 } satisfies Record<string, FC<SVGProps<SVGSVGElement>>>;
 
 export type IconName = keyof typeof ICONS;
@@ -61,7 +65,14 @@ type IconProps = SVGProps<SVGSVGElement> & {
   label?: string;
 };
 
-export function Icon({ name, size, width, height, label, ...props }: IconProps) {
+export function Icon({
+  name,
+  size,
+  width,
+  height,
+  label,
+  ...props
+}: IconProps) {
   const Svg = ICONS[name];
   const a11y = label
     ? { role: 'img' as const, 'aria-label': label }

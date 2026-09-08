@@ -2,7 +2,8 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import useSWR, { mutate as revalidateAll } from 'swr';
-import { Loader2, SquarePlay } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
+import { AdPlayIcon } from '@/components/ui/AdPlayIcon';
 import confetti from 'canvas-confetti';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { cn } from '@/lib/utils';
@@ -748,7 +749,7 @@ function FreeFliesCard({
           {busy ? (
             <Loader2 className="h-5 w-5 animate-spin text-primary" />
           ) : (
-            <SquarePlay
+            <AdPlayIcon
               className={cn(
                 'h-6 w-6 sm:h-7 sm:w-7',
                 exhausted ? 'text-muted-foreground' : 'text-primary',
@@ -766,10 +767,10 @@ function FreeFliesCard({
             )}
           >
             {exhausted
-              ? 'Every round caught today'
+              ? 'All caught for today'
               : waiting
-                ? 'Next round is warming up'
-                : `Watch a short clip, catch ${reward} flies`}
+                ? 'Warming up the next one'
+                : `Watch an ad for ${reward} flies`}
           </span>
           <span
             className={cn(
@@ -778,10 +779,10 @@ function FreeFliesCard({
             )}
           >
             {exhausted
-              ? `All ${cap} bonus rounds are gone — the pond refills tomorrow.`
+              ? `Your ${cap} free rounds refill tomorrow.`
               : waiting
-                ? 'One at a time — the pond needs a moment.'
-                : 'They land in your jar the second it ends.'}
+                ? 'One at a time — just a moment.'
+                : 'They land in your jar right after.'}
           </span>
           {/* Rounds left is the only honest scarcity in this sheet, so it is
               drawn as something countable rather than buried in a fraction. */}
@@ -814,7 +815,7 @@ function FreeFliesCard({
             ) : (
               <>
                 +{reward}
-                <Fly size={16} y={-2} paused />
+                <Fly size={22} y={-1} paused />
               </>
             )}
           </span>

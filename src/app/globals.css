@@ -677,7 +677,14 @@ body {
 }
 
 /* Smooth color transitions — scoped to interactive elements only (global * rule kills drag/animation perf on mobile) */
-button, a, input, select, textarea, [role="button"], [role="tab"], [data-theme-transition] {
+button,
+a,
+input,
+select,
+textarea,
+[role='button'],
+[role='tab'],
+[data-theme-transition] {
   @apply transition-colors duration-200;
 }
 .progress-rtl {
@@ -1076,4 +1083,54 @@ body.dragging {
   .auth-fly-drift {
     animation: none;
   }
+}
+
+.pond-panel {
+  --pond-surface-top: #f1f9ed;
+  --pond-surface-bottom: #dcefd6;
+  --pond-line: rgba(31, 98, 28, 0.16);
+  --pond-well: #ffffff;
+  --pond-shadow: rgba(31, 98, 28, 0.3);
+  --pond-chip: #ffffff;
+  --pond-chip-line: rgba(31, 98, 28, 0.14);
+  --pond-chip-hover: #f6fbf3;
+  --pond-ink: #16351a;
+  --pond-ink-muted: rgba(22, 53, 26, 0.66);
+  --pond-ink-faint: rgba(22, 53, 26, 0.45);
+  --pond-eyebrow: #2f6b2c;
+  --pond-track: rgba(31, 98, 28, 0.18);
+  --pond-accent: #4f9149;
+  --pond-accent-hover: #5aa354;
+  --pond-accent-ink: #ffffff;
+  --pond-accent-shadow: #34631f;
+  --pond-accent-2: #4f9149;
+  --pond-accent-2-hover: #5aa354;
+  --pond-accent-2-ink: #ffffff;
+  --pond-accent-2-shadow: #34631f;
+  --pond-glow: rgba(126, 200, 112, 0.3);
+}
+
+.dark .pond-panel {
+  --pond-surface-top: #234329;
+  --pond-surface-bottom: #17301e;
+  --pond-line: rgba(142, 208, 127, 0.2);
+  --pond-well: rgba(0, 0, 0, 0.26);
+  --pond-shadow: rgba(0, 0, 0, 0.55);
+  --pond-chip: rgba(255, 255, 255, 0.06);
+  --pond-chip-line: rgba(255, 255, 255, 0.09);
+  --pond-chip-hover: rgba(255, 255, 255, 0.12);
+  --pond-ink: #e8f1e8;
+  --pond-ink-muted: rgba(232, 241, 232, 0.6);
+  --pond-ink-faint: rgba(232, 241, 232, 0.4);
+  --pond-eyebrow: #8fc394;
+  --pond-track: rgba(255, 255, 255, 0.1);
+  --pond-accent: #6cbb5f;
+  --pond-accent-hover: #78c66b;
+  --pond-accent-ink: #0d1f0b;
+  --pond-accent-shadow: #3f7736;
+  --pond-accent-2: #3f7d3a;
+  --pond-accent-2-hover: #488a42;
+  --pond-accent-2-ink: #eaf5e9;
+  --pond-accent-2-shadow: #27501f;
+  --pond-glow: rgba(108, 187, 95, 0.16);
 }

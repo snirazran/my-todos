@@ -48,23 +48,22 @@ export function FriendSuggestionsRow({
   if (error) {
     return (
       <div
-        className={cn(
-          variant === 'page' ? 'mt-5 w-full' : 'w-full',
-          className,
-        )}
+        className={cn(variant === 'page' ? 'mt-5 w-full' : 'w-full', className)}
       >
         <div
           className={cn(
             'flex items-center justify-between gap-3 rounded-[18px] px-4 py-3',
             inverted
-              ? 'bg-white/8'
+              ? 'bg-[color:var(--pond-chip)] ring-1 ring-inset ring-[color:var(--pond-chip-line)]'
               : 'border border-border/50 bg-card/40',
           )}
         >
           <p
             className={cn(
               'text-xs font-semibold',
-              inverted ? 'text-white/60' : 'text-muted-foreground',
+              inverted
+                ? 'text-[color:var(--pond-ink-muted)]'
+                : 'text-muted-foreground',
             )}
           >
             Couldn&apos;t load suggestions.
@@ -75,7 +74,7 @@ export function FriendSuggestionsRow({
             className={cn(
               'shrink-0 rounded-lg px-2 py-1 text-xs font-black transition-colors',
               inverted
-                ? 'text-[#a5d6a7] hover:bg-white/10'
+                ? 'text-[color:var(--pond-eyebrow)] hover:bg-[color:var(--pond-chip-hover)]'
                 : 'text-[#4f9149] hover:bg-[#4f9149]/10',
             )}
           >
@@ -93,9 +92,7 @@ export function FriendSuggestionsRow({
       (curr) =>
         curr
           ? {
-              suggestions: curr.suggestions.filter(
-                (s) => s.userId !== userId,
-              ),
+              suggestions: curr.suggestions.filter((s) => s.userId !== userId),
             }
           : curr,
       { revalidate: false },
@@ -146,7 +143,7 @@ export function FriendSuggestionsRow({
           className={cn(
             'font-black tracking-tight',
             variant === 'page' ? 'text-lg' : 'text-base',
-            inverted ? 'text-white' : 'text-foreground',
+            inverted ? 'text-[color:var(--pond-ink)]' : 'text-foreground',
           )}
         >
           {title}
@@ -154,7 +151,9 @@ export function FriendSuggestionsRow({
         <p
           className={cn(
             'text-[11px] font-bold',
-            inverted ? 'text-white/60' : 'text-muted-foreground',
+            inverted
+              ? 'text-[color:var(--pond-ink-muted)]'
+              : 'text-muted-foreground',
           )}
         >
           {subtitle}
@@ -162,10 +161,8 @@ export function FriendSuggestionsRow({
       </div>
       <div
         className={cn(
-          'w-full overflow-hidden rounded-[18px] p-1.5',
-          inverted
-            ? 'bg-white/8'
-            : 'border border-border/50 bg-card/40 shadow-sm',
+          'w-full overflow-hidden rounded-[18px]',
+          inverted ? '' : 'border border-border/50 bg-card/40 p-1.5 shadow-sm',
         )}
       >
         <ul className="flex flex-col gap-1.5 lg:grid lg:grid-cols-2 lg:gap-2">
@@ -175,9 +172,9 @@ export function FriendSuggestionsRow({
               <li
                 key={s.userId}
                 className={cn(
-                  'relative flex items-center gap-2 rounded-xl py-1.5 pl-1.5 pr-2 sm:gap-2.5',
+                  'relative flex items-center gap-2 rounded-2xl py-1.5 pl-1.5 pr-2 sm:gap-2.5',
                   inverted
-                    ? 'bg-white/8'
+                    ? 'bg-[color:var(--pond-chip)] ring-1 ring-inset ring-[color:var(--pond-chip-line)]'
                     : 'border border-border/50 bg-card',
                 )}
               >
@@ -193,7 +190,9 @@ export function FriendSuggestionsRow({
                   <p
                     className={cn(
                       'flex items-center gap-1 text-sm font-bold leading-tight tracking-tight',
-                      inverted ? 'text-white' : 'text-foreground',
+                      inverted
+                        ? 'text-[color:var(--pond-ink)]'
+                        : 'text-foreground',
                     )}
                   >
                     <span
@@ -215,7 +214,9 @@ export function FriendSuggestionsRow({
                   <p
                     className={cn(
                       'truncate text-xs font-medium',
-                      inverted ? 'text-white/60' : 'text-muted-foreground',
+                      inverted
+                        ? 'text-[color:var(--pond-ink-muted)]'
+                        : 'text-muted-foreground',
                     )}
                   >
                     {reasonLabel(s)}
@@ -227,9 +228,18 @@ export function FriendSuggestionsRow({
                   disabled={busyId === s.userId || sent}
                   className={cn(
                     'flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl px-3 text-xs font-black transition-colors',
-                    sent
-                      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400'
-                      : 'bg-[#4f9149] text-white shadow-[0_3px_0_0_#34631f] hover:bg-[#5aa354] active:translate-y-0.5 active:shadow-none',
+                    sent &&
+                      inverted &&
+                      'bg-[color:var(--pond-chip)] text-[color:var(--pond-eyebrow)] ring-1 ring-inset ring-[color:var(--pond-chip-line)]',
+                    sent &&
+                      !inverted &&
+                      'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400',
+                    !sent &&
+                      inverted &&
+                      'bg-[color:var(--pond-accent-2)] text-[color:var(--pond-accent-2-ink)] shadow-[0_3px_0_0_var(--pond-accent-2-shadow)] hover:bg-[color:var(--pond-accent-2-hover)] active:translate-y-0.5 active:shadow-none',
+                    !sent &&
+                      !inverted &&
+                      'bg-[#4f9149] text-white shadow-[0_3px_0_0_#34631f] hover:bg-[#5aa354] active:translate-y-0.5 active:shadow-none',
                   )}
                 >
                   {busyId === s.userId ? (
@@ -254,7 +264,7 @@ export function FriendSuggestionsRow({
                   className={cn(
                     'flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors',
                     inverted
-                      ? 'text-white/45 hover:bg-white/10 hover:text-white'
+                      ? 'text-[color:var(--pond-ink-faint)] hover:bg-[color:var(--pond-chip-hover)] hover:text-[color:var(--pond-ink)]'
                       : 'text-muted-foreground/60 hover:bg-muted hover:text-foreground',
                   )}
                 >

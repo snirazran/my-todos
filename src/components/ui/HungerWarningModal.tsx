@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import Frog from '@/components/ui/frog';
 import type { WardrobeSlot } from '@/components/ui/frog';
 import Fly from '@/components/ui/fly';
-import { Loader2, SquarePlay, Utensils } from 'lucide-react';
+import { Loader2, Utensils } from 'lucide-react';
+import { AdPlayIcon } from '@/components/ui/AdPlayIcon';
 import { Icon } from '@/components/ui/Icon';
 import { useRewardGate } from '@/hooks/useRewardGate';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
@@ -159,7 +160,7 @@ export function HungerWarningModal({
                     ) : mode === 'plus' ? (
                       <Icon name="frogPlus" label="Plus" className="h-5 w-5" />
                     ) : (
-                      <SquarePlay className="h-4 w-4" strokeWidth={2.5} />
+                      <AdPlayIcon className="h-4 w-4" strokeWidth={2.5} />
                     )}
                     {recovering
                       ? mode === 'ad'

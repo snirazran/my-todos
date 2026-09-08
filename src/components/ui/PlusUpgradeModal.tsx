@@ -7,7 +7,7 @@ import { mutate } from 'swr';
 import { Capacitor } from '@capacitor/core';
 import { Icon } from '@/components/ui/Icon';
 import { AppImage } from '@/components/ui/AppImage';
-import { BadgePercent, Check, Heart, Sparkle, X } from 'lucide-react';
+import { Check, Heart, Sparkle, X } from 'lucide-react';
 import { SAVED_LOOKS_FREE, SAVED_LOOKS_PLUS } from '@/lib/skins/looks';
 import { FREE_TAG_LIMIT, PREMIUM_TAG_LIMIT } from '@/lib/tags/limits';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
@@ -182,13 +182,17 @@ export function PlusUpgradeModal({
 
   if (!mounted) return null;
 
-  const next = () => setStep((current) => {
-    const nextStep = Math.min(3, current + 1) as Step;
-    if (nextStep !== current) {
-      trackAnalyticsEvent('paywall_step_viewed', { placement, step: nextStep + 1 });
-    }
-    return nextStep;
-  });
+  const next = () =>
+    setStep((current) => {
+      const nextStep = Math.min(3, current + 1) as Step;
+      if (nextStep !== current) {
+        trackAnalyticsEvent('paywall_step_viewed', {
+          placement,
+          step: nextStep + 1,
+        });
+      }
+      return nextStep;
+    });
 
   const trialReminderDate = (() => {
     const d = new Date();
@@ -211,8 +215,16 @@ export function PlusUpgradeModal({
           <motion.div
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
-            exit={{ y: '100%', transition: { type: 'spring', damping: 34, stiffness: 380 } }}
-            transition={{ type: 'spring', damping: 27, stiffness: 260, mass: 0.9 }}
+            exit={{
+              y: '100%',
+              transition: { type: 'spring', damping: 34, stiffness: 380 },
+            }}
+            transition={{
+              type: 'spring',
+              damping: 27,
+              stiffness: 260,
+              mass: 0.9,
+            }}
             className="pointer-events-none fixed inset-0 z-[10009] flex will-change-transform md:items-center md:justify-center md:p-6"
           >
             <div className="pointer-events-auto no-scrollbar relative mx-auto flex h-full w-full flex-col overflow-y-auto overflow-x-hidden bg-[#6c6fce] text-white md:h-[min(720px,calc(100dvh-3rem))] md:w-[min(100vw-3rem,28rem)] md:rounded-[32px] md:shadow-2xl">
@@ -228,10 +240,7 @@ export function PlusUpgradeModal({
               <AnimatePresence mode="wait">
                 {step === 0 && (
                   <StepShell key="step-0">
-                    <Step0
-                      onContinue={next}
-                      onMaybeLater={onClose}
-                    />
+                    <Step0 onContinue={next} onMaybeLater={onClose} />
                   </StepShell>
                 )}
                 {step === 1 && (
@@ -273,12 +282,19 @@ export function PlusUpgradeModal({
                       initial={{ scale: 0.95, y: 10 }}
                       animate={{ scale: 1, y: 0 }}
                       exit={{ scale: 0.95, y: 10 }}
-                      transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                      transition={{
+                        type: 'spring',
+                        stiffness: 380,
+                        damping: 30,
+                      }}
                       onClick={(e) => e.stopPropagation()}
                       className="w-full max-w-sm rounded-[28px] bg-white p-6 text-center text-slate-900 shadow-2xl"
                     >
                       <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-violet-100">
-                        <ShieldAlert className="h-7 w-7 text-violet-600" strokeWidth={2.5} />
+                        <ShieldAlert
+                          className="h-7 w-7 text-violet-600"
+                          strokeWidth={2.5}
+                        />
                       </div>
                       <h3 className="mt-3 text-lg font-black tracking-tight">
                         Save your frog first
@@ -459,7 +475,11 @@ function StepShell({ children }: { children: React.ReactNode }) {
       exit={
         reduceMotion
           ? { opacity: 0 }
-          : { opacity: 0, x: -32, transition: { duration: 0.16, ease: 'easeIn' } }
+          : {
+              opacity: 0,
+              x: -32,
+              transition: { duration: 0.16, ease: 'easeIn' },
+            }
       }
       transition={{ type: 'spring', stiffness: 380, damping: 34, mass: 0.8 }}
       className="relative flex min-h-full flex-1 flex-col will-change-transform"
@@ -564,51 +584,51 @@ function Step0({
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-b from-transparent to-[#6c6fce]" />
       </div>
       <div className="flex flex-1 flex-col px-6 pb-6 md:pb-5">
-      <Reveal delay={0.05}>
-        <h2 className="mt-2 text-center text-xl font-black tracking-tight md:text-2xl">
-          Become the person who
-          <br />
-          <span className="text-amber-300">follows through</span>
-        </h2>
-      </Reveal>
-      <div className="mt-5 space-y-3 rounded-2xl bg-white/10 p-4 md:mt-6">
-        <Reveal delay={0.12}>
-          <FeatureRow
-            icon={<span className="text-sm font-black text-amber-300">×2</span>}
-            title="Earn outfits twice as fast"
-            subtitle="Double flies on daily quests, leaps and commitments — and every gift opens twice."
-          />
+        <Reveal delay={0.05}>
+          <h2 className="mt-2 text-center text-xl font-black tracking-tight md:text-2xl">
+            Become the person who
+            <br />
+            <span className="text-amber-300">follows through</span>
+          </h2>
         </Reveal>
-        <Reveal delay={0.18}>
-          <FeatureRow
-            icon={<Icon name="lilyPad" className="h-5 w-5" />}
-            title="Keep your streak through a bad week"
-            subtitle="Three Lily Pads instead of two, one free every month, and two session moves a week instead of one."
-          />
-        </Reveal>
-        <Reveal delay={0.24}>
-          <FeatureRow
-            icon={<BadgePercent className="h-5 w-5 text-amber-300" />}
-            title="Shop on your terms"
-            subtitle="Reroll today's deals with no ad, and keep ten wishlist slots instead of four."
-          />
-        </Reveal>
-      </div>
+        <div className="mt-5 space-y-3 rounded-2xl bg-white/10 p-4 md:mt-6">
+          <Reveal delay={0.12}>
+            <FeatureRow
+              icon={<Icon name="x2" className="h-10 w-10" />}
+              title="Earn outfits twice as fast"
+              subtitle="Double flies on daily quests, leaps and commitments — and every gift opens twice."
+            />
+          </Reveal>
+          <Reveal delay={0.18}>
+            <FeatureRow
+              icon={<Icon name="lilyPad" className="h-10 w-10" />}
+              title="Keep your streak through a bad week"
+              subtitle="Three Lily Pads instead of two, one free every month, and two session moves a week instead of one."
+            />
+          </Reveal>
+          <Reveal delay={0.24}>
+            <FeatureRow
+              icon={<Icon name="discount" className="h-10 w-10" />}
+              title="Shop on your terms"
+              subtitle="Reroll today's deals with no ad, and keep ten wishlist slots instead of four."
+            />
+          </Reveal>
+        </div>
 
-      <Reveal delay={0.38} className="mt-auto space-y-2 pt-6 md:pt-5">
-        <PrimaryButton onClick={onContinue}>Try for free</PrimaryButton>
-        <p className="flex items-center justify-center gap-1.5 text-center text-xs font-semibold text-white/75">
-          <Heart className="h-3.5 w-3.5 text-rose-300" fill="currentColor" />
-          Frogress is built by a tiny team — Plus keeps us going
-        </p>
-        <button
-          type="button"
-          onClick={onMaybeLater}
-          className="h-10 w-full text-center text-sm font-bold text-white/80 transition-colors hover:text-white"
-        >
-          Maybe later
-        </button>
-      </Reveal>
+        <Reveal delay={0.38} className="mt-auto space-y-2 pt-6 md:pt-5">
+          <PrimaryButton onClick={onContinue}>Try for free</PrimaryButton>
+          <p className="flex items-center justify-center gap-1.5 text-center text-xs font-semibold text-white/75">
+            <Heart className="h-3.5 w-3.5 text-rose-300" fill="currentColor" />
+            Frogress is built by a tiny team — Plus keeps us going
+          </p>
+          <button
+            type="button"
+            onClick={onMaybeLater}
+            className="h-10 w-full text-center text-sm font-bold text-white/80 transition-colors hover:text-white"
+          >
+            Maybe later
+          </button>
+        </Reveal>
       </div>
     </div>
   );
@@ -625,7 +645,7 @@ function FeatureRow({
 }) {
   return (
     <div className="flex items-start gap-3">
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/20">
+      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-inset ring-white/15">
         {icon}
       </div>
       <div className="min-w-0 flex-1">
@@ -672,7 +692,6 @@ const COMPARISON_ROWS: {
 const PLUS_ONLY =
   'Plus also adds a free Lily Pad every month, the golden fly companion, free trade rerolls, a mid-week area change, and daily-deal rerolls with no ad.';
 
-
 function Step1({ onContinue }: { onContinue: () => void }) {
   return (
     <div className="flex min-h-full flex-col px-6 pb-6 pt-[calc(4rem+env(safe-area-inset-top))] md:pb-5 md:pt-12">
@@ -686,17 +705,71 @@ function Step1({ onContinue }: { onContinue: () => void }) {
         {/* PLUS column highlight */}
         <div className="pointer-events-none absolute -right-3 -top-3 -bottom-3 w-[6.25rem] overflow-hidden rounded-2xl bg-white/15 opacity-50">
           {/* Three evenly-spaced lanes with staggered timing for a calm, flowing stream */}
-          <FloatingSparkle delay={0.0} left="22%" size={14} duration={3.6} spin={180} />
-          <FloatingSparkle delay={1.2} left="22%" size={20} duration={3.6} spin={180} />
-          <FloatingSparkle delay={2.4} left="22%" size={11} duration={3.6} spin={180} />
+          <FloatingSparkle
+            delay={0.0}
+            left="22%"
+            size={14}
+            duration={3.6}
+            spin={180}
+          />
+          <FloatingSparkle
+            delay={1.2}
+            left="22%"
+            size={20}
+            duration={3.6}
+            spin={180}
+          />
+          <FloatingSparkle
+            delay={2.4}
+            left="22%"
+            size={11}
+            duration={3.6}
+            spin={180}
+          />
 
-          <FloatingSparkle delay={0.6} left="50%" size={18} duration={3.6} spin={180} />
-          <FloatingSparkle delay={1.8} left="50%" size={12} duration={3.6} spin={180} />
-          <FloatingSparkle delay={3.0} left="50%" size={22} duration={3.6} spin={180} />
+          <FloatingSparkle
+            delay={0.6}
+            left="50%"
+            size={18}
+            duration={3.6}
+            spin={180}
+          />
+          <FloatingSparkle
+            delay={1.8}
+            left="50%"
+            size={12}
+            duration={3.6}
+            spin={180}
+          />
+          <FloatingSparkle
+            delay={3.0}
+            left="50%"
+            size={22}
+            duration={3.6}
+            spin={180}
+          />
 
-          <FloatingSparkle delay={0.3} left="78%" size={11} duration={3.6} spin={180} />
-          <FloatingSparkle delay={1.5} left="78%" size={16} duration={3.6} spin={180} />
-          <FloatingSparkle delay={2.7} left="78%" size={13} duration={3.6} spin={180} />
+          <FloatingSparkle
+            delay={0.3}
+            left="78%"
+            size={11}
+            duration={3.6}
+            spin={180}
+          />
+          <FloatingSparkle
+            delay={1.5}
+            left="78%"
+            size={16}
+            duration={3.6}
+            spin={180}
+          />
+          <FloatingSparkle
+            delay={2.7}
+            left="78%"
+            size={13}
+            duration={3.6}
+            spin={180}
+          />
         </div>
 
         <div className="relative">
@@ -786,8 +859,8 @@ function Step2({
     <div className="flex min-h-full flex-col px-6 pb-6 pt-[calc(4rem+env(safe-area-inset-top))] md:pb-5 md:pt-12">
       <Reveal>
         <h2 className="text-center text-2xl font-black tracking-tight">
-          We&apos;ll remind you <span className="text-amber-300">2 days</span> before your
-          trial ends
+          We&apos;ll remind you <span className="text-amber-300">2 days</span>{' '}
+          before your trial ends
         </h2>
       </Reveal>
       <Reveal delay={0.08}>
@@ -870,11 +943,13 @@ function Step3({
             price={
               <>
                 {yearly?.priceString ?? placeholder}
-                {yearly && yearlyCompareAt !== null && yearlyCompareAt > yearly.amount && (
-                  <span className="ml-1.5 line-through opacity-60">
-                    {formatPlusPrice(yearlyCompareAt, yearly.currency)}
-                  </span>
-                )}
+                {yearly &&
+                  yearlyCompareAt !== null &&
+                  yearlyCompareAt > yearly.amount && (
+                    <span className="ml-1.5 line-through opacity-60">
+                      {formatPlusPrice(yearlyCompareAt, yearly.currency)}
+                    </span>
+                  )}
                 {yearly?.pricePerMonthString && (
                   <span className="ml-1.5">
                     ({yearly.pricePerMonthString}/month)
@@ -891,9 +966,7 @@ function Step3({
             selected={plan === 'monthly'}
             onSelect={onSelect}
             title={PLAN_DETAILS.monthly.title}
-            price={
-              monthly ? `${monthly.priceString} every month` : placeholder
-            }
+            price={monthly ? `${monthly.priceString} every month` : placeholder}
             subtitle={PLAN_DETAILS.monthly.subtitle}
           />
         </Reveal>
@@ -902,7 +975,11 @@ function Step3({
       <Reveal delay={0.2} className="flex flex-1 items-center justify-center">
         <motion.div
           className="will-change-transform"
-          animate={reduceMotion ? undefined : { y: [0, -7, 0], rotate: [0, -2, 0, 2, 0] }}
+          animate={
+            reduceMotion
+              ? undefined
+              : { y: [0, -7, 0], rotate: [0, -2, 0, 2, 0] }
+          }
           transition={{ duration: 4.2, repeat: Infinity, ease: 'easeInOut' }}
         >
           <Icon

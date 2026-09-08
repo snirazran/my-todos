@@ -19,13 +19,13 @@ import {
   ChevronDown,
   Crosshair,
   Dices,
-  SquarePlay,
   Repeat,
   ShoppingBag,
   Trash2,
   X,
   Zap,
 } from 'lucide-react';
+import { AdPlayIcon } from '@/components/ui/AdPlayIcon';
 import { hapticTick, hapticSelect, hapticCelebrate } from '@/lib/haptics';
 import {
   rewardedAdsAvailable,
@@ -1645,7 +1645,7 @@ export function TradePanel({
                           )}
                         </span>
                         {rewardedAdsAvailable() && (
-                          <SquarePlay className="w-[18px] h-[18px]" strokeWidth={2.5} />
+                          <AdPlayIcon className="w-[18px] h-[18px]" strokeWidth={2.5} />
                         )}
                       </>
                     )}

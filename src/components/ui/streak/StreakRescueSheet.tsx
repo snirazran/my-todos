@@ -4,7 +4,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import confetti from 'canvas-confetti';
-import { Flame, ShieldCheck, SquarePlay } from 'lucide-react';
+import { Flame, ShieldCheck } from 'lucide-react';
+import { AdPlayIcon } from '@/components/ui/AdPlayIcon';
 import Frog, { type FrogHandle } from '@/components/ui/frog';
 import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
 import { cn } from '@/lib/utils';
@@ -280,7 +281,7 @@ export function StreakRescueSheet({
                               : 'bg-white/10 text-white/40',
                           )}
                         >
-                          <SquarePlay className="h-[18px] w-[18px]" strokeWidth={2.5} />
+                          <AdPlayIcon className="h-[18px] w-[18px]" strokeWidth={2.5} />
                         </div>
                       ))}
                     </div>
@@ -335,7 +336,7 @@ export function StreakRescueSheet({
                               busy && 'opacity-70',
                             )}
                           >
-                            <SquarePlay className="h-[18px] w-[18px]" strokeWidth={2.5} />
+                            <AdPlayIcon className="h-[18px] w-[18px]" strokeWidth={2.5} />
                             {busy
                               ? 'Loading ad…'
                               : adsWatched > 0

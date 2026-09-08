@@ -89,7 +89,7 @@ export function GrowPondCard({
     <section
       data-hint="invite-friend"
       className={cn(
-        'relative -mx-4 overflow-hidden bg-[#25482a] px-4 py-7 text-white md:-mx-8 md:mt-2 md:rounded-[28px] md:px-8',
+        'pond-panel relative -mx-4 overflow-hidden bg-[linear-gradient(160deg,var(--pond-surface-top),var(--pond-surface-bottom))] px-4 py-7 text-[color:var(--pond-ink)] ring-1 ring-inset ring-[color:var(--pond-line)] md:-mx-8 md:mt-2 md:rounded-[28px] md:px-8 md:shadow-[0_24px_50px_-30px_var(--pond-shadow)]',
         flushTop
           ? '-mt-6 rounded-t-[24px] pt-9 md:mt-2 md:rounded-[28px] md:pt-7'
           : 'mt-2',
@@ -97,75 +97,81 @@ export function GrowPondCard({
     >
       <span
         aria-hidden
-        className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-[#4f9149]/35 blur-2xl"
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(130%_120%_at_88%_-10%,var(--pond-glow),transparent_58%)]"
       />
 
-      <div className="relative flex items-center gap-4">
-        <span className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-3xl bg-white/10 ring-1 ring-white/15">
-          {isOutfit && item ? (
-            <Frog
-              className="-translate-y-[16px]"
-              width={112}
-              height={96}
-              indices={rewardItemToIndices(item)}
-              paused={paused}
-            />
-          ) : item?.icon ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={item.icon} alt="" className="h-14 w-14 object-contain" />
-          ) : (
-            <Fly size={52} y={-2} paused />
-          )}
-        </span>
+      <div className="relative flex flex-col gap-5 md:flex-row md:items-center md:gap-7">
+        <div className="flex items-center gap-4 md:min-w-0 md:flex-1">
+          <span className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-[26px] bg-[color:var(--pond-well)] ring-1 ring-inset ring-[color:var(--pond-chip-line)]">
+            {isOutfit && item ? (
+              <Frog
+                className="-translate-y-[16px]"
+                width={112}
+                height={96}
+                indices={rewardItemToIndices(item)}
+                paused={paused}
+              />
+            ) : item?.icon ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={item.icon}
+                alt=""
+                className="h-14 w-14 object-contain"
+              />
+            ) : (
+              <Fly size={52} y={-2} paused />
+            )}
+          </span>
 
-        <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#a5d6a7]">
-            {completedAll ? 'Send a gift' : 'Grow your pond'}
-          </p>
-          <h2 className="mt-1 text-lg font-black leading-tight tracking-tight sm:text-xl">
-            {nextReward
-              ? `${needed} more ${needed === 1 ? 'friend' : 'friends'} unlocks ${item?.name ?? 'your next reward'}`
-              : 'Invite a friend, gift them a free outfit'}
-          </h2>
-          {!completedAll && (
-            <div className="mt-3 flex items-center gap-2.5">
-              <span
-                role="progressbar"
-                aria-label="Invite reward progress"
-                aria-valuemin={0}
-                aria-valuemax={target}
-                aria-valuenow={Math.min(claimed, target)}
-                className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-white/15"
-              >
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-black uppercase tracking-[0.16em] text-[color:var(--pond-eyebrow)]">
+              {completedAll ? 'Send a gift' : 'Grow your pond'}
+            </p>
+            <h2 className="mt-1 text-lg font-black leading-tight tracking-tight sm:text-xl">
+              {nextReward
+                ? `${needed} more ${needed === 1 ? 'friend' : 'friends'} unlocks ${item?.name ?? 'your next reward'}`
+                : 'Invite a friend, gift them a free outfit'}
+            </h2>
+            {!completedAll && (
+              <div className="mt-3 flex items-center gap-2.5">
                 <span
-                  className="block h-full w-full origin-left rounded-full bg-[#8ed07f] transition-transform duration-500"
-                  style={{ transform: `scaleX(${progress / 100})` }}
-                />
-              </span>
-              <span className="shrink-0 text-[11px] font-black tabular-nums text-white/70">
-                {claimed}/{target}
-              </span>
-            </div>
-          )}
+                  role="progressbar"
+                  aria-label="Invite reward progress"
+                  aria-valuemin={0}
+                  aria-valuemax={target}
+                  aria-valuenow={Math.min(claimed, target)}
+                  className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-[color:var(--pond-track)]"
+                >
+                  <span
+                    className="block h-full w-full origin-left rounded-full bg-[color:var(--pond-accent)] transition-transform duration-500"
+                    style={{ transform: `scaleX(${progress / 100})` }}
+                  />
+                </span>
+                <span className="shrink-0 text-[11px] font-black tabular-nums text-[color:var(--pond-ink-muted)]">
+                  {claimed}/{target}
+                </span>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
 
-      <div className="relative mt-5 flex gap-2.5">
-        <button
-          type="button"
-          onClick={onInvite}
-          className="min-h-[3.25rem] flex-1 touch-manipulation rounded-2xl bg-[#8ed07f] py-3.5 text-[15px] font-black tracking-tight text-[#1c3720] shadow-[0_4px_0_#5f9c53] transition-[transform,box-shadow] active:translate-y-0.5 active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#25482a]"
-        >
-          Invite a friend
-        </button>
-        <button
-          type="button"
-          onClick={onAdd}
-          aria-label="Add by friend code"
-          className="flex min-h-[3.25rem] w-14 shrink-0 touch-manipulation items-center justify-center rounded-2xl bg-white/12 text-white transition-colors hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#25482a]"
-        >
-          <UserPlus className="h-5 w-5" strokeWidth={2.5} />
-        </button>
+        <div className="flex gap-2.5 md:shrink-0">
+          <button
+            type="button"
+            onClick={onInvite}
+            className="min-h-[3.25rem] flex-1 touch-manipulation rounded-2xl bg-[color:var(--pond-accent)] px-8 py-3.5 md:flex-none text-[15px] font-black tracking-tight text-[color:var(--pond-accent-ink)] shadow-[0_4px_0_var(--pond-accent-shadow)] transition-[background-color,transform,box-shadow] hover:bg-[color:var(--pond-accent-hover)] active:translate-y-0.5 active:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--pond-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--pond-surface-top)]"
+          >
+            Invite a friend
+          </button>
+          <button
+            type="button"
+            onClick={onAdd}
+            aria-label="Add by friend code"
+            className="flex min-h-[3.25rem] w-14 shrink-0 touch-manipulation items-center justify-center rounded-2xl bg-[color:var(--pond-chip)] text-[color:var(--pond-ink)] ring-1 ring-inset ring-[color:var(--pond-chip-line)] transition-colors hover:bg-[color:var(--pond-chip-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--pond-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--pond-surface-top)]"
+          >
+            <UserPlus className="h-5 w-5" strokeWidth={2.5} />
+          </button>
+        </div>
       </div>
 
       <FriendSuggestionsRow
@@ -174,7 +180,7 @@ export function GrowPondCard({
         tone="inverted"
         title="People you may know"
         subtitle="Add them and you both start filling each other's pond"
-        className="mt-6"
+        className="relative mt-7"
       />
     </section>
   );

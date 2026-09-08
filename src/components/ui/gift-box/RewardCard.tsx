@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { AnimatePresence, motion, Variants } from 'framer-motion';
-import { Loader2, Crown, SquarePlay } from 'lucide-react';
+import { Loader2, Crown } from 'lucide-react';
+import { AdPlayIcon } from '@/components/ui/AdPlayIcon';
 import Frog from '@/components/ui/frog';
 import { takePlusOfferAfterAd } from '@/lib/ads';
 import { useRewardGate } from '@/hooks/useRewardGate';
@@ -425,7 +426,7 @@ export const RewardCard = ({
                     </span>
                   )}
                 </span>
-                {canWatchAd && <SquarePlay className="w-[18px] h-[18px]" strokeWidth={2.5} />}
+                {canWatchAd && <AdPlayIcon className="w-[18px] h-[18px]" strokeWidth={2.5} />}
               </>
             )}
           </GoldenRewardButton>

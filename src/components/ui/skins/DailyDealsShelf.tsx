@@ -7,8 +7,8 @@ import {
   Clock,
   RefreshCw,
   Sparkles,
-  SquarePlay,
 } from 'lucide-react';
+import { AdPlayIcon } from '@/components/ui/AdPlayIcon';
 import { cn } from '@/lib/utils';
 import { Icon } from '@/components/ui/Icon';
 import Fly from '@/components/ui/fly';
@@ -159,7 +159,7 @@ export function DailyDealsShelf({
             ) : adReroll ? (
               <>
                 Reroll
-                <SquarePlay className="h-3.5 w-3.5" strokeWidth={2.5} />
+                <AdPlayIcon className="h-3.5 w-3.5" strokeWidth={2.5} />
               </>
             ) : (
               'Reroll'

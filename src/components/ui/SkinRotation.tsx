@@ -39,8 +39,12 @@ import {
 const SHUFFLE_API = '/api/skins/shuffle';
 const LEGACY_STORAGE_KEY = 'skinRotationInterval';
 
-const SHUFFLE_ICON_ON_DARK =
-  'dark:[&_path:first-child]:fill-slate-300 dark:[&_path:not(:first-child)]:fill-emerald-400';
+const SHUFFLE_ICON_ON_DARK = cn(
+  'dark:[&_path:nth-child(1)]:fill-[#57a851]',
+  'dark:[&_path:nth-child(2)]:fill-[#cfd8d1] dark:[&_path:nth-child(2)]:stroke-[#7d8a80]',
+  'dark:[&_path:nth-child(3)]:fill-[#2c7a2a]',
+  'dark:[&_path:nth-child(4)]:fill-[#4a564d]',
+);
 
 export type { RotationInterval };
 
@@ -501,7 +505,11 @@ async function rotateOnce(auto = false) {
   }
 }
 
-export function StyleShuffleHeaderButton({ className }: { className?: string }) {
+export function StyleShuffleHeaderButton({
+  className,
+}: {
+  className?: string;
+}) {
   const [open, setOpen] = useState(false);
   const { value, setValue, eligible, loaded } = useShuffleInterval();
   const [spinning, setSpinning] = useState(false);
