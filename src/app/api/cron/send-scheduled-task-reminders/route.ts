@@ -11,7 +11,10 @@ import {
   isCompletedOnDate,
   occursOnDate,
 } from '@/lib/taskOccurrence';
-import { taskReminderBody } from '@/lib/notifications/frogVoice';
+import {
+  taskReminderLine,
+  type CopyCursors,
+} from '@/lib/notifications/frogVoice';
 import type { NotificationPrefs } from '@/lib/types/UserDoc';
 
 const CRON_SECRET = process.env.CRON_SECRET;
@@ -70,12 +73,12 @@ async function sendTaskReminder({
   userId,
   tokens,
   task,
-  reminder,
+  body,
 }: {
   userId: string;
   tokens: string[];
   task: TaskDoc;
-  reminder: string;
+  body: string;
 }) {
   if (!tokens.length) return 0;
 
@@ -83,7 +86,6 @@ async function sendTaskReminder({
   const invalidTokens: string[] = [];
   let sent = 0;
   const title = task.text;
-  const body = taskReminderBody(reminder);
 
   for (const token of tokens) {
     try {
@@ -169,6 +171,8 @@ export async function GET(req: NextRequest) {
       .exec();
 
     let sentForUser = 0;
+    const cursors: CopyCursors = { ...(prefs.copyCursor ?? {}) };
+    const cursorWrites: Record<string, number> = {};
 
     for (const task of tasks) {
       if (!occursOnDate(task, todayYMD, timezone)) continue;
@@ -201,12 +205,20 @@ export async function GET(req: NextRequest) {
 
       if (claim.modifiedCount !== 1) continue;
 
+      const line = taskReminderLine(reminder, cursors);
+      cursors[line.bucket] = line.cursor;
+      cursorWrites[`notificationPrefs.copyCursor.${line.bucket}`] = line.cursor;
+
       sentForUser += await sendTaskReminder({
         userId,
         tokens: prefs.fcmTokens ?? [],
         task,
-        reminder,
+        body: line.body,
       });
+    }
+
+    if (Object.keys(cursorWrites).length > 0) {
+      await UserModel.updateOne({ _id: userId }, { $set: cursorWrites });
     }
 
     results.push({ userId, sent: sentForUser, checked: tasks.length });

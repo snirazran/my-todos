@@ -17,6 +17,7 @@ import { isPremiumUser } from '@/lib/quests/engine';
 import { findTaskStreaksAtRisk } from '@/lib/streak/taskStreaks';
 import { sendStreakPush } from '@/lib/streak/push';
 import type { TaskStreakAtRisk } from '@/lib/streak/types';
+import { rotateIndex, type CopyCursors } from '@/lib/notifications/frogVoice';
 
 const MIN_HOURS_BETWEEN_NOTIFICATIONS = 4;
 const SAVER_NAMED_HABITS = 3;
@@ -57,6 +58,94 @@ function hoursSince(date: Date | string | undefined | null): number {
 }
 
 /**
+ * Pull the next option out of a copy bucket and record where it resumes, so
+ * the evening message does not land in the same words two nights running.
+ */
+function nextOption<T>(
+  bucket: string,
+  options: T[],
+  cursors: CopyCursors,
+  writes: Record<string, number>,
+): T {
+  const { index, cursor } = rotateIndex(bucket, options.length, cursors);
+  cursors[bucket] = cursor;
+  writes[`notificationPrefs.copyCursor.${bucket}`] = cursor;
+  return options[index];
+}
+
+// Lily Pads are not spent from a push — they apply on their own the next
+// morning. So the angle is "don't waste one", not "buy your way out".
+const SHIELD_NOTES_LEFT: ((n: number) => string)[] = [
+  (n) => ` Otherwise it costs you one of your ${n} Lily Pads.`,
+  (n) => ` Otherwise a Lily Pad covers it. You have ${n}.`,
+  (n) => ` Skip it and one of your ${n} Lily Pads is spent.`,
+  (n) => ` Otherwise a Lily Pad pays for it in the morning. You have ${n}.`,
+];
+
+const SHIELD_NOTES_NONE: string[] = [
+  ' You have no Lily Pad left to catch it.',
+  ' There is no Lily Pad left to cover the miss.',
+  ' No Lily Pads left, so nothing catches this one.',
+  ' Nothing left in the jar to cover it.',
+];
+
+const SAVER_MULTI_TITLES: ((n: number) => string)[] = [
+  (n) => `${n} streaks end at midnight`,
+  (n) => `${n} streaks are on the line tonight`,
+  (n) => `Midnight takes ${n} streaks`,
+  (n) => `${n} streaks expire tonight`,
+];
+
+const SAVER_HABIT_TITLES: ((text: string, count: number) => string)[] = [
+  (text, count) => `${text} — ${count}-day streak ends at midnight`,
+  (text, count) => `${text}: ${count} days, ending tonight`,
+  (text, count) => `Midnight ends your ${count} days of ${text}`,
+  (text, count) => `${text} — ${count} days on the line`,
+];
+
+const SAVER_HABIT_CLOSERS: string[] = [
+  'Ticking it off saves it.',
+  'One tick keeps it alive.',
+  'Check it off and it survives the night.',
+  'A single tick is all it takes.',
+];
+
+const SAVER_LOGIN_TITLES: ((n: number) => string)[] = [
+  (n) => `Your ${n}-day streak ends at midnight`,
+  (n) => `${n} days, gone at midnight`,
+  (n) => `Midnight ends your ${n}-day streak`,
+  (n) => `${n} days on the line tonight`,
+];
+
+const SAVER_LOGIN_CLOSERS: string[] = [
+  'A 30-second check-in saves it.',
+  'Opening the app saves it.',
+  'One check-in and it carries on.',
+  'Just open the app and it survives.',
+];
+
+const FREEZE_TITLES: ((n: number) => string)[] = [
+  (n) => `A Lily Pad caught your ${n}-day streak`,
+  (n) => `Your ${n}-day streak was saved overnight`,
+  (n) => `${n} days, rescued by a Lily Pad`,
+  (n) => `A Lily Pad took the hit for ${n} days`,
+];
+
+const FREEZE_BODIES_LEFT: ((n: number, plural: string) => string)[] = [
+  (n, s) => `${n} Lily Pad${s} left. Check in today and keep climbing.`,
+  (n, s) => `${n} Lily Pad${s} left in the jar. Today's check-in spends none.`,
+  (n, s) => `You have ${n} Lily Pad${s} left. Check in and keep them.`,
+  (n, s) => `${n} Lily Pad${s} remain. Check in today and the streak is safe.`,
+];
+
+const FREEZE_BODIES_NONE: string[] = [
+  'That was your last one. Check in today — your streak is on its own now.',
+  'No Lily Pads left. The streak survives only if you check in today.',
+  "That was the last Lily Pad. Today it's all on the check-in.",
+  'Nothing left to catch the next miss. Check in today.',
+];
+
+/**
  * One evening message for everything expiring tonight. Names what is actually
  * at stake rather than saying "your streak" — specific, countable copy is what
  * makes a loss-framed reminder land instead of reading as nagging.
@@ -65,24 +154,32 @@ function buildSaverMessage(args: {
   loginCount: number;
   habits: TaskStreakAtRisk[];
   shields: number;
+  cursors: CopyCursors;
+  writes: Record<string, number>;
 }): { title: string; body: string } {
-  const { loginCount, habits, shields } = args;
+  const { loginCount, habits, shields, cursors, writes } = args;
   const total = habits.length + (loginCount > 0 ? 1 : 0);
   const named = habits
     .slice(0, SAVER_NAMED_HABITS)
     .map((h) => `${h.text} (${h.count})`)
     .join(', ');
   const rest = habits.length - Math.min(habits.length, SAVER_NAMED_HABITS);
-  // Lily Pads are not spent from a push — they apply on their own the next
-  // morning. So the angle is "don't waste one", not "buy your way out".
   const shieldNote =
     shields > 0
-      ? ` Otherwise it costs you one of your ${shields} Lily Pads.`
-      : ' You have no Lily Pad left to catch it.';
+      ? nextOption('shield_note_left', SHIELD_NOTES_LEFT, cursors, writes)(
+          shields,
+        )
+      : nextOption('shield_note_none', SHIELD_NOTES_NONE, cursors, writes);
 
   if (total > 1) {
+    const title = nextOption(
+      'saver_multi_title',
+      SAVER_MULTI_TITLES,
+      cursors,
+      writes,
+    )(total);
     return {
-      title: `${total} streaks end at midnight`,
+      title,
       body: named
         ? `${named}${rest > 0 ? ` and ${rest} more` : ''}.${shieldNote}`
         : `Check in to keep them all.${shieldNote}`,
@@ -91,16 +188,34 @@ function buildSaverMessage(args: {
 
   if (habits.length === 1) {
     const h = habits[0];
-    return {
-      title: `${h.text} — ${h.count}-day streak ends at midnight`,
-      body: `Ticking it off saves it.${shieldNote}`,
-    };
+    const title = nextOption(
+      'saver_habit_title',
+      SAVER_HABIT_TITLES,
+      cursors,
+      writes,
+    )(h.text, h.count);
+    const closer = nextOption(
+      'saver_habit_close',
+      SAVER_HABIT_CLOSERS,
+      cursors,
+      writes,
+    );
+    return { title, body: `${closer}${shieldNote}` };
   }
 
-  return {
-    title: `Your ${loginCount}-day streak ends at midnight`,
-    body: `A 30-second check-in saves it.${shieldNote}`,
-  };
+  const title = nextOption(
+    'saver_login_title',
+    SAVER_LOGIN_TITLES,
+    cursors,
+    writes,
+  )(loginCount);
+  const closer = nextOption(
+    'saver_login_close',
+    SAVER_LOGIN_CLOSERS,
+    cursors,
+    writes,
+  );
+  return { title, body: `${closer}${shieldNote}` };
 }
 
 export async function runLoginStreakSweep() {
@@ -173,6 +288,22 @@ export async function runLoginStreakSweep() {
       state.notif.freezePushSentForDayKey !== lastFrozen &&
       state.lastDayKey !== todayKey
     ) {
+      const cursors: CopyCursors = { ...(prefs?.copyCursor ?? {}) };
+      const writes: Record<string, number> = {};
+      const title = nextOption(
+        'freeze_title',
+        FREEZE_TITLES,
+        cursors,
+        writes,
+      )(state.count);
+      const body =
+        shieldState.count > 0
+          ? nextOption('freeze_body_left', FREEZE_BODIES_LEFT, cursors, writes)(
+              shieldState.count,
+              shieldState.count === 1 ? '' : 's',
+            )
+          : nextOption('freeze_body_none', FREEZE_BODIES_NONE, cursors, writes);
+
       const claim = await UserModel.updateOne(
         {
           _id: userId,
@@ -184,16 +315,14 @@ export async function runLoginStreakSweep() {
           $set: {
             'quests.loginStreak.notif.freezePushSentForDayKey': lastFrozen,
             'notificationPrefs.lastNotifiedAt': new Date(),
+            ...writes,
           },
         },
       );
       if (claim.modifiedCount === 1) {
         await sendStreakPush(userId, {
-          title: `A Lily Pad caught your ${state.count}-day streak`,
-          body:
-            shieldState.count > 0
-              ? `${shieldState.count} Lily Pad${shieldState.count === 1 ? '' : 's'} left. Check in today and keep climbing.`
-              : `That was your last one. Check in today — your streak is on its own now.`,
+          title,
+          body,
           type: 'streak_freeze_used',
         });
         results.freezePush += 1;
@@ -222,6 +351,15 @@ export async function runLoginStreakSweep() {
       });
 
       if (loginAtRisk > 0 || habitsAtRisk.length > 0) {
+        const cursors: CopyCursors = { ...(prefs?.copyCursor ?? {}) };
+        const writes: Record<string, number> = {};
+        const message = buildSaverMessage({
+          loginCount: loginAtRisk,
+          habits: habitsAtRisk,
+          shields: shieldState.count,
+          cursors,
+          writes,
+        });
         const claim = await UserModel.updateOne(
           {
             _id: userId,
@@ -231,16 +369,13 @@ export async function runLoginStreakSweep() {
             $set: {
               'quests.loginStreak.notif.lastSaverSentDayKey': todayKey,
               'notificationPrefs.lastNotifiedAt': new Date(),
+              ...writes,
             },
           },
         );
         if (claim.modifiedCount === 1) {
           await sendStreakPush(userId, {
-            ...buildSaverMessage({
-              loginCount: loginAtRisk,
-              habits: habitsAtRisk,
-              shields: shieldState.count,
-            }),
+            ...message,
             type: 'streak_saver',
           });
           results.saverPush += 1;

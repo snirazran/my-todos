@@ -26,6 +26,7 @@ import {
   friendFliesMessage,
   hungerMessage,
   morningMessage,
+  type CopyCursors,
 } from '@/lib/notifications/frogVoice';
 import { runWishlistDealAlerts } from '@/lib/skins/wishlistAlerts';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
@@ -46,6 +47,8 @@ type PushMessage = {
   title: string;
   body: string;
   data: Record<string, string>;
+  bucket?: string;
+  cursor?: number;
 };
 
 /**
@@ -371,6 +374,18 @@ export async function GET(req: NextRequest) {
     );
     const ignoredCount = prefs.reminderIgnoredCount ?? 0;
 
+    const cursors = prefs.copyCursor as CopyCursors | undefined;
+    const withData = (
+      line: { title: string; body: string; bucket: string; cursor: number },
+      data: Record<string, string>,
+    ): PushMessage => ({
+      title: line.title,
+      body: line.body,
+      bucket: line.bucket,
+      cursor: line.cursor,
+      data,
+    });
+
     const routineNudge = (slot: 'morning' | 'evening'): PushMessage | null => {
       if (uncompletedCount === 0) return null;
       if (ignoredCount < REMINDER_MUTE_THRESHOLD) {
@@ -379,22 +394,20 @@ export async function GET(req: NextRequest) {
           frog,
           exampleTask: exampleText,
           ignoredStreak: ignoredCount,
+          cursors,
         };
         const copy =
           slot === 'morning' ? morningMessage(ctx) : eveningMessage(ctx);
-        return {
-          ...copy,
-          data: {
-            type: 'task_reminder',
-            uncompletedCount: String(uncompletedCount),
-          },
-        };
+        return withData(copy, {
+          type: 'task_reminder',
+          uncompletedCount: String(uncompletedCount),
+        });
       }
       if (ignoredCount === REMINDER_MUTE_THRESHOLD) {
-        return {
-          ...farewellMessage(frog),
-          data: { type: 'task_reminder_muted', path: '/' },
-        };
+        return withData(farewellMessage(frog, cursors), {
+          type: 'task_reminder_muted',
+          path: '/',
+        });
       }
       return null;
     };
@@ -404,7 +417,10 @@ export async function GET(req: NextRequest) {
 
     if (isEvening) {
       if (isFrogStarving(wardrobe)) {
-        message = { ...hungerMessage(frog), data: { type: 'frog_hunger', path: '/' } };
+        message = withData(hungerMessage(frog, cursors), {
+          type: 'frog_hunger',
+          path: '/',
+        });
       } else {
         const owedFlies = await countUnclaimedFriendFlies(
           userId,
@@ -412,10 +428,10 @@ export async function GET(req: NextRequest) {
           todayYMD,
         );
         if (owedFlies > 0) {
-          message = {
-            ...friendFliesMessage(owedFlies),
-            data: { type: 'friend_flies', path: '/friends' },
-          };
+          message = withData(friendFliesMessage(owedFlies, cursors), {
+            type: 'friend_flies',
+            path: '/friends',
+          });
         } else {
           const pactNudge = await pactMessage(userId, tz, frog);
           if (pactNudge) {
@@ -519,7 +535,15 @@ export async function GET(req: NextRequest) {
     await UserModel.updateOne(
       { _id: userId },
       {
-        $set: { 'notificationPrefs.lastNotifiedAt': new Date() },
+        $set: {
+          'notificationPrefs.lastNotifiedAt': new Date(),
+          ...(message.bucket
+            ? {
+                [`notificationPrefs.copyCursor.${message.bucket}`]:
+                  message.cursor,
+              }
+            : {}),
+        },
         ...(isRoutine
           ? { $inc: { 'notificationPrefs.reminderIgnoredCount': 1 } }
           : {}),

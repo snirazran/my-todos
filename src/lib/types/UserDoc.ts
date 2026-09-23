@@ -322,6 +322,7 @@ export type NotificationPrefs = {
   timezone: string; // User's IANA timezone
   morningSlot: number; // Best morning notification hour (0-23), default 9
   eveningSlot: number; // Best evening notification hour (0-23), default 21
+  copyCursor?: Record<string, number>; // Position in each frogVoice line bucket, so wording never repeats back to back
 };
 
 export type DailyRewardProgress = {
