@@ -5,7 +5,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminUserId as requireUserId } from '@/lib/adminAuth';
 import connectMongo from '@/lib/mongoose';
 import UserModel from '@/lib/models/User';
-import TaskModel from '@/lib/models/Task';
+import TaskModel, { type TaskDoc } from '@/lib/models/Task';
+import {
+  dayCandidateFilter,
+  isCompletedOnDate,
+  occursOnDate,
+} from '@/lib/taskOccurrence';
 import { getAdminMessaging } from '@/lib/firebaseAdmin';
 import type { NotificationPrefs } from '@/lib/types/UserDoc';
 
@@ -80,26 +85,14 @@ export async function GET() {
     | undefined;
   const tz = prefs?.timezone || 'UTC';
   const todayYMD = getTodayInTz(tz);
-  const dow = new Date(`${todayYMD}T12:00:00Z`).getUTCDay();
 
-  const tasks = await TaskModel.find({
-    userId: uid,
-    deletedAt: { $exists: false },
-    $or: [
-      { type: 'weekly', dayOfWeek: dow as any },
-      { type: 'regular', date: todayYMD },
-    ],
-  })
-    .lean()
+  const tasks = await TaskModel.find(dayCandidateFilter(uid, todayYMD))
+    .lean<TaskDoc[]>()
     .exec();
 
-  const uncompleted = tasks.filter((t: any) => {
-    if ((t.suppressedDates ?? []).includes(todayYMD)) return false;
-    if (t.type === 'weekly') {
-      return !(t.completedDates ?? []).includes(todayYMD);
-    }
-    return !t.completed;
-  });
+  const uncompleted = tasks.filter(
+    (t) => occursOnDate(t, todayYMD, tz) && !isCompletedOnDate(t, todayYMD),
+  );
 
   const templates = NOTIFICATION_TEMPLATES.map((t) => ({
     id: t.id,
@@ -150,25 +143,14 @@ export async function POST(req: NextRequest) {
 
   const tz = prefs.timezone || 'UTC';
   const todayYMD = getTodayInTz(tz);
-  const dow = new Date(`${todayYMD}T12:00:00Z`).getUTCDay();
 
-  const tasks = await TaskModel.find({
-    userId: uid,
-    deletedAt: { $exists: false },
-    $or: [
-      { type: 'weekly', dayOfWeek: dow as any },
-      { type: 'regular', date: todayYMD },
-    ],
-  })
-    .lean()
+  const tasks = await TaskModel.find(dayCandidateFilter(uid, todayYMD))
+    .lean<TaskDoc[]>()
     .exec();
 
-  const uncompleted = tasks.filter((t: any) => {
-    if ((t.suppressedDates ?? []).includes(todayYMD)) return false;
-    if (t.type === 'weekly')
-      return !(t.completedDates ?? []).includes(todayYMD);
-    return !t.completed;
-  });
+  const uncompleted = tasks.filter(
+    (t) => occursOnDate(t, todayYMD, tz) && !isCompletedOnDate(t, todayYMD),
+  );
 
   const template = NOTIFICATION_TEMPLATES.find((t) => t.id === templateId);
   if (!template) {

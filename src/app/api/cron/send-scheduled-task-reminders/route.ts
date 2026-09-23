@@ -6,6 +6,11 @@ import UserModel from '@/lib/models/User';
 import TaskModel, { type TaskDoc } from '@/lib/models/Task';
 import { getAdminMessaging } from '@/lib/firebaseAdmin';
 import { getZonedToday } from '@/lib/utils';
+import {
+  dayCandidateFilter,
+  isCompletedOnDate,
+  occursOnDate,
+} from '@/lib/taskOccurrence';
 import { taskReminderBody } from '@/lib/notifications/frogVoice';
 import type { NotificationPrefs } from '@/lib/types/UserDoc';
 
@@ -59,25 +64,6 @@ function zonedWallTimeToUtc(dateYMD: string, hhmm: string, tz: string) {
   const secondGuess = new Date(wallTimeMs - firstOffset);
   const secondOffset = getTimeZoneOffsetMs(secondGuess, tz);
   return new Date(wallTimeMs - secondOffset);
-}
-
-function getTaskReminderDate(task: TaskDoc, todayYMD: string) {
-  if (task.type === 'regular') {
-    return task.date === todayYMD ? todayYMD : null;
-  }
-
-  if (task.type === 'weekly') {
-    const dow = new Date(`${todayYMD}T12:00:00Z`).getUTCDay();
-    return task.dayOfWeek === dow ? todayYMD : null;
-  }
-
-  return null;
-}
-
-function isTaskDoneForDate(task: TaskDoc, dateYMD: string) {
-  if ((task.suppressedDates ?? []).includes(dateYMD)) return true;
-  if ((task.completedDates ?? []).includes(dateYMD)) return true;
-  return task.type === 'regular' && !!task.completed;
 }
 
 async function sendTaskReminder({
@@ -175,27 +161,20 @@ export async function GET(req: NextRequest) {
     const currentHour = getCurrentHourInTz(timezone);
 
     const tasks = await TaskModel.find({
-      userId,
-      deletedAt: { $exists: false },
+      ...dayCandidateFilter(userId, todayYMD),
       startTime: { $exists: true, $ne: '' },
       reminder: { $exists: true, $ne: '' },
-      type: { $in: ['regular', 'weekly'] },
-      $or: [
-        { type: 'regular', date: todayYMD },
-        { type: 'weekly' },
-      ],
     })
-      .lean()
+      .lean<TaskDoc[]>()
       .exec();
 
     let sentForUser = 0;
 
     for (const task of tasks) {
-      const reminderDate = getTaskReminderDate(task as TaskDoc, todayYMD);
-      if (!reminderDate || isTaskDoneForDate(task as TaskDoc, reminderDate)) {
-        continue;
-      }
+      if (!occursOnDate(task, todayYMD, timezone)) continue;
+      if (isCompletedOnDate(task, todayYMD)) continue;
 
+      const reminderDate = todayYMD;
       const reminder = task.reminder ?? 'at_time';
       const offset = REMINDER_OFFSETS[reminder];
       if (offset === undefined || !task.startTime) continue;
@@ -225,7 +204,7 @@ export async function GET(req: NextRequest) {
       sentForUser += await sendTaskReminder({
         userId,
         tokens: prefs.fcmTokens ?? [],
-        task: task as TaskDoc,
+        task,
         reminder,
       });
     }

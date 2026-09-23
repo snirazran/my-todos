@@ -4,7 +4,12 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import connectMongo from '@/lib/mongoose';
 import UserModel from '@/lib/models/User';
-import TaskModel from '@/lib/models/Task';
+import TaskModel, { type TaskDoc } from '@/lib/models/Task';
+import {
+  dayCandidateFilter,
+  isCompletedOnDate,
+  occursOnDate,
+} from '@/lib/taskOccurrence';
 import FriendshipModel from '@/lib/models/Friendship';
 import { getAdminMessaging } from '@/lib/firebaseAdmin';
 import { pondFliesFrom, type PondState } from '@/lib/friends/pond';
@@ -120,28 +125,15 @@ async function getUncompletedTasks(
   userId: string,
   dateYMD: string,
   nowMinutes: number,
+  tz: string,
 ): Promise<{ count: number; exampleText: string | null }> {
-  const dow = new Date(`${dateYMD}T12:00:00Z`).getUTCDay();
-
-  const tasks = await TaskModel.find({
-    userId,
-    deletedAt: { $exists: false },
-    $or: [
-      { type: 'weekly', dayOfWeek: dow as any },
-      { type: 'regular', date: dateYMD },
-    ],
-  })
-    .lean()
+  const tasks = await TaskModel.find(dayCandidateFilter(userId, dateYMD))
+    .lean<TaskDoc[]>()
     .exec();
 
-  // Filter out suppressed and already completed
-  const uncompleted = tasks.filter((t: any) => {
-    if ((t.suppressedDates ?? []).includes(dateYMD)) return false;
-    if (t.type === 'weekly') {
-      return !(t.completedDates ?? []).includes(dateYMD);
-    }
-    return !t.completed;
-  });
+  const uncompleted = tasks.filter(
+    (t) => occursOnDate(t, dateYMD, tz) && !isCompletedOnDate(t, dateYMD),
+  );
 
   const dueSoon = uncompleted
     .map((t: any) => ({ task: t, startMinutes: parseHHMM(t.startTime) }))
@@ -375,6 +367,7 @@ export async function GET(req: NextRequest) {
       userId,
       todayYMD,
       getCurrentMinutesInTz(tz),
+      tz,
     );
     const ignoredCount = prefs.reminderIgnoredCount ?? 0;
 

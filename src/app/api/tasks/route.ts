@@ -77,6 +77,9 @@ import {
   siblingOccursOn,
   customOccursOn,
   normalizeRepeatRule,
+  occursOnDate,
+  isCompletedOnDate,
+  dayCandidateFilter,
 } from '@/lib/taskOccurrence';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
 import { recordHungerBite } from '@/lib/analytics/hunger';
@@ -2845,32 +2848,13 @@ async function handleDailyGet(req: NextRequest, userId: string, tz: string) {
   const dateParam = url.searchParams.get('date');
   const todayLocal = getZonedToday(tz);
   const date = dateParam ?? todayLocal;
-  const dow = dowFromYMD(date);
-  const tasks: TaskDoc[] = await TaskModel.find({
-    userId,
-    deletedAt: { $exists: false },
-    $or: [
-      { type: 'weekly', dayOfWeek: dow },
-      { type: 'weekly', repeatMode: 'monthly' },
-      { type: 'weekly', repeatRule: { $exists: true } },
-      { type: 'regular', date },
-    ],
-  })
+  const tasks: TaskDoc[] = await TaskModel.find(
+    dayCandidateFilter(userId, date),
+  )
     .sort({ order: 1 })
     .lean<TaskDoc[]>()
     .exec();
-  const filtered = tasks.filter(
-    (t: TaskDoc) => {
-      const repeatStart = repeatStartForDoc(t, tz);
-      return (
-        !(t.suppressedDates ?? []).includes(date) &&
-        !(repeatStart && date < repeatStart) &&
-        !isAfterRepeatEnd(t, date) &&
-        !monthlyExcludesDate(t, date) &&
-        !(t.repeatRule && !customOccursOn(t, date))
-      );
-    },
-  );
+  const filtered = tasks.filter((t: TaskDoc) => occursOnDate(t, date, tz));
   const weeklyIdsForUI = new Set(
     filtered
       .filter((t: TaskDoc) => t.type === 'weekly')
@@ -2885,9 +2869,7 @@ async function handleDailyGet(req: NextRequest, userId: string, tz: string) {
   const economyConfig = await loadFlyEconomyConfig();
   const output = filtered
     .map((t: TaskDoc) => {
-      const completed =
-        (t.completedDates ?? []).includes(date) ||
-        (!!t.completed && t.type === 'regular');
+      const completed = isCompletedOnDate(t, date);
       const streak = t.type === 'weekly' ? streakMap.get(t.id) ?? 0 : 0;
       // What the row would pay if it were ticked now — the streak rate it is
       // about to reach, not the one it is on. Computed here so every surface

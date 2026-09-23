@@ -147,3 +147,61 @@ export function normalizeRepeatRule(
   }
   return rule;
 }
+
+/**
+ * Whether a task doc has a live occurrence on `date`: the repeat rule matches,
+ * the date sits inside the repeat's start/end bounds, and the occurrence has
+ * not been suppressed. The one answer every "what is on this day" surface
+ * should ask — list, reminder cron, count.
+ */
+export function occursOnDate(task: TaskDoc, date: string, tz: string) {
+  if ((task.suppressedDates ?? []).includes(date)) return false;
+  if (isAfterRepeatEnd(task, date)) return false;
+
+  const repeatStart = repeatStartForDoc(task, tz);
+  if (repeatStart && date < repeatStart) return false;
+
+  if (task.type === 'regular') return task.date === date;
+  if (task.type !== 'weekly') return false;
+
+  if (task.repeatRule) return customOccursOn(task, date);
+  if (task.repeatMode === 'monthly') {
+    const anchor =
+      typeof task.repeatDayOfMonth === 'number'
+        ? task.repeatDayOfMonth
+        : repeatStart
+          ? domFromYMD(repeatStart)
+          : null;
+    return anchor !== null && domFromYMD(date) === anchor;
+  }
+  return typeof task.dayOfWeek === 'number' && dowFromYMD(date) === task.dayOfWeek;
+}
+
+/** Whether the occurrence on `date` is already ticked off. */
+export function isCompletedOnDate(
+  task: Pick<TaskDoc, 'type' | 'completed' | 'completedDates'>,
+  date: string,
+) {
+  return (
+    (task.completedDates ?? []).includes(date) ||
+    (!!task.completed && task.type === 'regular')
+  );
+}
+
+/**
+ * Mongo filter for every doc that could occur on `date`. Monthly and custom
+ * repeats carry no `dayOfWeek`, so they need their own branches; the rule
+ * itself is still decided by `occursOnDate`.
+ */
+export function dayCandidateFilter(userId: string, date: string) {
+  return {
+    userId,
+    deletedAt: { $exists: false },
+    $or: [
+      { type: 'weekly', dayOfWeek: dowFromYMD(date) },
+      { type: 'weekly', repeatMode: 'monthly' },
+      { type: 'weekly', repeatRule: { $exists: true } },
+      { type: 'regular', date },
+    ],
+  };
+}
