@@ -37,9 +37,7 @@ let shieldOfferedThisSession = false;
 let rescueShownId: string | null = null;
 
 // Keyed per user so a fresh account created in the same session (after another
-// account already checked in today) still gets its own check-in. Until a task
-// has counted today, a resume checks again: a widget tick made while the app
-// was in the background leaves a reveal waiting to be claimed.
+// account already checked in today) still gets its own check-in.
 let lastChecked: { dayKey: string; userId: string; doneToday: boolean } | null =
   null;
 
@@ -80,7 +78,6 @@ function queueShieldOffer(offer: ShieldOffer) {
   return true;
 }
 
-/** Lets the tongue catch and fly pop finish before the reveal takes over. */
 const AFTER_CATCH_DELAY_MS = 1400;
 
 function revealStreakDay(result: CheckInResult, initialDelayMs = 0) {

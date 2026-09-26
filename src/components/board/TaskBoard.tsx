@@ -446,21 +446,28 @@ export default function TaskBoard({
     isCardDragging: () => dragActiveRef.current,
   });
 
-  const prevWindowStartRef = useRef(windowDates[0]);
-  const prevScrollWidthRef = useRef(0);
+  const frontAnchorRef = useRef<{ key: string; left: number } | null>(null);
   React.useLayoutEffect(() => {
     const s = scrollerRef.current;
     if (!s) return;
-    const start = windowDates[0];
-    if (
-      start !== prevWindowStartRef.current &&
-      cmpYmd(start, prevWindowStartRef.current) < 0
-    ) {
-      s.scrollLeft += s.scrollWidth - prevScrollWidthRef.current;
+    const anchor = frontAnchorRef.current;
+    if (anchor) {
+      const col = s.querySelector<HTMLElement>(
+        `[data-col="true"][data-date-key="${anchor.key}"]`,
+      );
+      const shift = col ? col.offsetLeft - anchor.left : 0;
+      if (Math.abs(shift) > 0.5) s.scrollLeft += shift;
     }
-    prevWindowStartRef.current = start;
-    prevScrollWidthRef.current = s.scrollWidth;
+    const first = s.querySelector<HTMLElement>('[data-col="true"]');
+    frontAnchorRef.current = first?.dataset.dateKey
+      ? { key: first.dataset.dateKey, left: first.offsetLeft }
+      : null;
   });
+
+  const { refreshDepth } = pager;
+  useEffect(() => {
+    refreshDepth();
+  }, [windowDates, refreshDepth]);
 
   // Backlog state
   const [backlogOpen, setBacklogOpen] = useState(false);

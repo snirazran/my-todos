@@ -438,6 +438,7 @@ export function useBoardPager({
     };
 
     const onDown = (e: PointerEvent) => {
+      suppressClickRef.current = false;
       if (!enabledRef.current || isCardDraggingRef.current()) return;
       if (!e.isPrimary) return;
       const target = e.target as HTMLElement | null;
@@ -544,7 +545,9 @@ export function useBoardPager({
         scheduleIdleSettle();
         return;
       }
-      if (canScrollVertically(e.target as HTMLElement, e.deltaY)) return;
+      const target = e.target as HTMLElement | null;
+      if (target?.closest(COL_SELECTOR)) return;
+      if (canScrollVertically(target, e.deltaY)) return;
 
       e.preventDefault();
       const notched =

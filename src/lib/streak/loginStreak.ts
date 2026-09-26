@@ -726,12 +726,6 @@ type DayEvaluation = {
   loginBrokeFrom: number;
 };
 
-/**
- * The once-a-day look back at yesterday: a held shield covers a single miss,
- * an uncovered miss becomes a rescue offer, and the saver's mute counter is
- * settled. It never grows the streak — only finishing a task does that.
- * Returns null when another request evaluated the day first.
- */
 async function evaluateStreakDay(
   userId: string,
   timezone: string,
@@ -855,7 +849,6 @@ async function ensureDayEvaluated(
   };
 }
 
-/** Takes the pending reveal exactly once, so two devices never both show it. */
 async function claimCelebration(
   userId: string,
   state: LoginStreakState,
@@ -871,11 +864,6 @@ async function claimCelebration(
   return pending.dayKey === todayKey ? pending : null;
 }
 
-/**
- * App open. Settles yesterday (shields, rescue, saver) and hands back any
- * streak day a finished task already earned. Opening the app never counts as
- * a streak day by itself.
- */
 export async function performCheckIn(args: {
   userId: string;
   timezone: string;
@@ -927,11 +915,6 @@ export type StreakExtension = {
   isPremium: boolean;
 };
 
-/**
- * The first task finished today grows the streak. Idempotent per day; the
- * reveal is parked on the state for the next check-in to claim, so it shows
- * after the catch on this device, or on the next open after a widget tick.
- */
 export async function extendStreakForCompletion(args: {
   userId: string;
   timezone: string;
@@ -967,8 +950,6 @@ export async function extendStreakForCompletion(args: {
       ? next.goal
       : null;
 
-  // Rewards are staged on a fresh document and only saved once the streak
-  // write below has won, so a double-tap can never pay a pledge twice.
   const user = goalCompleted ? await UserModel.findById(userId) : null;
   let goalEvent: LoginStreakRewardEvent | null = null;
   let shieldState = ctx.shieldState;
@@ -1099,9 +1080,6 @@ export async function performRescue(args: {
     };
   }
 
-  // Restoring bridges the missed day. If a task already counted today the
-  // streak lands on previous + 1; otherwise it waits at previous for today's
-  // first task to extend it.
   const loginRestored = rescue.previousCount > 0;
   const doneToday = state.lastDayKey === todayKey;
   const newCount = loginRestored
