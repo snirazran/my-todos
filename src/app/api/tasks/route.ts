@@ -393,7 +393,7 @@ async function currentFlyStatus(
 
   const premium = isPremiumUser(user);
   const limit = taskIncomeCap(config, premium);
-  await refundLegacyStolenFlies(userId, user as any);
+  await refundLegacyStolenFlies(userId, user as any).catch(() => 0);
   const { updates, status: hungerStatus } = calculateHunger(user);
   const wardrobe = user.wardrobe ?? { equipped: {}, inventory: {}, flies: 0 };
   await recordHungerStarted({
@@ -519,7 +519,7 @@ async function awardFlyForTask(
 
   const premium = isPremiumUser(user);
   const limit = taskIncomeCap(config, premium);
-  await refundLegacyStolenFlies(userId, user as any);
+  await refundLegacyStolenFlies(userId, user as any).catch(() => 0);
   const { updates: hungerUpdates, status: currentHungerState } =
     calculateHunger(user);
   const wardrobe = user.wardrobe ?? { equipped: {}, inventory: {}, flies: 0 };
@@ -828,7 +828,7 @@ async function unawardFlyForTask(
 
   const premium = isPremiumUser(user);
   const limit = taskIncomeCap(config, premium);
-  await refundLegacyStolenFlies(userId, user as any);
+  await refundLegacyStolenFlies(userId, user as any).catch(() => 0);
   const { updates: hungerUpdates, status: hungerStatus } = calculateHunger(user);
   const wardrobe = user.wardrobe ?? { equipped: {}, inventory: {}, flies: 0 };
   await recordHungerStarted({

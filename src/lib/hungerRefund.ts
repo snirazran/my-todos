@@ -9,25 +9,13 @@ export async function refundLegacyStolenFlies(
   const pending = user.wardrobe?.stolenFlies ?? 0;
   if (!user.wardrobe || !(pending > 0)) return 0;
 
-  const before = await UserModel.findOneAndUpdate(
-    { _id: userId, 'wardrobe.stolenFlies': { $gt: 0 } },
-    [
-      {
-        $set: {
-          'wardrobe.flies': {
-            $add: [
-              { $ifNull: ['$wardrobe.flies', 0] },
-              { $ifNull: ['$wardrobe.stolenFlies', 0] },
-            ],
-          },
-          'wardrobe.stolenFlies': 0,
-        },
-      },
-    ],
-    { new: false, projection: { 'wardrobe.stolenFlies': 1 } },
-  ).lean<{ wardrobe?: { stolenFlies?: number } }>();
+  const res = await UserModel.updateOne(
+    { _id: userId, 'wardrobe.stolenFlies': pending },
+    { $inc: { 'wardrobe.flies': pending }, $set: { 'wardrobe.stolenFlies': 0 } },
+  ).catch(() => null);
+  const refunded = res?.modifiedCount === 1;
 
-  const amount = before?.wardrobe?.stolenFlies ?? 0;
+  const amount = refunded ? pending : 0;
   user.wardrobe.stolenFlies = 0;
   if (amount <= 0) return 0;
   user.wardrobe.flies = (user.wardrobe.flies ?? 0) + amount;
