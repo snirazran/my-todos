@@ -1556,7 +1556,7 @@ function WardrobeManagerContent({
                 className={cn(
                   'pointer-events-none absolute left-1/2 top-0 bottom-0 -z-10 w-screen -translate-x-1/2',
                   'border-b border-border/50 bg-background shadow-lg shadow-black/5 dark:shadow-black/20',
-                  'md:border-border/30 md:bg-background/70 md:shadow-none md:backdrop-blur-xl',
+                  'md:border-border/40 md:bg-background/90 md:shadow-sm md:shadow-black/[.03] md:backdrop-blur-xl',
                   'transition-opacity duration-200',
                   isStuck ? 'opacity-100' : 'opacity-0',
                 )}
@@ -1652,7 +1652,7 @@ function WardrobeManagerContent({
                   ? cn(
                       '-mx-4 px-4 md:-mx-6 md:px-6 bg-background',
                       isStuck
-                        ? 'mt-2 rounded-t-none pt-0'
+                        ? 'mt-2 rounded-t-none pt-0 md:bg-transparent'
                         : 'mt-6 rounded-t-[24px] pt-3 md:mt-20',
                     )
                   : 'mt-2 w-full min-w-0',
@@ -1745,7 +1745,7 @@ function WardrobeManagerContent({
                 <div
                   className={cn(
                     'relative z-10 flex shrink-0 items-center gap-1.5 self-stretch border-l border-border/40 pl-2.5',
-                    'bg-background',
+                    'bg-background md:border-l-0 md:bg-transparent md:pl-1',
                   )}
                 >
                   {!isGuest && (

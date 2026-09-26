@@ -173,7 +173,8 @@ export function FilterBar({
           // Layout
           'flex items-center gap-2 overflow-x-auto',
           // Mobile Layout (Full Bleed)
-          '-mx-4 px-4 w-[calc(100%+2rem)] md:mx-0 md:px-0 md:w-full',
+          '-mx-4 px-4 w-[calc(100%+2rem)] md:mx-0 md:px-0 md:w-full md:pr-8',
+          'md:[mask-image:linear-gradient(to_right,#000_calc(100%-2.5rem),transparent)]',
           // Scroll & Interaction
           'pt-1 pb-2 touch-pan-x cursor-grab active:cursor-grabbing',
           // Hide Scrollbars
