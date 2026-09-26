@@ -211,13 +211,28 @@ export function useDragManager() {
       pxVelRef.current = 0;
       pxVelSmoothedRef.current = 0;
 
+      const columnCard = document.querySelector<HTMLElement>(
+        '[data-col="true"] [data-card-id]',
+      );
+      const columnList = listRefs.current.find((el) => !!el);
+      const columnWidth =
+        columnCard?.getBoundingClientRect().width ??
+        (columnList ? columnList.clientWidth - 4 : 0);
+      const width =
+        columnWidth > 0 && rect.width > columnWidth + 1 ? columnWidth : rect.width;
+      const grabX = clientX - rect.left;
+      const dxScaled =
+        width === rect.width
+          ? grabX
+          : Math.min(width - 12, Math.max(12, grabX * (width / rect.width)));
+
       hapticImpact();
       dragActiveRef.current = true;
       dragFromDayRef.current = day;
       targetDayRef.current = day;
       hapticIndexRef.current = null;
       hapticDayRef.current = day;
-      dragOffsetRef.current = { dx: clientX - rect.left, dy: clientY - rect.top };
+      dragOffsetRef.current = { dx: dxScaled, dy: clientY - rect.top };
       grabPointRef.current = { x: clientX, y: clientY };
       autoScrollArmedXRef.current = false;
       autoScrollArmedYRef.current = false;
@@ -231,9 +246,9 @@ export function useDragManager() {
         taskType,
         x: clientX,
         y: clientY,
-        dx: clientX - rect.left,
+        dx: dxScaled,
         dy: clientY - rect.top,
-        width: rect.width,
+        width,
         height: rect.height,
         tags,
         calendarEventId,

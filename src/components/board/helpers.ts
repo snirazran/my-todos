@@ -48,6 +48,7 @@ export type Task = {
   reminder?: string;
   /** Practice card seeded by the planner tour. */
   isTutorial?: boolean;
+  savedAt?: string;
 };
 
 // Display has 7 weekday columns + 1 “Later” column at index 7

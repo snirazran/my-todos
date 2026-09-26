@@ -44,6 +44,7 @@ export interface TaskDoc {
   weekStart?: string;
   createdAt: Date;
   updatedAt: Date;
+  savedAt?: Date;
   deletedAt?: Date;
   tags?: string[];
   frogodoroSettings?: {
@@ -134,6 +135,7 @@ const TaskSchema = new Schema<TaskDoc>(
     weekStart: { type: String },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
+    savedAt: { type: Date },
     deletedAt: { type: Date },
     tags: { type: [String], default: [] },
     frogodoroSettings: {

@@ -145,10 +145,10 @@ function DockTile({
         delay: index * 0.04,
       }}
       className={[
-        'flex h-[104px] flex-col items-center justify-center gap-1.5 rounded-[28px] px-3 text-center transition-[background-color,box-shadow,color] duration-150',
+        'flex h-[104px] flex-col items-center justify-center gap-1.5 rounded-[20px] border px-3 text-center shadow-sm transition-[background-color,border-color,color] duration-150',
         active
-          ? 'bg-[#4f9149] text-white shadow-[0_4px_0_0_#34631f]'
-          : 'bg-popover text-foreground ring-1 ring-border/80 shadow-[0_3px_0_0_rgba(0,0,0,0.18)]',
+          ? 'border-primary bg-primary text-primary-foreground'
+          : 'border-border/50 bg-card text-foreground',
       ].join(' ')}
     >
       <motion.span
@@ -165,7 +165,7 @@ function DockTile({
       </span>
       <span
         className={`text-[11px] font-bold leading-none ${
-          active ? 'text-white/85' : 'text-muted-foreground'
+          active ? 'text-primary-foreground/85' : 'text-muted-foreground'
         }`}
       >
         {subtitle}
@@ -566,6 +566,7 @@ export default function TaskBoard({
       if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
       if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
       if (scrollLocked || dragActiveRef.current) return;
+      if (calendarOpen || moveCalendarOpen) return;
       const t = e.target as HTMLElement | null;
       if (
         t?.closest(
@@ -578,7 +579,7 @@ export default function TaskBoard({
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [scrollLocked, stepBoard]);
+  }, [scrollLocked, stepBoard, calendarOpen, moveCalendarOpen]);
 
   const updateTodayVisibility = useCallback(() => {
     const s = scrollerRef.current;
@@ -1346,6 +1347,7 @@ export default function TaskBoard({
   // it only changes in visible steps) drives the visuals.
   const isDragOverBacklogRef = useRef(false);
   const dateZoneActiveRef = useRef(false);
+  const dockArmedRef = useRef(false);
   const backlogOpenRef = useRef(backlogOpen);
   backlogOpenRef.current = backlogOpen;
 
@@ -1362,6 +1364,7 @@ export default function TaskBoard({
     }
     const fromDay = drag.fromDay;
     const quantize = (v: number) => Math.round(v * 20) / 20;
+    dockArmedRef.current = false;
 
     const onFrame = (x: number, y: number) => {
       if (
@@ -1378,8 +1381,14 @@ export default function TaskBoard({
         setTrayCloseProgress(0);
       }
 
+      const dockEl = dockRef.current;
+      if (!dockArmedRef.current && dockEl) {
+        dockArmedRef.current = y < dockEl.getBoundingClientRect().top - 24;
+      }
+      const armed = dockArmedRef.current;
+
       const wasOverSave = isDragOverBacklogRef.current;
-      const box = backlogBoxRef.current;
+      const box = armed ? backlogBoxRef.current : null;
       if (box) {
         const r = box.getBoundingClientRect();
         const hit = x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
@@ -1395,7 +1404,8 @@ export default function TaskBoard({
         const r = el.getBoundingClientRect();
         return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
       };
-      const zone = !isDragOverBacklogRef.current && over(dateTileRef.current);
+      const zone =
+        armed && !isDragOverBacklogRef.current && over(dateTileRef.current);
       if (
         (zone && !dateZoneActiveRef.current) ||
         (isDragOverBacklogRef.current && !wasOverSave)
@@ -1405,8 +1415,8 @@ export default function TaskBoard({
       dateZoneActiveRef.current = zone;
       setDateZoneActive(zone);
 
-      const dock = dockRef.current;
-      const near = !!dock && y > dock.getBoundingClientRect().top - 90;
+      const near =
+        armed && !!dockEl && y > dockEl.getBoundingClientRect().top - 90;
       setDockNear(near);
     };
 
@@ -1804,6 +1814,56 @@ export default function TaskBoard({
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  const openTaskCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const [d, list] of Object.entries(tasksByDate)) {
+      const open = (list ?? []).filter((t) => !t.completed).length;
+      if (open > 0) counts.set(d, open);
+    }
+    return counts;
+  }, [tasksByDate]);
+
+  const readVisibleDates = () => {
+    const s = scrollerRef.current;
+    if (!s) return [];
+    const box = s.getBoundingClientRect();
+    return Array.from(
+      s.querySelectorAll<HTMLElement>('[data-col="true"]'),
+    )
+      .filter((col) => {
+        const r = col.getBoundingClientRect();
+        const shown = Math.min(r.right, box.right) - Math.max(r.left, box.left);
+        return shown > r.width * 0.5;
+      })
+      .map((col) => col.dataset.dateKey ?? '')
+      .filter(Boolean);
+  };
+
+  const quickSaveToBacklog = useCallback(
+    async (text: string) => {
+      const draft: Task = {
+        id: `draft-${randomUUID()}`,
+        text,
+        order: Number.MAX_SAFE_INTEGER,
+        type: 'backlog',
+        savedAt: new Date().toISOString(),
+      };
+      setBacklog((prev) => [...prev, draft]);
+      await trackWrite(async () => {
+        const res = await fetch('/api/tasks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, repeat: 'backlog', timezone: tz }),
+        }).catch(() => null);
+        if (!res?.ok) {
+          setBacklog((prev) => prev.filter((t) => t.id !== draft.id));
+          showNotification('Could not save that task - try again.');
+        }
+      });
+    },
+    [setBacklog, trackWrite, tz, showNotification],
+  );
+
   const renderCenter = useDeferredValue(pageIndex);
   const renderRadius = (isMobile ? 2 : 7) + (drag?.active ? 3 : 0);
   const isColumnLive = (i: number) =>
@@ -2030,7 +2090,7 @@ export default function TaskBoard({
       >
         <div
           ref={trackRef}
-          className="flex mx-auto gap-3 px-4 pt-[calc(9rem+env(safe-area-inset-top)+var(--lens-m))] md:pt-[calc(108px+var(--lens))] transition-[padding] duration-200 pb-[calc(100px+env(safe-area-inset-bottom))] md:pb-[calc(40px+env(safe-area-inset-bottom))] md:transition-[padding] md:duration-200"
+          className="flex mx-auto gap-3 px-4 pt-[calc(9rem+env(safe-area-inset-top)+var(--lens-m))] md:pt-[calc(140px+var(--lens))] transition-[padding] duration-200 pb-[calc(100px+env(safe-area-inset-bottom))] md:pb-[calc(40px+env(safe-area-inset-bottom))] md:transition-[padding] md:duration-200"
         >
           {renderEdge('past')}
           {windowDates.map((dk, i) => (
@@ -2052,7 +2112,7 @@ export default function TaskBoard({
                 count={activeTaskCount(tasksByDate[dk] ?? [])}
                 totalCount={(tasksByDate[dk] ?? []).length}
                 listRef={setListRef(i)}
-                maxHeightClass="max-h-[calc(100svh-315px-var(--lens-m)-var(--safe-bottom)-env(safe-area-inset-top))] md:max-h-[calc(100svh-224px-var(--lens)-var(--safe-bottom))]"
+                maxHeightClass="max-h-[calc(100svh-315px-var(--lens-m)-var(--safe-bottom)-env(safe-area-inset-top))] md:max-h-[calc(100svh-256px-var(--lens)-var(--safe-bottom))]"
                 isToday={dk === todayKey}
                 isPast={cmpYmd(dk, todayKey) < 0}
                 headerAction={
@@ -2191,7 +2251,7 @@ export default function TaskBoard({
 
       {/* Top header + dot strip (mobile + desktop) */}
       <div
-        className={`absolute top-[calc(0.5rem+env(safe-area-inset-top))] left-0 right-0 flex flex-col items-center gap-2 pointer-events-none px-3 md:top-[68px] ${
+        className={`absolute top-[calc(0.5rem+env(safe-area-inset-top))] left-0 right-0 flex flex-col items-center gap-2 pointer-events-none px-3 md:top-[80px] ${
           calendarOpen ? 'z-[97]' : 'z-[60]'
         } ${moveCalendarOpen ? 'hidden' : ''}`}
       >
@@ -2203,52 +2263,63 @@ export default function TaskBoard({
             variant="mobile"
           />
         </div>
-        <div className="hidden md:flex items-center gap-2 pointer-events-auto">
-          {!calendarOpen && (
-            <button
-              type="button"
-              onClick={() => stepBoard(-1, 'page')}
-              disabled={atBoardStart || !!drag?.active}
-              aria-label="Earlier days"
-              title="Earlier days (Shift + ←)"
-              className="flex h-9 w-9 items-center justify-center rounded-2xl bg-secondary text-secondary-foreground transition-[background-color,transform] hover:bg-secondary/80 active:scale-90 disabled:opacity-35 disabled:active:scale-100"
-            >
-              <ChevronLeft className="h-5 w-5" strokeWidth={2.75} />
-            </button>
-          )}
-          <PlannerHeader
-            dateKey={activeDateKey}
-            expanded={calendarOpen}
-            onToggle={() => setCalendarOpen((v) => !v)}
-            variant="desktop"
-          />
-          {!calendarOpen && (
-            <button
-              type="button"
-              onClick={() => stepBoard(1, 'page')}
-              disabled={!!drag?.active}
-              aria-label="Later days"
-              title="Later days (Shift + →)"
-              className="flex h-9 w-9 items-center justify-center rounded-2xl bg-secondary text-secondary-foreground transition-[background-color,transform] hover:bg-secondary/80 active:scale-90 disabled:opacity-35 disabled:active:scale-100"
-            >
-              <ChevronRight className="h-5 w-5" strokeWidth={2.75} />
-            </button>
-          )}
-          {!calendarOpen && !drag?.active && !todayInView && !isMobile && (
-            <motion.button
-              type="button"
-              onClick={goToToday}
-              aria-label="Go back to today"
-              title="Go back to today"
-              initial={{ opacity: 0, y: -4, scale: 0.96 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ type: 'spring', stiffness: 360, damping: 28 }}
-              className="flex items-center gap-2 rounded-2xl bg-primary px-3 py-2 text-sm font-black text-primary-foreground hover:brightness-105 active:scale-95"
-            >
-              <CalendarCheck className="h-4 w-4" />
-              <span>Jump to today</span>
-            </motion.button>
-          )}
+        <div className="hidden md:flex items-center gap-2.5 pointer-events-auto">
+          <AnimatePresence initial={false} mode="popLayout">
+            {!calendarOpen && !drag?.active && !todayInView && (
+              <motion.button
+                key="today"
+                layout
+                type="button"
+                onClick={goToToday}
+                aria-label="Go back to today"
+                title="Go back to today"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                transition={{ type: 'spring', stiffness: 460, damping: 32 }}
+                className="flex h-11 items-center gap-1.5 rounded-2xl border border-border/50 bg-card px-4 text-sm font-black text-primary shadow-sm transition-[background-color,transform] hover:bg-muted/60 active:scale-95"
+              >
+                <CalendarCheck className="h-4 w-4" strokeWidth={2.5} />
+                Today
+              </motion.button>
+            )}
+          </AnimatePresence>
+          <motion.div
+            layout
+            transition={{ type: 'spring', stiffness: 460, damping: 32 }}
+            className="flex h-11 items-center gap-0.5 rounded-2xl border border-border/50 bg-card p-1 shadow-sm"
+          >
+            {!calendarOpen && (
+              <button
+                type="button"
+                onClick={() => stepBoard(-1, 'page')}
+                disabled={atBoardStart || !!drag?.active}
+                aria-label="Earlier days"
+                title="Earlier days (Shift + ←)"
+                className="grid h-9 w-9 place-items-center rounded-xl text-foreground/80 transition-[background-color,transform] hover:bg-muted active:scale-90 disabled:opacity-30 disabled:hover:bg-transparent disabled:active:scale-100"
+              >
+                <ChevronLeft className="h-5 w-5" strokeWidth={2.75} />
+              </button>
+            )}
+            <PlannerHeader
+              dateKey={activeDateKey}
+              expanded={calendarOpen}
+              onToggle={() => setCalendarOpen((v) => !v)}
+              variant="desktop"
+            />
+            {!calendarOpen && (
+              <button
+                type="button"
+                onClick={() => stepBoard(1, 'page')}
+                disabled={!!drag?.active}
+                aria-label="Later days"
+                title="Later days (Shift + →)"
+                className="grid h-9 w-9 place-items-center rounded-xl text-foreground/80 transition-[background-color,transform] hover:bg-muted active:scale-90 disabled:opacity-30 disabled:hover:bg-transparent disabled:active:scale-100"
+              >
+                <ChevronRight className="h-5 w-5" strokeWidth={2.75} />
+              </button>
+            )}
+          </motion.div>
         </div>
         {!calendarOpen && (
           <div className="md:hidden pointer-events-auto w-full px-2 py-1.5 rounded-2xl bg-card/40 backdrop-blur-xl">
@@ -2293,7 +2364,7 @@ export default function TaskBoard({
       {/* Desktop lens — the chips sit on the board, not over it, so the columns
           visibly re-filter under each tap. Toggled from the column header. */}
       {lensOpen && (
-        <div className="pointer-events-none fixed inset-x-0 top-[76px] z-[61] hidden justify-center px-6 md:flex lg:px-10">
+        <div className="pointer-events-none fixed inset-x-0 top-[88px] z-[61] hidden justify-center px-6 md:flex lg:px-10">
           <div
             style={{ ['--strip-fade' as string]: 'var(--card)' }}
             className="pointer-events-auto flex min-w-0 max-w-full items-center rounded-[22px] border border-border/50 bg-card/95 px-2 py-1.5 shadow-sm backdrop-blur-xl"
@@ -2335,13 +2406,10 @@ export default function TaskBoard({
         selectedDate={activeDateKey}
         minDate={accountCreatedAt ?? undefined}
         footer={<CalendarSyncRow />}
-        hasTasksOn={
-          new Set(
-            Object.entries(tasksByDate)
-              .filter(([, list]) => (list?.length ?? 0) > 0)
-              .map(([d]) => d),
-          )
-        }
+        taskCounts={openTaskCounts}
+        visibleDates={calendarOpen ? readVisibleDates() : undefined}
+        showClose={false}
+        belowHeader
         onSelect={(d) => {
           const i = windowDates.indexOf(d);
           if (i >= 0) {
@@ -2380,13 +2448,7 @@ export default function TaskBoard({
             ? 'Duplicate to today'
             : 'Jump back to today'
         }
-        hasTasksOn={
-          new Set(
-            Object.entries(tasksByDate)
-              .filter(([, list]) => (list?.length ?? 0) > 0)
-              .map(([d]) => d),
-          )
-        }
+        taskCounts={openTaskCounts}
         onSelect={(d) => {
           if (bulkDateMode === 'duplicate') {
             const count = selection.stats.count;
@@ -2578,6 +2640,7 @@ export default function TaskBoard({
         trayRef={backlogTrayRef}
         closeProgress={trayCloseProgress}
         onRemove={(id) => removeFromBacklog(id)}
+        onQuickSave={quickSaveToBacklog}
         userTags={userTags}
         onEdit={(id, newText) => handleEditTask(BACKLOG_IDX, id, newText)}
         onToggleRepeat={(id) => onToggleRepeat && onToggleRepeat(id, todayKey)}

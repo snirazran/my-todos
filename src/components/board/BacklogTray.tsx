@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowDownToLine, CornerDownLeft, Plus } from 'lucide-react';
 import { Icon } from '@/components/ui/Icon';
 import { Task, draggableIdFor } from './helpers';
 import TaskCard from './TaskCard';
@@ -61,6 +61,69 @@ interface Props {
   onClearFilters?: () => void;
   hideDoTodayButton?: boolean;
   backlogDayIndex?: number;
+  onQuickSave?: (text: string) => Promise<void> | void;
+}
+
+type AgeBucket = 'fresh' | 'month' | 'old';
+const DAY_MS = 86_400_000;
+const BUCKET_LABEL: Record<AgeBucket, string> = {
+  fresh: 'This week',
+  month: 'Earlier this month',
+  old: 'Waiting a while',
+};
+
+function ageBucket(savedAt: string | undefined, now: number): AgeBucket {
+  const t = savedAt ? Date.parse(savedAt) : NaN;
+  if (!Number.isFinite(t)) return 'fresh';
+  const days = (now - t) / DAY_MS;
+  if (days < 7) return 'fresh';
+  if (days < 30) return 'month';
+  return 'old';
+}
+
+function QuickSave({ onSave }: { onSave: (text: string) => Promise<void> | void }) {
+  const [text, setText] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const value = text.trim();
+    if (!value) return;
+    setText('');
+    void onSave(value);
+    inputRef.current?.focus();
+  };
+  return (
+    <form
+      onSubmit={submit}
+      className="flex items-center gap-2 rounded-2xl border border-border/50 bg-muted/60 py-1.5 pl-3 pr-1.5 shadow-sm focus-within:border-primary/50 focus-within:bg-card"
+    >
+      <Plus className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={2.75} />
+      <input
+        ref={inputRef}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder="Save an idea for later"
+        aria-label="New saved task"
+        enterKeyHint="done"
+        className="min-w-0 flex-1 bg-transparent py-1.5 text-base font-semibold outline-none placeholder:text-muted-foreground/70"
+      />
+      <AnimatePresence initial={false}>
+        {text.trim() && (
+          <motion.button
+            type="submit"
+            aria-label="Save"
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            transition={{ type: 'spring', stiffness: 520, damping: 30 }}
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground active:scale-90"
+          >
+            <CornerDownLeft className="h-4 w-4" strokeWidth={2.75} />
+          </motion.button>
+        )}
+      </AnimatePresence>
+    </form>
+  );
 }
 
 export default React.memo(function BacklogTray({
@@ -86,6 +149,7 @@ export default React.memo(function BacklogTray({
   onClearFilters,
   hideDoTodayButton = false,
   backlogDayIndex = 7,
+  onQuickSave,
 }: Props) {
   // Menu & Dialog State
   const [menu, setMenu] = useState<{
@@ -104,18 +168,8 @@ export default React.memo(function BacklogTray({
 
   const [scheduleDialog, setScheduleDialog] = useState<{ task: Task } | null>(null);
 
-  const [isMobile, setIsMobile] = useState(false);
-  const [page, setPage] = useState(0);
   const [stripOpen, setStripOpen] = useState(false);
   const canFilterInline = !!onChangeFilters && !!baseFilters;
-
-  useEffect(() => {
-    const query = window.matchMedia('(max-width: 767px)');
-    const update = () => setIsMobile(query.matches);
-    update();
-    query.addEventListener('change', update);
-    return () => query.removeEventListener('change', update);
-  }, []);
 
   const handleDelete = async () => {
     if (!confirmItem || !onRemove) return;
@@ -152,27 +206,19 @@ export default React.memo(function BacklogTray({
     filters.sort,
     userTags.map((t) => t.id),
   );
-  const mobilePageSize = 4;
-  const pageCount = Math.max(1, Math.ceil(filteredTasks.length / mobilePageSize));
-  const visibleTasks = isMobile
-    ? filteredTasks.slice(page * mobilePageSize, (page + 1) * mobilePageSize)
-    : filteredTasks;
-  const firstPageDot = Math.min(
-    Math.max(0, page - 2),
-    Math.max(0, pageCount - 5),
-  );
-  const pageDots = Array.from(
-    { length: Math.min(5, pageCount) },
-    (_, index) => firstPageDot + index,
-  );
-
-  useEffect(() => {
-    if (!isOpen) {
-      setPage(0);
-      return;
+  const groups = useMemo(() => {
+    const now = Date.now();
+    const order: AgeBucket[] = ['fresh', 'month', 'old'];
+    const byBucket = new Map<AgeBucket, Task[]>();
+    for (const t of filteredTasks) {
+      const bucket = ageBucket(t.savedAt, now);
+      byBucket.set(bucket, [...(byBucket.get(bucket) ?? []), t]);
     }
-    setPage((current) => Math.min(current, pageCount - 1));
-  }, [isOpen, pageCount]);
+    return order
+      .filter((bucket) => (byBucket.get(bucket)?.length ?? 0) > 0)
+      .map((bucket) => ({ bucket, tasks: byBucket.get(bucket)! }));
+  }, [filteredTasks]);
+  const showGroupHeaders = groups.length > 1 || groups[0]?.bucket === 'old';
 
   return (
     <>
@@ -180,7 +226,12 @@ export default React.memo(function BacklogTray({
         ref={trayRef}
         isOpen={isOpen}
         onClose={onClose}
-        title={`${filteredTasks.length} Saved Tasks`}
+        title="Saved"
+        subtitle={
+          filteredTasks.length === 0
+            ? 'Tasks without a day'
+            : `${filteredTasks.length} ${filteredTasks.length === 1 ? 'task' : 'tasks'} waiting for a day`
+        }
         icon={<Icon name="saved" className="h-6 w-6" />}
         iconContainerClassName="bg-primary/10 text-primary"
         className="top-[38vh] md:top-0 md:w-[500px]"
@@ -228,49 +279,10 @@ export default React.memo(function BacklogTray({
             )}
           </div>
         )}
-        {isMobile && pageCount > 1 ? (
-          <div className="sticky top-0 z-10 -mx-1 flex shrink-0 items-center justify-between bg-card px-1 py-2">
-            <button
-              type="button"
-              aria-label="Previous saved tasks page"
-              disabled={page === 0}
-              onClick={() => setPage((current) => Math.max(0, current - 1))}
-              className="grid h-9 w-9 place-items-center rounded-full text-muted-foreground transition-colors active:scale-95 disabled:opacity-25"
-            >
-              <ChevronLeft className="h-5 w-5" />
-            </button>
-            <div
-              className="flex items-center gap-1.5"
-              aria-label={`Page ${page + 1} of ${pageCount}`}
-            >
-              {pageDots.map((index) => (
-                <button
-                  key={index}
-                  type="button"
-                  aria-label={`Go to saved tasks page ${index + 1}`}
-                  onClick={() => setPage(index)}
-                  className={`h-2 rounded-full transition-[width,background-color] ${
-                    index === page
-                      ? 'w-5 bg-primary'
-                      : 'w-2 bg-muted-foreground/25'
-                  }`}
-                />
-              ))}
-            </div>
-            <button
-              type="button"
-              aria-label="Next saved tasks page"
-              disabled={page >= pageCount - 1}
-              onClick={() =>
-                setPage((current) => Math.min(pageCount - 1, current + 1))
-              }
-              className="grid h-9 w-9 place-items-center rounded-full text-muted-foreground transition-colors active:scale-95 disabled:opacity-25"
-            >
-              <ChevronRight className="h-5 w-5" />
-            </button>
+        {onQuickSave && (
+          <div className="shrink-0 pb-3 pt-1">
+            <QuickSave onSave={onQuickSave} />
           </div>
-        ) : (
-          <div className="h-3 shrink-0" aria-hidden />
         )}
         <AnimatePresence mode="popLayout" initial={false}>
           {filteredTasks.length === 0 && filtersActive && tasks.length > 0 ? (
@@ -281,14 +293,49 @@ export default React.memo(function BacklogTray({
               />
             </div>
           ) : filteredTasks.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center gap-4 opacity-30 min-h-[300px]">
-              <Icon name="saved" className="h-16 w-16" />
-              <p className="text-sm font-bold">
-                No saved tasks
+            <motion.div
+              key="empty"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex min-h-[260px] flex-col items-center justify-center gap-3 px-6 text-center"
+            >
+              <span className="grid h-16 w-16 place-items-center rounded-3xl bg-primary/10">
+                <Icon name="saved" className="h-10 w-10" />
+              </span>
+              <p className="text-base font-black text-foreground">
+                Nothing saved yet
               </p>
-            </div>
+              <p className="max-w-[26ch] text-sm font-semibold leading-snug text-muted-foreground">
+                Park anything that doesn&apos;t need a day yet. Type it above, or drag a task to Save for later.
+              </p>
+              <span className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-xs font-bold text-muted-foreground">
+                <ArrowDownToLine className="h-3.5 w-3.5" />
+                Drag any task here
+              </span>
+            </motion.div>
           ) : (
-            visibleTasks.map((t) => {
+            groups.flatMap(({ bucket, tasks: groupTasks }) => [
+              showGroupHeaders ? (
+                <motion.div
+                  key={`group-${bucket}`}
+                  layout="position"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="px-1 pb-1 pt-3 first:pt-0"
+                >
+                  <p className="text-[12px] font-black uppercase tracking-wide text-muted-foreground">
+                    {BUCKET_LABEL[bucket]}
+                    <span className="ml-1.5 font-bold opacity-70">{groupTasks.length}</span>
+                  </p>
+                  {bucket === 'old' && (
+                    <p className="mt-0.5 text-[12px] font-semibold text-muted-foreground/80">
+                      Still want these? Give one a day, or let it go.
+                    </p>
+                  )}
+                </motion.div>
+              ) : null,
+              ...groupTasks.map((t) => {
               const originalIndex = tasks.findIndex((it) => it.id === t.id);
               return (
                 <motion.div
@@ -300,7 +347,7 @@ export default React.memo(function BacklogTray({
                     transition: { duration: 0.15 },
                   }}
                   key={t.id}
-                  layout={!isMobile}
+                  layout="position"
                   className="w-full relative"
                   data-hint="saved-task-card"
                 >
@@ -392,7 +439,8 @@ export default React.memo(function BacklogTray({
                   </div>
                 </motion.div>
               );
-            })
+            }),
+            ])
           )}
         </AnimatePresence>
       </SideOpenTray>

@@ -1467,6 +1467,7 @@ export async function createTasksForUser(
         weekStart,
         completed: false,
         createdAt: now,
+        savedAt: now,
         updatedAt: now,
         tags,
         notes,
@@ -1866,6 +1867,7 @@ async function handleBulkPut(uid: string, bulk: BulkBody, tz: string) {
               weekStart,
               order,
               updatedAt: now,
+              savedAt: now,
               completed: false,
             },
             $unset: {
@@ -2167,6 +2169,7 @@ export async function PUT(req: NextRequest) {
             weekStart,
             order: newOrder,
             updatedAt: now,
+            savedAt: now,
             completed: false, // Reset completion on move to backlog? Usually safer.
           },
           $unset: {
@@ -3117,6 +3120,7 @@ async function handleBoardGet(req: NextRequest, uid: string, tz: string) {
         text: doc.text,
         order: doc.order,
         type: doc.type,
+        savedAt: doc.savedAt ?? doc.createdAt,
         completed: !!doc.completed,
         tags: doc.tags ?? [],
         notes: doc.notes ?? '',
@@ -3273,6 +3277,7 @@ async function handleDateRangeGet(req: NextRequest, uid: string, tz: string) {
         text: doc.text,
         order: doc.order,
         type: doc.type,
+        savedAt: doc.savedAt ?? doc.createdAt,
         completed: !!doc.completed,
         tags: doc.tags ?? [],
         notes: doc.notes ?? '',
@@ -3620,6 +3625,7 @@ async function handleBoardPut(
               userId: uid,
               type: 'backlog',
               createdAt: now,
+              savedAt: now,
               completed: false,
               completedDates: [],
               suppressedDates: [],
