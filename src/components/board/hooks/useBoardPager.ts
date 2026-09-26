@@ -390,7 +390,7 @@ export function useBoardPager({
 
       if (g.state === "pending") {
         const slop = g.pointerType === "mouse" ? MOUSE_SLOP : TOUCH_SLOP;
-        if (Math.abs(dx) > slop && Math.abs(dx) > Math.abs(dy)) {
+        if (Math.abs(dx) > slop && Math.abs(dx) >= Math.abs(dy) * 0.8) {
           g.state = "dragging";
           g.startX = e.clientX;
           g.startScroll = s.scrollLeft;
@@ -400,7 +400,7 @@ export function useBoardPager({
             document.body.style.userSelect = "none";
             suppressClickRef.current = true;
           }
-        } else if (Math.abs(dy) > slop) {
+        } else if (Math.abs(dy) > slop && Math.abs(dy) > Math.abs(dx) * 1.25) {
           gestureRef.current = null;
           return;
         } else {
@@ -468,13 +468,20 @@ export function useBoardPager({
       e.preventDefault();
     };
 
+    const onTouchMove = (e: TouchEvent) => {
+      if (gestureRef.current?.state === "dragging" && e.cancelable) {
+        e.preventDefault();
+      }
+    };
     s.addEventListener("pointerdown", onDown, { passive: true });
+    s.addEventListener("touchmove", onTouchMove, { passive: false });
     window.addEventListener("pointermove", onMove, { passive: true });
     window.addEventListener("pointerup", onUp, { passive: true });
     window.addEventListener("pointercancel", onUp, { passive: true });
     s.addEventListener("click", onClickCapture, true);
     return () => {
       s.removeEventListener("pointerdown", onDown);
+      s.removeEventListener("touchmove", onTouchMove);
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onUp);
