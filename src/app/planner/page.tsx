@@ -211,15 +211,15 @@ export default function ManageTasksPage() {
   const extendingRef = useRef(false);
   const onExtendWindow = useCallback(
     async (direction: 'past' | 'future') => {
-      if (extendingRef.current) return;
+      if (extendingRef.current) return true;
       extendingRef.current = true;
       try {
         if (direction === 'past') {
           const minBound = accountCreatedAt ?? '1970-01-01';
-          if (cmpYmd(windowStart, minBound) <= 0) return;
+          if (cmpYmd(windowStart, minBound) <= 0) return true;
           const newStart = addDays(windowStart, -EXTEND_STEP);
           const clamped = cmpYmd(newStart, minBound) < 0 ? minBound : newStart;
-          if (clamped === windowStart) return;
+          if (clamped === windowStart) return true;
           await fetchRange(clamped, addDays(windowStart, -1), true);
           setWindowStart(clamped);
         } else {
@@ -227,8 +227,10 @@ export default function ManageTasksPage() {
           await fetchRange(addDays(windowEnd, 1), newEnd, true);
           setWindowEnd(newEnd);
         }
+        return true;
       } catch (e) {
         console.error('extend window failed', e);
+        return false;
       } finally {
         extendingRef.current = false;
       }

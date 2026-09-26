@@ -9,18 +9,18 @@ import React, {
 } from 'react';
 import { usePathname } from 'next/navigation';
 import { randomUUID } from '@/lib/uuid';
-import { hapticTick } from '@/lib/haptics';
 import { BACKLOG_CLOSED_EVENT } from '@/lib/hints/guides';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   ArrowDownToLine,
   CalendarCheck,
   CalendarPlus,
-  ChevronsLeft,
-  ChevronsRight,
+  ChevronLeft,
+  ChevronRight,
   EyeOff,
   ListChecks,
   Plus,
+  RotateCw,
 } from 'lucide-react';
 import useSWR from 'swr';
 import {
@@ -56,12 +56,13 @@ import {
 } from '@/components/ui/TaskFilterBar';
 import { useTaskFilters } from '@/hooks/useTaskFilters';
 import PaginationDots from './PaginationDots';
+import { Skeleton } from '@/components/ui/Skeleton';
 import DragOverlay from './DragOverlay';
 import PlannerHeader from './PlannerHeader';
 import MonthCalendar from './MonthCalendar';
 import CalendarSyncRow from './CalendarSyncRow';
 import { useDragManager } from './hooks/useDragManager';
-import { usePan } from './hooks/usePan';
+import { useBoardPager } from './hooks/useBoardPager';
 import QuickAddSheet from '@/components/ui/QuickAddSheet';
 import { useSections } from '@/hooks/useSections';
 import FrogodoroSheet from '@/components/ui/FrogodoroSheet';
@@ -82,6 +83,8 @@ import { useRiveInteractionPause } from '@/lib/riveInteractionPause';
 import { notifyQuestClaims } from '@/lib/questClaims';
 
 type RepeatChoice = 'this-week' | 'weekly';
+
+const EDGE_LOAD_DAYS = 7;
 
 // Keep finished tasks pinned to the bottom of a column while preserving the
 // relative order within the active and completed groups (stable). Returns the
@@ -167,7 +170,7 @@ export default function TaskBoard({
   activeDateKey: string;
   setActiveDateKey: (d: string) => void;
   accountCreatedAt?: string | null;
-  onExtendWindow?: (direction: 'past' | 'future') => void;
+  onExtendWindow?: (direction: 'past' | 'future') => Promise<boolean | void>;
   onJumpToDate?: (target: string) => void | Promise<void>;
   onMoveTaskToDate?: (
     taskId: string,
@@ -390,7 +393,6 @@ export default function TaskBoard({
   // and getting recreated on every scroll tick during a drag.
   const pageIndexRef = useRef(pageIndex);
   pageIndexRef.current = pageIndex;
-  const recomputeCanPanRef = useRef<(() => void) | undefined>(undefined);
 
   // Edge "Move to a specific date" drop zones (shown while dragging)
   const pastZoneRef = useRef<HTMLDivElement>(null);
@@ -410,77 +412,55 @@ export default function TaskBoard({
   }, [windowDates, accountCreatedAt]);
 
 
-  // Elastic edge "pull": how far past the first/last day the user has scrolled.
-  // Drives the Load-more expansion and arms a load-on-release gesture (mobile).
-  const PULL_ARM = 0.82; // fraction of PULL_FULL needed to trigger a load
-  const [edgePull, setEdgePull] = useState<{
-    side: 'past' | 'future' | null;
-    amount: number;
-  }>({ side: null, amount: 0 });
-  const edgePullRef = useRef(edgePull);
-  edgePullRef.current = edgePull;
-  const pullArmedRef = useRef(false);
-  const edgeArmedHapticRef = useRef(false);
-  // After an edge load, smooth-center this date once it enters the window.
-  const pendingCenterKeyRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    const key = pendingCenterKeyRef.current;
-    if (!key) return;
-    const i = windowDates.indexOf(key);
-    if (i < 0) return;
-    pendingCenterKeyRef.current = null;
-    requestAnimationFrame(() => centerColumnSmooth(i));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [windowDates]);
-
-  // Load 7 more days on an edge and glide one day in that direction. Used by
-  // both the "Load more" click (web) and the pull-to-load release (mobile).
-  const pastAnchorRef = useRef<{ key: string; offsetLeft: number } | null>(null);
-  const triggerEdgeLoad = useCallback(
-    (side: 'past' | 'future') => {
-      const target =
-        side === 'future'
-          ? addDays(windowDates[windowDates.length - 1], 1)
-          : addDays(windowDates[0], -1);
-      pendingCenterKeyRef.current = target;
-      if (side === 'past') {
-        // Anchor the current column across the prepend so the follow-up glide
-        // to the previous day starts from the right place (no jump).
-        const dk = windowDates[pageIndex];
-        const col = document.querySelector<HTMLElement>(
-          `[data-date-key="${dk}"]`,
-        );
-        if (col) pastAnchorRef.current = { key: dk, offsetLeft: col.offsetLeft };
-      }
-      onExtendWindow?.(side);
+  const [edgeStatus, setEdgeStatus] = useState<
+    Record<'past' | 'future', 'idle' | 'loading' | 'error'>
+  >({ past: 'idle', future: 'idle' });
+  const edgeBusyRef = useRef(false);
+  const edgeStatusRef = useRef(edgeStatus);
+  edgeStatusRef.current = edgeStatus;
+  const extendEdge = useCallback(
+    async (side: 'past' | 'future', auto = false) => {
+      if (!onExtendWindow || edgeBusyRef.current) return;
+      if (side === 'past' && !canLoadPast) return;
+      if (auto && edgeStatusRef.current[side] === 'error') return;
+      edgeBusyRef.current = true;
+      setEdgeStatus((prev) => ({ ...prev, [side]: 'loading' }));
+      const ok = await onExtendWindow(side).catch(() => false);
+      edgeBusyRef.current = false;
+      setEdgeStatus((prev) => ({
+        ...prev,
+        [side]: ok === false ? 'error' : 'idle',
+      }));
     },
-    [windowDates, pageIndex, onExtendWindow],
+    [onExtendWindow, canLoadPast],
   );
 
-  // After the window start changes (past prepend), restore scroll position so
-  // the anchored column stays under the same viewport offset.
+  const scrollLocked = useSheetStore((s) => s.count) > 0;
+  const trackRef = useRef<HTMLDivElement>(null);
+  const dragActiveRef = useRef(false);
+  dragActiveRef.current = !!drag?.active;
+  const pager = useBoardPager({
+    scrollerRef,
+    trackRef,
+    enabled: !scrollLocked,
+    isCardDragging: () => dragActiveRef.current,
+  });
+
   const prevWindowStartRef = useRef(windowDates[0]);
+  const prevScrollWidthRef = useRef(0);
   React.useLayoutEffect(() => {
-    const start = windowDates[0];
-    if (start === prevWindowStartRef.current) return;
-    prevWindowStartRef.current = start;
-    const anchor = pastAnchorRef.current;
     const s = scrollerRef.current;
-    if (!anchor || !s) return;
-    const col = document.querySelector<HTMLElement>(
-      `[data-date-key="${anchor.key}"]`,
-    );
-    if (col) {
-      // Instant correction (bypass the scroller's smooth behavior) so the
-      // anchor doesn't visibly slide; the follow-up glide handles the motion.
-      const prev = s.style.scrollBehavior;
-      s.style.scrollBehavior = 'auto';
-      s.scrollLeft += col.offsetLeft - anchor.offsetLeft;
-      s.style.scrollBehavior = prev;
+    if (!s) return;
+    const start = windowDates[0];
+    if (
+      start !== prevWindowStartRef.current &&
+      cmpYmd(start, prevWindowStartRef.current) < 0
+    ) {
+      s.scrollLeft += s.scrollWidth - prevScrollWidthRef.current;
     }
-    pastAnchorRef.current = null;
-  }, [windowDates, scrollerRef]);
+    prevWindowStartRef.current = start;
+    prevScrollWidthRef.current = s.scrollWidth;
+  });
 
   // Backlog state
   const [backlogOpen, setBacklogOpen] = useState(false);
@@ -502,19 +482,31 @@ export default function TaskBoard({
       window.removeEventListener(TOUR_SAVED_DROP_EVENT, onTourSavedDrop);
   }, []);
 
+  const { animateToIndex, settle: settleBoard, step: stepBoard } = pager;
+  const [atBoardStart, setAtBoardStart] = useState(false);
   const centerColumnSmooth = useCallback(
-    (i: number) => {
-      const s = scrollerRef.current;
-      const col = (document.querySelectorAll('[data-col="true"]')[i] ??
-        null) as HTMLElement | null;
-      if (!s || !col) return;
-      s.scrollTo({
-        left: col.offsetLeft - (s.clientWidth - col.clientWidth) / 2,
-        behavior: 'smooth',
-      });
-    },
-    [scrollerRef],
+    (i: number) => animateToIndex(i),
+    [animateToIndex],
   );
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (scrollLocked || dragActiveRef.current) return;
+      const t = e.target as HTMLElement | null;
+      if (
+        t?.closest(
+          'input, textarea, select, [contenteditable], [contenteditable="true"], [role="slider"], [role="listbox"]',
+        )
+      )
+        return;
+      e.preventDefault();
+      stepBoard(e.key === 'ArrowRight' ? 1 : -1, e.shiftKey ? 'page' : 'day');
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [scrollLocked, stepBoard]);
 
   const updateTodayVisibility = useCallback(() => {
     const s = scrollerRef.current;
@@ -553,7 +545,6 @@ export default function TaskBoard({
     });
     setPageIndex(activeIdx);
     didInitialCenter.current = true;
-    recomputeCanPanRef.current?.();
     updateTodayVisibility();
   }, [activeIdx, scrollerRef, updateTodayVisibility]);
 
@@ -659,46 +650,19 @@ export default function TaskBoard({
         if (dk && dk !== activeDateKey) setActiveDateKey(dk);
       }
 
-      // Elastic edge pull: how far the viewport extends past the first/last day.
+      const atStartNow = s.scrollLeft < 2 && !canLoadPast;
+      setAtBoardStart((prev) => (prev === atStartNow ? prev : atStartNow));
+
       const first = cols[0];
       const last = cols[cols.length - 1];
       if (first && last && !drag?.active) {
-        const PULL_FULL = 110;
-        const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
-        const quantize = (v: number) => Math.round(v * 25) / 25;
-        const futureExtra =
-          s.scrollLeft + s.clientWidth - (last.offsetLeft + last.clientWidth);
-        const pastExtra = first.offsetLeft - s.scrollLeft;
-
-        const rawPull =
-          futureExtra > 2
-            ? clamp01(futureExtra / PULL_FULL)
-            : pastExtra > 2 && canLoadPast
-              ? clamp01(pastExtra / PULL_FULL)
-              : 0;
-        const armedNow = rawPull >= PULL_ARM;
-        if (armedNow && !edgeArmedHapticRef.current) {
-          hapticTick();
-        }
-        edgeArmedHapticRef.current = armedNow;
-
-        if (futureExtra > 2) {
-          setEdgePull((prev) => {
-            const amount = quantize(clamp01(futureExtra / PULL_FULL));
-            return prev.side === 'future' && prev.amount === amount
-              ? prev
-              : { side: 'future', amount };
-          });
-        } else if (pastExtra > 2 && canLoadPast) {
-          setEdgePull((prev) => {
-            const amount = quantize(clamp01(pastExtra / PULL_FULL));
-            return prev.side === 'past' && prev.amount === amount
-              ? prev
-              : { side: 'past', amount };
-          });
-        } else {
-          setEdgePull((prev) => (prev.side ? { side: null, amount: 0 } : prev));
-        }
+        const lookahead = first.clientWidth * 3;
+        const rightGap =
+          last.offsetLeft + last.clientWidth - (s.scrollLeft + s.clientWidth);
+        const leftGap = s.scrollLeft - first.offsetLeft;
+        if (rightGap < lookahead) void extendEdge('future', true);
+        else if (leftGap < lookahead && canLoadPast)
+          void extendEdge('past', true);
       }
     };
     const handler = () => {
@@ -718,38 +682,8 @@ export default function TaskBoard({
     scrollerRef,
     drag?.active,
     canLoadPast,
+    extendEdge,
   ]);
-
-  // Load-on-release: when the user lifts after pulling an edge past the arm
-  // threshold, load 7 more days on that side and glide to the next day.
-  useEffect(() => {
-    const s = scrollerRef.current;
-    if (!s) return;
-    const onRelease = (e: Event) => {
-      // Touch-only: ignore mouse so the web edge stays a plain click.
-      if (e instanceof PointerEvent && e.pointerType === 'mouse') return;
-      const { side, amount } = edgePullRef.current;
-      if (!side || amount < PULL_ARM || pullArmedRef.current) return;
-      if (side === 'past' && !canLoadPast) return;
-      pullArmedRef.current = true;
-      setEdgePull({ side: null, amount: 0 });
-      triggerEdgeLoad(side);
-      // Allow the next gesture once state has settled.
-      requestAnimationFrame(() => {
-        pullArmedRef.current = false;
-      });
-    };
-    s.addEventListener('touchend', onRelease, { passive: true });
-    s.addEventListener('pointerup', onRelease, { passive: true });
-    return () => {
-      s.removeEventListener('touchend', onRelease);
-      s.removeEventListener('pointerup', onRelease);
-    };
-  }, [scrollerRef, canLoadPast, triggerEdgeLoad]);
-
-  const { panActive, startPanIfEligible, onPanMove, endPan, recomputeCanPan } =
-    usePan(scrollerRef);
-  recomputeCanPanRef.current = recomputeCanPan;
 
   // Freeze ambient Rive playback while a card is being dragged (scrolling is
   // covered globally by RiveScrollPause). Uses getState() on purpose: no React
@@ -760,102 +694,6 @@ export default function TaskBoard({
     acquire();
     return release;
   }, [drag?.active]);
-
-  // Keep snap suppressed briefly after a cross-column drop so the smooth
-  // centering glide finishes before mandatory snap re-engages — re-enabling
-  // snap mid-glide yanks the board to the nearest column edge.
-  const [snapHold, setSnapHold] = useState(false);
-  const snapHoldTimerRef = useRef<number | null>(null);
-  useEffect(() => {
-    return () => {
-      if (snapHoldTimerRef.current)
-        window.clearTimeout(snapHoldTimerRef.current);
-    };
-  }, []);
-
-  const snapSuppressed = !!drag?.active || panActive || snapHold;
-
-  // A touch during the hold takes over from the glide. Re-enabling snap here
-  // wouldn't help — browsers lock snap behavior per gesture, so a swipe that
-  // starts while snap is off free-scrolls and can settle between columns.
-  // Instead the swipe runs snap-free and on release we glide to the column it
-  // points at, re-engaging snap only once centered.
-  const holdTouchRef = useRef<{ startScrollLeft: number } | null>(null);
-  useEffect(() => {
-    if (!snapHold) return;
-    const s = scrollerRef.current;
-    if (!s) return;
-
-    const onTouchStart = () => {
-      if (snapHoldTimerRef.current) {
-        window.clearTimeout(snapHoldTimerRef.current);
-        snapHoldTimerRef.current = null;
-      }
-      s.scrollTo({ left: s.scrollLeft, behavior: 'auto' });
-      holdTouchRef.current = { startScrollLeft: s.scrollLeft };
-    };
-
-    const settle = () => {
-      const takeover = holdTouchRef.current;
-      holdTouchRef.current = null;
-      if (!takeover) return;
-      if (s.dataset.drag === '1') return;
-      const cols = Array.from(
-        document.querySelectorAll<HTMLElement>('[data-col="true"]'),
-      );
-      if (cols.length === 0) return;
-      const center = s.scrollLeft + s.clientWidth / 2;
-      let nearest = 0;
-      let best = Infinity;
-      cols.forEach((col, i) => {
-        const d = Math.abs(col.offsetLeft + col.clientWidth / 2 - center);
-        if (d < best) {
-          best = d;
-          nearest = i;
-        }
-      });
-      let target = nearest;
-      const delta = s.scrollLeft - takeover.startScrollLeft;
-      if (Math.abs(delta) > 30) {
-        const nearestCenter =
-          cols[nearest].offsetLeft + cols[nearest].clientWidth / 2;
-        if (delta > 0 && nearestCenter < center)
-          target = Math.min(nearest + 1, cols.length - 1);
-        else if (delta < 0 && nearestCenter > center)
-          target = Math.max(nearest - 1, 0);
-      }
-      if (snapHoldTimerRef.current)
-        window.clearTimeout(snapHoldTimerRef.current);
-      snapHoldTimerRef.current = window.setTimeout(
-        () => setSnapHold(false),
-        600,
-      );
-      centerColumnSmooth(target);
-    };
-
-    const cancelHold = () => {
-      if (snapHoldTimerRef.current) {
-        window.clearTimeout(snapHoldTimerRef.current);
-        snapHoldTimerRef.current = null;
-      }
-      setSnapHold(false);
-    };
-
-    s.addEventListener('touchstart', onTouchStart, { passive: true });
-    s.addEventListener('touchend', settle, { passive: true });
-    s.addEventListener('touchcancel', settle, { passive: true });
-    s.addEventListener('wheel', cancelHold, { passive: true });
-    return () => {
-      s.removeEventListener('touchstart', onTouchStart);
-      s.removeEventListener('touchend', settle);
-      s.removeEventListener('touchcancel', settle);
-      s.removeEventListener('wheel', cancelHold);
-    };
-  }, [snapHold, scrollerRef, centerColumnSmooth]);
-
-  // Lock the horizontal board scroller while any sheet/popup is open so the
-  // page behind the backdrop can't be slid around.
-  const scrollLocked = useSheetStore((s) => s.count) > 0;
 
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [quickText, setQuickText] = useState('');
@@ -1771,15 +1609,6 @@ export default function TaskBoard({
       const shouldGlideToColumn =
         settleDay !== BACKLOG_IDX && window.innerWidth < 768;
 
-      if (shouldGlideToColumn) {
-        setSnapHold(true);
-        if (snapHoldTimerRef.current)
-          window.clearTimeout(snapHoldTimerRef.current);
-        snapHoldTimerRef.current = window.setTimeout(
-          () => setSnapHold(false),
-          600,
-        );
-      }
       commitDragReorder(finalToDay, finalToIndex);
       // A drop back into the exact same slot changed nothing, so it shouldn't
       // cost the user their selection either.
@@ -1804,14 +1633,12 @@ export default function TaskBoard({
       setIsDragOverBacklog(false);
       setTrayCloseProgress(0);
 
-      if (shouldGlideToColumn) {
-        // Let React commit the source/destination lists and let Motion complete
-        // its layout reads before starting native smooth scrolling. Starting
-        // both in one frame makes scroll jank scale with the number of tasks.
+      window.requestAnimationFrame(() => {
         window.requestAnimationFrame(() => {
-          window.requestAnimationFrame(() => centerColumnSmooth(settleDay));
+          if (shouldGlideToColumn) centerColumnSmooth(settleDay);
+          else settleBoard();
         });
-      }
+      });
     });
   }, [
     drag,
@@ -1825,6 +1652,7 @@ export default function TaskBoard({
     backlogOpen,
     backlog.length,
     centerColumnSmooth,
+    settleBoard,
     commitDragReorder,
     endDrag,
     settleAndEnd,
@@ -1961,69 +1789,132 @@ export default function TaskBoard({
 
     if (isPast && !canLoadPast) return null;
 
-    // Not dragging: a ghost "next week" column — the same dashed-card language
-    // as the board's placeholders, previewing the exact dates a pull (mobile)
-    // or click (web) will load. The reveal itself is the progress: it brightens
-    // from muted to primary as the pull approaches the arm point.
-    const pull = edgePull.side === side ? edgePull.amount : 0;
-    const armed = pull >= PULL_ARM;
-    const REST_FILL = 0.35;
-    const fill = Math.max(REST_FILL, Math.min(1, pull / PULL_ARM));
-    const Chevron = isPast ? ChevronsLeft : ChevronsRight;
-    const label = !isMobile
-      ? 'Load more days'
-      : armed
-        ? 'Release to load'
-        : 'Pull to load';
-    const rangeStart = isPast
-      ? addDays(windowDates[0], -7)
-      : addDays(windowDates[windowDates.length - 1], 1);
-    const rangeEnd = isPast
-      ? addDays(windowDates[0], -1)
-      : addDays(windowDates[windowDates.length - 1], 7);
-    const fmtRange = (dk: string) =>
+    const status = edgeStatus[side];
+    const failed = status === 'error';
+    const edgeDay = isPast
+      ? windowDates[0]
+      : windowDates[windowDates.length - 1];
+    const upcoming = [1, 2, 3].map((n) => addDays(edgeDay, isPast ? -n : n));
+    const rangeFrom = isPast
+      ? addDays(edgeDay, -EDGE_LOAD_DAYS)
+      : addDays(edgeDay, 1);
+    const rangeTo = isPast
+      ? addDays(edgeDay, -1)
+      : addDays(edgeDay, EDGE_LOAD_DAYS);
+    const fmtShort = (dk: string) =>
       parseYmd(dk).toLocaleString('en-US', { month: 'short', day: 'numeric' });
     return (
       <div className="shrink-0 self-start flex h-[clamp(220px,calc(100svh-430px),480px)] w-[46vw] sm:w-[200px] md:w-[185px]">
         <button
           type="button"
-          onClick={() => triggerEdgeLoad(side)}
-          style={{ opacity: 0.5 + 0.5 * fill }}
-          className={[
-            'flex h-full w-full flex-col items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed px-4 text-center outline-none transition-colors duration-150',
-            armed
-              ? 'border-primary bg-primary/15 text-primary'
-              : 'border-border bg-card/40 text-muted-foreground hover:border-primary/50 hover:bg-primary/5 hover:text-primary',
-          ].join(' ')}
+          onClick={() => void extendEdge(side)}
+          disabled={status === 'loading'}
+          aria-label={
+            failed
+              ? 'Retry loading days'
+              : `${isPast ? 'Earlier' : 'Upcoming'} days, ${fmtShort(rangeFrom)} to ${fmtShort(rangeTo)}`
+          }
+          aria-busy={status === 'loading'}
+          className="group/edge relative flex h-full w-full flex-col items-center justify-center gap-4 rounded-[20px] px-3 text-center outline-none"
         >
-          <motion.span
-            animate={
-              armed
-                ? { x: isPast ? [0, -5, 0] : [0, 5, 0] }
-                : { x: 0 }
-            }
-            transition={
-              armed
-                ? { repeat: Infinity, duration: 0.7, ease: 'easeInOut' }
-                : { duration: 0.15 }
-            }
-          >
-            <Chevron className="h-8 w-8" strokeWidth={2.5} />
-          </motion.span>
-          <span className="text-sm font-black tracking-tight">{label}</span>
-          <span className="text-[11px] font-bold opacity-70">
-            {fmtRange(rangeStart)} – {fmtRange(rangeEnd)}
-          </span>
-          <span
-            className={[
-              'mt-1.5 rounded-full px-2.5 py-1 text-[12px] font-black transition-colors',
-              armed
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-primary/10 text-primary',
-            ].join(' ')}
-          >
-            +7 days
-          </span>
+          <div className="relative h-[168px] w-full max-w-[150px]">
+            {upcoming
+              .map((dk, n) => ({ dk, n }))
+              .reverse()
+              .map(({ dk, n }) => {
+                const d = parseYmd(dk);
+                return (
+                  <motion.div
+                    key={dk}
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{
+                      opacity: 1 - n * 0.22,
+                      y: n * 14,
+                      x: (isPast ? -1 : 1) * n * 6,
+                      rotate: (isPast ? -1 : 1) * n * 2.5,
+                      scale: 1 - n * 0.06,
+                    }}
+                    transition={{
+                      type: 'spring',
+                      stiffness: 320,
+                      damping: 28,
+                      delay: n * 0.05,
+                    }}
+                    className={[
+                      'absolute inset-x-0 top-0 rounded-2xl border bg-card p-3 text-left shadow-sm',
+                      failed ? 'border-destructive/30' : 'border-border/60',
+                    ].join(' ')}
+                    style={{
+                      zIndex: 3 - n,
+                      transformOrigin: isPast ? 'bottom left' : 'bottom right',
+                    }}
+                  >
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-lg font-black leading-none tracking-tight text-foreground/80">
+                        {d.getDate()}
+                      </span>
+                      <span className="text-[11px] font-bold text-muted-foreground">
+                        {d.toLocaleString('en-US', { weekday: 'short' })}
+                      </span>
+                    </div>
+                    <div className="mt-2.5 space-y-1.5">
+                      {failed ? (
+                        <>
+                          <div className="h-3 w-full rounded-md bg-muted" />
+                          <div className="h-3 w-2/3 rounded-md bg-muted" />
+                        </>
+                      ) : (
+                        <>
+                          <Skeleton className="h-3 w-full rounded-md" />
+                          <Skeleton className="h-3 w-2/3 rounded-md" />
+                        </>
+                      )}
+                    </div>
+                  </motion.div>
+                );
+              })}
+          </div>
+
+          {failed ? (
+            <span className="flex flex-col items-center gap-2">
+              <span className="text-xs font-bold text-muted-foreground">
+                Couldn&apos;t load these days
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-[12px] font-black text-primary-foreground shadow-sm transition-transform group-active/edge:scale-95">
+                <RotateCw className="h-3.5 w-3.5" strokeWidth={2.75} />
+                Retry
+              </span>
+            </span>
+          ) : (
+            <span className="flex flex-col items-center gap-1">
+              <span className="text-[13px] font-black tracking-tight text-foreground/70">
+                {fmtShort(rangeFrom)} – {fmtShort(rangeTo)}
+              </span>
+              <span className="flex items-center gap-1" aria-hidden>
+                {[0, 1, 2].map((dot) => (
+                  <motion.span
+                    key={dot}
+                    className="h-1.5 w-1.5 rounded-full bg-primary"
+                    animate={
+                      status === 'loading'
+                        ? { opacity: [0.25, 1, 0.25], y: [0, -3, 0] }
+                        : { opacity: 0.3, y: 0 }
+                    }
+                    transition={
+                      status === 'loading'
+                        ? {
+                            repeat: Infinity,
+                            duration: 0.9,
+                            delay: dot * 0.15,
+                            ease: 'easeInOut',
+                          }
+                        : { duration: 0.2 }
+                    }
+                  />
+                ))}
+              </span>
+            </span>
+          )}
         </button>
       </div>
     );
@@ -2054,23 +1945,16 @@ export default function TaskBoard({
         dir="ltr"
         data-role="board-scroller"
         data-drag={drag?.active ? '1' : '0'}
-        onPointerDown={scrollLocked ? undefined : startPanIfEligible}
-        onPointerMove={scrollLocked ? undefined : onPanMove}
-        onPointerUp={scrollLocked ? undefined : endPan}
         className={[
           'no-scrollbar absolute inset-0 w-full h-full select-none',
           'flex flex-col items-start overflow-y-hidden overscroll-x-contain',
-          scrollLocked ? 'overflow-x-hidden touch-none' : 'overflow-x-auto touch-pan-x',
-          snapSuppressed
-            ? 'snap-none'
-            : 'snap-x snap-mandatory scroll-smooth md:snap-none',
+          scrollLocked ? 'overflow-x-hidden touch-none' : 'overflow-x-auto touch-pan-y',
         ].join(' ')}
-        style={{
-          WebkitOverflowScrolling: 'touch',
-          scrollBehavior: snapSuppressed ? 'auto' : undefined,
-        }}
       >
-        <div className="flex mx-auto gap-3 px-4 pt-[calc(9rem+env(safe-area-inset-top)+var(--lens-m))] md:pt-[calc(108px+var(--lens))] transition-[padding] duration-200 pb-[calc(100px+env(safe-area-inset-bottom))] md:pb-[calc(40px+env(safe-area-inset-bottom))] md:transition-[padding] md:duration-200">
+        <div
+          ref={trackRef}
+          className="flex mx-auto gap-3 px-4 pt-[calc(9rem+env(safe-area-inset-top)+var(--lens-m))] md:pt-[calc(108px+var(--lens))] transition-[padding] duration-200 pb-[calc(100px+env(safe-area-inset-bottom))] md:pb-[calc(40px+env(safe-area-inset-bottom))] md:transition-[padding] md:duration-200"
+        >
           {renderEdge('past')}
           {windowDates.map((dk, i) => (
             <div
@@ -2083,7 +1967,7 @@ export default function TaskBoard({
                   ? 'tour-next-day'
                   : undefined
               }
-              className="shrink-0 snap-center snap-always w-[88vw] sm:w-[360px] md:w-[330px] lg:w-[310px] xl:w-[292px] h-full"
+              className="shrink-0 origin-center w-[84vw] sm:w-[360px] md:w-[330px] lg:w-[310px] xl:w-[292px] h-full"
             >
               <DayColumn
                 title={titleForIndex(i)}
@@ -2219,6 +2103,40 @@ export default function TaskBoard({
           {renderEdge('future')}
         </div>
       </motion.div>
+
+      {!drag?.active && !scrollLocked && (
+        <>
+          {(['past', 'future'] as const).map((side) => {
+            const back = side === 'past';
+            if (back && atBoardStart) return null;
+            const Chevron = back ? ChevronLeft : ChevronRight;
+            return (
+              <div
+                key={side}
+                className={[
+                  'absolute top-1/2 z-[55] hidden -translate-y-1/2 md:block',
+                  back ? 'left-3' : 'right-3',
+                ].join(' ')}
+              >
+                <motion.button
+                  type="button"
+                  onClick={() => stepBoard(back ? -1 : 1, 'page')}
+                  aria-label={back ? 'Earlier days' : 'Later days'}
+                  title={back ? 'Earlier days (Shift + ←)' : 'Later days (Shift + →)'}
+                  initial={{ opacity: 0, scale: 0.85 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  whileHover={{ scale: 1.08, x: back ? -2 : 2 }}
+                  whileTap={{ scale: 0.92 }}
+                  transition={{ type: 'spring', stiffness: 420, damping: 26 }}
+                  className="flex h-12 w-12 items-center justify-center rounded-full border border-border/60 bg-card/90 text-foreground shadow-lg shadow-black/10 backdrop-blur-xl hover:border-primary/40 hover:text-primary"
+                >
+                  <Chevron className="h-6 w-6" strokeWidth={2.75} />
+                </motion.button>
+              </div>
+            );
+          })}
+        </>
+      )}
 
       {/* Top header + dot strip (mobile + desktop) */}
       <div

@@ -126,8 +126,8 @@ export default function DayColumn({
         className={[
           'flex-1 px-0.5 pt-1 overflow-x-hidden transition-colors rounded-xl',
           disableVerticalScroll
-            ? 'overflow-y-visible touch-pan-x'
-            : 'overflow-y-auto no-scrollbar touch-auto overscroll-y-contain',
+            ? 'overflow-y-visible touch-pan-y'
+            : 'overflow-y-auto no-scrollbar touch-pan-y overscroll-y-contain',
           'pb-[env(safe-area-inset-bottom)]',
         ].join(' ')}
       >

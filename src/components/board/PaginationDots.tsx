@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { motion, LayoutGroup } from 'framer-motion';
+import { motion, LayoutGroup, AnimatePresence } from 'framer-motion';
 
 import { WEEK_ORDER, englishDays, dayLetterFromYmd, parseYmd, todayYmd, cmpYmd } from './helpers';
 
@@ -40,54 +40,64 @@ export default function PaginationDots({
     const today = todayYmd();
     return (
       <LayoutGroup id="pagination-dots-dates">
-        <div className="flex items-end justify-between gap-1 pb-1.5 px-1 w-full">
-          {dates.map((d) => {
-            const letter = dayLetterFromYmd(d);
-            const dayNum = parseYmd(d).getDate();
-            const isActive = d === activeDate;
-            const isToday = d === today;
-            const isPast = cmpYmd(d, today) < 0;
+        <div className="flex items-end justify-between gap-1 pb-1.5 px-1 w-full overflow-hidden">
+          <AnimatePresence mode="popLayout" initial={false}>
+            {dates.map((d) => {
+              const letter = dayLetterFromYmd(d);
+              const dayNum = parseYmd(d).getDate();
+              const isActive = d === activeDate;
+              const isToday = d === today;
+              const isPast = cmpYmd(d, today) < 0;
 
-            const letterColor = isActive
-              ? 'text-primary'
-              : isPast
-                ? 'text-muted-foreground/40'
-                : 'text-foreground/80';
+              const letterColor = isActive
+                ? 'text-primary'
+                : isPast
+                  ? 'text-muted-foreground/40'
+                  : 'text-foreground/80';
 
-            const numberClasses = isActive
-              ? 'bg-gradient-to-br from-primary/25 to-emerald-400/25 text-primary scale-105 ring-1 ring-primary/40'
-              : isPast
-                ? 'text-muted-foreground/40 hover:text-muted-foreground/70 hover:bg-muted/20'
-                : 'text-foreground hover:text-foreground hover:bg-muted/30';
+              const numberColor = isActive
+                ? 'text-primary'
+                : isPast
+                  ? 'text-muted-foreground/40 hover:text-muted-foreground/70'
+                  : 'text-foreground';
 
-            return (
-              <button
-                key={d}
-                onClick={() => onSelectDate?.(d)}
-                className="relative flex flex-1 flex-col items-center px-1 outline-none group"
-                aria-label={d}
-              >
-                <span
-                  className={`text-[11px] font-bold tracking-wide leading-none mb-1 ${letterColor}`}
+              return (
+                <motion.button
+                  key={d}
+                  layout="position"
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  transition={{ type: 'spring', stiffness: 520, damping: 42 }}
+                  onClick={() => onSelectDate?.(d)}
+                  className="relative flex flex-1 flex-col items-center px-1 outline-none group"
+                  aria-label={d}
+                  aria-current={isActive ? 'date' : undefined}
                 >
-                  {letter}
-                </span>
-                <div
-                  className={`flex items-center justify-center
-                    w-11 h-11 rounded-2xl text-[16px] font-black transition-colors duration-200 ${numberClasses}`}
-                >
-                  {dayNum}
-                </div>
-                {isToday && (
-                  <motion.span
-                    layoutId="today-dot"
-                    className="absolute -bottom-1 w-1.5 h-1.5 rounded-full bg-primary"
-                    transition={{ type: 'spring', stiffness: 500, damping: 35 }}
-                  />
-                )}
-              </button>
-            );
-          })}
+                  <span
+                    className={`text-[11px] font-bold tracking-wide leading-none mb-1 transition-colors duration-200 ${letterColor}`}
+                  >
+                    {letter}
+                  </span>
+                  <div
+                    className={`relative flex items-center justify-center w-11 h-11 rounded-2xl text-[16px] font-black transition-colors duration-200 ${numberColor}`}
+                  >
+                    {isActive && (
+                      <motion.span
+                        layoutId="active-date-pill"
+                        className="absolute inset-0 rounded-2xl bg-gradient-to-br from-primary/25 to-emerald-400/25 ring-1 ring-primary/40"
+                        transition={{ type: 'spring', stiffness: 520, damping: 38 }}
+                      />
+                    )}
+                    <span className="relative">{dayNum}</span>
+                  </div>
+                  {isToday && (
+                    <span className="absolute -bottom-1 w-1.5 h-1.5 rounded-full bg-primary" />
+                  )}
+                </motion.button>
+              );
+            })}
+          </AnimatePresence>
         </div>
       </LayoutGroup>
     );
