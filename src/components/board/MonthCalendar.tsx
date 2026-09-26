@@ -180,8 +180,10 @@ export default function MonthCalendar({
             animate={{ y: 0 }}
             exit={{ y: -8, opacity: 0 }}
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-            className={`absolute left-0 right-0 top-0 z-[96] px-3 pt-14 pointer-events-none ${
-              belowHeader ? 'md:pt-[136px]' : ''
+            className={`absolute left-0 right-0 top-0 z-[96] px-3 pointer-events-none ${
+              belowHeader
+                ? 'pt-[calc(3.75rem+env(safe-area-inset-top))] md:pt-[136px]'
+                : 'pt-14'
             }`}
           >
             <div
@@ -189,8 +191,10 @@ export default function MonthCalendar({
               role="dialog"
               aria-label="Pick a date"
               style={{ ['--cal-reserve' as string]: tourReserve }}
-              className={`mx-auto w-[min(96vw,520px)] max-h-[calc(100dvh-9rem-var(--cal-reserve,0px))] ${
-                belowHeader ? 'md:max-h-[calc(100dvh-176px-var(--cal-reserve,0px))]' : ''
+              className={`mx-auto w-[min(96vw,520px)] ${
+                belowHeader
+                  ? 'max-h-[calc(100dvh-9.5rem-env(safe-area-inset-top)-var(--cal-reserve,0px))] md:max-h-[calc(100dvh-176px-var(--cal-reserve,0px))]'
+                  : 'max-h-[calc(100dvh-9rem-var(--cal-reserve,0px))]'
               } overflow-y-auto overscroll-contain rounded-3xl bg-primary text-primary-foreground p-4 md:p-5 shadow-2xl pointer-events-auto`}
               onClick={(e) => e.stopPropagation()}
             >

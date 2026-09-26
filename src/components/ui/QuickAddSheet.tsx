@@ -328,6 +328,7 @@ export default function QuickAddSheet({
   const [sheetBaseHeight, setSheetBaseHeight] = useState<number | null>(null);
   const [suggestionsReady, setSuggestionsReady] = useState(false);
   const [hasSuggestionContent, setHasSuggestionContent] = useState(false);
+  const pickSetTimeRef = useRef(false);
   const { seenIntros, markIntroSeen } = useIntros(open);
   const markIntroSeenRef = useRef(markIntroSeen);
   markIntroSeenRef.current = markIntroSeen;
@@ -1535,6 +1536,73 @@ export default function QuickAddSheet({
                         />
                       </div>
 
+                      <SuggestionTabs
+                        open={open}
+                        variant="chips"
+                        query={text}
+                        selectedId={pickedBacklogTaskId}
+                        onUnpick={() => {
+                          if (pickedBacklogText !== null && text === pickedBacklogText) {
+                            setText('');
+                          }
+                          const removed = new Set(autoAddedTagIds);
+                          setTags((prev) => prev.filter((id) => !removed.has(id)));
+                          setAutoAddedTagIds([]);
+                          if (pickSetTimeRef.current) {
+                            setStartTime('');
+                            setEndTime('');
+                            setNotifyEnabled(false);
+                            pickSetTimeRef.current = false;
+                          }
+                          setPickedBacklogTaskId(null);
+                          setPickedBacklogText(null);
+                          setPickedNotes(undefined);
+                          setPickedChecklist(undefined);
+                          inputRef.current?.focus();
+                        }}
+                        onContentChange={setHasSuggestionContent}
+                        onPick={(pick) => {
+                            setText(pick.text);
+                            setTags((prev) => {
+                              const removed = new Set(autoAddedTagIds);
+                              const seen = new Set<string>();
+                              const next: string[] = [];
+                              for (const id of prev) {
+                                if (removed.has(id)) continue;
+                                if (seen.has(id)) continue;
+                                seen.add(id);
+                                next.push(id);
+                              }
+                              for (const id of pick.tagIds) {
+                                if (seen.has(id)) continue;
+                                seen.add(id);
+                                next.push(id);
+                              }
+                              return next;
+                            });
+                            setAutoAddedTagIds(pick.tagIds);
+                            pickSetTimeRef.current = pick.startTime !== undefined;
+                            if (pick.startTime !== undefined) {
+                              setStartTime(pick.startTime);
+                              setEndTime(pick.endTime ?? '');
+                              setNotifyEnabled(!!pick.reminder);
+                              if (pick.reminder) setReminder(pick.reminder);
+                            }
+                            if (pick.backlogTaskId) {
+                              setPickedBacklogTaskId(pick.backlogTaskId);
+                              setPickedBacklogText(pick.text);
+                              setPickedNotes(pick.notes);
+                              setPickedChecklist(pick.checklist);
+                            } else {
+                              setPickedBacklogTaskId(null);
+                              setPickedBacklogText(null);
+                              setPickedNotes(undefined);
+                              setPickedChecklist(undefined);
+                            }
+                            inputRef.current?.focus();
+                          }}
+                      />
+
                     </div>
                   </div>
 
@@ -1590,79 +1658,6 @@ export default function QuickAddSheet({
                       )}
                     </AnimatePresence>
 
-                    {suggestionsReady && (
-                      <motion.div
-                        key="quick-add-suggestions"
-                        initial={{ opacity: 0, y: suggestionsOffset }}
-                        animate={{
-                          opacity: showSuggestions ? 1 : 0,
-                          y: showSuggestions ? 0 : suggestionsOffset,
-                        }}
-                        exit={{ opacity: 0, y: suggestionsOffset }}
-                        transition={{
-                          duration: 0.4,
-                          ease: [0.32, 0.72, 0, 1],
-                        }}
-                        style={{ maxHeight: suggestionsMax }}
-                        className={[
-                          // Opaque (not the /70 blend used elsewhere) — this
-                          // panel sits over a blurred sheet backdrop, so a
-                          // translucent tint picks up whatever's behind it
-                          // instead of landing on the intended flat color.
-                          'flex min-h-0 flex-col overflow-hidden rounded-[28px] border border-border/80 bg-muted dark:bg-background p-4 shadow-[0_3px_0_0_rgba(0,0,0,0.18)]',
-                          showSuggestions
-                            ? 'relative pointer-events-auto'
-                            : 'invisible absolute inset-x-0 top-0 pointer-events-none',
-                        ].join(' ')}
-                      >
-                        <SuggestionTabs
-                          open={open}
-                          focusCategoryIds={focusCategoryIds}
-                          categoryTagMap={categoryTagMap}
-                          className="mt-0 min-h-0 border-t-0 pt-0"
-                          onContentChange={setHasSuggestionContent}
-                          onPick={(pick) => {
-                            setText(pick.text);
-                            setTags((prev) => {
-                              const removed = new Set(autoAddedTagIds);
-                              const seen = new Set<string>();
-                              const next: string[] = [];
-                              for (const id of prev) {
-                                if (removed.has(id)) continue;
-                                if (seen.has(id)) continue;
-                                seen.add(id);
-                                next.push(id);
-                              }
-                              for (const id of pick.tagIds) {
-                                if (seen.has(id)) continue;
-                                seen.add(id);
-                                next.push(id);
-                              }
-                              return next;
-                            });
-                            setAutoAddedTagIds(pick.tagIds);
-                            if (pick.startTime !== undefined) {
-                              setStartTime(pick.startTime);
-                              setEndTime(pick.endTime ?? '');
-                              setNotifyEnabled(!!pick.reminder);
-                              if (pick.reminder) setReminder(pick.reminder);
-                            }
-                            if (pick.backlogTaskId) {
-                              setPickedBacklogTaskId(pick.backlogTaskId);
-                              setPickedBacklogText(pick.text);
-                              setPickedNotes(pick.notes);
-                              setPickedChecklist(pick.checklist);
-                            } else {
-                              setPickedBacklogTaskId(null);
-                              setPickedBacklogText(null);
-                              setPickedNotes(undefined);
-                              setPickedChecklist(undefined);
-                            }
-                            inputRef.current?.focus();
-                          }}
-                        />
-                      </motion.div>
-                    )}
                   </div>
                   </div>
                 </div>

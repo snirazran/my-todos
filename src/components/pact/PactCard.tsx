@@ -8,6 +8,7 @@ import {
   HelpCircle,
   Loader2,
   Play,
+  X,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -489,6 +490,81 @@ export function PactCard({
               </p>
             </div>
           ) : null
+        ) : !active && variant === 'home' ? (
+          <div className="flex w-full items-center gap-3 rounded-[20px] border border-border/50 bg-card p-2.5 pr-3 text-left shadow-sm">
+            <button
+              type="button"
+              onClick={openPicker}
+              aria-label={`Take your Leap: ${teaser?.name ?? 'an area'}`}
+              className="relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl transition active:scale-95"
+            >
+              {teaser?.coverImageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={teaser.coverImageUrl}
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                  className="h-full w-full object-cover object-[center_35%]"
+                />
+              ) : (
+                <div
+                  className="h-full w-full"
+                  style={{
+                    background: `linear-gradient(135deg, ${teaser?.backgroundFrom ?? '#134e4a'}, ${teaser?.backgroundTo ?? '#0f172a'})`,
+                  }}
+                />
+              )}
+            </button>
+            <div className="flex min-w-0 flex-1 flex-col gap-1">
+              <div className="flex min-w-0 items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={openPicker}
+                  className="min-w-0 truncate text-left text-[15px] font-black leading-tight tracking-tight text-foreground"
+                >
+                  Take your Leap
+                </button>
+                <button
+                  type="button"
+                  aria-label="What is a Leap?"
+                  onClick={() => {
+                    setIntroOnly(true);
+                    setPickOpen(true);
+                  }}
+                  className="grid h-5 w-5 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors [@media(hover:hover)]:hover:text-foreground"
+                >
+                  <HelpCircle className="h-4 w-4" strokeWidth={2.5} />
+                </button>
+              </div>
+              <span className="truncate text-[12px] font-bold text-muted-foreground">
+                Suggested: {teaser?.name ?? 'an area'}
+                {data.streak.weeks > 0
+                  ? ` · ${data.streak.weeks}w streak`
+                  : ''}
+              </span>
+            </div>
+            <div className="flex shrink-0 items-center gap-1">
+              <button
+                type="button"
+                onClick={deferWeek}
+                aria-label="Not this week"
+                title="Not this week"
+                className="grid h-9 w-9 place-items-center rounded-full text-muted-foreground/70 transition-colors [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground"
+              >
+                <X className="h-4 w-4" strokeWidth={2.75} />
+              </button>
+              <button
+                type="button"
+                data-hint="pact-pick-area"
+                onClick={openPicker}
+                className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-amber-500 px-3.5 text-[13px] font-black text-white shadow-[0_3px_0_0_#b45309] transition active:translate-y-[2px] active:shadow-none"
+              >
+                <Play className="h-3.5 w-3.5 fill-current" />
+                Start
+              </button>
+            </div>
+          </div>
         ) : !active ? (
           <div className="relative w-full overflow-hidden rounded-[24px] border border-border/50 bg-card text-left shadow-sm">
           {/* Outside the banner's own button, not inside it: a button nested

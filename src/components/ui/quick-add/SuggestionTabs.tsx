@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import useSWR from 'swr';
-import { Pen, ListChecks } from 'lucide-react';
+import { Check, Pen, ListChecks } from 'lucide-react';
 import { TimeTag } from '@/components/ui/TimeTag';
 import { Icon as AppIcon } from '@/components/ui/Icon';
 import type {
@@ -51,9 +51,22 @@ type Props = {
   onPick: (pick: SuggestionPick) => void;
   /** Notifies the parent whether there is any saved task to display. */
   onContentChange?: (hasContent: boolean) => void;
+  variant?: 'list' | 'chips';
+  query?: string;
+  selectedId?: string | null;
+  onUnpick?: () => void;
 };
 
-export function SuggestionTabs({ open, className, onPick, onContentChange }: Props) {
+export function SuggestionTabs({
+  open,
+  className,
+  onPick,
+  onContentChange,
+  variant = 'list',
+  query = '',
+  selectedId = null,
+  onUnpick,
+}: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showBottomFade, setShowBottomFade] = useState(false);
 
@@ -88,6 +101,74 @@ export function SuggestionTabs({ open, className, onPick, onContentChange }: Pro
 
   // Only render when there are actually saved tasks.
   if (backlog.length === 0) return null;
+
+  const pickOf = (t: BacklogTask): SuggestionPick => ({
+    text: t.text,
+    tagIds: t.tags ?? [],
+    sourceTab: SAVED_TAB,
+    startTime: t.startTime,
+    endTime: t.endTime,
+    reminder: t.reminder,
+    backlogTaskId: t.id,
+    notes: t.notes,
+    checklist: t.checklist,
+  });
+
+  if (variant === 'chips') {
+    const q = query.trim().toLowerCase();
+    const selected = backlog.find((t) => t.id === selectedId);
+    const searching =
+      q.length >= 2 && !(selected && selected.text.trim().toLowerCase() === q);
+    const shown = searching
+      ? backlog.filter(
+          (t) => t.id === selectedId || t.text.toLowerCase().includes(q),
+        )
+      : backlog;
+    if (shown.length === 0) return null;
+    return (
+      <div className={cn('mt-3 border-t border-border/60 pt-2.5', className)}>
+        <div className="flex items-center gap-1.5 px-0.5 pb-2 text-[12px] font-black text-muted-foreground">
+          <AppIcon name="saved" className="h-3.5 w-3.5" />
+          <span>{searching ? 'Already saved?' : 'From Saved'}</span>
+          <span className="tabular-nums opacity-70">{shown.length}</span>
+        </div>
+        <div className="-mx-1 flex touch-pan-x gap-1.5 overflow-x-auto px-1 pb-0.5 no-scrollbar">
+          {shown.map((t) => {
+            const isSelected = t.id === selectedId;
+            const firstTag = t.tags?.length ? getTagDetails(t.tags[0]) : undefined;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() =>
+                  isSelected && onUnpick ? onUnpick() : onPick(pickOf(t))
+                }
+                aria-pressed={isSelected}
+                title={t.text}
+                className={cn(
+                  'inline-flex h-9 max-w-[220px] shrink-0 items-center gap-1.5 rounded-xl border px-3 text-[13px] font-bold transition-[background-color,border-color,color,transform] active:scale-95',
+                  isSelected
+                    ? 'border-primary/50 bg-primary/10 text-primary'
+                    : 'border-border/70 bg-muted/60 text-foreground [@media(hover:hover)]:hover:border-primary/40',
+                )}
+              >
+                {isSelected ? (
+                  <Check className="h-3.5 w-3.5 shrink-0" strokeWidth={3} />
+                ) : firstTag ? (
+                  <span
+                    aria-hidden
+                    className="h-2 w-2 shrink-0 rounded-full"
+                    style={{ backgroundColor: firstTag.color }}
+                  />
+                ) : null}
+                <span className="truncate">{t.text}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

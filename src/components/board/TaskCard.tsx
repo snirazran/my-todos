@@ -196,7 +196,9 @@ export default function TaskCard({
         return;
       }
 
-      if (dx > MOVE_TOLERANCE || dy > MOVE_TOLERANCE) {
+      const panningBoard =
+        pointerTypeRef.current !== 'mouse' && dx > 3 && dx >= dy;
+      if (panningBoard || dx > MOVE_TOLERANCE || dy > MOVE_TOLERANCE) {
         movedOutRef.current = true;
         // Cancel pending long-press; without drag, this becomes a no-op tap-cancel.
         if (longPressTimer.current) {

@@ -823,13 +823,12 @@ export default function HomeDashboard() {
                         name="planner"
                         className="w-7 h-7 shrink-0 md:w-8 md:h-8"
                       />
-                      <span className="text-sm font-black tracking-tight lowercase text-foreground md:text-base">
+                      <span className="text-sm font-black tracking-tight text-foreground md:text-base">
                         {dayCleared
-                          ? 'all done for today!'
-                          : `${openTaskCount} ${
-                              openTaskCount === 1 ? 'fly' : 'flies'
-                            } left for today!`}
+                          ? 'All done for today!'
+                          : `${openTaskCount} to do today`}
                       </span>
+
                       {filtersActive && (
                         <FilterStatusLine
                           tasks={data}

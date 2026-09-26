@@ -1,10 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef } from "react";
-import { hapticTick } from "@/lib/haptics";
 
 const COL_SELECTOR = '[data-col="true"]';
-const TOUCH_SLOP = 10;
+const TOUCH_SLOP = 6;
 const MOUSE_SLOP = 4;
 const FLICK_VELOCITY = 0.3;
 const COMMIT_FRACTION = 0.22;
@@ -287,13 +286,6 @@ export function useBoardPager({
           const settledCol = findCol();
           const settledIndex = columns().indexOf(settledCol);
           if (settledIndex >= 0) {
-            if (
-              m === "paged" &&
-              lastSettledRef.current !== null &&
-              lastSettledRef.current !== settledIndex
-            ) {
-              hapticTick();
-            }
             lastSettledRef.current = settledIndex;
             onSettledRef.current?.(settledIndex);
           }
