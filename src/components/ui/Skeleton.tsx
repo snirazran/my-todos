@@ -291,7 +291,7 @@ export function WardrobeGridSkeleton({
             showAction ? 'pb-0 md:pb-0.5' : 'pb-1.5 md:pb-2',
           )}
         >
-          <Skeleton className="aspect-[1/1.1] rounded-lg" />
+          <Skeleton className="aspect-square rounded-lg" />
           {showAction && (
             <Skeleton className="mx-auto my-1 h-5 w-1/2 rounded-lg" />
           )}
@@ -316,10 +316,19 @@ export function WardrobePageSkeleton() {
             <Skeleton className="h-10 flex-1 rounded-2xl" />
             <Skeleton className="h-10 flex-1 rounded-2xl" />
           </div>
-          <div className="flex gap-2 overflow-hidden">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <Skeleton key={i} className="h-9 w-16 shrink-0 rounded-full" />
-            ))}
+          <div className="flex items-center gap-2 overflow-hidden">
+            <div className="flex min-w-0 flex-1 gap-2 overflow-hidden">
+              {['w-16', 'w-20', 'w-[4.5rem]', 'w-[4.5rem]', 'w-20'].map(
+                (w, i) => (
+                  <Skeleton
+                    key={i}
+                    className={cn('h-10 shrink-0 rounded-full', w)}
+                  />
+                ),
+              )}
+            </div>
+            <Skeleton className="h-10 w-10 shrink-0 rounded-full md:w-24" />
+            <Skeleton className="h-10 w-10 shrink-0 rounded-full md:w-24" />
           </div>
           <WardrobeGridSkeleton />
         </div>
@@ -330,13 +339,15 @@ export function WardrobePageSkeleton() {
 
 export function FriendsLeaderboardSkeleton({ rows = 4 }: { rows?: number }) {
   return (
-    <ul className="flex flex-col gap-2">
+    <ul className="flex flex-col gap-2 lg:grid lg:grid-cols-2">
       {Array.from({ length: rows }).map((_, i) => (
         <li
           key={i}
-          className="flex items-center gap-2 rounded-2xl border border-border/60 bg-card py-1.5 pl-1.5 pr-2 sm:gap-2.5"
+          className="flex min-h-[88px] items-center gap-2 rounded-2xl border border-border/50 bg-card py-1.5 pl-1.5 pr-2.5 shadow-sm min-[360px]:gap-3"
         >
-          <div className="aspect-[6/5] w-[30%] min-w-[78px] max-w-[124px] shrink-0" />
+          <div className="flex aspect-[6/5] w-[76px] shrink-0 items-end justify-center sm:w-[88px]">
+            <Skeleton className="h-[70%] w-[80%] rounded-t-[40px] rounded-b-xl" />
+          </div>
           <div className="flex min-w-0 flex-1 flex-col gap-2">
             <Skeleton
               className={cn(
@@ -345,10 +356,9 @@ export function FriendsLeaderboardSkeleton({ rows = 4 }: { rows?: number }) {
               )}
             />
             <Skeleton className="h-3 w-1/3 rounded-full" />
-            <Skeleton className="h-3.5 w-14 rounded-full" />
           </div>
-          <Skeleton className="h-6 w-10 shrink-0 rounded-full" />
-          <Skeleton className="h-11 w-11 shrink-0 rounded-full" />
+          <Skeleton className="h-8 w-9 shrink-0 rounded-xl" />
+          {i > 0 && <Skeleton className="h-10 w-[84px] shrink-0 rounded-full" />}
         </li>
       ))}
     </ul>
@@ -361,21 +371,14 @@ export function FriendsPageSkeleton() {
       label="Loading friends"
       className="relative min-h-[100dvh] overflow-x-hidden pb-24 md:pb-12"
     >
-      <div className="relative mx-auto flex w-full flex-col items-center px-4 pt-[calc(env(safe-area-inset-top)+0.5rem)] md:max-w-2xl md:pt-11">
+      <div className="relative mx-auto flex w-full flex-col items-center px-4 pt-[calc(env(safe-area-inset-top)+0.5rem)] md:max-w-2xl md:pt-11 lg:max-w-5xl">
         <div className="h-[270px]" />
         <Skeleton className="relative z-20 -mt-2 h-14 w-[min(22rem,88vw)] rounded-full" />
 
         <div className="relative z-10 -mx-4 mt-8 flex w-[calc(100%+2rem)] flex-col self-stretch rounded-t-[24px] bg-background px-4 pb-12 pt-6 md:mt-24 md:px-8">
-          <Skeleton className="mb-2.5 ml-1.5 h-3 w-14 rounded-full" />
-          <div className="mb-7 flex flex-col gap-3.5 pl-6">
-            {['w-3/5', 'w-2/5', 'w-1/2'].map((w) => (
-              <Skeleton key={w} className={cn('h-3.5 rounded-full', w)} />
-            ))}
-          </div>
-
-          <div className="mb-3 flex items-end justify-between gap-3 px-1.5">
-            <Skeleton className="h-5 w-28 rounded-full" />
-            <Skeleton className="h-9 w-36 rounded-full" />
+          <div className="mb-3 flex flex-col gap-2 px-1.5">
+            <Skeleton className="h-5 w-44 rounded-full" />
+            <Skeleton className="h-3 w-64 max-w-full rounded-full" />
           </div>
 
           <FriendsLeaderboardSkeleton />

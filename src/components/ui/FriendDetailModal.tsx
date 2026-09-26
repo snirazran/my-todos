@@ -12,6 +12,7 @@ import {
   Check,
   Loader2,
   Clock,
+  Flame,
 } from 'lucide-react';
 import useSWR from 'swr';
 import Frog, { type FrogHandle } from '@/components/ui/frog';
@@ -77,6 +78,12 @@ type BuddyInvite = {
 const inviteFetcher = (url: string) => fetch(url).then((r) => r.json());
 
 function BackgroundPicture({ images }: { images: BackgroundImages }) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [images.mobile]);
+  if (failed || !images.mobile)
+    return (
+      <div className="h-full w-full bg-gradient-to-b from-sky-200 via-emerald-100 to-emerald-200 dark:from-sky-950 dark:via-emerald-950 dark:to-emerald-900" />
+    );
   return (
     <picture className="block h-full w-full">
       {images.webLarge && (
@@ -90,6 +97,7 @@ function BackgroundPicture({ images }: { images: BackgroundImages }) {
       <img
         src={images.mobile}
         alt=""
+        onError={() => setFailed(true)}
         className="h-full w-full object-cover object-top"
       />
     </picture>
@@ -399,10 +407,23 @@ export function FriendDetailModal({
                   </div>
                 )}
 
-                {/* Flies shared stats */}
-                <div className="grid grid-cols-2 gap-2.5">
-                  <FlyStat label="Shared today" value={today} />
-                  <FlyStat label="Shared total" value={total} />
+                <div className="grid grid-cols-3 divide-x divide-border/50 rounded-2xl border border-border/50 bg-card py-3 shadow-sm">
+                  <ProfileStat
+                    label="Streak"
+                    value={entry.streak ?? 0}
+                    icon={<Flame className="h-5 w-5 fill-orange-400 text-orange-500" />}
+                  />
+                  <ProfileStat
+                    label="Caught today"
+                    value={entry.fliesToday}
+                    icon={<Fly size={24} y={-3} interactive={false} paused />}
+                  />
+                  <ProfileStat
+                    label="Sent to you"
+                    value={total}
+                    hint={today > 0 ? `+${today} today` : undefined}
+                    icon={<Fly size={24} y={-3} interactive={false} paused />}
+                  />
                 </div>
 
                 {/* Friend's equipped look */}
@@ -444,15 +465,8 @@ export function FriendDetailModal({
                           name={friendBackground.name}
                           rarity={friendBackground.rarity}
                           preview={
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={
-                                friendBackground.images.mobile ||
-                                friendBackground.images.web ||
-                                ''
-                              }
-                              alt={friendBackground.name}
-                              className="h-full w-full object-cover"
+                            <BackgroundPicture
+                              images={friendBackground.images}
                             />
                           }
                           onClick={() =>
@@ -537,23 +551,26 @@ export function FriendDetailModal({
                   </div>
                 )}
 
-                {/* Buddy-up card */}
-                <div className="rounded-[20px] border border-[#4f9149]/25 bg-[#4f9149]/8 p-4 text-center">
-                  <div className="mx-auto mb-2 flex h-11 w-11 items-center justify-center rounded-2xl bg-[#4f9149]/15 text-[#4f9149]">
-                    <Users className="h-6 w-6" />
+                <div className="rounded-[20px] border border-[#4f9149]/25 bg-[#4f9149]/[.06] p-3.5">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#4f9149]/15 text-[#4f9149]">
+                      <Users className="h-6 w-6" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[15px] font-black leading-tight tracking-tight text-foreground">
+                        Buddy up with {entry.name || entry.frogName}
+                      </p>
+                      <p className="mt-0.5 text-[13px] font-medium leading-snug text-muted-foreground">
+                        Share a task and keep each other going.
+                      </p>
+                    </div>
                   </div>
-                  <p className="text-base font-black tracking-tight text-foreground">
-                    Building habits is better together
-                  </p>
-                  <p className="mt-1 text-[13px] font-medium text-muted-foreground">
-                    Team up on a task and keep each other going.
-                  </p>
                   <button
                     type="button"
                     onClick={() => onBuddyUp(entry)}
-                    className="mt-3.5 h-12 w-full rounded-2xl bg-[#4f9149] text-base font-black tracking-tight text-white shadow-[0_4px_0_#34631f] transition-all hover:bg-[#457f40] active:translate-y-0.5 active:shadow-none"
+                    className="mt-3 h-12 w-full rounded-2xl bg-[#4f9149] text-base font-black tracking-tight text-white shadow-[0_4px_0_#34631f] transition-all hover:bg-[#457f40] active:translate-y-0.5 active:shadow-none"
                   >
-                    Buddy up
+                    Start a buddy task
                   </button>
                 </div>
               </div>
@@ -595,15 +612,20 @@ function LookChip({
       onClick={onClick}
       aria-label={`View ${name}`}
       className={cn(
-        'relative flex w-[168px] shrink-0 flex-col items-stretch overflow-hidden rounded-2xl border-[3px] p-2.5 text-left shadow-sm transition-transform active:scale-[0.97]',
+        'relative flex w-[112px] shrink-0 flex-col items-stretch overflow-hidden rounded-2xl border-2 p-1.5 text-left shadow-sm transition-transform active:scale-[0.97]',
         config.border,
         config.bg,
       )}
     >
-      <RarityCornerBadge rarity={rarity} />
-      <div className="mt-4 flex aspect-[1/0.75] w-full items-end justify-center overflow-hidden rounded-xl bg-muted/40">
+      <div className="flex aspect-square w-full items-end justify-center overflow-hidden rounded-xl bg-muted/40">
         {preview}
       </div>
+      <p className="mt-1.5 truncate px-0.5 text-[12px] font-black leading-tight text-foreground">
+        {name}
+      </p>
+      <p className={cn('px-0.5 text-[10px] font-black', config.text)}>
+        {config.label}
+      </p>
     </button>
   );
 }
@@ -787,18 +809,33 @@ function ItemPeekSheet({
   );
 }
 
-function FlyStat({ label, value }: { label: string; value: number }) {
+function ProfileStat({
+  label,
+  value,
+  icon,
+  hint,
+}: {
+  label: string;
+  value: number;
+  icon: React.ReactNode;
+  hint?: string;
+}) {
   return (
-    <div className="flex flex-col items-center gap-1 rounded-[18px] border border-border/50 bg-card/60 px-3 py-3.5">
-      <div className="flex items-center gap-1.5">
-        <Fly size={26} y={-4} interactive={false} />
-        <span className="text-2xl font-black tabular-nums leading-none text-emerald-600">
-          {value}
+    <div className="flex flex-col items-center gap-1 px-2">
+      <div className="flex items-center gap-1">
+        {icon}
+        <span className="text-xl font-black tabular-nums leading-none text-foreground">
+          {value.toLocaleString()}
         </span>
       </div>
-      <span className="text-[13px] font-bold text-muted-foreground">
+      <span className="text-center text-[11px] font-bold leading-tight text-muted-foreground">
         {label}
       </span>
+      {hint && (
+        <span className="text-[10px] font-black text-emerald-600 dark:text-emerald-400">
+          {hint}
+        </span>
+      )}
     </div>
   );
 }

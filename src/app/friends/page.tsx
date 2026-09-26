@@ -276,8 +276,12 @@ export default function FriendsPage() {
             <>
               <div className="w-full">
                 <div className="mb-3 px-1.5">
-                  <h2 className="text-lg font-black tracking-tight text-foreground">
+                  <h2 className="flex items-baseline gap-2 text-lg font-black tracking-tight text-foreground">
                     Your pond
+                    <span className="text-[13px] font-bold text-muted-foreground">
+                      {friends.length}{' '}
+                      {friends.length === 1 ? 'friend' : 'friends'} · today
+                    </span>
                   </h2>
                   <CheerEarnHint />
                 </div>
@@ -312,7 +316,7 @@ export default function FriendsPage() {
                 )}
               </div>
 
-              <div className="mt-9">{growCard()}</div>
+              <div className="mt-6">{growCard()}</div>
             </>
           )}
         </div>

@@ -7,7 +7,7 @@ import { mutate } from 'swr';
 import { Capacitor } from '@capacitor/core';
 import { Icon } from '@/components/ui/Icon';
 import { AppImage } from '@/components/ui/AppImage';
-import { Check, Heart, Sparkle, X } from 'lucide-react';
+import { Bell, Check, Crown, Heart, Sparkle, X } from 'lucide-react';
 import { SAVED_LOOKS_FREE, SAVED_LOOKS_PLUS } from '@/lib/skins/looks';
 import { FREE_TAG_LIMIT, PREMIUM_TAG_LIMIT } from '@/lib/tags/limits';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
@@ -36,14 +36,14 @@ const PLAN_DETAILS: Record<
   { title: string; subtitle: string; trialDays: number; badge?: string }
 > = {
   yearly: {
-    title: '12 Months',
-    subtitle: 'Try 7 days free',
+    title: 'Yearly',
+    subtitle: '7 days free, then billed once a year',
     trialDays: 7,
-    badge: 'Best deal',
+    badge: 'Best value',
   },
   monthly: {
     title: 'Monthly',
-    subtitle: 'Try 3 days free',
+    subtitle: '3 days free, then billed monthly',
     trialDays: 3,
   },
 };
@@ -228,6 +228,7 @@ export function PlusUpgradeModal({
             className="pointer-events-none fixed inset-0 z-[10009] flex will-change-transform md:items-center md:justify-center md:p-6"
           >
             <div className="plus-sheet pointer-events-auto relative mx-auto flex h-full w-full flex-col overflow-hidden text-white md:h-[min(640px,calc(100dvh-3rem))] md:w-[min(100vw-3rem,58rem)] md:flex-row md:rounded-[32px] md:shadow-2xl">
+              <div aria-hidden className="plus-glow pointer-events-none absolute inset-0" />
               <CoverRail />
 
               <div className="no-scrollbar relative flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden">
@@ -240,6 +241,7 @@ export function PlusUpgradeModal({
                   <X className="h-5 w-5" />
                 </button>
 
+                <StepDots step={step} />
                 <AnimatePresence mode="wait">
                   {step === 0 && (
                     <StepShell key="step-0">
@@ -491,9 +493,9 @@ function CoverRail() {
           Frogress Plus
         </p>
         <p className="mt-1.5 text-lg font-black leading-tight tracking-tight text-white">
-          The whole pond,
+          Same habits.
           <br />
-          twice as rewarding.
+          Twice the rewards.
         </p>
       </div>
     </aside>
@@ -578,7 +580,7 @@ function PrimaryButton({
       disabled={disabled}
       whileTap={{ scale: 0.97 }}
       transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-      className="group relative isolate h-14 w-full overflow-hidden rounded-2xl text-base font-black tracking-tight text-emerald-900 ring-2 ring-amber-200/80 transition-transform disabled:opacity-60"
+      className="group relative isolate h-14 w-full overflow-hidden rounded-2xl text-[17px] font-black tracking-tight text-[color:var(--plus-gold-ink)] shadow-[0_10px_30px_-10px_rgba(251,191,36,0.7)] ring-1 ring-amber-100/70 transition-transform disabled:opacity-60"
     >
       <span
         aria-hidden
@@ -634,48 +636,58 @@ function Step0({
       </div>
       <div className="flex flex-1 flex-col px-6 pb-6 md:justify-center md:px-9 md:pb-9 md:pt-14">
         <Reveal delay={0.05}>
-          <h2 className="mt-2 text-center text-xl font-black tracking-tight md:mt-0 md:text-left md:text-[1.7rem] md:leading-[1.15]">
-            Become the person who
+          <h2 className="mt-2 text-center text-[1.6rem] font-black leading-[1.1] tracking-tight md:mt-0 md:text-left md:text-[2rem]">
+            Same habits.
             <br />
-            <span className="text-amber-300">follows through</span>
+            <span className="text-amber-300">Twice the rewards.</span>
           </h2>
+        </Reveal>
+        <Reveal delay={0.08}>
+          <p className="mt-2 text-center text-sm font-medium leading-snug text-white/85 md:text-left md:text-[15px]">
+            Plus doubles what your frog earns, so every outfit you want
+            arrives in half the time.
+          </p>
         </Reveal>
         <div className="mt-5 space-y-3 rounded-2xl bg-[color:var(--plus-surface)] p-4 ring-1 ring-inset ring-[color:var(--plus-line)] md:mt-6">
           <Reveal delay={0.12}>
             <FeatureRow
               icon={<Icon name="x2" className="h-10 w-10" />}
-              title="Earn outfits twice as fast"
-              subtitle="Double flies on daily quests, leaps and commitments — and every gift opens twice."
+              title="Double flies, double gifts"
+              subtitle="Daily quests, Leaps and commitments pay ×2, and every gift box drops two rewards."
             />
           </Reveal>
           <Reveal delay={0.18}>
             <FeatureRow
               icon={<Icon name="lilyPad" className="h-10 w-10" />}
-              title="Keep your streak through a bad week"
-              subtitle="Three Lily Pads instead of two, one free every month, and two session moves a week instead of one."
+              title="A safety net for rough weeks"
+              subtitle="Hold 3 Lily Pads instead of 2, get one free every month, and move 2 sessions a week."
             />
           </Reveal>
           <Reveal delay={0.24}>
             <FeatureRow
               icon={<Icon name="discount" className="h-10 w-10" />}
-              title="Shop on your terms"
-              subtitle="Reroll today's deals with no ad, and keep ten wishlist slots instead of four."
+              title="Shop without the wait"
+              subtitle="Reroll daily deals with no ads and wishlist up to 10 outfits instead of 4."
             />
           </Reveal>
         </div>
 
         <Reveal delay={0.38} className="mt-auto space-y-2 pt-6 md:mt-0 md:pt-7">
-          <PrimaryButton onClick={onContinue}>Try for free</PrimaryButton>
+          <p className="flex items-center justify-center gap-1.5 text-center text-[13px] font-black text-amber-200">
+            <Check className="h-4 w-4" strokeWidth={3} />
+            7 days free · No charge today · Cancel anytime
+          </p>
+          <PrimaryButton onClick={onContinue}>Try Plus for free</PrimaryButton>
           <p className="flex items-center justify-center gap-1.5 text-center text-xs font-semibold text-white/75">
             <Heart className="h-3.5 w-3.5 text-rose-300" fill="currentColor" />
-            Frogress is built by a tiny team — Plus keeps us going
+            Made by a tiny indie team. Plus keeps the pond alive.
           </p>
           <button
             type="button"
             onClick={onMaybeLater}
-            className="h-10 w-full text-center text-sm font-bold text-white/80 transition-colors hover:text-white"
+            className="h-10 w-full text-center text-sm font-bold text-white/70 transition-colors hover:text-white"
           >
-            Maybe later
+            Not now
           </button>
         </Reveal>
       </div>
@@ -694,8 +706,12 @@ function FeatureRow({
 }) {
   return (
     <div className="flex items-start gap-3">
-      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[color:var(--plus-surface-strong)] ring-1 ring-inset ring-[color:var(--plus-line)]">
-        {icon}
+      <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-[linear-gradient(150deg,#fffbeb_0%,#fef3c7_55%,#fde68a_100%)] shadow-[0_6px_16px_-6px_rgba(20,10,80,0.55),inset_0_-3px_0_rgba(217,119,6,0.18)] ring-1 ring-inset ring-white/70">
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-x-1 top-1 h-1/3 rounded-t-xl bg-white/60"
+        />
+        <span className="relative">{icon}</span>
       </div>
       <div className="min-w-0 flex-1">
         <p className="text-sm font-black leading-tight">{title}</p>
@@ -739,15 +755,18 @@ const COMPARISON_ROWS: {
 
 /** The Plus-only extras, as one line rather than five more rows. */
 const PLUS_ONLY =
-  'Plus also adds a free Lily Pad every month, the golden fly companion, free trade rerolls, a mid-week area change, and daily-deal rerolls with no ad.';
+  'Also included: a free Lily Pad every month, a golden fly companion for your frog, free trade rerolls, a mid-week area change, and ad-free deal rerolls.';
 
 function Step1({ onContinue }: { onContinue: () => void }) {
   return (
     <div className="flex min-h-full flex-col px-6 pb-6 pt-[calc(4rem+env(safe-area-inset-top))] md:px-9 md:pb-8 md:pt-12">
       <Reveal>
         <h2 className="text-center text-2xl font-black tracking-tight">
-          Everything you unlock with Plus
+          Free vs <span className="text-amber-300">Plus</span>
         </h2>
+        <p className="mt-1.5 text-center text-sm font-medium text-white/80">
+          Everything Plus adds, side by side.
+        </p>
       </Reveal>
 
       <Reveal delay={0.1} className="relative mt-8">
@@ -880,7 +899,7 @@ function Step1({ onContinue }: { onContinue: () => void }) {
         delay={0.3}
         className="sticky bottom-0 z-10 -mx-6 -mb-6 mt-auto bg-[linear-gradient(0deg,var(--plus-field-deep)_0%,var(--plus-field-deep)_72%,transparent_100%)] px-6 pb-[max(1rem,env(safe-area-inset-bottom))] pt-10 md:-mx-9 md:-mb-8 md:px-9 md:pb-8"
       >
-        <PrimaryButton onClick={onContinue}>Try 7 days free!</PrimaryButton>
+        <PrimaryButton onClick={onContinue}>Continue — 7 days free</PrimaryButton>
       </Reveal>
     </div>
   );
@@ -909,31 +928,30 @@ function Step2({
     <div className="flex min-h-full flex-col px-6 pb-6 pt-[calc(4rem+env(safe-area-inset-top))] md:px-9 md:pb-8 md:pt-12">
       <Reveal>
         <h2 className="text-center text-2xl font-black tracking-tight">
-          We&apos;ll remind you <span className="text-amber-300">2 days</span>{' '}
-          before your trial ends
+          How your <span className="text-amber-300">free trial</span> works
         </h2>
       </Reveal>
       <Reveal delay={0.08}>
-        <p className="mt-3 text-center text-sm font-medium text-white/90">
-          You&apos;ll get a push notification on {reminderDate}.
+        <p className="mt-2 text-center text-sm font-medium text-white/85">
+          No surprises. We&apos;ll ping you 2 days before it ends.
         </p>
       </Reveal>
 
       <Reveal
         delay={0.16}
-        className="mt-12 flex justify-center"
+        className="mt-6 flex justify-center"
         onAnimationComplete={() => setEntered(true)}
       >
         <motion.div
-          className="relative h-[240px] w-[240px] will-change-transform"
+          className="relative h-[170px] w-[170px] will-change-transform"
           animate={reduceMotion ? undefined : { y: [0, -8, 0] }}
           transition={{ duration: 3.4, repeat: Infinity, ease: 'easeInOut' }}
         >
           {entered && (
             <>
               <Frog
-                width={240}
-                height={240}
+                width={170}
+                height={170}
                 indices={step2Indices}
                 emote="love"
               />
@@ -943,8 +961,12 @@ function Step2({
         </motion.div>
       </Reveal>
 
-      <Reveal delay={0.24} className="mt-auto pt-8">
-        <PrimaryButton onClick={onContinue}>Try it for free</PrimaryButton>
+      <Reveal delay={0.22}>
+        <TrialTimeline reminderDate={reminderDate} />
+      </Reveal>
+
+      <Reveal delay={0.3} className="mt-auto pt-8">
+        <PrimaryButton onClick={onContinue}>Continue</PrimaryButton>
       </Reveal>
     </div>
   );
@@ -991,8 +1013,11 @@ function Step3({
     <div className="flex min-h-full flex-col px-6 pb-6 pt-[calc(4rem+env(safe-area-inset-top))] md:px-9 md:pb-8 md:pt-12">
       <Reveal>
         <h2 className="text-2xl font-black tracking-tight">
-          Choose a plan for after your free trial
+          Pick your plan
         </h2>
+        <p className="mt-1.5 text-sm font-medium text-white/80">
+          Nothing is charged until your free trial ends.
+        </p>
       </Reveal>
 
       <div className="mt-6 space-y-3">
@@ -1084,7 +1109,7 @@ function Step3({
           </a>
         </p>
         <PrimaryButton onClick={onStart} disabled={busy}>
-          {busy ? 'Processing…' : `Start my ${trialDays}-day free trial`}
+          {busy ? 'Processing…' : `Try free for ${trialDays} days`}
         </PrimaryButton>
         {isNative && (
           <button
@@ -1098,6 +1123,86 @@ function Step3({
         )}
       </Reveal>
     </div>
+  );
+}
+
+function StepDots({ step }: { step: Step }) {
+  return (
+    <div className="pointer-events-none absolute left-1/2 top-[calc(1.75rem+env(safe-area-inset-top))] z-20 flex -translate-x-1/2 gap-1.5 md:top-7">
+      {[0, 1, 2, 3].map((i) => (
+        <span
+          key={i}
+          className={`h-1.5 rounded-full transition-all duration-300 ${
+            i === step
+              ? 'w-5 bg-[color:var(--plus-gold)]'
+              : i < step
+                ? 'w-1.5 bg-white/70'
+                : 'w-1.5 bg-white/25'
+          }`}
+        />
+      ))}
+    </div>
+  );
+}
+
+function TrialTimeline({ reminderDate }: { reminderDate: string }) {
+  const endDate = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 7);
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  })();
+  const rows = [
+    {
+      icon: <Sparkle className="h-4 w-4" fill="currentColor" />,
+      title: 'Today',
+      body: 'Double flies, extra Lily Pads and your golden fly unlock. $0 due.',
+      active: true,
+    },
+    {
+      icon: <Bell className="h-4 w-4" strokeWidth={2.75} />,
+      title: `${reminderDate} · Reminder`,
+      body: 'A heads-up that your trial ends in 2 days.',
+      active: false,
+    },
+    {
+      icon: <Crown className="h-4 w-4" strokeWidth={2.75} />,
+      title: `${endDate} · Trial ends`,
+      body: 'Your plan begins. Cancel before this and you pay nothing.',
+      active: false,
+    },
+  ];
+  return (
+    <ol className="relative mx-auto mt-6 w-full max-w-sm">
+      {rows.map((row, i) => (
+        <li key={row.title} className="relative flex gap-3.5 pb-5 last:pb-0">
+          {i < rows.length - 1 && (
+            <span
+              aria-hidden
+              className={`absolute bottom-1 left-[17px] top-11 w-0.5 rounded-full ${
+                row.active
+                  ? 'bg-[linear-gradient(180deg,var(--plus-gold),rgba(255,255,255,0.3))]'
+                  : 'bg-white/25'
+              }`}
+            />
+          )}
+          <span
+            className={`relative z-10 flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
+              row.active
+                ? 'bg-[color:var(--plus-gold)] text-[color:var(--plus-gold-ink)] shadow-[0_0_0_4px_rgba(251,191,36,0.25)]'
+                : 'bg-[color:var(--plus-surface-strong)] text-white ring-1 ring-inset ring-[color:var(--plus-line)]'
+            }`}
+          >
+            {row.icon}
+          </span>
+          <div className="min-w-0 pt-0.5">
+            <p className="text-sm font-black leading-tight">{row.title}</p>
+            <p className="mt-0.5 text-[13px] font-medium leading-snug text-white/80">
+              {row.body}
+            </p>
+          </div>
+        </li>
+      ))}
+    </ol>
   );
 }
 

@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Fly from '@/components/ui/fly';
 import {
@@ -49,16 +50,16 @@ export function CheerButton({
       <button
         type="button"
         aria-label={sent ? 'Change your cheer' : 'Cheer this friend'}
+        aria-expanded={picking}
         onClick={(e) => {
           e.stopPropagation();
-          if (sent) setPicking((v) => !v);
-          else void send(DEFAULT_KIND);
+          setPicking((v) => !v);
         }}
         className={cn(
-          'flex h-11 w-11 touch-manipulation items-center justify-center rounded-full text-xl transition-[transform,background-color] active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f9149] focus-visible:ring-offset-2',
+          'relative flex h-10 touch-manipulation items-center justify-center gap-1 rounded-full transition-[transform,background-color,border-color] active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f9149] focus-visible:ring-offset-2',
           sent
-            ? 'bg-[#4f9149]/12'
-            : 'bg-muted/70 grayscale-[0.9] opacity-60 hover:opacity-100 hover:grayscale-0',
+            ? 'w-10 bg-[#4f9149]/12 text-lg'
+            : 'border border-[#4f9149]/30 bg-[#4f9149]/[.06] pl-2.5 pr-3 text-[13px] font-black text-[#4f9149] hover:bg-[#4f9149]/12',
         )}
       >
         <motion.span
@@ -66,9 +67,16 @@ export function CheerButton({
           initial={sent ? { scale: 0.4 } : false}
           animate={{ scale: 1 }}
           transition={{ type: 'spring', stiffness: 520, damping: 14 }}
+          className={cn(!sent && 'text-base')}
         >
           {REACTION_EMOJI[sent ?? DEFAULT_KIND]}
         </motion.span>
+        {!sent && <span>Cheer</span>}
+        {sent && (
+          <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full border-2 border-card bg-[#4f9149] text-white">
+            <Check className="h-2.5 w-2.5" strokeWidth={4} />
+          </span>
+        )}
       </button>
 
       <AnimatePresence>
@@ -87,29 +95,47 @@ export function CheerButton({
       <AnimatePresence>
         {picking && (
           <motion.div
-            initial={{ opacity: 0, y: 6, scale: 0.9 }}
+            initial={{ opacity: 0, y: 8, scale: 0.85 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 6, scale: 0.9 }}
-            transition={{ duration: 0.14 }}
-            className="absolute bottom-full right-0 z-40 mb-1.5 flex gap-0.5 rounded-2xl border border-border bg-popover p-1 shadow-xl"
+            exit={{ opacity: 0, y: 8, scale: 0.85 }}
+            transition={{ type: 'spring', stiffness: 520, damping: 30 }}
+            style={{ transformOrigin: 'bottom right' }}
+            className="absolute bottom-full right-0 z-40 mb-2 rounded-2xl border border-border/60 bg-popover p-1.5 shadow-xl"
           >
-            {LOOK_REACTIONS.map((kind) => (
-              <button
-                key={kind}
-                type="button"
-                aria-label={`React ${kind}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  void send(kind);
-                }}
-                className={cn(
-                  'flex h-9 w-9 items-center justify-center rounded-xl text-lg transition-transform active:scale-90',
-                  sent === kind ? 'bg-[#4f9149]/15' : 'hover:bg-accent',
-                )}
-              >
-                {REACTION_EMOJI[kind]}
-              </button>
-            ))}
+            <p className="px-1.5 pb-1 text-[11px] font-black text-muted-foreground">
+              {sent ? 'Change your cheer' : 'Send a cheer'}
+            </p>
+            <div className="flex gap-1">
+              {LOOK_REACTIONS.map((kind, i) => (
+                <motion.button
+                  key={kind}
+                  type="button"
+                  aria-label={`Send ${kind}`}
+                  initial={{ scale: 0.4, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{
+                    type: 'spring',
+                    stiffness: 600,
+                    damping: 20,
+                    delay: i * 0.03,
+                  }}
+                  whileHover={{ scale: 1.15, y: -2 }}
+                  whileTap={{ scale: 0.85 }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void send(kind);
+                  }}
+                  className={cn(
+                    'flex h-11 w-11 items-center justify-center rounded-xl text-2xl',
+                    sent === kind
+                      ? 'bg-[#4f9149]/15 ring-1 ring-inset ring-[#4f9149]/40'
+                      : 'hover:bg-accent',
+                  )}
+                >
+                  {REACTION_EMOJI[kind]}
+                </motion.button>
+              ))}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

@@ -54,10 +54,12 @@ export function FriendRow({
   return (
     <li
       className={cn(
-        'relative flex items-center gap-1 rounded-2xl border bg-card pr-2 transition-[border-color,box-shadow]',
-        flex
-          ? cn('border-2', flex.border, 'shadow-md', flex.glow)
-          : 'border-border/60 hover:border-[#4f9149]/40',
+        'relative flex items-center gap-1 rounded-2xl border bg-card pr-2.5 shadow-sm transition-[border-color,box-shadow]',
+        entry.isYou
+          ? 'border-[#4f9149]/35 bg-[#4f9149]/[.04]'
+          : flex
+            ? cn('border-2', flex.border, flex.glow)
+            : 'border-border/50 hover:border-[#4f9149]/40',
       )}
     >
       {buddyInvites > 0 && (
@@ -72,9 +74,9 @@ export function FriendRow({
           hapticTick();
           onOpen();
         }}
-        className="flex min-w-0 flex-1 touch-manipulation items-center gap-1.5 rounded-2xl py-1.5 pl-1 text-left transition-transform active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary min-[360px]:gap-2.5 min-[360px]:pl-1.5"
+        className="flex min-h-[76px] min-w-0 flex-1 touch-manipulation items-center gap-2 rounded-2xl py-1.5 pl-1.5 text-left transition-transform active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary min-[360px]:gap-3"
       >
-        <div className="relative flex aspect-[6/5] w-[30%] min-w-[78px] max-w-[124px] shrink-0 items-end justify-center self-center overflow-hidden">
+        <div className="relative flex aspect-[6/5] w-[76px] shrink-0 items-end justify-center self-center overflow-hidden sm:w-[88px]">
           {animate ? (
             <Frog
               className="translate-y-[15%]"
@@ -95,18 +97,18 @@ export function FriendRow({
           {medal && (
             <span
               className={cn(
-                'absolute left-0.5 top-0.5 z-10 flex h-6 w-6 items-center justify-center rounded-full border-2 border-card text-[11px] font-black shadow-sm',
+                'absolute left-0 top-0 z-10 flex h-5 w-5 items-center justify-center rounded-full border-2 border-card text-[10px] font-black shadow-sm',
                 medal,
               )}
             >
               {rank}
             </span>
           )}
-          <PremiumFrogAura show={!!entry.premium} compact flySize={28} />
+          <PremiumFrogAura show={!!entry.premium} compact flySize={22} />
         </div>
 
         <div className="min-w-0 flex-1">
-          <p className="flex min-w-0 items-center gap-1 text-sm font-bold leading-tight tracking-tight text-foreground sm:text-[15px]">
+          <p className="flex min-w-0 items-center gap-1 text-[15px] font-black leading-tight tracking-tight text-foreground">
             <span
               className={cn('truncate', entry.premium && 'plus-name-shimmer')}
             >
@@ -121,7 +123,7 @@ export function FriendRow({
               <Icon
                 name="frogPlus"
                 label="Frogress Plus"
-                className="h-5 w-5 shrink-0 min-[360px]:h-6 min-[360px]:w-6"
+                className="h-5 w-5 shrink-0"
               />
             )}
           </p>
@@ -146,7 +148,7 @@ export function FriendRow({
             </p>
           )}
 
-          <div className="mt-1 flex flex-wrap items-center gap-1">
+          <div className="mt-1 flex flex-wrap items-center gap-1 empty:hidden">
             {entry.isYou && <LookLovedChip />}
             {(entry.streak ?? 0) > 0 && (
               <span className="flex items-center gap-0.5 rounded-full bg-orange-500/10 px-1.5 py-0.5 text-[10px] font-black tabular-nums text-orange-500">
@@ -154,7 +156,7 @@ export function FriendRow({
                 {entry.streak}
               </span>
             )}
-            {look && hasLook && (
+            {flex && look && hasLook && (
               <span
                 className={cn(
                   'max-w-full truncate whitespace-nowrap rounded-full px-1.5 py-0.5 text-[10px] font-black',
@@ -169,16 +171,22 @@ export function FriendRow({
         </div>
 
         <span
+          aria-label={`${entry.fliesToday} flies today`}
           className={cn(
-            'flex shrink-0 items-center gap-0.5 rounded-lg px-1.5 py-1',
-            entry.fliesToday > 0 ? 'text-foreground' : 'text-muted-foreground',
+            'flex shrink-0 flex-col items-center rounded-xl px-1.5 py-1',
+            entry.fliesToday > 0 ? 'text-foreground' : 'text-muted-foreground/60',
           )}
         >
-          <span className={cn(entry.fliesToday <= 0 && 'grayscale opacity-60')}>
-            <Fly size={20} y={-2} interactive={false} paused={paused} />
+          <span className="flex items-center gap-0.5">
+            <span className={cn(entry.fliesToday <= 0 && 'grayscale opacity-50')}>
+              <Fly size={18} y={-2} interactive={false} paused={paused} />
+            </span>
+            <span className="text-base font-black tabular-nums leading-none">
+              {entry.fliesToday}
+            </span>
           </span>
-          <span className="text-base font-black tabular-nums leading-none">
-            {entry.fliesToday}
+          <span className="mt-0.5 text-[9px] font-bold uppercase tracking-wide opacity-70">
+            today
           </span>
         </span>
       </button>

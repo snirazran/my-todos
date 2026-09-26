@@ -1136,14 +1136,27 @@ body.dragging {
 }
 
 .plus-sheet {
-  --plus-field: #6c6fce;
-  --plus-field-deep: #6c6fce;
-  --plus-field-rgb: 108, 111, 206;
-  --plus-surface: rgba(255, 255, 255, 0.1);
-  --plus-surface-strong: rgba(255, 255, 255, 0.16);
-  --plus-line: rgba(255, 255, 255, 0.2);
+  --plus-field: #4a3dbf;
+  --plus-field-deep: #3a2f9f;
+  --plus-field-rgb: 74, 61, 191;
+  --plus-surface: rgba(255, 255, 255, 0.08);
+  --plus-surface-strong: rgba(255, 255, 255, 0.14);
+  --plus-line: rgba(255, 255, 255, 0.16);
   --plus-gold: #fbbf24;
   --plus-gold-soft: #fde68a;
   --plus-gold-ink: #3b2708;
   background-color: var(--plus-field);
+}
+
+.plus-glow {
+  background-image: linear-gradient(180deg, transparent 50%, var(--plus-field-deep) 100%);
+}
+
+@media (min-width: 768px) {
+  .plus-glow {
+    left: 45%;
+    background-image:
+      radial-gradient(70% 55% at 100% 0%, rgba(167, 139, 250, 0.38), transparent 70%),
+      radial-gradient(60% 45% at 100% 100%, rgba(251, 191, 36, 0.14), transparent 75%);
+  }
 }

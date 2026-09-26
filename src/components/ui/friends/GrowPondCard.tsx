@@ -89,10 +89,10 @@ export function GrowPondCard({
     <section
       data-hint="invite-friend"
       className={cn(
-        'pond-panel relative -mx-4 overflow-hidden bg-[linear-gradient(160deg,var(--pond-surface-top),var(--pond-surface-bottom))] px-4 py-7 text-[color:var(--pond-ink)] ring-1 ring-inset ring-[color:var(--pond-line)] md:-mx-8 md:mt-2 md:rounded-[28px] md:px-8 md:shadow-[0_24px_50px_-30px_var(--pond-shadow)]',
+        'pond-panel relative overflow-hidden bg-[linear-gradient(160deg,var(--pond-surface-top),var(--pond-surface-bottom))] text-[color:var(--pond-ink)] ring-1 ring-inset ring-[color:var(--pond-line)] md:rounded-[28px] md:px-8 md:shadow-[0_24px_50px_-30px_var(--pond-shadow)]',
         flushTop
-          ? '-mt-6 rounded-t-[24px] pt-9 md:mt-2 md:rounded-[28px] md:pt-7'
-          : 'mt-2',
+          ? '-mx-4 -mt-6 rounded-t-[24px] px-4 pb-7 pt-9 md:mx-0 md:mt-2 md:rounded-[28px] md:py-7'
+          : 'mt-2 rounded-[24px] px-4 py-5 md:py-7',
       )}
     >
       <span
