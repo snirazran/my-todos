@@ -11,6 +11,7 @@ import {
   checkInStreak,
   localDayKey,
   openStreakSheet,
+  STREAK_EXTENDED_EVENT,
   subscribeStreakSheet,
   takePrewarmedCheckIn,
   type StreakSheetRequest,
@@ -33,10 +34,14 @@ import type { ShieldOffer } from '@/lib/shields/types';
 // One auto-offer per app session, on top of the server's day-scale cooldown.
 // The server can't see that the user already closed it 30 seconds ago.
 let shieldOfferedThisSession = false;
+let rescueShownId: string | null = null;
 
 // Keyed per user so a fresh account created in the same session (after another
-// account already checked in today) still gets its own check-in.
-let lastChecked: { dayKey: string; userId: string } | null = null;
+// account already checked in today) still gets its own check-in. Until a task
+// has counted today, a resume checks again: a widget tick made while the app
+// was in the background leaves a reveal waiting to be claimed.
+let lastChecked: { dayKey: string; userId: string; doneToday: boolean } | null =
+  null;
 
 const EXCLUDED_PREFIXES = [
   '/welcome',
@@ -75,30 +80,19 @@ function queueShieldOffer(offer: ShieldOffer) {
   return true;
 }
 
-const PLEDGE_INVITE_KEY = 'frog:pledgeInviteDay';
-const PLEDGE_INVITE_COOLDOWN_DAYS = 3;
+/** Lets the tongue catch and fly pop finish before the reveal takes over. */
+const AFTER_CATCH_DELAY_MS = 1400;
 
-/**
- * True at most once every few days. The pledge is worth asking for, and worth
- * not nagging about — an invite that reappears every morning is a demand.
- */
-function takePledgeInvite(): boolean {
-  try {
-    const today = localDayKey();
-    const last = localStorage.getItem(PLEDGE_INVITE_KEY);
-    if (last) {
-      const elapsed =
-        (Date.parse(`${today}T00:00:00`) - Date.parse(`${last}T00:00:00`)) /
-        86_400_000;
-      if (!Number.isFinite(elapsed) || elapsed < PLEDGE_INVITE_COOLDOWN_DAYS) {
-        return false;
-      }
-    }
-    localStorage.setItem(PLEDGE_INVITE_KEY, today);
-    return true;
-  } catch {
-    return false;
-  }
+function revealStreakDay(result: CheckInResult, initialDelayMs = 0) {
+  queueStreakSheet(
+    () => openStreakSheet({ celebration: result }),
+    undefined,
+    initialDelayMs,
+  );
+  emitCampaignTrigger('streak_milestone', {
+    streak: result.view?.count ?? 0,
+  });
+  return true;
 }
 
 export function StreakCheckInProvider() {
@@ -115,7 +109,11 @@ export function StreakCheckInProvider() {
 
     const run = async () => {
       const today = localDayKey();
-      if (lastChecked?.dayKey === today && lastChecked.userId === userId)
+      if (
+        lastChecked?.dayKey === today &&
+        lastChecked.userId === userId &&
+        lastChecked.doneToday
+      )
         return;
       // Claimed before the check-in leaves for the server, not after it comes
       // back: everything else that fires on a launch timer would otherwise win
@@ -126,14 +124,22 @@ export function StreakCheckInProvider() {
         // The prewarmed check-in is fired from onboarding the moment the account
         // is created, so it can lose a race with the session cookie and resolve
         // null. Consuming that null without retrying left a brand-new account
-        // never checked in: streak stuck at 0, and no pledge invite.
+        // never checked in.
         const prewarmed = await takePrewarmedCheckIn();
         const result = prewarmed ?? (await checkInStreak());
         if (!result) return;
-        lastChecked = { dayKey: today, userId };
+        lastChecked = {
+          dayKey: today,
+          userId,
+          doneToday: !!result.view?.checkedInToday,
+        };
         recordAppUsageDay();
         if (!result.active) return;
-        if (result.shieldConsumedDays.length > 0 && result.view) {
+        if (
+          !result.extended &&
+          result.shieldConsumedDays.length > 0 &&
+          result.view
+        ) {
           showNotification(
             <span>
               🪷 A Lily Pad caught your <b>{result.view.count}-day</b> streak!
@@ -145,26 +151,14 @@ export function StreakCheckInProvider() {
           !!offer &&
           offer.adEligible &&
           offer.adsWatched < Math.max(1, offer.adsRequired);
-        if (offer && canRescue) {
+        if (offer && canRescue && rescueShownId !== offer.id) {
+          rescueShownId = offer.id;
           queueStreakSheet(() => openStreakSheet({ rescue: offer }));
           queued = true;
         } else if (result.shieldOffer) {
           queued = queueShieldOffer(result.shieldOffer);
         } else if (result.extended) {
-          queueStreakSheet(() => openStreakSheet({ celebration: result }));
-          queued = true;
-        } else if (!result.view?.goal && takePledgeInvite()) {
-          // A pledge is only ever offered, never auto-enrolled — but the offer
-          // used to ride on `extended`, and a new account's first check-in is
-          // consumed by the onboarding prewarm. That left day one with no invite
-          // at all, which is the one day it matters most.
-          queueStreakSheet(() => openStreakSheet({ commit: true }));
-          queued = true;
-        }
-        if (result.extended) {
-          emitCampaignTrigger('streak_milestone', {
-            streak: result.view?.count ?? 0,
-          });
+          queued = revealStreakDay(result);
         }
       } finally {
         // Nothing to reveal — a check-in that failed, a day already counted —
@@ -176,6 +170,27 @@ export function StreakCheckInProvider() {
 
     void run();
 
+    let revealing = false;
+    const onExtended = async () => {
+      if (revealing) return;
+      revealing = true;
+      holdAutoPopups(LOGIN_STREAK_HOLD);
+      let queued = false;
+      try {
+        const result = await checkInStreak();
+        if (result?.view?.checkedInToday) {
+          lastChecked = { dayKey: localDayKey(), userId, doneToday: true };
+        }
+        if (result?.active && result.extended) {
+          queued = revealStreakDay(result, AFTER_CATCH_DELAY_MS);
+        }
+      } finally {
+        revealing = false;
+        if (!queued) releaseAutoPopups(LOGIN_STREAK_HOLD, 0);
+      }
+    };
+    window.addEventListener(STREAK_EXTENDED_EVENT, onExtended);
+
     let handle: PluginListenerHandle | undefined;
     if (Capacitor.isNativePlatform()) {
       void App.addListener('appStateChange', ({ isActive }) => {
@@ -186,6 +201,7 @@ export function StreakCheckInProvider() {
     }
 
     return () => {
+      window.removeEventListener(STREAK_EXTENDED_EVENT, onExtended);
       void handle?.remove();
     };
   }, [eligible, userId, showNotification]);

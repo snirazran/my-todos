@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  AnimatePresence,
   motion,
   useReducedMotion,
   animate,
@@ -21,7 +20,6 @@ import {
   segmentFill,
 } from '@/lib/hungerDisplay';
 import {
-  FLIES_PER_PENALTY,
   MAX_HUNGER_MS,
   TASK_HUNGER_REWARD_MS,
 } from '@/lib/hungerLogic';
@@ -159,7 +157,7 @@ const DEMO_BEATS = [
   // sitting at Full before the drain starts.
   { id: 'feed', holdMs: 4400 },
   { id: 'drain', holdMs: 3400 },
-  { id: 'steal', holdMs: 3000 },
+  { id: 'hungry', holdMs: 3000 },
 ] as const;
 
 /** The six belly pips, driven by a live value instead of the real belly. */
@@ -227,7 +225,7 @@ const BELLY_FLY_BUZZ = {
 /**
  * The belly rule acted out instead of listed, as one unbroken loop: the frog
  * tongues a fly in and the bar gains a pip, two days drain it, and an empty
- * belly spits that same fly back out to be caught again next time round.
+ * belly just waits, sad, for the next fly to buzz back in.
  *
  * The catch runs on the real `useFrogTongue` — same curve, gulp, haptics and
  * squash as the welcome page and the task list, and `trackMovingTarget` keeps
@@ -281,7 +279,6 @@ function BellyStage({
 
   const [flyOut, setFlyOut] = useState(true);
   const [emerging, setEmerging] = useState(false);
-  const [showCost, setShowCost] = useState(false);
 
   // `triggerTongue` re-identifies as soon as a grab starts (it closes over
   // `grab`), so keeping it in the effect deps restarted the beat mid-flight and
@@ -292,13 +289,11 @@ function BellyStage({
 
   useEffect(() => {
     if (!open) return;
-    setShowCost(false);
 
     if (reduceMotion) {
       value.set(beat === 0 ? 100 : beat === 1 ? PIP_PERCENT : 0);
       setFlyOut(beat !== 1);
       setEmerging(false);
-      setShowCost(beat === 2);
       return;
     }
 
@@ -317,14 +312,11 @@ function BellyStage({
 
     if (beat === 2) {
       value.set(0);
-      // The fly the frog helps itself to leaves the mouth and stays out, so
-      // beat one has something real to catch when the loop comes round.
       const timer = window.setTimeout(() => {
         if (cancelled) return;
         setEmerging(true);
         setFlyOut(true);
-        window.setTimeout(() => !cancelled && setShowCost(true), 420);
-      }, 480);
+      }, 1200);
       return () => {
         cancelled = true;
         window.clearTimeout(timer);
@@ -378,7 +370,7 @@ function BellyStage({
             className="absolute z-20 -translate-x-1/2 pointer-events-none left-1/2"
             style={{ top: FLY_HOVER_TOP }}
             initial={
-              emerging ? { y: FROG_H * 0.42, opacity: 0, scale: 0.6 } : false
+              emerging ? { y: -FROG_H * 0.3, opacity: 0, scale: 0.6 } : false
             }
             animate={{ y: 0, opacity: 1, scale: 1 }}
             transition={{ duration: 0.85, ease: [0.22, 1, 0.36, 1] }}
@@ -399,19 +391,6 @@ function BellyStage({
                   oversample={1.5}
                 />
               </div>
-              <AnimatePresence>
-                {showCost && (
-                  <motion.span
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ type: 'spring', stiffness: 320, damping: 20 }}
-                    className="absolute left-full top-1/2 ml-1 -translate-y-1/2 whitespace-nowrap rounded-full bg-rose-500/15 px-1.5 py-0.5 text-[11px] font-black tabular-nums leading-none text-rose-500"
-                  >
-                    −{FLIES_PER_PENALTY} a day
-                  </motion.span>
-                )}
-              </AnimatePresence>
             </motion.div>
           </motion.div>
         )}
@@ -528,12 +507,7 @@ export function BellyFullIntroSheet({
       icon: <Fly size={24} alwaysPlay interactive={false} oversample={1.5} />,
       text: (
         <>
-          Empty belly? I help myself —{' '}
-          <b>
-            {FLIES_PER_PENALTY} {FLIES_PER_PENALTY === 1 ? 'fly' : 'flies'} a
-            day
-          </b>{' '}
-          from your stash
+          Empty belly? I just get sad — <b>your flies are always safe</b>
         </>
       ),
     },

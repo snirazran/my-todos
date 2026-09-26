@@ -18,6 +18,8 @@ import {
 } from '@/hooks/useInventory';
 import { mutateFriendsCaches } from '@/hooks/useFriendsSync';
 import { useRiveIdlePause } from '@/lib/riveIdlePause';
+import { STREAK_EXTENDED_EVENT } from '@/hooks/useLoginStreak';
+import { STREAK_EXTENDED_HEADER } from '@/lib/streak/types';
 
 const NATIVE_SYNC_INTERVAL_MS = 10_000;
 const TASK_EVENT_LAST_ID_KEY = 'frogress.taskSyncLastEventId';
@@ -127,6 +129,9 @@ export function TaskSyncProvider({ children }: { children: ReactNode }) {
       const response = await originalFetch(input, init);
       if (shouldAnnounce && response.ok) {
         notifyTaskSync({ reason: 'local-mutation' }, { broadcast: true });
+        if (response.headers.get(STREAK_EXTENDED_HEADER)) {
+          window.dispatchEvent(new Event(STREAK_EXTENDED_EVENT));
+        }
       }
       return response;
     };

@@ -9,6 +9,7 @@ import {
   readLoginStreakState,
 } from '@/lib/streak/loginStreak';
 import { isPremiumUser } from '@/lib/quests/engine';
+import { previousDayKey } from '@/lib/quests/streak';
 import {
   loadShieldConfig,
   readShieldState,
@@ -51,13 +52,15 @@ export async function POST(req: NextRequest) {
     }
     if (!(user as any).quests?.loginStreak) {
       return NextResponse.json(
-        { error: 'Check in once before setting a goal' },
+        { error: 'Finish a task once before setting a goal' },
         { status: 400 },
       );
     }
 
     const todayKey = getZonedToday(timezone);
-    const goal = { days, startCount: state.count, startDayKey: todayKey };
+    const liveCount =
+      state.lastDayKey >= previousDayKey(todayKey) ? state.count : 0;
+    const goal = { days, startCount: liveCount, startDayKey: todayKey };
     const res = await UserModel.updateOne(
       {
         _id: userId,

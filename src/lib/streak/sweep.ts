@@ -118,10 +118,10 @@ const SAVER_LOGIN_TITLES: ((n: number) => string)[] = [
 ];
 
 const SAVER_LOGIN_CLOSERS: string[] = [
-  'A 30-second check-in saves it.',
-  'Opening the app saves it.',
-  'One check-in and it carries on.',
-  'Just open the app and it survives.',
+  'One finished task saves it.',
+  'Any task ticked off saves it.',
+  'One small task and it carries on.',
+  'Tick off anything and it survives.',
 ];
 
 const FREEZE_TITLES: ((n: number) => string)[] = [
@@ -132,17 +132,17 @@ const FREEZE_TITLES: ((n: number) => string)[] = [
 ];
 
 const FREEZE_BODIES_LEFT: ((n: number, plural: string) => string)[] = [
-  (n, s) => `${n} Lily Pad${s} left. Check in today and keep climbing.`,
-  (n, s) => `${n} Lily Pad${s} left in the jar. Today's check-in spends none.`,
-  (n, s) => `You have ${n} Lily Pad${s} left. Check in and keep them.`,
-  (n, s) => `${n} Lily Pad${s} remain. Check in today and the streak is safe.`,
+  (n, s) => `${n} Lily Pad${s} left. Finish a task today and keep climbing.`,
+  (n, s) => `${n} Lily Pad${s} left in the jar. Today's first task spends none.`,
+  (n, s) => `You have ${n} Lily Pad${s} left. Finish a task and keep them.`,
+  (n, s) => `${n} Lily Pad${s} remain. Finish a task today and the streak is safe.`,
 ];
 
 const FREEZE_BODIES_NONE: string[] = [
-  'That was your last one. Check in today — your streak is on its own now.',
-  'No Lily Pads left. The streak survives only if you check in today.',
-  "That was the last Lily Pad. Today it's all on the check-in.",
-  'Nothing left to catch the next miss. Check in today.',
+  'That was your last one. Finish a task today — your streak is on its own now.',
+  'No Lily Pads left. The streak survives only if you finish a task today.',
+  "That was the last Lily Pad. Today it's all on your first task.",
+  'Nothing left to catch the next miss. Finish a task today.',
 ];
 
 /**
@@ -182,7 +182,7 @@ function buildSaverMessage(args: {
       title,
       body: named
         ? `${named}${rest > 0 ? ` and ${rest} more` : ''}.${shieldNote}`
-        : `Check in to keep them all.${shieldNote}`,
+        : `Finish a task to keep them all.${shieldNote}`,
     };
   }
 

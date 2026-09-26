@@ -1,6 +1,9 @@
 import type { QuestReward } from '@/lib/quests/types';
 import type { ShieldOffer } from '@/lib/shields/types';
 
+/** Set on a task response whose completion just grew the streak. */
+export const STREAK_EXTENDED_HEADER = 'x-streak-extended';
+
 export type ShieldReward = {
   type: 'SHIELD';
   amount: number;
@@ -78,9 +81,24 @@ export type RescueMethod = 'ad';
 
 export type LoginStreakRescue = StreakRescue;
 
+/**
+ * A streak day earned by finishing a task, waiting for the client to show it.
+ * The extension happens server-side on completion; the reveal is claimed once.
+ */
+export type PendingStreakCelebration = {
+  dayKey: string;
+  previousCount: number;
+  goalEvent: LoginStreakRewardEvent | null;
+  shieldConsumedDays: string[];
+};
+
 export type LoginStreakState = {
   count: number;
+  /** Last day at least one task was completed — the day the streak last grew. */
   lastDayKey: string;
+  /** Last day the missed-day checks (shields, rescue, saver accounting) ran. */
+  evaluatedDayKey: string;
+  celebration: PendingStreakCelebration | null;
   longestStreak: number;
   /** Days a shield auto-covered, for the snowflake marks on the week strip. */
   shieldedDayKeys: string[];
@@ -151,6 +169,8 @@ export type CheckInResult = {
   rescue: LoginStreakRescue | null;
   /** Set when the miss went uncovered and the user holds nothing. */
   shieldOffer: ShieldOffer | null;
+  /** Streak length that broke at today's evaluation, or 0. */
+  brokeFrom: number;
 };
 
 export type RescueResult = {

@@ -9,18 +9,16 @@ export const FLY_HUNGER_REWARD_MS = 2 * 60 * 60 * 1000;
 // belly pips round up visually, so awards within half a pip snap to full to
 // match what the user sees.
 export const HUNGER_FULL_SNAP_MS = 4 * 60 * 60 * 1000;
-export const PENALTY_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
-export const FLIES_PER_PENALTY = 1;
 export const HUNGRY_MOOD_THRESHOLD = 0.2;
 
 export type HungerStatus = {
   hunger: number; // Current hunger (ms remaining)
-  stolenFlies: number; // Total pending stolen flies
+  stolenFlies: number; // Legacy flies eaten before hunger stopped costing flies, awaiting refund
   maxHunger: number;
 };
 
 /**
- * Calculates current hunger state and penalties based on elapsed time.
+ * Calculates current hunger state based on elapsed time.
  * Returns the computed state and a MongoDB update object if changes are needed.
  */
 export function calculateHunger(user: UserDoc) {
@@ -36,7 +34,7 @@ export function calculateHunger(user: UserDoc) {
 
   // Initialize if missing or invalid, and clamp to current MAX_HUNGER
   let currentHunger = (typeof wardrobe.hunger === 'number' && !isNaN(wardrobe.hunger)) 
-    ? Math.min(wardrobe.hunger, MAX_HUNGER_MS)
+    ? Math.max(0, Math.min(wardrobe.hunger, MAX_HUNGER_MS))
     : MAX_HUNGER_MS;
     
   let lastUpdate = now;
@@ -45,12 +43,8 @@ export function calculateHunger(user: UserDoc) {
      if (!isNaN(t)) lastUpdate = t;
   }
   
-  let accumulatedStolen = (typeof wardrobe.stolenFlies === 'number' && !isNaN(wardrobe.stolenFlies))
+  const accumulatedStolen = (typeof wardrobe.stolenFlies === 'number' && !isNaN(wardrobe.stolenFlies))
     ? wardrobe.stolenFlies 
-    : 0;
-    
-  let currentFlies = (typeof wardrobe.flies === 'number' && !isNaN(wardrobe.flies))
-    ? wardrobe.flies
     : 0;
 
   // Time elapsed since last check
@@ -82,39 +76,7 @@ export function calculateHunger(user: UserDoc) {
     };
   }
 
-  // 1. Drain hunger
-  // Simply subtract time passed. If it goes negative, that represents starvation debt.
-  currentHunger -= elapsed;
-
-  // 2. Check for penalties if negative
-  let newStolen = 0;
-  
-  if (currentHunger < 0) {
-      const deficit = Math.abs(currentHunger);
-      const penalties = Math.floor(deficit / PENALTY_INTERVAL_MS);
-      
-      if (penalties > 0) {
-          // Charge penalties
-          newStolen = penalties * FLIES_PER_PENALTY;
-          
-          // We can only steal what they have? 
-          // Logic: "The frog eats your flies". If you have 0, he can't eat.
-          // But does the debt persist? 
-          // "stay there. for every day that its at 0 the frog eat 1"
-          // Let's assume we consume the time regardless of whether we successfully stole.
-          // Otherwise, debt accumulates forever until they get a fly, then INSTANTLY lose it.
-          // That feels fair: "I was starving for 3 days, I eat your next 3 flies".
-          
-          const actualStolen = Math.min(newStolen, currentFlies);
-          
-          currentFlies -= actualStolen;
-          accumulatedStolen += actualStolen;
-          
-          // "Pay" the debt to reset the interval
-          // We add back the time covered by the penalties so we don't double-charge
-          currentHunger += (penalties * PENALTY_INTERVAL_MS);
-      }
-  }
+  currentHunger = Math.max(0, currentHunger - elapsed);
 
   // Construct update object
   const updates: Record<string, any> = {};
@@ -125,16 +87,6 @@ export function calculateHunger(user: UserDoc) {
     hasChanges = true;
   }
   
-  if (currentFlies !== wardrobe.flies) {
-    updates['wardrobe.flies'] = currentFlies;
-    hasChanges = true;
-  }
-  
-  if (accumulatedStolen !== wardrobe.stolenFlies) {
-    updates['wardrobe.stolenFlies'] = accumulatedStolen;
-    hasChanges = true;
-  }
-
   // Always update the timestamp to Now if we processed time
   if (elapsed > 0) {
     updates['wardrobe.lastHungerUpdate'] = new Date(now);

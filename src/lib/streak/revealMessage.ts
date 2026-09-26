@@ -22,10 +22,10 @@ const MILESTONES: Record<number, string> = {
 };
 
 const WEEKDAY_LINES: Record<number, string> = {
-  0: 'A Sunday check-in. Those are the easy ones to skip.',
+  0: 'Something done on a Sunday. Those are the easy ones to skip.',
   1: 'Monday, and you still showed up.',
   5: 'Friday, going into the weekend {n} days deep.',
-  6: 'A Saturday check-in. Those are the easy ones to skip.',
+  6: 'Something done on a Saturday. Those are the easy ones to skip.',
 };
 
 /**
@@ -33,7 +33,7 @@ const WEEKDAY_LINES: Record<number, string> = {
  * eventually breaks, where "you're amazing" turns into a reason to quit.
  */
 const GENERIC_LINES = [
-  'You showed up today. That is how streaks are made.',
+  'You got something done today. That is how streaks are made.',
   'Day {n}, logged.',
   'You made time today. That is the whole trick.',
   'Another one on the board.',

@@ -1307,15 +1307,7 @@ export default function HomeDashboard() {
       <HungerWarningModal
         open={!!user && hungerStatus.stolenFlies > 0}
         stolenFlies={hungerStatus.stolenFlies}
-        isPremium={!!questsData?.isPremium}
         indices={indices}
-        onAcknowledge={async () => {
-          const res = await fetch('/api/hunger/acknowledge', {
-            method: 'POST',
-          });
-          if (!res.ok) throw new Error('Hunger acknowledge failed');
-          await mutateToday();
-        }}
         onRecover={async () => {
           const res = await fetch('/api/hunger/recover', { method: 'POST' });
           const payload = await res.json().catch(() => ({}));

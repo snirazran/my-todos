@@ -632,7 +632,7 @@ function CommitStep({
             id="streak-goal-hint"
             className="mt-2 max-w-[32ch] text-pretty text-center text-sm font-medium leading-snug text-muted-foreground short-screen:mt-1 short-screen:text-xs"
           >
-            Check in each day to reach your goal and earn the reward
+            Finish a task each day to reach your goal and earn the reward
           </p>
 
           <fieldset
@@ -842,7 +842,7 @@ function HomeStep({
               <span className="font-medium"> · best {view.longestStreak}</span>
             )}
             {!view.checkedInToday && view.count > 0 && (
-              <span className="text-orange-500"> · check in today!</span>
+              <span className="text-orange-500"> · finish a task today!</span>
             )}
           </p>
 

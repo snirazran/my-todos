@@ -38,6 +38,7 @@ import type {
   LoginStreakRewardSummary,
   LoginStreakState,
   LoginStreakView,
+  PendingStreakCelebration,
   RescueMethod,
   RescueResult,
   StreakRescue,
@@ -144,6 +145,18 @@ export async function loadLoginStreakConfig(): Promise<LoginStreakConfigDoc> {
   };
 }
 
+function readCelebration(raw: any): PendingStreakCelebration | null {
+  if (!raw || typeof raw.dayKey !== 'string') return null;
+  return {
+    dayKey: raw.dayKey,
+    previousCount: Math.max(0, Math.floor(raw.previousCount ?? 0)),
+    goalEvent: raw.goalEvent ?? null,
+    shieldConsumedDays: Array.isArray(raw.shieldConsumedDays)
+      ? raw.shieldConsumedDays.filter((k: unknown) => typeof k === 'string')
+      : [],
+  };
+}
+
 export function readLoginStreakState(user: any): LoginStreakState {
   const raw = user?.quests?.loginStreak;
   const goal =
@@ -158,6 +171,9 @@ export function readLoginStreakState(user: any): LoginStreakState {
   return {
     count: Math.max(0, Math.floor(raw?.count ?? 0)),
     lastDayKey: typeof raw?.lastDayKey === 'string' ? raw.lastDayKey : '',
+    evaluatedDayKey:
+      typeof raw?.evaluatedDayKey === 'string' ? raw.evaluatedDayKey : '',
+    celebration: readCelebration(raw?.celebration),
     longestStreak: Math.max(0, Math.floor(raw?.longestStreak ?? 0)),
     shieldedDayKeys: Array.isArray(raw?.shieldedDayKeys)
       ? raw.shieldedDayKeys.filter((k: unknown) => typeof k === 'string')
@@ -277,9 +293,12 @@ export function buildLoginStreakView(
 ): LoginStreakView {
   const gap = computeGap(state.lastDayKey, todayKey);
   const checkedInToday = state.lastDayKey === todayKey;
+  const evaluatedToday = state.evaluatedDayKey === todayKey;
   const alive =
     state.count > 0 &&
-    (checkedInToday || gap === 0 || (gap === 1 && shields.count > 0));
+    (checkedInToday ||
+      gap === 0 ||
+      (!evaluatedToday && gap === 1 && shields.count > 0));
   return {
     count: alive ? state.count : 0,
     longestStreak: state.longestStreak,
@@ -635,13 +654,28 @@ function buildRescueOffer(args: {
   };
 }
 
-export async function performCheckIn(args: {
-  userId: string;
-  timezone: string;
-}): Promise<CheckInResult> {
-  const { userId, timezone } = args;
-  await connectMongo();
+function matchStreakKey(field: 'lastDayKey' | 'evaluatedDayKey', value: string) {
+  const path = `quests.loginStreak.${field}`;
+  return value
+    ? { [path]: value }
+    : { $or: [{ [path]: '' }, { [path]: { $exists: false } }] };
+}
 
+type StreakContext = {
+  user: any;
+  config: LoginStreakConfigDoc;
+  shieldConfig: ShieldConfigView;
+  shieldState: ShieldState;
+  state: LoginStreakState;
+  isPremium: boolean;
+  todayKey: string;
+};
+
+async function loadStreakContext(
+  userId: string,
+  timezone: string,
+): Promise<StreakContext> {
+  await connectMongo();
   const [user, config, shieldConfig] = await Promise.all([
     UserModel.findById(userId),
     loadLoginStreakConfig(),
@@ -651,11 +685,9 @@ export async function performCheckIn(args: {
 
   const todayKey = getZonedToday(timezone);
   const userObject = user.toObject();
-  const state = readLoginStreakState(userObject);
   const isPremium = isPremiumUser(userObject);
-
   const storedShields = readShieldState(userObject);
-  let shieldState = applyMonthlyGrant(
+  const shieldState = applyMonthlyGrant(
     storedShields,
     shieldConfig,
     isPremium,
@@ -669,36 +701,44 @@ export async function performCheckIn(args: {
   ) {
     await persistShieldState(userId, shieldState);
   }
-  const shieldSnapshot = () => ({
-    count: shieldState.count,
-    cap: shieldCapFor(shieldConfig, isPremium),
-  });
 
-  if (!config.isActive) {
-    return {
-      active: false,
-      extended: false,
-      previousCount: state.count,
-      view: null,
-      shieldConsumedDays: [],
-      goalEvent: null,
-      rescue: null,
-      shieldOffer: null,
-    };
-  }
+  return {
+    user,
+    config,
+    shieldConfig,
+    shieldState,
+    state: readLoginStreakState(userObject),
+    isPremium,
+    todayKey,
+  };
+}
 
-  if (state.lastDayKey === todayKey) {
-    return {
-      active: true,
-      extended: false,
-      previousCount: state.count,
-      view: buildLoginStreakView(state, config, todayKey, shieldSnapshot()),
-      shieldConsumedDays: [],
-      goalEvent: null,
-      rescue: activeRescueForDay(state.rescue, todayKey),
-      shieldOffer: null,
-    };
-  }
+async function reloadStreakState(userId: string): Promise<LoginStreakState> {
+  const current = await UserModel.findById(userId).lean();
+  return readLoginStreakState(current);
+}
+
+type DayEvaluation = {
+  state: LoginStreakState;
+  shieldState: ShieldState;
+  consumed: string[];
+  shieldOffer: ShieldOffer | null;
+  loginBrokeFrom: number;
+};
+
+/**
+ * The once-a-day look back at yesterday: a held shield covers a single miss,
+ * an uncovered miss becomes a rescue offer, and the saver's mute counter is
+ * settled. It never grows the streak — only finishing a task does that.
+ * Returns null when another request evaluated the day first.
+ */
+async function evaluateStreakDay(
+  userId: string,
+  timezone: string,
+  ctx: StreakContext,
+): Promise<DayEvaluation | null> {
+  const { user, state, shieldConfig, todayKey } = ctx;
+  let shieldState = ctx.shieldState;
 
   const coverage = await applyShieldCoverage({
     userId,
@@ -710,21 +750,10 @@ export async function performCheckIn(args: {
   if (coverage) shieldState = coverage.shieldState;
   const freshState = coverage?.state ?? state;
   const yesterdayKey = previousDayKey(todayKey);
-  const previousCount = freshState.count;
-  const newCount =
-    freshState.lastDayKey === yesterdayKey ? freshState.count + 1 : 1;
-
-  const next: LoginStreakState = {
-    ...freshState,
-    count: newCount,
-    lastDayKey: todayKey,
-    longestStreak: Math.max(freshState.longestStreak, newCount),
-    rescue: activeRescueForDay(freshState.rescue, todayKey),
-  };
 
   const loginBroke =
-    newCount === 1 &&
-    previousCount >= RESCUE_MIN_STREAK &&
+    freshState.lastDayKey < yesterdayKey &&
+    freshState.count >= RESCUE_MIN_STREAK &&
     computeGap(freshState.lastDayKey, todayKey) === 1;
 
   const taskStreaksAtRisk = await findTaskStreaksAtRisk({
@@ -735,101 +764,47 @@ export async function performCheckIn(args: {
     minStreak: RESCUE_MIN_TASK_STREAK,
   });
 
-  // Saver mute accounting. The counter tracks warnings that DIDN'T work, not
-  // app opens: opening the app saves a login streak but does nothing for a
-  // habit, so resetting on check-in let an abandoned habit nag forever. A day
+  // Saver mute accounting. The counter tracks warnings that DIDN'T work: a day
   // where nothing broke forgives the counter (and un-mutes a returning user).
   const somethingBroke = loginBroke || taskStreaksAtRisk.length > 0;
   const warnedYesterday = freshState.notif.lastSaverSentDayKey === yesterdayKey;
-  next.notif = {
-    ...freshState.notif,
-    saverIgnoredCount: !somethingBroke
-      ? 0
-      : warnedYesterday
-        ? freshState.notif.saverIgnoredCount + 1
-        : freshState.notif.saverIgnoredCount,
+
+  const next: LoginStreakState = {
+    ...freshState,
+    evaluatedDayKey: todayKey,
+    notif: {
+      ...freshState.notif,
+      saverIgnoredCount: !somethingBroke
+        ? 0
+        : warnedYesterday
+          ? freshState.notif.saverIgnoredCount + 1
+          : freshState.notif.saverIgnoredCount,
+    },
+    rescue:
+      buildRescueOffer({
+        user,
+        state: freshState,
+        todayKey,
+        missedDayKey: yesterdayKey,
+        loginCountAtRisk: loginBroke ? freshState.count : 0,
+        taskStreaks: taskStreaksAtRisk,
+      }) ?? activeRescueForDay(freshState.rescue, todayKey),
   };
 
-  next.rescue =
-    buildRescueOffer({
-      user,
-      state: freshState,
-      todayKey,
-      missedDayKey: yesterdayKey,
-      loginCountAtRisk: loginBroke ? previousCount : 0,
-      taskStreaks: taskStreaksAtRisk,
-    }) ?? next.rescue;
-
-  const goalCompleted =
-    next.goal && newCount - next.goal.startCount >= next.goal.days
-      ? next.goal
-      : null;
-
-  let goalEvent: LoginStreakRewardEvent | null = null;
-
-  if (goalCompleted) {
-    const granted = await applyStreakRewardGrants({
-      user,
-      next,
-      config,
-      shieldConfig,
-      shieldState,
-      todayKey,
-      goalCompleted,
-    });
-    goalEvent = granted.event;
-    shieldState = granted.shieldState;
-
-    const currentQuests =
-      typeof (user as any).quests === 'object' && (user as any).quests
-        ? (user as any).quests
-        : {};
-    (user as any).quests = { ...currentQuests, loginStreak: next };
-    setShieldStateOn(user, shieldState);
-    user.markModified('wardrobe');
-    await user.save();
-  } else {
-    // The guard is optimistic concurrency: only write if nobody else moved the
-    // streak since it was read. "Never checked in" has three shapes on disk —
-    // subdocument absent, null, or present without a lastDayKey — and matching
-    // on the missing key covers all three, where `$exists: false` on the
-    // subdocument itself missed the last one and stranded the streak at 0.
-    const res = await UserModel.updateOne(
-      {
-        _id: userId,
-        $or: [
-          { 'quests.loginStreak.lastDayKey': freshState.lastDayKey },
-          ...(freshState.lastDayKey
-            ? []
-            : [{ 'quests.loginStreak.lastDayKey': { $exists: false } }]),
-        ],
-      },
-      { $set: { 'quests.loginStreak': next } },
-    );
-    if (res.modifiedCount === 0) {
-      const current = await UserModel.findById(userId).lean();
-      const currentState = readLoginStreakState(current);
-      return {
-        active: true,
-        extended: currentState.lastDayKey === todayKey,
-        previousCount,
-        view: buildLoginStreakView(
-          currentState,
-          config,
-          todayKey,
-          shieldSnapshot(),
-        ),
-        shieldConsumedDays: [],
-        goalEvent: null,
-        rescue: activeRescueForDay(currentState.rescue, todayKey),
-        shieldOffer: null,
-      };
-    }
-  }
+  const res = await UserModel.updateOne(
+    {
+      _id: userId,
+      $and: [
+        matchStreakKey('lastDayKey', freshState.lastDayKey),
+        matchStreakKey('evaluatedDayKey', freshState.evaluatedDayKey),
+      ],
+    },
+    { $set: { 'quests.loginStreak': next } },
+  );
+  if (res.modifiedCount === 0) return null;
 
   // A miss that nothing covered is the one moment the offer has earned: the
   // user just watched a streak break for want of the thing being offered.
-  // Everything else about whether to actually interrupt lives in the governor.
   let shieldOffer: ShieldOffer | null = null;
   if (!coverage && somethingBroke) {
     shieldOffer = shouldOfferShield({
@@ -839,7 +814,7 @@ export async function performCheckIn(args: {
       reason: 'missed',
       system: 'login',
       atStake: Math.max(
-        loginBroke ? previousCount : 0,
+        loginBroke ? freshState.count : 0,
         ...taskStreaksAtRisk.map((t) => t.count),
         0,
       ),
@@ -851,14 +826,195 @@ export async function performCheckIn(args: {
   }
 
   return {
-    active: true,
-    extended: true,
-    previousCount,
-    view: buildLoginStreakView(next, config, todayKey, shieldSnapshot()),
-    shieldConsumedDays: coverage?.consumed ?? [],
-    goalEvent,
-    rescue: next.rescue,
+    state: next,
+    shieldState,
+    consumed: coverage?.consumed ?? [],
     shieldOffer,
+    loginBrokeFrom: loginBroke ? freshState.count : 0,
+  };
+}
+
+async function ensureDayEvaluated(
+  userId: string,
+  timezone: string,
+  ctx: StreakContext,
+): Promise<{ ctx: StreakContext; evaluation: DayEvaluation | null }> {
+  if (ctx.state.evaluatedDayKey === ctx.todayKey) {
+    return { ctx, evaluation: null };
+  }
+  const evaluation = await evaluateStreakDay(userId, timezone, ctx);
+  if (evaluation) {
+    return {
+      ctx: { ...ctx, state: evaluation.state, shieldState: evaluation.shieldState },
+      evaluation,
+    };
+  }
+  return {
+    ctx: { ...ctx, state: await reloadStreakState(userId) },
+    evaluation: null,
+  };
+}
+
+/** Takes the pending reveal exactly once, so two devices never both show it. */
+async function claimCelebration(
+  userId: string,
+  state: LoginStreakState,
+  todayKey: string,
+): Promise<PendingStreakCelebration | null> {
+  const pending = state.celebration;
+  if (!pending) return null;
+  const res = await UserModel.updateOne(
+    { _id: userId, 'quests.loginStreak.celebration.dayKey': pending.dayKey },
+    { $set: { 'quests.loginStreak.celebration': null } },
+  );
+  if (res.modifiedCount === 0) return null;
+  return pending.dayKey === todayKey ? pending : null;
+}
+
+/**
+ * App open. Settles yesterday (shields, rescue, saver) and hands back any
+ * streak day a finished task already earned. Opening the app never counts as
+ * a streak day by itself.
+ */
+export async function performCheckIn(args: {
+  userId: string;
+  timezone: string;
+}): Promise<CheckInResult> {
+  const { userId, timezone } = args;
+  const loaded = await loadStreakContext(userId, timezone);
+  const { config, shieldConfig, isPremium, todayKey } = loaded;
+
+  if (!config.isActive) {
+    return {
+      active: false,
+      extended: false,
+      previousCount: loaded.state.count,
+      view: null,
+      shieldConsumedDays: [],
+      goalEvent: null,
+      rescue: null,
+      shieldOffer: null,
+      brokeFrom: 0,
+    };
+  }
+
+  const { ctx, evaluation } = await ensureDayEvaluated(userId, timezone, loaded);
+  const celebration = await claimCelebration(userId, ctx.state, todayKey);
+  const state = { ...ctx.state, celebration: null };
+
+  return {
+    active: true,
+    extended: !!celebration,
+    previousCount: celebration?.previousCount ?? state.count,
+    view: buildLoginStreakView(state, config, todayKey, {
+      count: ctx.shieldState.count,
+      cap: shieldCapFor(shieldConfig, isPremium),
+    }),
+    shieldConsumedDays:
+      celebration?.shieldConsumedDays ?? evaluation?.consumed ?? [],
+    goalEvent: celebration?.goalEvent ?? null,
+    rescue: activeRescueForDay(state.rescue, todayKey),
+    shieldOffer: evaluation?.shieldOffer ?? null,
+    brokeFrom: evaluation?.loginBrokeFrom ?? 0,
+  };
+}
+
+export type StreakExtension = {
+  count: number;
+  previousCount: number;
+  longestStreak: number;
+  goalEvent: LoginStreakRewardEvent | null;
+  isPremium: boolean;
+};
+
+/**
+ * The first task finished today grows the streak. Idempotent per day; the
+ * reveal is parked on the state for the next check-in to claim, so it shows
+ * after the catch on this device, or on the next open after a widget tick.
+ */
+export async function extendStreakForCompletion(args: {
+  userId: string;
+  timezone: string;
+}): Promise<StreakExtension | null> {
+  const { userId, timezone } = args;
+  await connectMongo();
+  const peek = await UserModel.findById(userId, {
+    'quests.loginStreak.lastDayKey': 1,
+  }).lean<any>();
+  if (peek?.quests?.loginStreak?.lastDayKey === getZonedToday(timezone)) {
+    return null;
+  }
+  const loaded = await loadStreakContext(userId, timezone);
+  if (!loaded.config.isActive) return null;
+  if (loaded.state.lastDayKey === loaded.todayKey) return null;
+
+  const { ctx } = await ensureDayEvaluated(userId, timezone, loaded);
+  const { config, shieldConfig, isPremium, todayKey } = ctx;
+  const state = ctx.state;
+  if (state.lastDayKey === todayKey) return null;
+
+  const yesterdayKey = previousDayKey(todayKey);
+  const newCount = state.lastDayKey === yesterdayKey ? state.count + 1 : 1;
+  const next: LoginStreakState = {
+    ...state,
+    count: newCount,
+    lastDayKey: todayKey,
+    longestStreak: Math.max(state.longestStreak, newCount),
+  };
+
+  const goalCompleted =
+    next.goal && newCount - next.goal.startCount >= next.goal.days
+      ? next.goal
+      : null;
+
+  // Rewards are staged on a fresh document and only saved once the streak
+  // write below has won, so a double-tap can never pay a pledge twice.
+  const user = goalCompleted ? await UserModel.findById(userId) : null;
+  let goalEvent: LoginStreakRewardEvent | null = null;
+  let shieldState = ctx.shieldState;
+  if (goalCompleted && user) {
+    const granted = await applyStreakRewardGrants({
+      user,
+      next,
+      config,
+      shieldConfig,
+      shieldState,
+      todayKey,
+      goalCompleted,
+    });
+    goalEvent = granted.event;
+    shieldState = granted.shieldState;
+  }
+
+  next.celebration = {
+    dayKey: todayKey,
+    previousCount: newCount - 1,
+    goalEvent,
+    shieldConsumedDays: state.shieldedDayKeys.includes(yesterdayKey)
+      ? [yesterdayKey]
+      : [],
+  };
+
+  const res = await UserModel.updateOne(
+    { _id: userId, ...matchStreakKey('lastDayKey', state.lastDayKey) },
+    { $set: { 'quests.loginStreak': next } },
+  );
+  if (res.modifiedCount === 0) return null;
+
+  if (user) {
+    user.markModified('wardrobe');
+    await user.save();
+    if (shieldState !== ctx.shieldState) {
+      await persistShieldState(userId, shieldState);
+    }
+  }
+
+  return {
+    count: newCount,
+    previousCount: newCount - 1,
+    longestStreak: next.longestStreak,
+    goalEvent,
+    isPremium,
   };
 }
 
@@ -907,7 +1063,6 @@ export async function performRescue(args: {
     !rescue ||
     rescue.id !== rescueId ||
     rescue.offeredDayKey !== todayKey ||
-    state.lastDayKey !== todayKey ||
     !rescue.adEligible
   ) {
     return {
@@ -944,11 +1099,19 @@ export async function performRescue(args: {
     };
   }
 
+  // Restoring bridges the missed day. If a task already counted today the
+  // streak lands on previous + 1; otherwise it waits at previous for today's
+  // first task to extend it.
   const loginRestored = rescue.previousCount > 0;
-  const newCount = loginRestored ? rescue.previousCount + 1 : state.count;
+  const doneToday = state.lastDayKey === todayKey;
+  const newCount = loginRestored
+    ? rescue.previousCount + (doneToday ? 1 : 0)
+    : state.count;
   const next: LoginStreakState = {
     ...state,
     count: newCount,
+    lastDayKey:
+      loginRestored && !doneToday ? rescue.missedDayKey : state.lastDayKey,
     longestStreak: Math.max(state.longestStreak, newCount),
     protectedDayKeys: [...state.protectedDayKeys, rescue.missedDayKey].slice(
       -PROTECTED_HISTORY_LIMIT,
@@ -958,7 +1121,10 @@ export async function performRescue(args: {
   };
 
   const goalCompleted =
-    loginRestored && next.goal && newCount - next.goal.startCount >= next.goal.days
+    loginRestored &&
+    doneToday &&
+    next.goal &&
+    newCount - next.goal.startCount >= next.goal.days
       ? next.goal
       : null;
   const granted = await applyStreakRewardGrants({

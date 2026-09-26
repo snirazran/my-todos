@@ -81,8 +81,11 @@ import {
   isCompletedOnDate,
   dayCandidateFilter,
 } from '@/lib/taskOccurrence';
+import { recordHungerStarted } from '@/lib/analytics/hunger';
+import { extendStreakForCompletion } from '@/lib/streak/loginStreak';
+import { recordStreakExtended } from '@/lib/streak/analytics';
+import { STREAK_EXTENDED_HEADER } from '@/lib/streak/types';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
-import { recordHungerBite } from '@/lib/analytics/hunger';
 import { taskAnalyticsProperties } from '@/lib/analytics/engagement';
 import {
   computeGroupStreak,
@@ -391,10 +394,10 @@ async function currentFlyStatus(
   const limit = taskIncomeCap(config, premium);
   const { updates, status: hungerStatus } = calculateHunger(user);
   const wardrobe = user.wardrobe ?? { equipped: {}, inventory: {}, flies: 0 };
-  await recordHungerBite({
+  await recordHungerStarted({
     userId,
-    previousStolen: wardrobe.stolenFlies ?? 0,
-    nextStolen: hungerStatus.stolenFlies,
+    previousHunger: wardrobe.hunger,
+    nextHunger: hungerStatus.hunger,
     isPremium: premium,
     dayKey: today,
   });
@@ -824,10 +827,10 @@ async function unawardFlyForTask(
   const limit = taskIncomeCap(config, premium);
   const { updates: hungerUpdates, status: hungerStatus } = calculateHunger(user);
   const wardrobe = user.wardrobe ?? { equipped: {}, inventory: {}, flies: 0 };
-  await recordHungerBite({
+  await recordHungerStarted({
     userId,
-    previousStolen: wardrobe.stolenFlies ?? 0,
-    nextStolen: hungerStatus.stolenFlies,
+    previousHunger: wardrobe.hunger,
+    nextHunger: hungerStatus.hunger,
     isPremium: premium,
     dayKey: today,
   });
@@ -2589,6 +2592,24 @@ export async function PUT(req: NextRequest) {
     milestone = result?.paid ?? undefined;
     milestonesQueued = result?.queued ?? 0;
   }
+  let streakExtended = false;
+  if (completed && !alreadyCompletedForDate && isTodayCompletion) {
+    const extension = await extendStreakForCompletion({
+      userId: uid,
+      timezone: tz,
+    }).catch((error) => {
+      console.error('Streak extension failed:', error);
+      return null;
+    });
+    if (extension) {
+      streakExtended = true;
+      await recordStreakExtended({
+        userId: uid,
+        dayKey: getZonedToday(tz),
+        extension,
+      });
+    }
+  }
   void syncGamification(uid, tz);
   await notifyTaskChanged(uid, {
     eventKind: completed ? 'task-completed' : 'task-uncompleted',
@@ -2628,7 +2649,7 @@ export async function PUT(req: NextRequest) {
     milestone,
     milestonesQueued: milestonesQueued || undefined,
     lateForStreak: lateForStreak && doc.type === 'weekly' ? true : undefined,
-  });
+  }, streakExtended ? { headers: { [STREAK_EXTENDED_HEADER]: '1' } } : undefined);
 }
 
 async function recordTaskDeleted(

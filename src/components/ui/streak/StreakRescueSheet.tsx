@@ -37,6 +37,7 @@ function toCelebrationResult(result: RescueResult): CheckInResult {
     goalEvent: result.goalEvent,
     rescue: null,
     shieldOffer: null,
+    brokeFrom: 0,
   };
 }
 

@@ -9,6 +9,9 @@ import type {
   RescueResult,
 } from '@/lib/streak/types';
 
+/** Fired when a task completion just grew the streak on the server. */
+export const STREAK_EXTENDED_EVENT = 'frogress:streak-extended';
+
 type StreakResponse = {
   active: boolean;
   view: LoginStreakView | null;

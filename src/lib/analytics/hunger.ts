@@ -1,19 +1,19 @@
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
 
-export async function recordHungerBite(args: {
+export async function recordHungerStarted(args: {
   userId: string;
-  previousStolen: number;
-  nextStolen: number;
+  previousHunger: number | undefined;
+  nextHunger: number;
   isPremium: boolean;
   dayKey: string;
 }) {
-  if (args.previousStolen > 0 || args.nextStolen <= 0) return;
+  if (typeof args.previousHunger === 'number' && args.previousHunger <= 0) return;
+  if (args.nextHunger > 0) return;
   await recordAnalyticsEvent({
     userId: args.userId,
     name: 'hunger_started',
     externalId: `hunger_started:${args.userId}:${args.dayKey}`,
     properties: {
-      fly_amount: args.nextStolen,
       is_premium: args.isPremium,
       day_key: args.dayKey,
     },
@@ -22,7 +22,7 @@ export async function recordHungerBite(args: {
 
 export async function recordHungerResolved(args: {
   userId: string;
-  method: 'accepted' | 'ad_recovery';
+  method: 'refund';
   flies: number;
   isPremium: boolean;
 }) {

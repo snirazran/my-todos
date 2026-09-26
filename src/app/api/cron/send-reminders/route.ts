@@ -162,14 +162,8 @@ async function getUncompletedTasks(
   };
 }
 
-/**
- * True when the frog's hunger has run out and the next fly penalty is
- * less than 24h away — the last useful moment to warn.
- */
+/** True when the frog's belly has run empty. */
 function isFrogStarving(wardrobe: Partial<UserWardrobe> | undefined): boolean {
-  const flies = wardrobe?.flies ?? 0;
-  if (flies <= 0) return false;
-
   const hunger =
     typeof wardrobe?.hunger === 'number' && !isNaN(wardrobe.hunger)
       ? Math.min(wardrobe.hunger, MAX_HUNGER_MS)
@@ -286,8 +280,8 @@ async function pactMessage(
  *
  * Morning slot: plan-your-day nudge (only if open tasks exist).
  * Evening slot: highest-value message wins —
- *   1. frog about to eat a fly (loss)
- *   2. unclaimed friend flies expiring at midnight (loss)
+ *   1. unclaimed friend flies expiring at midnight (loss)
+ *   2. frog's belly is empty (nudge — hunger never costs flies)
  *   3. open tasks remaining (nudge)
  */
 export async function GET(req: NextRequest) {
@@ -416,30 +410,32 @@ export async function GET(req: NextRequest) {
     let isRoutine = false;
 
     if (isEvening) {
-      if (isFrogStarving(wardrobe)) {
+      const owedFlies = await countUnclaimedFriendFlies(
+        userId,
+        wardrobe?.friendFlyDaily,
+        todayYMD,
+      );
+      if (owedFlies > 0) {
+        message = withData(friendFliesMessage(owedFlies, cursors), {
+          type: 'friend_flies',
+          path: '/friends',
+        });
+      } else if (
+        isFrogStarving(wardrobe) &&
+        ignoredCount < REMINDER_MUTE_THRESHOLD
+      ) {
         message = withData(hungerMessage(frog, cursors), {
           type: 'frog_hunger',
           path: '/',
         });
+        isRoutine = true;
       } else {
-        const owedFlies = await countUnclaimedFriendFlies(
-          userId,
-          wardrobe?.friendFlyDaily,
-          todayYMD,
-        );
-        if (owedFlies > 0) {
-          message = withData(friendFliesMessage(owedFlies, cursors), {
-            type: 'friend_flies',
-            path: '/friends',
-          });
+        const pactNudge = await pactMessage(userId, tz, frog);
+        if (pactNudge) {
+          message = pactNudge;
         } else {
-          const pactNudge = await pactMessage(userId, tz, frog);
-          if (pactNudge) {
-            message = pactNudge;
-          } else {
-            message = routineNudge('evening');
-            isRoutine = message !== null;
-          }
+          message = routineNudge('evening');
+          isRoutine = message !== null;
         }
       }
     } else {

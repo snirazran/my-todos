@@ -66,12 +66,12 @@ export async function POST() {
         userId,
         name: 'fly_earned',
         properties: {
-          source: 'frog_hunger_ad_recovery',
+          source: 'frog_hunger_refund',
           fly_amount: amount,
           is_premium: isPremium,
         },
       }),
-      recordHungerResolved({ userId, method: 'ad_recovery', flies: amount, isPremium }),
+      recordHungerResolved({ userId, method: 'refund', flies: amount, isPremium }),
     ]);
 
     return NextResponse.json({ granted: true, amount, balance });

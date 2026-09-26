@@ -574,33 +574,27 @@ const EVENING_FINAL: Line[] = [
 const HUNGER: Line[] = [
   {
     title: (c) => `${c.frog} is hungry`,
-    body: () =>
-      "One task and dinner's served. Otherwise I take a fly from your jar tonight.",
+    body: () => "One task and dinner's served.",
   },
   {
     title: (c) => `${c.frog} hasn't eaten`,
-    body: () =>
-      'Finish anything today and I eat. Otherwise a fly goes missing from your jar.',
+    body: () => 'Finish anything today and I eat.',
   },
   {
     title: () => 'My belly is empty',
-    body: () =>
-      'One task feeds me. Skip it and I help myself to a fly from your jar.',
+    body: () => 'One task feeds me. Any task.',
   },
   {
-    title: (c) => `${c.frog} is eyeing your jar`,
-    body: () =>
-      "One finished task and I leave it alone tonight. Otherwise I'm taking one.",
+    title: (c) => `${c.frog} is eyeing the pond`,
+    body: () => 'One finished task and I get a snack tonight.',
   },
   {
     title: () => 'Dinner is late',
-    body: () =>
-      "Tick one thing off and I'm fed. Otherwise tonight's meal comes from your jar.",
+    body: () => "Tick one thing off and I'm fed.",
   },
   {
     title: (c) => `${c.frog} needs feeding`,
-    body: () =>
-      'Any task will do. Otherwise a fly comes out of the jar. Nothing personal.',
+    body: () => 'Any task will do. Small ones count.',
   },
 ];
 
