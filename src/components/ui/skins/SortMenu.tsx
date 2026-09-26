@@ -66,10 +66,14 @@ export function SortMenu({
       <Button
         ref={triggerRef as any}
         variant="outline"
-        className="h-12 w-12 rounded-[18px] p-0 border border-border/50 bg-card/50 backdrop-blur-md hover:bg-accent/50 transition-all shadow-sm"
+        aria-label="Sort"
+        className="h-10 min-w-10 gap-1.5 rounded-full border border-border/60 bg-card px-2.5 text-[13px] font-black text-muted-foreground shadow-sm transition-colors hover:bg-muted/50"
         onClick={() => setOpen(!open)}
       >
-        <ArrowUpDown className="h-5 w-5 text-muted-foreground group-hover:text-primary" />
+        <ArrowUpDown className="h-4 w-4" />
+        <span className="hidden md:inline">
+          {options.find((o) => o.val === value)?.label.split(':')[0] ?? 'Sort'}
+        </span>
       </Button>
 
       {mounted && open && pos &&

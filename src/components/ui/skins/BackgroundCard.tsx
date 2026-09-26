@@ -72,6 +72,7 @@ export function BackgroundCard({
   selectedCount = 0,
   onAction,
   compact = false,
+  hideRarity = false,
 }: {
   item: BackgroundItem;
   owned: boolean;
@@ -84,6 +85,7 @@ export function BackgroundCard({
   selectedCount?: number;
   onAction: (e: React.MouseEvent) => void;
   compact?: boolean;
+  hideRarity?: boolean;
 }) {
   const config = RARITY_CONFIG[item.rarity];
   const tradeOnly = isTradeOnlyRarity(item.rarity);
@@ -124,7 +126,7 @@ export function BackgroundCard({
         compact
           ? 'p-1.5 pb-0 md:p-2 md:pb-0.5 rounded-xl border-2'
           : 'p-2.5 pb-1 md:p-3.5 md:pb-1.5 rounded-2xl border-[3px]',
-        compact && mode === 'inventory' && 'pb-1.5 md:pb-2',
+        compact && mode !== 'shop' && 'pb-1.5 md:pb-2',
         config.border,
         config.bg,
         isEquipped
@@ -142,23 +144,25 @@ export function BackgroundCard({
         </div>
       )}
 
-      <div className="absolute top-0 left-0 z-20 overflow-hidden rounded-br-2xl bg-background">
-        <div
-          className={cn(
-            'px-2 py-1 md:px-2.5 rounded-br-2xl text-[11px] md:text-[12px] font-black border-b border-r',
-            config.bg,
-            config.text,
-            config.border,
-          )}
-        >
-          {config.label}
+      {!hideRarity && (
+        <div className="absolute top-0 left-0 z-20 overflow-hidden rounded-br-2xl bg-background">
+          <div
+            className={cn(
+              'px-2 py-1 md:px-2.5 rounded-br-2xl text-[11px] md:text-[12px] font-black border-b border-r',
+              config.bg,
+              config.text,
+              config.border,
+            )}
+          >
+            {config.label}
+          </div>
         </div>
-      </div>
+      )}
 
       <div
         className={cn(
           compact
-            ? 'mt-0 mb-0.5 aspect-[1/1.1] rounded-lg'
+            ? 'mt-0 mb-0.5 aspect-square rounded-lg'
             : 'mt-4 mb-1 md:mt-5 md:mb-2 aspect-[1/0.75] md:aspect-[1.2/1] rounded-xl',
           'mx-auto w-full flex items-center justify-center relative overflow-hidden bg-gradient-to-br shadow-inner',
           config.gradient,
@@ -184,11 +188,25 @@ export function BackgroundCard({
           />
         )}
 
-        {ownedCount > 0 && (
-          <StackBadge
-            owned={ownedCount}
-            selected={mode === 'trade' ? selectedCount : 0}
-          />
+        {mode === 'shop' ? (
+          owned && (
+            <div className="absolute top-1 right-1 z-20 flex items-center gap-0.5 rounded-md bg-green-500 px-1.5 py-0.5 text-[9px] font-black text-white shadow-sm md:top-1.5 md:right-1.5 md:text-[10px]">
+              <Check className="h-2.5 w-2.5 stroke-[4]" />
+              {ownedCount > 1 ? `x${ownedCount}` : 'Owned'}
+            </div>
+          )
+        ) : (
+          (ownedCount > 1 || (mode === 'trade' && isSelected)) && (
+            <StackBadge
+              owned={ownedCount}
+              selected={mode === 'trade' ? selectedCount : 0}
+            />
+          )
+        )}
+        {mode === 'trade' && isSelected && (
+          <div className="absolute bottom-1 right-1 z-20 rounded-full bg-primary p-1 text-primary-foreground shadow-md">
+            <Check className="h-3 w-3 stroke-[4]" />
+          </div>
         )}
         {compact && isEquipped && (
           <div className="absolute bottom-1 right-1 z-20 p-1 text-white bg-green-500 rounded-full shadow-md">
@@ -198,7 +216,7 @@ export function BackgroundCard({
       </div>
 
       <div className={cn('w-full mx-auto md:w-3/4', compact ? 'mt-0' : 'mt-2')}>
-        {mode === 'inventory' && compact ? null : mode === 'inventory' ? (
+        {(mode === 'inventory' || mode === 'trade') && compact ? null : mode === 'inventory' ? (
           <div
             className={cn(
               'h-7 md:h-8 w-full flex items-center justify-center gap-1 rounded-lg text-[12px] md:text-[13px] font-black tracking-wide transition-colors duration-200',

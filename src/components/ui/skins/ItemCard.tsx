@@ -1,9 +1,9 @@
 'use client';
 
 import React, { memo, useMemo, useState, useRef, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
-import { Check, Info, Loader2, Repeat, X } from 'lucide-react';
+import { Check, ChevronDown, Info, Loader2, Repeat } from 'lucide-react';
+import { BaseSheet } from '@/components/ui/BaseSheet';
 import Fly from '@/components/ui/fly';
 import { cn } from '@/lib/utils';
 import { isTradeOnlyRarity } from '@/lib/skins/catalog';
@@ -258,8 +258,8 @@ function ItemCardComponent({
           ? 'p-1.5 pb-0 md:p-2 md:pb-0.5 rounded-xl border-2'
           : 'p-2.5 pb-1 md:p-3.5 md:pb-1.5 rounded-2xl border-[3px]',
         compact &&
-          mode === 'inventory' &&
-          item.slot !== 'container' &&
+          (mode === 'trade' ||
+            (mode === 'inventory' && item.slot !== 'container')) &&
           'pb-1.5 md:pb-2',
         config.border,
         config.bg,
@@ -294,7 +294,7 @@ function ItemCardComponent({
       <div
         className={cn(
           compact
-            ? 'mt-0 mb-0.5 aspect-[1/1.1] rounded-lg'
+            ? 'mt-0 mb-0.5 aspect-square rounded-lg'
             : 'mt-4 mb-1 md:mt-5 md:mb-2 aspect-[1/0.75] md:aspect-[1.2/1] rounded-xl',
           'mx-auto w-full flex items-center justify-center relative overflow-hidden',
           'bg-gradient-to-br shadow-inner',
@@ -360,12 +360,34 @@ function ItemCardComponent({
           />
         )}
 
-        {ownedCount > 0 && (
-          <StackBadge
-            owned={ownedCount}
-            selected={mode === 'trade' ? selectedCount || 0 : 0}
-          />
+        {mode === 'shop' ? (
+          isOwned && (
+            <div className="absolute top-1 right-1 z-20 flex items-center gap-0.5 rounded-md bg-green-500 px-1.5 py-0.5 text-[9px] font-black text-white shadow-sm md:top-1.5 md:right-1.5 md:text-[10px]">
+              <Check className="h-2.5 w-2.5 stroke-[4]" />
+              {ownedCount > 1 ? `x${ownedCount}` : 'Owned'}
+            </div>
+          )
+        ) : (
+          (ownedCount > 1 || (mode === 'trade' && isSelected)) && (
+            <StackBadge
+              owned={ownedCount}
+              selected={mode === 'trade' ? selectedCount || 0 : 0}
+            />
+          )
         )}
+        <AnimatePresence>
+          {mode === 'trade' && isSelected && !customAction && (
+            <motion.div
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 550, damping: 18 }}
+              className="absolute bottom-1 right-1 z-20 rounded-full bg-primary p-1 text-primary-foreground shadow-md"
+            >
+              <Check className="h-3 w-3 stroke-[4]" />
+            </motion.div>
+          )}
+        </AnimatePresence>
         <AnimatePresence>
           {compact && isEquipped && !customAction && (
             <motion.div
@@ -388,20 +410,6 @@ function ItemCardComponent({
 
       {/* Actions */}
       <div className="w-full mx-auto mt-0 md:w-3/4">
-        {mode === 'trade' && !customAction && (
-          <div
-            className={cn(
-              'h-7 md:h-8 w-full flex items-center justify-center rounded-lg text-[12px] md:text-[13px] font-black tracking-wide transition-colors',
-              compact && 'mt-1 mb-1.5',
-              isSelected
-                ? 'bg-primary text-primary-foreground shadow-md'
-                : 'bg-primary/15 text-primary border border-primary/30 group-hover:bg-primary/25',
-            )}
-          >
-            {actionLoading ? '...' : isSelected ? 'SELECTED' : 'SELECT'}
-          </div>
-        )}
-
         {/* Custom Action (e.g. Claim) */}
         {customAction && (
           <div className="w-full" onClick={(e) => e.stopPropagation()}>
@@ -632,9 +640,7 @@ function DropRatesButton({ giftId, name }: { giftId: string; name: string }) {
         Drop Rates
       </button>
 
-      <AnimatePresence>
-        {open && <DropRatesPopup giftId={giftId} name={name} onClose={handleClose} />}
-      </AnimatePresence>
+      <DropRatesPopup open={open} giftId={giftId} name={name} onClose={handleClose} />
     </>
   );
 }
@@ -679,37 +685,39 @@ export function GiftOddsButton({
           className,
         )}
       >
-        ?
+        <Info className="h-3.5 w-3.5" strokeWidth={2.75} />
       </button>
 
-      <AnimatePresence>
-        {open && (
-          <DropRatesPopup giftId={giftId} name={name} onClose={handleClose} />
-        )}
-      </AnimatePresence>
+      <DropRatesPopup
+        open={open}
+        giftId={giftId}
+        name={name}
+        onClose={handleClose}
+      />
     </>
   );
 }
 
 function DropRatesPopup({
+  open,
   giftId,
   name,
   onClose,
 }: {
+  open: boolean;
   giftId: string;
   name: string;
   onClose: () => void;
 }) {
-  const [mounted, setMounted] = useState(false);
+  const [rulesOpen, setRulesOpen] = useState(false);
   const [drops, setDrops] = useState<GiftDropRate[]>([]);
   const [rarityDrops, setRarityDrops] = useState<GiftRarityDropRate[]>([]);
   const [dropMode, setDropMode] = useState<'item' | 'rarity'>('item');
   const [mechanics, setMechanics] = useState<GiftMechanics | null>(null);
   const [loading, setLoading] = useState(true);
-  React.useEffect(() => setMounted(true), []);
-
   React.useEffect(() => {
-    if (!mounted) return;
+    if (!open) return;
+    setRulesOpen(false);
     let cancelled = false;
     setLoading(true);
     fetch(`/api/skins/gift-drops?giftId=${encodeURIComponent(giftId)}`)
@@ -733,9 +741,7 @@ function DropRatesPopup({
     return () => {
       cancelled = true;
     };
-  }, [giftId, mounted]);
-
-  if (!mounted) return null;
+  }, [giftId, open]);
 
   // Rarity mode: one row per rarity bucket (no per-item list).
   const rarityTotal = rarityDrops.reduce((sum, d) => sum + Math.max(0, d.chance), 0);
@@ -759,118 +765,80 @@ function DropRatesPopup({
   const isRarityMode = dropMode === 'rarity';
   const hasContent = isRarityMode ? rarityRows.length > 0 : itemGroups.length > 0;
 
-  return createPortal(
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.12 }}
-      className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
-      onClick={(e) => { e.stopPropagation(); onClose(); }}
-      onMouseDown={(e) => e.stopPropagation()}
-      onPointerDown={(e) => e.stopPropagation()}
-    >
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.12 }}
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-      />
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.9, y: 20 }}
-        transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-        onClick={(e) => e.stopPropagation()}
-        onMouseDown={(e) => e.stopPropagation()}
-        className="relative flex max-h-[80vh] w-full max-w-xs flex-col overflow-hidden rounded-3xl border border-border/60 bg-card shadow-2xl"
-      >
-        {/* Header */}
-        <div className="flex items-start justify-between gap-3 border-b border-border/40 px-5 pb-3 pt-5">
-          <div className="min-w-0">
-            <h3 className="truncate text-sm font-black tracking-tight text-foreground">{name}</h3>
-            <p className="mt-0.5 text-[11px] font-bold text-muted-foreground">
-              {isRarityMode ? 'Chance to win each rarity' : 'Drop rates'}
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="-mr-1 -mt-1 shrink-0 rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+  const stop = (e: React.SyntheticEvent) => e.stopPropagation();
 
-        {/* Body */}
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-          {loading ? (
-            <div className="flex items-center justify-center py-8 text-muted-foreground">
-              <Loader2 className="h-5 w-5 animate-spin" />
+  return (
+    <span
+      className="contents"
+      onClick={stop}
+      onMouseDown={stop}
+      onPointerDown={stop}
+    >
+      <BaseSheet
+        open={open}
+        onOpenChange={(v) => {
+          if (!v) onClose();
+        }}
+        className="max-h-[85dvh] sm:max-w-[400px]"
+        zIndex={1300}
+        closeAriaLabel="Close drop rates"
+      >
+        {({ bindScroll }) => (
+          <div
+            ref={bindScroll}
+            className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-5 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-3 sm:px-6 sm:pb-6 sm:pt-6"
+          >
+            <div className="pr-12">
+              <p className="text-[12px] font-black text-muted-foreground">
+                {isRarityMode ? 'Chance for each rarity' : 'Drop rates'}
+              </p>
+              <h3 className="truncate text-xl font-black tracking-tight text-foreground">
+                {name}
+              </h3>
             </div>
-          ) : !hasContent ? (
-            <div className="rounded-2xl border border-border/50 bg-muted/30 p-4 text-center text-xs font-bold text-muted-foreground">
-              No drops configured.
-            </div>
-          ) : isRarityMode ? (
-            <div className="space-y-2">
-              {rarityRows.map((row, i) => {
-                const tile = RARITY_TILE[row.rarity];
-                return (
-                  <motion.div
-                    key={row.rarity}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.04, type: 'spring', stiffness: 400, damping: 28 }}
-                    className={cn(
-                      'flex items-center gap-3 rounded-2xl border bg-gradient-to-br px-4 py-3 shadow-sm',
-                      tile.border,
-                      tile.gradient,
-                    )}
-                  >
-                    <span className={cn('h-2.5 w-2.5 shrink-0 rounded-full', tile.dot)} />
-                    <span className={cn('text-sm font-black tracking-wide', tile.text)}>
-                      {RARITY_LABEL[row.rarity]}
-                    </span>
-                    <span className={cn('ml-auto text-lg font-black tabular-nums', tile.text)}>
-                      {formatChance(row.pct)}
-                    </span>
-                  </motion.div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="space-y-2.5">
-              {itemGroups.map((group, i) => {
-                const tile = RARITY_TILE[group.rarity];
-                return (
-                  <motion.div
-                    key={group.rarity}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.04, type: 'spring', stiffness: 400, damping: 28 }}
-                    className={cn(
-                      'overflow-hidden rounded-2xl border bg-gradient-to-br shadow-sm',
-                      tile.border,
-                      tile.gradient,
-                    )}
-                  >
-                    {/* Rarity header */}
-                    <div className="flex items-center gap-2 px-4 pb-2 pt-2.5">
-                      <span className={cn('h-2.5 w-2.5 shrink-0 rounded-full', tile.dot)} />
-                      <span className={cn('text-sm font-black tracking-wide', tile.text)}>
-                        {RARITY_LABEL[group.rarity]}
-                      </span>
-                      <span className={cn('ml-auto text-base font-black tabular-nums', tile.text)}>
-                        {formatChance(group.pct)}
-                      </span>
-                    </div>
-                    {/* Items inside this rarity */}
-                    <div className="space-y-0.5 bg-background/55 px-4 py-2 dark:bg-background/30">
+
+            <div className="mt-4">
+              {loading ? (
+                <div className="space-y-2">
+                  {[0, 1, 2, 3].map((i) => (
+                    <div
+                      key={i}
+                      className="h-12 animate-pulse rounded-2xl bg-muted/60"
+                    />
+                  ))}
+                </div>
+              ) : !hasContent ? (
+                <div className="rounded-2xl border border-border/50 bg-muted/30 p-4 text-center text-xs font-bold text-muted-foreground">
+                  No drops configured.
+                </div>
+              ) : isRarityMode ? (
+                <div className="space-y-2">
+                  {rarityRows.map((row, i) => (
+                    <DropRateRow
+                      key={row.rarity}
+                      rarity={row.rarity}
+                      pct={row.pct}
+                      index={i}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {itemGroups.map((group, i) => (
+                    <DropRateRow
+                      key={group.rarity}
+                      rarity={group.rarity}
+                      pct={group.pct}
+                      index={i}
+                    >
                       {group.items.map((drop) => {
-                        const raw = itemTotal > 0 ? (drop.chance / itemTotal) * 100 : 0;
+                        const raw =
+                          itemTotal > 0 ? (drop.chance / itemTotal) * 100 : 0;
                         return (
-                          <div key={drop.itemId} className="flex items-center justify-between gap-2">
+                          <div
+                            key={drop.itemId}
+                            className="flex items-center justify-between gap-2"
+                          >
                             <span className="truncate text-xs font-bold text-foreground">
                               {drop.item?.name ?? drop.itemId}
                             </span>
@@ -880,18 +848,111 @@ function DropRatesPopup({
                           </div>
                         );
                       })}
-                    </div>
-                  </motion.div>
-                );
-              })}
+                    </DropRateRow>
+                  ))}
+                </div>
+              )}
             </div>
-          )}
 
-          {!loading && mechanics && <GiftMechanicsNote mechanics={mechanics} />}
+            {!loading && mechanics && (
+              <div className="mt-3">
+                <button
+                  type="button"
+                  onClick={() => setRulesOpen((v) => !v)}
+                  aria-expanded={rulesOpen}
+                  className="flex h-10 w-full items-center justify-center gap-1.5 rounded-xl text-[13px] font-black text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+                >
+                  <Info className="h-4 w-4" strokeWidth={2.5} />
+                  How the draw works
+                  <ChevronDown
+                    className={cn(
+                      'h-4 w-4 transition-transform duration-200',
+                      rulesOpen && 'rotate-180',
+                    )}
+                    strokeWidth={2.5}
+                  />
+                </button>
+                <AnimatePresence initial={false}>
+                  {rulesOpen && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
+                      className="overflow-hidden"
+                    >
+                      <GiftMechanicsNote mechanics={mechanics} />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
+          </div>
+        )}
+      </BaseSheet>
+    </span>
+  );
+}
+
+function DropRateRow({
+  rarity,
+  pct,
+  index,
+  children,
+}: {
+  rarity: Rarity;
+  pct: number;
+  index: number;
+  children?: React.ReactNode;
+}) {
+  const tile = RARITY_TILE[rarity];
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{
+        delay: index * 0.04,
+        type: 'spring',
+        stiffness: 400,
+        damping: 28,
+      }}
+      className={cn(
+        'overflow-hidden rounded-2xl border bg-gradient-to-br shadow-sm',
+        tile.border,
+        tile.gradient,
+      )}
+    >
+      <div className="px-4 py-2.5">
+        <div className="flex items-center gap-2">
+          <span className={cn('h-2.5 w-2.5 shrink-0 rounded-full', tile.dot)} />
+          <span className={cn('text-sm font-black tracking-wide', tile.text)}>
+            {RARITY_LABEL[rarity]}
+          </span>
+          <span
+            className={cn('ml-auto text-base font-black tabular-nums', tile.text)}
+          >
+            {formatChance(pct)}
+          </span>
         </div>
-      </motion.div>
-    </motion.div>,
-    document.body,
+        <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-foreground/[.07]">
+          <motion.div
+            initial={{ scaleX: 0 }}
+            animate={{ scaleX: Math.max(0.02, Math.min(1, pct / 100)) }}
+            transition={{
+              delay: 0.1 + index * 0.04,
+              duration: 0.6,
+              ease: [0.22, 1, 0.36, 1],
+            }}
+            className={cn('h-full w-full origin-left rounded-full', tile.dot)}
+          />
+        </div>
+      </div>
+      {children && (
+        <div className="space-y-0.5 bg-background/55 px-4 py-2 dark:bg-background/30">
+          {children}
+        </div>
+      )}
+    </motion.div>
   );
 }
 
@@ -935,10 +996,7 @@ function GiftMechanicsNote({
       : []),
   ];
   return (
-    <div className="mt-4 space-y-2 rounded-2xl border border-border/50 bg-muted/25 p-3.5">
-      <p className="text-[12px] font-black text-muted-foreground">
-        How the draw works
-      </p>
+    <div className="mt-1 space-y-2 rounded-2xl border border-border/50 bg-muted/25 p-3.5">
       {rows.map(([label, body]) => (
         <div key={label}>
           <p className="text-[11px] font-black text-foreground">{label}</p>

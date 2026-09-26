@@ -1340,12 +1340,17 @@ function WardrobeManagerContent({
     bg.catalog,
   ]);
 
-  const renderInventoryCard = (card: WardrobeCard, index: number) =>
+  const renderInventoryCard = (
+    card: WardrobeCard,
+    index: number,
+    hideRarity = false,
+  ) =>
     card.kind === 'item' ? (
       <ItemCard
         key={card.item.id}
         item={card.item}
         mode="inventory"
+        hideRarity={hideRarity}
         ownedCount={data?.wardrobe?.inventory?.[card.item.id] ?? 0}
         isEquipped={
           data?.wardrobe?.equipped?.[card.item.slot] === card.item.id
@@ -1376,6 +1381,7 @@ function WardrobeManagerContent({
         canAfford={bg.balance >= card.bg.priceFlies}
         mode="inventory"
         compact
+        hideRarity={hideRarity}
         actionLoading={bg.busyId === card.bg.id}
         onAction={() => bg.handleEquip(card.bg)}
       />
@@ -1425,6 +1431,7 @@ function WardrobeManagerContent({
         count={data?.wardrobe?.inventory?.[card.item.id] ?? 0}
         isNew={unseenInventorySet.has(card.item.id)}
         rarityBadge
+        cta="Open"
         corner={
           <GiftOddsButton giftId={card.item.id} name={card.item.name} />
         }
@@ -1440,12 +1447,17 @@ function WardrobeManagerContent({
       </WardrobeRowCard>
     ) : null;
 
-  const renderShopCard = (card: WardrobeCard, index: number) =>
+  const renderShopCard = (
+    card: WardrobeCard,
+    index: number,
+    hideRarity = false,
+  ) =>
     card.kind === 'item' ? (
       <ItemCard
         key={card.item.id}
         item={card.item}
         mode="shop"
+        hideRarity={hideRarity}
         ownedCount={data?.wardrobe?.inventory?.[card.item.id] ?? 0}
         isEquipped={false}
         canAfford={balance >= (card.item.priceFlies ?? 0) && !isGuest}
@@ -1467,6 +1479,7 @@ function WardrobeManagerContent({
         canAfford={bg.balance >= card.bg.priceFlies && !isGuest}
         mode="shop"
         compact
+        hideRarity={hideRarity}
         actionLoading={bg.busyId === card.bg.id}
         onAction={() => openBgPurchase(card.bg)}
       />
@@ -1542,8 +1555,9 @@ function WardrobeManagerContent({
                 aria-hidden
                 className={cn(
                   'pointer-events-none absolute left-1/2 top-0 bottom-0 -z-10 w-screen -translate-x-1/2',
-                  'border-b border-border/50 bg-background',
-                  'shadow-lg shadow-black/5 dark:shadow-black/20',
+                  'border-b border-border/50 bg-background shadow-lg shadow-black/5 dark:shadow-black/20',
+                  'md:border-border/30 md:bg-background/70 md:shadow-none md:backdrop-blur-xl',
+                  'transition-opacity duration-200',
                   isStuck ? 'opacity-100' : 'opacity-0',
                 )}
               />
@@ -1658,7 +1672,7 @@ function WardrobeManagerContent({
                       ? [
                           {
                             id: 'all',
-                            label: 'All Items',
+                            label: 'All',
                             icon: <Sparkles className="w-5 h-5" />,
                           },
                           {
@@ -1690,7 +1704,7 @@ function WardrobeManagerContent({
                       : [
                           {
                             id: 'all',
-                            label: 'All Items',
+                            label: 'All',
                             icon: <Sparkles className="w-5 h-5" />,
                           },
                           {
@@ -1856,6 +1870,7 @@ function WardrobeManagerContent({
                       label: React.ReactNode,
                       labelClass: string,
                       cards: WardrobeCard[],
+                      groupedByRarity = false,
                     ) =>
                       cards.length ? (
                         <div key={key} className="pb-2 last:pb-4">
@@ -1869,7 +1884,11 @@ function WardrobeManagerContent({
                           </p>
                           <div className={cardGridClass}>
                             {cards.map((card) =>
-                              renderInventoryCard(card, cardIndex++),
+                              renderInventoryCard(
+                                card,
+                                cardIndex++,
+                                groupedByRarity,
+                              ),
                             )}
                           </div>
                         </div>
@@ -1897,6 +1916,7 @@ function WardrobeManagerContent({
                           rarityHeading(group.rarity),
                           RARITY_CONFIG[group.rarity].text,
                           group.cards,
+                          true,
                         ),
                       );
                     }
@@ -2000,6 +2020,7 @@ function WardrobeManagerContent({
                             rarityHeading(group.rarity),
                             RARITY_CONFIG[group.rarity].text,
                             group.cards,
+                            true,
                           ),
                         )}
                       </>
@@ -2159,7 +2180,7 @@ function WardrobeManagerContent({
                         </p>
                         <div className={cardGridClass}>
                           {group.cards.map((card) =>
-                            renderShopCard(card, cardIndex++),
+                            renderShopCard(card, cardIndex++, true),
                           )}
                         </div>
                       </div>
@@ -2313,6 +2334,7 @@ function WardrobeRowCard({
   equipped,
   rarityBadge,
   corner,
+  cta,
   onClick,
   children,
 }: {
@@ -2325,6 +2347,7 @@ function WardrobeRowCard({
   equipped?: boolean;
   rarityBadge?: boolean;
   corner?: React.ReactNode;
+  cta?: string;
   onClick: () => void;
   children: React.ReactNode;
 }) {
@@ -2386,16 +2409,27 @@ function WardrobeRowCard({
             {name}
           </p>
         )}
-        <p
-          className={cn(
-            'truncate text-[10px] font-semibold',
-            !name && 'mt-1.5',
-            corner && 'pr-7',
-            sublabelClass ?? 'text-muted-foreground',
-          )}
-        >
-          {sublabel}
-        </p>
+        {cta ? (
+          <span
+            className={cn(
+              'mt-1.5 flex h-6 items-center justify-center rounded-lg bg-primary text-[11px] font-black text-primary-foreground shadow-sm',
+              corner && 'mr-7',
+            )}
+          >
+            {cta}
+          </span>
+        ) : (
+          <p
+            className={cn(
+              'truncate text-[10px] font-semibold',
+              !name && 'mt-1.5',
+              corner && 'pr-7',
+              sublabelClass ?? 'text-muted-foreground',
+            )}
+          >
+            {sublabel}
+          </p>
+        )}
       </button>
       {corner && (
         <div className="absolute bottom-2 right-2 z-30">{corner}</div>

@@ -270,41 +270,14 @@ export function PurchaseSheet({
             ref={bindScroll}
             className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-5 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-3 sm:px-6 sm:pb-6 sm:pt-7"
           >
-            {/* Eyebrow */}
-            <div className="flex items-center gap-2 pr-12 sm:pr-14">
-              <span
-                className={cn(
-                  'rounded-full px-2.5 py-1 text-[12px] font-black',
-                  rarity.chip,
-                )}
-              >
-                {rarity.label}
-              </span>
-              {target.slotLabel && (
-                <span className="text-[13px] font-bold text-muted-foreground">
-                  {target.slotLabel}
-                </span>
-              )}
-              {owned ? (
-                <span className="ml-auto rounded-full bg-foreground/5 px-2.5 py-1 text-[12px] font-black text-muted-foreground">
-                  Owned ×{ownedCount}
-                </span>
-              ) : onDeal ? (
-                <span className="ml-auto rounded-full bg-red-500 px-2.5 py-1 text-[12px] font-black text-white shadow-sm shadow-red-500/30">
-                  Deal today
-                </span>
-              ) : null}
-            </div>
-
-            {/* Preview */}
             <div
               className={cn(
-                'relative mx-auto mt-4 flex shrink-0 items-center justify-center overflow-hidden rounded-[28px] bg-gradient-to-br ring-1',
+                'relative mx-auto mt-3 flex shrink-0 items-center justify-center overflow-hidden rounded-[28px] bg-gradient-to-br ring-1',
                 // Sized off the viewport height so the preview yields first on
                 // a short screen instead of pushing the actions off-sheet.
                 previewWide
                   ? 'aspect-[16/10] w-full'
-                  : 'aspect-square w-[min(260px,28dvh)]',
+                  : 'aspect-square w-[min(280px,30dvh)]',
                 rarity.gradient,
                 rarity.ring,
                 (phase === 'success' || rarity.restGlow) && rarity.glow,
@@ -370,6 +343,36 @@ export function PurchaseSheet({
               {target.name}
             </motion.h2>
 
+            <div className="mt-2 flex flex-wrap items-center justify-center gap-1.5">
+              <span
+                className={cn(
+                  'rounded-full px-2.5 py-0.5 text-[12px] font-black',
+                  rarity.chip,
+                )}
+              >
+                {rarity.label}
+              </span>
+              {target.slotLabel && (
+                <span className="rounded-full bg-foreground/5 px-2.5 py-0.5 text-[12px] font-bold text-muted-foreground">
+                  {target.slotLabel}
+                </span>
+              )}
+              {owned && phase === 'confirm' && (
+                <span className="flex items-center gap-1 rounded-full bg-green-500/10 px-2.5 py-0.5 text-[12px] font-black text-green-700 dark:text-green-400">
+                  <Check className="h-3 w-3 stroke-[4]" />
+                  Owned{ownedCount > 1 ? ` ×${ownedCount}` : ''}
+                </span>
+              )}
+              {!owned && onDeal && (
+                <span className="flex items-center gap-1.5 rounded-full bg-red-500 px-2.5 py-0.5 text-[12px] font-black text-white shadow-sm shadow-red-500/30">
+                  −{savedPercent}%
+                  <span className="font-bold tabular-nums line-through decoration-2 opacity-80">
+                    {target.originalPrice?.toLocaleString()}
+                  </span>
+                </span>
+              )}
+            </div>
+
             {(phase === 'success' || owned) && (
               <p className="mt-1.5 text-center text-sm font-medium text-muted-foreground">
                 {phase === 'success'
@@ -419,72 +422,34 @@ export function PurchaseSheet({
               </div>
             )}
 
-            {/* Price */}
-            {phase === 'confirm' && !owned && !tradeOnly && (
-              <div className="mt-3.5 rounded-[22px] border border-border/60 bg-muted/40 p-4">
-                <div className="flex items-center justify-center">
-                  <span className="relative text-[30px] font-black leading-none tracking-tight tabular-nums text-foreground">
-                    {price.toLocaleString()}
-                    <span className="absolute left-full top-1/2 ml-2 -translate-y-1/2">
-                      <Fly size={36} paused y={-6} />
+            {phase === 'confirm' && !owned && !tradeOnly && !canAfford && !isGuest && (
+              <div className="mt-4 rounded-2xl border border-border/60 bg-muted/40 px-4 py-3">
+                <div className="mb-1.5 flex items-baseline justify-between text-[13px] font-black">
+                  <span className="text-muted-foreground">Your flies</span>
+                  <span className="tabular-nums text-foreground">
+                    {balance.toLocaleString()}
+                    <span className="text-muted-foreground">
+                      {' / '}
+                      {price.toLocaleString()}
                     </span>
                   </span>
                 </div>
-                {onDeal && (
-                  <div className="mt-2 flex items-center justify-center gap-2">
-                    <span className="text-sm font-bold leading-none tabular-nums text-muted-foreground line-through decoration-2">
-                      {target.originalPrice?.toLocaleString()}
-                    </span>
-                    <span className="rounded-full bg-red-500 px-1.5 py-0.5 text-[12px] font-black leading-none text-white">
-                      −{savedPercent}%
-                    </span>
-                  </div>
-                )}
-
-                {!canAfford && !isGuest ? (
-                  <div className="mt-4">
-                    <div className="mb-1.5 flex items-baseline justify-between text-[13px] font-black">
-                      <span className="text-muted-foreground">Your flies</span>
-                      <span className="tabular-nums text-foreground">
-                        {balance.toLocaleString()}
-                        <span className="text-muted-foreground">
-                          {' / '}
-                          {price.toLocaleString()}
-                        </span>
-                      </span>
-                    </div>
-                    <div className="relative h-2.5 w-full overflow-hidden rounded-full bg-border/70">
-                      <motion.div
-                        initial={{ width: 0 }}
-                        animate={{ width: `${Math.max(4, progress)}%` }}
-                        transition={{ duration: 0.75, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
-                        className="relative h-full overflow-hidden rounded-full bg-gradient-to-r from-green-500 to-emerald-400"
-                      >
-                        <span className="absolute inset-0 animate-shimmer bg-[linear-gradient(110deg,transparent_35%,rgba(255,255,255,0.55)_50%,transparent_65%)] bg-[length:200%_100%]" />
-                      </motion.div>
-                    </div>
-                    <p className="mt-2.5 text-center text-[13px] font-black text-foreground">
-                      <span className="tabular-nums">{shortBy.toLocaleString()}</span>{' '}
-                      more to go
-                      <span className="ml-1.5 font-bold text-muted-foreground">
-                        · {Math.floor(progress)}% there
-                      </span>
-                    </p>
-                  </div>
-                ) : canAfford ? (
-                  <div className="mt-3 flex items-center justify-center gap-1.5 border-t border-dashed border-border/70 pt-3 text-xs font-bold text-muted-foreground">
-                    <span>Balance</span>
-                    <AnimatedNumber
-                      value={balance}
-                      haptics
-                      className="tabular-nums text-foreground"
-                    />
-                    <span className="opacity-50">→</span>
-                    <span className="tabular-nums text-foreground">
-                      {(balance - price).toLocaleString()} left
-                    </span>
-                  </div>
-                ) : null}
+                <div className="relative h-2.5 w-full overflow-hidden rounded-full bg-border/70">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${Math.max(4, progress)}%` }}
+                    transition={{ duration: 0.75, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
+                    className="relative h-full overflow-hidden rounded-full bg-gradient-to-r from-green-500 to-emerald-400"
+                  >
+                    <span className="absolute inset-0 animate-shimmer bg-[linear-gradient(110deg,transparent_35%,rgba(255,255,255,0.55)_50%,transparent_65%)] bg-[length:200%_100%]" />
+                  </motion.div>
+                </div>
+                <p className="mt-2 text-center text-[12px] font-bold text-muted-foreground">
+                  <span className="font-black tabular-nums text-foreground">
+                    {shortBy.toLocaleString()}
+                  </span>{' '}
+                  more to go · {Math.floor(progress)}% there
+                </p>
               </div>
             )}
 
@@ -496,7 +461,6 @@ export function PurchaseSheet({
               </div>
             )}
 
-            {/* Actions */}
             <div className="mt-5 flex shrink-0 flex-col gap-2.5">
               {phase === 'success' ? (
                 <>
@@ -592,6 +556,18 @@ export function PurchaseSheet({
                       <Fly size={30} paused y={-5} />
                     </span>
                   </PrimaryButton>
+                  <p className="-mt-0.5 flex items-center justify-center gap-1.5 text-[12px] font-bold text-muted-foreground">
+                    <span>You have</span>
+                    <AnimatedNumber
+                      value={balance}
+                      className="tabular-nums text-foreground"
+                    />
+                    <span className="opacity-50">→</span>
+                    <span className="tabular-nums text-foreground">
+                      {(balance - price).toLocaleString()}
+                    </span>
+                    <span>after</span>
+                  </p>
                   <WishlistButton
                     isPinned={isPinned}
                     upsell={wishlistUpsell}
@@ -614,7 +590,12 @@ export function PurchaseSheet({
                   disabled
                   className="flex h-14 w-full items-center justify-center rounded-2xl bg-muted text-sm font-black tracking-wide text-muted-foreground"
                 >
-                  Sign in to buy
+                  <span className="inline-flex items-center gap-1.5">
+                    Sign in to buy
+                    <span className="opacity-50">·</span>
+                    <span className="tabular-nums">{price.toLocaleString()}</span>
+                    <Fly size={28} paused y={-5} />
+                  </span>
                 </button>
               ) : (
                 <>

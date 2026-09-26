@@ -595,6 +595,24 @@ export function TradePanel({
     setSelectedIds((prev) => [...prev, entry.uid]);
   };
 
+  const handleToggle = (entry: TradeEntry) => {
+    const selected = selectedCounts[entry.uid] || 0;
+    const full = selected >= entry.owned || !canSelect(entry);
+    if (selected === 0 || !full) {
+      handleSelect(entry);
+      return;
+    }
+    hapticSelect();
+    const mainIndex = selectedIds.lastIndexOf(entry.uid);
+    if (mainIndex >= 0) {
+      setSelectedIds((prev) => prev.filter((_, i) => i !== mainIndex));
+      return;
+    }
+    const fuelIndex = fuelIds.lastIndexOf(entry.uid);
+    if (fuelIndex >= 0)
+      setFuelIds((prev) => prev.filter((_, i) => i !== fuelIndex));
+  };
+
   const handleRemove = (index: number) => {
     hapticSelect();
     setSelectedIds((prev) => prev.filter((_, i) => i !== index));
@@ -878,7 +896,11 @@ export function TradePanel({
         onClick: handleConfirmTrade,
         label: (
           <span className="inline-flex items-center gap-2">
-            Trade up
+            {targetRarity && nextRarity && !fuelRarity
+              ? `Trade ${countOf(slotCount, targetRarity)} → 1 ${nextRarity}`
+              : nextRarity
+                ? `Trade for 1 ${nextRarity}`
+                : 'Trade up'}
             <ArrowUp size={18} strokeWidth={3} />
           </span>
         ),
@@ -1230,7 +1252,7 @@ export function TradePanel({
           primaryCta.tone === 'flies' &&
             'bg-amber-500 text-white shadow-[0_4px_0_0_#b45309] active:translate-y-0.5',
           primaryCta.tone === 'fill' &&
-            'bg-foreground/90 text-background shadow-[0_4px_0_0_hsl(var(--foreground)/0.45)] active:translate-y-0.5',
+            'border border-primary/30 bg-primary/10 text-primary shadow-none hover:bg-primary/15 active:scale-[0.98]',
           primaryCta.tone === 'idle' && 'bg-muted text-muted-foreground/70',
         )}
       >
@@ -1475,20 +1497,16 @@ export function TradePanel({
                   hapticSelect();
                   onUpgrade?.();
                 }}
-                className="group mb-2 flex w-full items-center gap-2 rounded-xl px-1.5 py-1.5 text-left transition-colors hover:bg-amber-500/10"
+                className="group mx-auto mb-1.5 flex max-w-full items-center justify-center gap-1.5 rounded-full px-2 py-1 transition-colors hover:bg-amber-500/10"
               >
                 <AppIcon
                   name="frogPlus"
                   label="Plus"
-                  className="h-6 w-6 shrink-0"
+                  className="h-4 w-4 shrink-0"
                 />
-                <span className="min-w-0 flex-1 truncate text-[11px] font-bold text-muted-foreground transition-colors group-hover:text-amber-700 dark:group-hover:text-amber-400">
+                <span className="min-w-0 truncate text-[11px] font-bold text-muted-foreground/80 transition-colors group-hover:text-amber-700 dark:group-hover:text-amber-400">
                   {plusPerk}
                 </span>
-                <ChevronDown
-                  size={14}
-                  className="-rotate-90 shrink-0 text-muted-foreground/50"
-                />
               </button>
             )}
 
@@ -1779,7 +1797,8 @@ export function TradePanel({
                 ) => {
                   const selected = selectedCounts[entry.uid] || 0;
                   const remaining = entry.owned - selected;
-                  const isDimmed = remaining === 0 || !canSelect(entry);
+                  const isDimmed =
+                    selected === 0 && (remaining === 0 || !canSelect(entry));
 
                   return (
                     <div
@@ -1802,7 +1821,7 @@ export function TradePanel({
                           canAfford={true}
                           actionLoading={false}
                           selectedCount={selected}
-                          onAction={() => handleSelect(entry)}
+                          onAction={() => handleToggle(entry)}
                           actionLabel={null}
                           isNew={unseenItems.includes(entry.id)}
                           deferPreview
@@ -1822,7 +1841,7 @@ export function TradePanel({
                           compact
                           actionLoading={false}
                           selectedCount={selected}
-                          onAction={() => handleSelect(entry)}
+                          onAction={() => handleToggle(entry)}
                         />
                       ) : null}
                     </div>

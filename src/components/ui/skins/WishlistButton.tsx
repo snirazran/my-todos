@@ -31,17 +31,18 @@ export function WishlistButton({
         onClick();
       }}
       className={cn(
-        'relative flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] border shadow-sm backdrop-blur-md transition-colors',
+        'relative flex h-10 min-w-10 shrink-0 items-center justify-center gap-1.5 rounded-full border px-2.5 text-[13px] font-black shadow-sm transition-colors',
         hot
           ? 'border-emerald-500/60 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 dark:text-emerald-400'
           : 'border-border/50 bg-card/50 text-muted-foreground hover:bg-accent/50',
       )}
     >
       <Bookmark
-        className="h-5 w-5"
+        className="h-4 w-4"
         strokeWidth={2.5}
         fill={count > 0 ? 'currentColor' : 'none'}
       />
+      <span className="hidden md:inline">Wishlist</span>
       {count > 0 && (
         <motion.span
           key={`${count}|${hot}`}

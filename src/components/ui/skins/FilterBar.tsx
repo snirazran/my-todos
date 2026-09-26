@@ -25,7 +25,7 @@ const CATEGORY_CONFIG: Record<
   FilterCategory,
   { label: string; icon: React.ReactNode }
 > = {
-  all: { label: 'All Items', icon: <Sparkles className="w-5 h-5" /> },
+  all: { label: 'All', icon: <Sparkles className="w-5 h-5" /> },
   container: { label: 'Gifts', icon: <Gift className="w-5 h-5" /> },
   skin: { label: 'Skins', icon: <Paintbrush className="w-5 h-5" /> },
   hat: { label: 'Hats', icon: <Crown className="w-5 h-5" /> },
@@ -171,7 +171,7 @@ export function FilterBar({
         onMouseMove={onMouseMove}
         className={cn(
           // Layout
-          'flex items-center gap-3 overflow-x-auto',
+          'flex items-center gap-2 overflow-x-auto',
           // Mobile Layout (Full Bleed)
           '-mx-4 px-4 w-[calc(100%+2rem)] md:mx-0 md:px-0 md:w-full',
           // Scroll & Interaction
@@ -208,16 +208,19 @@ export function FilterBar({
                 }
                 onChange(opt.id);
               }}
-              title={opt.label}
+              aria-pressed={isActive}
               className={cn(
-                'relative flex-none flex items-center justify-center gap-2 px-3 py-2 rounded-xl transition-all duration-200 border-[2px] shadow-sm select-none',
-                'text-sm font-bold whitespace-nowrap',
+                'relative flex h-10 flex-none select-none items-center justify-center gap-1.5 rounded-full border px-3.5 transition-colors duration-150',
+                'whitespace-nowrap text-[13px] font-black',
                 isActive
-                  ? 'bg-primary/12 text-primary border-primary/30 shadow-sm shadow-primary/10'
-                  : 'bg-muted/40 text-muted-foreground border-transparent hover:bg-muted/60 hover:text-foreground',
+                  ? 'border-primary/40 bg-primary/10 text-primary'
+                  : 'border-border/60 bg-card text-muted-foreground hover:bg-muted/50 hover:text-foreground',
               )}
             >
-              {opt.icon}
+              <span className="flex shrink-0 [&>svg]:h-4 [&>svg]:w-4" aria-hidden>
+                {opt.icon}
+              </span>
+              <span>{opt.label}</span>
               {badgeCount > 0 ? (
                 <span className={cn("absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center text-[10px] font-bold rounded-full border-2 border-background shadow-sm animate-in zoom-in", badgeClassName || "text-white bg-rose-500")}>
                   {badgeCount}
