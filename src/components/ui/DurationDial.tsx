@@ -47,7 +47,7 @@ export function DurationDial({
 
   return (
     <div className={compact ? 'flex flex-col items-center gap-2' : 'flex flex-col items-center gap-3'}>
-      <div className="relative flex h-[108px] w-[180px] items-center justify-center">
+      <div className="relative flex h-[96px] w-[180px] items-center justify-center">
         <AnimatePresence initial={false} mode="popLayout">
           {customOpen ? (
             <motion.div
@@ -99,7 +99,7 @@ export function DurationDial({
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.16 }}
-                className="text-[60px] font-black leading-none tracking-tighter tabular-nums drop-shadow-lg"
+                className="text-[52px] font-black leading-none tracking-tighter tabular-nums drop-shadow-lg"
               >
                 {rounded}
               </motion.span>

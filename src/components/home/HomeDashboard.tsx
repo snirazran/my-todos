@@ -513,6 +513,10 @@ export default function HomeDashboard() {
     // it. If another popup/menu is open, leave it to the global completion popup
     // (GlobalFrogodoroMini), which renders above everything.
     if (useSheetStore.getState().count > 0) return;
+    if (
+      useFrogodoroUiStore.getState().suppressedCompletionId === lastCompletionId
+    )
+      return;
 
     const completedTask =
       data.find((t) => t.id === lastCompletedTaskId) ??

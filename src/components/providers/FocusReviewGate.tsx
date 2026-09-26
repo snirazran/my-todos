@@ -55,7 +55,8 @@ export function FocusReviewGate() {
         .detail;
       if (
         ended &&
-        ended.focusSeconds >= MIN_REVIEWABLE_FOCUS_SECONDS &&
+        (ended.forceReview ||
+          ended.focusSeconds >= MIN_REVIEWABLE_FOCUS_SECONDS) &&
         !dismissedRef.current.has(ended.id)
       ) {
         setEndedHere({ ...ended, subjectTags: [] });

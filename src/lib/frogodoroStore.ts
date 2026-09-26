@@ -24,6 +24,7 @@ export type SessionEndedDetail = {
   subjectLabel: string;
   focusSeconds: number;
   breakSeconds: number;
+  forceReview?: boolean;
 };
 
 /** Tells the review gate a sitting just ended, so it can ask what got done. */
@@ -40,7 +41,7 @@ export const TEN_SECOND_MINUTES = 10 / 60;
 export const MAX_DURATION_MINUTES = 180;
 
 export const FOCUS_PRESETS = [15, 25, 45, 60];
-export const BREAK_PRESETS = [5, 10, 15];
+export const BREAK_PRESETS = [5, 10, 15, 30];
 
 export const DEFAULT_SETTINGS: FrogodoroSettings = {
   focusDuration: 25,

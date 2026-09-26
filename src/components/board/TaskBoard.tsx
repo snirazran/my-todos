@@ -816,6 +816,10 @@ export default function TaskBoard({
     if (isRehydrationArtifact) return;
 
     if (useSheetStore.getState().count > 0) return;
+    if (
+      useFrogodoroUiStore.getState().suppressedCompletionId === lastCompletionId
+    )
+      return;
 
     const completedTask =
       findTaskById(lastCompletedTaskId) ?? findTaskById(frogTaskId);

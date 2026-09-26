@@ -32,7 +32,7 @@ export type ReviewOutcome =
 
 type ReviewTask = { id: string; text: string; completed: boolean; tags?: string[] };
 
-const TASKS_SHOWN = 4;
+const TASKS_SHOWN = 3;
 
 function focusedLabel(seconds: number) {
   const minutes = Math.round(seconds / 60);
@@ -73,14 +73,14 @@ function NextCard({
         }
       }}
       aria-label={`${title}, ${minutes} minutes`}
-      className={`flex cursor-pointer flex-col gap-2 rounded-[22px] p-3.5 text-white shadow-sm transition-transform active:scale-[0.97] ${base}`}
+      className={`flex cursor-pointer flex-col gap-2.5 rounded-[22px] p-3.5 text-white shadow-sm transition-transform active:scale-[0.97] ${base}`}
     >
       <span className="flex items-center gap-1.5 text-[13px] font-black text-white/90">
         {icon}
         {title}
       </span>
       <span className="flex items-baseline gap-1">
-        <span className="text-[34px] font-black leading-none tracking-tight tabular-nums">
+        <span className="text-[32px] font-black leading-none tracking-tight tabular-nums">
           {minutes}
         </span>
         <span className="text-[13px] font-black text-white/75">min</span>
@@ -124,6 +124,7 @@ export function FocusReviewSheet({
   const [focusMinutes, setFocusMinutes] = useState(25);
   const [finishedIds, setFinishedIds] = useState<Set<string>>(new Set());
   const [showAllTasks, setShowAllTasks] = useState(false);
+  const finishedRef = useRef(false);
 
   const [frogSwap, setFrogSwap] = useState<'snapshot' | 'fading' | 'live'>(
     'snapshot',
@@ -154,6 +155,7 @@ export function FocusReviewSheet({
       setShowAllTasks(false);
       return;
     }
+    finishedRef.current = false;
     const store = useFrogodoroStore.getState();
     setBreakMinutes(Math.max(1, Math.round(store.settings.breakDuration)) || 5);
     setFocusMinutes(Math.max(1, Math.round(store.settings.focusDuration)) || 25);
@@ -189,7 +191,7 @@ export function FocusReviewSheet({
     ? candidates
     : candidates.slice(0, TASKS_SHOWN);
 
-  const toggleFinished = async (task: ReviewTask) => {
+  const toggleFinished = (task: ReviewTask) => {
     const nowDone = !finishedIds.has(task.id);
     if (nowDone) hapticSuccess();
     else hapticTick();
@@ -199,26 +201,21 @@ export function FocusReviewSheet({
       else next.delete(task.id);
       return next;
     });
-    try {
-      await fetch('/api/tasks', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          taskId: task.id,
-          date: today,
-          completed: nowDone,
-          timezone,
-        }),
-      });
-    } catch {
-      setFinishedIds((prev) => {
-        const next = new Set(prev);
-        if (nowDone) next.delete(task.id);
-        else next.add(task.id);
-        return next;
-      });
-    }
   };
+
+  const completeFinishedTasks = useCallback(async () => {
+    for (const taskId of Array.from(finishedIds)) {
+      try {
+        await fetch('/api/tasks', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ taskId, date: today, completed: true, timezone }),
+        });
+      } catch {
+        // Left open; it can still be ticked from the list.
+      }
+    }
+  }, [finishedIds, today, timezone]);
 
   const settleReview = useCallback(async () => {
     if (!review) return;
@@ -237,7 +234,10 @@ export function FocusReviewSheet({
   }, [review, finishedIds]);
 
   const finish = (outcome: ReviewOutcome) => {
+    if (finishedRef.current) return;
+    finishedRef.current = true;
     hapticSelect();
+    void completeFinishedTasks();
     void settleReview();
     onOutcome(outcome);
     onOpenChange(false);
@@ -255,7 +255,9 @@ export function FocusReviewSheet({
     <BaseSheet
       open={open}
       onOpenChange={(next) => {
-        if (!next) {
+        if (!next && !finishedRef.current) {
+          finishedRef.current = true;
+          void completeFinishedTasks();
           void settleReview();
           onOutcome({ kind: 'done' });
         }
@@ -268,14 +270,14 @@ export function FocusReviewSheet({
       {({ dragControls, isDesktop, entered }) => (
         <div className="flex max-h-[88dvh] flex-col">
           <div
-            className="flex shrink-0 flex-col items-center px-5 pb-2 pt-2 text-center sm:px-6 sm:pt-4"
+            className="flex shrink-0 flex-col items-center px-5 pb-1 pt-0 text-center sm:px-6"
             onPointerDown={isDesktop ? undefined : (event) => dragControls.start(event)}
           >
-            <div className="relative h-[92px] w-[82px]">
+            <div className="relative -mt-10 mb-7 h-[135px] w-[120px]">
               {entered && (
                 <Frog
-                  width={82}
-                  height={92}
+                  width={120}
+                  height={135}
                   indices={{ ...frogIndices, mood: 0 }}
                   emote="love"
                   ignoreIdlePause
@@ -288,23 +290,23 @@ export function FocusReviewSheet({
                     entered ? 'absolute inset-0' : ''
                   } ${frogSwap === 'fading' ? 'opacity-0' : 'opacity-100'}`}
                 >
-                  <FrogSnapshot indices={frogIndices} width={82} height={92} />
+                  <FrogSnapshot indices={frogIndices} width={120} height={135} />
                 </div>
               )}
             </div>
-            <h2 className="mt-1 text-balance text-[22px] font-black tracking-[-0.03em] text-foreground">
+            <h2 className="text-balance text-[24px] font-black leading-tight tracking-[-0.03em] text-foreground">
               Nice focus!
             </h2>
-            <p className="mt-1 inline-flex max-w-full items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-[13px] font-black text-primary">
+            <p className="mt-2 inline-flex max-w-full items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-[13px] font-black text-primary">
               <span className="tabular-nums">{focusedLabel(review.focusSeconds)}</span>
               <span className="opacity-60">on</span>
               <span className="truncate">{headline}</span>
             </p>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-4 pt-3 sm:px-6">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-4 pt-5 sm:px-6">
             {candidates.length > 0 && (
-              <section className="mb-5">
+              <section>
                 <h3 className="mb-2 px-1 text-[12px] font-black uppercase tracking-wide text-muted-foreground">
                   Finished anything?
                 </h3>
@@ -315,9 +317,9 @@ export function FocusReviewSheet({
                       <button
                         key={task.id}
                         type="button"
-                        onClick={() => void toggleFinished(task)}
+                        onClick={() => toggleFinished(task)}
                         aria-pressed={done}
-                        className={`flex min-h-[52px] w-full items-center gap-3 rounded-2xl border px-3.5 py-2 text-left transition-colors active:scale-[0.99] ${
+                        className={`flex min-h-[46px] w-full items-center gap-3 rounded-2xl border px-3.5 py-1.5 text-left transition-colors active:scale-[0.99] ${
                           done
                             ? 'border-primary/40 bg-primary/10'
                             : 'border-border/60 bg-card hover:bg-muted/40'
@@ -366,11 +368,14 @@ export function FocusReviewSheet({
               </section>
             )}
 
+          </div>
+
+          <div className="shrink-0 border-t border-border/50 px-5 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-4 sm:px-6">
             <section>
               <h3 className="mb-2 px-1 text-[12px] font-black uppercase tracking-wide text-muted-foreground">
                 Up next
               </h3>
-              <div className="grid grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-2 gap-3">
                 <NextCard
                   tone="break"
                   icon={<Coffee className="h-4 w-4" aria-hidden="true" />}
@@ -391,13 +396,10 @@ export function FocusReviewSheet({
                 />
               </div>
             </section>
-          </div>
-
-          <div className="shrink-0 px-5 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-1 sm:px-6">
             <button
               type="button"
               onClick={() => finish({ kind: 'done' })}
-              className="min-h-11 w-full rounded-2xl text-[14px] font-bold text-muted-foreground transition-colors hover:bg-muted/40"
+              className="mt-3 min-h-11 w-full rounded-2xl text-[14px] font-bold text-muted-foreground transition-colors hover:bg-muted/40"
             >
               I&apos;m done for now
             </button>

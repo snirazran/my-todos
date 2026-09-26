@@ -16,6 +16,8 @@ interface FrogodoroUiState {
   openSheets: number;
   addOpenSheet: () => void;
   removeOpenSheet: () => void;
+  suppressedCompletionId: number | null;
+  suppressCompletionPopup: (completionId: number) => void;
 }
 
 // Deliberately NOT persisted — it's transient mount state.
@@ -32,4 +34,7 @@ export const useFrogodoroUiStore = create<FrogodoroUiState>((set) => ({
   addOpenSheet: () => set((s) => ({ openSheets: s.openSheets + 1 })),
   removeOpenSheet: () =>
     set((s) => ({ openSheets: Math.max(0, s.openSheets - 1) })),
+  suppressedCompletionId: null,
+  suppressCompletionPopup: (completionId) =>
+    set({ suppressedCompletionId: completionId }),
 }));

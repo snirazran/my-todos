@@ -777,6 +777,20 @@ export default function FrogodoroSheet({
     }
   };
 
+  const actionBusyRef = useRef(false);
+  const [actionBusy, setActionBusy] = useState(false);
+  const runGuarded = async (fn: () => void | Promise<void>) => {
+    if (actionBusyRef.current) return;
+    actionBusyRef.current = true;
+    setActionBusy(true);
+    try {
+      await fn();
+    } finally {
+      actionBusyRef.current = false;
+      setActionBusy(false);
+    }
+  };
+
   // Acknowledge a finished session: silence the alarm and end the session. A
   // session ends when its timer ends, so the next phase is left fresh and
   // inactive (not a continuation) — the user starts it anew when ready. Doesn't
@@ -797,7 +811,7 @@ export default function FrogodoroSheet({
     setAwaitingDone(false);
     stopTimer();
     onOpenChange(false);
-    announceSessionEnded(ended);
+    announceSessionEnded(ended ? { ...ended, forceReview: true } : ended);
   };
 
   // Stop ends the current session and stays on the popup (now idle), so you can
@@ -826,6 +840,7 @@ export default function FrogodoroSheet({
   // Ending a focus session with meaningful time on the clock asks first — a
   // gentle nudge to keep going, never a punishment (the minutes still count).
   const handleStopTimer = () => {
+    if (actionBusyRef.current) return;
     const live = useFrogodoroStore.getState();
     if (
       phase === 'focus' &&
@@ -836,7 +851,7 @@ export default function FrogodoroSheet({
       setConfirmStop(true);
       return;
     }
-    void performStop();
+    void runGuarded(performStop);
   };
 
   const handleKeepGoing = () => {
@@ -858,7 +873,20 @@ export default function FrogodoroSheet({
       onMutateToday?.();
     }
     hapticImpact();
+    const wasFocus = phase === 'focus';
+    if (wasFocus) {
+      useFrogodoroUiStore
+        .getState()
+        .suppressCompletionPopup(useFrogodoroStore.getState().lastCompletionId + 1);
+    }
     completePhase(false, liveElapsed, true, true);
+    if (wasFocus) {
+      const ended = endedSessionDetail();
+      setAwaitingDone(false);
+      stopTimer();
+      onOpenChange(false);
+      announceSessionEnded(ended ? { ...ended, forceReview: true } : ended);
+    }
   };
   const persistTaskSettings = async (settingsToSave: typeof DEFAULT_SETTINGS) => {
     if (selectedTaskId) {
@@ -1510,7 +1538,7 @@ export default function FrogodoroSheet({
                            Stacked absolutely and cross-faded, the whole
                            transition is transform + opacity, so it stays on
                            the compositor and the card never reflows. */
-                        <div className={`relative mb-3 ${timerActive || awaitingDone ? 'h-[212px]' : 'h-[244px]'}`}>
+                        <div className="relative mb-3 h-[212px]">
                           <AnimatePresence initial={false} mode="popLayout">
                             {!timerActive && !awaitingDone ? (
                               <motion.div
@@ -1552,32 +1580,27 @@ export default function FrogodoroSheet({
                                     hapticTick();
                                     setDeepFocus(!deepFocus);
                                   }}
-                                  className={`flex w-full max-w-[300px] items-center gap-3 rounded-2xl px-3.5 py-2 text-left transition-colors ${
-                                    deepFocus ? 'bg-amber-300/25' : 'bg-black/15 hover:bg-black/20'
+                                  className={`flex min-h-9 items-center gap-2 rounded-full pl-3 pr-1.5 text-[12px] font-black transition-colors ${
+                                    deepFocus
+                                      ? 'bg-amber-300 text-amber-950'
+                                      : 'bg-black/20 text-white/85 hover:bg-black/30'
                                   }`}
                                 >
                                   <Zap
-                                    className={`h-4 w-4 shrink-0 ${
-                                      deepFocus ? 'fill-amber-300 text-amber-300' : 'text-white/80'
+                                    className={`h-3.5 w-3.5 shrink-0 ${
+                                      deepFocus ? 'fill-current' : ''
                                     }`}
                                   />
-                                  <span className="min-w-0 flex-1 leading-tight">
-                                    <span className="block text-[13px] font-black text-white">
-                                      Deep focus
-                                    </span>
-                                    <span className="block text-[11px] font-bold text-white/75">
-                                      No pausing · +{DEEP_FOCUS_BONUS_FLIES} bonus fly
-                                    </span>
-                                  </span>
+                                  Deep focus · +{DEEP_FOCUS_BONUS_FLIES} fly
                                   <span
                                     aria-hidden
-                                    className={`relative h-6 w-10 shrink-0 rounded-full transition-colors ${
-                                      deepFocus ? 'bg-amber-300' : 'bg-white/25'
+                                    className={`relative ml-0.5 h-5 w-8 shrink-0 rounded-full transition-colors ${
+                                      deepFocus ? 'bg-amber-950/25' : 'bg-white/25'
                                     }`}
                                   >
                                     <span
-                                      className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 ${
-                                        deepFocus ? 'translate-x-4' : 'translate-x-0'
+                                      className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ${
+                                        deepFocus ? 'translate-x-3' : 'translate-x-0'
                                       }`}
                                     />
                                   </span>
@@ -1701,7 +1724,8 @@ export default function FrogodoroSheet({
                               </div>
                               {celebrateFocus ? (
                                 <button
-                                  onClick={handleWrapUp}
+                                  onClick={() => void runGuarded(handleWrapUp)}
+                                  disabled={actionBusy}
                                   className="relative flex items-center justify-center rounded-2xl bg-white px-7 py-3 text-[16px] font-black text-emerald-600 shadow-[0_6px_0_rgba(0,0,0,0.15)] transition-[transform,box-shadow,background-color,color,opacity] active:translate-y-1.5 active:shadow-[0_0_0_rgba(0,0,0,0.15)] dark:bg-slate-50 dark:text-emerald-700 min-[380px]:px-10"
                                 >
                                   <Check className="mr-1.5 h-5 w-5" />
@@ -1709,7 +1733,8 @@ export default function FrogodoroSheet({
                                 </button>
                               ) : (
                                 <button
-                                  onClick={handleDone}
+                                  onClick={() => void runGuarded(handleDone)}
+                                  disabled={actionBusy}
                                   className={`relative flex items-center justify-center px-7 min-[380px]:px-10 py-3 bg-white dark:bg-slate-50 text-[16px]
  font-black rounded-2xl shadow-[0_6px_0_rgba(0,0,0,0.15)]
  active:shadow-[0_0_0_rgba(0,0,0,0.15)] active:translate-y-1.5 transition-[transform,box-shadow,background-color,color,opacity] ${getPhaseAccent()}`}
@@ -1723,7 +1748,8 @@ export default function FrogodoroSheet({
                             {celebrateFocus && (
                               <div className="flex items-center justify-center gap-2.5">
                                 <button
-                                  onClick={handleKeepGoing}
+                                  onClick={() => void runGuarded(handleKeepGoing)}
+                                  disabled={actionBusy}
                                   className="flex items-center justify-center rounded-xl bg-white/20 px-3.5 py-2 text-[13px] font-black text-white transition-[transform,box-shadow,background-color,color,opacity] hover:bg-white/30 active:scale-95"
                                 >
                                   <Zap className="mr-1 h-3.5 w-3.5 fill-current" />
@@ -1735,7 +1761,8 @@ export default function FrogodoroSheet({
                         ) : (
                         <div className="relative z-10 flex flex-col items-center gap-2.5">
                           <button
-                            onClick={toggleTimer}
+                            onClick={() => void runGuarded(toggleTimer)}
+                            disabled={actionBusy}
                             data-hint={timerActive ? undefined : 'focus-start'}
                             className={`relative flex items-center justify-center px-8 py-3 bg-white dark:bg-slate-50 text-[16px]
  font-black rounded-2xl shadow-[0_6px_0_rgba(0,0,0,0.15)]
@@ -1753,7 +1780,8 @@ export default function FrogodoroSheet({
                             <div className="flex items-center justify-center gap-2">
                               <button
                                 type="button"
-                                onClick={handleManualSkip}
+                                onClick={() => void runGuarded(handleManualSkip)}
+                                disabled={actionBusy}
                                 className="inline-flex h-9 items-center gap-1.5 rounded-full bg-white/20 px-3.5 text-[13px] font-black text-white transition-[transform,background-color] hover:bg-white/30 active:scale-95"
                               >
                                 {phase === 'focus' ? (
@@ -1771,6 +1799,7 @@ export default function FrogodoroSheet({
                               <button
                                 type="button"
                                 onClick={handleStopTimer}
+                                disabled={actionBusy}
                                 className="inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[13px] font-bold text-white/75 transition-colors hover:text-white active:scale-95"
                               >
                                 <Square className="h-3.5 w-3.5 fill-current" />
@@ -1857,7 +1886,8 @@ export default function FrogodoroSheet({
                           Keep going
                         </button>
                         <button
-                          onClick={() => void performStop()}
+                          onClick={() => void runGuarded(performStop)}
+                          disabled={actionBusy}
                           className="mt-2 w-full rounded-2xl py-2.5 text-sm font-bold text-muted-foreground transition-colors hover:bg-muted/40"
                         >
                           End session
@@ -1967,7 +1997,8 @@ export default function FrogodoroSheet({
                           Keep current timer
                         </button>
                         <button
-                          onClick={() => void performTaskSwitch()}
+                          onClick={() => void runGuarded(performTaskSwitch)}
+                          disabled={actionBusy}
                           className="mt-2 w-full rounded-2xl py-2.5 text-sm font-bold text-muted-foreground transition-colors hover:bg-muted/40"
                         >
                           Switch to this task
