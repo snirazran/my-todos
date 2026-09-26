@@ -235,6 +235,35 @@ function PhaseProgressFill({ animate }: { animate: boolean }) {
   );
 }
 
+function NextFlyLine({
+  focusFlyDaily,
+}: {
+  focusFlyDaily?: FocusFlyDaily;
+}) {
+  const info = useFrogodoroStore(
+    useShallow((s) => {
+      if (s.phase !== 'focus' || !s.timerActive) return { show: false, next: null as number | null, done: false };
+      const c = phaseCatchesOf(s, focusFlyDaily);
+      return {
+        show: c.potential > 0,
+        next: c.nextCatchIn,
+        done: c.nextCatchIn === null && c.caught >= c.potential,
+      };
+    }),
+  );
+  if (!info.show) return null;
+  return (
+    <p className="mt-2 flex items-center justify-center gap-1.5 text-[13px] font-black text-white/80 tabular-nums">
+      <Fly size={28} y={-3} interactive={false} paused />
+      {info.done
+        ? 'All flies caught — keep going'
+        : info.next !== null
+          ? `Next fly in ${formatTime(Math.max(0, info.next))}`
+          : null}
+    </p>
+  );
+}
+
 function SessionStatsRow({
   dbSession,
 }: {
@@ -972,7 +1001,7 @@ export default function FrogodoroSheet({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => onOpenChange(false)}
-            className="fixed inset-0 z-[999] bg-black/85 backdrop-blur-sm"
+            className="fixed inset-0 z-[999] bg-black/80"
           />
 
           <div className="fixed inset-0 z-[1000] flex items-end justify-center pointer-events-none px-3 pb-4 sm:items-center sm:p-6">
@@ -1017,7 +1046,7 @@ export default function FrogodoroSheet({
               }}
               className="pointer-events-auto w-full max-w-[500px] pb-[env(safe-area-inset-bottom)] will-change-transform"
             >
-              <div className="relative rounded-[28px] bg-popover/95 backdrop-blur-2xl shadow-[0_24px_48px_rgba(15,23,42,0.25)] overflow-hidden">
+              <div className="relative rounded-[28px] bg-popover shadow-[0_24px_48px_rgba(15,23,42,0.25)] overflow-hidden">
                 {/* Drag handle – mobile only. Overlaid so the timer view's
                     colour reaches the rounded top edge (no white strip). */}
                 {!isDesktop && (
@@ -1256,7 +1285,10 @@ export default function FrogodoroSheet({
                                     {Math.max(fliesPotential, sceneCaught)}
                                   </span>
                                 ) : (
-                                  <ChevronRight className="h-3.5 w-3.5 shrink-0 text-white/80" />
+                                  <span className="flex items-center gap-0.5 text-[12px] font-black leading-none text-white/90">
+                                    This week
+                                    <ChevronRight className="h-3.5 w-3.5 shrink-0 text-white/70" />
+                                  </span>
                                 )}
                                 <AnimatePresence>
                                   {pledgeLive && (
@@ -1384,10 +1416,15 @@ export default function FrogodoroSheet({
                           </div>
                           <button
                             onClick={() => onOpenChange(false)}
-                            aria-label="Close"
+                            aria-label={timerActive ? 'Minimize timer' : 'Close'}
+                            title={timerActive ? 'Minimize — the timer keeps running' : 'Close'}
                             className="flex items-center justify-center w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 transition-colors text-white"
                           >
-                            <X className="w-4 h-4" />
+                            {timerActive ? (
+                              <ChevronDown className="w-5 h-5" />
+                            ) : (
+                              <X className="w-4 h-4" />
+                            )}
                           </button>
                         </div>
 
@@ -1473,7 +1510,7 @@ export default function FrogodoroSheet({
                            Stacked absolutely and cross-faded, the whole
                            transition is transform + opacity, so it stays on
                            the compositor and the card never reflows. */
-                        <div className="relative mb-3 h-[212px]">
+                        <div className={`relative mb-3 ${timerActive || awaitingDone ? 'h-[212px]' : 'h-[244px]'}`}>
                           <AnimatePresence initial={false} mode="popLayout">
                             {!timerActive && !awaitingDone ? (
                               <motion.div
@@ -1498,7 +1535,7 @@ export default function FrogodoroSheet({
                                       the number the user came for. The cap is
                                       an aside, and only when it actually bites. */}
                                   {fliesPotential > 0
-                                    ? `Catches ${fliesPotential} ${fliesPotential === 1 ? 'fly' : 'flies'}${
+                                    ? `Earns up to ${fliesPotential} ${fliesPotential === 1 ? 'fly' : 'flies'}${
                                         focusFlyCapReached ? ' · daily max' : ''
                                       }`
                                     : focusFlyCapReached
@@ -1510,22 +1547,40 @@ export default function FrogodoroSheet({
                                   type="button"
                                   role="switch"
                                   aria-checked={deepFocus}
+                                  aria-label="Deep focus: no pausing, plus one bonus fly"
                                   onClick={() => {
                                     hapticTick();
                                     setDeepFocus(!deepFocus);
                                   }}
-                                  className={`flex min-h-9 items-center gap-2 rounded-full px-3.5 text-[12px] font-black transition-colors ${
-                                    deepFocus
-                                      ? 'bg-amber-300 text-amber-950'
-                                      : 'bg-black/20 text-white/80 hover:bg-black/30'
+                                  className={`flex w-full max-w-[300px] items-center gap-3 rounded-2xl px-3.5 py-2 text-left transition-colors ${
+                                    deepFocus ? 'bg-amber-300/25' : 'bg-black/15 hover:bg-black/20'
                                   }`}
                                 >
                                   <Zap
-                                    className={`h-3.5 w-3.5 shrink-0 ${
-                                      deepFocus ? 'fill-current' : ''
+                                    className={`h-4 w-4 shrink-0 ${
+                                      deepFocus ? 'fill-amber-300 text-amber-300' : 'text-white/80'
                                     }`}
                                   />
-                                  Deep focus · +1 fly
+                                  <span className="min-w-0 flex-1 leading-tight">
+                                    <span className="block text-[13px] font-black text-white">
+                                      Deep focus
+                                    </span>
+                                    <span className="block text-[11px] font-bold text-white/75">
+                                      No pausing · +{DEEP_FOCUS_BONUS_FLIES} bonus fly
+                                    </span>
+                                  </span>
+                                  <span
+                                    aria-hidden
+                                    className={`relative h-6 w-10 shrink-0 rounded-full transition-colors ${
+                                      deepFocus ? 'bg-amber-300' : 'bg-white/25'
+                                    }`}
+                                  >
+                                    <span
+                                      className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 ${
+                                        deepFocus ? 'translate-x-4' : 'translate-x-0'
+                                      }`}
+                                    />
+                                  </span>
                                 </button>
                               </motion.div>
                             ) : (
@@ -1536,13 +1591,16 @@ export default function FrogodoroSheet({
                                 exit={{ opacity: 0, scale: 0.94 }}
                                 transition={STAGE_TRANSITION}
                                 style={{ willChange: 'transform, opacity' }}
-                                className="absolute inset-0 flex items-center justify-center"
+                                className="absolute inset-0 flex flex-col items-center justify-center"
                               >
                                 <div className="min-w-0 text-center text-[clamp(44px,16vw,72px)] font-black leading-none tracking-tighter text-white drop-shadow-lg tabular-nums min-[420px]:min-w-[210px]">
                                   <CountdownText
                                     frozen={awaitingDone ? completedDuration : null}
                                   />
                                 </div>
+                                {!awaitingDone && (
+                                  <NextFlyLine focusFlyDaily={focusFlyDaily} />
+                                )}
                               </motion.div>
                             )}
                           </AnimatePresence>
@@ -1675,21 +1733,7 @@ export default function FrogodoroSheet({
                             )}
                           </div>
                         ) : (
-                        <div className="relative z-10 flex items-center justify-center gap-3">
-                          {/* Left: Stop ends the active session. Idle → spacer so
-                              START stays centred. */}
-                          {timerActive ? (
-                            <button
-                              onClick={handleStopTimer}
-                              aria-label="Stop session"
-                              className="p-2.5 bg-white/20 hover:bg-white/30 rounded-xl active:scale-95 text-white transition-[transform,box-shadow,background-color,color,opacity]"
-                            >
-                              <Square className="w-5 h-5 fill-current opacity-90" />
-                            </button>
-                          ) : (
-                            <div className="w-10 shrink-0" aria-hidden />
-                          )}
-
+                        <div className="relative z-10 flex flex-col items-center gap-2.5">
                           <button
                             onClick={toggleTimer}
                             data-hint={timerActive ? undefined : 'focus-start'}
@@ -1705,17 +1749,34 @@ export default function FrogodoroSheet({
                             {isRunning ? 'PAUSE' : timerActive ? 'RESUME' : 'START'}
                           </button>
 
-                          {/* Right: Skip (fast-forward) only while running. */}
-                          {isRunning ? (
-                            <button
-                              onClick={handleManualSkip}
-                              aria-label="Skip"
-                              className="p-2.5 bg-white/20 hover:bg-white/30 rounded-xl active:scale-95 text-white transition-[transform,box-shadow,background-color,color,opacity]"
-                            >
-                              <SkipForward className="w-5 h-5 fill-current opacity-90" />
-                            </button>
-                          ) : (
-                            <div className="w-10 shrink-0" aria-hidden />
+                          {timerActive && (
+                            <div className="flex items-center justify-center gap-2">
+                              <button
+                                type="button"
+                                onClick={handleManualSkip}
+                                className="inline-flex h-9 items-center gap-1.5 rounded-full bg-white/20 px-3.5 text-[13px] font-black text-white transition-[transform,background-color] hover:bg-white/30 active:scale-95"
+                              >
+                                {phase === 'focus' ? (
+                                  <>
+                                    <Check className="h-4 w-4" strokeWidth={3} />
+                                    Finish now
+                                  </>
+                                ) : (
+                                  <>
+                                    <SkipForward className="h-4 w-4 fill-current" />
+                                    Skip break
+                                  </>
+                                )}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={handleStopTimer}
+                                className="inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[13px] font-bold text-white/75 transition-colors hover:text-white active:scale-95"
+                              >
+                                <Square className="h-3.5 w-3.5 fill-current" />
+                                End session
+                              </button>
+                            </div>
                           )}
                         </div>
                         )}
@@ -1743,7 +1804,7 @@ export default function FrogodoroSheet({
                       </div>
 
                       {/* Stats Row */}
-                      {hasStats && (
+                      {hasStats && !timerActive && !awaitingDone && (
                         <SessionStatsRow dbSession={task?.frogodoroSession} />
                       )}
                     </motion.div>
@@ -1759,7 +1820,7 @@ export default function FrogodoroSheet({
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
-                      className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/60 p-6 backdrop-blur-sm"
+                      className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/65 p-6"
                     >
                       <motion.div
                         initial={{ scale: 0.94, y: 8 }}
@@ -1816,7 +1877,7 @@ export default function FrogodoroSheet({
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
-                      className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/60 p-6 backdrop-blur-sm"
+                      className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/65 p-6"
                     >
                       <motion.div
                         initial={{ scale: 0.94, y: 8 }}
@@ -1870,7 +1931,7 @@ export default function FrogodoroSheet({
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
-                      className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/60 p-6 backdrop-blur-sm"
+                      className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/65 p-6"
                     >
                       <motion.div
                         initial={{ scale: 0.94, y: 8 }}

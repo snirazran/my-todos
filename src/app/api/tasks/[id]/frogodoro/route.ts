@@ -25,6 +25,7 @@ export async function PUT(
     }
 
     let isModified = false;
+    let midSessionFlush = false;
 
     if (settings && typeof settings === 'object') {
       const setOps: Record<string, unknown> = {};
@@ -64,6 +65,7 @@ export async function PUT(
             }
           : null;
 
+      midSessionFlush = runningPhase !== null;
       await addFrogodoroSession(
         userId,
         id,
@@ -102,7 +104,7 @@ export async function PUT(
     }
 
     if (isModified) {
-      await notifyTaskChanged(userId);
+      if (!midSessionFlush || settings) await notifyTaskChanged(userId);
       void syncQuestState({ userId, timezone }).catch((syncError) => {
         console.error('Quest sync failed after frogodoro update:', syncError);
       });

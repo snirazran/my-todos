@@ -41,7 +41,11 @@ function isTaskMutation(input: RequestInfo | URL, init?: RequestInit) {
 
   try {
     const parsed = new URL(url, window.location.origin);
-    return parsed.origin === window.location.origin && parsed.pathname.startsWith('/api/tasks');
+    return (
+      parsed.origin === window.location.origin &&
+      parsed.pathname.startsWith('/api/tasks') &&
+      !parsed.pathname.endsWith('/frogodoro')
+    );
   } catch {
     return false;
   }

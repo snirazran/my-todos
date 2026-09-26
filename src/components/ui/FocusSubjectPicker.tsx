@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import useSWR from 'swr';
 import { format } from 'date-fns';
-import { Circle, Loader2 } from 'lucide-react';
+import { Loader2, Play } from 'lucide-react';
 import { Icon } from '@/components/ui/Icon';
 import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
 import { hapticSelect, hapticTick } from '@/lib/haptics';
@@ -230,7 +230,10 @@ export function FocusSubjectPicker({
             <div className="flex flex-col gap-1.5">
               {tasks.slice(0, taskCount).map((task) => {
                 const selected = currentSubjectId === task.id;
-                const meta = minutesLabel(task.frogodoroSession?.focusTime);
+                const tagNames = (task.tags ?? [])
+                  .map((id) => allTags.find((t) => t.id === id))
+                  .filter((t): t is Tag => !!t);
+                const minutes = minutesLabel(task.frogodoroSession?.focusTime);
                 return (
                   <button
                     key={task.id}
@@ -246,19 +249,39 @@ export function FocusSubjectPicker({
                         : 'border-border/60 bg-card hover:border-border hover:bg-muted/45'
                     }`}
                   >
-                    <Circle
-                      className="h-7 w-7 shrink-0 text-muted-foreground/45"
-                      aria-hidden="true"
-                    />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[15px] font-bold text-foreground">
                         {task.text}
                       </span>
-                      {meta && (
-                        <span className="block truncate text-[12px] font-semibold text-muted-foreground">
-                          {meta}
+                      {(tagNames.length > 0 || minutes) && (
+                        <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[12px] font-semibold text-muted-foreground">
+                          {tagNames.slice(0, 2).map((tag) => (
+                            <span
+                              key={tag.id}
+                              className="inline-flex min-w-0 items-center gap-1"
+                            >
+                              <span
+                                aria-hidden
+                                className="h-2 w-2 shrink-0 rounded-full"
+                                style={{ backgroundColor: tag.color }}
+                              />
+                              <span className="truncate">{tag.name}</span>
+                            </span>
+                          ))}
+                          {minutes && (
+                            <span className="shrink-0">
+                              {tagNames.length > 0 ? '· ' : ''}
+                              {minutes}
+                            </span>
+                          )}
                         </span>
                       )}
+                    </span>
+                    <span
+                      aria-hidden="true"
+                      className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary/10 text-primary"
+                    >
+                      <Play className="ml-0.5 h-3.5 w-3.5 fill-current" />
                     </span>
                   </button>
                 );

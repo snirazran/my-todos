@@ -3,7 +3,8 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
-import { Pause, Play, SkipForward, Square } from 'lucide-react';
+import { Pause, Play } from 'lucide-react';
+import { useShallow } from 'zustand/react/shallow';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import { useDeepFocusPauseGuard } from '@/hooks/useDeepFocusPauseGuard';
 import { cn } from '@/lib/utils';
@@ -13,21 +14,115 @@ interface Props {
   taskName?: string;
 }
 
+const RING_SIZE = 40;
+const RING_STROKE = 3.5;
+const RING_RADIUS = (RING_SIZE - RING_STROKE) / 2;
+const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
+
+function phaseSeconds(s: {
+  phase: string;
+  settings: { focusDuration: number; breakDuration: number };
+}) {
+  return (
+    (s.phase === 'focus' ? s.settings.focusDuration : s.settings.breakDuration) * 60
+  );
+}
+
+function PillTime() {
+  const timeLeft = useFrogodoroStore((s) => s.timeLeft);
+  const m = Math.floor(timeLeft / 60);
+  const sec = timeLeft % 60;
+  return (
+    <>
+      {m}:{sec.toString().padStart(2, '0')}
+    </>
+  );
+}
+
+function PillRing({ running }: { running: boolean }) {
+  const progress = useFrogodoroStore((s) => {
+    const total = phaseSeconds(s);
+    return total > 0 ? Math.min(1, Math.max(0, (total - s.timeLeft) / total)) : 0;
+  });
+  return (
+    <span className="relative grid h-10 w-10 shrink-0 place-items-center">
+      <svg
+        width={RING_SIZE}
+        height={RING_SIZE}
+        className="absolute inset-0 -rotate-90"
+        aria-hidden
+      >
+        <circle
+          cx={RING_SIZE / 2}
+          cy={RING_SIZE / 2}
+          r={RING_RADIUS}
+          fill="none"
+          strokeWidth={RING_STROKE}
+          className="stroke-white/25"
+        />
+        <circle
+          cx={RING_SIZE / 2}
+          cy={RING_SIZE / 2}
+          r={RING_RADIUS}
+          fill="none"
+          strokeWidth={RING_STROKE}
+          strokeLinecap="round"
+          strokeDasharray={RING_CIRCUMFERENCE}
+          strokeDashoffset={RING_CIRCUMFERENCE * (1 - progress)}
+          className={cn(
+            'stroke-white',
+            running && 'transition-[stroke-dashoffset] duration-1000 ease-linear',
+          )}
+        />
+      </svg>
+      <span className="relative flex h-4 w-4 items-center justify-center" aria-hidden>
+        <svg
+          viewBox="0 0 24 24"
+          className="absolute inset-0 h-4 w-4"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2.25}
+        >
+          <circle cx="12" cy="13" r="8.5" />
+          <line x1="10" y1="2.5" x2="14" y2="2.5" strokeLinecap="round" />
+        </svg>
+        <svg
+          viewBox="0 0 24 24"
+          className={cn(
+            'absolute inset-0 h-4 w-4',
+            running && 'animate-[spin_4s_linear_infinite]',
+          )}
+          style={{ transformOrigin: '50% 54%' }}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2.25}
+          strokeLinecap="round"
+        >
+          <line x1="12" y1="13" x2="12" y2="8" />
+        </svg>
+      </span>
+    </span>
+  );
+}
+
 export default function FrogodoroPill({ onClick, taskName }: Props) {
   const {
     timerActive,
     isRunning,
-    timeLeft,
-    endTime,
     phase,
     selectedTaskId,
-    settings,
-    phaseElapsed,
     startTimer,
     pauseTimer,
-    stopTimer,
-    completePhase,
-  } = useFrogodoroStore();
+  } = useFrogodoroStore(
+    useShallow((s) => ({
+      timerActive: s.timerActive,
+      isRunning: s.isRunning,
+      phase: s.phase,
+      selectedTaskId: s.selectedTaskId,
+      startTimer: s.startTimer,
+      pauseTimer: s.pauseTimer,
+    })),
+  );
 
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
   const { armed: pauseArmed, guardPause } = useDeepFocusPauseGuard();
@@ -38,234 +133,87 @@ export default function FrogodoroPill({ onClick, taskName }: Props) {
 
   if (!portalTarget || !selectedTaskId || !timerActive) return null;
 
-  const formatTime = (seconds: number) => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m}:${s.toString().padStart(2, '0')}`;
-  };
-
-  // Same green/blue as the rest of the Frogodoro UI. The base is the phase
-  // colour; the elapsed fill is a darker shade of that same colour and grows
-  // left→right as the phase passes.
   const phaseBase =
     phase === 'focus'
       ? 'bg-primary text-primary-foreground dark:bg-green-700 dark:text-white'
       : 'bg-sky-500 text-white dark:bg-sky-700';
-  const phaseFill = 'bg-black/20';
+  const accentText =
+    phase === 'focus' ? 'text-primary dark:text-green-700' : 'text-sky-600 dark:text-sky-700';
 
-  const phaseDuration =
-    (phase === 'focus' ? settings.focusDuration : settings.breakDuration) * 60;
-  const progressPercent =
-    phaseDuration > 0
-      ? Math.min(100, Math.max(0, ((phaseDuration - timeLeft) / phaseDuration) * 100))
-      : 0;
+  const status = !isRunning
+    ? 'Paused'
+    : phase === 'focus'
+      ? 'Focus'
+      : 'On a break';
 
-  // Pause flushes unsaved time via GlobalTimer's isRunning→false effect (it
-  // preserves timeLeft). Stop does not, because stopTimer resets timeLeft to the
-  // full duration in the same update, so the flush effect sees 0 elapsed — we
-  // must persist the unsaved time here first, like handleSkip and the sheet do.
   const handlePlayPause = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (isRunning) guardPause(pauseTimer);
     else startTimer();
   };
-  const handleStop = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    // Capture elapsed from the absolute endTime while running (accurate even
-    // right after resuming from background, when the ticked timeLeft can be
-    // momentarily stale); from timeLeft when paused.
-    const liveElapsed =
-      isRunning && endTime
-        ? phaseDuration - Math.max(0, Math.round((endTime - Date.now()) / 1000))
-        : phaseDuration - timeLeft;
-    const unsaved = Math.max(0, liveElapsed - phaseElapsed);
-
-    // Stop the live timer first so the running session stops being counted, then
-    // apply the persisted (optimistic) increment. Otherwise, for the moment
-    // between bumping the saved total and halting the timer, the same elapsed is
-    // counted in both the saved total and the live session — a transient double.
-    stopTimer();
-
-    if (selectedTaskId && unsaved > 0) {
-      const d = new Date();
-      const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      const session = {
-        date: today,
-        focusTime: phase === 'focus' ? unsaved : 0,
-        breakTime: phase === 'break' ? unsaved : 0,
-      };
-      window.dispatchEvent(
-        new CustomEvent('frogodoro-progress-saved', {
-          detail: { taskId: selectedTaskId, session },
-        }),
-      );
-      void fetch(`/api/tasks/${selectedTaskId}/frogodoro`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ session, timezone }),
-      }).catch(() => {});
-    }
-  };
-  // Skip to the next phase. completePhase advances state immediately, so we must
-  // flush the unsaved elapsed time to the DB *before* calling it (GlobalTimer's
-  // pause-flush can't, since the phase/timeLeft have already moved on).
-  const handleSkip = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    const phaseDuration =
-      (phase === 'focus' ? settings.focusDuration : settings.breakDuration) * 60;
-    const liveElapsed = phaseDuration - timeLeft;
-    const unsaved = Math.max(0, liveElapsed - phaseElapsed);
-    if (selectedTaskId && unsaved > 0) {
-      const d = new Date();
-      const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      const session = {
-        date: today,
-        focusTime: phase === 'focus' ? unsaved : 0,
-        breakTime: phase === 'break' ? unsaved : 0,
-      };
-      window.dispatchEvent(
-        new CustomEvent('frogodoro-progress-saved', {
-          detail: { taskId: selectedTaskId, session },
-        }),
-      );
-      void fetch(`/api/tasks/${selectedTaskId}/frogodoro`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ session, timezone }),
-      }).catch(() => {});
-    }
-    completePhase(false, liveElapsed);
-  };
 
   return createPortal(
     <motion.div
-      layout
       initial={{ opacity: 0, y: 20, scale: 0.96 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.15 } }}
       transition={{ type: 'spring', stiffness: 400, damping: 30 }}
       className={cn(
         'pointer-events-auto relative w-full overflow-hidden md:w-[380px] md:self-end',
-        'rounded-[18px] border border-white/10 shadow-sm backdrop-blur-2xl',
+        'rounded-[20px] border border-white/10 shadow-sm',
         phaseBase,
       )}
     >
-      {/* Progress fill — grows left→right as the phase elapses */}
-      <div
-        aria-hidden
-        className={cn(
-          'absolute inset-y-0 left-0 z-0',
-          phaseFill,
-          isRunning ? 'transition-[width] duration-1000 ease-linear' : '',
-        )}
-        style={{ width: `${progressPercent}%` }}
-      />
-
-      <div className="relative z-10 flex items-center gap-4 px-3 py-3">
-      <button
-        type="button"
-        onClick={onClick}
-        className="flex items-center gap-3 flex-1 min-w-0 text-left active:opacity-90 transition-opacity"
-      >
-        <div className="relative flex h-7 w-7 items-center justify-center rounded-full bg-white/20 shrink-0">
-          {isRunning ? (
-            <span className="relative flex h-4 w-4 items-center justify-center">
-              {/* Static clock face */}
-              <svg
-                viewBox="0 0 24 24"
-                className="absolute inset-0 h-4 w-4"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <circle cx="12" cy="12" r="9" />
-                {/* Top stem to keep the Timer silhouette */}
-                <line x1="10" y1="2" x2="14" y2="2" strokeLinecap="round" />
-              </svg>
-              {/* Only the hand spins — CSS keyframes so it runs on the
-                  compositor instead of waking the main thread every frame */}
-              <svg
-                viewBox="0 0 24 24"
-                className="absolute inset-0 h-4 w-4 animate-[spin_4s_linear_infinite]"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2}
-                strokeLinecap="round"
-              >
-                <line x1="12" y1="12" x2="12" y2="6.5" />
-              </svg>
+      <div className="relative flex items-center gap-3 py-2 pl-2 pr-2.5">
+        <button
+          type="button"
+          onClick={onClick}
+          aria-label={`Open timer${taskName ? ` for ${taskName}` : ''}`}
+          className="flex min-w-0 flex-1 items-center gap-3 text-left transition-opacity active:opacity-90"
+        >
+          <PillRing running={isRunning} />
+          <span className="flex min-w-0 flex-1 flex-col leading-tight">
+            <span className="truncate text-[15px] font-black">
+              {taskName || (phase === 'focus' ? 'Focus' : 'Break')}
             </span>
-          ) : (
-            <Pause className="w-4 h-4 fill-current" />
-          )}
-
-        </div>
-
-        <div className="flex flex-1 items-center justify-between gap-3 min-w-0">
-          <div className="flex flex-col min-w-0 leading-tight">
             {pauseArmed ? (
-              <span className="text-[11px] font-black text-amber-300">
+              <span className="text-[12px] font-black text-amber-300">
                 Tap again — +1 fly lost
               </span>
             ) : (
-              <>
-                <span className="text-[12px] font-black opacity-80">
-                  {isRunning
-                    ? phase === 'focus'
-                      ? taskName
-                        ? 'Focusing on'
-                        : 'Focusing'
-                      : 'On a break'
-                    : 'Paused'}
-                </span>
-                {taskName && (
-                  <span className="text-sm font-bold truncate opacity-95">
-                    {taskName}
-                  </span>
-                )}
-              </>
+              <span className="flex items-center gap-1.5 text-[12px] font-bold opacity-80">
+                <span
+                  aria-hidden
+                  className={cn(
+                    'h-1.5 w-1.5 rounded-full bg-current',
+                    isRunning && 'animate-pulse',
+                  )}
+                />
+                {status}
+              </span>
             )}
-          </div>
-          <span className="text-base font-black tabular-nums shrink-0">
-            {formatTime(timeLeft)}
           </span>
-        </div>
-      </button>
-
-      {/* Quick controls — stop · play/pause · skip-to-next-phase (far right) */}
-      <div className="flex shrink-0 items-center gap-4">
-        <button
-          type="button"
-          onClick={handleStop}
-          aria-label="Stop"
-          className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-white transition-colors hover:bg-white/30 active:scale-95"
-        >
-          <Square className="h-3.5 w-3.5 fill-current" />
+          <span className="shrink-0 text-[20px] font-black tabular-nums tracking-tight">
+            <PillTime />
+          </span>
         </button>
+
         <button
           type="button"
           onClick={handlePlayPause}
           aria-label={isRunning ? 'Pause' : 'Resume'}
-          className={`flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-white transition-colors hover:bg-white/30 active:scale-95 ${pauseArmed ? 'ring-2 ring-amber-400' : ''}`}
+          className={cn(
+            'grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white shadow-sm transition-transform active:scale-90',
+            accentText,
+            pauseArmed && 'ring-2 ring-amber-400 ring-offset-2 ring-offset-transparent',
+          )}
         >
           {isRunning ? (
-            <Pause className="h-4 w-4 fill-current" />
+            <Pause className="h-5 w-5 fill-current" />
           ) : (
-            <Play className="h-4 w-4 fill-current" />
+            <Play className="ml-0.5 h-5 w-5 fill-current" />
           )}
         </button>
-        <button
-          type="button"
-          onClick={handleSkip}
-          aria-label="Skip to next phase"
-          title="Skip to next phase"
-          className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-white transition-colors hover:bg-white/30 active:scale-95"
-        >
-          <SkipForward className="h-4 w-4 fill-current" />
-        </button>
-      </div>
       </div>
     </motion.div>,
     portalTarget,
