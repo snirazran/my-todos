@@ -29,6 +29,7 @@ export default function DragOverlay({
   checklist,
   frogodoroSession,
   bundleCount = 1,
+  compact = false,
 }: {
   x: number;
   y: number;
@@ -50,6 +51,7 @@ export default function DragOverlay({
   frogodoroSession?: { date: string; focusTime: number; breakTime: number } | null;
   /** Cards travelling together — >1 fans a stack out behind the lead card. */
   bundleCount?: number;
+  compact?: boolean;
 }) {
   const stacked = Math.min(Math.max(bundleCount - 1, 0), 3);
   return (
@@ -62,6 +64,12 @@ export default function DragOverlay({
         willChange: 'transform',
       }}
     >
+      <motion.div
+        initial={false}
+        animate={{ scale: compact ? 0.42 : 1, opacity: compact ? 0.92 : 1 }}
+        transition={{ type: 'spring', stiffness: 520, damping: 34 }}
+        style={{ transformOrigin: `${dx}px ${dy}px` }}
+      >
       {/* Cards behind the lead one — the iOS "flock" read: the pile you're
           carrying is visible before you drop it. */}
       {Array.from({ length: stacked }, (_, i) => stacked - i).map((depth) => (
@@ -214,6 +222,7 @@ export default function DragOverlay({
             <Fly size={36} y={-3} />
           </span>
         </span>
+      </motion.div>
       </motion.div>
     </div>
   );

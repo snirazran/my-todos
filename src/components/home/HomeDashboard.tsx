@@ -66,7 +66,6 @@ import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { FrogDisplay } from '@/components/ui/FrogDisplay';
 import { getQuestsUrl } from '@/components/ui/QuestsPanel';
 import { HomePageSkeleton } from '@/components/ui/Skeleton';
-import { HungerWarningModal } from '@/components/ui/HungerWarningModal';
 import { useFrogTongue, TONGUE_STROKE } from '@/hooks/useFrogTongue';
 import { useNotification } from '@/components/providers/NotificationProvider';
 import useSWR, { mutate as swrMutate } from 'swr';
@@ -78,7 +77,6 @@ import {
   HungerStatus,
 } from '@/hooks/useTaskData';
 import { HUNGRY_MOOD_THRESHOLD } from '@/lib/hungerLogic';
-import { patchInventoryFlies } from '@/hooks/useInventory';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import { randomUUID } from '@/lib/uuid';
 import { QuestOnboardingPopup } from '@/components/ui/QuestOnboardingPopup';
@@ -1304,22 +1302,6 @@ export default function HomeDashboard() {
         />
       )}
 
-      <HungerWarningModal
-        open={!!user && hungerStatus.stolenFlies > 0}
-        stolenFlies={hungerStatus.stolenFlies}
-        indices={indices}
-        onRecover={async () => {
-          const res = await fetch('/api/hunger/recover', { method: 'POST' });
-          const payload = await res.json().catch(() => ({}));
-          if (!res.ok || !payload.granted) {
-            throw new Error(payload.error ?? 'Recovery failed');
-          }
-          if (typeof payload.balance === 'number') {
-            patchInventoryFlies(payload.balance);
-          }
-          await mutateToday();
-        }}
-      />
 
       <QuestOnboardingPopup
         show={

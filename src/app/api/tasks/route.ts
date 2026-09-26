@@ -82,6 +82,7 @@ import {
   dayCandidateFilter,
 } from '@/lib/taskOccurrence';
 import { recordHungerStarted } from '@/lib/analytics/hunger';
+import { refundLegacyStolenFlies } from '@/lib/hungerRefund';
 import { extendStreakForCompletion } from '@/lib/streak/loginStreak';
 import { recordStreakExtended } from '@/lib/streak/analytics';
 import { STREAK_EXTENDED_HEADER } from '@/lib/streak/types';
@@ -392,6 +393,7 @@ async function currentFlyStatus(
 
   const premium = isPremiumUser(user);
   const limit = taskIncomeCap(config, premium);
+  await refundLegacyStolenFlies(userId, user as any);
   const { updates, status: hungerStatus } = calculateHunger(user);
   const wardrobe = user.wardrobe ?? { equipped: {}, inventory: {}, flies: 0 };
   await recordHungerStarted({
@@ -517,6 +519,7 @@ async function awardFlyForTask(
 
   const premium = isPremiumUser(user);
   const limit = taskIncomeCap(config, premium);
+  await refundLegacyStolenFlies(userId, user as any);
   const { updates: hungerUpdates, status: currentHungerState } =
     calculateHunger(user);
   const wardrobe = user.wardrobe ?? { equipped: {}, inventory: {}, flies: 0 };
@@ -825,6 +828,7 @@ async function unawardFlyForTask(
 
   const premium = isPremiumUser(user);
   const limit = taskIncomeCap(config, premium);
+  await refundLegacyStolenFlies(userId, user as any);
   const { updates: hungerUpdates, status: hungerStatus } = calculateHunger(user);
   const wardrobe = user.wardrobe ?? { equipped: {}, inventory: {}, flies: 0 };
   await recordHungerStarted({
@@ -2373,6 +2377,20 @@ export async function PUT(req: NextRequest) {
   }).lean<TaskDoc>();
   if (!doc)
     return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+  if (body.unskip === true) {
+    if (doc.type !== 'weekly')
+      return NextResponse.json(
+        { error: 'Only repeating tasks can be unskipped' },
+        { status: 400 },
+      );
+    await TaskModel.updateOne(
+      { userId: uid, id: taskId },
+      { $pull: { suppressedDates: date } },
+    );
+    await syncGamification(uid, tz);
+    await notifyTaskChanged(uid);
+    return NextResponse.json({ ok: true });
+  }
   if (toggleType) {
     if (doc.type === 'weekly') {
       const isCompletedToday = (doc.completedDates ?? []).includes(date);

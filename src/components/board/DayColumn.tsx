@@ -138,3 +138,41 @@ export default function DayColumn({
     </section>
   );
 }
+
+export function DayColumnShell({
+  title,
+  isToday = false,
+  isPast = false,
+}: {
+  title: string;
+  isToday?: boolean;
+  isPast?: boolean;
+}) {
+  const match = title.match(/^(.*) (\d+\/\d+)$/);
+  const displayName = match ? match[1] : title;
+  const displayDate = match ? match[2] : null;
+  return (
+    <section
+      aria-hidden
+      className={[
+        'flex min-h-[200px] flex-col rounded-[20px] border border-border/50 p-3 shadow-sm',
+        isPast ? 'bg-muted/40 dark:bg-background/60' : 'bg-muted/70 dark:bg-background',
+      ].join(' ')}
+    >
+      <h2 className="flex items-baseline gap-2 px-1 pt-1">
+        {displayDate && (
+          <span
+            className={`text-2xl font-black tracking-tight leading-none ${
+              isToday ? 'text-primary' : isPast ? 'text-muted-foreground/70' : 'text-foreground'
+            }`}
+          >
+            {displayDate}
+          </span>
+        )}
+        <span className="text-[13px] font-bold tracking-wide text-muted-foreground">
+          {displayName}
+        </span>
+      </h2>
+    </section>
+  );
+}

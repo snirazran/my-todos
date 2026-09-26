@@ -2,6 +2,7 @@
 
 import React, {
   useCallback,
+  useDeferredValue,
   useEffect,
   useMemo,
   useRef,
@@ -9,6 +10,7 @@ import React, {
 } from 'react';
 import { usePathname } from 'next/navigation';
 import { randomUUID } from '@/lib/uuid';
+import { hapticTick } from '@/lib/haptics';
 import { BACKLOG_CLOSED_EVENT } from '@/lib/hints/guides';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
@@ -34,7 +36,7 @@ import {
   relativeDayLabel,
   WEEK_ORDER,
 } from './helpers';
-import DayColumn from './DayColumn';
+import DayColumn, { DayColumnShell } from './DayColumn';
 import TaskList from './TaskList';
 import BulkActionBar, { type BulkAction } from './BulkActionBar';
 import BulkTagsSheet from './BulkTagsSheet';
@@ -73,6 +75,7 @@ import {
   TOUR_EVENT,
   TOUR_SAVED_DROP_EVENT,
   emitTourEvent,
+  isPlannerTourLocked,
   isSavedDropHidden,
 } from '@/lib/tour/plannerTour';
 import { useNotification } from '@/components/providers/NotificationProvider';
@@ -108,6 +111,67 @@ function sortCompletedLast(
   const completed: Task[] = [];
   for (const t of tasks) (isDone(t) ? completed : active).push(t);
   return [...active, ...completed];
+}
+
+function DockTile({
+  tileRef,
+  hint,
+  active,
+  index,
+  icon,
+  title,
+  subtitle,
+  activeTitle,
+}: {
+  tileRef: React.RefObject<HTMLDivElement | null>;
+  hint?: string;
+  active: boolean;
+  index: number;
+  icon: React.ReactNode;
+  title: string;
+  subtitle: string;
+  activeTitle: string;
+}) {
+  return (
+    <motion.div
+      ref={tileRef}
+      data-hint={hint}
+      initial={{ opacity: 0, y: 16, scale: 0.94 }}
+      animate={{ opacity: 1, y: active ? -6 : 0, scale: active ? 1.05 : 1 }}
+      transition={{
+        type: 'spring',
+        stiffness: 520,
+        damping: 30,
+        delay: index * 0.04,
+      }}
+      className={[
+        'flex h-[104px] flex-col items-center justify-center gap-1.5 rounded-[28px] px-3 text-center transition-[background-color,box-shadow,color] duration-150',
+        active
+          ? 'bg-[#4f9149] text-white shadow-[0_4px_0_0_#34631f]'
+          : 'bg-popover text-foreground ring-1 ring-border/80 shadow-[0_3px_0_0_rgba(0,0,0,0.18)]',
+      ].join(' ')}
+    >
+      <motion.span
+        animate={active ? { scale: 1.15, rotate: -6 } : { scale: 1, rotate: 0 }}
+        transition={{ type: 'spring', stiffness: 520, damping: 18 }}
+        className={`grid h-10 w-10 place-items-center rounded-2xl ${
+          active ? 'bg-white/20' : 'bg-primary/10 text-primary'
+        }`}
+      >
+        {icon}
+      </motion.span>
+      <span className="text-[15px] font-black leading-none tracking-tight">
+        {active ? activeTitle : title}
+      </span>
+      <span
+        className={`text-[11px] font-bold leading-none ${
+          active ? 'text-white/85' : 'text-muted-foreground'
+        }`}
+      >
+        {subtitle}
+      </span>
+    </motion.div>
+  );
 }
 
 export default function TaskBoard({
@@ -395,9 +459,10 @@ export default function TaskBoard({
   pageIndexRef.current = pageIndex;
 
   // Edge "Move to a specific date" drop zones (shown while dragging)
-  const pastZoneRef = useRef<HTMLDivElement>(null);
-  const futureZoneRef = useRef<HTMLDivElement>(null);
+  const dateTileRef = useRef<HTMLDivElement>(null);
+  const dockRef = useRef<HTMLDivElement>(null);
   const [dateZoneActive, setDateZoneActive] = useState(false);
+  const [dockNear, setDockNear] = useState(false);
   const [moveCalendarOpen, setMoveCalendarOpen] = useState(false);
   const [pendingMove, setPendingMove] = useState<{
     taskId: string;
@@ -1292,6 +1357,7 @@ export default function TaskBoard({
       setIsDragOverBacklog(false);
       setTrayCloseProgress(0);
       setDateZoneActive(false);
+      setDockNear(false);
       return;
     }
     const fromDay = drag.fromDay;
@@ -1312,6 +1378,7 @@ export default function TaskBoard({
         setTrayCloseProgress(0);
       }
 
+      const wasOverSave = isDragOverBacklogRef.current;
       const box = backlogBoxRef.current;
       if (box) {
         const r = box.getBoundingClientRect();
@@ -1328,9 +1395,19 @@ export default function TaskBoard({
         const r = el.getBoundingClientRect();
         return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
       };
-      const zone = over(pastZoneRef.current) || over(futureZoneRef.current);
+      const zone = !isDragOverBacklogRef.current && over(dateTileRef.current);
+      if (
+        (zone && !dateZoneActiveRef.current) ||
+        (isDragOverBacklogRef.current && !wasOverSave)
+      ) {
+        hapticTick();
+      }
       dateZoneActiveRef.current = zone;
       setDateZoneActive(zone);
+
+      const dock = dockRef.current;
+      const near = !!dock && y > dock.getBoundingClientRect().top - 90;
+      setDockNear(near);
     };
 
     setFrameCallback(onFrame);
@@ -1546,7 +1623,27 @@ export default function TaskBoard({
 
     if (overBacklog && draggingRepeating && !bundled) {
       const fromKey = windowDates[drag.fromDay];
-      if (fromKey) removeOnDate(fromKey, drag.taskId).catch(console.error);
+      const skippedId = drag.taskId;
+      if (fromKey) {
+        removeOnDate(fromKey, skippedId).catch(console.error);
+        const undoSkip = async () => {
+          await fetch('/api/tasks', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              taskId: skippedId,
+              date: fromKey,
+              unskip: true,
+              timezone: tz,
+            }),
+          });
+          window.dispatchEvent(new Event('board-refresh'));
+        };
+        showNotification(
+          `Skipped ${relativeDayLabel(fromKey)}`,
+          isPlannerTourLocked() ? undefined : undoSkip,
+        );
+      }
       if (draggedWasSelected) selection.exit();
       endDrag();
       setIsDragOverBacklog(false);
@@ -1628,6 +1725,24 @@ export default function TaskBoard({
       const changedDay = finalToDay !== drag.fromDay;
       if (toBacklog && !fromBacklog) {
         emitTourEvent(TOUR_EVENT.parked);
+        const savedFromKey = windowDates[drag.fromDay];
+        const savedId = drag.taskId;
+        if (bundled) {
+          showNotification(`Saved ${drag.bundleCount} tasks for later`);
+        } else if (savedFromKey && !isPlannerTourLocked()) {
+          showNotification('Saved for later', async () => {
+            await fetch('/api/tasks', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                taskId: savedId,
+                move: { type: 'regular', date: savedFromKey },
+                timezone: tz,
+              }),
+            });
+            window.dispatchEvent(new Event('board-refresh'));
+          });
+        }
       } else if (fromBacklog && !toBacklog) {
         emitTourEvent(TOUR_EVENT.unparked);
       } else if (changedDay && !toBacklog) {
@@ -1666,6 +1781,8 @@ export default function TaskBoard({
     draggingRepeating,
     removeOnDate,
     selection,
+    showNotification,
+    tz,
   ]);
 
   useEffect(() => {
@@ -1686,6 +1803,11 @@ export default function TaskBoard({
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  const renderCenter = useDeferredValue(pageIndex);
+  const renderRadius = (isMobile ? 2 : 7) + (drag?.active ? 3 : 0);
+  const isColumnLive = (i: number) =>
+    Math.abs(i - renderCenter) <= renderRadius;
 
   const goToToday = useCallback(() => {
     const i = windowDates.indexOf(todayKey);
@@ -1738,61 +1860,6 @@ export default function TaskBoard({
   // "Load more" button that loads 7 more days on that side.
   const renderEdge = (side: 'past' | 'future') => {
     const isPast = side === 'past';
-
-    // Nothing left to load in the past: render no edge slot at all — mounting
-    // a drop zone there on drag start would insert width at the front of the
-    // row and shunt the whole board. The future zone covers "pick a date".
-    if (isPast && !canLoadPast) return null;
-
-    // While dragging a task: an animated "Move to a specific date" drop zone.
-    if (drag?.active) {
-      return (
-        <div
-          ref={isPast ? pastZoneRef : futureZoneRef}
-          data-edge-zone={side}
-          // Must match the idle edge's width exactly — a wider drop zone
-          // replacing the idle slot at grab time shifts every column and reads
-          // as the view sliding sideways on lift/release.
-          className="shrink-0 self-start flex h-[clamp(220px,calc(100svh-430px),480px)] w-[46vw] sm:w-[200px] md:w-[185px]"
-        >
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{
-              scale: dateZoneActive ? 1.02 : 1,
-              opacity: 1,
-            }}
-            transition={{ type: 'spring', stiffness: 380, damping: 26 }}
-            className={[
-              'flex h-full w-full flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed px-5 py-8 text-center transition-colors duration-200',
-              dateZoneActive
-                ? 'border-primary bg-primary/20 text-primary shadow-lg shadow-primary/20'
-                : 'border-primary/40 bg-card/40 text-muted-foreground',
-            ].join(' ')}
-          >
-            <motion.div
-              animate={
-                dateZoneActive
-                  ? { y: [0, -5, 0], scale: 1.1 }
-                  : { y: 0, scale: 1 }
-              }
-              transition={
-                dateZoneActive
-                  ? { y: { repeat: Infinity, duration: 1 }, scale: { duration: 0.2 } }
-                  : { duration: 0.2 }
-              }
-            >
-              <CalendarPlus className="h-9 w-9" />
-            </motion.div>
-            <span className="text-base font-black leading-relaxed">
-              {dateZoneActive ? 'Release to pick a date' : 'Drop to pick a date'}
-            </span>
-            <span className="text-xs font-medium leading-relaxed opacity-70">
-              Move this task to a specific day
-            </span>
-          </motion.div>
-        </div>
-      );
-    }
 
     if (isPast && !canLoadPast) return null;
 
@@ -1927,10 +1994,13 @@ export default function TaskBoard({
     );
   };
 
-  // A card lifted out of the tray has nowhere to go in the tray, so the whole
-  // save-for-later drop affordance stays out of its way.
-  const showSavedDrop =
-    !!drag?.active && drag.fromDay !== BACKLOG_IDX && !savedDropHidden;
+  const showDock = !!drag?.active && !savedDropHidden;
+  const showSavedDrop = showDock && drag.fromDay !== BACKLOG_IDX;
+  const dragFromKey =
+    drag?.active && drag.fromDay !== BACKLOG_IDX ? windowDates[drag.fromDay] : undefined;
+  const dragBundled = (drag?.bundleCount ?? 1) > 1;
+  const skipMode = draggingRepeating && !dragBundled;
+  const showDateTile = showDock && !(isPlannerTourLocked() && showSavedDrop);
 
   // One lens for both layouts: the chips sit on the board under the header,
   // directly below the column-header trigger that opened them.
@@ -1974,8 +2044,9 @@ export default function TaskBoard({
                   ? 'tour-next-day'
                   : undefined
               }
-              className="shrink-0 origin-center w-[84vw] sm:w-[360px] md:w-[330px] lg:w-[310px] xl:w-[292px] h-full"
+              className="shrink-0 origin-center w-[88vw] max-w-[480px] md:w-[330px] md:max-w-none lg:w-[310px] xl:w-[292px] h-full"
             >
+              {isColumnLive(i) ? (
               <DayColumn
                 title={titleForIndex(i)}
                 count={activeTaskCount(tasksByDate[dk] ?? [])}
@@ -2105,45 +2176,18 @@ export default function TaskBoard({
                   }}
                 />
               </DayColumn>
+              ) : (
+                <DayColumnShell
+                  title={titleForIndex(i)}
+                  isToday={dk === todayKey}
+                  isPast={cmpYmd(dk, todayKey) < 0}
+                />
+              )}
             </div>
           ))}
           {renderEdge('future')}
         </div>
       </motion.div>
-
-      {!drag?.active && !scrollLocked && (
-        <>
-          {(['past', 'future'] as const).map((side) => {
-            const back = side === 'past';
-            if (back && atBoardStart) return null;
-            const Chevron = back ? ChevronLeft : ChevronRight;
-            return (
-              <div
-                key={side}
-                className={[
-                  'absolute top-1/2 z-[55] hidden -translate-y-1/2 md:block',
-                  back ? 'left-3' : 'right-3',
-                ].join(' ')}
-              >
-                <motion.button
-                  type="button"
-                  onClick={() => stepBoard(back ? -1 : 1, 'page')}
-                  aria-label={back ? 'Earlier days' : 'Later days'}
-                  title={back ? 'Earlier days (Shift + ←)' : 'Later days (Shift + →)'}
-                  initial={{ opacity: 0, scale: 0.85 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  whileHover={{ scale: 1.08, x: back ? -2 : 2 }}
-                  whileTap={{ scale: 0.92 }}
-                  transition={{ type: 'spring', stiffness: 420, damping: 26 }}
-                  className="flex h-12 w-12 items-center justify-center rounded-full border border-border/60 bg-card/90 text-foreground shadow-lg shadow-black/10 backdrop-blur-xl hover:border-primary/40 hover:text-primary"
-                >
-                  <Chevron className="h-6 w-6" strokeWidth={2.75} />
-                </motion.button>
-              </div>
-            );
-          })}
-        </>
-      )}
 
       {/* Top header + dot strip (mobile + desktop) */}
       <div
@@ -2160,12 +2204,36 @@ export default function TaskBoard({
           />
         </div>
         <div className="hidden md:flex items-center gap-2 pointer-events-auto">
+          {!calendarOpen && (
+            <button
+              type="button"
+              onClick={() => stepBoard(-1, 'page')}
+              disabled={atBoardStart || !!drag?.active}
+              aria-label="Earlier days"
+              title="Earlier days (Shift + ←)"
+              className="flex h-9 w-9 items-center justify-center rounded-2xl bg-secondary text-secondary-foreground transition-[background-color,transform] hover:bg-secondary/80 active:scale-90 disabled:opacity-35 disabled:active:scale-100"
+            >
+              <ChevronLeft className="h-5 w-5" strokeWidth={2.75} />
+            </button>
+          )}
           <PlannerHeader
             dateKey={activeDateKey}
             expanded={calendarOpen}
             onToggle={() => setCalendarOpen((v) => !v)}
             variant="desktop"
           />
+          {!calendarOpen && (
+            <button
+              type="button"
+              onClick={() => stepBoard(1, 'page')}
+              disabled={!!drag?.active}
+              aria-label="Later days"
+              title="Later days (Shift + →)"
+              className="flex h-9 w-9 items-center justify-center rounded-2xl bg-secondary text-secondary-foreground transition-[background-color,transform] hover:bg-secondary/80 active:scale-90 disabled:opacity-35 disabled:active:scale-100"
+            >
+              <ChevronRight className="h-5 w-5" strokeWidth={2.75} />
+            </button>
+          )}
           {!calendarOpen && !drag?.active && !todayInView && !isMobile && (
             <motion.button
               type="button"
@@ -2359,7 +2427,7 @@ export default function TaskBoard({
           // and border still read as the active target around it.
           drag?.active ? 'z-[95]' : 'z-[40]'
         } ${
-          scrollLocked || (selection.active && !drag?.active)
+          scrollLocked || (selection.active && !drag?.active) || showDock
             ? 'invisible opacity-0'
             : ''
         }`}
@@ -2378,9 +2446,9 @@ export default function TaskBoard({
           >
             <div
               className={`flex w-full items-center gap-1 transition-opacity duration-150 ${
-                showSavedDrop ? 'pointer-events-none opacity-0' : 'opacity-100'
+                showDock ? 'pointer-events-none opacity-0' : 'opacity-100'
               }`}
-              aria-hidden={showSavedDrop}
+              aria-hidden={showDock}
             >
               <BacklogBox
                 count={backlog.length}
@@ -2436,61 +2504,62 @@ export default function TaskBoard({
               </button>
             </div>
 
-            <AnimatePresence>
-              {showSavedDrop && (
-                <motion.div
-                  ref={backlogBoxRef}
-                  data-hint="saved-drop-zone"
-                  initial={{ opacity: 0, scale: 0.94 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.94 }}
-                  transition={{ type: 'spring', stiffness: 480, damping: 32 }}
-                  className={`absolute inset-1.5 flex items-center justify-center gap-2 rounded-[22px] border-2 transition-colors ${
-                    isDragOverBacklog
-                      ? 'border-primary bg-primary/12 text-primary'
-                      : 'border-dashed border-primary/30 bg-primary/5 text-primary/70'
-                  }`}
-                >
-                  {draggingRepeating ? (
-                    <EyeOff className="h-6 w-6 shrink-0" />
-                  ) : (
-                    <ArrowDownToLine className="h-6 w-6 shrink-0" />
-                  )}
-                </motion.div>
-              )}
-            </AnimatePresence>
           </div>
         </div>
       </div>
 
-      {/* The drop label rides above the toolbar rather than inside it: the card
-          under the finger sits over the strip, and a label printed on the strip
-          disappears underneath it exactly when it matters most. */}
       <AnimatePresence>
-        {showSavedDrop && (
+        {showDock && (
           <motion.div
-            key="drop-hint"
-            initial={{ opacity: 0, y: 6 }}
+            key="drop-dock"
+            ref={dockRef}
+            initial={{ opacity: 0, y: 28 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 6 }}
-            transition={{ type: 'spring', stiffness: 480, damping: 32 }}
-            className="pointer-events-none fixed inset-x-0 z-[110] flex justify-center px-4 bottom-[calc(env(safe-area-inset-bottom)+158px)] md:bottom-[calc(env(safe-area-inset-bottom)+110px)]"
+            exit={{ opacity: 0, y: 28, transition: { duration: 0.14 } }}
+            transition={{ type: 'spring', stiffness: 460, damping: 34 }}
+            className="pointer-events-none fixed inset-x-0 z-[96] flex justify-center px-3 bottom-[calc(env(safe-area-inset-bottom)+84px)] md:bottom-[calc(env(safe-area-inset-bottom)+32px)]"
           >
-            <span
-              className={`inline-flex items-center gap-2 whitespace-nowrap rounded-full border px-4 py-2 text-sm font-black shadow-xl backdrop-blur-xl transition-colors ${
-                isDragOverBacklog
-                  ? 'border-primary bg-primary text-primary-foreground'
-                  : 'border-primary/30 bg-card text-primary'
+            <div
+              className={`grid w-[88vw] max-w-[440px] gap-3 ${
+                showSavedDrop && showDateTile ? 'grid-cols-2' : 'grid-cols-1'
               }`}
             >
-              {isDragOverBacklog
-                ? draggingRepeating
-                  ? 'Release to skip this day'
-                  : 'Release to save for later'
-                : draggingRepeating
-                  ? 'Drop to skip this day'
-                  : 'Drop to save for later'}
-            </span>
+              {showSavedDrop && (
+                <DockTile
+                  tileRef={backlogBoxRef}
+                  hint="saved-drop-zone"
+                  active={isDragOverBacklog}
+                  index={0}
+                  icon={
+                    skipMode ? (
+                      <EyeOff className="h-6 w-6" strokeWidth={2.5} />
+                    ) : (
+                      <ArrowDownToLine className="h-6 w-6" strokeWidth={2.5} />
+                    )
+                  }
+                  title={skipMode ? 'Skip this day' : 'Save for later'}
+                  subtitle={
+                    skipMode
+                      ? `Only ${dragFromKey ? relativeDayLabel(dragFromKey) : 'this day'}`
+                      : dragBundled
+                        ? `${drag?.bundleCount} tasks to Saved`
+                        : 'Moves to Saved'
+                  }
+                  activeTitle={skipMode ? 'Release to skip' : 'Release to save'}
+                />
+              )}
+              {showDateTile && (
+                <DockTile
+                  tileRef={dateTileRef}
+                  active={dateZoneActive}
+                  index={showSavedDrop ? 1 : 0}
+                  icon={<CalendarPlus className="h-6 w-6" strokeWidth={2.5} />}
+                  title="Pick a date"
+                  subtitle="Any day, any week"
+                  activeTitle="Release to pick"
+                />
+              )}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -2832,6 +2901,7 @@ export default function TaskBoard({
           checklist={drag.checklist}
           frogodoroSession={drag.frogodoroSession}
           bundleCount={drag.bundleCount}
+          compact={dockNear}
         />
       )}
 

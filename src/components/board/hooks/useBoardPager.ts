@@ -11,7 +11,7 @@ const COMMIT_FRACTION = 0.22;
 const MOMENTUM_MS = 260;
 const DESKTOP_INSET = 16;
 const WHEEL_IDLE_MS = 140;
-const DEPTH_SCALE = 0.05;
+const DEPTH_SCALE = 0.025;
 const DEPTH_FADE = 0.45;
 
 type Spring = { response: number; damping: number };
