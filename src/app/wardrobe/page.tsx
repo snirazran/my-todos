@@ -29,8 +29,9 @@ function WardrobePageInner() {
   const { data: bgData } = useBackgrounds(true);
   const isStuck = useUIStore((s) => s.isWardrobeStuck);
   const wardrobeTab = useUIStore((s) => s.wardrobeTab);
-  const defaultTab =
-    (searchParams.get('tab') as 'inventory' | 'shop' | 'trade') || 'inventory';
+  const lastWardrobeTab = useUIStore((s) => s.lastWardrobeTab);
+  const defaultTab = ((searchParams.get('tab') || lastWardrobeTab) ||
+    'inventory') as 'inventory' | 'shop' | 'trade';
   const focusItemId = searchParams.get('item') || null;
   const focusItemKind =
     searchParams.get('kind') === 'background' ? 'background' : 'item';

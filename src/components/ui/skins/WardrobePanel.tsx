@@ -527,15 +527,33 @@ function WardrobeManagerContent({
   }, [embedded, isStuck, setWardrobeStuck]);
 
   const setWardrobeTab = useUIStore((s) => s.setWardrobeTab);
+  const setLastWardrobeTab = useUIStore((s) => s.setLastWardrobeTab);
   const openFlyShop = useUIStore((s) => s.openFlyShop);
   React.useEffect(() => {
     if (!embedded) return;
     setWardrobeTab(activeTab);
+    setLastWardrobeTab(activeTab);
     return () => setWardrobeTab('inventory');
-  }, [embedded, activeTab, setWardrobeTab]);
+  }, [embedded, activeTab, setWardrobeTab, setLastWardrobeTab]);
+
+  const newItemCount =
+    activeTab === 'inventory'
+      ? 0
+      : unseenItems.length + unseenContainers.length;
+  const bestDealDiscount =
+    activeTab === 'shop'
+      ? 0
+      : Math.max(
+          0,
+          ...(data?.dailyDeals ?? [])
+            .filter((deal) => deal.onSale)
+            .map((deal) => deal.discountPercent),
+        );
+  const tradeTabBadge = activeTab === 'trade' ? 0 : readyTrades;
 
   const tabTriggerClass = cn(
-    'flex-1 h-full rounded-2xl relative flex items-center justify-center gap-2',
+    'flex-1 min-w-0 h-full rounded-2xl relative flex items-center justify-center gap-1.5 whitespace-nowrap',
+    '[@media(max-width:340px)]:text-[12px]',
     'text-[13px] md:text-sm font-bold tracking-wide transition-colors',
     embedded
       ? 'data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-sm'
@@ -1594,9 +1612,16 @@ function WardrobeManagerContent({
                   onClick={scrollPageToTop}
                   data-hint="wardrobe-inventory-tab"
                 >
-                  <AppIcon name="wardrobe" className="w-5 h-5" />
-                  <span className="narrow:hidden">Inventory</span>
-                  <span className="hidden narrow:inline">Inv</span>
+                  <AppIcon
+                    name="wardrobe"
+                    className="w-5 h-5 shrink-0 [@media(max-width:400px)]:hidden"
+                  />
+                  <span>Inventory</span>
+                  {newItemCount > 0 && (
+                    <span className="flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-black leading-none text-white shadow-sm">
+                      {newItemCount > 9 ? '9+' : newItemCount}
+                    </span>
+                  )}
                 </TabsTrigger>
                 <TabsTrigger
                   value="shop"
@@ -1604,8 +1629,16 @@ function WardrobeManagerContent({
                   onClick={scrollPageToContent}
                   data-hint="wardrobe-shop-tab"
                 >
-                  <AppIcon name="store" className="w-5 h-5" />
+                  <AppIcon
+                    name="store"
+                    className="w-5 h-5 shrink-0 [@media(max-width:400px)]:hidden"
+                  />
                   <span>Shop</span>
+                  {bestDealDiscount > 0 && (
+                    <span className="flex h-[18px] shrink-0 items-center justify-center rounded-full bg-emerald-500 px-1.5 text-[10px] font-black leading-none text-white shadow-sm">
+                      −{bestDealDiscount}%
+                    </span>
+                  )}
                 </TabsTrigger>
                 <TabsTrigger
                   value="trade"
@@ -1613,12 +1646,15 @@ function WardrobeManagerContent({
                   onClick={scrollPageToContent}
                   data-hint="wardrobe-trade-tab"
                 >
-                  <AppIcon name="trade" className="w-5 h-5" />
-                  <span>Trade</span>
-                  {readyTrades > 0 && (
+                  <AppIcon
+                    name="trade"
+                    className="w-5 h-5 shrink-0 [@media(max-width:400px)]:hidden"
+                  />
+                  <span>Trade Up</span>
+                  {tradeTabBadge > 0 && (
                     <span
                       title={tradeReadyTitle(readyTrades, tradeReadiness.byRarity)}
-                      className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[9px] font-black leading-none text-white shadow-sm"
+                      className="flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-amber-500 px-1.5 text-[10px] font-black leading-none text-white shadow-sm"
                     >
                       {readyTrades > 9 ? '9+' : readyTrades}
                     </span>

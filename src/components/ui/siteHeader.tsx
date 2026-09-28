@@ -8,7 +8,6 @@ import {
   LogIn,
   LogOut,
 } from 'lucide-react';
-import { WardrobeHub } from '@/components/ui/WardrobePopup';
 import { TRADE_MIN_ITEM_COUNT } from '@/lib/skins/catalog';
 import { Icon } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/button';
@@ -63,18 +62,6 @@ export default function SiteHeader() {
   const flyBalance = inventoryData?.wardrobe?.flies;
   const inventoryBadge = unseenCount + unseenContainerCount;
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const [wardrobeDropdownOpen, setWardrobeDropdownOpen] = useState(false);
-  const wardrobeRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (wardrobeRef.current && !wardrobeRef.current.contains(event.target as Node)) {
-        setWardrobeDropdownOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
   const { data: questsData } = useSWR<{
     claimableCount?: number;
@@ -126,14 +113,10 @@ export default function SiteHeader() {
       protected: true,
     },
     {
+      href: '/wardrobe',
       label: 'Wardrobe',
       iconName: 'wardrobe' as const,
-      onClick: () => {
-        if (!user) { router.push('/login'); return; }
-        hapticTick();
-        setWardrobeDropdownOpen((prev) => !prev);
-      },
-      isActive: pathname === '/wardrobe',
+      protected: true,
     },
     {
       href: '/friends',
@@ -190,7 +173,7 @@ export default function SiteHeader() {
         {/* ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ Desktop Navigation (Centered) ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ */}
         <div className="hidden md:flex flex-1 min-w-0 items-center justify-center gap-0.5 xl:gap-1">
           {navItems.map((item) => {
-            const isActive = item.href ? pathname === item.href : item.isActive;
+            const isActive = pathname === item.href;
 
             const buttonClass = `
               relative flex items-center gap-1.5 xl:gap-2 px-2.5 xl:px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all
@@ -200,51 +183,6 @@ export default function SiteHeader() {
                   : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
               }
             `;
-
-            if (item.label === 'Wardrobe') {
-              return (
-                <div key={item.label} className="relative" ref={wardrobeRef}>
-                  <button onClick={item.onClick} className={buttonClass}>
-                    <Icon name={item.iconName} label={item.label} className="w-8 h-8" />
-                    <span className="hidden xl:inline">{item.label}</span>
-                    {inventoryBadge > 0 ? (
-                      <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white shadow-sm ml-1">
-                        {inventoryBadge > 9 ? '9+' : inventoryBadge}
-                      </span>
-                    ) : null}
-                  </button>
-
-                  <AnimatePresence>
-                    {wardrobeDropdownOpen && (
-                      <motion.div
-                        initial={{ opacity: 0, y: -8, scale: 0.96 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: -8, scale: 0.96 }}
-                        transition={{ duration: 0.18 }}
-                        className="absolute left-1/2 -translate-x-1/2 top-full mt-2 z-50 w-[380px] origin-top"
-                      >
-                        <div className="p-4 bg-popover rounded-[28px] ring-1 ring-border/80 shadow-[0_3px_0_0_rgba(0,0,0,0.18),0_20px_40px_-12px_rgba(0,0,0,0.25)]">
-                          <WardrobeHub
-                            compact
-                            onSelect={(tab) => {
-                              setWardrobeDropdownOpen(false);
-                              router.push(`/wardrobe?tab=${tab}`);
-                              document
-                                .getElementById('main-scroll')
-                                ?.scrollTo({ top: 0, behavior: 'smooth' });
-                            }}
-                            onOpenFlyShop={() => {
-                              setWardrobeDropdownOpen(false);
-                              openFlyShop();
-                            }}
-                          />
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              );
-            }
 
             return (
               <Link
@@ -259,6 +197,11 @@ export default function SiteHeader() {
                   className={`w-8 h-8 ${item.label === 'Friends' ? 'scale-125' : ''}`}
                 />
                 <span className="hidden xl:inline">{item.label}</span>
+                {item.label === 'Wardrobe' && inventoryBadge > 0 ? (
+                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white shadow-sm ml-1">
+                    {inventoryBadge > 9 ? '9+' : inventoryBadge}
+                  </span>
+                ) : null}
                 {item.label === 'Quests' && questClaimableCount > 0 ? (
                   <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white shadow-sm ml-1">
                     {questClaimableCount > 99 ? '99+' : questClaimableCount}

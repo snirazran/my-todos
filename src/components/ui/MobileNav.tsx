@@ -1,13 +1,13 @@
 ﻿'use client';
 
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { Icon } from '@/components/ui/Icon';
 import { useAuth } from '@/components/auth/AuthContext';
 import useSWR from 'swr';
 import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { WardrobePopup, useWardrobeBadges } from '@/components/ui/WardrobePopup';
+import { useWardrobeBadges } from '@/hooks/useWardrobeBadges';
 import { TRADE_MIN_ITEM_COUNT } from '@/lib/skins/catalog';
 import { hapticTick } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
@@ -17,26 +17,10 @@ const NAV_STUCK_MS = 5000;
 
 export default function MobileNav() {
   const pathname = usePathname();
-  const router = useRouter();
   const { user } = useAuth();
   const { inventoryBadge } = useWardrobeBadges();
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const [wardrobePopupOpen, setWardrobePopupOpen] = useState(false);
   const [pendingHref, setPendingHref] = useState<string | null>(null);
-
-  // The nav rides above the popup's backdrop while it's open — and must stay
-  // raised until the exit animation lands, or the sheet slides down OVER the
-  // nav the moment `open` flips false.
-  const [navRaised, setNavRaised] = useState(false);
-  useEffect(() => {
-    if (!wardrobePopupOpen) return;
-    setNavRaised(true);
-  }, [wardrobePopupOpen]);
-  useEffect(() => {
-    if (!navRaised || wardrobePopupOpen) return;
-    const t = window.setTimeout(() => setNavRaised(false), 1200);
-    return () => window.clearTimeout(t);
-  }, [navRaised, wardrobePopupOpen]);
 
   const pathnameRef = useRef(pathname);
   const stuckTimerRef = useRef<number | null>(null);
@@ -65,7 +49,6 @@ export default function MobileNav() {
     pathnameRef.current = pathname;
     clearStuckTimer();
     setPendingHref(null);
-    setWardrobePopupOpen(false);
   }, [pathname, clearStuckTimer]);
 
   useEffect(() => clearStuckTimer, [clearStuckTimer]);
@@ -150,10 +133,7 @@ export default function MobileNav() {
     <>
       <nav
         data-app-bottom-nav
-        className={cn(
-          'fixed bottom-0 left-0 w-full bg-background/90 backdrop-blur-lg md:hidden pb-[env(safe-area-inset-bottom)]',
-          navRaised ? 'z-[100]' : 'z-50',
-        )}
+        className="fixed bottom-0 left-0 z-50 w-full bg-background/90 backdrop-blur-lg md:hidden pb-[env(safe-area-inset-bottom)]"
       >
         <div className="grid grid-cols-5 h-[76px] py-2.5">
           {navItems.map((item) => {
@@ -197,45 +177,14 @@ export default function MobileNav() {
               </div>
             );
 
-            if (item.label === 'Wardrobe' && user) {
-              return (
-                <button
-                  key={item.href}
-                  type="button"
-                  onClick={() => {
-                    hapticTick();
-                    setWardrobePopupOpen((prev) => !prev);
-                  }}
-                  className={`flex flex-col items-center justify-center w-full h-full transition-[color,transform] active:scale-95 ${
-                    isActive
-                      ? 'text-primary'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  {content}
-                </button>
-              );
-            }
-
             return (
               <Link
                 key={item.href}
                 href={target}
                 prefetch={true}
-                onClick={(e) => {
+                onClick={() => {
                   hapticTick();
                   if (pathname !== target) watchNavigation(target);
-                  if (wardrobePopupOpen) {
-                    e.preventDefault();
-                    setWardrobePopupOpen(false);
-                    window.setTimeout(() => {
-                      if (target === item.href && pathname !== item.href) {
-                        setPendingHref(item.href);
-                      }
-                      router.push(target);
-                    }, 230);
-                    return;
-                  }
                   if (target === item.href && pathname !== item.href) {
                     setPendingHref(item.href);
                   }
@@ -252,22 +201,6 @@ export default function MobileNav() {
           })}
         </div>
       </nav>
-
-      <WardrobePopup
-        open={wardrobePopupOpen}
-        onClose={() => setWardrobePopupOpen(false)}
-        onExitComplete={() => setNavRaised(false)}
-        onSelect={(tab) => {
-          setWardrobePopupOpen(false);
-          if (pathname !== '/wardrobe') watchNavigation('/wardrobe');
-          window.setTimeout(() => {
-            router.push(`/wardrobe?tab=${tab}`);
-            document
-              .getElementById('main-scroll')
-              ?.scrollTo({ top: 0, behavior: 'smooth' });
-          }, 230);
-        }}
-      />
     </>
   );
 }

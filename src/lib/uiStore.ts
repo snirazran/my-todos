@@ -46,6 +46,8 @@ interface UIState {
 
   wardrobeTab: string;
   setWardrobeTab: (tab: string) => void;
+  lastWardrobeTab: string;
+  setLastWardrobeTab: (tab: string) => void;
 
   activeHint: {
     guideId: string;
@@ -114,6 +116,8 @@ export const useUIStore = create<UIState>()(
 
       wardrobeTab: 'inventory',
       setWardrobeTab: (tab: string) => set({ wardrobeTab: tab }),
+      lastWardrobeTab: 'inventory',
+      setLastWardrobeTab: (tab: string) => set({ lastWardrobeTab: tab }),
 
       activeHint: null,
       startHintGuide: (guideId, context) =>
