@@ -32,15 +32,16 @@ type Pack = {
   bonusPercent: number;
   badge?: 'popular' | 'best';
   flies: number[];
+  name: string;
 };
 
 const PACK_META: Omit<Pack, 'amount' | 'bonusPercent'>[] = [
-  { id: 'pinch', price: '$1.99', flies: [30] },
-  { id: 'rare-jar', price: '$4.99', badge: 'popular', flies: [32, 22] },
-  { id: 'swarm', price: '$9.99', flies: [36, 26] },
-  { id: 'epic-cloud', price: '$19.99', flies: [36, 28, 20] },
-  { id: 'mega-swarm', price: '$49.99', flies: [40, 30, 22] },
-  { id: 'legendary-vault', price: '$99.99', badge: 'best', flies: [44, 34, 26, 20] },
+  { id: 'pinch', name: 'Pinch', price: '$1.99', flies: [30] },
+  { id: 'rare-jar', name: 'Jar', price: '$4.99', badge: 'popular', flies: [32, 22] },
+  { id: 'swarm', name: 'Swarm', price: '$9.99', flies: [36, 26] },
+  { id: 'epic-cloud', name: 'Cloud', price: '$19.99', flies: [36, 28, 20] },
+  { id: 'mega-swarm', name: 'Mega swarm', price: '$49.99', flies: [40, 30, 22] },
+  { id: 'legendary-vault', name: 'Vault', price: '$99.99', badge: 'best', flies: [44, 34, 26, 20] },
 ];
 
 // The ladder's entire argument is flies per dollar, so it is measured off the
@@ -243,9 +244,14 @@ export function CurrencyShop() {
       {({ bindScroll }) => (
         <>
           <div className="flex shrink-0 items-center justify-between gap-4 px-5 pb-3 pt-2 sm:px-6 sm:pt-6">
-            <h2 className="text-2xl font-black tracking-tight text-foreground sm:text-[28px]">
-              Fly Shop
-            </h2>
+            <div className="min-w-0">
+              <h2 className="text-2xl font-black leading-none tracking-tight text-foreground sm:text-[28px]">
+                Fly Shop
+              </h2>
+              <p className="mt-1.5 text-[12px] font-bold leading-none text-muted-foreground">
+                Stock up for outfits and gifts
+              </p>
+            </div>
             <div className="mr-9 flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 sm:mr-10">
               <Fly size={26} y={-4} paused />
               <AnimatedNumber
@@ -303,7 +309,7 @@ export function CurrencyShop() {
                 above the shelf would put three competing calls to action in
                 front of the merchandise, so the upsell waits until they have
                 seen the prices it is measured against. */}
-            {freeMode === 'ads' && <PlusFliesCard variant="closer" />}
+            {freeMode !== 'none' && <PlusFliesCard />}
 
             <p className="mx-auto mt-6 max-w-[17rem] text-center text-[11px] font-medium leading-relaxed text-muted-foreground/70">
               Built by a tiny team and one very hungry frog. Every pack keeps
@@ -404,7 +410,10 @@ function PackCard({
   const popular = !covers && pack.badge === 'popular';
   const best = !covers && pack.badge === 'best';
   const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState<string | null>(null);
+  const [status, setStatus] = useState<{
+    text: string;
+    tone: 'muted' | 'success' | 'error';
+  } | null>(null);
 
   const buy = async () => {
     if (busy) return;
@@ -413,14 +422,38 @@ function PackCard({
     try {
       const result = await purchaseFlyPack(pack.id as FlyPackId);
       if (result === 'purchased') {
-        setStatus('Adding flies...');
-        const landed = await onPurchased((info) => setStatus(`Adding flies ${info}`));
-        setStatus(landed ? null : 'Still processing...');
+        setStatus({ text: 'Adding flies…', tone: 'muted' });
+        const landed = await onPurchased(() => {});
+        if (landed) {
+          setStatus({
+            text: `+${pack.amount.toLocaleString()} flies added!`,
+            tone: 'success',
+          });
+          hapticSuccess();
+          confetti({
+            particleCount: 80,
+            spread: 80,
+            startVelocity: 36,
+            origin: { y: 0.45 },
+            zIndex: 99999,
+            colors: ['#4ade80', '#22c55e', '#fbbf24', '#bbf7d0'],
+          });
+          window.setTimeout(() => setStatus(null), 3000);
+        } else {
+          setStatus({
+            text: 'Still processing — flies will arrive shortly',
+            tone: 'muted',
+          });
+        }
       }
     } catch (error) {
-      setStatus(error instanceof Error && error.message.includes('not configured')
-        ? 'Pack unavailable'
-        : 'Purchase failed');
+      setStatus({
+        text:
+          error instanceof Error && error.message.includes('not configured')
+            ? 'This pack isn’t available right now'
+            : 'Purchase didn’t go through — please try again',
+        tone: 'error',
+      });
     } finally {
       setBusy(false);
     }
@@ -475,10 +508,13 @@ function PackCard({
         showArt={showArt}
         fallback={flyCluster}
         rays={best}
-        className="h-28 w-full sm:h-32"
+        className="h-24 w-full sm:h-28"
       />
 
       <span className="flex w-full flex-col items-start gap-1 px-0.5">
+        <span className="text-[11px] font-black leading-none text-muted-foreground">
+          {pack.name}
+        </span>
         <span className="flex w-full flex-wrap items-baseline gap-x-2 gap-y-1">
           <span className="flex items-baseline gap-1.5">
             <span className="text-xl font-black leading-none tabular-nums text-foreground">
@@ -497,13 +533,23 @@ function PackCard({
                   : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400',
               )}
             >
-              +{pack.bonusPercent}% value
+              +{pack.bonusPercent}% extra
             </span>
           )}
         </span>
         {status && (
-          <span className="block text-[10px] font-bold leading-none text-muted-foreground">
-            {status}
+          <span
+            role="status"
+            className={cn(
+              'block text-[11px] font-black leading-tight',
+              status.tone === 'success'
+                ? 'text-emerald-600 dark:text-emerald-400'
+                : status.tone === 'error'
+                  ? 'text-rose-600 dark:text-rose-400'
+                  : 'text-muted-foreground',
+            )}
+          >
+            {status.text}
           </span>
         )}
       </span>
@@ -522,95 +568,38 @@ function PackCard({
   );
 }
 
-/**
- * The Plus upsell, in the two places it earns.
- *
- * `primary` stands in for the ad round where rewarded video does not exist
- * (web), so it keeps the full card. `closer` runs under the shelf on device,
- * where the ad round already holds the top slot: stacking both above the packs
- * would put three competing calls to action in front of the merchandise, and
- * the upsell argues better once the prices it undercuts have been seen.
- *
- * Both wear the paywall's own colours — periwinkle ground, amber action — so
- * the tap lands somewhere that looks like where it came from.
- */
-function PlusFliesCard({
-  variant = 'primary',
-}: {
-  variant?: 'primary' | 'closer';
-}) {
+function PlusFliesCard() {
   const openPremium = useUIStore((s) => s.setPremiumModalOpen);
   const open = () => openPremium(true, 'fly_shop_free_flies');
 
-  if (variant === 'closer') {
-    return (
-      <button
-        type="button"
-        onClick={open}
-        className="group mt-5 flex w-full items-center gap-3 rounded-[22px] bg-[#6c6fce]/10 p-3 text-left ring-1 ring-[#6c6fce]/30 transition-all hover:-translate-y-0.5 active:scale-[0.99] dark:bg-[#6c6fce]/20"
-      >
-        <span className="-my-3 flex shrink-0 items-center">
-          <Icon
-            name="frogPlus"
-            label="Plus"
-            className="h-[60px] w-[60px] drop-shadow-[0_3px_5px_rgba(0,0,0,0.2)]"
-          />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block text-sm font-black tracking-tight text-foreground">
-            Earn outfits twice as fast
-          </span>
-          <span className="block text-xs font-semibold text-muted-foreground">
-            Double flies on quests and leaps, and reroll the daily deals with no
-            ad.
-          </span>
-        </span>
-        <span className="flex h-10 shrink-0 items-center rounded-xl bg-amber-500 px-3 text-xs font-black text-white shadow-[0_3px_0_0_#b45309] transition-all group-active:translate-y-0.5 group-active:shadow-none">
-          Get Plus
-        </span>
-      </button>
-    );
-  }
-
   return (
-    <div>
-      <p className="mb-3.5 mt-5 px-1 text-[12px] font-black text-muted-foreground">
-        Free flies
-      </p>
-      <button
-        type="button"
-        onClick={open}
-        className="group relative flex w-full items-center gap-3 rounded-[24px] bg-[#6c6fce] p-3.5 pl-2 text-left text-white shadow-[0_4px_0_0_#4c4fa8] transition-all hover:-translate-y-0.5 active:translate-y-1 active:shadow-none sm:gap-4 sm:p-4 sm:pl-2.5"
-      >
-        {/* The mark carries the brand on its own — a tile around it just adds
-            another box, so it is sized up and allowed to break the card edge
-            instead. */}
-        <span className="-my-4 flex shrink-0 items-center sm:-my-5">
-          <Icon
-            name="frogPlus"
-            label="Plus"
-            className="h-[76px] w-[76px] drop-shadow-[0_4px_6px_rgba(0,0,0,0.28)] sm:h-[88px] sm:w-[88px]"
-          />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="flex items-center gap-2">
-            <span className="text-sm font-black tracking-tight sm:text-base">
-              Earn outfits twice as fast
-            </span>
-            <span className="rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-black leading-none text-amber-950">
-              ×2
-            </span>
-          </span>
-          <span className="mt-0.5 block text-xs font-semibold text-white/85">
-            Double flies on daily quests, leaps and commitments — and every gift
-            opens twice.
+    <button
+      type="button"
+      onClick={open}
+      className="group mt-5 flex w-full items-center gap-3 rounded-[22px] bg-[#6c6fce]/10 p-3 pl-2 text-left ring-1 ring-[#6c6fce]/30 transition-all hover:-translate-y-0.5 active:scale-[0.99] dark:bg-[#6c6fce]/20"
+    >
+      <span className="-my-3 flex shrink-0 items-center">
+        <Icon
+          name="frogPlus"
+          label="Plus"
+          className="h-[64px] w-[64px] drop-shadow-[0_3px_5px_rgba(0,0,0,0.2)]"
+        />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-1.5">
+          <span className="text-sm font-black tracking-tight text-foreground">
+            Or earn 2× flies with Plus
           </span>
         </span>
-        <span className="relative flex h-11 shrink-0 items-center justify-center rounded-2xl bg-amber-500 px-3.5 text-xs font-black text-white shadow-[0_3px_0_0_#b45309]">
-          Get Plus
+        <span className="mt-0.5 block text-xs font-semibold text-muted-foreground">
+          Double flies from quests, streaks and leaps — every day, not just
+          once.
         </span>
-      </button>
-    </div>
+      </span>
+      <span className="flex h-10 shrink-0 items-center rounded-xl bg-amber-500 px-3 text-xs font-black text-white shadow-[0_3px_0_0_#b45309] transition-all group-active:translate-y-0.5 group-active:shadow-none">
+        Get Plus
+      </span>
+    </button>
   );
 }
 
@@ -660,7 +649,7 @@ function FreeFliesCard({
 
   // Plus pays to not see ads, so the surface is gone rather than merely refused.
   if (data && data.available === false) return null;
-  if (!available) return data ? <PlusFliesCard /> : null;
+  if (!available) return null;
 
   const remaining = data?.remaining ?? 0;
   const cap = data?.cap ?? 5;

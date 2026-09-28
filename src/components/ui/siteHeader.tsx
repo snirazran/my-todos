@@ -8,7 +8,7 @@ import {
   LogIn,
   LogOut,
 } from 'lucide-react';
-import { useWardrobeBadges } from '@/components/ui/WardrobePopup';
+import { WardrobeHub } from '@/components/ui/WardrobePopup';
 import { TRADE_MIN_ITEM_COUNT } from '@/lib/skins/catalog';
 import { Icon } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/button';
@@ -50,27 +50,6 @@ import { CurrencyShop } from './shop/CurrencyShop';
 import { HelpCenterPanel, ContactPanel } from '@/components/ui/HelpCenter';
 import { cn } from '@/lib/utils';
 
-const wardrobeItems = [
-  {
-    tab: 'inventory' as const,
-    label: 'Inventory',
-    color: 'bg-primary/10',
-    icon: 'wardrobe' as const,
-  },
-  {
-    tab: 'shop' as const,
-    label: 'Shop',
-    color: 'bg-sky-500/10',
-    icon: 'store' as const,
-  },
-  {
-    tab: 'trade' as const,
-    label: 'Trade',
-    color: 'bg-amber-500/10',
-    icon: 'trade' as const,
-  },
-];
-
 export default function SiteHeader() {
   const { user, loading } = useAuth();
   const pathname = usePathname();
@@ -83,8 +62,6 @@ export default function SiteHeader() {
   const { unseenCount, unseenContainerCount, data: inventoryData } = useInventory(!!user, true);
   const flyBalance = inventoryData?.wardrobe?.flies;
   const inventoryBadge = unseenCount + unseenContainerCount;
-  const { readyTrades } = useWardrobeBadges();
-  const tradeSparesReady = readyTrades > 0;
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const [wardrobeDropdownOpen, setWardrobeDropdownOpen] = useState(false);
   const wardrobeRef = useRef<HTMLDivElement>(null);
@@ -244,64 +221,23 @@ export default function SiteHeader() {
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: -8, scale: 0.96 }}
                         transition={{ duration: 0.18 }}
-                        className="absolute left-1/2 -translate-x-1/2 top-full mt-2 z-50 w-72 origin-top"
+                        className="absolute left-1/2 -translate-x-1/2 top-full mt-2 z-50 w-[380px] origin-top"
                       >
-                        <div className="p-3 bg-popover border border-border rounded-2xl shadow-xl ring-1 ring-black/5">
-                          <div className="flex items-baseline justify-between px-1 pb-2">
-                            <p className="text-[12px] font-black text-muted-foreground">
-                              Dress your frog
-                            </p>
-                            {typeof flyBalance === 'number' && (
-                              <span className="flex items-center gap-1 text-[11px] font-black tabular-nums text-foreground">
-                                <img src="/fly.svg" alt="" className="h-4 w-4" />
-                                {flyBalance.toLocaleString()}
-                              </span>
-                            )}
-                          </div>
-                          <div className="grid grid-cols-3 gap-2">
-                            {wardrobeItems.map((wItem) => {
-                              const badge =
-                                wItem.tab === 'inventory'
-                                  ? inventoryBadge
-                                  : wItem.tab === 'trade' && tradeSparesReady
-                                    ? readyTrades
-                                    : 0;
-                              return (
-                                <button
-                                  key={wItem.tab}
-                                  onClick={() => {
-                                    hapticTick();
-                                    setWardrobeDropdownOpen(false);
-                                    router.push(`/wardrobe?tab=${wItem.tab}`);
-                                    document
-                                      .getElementById('main-scroll')
-                                      ?.scrollTo({ top: 0, behavior: 'smooth' });
-                                  }}
-                                  className="relative flex flex-col items-center gap-2 p-3 rounded-xl bg-muted/50 hover:bg-muted transition-all active:scale-95"
-                                >
-                                  {badge > 0 && (
-                                    <span
-                                      className={`absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-popover px-1 text-[10px] font-black text-white shadow-sm ${
-                                        wItem.tab === 'inventory'
-                                          ? 'bg-rose-500'
-                                          : 'bg-amber-500'
-                                      }`}
-                                    >
-                                      {badge > 9 ? '9+' : badge}
-                                    </span>
-                                  )}
-                                  <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${wItem.color}`}>
-                                    <Icon
-                                      name={wItem.icon}
-                                      label={wItem.label}
-                                      className="w-7 h-7"
-                                    />
-                                  </div>
-                                  <span className="text-xs font-bold text-foreground">{wItem.label}</span>
-                                </button>
-                              );
-                            })}
-                          </div>
+                        <div className="p-4 bg-popover rounded-[28px] ring-1 ring-border/80 shadow-[0_3px_0_0_rgba(0,0,0,0.18),0_20px_40px_-12px_rgba(0,0,0,0.25)]">
+                          <WardrobeHub
+                            compact
+                            onSelect={(tab) => {
+                              setWardrobeDropdownOpen(false);
+                              router.push(`/wardrobe?tab=${tab}`);
+                              document
+                                .getElementById('main-scroll')
+                                ?.scrollTo({ top: 0, behavior: 'smooth' });
+                            }}
+                            onOpenFlyShop={() => {
+                              setWardrobeDropdownOpen(false);
+                              openFlyShop();
+                            }}
+                          />
                         </div>
                       </motion.div>
                     )}

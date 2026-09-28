@@ -2,18 +2,27 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Clock } from 'lucide-react';
+import { motion, AnimatePresence, type Variants } from 'framer-motion';
+import { ArrowUp, Clock, Plus } from 'lucide-react';
 import { useCountdown } from '@/components/ui/skins/DailyDealsShelf';
 import Fly from '@/components/ui/fly';
 import { Icon } from '@/components/ui/Icon';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
+import { RARITY_CONFIG } from '@/components/ui/gift-box/constants';
 import { useAuth } from '@/components/auth/AuthContext';
 import { useInventory } from '@/hooks/useInventory';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
-import { countInventorySpares } from '@/lib/skins/catalog';
-import { useReadyTrades } from '@/hooks/useReadyTrades';
+import { useUIStore } from '@/lib/uiStore';
+import {
+  countInventorySpares,
+  RARITY_ORDER,
+  type ItemDef,
+} from '@/lib/skins/catalog';
+import type { DailyDeal } from '@/lib/skins/dailyDeal';
+import { useTradeReadiness } from '@/hooks/useReadyTrades';
+import { useTradeConfig } from '@/hooks/useTradeConfig';
+import { recipeFor } from '@/lib/skins/tradeModifiers';
 import { hapticTick } from '@/lib/haptics';
 import { cn } from '@/lib/utils';
 
@@ -34,9 +43,39 @@ export function useWardrobeBadges() {
       countInventorySpares(data?.wardrobe?.inventory, data?.catalog).owned,
     [data],
   );
-  const readyTrades = useReadyTrades(!!user);
+  const { trades: readyTrades, startRarity } = useTradeReadiness(!!user);
+  const tradeModifiers = useTradeConfig(!!user);
+  const tradeRecipe = useMemo(() => {
+    if (startRarity) return recipeFor(tradeModifiers, startRarity);
+    return (
+      [...tradeModifiers.recipes].sort(
+        (a, b) => RARITY_ORDER.indexOf(a.from) - RARITY_ORDER.indexOf(b.from),
+      )[0] ?? null
+    );
+  }, [startRarity, tradeModifiers]);
 
-  return { inventoryBadge, flyBalance, readyTrades, ownedCount, dealEndsAt };
+  const featuredDeal = useMemo(() => {
+    const deals = data?.dailyDeals ?? [];
+    if (!deals.length || !data?.catalog) return null;
+    const byId = new Map(data.catalog.map((item) => [item.id, item]));
+    const entries = deals
+      .map((deal) => ({ deal, item: byId.get(deal.itemId) }))
+      .filter((e): e is { deal: DailyDeal; item: ItemDef } => !!e.item);
+    if (!entries.length) return null;
+    return entries.reduce((best, e) =>
+      e.deal.discountPercent > best.deal.discountPercent ? e : best,
+    );
+  }, [data?.dailyDeals, data?.catalog]);
+
+  return {
+    inventoryBadge,
+    flyBalance,
+    readyTrades,
+    tradeRecipe,
+    ownedCount,
+    dealEndsAt,
+    featuredDeal,
+  };
 }
 
 const SHEET_ENTER = {
@@ -50,65 +89,340 @@ const SHEET_EXIT = {
   ease: [0.4, 0, 1, 1] as [number, number, number, number],
 };
 
-/**
- * One card shape for all three destinations — they're peers, and the old
- * wide-row-plus-two-tiles layout implied a hierarchy that doesn't exist.
- * Colour is reserved for live state (a running deal, spares ready to trade),
- * so it reads as information rather than decoration.
- */
+const GRID_VARIANTS: Variants = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.05, delayChildren: 0.08 } },
+};
+const CARD_VARIANTS: Variants = {
+  hidden: { opacity: 0, y: 18, scale: 0.94 },
+  show: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: { type: 'spring', stiffness: 520, damping: 30 },
+  },
+};
+
+type Tone = 'emerald' | 'amber' | 'sky';
+
+const STAGE_TONE: Record<Tone, string> = {
+  emerald:
+    'from-emerald-100 to-lime-50 dark:from-emerald-900/50 dark:to-emerald-950/30',
+  amber:
+    'from-amber-100 to-orange-50 dark:from-amber-900/45 dark:to-orange-950/25',
+  sky: 'from-sky-100 to-indigo-50 dark:from-sky-900/45 dark:to-indigo-950/25',
+};
+
+const STATUS_TONE = {
+  muted: 'text-muted-foreground',
+  rose: 'text-rose-600 dark:text-rose-400',
+  amber: 'text-amber-600 dark:text-amber-400',
+  emerald: 'text-emerald-600 dark:text-emerald-400',
+};
+
 function DestinationCard({
-  icon,
   label,
-  detail,
-  detailTone = 'muted',
-  detailIcon,
+  stage,
+  stageTone,
+  stageClassName,
+  status,
+  statusTone = 'muted',
+  statusIcon,
   badge = 0,
   badgeTone = 'rose',
+  glow = false,
+  compact = false,
   onClick,
 }: {
-  icon: React.ReactNode;
   label: string;
-  detail: string;
-  detailTone?: 'muted' | 'amber';
-  detailIcon?: React.ReactNode;
+  stage: React.ReactNode;
+  stageTone: Tone;
+  stageClassName?: string;
+  status: string;
+  statusTone?: keyof typeof STATUS_TONE;
+  statusIcon?: React.ReactNode;
   badge?: number;
   badgeTone?: 'rose' | 'amber';
+  glow?: boolean;
+  compact?: boolean;
   onClick: () => void;
 }) {
   return (
-    <button
+    <motion.button
       type="button"
+      variants={CARD_VARIANTS}
       onClick={onClick}
-      className="relative flex flex-col items-center gap-2 overflow-hidden rounded-2xl border border-border/50 bg-card px-1.5 pb-2.5 pt-3.5 shadow-sm transition-transform active:scale-[0.97]"
-    >
-      {badge > 0 && (
-        <span
-          className={cn(
-            'absolute right-1.5 top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-black text-white shadow-sm',
-            badgeTone === 'rose' ? 'bg-rose-500' : 'bg-amber-500',
-          )}
-        >
-          {badge > 9 ? '9+' : badge}
-        </span>
+      aria-label={badge > 0 ? `${label}, ${badge} new` : label}
+      className={cn(
+        'group relative flex min-w-0 flex-col rounded-[22px] bg-card p-1.5 text-left ring-1 ring-border/70',
+        'shadow-[0_3px_0_0_rgba(0,0,0,0.12)] transition-[transform,box-shadow] duration-100',
+        'active:translate-y-[2px] active:shadow-[0_1px_0_0_rgba(0,0,0,0.12)]',
+        'hover:ring-border md:hover:-translate-y-0.5 md:hover:shadow-[0_5px_0_0_rgba(0,0,0,0.12)]',
+        'dark:shadow-[0_3px_0_0_rgba(0,0,0,0.45)]',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
       )}
-      <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
-        {icon}
-      </span>
-      <span className="w-full truncate text-center text-[13px] font-black leading-none text-foreground">
-        {label}
-      </span>
+    >
       <span
         className={cn(
-          'flex w-full items-center justify-center gap-0.5 truncate text-[10px] font-bold leading-none tabular-nums',
-          detailTone === 'amber'
-            ? 'text-amber-600 dark:text-amber-400'
-            : 'text-muted-foreground',
+          'relative flex w-full items-end justify-center overflow-hidden rounded-[16px] bg-gradient-to-b',
+          compact ? 'h-[72px]' : 'h-[88px]',
+          STAGE_TONE[stageTone],
+          stageClassName,
         )}
       >
-        {detailIcon}
-        {detail}
+        <span className="pointer-events-none absolute inset-x-3 top-1.5 h-1/3 rounded-full bg-white/50 blur-md dark:bg-white/5" />
+        {glow && (
+          <span className="pointer-events-none absolute inset-0 animate-pulse rounded-[16px] ring-2 ring-inset ring-amber-400/70" />
+        )}
+        <span className="relative flex h-full w-full items-end justify-center transition-transform duration-200 group-hover:scale-[1.04]">
+          {stage}
+        </span>
       </span>
-    </button>
+
+      <AnimatePresence>
+        {badge > 0 && (
+          <motion.span
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            exit={{ scale: 0 }}
+            transition={{ type: 'spring', stiffness: 600, damping: 18, delay: 0.25 }}
+            className={cn(
+              'absolute -right-1 -top-1 z-10 flex h-6 min-w-6 items-center justify-center rounded-full border-2 border-card px-1.5 text-[11px] font-black text-white shadow-sm',
+              badgeTone === 'rose' ? 'bg-rose-500' : 'bg-amber-500',
+            )}
+          >
+            {badge > 9 ? '9+' : badge}
+          </motion.span>
+        )}
+      </AnimatePresence>
+
+      <span className="flex min-w-0 flex-col gap-1 px-1 pb-1 pt-2 min-[380px]:px-1.5">
+        <span className="truncate text-[clamp(13px,4vw,15px)] font-black leading-none text-foreground">
+          {label}
+        </span>
+        <span
+          className={cn(
+            'flex min-w-0 items-start gap-1 text-[clamp(10px,3vw,11px)] font-bold leading-tight tabular-nums',
+            STATUS_TONE[statusTone],
+          )}
+        >
+          {statusIcon && <span className="mt-px shrink-0">{statusIcon}</span>}
+          <span className="line-clamp-2 min-w-0 break-words">{status}</span>
+        </span>
+      </span>
+    </motion.button>
+  );
+}
+
+export function WardrobeHub({
+  active = true,
+  compact = false,
+  onSelect,
+  onOpenFlyShop,
+}: {
+  active?: boolean;
+  compact?: boolean;
+  onSelect: (tab: WardrobeTab) => void;
+  onOpenFlyShop?: () => void;
+}) {
+  const { user } = useAuth();
+  const { indices } = useWardrobeIndices(!!user);
+  const {
+    inventoryBadge,
+    flyBalance,
+    readyTrades,
+    tradeRecipe,
+    ownedCount,
+    dealEndsAt,
+    featuredDeal,
+  } = useWardrobeBadges();
+  const dealCountdown = useCountdown(
+    active && dealEndsAt ? dealEndsAt : undefined,
+  );
+
+  const tradeReady = readyTrades > 0;
+  const snapshotSize = compact ? 96 : 116;
+
+  const pick = (tab: WardrobeTab) => {
+    hapticTick();
+    onSelect(tab);
+  };
+
+  const inventoryStatus =
+    inventoryBadge > 0
+      ? `${inventoryBadge} new`
+      : ownedCount > 0
+        ? `${ownedCount} ${ownedCount === 1 ? 'item' : 'items'}`
+        : 'Start collecting';
+
+  const onSale = featuredDeal?.deal.onSale ?? false;
+
+  return (
+    <div>
+      <div className="flex items-center gap-3 px-1 pb-3">
+        <div className="min-w-0 flex-1">
+          <h2
+            className={cn(
+              'font-black leading-none text-foreground',
+              compact ? 'text-lg' : 'text-[22px]',
+            )}
+          >
+            Wardrobe
+          </h2>
+          <p className="mt-1 text-[12px] font-bold leading-none text-muted-foreground">
+            Dress up your frog
+          </p>
+        </div>
+        {typeof flyBalance === 'number' && (
+          <button
+            type="button"
+            onClick={() => {
+              hapticTick();
+              onOpenFlyShop?.();
+            }}
+            aria-label={`${flyBalance} flies, get more`}
+            className="flex shrink-0 items-center gap-1 rounded-full bg-card py-1 pl-1.5 pr-1 ring-1 ring-border/70 shadow-[0_2px_0_0_rgba(0,0,0,0.1)] transition-transform active:translate-y-px active:shadow-none"
+          >
+            <Fly size={24} paused y={-4} />
+            <span className="text-[14px] font-black tabular-nums text-foreground">
+              {flyBalance.toLocaleString()}
+            </span>
+            <span className="ml-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-[#4f9149] text-white shadow-[0_2px_0_0_#34631f]">
+              <Plus className="h-3.5 w-3.5" strokeWidth={3.5} />
+            </span>
+          </button>
+        )}
+      </div>
+
+      <motion.div
+        variants={GRID_VARIANTS}
+        initial="hidden"
+        animate="show"
+        className="grid grid-cols-3 gap-2.5"
+      >
+        <DestinationCard
+          label="Inventory"
+          stageTone="emerald"
+          compact={compact}
+          stage={
+            <FrogSnapshot
+              indices={indices}
+              width={snapshotSize}
+              height={snapshotSize}
+              visualOffsetY={0}
+            />
+          }
+          status={inventoryStatus}
+          statusTone={inventoryBadge > 0 ? 'rose' : 'muted'}
+          badge={inventoryBadge}
+          badgeTone="rose"
+          onClick={() => pick('inventory')}
+        />
+        <DestinationCard
+          label="Shop"
+          stageTone="amber"
+          compact={compact}
+          stageClassName={
+            featuredDeal
+              ? RARITY_CONFIG[featuredDeal.item.rarity].gradient
+              : undefined
+          }
+          stage={
+            featuredDeal ? (
+              <>
+                <FrogSnapshot
+                  indices={{
+                    [featuredDeal.item.slot]: featuredDeal.item.riveIndex,
+                  }}
+                  width={snapshotSize}
+                  height={snapshotSize}
+                  visualOffsetY={0}
+                />
+                {onSale && (
+                  <span className="absolute left-1.5 top-1.5 rounded-full bg-emerald-500 px-1.5 py-0.5 text-[10px] font-black leading-none text-white shadow-sm">
+                    −{featuredDeal.deal.discountPercent}%
+                  </span>
+                )}
+              </>
+            ) : (
+              <span className="flex h-full items-center">
+                <Icon name="store" className="h-12 w-12" />
+              </span>
+            )
+          }
+          status={dealCountdown || 'New every day'}
+          statusTone={dealCountdown ? 'amber' : 'muted'}
+          statusIcon={
+            dealCountdown ? <Clock className="h-3 w-3 shrink-0" /> : null
+          }
+          onClick={() => pick('shop')}
+        />
+        <DestinationCard
+          label="Trade Up"
+          stageTone="sky"
+          compact={compact}
+          glow={tradeReady}
+          stage={
+            <span className="flex h-full w-full flex-col items-center justify-center gap-1.5 px-1">
+              <span className="relative flex">
+                <motion.span
+                  animate={tradeReady ? { rotate: [0, -8, 8, 0] } : undefined}
+                  transition={{ duration: 0.9, repeat: Infinity, repeatDelay: 1.6 }}
+                  className="flex"
+                >
+                  <Icon name="trade" className={compact ? 'h-9 w-9' : 'h-11 w-11'} />
+                </motion.span>
+                <motion.span
+                  animate={tradeReady ? { y: [0, -3, 0] } : undefined}
+                  transition={{ duration: 0.8, repeat: Infinity, repeatDelay: 0.6 }}
+                  className={cn(
+                    'absolute -right-2.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white text-white shadow-sm dark:border-slate-900',
+                    tradeReady ? 'bg-emerald-500' : 'bg-slate-400',
+                  )}
+                >
+                  <ArrowUp className="h-3 w-3" strokeWidth={3.5} />
+                </motion.span>
+              </span>
+              {tradeRecipe && (
+                <span
+                  aria-label={`${RARITY_CONFIG[tradeRecipe.from].label} to ${RARITY_CONFIG[tradeRecipe.to].label}`}
+                  className="flex max-w-full items-center gap-0.5 whitespace-nowrap rounded-full bg-white/80 px-1.5 py-0.5 text-[9px] font-black leading-none shadow-sm dark:bg-black/30"
+                >
+                  <span
+                    className={cn(
+                      'h-2 w-2 shrink-0 rounded-full border min-[380px]:hidden',
+                      RARITY_CONFIG[tradeRecipe.from].bg,
+                      RARITY_CONFIG[tradeRecipe.from].border,
+                    )}
+                  />
+                  <span
+                    className={cn(
+                      'hidden min-[380px]:inline',
+                      RARITY_CONFIG[tradeRecipe.from].text,
+                    )}
+                  >
+                    {RARITY_CONFIG[tradeRecipe.from].label}
+                  </span>
+                  <span className="text-muted-foreground">→</span>
+                  <span className={RARITY_CONFIG[tradeRecipe.to].text}>
+                    {RARITY_CONFIG[tradeRecipe.to].label}
+                  </span>
+                </span>
+              )}
+            </span>
+          }
+          status={
+            tradeReady
+              ? `${readyTrades} ready`
+              : 'Upgrade spares'
+          }
+          statusTone={tradeReady ? 'amber' : 'muted'}
+          badge={readyTrades}
+          badgeTone="amber"
+          onClick={() => pick('trade')}
+        />
+      </motion.div>
+    </div>
   );
 }
 
@@ -125,22 +439,19 @@ export function WardrobePopup({
 }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
-  const { user } = useAuth();
-  const { indices } = useWardrobeIndices(!!user);
-  const { inventoryBadge, flyBalance, readyTrades, ownedCount, dealEndsAt } =
-    useWardrobeBadges();
-  const dealCountdown = useCountdown(
-    open && dealEndsAt ? dealEndsAt : undefined,
-  );
+  const openFlyShop = useUIStore((s) => s.openFlyShop);
   useRegisterOpenSheet(open);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
+
   if (!mounted) return null;
-
-  const tradeReady = readyTrades > 0;
-
-  const pick = (tab: WardrobeTab) => {
-    hapticTick();
-    onSelect(tab);
-  };
 
   return createPortal(
     <AnimatePresence onExitComplete={onExitComplete}>
@@ -156,6 +467,9 @@ export function WardrobePopup({
           />
 
           <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Wardrobe"
             initial={{ y: '112%' }}
             animate={{ y: 0 }}
             exit={{ y: '112%', transition: SHEET_EXIT }}
@@ -166,80 +480,25 @@ export function WardrobePopup({
             onDragEnd={(_, info) => {
               if (info.offset.y > 90 || info.velocity.y > 600) onClose();
             }}
-            className="fixed left-0 right-0 z-[99] md:hidden"
-            style={{ bottom: 'calc(4rem + env(safe-area-inset-bottom))' }}
+            className="fixed inset-x-0 bottom-0 z-[99] md:hidden"
           >
-            <div className="rounded-t-[28px] border-t border-border/60 bg-background pb-4 shadow-[0_-12px_40px_rgba(0,0,0,0.35)]">
-              <div className="flex justify-center pb-2 pt-3">
+            <div
+              className="rounded-t-[28px] border-t border-border/60 bg-background px-4 shadow-[0_-12px_40px_rgba(0,0,0,0.35)]"
+              style={{
+                paddingBottom: 'calc(76px + env(safe-area-inset-bottom) + 14px)',
+              }}
+            >
+              <div className="flex justify-center pb-3 pt-3">
                 <div className="h-1 w-10 rounded-full bg-border" />
               </div>
-
-              {/* Your actual frog leads — this is the one thing that makes it
-                  this app's wardrobe rather than a generic action sheet. */}
-              <div className="flex items-center gap-3 px-5 pb-4">
-                <div className="flex h-12 w-12 shrink-0 items-end justify-center overflow-hidden rounded-2xl bg-primary/10">
-                  <span className="shrink-0">
-                    <FrogSnapshot
-                      indices={indices}
-                      width={60}
-                      height={60}
-                      visualOffsetY={0}
-                    />
-                  </span>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[12px] font-black leading-none text-muted-foreground">
-                    Dress your frog
-                  </p>
-                  <h2 className="mt-1 text-xl font-black leading-none text-foreground">
-                    Wardrobe
-                  </h2>
-                </div>
-                {typeof flyBalance === 'number' && (
-                  <div className="flex shrink-0 items-center gap-1 rounded-full border border-border/60 bg-card py-1 pl-1.5 pr-2.5 shadow-sm">
-                    <Fly size={24} paused y={-4} />
-                    <span className="text-[13px] font-black tabular-nums text-foreground">
-                      {flyBalance.toLocaleString()}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* Three peers, one shape. Icons match the tabs they open, so the
-                  glyph you tap is the glyph you land on. */}
-              <div className="grid grid-cols-3 gap-2.5 px-4">
-                <DestinationCard
-                  icon={<Icon name="wardrobe" className="h-8 w-8" />}
-                  label="Inventory"
-                  detail={ownedCount > 0 ? `${ownedCount} owned` : 'Empty'}
-                  badge={inventoryBadge}
-                  badgeTone="rose"
-                  onClick={() => pick('inventory')}
-                />
-                <DestinationCard
-                  icon={<Icon name="store" className="h-8 w-8" />}
-                  label="Shop"
-                  detail={dealCountdown || 'New daily'}
-                  detailTone={dealCountdown ? 'amber' : 'muted'}
-                  detailIcon={
-                    dealCountdown ? <Clock className="h-3 w-3" /> : null
-                  }
-                  onClick={() => pick('shop')}
-                />
-                <DestinationCard
-                  icon={<Icon name="trade" className="h-8 w-8" />}
-                  label="Trade"
-                  detail={
-                    tradeReady
-                      ? `${readyTrades} ready`
-                      : 'Nothing to swap'
-                  }
-                  detailTone={tradeReady ? 'amber' : 'muted'}
-                  badge={readyTrades}
-                  badgeTone="amber"
-                  onClick={() => pick('trade')}
-                />
-              </div>
+              <WardrobeHub
+                active={open}
+                onSelect={onSelect}
+                onOpenFlyShop={() => {
+                  onClose();
+                  openFlyShop();
+                }}
+              />
             </div>
           </motion.div>
         </>
