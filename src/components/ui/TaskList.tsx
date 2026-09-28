@@ -1816,6 +1816,8 @@ export default function TaskList({
   );
   const { showNotification } = useNotification();
   const prevCompletedRef = useRef<Map<string, boolean> | null>(null);
+  const toggleRef = useRef(toggle);
+  toggleRef.current = toggle;
 
   // Any completion — checkmark tap, fly catch, detail sheet — surfaces a
   // transient Undo toast, keyed off the task actually flipping to done.
@@ -1841,7 +1843,7 @@ export default function TaskList({
           next.delete(id);
           return next;
         });
-        toggle(id, false);
+        return toggleRef.current(id, false);
       },
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps

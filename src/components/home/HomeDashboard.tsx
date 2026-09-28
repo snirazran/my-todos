@@ -256,6 +256,8 @@ export default function HomeDashboard() {
     scrollContainerRef: mainScrollRef,
     trackMovingTarget: true,
   });
+  const tongueBusyRef = useRef(false);
+  tongueBusyRef.current = !!cinematic || !!grab;
 
   // Any sheet/popup open (BaseSheet popups + bespoke sheets register here).
   const anySheetOpen = useSheetStore((s) => s.count > 0);
@@ -623,7 +625,11 @@ export default function HomeDashboard() {
       explicitCompleted !== undefined ? explicitCompleted : !task.completed;
 
     if (!completed) {
-      if (cinematic || grab) return;
+      const waitUntil = Date.now() + 4000;
+      while (tongueBusyRef.current && Date.now() < waitUntil) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+      if (tongueBusyRef.current) return;
       if (user) {
         await toggleTask(taskId, false);
         await mutateQuests();
