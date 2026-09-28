@@ -1,11 +1,20 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Trash2 } from 'lucide-react';
+import { Check, ChevronDown, Tag, Trash2 } from 'lucide-react';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { useKeyboardInset } from '@/components/ui/quick-add/useKeyboardInset';
 
 export type SectionTagOption = { id: string; name: string; color: string };
+
+const NAME_SUGGESTIONS = [
+  'Morning',
+  'Afternoon',
+  'Evening',
+  'Work',
+  'Home',
+  'Errands',
+];
 
 export function SectionEditorSheet({
   open,
@@ -13,6 +22,8 @@ export function SectionEditorSheet({
   initialName = '',
   initialTagIds = [],
   tags,
+  tagOwners = {},
+  existingNames = [],
   onClose,
   onSave,
   onDelete,
@@ -22,6 +33,8 @@ export function SectionEditorSheet({
   initialName?: string;
   initialTagIds?: string[];
   tags: SectionTagOption[];
+  tagOwners?: Record<string, string>;
+  existingNames?: string[];
   onClose: () => void;
   onSave: (name: string, tagIds: string[]) => void;
   onDelete?: () => void;
@@ -29,6 +42,7 @@ export function SectionEditorSheet({
   const [name, setName] = useState(initialName);
   const [tagIds, setTagIds] = useState<string[]>(initialTagIds);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [tagsOpen, setTagsOpen] = useState(initialTagIds.length > 0);
   const [inputFocused, setInputFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const { inset: keyboardInset } = useKeyboardInset(open);
@@ -50,6 +64,7 @@ export function SectionEditorSheet({
     if (!open) return;
     setName(initialName);
     setTagIds(initialTagIds);
+    setTagsOpen(initialTagIds.length > 0);
     setConfirmDelete(false);
     setInputFocused(false);
     const id = window.setTimeout(() => {
@@ -65,6 +80,11 @@ export function SectionEditorSheet({
     onSave(trimmed, tagIds);
     onClose();
   };
+
+  const taken = new Set(existingNames.map((n) => n.trim().toLowerCase()));
+  const suggestions = NAME_SUGGESTIONS.filter(
+    (n) => !taken.has(n.toLowerCase()),
+  );
 
   const toggleTag = (id: string) =>
     setTagIds((prev) =>
@@ -98,7 +118,8 @@ export function SectionEditorSheet({
             onFocus={() => setInputFocused(true)}
             onBlur={() => setInputFocused(false)}
             maxLength={60}
-            placeholder="Section name"
+            placeholder="e.g. Morning routine"
+            aria-label="Section name"
             enterKeyHint="done"
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
@@ -106,52 +127,128 @@ export function SectionEditorSheet({
                 commit();
               }
             }}
-            className="w-full rounded-2xl bg-muted/60 px-4 py-3.5 text-[16px] font-black text-foreground ring-1 ring-inset ring-border/60 placeholder:font-bold placeholder:normal-case placeholder:tracking-normal placeholder:text-muted-foreground/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            className="w-full rounded-2xl bg-muted/60 px-4 py-3.5 text-[16px] font-black text-foreground ring-1 ring-inset ring-border/60 transition-shadow placeholder:font-bold placeholder:text-muted-foreground/50 focus:outline-none focus-visible:bg-background focus-visible:ring-2 focus-visible:ring-primary/50"
           />
 
-          <div className="mt-5">
-            <p className="px-1 text-[13px] font-black text-foreground">
-              Connected tags
-            </p>
-            <p className="mt-0.5 px-1 text-[12px] font-semibold text-muted-foreground">
-              New tasks with these tags land in this section automatically.
-            </p>
+          {displayMode === 'create' && suggestions.length > 0 && (
+            <div className="mt-2.5 flex flex-wrap gap-1.5">
+              {suggestions.map((suggestion) => {
+                const picked = name.trim() === suggestion;
+                return (
+                  <button
+                    key={suggestion}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => setName(suggestion)}
+                    className={`h-8 rounded-full px-3 text-[13px] font-bold transition-[transform,background-color,color] active:scale-95 ${
+                      picked
+                        ? 'bg-primary/15 text-primary'
+                        : 'bg-muted/70 text-muted-foreground [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground'
+                    }`}
+                  >
+                    {suggestion}
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
-            {tags.length === 0 ? (
-              <p className="mt-3 px-1 text-[13px] font-semibold text-muted-foreground/70">
-                You don&apos;t have any tags yet.
-              </p>
-            ) : (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {tags.map((tag) => {
-                  const selected = tagIds.includes(tag.id);
-                  return (
-                    <button
-                      key={tag.id}
-                      type="button"
-                      onClick={() => toggleTag(tag.id)}
-                      className={`inline-flex h-9 items-center rounded-xl border px-3 text-[13px] font-black shadow-sm transition-all active:scale-95 [@media(hover:hover)]:hover:opacity-75 ${
- selected ? 'ring-2 ring-offset-1 ring-offset-background' : ''
- }`}
-                      style={{
-                        backgroundColor: `${tag.color}20`,
-                        color: tag.color,
-                        borderColor: `${tag.color}40`,
-                      }}
-                    >
-                      <span className="max-w-[140px] truncate">{tag.name}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+          {tags.length > 0 && (
+            <div className="mt-5 overflow-hidden rounded-2xl ring-1 ring-inset ring-border/60">
+              <button
+                type="button"
+                aria-expanded={tagsOpen}
+                onClick={() => setTagsOpen((v) => !v)}
+                className="flex min-h-[56px] w-full items-center gap-3 px-4 py-2.5 text-left transition-colors [@media(hover:hover)]:hover:bg-muted/40"
+              >
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary/10 text-primary">
+                  <Tag className="h-4 w-4" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[14px] font-black text-foreground">
+                    File tasks by tag
+                  </span>
+                  <span className="block truncate text-[12px] font-semibold text-muted-foreground">
+                    {tagIds.length === 0
+                      ? 'Optional'
+                      : tags
+                          .filter((t) => tagIds.includes(t.id))
+                          .map((t) => t.name)
+                          .join(', ')}
+                  </span>
+                </span>
+                <ChevronDown
+                  className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 ${
+                    tagsOpen ? 'rotate-180' : ''
+                  }`}
+                  strokeWidth={2.75}
+                />
+              </button>
+
+              {tagsOpen && (
+                <div className="border-t border-border/60 px-4 pb-4 pt-3">
+                  <p className="text-[12px] font-semibold leading-snug text-muted-foreground">
+                    New tasks you add with these tags go into this section.
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {tags.map((tag) => {
+                      const selected = tagIds.includes(tag.id);
+                      const owner = tagOwners[tag.id];
+                      return (
+                        <button
+                          key={tag.id}
+                          type="button"
+                          aria-pressed={selected}
+                          onClick={() => toggleTag(tag.id)}
+                          className="inline-flex h-9 max-w-full items-center gap-1.5 rounded-full border px-3 text-[13px] font-black transition-[transform,background-color,border-color,color] active:scale-95"
+                          style={
+                            selected
+                              ? {
+                                  backgroundColor: tag.color,
+                                  borderColor: tag.color,
+                                  color: '#fff',
+                                }
+                              : {
+                                  backgroundColor: 'transparent',
+                                  borderColor: `${tag.color}55`,
+                                  color: tag.color,
+                                }
+                          }
+                        >
+                          {selected ? (
+                            <Check className="h-3.5 w-3.5 shrink-0" strokeWidth={3.5} />
+                          ) : (
+                            <span
+                              aria-hidden
+                              className="h-2 w-2 shrink-0 rounded-full"
+                              style={{ backgroundColor: tag.color }}
+                            />
+                          )}
+                          <span className="max-w-[140px] truncate">{tag.name}</span>
+                          {owner && !selected && (
+                            <span className="shrink-0 text-[11px] font-bold opacity-60">
+                              · in {owner}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {tagIds.some((id) => tagOwners[id]) && (
+                    <p className="mt-2.5 text-[12px] font-semibold text-muted-foreground">
+                      Tags already in another section will move here.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           <button
             type="button"
             onClick={commit}
             disabled={!name.trim()}
-            className="mt-6 w-full rounded-2xl bg-[#4f9149] py-3.5 text-[15px] font-black text-white shadow-[0_4px_0_0_#34631f] transition-all active:translate-y-1 active:shadow-none disabled:opacity-50 disabled:shadow-none"
+            className="mt-6 w-full rounded-2xl bg-[#4f9149] py-3.5 text-[15px] font-black text-white shadow-[0_4px_0_0_#34631f] transition-all active:translate-y-1 active:shadow-none disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none"
           >
             {displayMode === 'create' ? 'Create section' : 'Save'}
           </button>

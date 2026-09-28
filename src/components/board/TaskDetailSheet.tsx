@@ -6,11 +6,9 @@ import {
   CalendarDays,
   CalendarPlus,
   CheckCircle2,
-  ChevronUp,
   Clock,
   EyeOff,
   Flame,
-  ListChecks,
   Pen,
   Pencil,
   Repeat,
@@ -38,35 +36,12 @@ import { BuddyTaskInvite } from '@/components/ui/buddy/BuddyTaskInvite';
 import { mutateFriendsCaches } from '@/hooks/useFriendsSync';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import { useKeyboardInset } from '@/components/ui/quick-add/useKeyboardInset';
-import { hapticSuccess, hapticTick } from '@/lib/haptics';
-import { ChecklistCheckbox, ChecklistEditor } from './ChecklistEditor';
+import { ChecklistEditor } from './ChecklistEditor';
 import { taskFlyWorthNow } from '@/lib/flyValue';
 import { TaskRepeatPopup } from './TaskRepeatPopup';
-import RichNotesEditor from './RichNotesEditor';
+import RichNotesEditor, { NotesView } from './RichNotesEditor';
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-const PREVIEW_ITEMS = 3;
-
-function AddDetailButton({
-  icon,
-  label,
-  onClick,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className="flex h-10 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl border border-dashed border-border bg-muted/30 text-[12px] font-bold text-muted-foreground transition-colors active:scale-[0.98] [@media(hover:hover)]:hover:bg-muted/60 [@media(hover:hover)]:hover:text-foreground"
-    >
-      {icon}
-      {label}
-    </button>
-  );
-}
 
 export interface TaskDetailTask {
   id: string;
@@ -153,9 +128,7 @@ export default function TaskDetailSheet({
 
   const [notes, setNotes] = useState('');
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
-  const [checklistFocus, setChecklistFocus] = useState<string | null>(null);
-  const [tab, setTab] = useState<'notes' | 'checklist'>('notes');
-  const [expanded, setExpanded] = useState(false);
+  const [editingNotes, setEditingNotes] = useState(false);
   const [showRepeat, setShowRepeat] = useState(false);
 
   const { inset: kbInset, height: vvHeight } = useKeyboardInset(open);
@@ -169,11 +142,7 @@ export default function TaskDetailSheet({
     if (open && task) {
       setNotes(task.notes ?? '');
       setChecklist(task.checklist ?? []);
-      setChecklistFocus(null);
-      const hasNotes = !!(task.notes ?? '').trim();
-      const hasChecklist = (task.checklist?.length ?? 0) > 0;
-      setTab(hasNotes || !hasChecklist ? 'notes' : 'checklist');
-      setExpanded(false);
+      setEditingNotes(false);
       setShowRepeat(false);
       setInputFocused(false);
     }
@@ -217,6 +186,30 @@ export default function TaskDetailSheet({
     [],
   );
 
+  const nestedOpenRef = useRef(false);
+  const escapeRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented || nestedOpenRef.current)
+        return;
+      e.preventDefault();
+      const active = document.activeElement as HTMLElement | null;
+      if (
+        active &&
+        (active.tagName === 'INPUT' ||
+          active.tagName === 'TEXTAREA' ||
+          active.isContentEditable)
+      ) {
+        active.blur();
+        return;
+      }
+      escapeRef.current();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open]);
+
   const tagDetails = useMemo(() => {
     const byId = new Map(tags.map((t) => [t.id, t] as const));
     const byName = new Map(tags.map((t) => [t.name, t] as const));
@@ -226,6 +219,7 @@ export default function TaskDetailSheet({
   const buddyByTaskId = useBuddyState(open);
   const buddy = displayTask ? buddyByTaskId[displayTask.id] : undefined;
   const [showBuddyInvite, setShowBuddyInvite] = useState(false);
+  nestedOpenRef.current = showRepeat || showBuddyInvite;
   const [cancelling, setCancelling] = useState(false);
 
   const notesText = useMemo(() => {
@@ -242,10 +236,26 @@ export default function TaskDetailSheet({
   // No notify/tags/notes/checklist/repeat editing on a past day.
   const minimal = isCompleted || isPast;
 
-  const close = () => onOpenChange(false);
+  const flushDetails = () => {
+    commitNotes();
+    const trimmed = checklist.filter((it) => it.text.trim());
+    if (trimmed.length !== checklist.length) {
+      setChecklist(trimmed);
+      persist({ checklist: trimmed });
+    }
+  };
+
+  const handleOpenChange = (next: boolean) => {
+    if (!next) flushDetails();
+    onOpenChange(next);
+  };
+
+  const close = () => handleOpenChange(false);
+  escapeRef.current = close;
   const runAndClose = (fn?: () => void) => () => {
+    flushDetails();
     fn?.();
-    close();
+    onOpenChange(false);
   };
 
   const persist = (next: { notes?: string; checklist?: ChecklistItem[] }) =>
@@ -255,40 +265,6 @@ export default function TaskDetailSheet({
     if ((displayTask.notes ?? '') !== notes) persist({ notes });
   };
 
-  const openEditor = (which: 'notes' | 'checklist', focusId?: string) => {
-    if (which === 'checklist') {
-      setChecklistFocus(focusId ?? (checklist.length === 0 ? 'new' : null));
-    }
-    setTab(which);
-    setExpanded(true);
-  };
-
-  const collapseEditor = () => {
-    commitNotes();
-    const trimmed = checklist.filter((it) => it.text.trim());
-    if (trimmed.length !== checklist.length) {
-      setChecklist(trimmed);
-      persist({ checklist: trimmed });
-    }
-    setExpanded(false);
-  };
-
-  const setAndPersistChecklist = (next: ChecklistItem[]) => {
-    setChecklist(next);
-    persist({ checklist: next });
-  };
-
-  const toggleItem = (id: string) => {
-    const next = checklist.map((it) =>
-      it.id === id ? { ...it, done: !it.done } : it,
-    );
-    const becameDone = next.find((it) => it.id === id)?.done ?? false;
-    if (becameDone && next.every((it) => it.done)) hapticSuccess();
-    else hapticTick();
-    setAndPersistChecklist(next);
-  };
-
-  const doneCount = checklist.filter((it) => it.done).length;
   const taskFlies = taskFlyWorthNow({
     checklist,
     streak: (displayTask.streak ?? 0) + (isCompleted ? 0 : 1),
@@ -339,11 +315,9 @@ export default function TaskDetailSheet({
   const hasContent = !!notesText || checklist.length > 0;
   const hasMeta =
     isCompleted ||
-    !!displayTask.startTime ||
     (isRepeating && streak > 0) ||
     !!buddy ||
-    (minimal && isRepeating) ||
-    taskTags.length > 0;
+    (minimal && (isRepeating || !!displayTask.startTime || taskTags.length > 0));
 
   const chipBase =
     'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-black leading-none';
@@ -352,8 +326,8 @@ export default function TaskDetailSheet({
     <>
       <BaseSheet
         open={open}
-        onOpenChange={onOpenChange}
-        className="sm:max-w-md max-h-[92vh] !border-0 !bg-transparent !shadow-none"
+        onOpenChange={handleOpenChange}
+        className="sm:max-w-[500px] max-h-[92vh] !border-0 !bg-transparent !shadow-none"
         zIndex={1400}
         hideHandle
         showClose={false}
@@ -367,9 +341,12 @@ export default function TaskDetailSheet({
         {({ bindScroll, dragControls }) => (
           <div
             ref={bindScroll}
+            role="dialog"
+            aria-modal="true"
+            aria-label={displayTask.text}
             onFocusCapture={handleFocusCapture}
             onBlurCapture={handleBlurCapture}
-            className={`flex flex-1 min-h-0 flex-col gap-3 overflow-hidden px-3 pt-1 ${
+            className={`flex flex-1 min-h-0 flex-col gap-3 overflow-hidden px-3 pt-1 sm:gap-2.5 sm:rounded-[32px] sm:bg-popover sm:p-3 sm:shadow-[0_24px_64px_-16px_rgba(0,0,0,0.45)] sm:ring-1 sm:ring-border/70 ${
               keyboardActive
                 ? 'pb-2'
                 : 'pb-[calc(env(safe-area-inset-bottom)+14px)] sm:pb-2'
@@ -377,7 +354,7 @@ export default function TaskDetailSheet({
           >
             {/* Main card — mirrors the QuickAddSheet shell */}
             <div
-              className="relative flex min-h-0 shrink-0 flex-col overflow-hidden rounded-[28px] bg-popover ring-1 ring-border/80 shadow-[0_3px_0_0_rgba(0,0,0,0.18)]"
+              className="relative flex min-h-0 shrink-0 flex-col overflow-hidden rounded-[28px] bg-popover ring-1 ring-border/80 shadow-[0_3px_0_0_rgba(0,0,0,0.18)] sm:rounded-[24px] sm:shadow-none sm:ring-0"
             >
               <div
                 onPointerDown={(e) => dragControls.start(e)}
@@ -387,14 +364,14 @@ export default function TaskDetailSheet({
               </div>
 
               <div className="absolute right-3 top-3 z-10 flex items-center gap-1.5 sm:right-4 sm:top-4">
-                {isCompleted && onDelete && (
+                {onDelete && (
                   <button
                     onClick={runAndClose(onDelete)}
                     aria-label="Delete task"
                     title="Delete"
-                    className="grid h-8 w-8 place-items-center rounded-full bg-rose-500/10 text-rose-500 transition-colors hover:bg-rose-500/20"
+                    className="grid h-8 w-8 place-items-center rounded-full text-muted-foreground/70 transition-colors hover:bg-rose-500/10 hover:text-rose-500"
                   >
-                    <Trash2 size={15} />
+                    <Trash2 size={16} />
                   </button>
                 )}
                 <button
@@ -407,7 +384,7 @@ export default function TaskDetailSheet({
               </div>
 
               <div className="flex min-h-0 flex-1 flex-col px-5 pb-4 pt-1 sm:pt-5">
-                <div className={isCompleted && onDelete ? 'pr-[76px]' : 'pr-9'}>
+                <div className={onDelete ? 'pr-[76px]' : 'pr-9'}>
                   {!minimal && onEdit ? (
                     <button
                       onClick={onEdit}
@@ -442,7 +419,7 @@ export default function TaskDetailSheet({
                         <span className="tabular-nums">×{streak}</span>
                       </span>
                     )}
-                    {displayTask.startTime && (
+                    {minimal && displayTask.startTime && (
                       <button
                         onClick={!minimal && onSchedule ? onSchedule : undefined}
                         disabled={minimal || !onSchedule}
@@ -483,13 +460,13 @@ export default function TaskDetailSheet({
                         </span>
                       </span>
                     ) : null}
-                    {taskTags.map((tagId) => {
+                    {minimal && taskTags.map((tagId) => {
                       const t = tagDetails(tagId);
                       if (!t) return null;
                       return (
                         <button
                           key={tagId}
-                          onClick={!minimal && onAddTags ? onAddTags : undefined}
+                          onClick={undefined}
                           disabled={minimal || !onAddTags}
                           className="inline-flex items-center rounded-full border px-2 py-0.5 text-[12px] font-black tracking-wide leading-4 disabled:pointer-events-none"
                           style={{
@@ -509,244 +486,131 @@ export default function TaskDetailSheet({
                   <>
                     <div className="mt-3 h-px shrink-0 bg-border/60" />
 
-                    {!expanded && (
-                      <div className="flex flex-col pt-2.5">
-                        {hasContent ? (
-                          <>
-                            {notesText && (
-                              <button
-                                onClick={() => openEditor('notes')}
-                                className="flex items-start gap-2.5 rounded-xl px-1 py-1.5 text-left transition-colors [@media(hover:hover)]:hover:bg-muted/40"
-                              >
-                                <Pen className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground/60" />
-                                <span className="line-clamp-2 min-w-0 flex-1 text-[14px] leading-snug text-muted-foreground">
-                                  {notesText}
-                                </span>
-                              </button>
-                            )}
-                            {checklist.slice(0, PREVIEW_ITEMS).map((it) => (
-                              <div
-                                key={it.id}
-                                className="flex items-center gap-2.5 rounded-xl px-1 py-1.5"
-                              >
-                                <ChecklistCheckbox
-                                  checked={it.done}
-                                  onToggle={() => toggleItem(it.id)}
-                                  size={20}
-                                />
-                                <button
-                                  onClick={() => openEditor('checklist', it.id)}
-                                  className={`min-w-0 flex-1 truncate text-left text-[14px] leading-snug transition-colors ${
-                                    it.done
-                                      ? 'text-muted-foreground line-through'
-                                      : 'text-foreground'
-                                  }`}
-                                >
-                                  {it.text}
-                                </button>
-                              </div>
-                            ))}
-                            {checklist.length > PREVIEW_ITEMS && (
-                              <button
-                                onClick={() => openEditor('checklist')}
-                                className="rounded-xl px-1 py-1 text-left text-[12px] font-bold text-primary"
-                              >
-                                +{checklist.length - PREVIEW_ITEMS} more ·{' '}
-                                <span className="tabular-nums">
-                                  {doneCount}/{checklist.length} done
-                                </span>
-                              </button>
-                            )}
-                            {/* Whichever half the task doesn't have yet stays
-                                offered — otherwise adding notes hides the only
-                                route to a checklist, and vice versa. */}
-                            {(!notesText || checklist.length === 0) && (
-                              <div className="mt-1.5 flex gap-2">
-                                {!notesText && (
-                                  <AddDetailButton
-                                    icon={<Pen className="h-3.5 w-3.5 shrink-0" />}
-                                    label="Add notes"
-                                    onClick={() => openEditor('notes')}
-                                  />
-                                )}
-                                {checklist.length === 0 && (
-                                  <AddDetailButton
-                                    icon={
-                                      <ListChecks className="h-4 w-4 shrink-0" />
-                                    }
-                                    label="Add checklist"
-                                    onClick={() => openEditor('checklist')}
-                                  />
-                                )}
-                              </div>
-                            )}
-                          </>
-                        ) : (
-                          <div className="flex gap-2">
-                            <AddDetailButton
-                              icon={<Pen className="h-3.5 w-3.5 shrink-0" />}
-                              label="Add notes"
-                              onClick={() => openEditor('notes')}
-                            />
-                            <AddDetailButton
-                              icon={<ListChecks className="h-4 w-4 shrink-0" />}
-                              label="Add checklist"
-                              onClick={() => openEditor('checklist')}
-                            />
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {expanded && (
-                      <div
-                        style={
-                          keyboardActive && vvHeight
-                            ? {
-                                height: Math.max(
-                                  150,
-                                  Math.min(340, vvHeight - 240),
-                                ),
-                              }
-                            : undefined
-                        }
-                        className={`mt-3 flex shrink-0 flex-col ${
-                          keyboardActive ? '' : 'h-[min(340px,40dvh)]'
-                        }`}
-                      >
-                        <div className="flex shrink-0 items-center gap-2">
-                          <div className="flex flex-1 gap-1 rounded-full bg-muted/70 p-1">
-                            <TabButton
-                              active={tab === 'notes'}
-                              onClick={() => setTab('notes')}
-                            >
-                              Notes
-                            </TabButton>
-                            <TabButton
-                              active={tab === 'checklist'}
-                              onClick={() => setTab('checklist')}
-                            >
-                              Checklist
-                              {checklist.length > 0 && (
-                                <span className="ml-1 tabular-nums opacity-70">
-                                  {doneCount}/{checklist.length}
-                                </span>
-                              )}
-                            </TabButton>
-                          </div>
-                          <button
-                            onClick={collapseEditor}
-                            aria-label="Collapse"
-                            title="Collapse"
-                            className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-muted/60 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                          >
-                            <ChevronUp className="h-[18px] w-[18px]" />
-                          </button>
-                        </div>
-
-                        <div className="mt-3 flex min-h-0 flex-1 flex-col">
-                          {tab === 'notes' ? (
-                            <RichNotesEditor
-                              value={notes}
-                              onChange={setNotes}
-                              onBlur={commitNotes}
-                            />
-                          ) : (
-                            <div className="flex min-h-0 flex-1 flex-col">
-                              {checklist.length > 0 ? null : (
-                                <div className="mb-2 flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-muted/30 px-4 py-2.5 text-center">
-                                  <Fly size={22} y={-1} interactive={false} />
-                                  <p className="text-[12px] font-semibold leading-snug text-muted-foreground">
-                                    Break it into steps — tick them off to catch
-                                    this task&apos;s flies.
-                                  </p>
-                                </div>
-                              )}
-
-                              <ChecklistEditor
-                                items={checklist}
-                                autoFocus={checklistFocus}
-                                className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
-                                onChange={(next, { persist: persistNow }) => {
-                                  setChecklist(next);
-                                  if (persistNow) persist({ checklist: next });
-                                }}
-                              />
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Toolbar — same anatomy as the QuickAddSheet bottom row */}
-                    {!keyboardActive && (
-                    <div className="mt-3 flex shrink-0 items-center gap-1.5">
-                      {onSetRepeat && (
+                    <div
+                      style={
+                        keyboardActive && vvHeight
+                          ? { maxHeight: Math.max(150, vvHeight - 200) }
+                          : undefined
+                      }
+                      className={`-mx-2 mt-2 flex min-h-0 flex-col gap-1 overflow-y-auto overscroll-contain px-2 pb-1 ${
+                        keyboardActive ? '' : 'max-h-[min(460px,50dvh)]'
+                      }`}
+                    >
+                      {editingNotes ? (
+                        <RichNotesEditor
+                          value={notes}
+                          onChange={setNotes}
+                          autoFocus
+                          onBlur={() => {
+                            commitNotes();
+                            setEditingNotes(false);
+                          }}
+                        />
+                      ) : notesText ? (
+                        <NotesView
+                          value={notes}
+                          onEdit={() => setEditingNotes(true)}
+                        />
+                      ) : (
                         <button
-                          data-hint="repeat-button"
-                          onClick={() => setShowRepeat(true)}
-                          className={`inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-bold transition-transform active:scale-95 ${
-                            isRepeating
-                              ? 'bg-primary/10 text-primary'
-                              : 'bg-muted/70 text-muted-foreground [@media(hover:hover)]:hover:text-foreground'
-                          }`}
+                          type="button"
+                          onClick={() => setEditingNotes(true)}
+                          className="flex min-h-[44px] items-center gap-3 rounded-xl px-2 text-left text-[15px] text-muted-foreground/70 transition-colors [@media(hover:hover)]:hover:bg-muted/40"
                         >
-                          <Repeat className="h-4 w-4 shrink-0" />
-                          <span className="whitespace-nowrap">
-                            {isRepeating ? repeatChipLabel : 'Repeat'}
+                          <span className="grid h-[23px] w-[23px] shrink-0 place-items-center">
+                            <Pen className="h-4 w-4" />
                           </span>
+                          Add notes…
                         </button>
                       )}
-                      <div className="ml-auto flex items-center gap-1">
+
+                      <ChecklistEditor
+                        items={checklist}
+                        onChange={(next, { persist: persistNow }) => {
+                          setChecklist(next);
+                          if (persistNow) persist({ checklist: next });
+                        }}
+                      />
+                    </div>
+
+                    {!keyboardActive && (
+                      <div
+                        className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-border/60 pt-3"
+                      >
+                        {onSetRepeat && (
+                          <PropertyChip
+                            dataHint="repeat-button"
+                            active={isRepeating}
+                            icon={<Repeat className="h-4 w-4" />}
+                            onClick={() => setShowRepeat(true)}
+                          >
+                            {isRepeating ? repeatChipLabel : 'Repeat'}
+                          </PropertyChip>
+                        )}
                         {onSchedule && (
-                          <ToolbarIconButton
-                            label="Reminder"
-                            active={!!displayTask.reminder}
+                          <PropertyChip
+                            active={!!displayTask.startTime || !!displayTask.reminder}
+                            icon={<Bell className="h-4 w-4" />}
                             onClick={onSchedule}
                           >
-                            <Bell className="h-5 w-5" />
-                          </ToolbarIconButton>
+                            {displayTask.startTime ? (
+                              <span className="tabular-nums">
+                                {displayTask.startTime}
+                              </span>
+                            ) : (
+                              'Remind me'
+                            )}
+                          </PropertyChip>
                         )}
                         {onAddTags && (
                           <span
                             data-hint="task-tags-button"
                             data-tag-ids={taskTags.join(',') || undefined}
-                            className="inline-flex"
+                            className="inline-flex flex-wrap items-center gap-1.5"
                           >
-                            <ToolbarIconButton
-                              label="Tags"
-                              active={taskTags.length > 0}
-                              onClick={onAddTags}
-                            >
-                              <Tag className="h-5 w-5" />
-                            </ToolbarIconButton>
+                            {taskTags.some((id) => tagDetails(id)) ? (
+                              taskTags.map((tagId) => {
+                                const t = tagDetails(tagId);
+                                if (!t) return null;
+                                return (
+                                  <button
+                                    key={tagId}
+                                    type="button"
+                                    onClick={onAddTags}
+                                    className="inline-flex h-9 items-center gap-1.5 rounded-full border px-3 text-[13px] font-black transition-transform active:scale-95"
+                                    style={{
+                                      backgroundColor: `${t.color}1a`,
+                                      color: t.color,
+                                      borderColor: `${t.color}40`,
+                                    }}
+                                  >
+                                    <Tag className="h-3.5 w-3.5" />
+                                    {t.name}
+                                  </button>
+                                );
+                              })
+                            ) : (
+                              <PropertyChip
+                                icon={<Tag className="h-4 w-4" />}
+                                onClick={onAddTags}
+                              >
+                                Tag
+                              </PropertyChip>
+                            )}
                           </span>
                         )}
-                        {onDelete && (
-                          <button
-                            onClick={runAndClose(onDelete)}
-                            aria-label="Delete task"
-                            title="Delete"
-                            className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-rose-500/80 transition-colors active:scale-95 [@media(hover:hover)]:hover:bg-rose-500/10 [@media(hover:hover)]:hover:text-rose-500"
+                        {canShareWithBuddy && !buddy && (
+                          <PropertyChip
+                            tone="buddy"
+                            icon={<Users className="h-4 w-4" strokeWidth={2.5} />}
+                            onClick={() => setShowBuddyInvite(true)}
                           >
-                            <Trash2 className="h-5 w-5" />
-                          </button>
+                            Do with a friend
+                          </PropertyChip>
                         )}
                       </div>
-                    </div>
                     )}
 
-                    {/* Goal buddy */}
-                    {!keyboardActive && canShareWithBuddy && !buddy && (
-                      <button
-                        type="button"
-                        onClick={() => setShowBuddyInvite(true)}
-                        className="mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-[#4f9149]/45 bg-[#4f9149]/[0.07] text-[13px] font-black tracking-tight text-[#4f9149] transition-transform active:scale-[0.99]"
-                      >
-                        <Users className="h-4 w-4" strokeWidth={2.5} />
-                        Do this with a friend
-                      </button>
-                    )}
                     {!keyboardActive &&
                       buddy?.status === 'pending' &&
                       buddy.invitedByMe && (
@@ -913,30 +777,36 @@ export default function TaskDetailSheet({
   );
 }
 
-function ToolbarIconButton({
-  label,
+function PropertyChip({
+  icon,
   active = false,
+  tone = 'default',
   onClick,
+  dataHint,
   children,
 }: {
-  label: string;
+  icon: React.ReactNode;
   active?: boolean;
+  tone?: 'default' | 'buddy';
   onClick: () => void;
+  dataHint?: string;
   children: React.ReactNode;
 }) {
   return (
     <button
       type="button"
-      aria-label={label}
-      title={label}
+      data-hint={dataHint}
       onClick={onClick}
-      className={`grid h-10 w-10 shrink-0 place-items-center rounded-full transition-colors active:scale-95 ${
-        active
-          ? 'bg-primary/10 text-primary'
-          : 'text-muted-foreground [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground'
+      className={`inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3 text-[13px] font-bold transition-[transform,background-color,color] active:scale-95 ${
+        tone === 'buddy'
+          ? 'bg-[#4f9149]/10 text-[#4f9149] [@media(hover:hover)]:hover:bg-[#4f9149]/[0.16]'
+          : active
+            ? 'bg-primary/10 text-primary [@media(hover:hover)]:hover:bg-primary/15'
+            : 'bg-muted/70 text-muted-foreground [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground'
       }`}
     >
-      {children}
+      <span className="flex shrink-0">{icon}</span>
+      <span className="whitespace-nowrap">{children}</span>
     </button>
   );
 }
@@ -1028,28 +898,5 @@ function TaskFocusButton({
       }
       dataHint="focus-button"
     />
-  );
-}
-
-function TabButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`flex flex-1 items-center justify-center gap-1 rounded-full py-1.5 text-[13px] font-black transition-colors ${
-        active
-          ? 'bg-primary text-primary-foreground shadow-sm'
-          : 'text-muted-foreground hover:text-foreground'
-      }`}
-    >
-      {children}
-    </button>
   );
 }

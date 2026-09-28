@@ -22,6 +22,7 @@ import { notifyQuestClaims } from '@/lib/questClaims';
 import { taskFlyWorthNow } from '@/lib/flyValue';
 import { FlyValueBadge } from '@/components/ui/FlyValueBadge';
 import { useIntros } from '@/hooks/useIntros';
+import { useHideOnScroll } from '@/hooks/useHideOnScroll';
 import {
   BellyFullIntroSheet,
   SavedTaskIntroSheet,
@@ -177,6 +178,8 @@ export default function HomeDashboard() {
   const [guestTasks, setGuestTasks] = useState<Task[]>(demoTasks);
 
   const [quickText, setQuickText] = useState('');
+  const [quickSectionId, setQuickSectionId] = useState<string | null>(null);
+  const fabsConcealed = useHideOnScroll();
   const [showQuickAdd, setShowQuickAdd] = useState(false);
 
   // The widget's add bar lands here, via a session flag rather than the URL —
@@ -822,7 +825,7 @@ export default function HomeDashboard() {
                     steps aside, unless filters are on and must stay reachable. */}
                 {!((dayCleared || data.length === 0) && !filtersActive) && (
                   <div className="mb-2 flex items-center justify-between gap-2 px-2 md:mb-4 md:px-4">
-                    <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 ml-3 cursor-pointer group md:gap-2.5 narrow:ml-1">
+                    <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 md:gap-x-2.5">
                       <Icon
                         name="planner"
                         className="w-7 h-7 shrink-0 md:w-8 md:h-8"
@@ -934,12 +937,13 @@ export default function HomeDashboard() {
                       </div>
                     );
                   }}
-                  onAddRequested={(prefill) => {
+                  onAddRequested={(prefill, _index, opts) => {
                     if (!user) {
                       router.push('/login');
                       return;
                     }
                     setQuickText(prefill || '');
+                    setQuickSectionId(opts?.sectionId ?? null);
                     setShowQuickAdd(true);
                   }}
                   weeklyIds={weeklyIds}
@@ -1129,12 +1133,16 @@ export default function HomeDashboard() {
 
       <QuickAddSheet
         open={showQuickAdd}
-        onOpenChange={setShowQuickAdd}
+        onOpenChange={(v) => {
+          setShowQuickAdd(v);
+          if (!v) setQuickSectionId(null);
+        }}
         initialText={quickText}
         defaultRepeat="this-week"
         focusCategoryIds={questOnboarding?.selectedCategoryIds}
         categoryTagMap={questOnboarding?.categoryTagMap}
         sections={user ? sections : []}
+        defaultSectionId={quickSectionId}
         onBulkSubmit={async (bulkTasks) => {
           if (!user) throw new Error('Sign in to add tasks.');
           const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -1332,17 +1340,20 @@ export default function HomeDashboard() {
 
       <FocusFabSatellite
         bottom={`calc(env(safe-area-inset-bottom) + ${
-          notificationStackHeight > 0 ? 144 + notificationStackHeight : 152
+          notificationStackHeight > 0 ? 148 + notificationStackHeight : 156
         }px)`}
         bottomMd={`calc(env(safe-area-inset-bottom) + ${
-          notificationStackHeight > 0 ? 92 + notificationStackHeight : 88
+          notificationStackHeight > 0 ? 96 + notificationStackHeight : 92
         }px)`}
+        concealed={fabsConcealed}
       />
 
       {/* Floating Add Task FAB */}
       <button
         type="button"
         aria-label="Add task"
+        aria-hidden={fabsConcealed || undefined}
+        tabIndex={fabsConcealed ? -1 : undefined}
         data-hint="add-task"
         onClick={() => {
           if (!user) {
@@ -1352,7 +1363,9 @@ export default function HomeDashboard() {
           setQuickText('');
           setShowQuickAdd(true);
         }}
-        className="fixed right-6 z-[40] grid h-14 w-14 place-items-center rounded-full bg-primary text-primary-foreground shadow-[0_4px_10px_-2px_rgba(0,0,0,0.25)] transition-all hover:brightness-105 active:scale-95 active:shadow-[0_2px_6px_-2px_rgba(0,0,0,0.25)] bottom-[var(--fab-bottom)] md:bottom-[var(--fab-bottom-md)] md:right-[max(1.5rem,50vw_-_400px)]"
+        className={`fixed right-6 z-[40] grid h-14 w-14 place-items-center rounded-full bg-primary text-primary-foreground shadow-[0_4px_10px_-2px_rgba(0,0,0,0.25)] hover:brightness-105 active:scale-95 active:shadow-[0_2px_6px_-2px_rgba(0,0,0,0.25)] bottom-[var(--fab-bottom)] md:bottom-[var(--fab-bottom-md)] md:right-[max(1.5rem,50vw_-_400px)] ${
+          fabsConcealed ? 'pointer-events-none translate-y-24 opacity-0' : 'translate-y-0 opacity-100'
+        }`}
         style={
           {
             '--fab-bottom': `calc(env(safe-area-inset-bottom) + ${
@@ -1361,7 +1374,8 @@ export default function HomeDashboard() {
             '--fab-bottom-md': `calc(env(safe-area-inset-bottom) + ${
               notificationStackHeight > 0 ? 28 + notificationStackHeight : 24
             }px)`,
-            transition: 'bottom 200ms ease',
+            transition:
+              'bottom 320ms cubic-bezier(0.22,1,0.36,1), transform 240ms cubic-bezier(0.32,0.72,0,1), opacity 180ms ease',
           } as React.CSSProperties
         }
       >

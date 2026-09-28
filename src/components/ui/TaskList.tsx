@@ -47,6 +47,7 @@ import {
   useSensor,
   useSensors,
   DragEndEvent,
+  DragMoveEvent,
   DragOverEvent,
   DragStartEvent,
   TouchSensor,
@@ -67,7 +68,6 @@ import {
   defaultAnimateLayoutChanges,
   type AnimateLayoutChanges,
 } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 import { DeleteDialog } from '@/components/ui/DeleteDialog';
 import {
   LeapSessionDeleteSheet,
@@ -86,7 +86,7 @@ import { TimePopup } from '@/components/ui/TimePopup';
 import { BuddyBadge } from '@/components/ui/BuddyBadge';
 import {
   ChecklistCheckbox,
-  ChecklistFlyLine,
+  ChecklistRewardTrack,
 } from '../board/ChecklistEditor';
 import { checklistPayout, type ChecklistItem } from '@/lib/checklist';
 import {
@@ -183,7 +183,13 @@ const pointerMidpointCollision: CollisionDetection = (args) => {
 const SWIPE_ACTION_WIDTH = 88;
 const SWIPE_SNAP_THRESHOLD = 32;
 const SWIPE_COMMIT_X = SWIPE_ACTION_WIDTH + 40;
-const SWIPE_SPRING = { type: 'spring' as const, stiffness: 520, damping: 34 };
+const SWIPE_SPRING = { type: 'spring' as const, stiffness: 900, damping: 80, mass: 1 };
+const SWIPE_MAX_RELEASE_VELOCITY = 1500;
+
+const SORT_TRANSITION = {
+  duration: 260,
+  easing: 'cubic-bezier(0.25, 1, 0.5, 1)',
+};
 
 interface SortableTaskItemProps {
   task: Task;
@@ -318,12 +324,27 @@ const SortableTaskItem = React.forwardRef<
         : onDoLater;
     const secondaryLabel = isRepeating ? 'Skip today' : 'Save later';
 
+    const [rowWidth, setRowWidth] = useState(360);
+    useEffect(() => {
+      const el = containerRef.current;
+      if (!el) return;
+      const measure = () => setRowWidth(el.offsetWidth || 360);
+      measure();
+      const ro = new ResizeObserver(measure);
+      ro.observe(el);
+      return () => ro.disconnect();
+    }, []);
+    const commitX = Math.max(SWIPE_COMMIT_X, Math.round(rowWidth * 0.5));
+    const commitXRef = React.useRef(commitX);
+    commitXRef.current = commitX;
+
     const pastCommitRef = React.useRef(false);
     useEffect(() => {
       const unsub = x.on('change', (v) => {
-        const past = Math.abs(v) >= SWIPE_COMMIT_X;
-        if (past && !pastCommitRef.current && isDraggingRef.current) {
-          hapticImpact();
+        const past = Math.abs(v) >= commitXRef.current;
+        if (isDraggingRef.current && past !== pastCommitRef.current) {
+          if (past) hapticImpact();
+          else hapticTick();
         }
         pastCommitRef.current = past;
       });
@@ -331,7 +352,7 @@ const SortableTaskItem = React.forwardRef<
     }, [x]);
 
     const snapSwipe = React.useCallback(
-      (side: 'timer' | 'secondary' | null) => {
+      (side: 'timer' | 'secondary' | null, velocity = 0) => {
         setOpenSide(side);
         const target =
           side === 'timer'
@@ -339,7 +360,7 @@ const SortableTaskItem = React.forwardRef<
             : side === 'secondary'
               ? -SWIPE_ACTION_WIDTH
               : 0;
-        animate(x, target, SWIPE_SPRING);
+        animate(x, target, { ...SWIPE_SPRING, velocity });
       },
       [x],
     );
@@ -370,9 +391,10 @@ const SortableTaskItem = React.forwardRef<
       id: task.id,
       disabled: isDragDisabled || isOpen,
       animateLayoutChanges,
+      transition: SORT_TRANSITION,
     });
     const showSwipeActions =
-      (isOpen || isSwiping) && !isDragging && !isSortDragging;
+      !isDesktop && !isDragging && !isSortDragging && !isExitingLater;
 
     const activeHint = useUIStore((s) => s.activeHint);
     const hintBeat = activeHint
@@ -467,17 +489,9 @@ const SortableTaskItem = React.forwardRef<
     // Transform values based on drag position x. Releasing only reveals the
     // corresponding action; the user must tap the button to run it.
     const timerActionOpacity = useTransform(x, [0, 25], [0, 1]);
-    const timerActionScale = useTransform(
-      x,
-      [0, SWIPE_ACTION_WIDTH, SWIPE_COMMIT_X],
-      [0.9, 1, 1.18],
-    );
+    const timerTrayWidth = useTransform(x, (v) => Math.max(0, v));
+    const secondaryTrayWidth = useTransform(x, (v) => Math.max(0, -v));
     const secondaryActionOpacity = useTransform(x, [-25, 0], [1, 0]);
-    const secondaryActionScale = useTransform(
-      x,
-      [-SWIPE_COMMIT_X, -SWIPE_ACTION_WIDTH, 0],
-      [1.18, 1, 0.9],
-    );
 
     useEffect(() => {
       const handleOtherSwipe = (e: Event) => {
@@ -539,6 +553,8 @@ const SortableTaskItem = React.forwardRef<
       };
     }, []);
 
+    const pressPointRef = React.useRef<{ x: number; y: number } | null>(null);
+
     const blockImmediatePostSwipeClick = () => {
       hasActionTriggeredRef.current = true;
       if (actionBlockTimeoutRef.current) {
@@ -575,6 +591,10 @@ const SortableTaskItem = React.forwardRef<
       }
 
       const projectedX = x.get() + info.velocity.x * 0.06;
+      const releaseVelocity = Math.max(
+        -SWIPE_MAX_RELEASE_VELOCITY,
+        Math.min(SWIPE_MAX_RELEASE_VELOCITY, info.velocity.x),
+      );
       const startSide = dragStartSideRef.current;
       dragStartSideRef.current = null;
 
@@ -582,13 +602,13 @@ const SortableTaskItem = React.forwardRef<
       // release — no second tap needed. Short swipes still just reveal.
       // It opens the timer rather than starting one: how long to focus is a
       // decision, and a swipe must never commit you to the last length used.
-      if (x.get() >= SWIPE_COMMIT_X && onStartTimer && !isDone) {
+      if (x.get() >= commitXRef.current && onStartTimer && !isDone) {
         blockImmediatePostSwipeClick();
         snapSwipe(null);
         onStartTimer(task);
         return;
       }
-      if (x.get() <= -SWIPE_COMMIT_X && secondaryAction && !isDone) {
+      if (x.get() <= -commitXRef.current && secondaryAction && !isDone) {
         blockImmediatePostSwipeClick();
         snapSwipe(null);
         secondaryAction(task);
@@ -603,6 +623,7 @@ const SortableTaskItem = React.forwardRef<
           projectedX > SWIPE_SNAP_THRESHOLD && onStartTimer && !isDone
             ? 'timer'
             : null,
+          releaseVelocity,
         );
       } else if (startSide === 'secondary') {
         blockImmediatePostSwipeClick();
@@ -610,6 +631,7 @@ const SortableTaskItem = React.forwardRef<
           projectedX < -SWIPE_SNAP_THRESHOLD && secondaryAction && !isDone
             ? 'secondary'
             : null,
+          releaseVelocity,
         );
       } else if (
         projectedX > SWIPE_SNAP_THRESHOLD &&
@@ -617,16 +639,16 @@ const SortableTaskItem = React.forwardRef<
         !isDone
       ) {
         blockImmediatePostSwipeClick();
-        snapSwipe('timer');
+        snapSwipe('timer', releaseVelocity);
       } else if (
         projectedX < -SWIPE_SNAP_THRESHOLD &&
         secondaryAction &&
         !isDone
       ) {
         blockImmediatePostSwipeClick();
-        snapSwipe('secondary');
+        snapSwipe('secondary', releaseVelocity);
       } else {
-        snapSwipe(null);
+        snapSwipe(null, releaseVelocity);
       }
     };
 
@@ -650,6 +672,14 @@ const SortableTaskItem = React.forwardRef<
 
     const handleCardClick = (e: React.MouseEvent) => {
       if (isDraggingRef.current) return;
+      if (performance.now() - lastSortDragAt < 400) return;
+      const press = pressPointRef.current;
+      pressPointRef.current = null;
+      if (
+        press &&
+        Math.hypot(e.clientX - press.x, e.clientY - press.y) > TAP_SLOP_PX
+      )
+        return;
       if (isExitingLater || hasActionTriggeredRef.current) return;
 
       if (isOpen) {
@@ -662,7 +692,7 @@ const SortableTaskItem = React.forwardRef<
     };
 
     const style = {
-      transform: CSS.Translate.toString(transform),
+      transform: pixelSnappedTranslate(transform),
       transition,
       zIndex: isDragging
         ? 30
@@ -687,7 +717,7 @@ const SortableTaskItem = React.forwardRef<
             (ref as React.MutableRefObject<HTMLDivElement | null>).current =
               node;
         }}
-        style={{ ...style, overflow: 'hidden' }}
+        style={{ ...style, overflow: isDragging ? 'visible' : 'hidden' }}
         {...attributes}
         {...listeners}
         onKeyDown={(e: React.KeyboardEvent) => {
@@ -736,50 +766,53 @@ const SortableTaskItem = React.forwardRef<
             layout: { duration: 0.25, ease: [0.25, 0.1, 0.25, 1] },
             opacity: { duration: 0.2, ease: 'easeOut', delay: 0.15 },
           }}
-          className={`group relative w-full rounded-xl ${isDragging ? 'overflow-visible shadow-none' : isExitingLater ? 'overflow-visible shadow-none' : isGlowActive && !isDone ? 'overflow-visible shadow-none' : isOpen || isSwiping ? 'overflow-hidden bg-muted/70 shadow-none' : 'overflow-hidden'} ${isExitingLater ? 'will-change-transform' : ''}`}
+          className={`group relative w-full rounded-xl ${isDragging ? 'overflow-visible shadow-none' : isExitingLater ? 'overflow-visible shadow-none' : isGlowActive && !isDone ? 'overflow-visible shadow-none' : isOpen || isSwiping ? 'overflow-hidden shadow-none' : 'overflow-hidden'} ${isExitingLater ? 'will-change-transform' : ''}`}
         >
           {/* Swipe actions stay behind the row until the drag snaps open. A
               swipe never performs an action by itself. */}
           {onStartTimer && !isDone && showSwipeActions && (
-            <button
+            <motion.button
               type="button"
               aria-label={`Start focus timer for ${task.text}`}
+              aria-hidden={openSide !== 'timer'}
+              tabIndex={openSide === 'timer' ? 0 : -1}
               onPointerDown={(event) => event.stopPropagation()}
               onClick={handleTimerAction}
-              className="absolute inset-y-0 left-0 flex w-[88px] flex-col items-center justify-center gap-0.5 rounded-l-xl bg-emerald-600 text-white"
+              style={{ width: timerTrayWidth }}
+              className="absolute inset-y-0 left-0 flex items-center justify-center overflow-hidden rounded-l-xl bg-emerald-600 text-white"
             >
               <motion.span
-                className="flex flex-col items-center justify-center"
-                style={{ opacity: timerActionOpacity, scale: timerActionScale }}
+                className="flex w-[88px] shrink-0 flex-col items-center justify-center gap-0.5"
+                style={{ opacity: timerActionOpacity }}
               >
                 <Icon name="clock" className="-mb-1 h-10 w-10 drop-shadow-sm" />
                 <span className="text-[12px] font-black tracking-wide">
                   Focus
                 </span>
               </motion.span>
-            </button>
+            </motion.button>
           )}
 
           {secondaryAction && !isDone && showSwipeActions && (
-            <button
+            <motion.button
               type="button"
               aria-label={
                 isRepeating
                   ? `Skip ${task.text} today`
                   : `Save ${task.text} for later`
               }
+              aria-hidden={openSide !== 'secondary'}
+              tabIndex={openSide === 'secondary' ? 0 : -1}
               onPointerDown={(event) => event.stopPropagation()}
               onClick={handleSecondaryAction}
-              className={`absolute inset-y-0 right-0 flex w-[88px] flex-col items-center justify-center gap-1 rounded-r-xl text-white ${
+              style={{ width: secondaryTrayWidth }}
+              className={`absolute inset-y-0 right-0 flex items-center justify-center overflow-hidden rounded-r-xl text-white ${
                 isRepeating ? 'bg-slate-500' : 'bg-amber-500'
               }`}
             >
               <motion.span
-                className="flex flex-col items-center justify-center gap-1"
-                style={{
-                  opacity: secondaryActionOpacity,
-                  scale: secondaryActionScale,
-                }}
+                className="flex w-[88px] shrink-0 flex-col items-center justify-center gap-1"
+                style={{ opacity: secondaryActionOpacity }}
               >
                 {isRepeating ? (
                   <EyeOff className="h-6 w-6" strokeWidth={2.75} />
@@ -790,7 +823,7 @@ const SortableTaskItem = React.forwardRef<
                   {secondaryLabel}
                 </span>
               </motion.span>
-            </button>
+            </motion.button>
           )}
 
           {/* Foreground Card (Swipeable) */}
@@ -805,19 +838,19 @@ const SortableTaskItem = React.forwardRef<
               left:
                 openSide === 'timer'
                   ? 0
-                  : secondaryAction
-                    ? -SWIPE_ACTION_WIDTH
+                  : secondaryAction && !isDone
+                    ? -(rowWidth - 24)
                     : 0,
               right:
                 openSide === 'secondary'
                   ? 0
                   : onStartTimer && !isDone
-                    ? SWIPE_ACTION_WIDTH
+                    ? rowWidth - 24
                     : 0,
             }}
             dragElastic={{
-              right: onStartTimer && !isDone ? 0.5 : 0,
-              left: secondaryAction && !isDone ? 0.5 : 0,
+              right: onStartTimer && !isDone ? 0.12 : 0.04,
+              left: secondaryAction && !isDone ? 0.12 : 0.04,
             }}
             dragMomentum={false}
             onDragStart={handleDragStart}
@@ -826,17 +859,9 @@ const SortableTaskItem = React.forwardRef<
             onMouseEnter={() => isDesktop && !isDragging && setIsHovered(true)}
             onMouseLeave={() => isDesktop && setIsHovered(false)}
             initial={false}
-            animate={{
-              x: isExitingLater
-                ? isDesktop
-                  ? 800
-                  : 450
-                : openSide === 'timer'
-                  ? SWIPE_ACTION_WIDTH
-                  : openSide === 'secondary'
-                    ? -SWIPE_ACTION_WIDTH
-                    : 0,
-            }}
+            animate={
+              isExitingLater ? { x: isDesktop ? 800 : 450 } : undefined
+            }
             style={{
               x: x,
               cursor: 'pointer',
@@ -849,11 +874,11 @@ const SortableTaskItem = React.forwardRef<
                     duration: 0.8,
                     ease: [0.22, 1, 0.36, 1],
                   }
-                : { type: 'spring', stiffness: 600, damping: 28, mass: 1 }
+                : SWIPE_SPRING
             }
             className={`
               relative flex w-full flex-col px-2.5 py-2.5 md:px-3.5 md:py-3.5
-              transition-colors duration-200 rounded-xl
+              transition-[border-color,box-shadow,background-color] duration-200 rounded-xl
               bg-card dark:bg-muted
               border shadow-none
               ${
@@ -863,21 +888,24 @@ const SortableTaskItem = React.forwardRef<
                     : 'border-primary/70 dark:border-primary/80'
                   : 'border-transparent'
               }
-              ${isHovered && isDesktop && !isDone && !timerPhase ? 'border-primary/40' : ''}
+              ${isHovered && isDesktop && !isDone && !timerPhase ? 'border-primary/35 shadow-[0_8px_20px_-12px_rgba(0,0,0,0.28)]' : ''}
               ${
                 isGlowActive && !isDone
                   ? 'ring-2 ring-primary shadow-[0_0_30px_rgba(var(--primary),0.3)]'
                   : ''
               }
 
-              select-none active:border-primary/40 active:bg-muted
-              has-[[data-completion-target]:active]:border-transparent has-[[data-completion-target]:active]:bg-card dark:has-[[data-completion-target]:active]:bg-muted
-              ${isDragging ? 'z-[100] opacity-100 shadow-lg shadow-black/15 ring-2 ring-primary/40 dark:shadow-black/40' : ''}
+              select-none [@media(hover:hover)]:active:border-primary/40 [@media(hover:hover)]:active:bg-muted
+              [@media(hover:hover)]:has-[[data-completion-target]:active]:border-transparent [@media(hover:hover)]:has-[[data-completion-target]:active]:bg-card dark:[@media(hover:hover)]:has-[[data-completion-target]:active]:bg-muted
+              ${isDragging ? 'z-[100] opacity-100 shadow-[0_18px_36px_-14px_rgba(0,0,0,0.35)] ring-2 ring-primary/40 dark:shadow-[0_18px_36px_-14px_rgba(0,0,0,0.7)]' : ''}
               ${isDone && !isDragging && isHovered && isDesktop ? 'bg-accent/50' : ''}
               cursor-pointer
             `}
             // Note: We are using 'style' prop for x motion value to avoid re-renders
             // combined with the style object above, so we pass x via the style prop on the motion component directly
+            onPointerDownCapture={(e) => {
+              pressPointRef.current = { x: e.clientX, y: e.clientY };
+            }}
             onClick={handleCardClick}
           >
             {/* Glow Animation Overlay */}
@@ -993,54 +1021,33 @@ const SortableTaskItem = React.forwardRef<
                   {task.calendarEventId && (
                     <CalendarDays className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400 flex-shrink-0" />
                   )}
-                  {(task.notes?.trim() ||
-                    (task.checklist && task.checklist.length > 0)) && (
-                    <span className="inline-flex flex-shrink-0 items-center gap-1.5 no-underline">
-                      {task.notes?.trim() && (
-                        <Pen
-                          aria-label="Has notes"
-                          className="h-4 w-4 text-muted-foreground/70"
-                        />
-                      )}
-                      {checklist.length > 0 && (
-                        <button
-                          type="button"
-                          aria-expanded={stepsOpen}
-                          aria-label={
-                            stepsOpen
-                              ? `Hide steps for ${task.text}`
-                              : `Show steps for ${task.text}`
-                          }
-                          onPointerDown={(e) => e.stopPropagation()}
-                          onMouseDown={(e) => e.stopPropagation()}
-                          onTouchStart={(e) => e.stopPropagation()}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            hapticTick();
-                            onToggleSteps?.();
-                          }}
-                          className={`-my-1 inline-flex items-center gap-1 rounded-md py-1 pl-1 pr-0.5 transition-colors ${
-                            checklistPayoutState.doneCount === checklist.length
-                              ? 'text-primary'
-                              : 'text-muted-foreground/70'
-                          } [@media(hover:hover)]:hover:text-primary`}
-                        >
-                          <ListChecks className="h-4 w-4" />
-                          <span className="text-[11px] font-bold tabular-nums no-underline">
-                            {checklistPayoutState.doneCount}/{checklist.length}
-                          </span>
-                          <ChevronDown
-                            className={`h-3.5 w-3.5 transition-transform duration-200 ${
-                              stepsOpen ? 'rotate-180' : ''
-                            }`}
-                            strokeWidth={3}
-                          />
-                        </button>
-                      )}
-                    </span>
+                  {task.notes?.trim() && (
+                    <Pen
+                      aria-label="Has notes"
+                      className="h-4 w-4 flex-shrink-0 text-muted-foreground/70"
+                    />
                   )}
                 </span>
-                
+
+                {checklist.length > 0 && (
+                  <StepsStrip
+                    taskText={task.text}
+                    items={checklistPayoutState.items}
+                    doneCount={checklistPayoutState.doneCount}
+                    open={stepsOpen}
+                    isDone={isDone}
+                    onToggleOpen={() => {
+                      hapticTick();
+                      onToggleSteps?.();
+                    }}
+                    onCheckNext={
+                      onToggleChecklistItem
+                        ? (itemId) => onToggleChecklistItem(task, itemId)
+                        : undefined
+                    }
+                  />
+                )}
+
                 {task.frogodoroSession && ((task.frogodoroSession.focusTime ?? 0) > 0 || (task.frogodoroSession.breakTime ?? 0) > 0) && (
                   <div className="flex flex-wrap items-center gap-1 mt-0.5">
                     {(task.frogodoroSession.focusTime ?? 0) > 0 && (() => { const s = task.frogodoroSession!.focusTime; const m = Math.floor(s / 60); const sec = s % 60; const t = s < 60 ? `${s}s` : sec > 0 ? `${m}m ${sec}s` : `${m}m`; return (
@@ -1065,10 +1072,10 @@ const SortableTaskItem = React.forwardRef<
               !isDone &&
               ((onStartTimer && !task.isStarter) || secondaryAction) && (
               <div
-                className={`relative z-10 hidden flex-shrink-0 items-center gap-0.5 md:flex transition-opacity duration-150 ${
+                className={`relative z-10 hidden flex-shrink-0 items-center gap-0.5 md:flex transition-[opacity,transform] duration-200 ease-out ${
                   isHovered && !isDragging
-                    ? 'opacity-100'
-                    : 'pointer-events-none opacity-0'
+                    ? 'translate-x-0 opacity-100'
+                    : 'pointer-events-none translate-x-2 opacity-0'
                 }`}
               >
                 {onStartTimer && !task.isStarter && (
@@ -1212,18 +1219,20 @@ const SortableTaskItem = React.forwardRef<
                   onPointerDown={(e) => e.stopPropagation()}
                   className="relative z-10 w-full overflow-hidden"
                 >
-                  <div className="mt-1.5 border-t border-border/70 pl-3 pr-2 pt-2 md:pl-4">
-                    {checklistPayoutState.items.map((item, i) => {
-                      const caught =
-                        item.reward && checklistPayoutState.doneCount >= i + 1;
+                  <div className="pb-1 pl-5 pr-0 pt-2 md:pr-[52px]">
+                    <ChecklistRewardTrack
+                      items={checklistPayoutState.items}
+                      className="mb-1"
+                    />
+                    {checklistPayoutState.items.map((item) => {
                       return (
-                        <React.Fragment key={item.id}>
                         <button
+                          key={item.id}
                           type="button"
                           onPointerDown={(e) => e.preventDefault()}
                           onClick={() => onToggleChecklistItem?.(task, item.id)}
                           aria-pressed={item.done}
-                          className="-mx-2 flex min-h-[44px] w-[calc(100%+1rem)] touch-manipulation items-center gap-3 rounded-xl px-2 text-left transition-colors active:bg-muted/50 [@media(hover:hover)]:hover:bg-muted/40"
+                          className="flex min-h-[44px] w-full touch-manipulation items-center gap-3 rounded-xl px-3 text-left transition-colors duration-150 active:bg-primary/10 [@media(hover:hover)]:hover:bg-primary/[0.06]"
                         >
                           <ChecklistCheckbox
                             size={23}
@@ -1234,7 +1243,7 @@ const SortableTaskItem = React.forwardRef<
                             interactive={false}
                           />
                           <span
-                            className={`min-w-0 flex-1 break-words text-[13px] font-semibold leading-snug transition-colors duration-200 md:text-[14px] ${
+                            className={`min-w-0 flex-1 break-words text-[14px] font-semibold leading-snug transition-colors duration-200 md:text-[15px] ${
                               item.done
                                 ? 'text-muted-foreground/70 line-through decoration-muted-foreground/50'
                                 : 'text-foreground/90'
@@ -1243,14 +1252,6 @@ const SortableTaskItem = React.forwardRef<
                             {item.text || 'Untitled step'}
                           </span>
                         </button>
-                        {item.reward && (
-                          <ChecklistFlyLine
-                            caught={!!caught}
-                            at={i + 1}
-                            total={checklist.length}
-                          />
-                        )}
-                        </React.Fragment>
                       );
                     })}
                   </div>
@@ -1264,6 +1265,157 @@ const SortableTaskItem = React.forwardRef<
   },
 );
 
+const stopRowGesture = {
+  onPointerDown: (e: React.PointerEvent) => e.stopPropagation(),
+  onMouseDown: (e: React.MouseEvent) => e.stopPropagation(),
+  onTouchStart: (e: React.TouchEvent) => e.stopPropagation(),
+};
+
+function StepsBonus({ items, doneCount }: { items: ChecklistItem[]; doneCount: number }) {
+  const markers = items.flatMap((it, i) => (it.reward ? [i + 1] : []));
+  if (markers.length === 0) return null;
+  const caught = markers.filter((m) => doneCount >= m).length;
+  const allCaught = caught === markers.length;
+  return (
+    <span
+      aria-hidden
+      className={`inline-flex items-center gap-0.5 rounded-full py-0.5 pl-0.5 pr-1.5 transition-colors duration-300 ${
+        allCaught ? 'bg-primary/15' : 'bg-background/80'
+      }`}
+    >
+      <span
+        className={`grid place-items-center transition-[opacity,filter] duration-300 ${
+          allCaught ? '' : 'opacity-50 grayscale'
+        }`}
+        style={{ width: 16, height: 16 }}
+      >
+        <Fly size={20} x={-2} y={-4} interactive={false} paused />
+      </span>
+      <span
+        className={`text-[11px] font-black leading-none tabular-nums ${
+          allCaught ? 'text-primary' : 'text-primary/60'
+        }`}
+      >
+        +{markers.length}
+      </span>
+    </span>
+  );
+}
+
+function StepsStrip({
+  taskText,
+  items,
+  doneCount,
+  open,
+  isDone,
+  onToggleOpen,
+  onCheckNext,
+}: {
+  taskText: string;
+  items: ChecklistItem[];
+  doneCount: number;
+  open: boolean;
+  isDone: boolean;
+  onToggleOpen: () => void;
+  onCheckNext?: (itemId: string) => void;
+}) {
+  const total = items.length;
+  const allDone = doneCount === total;
+  const next = items.find((it) => !it.done);
+  const showPeek = !open && !!next && !isDone;
+
+  return (
+    <div
+      {...stopRowGesture}
+      onClick={(e) => e.stopPropagation()}
+      className={`mt-1.5 inline-flex h-9 max-w-full items-center rounded-full transition-colors duration-150 ${
+        allDone && !isDone
+          ? 'bg-primary/10 active:bg-primary/20 [@media(hover:hover)]:hover:bg-primary/15'
+          : 'bg-muted/70 active:bg-muted [@media(hover:hover)]:hover:bg-muted'
+      }`}
+    >
+      {showPeek && onCheckNext ? (
+        <span className="flex flex-shrink-0 pl-3">
+          <ChecklistCheckbox
+            size={18}
+            checked={false}
+            onToggle={() => onCheckNext(next.id)}
+          />
+        </span>
+      ) : (
+        <span
+          aria-hidden
+          className={`flex flex-shrink-0 pl-3 ${
+            allDone ? 'text-primary' : 'text-muted-foreground'
+          }`}
+        >
+          {allDone ? (
+            <CheckCircle2 className="h-[18px] w-[18px]" />
+          ) : (
+            <ListChecks className="h-[18px] w-[18px]" />
+          )}
+        </span>
+      )}
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-label={`${open ? 'Hide' : 'Show'} steps for ${taskText}, ${doneCount} of ${total} done`}
+        onClick={onToggleOpen}
+        className="flex h-full min-w-0 touch-manipulation items-center gap-2 rounded-r-full pl-2 pr-2.5 text-left"
+      >
+        <span className="relative min-w-0 overflow-hidden">
+          <AnimatePresence mode="popLayout" initial={false}>
+            <motion.span
+              key={showPeek ? next.id : allDone ? 'done' : 'steps'}
+              initial={{ y: 8, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: -8, opacity: 0 }}
+              transition={{ duration: 0.2, ease: [0.32, 0.72, 0, 1] }}
+              className={`block truncate text-[13px] font-semibold leading-none md:text-[14px] ${
+                allDone ? 'text-primary' : 'text-foreground/75'
+              }`}
+            >
+              {showPeek
+                ? next.text || 'Untitled step'
+                : allDone
+                  ? `All ${total} steps done`
+                  : `${total} steps`}
+            </motion.span>
+          </AnimatePresence>
+        </span>
+        <span aria-hidden className="h-3.5 w-px flex-shrink-0 bg-foreground/10" />
+        <span className="flex flex-shrink-0 items-center gap-1.5">
+          <span
+            className={`text-[12px] font-bold leading-none tabular-nums ${
+              allDone ? 'text-primary' : 'text-muted-foreground'
+            }`}
+          >
+            {doneCount}/{total}
+          </span>
+          <StepsBonus items={items} doneCount={doneCount} />
+          <ChevronDown
+            className={`h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 ${
+              open ? 'rotate-180' : ''
+            }`}
+            strokeWidth={3}
+          />
+        </span>
+      </button>
+    </div>
+  );
+}
+
+let lastSortDragAt = 0;
+const TAP_SLOP_PX = 8;
+
+function pixelSnappedTranslate(
+  transform: { x: number; y: number } | null,
+): string | undefined {
+  if (!transform) return undefined;
+  return `translate3d(${Math.round(transform.x)}px, ${Math.round(transform.y)}px, 0)`;
+}
+const TAP_AFTER_LIFT_MS = 180;
+
 function SortableSectionHeader({
   section,
   count,
@@ -1271,6 +1423,7 @@ function SortableSectionHeader({
   isFirst,
   onToggleCollapsed,
   onEdit,
+  onAddTask,
 }: {
   section: TaskListSection;
   count: number;
@@ -1278,6 +1431,7 @@ function SortableSectionHeader({
   isFirst: boolean;
   onToggleCollapsed: () => void;
   onEdit: () => void;
+  onAddTask?: () => void;
 }) {
   const {
     attributes,
@@ -1305,7 +1459,7 @@ function SortableSectionHeader({
     <div
       ref={setNodeRef}
       style={{
-        transform: CSS.Translate.toString(transform),
+        transform: pixelSnappedTranslate(transform),
         transition,
         zIndex: isDragging ? 30 : 1,
       }}
@@ -1319,7 +1473,7 @@ function SortableSectionHeader({
         {...attributes}
         {...listeners}
         onClick={onToggleCollapsed}
-        className={`group flex min-h-[40px] cursor-pointer items-center gap-1.5 rounded-xl px-1.5 py-1 transition-colors ${
+        className={`group flex min-h-[40px] cursor-pointer items-center gap-1 rounded-xl px-2.5 py-1 transition-colors md:px-3.5 ${
           isDragging ? 'bg-popover shadow-md ring-1 ring-border/70' : ''
         }`}
       >
@@ -1327,12 +1481,12 @@ function SortableSectionHeader({
           initial={false}
           animate={{ rotate: section.collapsed ? -90 : 0 }}
           transition={{ duration: 0.18, ease: 'easeOut' }}
-          className="grid h-7 w-7 shrink-0 place-items-center text-muted-foreground/70"
+          className="-ml-1 grid h-7 w-5 shrink-0 place-items-center text-muted-foreground/70"
         >
           <ChevronDown className="h-4 w-4" strokeWidth={2.75} />
         </motion.span>
 
-        <span className="min-w-0 flex-1 truncate text-[13px] font-black text-muted-foreground">
+        <span className="min-w-0 flex-1 truncate text-[14px] font-black text-foreground/80 md:text-[15px]">
           {section.name}
         </span>
 
@@ -1346,6 +1500,22 @@ function SortableSectionHeader({
           >
             {remaining === 0 ? '✓' : remaining}
           </span>
+        )}
+
+        {onAddTask && (
+          <button
+            type="button"
+            aria-label={`Add a task to ${section.name}`}
+            title="Add task"
+            {...stopDndActivation}
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddTask();
+            }}
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-muted-foreground/60 transition-colors [@media(hover:hover)]:hover:bg-primary/10 [@media(hover:hover)]:hover:text-primary"
+          >
+            <Plus className="h-[18px] w-[18px]" strokeWidth={2.5} />
+          </button>
         )}
 
         {!section.collapsed && (
@@ -1363,6 +1533,20 @@ function SortableSectionHeader({
           </button>
         )}
       </div>
+      {count === 0 && !section.collapsed && !isDragging && (
+        <button
+          type="button"
+          {...stopDndActivation}
+          onClick={(e) => {
+            e.stopPropagation();
+            onAddTask?.();
+          }}
+          disabled={!onAddTask}
+          className="mt-1 flex w-full items-center justify-center rounded-xl border border-dashed border-muted-foreground/25 px-3 py-3 text-[13px] font-semibold text-muted-foreground/70 transition-colors disabled:pointer-events-none [@media(hover:hover)]:hover:bg-card/60"
+        >
+          No tasks yet · tap to add, or drag one in
+        </button>
+      )}
     </div>
   );
 }
@@ -1379,10 +1563,16 @@ function AddSectionRow({
       type="button"
       onClick={onOpen}
       disabled={disabled}
-      className="mt-1 flex w-full items-center justify-center gap-1.5 rounded-xl py-2 text-[13px] font-bold text-muted-foreground/60 transition-colors [@media(hover:hover)]:hover:text-foreground disabled:pointer-events-none"
+      className="group mt-2 flex min-h-[44px] w-full items-center gap-1 rounded-xl px-2.5 text-[14px] font-black text-muted-foreground/70 transition-colors disabled:pointer-events-none md:px-3.5 [@media(hover:hover)]:hover:text-primary"
     >
-      <Plus className="h-3.5 w-3.5" strokeWidth={2.75} />
-      New section
+      <span className="-ml-1 grid h-7 w-5 shrink-0 place-items-center">
+        <Plus className="h-4 w-4" strokeWidth={2.75} />
+      </span>
+      <span className="shrink-0">New section</span>
+      <span
+        aria-hidden
+        className="ml-2 h-px flex-1 bg-border transition-colors [@media(hover:hover)]:group-hover:bg-primary/40"
+      />
     </button>
   );
 }
@@ -1468,7 +1658,7 @@ export default function TaskList({
   onAddRequested: (
     prefill: string,
     insertAfterIndex: number | null,
-    opts?: { preselectToday?: boolean },
+    opts?: { preselectToday?: boolean; sectionId?: string },
   ) => void;
 
   weeklyIds?: Set<string>;
@@ -1624,12 +1814,7 @@ export default function TaskList({
   const [delayedCompleted, setDelayedCompleted] = useState<Set<string>>(
     new Set(),
   );
-  const [undoToast, setUndoToast] = useState<{
-    id: string;
-    text: string;
-  } | null>(null);
-  const { stackHeight: notificationStackHeight } = useNotification();
-  const undoTimerRef = useRef<number | null>(null);
+  const { showNotification } = useNotification();
   const prevCompletedRef = useRef<Map<string, boolean> | null>(null);
 
   // Any completion — checkmark tap, fly catch, detail sheet — surfaces a
@@ -1643,31 +1828,24 @@ export default function TaskList({
     );
     if (!flipped) return;
     emitCampaignTrigger('task_completed');
-    setUndoToast({ id: flipped.id, text: flipped.text });
-    if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
-    undoTimerRef.current = window.setTimeout(() => setUndoToast(null), 4000);
+    const id = flipped.id;
+    showNotification(
+      <span className="flex min-w-0 items-center gap-2.5">
+        <CheckCircle2 className="h-5 w-5 shrink-0 text-green-500" />
+        <span className="min-w-0 truncate font-semibold">{flipped.text}</span>
+      </span>,
+      () => {
+        hapticTick();
+        setDelayedCompleted((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+        toggle(id, false);
+      },
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tasks]);
-
-  useEffect(
-    () => () => {
-      if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
-    },
-    [],
-  );
-
-  const handleUndoComplete = () => {
-    if (!undoToast) return;
-    hapticTick();
-    const id = undoToast.id;
-    setUndoToast(null);
-    if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
-    setDelayedCompleted((prev) => {
-      const next = new Set(prev);
-      next.delete(id);
-      return next;
-    });
-    toggle(id, false);
-  };
   const [isAnyDragging, setIsAnyDragging] = useState(false);
   const [sectionEditor, setSectionEditor] = useState<
     { mode: 'create' } | { mode: 'edit'; sectionId: string } | null
@@ -2097,6 +2275,8 @@ export default function TaskList({
   ).length;
 
   const handleDragStart = (event: DragStartEvent) => {
+    maxDragDistRef.current = 0;
+    dragStartedAtRef.current = performance.now();
     hapticGrab();
     lastDragOverIdRef.current = null;
     setIsAnyDragging(true);
@@ -2186,7 +2366,15 @@ export default function TaskList({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [collapsedForDrag]);
 
+  const maxDragDistRef = useRef(0);
+  const dragStartedAtRef = useRef(0);
+  const handleDragMove = (event: DragMoveEvent) => {
+    const dist = Math.max(Math.abs(event.delta.x), Math.abs(event.delta.y));
+    if (dist > maxDragDistRef.current) maxDragDistRef.current = dist;
+  };
+
   const handleDragCancel = () => {
+    if (maxDragDistRef.current >= 5) lastSortDragAt = performance.now();
     setIsAnyDragging(false);
     setCollapsedForDrag(false);
     clearDraggingSection();
@@ -2207,6 +2395,12 @@ export default function TaskList({
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
+    const travelled = Math.max(
+      maxDragDistRef.current,
+      Math.abs(event.delta.x),
+      Math.abs(event.delta.y),
+    );
+    if (travelled >= 5) lastSortDragAt = performance.now();
     setIsAnyDragging(false);
     setCollapsedForDrag(false);
     activeAreaLimitsRef.current = null;
@@ -2218,14 +2412,13 @@ export default function TaskList({
     // movement, and dnd-kit then swallows the detail-sheet click. Section
     // headers have a dedicated reorder handle, so a stationary handle release
     // should do nothing rather than toggling the section.
-    if (
-      Math.abs(event.delta.x) < 5 &&
-      Math.abs(event.delta.y) < 5 &&
-      typeof active.id === 'string'
-    ) {
+    if (travelled < 5 && typeof active.id === 'string') {
       clearDraggingSection();
-      if (!activeSectionId) {
+      const heldMs = performance.now() - dragStartedAtRef.current;
+      if (!activeSectionId && heldMs < TAP_AFTER_LIFT_MS) {
         setActionSheetId(active.id);
+      } else {
+        lastSortDragAt = performance.now();
       }
       return;
     }
@@ -2296,7 +2489,7 @@ export default function TaskList({
       ...completedTasks,
       ...hiddenTasks,
     ];
-    hapticTick();
+    hapticImpact();
     onReorder(finalOrder);
   };
 
@@ -2450,6 +2643,7 @@ export default function TaskList({
               }
               onDragStart={handleDragStart}
               onDragOver={handleDragOver}
+              onDragMove={handleDragMove}
               onDragEnd={handleDragEnd}
               onDragCancel={handleDragCancel}
               modifiers={[restrictToActiveArea]}
@@ -2506,6 +2700,15 @@ export default function TaskList({
                                 mode: 'edit',
                                 sectionId: s.id,
                               })
+                            }
+                            onAddTask={
+                              quickAddOpen
+                                ? undefined
+                                : () =>
+                                    onAddRequested('', null, {
+                                      preselectToday: true,
+                                      sectionId: s.id,
+                                    })
                             }
                           />
                         );
@@ -2730,8 +2933,25 @@ export default function TaskList({
             initialName={editing?.name ?? ''}
             initialTagIds={editing?.tagIds ?? []}
             tags={userTags}
+            tagOwners={Object.fromEntries(
+              sections
+                .filter((sec) => sec.id !== editing?.id)
+                .flatMap((sec) =>
+                  (sec.tagIds ?? []).map((id) => [id, sec.name] as const),
+                ),
+            )}
+            existingNames={sections.map((sec) => sec.name)}
             onClose={() => setSectionEditor(null)}
             onSave={(name, tagIds) => {
+              for (const other of sections) {
+                if (other.id === editing?.id) continue;
+                const kept = (other.tagIds ?? []).filter(
+                  (id) => !tagIds.includes(id),
+                );
+                if (kept.length !== (other.tagIds ?? []).length) {
+                  onUpdateSection?.(other.id, { tagIds: kept });
+                }
+              }
               if (editing) onUpdateSection?.(editing.id, { name, tagIds });
               else onCreateSection?.(name, tagIds);
             }}
@@ -2941,51 +3161,6 @@ export default function TaskList({
               : undefined
         }
       />
-
-      {typeof document !== 'undefined' &&
-        createPortal(
-          <AnimatePresence>
-            {undoToast && (
-              <motion.div
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 16 }}
-                transition={{ type: 'spring', stiffness: 500, damping: 34 }}
-                className="pointer-events-none fixed inset-x-0 z-[9980] flex justify-center px-4 bottom-[var(--undo-bottom)] md:bottom-[var(--undo-bottom-md)]"
-                style={
-                  {
-                    '--undo-bottom': `calc(env(safe-area-inset-bottom) + ${
-                      notificationStackHeight > 0
-                        ? 80 + notificationStackHeight
-                        : 84
-                    }px)`,
-                    '--undo-bottom-md': `${
-                      notificationStackHeight > 0
-                        ? 28 + notificationStackHeight
-                        : 24
-                    }px`,
-                    transition: 'bottom 200ms ease',
-                  } as React.CSSProperties
-                }
-              >
-                <div className="pointer-events-auto flex w-full max-w-sm items-center gap-2.5 rounded-2xl border border-border/60 bg-popover py-1.5 pl-3 pr-1.5 shadow-lg">
-                  <CheckCircle2 className="h-5 w-5 shrink-0 text-green-500" />
-                  <span className="min-w-0 flex-1 truncate text-[13px] font-bold text-foreground">
-                    {undoToast.text}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={handleUndoComplete}
-                    className="shrink-0 rounded-xl px-3 py-2 text-[13px] font-black text-primary transition-colors [@media(hover:hover)]:hover:bg-primary/10"
-                  >
-                    Undo
-                  </button>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>,
-          document.body,
-        )}
 
       <style jsx>{`
         @keyframes fadeInUp {

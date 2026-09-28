@@ -35,7 +35,8 @@ import Fly from '@/components/ui/fly';
 import { useIntros } from '@/hooks/useIntros';
 import { useUIStore } from '@/lib/uiStore';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
-import { hapticTick } from '@/lib/haptics';
+import { hapticSuccess, hapticTick } from '@/lib/haptics';
+import { useNotification } from '@/components/providers/NotificationProvider';
 import { PlusUpgradeModal } from './PlusUpgradeModal';
 import { PickerSheet } from './quick-add/PickerSheet';
 import { QuickAddTip } from './quick-add/QuickAddTip';
@@ -192,8 +193,10 @@ export default function QuickAddSheet({
   submitLabel = 'Add Task',
   defaultRepeatDaily = false,
   sections = [],
+  defaultSectionId = null,
 }: QuickAddSheetProps) {
   const [text, setText] = useState(initialText);
+  const { showNotification } = useNotification();
   const [bulkInitialTasks, setBulkInitialTasks] = useState<string[] | null>(null);
   const [bulkOmittedCount, setBulkOmittedCount] = useState(0);
   const [nlDismissed, setNlDismissed] = useState('');
@@ -501,15 +504,15 @@ export default function QuickAddSheet({
     setShowSavedConfirm(false);
     setHasSuggestionContent(false);
     setManagedTag(null);
-    setPickedSectionId(null);
-    setSectionPickedManually(false);
+    setPickedSectionId(defaultSectionId);
+    setSectionPickedManually(!!defaultSectionId);
     setShowSectionPicker(false);
 
     const initialDate = defaultDateKey ?? ymdLocal(new Date());
     setSelectedDateKey(initialDate);
     calendar.setCalendarMonthFromDate(parseYmdLocal(initialDate));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, initialText, defaultRepeat, defaultPickedDay, defaultDateKey, daysOrder]);
+  }, [open, initialText, defaultRepeat, defaultPickedDay, defaultDateKey, daysOrder, defaultSectionId]);
 
   const isLater = pickedDays.includes(7);
   const pickedSection =
@@ -546,7 +549,7 @@ export default function QuickAddSheet({
     .join(',');
   const selectedTagKey = tags.join(',');
   useEffect(() => {
-    if (!open || sectionPickedManually) return;
+    if (!open || sectionPickedManually || defaultSectionId) return;
     const match = sections.find((s) =>
       (s.tagIds ?? []).some((id) => tags.includes(id)),
     );
@@ -950,19 +953,29 @@ export default function QuickAddSheet({
     if (isSubmitting) return;
     const submitData = submitDataFor(text, true);
     if (!submitData) return;
+    const savedTaskId = removeSavedTask ? pickedBacklogTaskId : null;
 
-    setIsSubmitting(true);
-    try {
-      await onSubmit(submitData);
-      markIntroSeenRef.current('quickAddNl');
-      if (removeSavedTask && pickedBacklogTaskId) {
+    hapticSuccess();
+    markIntroSeenRef.current('quickAddNl');
+    onOpenChange(false);
+
+    const attempt = async (): Promise<void> => {
+      try {
+        await onSubmit(submitData);
+      } catch (error) {
+        console.error('Add task failed', error);
+        showNotification(
+          `Couldn't add "${submitData.text}"`,
+          () => attempt(),
+          { durationMs: 8000, actionLabel: 'Retry' },
+        );
+        return;
+      }
+      if (savedTaskId) {
         const backlogKey = '/api/tasks?view=board&day=-1';
-        // Drop it from the SWR cache right away so it doesn't flicker back in
-        // (stale-while-revalidate) the next time the sheet opens.
         mutate(
           backlogKey,
-          (cur?: { id: string }[]) =>
-            cur?.filter((t) => t.id !== pickedBacklogTaskId),
+          (cur?: { id: string }[]) => cur?.filter((t) => t.id !== savedTaskId),
           { revalidate: false },
         );
         fetch(`/api/tasks?view=board`, {
@@ -970,17 +983,15 @@ export default function QuickAddSheet({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             day: -1,
-            taskId: pickedBacklogTaskId,
+            taskId: savedTaskId,
             timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           }),
         })
           .then(() => mutate(backlogKey))
           .catch(console.error);
       }
-      onOpenChange(false);
-    } finally {
-      setIsSubmitting(false);
-    }
+    };
+    void attempt();
   };
 
   const submitBulkTasks = async (taskTexts: string[]) => {
@@ -1241,11 +1252,15 @@ export default function QuickAddSheet({
                             onFocus={() => setInputFocused(true)}
                             onBlur={() => setInputFocused(false)}
                             placeholder="Add a task"
+                            aria-label="Task name"
                             disabled={isSubmitting}
                             spellCheck={false}
                             autoComplete="off"
+                            autoCorrect="on"
+                            autoCapitalize="sentences"
+                            enterKeyHint="done"
                             maxLength={100}
-                            className="block w-full min-h-[60px] max-h-[136px] resize-none overflow-y-auto rounded-xl bg-transparent px-1 pt-3 pb-1 text-[22px] font-semibold leading-[30px] tracking-tight text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-50 text-left sm:text-2xl"
+                            className="block w-full min-h-[60px] max-h-[136px] resize-none overflow-y-auto rounded-xl bg-transparent px-1 pt-3 pb-1 text-[22px] font-semibold leading-[30px] tracking-tight text-foreground caret-primary placeholder:text-muted-foreground/45 focus:outline-none disabled:opacity-50 text-left sm:text-2xl"
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') {
                                 e.preventDefault();
@@ -1264,9 +1279,23 @@ export default function QuickAddSheet({
                             </span>
                           )}
                         </div>
-                        <div className="mt-1 grid h-14 w-14 shrink-0 place-items-center rounded-full bg-muted/60 ring-1 ring-inset ring-border/60 sm:h-16 sm:w-16">
+                        <motion.div
+                          aria-hidden
+                          initial={false}
+                          animate={
+                            hasTaskText
+                              ? { scale: [1, 1.12, 1.04], rotate: [0, -6, 0] }
+                              : { scale: 1, rotate: 0 }
+                          }
+                          transition={{ duration: 0.45, ease: [0.32, 0.72, 0, 1] }}
+                          className={`mt-1 grid h-14 w-14 shrink-0 place-items-center rounded-full ring-inset transition-[background-color,box-shadow] duration-300 sm:h-16 sm:w-16 ${
+                            hasTaskText
+                              ? 'bg-primary/10 ring-2 ring-primary/50'
+                              : 'bg-muted/60 ring-1 ring-border/60'
+                          }`}
+                        >
                           <Fly size={48} y={-3} />
-                        </div>
+                        </motion.div>
                       </div>
 
                       {showNlHint && (
@@ -1350,12 +1379,20 @@ export default function QuickAddSheet({
                           onMouseLeave={tagScroll.handlers.onMouseLeave}
                           onMouseUp={tagScroll.handlers.onMouseUp}
                           onMouseMove={tagScroll.handlers.onMouseMove}
-                          className={`grid auto-cols-max grid-flow-col ${
-                            stripTags.length > 5 ? 'grid-rows-2' : 'grid-rows-1'
-                          } gap-y-3 cursor-grab select-none items-center gap-x-3 overflow-x-auto overscroll-x-none no-scrollbar px-2 pt-2 pb-2 touch-pan-x active:cursor-grabbing ${
-                            tagFadeRight ? 'mask-fade-right' : ''
-                          }`}
-                          style={{ overscrollBehaviorX: 'none' }}
+                          className={
+                            isDesktop
+                              ? 'flex flex-wrap items-center gap-2 px-2 py-1.5'
+                              : `grid auto-cols-max grid-flow-col ${
+                                  stripTags.length > 5 ? 'grid-rows-2' : 'grid-rows-1'
+                                } gap-y-2.5 cursor-grab select-none items-center gap-x-2 overflow-x-auto overscroll-x-none no-scrollbar px-2 pt-2 pb-2 touch-pan-x active:cursor-grabbing ${
+                                  tagFadeRight ? 'mask-fade-right' : ''
+                                }`
+                          }
+                          style={{
+                            overscrollBehaviorX: 'none',
+                            rowGap: 10,
+                            columnGap: 8,
+                          }}
                         >
                         {stripTags.map((tag) => {
                           const selected = tags.includes(tag.id);
@@ -1421,23 +1458,31 @@ export default function QuickAddSheet({
                                 }
                                 tagManager.toggleTag(tag);
                               })}
-                              className={`relative inline-flex h-9 select-none items-center justify-center gap-1.5 rounded-xl border px-3 text-[13px] font-black shadow-sm transition-all active:scale-95 [@media(hover:hover)]:hover:opacity-75 ${
- tag.disabled
- ? 'border-dashed border-border bg-muted text-muted-foreground/70'
- : selected
- ? 'ring-2 ring-offset-1 ring-offset-popover'
- : ''
- }`}
+                              aria-pressed={selected}
+                              className={`relative inline-flex h-9 select-none items-center justify-center gap-1.5 rounded-full border px-3.5 text-[13px] font-black transition-[transform,background-color,border-color,color] active:scale-95 ${
+                                tag.disabled
+                                  ? 'border-dashed border-border bg-muted text-muted-foreground/70'
+                                  : ''
+                              }`}
                               style={
                                 tag.disabled
                                   ? undefined
-                                  : {
-                                      backgroundColor: `${tag.color}20`,
-                                      color: tag.color,
-                                      borderColor: `${tag.color}40`,
-                                    }
+                                  : selected
+                                    ? {
+                                        backgroundColor: tag.color,
+                                        color: '#fff',
+                                        borderColor: tag.color,
+                                      }
+                                    : {
+                                        backgroundColor: `${tag.color}14`,
+                                        color: tag.color,
+                                        borderColor: `${tag.color}40`,
+                                      }
                               }
                             >
+                              {selected && !tag.disabled && (
+                                <Check className="h-3.5 w-3.5 shrink-0" strokeWidth={3.5} />
+                              )}
                               <span className="max-w-[128px] truncate">
                                 {tag.name}
                               </span>
@@ -1451,7 +1496,7 @@ export default function QuickAddSheet({
                           type="button"
                           aria-label="Add tag"
                           onClick={tagScroll.guard(() => setActivePicker('tags'))}
-                          className="inline-flex h-9 items-center justify-center gap-1 rounded-xl border border-dashed border-primary/40 bg-primary/5 px-3 text-[13px] font-extrabold text-primary transition-colors active:scale-95 [@media(hover:hover)]:hover:bg-primary/10"
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-dashed border-primary/40 bg-primary/5 text-[13px] font-extrabold text-primary transition-colors active:scale-95 [@media(hover:hover)]:hover:bg-primary/10"
                         >
                           <Plus className="h-3.5 w-3.5 shrink-0 stroke-[3]" />
                         </button>

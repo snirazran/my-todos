@@ -25,16 +25,7 @@ type Tag = { id: string; name: string; color: string };
 type TasksResponse = { tasks?: TimerTask[] };
 type SubjectsResponse = { areas?: Area[]; tags?: Tag[] };
 
-// Enough of each group to choose from without scrolling past it; the rest is
-// one tap away; the lane chips do the rest of the narrowing.
-const TASK_CAP = 5;
-const AREA_CAP = 4;
-const TAG_CAP = 8;
-// Filter chips over one list, not tabs between three. Material 3 reserves the
-// connected-track control for mutually exclusive views; these are facets of a
-// single question, so "All" is the default and nothing is hidden until the user
-// chooses to narrow — which is what made the first tabbed version cost taps.
-type Lane = 'all' | 'tasks' | 'areas' | 'tags';
+const TASK_CAP = 3;
 
 export interface FocusSubjectPickerProps {
   active: boolean;
@@ -58,8 +49,7 @@ export function FocusSubjectPicker({
   bindScroll,
 }: Readonly<FocusSubjectPickerProps>) {
   const [pendingId, setPendingId] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-  const [lane, setLane] = useState<Lane>('all');
+  const [showAllTasks, setShowAllTasks] = useState(false);
   const timezone = useMemo(
     () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
     [],
@@ -86,29 +76,9 @@ export function FocusSubjectPicker({
   const allAreas = subjectData?.areas ?? [];
   const allTags = subjectData?.tags ?? [];
 
-  const inLane = (which: Exclude<Lane, 'all'>) => lane === 'all' || lane === which;
-
-  const tasks = inLane('tasks') ? allTasks : [];
-  const areas = inLane('areas') ? allAreas : [];
-  const tags = inLane('tags') ? allTags : [];
-
-  const totalOptions = allTasks.length + allAreas.length + allTags.length;
-
-  const lanes = (
-    [
-      { id: 'all', label: 'All', count: totalOptions },
-      { id: 'tasks', label: 'Tasks', count: allTasks.length },
-      { id: 'areas', label: 'Areas', count: allAreas.length },
-      { id: 'tags', label: 'Tags', count: allTags.length },
-    ] satisfies Array<{ id: Lane; label: string; count: number }>
-  ).filter((entry) => entry.id === 'all' || entry.count > 0);
-  // With one group there is nothing to filter between.
-  const showLanes = lanes.length > 2;
-
-  // Picking a lane IS the narrowing, so it lifts the caps — asking someone who
-  // just filtered to Tags to then "show 3 more" tags is the same job twice.
-  const cap = (key: string, list: unknown[], limit: number) =>
-    lane !== 'all' || expanded[key] ? list.length : Math.min(limit, list.length);
+  const tasks = allTasks;
+  const areas = allAreas;
+  const tags = allTags;
 
   const openContainer = async (kind: FocusSubjectKind, id: string, key: string) => {
     if (pendingId) return;
@@ -130,64 +100,24 @@ export function FocusSubjectPicker({
     }
   };
 
-  const taskCount = cap('tasks', tasks, TASK_CAP);
-  const areaCount = cap('areas', areas, AREA_CAP);
-  const tagCount = cap('tags', tags, TAG_CAP);
-  const nothingMatches =
-    !loading && tasks.length === 0 && areas.length === 0 && tags.length === 0;
+  const taskCount = showAllTasks ? tasks.length : Math.min(TASK_CAP, tasks.length);
+  const hasTrackables = areas.length > 0 || tags.length > 0;
+  const nothingMatches = !loading && tasks.length === 0 && !hasTrackables;
 
   return (
     <div
       ref={bindScroll}
       className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-3 sm:px-5"
     >
-      {showLanes && (
-        <div
-          role="group"
-          aria-label="Filter what to focus on"
-          className="mb-3 flex flex-wrap gap-1.5"
-        >
-          {lanes.map((entry) => {
-            const selected = lane === entry.id;
-            return (
-              <button
-                key={entry.id}
-                type="button"
-                aria-pressed={selected}
-                onClick={() => {
-                  hapticTick();
-                  setLane(entry.id);
-                }}
-                className={`inline-flex min-h-8 items-center gap-1.5 rounded-full border px-3 text-[13px] font-black transition-colors ${
-                  selected
-                    ? 'border-primary bg-primary text-primary-foreground'
-                    : 'border-border/60 bg-card text-muted-foreground hover:bg-muted/50 hover:text-foreground'
-                }`}
-              >
-                {entry.label}
-                <span
-                  className={`tabular-nums ${
-                    selected ? 'text-primary-foreground/70' : 'text-muted-foreground/60'
-                  }`}
-                >
-                  {entry.count}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-
       {/* The fastest path out of this sheet, so it sits first and reads as the
           default rather than a footnote parked at the bottom. */}
-      {lane === 'all' && (
         <button
           type="button"
           data-hint="focus-subject"
           onClick={() => void openContainer('open', '', 'open')}
-          className="mb-5 flex min-h-[56px] w-full items-center gap-3 rounded-2xl border border-primary/25 bg-primary/[0.07] px-4 py-2.5 text-left transition-colors hover:bg-primary/[0.12] active:scale-[0.99]"
+          className="mb-5 flex min-h-[60px] w-full items-center gap-3 rounded-2xl bg-[#4f9149] px-4 py-2.5 text-left text-white shadow-[0_3px_0_0_#34631f] transition-all active:translate-y-0.5 active:shadow-none [@media(hover:hover)]:hover:brightness-105"
         >
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white/90 text-[#4f9149]">
             {pendingId === 'open' ? (
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
             ) : (
@@ -195,15 +125,15 @@ export function FocusSubjectPicker({
             )}
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block text-[14px] font-black leading-tight text-foreground">
+            <span className="block text-[16px] font-black leading-tight">
               Just focus
             </span>
-            <span className="block text-[12px] font-semibold leading-tight text-muted-foreground">
+            <span className="block text-[12px] font-semibold leading-tight text-white/80">
               Start now, tick off what you finished after
             </span>
           </span>
+          <Play className="h-5 w-5 shrink-0 fill-current" aria-hidden="true" />
         </button>
-      )}
 
       {loading ? (
         <div
@@ -219,16 +149,16 @@ export function FocusSubjectPicker({
               tasks as task rows, areas as their artwork, tags as tag pills —
               so the list is scannable by form, not just by heading. */}
           <Section
-            title="Today's tasks"
+            title="Or pick a task"
             show={tasks.length > 0}
             hidden={tasks.length - taskCount}
             onShowAll={() => {
               hapticTick();
-              setExpanded((prev) => ({ ...prev, tasks: true }));
+              setShowAllTasks(true);
             }}
           >
-            <div className="flex flex-col gap-1.5">
-              {tasks.slice(0, taskCount).map((task) => {
+            <div className="overflow-hidden rounded-2xl border border-border/60 bg-card">
+              {tasks.slice(0, taskCount).map((task, index) => {
                 const selected = currentSubjectId === task.id;
                 const tagNames = (task.tags ?? [])
                   .map((id) => allTags.find((t) => t.id === id))
@@ -243,10 +173,12 @@ export function FocusSubjectPicker({
                       hapticSelect();
                       onPick({ ...task, subjectKind: 'task' });
                     }}
-                    className={`flex min-h-[56px] w-full items-center gap-3 rounded-2xl border px-3.5 py-2.5 text-left transition-[transform,box-shadow,background-color,color,opacity] active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                    className={`flex min-h-[52px] w-full items-center gap-3 px-3.5 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary ${
+                      index > 0 ? 'border-t border-border/50' : ''
+                    } ${
                       selected
-                        ? 'border-primary/60 bg-primary/5'
-                        : 'border-border/60 bg-card hover:border-border hover:bg-muted/45'
+                        ? 'bg-primary/[0.06]'
+                        : 'active:bg-muted/60 [@media(hover:hover)]:hover:bg-muted/40'
                     }`}
                   >
                     <span className="min-w-0 flex-1">
@@ -277,12 +209,10 @@ export function FocusSubjectPicker({
                         </span>
                       )}
                     </span>
-                    <span
+                    <Play
                       aria-hidden="true"
-                      className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary/10 text-primary"
-                    >
-                      <Play className="ml-0.5 h-3.5 w-3.5 fill-current" />
-                    </span>
+                      className="h-4 w-4 shrink-0 fill-current text-primary/70"
+                    />
                   </button>
                 );
               })}
@@ -290,16 +220,13 @@ export function FocusSubjectPicker({
           </Section>
 
           <Section
-            title="Areas"
-            show={areas.length > 0}
-            hidden={areas.length - areaCount}
-            onShowAll={() => {
-              hapticTick();
-              setExpanded((prev) => ({ ...prev, areas: true }));
-            }}
+            title="Or track time toward"
+            show={hasTrackables}
+            hidden={0}
+            onShowAll={() => {}}
           >
-            <div className="grid grid-cols-2 gap-2">
-              {areas.slice(0, areaCount).map((area) => {
+            <div className="flex flex-wrap gap-1.5">
+              {areas.map((area) => {
                 const selected = currentSubjectId === `focus-area:${area.id}`;
                 const busy = pendingId === `area:${area.id}`;
                 return (
@@ -308,49 +235,34 @@ export function FocusSubjectPicker({
                     type="button"
                     data-hint="focus-subject"
                     onClick={() => void openContainer('area', area.id, `area:${area.id}`)}
-                    className={`relative flex h-24 flex-col justify-end overflow-hidden rounded-2xl border p-2.5 text-left transition-[transform,box-shadow,background-color,color,opacity] active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
-                      selected ? 'border-primary' : 'border-border/60'
+                    className={`inline-flex h-10 max-w-full items-center gap-2 rounded-full border bg-card py-1 pl-1 pr-3.5 text-[13px] font-black text-foreground transition-[transform,background-color] active:scale-95 [@media(hover:hover)]:hover:bg-muted/50 ${
+                      selected ? 'border-primary ring-1 ring-primary' : 'border-border/60'
                     }`}
-                    style={{ backgroundColor: area.accent }}
                   >
-                    {area.coverImageUrl && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={area.coverImageUrl}
-                        alt=""
-                        aria-hidden
-                        className="absolute inset-0 h-full w-full object-cover"
-                      />
-                    )}
                     <span
-                      aria-hidden
-                      className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent"
-                    />
-                    <span className="relative truncate text-[14px] font-black leading-tight text-white drop-shadow">
-                      {area.name}
+                      className="relative grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-full"
+                      style={{ backgroundColor: area.accent }}
+                    >
+                      {area.coverImageUrl && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={area.coverImageUrl}
+                          alt=""
+                          aria-hidden
+                          className="absolute inset-0 h-full w-full object-cover"
+                        />
+                      )}
+                      {busy && (
+                        <span className="absolute inset-0 grid place-items-center bg-black/40">
+                          <Loader2 className="h-4 w-4 animate-spin text-white" aria-hidden="true" />
+                        </span>
+                      )}
                     </span>
-                    {busy && (
-                      <span className="absolute inset-0 grid place-items-center bg-black/35">
-                        <Loader2 className="h-5 w-5 animate-spin text-white" aria-hidden="true" />
-                      </span>
-                    )}
+                    <span className="truncate">{area.name}</span>
                   </button>
                 );
               })}
-            </div>
-          </Section>
-
-          <Section
-            title="Tags"
-            show={tags.length > 0}
-            hidden={tags.length - tagCount}
-            onShowAll={() => {
-              hapticTick();
-              setExpanded((prev) => ({ ...prev, tags: true }));
-            }}
-          >
-            <div className="flex flex-wrap gap-2">
-              {tags.slice(0, tagCount).map((tag) => {
+              {tags.map((tag) => {
                 const selected = currentSubjectId === `focus-tag:${tag.id}`;
                 const busy = pendingId === `tag:${tag.id}`;
                 return (
@@ -360,11 +272,11 @@ export function FocusSubjectPicker({
                     data-hint="focus-subject-tag"
                     data-tag-id={tag.id}
                     onClick={() => void openContainer('tag', tag.id, `tag:${tag.id}`)}
-                    className={`inline-flex max-w-full select-none items-center gap-1.5 rounded-2xl border px-4 py-2.5 text-[13px] font-black shadow-sm transition-[transform,box-shadow,background-color,color,opacity] active:scale-95 ${
+                    className={`inline-flex h-10 max-w-full select-none items-center gap-1.5 rounded-full border px-3.5 text-[13px] font-black transition-transform active:scale-95 ${
                       selected ? 'ring-2 ring-offset-1 ring-offset-background' : ''
                     }`}
                     style={{
-                      backgroundColor: `${tag.color}20`,
+                      backgroundColor: `${tag.color}1a`,
                       color: tag.color,
                       borderColor: `${tag.color}40`,
                       ...(selected
@@ -384,13 +296,14 @@ export function FocusSubjectPicker({
                 );
               })}
             </div>
+            <p className="mt-2 px-1 text-[12px] font-semibold text-muted-foreground">
+              Your focus minutes count toward it, no task needed.
+            </p>
           </Section>
 
           {nothingMatches && (
             <p className="py-8 text-center text-sm font-bold text-muted-foreground">
-              {lane === 'all'
-                ? 'Nothing to pick yet — just focus above.'
-                : 'Nothing here yet.'}
+              Nothing to pick yet — just focus above.
             </p>
           )}
         </>

@@ -21,6 +21,7 @@ import { hapticImpact, hapticSuccess, hapticTick } from '@/lib/haptics';
 import { randomUUID } from '@/lib/uuid';
 import {
   CHECKLIST_MAX_ITEMS,
+  checklistBonus,
   normalizeChecklistRewards,
   type ChecklistItem,
 } from '@/lib/checklist';
@@ -29,53 +30,142 @@ export type { ChecklistItem };
 export { CHECKLIST_MAX_ITEMS };
 export const CHECKLIST_ITEM_MAX = 120;
 
-/**
- * The line a checklist crosses to catch a fly. It sits between rows rather than
- * on one because the payout counts steps done, not which ones.
- */
-export function ChecklistFlyLine({
-  caught,
-  at,
-  total,
+function stepWord(n: number) {
+  return `${n} ${n === 1 ? 'step' : 'steps'}`;
+}
+
+function firstBonusLength(): number | null {
+  for (let n = 1; n <= CHECKLIST_MAX_ITEMS; n++) {
+    if (checklistBonus(n) > 0) return n;
+  }
+  return null;
+}
+
+export function ChecklistRewardTrack({
+  items,
+  teach = false,
+  className = '',
 }: {
-  caught: boolean;
-  at: number;
-  total: number;
+  items: ChecklistItem[];
+  teach?: boolean;
+  className?: string;
 }) {
-  const rule = `h-px flex-1 transition-colors duration-300 ${
-    caught ? 'bg-primary/60' : 'bg-primary/20'
-  }`;
+  const total = items.length;
+  const doneCount = items.filter((it) => it.done).length;
+  const markers = items.flatMap((it, i) => (it.reward ? [i + 1] : []));
+
+  if (markers.length === 0) {
+    const need = teach && total > 0 ? firstBonusLength() : null;
+    if (!need || need <= total) return null;
+    return (
+      <div
+        className={`flex items-center gap-2 rounded-xl bg-muted/50 px-3 py-2 text-[12px] font-bold text-muted-foreground ${className}`}
+      >
+        <FlyBadge caught={false} />
+        Add {stepWord(need - total)} more to earn a bonus fly
+      </div>
+    );
+  }
+
+  const caught = markers.filter((m) => doneCount >= m).length;
+  const next = markers.find((m) => doneCount < m);
+  const allCaught = next === undefined;
+  const left = next !== undefined ? next - doneCount : 0;
+  const caption = allCaught
+    ? `Bonus caught · +${markers.length} ${markers.length === 1 ? 'fly' : 'flies'}`
+    : next === total
+      ? caught === 0
+        ? `Check all ${total} steps for a bonus fly`
+        : `Finish all steps for your last bonus fly`
+      : `${stepWord(left)} to ${caught === 0 ? 'a' : 'the next'} bonus fly`;
+
   return (
     <div
-      aria-label={`${caught ? 'Caught' : 'Catches'} a fly at ${at} of ${total} steps done`}
-      className="flex items-center gap-2 py-1.5"
+      role="group"
+      aria-label={`${caught} of ${markers.length} bonus flies caught. ${caption}`}
+      className={`rounded-xl px-3 pb-2.5 pt-2.5 transition-colors duration-300 ${
+        allCaught ? 'bg-primary/10' : 'bg-primary/[0.05]'
+      } ${className}`}
     >
-      <span className={rule} />
-      <span
-        className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 transition-colors duration-300 ${
-          caught
-            ? 'border-primary/40 bg-primary/15'
-            : 'border-primary/20 bg-primary/5'
-        }`}
-      >
-        <span
-          className={`grid place-items-center transition-all duration-300 ${
-            caught ? 'opacity-100' : 'opacity-40 grayscale'
-          }`}
-          style={{ width: 20, height: 20 }}
-        >
-          <Fly size={24} x={-2} y={-5} interactive={false} paused />
+      <div className="flex items-center justify-between gap-3">
+        <AnimatePresence mode="popLayout" initial={false}>
+          <motion.span
+            key={caption}
+            initial={{ y: 6, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -6, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className={`min-w-0 truncate text-[12px] font-bold md:text-[13px] ${
+              allCaught ? 'text-primary' : 'text-foreground/70'
+            }`}
+          >
+            {caption}
+          </motion.span>
+        </AnimatePresence>
+        <span className="shrink-0 text-[12px] font-black tabular-nums text-muted-foreground">
+          {doneCount}/{total}
         </span>
-        <span
-          className={`text-[11px] font-black leading-none tabular-nums transition-colors duration-300 ${
-            caught ? 'text-primary' : 'text-primary/50'
-          }`}
-        >
-          +1
-        </span>
-      </span>
-      <span className={rule} />
+      </div>
+      <div className="mt-2 flex items-center">
+        <div className="relative -mr-2 h-2 flex-1 rounded-full bg-primary/15">
+          <motion.span
+            className="absolute inset-y-0 left-0 rounded-full bg-primary"
+            initial={false}
+            animate={{ width: `${(doneCount / total) * 100}%` }}
+            transition={{ type: 'spring', stiffness: 320, damping: 32 }}
+          />
+          {markers
+            .filter((m) => m < total)
+            .map((m) => (
+              <span
+                key={m}
+                className="absolute top-1/2 z-10 -translate-x-1/2 -translate-y-1/2"
+                style={{ left: `${(m / total) * 100}%` }}
+              >
+                <FlyBadge caught={doneCount >= m} />
+              </span>
+            ))}
+        </div>
+        {markers.includes(total) && (
+          <span className="relative z-10">
+            <FlyBadge caught={doneCount >= total} size="lg" />
+          </span>
+        )}
+      </div>
     </div>
+  );
+}
+
+function FlyBadge({
+  caught,
+  size = 'md',
+}: {
+  caught: boolean;
+  size?: 'md' | 'lg';
+}) {
+  const box = size === 'lg' ? 34 : 26;
+  const fly = size === 'lg' ? 28 : 22;
+  return (
+    <motion.span
+      initial={false}
+      animate={caught ? { scale: [1, 1.25, 1] } : { scale: 1 }}
+      transition={{ duration: 0.35, ease: 'easeOut' }}
+      className={`grid shrink-0 place-items-center rounded-full border-2 bg-background transition-[border-color,box-shadow] duration-300 ${
+        caught
+          ? 'border-primary shadow-[0_0_0_3px_hsl(var(--primary)/0.18)]'
+          : 'border-primary/25'
+      }`}
+      style={{ width: box, height: box }}
+    >
+      <span
+        className={`grid place-items-center transition-[opacity,filter] duration-300 ${
+          caught ? 'opacity-100' : 'opacity-40 grayscale'
+        }`}
+        style={{ width: fly, height: fly }}
+      >
+        <Fly size={fly} y={-2} interactive={false} paused />
+      </span>
+    </motion.span>
   );
 }
 
@@ -297,11 +387,7 @@ export function ChecklistEditor({
   };
 
   const atCap = items.length >= CHECKLIST_MAX_ITEMS;
-  const doneCount = items.filter((it) => it.done).length;
-  const rewards = useMemo(
-    () => normalizeChecklistRewards(items).map((it) => !!it.reward),
-    [items],
-  );
+  const rewardItems = useMemo(() => normalizeChecklistRewards(items), [items]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const autoScrollAt = (pointY: number) => {
@@ -319,6 +405,7 @@ export function ChecklistEditor({
       layoutScroll
       className={`flex flex-col ${className}`}
     >
+      <ChecklistRewardTrack items={rewardItems} teach className="mb-2" />
       <Reorder.Group
         as="div"
         axis="y"
@@ -327,14 +414,10 @@ export function ChecklistEditor({
         className="flex flex-col"
       >
         <AnimatePresence initial={false}>
-          {items.map((it, index) => (
+          {items.map((it) => (
             <ChecklistRow
               key={it.id}
               item={it}
-              reward={rewards[index]}
-              at={index + 1}
-              total={items.length}
-              doneCount={doneCount}
               onToggle={() => toggle(it.id)}
               onTextChange={(text) => setText(it.id, text)}
               onCommit={commitText}
@@ -403,10 +486,6 @@ export function ChecklistEditor({
 
 function ChecklistRow({
   item,
-  reward,
-  at,
-  total,
-  doneCount,
   onToggle,
   onTextChange,
   onCommit,
@@ -418,10 +497,6 @@ function ChecklistRow({
   canDrag,
 }: {
   item: ChecklistItem;
-  reward: boolean;
-  at: number;
-  total: number;
-  doneCount: number;
   onToggle: () => void;
   onTextChange: (text: string) => void;
   onCommit: () => void;
@@ -541,9 +616,6 @@ function ChecklistRow({
           </button>
         )}
       </div>
-      {reward && !dragging && (
-        <ChecklistFlyLine caught={doneCount >= at} at={at} total={total} />
-      )}
     </Reorder.Item>
   );
 }

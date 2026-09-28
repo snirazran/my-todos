@@ -19,6 +19,7 @@ interface NotificationItem {
   undoAction?: () => void | Promise<void>;
   durationMs: number;
   dedupeKey: string;
+  actionLabel: string;
 }
 
 function textOf(node: React.ReactNode): string {
@@ -37,7 +38,7 @@ interface NotificationContextType {
   showNotification: (
     content: React.ReactNode,
     undoAction?: () => void | Promise<void>,
-    options?: { durationMs?: number },
+    options?: { durationMs?: number; actionLabel?: string },
   ) => void;
   hideNotification: () => void;
   isVisible: boolean;
@@ -83,7 +84,14 @@ export function useNotification() {
   return context;
 }
 
-const AUTO_DISMISS_MS = 3000;
+function readingTimeMs(text: string, hasAction: boolean): number {
+  const words = text.split(/[\s|]+/).filter(Boolean).length;
+  const base = Math.min(8000, 2500 + words * 280);
+  return Math.max(base, hasAction ? 5000 : 3500);
+}
+
+const RESUME_FLOOR_MS = 1500;
+const SWIPE_DISMISS_PX = 72;
 
 export function NotificationProvider({
   children,
@@ -98,10 +106,13 @@ export function NotificationProvider({
   const stackSuppressed = openSheets > 0;
   useEffect(() => setMounted(true), []);
 
-  const frontTimerRef = useRef<{
-    id: number;
-    timeout: ReturnType<typeof setTimeout>;
-  } | null>(null);
+  const [hovered, setHovered] = useState(false);
+  const [pressed, setPressed] = useState(false);
+  const [pageHidden, setPageHidden] = useState(false);
+  const [swiped, setSwiped] = useState<{ id: number; dir: number } | null>(
+    null,
+  );
+  const remainingRef = useRef(new Map<number, number>());
   const stackRef = useRef<HTMLDivElement | null>(null);
   const deckRef = useRef<HTMLDivElement | null>(null);
   const [deckHeight, setDeckHeight] = useState(0);
@@ -112,6 +123,7 @@ export function NotificationProvider({
   }, [deckHeight]);
 
   const dismiss = useCallback((id: number) => {
+    remainingRef.current.delete(id);
     setNotifications((prev) => prev.filter((n) => n.id !== id));
   }, []);
 
@@ -124,7 +136,7 @@ export function NotificationProvider({
     (
       content: React.ReactNode,
       undoAction?: () => void | Promise<void>,
-      options?: { durationMs?: number },
+      options?: { durationMs?: number; actionLabel?: string },
     ) => {
       const id = Date.now() + Math.random();
       const dedupeKey = textOf(content);
@@ -142,8 +154,10 @@ export function NotificationProvider({
             id,
             content,
             undoAction,
-            durationMs: options?.durationMs ?? AUTO_DISMISS_MS,
+            durationMs:
+              options?.durationMs ?? readingTimeMs(dedupeKey, !!undoAction),
             dedupeKey,
+            actionLabel: options?.actionLabel ?? 'Undo',
           },
         ];
       });
@@ -151,25 +165,37 @@ export function NotificationProvider({
     [],
   );
 
-  // Only the front toast's auto-dismiss timer runs; the ones queued behind it
-  // keep their full read-time for when they step forward.
-  useEffect(() => {
-    const front = notifications[notifications.length - 1] ?? null;
-    if (frontTimerRef.current && frontTimerRef.current.id !== front?.id) {
-      clearTimeout(frontTimerRef.current.timeout);
-      frontTimerRef.current = null;
-    }
-    if (!front || frontTimerRef.current?.id === front.id) return;
-    frontTimerRef.current = {
-      id: front.id,
-      timeout: setTimeout(() => dismiss(front.id), front.durationMs),
-    };
-  }, [notifications, dismiss]);
+  const front = notifications[notifications.length - 1] ?? null;
+  const frontId = front?.id ?? null;
+  const frontDuration = front?.durationMs ?? 0;
+  const timerPaused =
+    hovered || pressed || pageHidden || undoingId !== null || stackSuppressed;
 
   useEffect(() => {
+    if (frontId === null || timerPaused) return;
+    const remaining = remainingRef.current.get(frontId) ?? frontDuration;
+    const startedAt = Date.now();
+    const timeout = setTimeout(() => dismiss(frontId), remaining);
     return () => {
-      if (frontTimerRef.current) clearTimeout(frontTimerRef.current.timeout);
+      clearTimeout(timeout);
+      remainingRef.current.set(
+        frontId,
+        Math.max(RESUME_FLOOR_MS, remaining - (Date.now() - startedAt)),
+      );
     };
+  }, [frontId, frontDuration, timerPaused, dismiss]);
+
+  useEffect(() => {
+    setHovered(false);
+    setPressed(false);
+  }, [frontId]);
+
+  useEffect(() => {
+    const onVisibility = () => setPageHidden(document.hidden);
+    onVisibility();
+    document.addEventListener('visibilitychange', onVisibility);
+    return () =>
+      document.removeEventListener('visibilitychange', onVisibility);
   }, []);
 
   // Measure the deck's natural (bottom-anchored) content height. Increases
@@ -226,10 +252,6 @@ export function NotificationProvider({
   const handleUndo = async (item: NotificationItem) => {
     if (!item.undoAction) return;
     setUndoingId(item.id);
-    if (frontTimerRef.current?.id === item.id) {
-      clearTimeout(frontTimerRef.current.timeout);
-      frontTimerRef.current = null;
-    }
     try {
       await item.undoAction();
     } catch (error) {
@@ -281,13 +303,16 @@ export function NotificationProvider({
         >
         <div
           ref={deckRef}
+          role="status"
+          aria-live="polite"
+          aria-atomic="false"
           className="absolute inset-x-0 bottom-0"
           style={{
             paddingTop:
               Math.min(Math.max(notifications.length - 1, 0), 2) * 10,
           }}
         >
-        <AnimatePresence initial={false}>
+        <AnimatePresence initial={false} custom={swiped}>
           {notifications.map((n, index) => {
             const depth = notifications.length - 1 - index;
             const isFront = depth === 0;
@@ -302,32 +327,84 @@ export function NotificationProvider({
             return (
               <motion.div
                 key={n.id}
-                initial={{ opacity: 0, y: 20, scale: 0.96 }}
+                custom={swiped}
+                variants={{
+                  exit: (swipe: { id: number; dir: number } | null) =>
+                    swipe?.id === n.id
+                      ? {
+                          x: swipe.dir * 420,
+                          opacity: 0,
+                          position: 'absolute',
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          transition: { duration: 0.2, ease: [0.32, 0.72, 0, 1] },
+                        }
+                      : {
+                          opacity: 0,
+                          y: 8,
+                          scale: 0.96,
+                          position: 'absolute',
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          transition: { duration: 0.16, ease: 'easeIn' },
+                        },
+                }}
+                initial={{ opacity: 0, y: 24, scale: 0.96 }}
                 animate={{
                   opacity: depth > 2 ? 0 : 1,
                   y: depth * -10,
                   scale: 1 - depth * 0.05,
                 }}
-                exit={{
-                  opacity: 0,
-                  scale: 0.96,
-                  position: 'absolute',
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  transition: { duration: 0.15 },
+                exit="exit"
+                transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+                drag={isFront && !isUndoing ? 'x' : false}
+                dragDirectionLock
+                dragSnapToOrigin
+                dragElastic={0.5}
+                onDragEnd={(_, info) => {
+                  setPressed(false);
+                  if (
+                    Math.abs(info.offset.x) > SWIPE_DISMISS_PX ||
+                    Math.abs(info.velocity.x) > 600
+                  ) {
+                    setSwiped({ id: n.id, dir: Math.sign(info.offset.x) || 1 });
+                    dismiss(n.id);
+                  }
                 }}
-                transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                style={{ zIndex: 100 - depth }}
+                onPointerEnter={
+                  isFront
+                    ? (e) => {
+                        if (e.pointerType === 'mouse') setHovered(true);
+                      }
+                    : undefined
+                }
+                onPointerLeave={
+                  isFront
+                    ? (e) => {
+                        if (e.pointerType === 'mouse') setHovered(false);
+                      }
+                    : undefined
+                }
+                onPointerDown={isFront ? () => setPressed(true) : undefined}
+                onPointerUp={isFront ? () => setPressed(false) : undefined}
+                onPointerCancel={isFront ? () => setPressed(false) : undefined}
+                onFocusCapture={
+                  isFront
+                    ? (e) => {
+                        if ((e.target as HTMLElement).matches?.(':focus-visible'))
+                          setHovered(true);
+                      }
+                    : undefined
+                }
+                onBlurCapture={isFront ? () => setHovered(false) : undefined}
+                style={{ zIndex: 100 - depth, touchAction: 'pan-y' }}
                 className={`${
                   isFront
                     ? 'pointer-events-auto relative'
                     : 'pointer-events-none absolute inset-x-0 bottom-0'
-                } flex w-full items-center gap-3 px-4 py-3 rounded-[18px] border shadow-sm backdrop-blur-2xl ${
-                  isMoveToast
-                    ? 'bg-card/90 text-foreground border-border/50'
-                    : 'bg-popover/90 text-popover-foreground border-border'
-                }`}
+                } flex w-full items-center gap-3 px-4 py-3 rounded-[18px] border border-border/50 bg-card/90 text-foreground shadow-sm backdrop-blur-2xl`}
               >
                 {isMoveToast && (
                   <span
@@ -343,11 +420,7 @@ export function NotificationProvider({
                     )}
                   </span>
                 )}
-                <div
-                  className={`min-w-0 flex-1 text-sm ${
-                    isMoveToast ? 'font-semibold' : 'font-medium'
-                  }`}
-                >
+                <div className="min-w-0 flex-1 text-sm font-semibold">
                   <NotificationBody id={n.id} dismiss={dismiss}>
                     {n.content}
                   </NotificationBody>
@@ -356,7 +429,7 @@ export function NotificationProvider({
                   <button
                     onClick={() => handleUndo(n)}
                     disabled={isUndoing}
-                    className="text-sm font-bold text-primary hover:text-primary/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    className="-my-1.5 flex h-9 shrink-0 items-center gap-2 rounded-full px-2.5 text-sm font-bold text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {isUndoing ? (
                       <>
@@ -380,18 +453,18 @@ export function NotificationProvider({
                             d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                           ></path>
                         </svg>
-                        Undo
+                        {n.actionLabel}
                       </>
                     ) : (
-                      'Undo'
+                      n.actionLabel
                     )}
                   </button>
                 )}
                 <button
                   onClick={() => dismiss(n.id)}
                   disabled={isUndoing}
-                  className="p-1 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
-                  aria-label="Close"
+                  className="-my-1.5 -mr-2 grid h-9 w-9 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+                  aria-label="Dismiss notification"
                 >
                   <X size={16} />
                 </button>

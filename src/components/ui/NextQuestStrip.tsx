@@ -388,7 +388,7 @@ export function NextQuestStrip({
                 ? 'border-amber-400/70 bg-amber-100/80 hover:bg-amber-100 dark:border-amber-400/40 dark:bg-amber-500/15 dark:hover:bg-amber-500/20'
                 : `${objectiveCardTone(true)} hover:bg-lime-100 dark:hover:bg-lime-500/20`
             }`
-          : 'mb-1.5 gap-2.5 rounded-xl px-1 py-1 hover:bg-muted/30 md:mb-0 md:gap-3 md:rounded-xl md:border-0 md:bg-transparent md:px-4 md:py-1.5 md:shadow-none md:hover:bg-muted/30'
+          : 'mb-2 gap-3 rounded-2xl border border-border/60 bg-card px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.06)] transition-[border-color,box-shadow,transform] active:scale-[0.99] [@media(hover:hover)]:hover:border-primary/30 [@media(hover:hover)]:hover:shadow-[0_6px_16px_-10px_rgba(0,0,0,0.25)] md:mb-3 md:px-4 md:py-3'
       }`}
     >
       {showClaimable && claimable ? (
@@ -476,26 +476,26 @@ export function NextQuestStrip({
             </div>
           ) : (
             <div className="flex min-w-0 flex-1 flex-col gap-1 md:gap-1.5">
-              <span className="hidden items-center gap-1.5 text-[11px] font-bold text-muted-foreground md:flex">
+              <span className="flex min-w-0 items-center gap-1.5 text-[11px] font-bold text-muted-foreground">
                 <span
                   aria-hidden="true"
-                  className="h-1.5 w-1.5 rounded-full bg-primary"
+                  className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary"
                 />
-                Next Quest
+                <span className="shrink-0">Next quest</span>
+                {!fillingTrackable && (nextUpReasonLabel || nextUpResetLabel) ? (
+                  <span className="min-w-0 truncate text-muted-foreground/80">
+                    · {nextUpReasonLabel ?? nextUpResetLabel}
+                  </span>
+                ) : null}
               </span>
-              <span className="flex min-w-0 items-center text-[12px] font-black leading-tight text-foreground md:text-[14px] md:font-bold">
-                <span className="min-w-0 flex-1 md:truncate">
+              <span className="min-w-0 text-[13px] font-black leading-tight text-foreground md:text-[14px] md:font-bold">
+                <span className="line-clamp-2 md:line-clamp-1">
                   <ObjectiveLabel
                     label={displayNextUp.remainingLabel}
                     tags={displayNextUp.tags}
                     maxTags={1}
                   />
                 </span>
-                {!fillingTrackable && (nextUpReasonLabel || nextUpResetLabel) ? (
-                  <span className="ml-1.5 hidden shrink-0 whitespace-nowrap text-[10px] font-bold text-muted-foreground min-[400px]:inline">
-                    {nextUpReasonLabel ?? nextUpResetLabel}
-                  </span>
-                ) : null}
               </span>
               <ObjectiveProgressBar
                 heightClassName="h-4 md:h-3.5"
@@ -523,7 +523,7 @@ export function NextQuestStrip({
           ) : (
             <ChevronRight
               aria-hidden="true"
-              className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
+              className="h-5 w-5 shrink-0 text-muted-foreground/70 transition-[transform,color] group-hover:translate-x-0.5 group-hover:text-primary"
             />
           )}
         </>

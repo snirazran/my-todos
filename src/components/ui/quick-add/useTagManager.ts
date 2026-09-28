@@ -21,6 +21,8 @@ type Options = {
   onMaxSelectedTags?: () => void;
 };
 
+const NO_TAGS: SavedTag[] = [];
+
 export function useTagManager({
   open,
   selectedTags,
@@ -30,7 +32,7 @@ export function useTagManager({
   onMaxSelectedTags,
 }: Options) {
   const { data: tagsData } = useSWR(open ? '/api/tags' : null, fetcher);
-  const savedTags: SavedTag[] = tagsData?.tags || [];
+  const savedTags: SavedTag[] = tagsData?.tags ?? NO_TAGS;
   const isPremium: boolean = !!tagsData?.isPremium;
   const tagLimit = isPremium ? PREMIUM_TAG_LIMIT : FREE_TAG_LIMIT;
 
