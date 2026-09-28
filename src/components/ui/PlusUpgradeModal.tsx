@@ -1,13 +1,12 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { mutate } from 'swr';
 import { Capacitor } from '@capacitor/core';
-import { Icon } from '@/components/ui/Icon';
-import { AppImage } from '@/components/ui/AppImage';
-import { Bell, Check, Crown, Heart, Sparkle, X } from 'lucide-react';
+import { Icon, type IconName } from '@/components/ui/Icon';
+import { Bell, Check, ChevronLeft, ChevronRight, Crown, ShieldAlert, Sparkle, X } from 'lucide-react';
 import { SAVED_LOOKS_FREE, SAVED_LOOKS_PLUS } from '@/lib/skins/looks';
 import { FREE_TAG_LIMIT, PREMIUM_TAG_LIMIT } from '@/lib/tags/limits';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
@@ -25,9 +24,11 @@ import {
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
 import { mutateInventoryCaches } from '@/hooks/useInventory';
 import { auth } from '@/lib/firebase';
-import { ShieldAlert } from 'lucide-react';
 
-type Step = 0 | 1 | 2 | 3;
+type Step = 0 | 1 | 2;
+type View = Step | 'compare';
+
+const STEP_COUNT = 3;
 
 type PlanId = 'yearly' | 'monthly';
 
@@ -53,6 +54,46 @@ const APPLE_EULA_URL =
 const TERMS_URL = 'https://frogress.com/terms';
 const PRIVACY_URL = 'https://frogress.com/privacy';
 
+const BENEFITS: { icon: IconName; title: string; body: string }[] = [
+  {
+    icon: 'lilyPad',
+    title: 'Never lose a streak to one bad day',
+    body: 'Extra Lily Pads, plus a free one every month.',
+  },
+  {
+    icon: 'leap',
+    title: 'Commitments that bend, not break',
+    body: 'Move Leap sessions when life gets busy.',
+  },
+  {
+    icon: 'x2',
+    title: 'Motivation that keeps up with you',
+    body: 'Every quest and gift pays double.',
+  },
+];
+
+const desktopQuery = '(min-width: 768px)';
+
+function subscribeDesktop(callback: () => void) {
+  const mql = window.matchMedia(desktopQuery);
+  mql.addEventListener('change', callback);
+  return () => mql.removeEventListener('change', callback);
+}
+
+function useIsDesktop() {
+  return useSyncExternalStore(
+    subscribeDesktop,
+    () => window.matchMedia(desktopQuery).matches,
+    () => false,
+  );
+}
+
+function addDays(days: number) {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
 export function PlusUpgradeModal({
   open,
   onClose,
@@ -67,16 +108,19 @@ export function PlusUpgradeModal({
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
-  const [step, setStep] = useState<Step>(0);
+  const [view, setView] = useState<View>(0);
+  const [lastStep, setLastStep] = useState<Step>(0);
   const [plan, setPlan] = useState<PlanId>('yearly');
   const [purchasing, setPurchasing] = useState(false);
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
   const [celebrating, setCelebrating] = useState(false);
   const [needsAccount, setNeedsAccount] = useState(false);
+  const [sheetReady, setSheetReady] = useState(false);
   const [pricing, setPricing] = useState<Partial<
     Record<PlanId, PlusPriceInfo>
   > | null>(null);
   const [pricingFailed, setPricingFailed] = useState(false);
+  const isDesktop = useIsDesktop();
 
   useEffect(() => {
     if (!open) return;
@@ -97,13 +141,16 @@ export function PlusUpgradeModal({
 
   useEffect(() => {
     if (open) {
-      setStep(0);
+      setView(0);
+      setLastStep(0);
       setPlan('yearly');
       setPurchasing(false);
       setPurchaseError(null);
       setNeedsAccount(false);
       trackAnalyticsEvent('paywall_viewed', { placement });
       trackAnalyticsEvent('paywall_step_viewed', { placement, step: 1 });
+    } else {
+      setSheetReady(false);
     }
   }, [open, placement]);
 
@@ -182,23 +229,23 @@ export function PlusUpgradeModal({
 
   if (!mounted) return null;
 
-  const next = () =>
-    setStep((current) => {
-      const nextStep = Math.min(3, current + 1) as Step;
-      if (nextStep !== current) {
-        trackAnalyticsEvent('paywall_step_viewed', {
-          placement,
-          step: nextStep + 1,
-        });
-      }
-      return nextStep;
-    });
+  const goToStep = (target: Step) => {
+    setView(target);
+    if (target > lastStep) {
+      setLastStep(target);
+      trackAnalyticsEvent('paywall_step_viewed', { placement, step: target + 1 });
+    }
+  };
 
-  const trialReminderDate = (() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 5);
-    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-  })();
+  const goBack = () => {
+    if (view === 'compare') setView(0);
+    else if (view > 0) setView((view - 1) as Step);
+  };
+
+  const trialDays = PLAN_DETAILS[plan].trialDays;
+  const reminderDate = addDays(Math.max(1, trialDays - 2));
+  const endDate = addDays(trialDays);
+  const activeStep: Step = view === 'compare' ? 0 : view;
 
   return createPortal(
     <AnimatePresence>
@@ -225,57 +272,109 @@ export function PlusUpgradeModal({
               stiffness: 260,
               mass: 0.9,
             }}
+            onAnimationComplete={() => setSheetReady(true)}
             className="pointer-events-none fixed inset-0 z-[10009] flex will-change-transform md:items-center md:justify-center md:p-6"
           >
-            <div className="plus-sheet pointer-events-auto relative mx-auto flex h-full w-full flex-col overflow-hidden text-white md:h-[min(640px,calc(100dvh-3rem))] md:w-[min(100vw-3rem,58rem)] md:flex-row md:rounded-[32px] md:shadow-2xl">
+            <div className="plus-sheet pointer-events-auto relative mx-auto flex h-full w-full flex-col overflow-hidden text-white md:h-[min(640px,calc(100dvh-3rem))] md:w-[min(100vw-3rem,56rem)] md:flex-row md:rounded-[32px] md:shadow-2xl">
               <div aria-hidden className="plus-glow pointer-events-none absolute inset-0" />
-              <CoverRail />
+              {isDesktop && <DesktopRail ready={sheetReady} />}
 
-              <div className="no-scrollbar relative flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="absolute right-4 top-[calc(1rem+env(safe-area-inset-top))] z-20 flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-white transition-colors hover:bg-white/30 md:top-4"
-                  aria-label="Close"
-                >
-                  <X className="h-5 w-5" />
-                </button>
+              <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
+                <div className="relative z-20 flex h-14 shrink-0 items-center justify-between px-4 pt-[env(safe-area-inset-top)] box-content md:box-border md:h-16 md:px-6 md:pt-0">
+                  {view !== 0 ? (
+                    <button
+                      type="button"
+                      onClick={goBack}
+                      className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
+                      aria-label="Back"
+                    >
+                      <ChevronLeft className="h-5 w-5" strokeWidth={2.75} />
+                    </button>
+                  ) : (
+                    <span aria-hidden className="h-10 w-10" />
+                  )}
+                  {view === 'compare' ? (
+                    <span className="text-sm font-black tracking-tight text-white/90">
+                      Free vs Plus
+                    </span>
+                  ) : (
+                    <StepDots step={activeStep} />
+                  )}
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
+                    aria-label="Close"
+                  >
+                    <X className="h-5 w-5" strokeWidth={2.75} />
+                  </button>
+                </div>
 
-                <StepDots step={step} />
-                <AnimatePresence mode="wait">
-                  {step === 0 && (
-                    <StepShell key="step-0">
-                      <Step0 onContinue={next} onMaybeLater={onClose} />
+                <div className="no-scrollbar relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain">
+                  <AnimatePresence mode="wait" initial={false}>
+                    <StepShell key={String(view)}>
+                      {view === 0 && (
+                        <WhyPlusStep
+                          showHero={!isDesktop}
+                          ready={sheetReady}
+                          onCompare={() => setView('compare')}
+                        />
+                      )}
+                      {view === 1 && (
+                        <TrialStep
+                          trialDays={trialDays}
+                          reminderDate={reminderDate}
+                          endDate={endDate}
+                        />
+                      )}
+                      {view === 2 && (
+                        <PlanStep plan={plan} onSelect={setPlan} pricing={pricing} pricingFailed={pricingFailed} />
+                      )}
+                      {view === 'compare' && <CompareView />}
                     </StepShell>
+                  </AnimatePresence>
+                </div>
+
+                <div className="relative z-10 shrink-0 px-6 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 md:px-10 md:pb-8">
+                  <span
+                    aria-hidden
+                    className="pointer-events-none absolute inset-x-0 bottom-full h-8 bg-gradient-to-t from-[color:var(--plus-field-deep)] to-transparent"
+                  />
+                  {(view === 0 || view === 'compare') && (
+                    <>
+                      <PrimaryButton onClick={() => goToStep(1)}>
+                        Try Plus free
+                      </PrimaryButton>
+                      <p className="mt-2.5 flex items-center justify-center gap-1.5 text-center text-xs font-bold text-white/70">
+                        <Check className="h-3.5 w-3.5 text-[color:var(--plus-gold)]" strokeWidth={3.5} />
+                        No charge today · Cancel anytime
+                      </p>
+                      {view === 0 && (
+                        <button
+                          type="button"
+                          onClick={onClose}
+                          className="mt-1 h-10 w-full text-center text-sm font-bold text-white/60 transition-colors hover:text-white"
+                        >
+                          Not now
+                        </button>
+                      )}
+                    </>
                   )}
-                  {step === 1 && (
-                    <StepShell key="step-1">
-                      <Step1 onContinue={next} />
-                    </StepShell>
+                  {view === 1 && (
+                    <PrimaryButton onClick={() => goToStep(2)}>Continue</PrimaryButton>
                   )}
-                  {step === 2 && (
-                    <StepShell key="step-2">
-                      <Step2
-                        reminderDate={trialReminderDate}
-                        onContinue={next}
-                      />
-                    </StepShell>
+                  {view === 2 && (
+                    <PlanFooter
+                      plan={plan}
+                      trialDays={trialDays}
+                      selected={pricing?.[plan]}
+                      busy={purchasing}
+                      error={purchaseError}
+                      onStart={startPurchase}
+                      onRestore={restorePurchases}
+                    />
                   )}
-                  {step === 3 && (
-                    <StepShell key="step-3">
-                      <Step3
-                        plan={plan}
-                        onSelect={setPlan}
-                        onStart={startPurchase}
-                        onRestore={restorePurchases}
-                        busy={purchasing}
-                        error={purchaseError}
-                        pricing={pricing}
-                        pricingFailed={pricingFailed}
-                      />
-                    </StepShell>
-                  )}
-                </AnimatePresence>
+                </div>
               </div>
 
               <AnimatePresence>
@@ -299,9 +398,9 @@ export function PlusUpgradeModal({
                       onClick={(e) => e.stopPropagation()}
                       className="w-full max-w-sm rounded-[28px] bg-white p-6 text-center text-slate-900 shadow-2xl"
                     >
-                      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-violet-100">
+                      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50">
                         <ShieldAlert
-                          className="h-7 w-7 text-violet-600"
+                          className="h-7 w-7 text-[#4f9149]"
                           strokeWidth={2.5}
                         />
                       </div>
@@ -309,15 +408,14 @@ export function PlusUpgradeModal({
                         Save your frog first
                       </h3>
                       <p className="mt-2 text-sm font-medium text-slate-600">
-                        Plus is tied to your account. Create a free account so
-                        your subscription and progress are never lost.
+                        Plus is tied to your account, so create a free one first.
                       </p>
                       <button
                         type="button"
                         onClick={() =>
                           window.location.assign('/login?upgrade=1')
                         }
-                        className="mt-5 h-12 w-full rounded-2xl bg-violet-600 text-sm font-black text-white transition-all hover:brightness-110 active:scale-[0.98]"
+                        className="mt-5 h-12 w-full rounded-2xl bg-[#4f9149] text-[15px] font-black text-white shadow-[0_4px_0_0_#34631f] transition-all hover:brightness-110 active:translate-y-1 active:shadow-none"
                       >
                         Create free account
                       </button>
@@ -475,27 +573,57 @@ export function PlusWelcomeCelebration({ onDone }: { onDone: () => void }) {
   );
 }
 
-function CoverRail() {
+function PlusFrog({
+  ready,
+  width,
+  height,
+}: {
+  ready: boolean;
+  width: number;
+  height: number;
+}) {
+  const { indices: wardrobeIndices } = useWardrobeIndices(true);
+  const indices = React.useMemo(
+    () => ({ ...wardrobeIndices }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      wardrobeIndices.skin,
+      wardrobeIndices.hat,
+      wardrobeIndices.body,
+      wardrobeIndices.hand_item,
+    ],
+  );
+  return (
+    <div className="relative shrink-0" style={{ width, height }}>
+      <div
+        aria-hidden
+        className="absolute inset-y-0 -inset-x-1/4 bg-[radial-gradient(closest-side,rgba(251,191,36,0.26)_0%,rgba(251,191,36,0.08)_55%,transparent_100%)]"
+      />
+      {ready && (
+        <>
+          <Frog width={width} height={height} indices={indices} emote="love" />
+          <PremiumFrogAura show alwaysPlay />
+        </>
+      )}
+    </div>
+  );
+}
+
+function DesktopRail({ ready }: { ready: boolean }) {
   return (
     <aside
       aria-hidden
-      className="relative hidden shrink-0 overflow-hidden md:block md:w-[45%]"
+      className="relative flex w-[42%] shrink-0 flex-col items-center justify-center overflow-hidden bg-[radial-gradient(90%_70%_at_50%_40%,#1d5a3f_0%,#123a2a_55%,#0b271c_100%)]"
     >
-      <AppImage
-        src="/premium-cover.webp"
-        priority
-        className="h-full w-full object-cover object-[52%_32%]"
-      />
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-[linear-gradient(180deg,rgba(24,20,64,0)_0%,rgba(24,20,64,0.55)_100%)]" />
-      <div className="pointer-events-none absolute inset-y-0 right-0 w-40 bg-[linear-gradient(90deg,rgba(var(--plus-field-rgb),0)_0%,rgba(var(--plus-field-rgb),0.04)_28%,rgba(var(--plus-field-rgb),0.16)_44%,rgba(var(--plus-field-rgb),0.38)_58%,rgba(var(--plus-field-rgb),0.62)_70%,rgba(var(--plus-field-rgb),0.82)_80%,rgba(var(--plus-field-rgb),0.95)_89%,rgba(var(--plus-field-rgb),1)_95%,rgba(var(--plus-field-rgb),1)_100%)]" />
-      <div className="absolute inset-x-0 bottom-0 p-8 pr-16">
-        <p className="text-[11px] font-black uppercase tracking-[0.22em] text-amber-300">
+      <PlusFrog ready={ready} width={250} height={282} />
+      <div className="absolute inset-x-0 bottom-0 p-8">
+        <p className="text-[11px] font-black uppercase tracking-[0.22em] text-[color:var(--plus-gold)]">
           Frogress Plus
         </p>
         <p className="mt-1.5 text-lg font-black leading-tight tracking-tight text-white">
-          Same habits.
+          Your backup plan for
           <br />
-          Twice the rewards.
+          habits that stick.
         </p>
       </div>
     </aside>
@@ -506,57 +634,19 @@ function StepShell({ children }: { children: React.ReactNode }) {
   const reduceMotion = useReducedMotion();
   return (
     <motion.div
-      initial={reduceMotion ? { opacity: 0 } : { opacity: 0, x: 32 }}
+      initial={reduceMotion ? { opacity: 0 } : { opacity: 0, x: 24 }}
       animate={{ opacity: 1, x: 0 }}
       exit={
         reduceMotion
           ? { opacity: 0 }
           : {
               opacity: 0,
-              x: -32,
-              transition: { duration: 0.16, ease: 'easeIn' },
+              x: -24,
+              transition: { duration: 0.14, ease: 'easeIn' },
             }
       }
-      transition={{ type: 'spring', stiffness: 380, damping: 34, mass: 0.8 }}
-      className="relative flex min-h-full flex-1 flex-col will-change-transform"
-    >
-      {children}
-    </motion.div>
-  );
-}
-
-// Staggered entrance for a step's content blocks: transform + opacity only,
-// so it stays composited on mobile GPUs.
-function Reveal({
-  children,
-  delay = 0,
-  className,
-  onAnimationComplete,
-}: {
-  children: React.ReactNode;
-  delay?: number;
-  className?: string;
-  onAnimationComplete?: () => void;
-}) {
-  const reduceMotion = useReducedMotion();
-  useEffect(() => {
-    if (reduceMotion) onAnimationComplete?.();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reduceMotion]);
-  if (reduceMotion) return <div className={className}>{children}</div>;
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 18, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{
-        type: 'spring',
-        stiffness: 400,
-        damping: 30,
-        mass: 0.7,
-        delay,
-      }}
-      onAnimationComplete={onAnimationComplete}
-      className={className}
+      transition={{ type: 'spring', stiffness: 400, damping: 36, mass: 0.8 }}
+      className="flex min-h-full flex-col"
     >
       {children}
     </motion.div>
@@ -574,567 +664,394 @@ function PrimaryButton({
 }) {
   const reduceMotion = useReducedMotion();
   return (
-    <motion.button
+    <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      whileTap={{ scale: 0.97 }}
-      transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-      className="group relative isolate h-14 w-full overflow-hidden rounded-2xl text-[17px] font-black tracking-tight text-[color:var(--plus-gold-ink)] shadow-[0_10px_30px_-10px_rgba(251,191,36,0.7)] ring-1 ring-amber-100/70 transition-transform disabled:opacity-60"
+      className="relative isolate flex h-14 w-full select-none items-center justify-center overflow-hidden rounded-2xl bg-[linear-gradient(180deg,#fcd34d_0%,#f59e0b_100%)] text-[17px] font-black tracking-tight text-[color:var(--plus-gold-ink)] shadow-[0_4px_0_0_#b45309] ring-1 ring-inset ring-amber-100/60 transition-all [-webkit-tap-highlight-color:transparent] active:translate-y-1 active:shadow-none disabled:translate-y-0 disabled:opacity-60 [@media(hover:hover)]:hover:brightness-105"
     >
-      <span
-        aria-hidden
-        className="absolute inset-0 -z-10 rounded-2xl bg-[linear-gradient(125deg,#fde68a_0%,#fbbf24_45%,#f59e0b_75%,#d97706_100%)]"
-      />
-      <span
-        aria-hidden
-        className="absolute inset-x-0 top-0 -z-10 h-1/2 rounded-t-2xl bg-gradient-to-b from-white/45 to-transparent"
-      />
-      {!reduceMotion && (
+      {!reduceMotion && !disabled && (
         <motion.span
           aria-hidden
-          className="pointer-events-none absolute inset-y-0 left-0 w-1/3 -skew-x-12 bg-gradient-to-r from-transparent via-white/55 to-transparent will-change-transform"
+          className="pointer-events-none absolute inset-y-0 left-0 -z-10 w-1/3 -skew-x-12 bg-gradient-to-r from-transparent via-white/45 to-transparent will-change-transform"
           initial={{ x: '-150%' }}
           animate={{ x: '450%' }}
           transition={{
             duration: 1.4,
             repeat: Infinity,
-            repeatDelay: 2.6,
+            repeatDelay: 3.6,
             ease: 'easeInOut',
           }}
         />
       )}
-      <span className="relative">{children}</span>
-    </motion.button>
+      {children}
+    </button>
   );
 }
 
-function Step0({
-  onContinue,
-  onMaybeLater,
+function WhyPlusStep({
+  showHero,
+  ready,
+  onCompare,
 }: {
-  onContinue: () => void;
-  onMaybeLater: () => void;
+  showHero: boolean;
+  ready: boolean;
+  onCompare: () => void;
 }) {
-  const reduceMotion = useReducedMotion();
   return (
-    <div className="flex min-h-full flex-col pb-8">
-      <div className="relative -mt-px h-[40vh] min-h-[260px] w-full overflow-hidden md:hidden">
+    <div className="flex flex-1 flex-col items-center px-6 pb-4 text-center md:items-start md:justify-center md:px-10 md:text-left">
+      {showHero && (
+        <div className="flex justify-center pb-1 pt-3">
+          <PlusFrog ready={ready} width={172} height={194} />
+        </div>
+      )}
+      <p className="text-[11px] font-black uppercase tracking-[0.22em] text-[color:var(--plus-gold)]">
+        Frogress Plus
+      </p>
+      <h2 className="mt-2 text-[1.75rem] font-black leading-[1.08] tracking-tight md:text-[2.1rem]">
+        Keep showing up.
+        <br />
+        <span className="text-[color:var(--plus-gold-soft)]">Even on the hard days.</span>
+      </h2>
+      <p className="mt-2.5 max-w-xs text-[15px] font-medium leading-snug text-white/75">
+        Plus gives you the backup to stay consistent until it sticks.
+      </p>
+
+      <ul className="mt-6 w-full max-w-sm space-y-4 text-left">
+        {BENEFITS.map((benefit) => (
+          <li key={benefit.title} className="flex items-center gap-3.5">
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/[0.08] ring-1 ring-inset ring-white/10">
+              <Icon name={benefit.icon} className="h-8 w-8" />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-[15px] font-black leading-tight">{benefit.title}</span>
+              <span className="mt-0.5 block text-[13px] font-medium leading-snug text-white/65">
+                {benefit.body}
+              </span>
+            </span>
+          </li>
+        ))}
+      </ul>
+
+      <button
+        type="button"
+        onClick={onCompare}
+        className="mt-5 inline-flex h-10 items-center gap-1 rounded-full px-3 text-sm font-bold text-white/70 transition-colors hover:text-white md:-ml-3"
+      >
+        See everything in Plus
+        <ChevronRight className="h-4 w-4" strokeWidth={2.75} />
+      </button>
+    </div>
+  );
+}
+
+function TrialStep({
+  trialDays,
+  reminderDate,
+  endDate,
+}: {
+  trialDays: number;
+  reminderDate: string;
+  endDate: string;
+}) {
+  const rows = [
+    {
+      icon: <Sparkle className="h-4 w-4" fill="currentColor" />,
+      title: 'Today',
+      body: 'Everything in Plus unlocks. Nothing to pay.',
+      active: true,
+    },
+    {
+      icon: <Bell className="h-4 w-4" strokeWidth={2.75} />,
+      title: reminderDate,
+      body: 'We remind you your trial is ending.',
+      active: false,
+    },
+    {
+      icon: <Crown className="h-4 w-4" strokeWidth={2.75} />,
+      title: endDate,
+      body: 'Your plan starts. Cancel before and pay nothing.',
+      active: false,
+    },
+  ];
+  return (
+    <div className="flex flex-1 flex-col justify-center px-6 pb-4 md:px-10">
+      <h2 className="text-center text-[1.75rem] font-black leading-[1.08] tracking-tight md:text-left md:text-[2.1rem]">
+        {trialDays} days free.
+        <br />
+        <span className="text-[color:var(--plus-gold-soft)]">No surprises.</span>
+      </h2>
+      <ol className="mx-auto mt-8 w-full max-w-sm md:mx-0">
+        {rows.map((row, i) => (
+          <li key={row.title} className="relative flex gap-4 pb-7 last:pb-0">
+            {i < rows.length - 1 && (
+              <span
+                aria-hidden
+                className={`absolute bottom-0 left-[19px] top-11 w-0.5 rounded-full ${
+                  row.active
+                    ? 'bg-[linear-gradient(180deg,var(--plus-gold),rgba(255,255,255,0.2))]'
+                    : 'bg-white/20'
+                }`}
+              />
+            )}
+            <span
+              className={`relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
+                row.active
+                  ? 'bg-[color:var(--plus-gold)] text-[color:var(--plus-gold-ink)] shadow-[0_0_0_5px_rgba(251,191,36,0.2)]'
+                  : 'bg-white/10 text-white ring-1 ring-inset ring-white/15'
+              }`}
+            >
+              {row.icon}
+            </span>
+            <div className="min-w-0 pt-1">
+              <p className="text-[15px] font-black leading-tight">{row.title}</p>
+              <p className="mt-1 text-[13px] font-medium leading-snug text-white/70">
+                {row.body}
+              </p>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+function PlanStep({
+  plan,
+  onSelect,
+  pricing,
+  pricingFailed,
+}: {
+  plan: PlanId;
+  onSelect: (p: PlanId) => void;
+  pricing: Partial<Record<PlanId, PlusPriceInfo>> | null;
+  pricingFailed: boolean;
+}) {
+  const yearly = pricing?.yearly;
+  const monthly = pricing?.monthly;
+  const yearlyCompareAt =
+    yearly && monthly && monthly.currency === yearly.currency
+      ? monthly.amount * 12
+      : null;
+  const placeholder = pricingFailed ? 'See price at checkout' : '—';
+  const reduceMotion = useReducedMotion();
+
+  return (
+    <div className="flex flex-1 flex-col justify-center px-6 pb-4 md:px-10">
+      <div className="relative mx-auto mb-4 flex h-32 w-40 items-center justify-center md:mx-0 md:-ml-4 md:h-28 md:w-32">
+        <div
+          aria-hidden
+          className="absolute inset-0 bg-[radial-gradient(closest-side,rgba(251,191,36,0.3)_0%,rgba(251,191,36,0.08)_55%,transparent_100%)]"
+        />
         <motion.div
-          className="h-full w-full will-change-transform"
-          initial={reduceMotion ? undefined : { scale: 1.08 }}
-          animate={reduceMotion ? undefined : { scale: 1 }}
-          transition={{ duration: 1.4, ease: [0.22, 1, 0.36, 1] }}
+          className="relative will-change-transform"
+          animate={
+            reduceMotion
+              ? undefined
+              : { y: [0, -6, 0], rotate: [0, -2, 0, 2, 0] }
+          }
+          transition={{ duration: 4.2, repeat: Infinity, ease: 'easeInOut' }}
         >
-          <AppImage
-            src="/premium-cover.webp"
-            priority
-            className="h-full w-full object-cover object-top"
+          <Icon
+            name="frogPlus"
+            className="h-28 w-28 drop-shadow-[0_5px_0_rgba(0,0,0,0.3)] md:h-24 md:w-24"
           />
         </motion.div>
-        <div className="pointer-events-none absolute -inset-x-px -bottom-px top-0 bg-[linear-gradient(180deg,rgba(var(--plus-field-rgb),0)_0%,rgba(var(--plus-field-rgb),0.03)_30%,rgba(var(--plus-field-rgb),0.12)_45%,rgba(var(--plus-field-rgb),0.30)_57%,rgba(var(--plus-field-rgb),0.52)_67%,rgba(var(--plus-field-rgb),0.72)_76%,rgba(var(--plus-field-rgb),0.88)_84%,rgba(var(--plus-field-rgb),0.97)_91%,rgba(var(--plus-field-rgb),1)_96%,rgba(var(--plus-field-rgb),1)_100%)]" />
       </div>
-      <div className="flex flex-1 flex-col px-6 pb-6 md:justify-center md:px-9 md:pb-9 md:pt-14">
-        <Reveal delay={0.05}>
-          <h2 className="mt-2 text-center text-[1.6rem] font-black leading-[1.1] tracking-tight md:mt-0 md:text-left md:text-[2rem]">
-            Same habits.
-            <br />
-            <span className="text-amber-300">Twice the rewards.</span>
-          </h2>
-        </Reveal>
-        <Reveal delay={0.08}>
-          <p className="mt-2 text-center text-sm font-medium leading-snug text-white/85 md:text-left md:text-[15px]">
-            Plus doubles what your frog earns, so every outfit you want
-            arrives in half the time.
-          </p>
-        </Reveal>
-        <div className="mt-5 space-y-3 rounded-2xl bg-[color:var(--plus-surface)] p-4 ring-1 ring-inset ring-[color:var(--plus-line)] md:mt-6">
-          <Reveal delay={0.12}>
-            <FeatureRow
-              icon={<Icon name="x2" className="h-10 w-10" />}
-              title="Double flies, double gifts"
-              subtitle="Daily quests, Leaps and commitments pay ×2, and every gift box drops two rewards."
-            />
-          </Reveal>
-          <Reveal delay={0.18}>
-            <FeatureRow
-              icon={<Icon name="lilyPad" className="h-10 w-10" />}
-              title="A safety net for rough weeks"
-              subtitle="Hold 3 Lily Pads instead of 2, get one free every month, and move 2 sessions a week."
-            />
-          </Reveal>
-          <Reveal delay={0.24}>
-            <FeatureRow
-              icon={<Icon name="discount" className="h-10 w-10" />}
-              title="Shop without the wait"
-              subtitle="Reroll daily deals with no ads and wishlist up to 10 outfits instead of 4."
-            />
-          </Reveal>
-        </div>
-
-        <Reveal delay={0.38} className="mt-auto space-y-2 pt-6 md:mt-0 md:pt-7">
-          <p className="flex items-center justify-center gap-1.5 text-center text-[13px] font-black text-amber-200">
-            <Check className="h-4 w-4" strokeWidth={3} />
-            7 days free · No charge today · Cancel anytime
-          </p>
-          <PrimaryButton onClick={onContinue}>Try Plus for free</PrimaryButton>
-          <p className="flex items-center justify-center gap-1.5 text-center text-xs font-semibold text-white/75">
-            <Heart className="h-3.5 w-3.5 text-rose-300" fill="currentColor" />
-            Made by a tiny indie team. Plus keeps the pond alive.
-          </p>
-          <button
-            type="button"
-            onClick={onMaybeLater}
-            className="h-10 w-full text-center text-sm font-bold text-white/70 transition-colors hover:text-white"
-          >
-            Not now
-          </button>
-        </Reveal>
-      </div>
-    </div>
-  );
-}
-
-function FeatureRow({
-  icon,
-  title,
-  subtitle,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  subtitle: string;
-}) {
-  return (
-    <div className="flex items-start gap-3">
-      <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-[linear-gradient(150deg,#fffbeb_0%,#fef3c7_55%,#fde68a_100%)] shadow-[0_6px_16px_-6px_rgba(20,10,80,0.55),inset_0_-3px_0_rgba(217,119,6,0.18)] ring-1 ring-inset ring-white/70">
-        <span
-          aria-hidden
-          className="pointer-events-none absolute inset-x-1 top-1 h-1/3 rounded-t-xl bg-white/60"
+      <h2 className="text-center text-[1.75rem] font-black leading-[1.08] tracking-tight md:text-left md:text-[2.1rem]">
+        Choose your plan
+      </h2>
+      <p className="mt-2 text-center text-[15px] font-medium text-white/70 md:text-left">
+        Nothing is charged today.
+      </p>
+      <div className="mt-7 space-y-3">
+        <PlanCard
+          id="yearly"
+          selected={plan === 'yearly'}
+          onSelect={onSelect}
+          badge={PLAN_DETAILS.yearly.badge}
+          title={PLAN_DETAILS.yearly.title}
+          price={
+            <>
+              {yearly?.pricePerMonthString
+                ? `${yearly.pricePerMonthString}/month`
+                : (yearly?.priceString ?? placeholder)}
+            </>
+          }
+          detail={
+            yearly ? (
+              <>
+                {yearly.priceString} a year
+                {yearlyCompareAt !== null && yearlyCompareAt > yearly.amount && (
+                  <span className="ml-1.5 line-through opacity-60">
+                    {formatPlusPrice(yearlyCompareAt, yearly.currency)}
+                  </span>
+                )}
+                {' · '}
+                {PLAN_DETAILS.yearly.trialDays} days free
+              </>
+            ) : (
+              PLAN_DETAILS.yearly.subtitle
+            )
+          }
         />
-        <span className="relative">{icon}</span>
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-black leading-tight">{title}</p>
-        <p className="mt-0.5 text-xs font-medium text-white/85">{subtitle}</p>
+        <PlanCard
+          id="monthly"
+          selected={plan === 'monthly'}
+          onSelect={onSelect}
+          title={PLAN_DETAILS.monthly.title}
+          price={monthly ? `${monthly.priceString}/month` : placeholder}
+          detail={`${PLAN_DETAILS.monthly.trialDays} days free, then billed monthly`}
+        />
       </div>
     </div>
   );
 }
 
-/**
- * One row per thing that actually differs, with both sides stated.
- *
- * Values are kept to a word or a number: the columns are narrow enough that
- * anything longer wraps mid-phrase and the table stops scanning as a table.
- * `null` in a column means "nothing at all" on Free and a tick on Plus — the
- * shape reserved for what Plus adds outright rather than raises.
- */
+function PlanFooter({
+  plan,
+  trialDays,
+  selected,
+  busy,
+  error,
+  onStart,
+  onRestore,
+}: {
+  plan: PlanId;
+  trialDays: number;
+  selected: PlusPriceInfo | undefined;
+  busy: boolean;
+  error: string | null;
+  onStart: () => void | Promise<void>;
+  onRestore: () => void | Promise<void>;
+}) {
+  const isNative = Capacitor.isNativePlatform();
+  const isIos = Capacitor.getPlatform() === 'ios';
+  const termsUrl = isIos ? APPLE_EULA_URL : TERMS_URL;
+  const termsLabel = isIos ? 'Terms of Use (EULA)' : 'Terms';
+  const period = plan === 'yearly' ? 'year' : 'month';
+  return (
+    <div className="space-y-2.5 text-center">
+      {error && (
+        <p className="text-xs font-bold text-rose-200" role="alert">
+          {error}
+        </p>
+      )}
+      <PrimaryButton onClick={onStart} disabled={busy}>
+        {busy ? 'Processing…' : `Start my ${trialDays}-day free trial`}
+      </PrimaryButton>
+      <p className="text-[11px] font-medium leading-relaxed text-white/60">
+        {trialDays} days free, then{' '}
+        {selected ? selected.priceString : 'the price shown at checkout'}/{period}.
+        Renews automatically until you cancel.{' '}
+        <a
+          href={termsUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="underline underline-offset-2 hover:text-white"
+        >
+          {termsLabel}
+        </a>
+        {' · '}
+        <a
+          href={PRIVACY_URL}
+          target="_blank"
+          rel="noreferrer"
+          className="underline underline-offset-2 hover:text-white"
+        >
+          Privacy
+        </a>
+      </p>
+      {isNative && (
+        <button
+          type="button"
+          onClick={onRestore}
+          disabled={busy}
+          className="h-8 w-full text-center text-xs font-bold text-white/60 transition-colors hover:text-white disabled:opacity-60"
+        >
+          Restore purchases
+        </button>
+      )}
+    </div>
+  );
+}
+
 const COMPARISON_ROWS: {
   label: string;
   free: string | null;
   plus: string | null;
 }[] = [
+  { label: 'Lily Pads held', free: '2', plus: '3' },
+  { label: 'Free Lily Pad monthly', free: null, plus: null },
+  { label: 'Leap session moves a week', free: '1', plus: '2' },
   { label: 'Flies from every quest', free: '×1', plus: '×2' },
   { label: 'Rewards per gift box', free: '1', plus: '2' },
-  // Defaults; both caps are admin-tunable under Shields.
-  { label: 'Lily Pads held', free: '2', plus: '3' },
-  { label: 'Session moves a week', free: '1', plus: '2' },
-  { label: 'Wishlist slots', free: '4', plus: '10' },
   {
     label: 'Tags',
     free: String(FREE_TAG_LIMIT),
     plus: String(PREMIUM_TAG_LIMIT),
   },
+  { label: 'Wishlist slots', free: '4', plus: '10' },
   {
     label: 'Saved looks',
     free: String(SAVED_LOOKS_FREE),
     plus: String(SAVED_LOOKS_PLUS),
   },
   { label: 'Season Plus track', free: null, plus: null },
+  { label: 'Golden fly companion', free: null, plus: null },
 ];
 
-/** The Plus-only extras, as one line rather than five more rows. */
-const PLUS_ONLY =
-  'Also included: a free Lily Pad every month, a golden fly companion for your frog, free trade rerolls, a mid-week area change, and ad-free deal rerolls.';
-
-function Step1({ onContinue }: { onContinue: () => void }) {
+function CompareView() {
   return (
-    <div className="flex min-h-full flex-col px-6 pb-6 pt-[calc(4rem+env(safe-area-inset-top))] md:px-9 md:pb-8 md:pt-12">
-      <Reveal>
-        <h2 className="text-center text-2xl font-black tracking-tight">
-          Free vs <span className="text-amber-300">Plus</span>
-        </h2>
-        <p className="mt-1.5 text-center text-sm font-medium text-white/80">
-          Everything Plus adds, side by side.
-        </p>
-      </Reveal>
-
-      <Reveal delay={0.1} className="relative mt-8">
-        {/* PLUS column highlight */}
-        <div className="pointer-events-none absolute -right-3 -top-3 -bottom-3 w-[6.25rem] overflow-hidden rounded-2xl bg-[color:var(--plus-surface-strong)] ring-1 ring-inset ring-[color:var(--plus-line)]">
-          {/* Three evenly-spaced lanes with staggered timing for a calm, flowing stream */}
-          <FloatingSparkle
-            delay={0.0}
-            left="22%"
-            size={14}
-            duration={3.6}
-            spin={180}
-          />
-          <FloatingSparkle
-            delay={1.2}
-            left="22%"
-            size={20}
-            duration={3.6}
-            spin={180}
-          />
-          <FloatingSparkle
-            delay={2.4}
-            left="22%"
-            size={11}
-            duration={3.6}
-            spin={180}
-          />
-
-          <FloatingSparkle
-            delay={0.6}
-            left="50%"
-            size={18}
-            duration={3.6}
-            spin={180}
-          />
-          <FloatingSparkle
-            delay={1.8}
-            left="50%"
-            size={12}
-            duration={3.6}
-            spin={180}
-          />
-          <FloatingSparkle
-            delay={3.0}
-            left="50%"
-            size={22}
-            duration={3.6}
-            spin={180}
-          />
-
-          <FloatingSparkle
-            delay={0.3}
-            left="78%"
-            size={11}
-            duration={3.6}
-            spin={180}
-          />
-          <FloatingSparkle
-            delay={1.5}
-            left="78%"
-            size={16}
-            duration={3.6}
-            spin={180}
-          />
-          <FloatingSparkle
-            delay={2.7}
-            left="78%"
-            size={13}
-            duration={3.6}
-            spin={180}
-          />
+    <div className="px-6 pb-6 pt-2 md:px-10">
+      <div className="relative">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -bottom-2 -top-2 right-0 w-[4.5rem] rounded-2xl bg-white/[0.08] ring-1 ring-inset ring-[color:var(--plus-gold)]/30"
+        />
+        <div className="relative grid grid-cols-[1fr_3.5rem_4.5rem] items-center pb-2 text-xs font-black uppercase tracking-wider">
+          <span />
+          <span className="text-center text-white/60">Free</span>
+          <span className="text-center text-[color:var(--plus-gold)]">Plus</span>
         </div>
-
-        <div className="relative">
-          <div className="grid grid-cols-[1fr_4rem_5.5rem] items-center pb-3 text-sm font-black">
-            <div />
-            <div className="text-center text-white/90">Free</div>
-            <div className="flex justify-center pl-1.5">
-              <span className="rounded-lg bg-[linear-gradient(125deg,#fde68a_0%,#fbbf24_55%,#f59e0b_100%)] px-2.5 py-1 text-[11px] font-black tracking-wider text-emerald-950">
-                PLUS
-              </span>
-            </div>
+        {COMPARISON_ROWS.map((row, i) => (
+          <div
+            key={row.label}
+            className={`relative grid grid-cols-[1fr_3.5rem_4.5rem] items-center text-sm font-bold ${
+              i < COMPARISON_ROWS.length - 1 ? 'border-b border-white/10' : ''
+            }`}
+          >
+            <span className="py-3 pr-3 leading-tight">{row.label}</span>
+            <span className="py-3 text-center text-white/55">{row.free ?? '—'}</span>
+            <span className="flex justify-center py-3 font-black text-[color:var(--plus-gold-soft)]">
+              {row.plus ?? <Check className="h-5 w-5" strokeWidth={3} />}
+            </span>
           </div>
-          {COMPARISON_ROWS.map((row, i) => (
-            <Reveal key={row.label} delay={0.16 + i * 0.05}>
-              <div className="grid grid-cols-[1fr_4rem_5.5rem] items-stretch text-sm font-bold">
-                <span
-                  className={`flex items-center py-3.5 pr-4 ${
-                    i < COMPARISON_ROWS.length - 1
-                      ? 'border-b border-[color:var(--plus-line)]'
-                      : ''
-                  }`}
-                >
-                  {row.label}
-                </span>
-                <div
-                  className={`flex items-center justify-center whitespace-nowrap py-3.5 text-white/70 ${
-                    i < COMPARISON_ROWS.length - 1
-                      ? 'border-b border-[color:var(--plus-line)]'
-                      : ''
-                  }`}
-                >
-                  {row.free ?? '—'}
-                </div>
-                <div
-                  className={`flex items-center justify-center whitespace-nowrap py-3.5 pl-1.5 font-black text-amber-300 ${
-                    i < COMPARISON_ROWS.length - 1
-                      ? 'border-b border-[color:var(--plus-line)]'
-                      : ''
-                  }`}
-                >
-                  {row.plus ?? <Check className="h-5 w-5 stroke-[3]" />}
-                </div>
-              </div>
-            </Reveal>
-          ))}
-        </div>
-      </Reveal>
-
-      <Reveal delay={0.55}>
-        <p className="mt-6 text-center text-xs font-semibold leading-relaxed text-white/75">
-          {PLUS_ONLY}
-        </p>
-      </Reveal>
-
-      {/* Pinned to the bottom of the scroll area — the comparison list grows as
-          Plus gains perks, and the CTA must never scroll out of reach.
-          -mx-6/px-6 lets the fade span the full panel width. */}
-      <Reveal
-        delay={0.3}
-        className="sticky bottom-0 z-10 -mx-6 -mb-6 mt-auto bg-[linear-gradient(0deg,var(--plus-field-deep)_0%,var(--plus-field-deep)_72%,transparent_100%)] px-6 pb-[max(1rem,env(safe-area-inset-bottom))] pt-10 md:-mx-9 md:-mb-8 md:px-9 md:pb-8"
-      >
-        <PrimaryButton onClick={onContinue}>Continue — 7 days free</PrimaryButton>
-      </Reveal>
-    </div>
-  );
-}
-
-function Step2({
-  reminderDate,
-  onContinue,
-}: {
-  reminderDate: string;
-  onContinue: () => void;
-}) {
-  const [entered, setEntered] = useState(false);
-  const { indices: wardrobeIndices } = useWardrobeIndices(true);
-  const step2Indices = React.useMemo(
-    () => ({ ...wardrobeIndices }),
-    [
-      wardrobeIndices.skin,
-      wardrobeIndices.hat,
-      wardrobeIndices.body,
-      wardrobeIndices.hand_item,
-    ],
-  );
-  const reduceMotion = useReducedMotion();
-  return (
-    <div className="flex min-h-full flex-col px-6 pb-6 pt-[calc(4rem+env(safe-area-inset-top))] md:px-9 md:pb-8 md:pt-12">
-      <Reveal>
-        <h2 className="text-center text-2xl font-black tracking-tight">
-          How your <span className="text-amber-300">free trial</span> works
-        </h2>
-      </Reveal>
-      <Reveal delay={0.08}>
-        <p className="mt-2 text-center text-sm font-medium text-white/85">
-          No surprises. We&apos;ll ping you 2 days before it ends.
-        </p>
-      </Reveal>
-
-      <Reveal
-        delay={0.16}
-        className="mt-6 flex justify-center"
-        onAnimationComplete={() => setEntered(true)}
-      >
-        <motion.div
-          className="relative h-[170px] w-[170px] will-change-transform"
-          animate={reduceMotion ? undefined : { y: [0, -8, 0] }}
-          transition={{ duration: 3.4, repeat: Infinity, ease: 'easeInOut' }}
-        >
-          {entered && (
-            <>
-              <Frog
-                width={170}
-                height={170}
-                indices={step2Indices}
-                emote="love"
-              />
-              <PremiumFrogAura show alwaysPlay />
-            </>
-          )}
-        </motion.div>
-      </Reveal>
-
-      <Reveal delay={0.22}>
-        <TrialTimeline reminderDate={reminderDate} />
-      </Reveal>
-
-      <Reveal delay={0.3} className="mt-auto pt-8">
-        <PrimaryButton onClick={onContinue}>Continue</PrimaryButton>
-      </Reveal>
-    </div>
-  );
-}
-
-function Step3({
-  plan,
-  onSelect,
-  onStart,
-  onRestore,
-  busy,
-  error,
-  pricing,
-  pricingFailed,
-}: {
-  plan: PlanId;
-  onSelect: (p: PlanId) => void;
-  onStart: () => void | Promise<void>;
-  onRestore: () => void | Promise<void>;
-  busy: boolean;
-  error: string | null;
-  pricing: Partial<Record<PlanId, PlusPriceInfo>> | null;
-  pricingFailed: boolean;
-}) {
-  const reduceMotion = useReducedMotion();
-  const isNative = Capacitor.isNativePlatform();
-  const isIos = Capacitor.getPlatform() === 'ios';
-  const termsUrl = isIos ? APPLE_EULA_URL : TERMS_URL;
-  const termsLabel = isIos ? 'Terms of Use (EULA)' : 'Terms of Service';
-  const yearly = pricing?.yearly;
-  const monthly = pricing?.monthly;
-
-  const yearlyCompareAt =
-    yearly && monthly && monthly.currency === yearly.currency
-      ? monthly.amount * 12
-      : null;
-
-  const placeholder = pricingFailed ? 'See price at checkout' : '—';
-
-  const selected = pricing?.[plan];
-  const trialDays = PLAN_DETAILS[plan].trialDays;
-  const period = plan === 'yearly' ? 'year' : 'month';
-  return (
-    <div className="flex min-h-full flex-col px-6 pb-6 pt-[calc(4rem+env(safe-area-inset-top))] md:px-9 md:pb-8 md:pt-12">
-      <Reveal>
-        <h2 className="text-2xl font-black tracking-tight">
-          Pick your plan
-        </h2>
-        <p className="mt-1.5 text-sm font-medium text-white/80">
-          Nothing is charged until your free trial ends.
-        </p>
-      </Reveal>
-
-      <div className="mt-6 space-y-3">
-        <Reveal delay={0.08}>
-          <PlanCard
-            id="yearly"
-            selected={plan === 'yearly'}
-            onSelect={onSelect}
-            badge={PLAN_DETAILS.yearly.badge}
-            title={PLAN_DETAILS.yearly.title}
-            price={
-              <>
-                {yearly?.priceString ?? placeholder}
-                {yearly &&
-                  yearlyCompareAt !== null &&
-                  yearlyCompareAt > yearly.amount && (
-                    <span className="ml-1.5 line-through opacity-60">
-                      {formatPlusPrice(yearlyCompareAt, yearly.currency)}
-                    </span>
-                  )}
-                {yearly?.pricePerMonthString && (
-                  <span className="ml-1.5">
-                    ({yearly.pricePerMonthString}/month)
-                  </span>
-                )}
-              </>
-            }
-            subtitle={PLAN_DETAILS.yearly.subtitle}
-          />
-        </Reveal>
-        <Reveal delay={0.14}>
-          <PlanCard
-            id="monthly"
-            selected={plan === 'monthly'}
-            onSelect={onSelect}
-            title={PLAN_DETAILS.monthly.title}
-            price={monthly ? `${monthly.priceString} every month` : placeholder}
-            subtitle={PLAN_DETAILS.monthly.subtitle}
-          />
-        </Reveal>
+        ))}
       </div>
-
-      <Reveal delay={0.2} className="flex flex-1 items-center justify-center">
-        <motion.div
-          className="will-change-transform"
-          animate={
-            reduceMotion
-              ? undefined
-              : { y: [0, -7, 0], rotate: [0, -2, 0, 2, 0] }
-          }
-          transition={{ duration: 4.2, repeat: Infinity, ease: 'easeInOut' }}
-        >
-          <Icon
-            name="frogPlus"
-            className="h-44 w-44 drop-shadow-[0_5px_0_rgba(0,0,0,0.3)] md:h-28 md:w-28"
-          />
-        </motion.div>
-      </Reveal>
-
-      <Reveal delay={0.26} className="mt-auto space-y-2 pt-6 text-center">
-        {error && (
-          <p className="text-xs font-bold text-rose-200" role="alert">
-            {error}
-          </p>
-        )}
-        <p className="text-[11px] font-medium leading-relaxed text-white/85">
-          {trialDays} days free, then{' '}
-          {selected ? selected.priceString : 'the price shown at checkout'} per{' '}
-          {period}. It renews automatically until you cancel, and you can cancel
-          any time before the trial ends.
-        </p>
-        <p className="text-[11px] font-medium text-white/70">
-          <a
-            href={termsUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="underline underline-offset-2 hover:text-white"
-          >
-            {termsLabel}
-          </a>
-          <span className="px-1.5 opacity-60">·</span>
-          <a
-            href={PRIVACY_URL}
-            target="_blank"
-            rel="noreferrer"
-            className="underline underline-offset-2 hover:text-white"
-          >
-            Privacy Policy
-          </a>
-        </p>
-        <PrimaryButton onClick={onStart} disabled={busy}>
-          {busy ? 'Processing…' : `Try free for ${trialDays} days`}
-        </PrimaryButton>
-        {isNative && (
-          <button
-            type="button"
-            onClick={onRestore}
-            disabled={busy}
-            className="h-9 w-full text-center text-xs font-bold text-white/70 transition-colors hover:text-white disabled:opacity-60"
-          >
-            Restore purchases
-          </button>
-        )}
-      </Reveal>
+      <p className="mt-5 text-center text-xs font-semibold leading-relaxed text-white/60">
+        Also: free trade rerolls, a mid-week area change and ad-free deal rerolls.
+      </p>
     </div>
   );
 }
 
 function StepDots({ step }: { step: Step }) {
   return (
-    <div className="pointer-events-none absolute left-1/2 top-[calc(1.75rem+env(safe-area-inset-top))] z-20 flex -translate-x-1/2 gap-1.5 md:top-7">
-      {[0, 1, 2, 3].map((i) => (
+    <div
+      role="progressbar"
+      aria-label="Plus upgrade progress"
+      aria-valuemin={1}
+      aria-valuemax={STEP_COUNT}
+      aria-valuenow={step + 1}
+      className="flex gap-1.5"
+    >
+      {Array.from({ length: STEP_COUNT }, (_, i) => (
         <span
           key={i}
           className={`h-1.5 rounded-full transition-all duration-300 ${
             i === step
-              ? 'w-5 bg-[color:var(--plus-gold)]'
+              ? 'w-6 bg-[color:var(--plus-gold)]'
               : i < step
                 ? 'w-1.5 bg-white/70'
                 : 'w-1.5 bg-white/25'
@@ -1145,109 +1062,6 @@ function StepDots({ step }: { step: Step }) {
   );
 }
 
-function TrialTimeline({ reminderDate }: { reminderDate: string }) {
-  const endDate = (() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 7);
-    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-  })();
-  const rows = [
-    {
-      icon: <Sparkle className="h-4 w-4" fill="currentColor" />,
-      title: 'Today',
-      body: 'Double flies, extra Lily Pads and your golden fly unlock. $0 due.',
-      active: true,
-    },
-    {
-      icon: <Bell className="h-4 w-4" strokeWidth={2.75} />,
-      title: `${reminderDate} · Reminder`,
-      body: 'A heads-up that your trial ends in 2 days.',
-      active: false,
-    },
-    {
-      icon: <Crown className="h-4 w-4" strokeWidth={2.75} />,
-      title: `${endDate} · Trial ends`,
-      body: 'Your plan begins. Cancel before this and you pay nothing.',
-      active: false,
-    },
-  ];
-  return (
-    <ol className="relative mx-auto mt-6 w-full max-w-sm">
-      {rows.map((row, i) => (
-        <li key={row.title} className="relative flex gap-3.5 pb-5 last:pb-0">
-          {i < rows.length - 1 && (
-            <span
-              aria-hidden
-              className={`absolute bottom-1 left-[17px] top-11 w-0.5 rounded-full ${
-                row.active
-                  ? 'bg-[linear-gradient(180deg,var(--plus-gold),rgba(255,255,255,0.3))]'
-                  : 'bg-white/25'
-              }`}
-            />
-          )}
-          <span
-            className={`relative z-10 flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
-              row.active
-                ? 'bg-[color:var(--plus-gold)] text-[color:var(--plus-gold-ink)] shadow-[0_0_0_4px_rgba(251,191,36,0.25)]'
-                : 'bg-[color:var(--plus-surface-strong)] text-white ring-1 ring-inset ring-[color:var(--plus-line)]'
-            }`}
-          >
-            {row.icon}
-          </span>
-          <div className="min-w-0 pt-0.5">
-            <p className="text-sm font-black leading-tight">{row.title}</p>
-            <p className="mt-0.5 text-[13px] font-medium leading-snug text-white/80">
-              {row.body}
-            </p>
-          </div>
-        </li>
-      ))}
-    </ol>
-  );
-}
-
-function FloatingSparkle({
-  delay,
-  left,
-  size,
-  duration,
-  spin,
-}: {
-  delay: number;
-  left: string;
-  size: number;
-  duration: number;
-  spin: number;
-}) {
-  const reduceMotion = useReducedMotion();
-  if (reduceMotion) return null;
-  return (
-    <motion.div
-      className="pointer-events-none absolute"
-      style={{ left }}
-      initial={{ bottom: '-6%', opacity: 0, rotate: 0 }}
-      animate={{
-        bottom: '102%',
-        opacity: [0, 1, 1, 0],
-        rotate: spin,
-      }}
-      transition={{
-        duration,
-        delay,
-        repeat: Infinity,
-        ease: 'linear',
-        times: [0, 0.15, 0.8, 1],
-      }}
-    >
-      <Sparkle
-        style={{ width: size, height: size }}
-        className="text-white/80"
-        fill="currentColor"
-      />
-    </motion.div>
-  );
-}
-
 function PlanCard({
   id,
   selected,
@@ -1255,7 +1069,7 @@ function PlanCard({
   badge,
   title,
   price,
-  subtitle,
+  detail,
 }: {
   id: PlanId;
   selected: boolean;
@@ -1263,42 +1077,42 @@ function PlanCard({
   badge?: string;
   title: string;
   price: React.ReactNode;
-  subtitle: string;
+  detail: React.ReactNode;
 }) {
   return (
-    <motion.button
+    <button
       type="button"
+      role="radio"
+      aria-checked={selected}
       onClick={() => onSelect(id)}
-      whileTap={{ scale: 0.98 }}
-      animate={{ scale: selected ? 1.02 : 1 }}
-      transition={{ type: 'spring', stiffness: 480, damping: 26 }}
-      className={`relative w-full rounded-2xl px-5 py-4 text-left transition-colors will-change-transform ${
+      className={`relative flex w-full items-center gap-4 rounded-2xl px-4 py-4 text-left transition-all [-webkit-tap-highlight-color:transparent] active:scale-[0.99] ${
         selected
-          ? 'bg-[color:var(--plus-surface-strong)] ring-2 ring-[color:var(--plus-gold)]'
-          : 'bg-[color:var(--plus-surface)] ring-1 ring-[color:var(--plus-line)]'
+          ? 'bg-white/[0.12] ring-2 ring-[color:var(--plus-gold)]'
+          : 'bg-white/[0.05] ring-1 ring-white/15 hover:bg-white/[0.08]'
       }`}
     >
-      {badge && (
-        <span className="absolute right-4 top-4 rounded-md bg-[linear-gradient(125deg,#fde68a_0%,#fbbf24_55%,#f59e0b_100%)] px-2 py-0.5 text-[10px] font-black tracking-wider text-emerald-950">
-          {badge}
+      <span
+        aria-hidden
+        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full transition-colors ${
+          selected
+            ? 'bg-[color:var(--plus-gold)] text-[color:var(--plus-gold-ink)]'
+            : 'ring-2 ring-inset ring-white/35'
+        }`}
+      >
+        {selected && <Check className="h-4 w-4" strokeWidth={3.5} />}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-2">
+          <span className="text-base font-black tracking-tight">{title}</span>
+          {badge && (
+            <span className="rounded-md bg-[color:var(--plus-gold)] px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-[color:var(--plus-gold-ink)]">
+              {badge}
+            </span>
+          )}
         </span>
-      )}
-      <p className="text-lg font-black tracking-tight">{title}</p>
-      <p className="mt-1 text-sm font-bold text-white/90">{price}</p>
-      <p className="mt-0.5 text-xs font-medium text-white/75">{subtitle}</p>
-      <AnimatePresence>
-        {selected && (
-          <motion.span
-            initial={{ opacity: 0, scale: 0.4 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.4 }}
-            transition={{ type: 'spring', stiffness: 520, damping: 24 }}
-            className={`absolute ${badge ? 'right-4 top-11' : 'right-4 top-4'} flex h-6 w-6 items-center justify-center rounded-full bg-[color:var(--plus-gold)] text-[color:var(--plus-gold-ink)]`}
-          >
-            <Check className="h-4 w-4 stroke-[3.5]" />
-          </motion.span>
-        )}
-      </AnimatePresence>
-    </motion.button>
+        <span className="mt-0.5 block text-xs font-medium text-white/65">{detail}</span>
+      </span>
+      <span className="shrink-0 text-right text-[15px] font-black tracking-tight">{price}</span>
+    </button>
   );
 }

@@ -83,6 +83,10 @@ export function primeCatchSounds() {
 
 const semitone = (n: number) => Math.pow(2, n / 12);
 
+const COMBO_SCALE = [0, 2, 4, 7, 9, 12, 14, 16];
+const comboPitch = (combo: number) =>
+  semitone(COMBO_SCALE[Math.max(0, Math.min(combo, COMBO_SCALE.length - 1))]);
+
 function getNoise(ctx: AudioContext): AudioBuffer {
   if (noiseBuffer) return noiseBuffer;
   const len = Math.floor(ctx.sampleRate * 0.1);
@@ -125,7 +129,7 @@ export function playPop(combo = 0) {
     const ctx = getCtx();
     if (!ctx) return;
     const now = ctx.currentTime;
-    const pitch = semitone(Math.min(combo, 4) * 2);
+    const pitch = comboPitch(combo);
 
     const osc = ctx.createOscillator();
     osc.type = 'sine';
@@ -161,7 +165,7 @@ export function playGulp(combo = 0, golden = false) {
     const ctx = getCtx();
     if (!ctx) return;
     const now = ctx.currentTime;
-    const pitch = semitone(Math.min(combo, 4) * 2);
+    const pitch = comboPitch(Math.min(combo, 2));
 
     if (gulpBuffer) {
       const src = ctx.createBufferSource();
@@ -204,6 +208,34 @@ export function playGulp(combo = 0, golden = false) {
         osc.start(now + offset);
         osc.stop(now + offset + 0.25);
       }
+    }
+  } catch {
+    // ignore
+  }
+}
+
+export function playComboChime(combo: number) {
+  if (!catchSoundsEnabled() || combo < 1) return;
+  try {
+    const ctx = getCtx();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const base = 880 * comboPitch(combo);
+    const notes: Array<[number, number]> = [
+      [base, 0],
+      [base * semitone(7), 0.07],
+    ];
+    for (const [freq, offset] of notes) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, now + offset);
+      gain.gain.setValueAtTime(0.001, now + offset);
+      gain.gain.exponentialRampToValueAtTime(0.09, now + offset + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + offset + 0.18);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(now + offset);
+      osc.stop(now + offset + 0.2);
     }
   } catch {
     // ignore

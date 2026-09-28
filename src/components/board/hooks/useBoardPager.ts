@@ -60,12 +60,14 @@ export function useBoardPager({
   enabled,
   isCardDragging,
   onSettled,
+  onWrite,
 }: {
   scrollerRef: React.RefObject<HTMLDivElement | null>;
   trackRef: React.RefObject<HTMLDivElement | null>;
   enabled: boolean;
   isCardDragging: () => boolean;
   onSettled?: (index: number) => void;
+  onWrite?: () => void;
 }) {
   const enabledRef = useRef(enabled);
   enabledRef.current = enabled;
@@ -73,6 +75,8 @@ export function useBoardPager({
   isCardDraggingRef.current = isCardDragging;
   const onSettledRef = useRef(onSettled);
   onSettledRef.current = onSettled;
+  const onWriteRef = useRef(onWrite);
+  onWriteRef.current = onWrite;
 
   const scrollAnim = useRef<Anim | null>(null);
   const bandAnim = useRef<Anim | null>(null);
@@ -169,6 +173,11 @@ export function useBoardPager({
   const scheduleDepth = useCallback(() => {
     if (depthFrame.current) return;
     depthFrame.current = requestAnimationFrame(applyDepth);
+  }, [applyDepth]);
+  const afterWrite = useCallback(() => {
+    if (depthFrame.current) cancelAnimationFrame(depthFrame.current);
+    applyDepth();
+    onWriteRef.current?.();
   }, [applyDepth]);
 
   const setBand = useCallback(
@@ -278,6 +287,7 @@ export function useBoardPager({
         target: () => positionFor(findCol(), m),
         write: (v) => {
           s.scrollLeft = v;
+          afterWrite();
         },
         read: () => s.scrollLeft,
         spring: prefersReducedMotion() ? REDUCED_SPRING : PAGE_SPRING,
@@ -293,7 +303,7 @@ export function useBoardPager({
       });
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [scrollerRef, columns, positionFor, runSpring],
+    [scrollerRef, columns, positionFor, runSpring, afterWrite],
   );
 
   const currentIndex = useCallback(
@@ -327,6 +337,11 @@ export function useBoardPager({
       animateToIndex(nearestIndex(projected), velocity);
     },
     [scrollerRef, animateToIndex, nearestIndex],
+  );
+
+  const isBusy = useCallback(
+    () => gestureRef.current?.state === "dragging" || !!scrollAnim.current,
+    [],
   );
 
   const stop = useCallback(() => {
@@ -416,6 +431,7 @@ export function useBoardPager({
       const clamped = Math.min(Math.max(0, raw), max);
       s.scrollLeft = clamped;
       g.lastWritten = s.scrollLeft;
+      afterWrite();
       setBand(-rubberBand(raw - clamped, s.clientWidth));
       g.samples.push({ t: performance.now(), x: e.clientX });
       if (g.samples.length > 12) g.samples.shift();
@@ -497,6 +513,7 @@ export function useBoardPager({
     settle,
     settleBand,
     setBand,
+    afterWrite,
   ]);
 
   useEffect(() => {
@@ -559,6 +576,7 @@ export function useBoardPager({
       }
       if (scrollAnim.current) stop();
       s.scrollLeft += e.deltaY;
+      afterWrite();
       scheduleIdleSettle();
     };
 
@@ -567,7 +585,7 @@ export function useBoardPager({
       s.removeEventListener("wheel", onWheel);
       if (wheelIdleRef.current) window.clearTimeout(wheelIdleRef.current);
     };
-  }, [scrollerRef, animateToIndex, nearestIndex, settle, stop]);
+  }, [scrollerRef, animateToIndex, nearestIndex, settle, stop, afterWrite]);
 
   useEffect(() => {
     const s = scrollerRef.current;
@@ -599,6 +617,7 @@ export function useBoardPager({
     settle,
     stop,
     currentIndex,
+    isBusy,
     refreshDepth: scheduleDepth,
   };
 }

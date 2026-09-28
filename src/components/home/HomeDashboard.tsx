@@ -617,13 +617,13 @@ export default function HomeDashboard() {
   };
 
   const handleToggle = async (taskId: string, explicitCompleted?: boolean) => {
-    if (cinematic || grab) return;
     const task = data.find((t) => t.id === taskId);
     if (!task) return;
     const completed =
       explicitCompleted !== undefined ? explicitCompleted : !task.completed;
 
     if (!completed) {
+      if (cinematic || grab) return;
       if (user) {
         await toggleTask(taskId, false);
         await mutateQuests();
@@ -672,10 +672,15 @@ export default function HomeDashboard() {
       frogStopTimer();
     }
 
+    if (useSheetStore.getState().count > 0) {
+      await waitForSheetsClosed();
+    }
+
     await triggerTongue({
       key: taskId,
       completed,
       allowGolden: true,
+      queueIfBusy: true,
       onPersist: async () => {
         if (user) {
           await toggleTask(taskId, true);
@@ -1437,6 +1442,23 @@ export default function HomeDashboard() {
 /* ------------------------------------------------------------------ */
 /*  Cinematic overlay: full-screen tap blocker + skip indicator       */
 /* ------------------------------------------------------------------ */
+function waitForSheetsClosed() {
+  return new Promise<void>((resolve) => {
+    const startedAt = performance.now();
+    const check = () => {
+      if (
+        useSheetStore.getState().count === 0 ||
+        performance.now() - startedAt > 1500
+      ) {
+        window.setTimeout(resolve, 240);
+        return;
+      }
+      requestAnimationFrame(check);
+    };
+    requestAnimationFrame(check);
+  });
+}
+
 function CinematicOverlay({ onSkip }: Readonly<{ onSkip: () => void }>) {
   const [active, setActive] = React.useState(false);
   const [portalTarget, setPortalTarget] = React.useState<HTMLElement | null>(null);
@@ -1453,6 +1475,23 @@ function CinematicOverlay({ onSkip }: Readonly<{ onSkip: () => void }>) {
     onSkip();
   }, [active, onSkip]);
 
+  const handlePointerDown = React.useCallback(
+    (e: React.PointerEvent<HTMLButtonElement>) => {
+      const target = document
+        .elementsFromPoint(e.clientX, e.clientY)
+        .find(
+          (el): el is HTMLElement =>
+            el instanceof HTMLElement && el.hasAttribute('data-completion-target'),
+        );
+      if (target) {
+        target.click();
+        return;
+      }
+      handleSkip();
+    },
+    [handleSkip],
+  );
+
   return (
     <>
       {/* Invisible full-screen tap target */}
@@ -1460,8 +1499,7 @@ function CinematicOverlay({ onSkip }: Readonly<{ onSkip: () => void }>) {
         type="button"
         aria-label="Tap anywhere to fast-forward tongue animation"
         className="fixed inset-0 z-[55] cursor-default bg-transparent"
-        onClick={handleSkip}
-        onTouchStart={handleSkip}
+        onPointerDown={handlePointerDown}
       />
 
       {portalTarget &&

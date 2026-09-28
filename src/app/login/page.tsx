@@ -66,6 +66,7 @@ const slide = {
   exit: (dir: number) => ({ x: dir * -50, opacity: 0 }),
 };
 
+const PASSWORD_LOGIN_ENABLED = false;
 const EMAIL_LINK_STORAGE_KEY = 'emailForSignIn';
 const POST_LOGIN_ROUTE_KEY = 'frogress.post-login-route';
 
@@ -612,15 +613,17 @@ function LoginPageInner() {
                       </>
                     )}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setUsePassword((value) => !value)}
-                    className="mx-auto block text-xs font-bold tracking-wide text-primary hover:underline"
-                  >
-                    {usePassword
-                      ? 'Email me a sign-in link instead'
-                      : 'Use a password instead'}
-                  </button>
+                  {PASSWORD_LOGIN_ENABLED && (
+                    <button
+                      type="button"
+                      onClick={() => setUsePassword((value) => !value)}
+                      className="mx-auto block text-xs font-bold tracking-wide text-primary hover:underline"
+                    >
+                      {usePassword
+                        ? 'Email me a sign-in link instead'
+                        : 'Use a password instead'}
+                    </button>
+                  )}
                 </form>
               </motion.div>
             )}

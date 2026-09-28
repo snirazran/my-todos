@@ -25,7 +25,8 @@ import {
 import { TimeTag } from '@/components/ui/TimeTag';
 import { OnboardingFrogHeader, ONBOARDING_BODY_CLASS } from './OnboardingFrogHeader';
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
-import { hapticGrab, hapticTick } from '@/lib/haptics';
+import { hapticGrab, hapticSelect, hapticTick } from '@/lib/haptics';
+import { OnboardingButton, OnboardingFooter } from './OnboardingFooter';
 
 type PlanResponse = {
   isActive?: boolean;
@@ -158,6 +159,7 @@ export default function StarterPlanStep({
   );
 
   const toggle = (id: string) => {
+    hapticSelect();
     setChecked((prev) => {
       const current = prev ?? [];
       return current.includes(id)
@@ -445,39 +447,18 @@ export default function StarterPlanStep({
 
       <div className="flex-1" />
 
-      <div className="sticky bottom-0 z-30 mt-2 flex flex-col items-center gap-2 bg-background pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-3">
-        <span
-          aria-hidden
-          className="pointer-events-none absolute inset-x-0 bottom-full h-8 bg-gradient-to-t from-background to-transparent"
-        />
-        <motion.button
-          type="button"
+      <OnboardingFooter>
+        <OnboardingButton
           onClick={() => commit(selectedIds)}
-          disabled={saving || checked === null}
-          whileTap={{ scale: 0.97 }}
-          className={cn(
-            'h-14 w-full rounded-2xl text-base font-bold tracking-wide shadow-lg transition-all duration-200 md:w-80',
-            selectedIds.length > 0
-              ? 'bg-primary text-primary-foreground shadow-primary/25 hover:brightness-110'
-              : 'bg-muted text-muted-foreground shadow-none',
-            (saving || checked === null) && 'cursor-not-allowed opacity-70',
-          )}
+          disabled={checked === null || selectedIds.length === 0}
+          loading={saving}
         >
-          {selectedIds.length > 0 ? acceptLabel : 'Continue'}
-        </motion.button>
-
-        <button
-          type="button"
-          onClick={() => commit([])}
-          disabled={saving}
-          className={cn(
-            'h-11 text-sm font-black text-muted-foreground transition-colors hover:text-foreground',
-            saving && 'cursor-not-allowed opacity-70',
-          )}
-        >
+          {acceptLabel}
+        </OnboardingButton>
+        <OnboardingButton variant="ghost" onClick={() => commit([])} disabled={saving}>
           {declineLabel}
-        </button>
-      </div>
+        </OnboardingButton>
+      </OnboardingFooter>
     </div>
   );
 }

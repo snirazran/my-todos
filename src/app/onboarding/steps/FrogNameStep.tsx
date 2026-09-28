@@ -5,6 +5,8 @@ import { motion } from 'framer-motion';
 import { Shuffle, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { OnboardingStepProps } from './types';
+import { hapticSelect } from '@/lib/haptics';
+import { OnboardingButton, OnboardingFooter } from './OnboardingFooter';
 import { OnboardingFrogHeader, ONBOARDING_BODY_CLASS, ONBOARDING_FOOTER_SPACER_CLASS } from './OnboardingFrogHeader';
 
 const NAME_OPTIONS = [
@@ -50,6 +52,7 @@ const getRandomName = (currentName?: string) => {
 
 export default function FrogNameStep({ selections, onSelect, onNext, saving, direction }: OnboardingStepProps) {
   const [initialName] = useState(() => getRandomName());
+  const [spins, setSpins] = useState(0);
   const storedName = selections.frogName?.[0];
   const frogName = storedName ?? initialName;
   const canContinue = frogName.trim().length > 0;
@@ -65,6 +68,8 @@ export default function FrogNameStep({ selections, onSelect, onNext, saving, dir
   };
 
   const shuffleName = () => {
+    hapticSelect();
+    setSpins((n) => n + 1);
     setName(getRandomName(frogName));
   };
 
@@ -75,76 +80,76 @@ export default function FrogNameStep({ selections, onSelect, onNext, saving, dir
         subtitle="You can change this later."
       />
 
-      <div className={cn('flex flex-col items-center px-4', ONBOARDING_BODY_CLASS)}>
+      <div className={cn('flex flex-col items-center', ONBOARDING_BODY_CLASS)}>
         <motion.div
           key="frog-name"
           custom={direction}
           initial={{ opacity: 0, x: direction * 40 }}
           animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: direction * -40 }}
           transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-          className="w-full"
+          className="flex w-full flex-col items-center md:max-w-md"
         >
-
-          <div className="relative w-full">
+          <form
+            className="relative w-full"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (canContinue && !saving) onNext();
+            }}
+          >
             <input
               value={frogName}
               onChange={(event) => setName(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  event.preventDefault();
-                  if (canContinue && !saving) onNext();
-                }
-              }}
-              className="w-full h-16 md:h-[4.25rem] rounded-3xl border-2 border-border/50 bg-background px-12 text-center text-xl md:text-2xl font-black text-foreground shadow-sm outline-none transition focus:border-primary/60 focus:ring-4 focus:ring-primary/10"
+              onFocus={(event) => event.currentTarget.select()}
+              className="h-16 w-full rounded-3xl border-2 border-border/60 bg-card px-12 text-center text-2xl font-black tracking-tight text-foreground shadow-[0_3px_0_0_rgba(0,0,0,0.06)] outline-none transition placeholder:text-muted-foreground/40 focus:border-primary/60 focus:ring-4 focus:ring-primary/10"
               aria-label="Frog name"
+              placeholder="Frog name"
+              name="frog-nickname"
               maxLength={24}
               enterKeyHint="next"
+              autoComplete="off"
               autoCapitalize="words"
               autoCorrect="off"
               spellCheck={false}
+              data-1p-ignore
+              data-lpignore="true"
             />
             {frogName.length > 0 && (
               <button
                 type="button"
+                onMouseDown={(event) => event.preventDefault()}
                 onClick={() => setName('')}
-                className="absolute right-4 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-muted text-muted-foreground transition hover:bg-muted/80"
+                className="absolute right-3 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground/70 transition hover:bg-muted active:scale-90"
                 aria-label="Clear frog name"
               >
                 <X className="h-4 w-4" />
               </button>
             )}
-          </div>
+          </form>
 
           <button
             type="button"
             onClick={shuffleName}
-            className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-muted font-bold text-muted-foreground shadow-sm transition hover:bg-muted/80 active:scale-[0.98]"
+            className="mt-3 inline-flex h-11 items-center justify-center gap-2 rounded-full border border-border/70 bg-card px-5 text-sm font-black text-muted-foreground shadow-[0_3px_0_0_rgba(0,0,0,0.08)] transition-all active:translate-y-[3px] active:shadow-none [@media(hover:hover)]:hover:text-foreground"
           >
-            <Shuffle className="h-4 w-4" />
-            Shuffle
+            <motion.span
+              animate={{ rotate: spins * 180 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 18 }}
+              className="inline-flex"
+            >
+              <Shuffle className="h-4 w-4" />
+            </motion.span>
+            Suggest a name
           </button>
         </motion.div>
       </div>
 
       <div className={ONBOARDING_FOOTER_SPACER_CLASS} />
 
-      <div className="flex justify-center pb-[calc(4rem+env(safe-area-inset-bottom))]">
-        <motion.button
-          type="button"
-          onClick={onNext}
-          disabled={!canContinue || saving}
-          whileTap={{ scale: 0.97 }}
-          className={cn(
-            'w-full md:w-80 h-14 rounded-2xl font-bold text-base tracking-wide transition-all duration-200',
-            canContinue && !saving
-              ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/25 hover:brightness-110'
-              : 'bg-muted text-muted-foreground cursor-not-allowed',
-          )}
-        >
-          {saving ? 'Setting up...' : 'Next'}
-        </motion.button>
-      </div>
+      <OnboardingFooter>
+        <OnboardingButton onClick={onNext} disabled={!canContinue} loading={saving}>
+          Next
+        </OnboardingButton>
+      </OnboardingFooter>
     </div>
   );
 }

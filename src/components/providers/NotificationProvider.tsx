@@ -34,6 +34,32 @@ function textOf(node: React.ReactNode): string {
 
 const MAX_IDENTICAL_TOASTS = 3;
 
+function isUndoItem(n: NotificationItem) {
+  return !!n.undoAction && n.actionLabel === 'Undo';
+}
+
+function useAutoDismiss(
+  id: number | null,
+  durationMs: number,
+  paused: boolean,
+  dismiss: (id: number) => void,
+  remainingRef: React.MutableRefObject<Map<number, number>>,
+) {
+  useEffect(() => {
+    if (id === null || paused) return;
+    const remaining = remainingRef.current.get(id) ?? durationMs;
+    const startedAt = Date.now();
+    const timeout = setTimeout(() => dismiss(id), remaining);
+    return () => {
+      clearTimeout(timeout);
+      remainingRef.current.set(
+        id,
+        Math.max(RESUME_FLOOR_MS, remaining - (Date.now() - startedAt)),
+      );
+    };
+  }, [id, durationMs, paused, dismiss, remainingRef]);
+}
+
 interface NotificationContextType {
   showNotification: (
     content: React.ReactNode,
@@ -140,6 +166,15 @@ export function NotificationProvider({
     ) => {
       const id = Date.now() + Math.random();
       const dedupeKey = textOf(content);
+      const item: NotificationItem = {
+        id,
+        content,
+        undoAction,
+        durationMs:
+          options?.durationMs ?? readingTimeMs(dedupeKey, !!undoAction),
+        dedupeKey,
+        actionLabel: options?.actionLabel ?? 'Undo',
+      };
       setNotifications((prev) => {
         if (
           dedupeKey &&
@@ -148,47 +183,30 @@ export function NotificationProvider({
         ) {
           return prev;
         }
-        return [
-          ...prev,
-          {
-            id,
-            content,
-            undoAction,
-            durationMs:
-              options?.durationMs ?? readingTimeMs(dedupeKey, !!undoAction),
-            dedupeKey,
-            actionLabel: options?.actionLabel ?? 'Undo',
-          },
-        ];
+        const base = isUndoItem(item)
+          ? prev.filter((n) => !isUndoItem(n))
+          : prev;
+        return [...base, item];
       });
     },
     [],
   );
 
-  const front = notifications[notifications.length - 1] ?? null;
+  const deckItems = notifications.filter((n) => !isUndoItem(n));
+  const undoItem = notifications.filter(isUndoItem).at(-1) ?? null;
+  const front = deckItems[deckItems.length - 1] ?? null;
   const frontId = front?.id ?? null;
-  const frontDuration = front?.durationMs ?? 0;
+  const undoId = undoItem?.id ?? null;
   const timerPaused =
     hovered || pressed || pageHidden || undoingId !== null || stackSuppressed;
 
-  useEffect(() => {
-    if (frontId === null || timerPaused) return;
-    const remaining = remainingRef.current.get(frontId) ?? frontDuration;
-    const startedAt = Date.now();
-    const timeout = setTimeout(() => dismiss(frontId), remaining);
-    return () => {
-      clearTimeout(timeout);
-      remainingRef.current.set(
-        frontId,
-        Math.max(RESUME_FLOOR_MS, remaining - (Date.now() - startedAt)),
-      );
-    };
-  }, [frontId, frontDuration, timerPaused, dismiss]);
+  useAutoDismiss(frontId, front?.durationMs ?? 0, timerPaused, dismiss, remainingRef);
+  useAutoDismiss(undoId, undoItem?.durationMs ?? 0, timerPaused, dismiss, remainingRef);
 
   useEffect(() => {
     setHovered(false);
     setPressed(false);
-  }, [frontId]);
+  }, [frontId, undoId]);
 
   useEffect(() => {
     const onVisibility = () => setPageHidden(document.hidden);
@@ -262,6 +280,164 @@ export function NotificationProvider({
     }
   };
 
+  const renderCard = (n: NotificationItem, depth: number) => {
+        const isFront = depth === 0;
+        const isSavedTasksToast = n.content === 'Moved to Saved Tasks';
+        const isMovedToTodayToast = n.content === 'Moved to Today';
+        const isDuplicateToast =
+          typeof n.content === 'string' &&
+          n.content.startsWith('Duplicated to');
+        const isMoveToast =
+          isSavedTasksToast || isMovedToTodayToast || isDuplicateToast;
+        const isUndoing = undoingId === n.id;
+        return (
+          <motion.div
+            key={n.id}
+            custom={swiped}
+            variants={{
+              exit: (swipe: { id: number; dir: number } | null) =>
+                swipe?.id === n.id
+                  ? {
+                      x: swipe.dir * 420,
+                      opacity: 0,
+                      position: 'absolute',
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      transition: { duration: 0.2, ease: [0.32, 0.72, 0, 1] },
+                    }
+                  : {
+                      opacity: 0,
+                      y: 8,
+                      scale: 0.96,
+                      position: 'absolute',
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      transition: { duration: 0.16, ease: 'easeIn' },
+                    },
+            }}
+            initial={{ opacity: 0, y: 24, scale: 0.96 }}
+            animate={{
+              opacity: depth > 2 ? 0 : 1,
+              y: depth * -10,
+              scale: 1 - depth * 0.05,
+            }}
+            exit="exit"
+            transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+            drag={isFront && !isUndoing ? 'x' : false}
+            dragDirectionLock
+            dragSnapToOrigin
+            dragElastic={0.5}
+            onDragEnd={(_, info) => {
+              setPressed(false);
+              if (
+                Math.abs(info.offset.x) > SWIPE_DISMISS_PX ||
+                Math.abs(info.velocity.x) > 600
+              ) {
+                setSwiped({ id: n.id, dir: Math.sign(info.offset.x) || 1 });
+                dismiss(n.id);
+              }
+            }}
+            onPointerEnter={
+              isFront
+                ? (e) => {
+                    if (e.pointerType === 'mouse') setHovered(true);
+                  }
+                : undefined
+            }
+            onPointerLeave={
+              isFront
+                ? (e) => {
+                    if (e.pointerType === 'mouse') setHovered(false);
+                  }
+                : undefined
+            }
+            onPointerDown={isFront ? () => setPressed(true) : undefined}
+            onPointerUp={isFront ? () => setPressed(false) : undefined}
+            onPointerCancel={isFront ? () => setPressed(false) : undefined}
+            onFocusCapture={
+              isFront
+                ? (e) => {
+                    if ((e.target as HTMLElement).matches?.(':focus-visible'))
+                      setHovered(true);
+                  }
+                : undefined
+            }
+            onBlurCapture={isFront ? () => setHovered(false) : undefined}
+            style={{ zIndex: 100 - depth, touchAction: 'pan-y' }}
+            className={`${
+              isFront
+                ? 'pointer-events-auto relative'
+                : 'pointer-events-none absolute inset-x-0 bottom-0'
+            } flex w-full items-center gap-3 px-4 py-3 rounded-[18px] border border-border/50 bg-card/90 text-foreground shadow-sm backdrop-blur-2xl`}
+          >
+            {isMoveToast && (
+              <span
+                aria-hidden
+                className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/15 text-primary ring-1 ring-primary/25 bg-background"
+              >
+                {isSavedTasksToast ? (
+                  <FolderOpen size={14} />
+                ) : isDuplicateToast ? (
+                  <CopyPlus size={14} />
+                ) : (
+                  <CalendarCheck size={14} />
+                )}
+              </span>
+            )}
+            <div className="min-w-0 flex-1 text-sm font-semibold">
+              <NotificationBody id={n.id} dismiss={dismiss}>
+                {n.content}
+              </NotificationBody>
+            </div>
+            {n.undoAction && (
+              <button
+                onClick={() => handleUndo(n)}
+                disabled={isUndoing}
+                className="-my-1.5 flex h-9 shrink-0 items-center gap-2 rounded-full px-2.5 text-sm font-bold text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isUndoing ? (
+                  <>
+                    <svg
+                      className="animate-spin h-3 w-3 text-current"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      ></path>
+                    </svg>
+                    {n.actionLabel}
+                  </>
+                ) : (
+                  n.actionLabel
+                )}
+              </button>
+            )}
+            <button
+              onClick={() => dismiss(n.id)}
+              disabled={isUndoing}
+              className="-my-1.5 -mr-2 grid h-9 w-9 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+              aria-label="Dismiss notification"
+            >
+              <X size={16} />
+            </button>
+          </motion.div>
+        );
+  };
+
   return (
     <NotificationContext.Provider
       value={{
@@ -284,6 +460,22 @@ export function NotificationProvider({
           >
         {/* Top slot: timer pill portals in here (above all toasts) */}
         <div id="frog-bottom-stack-top" className="contents" />
+        <AnimatePresence initial={false}>
+          {undoItem && (
+            <motion.div
+              key={undoItem.id}
+              role="status"
+              aria-live="polite"
+              className="w-full md:w-[380px] md:self-end"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+            >
+              {renderCard(undoItem, 0)}
+            </motion.div>
+          )}
+        </AnimatePresence>
         {/* Deck stack: newest toast in front; older ones peek out behind it
             and step forward as the front one leaves. The wrapper renders at an
             explicitly animated height (measured with dip-filtering) so the
@@ -309,168 +501,13 @@ export function NotificationProvider({
           className="absolute inset-x-0 bottom-0"
           style={{
             paddingTop:
-              Math.min(Math.max(notifications.length - 1, 0), 2) * 10,
+              Math.min(Math.max(deckItems.length - 1, 0), 2) * 10,
           }}
         >
         <AnimatePresence initial={false} custom={swiped}>
-          {notifications.map((n, index) => {
-            const depth = notifications.length - 1 - index;
-            const isFront = depth === 0;
-            const isSavedTasksToast = n.content === 'Moved to Saved Tasks';
-            const isMovedToTodayToast = n.content === 'Moved to Today';
-            const isDuplicateToast =
-              typeof n.content === 'string' &&
-              n.content.startsWith('Duplicated to');
-            const isMoveToast =
-              isSavedTasksToast || isMovedToTodayToast || isDuplicateToast;
-            const isUndoing = undoingId === n.id;
-            return (
-              <motion.div
-                key={n.id}
-                custom={swiped}
-                variants={{
-                  exit: (swipe: { id: number; dir: number } | null) =>
-                    swipe?.id === n.id
-                      ? {
-                          x: swipe.dir * 420,
-                          opacity: 0,
-                          position: 'absolute',
-                          left: 0,
-                          right: 0,
-                          bottom: 0,
-                          transition: { duration: 0.2, ease: [0.32, 0.72, 0, 1] },
-                        }
-                      : {
-                          opacity: 0,
-                          y: 8,
-                          scale: 0.96,
-                          position: 'absolute',
-                          left: 0,
-                          right: 0,
-                          bottom: 0,
-                          transition: { duration: 0.16, ease: 'easeIn' },
-                        },
-                }}
-                initial={{ opacity: 0, y: 24, scale: 0.96 }}
-                animate={{
-                  opacity: depth > 2 ? 0 : 1,
-                  y: depth * -10,
-                  scale: 1 - depth * 0.05,
-                }}
-                exit="exit"
-                transition={{ type: 'spring', stiffness: 420, damping: 34 }}
-                drag={isFront && !isUndoing ? 'x' : false}
-                dragDirectionLock
-                dragSnapToOrigin
-                dragElastic={0.5}
-                onDragEnd={(_, info) => {
-                  setPressed(false);
-                  if (
-                    Math.abs(info.offset.x) > SWIPE_DISMISS_PX ||
-                    Math.abs(info.velocity.x) > 600
-                  ) {
-                    setSwiped({ id: n.id, dir: Math.sign(info.offset.x) || 1 });
-                    dismiss(n.id);
-                  }
-                }}
-                onPointerEnter={
-                  isFront
-                    ? (e) => {
-                        if (e.pointerType === 'mouse') setHovered(true);
-                      }
-                    : undefined
-                }
-                onPointerLeave={
-                  isFront
-                    ? (e) => {
-                        if (e.pointerType === 'mouse') setHovered(false);
-                      }
-                    : undefined
-                }
-                onPointerDown={isFront ? () => setPressed(true) : undefined}
-                onPointerUp={isFront ? () => setPressed(false) : undefined}
-                onPointerCancel={isFront ? () => setPressed(false) : undefined}
-                onFocusCapture={
-                  isFront
-                    ? (e) => {
-                        if ((e.target as HTMLElement).matches?.(':focus-visible'))
-                          setHovered(true);
-                      }
-                    : undefined
-                }
-                onBlurCapture={isFront ? () => setHovered(false) : undefined}
-                style={{ zIndex: 100 - depth, touchAction: 'pan-y' }}
-                className={`${
-                  isFront
-                    ? 'pointer-events-auto relative'
-                    : 'pointer-events-none absolute inset-x-0 bottom-0'
-                } flex w-full items-center gap-3 px-4 py-3 rounded-[18px] border border-border/50 bg-card/90 text-foreground shadow-sm backdrop-blur-2xl`}
-              >
-                {isMoveToast && (
-                  <span
-                    aria-hidden
-                    className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/15 text-primary ring-1 ring-primary/25 bg-background"
-                  >
-                    {isSavedTasksToast ? (
-                      <FolderOpen size={14} />
-                    ) : isDuplicateToast ? (
-                      <CopyPlus size={14} />
-                    ) : (
-                      <CalendarCheck size={14} />
-                    )}
-                  </span>
-                )}
-                <div className="min-w-0 flex-1 text-sm font-semibold">
-                  <NotificationBody id={n.id} dismiss={dismiss}>
-                    {n.content}
-                  </NotificationBody>
-                </div>
-                {n.undoAction && (
-                  <button
-                    onClick={() => handleUndo(n)}
-                    disabled={isUndoing}
-                    className="-my-1.5 flex h-9 shrink-0 items-center gap-2 rounded-full px-2.5 text-sm font-bold text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {isUndoing ? (
-                      <>
-                        <svg
-                          className="animate-spin h-3 w-3 text-current"
-                          xmlns="http://www.w3.org/2000/svg"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                        >
-                          <circle
-                            className="opacity-25"
-                            cx="12"
-                            cy="12"
-                            r="10"
-                            stroke="currentColor"
-                            strokeWidth="4"
-                          ></circle>
-                          <path
-                            className="opacity-75"
-                            fill="currentColor"
-                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                          ></path>
-                        </svg>
-                        {n.actionLabel}
-                      </>
-                    ) : (
-                      n.actionLabel
-                    )}
-                  </button>
-                )}
-                <button
-                  onClick={() => dismiss(n.id)}
-                  disabled={isUndoing}
-                  className="-my-1.5 -mr-2 grid h-9 w-9 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
-                  aria-label="Dismiss notification"
-                >
-                  <X size={16} />
-                </button>
-              </motion.div>
-            );
-          })}
+          {deckItems.map((n, index) =>
+            renderCard(n, deckItems.length - 1 - index),
+          )}
         </AnimatePresence>
         </div>
         </motion.div>

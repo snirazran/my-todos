@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FrogHandle } from '@/components/ui/frog';
 import { hapticImpact } from '@/lib/haptics';
 import {
+  playComboChime,
   playGulp,
   playPop,
   playThwip,
@@ -12,6 +13,7 @@ import {
 
 export const TONGUE_MS = 1111;
 export const OFFSET_MS = 160;
+const CHAIN_OFFSET_MS = 70;
 const PRE_PAN_MS = 600;
 const PRE_LINGER_MS = 180;
 const CAM_START_DELAY = 140;
@@ -21,7 +23,11 @@ export const HIT_AT = 0.42;
 const HOLD_END = 0.5;
 const LUT_N = 96;
 const COMBO_WINDOW_MS = 8000;
-const COMBO_SPEED = [1, 0.85, 0.72];
+const COMBO_SPEED = [1, 0.85, 0.74, 0.66];
+const COMBO_MAX = 7;
+const QUEUE_SPEED = 1.45;
+const FLINCH_AT = 0.24;
+const BITS_COLORS = ['#fb7185', '#86efac', '#fde68a', '#7dd3fc'];
 const GOLDEN_CHANCE = 0.05;
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -43,6 +49,8 @@ export interface TongueRequest {
   silent?: boolean;
   /** Allow this grab to roll a rare golden catch. */
   allowGolden?: boolean;
+  /** When the tongue is busy, line this catch up instead of dropping it. */
+  queueIfBusy?: boolean;
   onPersist: () => Promise<void> | void;
 }
 
@@ -85,6 +93,11 @@ export function useFrogTongue({
   const lastTickRef = useRef(0);
   const comboRef = useRef(0);
   const lastCatchEndRef = useRef(-Infinity);
+  const busyRef = useRef(false);
+  const queueRef = useRef<TongueRequest[]>([]);
+  const startRef = useRef<(req: TongueRequest, chained: boolean) => Promise<void>>(
+    async () => {},
+  );
   const [cinematic, setCinematic] = useState(false);
 
   const [grab, setGrab] = useState<{
@@ -119,6 +132,7 @@ export function useFrogTongue({
     geom: Geom;
     hidImpact: boolean;
     thwipDone: boolean;
+    flinched: boolean;
     raf: number;
   } | null>(null);
 
@@ -203,113 +217,196 @@ export function useFrogTongue({
 
   const [visuallyDone, setVisuallyDone] = useState<Set<string>>(new Set());
 
-  const triggerTongue = useCallback(
-    async ({
+  const setQueuedMark = (key: string, on: boolean) => {
+    const el = flyRefs.current[key];
+    if (!el) return;
+    if (on) el.dataset.tongueQueued = '';
+    else delete el.dataset.tongueQueued;
+  };
+
+  const drainNext = useCallback(async () => {
+    const next = queueRef.current.shift();
+    if (next) {
+      await startRef.current(next, true);
+      return;
+    }
+    busyRef.current = false;
+  }, []);
+
+  const startGrab = async (
+    {
       key,
       completed,
       silent = false,
       allowGolden = false,
       onPersist,
-    }: TongueRequest) => {
-      if (cinematic || grab || performance.now() < cooldownUntil.current) {
-        if (!completed) await onPersist();
-        return;
-      }
+    }: TongueRequest,
+    chained: boolean,
+  ) => {
+    busyRef.current = true;
+    setQueuedMark(key, false);
 
-      const flyEl = flyRefs.current[key];
-      if (!flyEl) {
-        await onPersist();
-        return;
-      }
-
-      if (!silent) primeCatchSounds();
-
-      const reduced = prefersReducedMotion();
-      let combo = 0;
-      if (!silent) {
-        combo =
-          performance.now() - lastCatchEndRef.current < COMBO_WINDOW_MS
-            ? Math.min(comboRef.current + 1, COMBO_SPEED.length - 1)
-            : 0;
-        comboRef.current = combo;
-      }
-      const golden = allowGolden && !silent && Math.random() < GOLDEN_CHANCE;
-      const duration = durationMs * COMBO_SPEED[combo];
-
-      const sc = getSC();
-      const vh = sc ? sc.clientHeight : window.innerHeight;
-
-      const originDoc0 = getMouthDoc();
-      const targetDoc0 = getFlyDoc(flyEl);
-
-      let frogFocusY = Math.max(0, originDoc0.y - vh * 0.35);
-      let flyFocusY = Math.max(0, targetDoc0.y - vh * 0.45);
-
-      const flyR = flyEl.getBoundingClientRect();
-      const frogR = frogBoxRef?.current?.getBoundingClientRect();
-      const frogRatio = frogR ? visibleRatio(frogR) : 0;
-
-      let flyVisible: boolean;
-      if (sc) {
-        const cr = sc.getBoundingClientRect();
-        flyVisible =
-          flyR.top < cr.bottom && flyR.bottom > cr.top &&
-          flyR.left < cr.right && flyR.right > cr.left;
-      } else {
-        flyVisible =
-          flyR.top < window.innerHeight && flyR.bottom > 0 &&
-          flyR.left < window.innerWidth && flyR.right > 0;
-      }
-
-      const needCine = allowCameraFollow && (frogRatio < 0.75 || !flyVisible);
-      speedRef.current = 1;
-      setCinematic(true);
-
-      if (needCine) {
-        if (reduced) {
-          if (sc) sc.scrollTop = flyFocusY;
-          else window.scrollTo(0, flyFocusY);
-        } else {
-          await animateScrollTo(frogFocusY, PRE_PAN_MS, speedRef, sc);
-          await new Promise((r) =>
-            setTimeout(r, PRE_LINGER_MS / speedRef.current),
-          );
-        }
-      }
-
-      const originDoc = getMouthDoc();
-      const targetDoc = getFlyDoc(flyEl);
-      frogFocusY = Math.max(0, originDoc.y - vh * 0.35);
-      flyFocusY = Math.max(0, targetDoc.y - vh * 0.45);
-
-      const startAt = performance.now() + OFFSET_MS;
-      const camStartAt = startAt + CAM_START_DELAY;
-
-      flyEl.style.visibility = 'visible';
-
-      if (tipGroupEl.current) {
-        tipGroupEl.current.style.visibility = 'hidden';
-      }
-
-      setGrab({
-        key,
-        completed,
-        silent,
-        golden,
-        combo,
-        reduced,
-        duration,
-        originDoc,
-        targetDoc,
-        startAt,
-        camStartAt,
-        follow: needCine && !reduced,
-        frogFocusY,
-        flyFocusY,
-        onPersist,
+    const flyEl = flyRefs.current[key];
+    if (!flyEl || !flyEl.isConnected) {
+      await Promise.resolve(onPersist()).catch((error) => {
+        console.error('Failed to persist tongue action', error);
       });
+      if (chained) {
+        await drainNext();
+      } else {
+        busyRef.current = false;
+        void drainNext();
+      }
+      return;
+    }
+
+    if (!silent) primeCatchSounds();
+
+    const reduced = prefersReducedMotion();
+    let combo = 0;
+    if (!silent) {
+      combo =
+        chained || performance.now() - lastCatchEndRef.current < COMBO_WINDOW_MS
+          ? Math.min(comboRef.current + 1, COMBO_MAX)
+          : 0;
+      comboRef.current = combo;
+    }
+    const golden = allowGolden && !silent && Math.random() < GOLDEN_CHANCE;
+    const duration =
+      durationMs * COMBO_SPEED[Math.min(combo, COMBO_SPEED.length - 1)];
+
+    const sc = getSC();
+    const vh = sc ? sc.clientHeight : window.innerHeight;
+
+    const originDoc0 = getMouthDoc();
+    const targetDoc0 = getFlyDoc(flyEl);
+
+    let frogFocusY = Math.max(0, originDoc0.y - vh * 0.35);
+    let flyFocusY = Math.max(0, targetDoc0.y - vh * 0.45);
+
+    const flyR = flyEl.getBoundingClientRect();
+    const frogR = frogBoxRef?.current?.getBoundingClientRect();
+    const frogRatio = frogR ? visibleRatio(frogR) : 0;
+
+    let flyVisible: boolean;
+    if (sc) {
+      const cr = sc.getBoundingClientRect();
+      flyVisible =
+        flyR.top < cr.bottom && flyR.bottom > cr.top &&
+        flyR.left < cr.right && flyR.right > cr.left;
+    } else {
+      flyVisible =
+        flyR.top < window.innerHeight && flyR.bottom > 0 &&
+        flyR.left < window.innerWidth && flyR.right > 0;
+    }
+
+    const needCine = allowCameraFollow && (frogRatio < 0.75 || !flyVisible);
+    speedRef.current = queueRef.current.length > 0 ? QUEUE_SPEED : 1;
+    setCinematic(true);
+
+    if (needCine) {
+      if (reduced) {
+        if (sc) sc.scrollTop = flyFocusY;
+        else window.scrollTo(0, flyFocusY);
+      } else {
+        await animateScrollTo(frogFocusY, PRE_PAN_MS, speedRef, sc);
+        await new Promise((r) =>
+          setTimeout(r, PRE_LINGER_MS / speedRef.current),
+        );
+      }
+    }
+
+    const originDoc = getMouthDoc();
+    const targetDoc = getFlyDoc(flyEl);
+    frogFocusY = Math.max(0, originDoc.y - vh * 0.35);
+    flyFocusY = Math.max(0, targetDoc.y - vh * 0.45);
+
+    const offset = chained ? CHAIN_OFFSET_MS : OFFSET_MS;
+    const startAt = performance.now() + offset;
+    const camStartAt = startAt + CAM_START_DELAY;
+
+    flyEl.style.visibility = 'visible';
+
+    if (tipGroupEl.current) {
+      tipGroupEl.current.style.visibility = 'hidden';
+    }
+
+    if (!reduced) {
+      pulseBox(
+        frogBoxRef?.current,
+        [
+          { transform: 'scale(1, 1)' },
+          { transform: 'scale(1.05, 0.93)', offset: 0.7 },
+          { transform: 'scale(0.97, 1.05)', offset: 0.88 },
+          { transform: 'scale(1, 1)' },
+        ],
+        { duration: offset + 90, easing: 'ease-out' },
+      );
+    }
+
+    setGrab({
+      key,
+      completed,
+      silent,
+      golden,
+      combo,
+      reduced,
+      duration,
+      originDoc,
+      targetDoc,
+      startAt,
+      camStartAt,
+      follow: needCine && !reduced,
+      frogFocusY,
+      flyFocusY,
+      onPersist,
+    });
+  };
+  startRef.current = startGrab;
+
+  const triggerTongue = useCallback(
+    async (req: TongueRequest) => {
+      const { key, completed, silent = false, queueIfBusy = false, onPersist } =
+        req;
+      if (
+        busyRef.current ||
+        cinematic ||
+        grab ||
+        performance.now() < cooldownUntil.current
+      ) {
+        if (!completed) {
+          await onPersist();
+          return;
+        }
+        if (
+          queueIfBusy &&
+          !silent &&
+          busyRef.current &&
+          grab?.key !== key &&
+          !queueRef.current.some((q) => q.key === key) &&
+          flyRefs.current[key]
+        ) {
+          queueRef.current.push(req);
+          setQueuedMark(key, true);
+          speedRef.current = Math.max(speedRef.current, QUEUE_SPEED);
+        }
+        return;
+      }
+
+      await startRef.current(req, false);
     },
-    [allowCameraFollow, cinematic, grab, durationMs, flyRefs, frogBoxRef, getFlyDoc, getMouthDoc],
+    [cinematic, grab, flyRefs],
+  );
+
+  useEffect(
+    () => () => {
+      const pending = queueRef.current;
+      queueRef.current = [];
+      for (const req of pending) {
+        void Promise.resolve(req.onPersist()).catch(() => {});
+      }
+    },
+    [],
   );
 
   /* ================================================================= */
@@ -355,7 +452,13 @@ export function useFrogTongue({
     };
 
     let geom = buildGeom(p0Doc, grab.targetDoc);
-    runRef.current = { geom, hidImpact: false, thwipDone: false, raf: 0 };
+    runRef.current = {
+      geom,
+      hidImpact: false,
+      thwipDone: false,
+      flinched: false,
+      raf: 0,
+    };
 
     const pathNode = tonguePathEl.current;
     const world = worldGroupEl.current;
@@ -379,36 +482,34 @@ export function useFrogTongue({
     const pulseFrog = (
       keyframes: Keyframe[],
       options: KeyframeAnimationOptions,
-    ) => {
-      const box = frogBoxRef?.current;
-      if (!box) return;
-      try {
-        const prevOrigin = box.style.transformOrigin;
-        box.style.transformOrigin = '50% 88%';
-        const anim = box.animate(keyframes, {
-          ...options,
-          composite: 'add',
-        });
-        const restore = () => {
-          box.style.transformOrigin = prevOrigin;
-        };
-        anim.onfinish = restore;
-        anim.oncancel = restore;
-      } catch {
-        // ignore
-      }
-    };
+    ) => pulseBox(frogBoxRef?.current, keyframes, options);
 
     const spawnFx = (
       x: number,
       y: number,
-      kind: 'ring' | 'sparkle',
+      kind: 'ring' | 'sparkle' | 'bit',
       golden: boolean,
     ) => {
       const g = fxGroupEl.current;
       if (!g) return;
       const c = document.createElementNS(SVG_NS, 'circle');
-      if (kind === 'ring') {
+      let bitDx = 0;
+      let bitDy = 0;
+      if (kind === 'bit') {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 16 + Math.random() * 12;
+        bitDx = Math.cos(angle) * dist;
+        bitDy = Math.sin(angle) * dist;
+        c.setAttribute('cx', `${x}`);
+        c.setAttribute('cy', `${y}`);
+        c.setAttribute('r', `${1.8 + Math.random() * 1.6}`);
+        c.setAttribute(
+          'fill',
+          golden
+            ? '#fbbf24'
+            : BITS_COLORS[Math.floor(Math.random() * BITS_COLORS.length)],
+        );
+      } else if (kind === 'ring') {
         c.setAttribute('cx', `${x}`);
         c.setAttribute('cy', `${y}`);
         c.setAttribute('r', '7');
@@ -426,7 +527,18 @@ export function useFrogTongue({
       g.appendChild(c);
       try {
         const anim =
-          kind === 'ring'
+          kind === 'bit'
+            ? c.animate(
+                [
+                  { opacity: 1, transform: 'translate(0px, 0px) scale(1)' },
+                  {
+                    opacity: 0,
+                    transform: `translate(${bitDx}px, ${bitDy}px) scale(0.4)`,
+                  },
+                ],
+                { duration: 360, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' },
+              )
+            : kind === 'ring'
             ? c.animate(
                 [
                   { opacity: 0.9, transform: 'scale(0.4)' },
@@ -467,6 +579,27 @@ export function useFrogTongue({
       const t = Math.max(0, Math.min(1, tRaw));
 
       const run = runRef.current!;
+
+      if (!run.flinched && t >= FLINCH_AT && !grab.silent && !grab.reduced) {
+        run.flinched = true;
+        const flyEl = flyRefs.current[grab.key];
+        try {
+          flyEl?.animate(
+            [
+              { transform: 'scale(1) rotate(0deg)' },
+              { transform: 'scale(1.16) rotate(-9deg)', offset: 0.45 },
+              { transform: 'scale(1.1) rotate(7deg)' },
+            ],
+            {
+              duration: ((HIT_AT - FLINCH_AT) * grab.duration) / speedRef.current,
+              easing: 'ease-out',
+              composite: 'add',
+            },
+          );
+        } catch {
+          // ignore
+        }
+      }
 
       if (!run.thwipDone && t > 0) {
         run.thwipDone = true;
@@ -529,8 +662,15 @@ export function useFrogTongue({
         setViewportPath(offX, offY);
       }
 
+      const bulgeEnd = HOLD_END + 0.08;
+      const bulge =
+        !grab.reduced && !grab.silent && t > HIT_AT && t < bulgeEnd
+          ? Math.sin((Math.PI * (t - HIT_AT)) / (bulgeEnd - HIT_AT))
+          : 0;
+
       if (pathNode) {
         pathNode.style.strokeDasharray = `${geom.total * forward} ${geom.total}`;
+        pathNode.style.strokeWidth = `${TONGUE_STROKE * (1 + 0.32 * bulge)}`;
       }
 
       const sLen = geom.total * forward;
@@ -545,7 +685,16 @@ export function useFrogTongue({
       if (tipGroupEl.current) {
         const tx = world ? tipDocX : tipDocX - offX;
         const ty = world ? tipDocY : tipDocY - offY;
-        tipGroupEl.current.setAttribute('transform', `translate(${tx}, ${ty})`);
+        let rot = 0;
+        if (!grab.reduced && t > HOLD_END) {
+          const u = (t - HOLD_END) / (1 - HOLD_END);
+          rot = Math.sin(u * Math.PI * 2.5) * 16 * (1 - u);
+        }
+        const sc2 = 1 + 0.2 * bulge;
+        tipGroupEl.current.setAttribute(
+          'transform',
+          `translate(${tx}, ${ty}) rotate(${rot}) scale(${sc2})`,
+        );
       }
 
       if (!run.hidImpact && t >= HIT_AT) {
@@ -563,6 +712,10 @@ export function useFrogTongue({
           playPop(grab.combo);
           if (!grab.reduced) {
             spawnFx(tipDocX, tipDocY, 'ring', grab.golden);
+            const bits = 5 + Math.min(grab.combo, 4);
+            for (let i = 0; i < bits; i++) {
+              spawnFx(tipDocX, tipDocY, 'bit', grab.golden);
+            }
             pulseFrog(
               [
                 { transform: 'translateY(0)' },
@@ -605,6 +758,11 @@ export function useFrogTongue({
         if (!grab.silent) {
           frogRef.current?.fireEmote('love');
           playGulp(grab.combo, grab.golden);
+          if (grab.combo > 0) {
+            window.setTimeout(() => playComboChime(grab.combo), 70);
+            const mouth = frogRef.current?.getMouthPoint();
+            if (mouth) showComboLabel(mouth.x, mouth.y, grab.combo, grab.reduced);
+          }
           lastCatchEndRef.current = performance.now();
           if (!grab.reduced) {
             pulseFrog(
@@ -629,8 +787,17 @@ export function useFrogTongue({
             s.delete(grab.key);
             return s;
           });
+          if (queueRef.current.length > 0) {
+            void drainNext();
+            return;
+          }
           cooldownUntil.current = performance.now() + 220;
           setTimeout(() => {
+            if (queueRef.current.length > 0) {
+              void drainNext();
+              return;
+            }
+            busyRef.current = false;
             setCinematic(false);
             setGrab(null);
           }, 140);
@@ -656,6 +823,7 @@ export function useFrogTongue({
       }
       if (pathNode) {
         pathNode.style.strokeDasharray = `0 ${geom.total}`;
+        pathNode.style.strokeWidth = `${TONGUE_STROKE}`;
         pathNode.style.visibility = 'hidden';
       }
       if (fxGroupEl.current) {
@@ -663,6 +831,7 @@ export function useFrogTongue({
       }
     };
   }, [
+    drainNext,
     flyRefs,
     frogBoxRef,
     frogRef,
@@ -690,6 +859,83 @@ export function useFrogTongue({
     visuallyDone,
     speedUpTongue,
   };
+}
+
+function pulseBox(
+  box: HTMLElement | null | undefined,
+  keyframes: Keyframe[],
+  options: KeyframeAnimationOptions,
+) {
+  if (!box) return;
+  try {
+    const prevOrigin = box.style.transformOrigin;
+    box.style.transformOrigin = '50% 88%';
+    const anim = box.animate(keyframes, {
+      ...options,
+      composite: 'add',
+    });
+    const restore = () => {
+      box.style.transformOrigin = prevOrigin;
+    };
+    anim.onfinish = restore;
+    anim.oncancel = restore;
+  } catch {
+    // ignore
+  }
+}
+
+function showComboLabel(x: number, y: number, combo: number, reduced: boolean) {
+  if (typeof document === 'undefined') return;
+  const el = document.createElement('div');
+  const hot = combo >= 3;
+  el.textContent = `Combo ×${combo + 1}`;
+  el.setAttribute('aria-hidden', 'true');
+  Object.assign(el.style, {
+    position: 'fixed',
+    left: `${x}px`,
+    top: `${y - 34}px`,
+    zIndex: '60',
+    pointerEvents: 'none',
+    padding: '4px 10px',
+    borderRadius: '999px',
+    font: '900 13px/1.1 system-ui, -apple-system, sans-serif',
+    letterSpacing: '0.02em',
+    whiteSpace: 'nowrap',
+    color: '#fff',
+    background: hot
+      ? 'linear-gradient(180deg, #fcd34d, #f59e0b)'
+      : 'linear-gradient(180deg, #fb7185, #f43f5e)',
+    boxShadow: hot
+      ? '0 4px 14px -4px rgba(245, 158, 11, 0.7)'
+      : '0 4px 14px -4px rgba(244, 63, 94, 0.6)',
+    transform: 'translate(-50%, -50%)',
+  });
+  document.body.appendChild(el);
+  try {
+    const anim = el.animate(
+      reduced
+        ? [{ opacity: 1 }, { opacity: 1, offset: 0.7 }, { opacity: 0 }]
+        : [
+            { opacity: 0, transform: 'translate(-50%, -50%) scale(0.4)' },
+            {
+              opacity: 1,
+              transform: 'translate(-50%, -60%) scale(1.15) rotate(-4deg)',
+              offset: 0.18,
+            },
+            {
+              opacity: 1,
+              transform: 'translate(-50%, -80%) scale(1) rotate(0deg)',
+              offset: 0.65,
+            },
+            { opacity: 0, transform: 'translate(-50%, -150%) scale(0.95)' },
+          ],
+      { duration: 950, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
+    );
+    anim.onfinish = () => el.remove();
+    anim.oncancel = () => el.remove();
+  } catch {
+    window.setTimeout(() => el.remove(), 950);
+  }
 }
 
 function easeOutQuad(t: number) {

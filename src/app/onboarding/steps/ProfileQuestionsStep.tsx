@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Check } from 'lucide-react';
 import useSWR from 'swr';
@@ -8,6 +8,8 @@ import { cn } from '@/lib/utils';
 import type { OnboardingStepProps } from './types';
 import type { MacroCategoryDefinition } from '@/lib/quests/types';
 import { OnboardingFrogHeader } from './OnboardingFrogHeader';
+import { OnboardingButton, OnboardingFooter } from './OnboardingFooter';
+import { hapticSelect } from '@/lib/haptics';
 
 type AboutOption = {
   id: string;
@@ -131,20 +133,32 @@ export default function ProfileQuestionsStep({
       (o) => !o.icon && !o.iconImageUrl && !o.description,
     );
 
+  const advanceTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (advanceTimerRef.current !== null) window.clearTimeout(advanceTimerRef.current);
+      advanceTimerRef.current = null;
+    };
+  }, [questionIndex]);
+
   const chooseOption = (id: string) => {
+    hapticSelect();
     if (currentQuestion.multiSelect) {
       onSelect(currentQuestion.id, id, true);
       return;
     }
 
+    if (advanceTimerRef.current !== null) return;
     onSelect(currentQuestion.id, id);
-    window.setTimeout(() => {
+    advanceTimerRef.current = window.setTimeout(() => {
+      advanceTimerRef.current = null;
       if (questionIndex < displayedQuestions.length - 1) {
         onSubStepChange(questionIndex + 1);
       } else {
         onNext();
       }
-    }, 120);
+    }, 240);
   };
 
   const handleMultiSelectNext = () => {
@@ -207,9 +221,10 @@ export default function ProfileQuestionsStep({
                       // Short banner on phones so the list stays scannable; a
                       // wider tile once the grid gains columns.
                       'md:h-auto md:aspect-[16/9]',
+                      '[-webkit-tap-highlight-color:transparent]',
                       isSelected
-                        ? 'border-primary'
-                        : 'border-transparent hover:border-white/50',
+                        ? 'border-primary ring-4 ring-primary/25'
+                        : 'border-transparent [@media(hover:hover)]:hover:border-white/50',
                       saving && 'cursor-not-allowed opacity-70',
                     )}
                   >
@@ -282,10 +297,11 @@ export default function ProfileQuestionsStep({
               <button
                 key={option.id}
                 type="button"
+                aria-pressed={isSelected}
                 onClick={() => chooseOption(option.id)}
                 disabled={saving}
                 className={cn(
-                  'rounded-3xl border-2 bg-background text-base font-black text-foreground shadow-sm transition-all duration-200 active:scale-[0.98]',
+                  'relative rounded-2xl border-2 bg-card text-base font-black text-foreground shadow-[0_3px_0_0_rgba(0,0,0,0.06)] transition-all duration-150 [-webkit-tap-highlight-color:transparent] active:translate-y-[2px] active:shadow-none',
                   hasDescription
                     ? 'flex flex-col items-center justify-center gap-1 px-5 py-4 text-center md:py-3.5'
                     : 'h-[62px] md:h-[56px]',
@@ -295,8 +311,8 @@ export default function ProfileQuestionsStep({
                     currentQuestion.options.length % 2 === 1 &&
                     'col-span-2',
                   isSelected
-                    ? 'border-primary/60 bg-primary/10 text-primary'
-                    : 'border-border/50 hover:border-primary/30 hover:bg-muted/30',
+                    ? 'border-primary bg-primary/10 text-primary shadow-none'
+                    : 'border-border/60 [@media(hover:hover)]:hover:border-primary/40',
                   saving && 'cursor-not-allowed opacity-70',
                 )}
               >
@@ -363,26 +379,23 @@ export default function ProfileQuestionsStep({
           )}
         </div>
 
-        {currentQuestion.multiSelect && (
-          <div className="sticky bottom-0 z-30 mt-1 flex w-[calc(100%+2rem)] max-w-[calc(100vw-2rem)] justify-center bg-gradient-to-t from-background via-background/90 to-transparent pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-4 md:mx-auto md:w-full md:max-w-md">
-            <motion.button
-              type="button"
-              onClick={handleMultiSelectNext}
-              disabled={selectedValues.length === 0 || saving}
-              whileTap={{ scale: 0.97 }}
-              className={cn(
-                'h-14 w-full rounded-3xl font-bold text-base tracking-wide transition-all duration-200 md:w-80',
-                selectedValues.length > 0 && !saving
-                  ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/25 hover:brightness-110'
-                  : 'bg-muted text-muted-foreground cursor-not-allowed',
-              )}
-            >
-              {saving ? 'Setting up...' : 'Next'}
-            </motion.button>
-          </div>
-        )}
       </motion.div>
       </div>
+
+      {currentQuestion.multiSelect && (
+        <>
+          <div className="flex-1" />
+          <OnboardingFooter>
+            <OnboardingButton
+              onClick={handleMultiSelectNext}
+              disabled={selectedValues.length === 0}
+              loading={saving}
+            >
+              {selectedValues.length > 0 ? `Continue · ${selectedValues.length} picked` : 'Pick at least one'}
+            </OnboardingButton>
+          </OnboardingFooter>
+        </>
+      )}
     </div>
   );
 }

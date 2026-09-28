@@ -7,6 +7,7 @@ import React, {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from 'react';
 import { usePathname } from 'next/navigation';
 import { randomUUID } from '@/lib/uuid';
@@ -57,7 +58,7 @@ import {
   FilterTriggerButton,
 } from '@/components/ui/TaskFilterBar';
 import { useTaskFilters } from '@/hooks/useTaskFilters';
-import PaginationDots from './PaginationDots';
+import DateStrip, { createLiveDateStore, type LiveDateStore } from './DateStrip';
 import { Skeleton } from '@/components/ui/Skeleton';
 import DragOverlay from './DragOverlay';
 import PlannerHeader from './PlannerHeader';
@@ -111,6 +112,30 @@ function sortCompletedLast(
   const completed: Task[] = [];
   for (const t of tasks) (isDone(t) ? completed : active).push(t);
   return [...active, ...completed];
+}
+
+function LivePlannerHeader({
+  liveDate,
+  expanded,
+  onToggle,
+}: {
+  liveDate: LiveDateStore;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  const dateKey = useSyncExternalStore(
+    liveDate.subscribe,
+    liveDate.get,
+    liveDate.get,
+  );
+  return (
+    <PlannerHeader
+      dateKey={dateKey}
+      expanded={expanded}
+      onToggle={onToggle}
+      variant="mobile"
+    />
+  );
 }
 
 function DockTile({
@@ -504,11 +529,22 @@ export default function TaskBoard({
   const trackRef = useRef<HTMLDivElement>(null);
   const dragActiveRef = useRef(false);
   dragActiveRef.current = !!drag?.active;
+  const stripSyncRef = useRef<(() => void) | null>(null);
+  const [liveDate] = useState(() => createLiveDateStore(activeDateKey));
+  useEffect(() => {
+    liveDate.set(activeDateKey);
+  }, [liveDate, activeDateKey]);
   const pager = useBoardPager({
     scrollerRef,
     trackRef,
     enabled: !scrollLocked,
     isCardDragging: () => dragActiveRef.current,
+    onWrite: () => stripSyncRef.current?.(),
+    onSettled: (i) => {
+      setPageIndex(i);
+      const dk = windowDates[i];
+      if (dk) setActiveDateKey(dk);
+    },
   });
 
   const frontAnchorRef = useRef<{ key: string; left: number } | null>(null);
@@ -527,6 +563,7 @@ export default function TaskBoard({
     frontAnchorRef.current = first?.dataset.dateKey
       ? { key: first.dataset.dateKey, left: first.offsetLeft }
       : null;
+    stripSyncRef.current?.();
   });
 
   const { refreshDepth } = pager;
@@ -554,7 +591,12 @@ export default function TaskBoard({
       window.removeEventListener(TOUR_SAVED_DROP_EVENT, onTourSavedDrop);
   }, []);
 
-  const { animateToIndex, settle: settleBoard, step: stepBoard } = pager;
+  const {
+    animateToIndex,
+    settle: settleBoard,
+    step: stepBoard,
+    isBusy: pagerBusy,
+  } = pager;
   const [atBoardStart, setAtBoardStart] = useState(false);
   const centerColumnSmooth = useCallback(
     (i: number) => animateToIndex(i),
@@ -717,7 +759,9 @@ export default function TaskBoard({
         const scrollCenter = s.scrollLeft + s.clientWidth / 2;
         return Math.abs(colCenter - scrollCenter) < col.clientWidth / 2;
       });
-      if (idx >= 0 && idx < N) {
+      const deferToSettle =
+        pagerBusy() && Math.abs(idx - pageIndexRef.current) < 2;
+      if (idx >= 0 && idx < N && !deferToSettle) {
         setPageIndex(idx);
         const dk = windowDates[idx];
         if (dk && dk !== activeDateKey) setActiveDateKey(dk);
@@ -756,6 +800,7 @@ export default function TaskBoard({
     drag?.active,
     canLoadPast,
     extendEdge,
+    pagerBusy,
   ]);
 
   // Freeze ambient Rive playback while a card is being dragged (scrolling is
@@ -1891,21 +1936,6 @@ export default function TaskBoard({
     windowDates,
   ]);
 
-  // Visible 7 dots centered on the live pageIndex (tracks scroll for smooth transitions).
-  const visibleDateDots = useMemo(() => {
-    if (windowDates.length === 0) return [];
-    const want = 7;
-    const half = Math.floor(want / 2);
-    const center = Math.min(Math.max(pageIndex, 0), windowDates.length - 1);
-    let start = Math.max(0, center - half);
-    let end = start + want;
-    if (end > windowDates.length) {
-      end = windowDates.length;
-      start = Math.max(0, end - want);
-    }
-    return windowDates.slice(start, end);
-  }, [windowDates, pageIndex]);
-
   // Build per-column titles ("Wed 5/14" on mobile, "Wednesday 5/14" on desktop)
   const titleForIndex = useCallback(
     (i: number) => {
@@ -2260,11 +2290,10 @@ export default function TaskBoard({
         } ${moveCalendarOpen ? 'hidden' : ''}`}
       >
         <div className="md:hidden pointer-events-auto flex w-full items-center justify-center">
-          <PlannerHeader
-            dateKey={activeDateKey}
+          <LivePlannerHeader
+            liveDate={liveDate}
             expanded={calendarOpen}
             onToggle={() => setCalendarOpen((v) => !v)}
-            variant="mobile"
           />
         </div>
         <div className="hidden md:flex items-center gap-2.5 pointer-events-auto">
@@ -2327,9 +2356,11 @@ export default function TaskBoard({
         </div>
         {!calendarOpen && (
           <div className="md:hidden pointer-events-auto w-full px-2 py-1.5 rounded-2xl bg-card/40 backdrop-blur-xl">
-            <PaginationDots
-              dates={visibleDateDots}
-              activeDate={windowDates[pageIndex] ?? activeDateKey}
+            <DateStrip
+              dates={windowDates}
+              scrollerRef={scrollerRef}
+              syncRef={stripSyncRef}
+              liveDate={liveDate}
               onSelectDate={(d) => {
                 const i = windowDates.indexOf(d);
                 if (i >= 0) centerColumnSmooth(i);

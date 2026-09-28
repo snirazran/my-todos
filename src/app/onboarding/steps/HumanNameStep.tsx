@@ -5,7 +5,8 @@ import { motion } from 'framer-motion';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { OnboardingStepProps } from './types';
-import { OnboardingFrogHeader, ONBOARDING_BODY_CLASS } from './OnboardingFrogHeader';
+import { OnboardingFrogHeader, ONBOARDING_BODY_CLASS, ONBOARDING_FOOTER_SPACER_CLASS } from './OnboardingFrogHeader';
+import { OnboardingButton, OnboardingFooter } from './OnboardingFooter';
 
 export default function HumanNameStep({ selections, onSelect, onNext, saving, direction }: OnboardingStepProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -34,24 +35,24 @@ export default function HumanNameStep({ selections, onSelect, onNext, saving, di
         custom={direction}
         initial={{ opacity: 0, x: direction * 40 }}
         animate={{ opacity: 1, x: 0 }}
-        exit={{ opacity: 0, x: direction * -40 }}
         transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-        className={cn('flex flex-col items-center px-4', ONBOARDING_BODY_CLASS)}
+        className={cn('flex flex-col items-center', ONBOARDING_BODY_CLASS)}
       >
-        <div className="relative -mt-28 w-full">
+        <form
+          className="relative -mt-28 w-full md:max-w-md"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (canContinue && !saving) onNext();
+          }}
+        >
           <input
             ref={inputRef}
             value={humanName}
             onChange={(event) => setHumanName(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                event.preventDefault();
-                if (canContinue && !saving) onNext();
-              }
-            }}
-            className="relative w-full h-16 md:h-[4.25rem] rounded-3xl border-2 border-border/50 bg-background px-12 text-center text-lg md:text-xl font-bold text-foreground shadow-sm outline-none transition placeholder:text-muted-foreground/35 focus:border-primary/60 focus:ring-4 focus:ring-primary/10"
+            className="relative h-16 w-full rounded-3xl border-2 border-border/60 bg-card px-12 text-center text-xl font-black tracking-tight text-foreground shadow-[0_3px_0_0_rgba(0,0,0,0.06)] outline-none transition placeholder:font-bold placeholder:text-muted-foreground/40 focus:border-primary/60 focus:ring-4 focus:ring-primary/10"
             aria-label="Your name"
-            placeholder="Your name"
+            placeholder="Your first name"
+            name="given-name"
             maxLength={40}
             enterKeyHint="next"
             autoComplete="given-name"
@@ -62,32 +63,24 @@ export default function HumanNameStep({ selections, onSelect, onNext, saving, di
           {humanName.length > 0 && (
             <button
               type="button"
+              onMouseDown={(event) => event.preventDefault()}
               onClick={() => setHumanName('')}
-              className="absolute right-4 top-1/2 z-20 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-muted text-muted-foreground transition hover:bg-muted/80"
+              className="absolute right-3 top-1/2 z-20 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground/70 transition hover:bg-muted active:scale-90"
               aria-label="Clear your name"
             >
               <X className="h-4 w-4" />
             </button>
           )}
-        </div>
-
-        <motion.button
-          type="button"
-          onClick={onNext}
-          disabled={!canContinue || saving}
-          whileTap={{ scale: 0.97 }}
-          className={cn(
-            'mt-4 w-full md:w-80 h-14 rounded-2xl font-bold text-base tracking-wide transition-all duration-200',
-            canContinue && !saving
-              ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/25 hover:brightness-110'
-              : 'bg-muted text-muted-foreground cursor-not-allowed',
-          )}
-        >
-          {saving ? 'Setting up...' : 'Next'}
-        </motion.button>
+        </form>
       </motion.div>
 
-      <div className="flex-[8]" />
+      <div className={ONBOARDING_FOOTER_SPACER_CLASS} />
+
+      <OnboardingFooter>
+        <OnboardingButton onClick={onNext} disabled={!canContinue} loading={saving}>
+          Next
+        </OnboardingButton>
+      </OnboardingFooter>
     </div>
   );
 }

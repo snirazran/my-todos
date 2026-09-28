@@ -2,8 +2,6 @@
 
 import { type ReactNode } from 'react';
 import { motion } from 'framer-motion';
-import { Check } from 'lucide-react';
-import { cn } from '@/lib/utils';
 
 type Props = {
   onBack?: () => void;
@@ -33,9 +31,16 @@ export function OnboardingTopBar({ onBack, done, total, rightSlot }: Props) {
         <div aria-hidden className="h-10 w-10 shrink-0" />
       )}
 
-      <div className="relative h-10 flex-1 rounded-full bg-background/85 px-4 shadow-md ring-1 ring-border/40 backdrop-blur">
+      <div
+        role="progressbar"
+        aria-label="Onboarding progress"
+        aria-valuemin={0}
+        aria-valuemax={total}
+        aria-valuenow={done}
+        className="relative h-10 flex-1 rounded-full bg-background/85 px-4 shadow-md ring-1 ring-border/40 backdrop-blur"
+      >
         <div className="relative h-full">
-          <div className="absolute left-0 right-0 top-1/2 h-3 -translate-y-1/2 rounded-full bg-zinc-300 dark:bg-zinc-600" />
+          <div className="absolute left-0 right-0 top-1/2 h-3 -translate-y-1/2 rounded-full bg-zinc-200 dark:bg-zinc-700" />
           <motion.div
             className="absolute left-0 top-1/2 h-3 -translate-y-1/2"
             initial={false}
@@ -59,25 +64,6 @@ export function OnboardingTopBar({ onBack, done, total, rightSlot }: Props) {
               }}
             />
           </motion.div>
-          {Array.from({ length: Math.max(total - 1, 0) }, (_, index) => {
-            const milestone = index + 1;
-            const isCompleted = milestone <= done;
-
-            return (
-              <div
-                key={milestone}
-                className={cn(
-                  'absolute top-1/2 flex h-5 w-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full transition-colors',
-                  isCompleted
-                    ? 'bg-primary text-primary-foreground shadow-sm'
-                    : 'bg-zinc-300 text-transparent dark:bg-zinc-600',
-                )}
-                style={{ left: `${(milestone / total) * 100}%` }}
-              >
-                {isCompleted ? <Check className="h-3 w-3" strokeWidth={3.5} /> : null}
-              </div>
-            );
-          })}
         </div>
       </div>
 

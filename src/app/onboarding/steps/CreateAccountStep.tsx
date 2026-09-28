@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Loader2 } from 'lucide-react';
+import { MailCheck } from 'lucide-react';
 import { sendSignInLinkToEmail, signOut, type AuthCredential } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { clearSessionCookie, establishSessionCookie } from '@/lib/authCookie';
@@ -34,6 +34,7 @@ import { GoogleIcon } from '@/components/ui/GoogleIcon';
 import { AppleIcon } from '@/components/ui/AppleIcon';
 import type { OnboardingStepProps } from './types';
 import { OnboardingFrogHeader, ONBOARDING_BODY_CLASS } from './OnboardingFrogHeader';
+import { OnboardingButton, useOnboardingKeyboardInset } from './OnboardingFooter';
 
 type Step = 'enter' | 'email-sent';
 
@@ -69,6 +70,22 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
     'new-account',
   );
   const [switching, setSwitching] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+  const keyboardInset = useOnboardingKeyboardInset();
+
+  useEffect(() => {
+    const form = formRef.current;
+    const vv = window.visualViewport;
+    if (!keyboardInset || !form || !vv) return;
+    const scroller = form.closest('main');
+    if (!scroller) return;
+    const frame = requestAnimationFrame(() => {
+      const visibleBottom = vv.offsetTop + vv.height - 12;
+      const overlap = form.getBoundingClientRect().bottom - visibleBottom;
+      if (overlap > 0) scroller.scrollBy({ top: overlap, behavior: 'smooth' });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [keyboardInset, error]);
 
   useEffect(() => {
     void initNativeGoogleSignIn().catch(() => {
@@ -265,7 +282,7 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
         subtitle="Create a free account so your frog and progress are safe on any device."
       />
 
-      <div className={`relative z-20 flex w-full flex-col items-center px-4 ${ONBOARDING_BODY_CLASS}`}>
+      <div className={`relative z-20 flex w-full flex-col items-center px-4 pb-[calc(2rem+env(safe-area-inset-bottom))] md:pb-10 ${ONBOARDING_BODY_CLASS}`}>
         <div className="w-full max-w-sm">
           <AnimatePresence mode="wait">
             {step === 'enter' ? (
@@ -277,70 +294,69 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
                 exit="exit"
                 transition={{ duration: 0.18 }}
               >
-                <button
-                  type="button"
-                  onClick={handleGoogle}
-                  disabled={loading}
-                  className="flex h-12 w-full items-center justify-center gap-3 rounded-2xl border border-border bg-card/60 text-sm font-bold tracking-wide transition-all hover:bg-muted/50 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {loading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <>
-                      <GoogleIcon /> Continue with Google
-                    </>
-                  )}
-                </button>
+                <div className="flex flex-col gap-3">
+                  <OnboardingButton
+                    variant="secondary"
+                    onClick={handleGoogle}
+                    loading={loading}
+                    className="h-[52px] text-foreground md:w-full"
+                  >
+                    <GoogleIcon /> Continue with Google
+                  </OnboardingButton>
+                  <OnboardingButton
+                    variant="secondary"
+                    onClick={handleApple}
+                    loading={loading}
+                    className="h-[52px] text-foreground md:w-full"
+                  >
+                    <AppleIcon /> Continue with Apple
+                  </OnboardingButton>
+                </div>
 
-                <button
-                  type="button"
-                  onClick={handleApple}
-                  disabled={loading}
-                  className="mt-3 flex h-12 w-full items-center justify-center gap-3 rounded-2xl border border-border bg-card/60 text-sm font-bold tracking-wide transition-all hover:bg-muted/50 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {loading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <>
-                      <AppleIcon /> Continue with Apple
-                    </>
-                  )}
-                </button>
-
-                <div className="relative my-4">
+                <div className="relative my-5">
                   <div className="absolute inset-0 flex items-center">
                     <span className="w-full border-t border-border/60" />
                   </div>
                   <div className="relative flex justify-center text-[13px]">
-                    <span className="bg-background px-2 font-bold tracking-widest text-muted-foreground">
-                      Or
+                    <span className="bg-background px-3 font-bold text-muted-foreground">
+                      or use email
                     </span>
                   </div>
                 </div>
 
-                <form onSubmit={handleSendEmailLink} className="space-y-3">
+                <form ref={formRef} onSubmit={handleSendEmailLink} className="space-y-3">
                   <Input
                     type="email"
                     inputMode="email"
                     autoComplete="email"
                     enterKeyHint="send"
                     autoCapitalize="none"
+                    autoCorrect="off"
                     spellCheck={false}
-                    placeholder="Email address"
+                    placeholder="you@example.com"
+                    aria-label="Email address"
+                    name="email"
                     value={email}
-                    onChange={(event) => setEmail(event.target.value)}
-                    className="h-12 rounded-2xl border-border/60 bg-muted/30 text-center focus-visible:ring-primary/30"
+                    onChange={(event) => {
+                      setEmail(event.target.value);
+                      if (error) setError(null);
+                    }}
+                    className="h-[52px] rounded-2xl border-2 border-border/60 bg-card text-center text-base font-bold shadow-[0_3px_0_0_rgba(0,0,0,0.06)] placeholder:font-semibold placeholder:text-muted-foreground/50 focus-visible:border-primary/60 focus-visible:ring-4 focus-visible:ring-primary/10 focus-visible:ring-offset-0 md:text-base"
                     required
                   />
                   {error ? <ErrorMsg>{error}</ErrorMsg> : null}
-                  <button
+                  <OnboardingButton
                     type="submit"
-                    disabled={!email.trim() || loading}
-                    className="flex h-12 w-full items-center justify-center rounded-2xl bg-primary text-sm font-black text-primary-foreground transition-all hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={!email.trim()}
+                    loading={loading}
+                    className="md:w-full"
                   >
-                    {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Send sign-in link'}
-                  </button>
+                    Send sign-in link
+                  </OnboardingButton>
                 </form>
+                {keyboardInset > 0 ? (
+                  <div aria-hidden style={{ height: keyboardInset }} />
+                ) : null}
               </motion.div>
             ) : (
               <motion.div
@@ -350,30 +366,33 @@ export default function CreateAccountStep({ selections, onNext, saving }: Onboar
                 animate="center"
                 exit="exit"
                 transition={{ duration: 0.18 }}
-                className="text-center"
+                className="flex flex-col items-center text-center"
               >
-                <p className="text-sm text-foreground">Check your email at</p>
-                <p className="mt-1 text-sm font-bold text-foreground">{email}</p>
-                {sentIntent === 'existing-account' ? (
-                  <p className="mt-3 text-xs text-muted-foreground">
-                    Tap the link to sign back into your account. Your frog and
-                    progress will be exactly as you left them.
+                <div className="flex w-full flex-col items-center rounded-3xl border border-border/60 bg-card px-5 py-5 shadow-[0_3px_0_0_rgba(0,0,0,0.06)]">
+                  <span className="grid h-12 w-12 place-items-center rounded-2xl bg-primary/10 text-primary">
+                    <MailCheck className="h-6 w-6" strokeWidth={2.25} />
+                  </span>
+                  <p className="mt-3 text-base font-black text-foreground">Check your inbox</p>
+                  <p className="mt-1 break-all text-sm font-bold text-primary">{email}</p>
+                  <p className="mt-2 text-[13px] font-medium leading-snug text-muted-foreground">
+                    {sentIntent === 'existing-account'
+                      ? 'Tap the link to sign back into your account. Your frog and progress will be exactly as you left them.'
+                      : 'Tap the link to finish signing in. You can hop in meanwhile.'}
                   </p>
-                ) : (
-                  <>
-                    <p className="mt-3 text-xs text-muted-foreground">
-                      Tap the link to finish signing in. You can hop in meanwhile.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={onNext}
-                      disabled={saving}
-                      className="mt-6 h-12 rounded-2xl bg-primary px-8 text-sm font-black text-primary-foreground disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {saving ? 'Setting up...' : 'Hop in'}
-                    </button>
-                  </>
-                )}
+                </div>
+                {sentIntent === 'new-account' ? (
+                  <OnboardingButton onClick={onNext} loading={saving} className="mt-5 md:w-full">
+                    Hop in
+                  </OnboardingButton>
+                ) : null}
+                <OnboardingButton
+                  variant="ghost"
+                  onClick={() => setStep('enter')}
+                  disabled={saving}
+                  className="mt-1 md:w-full"
+                >
+                  Use a different email
+                </OnboardingButton>
               </motion.div>
             )}
           </AnimatePresence>

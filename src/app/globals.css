@@ -246,6 +246,29 @@ body:has([data-public-home]) #main-scroll {
   }
 }
 
+@keyframes tongue-queued-jitter {
+  0%,
+  100% {
+    transform: scale(1.08) rotate(0deg);
+  }
+  25% {
+    transform: scale(1.08) rotate(-7deg);
+  }
+  75% {
+    transform: scale(1.08) rotate(7deg);
+  }
+}
+[data-tongue-queued] {
+  border-color: hsl(var(--primary) / 0.7) !important;
+  box-shadow: 0 0 0 3px hsl(var(--primary) / 0.25);
+  animation: tongue-queued-jitter 0.32s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-tongue-queued] {
+    animation: none;
+  }
+}
+
 /* 404 / crash scene: marching flight path, drifting catchable flies, catch pop. */
 @keyframes error-route-draw {
   to {
@@ -1136,9 +1159,9 @@ body.dragging {
 }
 
 .plus-sheet {
-  --plus-field: #4a3dbf;
-  --plus-field-deep: #3a2f9f;
-  --plus-field-rgb: 74, 61, 191;
+  --plus-field: #123a2a;
+  --plus-field-deep: #0b271c;
+  --plus-field-rgb: 18, 58, 42;
   --plus-surface: rgba(255, 255, 255, 0.08);
   --plus-surface-strong: rgba(255, 255, 255, 0.14);
   --plus-line: rgba(255, 255, 255, 0.16);
@@ -1149,14 +1172,16 @@ body.dragging {
 }
 
 .plus-glow {
-  background-image: linear-gradient(180deg, transparent 50%, var(--plus-field-deep) 100%);
+  background-image:
+    radial-gradient(90% 38% at 50% 0%, rgba(74, 160, 108, 0.35), transparent 70%),
+    linear-gradient(180deg, transparent 45%, var(--plus-field-deep) 100%);
 }
 
 @media (min-width: 768px) {
   .plus-glow {
-    left: 45%;
+    left: 42%;
     background-image:
-      radial-gradient(70% 55% at 100% 0%, rgba(167, 139, 250, 0.38), transparent 70%),
-      radial-gradient(60% 45% at 100% 100%, rgba(251, 191, 36, 0.14), transparent 75%);
+      radial-gradient(70% 55% at 100% 0%, rgba(74, 160, 108, 0.3), transparent 70%),
+      radial-gradient(60% 45% at 100% 100%, rgba(251, 191, 36, 0.1), transparent 75%);
   }
 }

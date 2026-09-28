@@ -6,8 +6,10 @@ import { Capacitor } from '@capacitor/core';
 import { FirebaseMessaging } from '@capacitor-firebase/messaging';
 import { enableWebPush } from '@/lib/webPush';
 import { cn } from '@/lib/utils';
+import { Bell } from 'lucide-react';
 import type { OnboardingStepProps } from './types';
 import { OnboardingFrogHeader, ONBOARDING_BODY_CLASS, ONBOARDING_FOOTER_SPACER_CLASS } from './OnboardingFrogHeader';
+import { OnboardingButton, OnboardingFooter } from './OnboardingFooter';
 
 async function enableNotifications() {
   if (Capacitor.isNativePlatform()) {
@@ -64,51 +66,41 @@ export default function NotificationStep({ selections, onNext, saving, direction
         custom={direction}
         initial={{ opacity: 0, x: direction * 40 }}
         animate={{ opacity: 1, x: 0 }}
-        exit={{ opacity: 0, x: direction * -40 }}
         transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-        className={cn('flex flex-col items-center px-4', ONBOARDING_BODY_CLASS)}
+        className={cn('flex flex-col items-center', ONBOARDING_BODY_CLASS)}
       >
-        <div className="flex w-[calc(100%+4rem)] max-w-[calc(100vw-1.5rem)] items-center gap-3 rounded-3xl bg-muted/70 px-4 py-3 shadow-sm md:w-full md:max-w-md lg:max-w-lg">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-background shadow-sm">
-            <img src="/frogress-icon.png" alt="" className="h-10 w-10 rounded-xl" />
-          </div>
+        <motion.div
+          initial={{ opacity: 0, y: -18, scale: 0.96 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ delay: 0.2, type: 'spring', stiffness: 320, damping: 24 }}
+          className="flex w-full items-center gap-3 rounded-[22px] border border-border/50 bg-card/95 px-3.5 py-3 shadow-[0_8px_24px_-12px_rgba(0,0,0,0.25)] backdrop-blur md:max-w-md"
+        >
+          <img src="/frogress-icon.png" alt="" className="h-11 w-11 shrink-0 rounded-[12px] shadow-sm" />
           <div className="min-w-0 flex-1">
             <div className="flex items-center justify-between gap-3">
-              <p className="truncate text-base font-black text-foreground">From {frogName}</p>
-              <span className="text-sm font-medium text-muted-foreground">now</span>
+              <p className="truncate text-[15px] font-black text-foreground">{frogName}</p>
+              <span className="text-xs font-semibold text-muted-foreground">now</span>
             </div>
-            <p className="truncate text-base text-foreground">Remember to drink water!</p>
+            <p className="truncate text-[15px] text-foreground/90">Remember to drink water! 💧</p>
           </div>
-        </div>
+        </motion.div>
+        <p className="mt-4 text-center text-[13px] font-semibold text-muted-foreground">
+          No spam. Turn them off anytime.
+        </p>
 
       </motion.div>
 
       <div className={ONBOARDING_FOOTER_SPACER_CLASS} />
 
-      <div className="flex flex-col items-center gap-3 pb-[calc(4rem+env(safe-area-inset-bottom))]">
-        <motion.button
-          type="button"
-          onClick={handleEnable}
-          disabled={saving || requesting}
-          whileTap={{ scale: 0.97 }}
-          className="h-14 w-full md:w-80 rounded-2xl bg-primary text-base font-bold tracking-wide text-primary-foreground shadow-lg shadow-primary/25 transition-all duration-200 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
-        >
-          {requesting ? 'Opening settings...' : 'Turn on notifications'}
-        </motion.button>
-
-        <motion.button
-          type="button"
-          onClick={onNext}
-          disabled={saving || requesting}
-          whileTap={{ scale: 0.97 }}
-          className={cn(
-            'h-14 w-full md:w-80 rounded-2xl bg-muted text-base font-bold tracking-wide text-muted-foreground shadow-sm transition-all duration-200 hover:bg-muted/80',
-            (saving || requesting) && 'cursor-not-allowed opacity-70',
-          )}
-        >
+      <OnboardingFooter>
+        <OnboardingButton onClick={handleEnable} disabled={saving} loading={requesting}>
+          <Bell className="h-5 w-5" strokeWidth={2.5} />
+          Turn on reminders
+        </OnboardingButton>
+        <OnboardingButton variant="ghost" onClick={onNext} disabled={saving || requesting}>
           Maybe later
-        </motion.button>
-      </div>
+        </OnboardingButton>
+      </OnboardingFooter>
     </div>
   );
 }
