@@ -91,6 +91,7 @@ export function DriftFly({
   forceEntry = false,
   localClock = false,
   alwaysPlay = false,
+  flapWhenIdle = false,
   flyRef,
 }: {
   drift: FocusDrift;
@@ -107,6 +108,8 @@ export function DriftFly({
   /** Keep animating while a sheet/scroll holds the global Rive pause — for
    *  flies rendered inside the open sheet itself. */
   alwaysPlay?: boolean;
+  /** Keep the wings flapping at full opacity while the timer is idle or paused. */
+  flapWhenIdle?: boolean;
   flyRef?: (el: HTMLElement | null) => void;
 }) {
   const spanRef = useRef<HTMLSpanElement | null>(null);
@@ -173,7 +176,7 @@ export function DriftFly({
       style={{
         ...drift.anchor,
         visibility: hidden ? 'hidden' : 'visible',
-        opacity: running ? 1 : 0.7,
+        opacity: running || flapWhenIdle ? 1 : 0.7,
       }}
     >
       <Fly
@@ -181,7 +184,7 @@ export function DriftFly({
         interactive={false}
         alwaysPlay={alwaysPlay}
         ignoreIdlePause
-        paused={!running || hidden}
+        paused={(!running && !flapWhenIdle) || hidden}
       />
     </span>
   );

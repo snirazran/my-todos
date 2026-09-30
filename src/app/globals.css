@@ -1185,3 +1185,184 @@ body.dragging {
       radial-gradient(60% 45% at 100% 100%, rgba(251, 191, 36, 0.1), transparent 75%);
   }
 }
+
+@layer components {
+  :where([data-public-home]) .ph-game-type {
+    font-family: var(--font-display), 'Luckiest Guy', cursive;
+    letter-spacing: 0.02em;
+    -webkit-text-stroke: 2px #0f2e1d;
+    paint-order: stroke fill;
+    text-shadow: 0 3px 0 #0f2e1d;
+  }
+
+  :where([data-public-home]) .ph-title {
+    font-family: var(--font-display), 'Luckiest Guy', cursive;
+    font-weight: 400;
+    letter-spacing: 0.015em;
+    color: #fffdf5;
+    -webkit-text-stroke: 5px #0f2e1d;
+    paint-order: stroke fill;
+    text-shadow: 0 6px 0 #0f2e1d;
+  }
+
+  @media (min-width: 1024px) {
+    :where([data-public-home]) .ph-title {
+      -webkit-text-stroke-width: 7px;
+      text-shadow: 0 8px 0 #0f2e1d;
+    }
+  }
+
+  :where([data-public-home]) .ph-h2 {
+    margin-top: 0;
+    text-wrap: balance;
+    font-size: clamp(1.85rem, 4.2vw, 3rem);
+    font-weight: 700;
+    line-height: 1.08;
+    letter-spacing: -0.035em;
+  }
+
+  :where([data-public-home]) .ph-body {
+    margin-top: 1.25rem;
+    max-width: 48ch;
+    text-wrap: pretty;
+    font-size: 1.0625rem;
+    font-weight: 500;
+    line-height: 1.75;
+    color: hsl(var(--muted-foreground));
+  }
+}
+
+[data-public-home] .ph-cta {
+  display: inline-flex;
+  min-height: 3.5rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 1.25rem;
+  background: #4f9149;
+  padding: 0.75rem 1.75rem;
+  font-size: 1rem;
+  font-weight: 900;
+  color: #fff;
+  box-shadow: 0 5px 0 0 #34631f;
+  outline-offset: 4px;
+  transition: transform 150ms ease, box-shadow 150ms ease, background-color 150ms ease;
+}
+
+@media (hover: hover) {
+  [data-public-home] .ph-cta:hover {
+    background: #57a050;
+    transform: translateY(-2px);
+    box-shadow: 0 7px 0 0 #34631f;
+  }
+}
+
+[data-public-home] .ph-cta:active {
+  transform: translateY(5px);
+  box-shadow: 0 0 0 0 #34631f;
+}
+
+[data-public-home] .ph-cta:focus-visible {
+  outline: 3px solid #34631f;
+}
+
+@keyframes ph-rise {
+  from {
+    opacity: 0;
+    transform: translateY(28px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes ph-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes ph-jar-bump {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.45) rotate(-12deg); }
+  70% { transform: scale(0.92) rotate(6deg); }
+  100% { transform: scale(1); }
+}
+
+@keyframes ph-task-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes ph-check-pop {
+  0% { transform: scale(0.3); opacity: 0; }
+  60% { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); }
+}
+
+@keyframes ph-fly-ring {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(79, 145, 73, 0.45); }
+  50% { box-shadow: 0 0 0 7px rgba(79, 145, 73, 0); }
+}
+
+@keyframes ph-bubble-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
+@keyframes ph-frog-swap {
+  0% { transform: translateY(18px) scaleY(0.9); opacity: 0.4; }
+  55% { transform: translateY(-6px) scaleY(1.04); opacity: 1; }
+  100% { transform: none; }
+}
+
+[data-public-home] .ph-rise {
+  animation: ph-rise 800ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+[data-public-home] .ph-fade {
+  animation: ph-fade 700ms ease-out both;
+}
+[data-public-home] .ph-jar-bump {
+  animation: ph-jar-bump 520ms cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+[data-public-home] .ph-task-in {
+  animation: ph-task-in 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+[data-public-home] .ph-check-pop {
+  animation: ph-check-pop 380ms cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+[data-public-home] .ph-fly-ring {
+  animation: ph-fly-ring 1.8s ease-in-out infinite;
+}
+[data-public-home] .ph-bubble-in {
+  animation: ph-bubble-in 360ms cubic-bezier(0.34, 1.4, 0.64, 1) both;
+}
+[data-public-home] .ph-frog-swap {
+  transform-origin: bottom center;
+  animation: ph-frog-swap 520ms cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-public-home] .ph-rise,
+  [data-public-home] .ph-fade,
+  [data-public-home] .ph-jar-bump,
+  [data-public-home] .ph-task-in,
+  [data-public-home] .ph-check-pop,
+  [data-public-home] .ph-fly-ring,
+  [data-public-home] .ph-bubble-in,
+  [data-public-home] .ph-frog-swap {
+    animation: none;
+  }
+}

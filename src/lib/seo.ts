@@ -276,61 +276,56 @@ export const HOMEPAGE_FAQ: readonly FaqItem[] = [
   {
     question: 'Is Frogress free?',
     answer:
-      'Yes. The to-do list, weekly planner, focus timer, daily quests, streaks and your frog are all free on web, iOS and Android, with no card required. Frogress Plus is an optional subscription that adds unlimited quests and tags, double rewards, and Plus-only outfits and backgrounds.',
+      'Yes. The to-do list, weekly planner, focus timer, daily quests, streaks and your frog are all free on the web, iPhone and Android. No card needed. Frogress Plus is an optional subscription that adds unlimited quests and tags, double rewards, and Plus-only outfits and backgrounds.',
   },
   {
     question: 'What makes Frogress different from a normal to-do list app?',
     answer:
-      'Underneath, Frogress is a real task manager: due dates, repeats, tags, notes, subtasks, reminders and calendar sync. On top of that, every task you finish earns a fly, and flies feed and dress a pet frog that lives in the app. The list does the work; the frog is the reason you keep opening it.',
-  },
-  {
-    question: 'How is Frogress different from Habitica or Finch?',
-    answer:
-      'Habitica turns your habits into an RPG with parties, stats and boss fights. Finch is built around self-care check-ins and journaling. Frogress keeps a plain, fast to-do list and planner at the centre and puts a single pet frog on top of it — no combat, no character sheet, and nothing is taken away when you miss a day.',
+      'Underneath, Frogress is a real task manager, with due dates, repeats, tags, notes, subtasks, reminders and calendar sync. On top of that, every task you finish earns a fly, and flies feed and dress a pet frog who lives in the app. The list does the work. The frog is why you keep opening it.',
   },
   {
     question: 'What if plain to-do lists never stick for me?',
     answer:
-      'That is exactly who Frogress is built for. A plain checklist gives you nothing back when you tick something off, so the list slowly stops being worth opening. In Frogress, every finish pays out something small and visible — a fly caught, a quest ticking over, a hungry frog fed — so the app is worth returning to tomorrow.',
+      'Then Frogress was built for you. A plain checklist gives you nothing back when you tick something off, so it slowly stops being worth opening. In Frogress every finish pays out something small you can see: a fly caught, a quest filling up, a hungry frog fed. That’s what brings you back tomorrow.',
   },
   {
     question: 'Do I need an account to try it?',
     answer:
-      'No. You can start adding tasks and feeding your frog right away. Signing in with Apple, Google or an email link saves your tasks, flies and frog so they sync across devices and are never lost.',
+      'No. Start adding tasks and feeding your frog right away. When you’re ready, sign in with Apple, Google or an email link to save your tasks, flies and frog and sync them across your devices.',
   },
   {
     question: 'Does Frogress work on iPhone, Android and the web?',
     answer:
-      'Yes. Frogress runs in any modern browser and has native iOS and Android apps. They all share one account, so tasks, flies, streaks and your frog stay in sync on every device you sign in on.',
+      'Yes. Frogress runs in any modern browser and has apps for iPhone and Android. Sign in with one account and your tasks, flies, streaks and frog stay in sync everywhere.',
   },
   {
     question: 'Can Frogress sync with my calendar?',
     answer:
-      'Yes. Google Calendar and Apple Calendar sync two ways, so your events sit beside your tasks in the planner and changes you make in Frogress flow back to your calendar.',
+      'Yes. Google Calendar and Apple Calendar sync both ways. Your events sit beside your tasks in the planner, and changes you make in Frogress show up in your calendar.',
   },
   {
     question: 'How does the focus timer work?',
     answer:
-      'Pick one task and start a session. On iPhone the timer runs on the Lock Screen and in the Dynamic Island, and the end-of-session alarm rings even in Silent mode. Finished sessions pay out flies, so focused time counts towards your frog as well.',
+      'Pick one task and start a session. On iPhone the timer shows on your Lock Screen and in the Dynamic Island, and the alarm rings even on silent. Finished sessions pay out flies, so focus time feeds your frog too.',
   },
   {
     question: 'What are flies, and what do I spend them on?',
     answer:
-      'Flies are what finishing pays. You earn them by completing tasks, finishing focus sessions, keeping streaks and claiming daily quests. You spend them on hats, outfits, held items, gift boxes and whole new ponds for your frog.',
+      'Flies are your pay for getting things done. You earn them by finishing tasks and focus sessions, keeping streaks and completing daily quests. Spend them on hats, outfits, held items, gift boxes and whole new ponds for your frog.',
   },
   {
-    question: 'Does my frog die if I stop using the app?',
+    question: 'What happens to my frog if I take a break?',
     answer:
-      'Never. Your frog gets hungry when tasks pile up and cheers up when you feed it, but nothing is ever deleted, lost or killed off. Come back after a month away and your frog, your flies and your wardrobe are all still there.',
+      'Nothing bad. Your frog gets hungry when tasks pile up and perks up the moment you feed it, and nothing is ever deleted or lost. Come back after a month away and your frog, flies and wardrobe are right where you left them.',
   },
   {
     question: 'Can I use Frogress with a friend?',
     answer:
-      'Yes. Add friends with a code, share a buddy task you both have to finish, and you each earn bonus flies when it is done. You can also see your friends’ streaks and react to their frogs.',
+      'Yes. Add friends with a code and share a buddy task you both need to finish. When it’s done, you each earn bonus flies. You can also see your friends’ streaks and react to their frogs.',
   },
   {
     question: 'Where is my data stored, and can I delete it?',
     answer:
-      'Your tasks and account data are stored on our servers so they can sync between your devices, and are covered by our Privacy Policy. You can permanently delete your account and everything in it from the profile panel inside the app, or by emailing help@frogress.com.',
+      'Your tasks and account data are stored on our servers so they can sync between your devices, and are covered by our Privacy Policy. You can permanently delete your account and everything in it from the profile panel in the app, or by emailing help@frogress.com.',
   },
 ];

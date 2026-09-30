@@ -1,13 +1,14 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { GripVertical } from 'lucide-react';
 import DayColumn from '@/components/board/DayColumn';
 import TaskCard from '@/components/board/TaskCard';
 import BoardDragOverlay from '@/components/board/DragOverlay';
 import { useDragManager, type DragState } from '@/components/board/hooks/useDragManager';
 import { usePan } from '@/components/board/hooks/usePan';
 import type { Task } from '@/components/board/helpers';
+import { useFlyJar } from '@/components/marketing/FlyJar';
+import { taskFlyWorthNow } from '@/lib/flyValue';
 
 type PlannerDay = {
   id: string;
@@ -17,7 +18,8 @@ type PlannerDay = {
 };
 
 const userTags = [
-  { id: 'productive', name: 'Productivite', color: '#6366f1' },
+  { id: 'productive', name: 'Work', color: '#6366f1' },
+  { id: 'home', name: 'Home', color: '#d97706' },
   { id: 'fitness', name: 'Fitness', color: '#4d9850' },
   { id: 'mindfulness', name: 'Mindfulness', color: '#a855f7' },
 ];
@@ -37,7 +39,7 @@ const initialDays: PlannerDay[] = [
     title: 'Tuesday 7/21',
     tasks: [
       { id: 'first-paragraph', text: 'Draft the first paragraph', order: 0, tags: ['productive'], startTime: '10:00', frogodoroSession: { date: '2026-07-21', focusTime: 1500, breakTime: 300 } },
-      { id: 'dentist', text: 'Book the dentist appointment', order: 1, tags: ['productive'], startTime: '15:30' },
+      { id: 'dentist', text: 'Book the dentist appointment', order: 1, tags: ['home'], startTime: '15:30' },
     ],
   },
   {
@@ -52,7 +54,7 @@ const initialDays: PlannerDay[] = [
     id: 'thu',
     title: 'Thursday 7/23',
     tasks: [
-      { id: 'kitchen-counter', text: 'Clear the kitchen counter', order: 0, tags: ['productive'], startTime: '16:00' },
+      { id: 'kitchen-counter', text: 'Clear the kitchen counter', order: 0, tags: ['home'], startTime: '16:00' },
       { id: 'gym', text: 'Move for 30 minutes', order: 1, tags: ['fitness'], startTime: '18:30', repeatMode: 'weekly', streak: 2 },
     ],
   },
@@ -68,6 +70,7 @@ function RealTaskPreview({
   isToday,
   onGrab,
   setCardRef,
+  onToggleComplete,
 }: {
   task: Task;
   dayIndex: number;
@@ -76,6 +79,7 @@ function RealTaskPreview({
   isToday: boolean;
   onGrab: DragManager['onGrab'];
   setCardRef: DragManager['setCardRef'];
+  onToggleComplete: (task: Task, isToday: boolean) => void;
 }) {
   const dragId = `marketing-${task.id}`;
 
@@ -119,7 +123,7 @@ function RealTaskPreview({
       isAnyDragging={dragging}
       compact
       onTap={() => undefined}
-      onToggleComplete={() => undefined}
+      onToggleComplete={() => onToggleComplete(task, isToday)}
       showStreak
       isToday={isToday}
     />
@@ -136,6 +140,7 @@ function RealDayPreview({
   setListRef,
   setCardRef,
   onGrab,
+  onToggleComplete,
 }: {
   day: PlannerDay;
   dayIndex: number;
@@ -146,6 +151,7 @@ function RealDayPreview({
   setListRef: DragManager['setListRef'];
   setCardRef: DragManager['setCardRef'];
   onGrab: DragManager['onGrab'];
+  onToggleComplete: (task: Task, isToday: boolean) => void;
 }) {
   const activeCount = day.tasks.filter((task) => !task.completed).length;
   const shownTasks = day.tasks.filter(
@@ -184,6 +190,7 @@ function RealDayPreview({
                 isToday={!!day.isToday}
                 onGrab={onGrab}
                 setCardRef={setCardRef}
+                onToggleComplete={onToggleComplete}
               />
             </div>
           ))}
@@ -198,6 +205,7 @@ function RealDayPreview({
 
 export function MarketingPlannerPreview() {
   const [days, setDays] = useState(initialDays);
+  const { award } = useFlyJar();
   const {
     scrollerRef,
     setSlideRef,
@@ -249,6 +257,41 @@ export function MarketingPlannerPreview() {
     });
   }, [endDrag, settleAndEnd]);
 
+  const toggleComplete = useCallback(
+    (task: Task, isToday: boolean) => {
+      const finishing = !task.completed;
+      if (finishing) {
+        const repeating = task.repeatMode !== undefined && task.repeatMode !== 'none';
+        const worth = taskFlyWorthNow({
+          checklist: task.checklist,
+          streak: isToday && repeating ? (task.streak ?? 0) + 1 : 0,
+        });
+        const button = document.querySelector(
+          `[data-card-id="marketing-${task.id}"] button[aria-label="Mark done"]`,
+        );
+        award(`planner-${task.id}`, worth, button);
+      }
+      setDays((current) =>
+        current.map((day) => ({
+          ...day,
+          tasks: day.tasks.map((item) =>
+            item.id === task.id
+              ? {
+                  ...item,
+                  completed: finishing,
+                  streak:
+                    item.streak !== undefined && isToday
+                      ? item.streak + (finishing ? 1 : -1)
+                      : item.streak,
+                }
+              : item,
+          ),
+        })),
+      );
+    },
+    [award],
+  );
+
   useEffect(() => {
     if (!drag?.active) {
       dropInFlightRef.current = false;
@@ -262,16 +305,16 @@ export function MarketingPlannerPreview() {
   }, [drag?.active, finishDrop]);
 
   return (
-    <div className="min-w-0 max-w-full rounded-[30px] border border-white/15 bg-background p-3 text-foreground shadow-2xl shadow-black/30 sm:p-5">
-      <div className="mb-4 px-1">
-        <p className="text-[11px] font-black text-muted-foreground">Weekly planner</p>
-        <p className="mt-0.5 text-base font-black">July 20–26</p>
+    <div className="min-w-0 max-w-full rounded-[30px] bg-card p-3 text-foreground shadow-[0_6px_0_rgba(15,46,29,0.08),0_40px_70px_-35px_rgba(15,46,29,0.45)] ring-1 ring-[#0f2e1d]/[0.06] dark:ring-white/[0.08] sm:p-5">
+      <div className="mb-3 flex items-end justify-between gap-3 px-1">
+        <div>
+          <p className="text-[11px] font-black text-muted-foreground">This week</p>
+          <p className="mt-0.5 text-base font-black">July 20–26</p>
+        </div>
+        <p className="max-w-[24ch] text-right text-[11px] font-bold leading-tight text-muted-foreground">
+          Hold a card to move it. Tap a fly to finish.
+        </p>
       </div>
-
-      <p className="mb-2 px-1 text-[9px] font-black text-muted-foreground">
-        Swipe the board · hold a task, then move it between days
-        <GripVertical className="ml-1 inline h-3 w-3" aria-hidden />
-      </p>
       <div
         ref={scrollerRef}
         dir="ltr"
@@ -299,6 +342,7 @@ export function MarketingPlannerPreview() {
             setListRef={setListRef}
             setCardRef={setCardRef}
             onGrab={onGrab}
+            onToggleComplete={toggleComplete}
           />
         ))}
       </div>

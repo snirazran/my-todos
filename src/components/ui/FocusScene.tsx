@@ -46,6 +46,7 @@ export function FocusScene({
   trackMovingTarget = false,
   allowCameraFollow = true,
   localClock = false,
+  flapWhenIdle = false,
 }: {
   indices?: Partial<Record<WardrobeSlot, number>>;
   running: boolean;
@@ -72,6 +73,8 @@ export function FocusScene({
   /** Decorative scenes with no real focus session behind them — drift on wall
    *  time so the swarm still moves. */
   localClock?: boolean;
+  /** Keep the swarm's wings flapping while the timer is idle or paused. */
+  flapWhenIdle?: boolean;
 }) {
   const frogRef = useRef<FrogHandle | null>(null);
   const frogBoxRef = useRef<HTMLDivElement | null>(null);
@@ -293,6 +296,7 @@ export function FocusScene({
                 hidden={hidden}
                 localClock={localClock}
                 alwaysPlay
+                flapWhenIdle={flapWhenIdle}
                 entryFromX={entrySideFor(drift)}
                 forceEntry={epoch > 0}
                 flyRef={(el) => {
