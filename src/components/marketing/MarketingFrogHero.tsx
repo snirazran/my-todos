@@ -122,7 +122,7 @@ export function MarketingFrogHero() {
 
   return (
     <div className="ph-hero-demo relative mx-auto w-full max-w-[460px] pt-[226px] sm:pt-[238px]">
-      <div className="absolute inset-x-0 -top-1.5 z-40 flex justify-center sm:top-0">
+      <div className="absolute inset-x-0 -top-3.5 z-40 flex justify-center sm:top-0">
         <div ref={frogBoxRef} className="relative w-[250px] sm:w-[270px]">
           <FrogSpeechBubble
             rate={0}

@@ -301,7 +301,7 @@ export function MarketingWardrobePreview() {
           </button>
         </div>
 
-        <div className="pointer-events-none absolute inset-x-0 bottom-1 z-50 flex justify-center sm:-bottom-4">
+        <div className="pointer-events-none absolute inset-x-0 bottom-[6px] z-50 flex justify-center sm:-bottom-4">
           <div className="relative h-[260px] w-[235px] sm:h-[290px] sm:w-[260px]">
             <Frog
               className="absolute inset-x-0 bottom-[-22px] z-10"
