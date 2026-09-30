@@ -164,7 +164,7 @@ async function runConsentFlow(AdMob: AdMobPlugin) {
 export async function openPrivacyOptions(): Promise<boolean> {
   if (!Capacitor.isNativePlatform()) return false;
   try {
-    const AdMob = await ensureInitialized();
+    const { AdMob } = await ensureInitialized();
     await AdMob.showPrivacyOptionsForm();
     const info = await AdMob.requestConsentInfo();
     consentBlocked = info.canRequestAds === false;
@@ -177,9 +177,9 @@ export async function openPrivacyOptions(): Promise<boolean> {
   }
 }
 
-let initPromise: Promise<AdMobPlugin> | null = null;
+let initPromise: Promise<void> | null = null;
 
-async function ensureInitialized(): Promise<AdMobPlugin> {
+async function ensureInitialized(): Promise<{ AdMob: AdMobPlugin }> {
   const { AdMob } = await import('@capacitor-community/admob');
   if (!initPromise) {
     initPromise = (async () => {
@@ -204,10 +204,10 @@ async function ensureInitialized(): Promise<AdMobPlugin> {
           ? { testingDevices: testDevices, initializeForTesting: true }
           : {},
       );
-      return AdMob;
     })();
   }
-  return initPromise;
+  await initPromise;
+  return { AdMob };
 }
 
 let preloadPromise: Promise<boolean> | null = null;
@@ -230,7 +230,7 @@ export function preloadRewardedAd(placement: string): Promise<boolean> {
 
   preloadPromise = (async () => {
     try {
-      const AdMob = await ensureInitialized();
+      const { AdMob } = await ensureInitialized();
       if (consentBlocked) return false;
       await AdMob.prepareRewardVideoAd({ adId: unitId });
       preloadedUnit = unitId;
@@ -254,7 +254,7 @@ export async function showRewardedAd(placement = 'unknown'): Promise<RewardedAdR
     return 'failed';
   }
   try {
-    const AdMob = await ensureInitialized();
+    const { AdMob } = await ensureInitialized();
     if (consentBlocked) {
       trackAnalyticsEvent('ad_failed', { placement, reason: 'consent' });
       return 'failed';
