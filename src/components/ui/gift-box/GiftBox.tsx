@@ -268,6 +268,16 @@ type GiftBoxProps = {
   loadingText?: string;
   isMilestone?: boolean;
   color?: number;
+  name?: string;
+  rarity?: keyof typeof GIFT_ACCENT;
+};
+
+const GIFT_ACCENT = {
+  common: '#cbd5e1',
+  uncommon: '#6ee7b7',
+  rare: '#7dd3fc',
+  epic: '#c4b5fd',
+  legendary: '#fcd34d',
 };
 
 export const GiftBox = ({
@@ -276,7 +286,10 @@ export const GiftBox = ({
   loadingText,
   isMilestone,
   color = 1,
+  name = 'Mystery Gift',
+  rarity = 'common',
 }: GiftBoxProps) => {
+  const accent = GIFT_ACCENT[rarity];
   return (
     <motion.div
       key="gift"
@@ -294,7 +307,7 @@ export const GiftBox = ({
       <motion.div
         animate={phase}
         variants={shakeVariants}
-        className="relative w-[450px] h-[450px] md:w-[500px] md:h-[500px]"
+        className="relative h-[min(450px,56svh)] w-[min(450px,56svh)] md:h-[min(500px,58svh)] md:w-[min(500px,58svh)]"
       >
         <GiftRive triggerOpen={phase === 'shaking'} isMilestone={isMilestone} color={color} ambient="jump" />
       </motion.div>
@@ -302,18 +315,19 @@ export const GiftBox = ({
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0, transition: { delay: 0.3 } }}
-        className="mt-4 space-y-2 text-center"
+        className="mt-4 space-y-2 px-6 text-center short-screen:mt-2 short-screen:space-y-1"
       >
-        <h2 className="text-4xl font-black text-white">
-          {phase === 'shaking' ? 'UNWRAPPING...' : 'TAP TO UNWRAP'}
+        <p
+          className="text-[12px] font-black uppercase tracking-[0.24em]"
+          style={{ color: accent }}
+        >
+          {name}
+        </p>
+        <h2 className="text-4xl font-black tracking-tight text-white short-screen:text-3xl">
+          {phase === 'shaking' ? 'Unwrapping…' : 'Tap to unwrap'}
         </h2>
-        {phase === 'idle' && (
-          <p className="text-lg font-bold tracking-wide text-slate-300">
-            Mystery Gift
-          </p>
-        )}
         {phase === 'shaking' && (
-          <p className="text-base font-bold text-slate-300 animate-pulse min-h-[1.5em]">
+          <p className="mx-auto max-w-[19rem] text-base font-bold text-slate-300 animate-pulse min-h-[3em] short-screen:text-sm">
             {loadingText}
           </p>
         )}

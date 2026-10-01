@@ -53,6 +53,8 @@ export default function SiteHeader() {
   const { user, loading } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
+  useEffect(() => setPendingHref(null), [pathname]);
   const {
     isLoadingScreenVisible,
     isWardrobeStuck,
@@ -92,7 +94,6 @@ export default function SiteHeader() {
   const friendAlerts =
     (buddyInvitesData?.incoming?.length ?? 0) +
     (friendRequestsData?.incoming?.length ?? 0);
-  const questActiveCount = questsData?.activeCount ?? 0;
 
   const navItems = [
     {
@@ -170,69 +171,77 @@ export default function SiteHeader() {
 
         <CurrencyShop />
 
-        {/* ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ Desktop Navigation (Centered) ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ */}
-        <div className="hidden md:flex flex-1 min-w-0 items-center justify-center gap-0.5 xl:gap-1">
+        <nav
+          aria-label="Main"
+          className="hidden md:flex flex-1 min-w-0 items-center justify-center gap-0.5 xl:gap-1"
+        >
           {navItems.map((item) => {
-            const isActive = pathname === item.href;
-
-            const buttonClass = `
-              relative flex items-center gap-1.5 xl:gap-2 px-2.5 xl:px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all
-              ${
-                isActive
-                  ? 'bg-primary/10 text-primary hover:bg-primary/20'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-              }
-            `;
+            const href = item.protected && !user ? '/login' : item.href;
+            const isActive = pendingHref ? pendingHref === item.href : pathname === item.href;
+            const badge =
+              item.label === 'Wardrobe' && inventoryBadge > 0
+                ? { count: inventoryBadge, tone: 'bg-rose-500' }
+                : item.label === 'Quests' && questClaimableCount > 0
+                  ? { count: questClaimableCount, tone: 'bg-amber-500' }
+                  : item.label === 'Friends' && friendAlerts > 0
+                    ? { count: friendAlerts, tone: 'bg-rose-500' }
+                    : item.label === 'Friends' && friendClaimable > 0
+                      ? { count: friendClaimable, tone: 'bg-amber-500' }
+                      : null;
 
             return (
               <Link
                 key={item.label}
-                href={item.protected && !user ? '/login' : item.href!}
+                href={href}
                 prefetch={true}
-                className={buttonClass}
+                onClick={() => {
+                  if (href === item.href && pathname !== item.href) setPendingHref(item.href);
+                }}
+                aria-current={isActive ? 'page' : undefined}
+                title={item.label}
+                className={cn(
+                  'group relative flex items-center gap-2 rounded-full px-2.5 py-1.5 text-sm font-bold whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 xl:px-3.5',
+                  isActive ? 'text-primary' : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
+                )}
               >
-                <Icon
-                  name={item.iconName}
-                  label={item.label}
-                  className={`w-8 h-8 ${item.label === 'Friends' ? 'scale-125' : ''}`}
-                />
-                <span className="hidden xl:inline">{item.label}</span>
-                {item.label === 'Wardrobe' && inventoryBadge > 0 ? (
-                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white shadow-sm ml-1">
-                    {inventoryBadge > 9 ? '9+' : inventoryBadge}
-                  </span>
+                {isActive ? (
+                  <motion.span
+                    layoutId="site-header-active-tab"
+                    aria-hidden
+                    className="absolute inset-0 rounded-full bg-primary/10 ring-1 ring-primary/15"
+                    transition={{ type: 'spring', stiffness: 520, damping: 40 }}
+                  />
                 ) : null}
-                {item.label === 'Quests' && questClaimableCount > 0 ? (
-                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white shadow-sm ml-1">
-                    {questClaimableCount > 99 ? '99+' : questClaimableCount}
-                  </span>
-                ) : item.label === 'Quests' && questActiveCount > 0 ? (
-                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-muted-foreground px-1 text-[10px] font-bold text-white shadow-sm ml-1">
-                    {questActiveCount > 9 ? '9+' : questActiveCount}
-                  </span>
-                ) : item.label === 'Friends' && friendAlerts > 0 ? (
-                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white shadow-sm ml-1">
-                    {friendAlerts > 9 ? '9+' : friendAlerts}
-                  </span>
-                ) : item.label === 'Friends' && friendClaimable > 0 ? (
-                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white shadow-sm ml-1">
-                    {friendClaimable > 9 ? '9+' : friendClaimable}
-                  </span>
-                ) : null}
+                <span className="relative">
+                  <Icon
+                    name={item.iconName}
+                    label={item.label}
+                    className={cn(
+                      'h-8 w-8 transition-transform duration-200 group-hover:-translate-y-0.5 group-active:scale-95',
+                      item.label === 'Friends' && 'scale-125 group-hover:scale-125',
+                    )}
+                  />
+                  {badge ? (
+                    <span
+                      className={cn(
+                        'absolute -right-1.5 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] font-black leading-none text-white ring-2 ring-background',
+                        badge.tone,
+                      )}
+                      aria-label={`${badge.count} new`}
+                    >
+                      {badge.count > 9 ? '9+' : badge.count}
+                    </span>
+                  ) : null}
+                </span>
+                <span className={cn('relative hidden xl:inline', pendingHref === item.href && 'animate-pulse')}>
+                  {item.label}
+                </span>
               </Link>
             );
           })}
-        </div>
+        </nav>
 
-        {/* ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ Right Side (Desktop: User Menu, Mobile: Hamburger) ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ */}
-        <div className="flex items-center gap-3 shrink-0">
-          <RightActions
-            user={user}
-            loading={loading}
-            onSignIn={() => router.push('/login')}
-            onSignOut={() => window.location.replace('/login')}
-          />
-
+        <div className="flex items-center gap-2.5 shrink-0">
           {user &&
             flyBalance !== undefined &&
             (pathname === '/' ||
@@ -250,8 +259,16 @@ export default function SiteHeader() {
                 onClick={() => openFlyShop()}
                 showGoal
               />
+              <span aria-hidden className="mx-0.5 h-7 w-px bg-border" />
             </>
           )}
+
+          <RightActions
+            user={user}
+            loading={loading}
+            onSignIn={() => router.push('/login')}
+            onSignOut={() => window.location.replace('/login')}
+          />
         </div>
         <style jsx>{`
           @keyframes float {
@@ -477,12 +494,23 @@ function RightActions({
       {/* Desktop Trigger */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        aria-label="Open menu"
-        className="hidden md:flex h-10 items-center justify-center p-1 rounded-full border border-border/50 bg-background hover:bg-accent/50 transition-all group"
+        aria-label="Open profile and settings"
+        aria-expanded={isOpen}
+        className="group hidden h-10 w-10 items-center justify-center rounded-full ring-2 ring-transparent transition-[box-shadow] hover:ring-primary/30 focus-visible:outline-none focus-visible:ring-primary/60 md:flex"
       >
-        <div className="h-8 w-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold shadow-sm group-hover:shadow-md transition-all">
-          <span>{user.displayName?.[0] || 'U'}</span>
-        </div>
+        {user.photoURL ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={user.photoURL}
+            alt=""
+            referrerPolicy="no-referrer"
+            className="h-9 w-9 rounded-full object-cover shadow-sm"
+          />
+        ) : (
+          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-green-700 text-sm font-black text-white shadow-sm">
+            {(user.displayName?.[0] || user.email?.[0] || 'U').toUpperCase()}
+          </span>
+        )}
       </button>
 
       {/* Mobile Trigger */}

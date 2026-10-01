@@ -4,13 +4,16 @@ import React, { useEffect, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { mutate } from 'swr';
+import { create } from 'zustand';
+import { useNotification } from '@/components/providers/NotificationProvider';
 import { Capacitor } from '@capacitor/core';
 import { Icon, type IconName } from '@/components/ui/Icon';
-import { Bell, Check, ChevronLeft, ChevronRight, Crown, ShieldAlert, Sparkle, X } from 'lucide-react';
+import { Bell, Check, ChevronLeft, ChevronRight, Crown, Loader2, ShieldAlert, Sparkle, X } from 'lucide-react';
 import { SAVED_LOOKS_FREE, SAVED_LOOKS_PLUS } from '@/lib/skins/looks';
 import { FREE_TAG_LIMIT, PREMIUM_TAG_LIMIT } from '@/lib/tags/limits';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import Frog from '@/components/ui/frog';
+import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
 import { PremiumFrogAura } from '@/components/ui/PremiumFrogAura';
 import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
 import { RARITY_CONFIG } from '@/components/ui/gift-box/constants';
@@ -24,6 +27,19 @@ import {
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
 import { mutateInventoryCaches } from '@/hooks/useInventory';
 import { auth } from '@/lib/firebase';
+import { establishSessionCookie } from '@/lib/authCookie';
+import {
+  GoogleAccountExistsError,
+  getGoogleAuthErrorMessage,
+  signInWithGoogle,
+} from '@/lib/googleAuth';
+import {
+  AppleAccountExistsError,
+  getAppleAuthErrorMessage,
+  signInWithApple,
+} from '@/lib/appleAuth';
+import { GoogleIcon } from '@/components/ui/GoogleIcon';
+import { AppleIcon } from '@/components/ui/AppleIcon';
 
 type Step = 0 | 1 | 2;
 type View = Step | 'compare';
@@ -72,6 +88,69 @@ const BENEFITS: { icon: IconName; title: string; body: string }[] = [
   },
 ];
 
+type PaywallContext = {
+  headline: string;
+  accent: string;
+  sub: string;
+  lead?: IconName;
+};
+
+const DEFAULT_CONTEXT: PaywallContext = {
+  headline: 'Keep showing up.',
+  accent: 'Even on the hard days.',
+  sub: 'Plus gives you the backup to stay consistent until it sticks.',
+};
+
+function contextFor(placement: string): PaywallContext {
+  if (placement === 'gift_double') {
+    return {
+      headline: 'Open this gift again.',
+      accent: 'And every gift after it.',
+      sub: 'With Plus, every gift box opens two prizes.',
+      lead: 'x2',
+    };
+  }
+  if (placement === 'trade_reroll') {
+    return {
+      headline: 'Reroll this trade.',
+      accent: 'Free, every time.',
+      sub: 'Not feeling the prize? Plus rerolls trade rewards for free.',
+    };
+  }
+  if (placement === 'shop_reroll') {
+    return {
+      headline: 'Reroll the shop.',
+      accent: 'Find the look you want.',
+      sub: 'Plus rerolls today’s deals for free.',
+    };
+  }
+  if (placement === 'streak_rescue') {
+    return {
+      headline: 'Save your streak.',
+      accent: 'And never lose one again.',
+      sub: 'Plus saves it right now, with a free rescue every week.',
+      lead: 'lilyPad',
+    };
+  }
+  if (placement.endsWith('_double')) {
+    return {
+      headline: 'Double this reward.',
+      accent: 'And every one after it.',
+      sub: 'With Plus, every quest and gift pays twice.',
+      lead: 'x2',
+    };
+  }
+  return DEFAULT_CONTEXT;
+}
+
+function benefitsFor(lead?: IconName) {
+  if (!lead) return BENEFITS;
+  return [
+    ...BENEFITS.filter((benefit) => benefit.icon === lead),
+    ...BENEFITS.filter((benefit) => benefit.icon !== lead),
+  ];
+}
+
 const desktopQuery = '(min-width: 768px)';
 
 function subscribeDesktop(callback: () => void) {
@@ -85,6 +164,64 @@ function useIsDesktop() {
     subscribeDesktop,
     () => window.matchMedia(desktopQuery).matches,
     () => false,
+  );
+}
+
+const PREMIUM_CONFIRM_LATE_MS = 10 * 60 * 1000;
+const WELCOME_AFTER_DELIVERY_MS = 1800;
+
+async function refreshPremiumState() {
+  await mutate(() => true);
+  mutateInventoryCaches();
+}
+
+async function confirmPremiumActive(timeoutMs: number) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetch('/api/purchases/sync', { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.isPremium) return true;
+      }
+    } catch {}
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+  }
+  return false;
+}
+
+async function deliverPlusUnlock(
+  deliver: () => void | Promise<void>,
+  welcome: boolean,
+) {
+  try {
+    await deliver();
+  } catch (err) {
+    console.error('Delivering the Plus unlock failed', err);
+  }
+  if (welcome) setTimeout(showPlusWelcome, WELCOME_AFTER_DELIVERY_MS);
+}
+
+const usePlusWelcomeStore = create<{ open: boolean }>(() => ({ open: false }));
+
+export function showPlusWelcome() {
+  usePlusWelcomeStore.setState({ open: true });
+}
+
+export function PlusWelcomeHost() {
+  const open = usePlusWelcomeStore((state) => state.open);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  if (!mounted) return null;
+  return createPortal(
+    <AnimatePresence>
+      {open && (
+        <PlusWelcomeCelebration
+          onDone={() => usePlusWelcomeStore.setState({ open: false })}
+        />
+      )}
+    </AnimatePresence>,
+    document.body,
   );
 }
 
@@ -113,17 +250,20 @@ export function PlusUpgradeModal({
   const [plan, setPlan] = useState<PlanId>('yearly');
   const [purchasing, setPurchasing] = useState(false);
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
-  const [celebrating, setCelebrating] = useState(false);
+  const { showNotification } = useNotification();
   const [needsAccount, setNeedsAccount] = useState(false);
+  const [linking, setLinking] = useState<'google' | 'apple' | null>(null);
+  const [linkError, setLinkError] = useState<string | null>(null);
   const [sheetReady, setSheetReady] = useState(false);
   const [pricing, setPricing] = useState<Partial<
     Record<PlanId, PlusPriceInfo>
   > | null>(null);
   const [pricingFailed, setPricingFailed] = useState(false);
   const isDesktop = useIsDesktop();
+  const scrollRef = React.useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || !sheetReady) return;
     let cancelled = false;
     setPricingFailed(false);
     getPlusPricing()
@@ -137,7 +277,7 @@ export function PlusUpgradeModal({
     return () => {
       cancelled = true;
     };
-  }, [open]);
+  }, [open, sheetReady]);
 
   useEffect(() => {
     if (open) {
@@ -147,6 +287,7 @@ export function PlusUpgradeModal({
       setPurchasing(false);
       setPurchaseError(null);
       setNeedsAccount(false);
+      setLinkError(null);
       trackAnalyticsEvent('paywall_viewed', { placement });
       trackAnalyticsEvent('paywall_step_viewed', { placement, step: 1 });
     } else {
@@ -154,24 +295,47 @@ export function PlusUpgradeModal({
     }
   }, [open, placement]);
 
-  const refreshPremiumState = async () => {
-    await mutate(() => true);
-    mutateInventoryCaches();
-  };
-
-  const confirmPremiumActive = async () => {
-    const deadline = Date.now() + 60000;
-    while (Date.now() < deadline) {
-      try {
-        const res = await fetch('/api/purchases/sync', { method: 'POST' });
-        if (res.ok) {
-          const data = await res.json();
-          if (data?.isPremium) return true;
-        }
-      } catch {}
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+  const linkGuestAccount = async (provider: 'google' | 'apple') => {
+    const current = auth?.currentUser;
+    if (!current || linking) return;
+    setLinking(provider);
+    setLinkError(null);
+    try {
+      if (provider === 'google') {
+        await signInWithGoogle({ linkTo: current });
+      } else {
+        await signInWithApple({ linkTo: current });
+      }
+      const user = auth?.currentUser;
+      if (!user) throw new Error('Authentication did not complete');
+      await user.getIdToken(true);
+      await establishSessionCookie(user);
+      await fetch('/api/user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        }),
+      });
+      setNeedsAccount(false);
+      void mutate(() => true);
+      void startPurchase();
+    } catch (err) {
+      if (
+        err instanceof GoogleAccountExistsError ||
+        err instanceof AppleAccountExistsError
+      ) {
+        window.location.assign('/login?upgrade=1');
+        return;
+      }
+      setLinkError(
+        provider === 'google'
+          ? getGoogleAuthErrorMessage(err)
+          : getAppleAuthErrorMessage(err),
+      );
+    } finally {
+      setLinking(null);
     }
-    return false;
   };
 
   const startPurchase = async () => {
@@ -185,10 +349,26 @@ export function PlusUpgradeModal({
     try {
       const outcome = await purchasePlus(plan, placement);
       if (outcome === 'purchased') {
-        await confirmPremiumActive();
+        const confirmed = await confirmPremiumActive(60000);
         await refreshPremiumState();
-        await onStartTrial?.(plan);
-        setCelebrating(true);
+        const deliver = onStartTrial;
+        onClose();
+        if (!deliver) {
+          showPlusWelcome();
+        } else if (confirmed) {
+          void deliverPlusUnlock(() => deliver(plan), true);
+        } else {
+          showNotification(
+            'Plus is activating — your reward lands in a moment.',
+            undefined,
+            { durationMs: 5000 },
+          );
+          void (async () => {
+            await confirmPremiumActive(PREMIUM_CONFIRM_LATE_MS);
+            await refreshPremiumState();
+            await deliverPlusUnlock(() => deliver(plan), true);
+          })();
+        }
       }
     } catch (err) {
       console.error('Plus purchase failed', err);
@@ -205,8 +385,11 @@ export function PlusUpgradeModal({
     try {
       const restored = await restorePlusPurchases();
       if (restored) {
+        await confirmPremiumActive(60000);
         await refreshPremiumState();
+        const deliver = onStartTrial;
         onClose();
+        if (deliver) void deliverPlusUnlock(() => deliver(plan), false);
       } else {
         setPurchaseError('No previous purchases found.');
       }
@@ -246,6 +429,7 @@ export function PlusUpgradeModal({
   const reminderDate = addDays(Math.max(1, trialDays - 2));
   const endDate = addDays(trialDays);
   const activeStep: Step = view === 'compare' ? 0 : view;
+  const paywallContext = contextFor(placement);
 
   return createPortal(
     <AnimatePresence>
@@ -257,7 +441,7 @@ export function PlusUpgradeModal({
             exit={{ opacity: 0 }}
             transition={{ duration: 0.25, ease: 'easeOut' }}
             onClick={onClose}
-            className="fixed inset-0 z-[10008] bg-black/60 backdrop-blur-sm"
+            className="fixed inset-0 z-[10008] bg-black/60 md:backdrop-blur-sm"
           />
           <motion.div
             initial={{ y: '100%' }}
@@ -310,11 +494,20 @@ export function PlusUpgradeModal({
                   </button>
                 </div>
 
-                <div className="no-scrollbar relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain">
-                  <AnimatePresence mode="wait" initial={false}>
+                <div
+                  ref={scrollRef}
+                  className="no-scrollbar relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain"
+                >
+                  <AnimatePresence
+                    mode="wait"
+                    initial={false}
+                    onExitComplete={() => scrollRef.current?.scrollTo({ top: 0 })}
+                  >
                     <StepShell key={String(view)}>
                       {view === 0 && (
                         <WhyPlusStep
+                          context={paywallContext}
+                          benefits={benefitsFor(paywallContext.lead)}
                           showHero={!isDesktop}
                           ready={sheetReady}
                           onCompare={() => setView('compare')}
@@ -408,23 +601,51 @@ export function PlusUpgradeModal({
                         Save your frog first
                       </h3>
                       <p className="mt-2 text-sm font-medium text-slate-600">
-                        Plus is tied to your account, so create a free one first.
+                        Plus is tied to your account. Save your frog, and
+                        we&apos;ll pick up right where you left off.
                       </p>
+                      <button
+                        type="button"
+                        onClick={() => void linkGuestAccount('apple')}
+                        disabled={!!linking}
+                        className="mt-5 flex h-12 w-full items-center justify-center gap-2.5 rounded-2xl bg-slate-900 text-[15px] font-black text-white shadow-[0_4px_0_0_#020617] transition-all hover:brightness-110 active:translate-y-1 active:shadow-none disabled:opacity-60"
+                      >
+                        {linking === 'apple' ? (
+                          <Loader2 className="h-5 w-5 animate-spin" />
+                        ) : (
+                          <>
+                            <AppleIcon /> Continue with Apple
+                          </>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void linkGuestAccount('google')}
+                        disabled={!!linking}
+                        className="mt-2.5 flex h-12 w-full items-center justify-center gap-2.5 rounded-2xl border border-slate-200 bg-white text-[15px] font-black text-slate-900 shadow-[0_4px_0_0_#e2e8f0] transition-all hover:bg-slate-50 active:translate-y-1 active:shadow-none disabled:opacity-60"
+                      >
+                        {linking === 'google' ? (
+                          <Loader2 className="h-5 w-5 animate-spin" />
+                        ) : (
+                          <>
+                            <GoogleIcon /> Continue with Google
+                          </>
+                        )}
+                      </button>
+                      {linkError && (
+                        <p className="mt-2.5 text-xs font-bold text-red-500">
+                          {linkError}
+                        </p>
+                      )}
                       <button
                         type="button"
                         onClick={() =>
                           window.location.assign('/login?upgrade=1')
                         }
-                        className="mt-5 h-12 w-full rounded-2xl bg-[#4f9149] text-[15px] font-black text-white shadow-[0_4px_0_0_#34631f] transition-all hover:brightness-110 active:translate-y-1 active:shadow-none"
+                        disabled={!!linking}
+                        className="mt-2 h-10 w-full rounded-2xl text-sm font-bold text-slate-500 transition-colors hover:text-slate-700"
                       >
-                        Create free account
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setNeedsAccount(false)}
-                        className="mt-2 h-11 w-full rounded-2xl text-sm font-bold text-slate-500 transition-colors hover:text-slate-700"
-                      >
-                        Not now
+                        Use email instead
                       </button>
                     </motion.div>
                   </motion.div>
@@ -432,14 +653,6 @@ export function PlusUpgradeModal({
               </AnimatePresence>
             </div>
           </motion.div>
-          {celebrating && (
-            <PlusWelcomeCelebration
-              onDone={() => {
-                setCelebrating(false);
-                onClose();
-              }}
-            />
-          )}
         </>
       )}
     </AnimatePresence>,
@@ -593,17 +806,27 @@ function PlusFrog({
       wardrobeIndices.hand_item,
     ],
   );
+  const reduceMotion = useReducedMotion();
   return (
     <div className="relative shrink-0" style={{ width, height }}>
-      <div
+      <motion.div
         aria-hidden
-        className="absolute inset-y-0 -inset-x-1/4 bg-[radial-gradient(closest-side,rgba(251,191,36,0.26)_0%,rgba(251,191,36,0.08)_55%,transparent_100%)]"
+        className="absolute inset-y-0 -inset-x-1/4 bg-[radial-gradient(closest-side,rgba(251,191,36,0.3)_0%,rgba(251,191,36,0.08)_55%,transparent_100%)]"
+        initial={false}
+        animate={
+          ready
+            ? { opacity: 1, scale: 1 }
+            : { opacity: 0, scale: reduceMotion ? 1 : 0.6 }
+        }
+        transition={{ type: 'spring', stiffness: 160, damping: 18 }}
       />
-      {ready && (
+      {ready ? (
         <>
           <Frog width={width} height={height} indices={indices} emote="love" />
           <PremiumFrogAura show alwaysPlay />
         </>
+      ) : (
+        <FrogSnapshot width={width} height={height} indices={indices} />
       )}
     </div>
   );
@@ -690,14 +913,19 @@ function PrimaryButton({
 }
 
 function WhyPlusStep({
+  context,
+  benefits,
   showHero,
   ready,
   onCompare,
 }: {
+  context: PaywallContext;
+  benefits: typeof BENEFITS;
   showHero: boolean;
   ready: boolean;
   onCompare: () => void;
 }) {
+  const reduceMotion = useReducedMotion();
   return (
     <div className="flex flex-1 flex-col items-center px-6 pb-4 text-center md:items-start md:justify-center md:px-10 md:text-left">
       {showHero && (
@@ -709,27 +937,48 @@ function WhyPlusStep({
         Frogress Plus
       </p>
       <h2 className="mt-2 text-[1.75rem] font-black leading-[1.08] tracking-tight md:text-[2.1rem]">
-        Keep showing up.
+        {context.headline}
         <br />
-        <span className="text-[color:var(--plus-gold-soft)]">Even on the hard days.</span>
+        <span className="text-[color:var(--plus-gold-soft)]">{context.accent}</span>
       </h2>
       <p className="mt-2.5 max-w-xs text-[15px] font-medium leading-snug text-white/75">
-        Plus gives you the backup to stay consistent until it sticks.
+        {context.sub}
       </p>
 
       <ul className="mt-6 w-full max-w-sm space-y-4 text-left">
-        {BENEFITS.map((benefit) => (
-          <li key={benefit.title} className="flex items-center gap-3.5">
-            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/[0.08] ring-1 ring-inset ring-white/10">
+        {benefits.map((benefit, i) => (
+          <motion.li
+            key={benefit.title}
+            className="flex items-center gap-3.5"
+            initial={reduceMotion ? false : { opacity: 0, y: 14 }}
+            animate={ready ? { opacity: 1, y: 0 } : undefined}
+            transition={{
+              type: 'spring',
+              stiffness: 320,
+              damping: 26,
+              delay: 0.08 + i * 0.09,
+            }}
+          >
+            <motion.span
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/[0.08] ring-1 ring-inset ring-white/10"
+              initial={reduceMotion ? false : { scale: 0.4, rotate: -12 }}
+              animate={ready ? { scale: 1, rotate: 0 } : undefined}
+              transition={{
+                type: 'spring',
+                stiffness: 420,
+                damping: 14,
+                delay: 0.14 + i * 0.09,
+              }}
+            >
               <Icon name={benefit.icon} className="h-8 w-8" />
-            </span>
+            </motion.span>
             <span className="min-w-0">
               <span className="block text-[15px] font-black leading-tight">{benefit.title}</span>
               <span className="mt-0.5 block text-[13px] font-medium leading-snug text-white/65">
                 {benefit.body}
               </span>
             </span>
-          </li>
+          </motion.li>
         ))}
       </ul>
 

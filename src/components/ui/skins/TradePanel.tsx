@@ -25,7 +25,6 @@ import {
   X,
   Zap,
 } from 'lucide-react';
-import { AdPlayIcon } from '@/components/ui/AdPlayIcon';
 import { hapticTick, hapticSelect, hapticCelebrate } from '@/lib/haptics';
 import {
   rewardedAdsAvailable,
@@ -60,6 +59,7 @@ import { ItemCard } from './ItemCard';
 // Import from gift-box for the reward UI
 import {
   GoldenRewardButton,
+  PlusOfferButton,
   RewardCard,
 } from '@/components/ui/gift-box/RewardCard';
 import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
@@ -896,11 +896,7 @@ export function TradePanel({
         onClick: handleConfirmTrade,
         label: (
           <span className="inline-flex items-center gap-2">
-            {targetRarity && nextRarity && !fuelRarity
-              ? `Trade ${countOf(slotCount, targetRarity)} → 1 ${nextRarity}`
-              : nextRarity
-                ? `Trade for 1 ${nextRarity}`
-                : 'Trade up'}
+            {nextRarity ? `Trade for 1 ${nextRarity}` : 'Trade up'}
             <ArrowUp size={18} strokeWidth={3} />
           </span>
         ),
@@ -954,7 +950,7 @@ export function TradePanel({
       return `Plus takes ${modifiers.aimPlusDiscountPercent}% off Aim`;
     }
     if (modifiers.wishlistSlotsPlus > modifiers.wishlistSlotsFree) {
-      return `Plus aims at ${modifiers.wishlistSlotsPlus} wishlist picks, not ${modifiers.wishlistSlotsFree}`;
+      return `With Plus, aim at up to ${modifiers.wishlistSlotsPlus} wishlist picks`;
     }
     return null;
   }, [
@@ -1286,7 +1282,7 @@ export function TradePanel({
             </div>
           </div>
         ) : (
-          <div className="flex w-full items-center gap-3 px-3 pt-2.5 pb-2">
+          <div className="flex w-full items-center gap-1 px-3 pt-2.5 pb-2">
             <button
               type="button"
               onClick={() => {
@@ -1324,6 +1320,16 @@ export function TradePanel({
                 )}
               />
             </button>
+            {expanded && totalPicked > 0 && (
+              <button
+                type="button"
+                onClick={handleClear}
+                aria-label="Clear contract"
+                className="ml-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors active:bg-destructive/10 active:text-destructive"
+              >
+                <Trash2 className="h-4 w-4" strokeWidth={2.5} />
+              </button>
+            )}
           </div>
         )}
 
@@ -1349,27 +1355,31 @@ export function TradePanel({
                 }}
                 disabled={rewardPool.length === 0}
                 className={cn(
-                  'mb-3 flex w-full items-center gap-3 rounded-xl border border-border/60 bg-muted/40 p-2 text-left transition-colors active:bg-muted lg:mb-4 lg:flex-col lg:gap-2 lg:p-3',
+                  'mb-3 flex w-full items-center gap-3 rounded-xl border border-border/60 bg-muted/40 text-left transition-colors active:bg-muted lg:mb-4 lg:flex-col lg:gap-2 lg:p-3',
+                  desktopMode ? 'p-2' : 'px-3 py-2.5',
                 )}
               >
-                <PrizeOrb
-                  rarity={nextRarity}
-                  progress={progress}
-                  ready={isReady}
-                  size={desktopMode ? 88 : 60}
-                />
+                {desktopMode && (
+                  <PrizeOrb
+                    rarity={nextRarity}
+                    progress={progress}
+                    ready={isReady}
+                    size={88}
+                  />
+                )}
                 <RewardSummary
                   rarity={nextRarity}
                   total={rewardPool.length}
                   fresh={newInPool}
                   wishlisted={wishlistHits}
                   centered={desktopMode}
+                  showLink={desktopMode}
                 />
-                {rewardPool.length > 0 && (
-                  <ChevronDown
-                    size={16}
-                    className="-rotate-90 shrink-0 text-muted-foreground lg:hidden"
-                  />
+                {!desktopMode && rewardPool.length > 0 && (
+                  <span className="ml-auto flex shrink-0 items-center gap-0.5 text-[12px] font-black text-primary">
+                    See all
+                    <ChevronDown size={14} strokeWidth={3} className="-rotate-90" />
+                  </span>
                 )}
               </button>
             )}
@@ -1497,16 +1507,21 @@ export function TradePanel({
                   hapticSelect();
                   onUpgrade?.();
                 }}
-                className="group mx-auto mb-1.5 flex max-w-full items-center justify-center gap-1.5 rounded-full px-2 py-1 transition-colors hover:bg-amber-500/10"
+                className="mx-auto mb-1.5 flex max-w-full items-center justify-center gap-1.5 rounded-full border border-amber-300/60 bg-amber-50 py-1 pl-1.5 pr-2.5 transition-colors hover:bg-amber-100 active:scale-[0.98] dark:border-amber-500/30 dark:bg-amber-950/30"
               >
                 <AppIcon
                   name="frogPlus"
                   label="Plus"
-                  className="h-4 w-4 shrink-0"
+                  className="h-5 w-5 shrink-0"
                 />
-                <span className="min-w-0 truncate text-[11px] font-bold text-muted-foreground/80 transition-colors group-hover:text-amber-700 dark:group-hover:text-amber-400">
+                <span className="min-w-0 truncate text-[11px] font-black text-amber-800 dark:text-amber-300">
                   {plusPerk}
                 </span>
+                <ChevronDown
+                  size={12}
+                  strokeWidth={3}
+                  className="-rotate-90 shrink-0 text-amber-700/70 dark:text-amber-300/70"
+                />
               </button>
             )}
 
@@ -1520,20 +1535,6 @@ export function TradePanel({
         </motion.div>
 
         <div className="sticky bottom-0 z-10 w-full max-w-md mx-auto shrink-0 bg-card px-3 pb-3 pt-1 lg:px-4 lg:pb-4">
-          {/* Inside the sticky footer, not at the end of the scrolling body: a
-              contract with a fuel row is tall enough that the body's last child
-              sits behind this bar, which is how Clear disappeared exactly when
-              a stuck contract needed it most. */}
-          {!desktopMode && totalPicked > 0 && (
-            <button
-              type="button"
-              onClick={handleClear}
-              className="mb-2 flex w-full items-center justify-center gap-1.5 text-[12px] font-black text-muted-foreground transition-colors active:text-destructive"
-            >
-              <Trash2 className="h-3 w-3" strokeWidth={3} />
-              Clear contract
-            </button>
-          )}
           {primaryButton}
           {contractHint && (
             <p className="mt-1.5 text-center text-[10px] font-bold text-muted-foreground">
@@ -1633,41 +1634,28 @@ export function TradePanel({
                   transition={{ delay: 0.9 }}
                   className="mt-4 flex w-full max-w-[280px] flex-col items-center gap-1.5"
                 >
-                  <GoldenRewardButton
-                    onClick={() => {
-                      if (isPremium || rewardedAdsAvailable()) {
-                        void handleReroll();
-                      } else {
-                        setShowPlusOffer(true);
-                      }
-                    }}
-                    disabled={rerollBusy}
-                    className="py-4 text-lg"
-                  >
-                    {isPremium ? (
-                      <>
-                        <Dices className="h-4 w-4" />
-                        {rerollBusy ? 'Rerolling...' : 'Reroll Reward'}
-                      </>
-                    ) : rerollBusy ? (
-                      'Loading ad...'
-                    ) : (
-                      <>
-                        <Dices className="h-5 w-5" strokeWidth={2.75} />
-                        <span className="flex flex-col items-start leading-tight">
-                          <span>Reroll Reward</span>
-                          {!rewardedAdsAvailable() && (
-                            <span className="text-[10px] font-bold normal-case tracking-normal text-white/80">
-                              with Plus
-                            </span>
-                          )}
-                        </span>
-                        {rewardedAdsAvailable() && (
-                          <AdPlayIcon className="w-[18px] h-[18px]" strokeWidth={2.5} />
-                        )}
-                      </>
-                    )}
-                  </GoldenRewardButton>
+                  {isPremium ? (
+                    <GoldenRewardButton
+                      onClick={() => void handleReroll()}
+                      disabled={rerollBusy}
+                      className="py-4 text-lg"
+                    >
+                      <Dices className="h-4 w-4" />
+                      {rerollBusy ? 'Rerolling...' : 'Reroll Reward'}
+                    </GoldenRewardButton>
+                  ) : (
+                    <PlusOfferButton
+                      mode={rewardedAdsAvailable() ? 'ad' : 'plus'}
+                      visual={<Dices className="h-6 w-6" strokeWidth={2.5} />}
+                      title="Reroll this reward"
+                      busy={rerollBusy}
+                      busyLabel="Loading ad..."
+                      onClick={() => {
+                        if (rewardedAdsAvailable()) void handleReroll();
+                        else setShowPlusOffer(true);
+                      }}
+                    />
+                  )}
                   {rerollError && (
                     <p className="text-center text-xs font-bold text-red-300">
                       {rerollError}
@@ -2106,12 +2094,14 @@ function RewardSummary({
   fresh,
   wishlisted,
   centered = false,
+  showLink = true,
 }: {
   rarity: Rarity;
   total: number;
   fresh: number;
   wishlisted: number;
   centered?: boolean;
+  showLink?: boolean;
 }) {
   return (
     <div
@@ -2130,17 +2120,20 @@ function RewardSummary({
       </span>
       <span className="text-[10px] font-bold text-muted-foreground">
         {total} possible
-        {fresh > 0 && ` · ${fresh} you don't own`}
+        {fresh > 0 && ` · ${fresh} new to you`}
       </span>
       <span
         className={cn(
           'flex items-center gap-1.5',
           centered && 'justify-center',
+          !showLink && wishlisted === 0 && 'hidden',
         )}
       >
-        <span className="text-[12px] font-black text-primary underline underline-offset-2">
-          See them all
-        </span>
+        {showLink && (
+          <span className="text-[12px] font-black text-primary underline underline-offset-2">
+            See them all
+          </span>
+        )}
         {wishlisted > 0 && (
           <span className="inline-flex items-center gap-0.5 rounded-full bg-primary/15 px-1.5 py-0.5 text-[11px] font-black text-primary">
             <Bookmark className="h-2.5 w-2.5" strokeWidth={3.5} fill="currentColor" />

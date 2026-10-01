@@ -1,6 +1,9 @@
 'use client';
 
-import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
+import {
+  PlusUpgradeModal,
+  PlusWelcomeHost,
+} from '@/components/ui/PlusUpgradeModal';
 import { useUIStore } from '@/lib/uiStore';
 
 /**
@@ -17,10 +20,13 @@ export function PremiumModalHost() {
   const setOpen = useUIStore((s) => s.setPremiumModalOpen);
 
   return (
-    <PlusUpgradeModal
-      open={open}
-      placement={placement}
-      onClose={() => setOpen(false)}
-    />
+    <>
+      <PlusUpgradeModal
+        open={open}
+        placement={placement}
+        onClose={() => setOpen(false)}
+      />
+      <PlusWelcomeHost />
+    </>
   );
 }

@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { AnimatePresence, motion, Variants } from 'framer-motion';
-import { Loader2, Crown } from 'lucide-react';
+import { ChevronRight, Loader2, Crown } from 'lucide-react';
 import { AdPlayIcon } from '@/components/ui/AdPlayIcon';
+import { Icon } from '@/components/ui/Icon';
 import Frog from '@/components/ui/frog';
 import { takePlusOfferAfterAd } from '@/lib/ads';
 import { useRewardGate } from '@/hooks/useRewardGate';
@@ -33,6 +34,7 @@ type RewardCardProps = {
    *  Plus paywall on web, and the action runs once either is paid. */
   onWatchAd?: () => void | Promise<void>;
   doublePlacement?: string;
+  upsell?: React.ReactNode;
   paused?: boolean;
 };
 
@@ -70,6 +72,97 @@ export function GoldenRewardButton({
   );
 }
 
+export function PlusOfferButton({
+  mode,
+  visual,
+  title,
+  busyLabel,
+  busy,
+  disabled,
+  onClick,
+}: {
+  mode: 'ad' | 'plus';
+  visual: React.ReactNode;
+  title: string;
+  busyLabel?: string;
+  busy?: boolean;
+  disabled?: boolean;
+  onClick?: () => void;
+}) {
+  const plus = mode === 'plus';
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled || busy}
+      className={cn(
+        'group relative flex w-full items-center gap-3 rounded-2xl py-2.5 pl-2.5 pr-3 text-left transition-all active:translate-y-[3px] disabled:cursor-not-allowed disabled:opacity-70',
+        plus
+          ? 'bg-[linear-gradient(135deg,#2f7d50_0%,#1d5a3f_55%,#123a2a_100%)] text-white shadow-[0_4px_0_0_#0b271c,0_14px_28px_-10px_rgba(251,191,36,0.45)] ring-1 ring-inset ring-[#fbbf24]/50 active:shadow-[0_1px_0_0_#0b271c]'
+          : 'bg-gradient-to-r from-amber-400 via-orange-500 to-amber-400 text-white shadow-[0_4px_0_0_#b45309,0_14px_28px_-10px_rgba(245,158,11,0.5)] active:shadow-[0_1px_0_0_#b45309]',
+      )}
+    >
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl"
+      >
+        <span className="absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-white/25 to-transparent animate-shine" />
+      </span>
+      <span
+        className={cn(
+          'relative flex h-12 w-12 shrink-0 items-center justify-center rounded-xl',
+          plus ? 'bg-white/10 ring-1 ring-inset ring-white/15' : 'bg-white/20',
+        )}
+      >
+        {visual}
+      </span>
+      <span className="relative flex min-w-0 flex-1 flex-col leading-tight">
+        <span className="truncate whitespace-nowrap text-[17px] font-black tracking-tight">
+          {busy ? busyLabel ?? 'Loading...' : title}
+        </span>
+        <span
+          className={cn(
+            'mt-0.5 flex items-center gap-1 text-[12px] font-bold',
+            plus ? 'text-[#fde68a]' : 'text-white/90',
+          )}
+        >
+          {plus ? (
+            <>
+              <Icon name="frogPlus" label="Plus" className="h-4 w-4 shrink-0" />
+              Free with Plus trial
+            </>
+          ) : (
+            <>
+              <AdPlayIcon className="h-3.5 w-3.5 shrink-0" strokeWidth={2.75} />
+              Watch a short ad
+            </>
+          )}
+        </span>
+      </span>
+      <span
+        className={cn(
+          'relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full',
+          plus ? 'bg-[#fbbf24] text-[#3b2708]' : 'bg-white/25 text-white',
+        )}
+      >
+        {busy ? (
+          <Loader2 className="h-4 w-4 animate-spin" strokeWidth={3} />
+        ) : (
+          <ChevronRight className="h-5 w-5" strokeWidth={3} />
+        )}
+      </span>
+    </button>
+  );
+}
+
+export function DoubleCoin() {
+  return (
+    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-b from-amber-300 to-amber-500 text-[13px] font-black text-amber-950 shadow-[inset_0_-2px_0_rgba(146,64,14,0.45),0_2px_6px_rgba(0,0,0,0.25)]">
+      x2
+    </span>
+  );
+}
+
 export const RewardCard = ({
   prize,
   claiming,
@@ -86,6 +179,7 @@ export const RewardCard = ({
   rewardAmount,
   onWatchAd,
   doublePlacement = 'double_reward',
+  upsell,
   paused = false,
 }: RewardCardProps) => {
   const [showContent, setShowContent] = useState(false);
@@ -149,6 +243,7 @@ export const RewardCard = ({
   };
 
   const isProcessing = claiming || localClaiming;
+  const hasUpsell = !!showDoubleUpsell || !!upsell;
 
   return (
     <motion.div
@@ -210,10 +305,10 @@ export const RewardCard = ({
           </div>
 
           {/* Main Frog Display */}
-          <div className="flex items-center justify-center flex-1 w-full p-3 mt-4">
+          <div className="flex items-center justify-center flex-1 w-full p-3 mt-4 short-screen:mt-2 short-screen:p-2">
             <div
               className={cn(
-                'w-full aspect-[1.1/1] md:aspect-[1.2/1] rounded-[20px] relative overflow-hidden flex items-center justify-center',
+                'w-full aspect-[1.1/1] md:aspect-[1.2/1] short-screen:aspect-[1.4/1] rounded-[20px] relative overflow-hidden flex items-center justify-center',
                 'bg-gradient-to-b shadow-inner',
                 config.gradient
               )}
@@ -331,12 +426,12 @@ export const RewardCard = ({
                 : { opacity: 0, y: 10, filter: 'blur(4px)' }
             }
             transition={{ duration: 0.5, delay: 0.2, ease: 'easeOut' }}
-            className="flex min-h-24 flex-col items-center justify-center p-4 border-t bg-white/50 dark:bg-black/20 backdrop-blur-sm border-black/5 dark:border-white/5"
+            className="flex min-h-24 flex-col items-center justify-center p-4 short-screen:min-h-0 short-screen:p-3 border-t bg-white/50 dark:bg-black/20 backdrop-blur-sm border-black/5 dark:border-white/5"
           >
-            <h3 className="mb-1 text-2xl font-black leading-none text-center text-slate-800 dark:text-white">
+            <h3 className="mb-1 text-2xl font-black leading-none text-center text-slate-800 dark:text-white short-screen:text-xl">
               {prize.name}
             </h3>
-            <p className="text-sm font-bold text-slate-500 dark:text-slate-400">
+            <p className="text-sm font-bold capitalize text-slate-500 dark:text-slate-400">
               {slotLabel ??
                 (prize.kind === 'background'
                   ? 'Background'
@@ -354,18 +449,32 @@ export const RewardCard = ({
       {/* Claim Button - Simplified animation for better performance */}
       <div
         className={cn(
-          'mt-10 flex w-full max-w-[280px] flex-col gap-3 transition-all duration-500',
+          'mt-10 flex w-full max-w-[280px] flex-col gap-3 transition-all duration-500 short-screen:mt-7',
           showContent
             ? 'opacity-100 translate-y-0'
             : 'opacity-0 translate-y-4 pointer-events-none',
         )}
       >
+        {showDoubleUpsell && (
+          <PlusOfferButton
+            mode={canWatchAd ? 'ad' : 'plus'}
+            visual={<DoubleCoin />}
+            title={rewardAmount ? `Claim ${rewardAmount * 2} instead` : 'Double your reward'}
+            busy={watchingAd}
+            busyLabel={canWatchAd ? 'Loading ad...' : 'Claiming...'}
+            disabled={isProcessing || !showContent}
+            onClick={handleDoubleClick}
+          />
+        )}
+        {upsell}
         <button
           onClick={handleClaimClick}
           disabled={isProcessing || !showContent}
           className={cn(
-            'group relative flex w-full items-center justify-center gap-3 overflow-hidden rounded-2xl py-4 text-lg font-black shadow-xl transition-all duration-500 active:scale-95 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-80',
-            config.button,
+            'group relative flex w-full items-center justify-center gap-3 overflow-hidden rounded-2xl font-black transition-all duration-500 active:scale-95 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-80',
+            hasUpsell
+              ? 'border border-white/15 bg-white/10 py-3 text-base text-white shadow-lg hover:bg-white/15'
+              : cn('py-4 text-lg shadow-xl', config.button),
           )}
         >
           {isProcessing ? (
@@ -386,7 +495,9 @@ export const RewardCard = ({
                   ? quantity && quantity > 1
                     ? `Open All (${quantity})`
                     : 'Open Now'
-                  : 'Claim Reward'}
+                  : rewardAmount
+                    ? `Claim ${rewardAmount}`
+                    : 'Claim Reward'}
               </span>
             </>
           )}
@@ -400,36 +511,6 @@ export const RewardCard = ({
           >
             {openLaterLabel}
           </button>
-        )}
-        {showDoubleUpsell && (
-          <GoldenRewardButton
-            onClick={handleDoubleClick}
-            disabled={isProcessing || !showContent || watchingAd}
-          >
-            {watchingAd ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                {canWatchAd ? 'Loading ad...' : 'Claiming...'}
-              </>
-            ) : (
-              <>
-                <span className="flex items-center justify-center w-7 h-7 text-[11px] font-black text-amber-900 rounded-lg bg-white/30 shadow-inner">
-                  x2
-                </span>
-                <span className="flex flex-col items-start leading-tight">
-                  <span>
-                    {rewardAmount ? `Claim ${rewardAmount * 2}` : 'Double Reward'}
-                  </span>
-                  {!canWatchAd && (
-                    <span className="text-[10px] font-bold normal-case tracking-normal text-white/80">
-                      with Plus
-                    </span>
-                  )}
-                </span>
-                {canWatchAd && <AdPlayIcon className="w-[18px] h-[18px]" strokeWidth={2.5} />}
-              </>
-            )}
-          </GoldenRewardButton>
         )}
       </div>
       {doubleError && (

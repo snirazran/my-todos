@@ -6,7 +6,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/components/auth/AuthContext';
 import { useRouter } from 'next/navigation';
 import { X } from 'lucide-react';
-import { AdPlayIcon } from '@/components/ui/AdPlayIcon';
 import { ItemDef, byId } from '@/lib/skins/catalog';
 import { cn } from '@/lib/utils';
 import {
@@ -18,10 +17,10 @@ import { useRewardedAdPreload } from '@/hooks/useRewardedAdPreload';
 import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
 import { RARITY_CONFIG } from './constants';
 import { RotatingRays } from './RotatingRays';
-import { GiftBox } from './GiftBox';
+import { GiftBox, GiftRive } from './GiftBox';
 import { hapticCelebrate, hapticImpact, hapticTick } from '@/lib/haptics';
-import { GoldenRewardButton, RewardCard } from './RewardCard';
-import { FUNNY_SENTENCES } from './funnySentences';
+import { PlusOfferButton, RewardCard } from './RewardCard';
+import { pickFunnySentence } from './funnySentences';
 import { queuePlusIntroOnce } from '@/lib/plusIntro';
 
 /** What the server says about a reveal beyond the prize itself. */
@@ -59,7 +58,7 @@ export default function GiftBoxOpening({
   const [openError, setOpenError] = useState<string | null>(null);
   const [showPlusOffer, setShowPlusOffer] = useState(false);
   const [loadingText, setLoadingText] = useState(
-    () => FUNNY_SENTENCES[Math.floor(Math.random() * FUNNY_SENTENCES.length)],
+    () => pickFunnySentence(),
   );
   const [mounted, setMounted] = useState(false);
   const [showGuestPrompt, setShowGuestPrompt] = useState(false);
@@ -87,9 +86,7 @@ export default function GiftBoxOpening({
 
     // Cycle funny sentences
     const interval = setInterval(() => {
-      setLoadingText(
-        FUNNY_SENTENCES[Math.floor(Math.random() * FUNNY_SENTENCES.length)],
-      );
+      setLoadingText((previous) => pickFunnySentence(previous));
     }, 2000);
 
     try {
@@ -238,6 +235,7 @@ export default function GiftBoxOpening({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
+        onClick={phase === 'idle' ? handleOpen : undefined}
         className="absolute inset-0 bg-slate-950/90 backdrop-blur-sm"
       />
 
@@ -264,7 +262,8 @@ export default function GiftBoxOpening({
       {phase === 'idle' && user && (
         <button
           onClick={onClose}
-          className="absolute z-50 p-3 transition-all rounded-full top-4 right-4 md:top-8 md:right-8 bg-black/20 hover:bg-black/40 text-white/70 hover:text-white backdrop-blur-md"
+          aria-label="Close"
+          className="absolute z-50 p-3 transition-all rounded-full top-[calc(env(safe-area-inset-top)+0.75rem)] right-[calc(env(safe-area-inset-right)+0.75rem)] md:top-8 md:right-8 bg-white/15 hover:bg-white/25 text-white backdrop-blur-md ring-1 ring-white/20"
         >
           <X className="w-6 h-6" />
         </button>
@@ -286,6 +285,8 @@ export default function GiftBoxOpening({
               onOpen={handleOpen}
               loadingText={loadingText}
               color={giftColor}
+              name={giftDef?.name}
+              rarity={giftDef?.rarity}
             />
           )}
 
@@ -324,50 +325,33 @@ export default function GiftBoxOpening({
                 onClaim={handleClaim}
                 paused={paused}
                 spareCount={prizeMeta?.duplicate ? prizeMeta.owned : undefined}
+                upsell={
+                  user && doubleClaimId ? (
+                    <>
+                      <PlusOfferButton
+                        mode={rewardedAdsAvailable() ? 'ad' : 'plus'}
+                        visual={
+                          <span className="pointer-events-none absolute -top-8 left-1/2 h-[80px] w-[60px] -translate-x-1/2">
+                            <GiftRive color={giftColor} className="h-full w-full" />
+                          </span>
+                        }
+                        title="Open another gift"
+                        busy={adBusy}
+                        busyLabel="Loading ad..."
+                        onClick={() => {
+                          if (rewardedAdsAvailable()) void handleDouble();
+                          else setShowPlusOffer(true);
+                        }}
+                      />
+                      {adError && (
+                        <p className="text-center text-xs font-bold text-red-300">
+                          {adError}
+                        </p>
+                      )}
+                    </>
+                  ) : undefined
+                }
               />
-              {user && doubleClaimId && (
-                <motion.div
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.9 }}
-                  className="mt-4 flex w-full max-w-[280px] flex-col items-center gap-1.5"
-                >
-                  <GoldenRewardButton
-                    onClick={() => {
-                      if (rewardedAdsAvailable()) void handleDouble();
-                      else setShowPlusOffer(true);
-                    }}
-                    disabled={adBusy}
-                    className="py-4 text-lg"
-                  >
-                    {adBusy ? (
-                      'Loading ad...'
-                    ) : (
-                      <>
-                        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/30 text-[11px] font-black text-amber-900 shadow-inner">
-                          x2
-                        </span>
-                        <span className="flex flex-col items-start leading-tight">
-                          <span>Open Another</span>
-                          {!rewardedAdsAvailable() && (
-                            <span className="text-[10px] font-bold normal-case tracking-normal text-white/80">
-                              with Plus
-                            </span>
-                          )}
-                        </span>
-                        {rewardedAdsAvailable() && (
-                          <AdPlayIcon className="w-[18px] h-[18px]" strokeWidth={2.5} />
-                        )}
-                      </>
-                    )}
-                  </GoldenRewardButton>
-                  {adError && (
-                    <p className="text-center text-xs font-bold text-red-300">
-                      {adError}
-                    </p>
-                  )}
-                </motion.div>
-              )}
             </motion.div>
           )}
         </AnimatePresence>

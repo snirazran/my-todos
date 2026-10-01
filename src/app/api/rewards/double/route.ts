@@ -48,12 +48,14 @@ export async function POST(req: NextRequest) {
     }
 
     const premium = isPremiumActive(user.premiumUntil);
-    const spend = await consumeAdView({
-      userId,
-      placement: 'reward_double',
-      premium,
-    });
-    if (!spend.ok) {
+    const spend = premium
+      ? null
+      : await consumeAdView({
+          userId,
+          placement: 'reward_double',
+          premium: false,
+        });
+    if (spend && !spend.ok) {
       return NextResponse.json({
         granted: false,
         reason: spend.reason,
@@ -93,7 +95,7 @@ export async function POST(req: NextRequest) {
     try {
       await user.save();
     } catch (saveErr) {
-      await refundAdView({ userId, placement: 'reward_double' });
+      if (spend) await refundAdView({ userId, placement: 'reward_double' });
       throw saveErr;
     }
     if (claim.fliesGranted > 0) {

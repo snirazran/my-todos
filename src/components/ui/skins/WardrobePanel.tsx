@@ -398,7 +398,9 @@ function WardrobeManagerContent({
   const [plusOpen, setPlusOpen] = useState(false);
   const [plusPlacement, setPlusPlacement] = useState('premium_daily_deal');
   const [wishlistOpen, setWishlistOpen] = useState(false);
+  const pendingDealRerollRef = React.useRef(false);
   const openPlus = (placement: string) => {
+    pendingDealRerollRef.current = false;
     setPlusPlacement(placement);
     setPlusOpen(true);
   };
@@ -621,11 +623,12 @@ function WardrobeManagerContent({
 
   useRewardedAdPreload('shop_reroll', !data?.isPremium);
 
-  const rerollDeals = async () => {
+  const rerollDeals = async (asPlus = false) => {
     if (rerolling) return;
-    const isPlus = !!data?.isPremium;
+    const isPlus = asPlus || !!data?.isPremium;
     if (!isPlus && !rewardedAdsAvailable()) {
-      openPlus('premium_daily_deal');
+      openPlus('shop_reroll');
+      pendingDealRerollRef.current = true;
       return;
     }
     setRerolling(true);
@@ -2126,8 +2129,8 @@ function WardrobeManagerContent({
                       rerolling={rerolling}
                       wishlistedIds={wishlistedItemIds}
                       onBuy={(item) => openItemPurchase(item)}
-                      onReroll={rerollDeals}
-                      onUpgrade={() => openPlus('premium_daily_deal')}
+                      onReroll={() => void rerollDeals()}
+                      onUpgrade={() => void rerollDeals()}
                     />
                   )}
                   {activeFilter === 'all' && !isGuest && (
@@ -2351,6 +2354,11 @@ function WardrobeManagerContent({
       <PlusUpgradeModal
         open={plusOpen}
         placement={plusPlacement}
+        onStartTrial={async () => {
+          if (!pendingDealRerollRef.current) return;
+          pendingDealRerollRef.current = false;
+          await rerollDeals(true);
+        }}
         onClose={() => {
           setPlusOpen(false);
           mutateInventoryCaches();

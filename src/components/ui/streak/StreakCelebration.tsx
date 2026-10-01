@@ -171,9 +171,12 @@ export function StreakCelebration({
                         disabled={doubling}
                         className="mx-auto flex h-11 items-center justify-center gap-2 rounded-2xl bg-white/20 px-5 text-[13px] font-black text-white backdrop-blur transition-colors hover:bg-white/30 disabled:opacity-60"
                       >
-                        {!doubling && mode === 'ad' && (
-                          <AdPlayIcon className="h-4 w-4" strokeWidth={2.5} />
-                        )}
+                        {!doubling &&
+                          (mode === 'ad' ? (
+                            <AdPlayIcon className="h-4 w-4" strokeWidth={2.5} />
+                          ) : (
+                            <Icon name="frogPlus" label="Plus" className="h-5 w-5" />
+                          ))}
                         {doubling
                           ? mode === 'ad'
                             ? 'Loading ad…'

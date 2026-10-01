@@ -6,6 +6,8 @@ import type { AdMobPlugin } from '@capacitor-community/admob';
 
 export type RewardedAdResult = 'rewarded' | 'dismissed' | 'failed';
 
+export const REWARDED_ADS_ENABLED = false;
+
 type AdUnitKey =
   | 'daily_flies'
   | 'gift_double'
@@ -99,13 +101,17 @@ function notifyAdConsentChanged() {
 }
 
 export function rewardedAdsAvailable() {
-  return Capacitor.isNativePlatform() && !consentBlocked;
+  return (
+    REWARDED_ADS_ENABLED && Capacitor.isNativePlatform() && !consentBlocked
+  );
 }
 
 /** True once the UMP flow has told us this user is entitled to a "Privacy
  *  options" entry point, which Google requires us to surface for them. */
 export function privacyOptionsAvailable() {
-  return Capacitor.isNativePlatform() && privacyOptionsRequired;
+  return (
+    REWARDED_ADS_ENABLED && Capacitor.isNativePlatform() && privacyOptionsRequired
+  );
 }
 
 function testDeviceIdentifiers() {
@@ -249,7 +255,7 @@ export function preloadRewardedAd(placement: string): Promise<boolean> {
 
 export async function showRewardedAd(placement = 'unknown'): Promise<RewardedAdResult> {
   trackAnalyticsEvent('ad_requested', { placement });
-  if (!Capacitor.isNativePlatform()) {
+  if (!rewardedAdsAvailable()) {
     trackAnalyticsEvent('ad_failed', { placement, reason: 'unsupported_platform' });
     return 'failed';
   }
