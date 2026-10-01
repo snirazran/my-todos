@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import confetti from 'canvas-confetti';
+import { usePathname, useRouter } from 'next/navigation';
 import { Flame, Snowflake, Trophy, X, ChevronRight } from 'lucide-react';
 import Frog, { type FrogHandle } from '@/components/ui/frog';
 import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
@@ -285,32 +286,50 @@ function WeekStrip({
   }, [view.count, view.lastDayKey, view.shieldedDayKeys]);
 
   return (
-    <div className="mt-6 grid w-full max-w-sm grid-cols-7 gap-1.5 short-screen:mt-3 short-screen:gap-1 md:mt-7">
+    <ul
+      aria-label="This week"
+      className="mt-6 grid w-full max-w-sm grid-cols-7 gap-1.5 short-screen:mt-3 short-screen:gap-1 md:mt-7"
+    >
       {days.map((dayKey, i) => {
         const frozen = view.shieldedDayKeys.includes(dayKey);
         const lit =
           !!runStart && dayKey >= runStart && dayKey <= view.lastDayKey;
         const isToday = dayKey === today;
-        const label = new Date(`${dayKey}T12:00:00`).toLocaleDateString(
-          undefined,
-          { weekday: 'narrow' },
-        );
+        const future = dayKey > today;
+        const pendingToday = isToday && !lit && !frozen;
+        const date = new Date(`${dayKey}T12:00:00`);
+        const label = date.toLocaleDateString(undefined, { weekday: 'narrow' });
+        const longLabel = date.toLocaleDateString(undefined, { weekday: 'long' });
+        const state = frozen
+          ? 'covered by a Lily Pad'
+          : lit
+            ? 'streak kept'
+            : pendingToday
+              ? 'not done yet'
+              : future
+                ? 'upcoming'
+                : 'no streak';
         return (
-          <div
+          <li
             key={dayKey}
+            aria-label={`${longLabel}${isToday ? ', today' : ''}, ${state}`}
             className="flex flex-col items-center gap-1.5 short-screen:gap-1"
           >
             <span
+              aria-hidden
               className={cn(
                 'text-[12px] font-black',
                 light
                   ? 'text-white drop-shadow-[0_1px_2px_rgba(124,45,18,0.6)]'
-                  : 'text-muted-foreground',
+                  : isToday
+                    ? 'text-foreground'
+                    : 'text-muted-foreground',
               )}
             >
               {label}
             </span>
             <motion.div
+              aria-hidden
               initial={{ scale: 0.6, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{
@@ -329,27 +348,38 @@ function WeekStrip({
                     ? light
                       ? 'bg-white text-orange-500'
                       : 'bg-orange-100 text-orange-500 dark:bg-orange-500/15'
-                    : light
-                      ? 'bg-orange-950/25 text-white/50'
-                      : 'bg-muted/60 text-muted-foreground/40',
+                    : pendingToday
+                      ? light
+                        ? 'border-2 border-dashed border-white text-white/80'
+                        : 'border-2 border-dashed border-orange-400 text-orange-400'
+                      : future
+                        ? light
+                          ? 'border-2 border-dashed border-white/40'
+                          : 'border-2 border-dashed border-border'
+                        : light
+                          ? 'bg-orange-950/25 text-white/60'
+                          : 'bg-muted text-muted-foreground',
                 isToday &&
+                  !pendingToday &&
                   (light
                     ? 'ring-2 ring-white ring-offset-2 ring-offset-transparent'
-                    : 'ring-2 ring-primary'),
+                    : 'ring-2 ring-orange-400 ring-offset-2 ring-offset-background'),
               )}
             >
               {frozen ? (
-                <Icon name="lilyPad" label="Covered" className="h-4 w-4" />
+                <Icon name="lilyPad" className="h-4 w-4" />
               ) : lit ? (
                 <Flame className="w-4 h-4 fill-current" />
-              ) : (
-                <span className="text-xs font-bold">·</span>
+              ) : pendingToday ? (
+                <Flame className="w-4 h-4" />
+              ) : future ? null : (
+                <span className="h-1.5 w-1.5 rounded-full bg-current" />
               )}
             </motion.div>
-          </div>
+          </li>
         );
       })}
-    </div>
+    </ul>
   );
 }
 
@@ -809,6 +839,7 @@ function HomeStep({
   onGetLilyPad,
   onCommit,
   onDone,
+  onGoToTasks,
 }: {
   view: LoginStreakView;
   indices: Partial<Record<'skin' | 'hat' | 'body' | 'hand_item', number>>;
@@ -818,138 +849,164 @@ function HomeStep({
   onGetLilyPad: () => void;
   onCommit: () => void;
   onDone: () => void;
+  onGoToTasks: () => void;
 }) {
+  const reduceMotion = useReducedMotion();
+  const atRisk = !view.checkedInToday && view.count > 0;
+  const toBeat = view.longestStreak - view.count + 1;
+  const goal = view.goal;
+  const goalPct = goal
+    ? Math.min(100, Math.max(4, (goal.stepsFilled / Math.max(1, goal.stepCount)) * 100))
+    : 0;
+  const daysLeft = goal ? Math.max(0, goal.days - goal.progress) : 0;
+
   return (
     <div className="flex flex-col flex-1 min-h-0 bg-background">
-      <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-4 pt-[calc(env(safe-area-inset-top)+3rem)] short-screen:pt-[calc(env(safe-area-inset-top)+1rem)] md:px-8 md:pt-9">
+      <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-4 pt-[calc(env(safe-area-inset-top)+2.25rem)] short-screen:pt-[calc(env(safe-area-inset-top)+1rem)] md:px-8 md:pt-8">
         <div className="flex flex-col items-center w-full max-w-sm mx-auto md:max-w-xl">
-          <div className="flex items-center gap-2">
-            <Flame
-              className={cn(
-                'h-10 w-10',
-                view.count > 0
-                  ? 'fill-orange-400 text-orange-500'
-                  : 'text-muted-foreground/40',
-              )}
-            />
-            <span className="text-6xl font-black tabular-nums text-foreground">
-              {view.count}
+          <h2 className="flex flex-col items-center">
+            <span className="flex items-center gap-1.5">
+              <Flame
+                aria-hidden
+                className={cn(
+                  'h-9 w-9',
+                  view.count > 0
+                    ? 'fill-orange-400 text-orange-500'
+                    : 'text-muted-foreground/60',
+                )}
+              />
+              <span className="text-5xl font-black tabular-nums leading-none text-foreground">
+                {view.count}
+              </span>
             </span>
-          </div>
-          <p className="mt-1 text-sm font-bold text-muted-foreground">
-            day streak
-            {view.longestStreak > 1 && (
-              <span className="font-medium"> · best {view.longestStreak}</span>
-            )}
-            {!view.checkedInToday && view.count > 0 && (
-              <span className="text-orange-500"> · finish a task today!</span>
-            )}
-          </p>
+            <span className="mt-1 text-sm font-bold text-muted-foreground">
+              day streak
+              {view.longestStreak > 1 && (
+                <span className="font-medium"> · best {view.longestStreak}</span>
+              )}
+            </span>
+          </h2>
+          {atRisk ? (
+            <p className="mt-1 rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-black text-orange-700 dark:bg-orange-500/15 dark:text-orange-300">
+              Finish a task today to keep it
+            </p>
+          ) : view.count > 1 && view.count >= view.longestStreak ? (
+            <p className="mt-1 text-xs font-black text-orange-600 dark:text-orange-400">
+              Personal best — keep going!
+            </p>
+          ) : view.longestStreak > 1 && toBeat > 0 ? (
+            <p className="mt-1 text-xs font-bold text-muted-foreground">
+              {toBeat} more {toBeat === 1 ? 'day' : 'days'} to beat your best
+            </p>
+          ) : null}
 
           <motion.div
-            animate={{ y: [0, -6, 0] }}
+            aria-hidden
+            animate={reduceMotion ? undefined : { y: [0, -5, 0] }}
             transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut' }}
-            className="-mt-8"
+            className="mb-1 -mt-14 short-screen:-mt-16"
           >
             {frogReady ? (
-              <Frog width={170} height={170} indices={indices} emote="love" />
+              <Frog width={196} height={196} indices={indices} emote="love" />
             ) : (
-              <div style={{ width: 170, height: 170 }} />
+              <div style={{ width: 196, height: 196 }} />
             )}
           </motion.div>
 
           <WeekStrip view={view} />
 
-          <div className="grid w-full gap-3 mt-6 md:grid-cols-2">
-            <div className="w-full p-4 border rounded-2xl border-border/60 bg-card">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="flex items-center gap-1.5 text-sm font-black text-foreground">
-                    <Icon name="lilyPad" className="h-5 w-5" />
-                    Lily Pads
-                  </p>
-                  <p className="mt-0.5 text-xs font-medium text-muted-foreground">
-                    Catches your streak by itself the day you miss.
-                  </p>
-                </div>
-                <div className="flex items-center gap-1">
-                  {Array.from({ length: view.shieldCap }, (_, i) => (
-                    <div
-                      key={i}
-                      className={cn(
-                        'grid h-10 w-10 place-items-center rounded-full',
-                        i < view.shields
-                          ? 'bg-emerald-100 dark:bg-emerald-500/15'
-                          : 'bg-muted/60 opacity-30 grayscale',
-                      )}
-                    >
-                      <Icon name="lilyPad" className="h-6 w-6" />
-                    </div>
-                  ))}
-                </div>
+          <div className="mt-5 grid w-full gap-2.5 md:grid-cols-2">
+            <div className="flex w-full items-center gap-3 rounded-2xl border border-border/60 bg-card px-3.5 py-3">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-100 dark:bg-emerald-500/15">
+                <Icon name="lilyPad" className="h-6 w-6" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="flex items-center gap-2 text-sm font-black text-foreground">
+                  Lily Pads
+                  <span
+                    className="flex items-center gap-1"
+                    role="img"
+                    aria-label={`${view.shields} of ${view.shieldCap}`}
+                  >
+                    {Array.from({ length: view.shieldCap }, (_, i) => (
+                      <span
+                        key={i}
+                        className={cn(
+                          'h-2 w-2 rounded-full',
+                          i < view.shields
+                            ? 'bg-emerald-500'
+                            : 'border border-muted-foreground/50',
+                        )}
+                      />
+                    ))}
+                  </span>
+                </p>
+                <p className="text-xs font-medium leading-snug text-muted-foreground">
+                  Saves your streak on a day you miss.
+                </p>
               </div>
               {view.shields < view.shieldCap && (
                 <button
                   type="button"
                   onClick={onGetLilyPad}
-                  className="mt-3 flex h-10 w-full items-center justify-center gap-1.5 rounded-xl bg-[#4f9149] text-sm font-black text-white shadow-[0_3px_0_0_#3b7a38] transition-all active:translate-y-0.5 active:shadow-none"
+                  className="flex min-h-10 shrink-0 items-center gap-0.5 rounded-xl px-2.5 text-[13px] font-black text-emerald-700 transition-colors hover:bg-emerald-500/10 active:scale-95 dark:text-emerald-400"
                 >
-                  Get a Lily Pad
+                  Get more
+                  <ChevronRight aria-hidden className="h-4 w-4" />
                 </button>
               )}
             </div>
 
-            <div className="w-full p-4 border rounded-2xl border-border/60 bg-card">
-              {view.goal ? (
+            <div className="w-full rounded-2xl border border-border/60 bg-card px-3.5 py-3">
+              {goal ? (
                 <>
-                  <p className="flex items-center gap-1.5 text-sm font-black text-foreground">
-                    <Trophy className="w-4 h-4 text-amber-500" />
-                    {view.goal.days}-day commitment
-                  </p>
-                  {/* Endowed progress: the pledge itself is step one, already
-                      filled, so the bar never starts at nothing. */}
-                  <div className="mt-2.5 flex gap-1">
-                    {Array.from({ length: view.goal.stepCount }).map((_, step) => (
-                      <motion.span
-                        key={step}
-                        initial={{ opacity: 0.4, scaleY: 0.6 }}
-                        animate={{ opacity: 1, scaleY: 1 }}
-                        transition={{
-                          duration: 0.3,
-                          delay: Math.min(0.4, step * 0.02),
-                        }}
-                        className={cn(
-                          'h-3 min-w-0 flex-1 rounded-full',
-                          step < view.goal!.stepsFilled
-                            ? step === 0
-                              ? 'bg-emerald-400'
-                              : 'bg-amber-400'
-                            : 'bg-muted',
-                        )}
-                      />
-                    ))}
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="flex items-center gap-1.5 text-sm font-black text-foreground">
+                      <Trophy aria-hidden className="w-4 h-4 text-amber-500" />
+                      {goal.days}-day pledge
+                    </p>
+                    <p className="text-xs font-black tabular-nums text-muted-foreground">
+                      {goal.progress} / {goal.days}
+                    </p>
+                  </div>
+                  <div
+                    role="progressbar"
+                    aria-label={`${goal.days}-day pledge`}
+                    aria-valuemin={0}
+                    aria-valuemax={goal.days}
+                    aria-valuenow={goal.progress}
+                    aria-valuetext={`${goal.progress} of ${goal.days} days`}
+                    className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-muted"
+                  >
+                    <motion.div
+                      initial={reduceMotion ? false : { width: 0 }}
+                      animate={{ width: `${goalPct}%` }}
+                      transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+                      className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-amber-400"
+                    />
                   </div>
                   <p className="mt-1.5 text-xs font-bold text-muted-foreground">
-                    <span className="text-emerald-600 dark:text-emerald-400">
-                      You made the pledge ✓
-                    </span>{' '}
-                    · {view.goal.progress} / {view.goal.days} days
-                    {view.goal.payoutPercent < 100
-                      ? ` · ${view.goal.payoutPercent}% (repeat rung)`
+                    <span className="text-emerald-700 dark:text-emerald-400">
+                      Pledge made ✓
+                    </span>
+                    {' · '}
+                    {daysLeft} {daysLeft === 1 ? 'day' : 'days'} to go
+                    {goal.payoutPercent < 100
+                      ? ` · ${goal.payoutPercent}% flies (repeat)`
                       : ''}
                   </p>
-                  <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5">
+                  <div className="mt-2.5 flex items-center gap-2.5 border-t border-border/50 pt-2.5">
+                    <span className="shrink-0 text-xs font-black text-muted-foreground">
+                      Finish prize
+                    </span>
                     <PledgeRewardTiles
                       rewards={
-                        view.goalTiers.find((t) => t.days === view.goal!.days)
+                        view.goalTiers.find((t) => t.days === goal.days)
                           ?.rewards ?? []
                       }
                       rewardCatalog={rewardCatalog}
                       isPremium={isPremium}
                     />
-                    <span className="whitespace-nowrap text-[11px] font-bold text-muted-foreground">
-                      at the finish
-                    </span>
                   </div>
                 </>
               ) : (
@@ -958,8 +1015,8 @@ function HomeStep({
                   onClick={onCommit}
                   className="flex items-center w-full gap-3 text-left"
                 >
-                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-amber-100 dark:bg-amber-500/15">
-                    <Trophy className="w-5 h-5 text-amber-500" />
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-amber-100 dark:bg-amber-500/15">
+                    <Trophy aria-hidden className="w-5 h-5 text-amber-500" />
                   </span>
                   <span className="flex-1 min-w-0">
                     <span className="block text-sm font-black text-foreground">
@@ -969,7 +1026,7 @@ function HomeStep({
                       Pick a goal, earn a reward at the finish.
                     </span>
                   </span>
-                  <ChevronRight className="w-5 h-5 shrink-0 text-muted-foreground/40" />
+                  <ChevronRight aria-hidden className="w-5 h-5 shrink-0 text-muted-foreground" />
                 </button>
               )}
             </div>
@@ -977,13 +1034,19 @@ function HomeStep({
         </div>
       </div>
 
-      <div className="shrink-0 border-t border-border/60 bg-background px-6 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3 short-screen:pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:px-8 md:pb-6">
+      <div className="shrink-0 border-t border-border/60 bg-background px-5 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3 short-screen:pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:px-8 md:pb-6">
         <button
           type="button"
-          onClick={onDone}
-          className="mx-auto block w-full max-w-sm rounded-2xl bg-primary py-3.5 text-sm font-black tracking-wide text-primary-foreground shadow-[0_5px_0_0_rgba(0,0,0,0.15)] transition-all active:translate-y-1 active:shadow-none"
+          onClick={atRisk ? onGoToTasks : onDone}
+          className={cn(
+            'mx-auto flex w-full max-w-sm items-center justify-center gap-1.5 rounded-2xl py-3.5 text-sm font-black tracking-wide transition-all active:translate-y-1 active:shadow-none',
+            atRisk
+              ? 'bg-orange-500 text-white shadow-[0_5px_0_0_#c2410c]'
+              : 'bg-primary text-primary-foreground shadow-[0_5px_0_0_rgba(0,0,0,0.15)]',
+          )}
         >
-          Done
+          {atRisk && <Flame aria-hidden className="h-4 w-4 fill-current" />}
+          {atRisk ? 'Go to my tasks' : 'Done'}
         </button>
       </div>
     </div>
@@ -1001,6 +1064,8 @@ export function StreakSheet({
   celebration: CheckInResult | null;
   commitIntent?: boolean;
 }) {
+  const router = useRouter();
+  const pathname = usePathname();
   const { view: liveView } = useLoginStreak(open);
   // Full catalog, not the owned-items summary: reward tiles resolve art by id,
   // so gift boxes rendered as blank tiles and the guaranteed-skin pool came up
@@ -1121,7 +1186,7 @@ export function StreakSheet({
                     onClick={() =>
                       step === 'commit' ? finishCommit() : onOpenChange(false)
                     }
-                    className="absolute right-4 top-[calc(env(safe-area-inset-top)+0.75rem)] z-40 grid h-10 w-10 place-items-center rounded-full bg-muted/70 text-muted-foreground backdrop-blur transition-colors hover:bg-muted active:scale-95 md:top-4"
+                    className="absolute right-4 top-[calc(env(safe-area-inset-top)+0.75rem)] z-40 grid h-11 w-11 place-items-center rounded-full bg-muted/70 text-muted-foreground backdrop-blur transition-colors hover:bg-muted active:scale-95 md:top-4"
                   >
                     <X className="w-5 h-5" />
                   </button>
@@ -1154,6 +1219,10 @@ export function StreakSheet({
                     onGetLilyPad={() => openShieldSheet()}
                     onCommit={() => setStep('commit')}
                     onDone={() => onOpenChange(false)}
+                    onGoToTasks={() => {
+                      onOpenChange(false);
+                      if (pathname !== '/') router.push('/');
+                    }}
                   />
                 )}
               </motion.div>
@@ -1168,18 +1237,6 @@ export function StreakSheet({
             />
           )}
 
-          {(step === 'home' || step === 'commit') && (
-            <button
-              type="button"
-              aria-label="Close streak"
-              onClick={() =>
-                step === 'commit' ? finishCommit() : onOpenChange(false)
-              }
-              className="absolute right-4 top-[calc(env(safe-area-inset-top)+0.75rem)] z-40 grid h-10 w-10 place-items-center rounded-full bg-muted/70 text-muted-foreground backdrop-blur transition-colors active:scale-95"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          )}
 
         </motion.div>
       )}

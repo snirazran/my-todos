@@ -1,5 +1,9 @@
 import type { WardrobeSlot } from '@/lib/skins/catalog';
-import type { RotationInterval } from '@/lib/skins/styleShuffle';
+import type {
+  RotationInterval,
+  ShuffleLock,
+  ShuffleSource,
+} from '@/lib/skins/styleShuffle';
 import type { WishlistPin } from '@/lib/skins/wishlist';
 import type { DealReroll } from '@/lib/skins/dailyDeal';
 import type { SavedLook } from '@/lib/skins/looks';
@@ -104,7 +108,15 @@ export type StyleShufflePrefs = {
   /** Last time a shuffle offered an unowned item as a try-on. */
   lastTryOnAt?: Date | string | null;
   /** Slots the shuffle must leave alone. */
-  lockedSlots?: WardrobeSlot[];
+  lockedSlots?: ShuffleLock[];
+  source?: ShuffleSource;
+  lastAutoDay?: string | null;
+  previous?: {
+    equipped: Partial<Record<WardrobeSlot, string | null>>;
+    backgroundId: string | null;
+    at: Date | string;
+  } | null;
+  equipCounts?: Record<string, number>;
 };
 
 export type UserSkins = {

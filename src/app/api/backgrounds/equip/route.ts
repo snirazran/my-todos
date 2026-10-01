@@ -46,6 +46,7 @@ export async function PUT(req: NextRequest) {
 
     const update: Record<string, unknown> = {
       'wardrobe.backgrounds.equipped': targetId,
+      'styleShuffle.previous': null,
     };
     // Make sure default ownership is recorded if we're snapping to it
     if (targetId === DEFAULT_BACKGROUND_ID && ownedCount <= 0) {

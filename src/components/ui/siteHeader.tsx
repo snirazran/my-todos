@@ -2182,7 +2182,7 @@ function QuickTilesGrid({
   onOpenFocusTimer: () => void;
   calendarSubtitle: string;
 }) {
-  const { value: rotation, setValue: setRotation } = useShuffleInterval();
+  const { value: rotation } = useShuffleInterval();
   const [rotationOpen, setRotationOpen] = useState(false);
 
   return (
@@ -2238,12 +2238,7 @@ function QuickTilesGrid({
       />
       <SkinRotationDialog
         open={rotationOpen}
-        currentValue={rotation}
         onClose={() => setRotationOpen(false)}
-        onSelect={(v) => {
-          void setRotation(v);
-          setRotationOpen(false);
-        }}
       />
     </div>
   );

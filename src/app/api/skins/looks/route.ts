@@ -211,6 +211,7 @@ export async function PUT(req: NextRequest) {
       }
     }
 
+    set['styleShuffle.previous'] = null;
     await UserModel.updateOne({ _id: userId }, { $set: set });
     await notifyUserChanged(userId, { eventKind: 'wardrobe-equipped' });
     await bumpQuestMetric({ userId, metric: 'skin_equipped' });

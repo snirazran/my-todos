@@ -306,7 +306,12 @@ export async function PUT(req: NextRequest) {
       const previousId = wardrobe.equipped?.[slot] ?? null;
       await UserModel.updateOne(
         { _id: user._id },
-        { $set: { [`wardrobe.equipped.${slot}`]: null } },
+        {
+          $set: {
+            [`wardrobe.equipped.${slot}`]: null,
+            'styleShuffle.previous': null,
+          },
+        },
       );
       await notifyUserChanged(userId, {
         eventKind: 'wardrobe-equipped',
@@ -339,7 +344,15 @@ export async function PUT(req: NextRequest) {
 
     await UserModel.updateOne(
       { _id: user._id },
-      { $set: { [`wardrobe.equipped.${slot}`]: itemId } },
+      {
+        $set: {
+          [`wardrobe.equipped.${slot}`]: itemId,
+          'styleShuffle.previous': null,
+        },
+        ...(/^[A-Za-z0-9_-]+$/.test(itemId)
+          ? { $inc: { [`styleShuffle.equipCounts.${itemId}`]: 1 } }
+          : {}),
+      },
     );
     await notifyUserChanged(userId, {
       eventKind: 'wardrobe-equipped',
