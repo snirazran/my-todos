@@ -44,7 +44,6 @@ import {
   HEADER_CONTROL_ICON_BUTTON,
 } from '@/components/ui/MobileHeaderActions';
 import { StreakChip } from '@/components/ui/streak/StreakChip';
-import { PremiumFrogAura } from '@/components/ui/PremiumFrogAura';
 import { CurrencyShop } from './shop/CurrencyShop';
 import { HelpCenterPanel, ContactPanel } from '@/components/ui/HelpCenter';
 import { cn } from '@/lib/utils';
@@ -336,6 +335,7 @@ import { useNotificationStatus } from '@/hooks/useNotificationStatus';
 import { InviteFriendsModal } from '@/components/ui/InviteFriendsModal';
 import { CommunityPanel } from '@/components/ui/CommunityModal';
 import { ProfilePanel } from '@/components/ui/ProfileModal';
+import { PlusMembershipSheet } from '@/components/ui/PlusMembershipSheet';
 import { useFrogodoroUiStore } from '@/lib/frogodoroUiStore';
 
 export function MobileMenuCluster({
@@ -1389,27 +1389,7 @@ function MainView({
   const activeCalendars = connections.filter((c) => c.status === 'active').length;
   const activeConnections = activeCalendars + aiConnections;
   const needsAttention = connections.some((c) => c.status !== 'active');
-  const premiumUntilDate = premiumUntil ? new Date(premiumUntil) : null;
-  const premiumUntilLabel = premiumUntilDate
-    ? premiumUntilDate.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-      })
-    : null;
-  const premiumDaysLeft = premiumUntilDate
-    ? Math.max(0, Math.ceil((premiumUntilDate.getTime() - Date.now()) / 86_400_000))
-    : null;
   const isDesktop = layout === 'desktop';
-
-  useEffect(() => {
-    if (!plusInfoOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setPlusInfoOpen(false);
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [plusInfoOpen]);
 
   return (
     <div className="space-y-5">
@@ -1580,92 +1560,11 @@ function MainView({
         />
       </MenuSection>
 
-      {plusInfoOpen && createPortal(
-        <div
-          className="fixed inset-0 z-[1360] flex items-center justify-center bg-black/60 px-5 backdrop-blur-sm animate-in fade-in duration-200"
-          onClick={() => setPlusInfoOpen(false)}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="plus-info-title"
-            onClick={(e) => e.stopPropagation()}
-            className="relative w-full max-w-sm overflow-hidden rounded-[28px] bg-card shadow-[0_24px_60px_-12px_rgba(0,0,0,0.45)] ring-1 ring-border/60 animate-in fade-in zoom-in-95 duration-300"
-          >
-            <div className="relative isolate px-6 pb-6 pt-7 text-center text-emerald-950">
-              <span
-                aria-hidden
-                className="absolute inset-0 -z-10 bg-[linear-gradient(150deg,#fef3c7_0%,#fcd34d_42%,#f59e0b_74%,#d97706_100%)]"
-              />
-              <span
-                aria-hidden
-                className="absolute -top-20 left-1/2 -z-10 h-56 w-56 -translate-x-1/2 rounded-full bg-white/50 blur-2xl"
-              />
-              <span
-                aria-hidden
-                className="absolute inset-x-0 bottom-0 -z-10 h-px bg-emerald-950/10"
-              />
-              <button
-                type="button"
-                onClick={() => setPlusInfoOpen(false)}
-                aria-label="Close"
-                className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-emerald-950/10 text-emerald-900/80 transition-colors hover:bg-emerald-950/20 hover:text-emerald-950"
-              >
-                <X className="h-4 w-4" />
-              </button>
-              <div className="relative mx-auto h-24 w-44">
-                <span
-                  aria-hidden
-                  className="absolute left-1/2 top-1/2 h-[86px] w-[86px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)] ring-1 ring-inset ring-white/60"
-                />
-                <Icon
-                  name="frogPlus"
-                  className="absolute left-1/2 top-1/2 h-[60px] w-[60px] -translate-x-1/2 -translate-y-1/2 drop-shadow-[0_3px_0_rgba(31,98,28,0.3)]"
-                />
-                <PremiumFrogAura show compact alwaysPlay />
-              </div>
-              <h2
-                id="plus-info-title"
-                className="mt-3 flex items-center justify-center gap-2 text-[22px] font-black leading-none tracking-tight"
-              >
-                Frogress
-                <span className="inline-flex items-center rounded-md bg-gradient-to-b from-emerald-600 to-emerald-800 px-1.5 py-1 text-[12px] font-black leading-none text-amber-100 ring-1 ring-emerald-900/40">
-                  Plus
-                </span>
-              </h2>
-              <p className="mt-2.5 inline-flex items-center gap-1.5 rounded-full bg-emerald-950/10 px-3 py-1 text-[12px] font-black uppercase tracking-wide text-emerald-900">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-700" />
-                Subscription active
-              </p>
-            </div>
-
-            <div className="px-6 pb-6 pt-5">
-              {premiumUntilLabel && (
-                <div className="rounded-2xl border border-border/50 bg-muted/40 px-4 py-3.5 text-center">
-                  <p className="text-[11px] font-black uppercase tracking-wide text-muted-foreground">
-                    Active until
-                  </p>
-                  <p className="mt-1 text-lg font-black leading-none tracking-tight text-foreground">
-                    {premiumUntilLabel}
-                  </p>
-                  {premiumDaysLeft !== null && (
-                    <p className="mt-1.5 text-[12px] font-bold text-muted-foreground">
-                      {premiumDaysLeft === 0
-                        ? 'Last day'
-                        : `${premiumDaysLeft} ${premiumDaysLeft === 1 ? 'day' : 'days'} left`}
-                    </p>
-                  )}
-                </div>
-              )}
-              <p className="mt-4 text-center text-xs font-semibold leading-relaxed text-muted-foreground">
-                Thanks for supporting Frogress — you&apos;re helping us keep
-                building 🐸
-              </p>
-            </div>
-          </div>
-        </div>,
-        document.body,
-      )}
+      <PlusMembershipSheet
+        open={plusInfoOpen}
+        onClose={() => setPlusInfoOpen(false)}
+        fallbackUntil={premiumUntil}
+      />
 
       {/* Support */}
       {!isDesktop && (

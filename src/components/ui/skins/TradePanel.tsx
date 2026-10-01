@@ -64,6 +64,7 @@ import {
 } from '@/components/ui/gift-box/RewardCard';
 import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
 import { RARITY_CONFIG as GIFT_RARITY_CONFIG } from '@/components/ui/gift-box/constants';
+import { useAutoPopupHold } from '@/lib/popupGate';
 
 /* ---------------- Visual Helpers ---------------- */
 const RARITY_CONFIG: Record<
@@ -224,6 +225,7 @@ export function TradePanel({
   const [rewardQueue, setRewardQueue] = useState<TradePrize[]>([]);
   const [wasGolden, setWasGolden] = useState(false);
   const tradeResult = rewardQueue[0] ?? null;
+  useAutoPopupHold('trade-reward', !!tradeResult);
   const [rerollClaimId, setRerollClaimId] = useState<string | null>(null);
   const [rerollBusy, setRerollBusy] = useState(false);
   const [rerollError, setRerollError] = useState<string | null>(null);

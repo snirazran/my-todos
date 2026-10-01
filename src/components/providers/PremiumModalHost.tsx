@@ -1,9 +1,7 @@
 'use client';
 
-import {
-  PlusUpgradeModal,
-  PlusWelcomeHost,
-} from '@/components/ui/PlusUpgradeModal';
+import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
+import { PlusWelcomeHost } from '@/components/ui/PlusWelcome';
 import { useUIStore } from '@/lib/uiStore';
 
 /**

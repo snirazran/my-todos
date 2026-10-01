@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import { hapticCelebrate } from '@/lib/haptics';
 import { Trophy } from 'lucide-react';
+import { useAutoPopupHold } from '@/lib/popupGate';
 import { AdPlayIcon } from '@/components/ui/AdPlayIcon';
 import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
 import Fly from '@/components/ui/fly';
@@ -76,6 +77,7 @@ export function StreakCelebration({
   onClose: () => void;
   result: CheckInResult;
 }) {
+  useAutoPopupHold('streak-celebration', open);
   useEffect(() => {
     if (!open) return;
     confetti({

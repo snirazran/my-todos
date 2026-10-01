@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { create } from 'zustand';
 import { useSheetStore } from '@/lib/sheetStore';
 import { useUIStore } from '@/lib/uiStore';
@@ -195,4 +196,14 @@ export function whenScreenIsFree(show: () => void, options: WaitOptions = {}) {
  */
 export function whenAutoPopupsAllowed(show: () => void, options: WaitOptions = {}) {
   return waitFor(() => areAutoPopupsHeld(options.ownHold), show, options);
+}
+
+const LONG_HOLD_MS = 10 * 60 * 1000;
+
+export function useAutoPopupHold(reason: string, active: boolean) {
+  useEffect(() => {
+    if (!active) return;
+    holdAutoPopups(reason, LONG_HOLD_MS);
+    return () => releaseAutoPopups(reason);
+  }, [active, reason]);
 }

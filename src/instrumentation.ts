@@ -13,6 +13,8 @@ export async function register() {
   startLoginStreakTicker();
   const { startCalendarSyncTicker } = await import('@/lib/calendarSyncTicker');
   startCalendarSyncTicker();
+  const { startPlusTicker } = await import('@/lib/plusTicker');
+  startPlusTicker();
 }
 
 export const onRequestError = Sentry.captureRequestError;

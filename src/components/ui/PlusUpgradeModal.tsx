@@ -4,7 +4,6 @@ import React, { useEffect, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { mutate } from 'swr';
-import { create } from 'zustand';
 import { useNotification } from '@/components/providers/NotificationProvider';
 import { Capacitor } from '@capacitor/core';
 import { Icon, type IconName } from '@/components/ui/Icon';
@@ -15,8 +14,6 @@ import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import Frog from '@/components/ui/frog';
 import { FrogSnapshot } from '@/components/ui/FrogSnapshot';
 import { PremiumFrogAura } from '@/components/ui/PremiumFrogAura';
-import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
-import { RARITY_CONFIG } from '@/components/ui/gift-box/constants';
 import {
   formatPlusPrice,
   getPlusPricing,
@@ -27,6 +24,8 @@ import {
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
 import { mutateInventoryCaches } from '@/hooks/useInventory';
 import { auth } from '@/lib/firebase';
+import { BENEFITS } from '@/lib/plusBenefits';
+import { showPlusWelcome } from '@/components/ui/PlusWelcome';
 import { establishSessionCookie } from '@/lib/authCookie';
 import {
   GoogleAccountExistsError,
@@ -70,23 +69,6 @@ const APPLE_EULA_URL =
 const TERMS_URL = 'https://frogress.com/terms';
 const PRIVACY_URL = 'https://frogress.com/privacy';
 
-const BENEFITS: { icon: IconName; title: string; body: string }[] = [
-  {
-    icon: 'lilyPad',
-    title: 'Never lose a streak to one bad day',
-    body: 'Extra Lily Pads, plus a free one every month.',
-  },
-  {
-    icon: 'leap',
-    title: 'Commitments that bend, not break',
-    body: 'Move Leap sessions when life gets busy.',
-  },
-  {
-    icon: 'x2',
-    title: 'Motivation that keeps up with you',
-    body: 'Every quest and gift pays double.',
-  },
-];
 
 type PaywallContext = {
   headline: string;
@@ -168,7 +150,6 @@ function useIsDesktop() {
 }
 
 const PREMIUM_CONFIRM_LATE_MS = 10 * 60 * 1000;
-const WELCOME_AFTER_DELIVERY_MS = 1800;
 
 async function refreshPremiumState() {
   await mutate(() => true);
@@ -199,31 +180,9 @@ async function deliverPlusUnlock(
   } catch (err) {
     console.error('Delivering the Plus unlock failed', err);
   }
-  if (welcome) setTimeout(showPlusWelcome, WELCOME_AFTER_DELIVERY_MS);
+  if (welcome) showPlusWelcome();
 }
 
-const usePlusWelcomeStore = create<{ open: boolean }>(() => ({ open: false }));
-
-export function showPlusWelcome() {
-  usePlusWelcomeStore.setState({ open: true });
-}
-
-export function PlusWelcomeHost() {
-  const open = usePlusWelcomeStore((state) => state.open);
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-  if (!mounted) return null;
-  return createPortal(
-    <AnimatePresence>
-      {open && (
-        <PlusWelcomeCelebration
-          onDone={() => usePlusWelcomeStore.setState({ open: false })}
-        />
-      )}
-    </AnimatePresence>,
-    document.body,
-  );
-}
 
 function addDays(days: number) {
   const d = new Date();
@@ -657,132 +616,6 @@ export function PlusUpgradeModal({
       )}
     </AnimatePresence>,
     document.body,
-  );
-}
-
-const PLUS_WELCOME_HIGHLIGHTS = [
-  'Double rewards',
-  'Every gift opens twice',
-  'A free Lily Pad every month',
-];
-
-export function PlusWelcomeCelebration({ onDone }: { onDone: () => void }) {
-  const { indices: wardrobeIndices } = useWardrobeIndices(true);
-  const reduceMotion = useReducedMotion();
-  const overlayRef = React.useRef<HTMLDivElement>(null);
-  const heroRef = React.useRef<HTMLDivElement>(null);
-  const rayOriginRef = React.useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const overlay = overlayRef.current;
-    const hero = heroRef.current;
-    const rayOrigin = rayOriginRef.current;
-    if (!overlay || !hero || !rayOrigin) return;
-
-    const alignRays = () => {
-      const overlayRect = overlay.getBoundingClientRect();
-      const heroRect = hero.getBoundingClientRect();
-      rayOrigin.style.top = `${heroRect.top - overlayRect.top + heroRect.height / 2}px`;
-    };
-
-    alignRays();
-    const observer = new ResizeObserver(alignRays);
-    observer.observe(hero);
-    window.addEventListener('resize', alignRays);
-    overlay.addEventListener('scroll', alignRays, { passive: true });
-    return () => {
-      observer.disconnect();
-      window.removeEventListener('resize', alignRays);
-      overlay.removeEventListener('scroll', alignRays);
-    };
-  }, []);
-
-  const reveal = (delay: number) => ({
-    initial: reduceMotion ? { opacity: 0 } : { opacity: 0, y: 10 },
-    animate: { opacity: 1, y: 0 },
-    transition: reduceMotion
-      ? { delay }
-      : { delay, type: 'spring' as const, damping: 24, stiffness: 300 },
-  });
-  return (
-    <motion.div
-      ref={overlayRef}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[10010] flex overflow-x-hidden overflow-y-auto px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(.75rem,env(safe-area-inset-top))]"
-    >
-      <div className="absolute inset-0 bg-slate-950/90 backdrop-blur-sm" />
-      <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div
-          ref={rayOriginRef}
-          className="absolute left-1/2 top-[30%] h-[200vmax] w-[200vmax] -translate-x-1/2 -translate-y-1/2"
-        >
-          <RotatingRays colorClass={RARITY_CONFIG.legendary.rays} />
-          <div
-            className="absolute inset-0"
-            style={{
-              background:
-                'radial-gradient(circle, transparent 9rem, rgba(2,6,23,0.8) 70vmax)',
-            }}
-          />
-        </div>
-      </div>
-      <motion.div
-        initial={
-          reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.85, y: 16 }
-        }
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ type: 'spring', damping: 22, stiffness: 260 }}
-        className="relative z-10 m-auto flex w-full max-w-sm flex-col items-center text-center"
-      >
-        <div
-          ref={heroRef}
-          className="relative flex h-[clamp(13rem,27.5dvh,16.5rem)] w-full shrink-0 items-center justify-center"
-        >
-          <div className="relative">
-            <Frog
-              width="clamp(13.125rem,28dvh,16.875rem)"
-              height="clamp(14.75rem,31.5dvh,19rem)"
-              indices={wardrobeIndices}
-              emote="love"
-            />
-            <PremiumFrogAura show compact flySize={50} alwaysPlay />
-          </div>
-        </div>
-        <h2 className="text-[clamp(1.55rem,4dvh,1.875rem)] font-black leading-none tracking-tight text-white">
-          Welcome to Plus!
-        </h2>
-        <p className="mt-[clamp(.3rem,.8dvh,.375rem)] text-sm font-semibold leading-tight text-white/85">
-          Your golden fly companion is already by your side.
-        </p>
-
-        <div className="mt-[clamp(.75rem,2dvh,1.25rem)] flex w-full max-w-[19rem] flex-col gap-[clamp(.3rem,.8dvh,.5rem)]">
-          {PLUS_WELCOME_HIGHLIGHTS.map((perk, i) => (
-            <motion.div
-              key={perk}
-              {...reveal(0.3 + i * 0.12)}
-              className="flex items-center gap-2.5 rounded-xl bg-white/15 px-3.5 py-[clamp(.4rem,1dvh,.625rem)] text-left ring-1 ring-white/20 backdrop-blur-md dark:bg-white/10"
-            >
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-amber-400 text-amber-950">
-                <Check className="h-4 w-4" strokeWidth={3.5} />
-              </span>
-              <span className="text-sm font-black tracking-tight text-white">
-                {perk}
-              </span>
-            </motion.div>
-          ))}
-        </div>
-
-        <button
-          type="button"
-          onClick={onDone}
-          className="mt-[clamp(.875rem,2.5dvh,1.5rem)] w-full max-w-[19rem] rounded-2xl bg-amber-500 py-[clamp(.7rem,1.6dvh,.875rem)] text-base font-black tracking-tight text-white shadow-[0_5px_0_0_#b45309] transition-all hover:bg-amber-400 active:translate-y-1 active:shadow-none"
-        >
-          Let&apos;s go!
-        </button>
-      </motion.div>
-    </motion.div>
   );
 }
 

@@ -74,6 +74,7 @@ const UserSchema = new Schema<UserDoc>(
       default: [],
     },
     premiumUntil: { type: Date },
+    plusSubscription: { type: Schema.Types.Mixed, default: undefined },
     plusIntroEligible: { type: Boolean, default: false },
     plusIntroShownAt: { type: Date, default: null },
     adDoubleClaim: { type: Schema.Types.Mixed, default: undefined },

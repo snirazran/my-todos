@@ -22,6 +22,7 @@ import { hapticCelebrate, hapticImpact, hapticTick } from '@/lib/haptics';
 import { PlusOfferButton, RewardCard } from './RewardCard';
 import { pickFunnySentence } from './funnySentences';
 import { queuePlusIntroOnce } from '@/lib/plusIntro';
+import { useAutoPopupHold } from '@/lib/popupGate';
 
 /** What the server says about a reveal beyond the prize itself. */
 type PrizeMeta = {
@@ -43,6 +44,7 @@ export default function GiftBoxOpening({
   paused?: boolean;
 }) {
   const { user } = useAuth();
+  useAutoPopupHold('gift-opening', true);
   const router = useRouter();
   const [phase, setPhase] = useState<'idle' | 'shaking' | 'revealed'>('idle');
   const [prize, setPrize] = useState<(ItemDef & { kind?: 'item' | 'background'; imageUrl?: string }) | null>(null);

@@ -39,7 +39,7 @@ import { useUIStore } from '@/lib/uiStore';
 import { AdminCosmeticsPopup } from '@/components/ui/AdminCosmeticsPopup';
 import { AdminGiftManagerPopup } from '@/components/ui/AdminGiftManagerPopup';
 import { AdminGuard } from '@/components/auth/AdminGuard';
-import { PlusWelcomeCelebration } from '@/components/ui/PlusUpgradeModal';
+import { PlusWelcomeCelebration } from '@/components/ui/PlusWelcome';
 import { createPortal } from 'react-dom';
 
 type Template = {

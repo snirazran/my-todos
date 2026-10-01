@@ -21,6 +21,7 @@ import { hapticCelebrate, hapticTick } from '@/lib/haptics';
 import { maybeRequestAppRating } from '@/lib/rateApp';
 import { useRiveInteractionPause } from '@/lib/riveInteractionPause';
 import { emitCampaignTrigger, setCampaignBusy } from '@/lib/campaigns/orchestrator';
+import { useAutoPopupHold } from '@/lib/popupGate';
 
 export type QuestRewardSummary = {
   fliesGranted?: number;
@@ -342,6 +343,7 @@ export function QuestRewardRevealHost() {
   // reveal or gift-opening is on screen; the overlay's own Rives opt out via
   // alwaysPlay.
   const revealActive = queue.length > 0 || !!giftOpening;
+  useAutoPopupHold('quest-reveal', revealActive);
   useEffect(() => {
     if (!revealActive) return;
     const { acquire, release } = useRiveInteractionPause.getState();
