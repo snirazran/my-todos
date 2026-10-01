@@ -4,12 +4,12 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { mutate as swrMutate } from 'swr';
 import {
   ArrowLeft,
+  CalendarClock,
   Check,
   ChevronRight,
   Flame,
   Loader2,
   Lock,
-  Pencil,
   Play,
   Sparkles,
 } from 'lucide-react';
@@ -37,6 +37,64 @@ const CUSTOM_TEXT_MAX = 80;
 
 const DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const FULL_DAY_NAMES = [
+  'Sunday',
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+];
+
+const TIME_PRESETS: { value: string; label: string }[] = [
+  { value: '08:00', label: 'Morning' },
+  { value: '12:30', label: 'Midday' },
+  { value: '19:00', label: 'Evening' },
+];
+
+const LEAP_STEPS = 3;
+
+function formatClock(hhmm: string) {
+  const [h, m] = hhmm.split(':').map(Number);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return hhmm;
+  return new Date(2000, 0, 1, h, m).toLocaleTimeString([], {
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
+function dayHint(dateKey: string, todayKey: string) {
+  if (dateKey === todayKey) return 'Today';
+  const date = new Date(`${dateKey}T12:00:00`);
+  const today = new Date(`${todayKey}T12:00:00`);
+  if (Math.round((date.getTime() - today.getTime()) / 86_400_000) === 1)
+    return 'Tomorrow';
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+function joinWords(parts: string[]) {
+  if (parts.length <= 1) return parts.join('');
+  return `${parts.slice(0, -1).join(', ')} & ${parts[parts.length - 1]}`;
+}
+
+function summarizeSchedule(
+  pickedDays: number[],
+  dayTimes: Record<number, string>,
+  startTime: string,
+) {
+  if (pickedDays.length === 0) return '';
+  const distinct = new Set(pickedDays.map((day) => dayTimes[day] ?? startTime));
+  if (distinct.size > 1) {
+    return joinWords(
+      pickedDays.map(
+        (day) => `${DAY_NAMES[day]} ${formatClock(dayTimes[day] ?? startTime)}`,
+      ),
+    );
+  }
+  const only = dayTimes[pickedDays[0]] ?? startTime;
+  return `${joinWords(pickedDays.map((day) => DAY_NAMES[day]))} at ${formatClock(only)}`;
+}
 
 const TIME_INPUT_RESET = cn(
   'block box-border w-full min-w-0 max-w-full appearance-none overflow-hidden',
@@ -149,19 +207,10 @@ export function PactPickSheet({
   const [areaId, setAreaId] = useState<string | null>(null);
   const [options, setOptions] = useState<PactOption[] | null>(null);
   const [optionId, setOptionId] = useState<string | null>(null);
-  const [customText, setCustomText] = useState('');
-  const [continueText, setContinueText] = useState('');
+  const [text, setText] = useState('');
   const [days, setDays] = useState<number[]>(() => fitDays(PACT_DEFAULT_DAYS));
-  const [pastDayHint, setPastDayHint] = useState<{
-    text: string;
-    id: number;
-  } | null>(null);
   const [startTime, setStartTime] = useState('19:00');
-  // Your own words are where the step starts — the card is live and marked
-  // from the first frame, and the ideas below are the detour. The keyboard is
-  // not forced up with it: a sheet that opens onto a keyboard hides the very
-  // ideas someone with a blank mind came here for.
-  const [writingOwn, setWritingOwn] = useState(true);
+  const [customTime, setCustomTime] = useState(false);
   const [perDayTimes, setPerDayTimes] = useState(false);
   const [tagId, setTagId] = useState<string | null>(null);
   const [pickingTag, setPickingTag] = useState(false);
@@ -191,9 +240,10 @@ export function PactPickSheet({
     setAreaId(null);
     setOptions(null);
     setOptionId(null);
-    setWritingOwn(true);
-    setCustomText('');
-    setContinueText('');
+    setText('');
+    setDays([]);
+    setCustomTime(false);
+    setPerDayTimes(false);
     setTagId(null);
     setPickingTag(false);
     setError(null);
@@ -210,17 +260,26 @@ export function PactPickSheet({
   );
   // Last week's tasks are still on the board, so this commitment edits them in
   // place — same rows, same calendar event — instead of adding a second set.
-  const continuing = !writingOwn && !!option?.continuePactId;
+  const continuing = !!option?.continuePactId;
+  const fromIdea =
+    !!option && (continuing || text.trim() === option.text.trim());
 
-  // Typing is the selection — a field you have to arm with a separate tap is a
-  // field people abandon. Switching in drops the idea that was picked, and its
-  // schedule with it: a repeat's days belong to its own sentence, not to a new
-  // one that happens to be typed over it.
-  const startWritingOwn = () => {
-    if (writingOwn) return;
-    setWritingOwn(true);
+  const pickIdea = (entry: PactOption) => {
+    setOptionId(entry.id);
+    setText(entry.text.slice(0, CUSTOM_TEXT_MAX));
+    setDays(entry.source === 'repeat' ? fitDays(entry.days) : []);
+    setStartTime(entry.startTime);
+    setCustomTime(!TIME_PRESETS.some((preset) => preset.value === entry.startTime));
+    setError(null);
+  };
+
+  const startFresh = () => {
     setOptionId(null);
+    setText('');
     setDays([]);
+    window.requestAnimationFrame(() =>
+      document.getElementById('pact-own-words')?.focus(),
+    );
   };
 
   const chooseArea = async (categoryId: string) => {
@@ -228,7 +287,8 @@ export function PactPickSheet({
     setStep('commitment');
     setOptions(null);
     setOptionId(null);
-    setWritingOwn(true);
+    setText('');
+    setDays([]);
     setLoading(true);
     setError(null);
     try {
@@ -253,12 +313,8 @@ export function PactPickSheet({
 
   const commit = async () => {
     if (!area) return;
-    const text = writingOwn
-      ? customText.trim()
-      : continuing
-        ? continueText.trim()
-        : (option?.text ?? '');
-    if (!text) {
+    const trimmed = text.trim();
+    if (!trimmed) {
       setError('Write what you’ll do, or pick an idea below');
       return;
     }
@@ -272,14 +328,14 @@ export function PactPickSheet({
         body: JSON.stringify({
           timezone,
           categoryId: area.categoryId,
-          text,
+          text: trimmed,
           days,
           startTime,
           dayTimes: perDayTimes ? dayTimes : undefined,
           tagId: tagId ?? undefined,
-          suggestionId: writingOwn ? undefined : option?.id,
+          suggestionId: fromIdea ? option?.id : undefined,
           continueFromPactId: continuing ? option?.continuePactId : undefined,
-          source: writingOwn ? 'custom' : option?.source,
+          source: fromIdea ? option?.source : 'custom',
         }),
       });
       const payload = await res.json();
@@ -300,14 +356,7 @@ export function PactPickSheet({
   };
 
   const toggleDay = (day: number) => {
-    if (isPastDay(day)) {
-      setPastDayHint({
-        text: `${DAY_NAMES[day]} has passed \u2014 pick a day still ahead this week.`,
-        id: Date.now(),
-      });
-      return;
-    }
-    setPastDayHint(null);
+    if (isPastDay(day)) return;
     setDays((prev) =>
       prev.includes(day)
         ? prev.filter((d) => d !== day)
@@ -315,11 +364,14 @@ export function PactPickSheet({
     );
   };
 
-  const previewText = writingOwn
-    ? customText.trim()
-    : continuing
-      ? continueText.trim()
-      : (option?.text ?? '');
+  const previewText = text.trim();
+  const remainingDays = orderedDays.filter((day) => !isPastDay(day));
+  const pickedDays = orderedDays.filter((day) => days.includes(day));
+  const scheduleSummary = summarizeSchedule(
+    pickedDays,
+    perDayTimes && pickedDays.length > 1 ? dayTimes : {},
+    startTime,
+  );
   const visibleOptions = (options ?? []).slice(0, PRIMARY_OPTIONS);
   // The shortest idea for this area, so the ghost text demonstrates the shape
   // a good answer has — a verb and a size — in the reader's own subject rather
@@ -450,17 +502,11 @@ export function PactPickSheet({
 
             {step === 'area' && (
               <div className="flex flex-col gap-4 py-2">
-                <div className="pt-2">
-                  <p className="text-[13px] font-black text-primary">
-                    This week
-                  </p>
-                  <h2 className="mt-1 text-[20px] font-black leading-tight text-foreground">
-                    Pick your area
-                  </h2>
-                  <p className="mt-1 text-[13px] font-semibold text-muted-foreground">
-                    Just one. You&apos;ll choose again next week.
-                  </p>
-                </div>
+                <StepHeader
+                  index={1}
+                  title="Which area this week?"
+                  subtitle="Pick one. You choose again next week."
+                />
                 {/* Always two columns: a full-width card at 16/9 is enormous on
                   a phone, and squeezing it shorter crops the frog back out.
                   Halving the width fixes both at once. */}
@@ -543,11 +589,11 @@ export function PactPickSheet({
                         {anyAreaStatus && (
                           <span
                             className={cn(
-                              'flex h-8 items-center truncate px-3 text-[11px] font-bold',
+                              'flex h-8 items-center truncate px-3 text-[12px] font-bold',
                               status?.tone === 'good'
                                 ? 'text-primary'
                                 : status?.tone === 'urgent'
-                                  ? 'text-amber-600 dark:text-amber-400'
+                                  ? 'text-amber-700 dark:text-amber-400'
                                   : 'text-muted-foreground',
                             )}
                           >
@@ -563,186 +609,123 @@ export function PactPickSheet({
 
             {step === 'commitment' && area && (
               <div className="flex flex-col gap-4 py-2">
-                <div className="flex items-center gap-2 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setStep('area')}
-                    aria-label="Back to areas"
-                    className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted"
+                <StepHeader
+                  index={2}
+                  eyebrow={area.shortLabel}
+                  title="What will you do?"
+                  subtitle="One small, clear action you can tick off."
+                  onBack={() => setStep('area')}
+                  backLabel="Back to areas"
+                />
+
+                <div>
+                  <label
+                    htmlFor="pact-own-words"
+                    className="mb-1.5 block px-0.5 text-[13px] font-black text-foreground"
                   >
-                    <ArrowLeft className="h-4 w-4" strokeWidth={2.5} />
-                  </button>
-                  <div className="min-w-0">
-                    <p className="text-[13px] font-black text-primary">
-                      {area.shortLabel}
-                    </p>
-                    <h2 className="text-[19px] font-black leading-tight text-foreground">
-                      What will you do?
-                    </h2>
-                    <p className="mt-0.5 text-[12.5px] font-bold text-muted-foreground">
-                      The clearer it is, the easier the Leap.
-                    </p>
+                    I will…
+                  </label>
+                  <div className="relative">
+                    <input
+                      id="pact-own-words"
+                      value={text}
+                      onChange={(event) => {
+                        setText(event.target.value);
+                        setError(null);
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' && previewText) {
+                          event.preventDefault();
+                          setStep('confirm');
+                        }
+                      }}
+                      maxLength={CUSTOM_TEXT_MAX}
+                      placeholder={customPlaceholder}
+                      enterKeyHint="next"
+                      autoComplete="off"
+                      aria-describedby="pact-own-words-hint"
+                      className="h-12 w-full rounded-2xl border-2 border-border/70 bg-background px-3.5 pr-14 text-[16px] font-bold text-foreground outline-none transition-colors placeholder:font-semibold placeholder:text-muted-foreground/70 focus:border-primary"
+                    />
+                    {text.length > 0 && (
+                      <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[11px] font-bold tabular-nums text-muted-foreground">
+                        {CUSTOM_TEXT_MAX - text.length}
+                      </span>
+                    )}
                   </div>
+                  <p
+                    id="pact-own-words-hint"
+                    className="mt-1.5 px-0.5 text-[12px] font-semibold text-muted-foreground"
+                  >
+                    {continuing ? (
+                      <>
+                        This updates last week&rsquo;s task.{' '}
+                        <button
+                          type="button"
+                          onClick={startFresh}
+                          className="font-black text-primary underline underline-offset-2"
+                        >
+                          Start fresh instead
+                        </button>
+                      </>
+                    ) : (
+                      'Type your own, or tap an idea to start from it.'
+                    )}
+                  </p>
                 </div>
 
                 {loading && (
-                  <div className="flex items-center justify-center py-10 text-muted-foreground">
+                  <div className="flex items-center justify-center py-8 text-muted-foreground">
                     <Loader2 className="h-5 w-5 animate-spin" />
                   </div>
                 )}
 
-                {!loading && options && (
-                  <div className="flex flex-col gap-3">
-                    {/* Never gated, and never last. The pact is the one system
-                        where the user names their own goal, and goal-setting
-                        theory's difficulty effects are conditional on the goal
-                        being self-endorsed — charging for that, or burying it
-                        under a menu of ready-made answers, turns the whole
-                        mechanic into someone else's assignment. The field is
-                        open from the start: the ideas below are a fallback for
-                        a blank mind, not the default path. */}
-                    <div
-                      className={cn(
-                        'rounded-2xl border p-3.5 transition',
-                        writingOwn
-                          ? 'border-primary bg-primary/[0.07]'
-                          : 'border-border/60 bg-card/60',
-                      )}
-                    >
-                      <label
-                        htmlFor="pact-own-words"
-                        className="flex items-center gap-2 text-[15px] font-black text-foreground"
-                      >
-                        <Pencil
-                          className={cn(
-                            'h-[18px] w-[18px] shrink-0',
-                            writingOwn ? 'text-primary' : 'text-muted-foreground',
-                          )}
-                          strokeWidth={2.5}
-                        />
-                        In your own words
-                      </label>
-                      <input
-                        id="pact-own-words"
-                        value={customText}
-                        onFocus={() => {
-                          // Reading the field is not choosing it. A tap that
-                          // silently dropped a picked idea punished anyone who
-                          // opened the keyboard to see what was on offer;
-                          // typing is the commitment, and text already in the
-                          // box means the choice was made earlier.
-                          if (customText.trim()) startWritingOwn();
-                        }}
-                        onChange={(event) => {
-                          startWritingOwn();
-                          setCustomText(event.target.value);
-                        }}
-                        maxLength={CUSTOM_TEXT_MAX}
-                        placeholder={customPlaceholder}
-                        className="mt-2.5 h-11 w-full rounded-xl border border-border/60 bg-background px-3 text-[16px] font-bold text-foreground outline-none focus:border-primary"
-                      />
-                      {customText.length > 0 && (
-                        <div className="mt-2 flex justify-end">
-                          <span className="text-[11px] font-bold tabular-nums text-muted-foreground">
-                            {customText.length}/{CUSTOM_TEXT_MAX}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-3 pt-1">
-                      <span className="h-px flex-1 bg-border/70" />
-                      <span className="text-[11.5px] font-black uppercase tracking-wide text-muted-foreground">
-                        Or start from an idea
-                      </span>
-                      <span className="h-px flex-1 bg-border/70" />
-                    </div>
-
+                {!loading && visibleOptions.length > 0 && (
+                  <div className="flex flex-col gap-2">
+                    <p className="px-0.5 text-[12px] font-black uppercase tracking-wide text-muted-foreground">
+                      Ideas for {area.shortLabel}
+                    </p>
                     {visibleOptions.map((entry) => {
-                      const selected = !writingOwn && optionId === entry.id;
+                      const selected = optionId === entry.id && fromIdea;
                       return (
                         <button
                           key={entry.id}
                           type="button"
-                          onClick={() => {
-                            setWritingOwn(false);
-                            setOptionId(entry.id);
-                            setContinueText(entry.text);
-                            // Only a repeat carries a schedule, and it is the
-                            // user's own from a week that worked. Everything
-                            // else starts blank so the days are chosen, not
-                            // inherited.
-                            setDays(
-                              entry.source === 'repeat'
-                                ? fitDays(entry.days)
-                                : [],
-                            );
-                            setStartTime(entry.startTime);
-                          }}
+                          aria-pressed={selected}
+                          onClick={() => pickIdea(entry)}
                           className={cn(
-                            'flex items-center gap-3 rounded-2xl border px-3.5 py-3 text-left transition',
+                            'flex min-h-12 items-center gap-3 rounded-2xl border-2 px-3.5 py-2.5 text-left transition active:scale-[0.99]',
                             selected
                               ? 'border-primary bg-primary/[0.07]'
-                              : 'border-border/60 bg-card/60 hover:border-primary/40',
+                              : 'border-border/60 bg-card hover:border-primary/40',
                           )}
                         >
-                          {/* One aligned attribute per row — effort. Reward
-                              rides on effort, so printing it three times only
-                              adds attributes to compare, which is the part of
-                              choice-set complexity that actually costs the
-                              reader. It is stated once, in the footer. */}
                           <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                            <span className="text-[15px] font-black leading-snug text-foreground">
+                            <span className="text-[14.5px] font-black leading-snug text-foreground">
                               {entry.text}
                             </span>
                             {entry.source === 'repeat' && (
-                              <span className="text-[12.5px] font-bold text-muted-foreground">
+                              <span className="text-[12px] font-bold text-muted-foreground">
                                 {repeatLabel(entry)}
                               </span>
                             )}
                           </span>
                           {selected ? (
-                            <Check
-                              className="h-5 w-5 shrink-0 text-primary"
-                              strokeWidth={3}
-                            />
+                            <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-primary text-white">
+                              <Check className="h-3.5 w-3.5" strokeWidth={3.5} />
+                            </span>
                           ) : (
-                            <span
-                              aria-hidden="true"
-                              className="h-5 w-5 shrink-0 rounded-full border-2 border-border"
-                            />
+                            <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-[11px] font-black text-muted-foreground">
+                              Use
+                            </span>
                           )}
                         </button>
                       );
                     })}
-
-                    {/* A picked idea is still the user's sentence to keep or
-                        change — the words that end up on the task should be
-                        the ones they endorse, and re-typing a suggestion by
-                        hand to adjust it is the kind of friction that makes
-                        people take the canned answer instead. */}
-                    {!writingOwn && option && !option.continuePactId && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setCustomText(option.text.slice(0, CUSTOM_TEXT_MAX));
-                          startWritingOwn();
-                          window.requestAnimationFrame(() => {
-                            document
-                              .getElementById('pact-own-words')
-                              ?.focus();
-                          });
-                        }}
-                        className="self-start text-[12.5px] font-black text-primary underline underline-offset-2"
-                      >
-                        Reword this one
-                      </button>
-                    )}
                   </div>
                 )}
 
                 {error && (
-                  <p className="text-[13px] font-bold text-destructive">
+                  <p role="alert" className="text-[13px] font-bold text-destructive">
                     {error}
                   </p>
                 )}
@@ -751,35 +734,25 @@ export function PactPickSheet({
 
             {step === 'confirm' && area && (
               <div className="flex flex-col gap-4 py-2">
-                <div className="flex items-center gap-2 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setStep('commitment')}
-                    aria-label="Back to options"
-                    className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted"
-                  >
-                    <ArrowLeft className="h-4 w-4" strokeWidth={2.5} />
-                  </button>
-                  <div className="min-w-0">
-                    <h2 className="text-[19px] font-black leading-tight text-foreground">
-                      How often, and when?
-                    </h2>
-                    <p className="text-[12.5px] font-bold text-muted-foreground">
-                      More days, bigger reward — if you keep them all.
-                    </p>
-                  </div>
-                </div>
+                <StepHeader
+                  index={3}
+                  eyebrow={area.shortLabel}
+                  title="When will you do it?"
+                  subtitle="A set day and time makes it far likelier to happen."
+                  onBack={() => setStep('commitment')}
+                  backLabel="Back to what you'll do"
+                />
 
-                <div className="overflow-hidden rounded-[24px] border border-border/50 bg-card shadow-sm">
+                <div className="overflow-hidden rounded-[22px] border border-border/50 bg-card shadow-sm">
                   <div
                     className="relative w-full overflow-hidden"
-                    style={{ aspectRatio: '16 / 5' }}
+                    style={{ aspectRatio: '16 / 4' }}
                   >
                     {area.coverImageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={area.coverImageUrl}
-                        alt={area.name}
+                        alt=""
                         decoding="async"
                         className="h-full w-full object-cover object-[center_42%]"
                       />
@@ -791,249 +764,326 @@ export function PactPickSheet({
                         }}
                       />
                     )}
-                    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-black/55 to-transparent" />
+                    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-black/55 to-transparent" />
                     <span
-                      className="absolute bottom-2 left-3.5 text-[19px] leading-none tracking-wide text-white drop-shadow-[0_3px_0_rgba(15,23,42,0.9)]"
+                      className="absolute bottom-2 left-3.5 text-[17px] leading-none tracking-wide text-white drop-shadow-[0_3px_0_rgba(15,23,42,0.9)]"
                       style={{
                         fontFamily:
                           'var(--font-display), "Luckiest Guy", cursive',
-                        WebkitTextStroke: '1.8px rgba(15, 23, 42, 0.95)',
+                        WebkitTextStroke: '1.6px rgba(15, 23, 42, 0.95)',
                         paintOrder: 'stroke fill',
                       }}
                     >
                       {area.name}
                     </span>
                   </div>
-                  <div className="px-4 py-3">
-                    {continuing ? (
-                      <>
-                        <input
-                          value={continueText}
-                          onChange={(event) =>
-                            setContinueText(event.target.value)
-                          }
-                          maxLength={80}
-                          aria-label="What you’ll do"
-                          className="h-9 w-full rounded-lg border border-border/60 bg-background px-2 text-[16px] font-black leading-snug text-foreground outline-none focus:border-primary"
-                        />
-                        <p className="mt-1.5 text-[12px] font-semibold text-muted-foreground">
-                          This edits last week&rsquo;s task instead of adding a
-                          new one.
-                        </p>
-                      </>
-                    ) : (
-                      <p className="text-[17px] font-black leading-snug text-foreground">
-                        {previewText}
-                      </p>
-                    )}
+                  <div className="px-4 py-3" aria-live="polite">
+                    <p className="text-[12px] font-black uppercase tracking-wide text-muted-foreground">
+                      Your plan
+                    </p>
+                    <p className="mt-1 text-[16px] font-black leading-snug text-foreground">
+                      {previewText}
+                    </p>
+                    <p
+                      className={cn(
+                        'mt-1.5 flex items-center gap-1.5 text-[13px] font-black',
+                        scheduleSummary ? 'text-primary' : 'text-muted-foreground',
+                      )}
+                    >
+                      <CalendarClock aria-hidden className="h-4 w-4 shrink-0" />
+                      {scheduleSummary || 'Pick a day and time below'}
+                    </p>
                   </div>
                 </div>
 
-                <div className="flex min-w-0 flex-col gap-3 rounded-2xl border border-border/60 bg-card/60 p-4">
-                  <div>
-                    <p className="mb-2 text-[13px] font-black text-muted-foreground">
-                      Days
-                    </p>
-                    <div className="flex gap-1.5">
-                      {orderedDays.map((day) => (
+                <fieldset className="min-w-0">
+                  <legend className="mb-2 flex w-full items-baseline justify-between gap-2 px-0.5">
+                    <span className="text-[14px] font-black text-foreground">
+                      Which days?
+                    </span>
+                    <span className="text-[12px] font-semibold text-muted-foreground">
+                      {remainingDays.length === 7
+                        ? 'More days, bigger reward'
+                        : `${remainingDays.length} ${remainingDays.length === 1 ? 'day' : 'days'} left this week`}
+                    </span>
+                  </legend>
+                  <div
+                    className="grid gap-1.5"
+                    style={{
+                      gridTemplateColumns: `repeat(${Math.max(remainingDays.length, 1)}, minmax(0, 1fr))`,
+                    }}
+                  >
+                    {remainingDays.map((day) => {
+                      const on = days.includes(day);
+                      const index = orderedDays.indexOf(day);
+                      return (
                         <button
                           key={day}
                           type="button"
                           onClick={() => toggleDay(day)}
-                          aria-disabled={isPastDay(day)}
-                          aria-label={
-                            isPastDay(day)
-                              ? `${DAY_NAMES[day]} \u2014 already passed`
-                              : DAY_NAMES[day]
-                          }
-                          aria-pressed={days.includes(day)}
+                          aria-pressed={on}
+                          aria-label={`${FULL_DAY_NAMES[day]}, ${dayHint(weekDates[index], todayKey)}`}
                           className={cn(
-                            'h-10 flex-1 rounded-lg text-[13px] font-black transition',
-                            isPastDay(day)
-                              ? 'cursor-not-allowed bg-muted/40 text-muted-foreground/40 line-through'
-                              : days.includes(day)
-                                ? 'bg-primary text-white'
-                                : 'bg-muted text-muted-foreground hover:bg-muted/70',
+                            'flex min-h-12 flex-col items-center justify-center rounded-xl border-2 text-[13px] font-black transition active:scale-95',
+                            on
+                              ? 'border-primary bg-primary text-white'
+                              : 'border-border/60 bg-card text-foreground hover:border-primary/50',
                           )}
                         >
-                          {DAY_LABELS[day]}
+                          <span>{DAY_NAMES[day]}</span>
+                          <span
+                            className={cn(
+                              'text-[10.5px] font-bold',
+                              on ? 'text-white/85' : 'text-muted-foreground',
+                            )}
+                          >
+                            {dayHint(weekDates[index], todayKey)}
+                          </span>
                         </button>
-                      ))}
-                    </div>
-                    {pastDayHint && (
-                      <p
-                        key={pastDayHint.id}
-                        role="status"
-                        className="leap-hint-in mt-2 text-[12px] font-semibold text-muted-foreground"
-                      >
-                        {pastDayHint.text}
-                      </p>
-                    )}
+                      );
+                    })}
                   </div>
-                  <div>
-                    <div className="mb-2 flex items-center justify-between gap-2">
-                      <p className="text-[13px] font-black text-muted-foreground">
-                        Time
-                      </p>
-                      {days.length > 1 && (
+                  {remainingDays.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setDays(
+                          days.length === remainingDays.length
+                            ? []
+                            : [...remainingDays].sort((a, b) => a - b),
+                        )
+                      }
+                      className="mt-2 px-0.5 text-[12.5px] font-black text-primary"
+                    >
+                      {days.length === remainingDays.length
+                        ? 'Clear days'
+                        : `Every day left (${remainingDays.length})`}
+                    </button>
+                  )}
+                </fieldset>
+
+                <fieldset className="min-w-0">
+                  <legend className="mb-2 flex w-full items-baseline justify-between gap-2 px-0.5">
+                    <span className="text-[14px] font-black text-foreground">
+                      What time?
+                    </span>
+                    <span className="text-[12px] font-semibold text-muted-foreground">
+                      We&apos;ll remind you then
+                    </span>
+                  </legend>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {TIME_PRESETS.map((preset) => {
+                      const on =
+                        !customTime && !perDayTimes && startTime === preset.value;
+                      return (
                         <button
+                          key={preset.value}
                           type="button"
-                          onClick={() => setPerDayTimes((prev) => !prev)}
-                          className="text-[11px] font-black text-primary"
+                          aria-pressed={on}
+                          onClick={() => {
+                            setStartTime(preset.value);
+                            setCustomTime(false);
+                            setPerDayTimes(false);
+                          }}
+                          className={cn(
+                            'flex min-h-12 flex-col items-center justify-center rounded-xl border-2 px-1 transition active:scale-95',
+                            on
+                              ? 'border-primary bg-primary/[0.08]'
+                              : 'border-border/60 bg-card hover:border-primary/50',
+                          )}
                         >
-                          {perDayTimes
-                            ? 'Same time each day'
-                            : 'Different times?'}
+                          <span className="text-[12.5px] font-black text-foreground">
+                            {preset.label}
+                          </span>
+                          <span className="text-[10.5px] font-bold text-muted-foreground">
+                            {formatClock(preset.value)}
+                          </span>
                         </button>
+                      );
+                    })}
+                    <button
+                      type="button"
+                      aria-pressed={customTime || perDayTimes}
+                      onClick={() => setCustomTime(true)}
+                      className={cn(
+                        'flex min-h-12 flex-col items-center justify-center rounded-xl border-2 px-1 transition active:scale-95',
+                        customTime || perDayTimes
+                          ? 'border-primary bg-primary/[0.08]'
+                          : 'border-border/60 bg-card hover:border-primary/50',
                       )}
-                    </div>
-                    {perDayTimes && days.length > 1 ? (
-                      <div className="flex flex-col gap-2">
-                        {orderedDays
-                          .filter((day) => days.includes(day))
-                          .map((day) => (
-                            <label
-                              key={day}
-                              className="flex items-center gap-3 rounded-xl border border-border/60 bg-background px-3 py-2"
-                            >
-                              <span className="w-10 shrink-0 text-[13px] font-black text-foreground">
-                                {DAY_NAMES[day]}
-                              </span>
-                              <input
-                                type="time"
-                                value={dayTimes[day] ?? startTime}
-                                onChange={(event) =>
-                                  setDayTimes((prev) => ({
-                                    ...prev,
-                                    [day]: event.target.value,
-                                  }))
-                                }
-                                className={cn(
-                                  TIME_INPUT_RESET,
-                                  'h-9 flex-1 rounded-lg bg-transparent text-left text-[15px] font-bold leading-9 text-foreground outline-none',
-                                  '[&::-webkit-date-and-time-value]:text-left',
-                                )}
-                              />
-                            </label>
-                          ))}
-                      </div>
-                    ) : (
+                    >
+                      <span className="text-[12.5px] font-black text-foreground">
+                        Custom
+                      </span>
+                      <span className="text-[10.5px] font-bold text-muted-foreground">
+                        {customTime && !perDayTimes ? formatClock(startTime) : 'Pick'}
+                      </span>
+                    </button>
+                  </div>
+
+                  {customTime && !perDayTimes && (
+                    <label className="mt-2 flex items-center gap-3 rounded-xl border-2 border-border/60 bg-background px-3.5">
+                      <span className="shrink-0 text-[13px] font-black text-muted-foreground">
+                        Time
+                      </span>
                       <input
                         type="time"
                         value={startTime}
                         onChange={(event) => setStartTime(event.target.value)}
                         className={cn(
                           TIME_INPUT_RESET,
-                          'h-11 rounded-xl border border-border/60 bg-background px-3 text-center text-[15px] font-bold leading-[42px] text-foreground outline-none focus:border-primary',
-                          '[&::-webkit-date-and-time-value]:text-center',
+                          'h-11 flex-1 bg-transparent text-right text-[16px] font-bold leading-[44px] text-foreground outline-none',
+                          '[&::-webkit-date-and-time-value]:text-right',
                         )}
                       />
-                    )}
-                  </div>
-                </div>
+                    </label>
+                  )}
 
-                {/* Which tag the sessions carry is invisible until the tasks
-                    appear, and by then it is already on them. Named here, with
-                    the user's own tags one tap away. */}
-                <div className="flex flex-col gap-2">
-                  <p className="text-[13px] font-black text-muted-foreground">
-                    Tag
-                  </p>
-                  {(() => {
-                    const chosen = tagId
-                      ? view.userTags.find((tag) => tag.id === tagId)
-                      : null;
-                    const shown = chosen ??
-                      (area.tagId
-                        ? {
-                            id: area.tagId,
-                            name: area.tagName ?? area.shortLabel,
-                            color: area.tagColor ?? '#22c55e',
-                          }
-                        : null);
-                    return (
-                      <div className="flex flex-wrap items-center gap-2">
-                        {shown ? (
-                          <span
-                            className="inline-flex max-w-[12rem] items-center truncate rounded-xl px-2.5 py-1 text-[12px] font-black"
-                            style={{
-                              backgroundColor: `${shown.color}22`,
-                              color: shown.color,
-                            }}
-                          >
-                            {shown.name}
+                  {perDayTimes && pickedDays.length > 1 && (
+                    <div className="mt-2 flex flex-col gap-1.5">
+                      {pickedDays.map((day) => (
+                        <label
+                          key={day}
+                          className="flex items-center gap-3 rounded-xl border-2 border-border/60 bg-background px-3.5"
+                        >
+                          <span className="w-12 shrink-0 text-[13px] font-black text-foreground">
+                            {DAY_NAMES[day]}
                           </span>
-                        ) : (
-                          <span className="text-[12.5px] font-bold text-muted-foreground">
-                            We&apos;ll make a “{area.shortLabel}” tag
-                          </span>
-                        )}
+                          <input
+                            type="time"
+                            value={dayTimes[day] ?? startTime}
+                            onChange={(event) =>
+                              setDayTimes((prev) => ({
+                                ...prev,
+                                [day]: event.target.value,
+                              }))
+                            }
+                            className={cn(
+                              TIME_INPUT_RESET,
+                              'h-11 flex-1 bg-transparent text-right text-[16px] font-bold leading-[44px] text-foreground outline-none',
+                              '[&::-webkit-date-and-time-value]:text-right',
+                            )}
+                          />
+                        </label>
+                      ))}
+                    </div>
+                  )}
+
+                  {pickedDays.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPerDayTimes((prev) => !prev);
+                        setCustomTime(false);
+                      }}
+                      className="mt-2 px-0.5 text-[12.5px] font-black text-primary"
+                    >
+                      {perDayTimes ? 'Same time every day' : 'Different time per day'}
+                    </button>
+                  )}
+                </fieldset>
+
+                {(() => {
+                  const chosen = tagId
+                    ? view.userTags.find((tag) => tag.id === tagId)
+                    : null;
+                  const shown =
+                    chosen ??
+                    (area.tagId
+                      ? {
+                          id: area.tagId,
+                          name: area.tagName ?? area.shortLabel,
+                          color: area.tagColor ?? '#22c55e',
+                        }
+                      : null);
+                  return (
+                    <div className="rounded-2xl bg-muted/40 px-3.5 py-2.5">
+                      <div className="flex items-center gap-2">
+                        <span className="shrink-0 text-[13px] font-black text-muted-foreground">
+                          Tag
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          {shown ? (
+                            <span
+                              className="inline-flex max-w-full items-center truncate rounded-lg px-2 py-0.5 text-[12.5px] font-black"
+                              style={{
+                                backgroundColor: `${shown.color}22`,
+                                color: shown.color,
+                              }}
+                            >
+                              {shown.name}
+                            </span>
+                          ) : (
+                            <span className="text-[12.5px] font-bold text-muted-foreground">
+                              New &ldquo;{area.shortLabel}&rdquo; tag
+                            </span>
+                          )}
+                        </span>
                         {view.userTags.length > 0 && (
                           <button
                             type="button"
+                            aria-expanded={pickingTag}
                             onClick={() => setPickingTag((v) => !v)}
-                            className="text-[11px] font-black text-primary"
+                            className="min-h-9 shrink-0 rounded-lg px-2 text-[12.5px] font-black text-primary"
                           >
-                            {pickingTag ? 'Done' : 'Use another'}
+                            {pickingTag ? 'Done' : 'Change'}
                           </button>
                         )}
                       </div>
-                    );
-                  })()}
-                  {pickingTag && (
-                    <div className="flex flex-wrap gap-1.5 rounded-xl bg-muted/40 p-2">
-                      {view.userTags.map((tag) => {
-                        const takenByOther =
-                          !!tag.linkedCategoryId &&
-                          tag.linkedCategoryId !== area.categoryId;
-                        const locked = takenByOther && !view.isPremium;
-                        return (
-                          <button
-                            key={tag.id}
-                            type="button"
-                            disabled={locked}
-                            title={
-                              takenByOther
-                                ? `Connected to ${tag.linkedAreaName}`
-                                : undefined
-                            }
-                            onClick={() => {
-                              if (locked) {
-                                onUpgrade();
-                                return;
-                              }
-                              setTagId(tag.id);
-                              setPickingTag(false);
-                            }}
-                            className={cn(
-                              'inline-flex max-w-[10rem] items-center gap-1 truncate rounded-lg px-2.5 py-1 text-[12px] font-black transition',
-                              locked && 'cursor-not-allowed opacity-40',
-                              !locked &&
-                                ((tagId ?? area.tagId) === tag.id
-                                  ? 'ring-2 ring-primary'
-                                  : 'opacity-80 hover:opacity-100'),
-                            )}
-                            style={{
-                              backgroundColor: `${tag.color}22`,
-                              color: tag.color,
-                            }}
-                          >
-                            {locked && (
-                              <Lock
-                                className="h-3 w-3 shrink-0"
-                                strokeWidth={3}
-                              />
-                            )}
-                            {tag.name}
-                          </button>
-                        );
-                      })}
+                      {pickingTag && (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {view.userTags.map((tag) => {
+                            const takenByOther =
+                              !!tag.linkedCategoryId &&
+                              tag.linkedCategoryId !== area.categoryId;
+                            const locked = takenByOther && !view.isPremium;
+                            const current = (tagId ?? area.tagId) === tag.id;
+                            return (
+                              <button
+                                key={tag.id}
+                                type="button"
+                                aria-pressed={current}
+                                aria-label={
+                                  takenByOther
+                                    ? `${tag.name}, connected to ${tag.linkedAreaName}${locked ? ', Plus only' : ''}`
+                                    : tag.name
+                                }
+                                onClick={() => {
+                                  if (locked) {
+                                    onUpgrade();
+                                    return;
+                                  }
+                                  setTagId(tag.id);
+                                  setPickingTag(false);
+                                }}
+                                className={cn(
+                                  'inline-flex min-h-9 max-w-[11rem] items-center gap-1 truncate rounded-lg px-2.5 text-[12.5px] font-black transition',
+                                  locked && 'opacity-50',
+                                  !locked &&
+                                    (current
+                                      ? 'ring-2 ring-primary'
+                                      : 'opacity-85 hover:opacity-100'),
+                                )}
+                                style={{
+                                  backgroundColor: `${tag.color}22`,
+                                  color: tag.color,
+                                }}
+                              >
+                                {locked && (
+                                  <Lock className="h-3 w-3 shrink-0" strokeWidth={3} />
+                                )}
+                                {tag.name}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
+                  );
+                })()}
 
                 {error && (
-                  <p className="text-[13px] font-bold text-destructive">
+                  <p role="alert" className="text-[13px] font-bold text-destructive">
                     {error}
                   </p>
                 )}
@@ -1041,22 +1091,36 @@ export function PactPickSheet({
             )}
 
             {step === 'done' && (
-              <div className="flex flex-col gap-5 py-8 text-center">
-                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/15">
-                  <Check className="h-7 w-7 text-primary" strokeWidth={3} />
+              <div className="flex flex-col gap-5 pb-2 pt-8 text-center">
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/15">
+                  <Check className="h-8 w-8 text-primary" strokeWidth={3} />
                 </div>
-                <div className="flex flex-col gap-2">
-                  <h2 className="text-[21px] font-black leading-tight text-foreground">
+                <div className="flex flex-col gap-1.5">
+                  <h2 className="text-[22px] font-black leading-tight text-foreground">
                     Your Leap is set
                   </h2>
                   <p className="mx-auto max-w-[32ch] text-[14px] font-semibold leading-snug text-muted-foreground">
                     {!result
-                      ? "Your tasks are on your list. We'll remind you each time."
+                      ? 'Your tasks are on your list.'
                       : result.continued
-                        ? `Last week's task carries on — ${result.scheduleLabel}. We'll remind you each time.`
-                        : `${result.taskCount} task${result.taskCount === 1 ? '' : 's'} added — ${result.scheduleLabel}. We'll remind you each time.`}
+                        ? 'Last week’s task carries on.'
+                        : `${result.taskCount} task${result.taskCount === 1 ? '' : 's'} added to your list.`}{' '}
+                    We&apos;ll remind you each time.
                   </p>
                 </div>
+                {area && previewText && (
+                  <div className="rounded-2xl border border-border/60 bg-card px-4 py-3 text-left">
+                    <p className="text-[12px] font-black uppercase tracking-wide text-muted-foreground">
+                      {area.shortLabel}
+                    </p>
+                    <p className="mt-1 text-[15px] font-black leading-snug text-foreground">
+                      {previewText}
+                    </p>
+                    <p className="mt-1 text-[13px] font-bold text-primary">
+                      {result?.scheduleLabel ?? scheduleSummary}
+                    </p>
+                  </div>
+                )}
                 <button
                   type="button"
                   onClick={onClose}
@@ -1113,7 +1177,7 @@ export function PactPickSheet({
               )}
               {step === 'confirm' && days.length === 0 && (
                 <p className="mb-2.5 text-[12.5px] font-bold text-muted-foreground">
-                  Pick at least one day.
+                  Pick at least one day to continue.
                 </p>
               )}
               {step === 'intro' ? (
@@ -1131,7 +1195,7 @@ export function PactPickSheet({
                   onClick={() => setStep('confirm')}
                   className="h-12 w-full rounded-2xl bg-[#4f9149] text-[15px] font-black text-white shadow-[0_4px_0_0_#34631f] ring-1 ring-[#34631f]/40 transition-transform active:translate-y-[2px] active:shadow-none disabled:opacity-50 disabled:shadow-none"
                 >
-                  Choose days &amp; time
+                  Next: choose when
                 </button>
               ) : (
                 <button
@@ -1171,6 +1235,74 @@ export function PactPickSheet({
  * how to fill in a screen they were about to see anyway, and never once said
  * what any of it was worth.
  */
+function StepHeader({
+  index,
+  eyebrow,
+  title,
+  subtitle,
+  onBack,
+  backLabel,
+}: {
+  index: number;
+  eyebrow?: string;
+  title: string;
+  subtitle?: string;
+  onBack?: () => void;
+  backLabel?: string;
+}) {
+  return (
+    <div className="pt-1">
+      <div className="flex items-center gap-2 pr-12">
+        {onBack ? (
+          <button
+            type="button"
+            onClick={onBack}
+            aria-label={backLabel ?? 'Back'}
+            className="-ml-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-foreground transition hover:bg-muted active:scale-95"
+          >
+            <ArrowLeft className="h-5 w-5" strokeWidth={2.5} />
+          </button>
+        ) : null}
+        <div
+          className="flex flex-1 items-center gap-1"
+          role="progressbar"
+          aria-label="Leap setup progress"
+          aria-valuemin={1}
+          aria-valuemax={LEAP_STEPS}
+          aria-valuenow={index}
+          aria-valuetext={`Step ${index} of ${LEAP_STEPS}`}
+        >
+          {Array.from({ length: LEAP_STEPS }, (_, i) => (
+            <span
+              key={i}
+              className={cn(
+                'h-1.5 flex-1 rounded-full transition-colors',
+                i < index ? 'bg-primary' : 'bg-muted',
+              )}
+            />
+          ))}
+        </div>
+        <span className="shrink-0 text-[12px] font-black tabular-nums text-muted-foreground">
+          {index}/{LEAP_STEPS}
+        </span>
+      </div>
+      <div className="mt-3">
+        {eyebrow && (
+          <p className="text-[13px] font-black text-primary">{eyebrow}</p>
+        )}
+        <h2 className="text-[21px] font-black leading-tight text-foreground">
+          {title}
+        </h2>
+        {subtitle && (
+          <p className="mt-1 text-[13px] font-semibold leading-snug text-muted-foreground">
+            {subtitle}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function IntroBeat({
   index,
   icon,
