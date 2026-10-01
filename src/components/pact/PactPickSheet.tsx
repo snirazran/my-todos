@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { mutate as swrMutate } from 'swr';
 import {
   ArrowLeft,
-  CalendarClock,
   Check,
   ChevronRight,
   Flame,
@@ -505,7 +504,6 @@ export function PactPickSheet({
                 <StepHeader
                   index={1}
                   title="Which area this week?"
-                  subtitle="Pick one. You choose again next week."
                 />
                 {/* Always two columns: a full-width card at 16/9 is enormous on
                   a phone, and squeezing it shorter crops the frog back out.
@@ -613,18 +611,11 @@ export function PactPickSheet({
                   index={2}
                   eyebrow={area.shortLabel}
                   title="What will you do?"
-                  subtitle="One small, clear action you can tick off."
                   onBack={() => setStep('area')}
                   backLabel="Back to areas"
                 />
 
                 <div>
-                  <label
-                    htmlFor="pact-own-words"
-                    className="mb-1.5 block px-0.5 text-[13px] font-black text-foreground"
-                  >
-                    I will…
-                  </label>
                   <div className="relative">
                     <input
                       id="pact-own-words"
@@ -643,7 +634,7 @@ export function PactPickSheet({
                       placeholder={customPlaceholder}
                       enterKeyHint="next"
                       autoComplete="off"
-                      aria-describedby="pact-own-words-hint"
+                      aria-label="What you'll do"
                       className="h-12 w-full rounded-2xl border-2 border-border/70 bg-background px-3.5 pr-14 text-[16px] font-bold text-foreground outline-none transition-colors placeholder:font-semibold placeholder:text-muted-foreground/70 focus:border-primary"
                     />
                     {text.length > 0 && (
@@ -652,25 +643,18 @@ export function PactPickSheet({
                       </span>
                     )}
                   </div>
-                  <p
-                    id="pact-own-words-hint"
-                    className="mt-1.5 px-0.5 text-[12px] font-semibold text-muted-foreground"
-                  >
-                    {continuing ? (
-                      <>
-                        This updates last week&rsquo;s task.{' '}
-                        <button
-                          type="button"
-                          onClick={startFresh}
-                          className="font-black text-primary underline underline-offset-2"
-                        >
-                          Start fresh instead
-                        </button>
-                      </>
-                    ) : (
-                      'Type your own, or tap an idea to start from it.'
-                    )}
-                  </p>
+                  {continuing && (
+                    <p className="mt-1.5 px-0.5 text-[12px] font-semibold text-muted-foreground">
+                      Updates last week&rsquo;s task ·{' '}
+                      <button
+                        type="button"
+                        onClick={startFresh}
+                        className="font-black text-primary"
+                      >
+                        Start fresh
+                      </button>
+                    </p>
+                  )}
                 </div>
 
                 {loading && (
@@ -681,8 +665,8 @@ export function PactPickSheet({
 
                 {!loading && visibleOptions.length > 0 && (
                   <div className="flex flex-col gap-2">
-                    <p className="px-0.5 text-[12px] font-black uppercase tracking-wide text-muted-foreground">
-                      Ideas for {area.shortLabel}
+                    <p className="px-0.5 text-[13px] font-black text-muted-foreground">
+                      Or pick an idea
                     </p>
                     {visibleOptions.map((entry) => {
                       const selected = optionId === entry.id && fromIdea;
@@ -714,9 +698,10 @@ export function PactPickSheet({
                               <Check className="h-3.5 w-3.5" strokeWidth={3.5} />
                             </span>
                           ) : (
-                            <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-[11px] font-black text-muted-foreground">
-                              Use
-                            </span>
+                            <span
+                              aria-hidden
+                              className="h-6 w-6 shrink-0 rounded-full border-2 border-border"
+                            />
                           )}
                         </button>
                       );
@@ -738,23 +723,22 @@ export function PactPickSheet({
                   index={3}
                   eyebrow={area.shortLabel}
                   title="When will you do it?"
-                  subtitle="A set day and time makes it far likelier to happen."
                   onBack={() => setStep('commitment')}
                   backLabel="Back to what you'll do"
                 />
 
-                <div className="overflow-hidden rounded-[22px] border border-border/50 bg-card shadow-sm">
-                  <div
-                    className="relative w-full overflow-hidden"
-                    style={{ aspectRatio: '16 / 4' }}
-                  >
+                <div
+                  className="flex items-center gap-3 rounded-2xl border border-border/60 bg-card p-2.5"
+                  aria-live="polite"
+                >
+                  <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl">
                     {area.coverImageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={area.coverImageUrl}
                         alt=""
                         decoding="async"
-                        className="h-full w-full object-cover object-[center_42%]"
+                        className="h-full w-full object-cover object-[center_40%]"
                       />
                     ) : (
                       <div
@@ -764,48 +748,25 @@ export function PactPickSheet({
                         }}
                       />
                     )}
-                    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-black/55 to-transparent" />
-                    <span
-                      className="absolute bottom-2 left-3.5 text-[17px] leading-none tracking-wide text-white drop-shadow-[0_3px_0_rgba(15,23,42,0.9)]"
-                      style={{
-                        fontFamily:
-                          'var(--font-display), "Luckiest Guy", cursive',
-                        WebkitTextStroke: '1.6px rgba(15, 23, 42, 0.95)',
-                        paintOrder: 'stroke fill',
-                      }}
-                    >
-                      {area.name}
-                    </span>
                   </div>
-                  <div className="px-4 py-3" aria-live="polite">
-                    <p className="text-[12px] font-black uppercase tracking-wide text-muted-foreground">
-                      Your plan
-                    </p>
-                    <p className="mt-1 text-[16px] font-black leading-snug text-foreground">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[15px] font-black leading-snug text-foreground">
                       {previewText}
                     </p>
                     <p
                       className={cn(
-                        'mt-1.5 flex items-center gap-1.5 text-[13px] font-black',
+                        'truncate text-[13px] font-bold',
                         scheduleSummary ? 'text-primary' : 'text-muted-foreground',
                       )}
                     >
-                      <CalendarClock aria-hidden className="h-4 w-4 shrink-0" />
-                      {scheduleSummary || 'Pick a day and time below'}
+                      {scheduleSummary || 'Pick days and a time'}
                     </p>
                   </div>
                 </div>
 
                 <fieldset className="min-w-0">
-                  <legend className="mb-2 flex w-full items-baseline justify-between gap-2 px-0.5">
-                    <span className="text-[14px] font-black text-foreground">
-                      Which days?
-                    </span>
-                    <span className="text-[12px] font-semibold text-muted-foreground">
-                      {remainingDays.length === 7
-                        ? 'More days, bigger reward'
-                        : `${remainingDays.length} ${remainingDays.length === 1 ? 'day' : 'days'} left this week`}
-                    </span>
+                  <legend className="mb-2 px-0.5 text-[14px] font-black text-foreground">
+                    Days
                   </legend>
                   <div
                     className="grid gap-1.5"
@@ -843,33 +804,11 @@ export function PactPickSheet({
                       );
                     })}
                   </div>
-                  {remainingDays.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setDays(
-                          days.length === remainingDays.length
-                            ? []
-                            : [...remainingDays].sort((a, b) => a - b),
-                        )
-                      }
-                      className="mt-2 px-0.5 text-[12.5px] font-black text-primary"
-                    >
-                      {days.length === remainingDays.length
-                        ? 'Clear days'
-                        : `Every day left (${remainingDays.length})`}
-                    </button>
-                  )}
                 </fieldset>
 
                 <fieldset className="min-w-0">
-                  <legend className="mb-2 flex w-full items-baseline justify-between gap-2 px-0.5">
-                    <span className="text-[14px] font-black text-foreground">
-                      What time?
-                    </span>
-                    <span className="text-[12px] font-semibold text-muted-foreground">
-                      We&apos;ll remind you then
-                    </span>
+                  <legend className="mb-2 px-0.5 text-[14px] font-black text-foreground">
+                    Time
                   </legend>
                   <div className="grid grid-cols-4 gap-1.5">
                     {TIME_PRESETS.map((preset) => {
@@ -880,106 +819,93 @@ export function PactPickSheet({
                           key={preset.value}
                           type="button"
                           aria-pressed={on}
+                          aria-label={`${preset.label}, ${formatClock(preset.value)}`}
                           onClick={() => {
                             setStartTime(preset.value);
                             setCustomTime(false);
                             setPerDayTimes(false);
                           }}
                           className={cn(
-                            'flex min-h-12 flex-col items-center justify-center rounded-xl border-2 px-1 transition active:scale-95',
+                            'min-h-11 rounded-xl border-2 px-1 text-[13px] font-black transition active:scale-95',
                             on
-                              ? 'border-primary bg-primary/[0.08]'
-                              : 'border-border/60 bg-card hover:border-primary/50',
+                              ? 'border-primary bg-primary text-white'
+                              : 'border-border/60 bg-card text-foreground hover:border-primary/50',
                           )}
                         >
-                          <span className="text-[12.5px] font-black text-foreground">
-                            {preset.label}
-                          </span>
-                          <span className="text-[10.5px] font-bold text-muted-foreground">
-                            {formatClock(preset.value)}
-                          </span>
+                          {formatClock(preset.value)}
                         </button>
                       );
                     })}
                     <button
                       type="button"
                       aria-pressed={customTime || perDayTimes}
+                      aria-expanded={customTime || perDayTimes}
                       onClick={() => setCustomTime(true)}
                       className={cn(
-                        'flex min-h-12 flex-col items-center justify-center rounded-xl border-2 px-1 transition active:scale-95',
+                        'min-h-11 rounded-xl border-2 px-1 text-[13px] font-black transition active:scale-95',
                         customTime || perDayTimes
-                          ? 'border-primary bg-primary/[0.08]'
-                          : 'border-border/60 bg-card hover:border-primary/50',
+                          ? 'border-primary bg-primary text-white'
+                          : 'border-border/60 bg-card text-foreground hover:border-primary/50',
                       )}
                     >
-                      <span className="text-[12.5px] font-black text-foreground">
-                        Custom
-                      </span>
-                      <span className="text-[10.5px] font-bold text-muted-foreground">
-                        {customTime && !perDayTimes ? formatClock(startTime) : 'Pick'}
-                      </span>
+                      Other
                     </button>
                   </div>
 
-                  {customTime && !perDayTimes && (
-                    <label className="mt-2 flex items-center gap-3 rounded-xl border-2 border-border/60 bg-background px-3.5">
-                      <span className="shrink-0 text-[13px] font-black text-muted-foreground">
-                        Time
-                      </span>
-                      <input
-                        type="time"
-                        value={startTime}
-                        onChange={(event) => setStartTime(event.target.value)}
-                        className={cn(
-                          TIME_INPUT_RESET,
-                          'h-11 flex-1 bg-transparent text-right text-[16px] font-bold leading-[44px] text-foreground outline-none',
-                          '[&::-webkit-date-and-time-value]:text-right',
-                        )}
-                      />
-                    </label>
-                  )}
-
-                  {perDayTimes && pickedDays.length > 1 && (
+                  {(customTime || perDayTimes) && (
                     <div className="mt-2 flex flex-col gap-1.5">
-                      {pickedDays.map((day) => (
-                        <label
-                          key={day}
-                          className="flex items-center gap-3 rounded-xl border-2 border-border/60 bg-background px-3.5"
+                      {perDayTimes && pickedDays.length > 1 ? (
+                        pickedDays.map((day) => (
+                          <label
+                            key={day}
+                            className="flex items-center gap-3 rounded-xl border-2 border-border/60 bg-background px-3.5"
+                          >
+                            <span className="w-12 shrink-0 text-[13px] font-black text-foreground">
+                              {DAY_NAMES[day]}
+                            </span>
+                            <input
+                              type="time"
+                              value={dayTimes[day] ?? startTime}
+                              onChange={(event) =>
+                                setDayTimes((prev) => ({
+                                  ...prev,
+                                  [day]: event.target.value,
+                                }))
+                              }
+                              className={cn(
+                                TIME_INPUT_RESET,
+                                'h-11 flex-1 bg-transparent text-right text-[16px] font-bold leading-[44px] text-foreground outline-none',
+                                '[&::-webkit-date-and-time-value]:text-right',
+                              )}
+                            />
+                          </label>
+                        ))
+                      ) : (
+                        <input
+                          type="time"
+                          value={startTime}
+                          aria-label="Time"
+                          onChange={(event) => setStartTime(event.target.value)}
+                          className={cn(
+                            TIME_INPUT_RESET,
+                            'h-11 rounded-xl border-2 border-border/60 bg-background px-3.5 text-center text-[16px] font-bold leading-[44px] text-foreground outline-none focus:border-primary',
+                            '[&::-webkit-date-and-time-value]:text-center',
+                          )}
+                        />
+                      )}
+                      {pickedDays.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPerDayTimes((prev) => !prev);
+                            setCustomTime(true);
+                          }}
+                          className="self-start px-0.5 text-[12.5px] font-black text-primary"
                         >
-                          <span className="w-12 shrink-0 text-[13px] font-black text-foreground">
-                            {DAY_NAMES[day]}
-                          </span>
-                          <input
-                            type="time"
-                            value={dayTimes[day] ?? startTime}
-                            onChange={(event) =>
-                              setDayTimes((prev) => ({
-                                ...prev,
-                                [day]: event.target.value,
-                              }))
-                            }
-                            className={cn(
-                              TIME_INPUT_RESET,
-                              'h-11 flex-1 bg-transparent text-right text-[16px] font-bold leading-[44px] text-foreground outline-none',
-                              '[&::-webkit-date-and-time-value]:text-right',
-                            )}
-                          />
-                        </label>
-                      ))}
+                          {perDayTimes ? 'Same time every day' : 'Different time per day'}
+                        </button>
+                      )}
                     </div>
-                  )}
-
-                  {pickedDays.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPerDayTimes((prev) => !prev);
-                        setCustomTime(false);
-                      }}
-                      className="mt-2 px-0.5 text-[12.5px] font-black text-primary"
-                    >
-                      {perDayTimes ? 'Same time every day' : 'Different time per day'}
-                    </button>
                   )}
                 </fieldset>
 
@@ -997,9 +923,9 @@ export function PactPickSheet({
                         }
                       : null);
                   return (
-                    <div className="rounded-2xl bg-muted/40 px-3.5 py-2.5">
-                      <div className="flex items-center gap-2">
-                        <span className="shrink-0 text-[13px] font-black text-muted-foreground">
+                    <div>
+                      <div className="flex items-center gap-2 px-0.5">
+                        <span className="shrink-0 text-[14px] font-black text-foreground">
                           Tag
                         </span>
                         <span className="min-w-0 flex-1">
@@ -1177,7 +1103,7 @@ export function PactPickSheet({
               )}
               {step === 'confirm' && days.length === 0 && (
                 <p className="mb-2.5 text-[12.5px] font-bold text-muted-foreground">
-                  Pick at least one day to continue.
+                  Pick at least one day.
                 </p>
               )}
               {step === 'intro' ? (
@@ -1195,7 +1121,7 @@ export function PactPickSheet({
                   onClick={() => setStep('confirm')}
                   className="h-12 w-full rounded-2xl bg-[#4f9149] text-[15px] font-black text-white shadow-[0_4px_0_0_#34631f] ring-1 ring-[#34631f]/40 transition-transform active:translate-y-[2px] active:shadow-none disabled:opacity-50 disabled:shadow-none"
                 >
-                  Next: choose when
+                  Next
                 </button>
               ) : (
                 <button
