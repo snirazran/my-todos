@@ -404,7 +404,12 @@ function TickerNumber({
 }) {
   const reduceMotion = useReducedMotion();
   return (
-    <span className={cn('relative inline-grid overflow-hidden', className)}>
+    <span
+      className={cn(
+        'relative -my-[0.2em] inline-grid overflow-hidden py-[0.2em]',
+        className,
+      )}
+    >
       <AnimatePresence initial={false} mode="popLayout">
         <motion.span
           key={value}

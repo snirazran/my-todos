@@ -63,11 +63,14 @@ function formatClock(hhmm: string) {
   });
 }
 
-function dayHint(dateKey: string, todayKey: string) {
+function dayHint(dateKey: string, todayKey: string, compact = false) {
   if (dateKey === todayKey) return 'Today';
   const date = new Date(`${dateKey}T12:00:00`);
   const today = new Date(`${todayKey}T12:00:00`);
-  if (Math.round((date.getTime() - today.getTime()) / 86_400_000) === 1)
+  if (
+    !compact &&
+    Math.round((date.getTime() - today.getTime()) / 86_400_000) === 1
+  )
     return 'Tomorrow';
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
@@ -785,7 +788,7 @@ export function PactPickSheet({
                           aria-pressed={on}
                           aria-label={`${FULL_DAY_NAMES[day]}, ${dayHint(weekDates[index], todayKey)}`}
                           className={cn(
-                            'flex min-h-12 flex-col items-center justify-center rounded-xl border-2 text-[13px] font-black transition active:scale-95',
+                            'flex min-h-12 min-w-0 flex-col items-center justify-center overflow-hidden rounded-xl border-2 px-0.5 text-[13px] font-black transition active:scale-95',
                             on
                               ? 'border-primary bg-primary text-white'
                               : 'border-border/60 bg-card text-foreground hover:border-primary/50',
@@ -794,11 +797,11 @@ export function PactPickSheet({
                           <span>{DAY_NAMES[day]}</span>
                           <span
                             className={cn(
-                              'text-[10.5px] font-bold',
+                              'max-w-full truncate text-[10.5px] font-bold',
                               on ? 'text-white/85' : 'text-muted-foreground',
                             )}
                           >
-                            {dayHint(weekDates[index], todayKey)}
+                            {dayHint(weekDates[index], todayKey, true)}
                           </span>
                         </button>
                       );
