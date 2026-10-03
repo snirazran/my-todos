@@ -28,6 +28,7 @@ import Frog, {
   type FrogHandle,
 } from '@/components/ui/frog';
 import { useFrogTongue, TONGUE_STROKE } from '@/hooks/useFrogTongue';
+import { BellyPip } from './BellyPip';
 
 // Above the notification stack (z-1300): a one-time explainer must never be
 // covered by a toast — an undo prompt was landing on top of the belly intro.
@@ -162,20 +163,19 @@ const DEMO_BEATS = [
 
 /** The six belly pips, driven by a live value instead of the real belly. */
 function DemoBellyBar({ percent }: { percent: number }) {
-  const { bg, text, label } = getHungerState(percent);
+  const tone = getHungerState(percent);
+  const { text, label } = tone;
   return (
     <div className="flex items-center gap-2.5">
       <div className="flex flex-1 items-center gap-1.5" aria-hidden>
         {Array.from({ length: HUNGER_SEGMENTS }).map((_, i) => (
-          <div
+          <BellyPip
             key={i}
-            className="relative flex-1 h-3 overflow-hidden rounded-full bg-foreground/10"
-          >
-            <div
-              className={cn('absolute inset-y-0 left-0 rounded-full', bg)}
-              style={{ width: `${segmentFill(percent, i) * 100}%` }}
-            />
-          </div>
+            fill={segmentFill(percent, i)}
+            tone={tone}
+            animate={false}
+            className="h-3.5"
+          />
         ))}
       </div>
       <span

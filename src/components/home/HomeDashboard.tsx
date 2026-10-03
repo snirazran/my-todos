@@ -803,6 +803,7 @@ export default function HomeDashboard() {
               questClaimableCount={questsData?.claimableCount ?? 0}
               questActiveCount={questsData?.activeCount ?? 0}
               paused={isAnyPanelOpen}
+              onBellyPress={user ? () => setBellyIntroOpen(true) : undefined}
             />
             </div>
           </FlyCatchSwipeLauncher>

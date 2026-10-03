@@ -1366,3 +1366,49 @@ body.dragging {
     animation: none;
   }
 }
+
+@keyframes belly-pip-pop-0 {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.18, 1.32);
+  }
+  70% {
+    transform: scale(0.96, 0.92);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes belly-pip-pop-1 {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.18, 1.32);
+  }
+  70% {
+    transform: scale(0.96, 0.92);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes belly-next {
+  0%,
+  100% {
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@keyframes belly-flash {
+  0% {
+    opacity: 0.85;
+  }
+  100% {
+    opacity: 0;
+  }
+}

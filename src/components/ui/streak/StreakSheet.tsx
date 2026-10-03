@@ -24,6 +24,7 @@ import { patchInventoryFlies, useInventory } from '@/hooks/useInventory';
 import { Icon } from '@/components/ui/Icon';
 import {
   RewardTile,
+  rewardLabel,
   type QuestRewardCatalogItem,
 } from '@/components/ui/QuestCards';
 import { rewardStackTileStyle } from '@/lib/questClaims';
@@ -384,17 +385,246 @@ function WeekStrip({
   );
 }
 
+const SPARKS = Array.from({ length: 10 }, (_, i) => {
+  const angle = (i / 10) * Math.PI * 2 + 0.3;
+  const distance = 54 + (i % 3) * 14;
+  return {
+    x: Math.cos(angle) * distance,
+    y: Math.sin(angle) * distance,
+    size: i % 2 ? 6 : 8,
+  };
+});
+
+function TickerNumber({
+  value,
+  className,
+}: {
+  value: number;
+  className?: string;
+}) {
+  const reduceMotion = useReducedMotion();
+  return (
+    <span className={cn('relative inline-grid overflow-hidden', className)}>
+      <AnimatePresence initial={false} mode="popLayout">
+        <motion.span
+          key={value}
+          initial={reduceMotion ? { opacity: 0 } : { y: '70%', opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={reduceMotion ? { opacity: 0 } : { y: '-70%', opacity: 0 }}
+          transition={{ type: 'spring', stiffness: 360, damping: 24 }}
+          className="col-start-1 row-start-1 block tabular-nums"
+        >
+          {value}
+        </motion.span>
+      </AnimatePresence>
+    </span>
+  );
+}
+
+function weekRunState(view: LoginStreakView) {
+  const today = localDayKey();
+  const weekStart = addDaysToKey(
+    today,
+    -new Date(`${today}T12:00:00`).getDay(),
+  );
+  const days = Array.from({ length: 7 }, (_, i) => addDaysToKey(weekStart, i));
+  let runStart: string | null = null;
+  if (view.count > 0 && view.lastDayKey) {
+    const frozen = new Set(view.shieldedDayKeys);
+    let cursor = view.lastDayKey;
+    let remaining = view.count;
+    for (let i = view.count + frozen.size; i > 0; i--) {
+      if (!frozen.has(cursor)) remaining -= 1;
+      if (remaining <= 0) break;
+      cursor = addDaysToKey(cursor, -1);
+    }
+    runStart = cursor;
+  }
+  return { today, days, runStart };
+}
+
+/**
+ * The week as one chain: kept days are joined by a band that draws itself in,
+ * and today's link lands last.
+ */
+function StreakChain({ view, play }: { view: LoginStreakView; play: boolean }) {
+  const reduceMotion = useReducedMotion();
+  const { today, days, runStart } = useMemo(() => weekRunState(view), [view]);
+  const litIndexes = days
+    .map((dayKey, i) =>
+      (runStart && dayKey >= runStart && dayKey <= view.lastDayKey) ||
+      view.shieldedDayKeys.includes(dayKey)
+        ? i
+        : -1,
+    )
+    .filter((i) => i >= 0);
+  const first = litIndexes.length ? Math.min(...litIndexes) : -1;
+  const last = litIndexes.length ? Math.max(...litIndexes) : -1;
+
+  return (
+    <div className="w-full">
+      <div className="grid grid-cols-7" aria-hidden>
+        {days.map((dayKey) => (
+          <span
+            key={dayKey}
+            className={cn(
+              'text-center text-[12px] font-black',
+              dayKey === today ? 'text-white' : 'text-white/70',
+            )}
+          >
+            {new Date(`${dayKey}T12:00:00`).toLocaleDateString(undefined, {
+              weekday: 'narrow',
+            })}
+          </span>
+        ))}
+      </div>
+      <ul
+        aria-label="This week"
+        className="relative mt-2 grid grid-cols-7 short-screen:mt-1.5"
+      >
+        {first >= 0 && (
+          <motion.span
+            aria-hidden
+            initial={reduceMotion ? false : { scaleX: 0 }}
+            animate={play ? { scaleX: 1 } : {}}
+            transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1], delay: 0.15 }}
+            className="absolute inset-y-0 origin-left rounded-full bg-white/35"
+            style={{
+              left: `calc(${(first / 7) * 100}% + 2px)`,
+              width: `calc(${((last - first + 1) / 7) * 100}% - 4px)`,
+            }}
+          />
+        )}
+        {days.map((dayKey, i) => {
+          const frozen = view.shieldedDayKeys.includes(dayKey);
+          const lit =
+            !!runStart && dayKey >= runStart && dayKey <= view.lastDayKey;
+          const isToday = dayKey === today;
+          const future = dayKey > today;
+          const pendingToday = isToday && !lit && !frozen;
+          const longLabel = new Date(`${dayKey}T12:00:00`).toLocaleDateString(
+            undefined,
+            { weekday: 'long' },
+          );
+          const state = frozen
+            ? 'covered by a Lily Pad'
+            : lit
+              ? 'streak kept'
+              : pendingToday
+                ? 'not done yet'
+                : future
+                  ? 'upcoming'
+                  : 'missed';
+          const landsLast = isToday && (lit || frozen);
+          return (
+            <li
+              key={dayKey}
+              aria-label={`${longLabel}${isToday ? ', today' : ''}, ${state}`}
+              className="relative flex justify-center py-1"
+            >
+              <motion.span
+                aria-hidden
+                initial={reduceMotion ? false : { scale: landsLast ? 0 : 0.7, opacity: 0 }}
+                animate={play || !landsLast ? { scale: 1, opacity: 1 } : {}}
+                transition={{
+                  type: 'spring',
+                  stiffness: landsLast ? 520 : 420,
+                  damping: landsLast ? 14 : 24,
+                  delay: landsLast ? 0.55 : 0.04 * i,
+                }}
+                className={cn(
+                  'grid h-9 w-9 place-items-center rounded-full short-screen:h-8 short-screen:w-8',
+                  frozen
+                    ? 'bg-white'
+                    : lit
+                      ? 'bg-white text-orange-500 shadow-[0_2px_0_0_rgba(124,45,18,0.25)]'
+                      : pendingToday
+                        ? 'bg-white/20 text-white ring-2 ring-white/80'
+                        : future
+                          ? 'bg-white/15'
+                          : 'bg-orange-950/20 text-white/50',
+                  isToday && (lit || frozen) && 'ring-[3px] ring-yellow-200',
+                )}
+              >
+                {frozen ? (
+                  <Icon name="lilyPad" className="h-4 w-4" />
+                ) : lit || pendingToday ? (
+                  <Flame className={cn('h-4 w-4', lit && 'fill-current')} />
+                ) : future ? null : (
+                  <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                )}
+              </motion.span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+function PledgeProgress({
+  goal,
+  rewards,
+  rewardCatalog,
+  isPremium,
+}: {
+  goal: NonNullable<LoginStreakView['goal']>;
+  rewards?: LoginStreakReward[];
+  rewardCatalog: Record<string, QuestRewardCatalogItem>;
+  isPremium: boolean;
+}) {
+  const reduceMotion = useReducedMotion();
+  const left = Math.max(0, goal.days - goal.progress);
+  const ratio = goal.stepCount > 0 ? goal.stepsFilled / goal.stepCount : 0;
+  const prize = rewards?.length
+    ? pledgePrizeSummary(rewards, rewardCatalog, isPremium)
+    : null;
+  return (
+    <div className="mt-4 border-t border-white/20 pt-4 text-left short-screen:mt-3 short-screen:pt-3">
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="flex items-center gap-1.5 text-[14px] font-black text-white">
+          <Trophy className="h-4 w-4" />
+          {goal.days}-day pledge
+        </span>
+        <span className="text-[13px] font-bold text-white/85">
+          {left === 0
+            ? 'Prize ready'
+            : `${left} ${left === 1 ? 'day' : 'days'} to go`}
+        </span>
+      </div>
+      <div className="mt-2 h-3 overflow-hidden rounded-full bg-orange-950/25">
+        <motion.div
+          initial={reduceMotion ? false : { scaleX: 0 }}
+          animate={{ scaleX: ratio }}
+          transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1], delay: 0.9 }}
+          className="h-full origin-left rounded-full bg-gradient-to-r from-yellow-200 to-white"
+        />
+      </div>
+      {prize && (
+        <p className="mt-2 text-[12px] font-bold text-white/80">
+          Prize: {prize}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function RevealStep({
   celebration,
   view,
   indices,
+  rewardCatalog,
+  isPremium,
   onContinue,
 }: {
   celebration: CheckInResult;
   view: LoginStreakView;
   indices: Partial<Record<'skin' | 'hat' | 'body' | 'hand_item', number>>;
+  rewardCatalog: Record<string, QuestRewardCatalogItem>;
+  isPremium: boolean;
   onContinue: () => void;
 }) {
+  const reduceMotion = useReducedMotion();
   const frogRef = useRef<FrogHandle>(null);
   const [count, setCount] = useState(celebration.previousCount);
   const [popped, setPopped] = useState(false);
@@ -408,6 +638,8 @@ function RevealStep({
     nextTierDays: view.nextTierDays,
     dayOfWeek: new Date().getDay(),
   });
+  const activeGoal =
+    view.goal && view.goal.progress < view.goal.days ? view.goal : null;
 
   useEffect(() => {
     const frogTimer = window.setTimeout(() => setFrogReady(true), 250);
@@ -419,12 +651,12 @@ function RevealStep({
         particleCount: 110,
         spread: 90,
         startVelocity: 40,
-        origin: { y: 0.45 },
+        origin: { y: 0.3 },
         zIndex: 99999,
         colors: ['#fb923c', '#fbbf24', '#fde68a', '#ffffff'],
       });
       hapticCelebrate();
-    }, 1100);
+    }, 1000);
     return () => {
       window.clearTimeout(frogTimer);
       window.clearTimeout(popTimer);
@@ -432,92 +664,113 @@ function RevealStep({
   }, [view.count]);
 
   return (
-    <div className="relative flex flex-col flex-1 min-h-0 bg-gradient-to-b from-orange-500 via-amber-500 to-amber-600">
-      <div className="absolute inset-0 pointer-events-none opacity-30">
+    <div className="relative flex min-h-0 flex-1 flex-col bg-gradient-to-b from-orange-500 via-orange-400 to-orange-600">
+      <div className="pointer-events-none absolute inset-0 opacity-[0.16]">
         <RotatingRays colorClass="text-white" />
       </div>
       <div
-        className="absolute inset-0 pointer-events-none"
+        className="pointer-events-none absolute inset-0"
         style={{
           background:
-            'radial-gradient(ellipse 92% 52% at 50% 36%, rgba(124,45,18,0.32), rgba(124,45,18,0) 72%)',
+            'radial-gradient(ellipse 70% 38% at 50% 22%, rgba(255,237,160,0.55), rgba(255,237,160,0) 70%)',
         }}
       />
 
-      <div className="no-scrollbar relative flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto overscroll-contain px-6 pb-2 pt-[calc(env(safe-area-inset-top)+2rem)] short-screen:pt-[calc(env(safe-area-inset-top)+1rem)] md:px-8 md:pt-9">
-        <div className="flex flex-col items-center w-full max-w-sm m-auto shrink-0 md:max-w-md">
-          <div className="flex flex-col items-center min-w-0">
-            <div className="relative flex items-center gap-3 short-screen:gap-2">
-              <motion.div
-                initial={{ scale: 0, rotate: -30 }}
-                animate={
+      <div className="no-scrollbar relative flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden overscroll-contain px-6 pb-2 pt-[calc(env(safe-area-inset-top)+2.25rem)] short-screen:pt-[calc(env(safe-area-inset-top)+1rem)] md:px-8 md:pt-10">
+        <div className="m-auto flex w-full max-w-sm shrink-0 flex-col items-center md:max-w-md">
+          <div className="flex items-center gap-1 short-screen:gap-0.5">
+            <div className="-mt-5 short-screen:-mt-3">
+            <motion.div
+              initial={reduceMotion ? false : { scale: 0.6, opacity: 0 }}
+              animate={
+                popped
+                  ? { scale: [1, 1.3, 1], rotate: [0, -8, 6, 0], opacity: 1 }
+                  : { scale: 1, opacity: 1 }
+              }
+              transition={
+                popped
+                  ? { duration: 0.6, ease: [0.22, 1, 0.36, 1] }
+                  : { type: 'spring', stiffness: 300, damping: 18, delay: 0.2 }
+              }
+              className="relative grid place-items-center"
+            >
+              {popped && !reduceMotion && (
+                <>
+                  <motion.span
+                    aria-hidden
+                    initial={{ opacity: 0.7, scale: 0.6 }}
+                    animate={{ opacity: 0, scale: 2.4 }}
+                    transition={{ duration: 0.7, ease: 'easeOut' }}
+                    className="absolute h-16 w-16 rounded-full bg-yellow-100"
+                  />
+                  {SPARKS.map((spark, i) => (
+                    <motion.span
+                      key={i}
+                      aria-hidden
+                      initial={{ x: 0, y: 0, opacity: 1, rotate: 0 }}
+                      animate={{
+                        x: spark.x,
+                        y: spark.y,
+                        opacity: 0,
+                        rotate: 90,
+                      }}
+                      transition={{ duration: 0.65, ease: [0.2, 0.8, 0.3, 1] }}
+                      className="absolute rounded-[2px] bg-yellow-100"
+                      style={{ width: spark.size, height: spark.size }}
+                    />
+                  ))}
+                </>
+              )}
+              <Flame
+                className={cn(
+                  'relative h-[84px] w-[84px] transition-[color,fill] duration-500 short-screen:h-16 short-screen:w-16',
                   popped
-                    ? { scale: [1, 1.35, 1], rotate: [0, -8, 8, 0] }
-                    : { scale: 1, rotate: 0 }
-                }
-                transition={
-                  popped
-                    ? { duration: 0.6, ease: [0.22, 1, 0.36, 1] }
-                    : {
-                        type: 'spring',
-                        stiffness: 320,
-                        damping: 16,
-                        delay: 0.35,
-                      }
-                }
-                className="relative"
-              >
-                <motion.div
-                  animate={
-                    popped
-                      ? { opacity: [0.6, 0], scale: [1, 2.2] }
-                      : { opacity: 0, scale: 1 }
-                  }
-                  transition={{ duration: 0.7 }}
-                  className="absolute inset-0 bg-yellow-200 rounded-full"
-                />
-                <Flame className="relative h-16 w-16 fill-yellow-200 text-yellow-100 drop-shadow-[0_3px_10px_rgba(255,200,50,0.55)] short-screen:h-12 short-screen:w-12" />
-              </motion.div>
-
-              <motion.span
-                key={count}
-                initial={popped ? { scale: 1.5, y: -6 } : false}
-                animate={{ scale: 1, y: 0 }}
-                transition={{ type: 'spring', stiffness: 320, damping: 14 }}
-                className="text-8xl font-black tabular-nums text-white drop-shadow-[0_3px_0_rgba(0,0,0,0.15)] short-screen:text-6xl"
-              >
-                {count}
-              </motion.span>
+                    ? 'fill-yellow-200 text-yellow-50 drop-shadow-[0_0_18px_rgba(255,230,120,0.9)]'
+                    : 'fill-white/25 text-white/50',
+                )}
+              />
+            </motion.div>
             </div>
 
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.5 }}
-              className="mt-2 text-lg font-black text-white drop-shadow-[0_1px_3px_rgba(124,45,18,0.55)] short-screen:mt-1 short-screen:text-base"
-            >
-              day streak
-            </motion.p>
-
-            <motion.p
-              initial={{ opacity: 0, y: 8 }}
-              animate={popped ? { opacity: 1, y: 0 } : {}}
-              transition={{ delay: 0.35 }}
-              className="mt-3 flex min-h-10 max-w-[34ch] items-center justify-center text-pretty text-center text-sm font-bold leading-snug text-white drop-shadow-[0_1px_3px_rgba(124,45,18,0.55)] short-screen:mt-2 short-screen:min-h-8 short-screen:text-xs"
-            >
-              {celebration.shieldConsumedDays.length > 0
-                ? '🪷 A Lily Pad caught your missed day. Welcome back!'
-                : revealMessage}
-            </motion.p>
+            <TickerNumber
+              value={count}
+              className="font-display text-[112px] leading-[0.95] tracking-wide text-white [filter:drop-shadow(0_5px_0_rgba(124,45,18,0.3))] short-screen:text-[84px]"
+            />
           </div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
+          <p className="-mt-1 font-display text-[26px] leading-none tracking-wide text-white [filter:drop-shadow(0_2px_0_rgba(124,45,18,0.3))] short-screen:text-[22px]">
+            day streak
+          </p>
+
+          <motion.p
+            initial={{ opacity: 0, y: 8 }}
             animate={popped ? { opacity: 1, y: 0 } : {}}
-            transition={{ delay: 0.5 }}
-            className="flex justify-center w-full"
+            transition={{ delay: 0.25 }}
+            className="mt-3 flex min-h-10 max-w-[32ch] items-center justify-center text-pretty text-center text-[15px] font-bold leading-snug text-white short-screen:mt-2 short-screen:min-h-8 short-screen:text-sm"
           >
-            <WeekStrip view={view} light />
+            {celebration.shieldConsumedDays.length > 0
+              ? 'A Lily Pad caught your missed day. Welcome back!'
+              : revealMessage}
+          </motion.p>
+
+          <motion.div
+            initial={{ opacity: 0, y: 14 }}
+            animate={popped ? { opacity: 1, y: 0 } : {}}
+            transition={{ delay: 0.35, type: 'spring', stiffness: 260, damping: 24 }}
+            className="mt-5 w-full rounded-[24px] bg-white/15 p-4 ring-1 ring-inset ring-white/25 backdrop-blur-sm short-screen:mt-3 short-screen:p-3"
+          >
+            <StreakChain view={view} play={popped} />
+            {activeGoal && (
+              <PledgeProgress
+                goal={activeGoal}
+                rewards={
+                  view.goalTiers.find((tier) => tier.days === activeGoal.days)
+                    ?.rewards
+                }
+                rewardCatalog={rewardCatalog}
+                isPremium={isPremium}
+              />
+            )}
           </motion.div>
         </div>
       </div>
@@ -528,7 +781,7 @@ function RevealStep({
             initial={{ y: 40, opacity: 0, scale: 0.85 }}
             animate={{ y: 0, opacity: 1, scale: 1 }}
             transition={{ type: 'spring', stiffness: 240, damping: 20 }}
-            className="pointer-events-none absolute inset-x-0 bottom-[calc(100%-11px)] z-20 flex justify-center short-screen:bottom-[calc(100%-10px)] md:bottom-[calc(100%-12px)]"
+            className="pointer-events-none absolute inset-x-0 bottom-[calc(100%-11px)] z-20 flex justify-center short-screen:bottom-[calc(100%-10px)]"
           >
             {frogReady && (
               <Frog
@@ -544,13 +797,13 @@ function RevealStep({
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={popped ? { opacity: 1, y: 0 } : {}}
-            transition={{ delay: 0.7 }}
+            transition={{ delay: 0.6 }}
             className="relative z-10 w-full"
           >
             <button
               type="button"
               onClick={onContinue}
-              className="w-full rounded-2xl bg-white py-4 text-base font-black tracking-wide text-amber-700 shadow-[0_5px_0_0_rgba(0,0,0,0.15)] transition-[transform,box-shadow,background-color] hover:bg-white/95 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-amber-500 active:translate-y-1 active:shadow-none short-screen:py-3.5"
+              className="w-full rounded-2xl bg-white py-4 text-[17px] font-black tracking-tight text-orange-600 shadow-[0_5px_0_0_#9a3412,0_12px_24px_-8px_rgba(124,45,18,0.55)] ring-1 ring-orange-900/10 transition-[transform,box-shadow] hover:bg-white/95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-orange-500 active:translate-y-1 active:shadow-none short-screen:py-3.5"
             >
               Continue
             </button>
@@ -559,6 +812,109 @@ function RevealStep({
       </div>
     </div>
   );
+}
+
+const PLEDGE_NAMES: Record<number, string> = {
+  7: 'Warm-up',
+  14: 'Steady',
+  30: 'Serious',
+  50: 'Legend',
+};
+
+function pledgeName(days: number) {
+  return PLEDGE_NAMES[days] ?? `${days} days`;
+}
+
+type PrizeRow = { key: string; tile: React.ReactNode; title: string; note?: string };
+
+function pledgePrizeRows(
+  rewards: LoginStreakReward[],
+  days: number,
+  rewardCatalog: Record<string, QuestRewardCatalogItem>,
+  isPremium: boolean,
+  paused: boolean,
+): PrizeRow[] {
+  const rows: PrizeRow[] = [];
+  rewards.forEach((reward, index) => {
+    if (isShieldReward(reward)) return;
+    if ((reward as { type?: string }).type === 'SKIN_ROLL') return;
+    const questReward = reward as QuestReward;
+    const copies =
+      questReward.type !== 'FLIES' && (questReward.amount ?? 1) > 1
+        ? `${questReward.amount}× `
+        : '';
+    const flies =
+      questReward.type === 'FLIES' ? Math.max(0, questReward.amount ?? 0) : 0;
+    rows.push({
+      key: `${index}-${questReward.type}-${questReward.itemId ?? ''}`,
+      tile: (
+        <RewardTile
+          reward={questReward}
+          rewardCatalog={rewardCatalog}
+          isPremium={isPremium}
+          compact
+          hideBadge
+          className="h-11 w-11 rounded-xl"
+          flySize={30}
+          hydrateDelayMs={index * 80}
+          paused={paused}
+        />
+      ),
+      title: `${copies}${rewardLabel(questReward, rewardCatalog, isPremium)}`,
+      note:
+        flies > 0 && days > 0
+          ? `About ${Math.round((flies / days) * 10) / 10} a day`
+          : undefined,
+    });
+  });
+  const shields = rewards.reduce(
+    (sum, reward) =>
+      isShieldReward(reward) ? sum + ((reward as any).amount ?? 1) : sum,
+    0,
+  );
+  if (shields > 0) {
+    rows.push({
+      key: 'shield',
+      tile: <LilyPadTile count={shields} />,
+      title: shields > 1 ? `${shields} Lily Pads` : 'Lily Pad',
+      note: shields > 1 ? 'Each one saves a missed day' : 'Saves a missed day',
+    });
+  }
+  const skinFloor = skinRollFloor(rewards);
+  if (skinFloor) {
+    rows.push({
+      key: 'skin',
+      tile: (
+        <SkinRollTile
+          minRarity={skinFloor}
+          rewardCatalog={rewardCatalog}
+          isPremium={isPremium}
+        />
+      ),
+      title: `${SKIN_ROLL_RARITY_LABEL[skinFloor] ?? skinFloor} skin`,
+      note: 'Guaranteed, and one you don’t own yet',
+    });
+  }
+  return rows;
+}
+
+function pledgePrizeSummary(
+  rewards: LoginStreakReward[],
+  rewardCatalog: Record<string, QuestRewardCatalogItem>,
+  isPremium: boolean,
+) {
+  return pledgePrizeRows(rewards, 0, rewardCatalog, isPremium, true)
+    .map((row) => row.title)
+    .join(', ');
+}
+
+function formatPledgeEnd(days: number) {
+  const end = new Date(`${addDaysToKey(localDayKey(), days)}T12:00:00`);
+  return end.toLocaleDateString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  });
 }
 
 function CommitStep({
@@ -578,10 +934,6 @@ function CommitStep({
   const [busyDays, setBusyDays] = useState<number | null>(null);
   const settled = useSettled();
   const [selectedDays, setSelectedDays] = useState<number | null>(null);
-  // `nextTierDays` is the rung above the longest pledge ever kept, so on a first
-  // pledge it is simply the lowest rung — badging that says nothing the
-  // pre-selected radio does not already say. It only carries information once
-  // there is a kept rung to step past.
   const lowestTierDays = view?.goalTiers?.length
     ? Math.min(...view.goalTiers.map((tier) => tier.days))
     : null;
@@ -591,19 +943,17 @@ function CommitStep({
   const steppingUpTo =
     stepUpTier &&
     stepUpTier.days !== lowestTierDays &&
-    // At the top of the ladder `nextTierDays` falls back to the last rung, so
-    // without this it would badge "step up" on a rung already kept.
     stepUpTier.repeatIndex === 0
       ? stepUpTier.days
       : null;
-  // The rung above the longest pledge kept so far arrives pre-selected, so the
-  // ladder offers the next step rather than asking the user to find it.
   useEffect(() => {
     if (selectedDays !== null) return;
-    const suggested = view?.nextTierDays ?? null;
+    const suggested = view?.nextTierDays ?? view?.goalTiers?.[0]?.days ?? null;
     if (suggested !== null) setSelectedDays(suggested);
-  }, [view?.nextTierDays, selectedDays]);
+  }, [view?.nextTierDays, view?.goalTiers, selectedDays]);
   const [error, setError] = useState<string | null>(null);
+  const selectedTier =
+    view.goalTiers.find((tier) => tier.days === selectedDays) ?? null;
 
   const pickGoal = async (days: number) => {
     if (busyDays !== null) return;
@@ -628,200 +978,204 @@ function CommitStep({
           return;
         }
       }
-      setError('Could not start this goal. Try again.');
+      setError('Could not start this pledge. Try again.');
     } catch {
-      setError('Could not start this goal. Try again.');
+      setError('Could not start this pledge. Try again.');
     } finally {
       setBusyDays(null);
     }
   };
 
+  const rows = selectedTier
+    ? pledgePrizeRows(
+        selectedTier.rewards,
+        selectedTier.days,
+        rewardCatalog,
+        isPremium,
+        false,
+      )
+    : [];
+
   return (
-    <div className="flex flex-col flex-1 min-h-0 bg-background">
+    <div className="flex min-h-0 flex-1 flex-col bg-background">
       <div
-        className="no-scrollbar min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-3 pb-4 pt-[calc(env(safe-area-inset-top)+3.5rem)] sm:px-6 short-screen:pt-[calc(0.75rem+env(safe-area-inset-top))] md:px-8 md:pt-9"
+        className="no-scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-4 pb-4 pt-[calc(env(safe-area-inset-top)+3.5rem)] sm:px-6 short-screen:pt-[calc(0.75rem+env(safe-area-inset-top))] md:px-8 md:pt-10"
         style={{ contain: 'paint' }}
       >
-        <div className="flex flex-col items-center w-full max-w-sm mx-auto md:max-w-xl">
-          <motion.div
-            initial={reduceMotion ? false : { scale: 0.7, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-            className="grid w-20 h-20 rounded-full shrink-0 place-items-center bg-amber-100 will-change-transform dark:bg-amber-500/15 short-screen:h-14 short-screen:w-14"
-            aria-hidden="true"
-          >
-            <Trophy className="w-10 h-10 text-amber-500 short-screen:h-7 short-screen:w-7" />
-          </motion.div>
-
+        <div className="mx-auto flex w-full max-w-sm flex-col items-center">
           <h2
             id="streak-goal-heading"
-            className="mt-5 max-w-full text-balance text-center text-[clamp(1.5rem,7vw,1.875rem)] font-black tracking-tight text-foreground short-screen:mt-3"
+            className="text-center text-[clamp(1.5rem,7vw,1.875rem)] font-black tracking-tight text-foreground"
           >
-            Choose a streak goal
+            Make a pledge
           </h2>
           <p
             id="streak-goal-hint"
-            className="mt-2 max-w-[32ch] text-pretty text-center text-sm font-medium leading-snug text-muted-foreground short-screen:mt-1 short-screen:text-xs"
+            className="mt-1.5 max-w-[30ch] text-pretty text-center text-sm font-semibold leading-snug text-muted-foreground"
           >
-            Finish a task each day to reach your goal and earn the reward
+            Get one thing done every day. Keep it up and the prize is yours.
           </p>
 
+          <div className="mt-5 flex items-center gap-1 text-orange-500 short-screen:mt-3">
+            <Flame className="h-12 w-12 fill-orange-400 short-screen:h-10 short-screen:w-10" />
+            <TickerNumber
+              value={selectedDays ?? 0}
+              className="font-display text-[72px] leading-none tracking-wide text-orange-500 short-screen:text-[60px]"
+            />
+          </div>
+          <p className="font-display text-xl leading-none tracking-wide text-orange-500/90">
+            days in a row
+          </p>
+          {selectedDays !== null && (
+            <span className="mt-2.5 rounded-full bg-orange-500/10 px-3 py-1 text-[13px] font-bold text-orange-700 dark:text-orange-300">
+              Ends {formatPledgeEnd(selectedDays)}
+            </span>
+          )}
+
           <fieldset
-            className="w-full mt-7 short-screen:mt-4"
+            className="mt-5 w-full short-screen:mt-4"
             aria-labelledby="streak-goal-heading"
             aria-describedby={`streak-goal-hint${error ? ' streak-goal-error' : ''}`}
             disabled={busyDays !== null}
           >
-            <legend className="sr-only">Streak goal options</legend>
-            <div className="grid grid-cols-1 gap-2.5 short-screen:gap-2 md:grid-cols-2 md:gap-3">
-              {view.goalTiers.map((tier, i) => {
+            <legend className="sr-only">Pledge length</legend>
+            <div className="grid grid-cols-4 gap-2">
+              {view.goalTiers.map((tier) => {
                 const selected = selectedDays === tier.days;
-                const rewardId = `streak-goal-${tier.days}-reward`;
                 return (
-                  <motion.div
-                    key={tier.days}
-                    initial={reduceMotion ? false : { opacity: 0, y: 14 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{
-                      type: 'spring',
-                      stiffness: 400,
-                      damping: 30,
-                      mass: 0.7,
-                      delay: i * 0.045,
-                    }}
-                    className="will-change-transform"
-                  >
-                    <label className="block cursor-pointer">
-                      <input
-                        type="radio"
-                        name="streak-goal"
-                        value={tier.days}
-                        checked={selected}
-                        onChange={() => {
-                          setSelectedDays(tier.days);
-                          setError(null);
-                        }}
-                        aria-describedby={rewardId}
-                        className="sr-only peer"
-                      />
+                  <label key={tier.days} className="relative block cursor-pointer">
+                    <input
+                      type="radio"
+                      name="streak-goal"
+                      value={tier.days}
+                      checked={selected}
+                      onChange={() => {
+                        setSelectedDays(tier.days);
+                        setError(null);
+                      }}
+                      className="peer sr-only"
+                    />
+                    {tier.days === steppingUpTo && (
+                      <span className="absolute -top-2 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-emerald-500 px-1.5 py-0.5 text-[10px] font-black leading-none text-white shadow-sm">
+                        Next up
+                      </span>
+                    )}
+                    <span
+                      className={cn(
+                        'flex h-[72px] flex-col items-center justify-center rounded-2xl border-2 transition-[transform,background-color,border-color,box-shadow] duration-150 active:translate-y-[2px] peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-disabled:cursor-wait',
+                        selected
+                          ? 'border-orange-500 bg-orange-500 text-white shadow-[0_4px_0_0_#c2410c]'
+                          : 'border-border/70 bg-card text-foreground shadow-[0_3px_0_0_rgba(0,0,0,0.08)] hover:border-orange-300',
+                      )}
+                    >
+                      <span className="font-display text-[26px] leading-none tracking-wide">
+                        {tier.days}
+                      </span>
                       <span
                         className={cn(
-                          'flex min-h-16 w-full items-center gap-3 rounded-2xl border bg-card p-3 text-left shadow-sm transition-[transform,border-color,background-color,box-shadow] hover:border-amber-400 active:scale-[0.99] peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-disabled:cursor-wait peer-disabled:opacity-60 sm:min-h-20 sm:gap-4 sm:p-4',
-                          selected
-                            ? 'border-amber-400 bg-amber-50/70 shadow-md dark:bg-amber-500/10'
-                            : 'border-border/60',
+                          'mt-1 text-[11px] font-black leading-none',
+                          selected ? 'text-white/90' : 'text-muted-foreground',
                         )}
                       >
-                        <span
-                          aria-hidden="true"
-                          className={cn(
-                            'grid h-5 w-5 shrink-0 place-items-center rounded-full border-2 transition-[border-color,background-color]',
-                            selected
-                              ? 'border-amber-500 bg-amber-500'
-                              : 'border-muted-foreground/40 bg-background',
-                          )}
-                        >
-                          {selected && (
-                            <span className="w-2 h-2 bg-white rounded-full" />
-                          )}
-                        </span>
-
-                        <span className="flex-1 min-w-0">
-                          <span className="flex items-center min-w-0 gap-2">
-                            <Flame
-                              aria-hidden="true"
-                              className="w-5 h-5 text-orange-500 shrink-0 fill-orange-400"
-                            />
-                            <span className="min-w-0 text-sm font-black text-foreground sm:text-base">
-                              {tier.days}-day pledge
-                            </span>
-                            {tier.days === steppingUpTo && (
-                              <span className="shrink-0 rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[11px] font-black text-emerald-600 dark:text-emerald-400">
-                                Step up
-                              </span>
-                            )}
-                            {tier.payoutPercent < 100 && (
-                              <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[11px] font-black text-muted-foreground">
-                                {tier.payoutPercent}%
-                              </span>
-                            )}
-                          </span>
-                          <span
-                            id={rewardId}
-                            className="mt-0.5 flex min-w-0 flex-wrap items-center gap-1 text-[11px] font-bold text-muted-foreground sm:text-xs"
-                          >
-                            {settled ? (
-                              <motion.span
-                                initial={reduceMotion ? false : { opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                transition={{ duration: 0.2, ease: 'easeOut' }}
-                                className="flex min-w-0 flex-1 items-center"
-                              >
-                                <PledgeRewardTiles
-                                  rewards={tier.rewards}
-                                  rewardCatalog={rewardCatalog}
-                                  isPremium={isPremium}
-                                  hydrateDelayMs={i * 90}
-                                  paused={!selected}
-                                />
-                              </motion.span>
-                            ) : (
-                              <span aria-hidden className="block h-11" />
-                            )}
-                            {tier.payoutPercent < 100 && (
-                              <span className="text-muted-foreground/70">
-                                · repeat rung, step up for full price
-                              </span>
-                            )}
-                          </span>
-                        </span>
+                        {tier.payoutPercent < 100
+                          ? `${tier.payoutPercent}% prize`
+                          : pledgeName(tier.days)}
                       </span>
-                    </label>
-                  </motion.div>
+                    </span>
+                  </label>
                 );
               })}
             </div>
           </fieldset>
+
+          <div className="mt-4 w-full rounded-[24px] border border-border/60 bg-card p-4 shadow-sm short-screen:mt-3 short-screen:p-3">
+            <p className="text-[13px] font-black text-muted-foreground">
+              {selectedDays !== null ? `Prize for ${selectedDays} days` : 'Prize'}
+            </p>
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.ul
+                key={selectedDays ?? 'none'}
+                initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -6 }}
+                transition={{ duration: 0.18 }}
+                className="mt-3 flex flex-col gap-3"
+              >
+                {settled
+                  ? rows.map((row) => (
+                      <li key={row.key} className="flex items-center gap-3">
+                        <span className="grid h-11 w-11 shrink-0 place-items-center">
+                          {row.tile}
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block text-[15px] font-black leading-tight text-foreground">
+                            {row.title}
+                          </span>
+                          {row.note && (
+                            <span className="mt-0.5 block text-[12px] font-semibold leading-tight text-muted-foreground">
+                              {row.note}
+                            </span>
+                          )}
+                        </span>
+                      </li>
+                    ))
+                  : rows.map((row) => (
+                      <li key={row.key} className="h-11" aria-hidden />
+                    ))}
+              </motion.ul>
+            </AnimatePresence>
+            {selectedTier && selectedTier.payoutPercent < 100 && (
+              <p className="mt-3 rounded-xl bg-muted px-3 py-2 text-[12px] font-bold leading-snug text-muted-foreground">
+                You&apos;ve kept this pledge before, so its flies pay{' '}
+                {selectedTier.payoutPercent}%. A longer one pays in full.
+              </p>
+            )}
+          </div>
+
+          <p className="mt-3 flex items-start gap-2 px-1 text-[12px] font-semibold leading-snug text-muted-foreground">
+            <Icon name="lilyPad" className="mt-px h-4 w-4 shrink-0" />
+            Miss a day and a Lily Pad can cover it. Breaking a pledge only
+            costs the prize.
+          </p>
         </div>
       </div>
 
-      <div className="shrink-0 border-t border-border/60 bg-background px-3 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3 sm:px-6 short-screen:pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:px-8 md:pb-6">
-        <div className="flex flex-col items-center w-full max-w-sm mx-auto">
+      <div className="shrink-0 border-t border-border/60 bg-background px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3 sm:px-6 short-screen:pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:px-8 md:pb-6">
+        <div className="mx-auto flex w-full max-w-sm flex-col items-center">
           {error && (
             <p
               id="streak-goal-error"
               role="alert"
-              className="mb-2 text-xs font-bold text-center text-destructive"
+              className="mb-2 text-center text-xs font-bold text-destructive"
             >
               {error}
             </p>
           )}
-
           <button
             type="button"
             disabled={busyDays !== null}
             onClick={() => {
               if (selectedDays === null) {
-                setError('Select a streak goal.');
+                setError('Pick how many days to pledge.');
                 return;
               }
               void pickGoal(selectedDays);
             }}
             aria-live="polite"
-            className="flex h-12 w-full items-center justify-center rounded-2xl bg-primary px-4 text-sm font-black text-primary-foreground shadow-[0_4px_0_0_hsl(var(--primary)/0.6)] transition-[transform,box-shadow,filter] hover:brightness-110 active:translate-y-1 active:shadow-none disabled:cursor-wait disabled:opacity-60"
+            className="flex h-[54px] w-full items-center justify-center gap-2 rounded-2xl bg-orange-500 px-4 text-base font-black text-white shadow-[0_4px_0_0_#c2410c] transition-[transform,box-shadow,filter] hover:brightness-105 active:translate-y-1 active:shadow-none disabled:cursor-wait disabled:opacity-60"
           >
+            <Flame className="h-5 w-5 fill-current" />
             {busyDays !== null
               ? 'Starting…'
               : selectedDays !== null
-                ? `Start ${selectedDays}-day goal`
-                : 'Start goal'}
+                ? `Pledge ${selectedDays} days`
+                : 'Pledge'}
           </button>
-
           <button
             type="button"
             onClick={onSkip}
             disabled={busyDays !== null}
-            className="px-4 mt-2 text-sm font-bold min-h-11 text-muted-foreground underline-offset-4 hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait disabled:opacity-60 short-screen:mt-1 short-screen:text-xs"
+            className="mt-1 min-h-11 px-4 text-sm font-bold text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait disabled:opacity-60"
           >
             Choose later
           </button>
@@ -1202,6 +1556,8 @@ export function StreakSheet({
                     celebration={celebration}
                     view={view}
                     indices={indices}
+                    rewardCatalog={rewardCatalog}
+                    isPremium={isPremium}
                     onContinue={advanceFromReveal}
                   />
                 )}

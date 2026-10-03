@@ -2175,7 +2175,7 @@ function RewardTileGloss() {
   );
 }
 
-function rewardLabel(
+export function rewardLabel(
   reward: QuestReward,
   rewardCatalog: Record<string, QuestRewardCatalogItem>,
   isPremium = false,

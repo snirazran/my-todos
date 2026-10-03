@@ -1,5 +1,6 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
+import { BellyPip } from './BellyPip';
 import {
   HUNGER_SEGMENTS,
   getHungerState,
@@ -21,7 +22,8 @@ export function BellyMeter({
   showLabel?: boolean;
   className?: string;
 }) {
-  const { bg, text, label } = getHungerState(percent);
+  const tone = getHungerState(percent);
+  const { text, label } = tone;
   return (
     <div
       className={cn('flex items-center gap-2', className)}
@@ -39,18 +41,12 @@ export function BellyMeter({
       )}
       <div className="flex flex-1 items-center gap-1" aria-hidden>
         {Array.from({ length: HUNGER_SEGMENTS }).map((_, i) => (
-          <div
+          <BellyPip
             key={i}
-            className="relative h-2 flex-1 overflow-hidden rounded-full bg-foreground/10"
-          >
-            <div
-              className={cn(
-                'absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-out',
-                bg,
-              )}
-              style={{ width: `${segmentFill(percent, i) * 100}%` }}
-            />
-          </div>
+            fill={segmentFill(percent, i)}
+            tone={tone}
+            className="h-2.5"
+          />
         ))}
       </div>
     </div>

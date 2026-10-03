@@ -45,6 +45,7 @@ type Props = {
   // Renders the bubble with exactly this text (demo/guest contexts) instead of
   // the fact-driven speech engine.
   fixedSpeech?: string | null;
+  onBellyPress?: () => void;
 };
 
 export function FrogDisplay({
@@ -73,6 +74,7 @@ export function FrogDisplay({
   showActionButtons = true,
   showSpeechBubble = true,
   fixedSpeech = null,
+  onBellyPress,
 }: Props) {
   const router = useRouter();
   const { unseenCount, unseenContainerCount } = useInventory(
@@ -225,6 +227,7 @@ export function FrogDisplay({
         hunger={hunger}
         maxHunger={maxHunger}
         animateHunger={animateHunger}
+        onPress={onBellyPress}
         className="-mt-6"
       />
     </div>
