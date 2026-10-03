@@ -5,9 +5,11 @@ import type { AnalyticsEventName } from '@/lib/analytics/events';
 
 const FIRST_PARTY_GROWTH_EVENTS: Record<string, AnalyticsEventName> = {
   funnel_view: 'try_funnel_viewed',
+  funnel_task_added: 'try_task_added',
   funnel_task_completed: 'try_task_completed',
   funnel_box_opened: 'try_gift_opened',
   funnel_signin_started: 'try_signin_started',
+  funnel_signin_skipped: 'try_signin_skipped',
   funnel_signup: 'try_signup_completed',
   funnel_gift_claimed: 'try_gift_claimed',
   funnel_try_on: 'try_cosmetic_previewed',

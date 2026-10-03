@@ -1,6 +1,8 @@
 export type CrossGiftPlatform = 'web' | 'native';
 
-export const FUNNEL_GIFT_ITEM_ID = 'skin_rainbow';
+export const FUNNEL_GIFT_ITEM_ID = '1003';
+export const FUNNEL_GIFT_NAME = 'Rainbow Frog';
+export const FUNNEL_GIFT_RIVE_INDEX = 4;
 export const CROSS_GIFT_FLIES = 100;
 
 export type CrossGiftStatus = {

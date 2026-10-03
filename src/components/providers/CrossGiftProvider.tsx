@@ -14,7 +14,11 @@ import { trackGrowthEvent } from '@/lib/growthTrack';
 import { whenScreenIsFree } from '@/lib/popupGate';
 import { markFlyEarn } from '@/lib/flyEarn';
 import { byId } from '@/lib/skins/catalog';
-import type { CrossGiftStatus } from '@/lib/crossGift';
+import {
+  FUNNEL_GIFT_ITEM_ID,
+  FUNNEL_GIFT_NAME,
+  type CrossGiftStatus,
+} from '@/lib/crossGift';
 
 export const CROSS_GIFT_SWR_KEY = 'cross-gift-status';
 export const FUNNEL_GIFT_PENDING_KEY = 'frogress_funnel_gift_pending';
@@ -96,7 +100,9 @@ export function CrossGiftProvider() {
         if (data?.itemId) {
           mutateFlyCaches();
           trackGrowthEvent('funnel_gift_claimed', { via: 'provider' });
-          const name = byId[data.itemId]?.name ?? 'A new skin';
+          const name =
+            byId[data.itemId]?.name ??
+            (data.itemId === FUNNEL_GIFT_ITEM_ID ? FUNNEL_GIFT_NAME : 'A new skin');
           showNotification(`${name} was saved to your pond 🎁`);
         }
       } catch {

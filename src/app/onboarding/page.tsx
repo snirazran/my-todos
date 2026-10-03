@@ -81,7 +81,17 @@ export default function OnboardingPage() {
         const res = await fetch('/api/user');
         if (!res.ok) return;
         const data = await res.json().catch(() => null);
-        if (cancelled || data?.onboardingCompleted !== true) return;
+        if (cancelled) return;
+        if (data?.onboardingCompleted !== true) {
+          const savedFrogName =
+            typeof data?.frogName === 'string' ? data.frogName.trim() : '';
+          if (savedFrogName && savedFrogName !== 'Cookie') {
+            setSelections((prev) =>
+              prev.frogName?.[0] ? prev : { ...prev, frogName: [savedFrogName] },
+            );
+          }
+          return;
+        }
         clearOnboardingDraft();
         resetBootstrapCache();
         await mutate('/api/user', data, { revalidate: false });
