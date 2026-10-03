@@ -4,7 +4,7 @@ import connectMongo from '@/lib/mongoose';
 import UserModel, { type UserDoc } from '@/lib/models/User';
 import { getFullCatalog } from '@/lib/skins/getCatalog';
 import { isPremiumActive, shopDay } from '@/lib/skins/dailyDeal';
-import { consumeAdView } from '@/lib/rewards/adBudget';
+import { consumeAdView, refundAdView } from '@/lib/rewards/adBudget';
 import { loadShopRotation } from '@/lib/skins/shopRotationServer';
 import { ensureShopSalesConfig } from '@/lib/models/ShopSalesConfig';
 import { rerollsAllowed } from '@/lib/skins/shopSales';
@@ -44,6 +44,15 @@ export async function POST(req: NextRequest) {
     if (!isPlus && !viaAd) {
       return json({ error: 'Watch a short ad to reroll', rerollsLeft: 0 }, 403);
     }
+    const { dayKey } = shopDay(new Date(), timezone, config);
+    const stored = user.wardrobe?.dealReroll ?? null;
+    const used =
+      stored && stored.date === dayKey
+        ? Math.max(0, Math.min(allowed, stored.count))
+        : 0;
+    if (used >= allowed)
+      return json({ error: 'No rerolls left today', rerollsLeft: 0 }, 429);
+
     if (!isPlus) {
       const spend = await consumeAdView({
         userId,
@@ -58,15 +67,6 @@ export async function POST(req: NextRequest) {
         );
       }
     }
-
-    const { dayKey } = shopDay(new Date(), timezone, config);
-    const stored = user.wardrobe?.dealReroll ?? null;
-    const used =
-      stored && stored.date === dayKey
-        ? Math.max(0, Math.min(allowed, stored.count))
-        : 0;
-    if (used >= allowed)
-      return json({ error: 'No rerolls left today', rerollsLeft: 0 }, 429);
 
     const next = used + 1;
     // Atomic on (date, count) so double-taps and parallel tabs can't burn two
@@ -84,7 +84,12 @@ export async function POST(req: NextRequest) {
       { $set: { 'wardrobe.dealReroll': { date: dayKey, count: next } } },
       { projection: { _id: 1 } },
     ).lean();
-    if (!claimed) return json({ error: 'Try again' }, 409);
+    if (!claimed) {
+      if (!isPlus) {
+        await refundAdView({ userId, placement: 'shop_reroll', tz: timezone });
+      }
+      return json({ error: 'Try again' }, 409);
+    }
 
     const catalog = await getFullCatalog();
     const rotation = await loadShopRotation({

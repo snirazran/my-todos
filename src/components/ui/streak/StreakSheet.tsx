@@ -30,6 +30,7 @@ import { rewardStackTileStyle } from '@/lib/questClaims';
 import type { QuestReward } from '@/lib/quests/types';
 import { openShieldSheet } from '@/hooks/useShields';
 import { StreakCelebration } from './StreakCelebration';
+import { maybeRequestAppRating } from '@/lib/rateApp';
 import { streakRevealMessage } from '@/lib/streak/revealMessage';
 import type {
   CheckInResult,
@@ -1122,8 +1123,12 @@ export function StreakSheet({
   };
 
   const advanceFromRewards = () => {
-    if (view && !view.goal) setStep('commit');
-    else close();
+    if (view && !view.goal) {
+      setStep('commit');
+      return;
+    }
+    close();
+    maybeRequestAppRating('streak_goal');
   };
 
   const finishCommit = () => {

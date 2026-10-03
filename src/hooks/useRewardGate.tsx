@@ -2,7 +2,11 @@
 
 import React, { useCallback, useState } from 'react';
 import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
-import { rewardedAdsAvailable, showRewardedAd } from '@/lib/ads';
+import {
+  rewardedAdFailureMessage,
+  rewardedAdsAvailable,
+  showRewardedAd,
+} from '@/lib/ads';
 import { useRewardedAdPreload } from '@/hooks/useRewardedAdPreload';
 
 export type RewardGateMode = 'free' | 'ad' | 'plus';
@@ -58,14 +62,17 @@ export function useRewardGate(
         const outcome = await showRewardedAd(placement);
         if (outcome !== 'rewarded') {
           if (outcome === 'failed') {
-            setError(
-              adFailedMessage ??
-                'Ad not available right now — try again in a moment.',
-            );
+            setError(adFailedMessage ?? rewardedAdFailureMessage());
           }
           return;
         }
         await action();
+      } catch (err) {
+        setError(
+          err instanceof Error && err.message
+            ? err.message
+            : 'Could not give your reward — try again.',
+        );
       } finally {
         setBusy(false);
       }

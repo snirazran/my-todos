@@ -17,6 +17,7 @@ import {
   claimRequestFor,
   objectiveCardTone,
   primeQuestsPageCache,
+  ratingMomentFor,
   refreshQuestHomeView,
   setQuestScrollTarget,
   sweepClaimLabels,
@@ -305,6 +306,7 @@ export function NextQuestStrip({
         catalog: (catalog ?? {}) as RevealCatalog,
         isPremium: !!isPremium,
         showFlyGainPill: false,
+        moment: ratingMomentFor(target),
       });
       const shields = payload.rewardSummary?.shieldsGranted ?? 0;
       if (shields > 0) {

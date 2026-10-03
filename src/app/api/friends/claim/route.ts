@@ -7,6 +7,7 @@ import FriendshipModel from '@/lib/models/Friendship';
 import UserModel from '@/lib/models/User';
 import { getZonedToday } from '@/lib/utils';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
+import { consumeAdVerification } from '@/lib/rewards/admobSsv';
 import { loadFlyEconomyConfig } from '@/lib/economy/config';
 import { fliesGrantedOnDay, settleFlyGrant } from '@/lib/economy/ledger';
 import { economyWeekKey, resolveEconomyTimezone } from '@/lib/economy/guards';
@@ -75,6 +76,12 @@ export async function POST(req: NextRequest) {
         lastClaim.amount <= 0
       ) {
         return NextResponse.json({ granted: 0 });
+      }
+      if (
+        !premium &&
+        !(await consumeAdVerification(userId, 'friend_reward_double'))
+      ) {
+        return NextResponse.json({ granted: 0, reason: 'unverified' });
       }
       const settlement = await settleFlyGrant({
         userId,

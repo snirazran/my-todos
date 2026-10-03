@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
+import UserModel from '@/lib/models/User';
+import { isPremiumActive } from '@/lib/skins/dailyDeal';
+import { consumeAdVerification } from '@/lib/rewards/admobSsv';
 import { dismissRescue, performRescue } from '@/lib/streak/loginStreak';
 
 export const dynamic = 'force-dynamic';
@@ -17,6 +20,17 @@ export async function POST(req: NextRequest) {
     await connectMongo();
     if (body.action === 'dismiss') {
       return NextResponse.json(await dismissRescue({ userId, rescueId }));
+    }
+    const user = await UserModel.findById(userId).select('premiumUntil').lean();
+    if (
+      !isPremiumActive(user?.premiumUntil) &&
+      !(await consumeAdVerification(userId, 'streak_rescue'))
+    ) {
+      return NextResponse.json({
+        granted: false,
+        completed: false,
+        error: 'unverified',
+      });
     }
     const result = await performRescue({
       userId,

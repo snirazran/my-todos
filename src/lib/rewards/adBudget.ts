@@ -3,6 +3,7 @@ import UserModel from '@/lib/models/User';
 import { loadFlyEconomyConfig, type FlyEconomyConfig } from '@/lib/economy/config';
 import { storedEconomyTimezone } from '@/lib/economy/guards';
 import { getZonedToday } from '@/lib/utils';
+import { consumeAdVerification } from '@/lib/rewards/admobSsv';
 
 export const AD_PLACEMENTS = [
   'daily_flies',
@@ -23,7 +24,7 @@ export type AdBudgetState = {
 
 export type AdBudgetRefusal = {
   ok: false;
-  reason: 'premium' | 'cooldown' | 'placement_cap' | 'daily_cap';
+  reason: 'premium' | 'cooldown' | 'placement_cap' | 'daily_cap' | 'unverified';
   cooldownLeft: number;
   remaining: number;
   placementRemaining: number;
@@ -210,6 +211,21 @@ export async function consumeAdView(args: {
       ok: false,
       reason: 'cooldown',
       cooldownLeft: cooldownSeconds,
+      remaining: totalRemaining,
+      placementRemaining,
+    };
+  }
+
+  if (!(await consumeAdVerification(args.userId, args.placement))) {
+    await refundAdView({
+      userId: args.userId,
+      placement: args.placement,
+      tz: args.tz,
+    });
+    return {
+      ok: false,
+      reason: 'unverified',
+      cooldownLeft: 0,
       remaining: totalRemaining,
       placementRemaining,
     };

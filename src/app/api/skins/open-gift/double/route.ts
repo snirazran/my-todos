@@ -8,7 +8,7 @@ import { giftLuckUpdate, readUserGiftLuck } from '@/lib/skins/giftLuck';
 import { readWishlistPins, wishlistPinKey } from '@/lib/skins/wishlist';
 import { dropFromWishlist } from '@/lib/skins/wishlistServer';
 import { DOUBLE_CLAIM_WINDOW_MS } from '@/lib/rewards/adDouble';
-import { consumeAdView } from '@/lib/rewards/adBudget';
+import { consumeAdView, refundAdView } from '@/lib/rewards/adBudget';
 import { isPremiumActive } from '@/lib/skins/dailyDeal';
 
 const json = (body: unknown, init = 200) =>
@@ -121,6 +121,7 @@ export async function POST(req: NextRequest) {
       { $inc: inc, $set: set },
     );
     if (res.modifiedCount === 0) {
+      if (!premium) await refundAdView({ userId, placement: 'gift_double' });
       return json({ granted: false });
     }
 

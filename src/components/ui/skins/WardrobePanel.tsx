@@ -75,6 +75,7 @@ import {
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
 import {
   rewardedAdsAvailable,
+  rewardedAdFailureMessage,
   showRewardedAd,
   takePlusOfferAfterAd,
 } from '@/lib/ads';
@@ -639,7 +640,7 @@ function WardrobeManagerContent({
         if (adResult !== 'rewarded') {
           if (adResult === 'failed') {
             setNotif({
-              msg: 'Ad not available right now — try again in a moment.',
+              msg: rewardedAdFailureMessage(),
               type: 'error',
             });
           }

@@ -20,7 +20,7 @@ import { StreakSheet } from '@/components/ui/streak/StreakSheet';
 import { StreakRescueSheet } from '@/components/ui/streak/StreakRescueSheet';
 import { ShieldSheet } from '@/components/ui/streak/ShieldSheet';
 import { openShieldSheet, subscribeShieldSheet } from '@/hooks/useShields';
-import { recordAppUsageDay } from '@/lib/rateApp';
+import { markNegativeMoment, recordAppUsageDay } from '@/lib/rateApp';
 import {
   LOGIN_STREAK_HOLD,
   holdAutoPopups,
@@ -142,6 +142,9 @@ export function StreakCheckInProvider() {
               🪷 A Lily Pad caught your <b>{result.view.count}-day</b> streak!
             </span>,
           );
+        }
+        if (result.brokeFrom > 1 || result.rescue) {
+          markNegativeMoment('streak_broken');
         }
         const offer = result.rescue;
         const canRescue =

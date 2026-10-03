@@ -116,8 +116,10 @@ export function StreakCelebration({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ claimId }),
       });
-      const data = await res.json();
-      if (!res.ok || !data?.granted) return;
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.granted) {
+        throw new Error('Could not double this reward — try again later.');
+      }
       setDoubled(true);
       setFlies((current) => current * 2);
       markFlyEarn();

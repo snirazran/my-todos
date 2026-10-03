@@ -12,7 +12,11 @@ import { AnimatedNumber } from '@/components/ui/AnimatedNumber';
 import { Icon } from '@/components/ui/Icon';
 import { useUIStore } from '@/lib/uiStore';
 import { useInventory, patchInventoryFlies } from '@/hooks/useInventory';
-import { rewardedAdsAvailable, showRewardedAd } from '@/lib/ads';
+import {
+  rewardedAdFailureMessage,
+  rewardedAdsAvailable,
+  showRewardedAd,
+} from '@/lib/ads';
 import { useRewardedAdPreload } from '@/hooks/useRewardedAdPreload';
 import { hapticSuccess } from '@/lib/haptics';
 import { bootstrapFetcher } from '@/lib/bootstrapFetcher';
@@ -664,7 +668,7 @@ function FreeFliesCard({
     try {
       const result = await showRewardedAd('daily_flies');
       if (result !== 'rewarded') {
-        if (result === 'failed') setError('Ad not available right now — try again later.');
+        if (result === 'failed') setError(rewardedAdFailureMessage());
         return;
       }
       const res = await fetch('/api/rewards/flies', {

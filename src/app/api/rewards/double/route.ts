@@ -64,39 +64,42 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    if (!user.wardrobe) {
-      user.wardrobe = { equipped: {}, inventory: {}, unseenItems: [], flies: 0 };
-    }
-    user.wardrobe.inventory = user.wardrobe.inventory ?? {};
-    user.wardrobe.unseenItems = user.wardrobe.unseenItems ?? [];
-    user.wardrobe.flies = user.wardrobe.flies ?? 0;
-    if (!user.wardrobe.backgrounds) {
-      user.wardrobe.backgrounds = { equipped: null, inventory: {} };
-    }
-    user.wardrobe.backgrounds.inventory =
-      user.wardrobe.backgrounds.inventory ?? {};
-
-    if (claim.fliesGranted > 0) {
-      user.wardrobe.flies += claim.fliesGranted;
-    }
+    const inc: Record<string, number> = {};
+    if (claim.fliesGranted > 0) inc['wardrobe.flies'] = claim.fliesGranted;
     for (const itemId of claim.grantedItemIds ?? []) {
-      user.wardrobe.inventory[itemId] =
-        (user.wardrobe.inventory[itemId] ?? 0) + 1;
-      user.wardrobe.unseenItems.push(itemId);
+      const key = `wardrobe.inventory.${itemId}`;
+      inc[key] = (inc[key] ?? 0) + 1;
     }
     for (const bgId of claim.grantedBackgroundIds ?? []) {
-      user.wardrobe.backgrounds.inventory[bgId] =
-        (user.wardrobe.backgrounds.inventory[bgId] ?? 0) + 1;
+      const key = `wardrobe.backgrounds.inventory.${bgId}`;
+      inc[key] = (inc[key] ?? 0) + 1;
+    }
+    const update: Record<string, unknown> = {
+      $set: { 'adDoubleClaim.doubled': true },
+    };
+    if (Object.keys(inc).length > 0) update.$inc = inc;
+    if (claim.grantedItemIds?.length) {
+      update.$push = { 'wardrobe.unseenItems': { $each: claim.grantedItemIds } };
     }
 
-    (user as any).adDoubleClaim = { ...claim, doubled: true };
-    user.markModified('adDoubleClaim');
-    user.markModified('wardrobe');
+    let updated: { wardrobe?: { flies?: number } } | null;
     try {
-      await user.save();
+      updated = await UserModel.findOneAndUpdate(
+        {
+          _id: userId,
+          'adDoubleClaim.id': claimId,
+          'adDoubleClaim.doubled': false,
+        },
+        update,
+        { returnDocument: 'after', projection: { 'wardrobe.flies': 1 } },
+      ).lean();
     } catch (saveErr) {
       if (spend) await refundAdView({ userId, placement: 'reward_double' });
       throw saveErr;
+    }
+    if (!updated) {
+      if (spend) await refundAdView({ userId, placement: 'reward_double' });
+      return NextResponse.json({ granted: false });
     }
     if (claim.fliesGranted > 0) {
       await recordAnalyticsEvent({
@@ -116,7 +119,7 @@ export async function POST(req: NextRequest) {
         fliesGranted: claim.fliesGranted,
         grantedItemIds: claim.grantedItemIds ?? [],
         grantedBackgroundIds: claim.grantedBackgroundIds ?? [],
-        flyBalanceAfter: user.wardrobe.flies,
+        flyBalanceAfter: updated.wardrobe?.flies ?? 0,
       },
     });
   } catch (err) {

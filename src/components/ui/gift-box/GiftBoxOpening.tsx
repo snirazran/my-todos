@@ -10,6 +10,7 @@ import { ItemDef, byId } from '@/lib/skins/catalog';
 import { cn } from '@/lib/utils';
 import {
   rewardedAdsAvailable,
+  rewardedAdFailureMessage,
   showRewardedAd,
   takePlusOfferAfterAd,
 } from '@/lib/ads';
@@ -185,7 +186,7 @@ export default function GiftBoxOpening({
         const adResult = await showRewardedAd('gift_double');
         if (adResult !== 'rewarded') {
           if (adResult === 'failed') {
-            setAdError('Ad not available right now — try again in a moment.');
+            setAdError(rewardedAdFailureMessage());
           }
           return;
         }
@@ -212,7 +213,11 @@ export default function GiftBoxOpening({
           setTimeout(() => setShowPlusOffer(true), 1600);
         }
       } else {
-        setAdError('Could not open another gift — it was already claimed.');
+        setAdError(
+          data.reason
+            ? 'Could not open another gift — try again later.'
+            : 'Could not open another gift — it was already claimed.',
+        );
       }
       setPhase('revealed');
     } catch (err) {

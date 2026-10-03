@@ -503,13 +503,15 @@ function FlyClaimRewardOverlay({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tz, double: true }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       const bonus = Math.max(0, Math.floor(data?.granted ?? 0));
       if (bonus > 0) {
         doubledRef.current = true;
         markFlyEarn();
         mutateInventoryCaches();
         setDisplayAmount((a) => a + bonus);
+      } else {
+        throw new Error('Could not double your flies — try again later.');
       }
     } finally {
       setDoubling(false);

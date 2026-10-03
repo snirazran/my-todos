@@ -28,6 +28,7 @@ import {
 import { hapticTick, hapticSelect, hapticCelebrate } from '@/lib/haptics';
 import {
   rewardedAdsAvailable,
+  rewardedAdFailureMessage,
   showRewardedAd,
   takePlusOfferAfterAd,
 } from '@/lib/ads';
@@ -809,7 +810,7 @@ export function TradePanel({
         const adResult = await showRewardedAd('trade_reroll');
         if (adResult !== 'rewarded') {
           if (adResult === 'failed') {
-            setRerollError('Ad not available right now — try again in a moment.');
+            setRerollError(rewardedAdFailureMessage());
           }
           return;
         }

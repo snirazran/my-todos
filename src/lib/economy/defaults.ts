@@ -169,7 +169,7 @@ export const FLY_ECONOMY_DEFAULTS: FlyEconomyConfig = {
   rewardedAds: {
     reward: 10,
     dailyCap: 6,
-    cooldownSeconds: 60,
+    cooldownSeconds: 10,
     totalDailyCap: 6,
     doubleRewardPerDay: 2,
     giftDoublePerDay: 2,

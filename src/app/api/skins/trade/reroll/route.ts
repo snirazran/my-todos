@@ -10,7 +10,7 @@ import { dropFromWishlist } from '@/lib/skins/wishlistServer';
 import { clearGiftLuckForPrizes } from '@/lib/skins/giftLuck';
 import type { Rarity } from '@/lib/skins/catalog';
 import { DOUBLE_CLAIM_WINDOW_MS } from '@/lib/rewards/adDouble';
-import { consumeAdView } from '@/lib/rewards/adBudget';
+import { consumeAdView, refundAdView } from '@/lib/rewards/adBudget';
 import { isPremiumActive } from '@/lib/skins/dailyDeal';
 
 export async function POST(req: NextRequest) {
@@ -58,6 +58,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ granted: false });
     }
 
+    const itemInv = user.wardrobe?.inventory ?? {};
+    const bgInv = user.wardrobe?.backgrounds?.inventory ?? {};
+    const ownedCount =
+      claim.rewardKind === 'background'
+        ? bgInv[claim.rewardId] || 0
+        : itemInv[claim.rewardId] || 0;
+    if (ownedCount < 1) {
+      return NextResponse.json({ granted: false });
+    }
+
     const premium = isPremiumActive(user.premiumUntil);
     if (!premium) {
       const spend = await consumeAdView({
@@ -69,16 +79,9 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ granted: false, reason: spend.reason });
       }
     }
-
-    const itemInv = user.wardrobe?.inventory ?? {};
-    const bgInv = user.wardrobe?.backgrounds?.inventory ?? {};
-    const ownedCount =
-      claim.rewardKind === 'background'
-        ? bgInv[claim.rewardId] || 0
-        : itemInv[claim.rewardId] || 0;
-    if (ownedCount < 1) {
-      return NextResponse.json({ granted: false });
-    }
+    const refund = async () => {
+      if (!premium) await refundAdView({ userId, placement: 'trade_reroll' });
+    };
 
     const [pool, modifiers] = await Promise.all([
       getRewardPool(),
@@ -111,10 +114,20 @@ export async function POST(req: NextRequest) {
       ? (draw(excluded, true) ?? draw(null, true) ?? draw(excluded, false) ?? draw(null, false))
       : (draw(excluded, false) ?? draw(null, false));
     if (!reward) {
+      await refund();
       return NextResponse.json(
         { error: `No prizes for rarity ${claim.rarity}` },
         { status: 500 },
       );
+    }
+
+    const locked = await User.updateOne(
+      { _id: userId, 'tradeRerollClaim.id': claimId, 'tradeRerollClaim.used': false },
+      { $set: { 'tradeRerollClaim.used': true } },
+    );
+    if (locked.modifiedCount === 0) {
+      await refund();
+      return NextResponse.json({ granted: false });
     }
 
     if (!user.wardrobe) {

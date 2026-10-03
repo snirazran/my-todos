@@ -4,6 +4,7 @@ import { Capacitor } from '@capacitor/core';
 import { auth } from '@/lib/firebase';
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
 import { FLY_PACKS, getFlyPack, type FlyPackId } from '@/lib/flyPacks';
+import { markNegativeMoment } from '@/lib/rateApp';
 
 export type PlusPlan = 'yearly' | 'monthly';
 export type PurchaseOutcome = 'purchased' | 'cancelled';
@@ -147,6 +148,7 @@ export async function purchasePlus(plan: PlusPlan, placement = 'unknown'): Promi
     );
     return outcome;
   } catch (error) {
+    markNegativeMoment('purchase_failed');
     trackAnalyticsEvent('purchase_failed', {
       plan,
       store,
@@ -234,6 +236,7 @@ export async function purchaseFlyPack(packId: FlyPackId): Promise<PurchaseOutcom
     }
     return 'purchased';
   } catch (error) {
+    markNegativeMoment('purchase_failed');
     trackAnalyticsEvent('fly_pack_purchase_failed', {
       pack_id: pack.id,
       store,
@@ -349,6 +352,7 @@ export async function purchaseStoreProduct(
     });
     return 'purchased';
   } catch (error) {
+    markNegativeMoment('purchase_failed');
     trackAnalyticsEvent('store_product_purchase_failed', {
       product_id: id,
       store,

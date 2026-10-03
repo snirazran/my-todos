@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/questRewardReveal';
 import { useDismissNotification } from '@/components/providers/NotificationProvider';
 import { pactViewKey } from '@/lib/pact/viewKey';
+import type { RatingMoment } from '@/lib/rateApp';
 
 const RewardTile = dynamic(
   () => import('@/components/ui/QuestCards').then((m) => m.RewardTile),
@@ -47,6 +48,12 @@ export type Claimable = {
   reward?: any;
   rewards?: any[];
 };
+
+export function ratingMomentFor(claimable: Claimable): RatingMoment | undefined {
+  if (claimable.kind === 'sweep') return 'clean_sweep';
+  if (claimable.kind === 'season') return 'quest_reward';
+  return undefined;
+}
 
 export function claimRequestFor(
   claimable: Claimable,
@@ -810,6 +817,7 @@ function ClaimRewardToast({
         catalog: catalog as RevealCatalog,
         isPremium,
         showFlyGainPill: window.location.pathname !== '/',
+        moment: ratingMomentFor(claimable),
       });
       primeQuestsPageCache();
       dismissToast?.();

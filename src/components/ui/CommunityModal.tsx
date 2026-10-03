@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { ChevronRight, Facebook, Instagram, Music2, Smartphone } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
+import { APP_STORE_REVIEW_URL, PLAY_STORE_URL } from '@/lib/appStores';
 
 type CommunityLink = {
   key: string;
@@ -14,8 +15,6 @@ type CommunityLink = {
 const FACEBOOK_URL = 'https://www.facebook.com/';
 const INSTAGRAM_URL = 'https://www.instagram.com/';
 const TIKTOK_URL = 'https://www.tiktok.com/';
-const APP_STORE_URL = 'https://apps.apple.com/';
-const PLAY_STORE_URL = 'https://play.google.com/store';
 
 export function CommunityPanel() {
   const [mounted, setMounted] = useState(false);
@@ -51,10 +50,10 @@ export function CommunityPanel() {
     ? {
         key: 'appstore',
         label: 'Rate Frogress on App Store',
-        href: APP_STORE_URL,
+        href: APP_STORE_REVIEW_URL,
         icon: <Smartphone className="h-5 w-5 text-amber-500" />,
       }
-    : isAndroid
+    : isAndroid && PLAY_STORE_URL
       ? {
           key: 'playstore',
           label: 'Rate Frogress on Play Store',

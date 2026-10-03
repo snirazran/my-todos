@@ -15,7 +15,8 @@ export const SUPPORT_EMAIL = 'help@frogress.com';
 export const FOUNDER_NAME = 'Snir Azran';
 
 export const ANDROID_PACKAGE = 'io.frog.tasks';
-export const APP_STORE_ID = process.env.NEXT_PUBLIC_APP_STORE_ID?.trim() || '';
+export const APP_STORE_ID =
+  process.env.NEXT_PUBLIC_APP_STORE_ID?.trim() || '6762088365';
 export const APP_STORE_LINK =
   process.env.NEXT_PUBLIC_APP_STORE_URL?.trim() ||
   (APP_STORE_ID ? `https://apps.apple.com/app/id${APP_STORE_ID}` : '');

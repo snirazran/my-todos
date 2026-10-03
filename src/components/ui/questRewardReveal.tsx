@@ -18,7 +18,7 @@ import {
 } from '@/hooks/useInventory';
 import { markFlyEarn } from '@/lib/flyEarn';
 import { hapticCelebrate, hapticTick } from '@/lib/haptics';
-import { maybeRequestAppRating } from '@/lib/rateApp';
+import { maybeRequestAppRating, type RatingMoment } from '@/lib/rateApp';
 import { useRiveInteractionPause } from '@/lib/riveInteractionPause';
 import { emitCampaignTrigger, setCampaignBusy } from '@/lib/campaigns/orchestrator';
 import { useAutoPopupHold } from '@/lib/popupGate';
@@ -87,6 +87,7 @@ let toastIdCounter = 0;
 let knownFlyBalance = 0;
 let doublingClaim = false;
 let revealWasDelightful = false;
+let revealMoment: RatingMoment = 'quest_reward';
 
 function createFlyRewardItem(amount: number): ItemDef {
   return {
@@ -111,9 +112,14 @@ export function enqueueQuestRewardReveal(
     // Pages whose own header counter already animates the gain (home) pass
     // false so the balance isn't celebrated twice.
     showFlyGainPill?: boolean;
+    moment?: RatingMoment;
   },
 ): number {
   const { catalog, isPremium } = options;
+  if (options.moment) {
+    revealWasDelightful = true;
+    revealMoment = options.moment;
+  }
   const suppressFlyPill = options.showFlyGainPill === false;
   const grantedItemIds = Array.isArray(summary?.grantedItemIds)
     ? summary.grantedItemIds
@@ -283,8 +289,10 @@ async function handleWatchAdDouble(entry: QuestRewardRevealEntry) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ claimId }),
     });
-    const data = await res.json();
-    if (!res.ok || !data?.granted) return;
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data?.granted) {
+      throw new Error('Could not double this reward — try again later.');
+    }
     markFlyEarn();
     mutateInventoryCaches();
     revealStore.setState((state) => ({
@@ -359,8 +367,9 @@ export function QuestRewardRevealHost() {
   useEffect(() => {
     if (prevRevealCountRef.current > 0 && queue.length === 0) {
       emitCampaignTrigger('quest_claimed');
-      if (revealWasDelightful) maybeRequestAppRating();
+      if (revealWasDelightful) maybeRequestAppRating(revealMoment);
       revealWasDelightful = false;
+      revealMoment = 'quest_reward';
     }
     prevRevealCountRef.current = queue.length;
   }, [queue.length]);

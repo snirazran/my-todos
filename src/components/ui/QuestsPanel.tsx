@@ -44,6 +44,7 @@ import {
   type QuestRewardSummary,
   type RevealCatalog,
 } from './questRewardReveal';
+import type { RatingMoment } from '@/lib/rateApp';
 import {
   refreshQuestHomeView,
   takeQuestScrollTarget,
@@ -326,10 +327,14 @@ export function QuestsPanel({
     }
   };
 
-  const queueRewardReveal = (summary?: QuestRewardSummary) =>
+  const queueRewardReveal = (
+    summary?: QuestRewardSummary,
+    moment?: RatingMoment,
+  ) =>
     enqueueQuestRewardReveal(summary, {
       catalog: (data?.rewardCatalog ?? {}) as RevealCatalog,
       isPremium: data?.isPremium ?? false,
+      moment,
     });
 
   useEffect(() => {
@@ -397,7 +402,7 @@ export function QuestsPanel({
       });
       const payload = await res.json();
       if (!res.ok) throw new Error(payload.error || 'Claim failed');
-      queueRewardReveal(payload.rewardSummary);
+      queueRewardReveal(payload.rewardSummary, 'clean_sweep');
       // A Lily Pad is not part of the reveal pipeline, so the only place it
       // would otherwise show up is a silently changed shield count.
       if ((payload.rewardSummary?.shieldsGranted ?? 0) > 0) {
@@ -472,7 +477,7 @@ export function QuestsPanel({
       });
       const payload = await res.json();
       if (!res.ok) throw new Error(payload.error || 'Claim failed');
-      queueRewardReveal(payload.rewardSummary);
+      queueRewardReveal(payload.rewardSummary, 'quest_reward');
       // A Lily Pad has no reveal art of its own, so the only thing that would
       // otherwise change is a silent shield count.
       if ((payload.rewardSummary?.shieldsGranted ?? 0) > 0) {
