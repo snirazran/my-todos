@@ -20,9 +20,7 @@ export const APP_STORE_ID =
 export const APP_STORE_LINK =
   process.env.NEXT_PUBLIC_APP_STORE_URL?.trim() ||
   (APP_STORE_ID ? `https://apps.apple.com/app/id${APP_STORE_ID}` : '');
-export const PLAY_STORE_LINK =
-  process.env.NEXT_PUBLIC_PLAY_STORE_URL?.trim() ||
-  `https://play.google.com/store/apps/details?id=${ANDROID_PACKAGE}`;
+export const PLAY_STORE_LINK = process.env.NEXT_PUBLIC_PLAY_STORE_URL?.trim() || '';
 
 export const TWITTER_HANDLE = process.env.NEXT_PUBLIC_TWITTER_HANDLE?.trim() || '';
 
