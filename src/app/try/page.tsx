@@ -100,6 +100,8 @@ const APP_FEATURES = [
   { icon: '/icons/GoogleCalendar.svg', text: 'Syncs with Google and Apple Calendar' },
 ];
 
+const USER_QUOTES: { quote: string; author: string }[] = [];
+
 const FROG_NAMES = [
   'Pickle',
   'Mochi',
@@ -701,6 +703,24 @@ export default function TryPage() {
                   </div>
                 </div>
 
+                {USER_QUOTES.length > 0 && (
+                  <div className="-mx-4 mt-8 flex snap-x gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] md:mx-0 md:px-0 [&::-webkit-scrollbar]:hidden">
+                    {USER_QUOTES.map((q) => (
+                      <figure
+                        key={q.author}
+                        className="w-[260px] shrink-0 snap-start rounded-2xl bg-muted/60 p-4 text-left"
+                      >
+                        <blockquote className="text-[14px] font-semibold leading-snug text-foreground">
+                          &ldquo;{q.quote}&rdquo;
+                        </blockquote>
+                        <figcaption className="mt-2 text-[12px] font-bold text-muted-foreground">
+                          {q.author}
+                        </figcaption>
+                      </figure>
+                    ))}
+                  </div>
+                )}
+
                 <div className="mx-auto mt-8 flex w-full max-w-sm flex-col gap-3">
                   <p className="text-center text-[13px] font-bold text-foreground/70">
                     A free account saves {name}, the {prize.name} skin and your task.
@@ -809,15 +829,17 @@ export default function TryPage() {
                         <ArrowRight className="h-5 w-5" strokeWidth={3} />
                       </ChunkyButton>
                     ) : (
-                      <div className="flex items-center gap-4 rounded-2xl bg-muted/60 p-3">
-                        <div className="relative flex h-[136px] w-[136px] shrink-0 items-center justify-center rounded-xl bg-white p-2 ring-1 ring-black/5">
+                      <div className="flex flex-col items-center gap-3 rounded-2xl bg-muted/60 p-4 text-center sm:flex-row sm:gap-4 sm:p-3 sm:text-left">
+                        <div className="relative flex h-36 w-36 flex-none items-center justify-center rounded-xl bg-white p-2 ring-1 ring-black/5">
                           {qrUrl ? (
                             <>
                               {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img
                                 src={qrUrl}
                                 alt="QR code to download the Frogress app"
-                                className="h-full w-full"
+                                width={128}
+                                height={128}
+                                className="block h-32 w-32"
                               />
                               <span className="absolute left-1/2 top-1/2 flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-xl bg-white">
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -832,7 +854,7 @@ export default function TryPage() {
                             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground/50" />
                           )}
                         </div>
-                        <div className="min-w-0 text-left">
+                        <div className="min-w-0 flex-1">
                           <p className="text-[16px] font-black leading-tight text-foreground">
                             Scan to download
                           </p>
