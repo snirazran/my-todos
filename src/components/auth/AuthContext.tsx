@@ -52,6 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
       setUser(user);
       if (user) {
+        void import('@/lib/purchases').then((m) => m.initNativePurchases());
         await ensureSessionCookie(user);
       } else {
         // Logout is local to this device. Hide and erase its persisted timer

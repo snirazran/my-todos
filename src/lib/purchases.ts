@@ -31,6 +31,9 @@ async function getNativePurchases(uid: string) {
     await Purchases.configure({ apiKey, appUserID: uid });
     nativeConfiguredFor = uid;
     try {
+      if (Capacitor.getPlatform() === 'ios') {
+        await Purchases.enableAdServicesAttributionTokenCollection();
+      }
       await Purchases.collectDeviceIdentifiers();
       const email = auth?.currentUser?.email;
       if (email) await Purchases.setEmail({ email });
@@ -39,6 +42,17 @@ async function getNativePurchases(uid: string) {
     }
   }
   return { Purchases };
+}
+
+export async function initNativePurchases() {
+  if (!Capacitor.isNativePlatform()) return;
+  const uid = auth?.currentUser?.uid;
+  if (!uid || nativeConfiguredFor === uid) return;
+  try {
+    await getNativePurchases(uid);
+  } catch (err) {
+    console.error('RevenueCat early configure failed', err);
+  }
 }
 
 export async function refreshNativeAttribution() {
