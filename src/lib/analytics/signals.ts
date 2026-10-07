@@ -34,6 +34,8 @@ function bandText(band: { min?: number; max?: number } | undefined, unit: string
 
 function actionFor(metricKey: string, level: SignalLevel): string {
   const actions: Record<string, string> = {
+    attributed_share: 'Too many new accounts have no known source. Tag every link you control with utm_source / utm_medium / utm_campaign, and press "Match sources now" on Acquisition to pull pending Apple Ads matches from RevenueCat.',
+    install_to_account: 'Installs from ads are not becoming accounts. Walk onboarding on a fresh install — every step before the account screen is where these people quit.',
     stickiness: 'Look at the notification ladder and the login streak — those are the two levers that pull people back on a day they were not planning to open the app.',
     activation_rate: 'Replay onboarding on a fresh account. The starter plan and the first task completion are the two steps that carry this number.',
     retention_d1: 'The first session is the problem, not the app. Check onboarding drop-off and whether day one ends with a visible reward.',
