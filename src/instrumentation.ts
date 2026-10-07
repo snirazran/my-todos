@@ -15,6 +15,8 @@ export async function register() {
   startCalendarSyncTicker();
   const { startPlusTicker } = await import('@/lib/plusTicker');
   startPlusTicker();
+  const { startAttributionTicker } = await import('@/lib/attributionTicker');
+  startAttributionTicker();
 }
 
 export const onRequestError = Sentry.captureRequestError;

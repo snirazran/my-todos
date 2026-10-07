@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { normalizeAnalyticsPage } from '@/lib/analytics/events';
 import { trackAnalyticsEvent } from '@/lib/analytics/client';
 import { captureClickIds } from '@/lib/adpixels/clickIds';
+import { captureFirstTouch } from '@/lib/attribution/touch';
 
 const SESSION_KEY = 'frogress.analytics.session';
 const SESSION_LAST_SEEN_KEY = 'frogress.analytics.lastSeen';
@@ -41,6 +42,8 @@ function trackOpen() {
     utm_source: params.get('utm_source') ?? '',
     utm_medium: params.get('utm_medium') ?? '',
     utm_campaign: params.get('utm_campaign') ?? '',
+    utm_content: params.get('utm_content') ?? '',
+    utm_term: params.get('utm_term') ?? '',
   });
 }
 
@@ -49,6 +52,7 @@ export function AnalyticsProvider() {
 
   useEffect(() => {
     captureClickIds();
+    captureFirstTouch();
     trackOpen();
     const keepAlive = window.setInterval(() => {
       if (document.visibilityState === 'visible') ensureSession();

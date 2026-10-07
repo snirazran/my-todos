@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireUserId } from '@/lib/auth';
 import { recordAnalyticsEvent } from '@/lib/analytics/server';
 import { readAdIdentity, saveAdIdentity } from '@/lib/adpixels/identity';
+import { saveFirstTouch } from '@/lib/attribution/server';
 import {
   ANALYTICS_EVENT_SET,
   type AnalyticsEventName,
@@ -118,18 +119,21 @@ export async function POST(req: NextRequest) {
     return new NextResponse(null, { status: 204 });
   }
 
+  const platform = inferPlatform(req);
+
   if (authenticated) {
     void saveAdIdentity(
       userId,
       readAdIdentity(req, { ttclid: body.ttclid, consent: body.adConsent }),
     );
+    if (body.touch) void saveFirstTouch(userId, body.touch, platform);
   }
 
   await recordAnalyticsEvent({
     userId,
     name: name as AnalyticsEventName,
     source: 'client',
-    platform: inferPlatform(req),
+    platform,
     sessionId: typeof body.sessionId === 'string' ? body.sessionId : undefined,
     anonymousId,
     properties:

@@ -7,6 +7,8 @@ import FriendshipModel from '@/lib/models/Friendship';
 import UserModel from '@/lib/models/User';
 import { addUtcDays, resolveRange, ymd } from '@/lib/analytics/report/context';
 import { toCsv } from '@/lib/analytics/export';
+import { channelKeyFor, channelLabel, pathFor } from '@/lib/analytics/report/acquisition';
+import type { UserAcquisition } from '@/lib/attribution/classify';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,6 +33,9 @@ export const USER_COLUMNS = [
   { key: 'created_at', label: 'Signed up' },
   { key: 'tier', label: 'Tier' },
   { key: 'platform', label: 'Platform' },
+  { key: 'channel', label: 'Source' },
+  { key: 'campaign', label: 'Campaign' },
+  { key: 'keyword', label: 'Keyword / ad' },
   { key: 'last_seen', label: 'Last seen' },
   { key: 'active_days', label: 'Active days' },
   { key: 'events', label: 'Events' },
@@ -129,6 +134,7 @@ export async function GET(req: NextRequest) {
   const tier = params.get('tier') ?? 'any';
   const segment = params.get('segment') ?? 'any';
   const platform = params.get('platform') ?? 'any';
+  const channel = params.get('channel') ?? 'any';
   const format = params.get('format') ?? 'json';
   const sort = params.get('sort') ?? 'last_seen';
   const direction = params.get('dir') === 'asc' ? 1 : -1;
@@ -152,6 +158,12 @@ export async function GET(req: NextRequest) {
   ];
   if (tier === 'guest') userFilter.isGuest = true;
   if (segment === 'new') userFilter.createdAt = window;
+  if (channel === 'unprocessed') userFilter.acquisition = { $exists: false };
+  else if (channel === 'awaiting_match') userFilter['acquisition.status'] = 'pending';
+  else if (channel !== 'any') {
+    userFilter['acquisition.channel'] = channel;
+    userFilter['acquisition.status'] = { $ne: 'pending' };
+  }
 
   const eventMatch: PipelineStage.Match['$match'] = {
     occurredAt: window,
@@ -159,7 +171,8 @@ export async function GET(req: NextRequest) {
   };
   if (platform !== 'any') eventMatch.platform = platform;
 
-  const useProfileSort = PROFILE_SORTS.has(sort) || segment === 'dormant' || !!search || tier !== 'any';
+  const useProfileSort =
+    PROFILE_SORTS.has(sort) || segment === 'dormant' || !!search || tier !== 'any' || channel !== 'any';
   const sortKey = EVENT_SORTS.has(sort) || PROFILE_SORTS.has(sort) ? sort : 'last_seen';
 
   let userIds: string[];
@@ -224,7 +237,7 @@ export async function GET(req: NextRequest) {
 
   const [users, aggregates, friendRows] = await Promise.all([
     UserModel.find({ _id: { $in: userIds } })
-      .select('_id name email createdAt premiumUntil isGuest wardrobe.flies quests.loginStreak.count')
+      .select('_id name email createdAt premiumUntil isGuest acquisition wardrobe.flies quests.loginStreak.count')
       .lean<
         Array<{
           _id: unknown;
@@ -233,6 +246,7 @@ export async function GET(req: NextRequest) {
           createdAt: Date;
           premiumUntil?: Date;
           isGuest?: boolean;
+          acquisition?: UserAcquisition;
           wardrobe?: { flies?: number };
           quests?: { loginStreak?: { count?: number } };
         }>
@@ -261,6 +275,7 @@ export async function GET(req: NextRequest) {
     .map((user) => {
       const id = String(user._id);
       const aggregate = aggregateById.get(id);
+      const source = pathFor(user.acquisition);
       return {
         name: user.name ?? '',
         email: user.email ?? '',
@@ -271,7 +286,10 @@ export async function GET(req: NextRequest) {
           : user.premiumUntil && new Date(user.premiumUntil) > now
             ? 'Plus'
             : 'Free',
-        platform: aggregate?.platform ?? 'unknown',
+        platform: user.acquisition?.platform ?? aggregate?.platform ?? 'unknown',
+        channel: channelLabel(channelKeyFor(user.acquisition)),
+        campaign: source[1]?.label ?? '',
+        keyword: source[3]?.label ?? source[2]?.label ?? '',
         last_seen: aggregate?.last_seen
           ? new Date(aggregate.last_seen).toISOString().slice(0, 10)
           : '',

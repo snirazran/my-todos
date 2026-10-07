@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Download, Search } from 'lucide-react';
 import { formatValue, integer } from './primitives';
+import { CHANNEL_LABELS } from '@/lib/attribution/classify';
 
 type UserRow = Record<string, string | number>;
 
@@ -38,6 +39,13 @@ const PLATFORMS = [
   { id: 'android', label: 'Android' },
 ];
 
+const CHANNELS = [
+  { id: 'any', label: 'Any source' },
+  ...Object.entries(CHANNEL_LABELS).map(([id, label]) => ({ id, label })),
+  { id: 'awaiting_match', label: 'Awaiting ad match' },
+  { id: 'unprocessed', label: 'Not processed yet' },
+];
+
 const NUMERIC = new Set([
   'active_days',
   'events',
@@ -53,12 +61,19 @@ const NUMERIC = new Set([
   'friends',
 ]);
 
-export function UsersExplorer({ range }: { range: { start: string; end: string } }) {
+export function UsersExplorer({
+  range,
+  onOpenUser,
+}: {
+  range: { start: string; end: string };
+  onOpenUser?: (userId: string) => void;
+}) {
   const [search, setSearch] = useState('');
   const [debounced, setDebounced] = useState('');
   const [segment, setSegment] = useState('any');
   const [tier, setTier] = useState('any');
   const [platform, setPlatform] = useState('any');
+  const [channel, setChannel] = useState('any');
   const [sort, setSort] = useState('last_seen');
   const [dir, setDir] = useState<'asc' | 'desc'>('desc');
   const [page, setPage] = useState(1);
@@ -73,7 +88,7 @@ export function UsersExplorer({ range }: { range: { start: string; end: string }
 
   useEffect(() => {
     setPage(1);
-  }, [debounced, segment, tier, platform, sort, dir, range.start, range.end]);
+  }, [debounced, segment, tier, platform, channel, sort, dir, range.start, range.end]);
 
   const query = useMemo(() => {
     const params = new URLSearchParams({
@@ -82,6 +97,7 @@ export function UsersExplorer({ range }: { range: { start: string; end: string }
       segment,
       tier,
       platform,
+      channel,
       sort,
       dir,
       page: String(page),
@@ -89,7 +105,7 @@ export function UsersExplorer({ range }: { range: { start: string; end: string }
     });
     if (debounced) params.set('q', debounced);
     return params;
-  }, [range.start, range.end, segment, tier, platform, sort, dir, page, debounced]);
+  }, [range.start, range.end, segment, tier, platform, channel, sort, dir, page, debounced]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -136,6 +152,7 @@ export function UsersExplorer({ range }: { range: { start: string; end: string }
           <Select value={segment} onChange={setSegment} options={SEGMENTS} label="Segment" />
           <Select value={tier} onChange={setTier} options={TIERS} label="Tier" />
           <Select value={platform} onChange={setPlatform} options={PLATFORMS} label="Platform" />
+          <Select value={channel} onChange={setChannel} options={CHANNELS} label="Source" />
           <a
             href={`/api/admin/statistics/users?${csvQuery.toString()}`}
             className="flex h-9 shrink-0 items-center gap-1.5 rounded-md border border-border px-3 text-xs font-bold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
@@ -146,7 +163,7 @@ export function UsersExplorer({ range }: { range: { start: string; end: string }
         </div>
         <p className="mt-2 text-[11px] font-medium text-muted-foreground">
           Per-user activity for {range.start} → {range.end}. Counts cover the selected range;
-          balance, streak, and friend count are current values.
+          balance, streak, and friend count are current values. Click a row to open that person&apos;s journey.
         </p>
       </div>
 
@@ -204,7 +221,8 @@ export function UsersExplorer({ range }: { range: { start: string; end: string }
                 data.rows.map((row) => (
                   <tr
                     key={String(row.user_id)}
-                    className="border-b border-border/50 last:border-0 hover:bg-muted/30"
+                    onClick={onOpenUser ? () => onOpenUser(String(row.user_id)) : undefined}
+                    className={`border-b border-border/50 last:border-0 hover:bg-muted/30 ${onOpenUser ? 'cursor-pointer' : ''}`}
                   >
                     {columns.map((column, index) => (
                       <td

@@ -15,6 +15,7 @@ export type MetricDirection = 'up' | 'down' | 'flat';
 export type MetricBand = { min?: number; max?: number };
 
 export type SystemId =
+  | 'acquisition'
   | 'growth'
   | 'tasks'
   | 'quests'
@@ -47,10 +48,16 @@ export type SystemDefinition = {
 
 export const SYSTEMS: SystemDefinition[] = [
   {
+    id: 'acquisition',
+    title: 'Acquisition',
+    question: 'Where do new people come from, and which sources bring the ones who stay and pay?',
+    blurb: 'Channel → campaign → ad group → keyword, each with what those users did next and what they cost.',
+  },
+  {
     id: 'growth',
     title: 'Growth',
     question: 'Are new people arriving, and do they come back?',
-    blurb: 'Signups, activation, retention curves, and where people come from.',
+    blurb: 'Signups, activation, retention curves, platforms, and screens.',
   },
   {
     id: 'tasks',
@@ -109,6 +116,80 @@ function metric(definition: MetricDefinition): MetricDefinition {
 }
 
 export const METRICS: MetricDefinition[] = [
+  metric({
+    key: 'attributed_share',
+    label: 'Source known',
+    system: 'acquisition',
+    unit: 'percent',
+    format: 'percent',
+    definition: 'Share of new accounts whose source is known: an ad network, an invite, a tagged link, a referring site, or a confirmed organic store install. Direct web visits, native installs still waiting for an ad match, and unprocessed accounts count as unknown.',
+    why: 'Every other acquisition number is only as good as this one. Below the band, the campaign tables are describing a minority of signups.',
+    direction: 'up',
+    band: { min: 70 },
+    benchmark: '70%+ — most of the rest should be genuinely direct traffic',
+  }),
+  metric({
+    key: 'paid_accounts',
+    label: 'Accounts from ads',
+    system: 'acquisition',
+    unit: 'users',
+    format: 'integer',
+    definition: 'New accounts in the range attributed to a paid channel (Apple Ads, Meta, TikTok, Google, or another paid UTM).',
+    why: 'The volume your ad spend is buying, measured at account creation rather than install.',
+    direction: 'up',
+  }),
+  metric({
+    key: 'ad_spend',
+    label: 'Ad spend',
+    system: 'acquisition',
+    unit: 'usd',
+    format: 'money',
+    definition: 'Spend imported from ad-network reports for days inside the range. Reports without a day column are spread evenly across the days they cover.',
+    why: 'The cost side of every efficiency metric. Zero here means no report has been imported for this range.',
+    direction: 'flat',
+  }),
+  metric({
+    key: 'cost_per_account',
+    label: 'Cost per account',
+    system: 'acquisition',
+    unit: 'usd',
+    format: 'money',
+    definition: 'Ad spend divided by accounts attributed to those same ad channels.',
+    why: 'Stricter than the network CPA: installs that never finish onboarding are not counted as acquired.',
+    direction: 'down',
+  }),
+  metric({
+    key: 'cost_per_activated',
+    label: 'Cost per activated user',
+    system: 'acquisition',
+    unit: 'usd',
+    format: 'money',
+    definition: 'Ad spend divided by ad-attributed accounts that completed at least one task.',
+    why: 'The cost of a user who actually used the app. Optimise campaigns on this, not on installs.',
+    direction: 'down',
+  }),
+  metric({
+    key: 'install_to_account',
+    label: 'Install → account',
+    system: 'acquisition',
+    unit: 'percent',
+    format: 'percent',
+    definition: 'Ad-attributed accounts divided by installs reported by the ad networks for the same channels and days.',
+    why: 'Accounts are only created at the end of onboarding, so the gap is people who installed and quit before finishing it — or installs that have not been matched to an account yet.',
+    direction: 'up',
+    band: { min: 60 },
+    benchmark: '60%+ with a deferred-account onboarding',
+  }),
+  metric({
+    key: 'paid_roas',
+    label: 'Return on ad spend',
+    system: 'acquisition',
+    unit: 'ratio',
+    format: 'decimal',
+    definition: 'Production revenue from ad-attributed accounts created in the range (all of it, to date) divided by ad spend in the range.',
+    why: 'Above 1.0 the ads have paid for themselves so far. Young cohorts read low because subscriptions keep paying after the range ends.',
+    direction: 'up',
+  }),
   metric({
     key: 'new_users',
     label: 'New accounts',
@@ -883,6 +964,58 @@ export type Signal = {
   value?: number | null;
 };
 
+export type AcquisitionMetrics = {
+  accounts: number;
+  onboarded: number;
+  activated: number;
+  d1Retained: number;
+  d1Eligible: number;
+  d7Retained: number;
+  d7Eligible: number;
+  tasksFirstWeek: number;
+  trials: number;
+  paid: number;
+  revenue: number;
+  spend: number;
+  installs: number;
+  taps: number;
+  impressions: number;
+  spendEstimated: boolean;
+};
+
+export type AcquisitionNode = {
+  path: string[];
+  labels: string[];
+  paid: boolean;
+  metrics: AcquisitionMetrics;
+};
+
+export type AcquisitionReport = {
+  coverage: {
+    accounts: number;
+    known: number;
+    direct: number;
+    awaiting: number;
+    unprocessed: number;
+    revenueCatConfigured: boolean;
+    spendImports: number;
+    spendInRange: number;
+    spendDepth: Record<string, number>;
+  };
+  levelNames: Record<string, string[]>;
+  channelLabels: Record<string, string>;
+  nodes: AcquisitionNode[];
+  funnel: Array<{ key: string; label: string; users: number; of: number; hint: string }>;
+};
+
+export type SummaryTone = 'good' | 'watch' | 'bad' | 'neutral';
+
+export type SummaryLine = {
+  tone: SummaryTone;
+  text: string;
+  view?: string;
+};
+
 export type StatisticsSnapshot = {
   meta: {
     generatedAt: string;
@@ -896,8 +1029,10 @@ export type StatisticsSnapshot = {
       eventsInRange: number;
     };
   };
+  summary: SummaryLine[];
   headline: StatKpi[];
   signals: Signal[];
+  acquisition: AcquisitionReport;
   sections: StatSection[];
   glossary: MetricDefinition[];
 };

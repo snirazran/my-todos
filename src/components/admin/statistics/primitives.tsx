@@ -146,7 +146,7 @@ export function KpiCard({
   return (
     <div className="flex flex-col rounded-lg border border-border bg-card p-4">
       <div className="flex items-start justify-between gap-2">
-        <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+        <p className="text-[12px] font-semibold text-muted-foreground">
           {definition?.label ?? entry.metric}
         </p>
         <button
@@ -161,18 +161,18 @@ export function KpiCard({
       </div>
 
       <div className="mt-2 flex items-baseline gap-2">
-        <span className="text-2xl font-black tabular-nums tracking-tight">
+        <span className="text-2xl font-bold tabular-nums tracking-tight">
           {formatMetric(entry.value, definition)}
         </span>
         <Delta value={entry.value} previous={entry.previous} direction={definition?.direction} />
       </div>
 
       {entry.detail ? (
-        <p className="mt-1 text-[11px] font-medium text-muted-foreground">{entry.detail}</p>
+        <p className="mt-1 text-[12px] text-muted-foreground">{entry.detail}</p>
       ) : null}
 
       {provisional ? (
-        <p className="mt-1 text-[11px] font-semibold text-amber-600 dark:text-amber-400">
+        <p className="mt-1 text-[12px] font-semibold text-amber-600 dark:text-amber-400">
           Only {entry.sample} observation{entry.sample === 1 ? '' : 's'} — too few to judge yet.
         </p>
       ) : null}
@@ -186,7 +186,7 @@ export function KpiCard({
       {banded && !provisional ? (
         <div className="mt-3 flex items-center gap-1.5">
           <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${styles.dot}`} />
-          <span className="text-[11px] font-semibold text-muted-foreground">
+          <span className="text-[12px] text-muted-foreground">
             {definition?.benchmark ??
               (definition?.band?.min !== undefined && definition?.band?.max !== undefined
                 ? `Target ${definition.band.min} – ${definition.band.max}`
@@ -199,11 +199,11 @@ export function KpiCard({
 
       {open && definition ? (
         <div className="mt-3 space-y-1.5 border-t border-border pt-3">
-          <p className="text-[11px] leading-relaxed text-muted-foreground">
+          <p className="text-[12px] leading-relaxed text-muted-foreground">
             <span className="font-bold text-foreground">How it is measured. </span>
             {definition.definition}
           </p>
-          <p className="text-[11px] leading-relaxed text-muted-foreground">
+          <p className="text-[12px] leading-relaxed text-muted-foreground">
             <span className="font-bold text-foreground">Why it matters. </span>
             {definition.why}
           </p>
@@ -357,8 +357,8 @@ export function DataTable({
     return (
       <section className="rounded-lg border border-border bg-card">
         <header className="border-b border-border px-4 py-3">
-          <h3 className="text-sm font-black tracking-tight">{table.title}</h3>
-          <p className="mt-0.5 text-[11px] font-medium text-muted-foreground">{table.question}</p>
+          <h3 className="text-sm font-bold">{table.title}</h3>
+          <p className="mt-0.5 text-[13px] text-muted-foreground">{table.question}</p>
         </header>
         <p className="px-4 py-6 text-center text-xs font-semibold text-muted-foreground">
           No data in this range yet.
@@ -371,8 +371,8 @@ export function DataTable({
     <section className="rounded-lg border border-border bg-card">
       <header className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
         <div className="min-w-0">
-          <h3 className="text-sm font-black tracking-tight">{table.title}</h3>
-          <p className="mt-0.5 text-[11px] font-medium text-muted-foreground">{table.question}</p>
+          <h3 className="text-sm font-bold">{table.title}</h3>
+          <p className="mt-0.5 text-[13px] text-muted-foreground">{table.question}</p>
         </div>
         {exportHref ? (
           <a
@@ -387,14 +387,14 @@ export function DataTable({
       </header>
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[520px] text-xs">
+        <table className="w-full min-w-[520px] text-[13px]">
           <thead>
             <tr className="border-b border-border">
               {table.columns.map((column) => (
                 <th
                   key={column.key}
                   scope="col"
-                  className={`px-3 py-2 font-bold text-muted-foreground ${align(column)}`}
+                  className={`px-3 py-2 text-[12px] font-semibold text-muted-foreground ${align(column)}`}
                   title={column.hint}
                 >
                   <button
@@ -456,7 +456,7 @@ export function DataTable({
       ) : null}
 
       {table.note ? (
-        <p className="border-t border-border px-4 py-2 text-[11px] leading-relaxed text-muted-foreground">
+        <p className="border-t border-border px-4 py-2 text-[12px] leading-relaxed text-muted-foreground">
           {table.note}
         </p>
       ) : null}
@@ -499,14 +499,110 @@ export function Panel({
     <section className="rounded-lg border border-border bg-card">
       <header className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
         <div className="min-w-0">
-          <h3 className="text-sm font-black tracking-tight">{title}</h3>
+          <h3 className="text-sm font-bold">{title}</h3>
           {subtitle ? (
-            <p className="mt-0.5 text-[11px] font-medium text-muted-foreground">{subtitle}</p>
+            <p className="mt-0.5 text-[13px] text-muted-foreground">{subtitle}</p>
           ) : null}
         </div>
         {action}
       </header>
       <div className="p-4">{children}</div>
     </section>
+  );
+}
+
+export const TONE_DOT: Record<'good' | 'watch' | 'bad' | 'neutral', string> = {
+  good: 'bg-emerald-500',
+  watch: 'bg-amber-500',
+  bad: 'bg-red-500',
+  neutral: 'bg-muted-foreground/40',
+};
+
+export function percentOf(users: number, of: number) {
+  if (!of) return null;
+  return Math.round((users / of) * 1000) / 10;
+}
+
+export function FunnelBars({
+  steps,
+}: {
+  steps: Array<{ key: string; label: string; users: number; of: number; hint?: string }>;
+}) {
+  const top = Math.max(1, steps[0]?.users ?? 1);
+  return (
+    <ol className="space-y-2.5">
+      {steps.map((step) => {
+        const share = percentOf(step.users, step.of);
+        const width = Math.max(step.users ? 2 : 0, Math.round((step.users / top) * 100));
+        return (
+          <li key={step.key}>
+            <div className="flex items-baseline justify-between gap-3 text-[13px]">
+              <span className="font-semibold" title={step.hint}>
+                {step.label}
+              </span>
+              <span className="shrink-0 tabular-nums text-muted-foreground">
+                <span className="font-bold text-foreground">{integer.format(step.users)}</span>
+                {step.key !== 'accounts' ? (
+                  <>
+                    {' '}
+                    of {integer.format(step.of)}
+                    {share !== null ? <span className="ml-1.5 font-bold text-foreground">{decimal.format(share)}%</span> : null}
+                  </>
+                ) : null}
+              </span>
+            </div>
+            <div className="mt-1 h-2 overflow-hidden rounded-full bg-muted">
+              <div className="h-full rounded-full bg-emerald-500" style={{ width: `${width}%` }} />
+            </div>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+export function BarList({
+  rows,
+  onSelect,
+}: {
+  rows: Array<{ key: string; label: string; value: number; detail?: string }>;
+  onSelect?: (key: string) => void;
+}) {
+  const max = Math.max(1, ...rows.map((row) => row.value));
+  return (
+    <ul className="space-y-1.5">
+      {rows.map((row) => {
+        const content = (
+          <>
+            <div
+              className="absolute inset-y-0 left-0 rounded-md bg-emerald-500/15"
+              style={{ width: `${Math.max(2, (row.value / max) * 100)}%` }}
+            />
+            <span className="relative truncate font-semibold">{row.label}</span>
+            <span className="relative shrink-0 tabular-nums text-muted-foreground">
+              {row.detail ? <span className="mr-2">{row.detail}</span> : null}
+              <span className="font-bold text-foreground">{integer.format(row.value)}</span>
+            </span>
+          </>
+        );
+        return (
+          <li key={row.key}>
+            {onSelect ? (
+              <button
+                type="button"
+                onClick={() => onSelect(row.key)}
+                className="relative flex w-full items-center justify-between gap-3 rounded-md px-2.5 py-1.5 text-left text-[13px] transition-colors hover:bg-muted/60"
+              >
+                {content}
+              </button>
+            ) : (
+              <div className="relative flex items-center justify-between gap-3 rounded-md px-2.5 py-1.5 text-[13px]">
+                {content}
+              </div>
+            )}
+          </li>
+        );
+      })}
+    </ul>
   );
 }

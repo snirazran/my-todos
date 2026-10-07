@@ -1,3 +1,4 @@
+import type { UserAcquisition } from '@/lib/attribution/classify';
 import type { WardrobeSlot } from '@/lib/skins/catalog';
 import type {
   RotationInterval,
@@ -155,6 +156,7 @@ export type UserDoc = {
   suggestionSnoozes?: { userId: string; until: Date }[];
   createdAt: Date;
   adIdentity?: AdIdentity;
+  acquisition?: UserAcquisition;
   wardrobe?: UserWardrobe;
   skins?: UserSkins;
   statistics?: UserStatistics;

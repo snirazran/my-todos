@@ -4,6 +4,7 @@ import type { AnalyticsEventName } from '@/lib/analytics/events';
 import { trackAdPixels } from '@/lib/adpixels/client';
 import { readTtclid } from '@/lib/adpixels/clickIds';
 import { readAdConsent } from '@/lib/adpixels/consent';
+import { readFirstTouch } from '@/lib/attribution/touch';
 
 export function trackAnalyticsEvent(
   name: AnalyticsEventName,
@@ -44,6 +45,7 @@ export function trackAnalyticsEvent(
       anonymousId,
       ttclid: readTtclid(),
       adConsent: readAdConsent(),
+      touch: name === 'app_opened' || name === 'page_viewed' ? readFirstTouch() : undefined,
     }),
   }).catch(() => {});
 }

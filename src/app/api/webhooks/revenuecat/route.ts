@@ -8,6 +8,7 @@ import FlyPurchaseModel from '@/lib/models/FlyPurchase';
 import { getFlyPackForProduct } from '@/lib/flyPacks';
 import StoreProductModel from '@/lib/models/StoreProduct';
 import { sendAdConversion } from '@/lib/adpixels/server';
+import { applyRevenueCatAttributes } from '@/lib/attribution/server';
 
 function revenueCatEventName(event: any): AnalyticsEventName | null {
   if (Number(event?.price) < 0) return 'subscription_refunded';
@@ -219,6 +220,9 @@ export async function POST(req: NextRequest) {
         });
       }
     }
+    await applyRevenueCatAttributes(userId, event?.subscriber_attributes).catch((error) => {
+      console.error('RevenueCat attribution apply failed:', error);
+    });
     await reportAdConversion(userId, event, flyPack?.id).catch((error) => {
       console.error('Ad conversion report failed:', error);
     });

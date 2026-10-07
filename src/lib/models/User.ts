@@ -39,6 +39,10 @@ const UserSchema = new Schema<UserDoc>(
       type: Schema.Types.Mixed,
       default: undefined,
     },
+    acquisition: {
+      type: Schema.Types.Mixed,
+      default: undefined,
+    },
     wardrobe: {
       type: Schema.Types.Mixed,
       default: () => ({

@@ -1,6 +1,17 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
+const ATTRIBUTION_PARAMS = [
+  'utm_source',
+  'utm_medium',
+  'utm_campaign',
+  'utm_content',
+  'utm_term',
+  'fbclid',
+  'ttclid',
+  'gclid',
+];
+
 export async function middleware(req: NextRequest) {
   const token = req.cookies.get('token')?.value;
   const isAuth = !!token;
@@ -35,6 +46,10 @@ export async function middleware(req: NextRequest) {
     const friend = req.nextUrl.searchParams.get('friend');
     if (ref) welcomeUrl.searchParams.set('ref', ref);
     if (friend) welcomeUrl.searchParams.set('friend', friend);
+    for (const key of ATTRIBUTION_PARAMS) {
+      const value = req.nextUrl.searchParams.get(key);
+      if (value) welcomeUrl.searchParams.set(key, value);
+    }
     return NextResponse.redirect(welcomeUrl);
   }
 

@@ -12,20 +12,23 @@ import { buildSocial } from './social';
 import { buildEconomy } from './economy';
 import { buildMoney } from './money';
 import { buildTracking } from './tracking';
+import { buildAcquisition } from './acquisition';
+import { buildSummary } from '@/lib/analytics/narrative';
 
 const HEADLINE_METRICS = [
-  'active_users',
-  'stickiness',
-  'retention_d7',
+  'new_users',
   'activation_rate',
-  'tasks_completed',
+  'retention_d1',
+  'retention_d7',
+  'stickiness',
   'gross_revenue',
 ];
 
 async function buildSections(range: DateRange): Promise<StatSection[]> {
   const context = await buildContext(range);
-  const [growth, tasks, quests, frog, wardrobe, social, economy, money, tracking] =
+  const [acquisition, growth, tasks, quests, frog, wardrobe, social, economy, money, tracking] =
     await Promise.all([
+      buildAcquisition(context),
       buildGrowth(context),
       buildTasks(context),
       buildQuests(context),
@@ -36,7 +39,7 @@ async function buildSections(range: DateRange): Promise<StatSection[]> {
       buildMoney(context),
       buildTracking(context),
     ]);
-  return [growth, tasks, quests, frog, wardrobe, social, economy, money, tracking];
+  return [acquisition.section, growth, tasks, quests, frog, wardrobe, social, economy, money, tracking];
 }
 
 export async function buildSnapshot(params: {
@@ -50,8 +53,9 @@ export async function buildSnapshot(params: {
   const range = resolveRange(params);
   const context = await buildContext(range);
 
-  const [growth, tasks, quests, frog, wardrobe, social, economy, money, tracking] =
+  const [acquisition, growth, tasks, quests, frog, wardrobe, social, economy, money, tracking] =
     await Promise.all([
+      buildAcquisition(context),
       buildGrowth(context),
       buildTasks(context),
       buildQuests(context),
@@ -63,7 +67,18 @@ export async function buildSnapshot(params: {
       buildTracking(context),
     ]);
 
-  const sections = [growth, tasks, quests, frog, wardrobe, social, economy, money, tracking];
+  const sections = [
+    acquisition.section,
+    growth,
+    tasks,
+    quests,
+    frog,
+    wardrobe,
+    social,
+    economy,
+    money,
+    tracking,
+  ];
 
   let compareRange: DateRange | null = null;
   if (params.compare) {
@@ -93,6 +108,8 @@ export async function buildSnapshot(params: {
     .filter((definition): definition is NonNullable<typeof definition> => !!definition)
     .sort((a, b) => a.system.localeCompare(b.system) || a.label.localeCompare(b.label));
 
+  const signals = buildSignals(sections);
+
   return {
     meta: {
       generatedAt: new Date().toISOString(),
@@ -112,8 +129,15 @@ export async function buildSnapshot(params: {
         eventsInRange: context.eventsInRange,
       },
     },
+    summary: buildSummary({
+      sections,
+      acquisition: acquisition.report,
+      signals,
+      days: range.days,
+    }),
     headline,
-    signals: buildSignals(sections),
+    signals,
+    acquisition: acquisition.report,
     sections,
     glossary,
   };

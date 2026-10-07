@@ -119,6 +119,18 @@ export function snapshotToTidyCsv(snapshot: StatisticsSnapshot) {
   return toCsv(rows);
 }
 
+function markdownCell(value: string | number | null | undefined) {
+  if (value === null || value === undefined) return '';
+  return String(value).replace(/\|/g, '/').replace(/\n/g, ' ');
+}
+
+const TABLE_ROW_LIMITS: Record<string, number> = {
+  'acquisition.people': 300,
+  'acquisition.keywords': 100,
+  'acquisition.ad_groups': 60,
+  'acquisition.campaigns': 60,
+};
+
 function markdownTable(table: StatTable, limit: number) {
   const header = `| ${table.columns.map((column) => column.label).join(' | ')} |`;
   const divider = `| ${table.columns.map(() => '---').join(' | ')} |`;
@@ -126,11 +138,18 @@ function markdownTable(table: StatTable, limit: number) {
     .slice(0, limit)
     .map(
       (row) =>
-        `| ${table.columns.map((column) => (row[column.key] ?? '')).join(' | ')} |`,
+        `| ${table.columns.map((column) => markdownCell(row[column.key])).join(' | ')} |`,
     );
   const truncated =
     table.rows.length > limit ? `\n_${table.rows.length - limit} more rows not shown._` : '';
   return [header, divider, ...body].join('\n') + truncated;
+}
+
+function bandLabel(band: { min?: number; max?: number } | undefined) {
+  if (band?.min !== undefined && band?.max !== undefined) return `${band.min} – ${band.max}`;
+  if (band?.min !== undefined) return `≥ ${band.min}`;
+  if (band?.max !== undefined) return `≤ ${band.max}`;
+  return '—';
 }
 
 export function snapshotToBrief(
@@ -163,23 +182,35 @@ export function snapshotToBrief(
   );
   lines.push('');
 
-  lines.push('## Metric definitions');
+  lines.push(
+    'Acquisition is measured per account, not per install. Each account carries one first-touch source: an ad (Apple Ads campaign, ad group and keyword come from RevenueCat\'s Apple Ads integration; web ads from UTM tags and click ids), a friend invite, a tagged link, a referring site, or an organic store install. Accounts are created at the END of onboarding, so installs that quit during onboarding never become accounts — compare "Installs" (reported by the ad network) with "Accounts" to see that gap. Cost columns come from ad-network reports imported by hand; a blank cost means no report covers that level or those dates.',
+  );
   lines.push('');
-  lines.push('| Key | Metric | Area | Unit | Good direction | Healthy band | Definition |');
-  lines.push('| --- | --- | --- | --- | --- | --- | --- |');
-  for (const definition of snapshot.glossary) {
-    const band =
-      definition.band?.min !== undefined && definition.band?.max !== undefined
-        ? `${definition.band.min} – ${definition.band.max}`
-        : definition.band?.min !== undefined
-          ? `≥ ${definition.band.min}`
-          : definition.band?.max !== undefined
-            ? `≤ ${definition.band.max}`
-            : '—';
-    lines.push(
-      `| ${definition.key} | ${definition.label} | ${definition.system} | ${definition.unit} | ${definition.direction} | ${band} | ${definition.definition} |`,
-    );
+
+  lines.push('## Summary in plain words');
+  lines.push('');
+  for (const line of snapshot.summary) {
+    const tag = line.tone === 'bad' ? '[PROBLEM] ' : line.tone === 'watch' ? '[WATCH] ' : line.tone === 'good' ? '[OK] ' : '';
+    lines.push(`- ${tag}${line.text}`);
   }
+  lines.push('');
+
+  const coverage = snapshot.acquisition.coverage;
+  lines.push('## Data caveats');
+  lines.push('');
+  lines.push(
+    `- New accounts in range: ${coverage.accounts}. Source known for ${coverage.known}; ${coverage.direct} direct/unknown web; ${coverage.awaiting} native installs still awaiting an ad match; ${coverage.unprocessed} not processed yet.`,
+  );
+  lines.push(
+    `- Apple Ads keyword-level attribution via RevenueCat: ${coverage.revenueCatConfigured ? 'connected' : 'NOT configured on the server'}.`,
+  );
+  const depthNames = ['', 'campaign', 'ad group', 'keyword'];
+  const depths = Object.entries(coverage.spendDepth);
+  lines.push(
+    depths.length
+      ? `- Ad spend imported for this range: $${coverage.spendInRange} (${depths.map(([channel, depth]) => `${snapshot.acquisition.channelLabels[channel] ?? channel} at ${depthNames[depth]} level`).join(', ')}).`
+      : '- No ad spend imported for this range, so cost metrics are blank.',
+  );
   lines.push('');
 
   lines.push('## Headline');
@@ -229,12 +260,22 @@ export function snapshotToBrief(
       lines.push(`### ${table.title}`);
       lines.push(`_${table.question}_`);
       lines.push('');
-      lines.push(markdownTable(table, rowLimit));
+      lines.push(markdownTable(table, Math.max(rowLimit, TABLE_ROW_LIMITS[table.key] ?? 0)));
       if (table.note) lines.push(`\n_${table.note}_`);
       lines.push('');
     }
   }
 
+  lines.push('## Appendix: metric definitions');
+  lines.push('');
+  lines.push('| Key | Metric | Area | Unit | Good direction | Healthy band | Definition |');
+  lines.push('| --- | --- | --- | --- | --- | --- | --- |');
+  for (const definition of snapshot.glossary) {
+    lines.push(
+      `| ${definition.key} | ${definition.label} | ${definition.system} | ${definition.unit} | ${definition.direction} | ${bandLabel(definition.band)} | ${markdownCell(definition.definition)} |`,
+    );
+  }
+  lines.push('');
   return lines.join('\n');
 }
 

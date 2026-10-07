@@ -32,7 +32,7 @@ export async function buildGrowth(context: ReportContext): Promise<StatSection> 
     .lean<CohortUser[]>();
   const cohortIds = cohortUsers.map((user) => String(user._id));
 
-  const [activeDayRows, milestoneRows, sourceRows, referrerRows, platformRows, pageRows] =
+  const [activeDayRows, milestoneRows, platformRows, pageRows] =
     await Promise.all([
       cohortIds.length
         ? AnalyticsEventModel.aggregate<{ _id: string; days: string[] }>([
@@ -76,40 +76,6 @@ export async function buildGrowth(context: ReportContext): Promise<StatSection> 
             { $group: { _id: '$name', users: { $addToSet: '$userId' } } },
           ])
         : Promise.resolve([]),
-      AnalyticsEventModel.aggregate<{ _id: string; users: string[]; count: number }>([
-        { $match: { occurredAt: context.window, name: 'app_opened' } },
-        {
-          $group: {
-            _id: {
-              $let: {
-                vars: { source: { $ifNull: ['$properties.utm_source', ''] } },
-                in: { $cond: [{ $eq: ['$$source', ''] }, 'direct', '$$source'] },
-              },
-            },
-            users: { $addToSet: '$userId' },
-            count: { $sum: 1 },
-          },
-        },
-        { $sort: { count: -1 } },
-        { $limit: 15 },
-      ]),
-      AnalyticsEventModel.aggregate<{ _id: string; users: string[]; count: number }>([
-        { $match: { occurredAt: context.window, name: 'app_opened' } },
-        {
-          $group: {
-            _id: {
-              $let: {
-                vars: { host: { $ifNull: ['$properties.referrer_host', ''] } },
-                in: { $cond: [{ $eq: ['$$host', ''] }, 'none', '$$host'] },
-              },
-            },
-            users: { $addToSet: '$userId' },
-            count: { $sum: 1 },
-          },
-        },
-        { $sort: { count: -1 } },
-        { $limit: 12 },
-      ]),
       AnalyticsEventModel.aggregate<{ _id: string; users: string[]; count: number }>([
         { $match: { occurredAt: context.window } },
         { $group: { _id: '$platform', users: { $addToSet: '$userId' }, count: { $sum: 1 } } },
@@ -225,7 +191,7 @@ export async function buildGrowth(context: ReportContext): Promise<StatSection> 
     id: 'growth',
     title: 'Growth',
     question: 'Are new people arriving, and do they come back?',
-    blurb: 'Signups, activation, retention curves, and where people come from.',
+    blurb: 'Signups, activation, retention curves, platforms, and screens.',
     kpis: [
       kpi('new_users', context.newUsers, {
         sparkline: context.dates.map((date) => context.dailyNewUsers.get(date) ?? 0),
@@ -276,36 +242,6 @@ export async function buildGrowth(context: ReportContext): Promise<StatSection> 
     tables: [
       activationTable,
       retentionTable,
-      {
-        key: 'growth.sources',
-        title: 'Acquisition sources',
-        question: 'Which campaigns and links are actually bringing people in?',
-        columns: [
-          { key: 'source', label: 'utm_source' },
-          { key: 'users', label: 'Users', format: 'integer' },
-          { key: 'sessions', label: 'Sessions', format: 'integer' },
-        ],
-        rows: sourceRows.map((row) => ({
-          source: row._id,
-          users: row.users.length,
-          sessions: row.count,
-        })),
-      },
-      {
-        key: 'growth.referrers',
-        title: 'Referring sites',
-        question: 'Where on the web are opens coming from?',
-        columns: [
-          { key: 'host', label: 'Referrer' },
-          { key: 'users', label: 'Users', format: 'integer' },
-          { key: 'opens', label: 'Opens', format: 'integer' },
-        ],
-        rows: referrerRows.map((row) => ({
-          host: row._id,
-          users: row.users.length,
-          opens: row.count,
-        })),
-      },
       {
         key: 'growth.platforms',
         title: 'Platforms',
