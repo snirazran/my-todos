@@ -306,6 +306,7 @@ async function handleWatchAdDouble(entry: QuestRewardRevealEntry) {
               : (e.flyBalanceAfter ?? 0) + e.fliesGranted;
           next.baseFlies = e.fliesGranted;
           next.fliesGranted = e.fliesGranted * 2;
+          next.item = createFlyRewardItem(next.fliesGranted);
           next.flyBalanceAfter = balanceAfter;
           knownFlyBalance = balanceAfter;
         }

@@ -121,12 +121,12 @@ export function buildSignals(sections: StatSection[]): Signal[] {
         level: 'bad',
         system: 'tracking',
         title: `${silent.length} event${silent.length === 1 ? '' : 's'} stopped reporting`,
-        detail: `These fired before and wrote nothing in this range: ${silent
+        detail: `At their usual share of traffic these should have fired at least 5 times in this range, and fired zero: ${silent
           .slice(0, 8)
           .map((row) => `${row.event} (${row.emitted_from})`)
           .join(', ')}${silent.length > 8 ? '…' : ''}.`,
         action:
-          'Usually a regression in a recent deploy. The "Emitted from" column names the file to check. A low-traffic event can also go quiet simply because nobody did it — compare the all-time count first.',
+          'Usually a regression in a recent deploy. The "Emitted from" column names the file to check, and "Expected in range" shows how unusual the silence is.',
       });
     }
     if (unwired.length) {

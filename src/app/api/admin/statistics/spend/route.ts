@@ -57,6 +57,8 @@ export async function POST(req: NextRequest) {
         preview: {
           level: parsed.level,
           hasDate: parsed.hasDate,
+          meta: parsed.meta,
+          campaigns: parsed.campaigns,
           dateRange: parsed.dateRange,
           columns: parsed.columns,
           warnings: parsed.warnings,

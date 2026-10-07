@@ -12,7 +12,9 @@ type LifetimeRow = { _id: string; total: number; firstAt: Date; lastAt: Date };
  * not happened yet, which is normal right after launch and must not read as a
  * fault. `silent` is the one that usually means a regression — it used to fire.
  */
-export type TrackingStatus = 'healthy' | 'silent' | 'waiting' | 'unwired';
+export type TrackingStatus = 'healthy' | 'silent' | 'rare' | 'waiting' | 'unwired';
+
+const SILENT_EXPECTATION = 5;
 
 export type TrackingRow = {
   event: string;
@@ -20,6 +22,7 @@ export type TrackingRow = {
   events: number;
   users: number;
   lifetime: number;
+  expected: number | null;
   last_seen: string | null;
   status: TrackingStatus;
   emitted_from: string;
@@ -38,23 +41,26 @@ export async function buildTracking(context: ReportContext): Promise<StatSection
   ]);
   const lifetime = new Map(lifetimeRows.map((row) => [row._id, row]));
 
+  const lifetimeEvents = lifetimeRows.reduce((sum, row) => sum + row.total, 0);
   const rows: TrackingRow[] = ANALYTICS_EVENTS.map((event) => {
     const inRange = context.metric(event);
     const allTime = lifetime.get(event);
     const wired = WIRED_EVENTS.has(event);
-    const status: TrackingStatus = !wired
-      ? 'unwired'
-      : inRange.events > 0
-        ? 'healthy'
-        : allTime && allTime.total > 0
-          ? 'silent'
-          : 'waiting';
+    const expected =
+      allTime && lifetimeEvents ? (allTime.total / lifetimeEvents) * context.eventsInRange : null;
+    let status: TrackingStatus = 'waiting';
+    if (!wired) status = 'unwired';
+    else if (inRange.events > 0) status = 'healthy';
+    else if (allTime && allTime.total > 0) {
+      status = (expected ?? 0) >= SILENT_EXPECTATION ? 'silent' : 'rare';
+    }
     return {
       event,
       category: analyticsCategory(event),
       events: inRange.events,
       users: inRange.users,
       lifetime: allTime?.total ?? 0,
+      expected: expected === null ? null : Math.round(expected * 10) / 10,
       last_seen: allTime?.lastAt ? new Date(allTime.lastAt).toISOString().slice(0, 10) : null,
       status,
       emitted_from: EVENT_EMIT_SITES[event] ?? '—',
@@ -65,6 +71,7 @@ export async function buildTracking(context: ReportContext): Promise<StatSection
   const silent = rows.filter((row) => row.status === 'silent').length;
   const unwired = rows.filter((row) => row.status === 'unwired').length;
   const waiting = rows.filter((row) => row.status === 'waiting').length;
+  const rare = rows.filter((row) => row.status === 'rare').length;
 
   const byCategory = new Map<string, TrackingRow[]>();
   for (const row of rows) {
@@ -82,7 +89,7 @@ export async function buildTracking(context: ReportContext): Promise<StatSection
       kpi('events_recorded', context.eventsInRange),
       kpi('events_live', live, { detail: `of ${rows.length} declared event types` }),
       kpi('events_silent', silent, {
-        detail: `${waiting} wired but not seen yet · ${unwired} with no emit site`,
+        detail: `${rare} rare events quiet as expected · ${waiting} wired but not seen yet · ${unwired} with no emit site`,
       }),
     ],
     series: [
@@ -130,6 +137,7 @@ export async function buildTracking(context: ReportContext): Promise<StatSection
           { key: 'status', label: 'Status' },
           { key: 'events', label: 'In range', format: 'integer' },
           { key: 'users', label: 'Users', format: 'integer' },
+          { key: 'expected', label: 'Expected in range', format: 'decimal', hint: 'This event\'s all-time share of all events × events recorded in the range. Silence only means something when this is 5 or more.' },
           { key: 'lifetime', label: 'All time', format: 'integer' },
           { key: 'last_seen', label: 'Last seen' },
           { key: 'emitted_from', label: 'Emitted from' },
@@ -140,13 +148,14 @@ export async function buildTracking(context: ReportContext): Promise<StatSection
             const order: Record<TrackingStatus, number> = {
               unwired: 0,
               silent: 1,
-              waiting: 2,
-              healthy: 3,
+              rare: 2,
+              waiting: 3,
+              healthy: 4,
             };
             if (order[a.status] !== order[b.status]) return order[a.status] - order[b.status];
             return b.events - a.events;
           }),
-        note: 'unwired = declared but nothing in the codebase writes it (always a defect). silent = it fired before and wrote nothing in this range, which usually means a regression. waiting = wired and simply has not happened yet, which is normal soon after launch.',
+        note: 'unwired = declared but nothing in the codebase writes it (always a defect). silent = at its usual share of traffic it should have fired 5+ times in this range and fired zero — that usually means a regression. rare = fired before but so seldom that a quiet range is normal. waiting = wired and simply has not happened yet.',
       },
     ],
   };

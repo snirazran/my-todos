@@ -25,10 +25,10 @@ export async function importSpend(input: {
 }) {
   const { parsed, channel } = input;
   const spread = !parsed.hasDate;
-  const start = spread ? input.start : parsed.dateRange?.start;
-  const end = spread ? input.end : parsed.dateRange?.end;
+  const start = spread ? input.start ?? parsed.dateRange?.start : parsed.dateRange?.start;
+  const end = spread ? input.end ?? parsed.dateRange?.end : parsed.dateRange?.end;
   if (!start || !end || start > end) {
-    throw new Error('This report has no date column — pick the date range it covers.');
+    throw new Error('This report has no day column and no date range at the top — pick the dates it covers.');
   }
   const days = daysBetween(start, end);
   if (!days.length) throw new Error('The date range is empty.');
@@ -63,12 +63,14 @@ export async function importSpend(input: {
     }
   }
 
-  const replaced = await AdSpendModel.distinct('batchId', {
+  const scope = {
     channel,
     level: parsed.level,
     date: { $gte: start, $lte: end },
-  });
-  await AdSpendModel.deleteMany({ channel, level: parsed.level, date: { $gte: start, $lte: end } });
+    campaignKey: { $in: Array.from(new Set(documents.map((document) => document.campaignKey))) },
+  };
+  const replaced = await AdSpendModel.distinct('batchId', scope);
+  await AdSpendModel.deleteMany(scope);
   await AdSpendModel.insertMany(documents, { ordered: false });
   await AdSpendImportModel.create({
     _id: batchId,

@@ -144,10 +144,10 @@ export function pathFor(acquisition: UserAcquisition | undefined): Segment[] {
   }
 }
 
-function spendPath(row: SpendRow, depth: number): Segment[] {
+function spendPath(row: SpendRow, depth: number, inferredAdGroup?: Segment): Segment[] {
   const segments: Segment[] = [{ key: row.channel, label: channelLabel(row.channel) }];
   if (depth >= 1) segments.push({ key: row.campaignKey, label: row.campaign });
-  if (depth >= 2) segments.push(segment(row.adGroup));
+  if (depth >= 2) segments.push(row.adGroup ? segment(row.adGroup) : inferredAdGroup ?? segment(undefined));
   if (depth >= 3) segments.push(segment(row.keyword, '(no keyword)'));
   return segments;
 }
@@ -489,6 +489,15 @@ export async function buildAcquisition(
     }
   }
 
+  const keywordHomes = new Map<string, Map<string, Segment>>();
+  for (const node of Array.from(nodes.values())) {
+    if (node.path.length !== 4) continue;
+    const key = `${node.path[0]}\u0001${node.path[1]}\u0001${node.path[3]}`;
+    const homes = keywordHomes.get(key) ?? new Map<string, Segment>();
+    homes.set(node.path[2], { key: node.path[2], label: node.labels[2] });
+    keywordHomes.set(key, homes);
+  }
+
   const spendDepth = coverage.spendDepth;
   const byChannel = new Map<string, SpendRow[]>();
   for (const row of spendRows) {
@@ -505,7 +514,10 @@ export async function buildAcquisition(
       if (!source) continue;
       for (const row of rows) {
         if (row.level !== source) continue;
-        const node = nodeFor(spendPath(row, depth), true);
+        const inferred = row.adGroup
+          ? undefined
+          : keywordHomes.get(`${row.channel}\u0001${row.campaignKey}\u0001${row.keywordKey ?? ''}`);
+        const node = nodeFor(spendPath(row, depth, inferred && inferred.size === 1 ? Array.from(inferred.values())[0] : undefined), true);
         node.metrics.spend += row.spend;
         node.metrics.installs += row.installs;
         node.metrics.taps += row.taps;

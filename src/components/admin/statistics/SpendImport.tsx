@@ -8,6 +8,8 @@ import { money } from './primitives';
 type Preview = {
   level: 'campaign' | 'adGroup' | 'keyword';
   hasDate: boolean;
+  meta: { campaign?: string; adGroup?: string; start?: string; end?: string };
+  campaigns: string[];
   dateRange: { start: string; end: string } | null;
   columns: Record<string, string>;
   warnings: string[];
@@ -132,7 +134,7 @@ export function SpendImports({ onChanged, defaultRange }: { onChanged: () => voi
             </tbody>
           </table>
           <p className="border-t border-border px-4 py-2 text-[12px] text-muted-foreground">
-            A new import replaces earlier rows for the same network, level, and dates, so re-importing a longer range is safe.
+            A new import only replaces earlier rows for the same network, level, dates, and campaigns — so per-campaign Ad Group and Keyword files sit side by side, and re-importing a file is safe.
           </p>
         </div>
       )}
@@ -181,7 +183,14 @@ function ImportDialog({
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? 'Import failed');
-      if (dryRun) setPreview(body.preview as Preview);
+      if (dryRun) {
+        const next = body.preview as Preview;
+        setPreview(next);
+        if (!next.hasDate && next.dateRange) {
+          setStart(next.dateRange.start);
+          setEnd(next.dateRange.end);
+        }
+      }
       else onImported();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Import failed');
@@ -269,6 +278,10 @@ function ImportDialog({
                 {LEVEL_TEXT[preview.level]} · {preview.rows} rows · {money.format(preview.totals.spend)} spend ·{' '}
                 {preview.totals.installs} installs · {preview.totals.taps} taps
               </p>
+              <p className="text-[12px]">
+                {preview.campaigns.length === 1 ? 'Campaign' : 'Campaigns'}: {preview.campaigns.join(', ')}
+                {preview.meta.campaign ? ' (read from the top of the file)' : ''}
+              </p>
               <p className="text-[12px] text-muted-foreground">
                 Columns found:{' '}
                 {Object.entries(preview.columns)
@@ -281,7 +294,11 @@ function ImportDialog({
                 </p>
               ) : (
                 <div className="flex flex-wrap items-center gap-2 text-[12px]">
-                  <span className="font-semibold">No day column — which dates does this report cover?</span>
+                  <span className="font-semibold">
+                    {preview.dateRange
+                      ? 'Dates from the top of the report (spend is spread evenly across them):'
+                      : 'No day column — which dates does this report cover?'}
+                  </span>
                   <input type="date" value={start} max={end} onChange={(event) => setStart(event.target.value)} className="h-8 rounded border border-border bg-background px-2" />
                   <span>→</span>
                   <input type="date" value={end} min={start} onChange={(event) => setEnd(event.target.value)} className="h-8 rounded border border-border bg-background px-2" />
